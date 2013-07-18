@@ -1,50 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 18 Jul 2013 14:48:50 +0530
-Subject: [PATCH] ARM: omap2: fix musb usage for n8x0
-In-Reply-To: <51E7B1FF.6000301@denx.de>
-References: <1374000777-5626-1-git-send-email-zonque@gmail.com>
- <51E7B1FF.6000301@denx.de>
-Message-ID: <51E7B2FA.7020206@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Jul 2013 10:17:35 +0100
+Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
+In-Reply-To: <20130718070402.GO7080@book.gsilab.sittig.org>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+ <1373914074-20889-6-git-send-email-gsi@denx.de>
+ <20130715193829.GS14452@pengutronix.de>
+ <20130718070402.GO7080@book.gsilab.sittig.org>
+Message-ID: <20130718091735.GW24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jul 18, 2013 at 09:04:02AM +0200, Gerhard Sittig wrote:
+> The common clock API assumes (it's part of the contract) that
+> there are potentially expensive operations like get, put, prepare
+> and unprepare, as well as swift and non-blocking operations like
+> enable and disable.
 
-On Thursday 18 July 2013 02:44 PM, Stefan Roese wrote:
-> On 07/16/2013 08:52 PM, Daniel Mack wrote:
->> Commit b7e2e75a8c ("usb: gadget: drop unused USB_GADGET_MUSB_HDRC")
->> dropped a config symbol that was unused by the musb core, but it turns
->> out that board support code had references to it.
->>
->> As the core now has a fall-back to host-only mode if support for
->> dual-role is not compiled in, so we can just pass MUSB_OTG as
->> mode from board files.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> Reported-and-tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> 
-> I'm testing musb as OTG on beagleboard (old one, not Beagle-xm). And
-> using the latest kernel.org version with this patch applied I see the
-> following messages while booting (repeatedly):
-> 
-> [    4.998168] usb usb1: bus auto-suspend, wakeup 1
-> [    5.003112] musb_bus_suspend 2457: trying to suspend as b_idle while active
-> [    5.010498] usb usb1: bus suspend fail, err -16
-> [    5.015289] hub 1-0:1.0: hub_resume
-> [    5.019073] hub 1-0:1.0: state 7 ports 1 chg 0000 evt 0000
-> [    5.024963] hub 1-0:1.0: hub_suspend
-> [    5.028778] usb usb1: bus auto-suspend, wakeup 1
-> ...
-> 
-> This is without a cable connected to the OTG port.
-> 
-> Any ideas what might be missing here?
+Let's get something straight here, because what you've said above is
+wrong.
 
-Even I observed these prints when I have dual mode enabled. When kept as gadget
-only mode I dint see these prints.
-However if you connect a cable, you should still see that enumeration should
-succeed.
-Not sure why those prints come though :-s
+1. clk_get() and clk_put() are NOT part of the common clock API.
+   They're separate - they're part of the clk API, and the infrastructure
+   behind that is clkdev, which is a separately owned thing (by me.)
 
-Thanks
-Kishon
+2. The "contract" of the clk API is defined by the clk API, not by some
+   random implementation like the common clock API.  The clk API is
+   maintained by myself, and is described in include/linux/clk.h
+
+3. clk_prepare() and clk_unprepare() are functions MUST only be called
+   from contexts where sleeping is permitted.  These functions MAY sleep
+   for whatever reason they require to, and as long as they require to.
+   (This is the whole reason these two functions were created in the
+   first place.)
+
+4. clk_enable() and clk_disable() MAY be called from any context, but
+   MUST never sleep.  If you need to talk over a non-atomic bus for these,
+   then these functions should be no-ops, and the code which does that
+   must be executed from the clk_prepare()/clk_unprepare() operations.
+
+That is the "clk API" contract.  The CCF has no bearing on this; if it
+disagrees, then the CCF is buggy and is non-conformant.
