@@ -1,111 +1,31 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 18 Jul 2013 18:07:19 +0800
-Subject: [PATCH] [RFC] EHCI: add to memory barrier to updating hw_next
-In-Reply-To: <000101ce8356$65011940$2f034bc0$@lge.com>
-References: <000001ce82aa$feac9ee0$fc05dca0$@lge.com>
- <CACVXFVOu-2q74JmHLEo3mCVSAzfc7n8GmqPDMPhEDp0wL37w_w@mail.gmail.com>
- <000101ce8356$65011940$2f034bc0$@lge.com>
-Message-ID: <CACVXFVNV-hGZpcy2ANQaca1K5yXJ88EOq1PTkJUEHEkFk9Btvw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 18 Jul 2013 11:08:00 +0100
+Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
+In-Reply-To: <20130718080657.GI10380@pengutronix.de>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+ <1373914074-20889-6-git-send-email-gsi@denx.de>
+ <20130715193829.GS14452@pengutronix.de>
+ <20130718070402.GO7080@book.gsilab.sittig.org>
+ <20130718080657.GI10380@pengutronix.de>
+Message-ID: <20130718100800.GF22506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 9:30 AM, Gioh Kim <gioh.kim@lge.com> wrote:
-> Thanks for your reply.
->
->> -----Original Message-----
->> From: Ming Lei [mailto:tom.leiming at gmail.com]
->> Sent: Wednesday, July 17, 2013 5:52 PM
->> To: ???
->> Cc: Alan Stern; linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
->> Mark Salter; namhyung.kim at lge.com; Minchan Kim; Chanho Min; Jong-Sung Kim;
->> linux-arm-kernel
->> Subject: Re: [PATCH] [RFC] EHCI: add to memory barrier to updating hw_next
->>
->> Cc: ARM list
->>
->> On Wed, Jul 17, 2013 at 1:03 PM, ??? <gioh.kim@lge.com> wrote:
->> > Hi,
->> >
->> > I have a missing urb completion problem on ARMv7 based platform.
->> >
->> > I thought the above problem was caused by coherent memory between the
->> > EHCI device and CPU so I tryied to allocates device type memory for
->> > EHCI via dma_declare_coherent_memory at machine initialization step so
->> > that EHCI always allocates from those device type memory.
->> > It seems to solve the issue because I didn't see any problem.
->> >
->> > But I am not sure it is acceptable solution. So I applied the patch
->> > https://lkml.org/lkml/2011/8/31/344.
->> > But it could not solve the problem so that I added another wmb() as my
->> > patch, and now my platform works fine.
->>
->> I remember the previous problem reported on Pandaboard firstly was fixed
->> by Will's commit 11ed0ba1(ARM: 7161/1: errata: no automatic store buffer
->> drain), so could you try to enable PL310_ERRATA_769419 and see if your
->> problem can be fixed?
->
->
-> I also know the errata but it didn't work for my platform.
->
->
->>
->> >
->> > I am not sure what's the exact problem and what wmb I added could
->> > solve but I just think the problem is related to store buffer flush of
->> hw_next.
->>
->> Yes, per the above commit, but it might be one hardware problem.
->>
->> > Anyway, important thing is that it fixed my problem so I expect you
->> > expert guys could find what I am missing and a right solution.
->> > IMHO, the patch might miss updating hw_next pointer.
->> > Am I correct?
->> >
->> > I understand the wmb() is just memory barrier, not write-buffer flush.
->> > But it is true that wmb() can flush write buffer in ARM.
->> > Anyhow I think that memory type, "normal memory, non-cacheable", may
->> > have a problem for some devices that needs device type memory.
->>
->> Currently on ARMv7 DMA coherent buffer has to be bufferable, in theory we
->> might need one API to flush CPU write buffer, as described in
->> Documentation/DMA-API-HOWTO.txt:
->>
->>              Also, on some platforms your driver may need to flush CPU write
->>              buffers in much the same way as it needs to flush write buffers
->>              found in PCI bridges (such as by reading a register's value
->>              after writing it).
->>
->> But actually on hardware without the problem(such as A15), I don't see any
->> effect without flushing store buffer explicitly.
->
->
-> The problem of my platform is occurring when it has very heavy traffic such as
-> HD video streaming service or very many small images display.
+On Thu, Jul 18, 2013 at 10:06:57AM +0200, Sascha Hauer wrote:
 
-Could you describe your test case in a bit detail?  Which USB
-applications/drivers
-may trigger your URB completion miss problem? Under what kind of video
-streaming service(USB video or only kind of heavy load)?
+> I think regmap has the potential to solve a number of issues like the
+> hardcoded readl/writel in the common clock blocks, issues with i2c
+> clocks and your endianess issue. The biggest question probably is how
+> to get there without putting too much of a burden on you. It's probably
+> not an option to convert all users to regmap, so it seems additional
+> functions like clk_register_gate_regmap are better to handle.
 
-> I guess that HC could have a use-after-free problem like following situation.
->
-> 1. A qtd which is not at the queue head should be removed in qh_completions().
-> 2. The last->hw_next become be pointing at the next qtd but the hw_next value is delayed in write-buffer.
-> 3. The qtd is removed in the list.
-> 4. The qtd is freed into DMA pool and re-allocated for another urb.
-> 5. HC try to process last->hw_next and it is pointing re-allocated qtd.
->
-> What do you think about it? Is it possible?
-
-I understand it might not be possible because:  when 'stopped' is set, that
-said the HC might not advance the queue. But I don't understand why
-'last->hw_next' is patched here under 'stopped' situation.
-
-Even the 'stopped' case may be seldom triggered, do you know under
-which condition the stopped is triggered in your problem?(stall, short read
-or others)
-
-
-Thanks,
--- 
-Ming Lei
+That's basically what regulator does.  There's versions of the ops that
+all the drivers can use.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130718/43ffb513/attachment.sig>
