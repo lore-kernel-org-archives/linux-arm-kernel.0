@@ -1,59 +1,77 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 18 Jul 2013 22:34:59 +0400
-Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
+Date: Thu, 18 Jul 2013 22:34:57 +0400
+Subject: [PATCH 06/10] ARM: clps711x: Add CLPS711X clocksource driver
 In-Reply-To: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
 References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+Message-ID: <1374172501-26796-7-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
-Designed primarily for migration CLPS711X subarch for multiplatform & DT.
+This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
+Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+for this as the "OF" and "not-OF" calls implemented.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/cpuidle/Kconfig            |  6 +++
- drivers/cpuidle/Makefile           |  1 +
- drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 87 insertions(+)
- create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
+ arch/arm/Kconfig                      |   2 -
+ drivers/clocksource/Kconfig           |   6 ++
+ drivers/clocksource/Makefile          |   1 +
+ drivers/clocksource/clps711x-clksrc.c | 151 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 158 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clocksource/clps711x-clksrc.c
 
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index 0e2cd5c..c68a0cf 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -36,6 +36,12 @@ config CPU_IDLE_CALXEDA
- 	help
- 	  Select this to enable cpuidle on Calxeda processors.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dfb1e7f..5c60cb7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -370,10 +370,8 @@ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select AUTO_ZRELADDR
+-	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select CPU_ARM720T
+-	select GENERIC_CLOCKEVENTS
+ 	select MFD_SYSCON
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index b7b9b04..bd6dc82 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -41,6 +41,12 @@ config VT8500_TIMER
+ config CADENCE_TTC_TIMER
+ 	bool
  
-+config CPU_IDLE_CLPS711X
-+	bool "CPU Idle Driver for CLPS711X processors"
-+	depends on ARCH_CLPS711X
-+	help
-+	  Select this to enable cpuidle on Cirrus Logic CLPS711X processors.
++config CLKSRC_CLPS711X
++	def_bool y if ARCH_CLPS711X
++	select CLKSRC_MMIO
++	select CLKSRC_OF if OF
++	select GENERIC_CLOCKEVENTS
 +
- config CPU_IDLE_ZYNQ
- 	bool "CPU Idle Driver for Xilinx Zynq processors"
- 	depends on ARCH_ZYNQ
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 8767a7b..d07d2cb 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -6,5 +6,6 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
- obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
- 
- obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
-+obj-$(CONFIG_CPU_IDLE_CLPS711X)	+= cpuidle-clps711x.o
- obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
- obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
-diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
+ config CLKSRC_NOMADIK_MTU
+ 	bool
+ 	depends on (ARCH_NOMADIK || ARCH_U8500)
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 8b00c5c..da6c102 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+ obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+ obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
+ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
++obj-$(CONFIG_CLKSRC_CLPS711X)	+= clps711x-clksrc.o
+ obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
+ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+diff --git a/drivers/clocksource/clps711x-clksrc.c b/drivers/clocksource/clps711x-clksrc.c
 new file mode 100644
-index 0000000..9f0129f
+index 0000000..1749b0b
 --- /dev/null
-+++ b/drivers/cpuidle/cpuidle-clps711x.c
-@@ -0,0 +1,80 @@
++++ b/drivers/clocksource/clps711x-clksrc.c
+@@ -0,0 +1,151 @@
 +/*
-+ *  CLPS711X CPU idle driver
++ *  CLPS711X clocksource driver
 + *
 + *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
 + *
@@ -63,74 +81,145 @@ index 0000000..9f0129f
 + * (at your option) any later version.
 + */
 +
-+#include <linux/cpuidle.h>
-+#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
 +#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
++#include <linux/ioport.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/sched_clock.h>
++#include <linux/slab.h>
 +
-+static void __iomem *clps711x_halt;
++#include <linux/mfd/syscon/clps711x.h>
 +
-+static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
-+				 struct cpuidle_driver *drv, int index)
++#define CLPS711X_SYSCON1	(0x0100)
++#define CLPS711X_TC1D		(0x0300)
++#define CLPS711X_TC2D		(0x0340)
++
++static struct {
++	void __iomem	*tc1d;
++	int		irq;
++} *clps711x_clksrc;
++
++static u32 notrace clps711x_sched_clock_read(void)
 +{
-+	writel(1, clps711x_halt);
-+	asm volatile ("mov r0, r0");
-+	asm volatile ("mov r0, r0");
-+
-+	return index;
++	return ~readw(clps711x_clksrc->tc1d);
 +}
 +
-+static struct cpuidle_driver clps711x_idle_driver = {
-+	.name			= "clps711x_idle",
-+	.owner			= THIS_MODULE,
-+	.state_count		= 1,
-+	.states[0]	= {
-+		.name		= "HALT",
-+		.desc		= "CLPS711X WFI",
-+		.enter		= clps711x_cpuidle_halt,
-+		.exit_latency	= 1,
-+	},
-+};
-+
-+static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
++static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
++					 struct clock_event_device *evt)
 +{
-+	struct resource *res;
++	disable_irq(clps711x_clksrc->irq);
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(clps711x_halt))
-+		return PTR_ERR(clps711x_halt);
-+
-+	return cpuidle_register(&clps711x_idle_driver, NULL);
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		enable_irq(clps711x_clksrc->irq);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* Not supported */
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_RESUME:
++		/* Left event sources disabled, no more interrupts appear */
++		break;
++	}
 +}
 +
-+static int clps711x_cpuidle_remove(struct platform_device *pdev)
-+{
-+	cpuidle_unregister(&clps711x_idle_driver);
++static struct clock_event_device clps711x_clockevent = {
++	.name		= "clps711x-clockevent",
++	.rating		= 300,
++	.features	= CLOCK_EVT_FEAT_PERIODIC,
++	.set_mode	= clps711x_clockevent_set_mode,
++};
 +
-+	return 0;
++static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
++{
++	clps711x_clockevent.event_handler(&clps711x_clockevent);
++
++	return IRQ_HANDLED;
 +}
 +
-+static const struct of_device_id clps711x_cpuidle_dt_ids[] = {
-+	{ .compatible = "cirrus,clps711x-cpuidle", },
-+	{ }
++static struct irqaction clps711x_timer_irq = {
++	.name		= "clps711x-timer",
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= clps711x_timer_interrupt,
 +};
-+MODULE_DEVICE_TABLE(of, clps711x_cpuidle_dt_ids);
 +
-+static struct platform_driver clps711x_cpuidle_driver = {
-+	.driver	= {
-+		.name		= "clps711x-cpuidle",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= clps711x_cpuidle_dt_ids,
-+	},
-+	.remove	= clps711x_cpuidle_remove,
-+};
-+module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
++static void __init _clps711x_clksrc_init(phys_addr_t phys_base, int irq,
++					 struct clk *tc1, struct clk *tc2)
++{
++	unsigned long tc1_rate, tc2_rate;
++	void __iomem *tc2d, *syscon1;
++	u32 tmp;
 +
-+MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
-+MODULE_DESCRIPTION("CLPS711X CPU idle driver");
-+MODULE_LICENSE("GPL");
++	BUG_ON(IS_ERR(tc1) || IS_ERR(tc2));
++
++	BUG_ON(!request_mem_region(phys_base + CLPS711X_TC1D, SZ_2, NULL));
++	BUG_ON(!request_mem_region(phys_base + CLPS711X_TC2D, SZ_2, NULL));
++
++	clps711x_clksrc = kzalloc(sizeof(*clps711x_clksrc), GFP_KERNEL);
++	BUG_ON(!clps711x_clksrc);
++
++	clps711x_clksrc->tc1d = ioremap(phys_base + CLPS711X_TC1D, SZ_2);
++	BUG_ON(!clps711x_clksrc->tc1d);
++
++	tc2d = ioremap(phys_base + CLPS711X_TC2D, SZ_2);
++	BUG_ON(!tc2d);
++
++	syscon1 = ioremap(phys_base + CLPS711X_SYSCON1, SZ_4);
++	BUG_ON(!syscon1);
++
++	clps711x_clksrc->irq = irq;
++
++	tmp = readl(syscon1);
++	/* TC1 in free running mode */
++	tmp &= ~SYSCON1_TC1M;
++	/* TC2 in prescale mode */
++	tmp |= SYSCON1_TC2M;
++	writel(tmp, syscon1);
++
++	tc1_rate = clk_get_rate(tc1);
++	tc2_rate = clk_get_rate(tc2);
++
++	clocksource_mmio_init(clps711x_clksrc->tc1d, "clps711x-clocksource",
++			      tc1_rate, 300, 16, clocksource_mmio_readw_down);
++
++	setup_sched_clock(clps711x_sched_clock_read, 16, tc1_rate);
++
++	/* Set Timer prescaler */
++	writew(DIV_ROUND_CLOSEST(tc2_rate, HZ), tc2d);
++
++	clockevents_config_and_register(&clps711x_clockevent, tc2_rate, 0, 0);
++
++	BUG_ON(setup_irq(clps711x_clksrc->irq, &clps711x_timer_irq));
++}
++
++void __init clps711x_clksrc_init(phys_addr_t phys_base, int irq)
++{
++	struct clk *tc1 = clk_get(NULL, "tc1");
++	struct clk *tc2 = clk_get(NULL, "tc2");
++
++	_clps711x_clksrc_init(phys_base, irq, tc1, tc2);
++}
++
++#ifdef CONFIG_CLKSRC_OF
++static void __init clps711x_clksrc_init_dt(struct device_node *np)
++{
++	struct clk *tc1 = of_clk_get_by_name(np, "tc1");
++	struct clk *tc2 = of_clk_get_by_name(np, "tc2");
++	struct resource res_io, res_irq;
++
++	BUG_ON(!of_address_to_resource(np, 0, &res_io));
++
++	BUG_ON(!of_irq_to_resource(np, 0, &res_irq));
++
++	_clps711x_clksrc_init(res_io.start, res_irq.start, tc1, tc2);
++}
++CLOCKSOURCE_OF_DECLARE(clps711x, "cirrus,clps711x-clocksource",
++		       clps711x_clksrc_init_dt);
++#endif
 -- 
 1.8.1.5
