@@ -1,96 +1,78 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Jul 2013 14:59:06 -0400 (EDT)
-Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
-In-Reply-To: <20130718180323.GC2655@localhost.localdomain>
-References: <1374118116-16836-1-git-send-email-nicolas.pitre@linaro.org>
- <1374118116-16836-2-git-send-email-nicolas.pitre@linaro.org>
- <20130718150408.GB2655@localhost.localdomain>
- <alpine.LFD.2.03.1307181231510.14924@syhkavp.arg>
- <20130718180323.GC2655@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 18 Jul 2013 14:04:38 -0500
+Subject: [PATCH 2/3] ARM: dts: DRA: Add crossbar device binding
+In-Reply-To: <1374165830-6367-3-git-send-email-r.sricharan@ti.com>
+References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
+ <1374165830-6367-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <51E83C46.3040000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Jul 2013, Dave Martin wrote:
+On 07/18/2013 11:43 AM, Sricharan R wrote:
+> This adds the irq/dma crossbar device nodes.
+>
+> There is a IRQ and DMA crossbar device in the soc, which
+> maps the irq/dma requests from the peripherals to the
+> mpu/dsp/ipu/eve interrupt and sdma/edma controller's inputs.
+> The Peripheral irq/dma requests are connected to only one crossbar
+> input and the output of the crossbar is connected to only one
+> controller's input line. On POR, there are some mappings which
+> are done by default. Those peripherals which do not have a
+> mapping on POR, should be configured to route its requests
+> using the crossbar control registers.
+>
 
-> On Thu, Jul 18, 2013 at 01:24:48PM -0400, Nicolas Pitre wrote:
-> > [ added Russell for his opinion on the patch below ]
-> 
-> [...]
-> 
-> > commit 390cf8b9b83eeeebdfef51912f5003a6a9b84115
-> > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Date:   Thu Jul 18 13:12:48 2013 -0400
-> > 
-> >     ARM: cacheflush: consolidate single-CPU ARMv7 cache disabling code
-> >     
-> >     This code is becoming duplicated in many places.  So let's consolidate
-> >     it into a handy macro that is known to be right and available for reuse.
-> >     
-> >     Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > 
-> > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> > index 17d0ae8672..8a76933e80 100644
-> > --- a/arch/arm/include/asm/cacheflush.h
-> > +++ b/arch/arm/include/asm/cacheflush.h
-> > @@ -436,4 +436,33 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
-> >  #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
-> >  #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
-> >  
-> > +/*
-> > + * Disabling cache access for one CPU in an ARMv7 SMP system is tricky.
-> > + * To do so we must:
-> > + *
-> > + * - Clear the SCTLR.C bit to prevent further cache allocations
-> > + * - Flush the desired level of cache
-> > + * - Clear the ACTLR "SMP" bit to disable local coherency
-> > + *
-> > + * ... and so without any intervening memory access in between those steps,
-> > + * not even to the stack.
-> > + *
-> > + * The clobber list is dictated by the call to v7_flush_dcache_*.
-> > + */
-> > +#define v7_disable_flush_cache(level) \
-> > +	asm volatile( \
-> > +	"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t" \
-> > +	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
-> > +	"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t" \
-> > +	"isb	\n\t" \
-> > +	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
-> > +	"clrex	\n\t" \
-> > +	"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t" \
-> > +	"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t" \
-> > +	"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t" \
-> > +	"isb	\n\t" \
-> > +	"dsb	" \
-> > +	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
-> > +	      "r9","r10","r11","lr","memory" )
-> > +
-> >  #endif
-> 
-> That's roughly what I had in mind, though it might belong somewhere more
-> obscure than cacheflush.h(?)
+What is POR? Plan on Record? I supppose, we just love our TLA?
 
-Any suggestions for that?  Maybe asm/mcpm.h but that might be used in 
-other circumstances as well.
+> The irq/dma mapping for some peripherals are
+> added with the crossbar nodes here.
+>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7.dtsi |   19 +++++++++++++++++++
+>   1 file changed, 19 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index a5d9350..e6208b4 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -85,6 +85,25 @@
+>   		ranges;
+>   		ti,hwmods = "l3_main_1", "l3_main_2";
+>
+> +		crossbar_mpu: mpuirq at 4a002a48 {
+> +			compatible = "crossbar";
+> +			crossbar-name = "mpu-irq";
+> +			reg = <0x4a002a48 0x0130>;
+> +			reg-width = <16>;
+> +			crossbar-lines = "mpu-irq", "rtc-ss-alarm", <0x9f 0xd9 0x12c>,
+> +					 "mpu-irq", "mcasp3-arevt", <0x9e 0x96 0x12a>,
+> +					 "mpu-irq", "mcasp3-axevt", <0x9d 0x97 0x128>;
 
-> "disable_flush_cache" sounds a too general-purpose for my liking.
-> 
-> "v7" isn't really right because we touch the ACTLR.  This only works
-> on certain CPUs and when Linux is running Secure.  Maybe saying "a15"
-> instead of "a7" is reasonable, since a7 is supposed to be an a15
-> workalike in most places.
-
-Isn't this how this should be done on an A9 too?  Lorenzo asked me to do 
-it this way, by fear of seeing people copy the previous implementation, 
-so the same sequence works on A9 as well as A15.
-
-> I had other names in mind, like "coherency_exit" or "cache_exit".
-> Those are not very intelligible, but that might at least make people
-> pause and think before blindly using it.
-
-Good point.  It should still embody the architecture name for which it 
-is valid though.
+a) I'd like to use UART10. oh, let me guess: we dont map all cross bar 
+options here.. just "certain ones"
+b) I like to use random 6 uarts out of the available 10 uarts on the fly.
+c) I'd like to use IRQCROSS bar such that i use all the hardware block 
+instances that dont have default GIC IRQ mapping.
 
 
-Nicolas
+> +		};
+> +
+> +		crossbar_dma: dmareq at 4a002b78 {
+> +			compatible = "crossbar";
+> +			crossbar-name = "dma-req";
+> +			reg = <0x4a002b78 0x0100>;
+> +			reg-width = <16>;
+> +			crossbar-lines = "dma-req", "mcasp3-rx", <0x7e 0x84 0xfc>,
+> +					 "dma-req", "mcasp3-tx", <0x7d 0x85 0xfa>;
+> +		};
+> +
+>   		counter32k: counter at 4ae04000 {
+>   			compatible = "ti,omap-counter32k";
+>   			reg = <0x4ae04000 0x40>;
+>
+
+
+-- 
+Regards,
+Nishanth Menon
