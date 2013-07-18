@@ -1,63 +1,80 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 18 Jul 2013 08:45:03 -0700
-Subject: [PATCH 3/3] arm: zynq: slcr: Use read-modify-write for register
- writes
-In-Reply-To: <20130718072106.GB15514@pengutronix.de>
-References: <1374081015-31431-1-git-send-email-soren.brinkmann@xilinx.com>
- <1374081015-31431-4-git-send-email-soren.brinkmann@xilinx.com>
- <20130718072106.GB15514@pengutronix.de>
-Message-ID: <a57f684c-8983-48d2-8e99-8c9712383091@TX2EHSMHS024.ehs.local>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 18 Jul 2013 08:49:54 -0700
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <51E7AE88.3050007@ti.com>
+References: <1374129984-765-1-git-send-email-kishon@ti.com>
+ <1374129984-765-2-git-send-email-kishon@ti.com>
+ <20130718072004.GA16720@kroah.com> <51E7AE88.3050007@ti.com>
+Message-ID: <20130718154954.GA31961@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 09:21:06AM +0200, Steffen Trumtrar wrote:
-> On Wed, Jul 17, 2013 at 10:10:15AM -0700, S?ren Brinkmann wrote:
-> > zynq_slcr_cpu_start/stop() ignored the current register state when
-> > writing to a register. Fixing this by implementing proper
-> > read-modify-write.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  arch/arm/mach-zynq/slcr.c | 16 ++++++++--------
-> >  1 file changed, 8 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-> > index 44a4ab6..1836d5a 100644
-> > --- a/arch/arm/mach-zynq/slcr.c
-> > +++ b/arch/arm/mach-zynq/slcr.c
-> > @@ -61,11 +61,11 @@ void zynq_slcr_system_reset(void)
-> >   */
-> >  void zynq_slcr_cpu_start(int cpu)
-> >  {
-> > -	/* enable CPUn */
-> > -	writel(SLCR_A9_CPU_CLKSTOP << cpu,
-> > -	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> > -	/* enable CLK for CPUn */
-> > -	writel(0x0 << cpu, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> > +	u32 reg = readl(zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> > +	reg &= ~(SLCR_A9_CPU_RST << cpu);
-> > +	writel(reg, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> > +	reg &= ~(SLCR_A9_CPU_CLKSTOP << cpu);
-> > +	writel(reg, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> >  }
-> >  
-> >  /**
-> > @@ -74,9 +74,9 @@ void zynq_slcr_cpu_start(int cpu)
-> >   */
-> >  void zynq_slcr_cpu_stop(int cpu)
-> >  {
-> > -	/* stop CLK and reset CPUn */
-> > -	writel((SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu,
-> > -	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> > +	u32 reg = readl(zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> > +	reg |= (SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu;
-> > +	writel(reg, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
-> >  }
-> >  
+On Thu, Jul 18, 2013 at 02:29:52PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> Hi!
+> On Thursday 18 July 2013 12:50 PM, Greg KH wrote:
+> > On Thu, Jul 18, 2013 at 12:16:10PM +0530, Kishon Vijay Abraham I wrote:
+> >> +struct phy_provider *__of_phy_provider_register(struct device *dev,
+> >> +	struct module *owner, struct phy * (*of_xlate)(struct device *dev,
+> >> +	struct of_phandle_args *args));
+> >> +struct phy_provider *__devm_of_phy_provider_register(struct device *dev,
+> >> +	struct module *owner, struct phy * (*of_xlate)(struct device *dev,
+> >> +	struct of_phandle_args *args))
+> >> +
+> >> +__of_phy_provider_register and __devm_of_phy_provider_register can be used to
+> >> +register the phy_provider and it takes device, owner and of_xlate as
+> >> +arguments. For the dt boot case, all PHY providers should use one of the above
+> >> +2 APIs to register the PHY provider.
+> > 
+> > Why do you have __ for the prefix of a public function?  Is that really
+> > the way that OF handles this type of thing?
 > 
-> Why do you also remove the comments? In my opinion they can stay.
-I found the #defines descriptive enough
+> I have a macro of_phy_provider_register/devm_of_phy_provider_register that
+> calls these functions and should be used by the PHY drivers. Probably I should
+> make a mention of it in the Documentation.
 
-	S?ren
+Yes, mention those as you never want to be calling __* functions
+directly, right?
+
+> >> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
+> > 
+> > Your naming is odd, no "phy" anywhere in it?  You rely on the sender to
+> > never send a duplicate name.id pair?  Why not create your own ids based
+> > on the number of phys in the system, like almost all other classes and
+> > subsystems do?
+> 
+> hmm.. some PHY drivers use the id they provide to perform some of their
+> internal operation as in [1] (This is used only if a single PHY provider
+> implements multiple PHYS). Probably I'll add an option like PLATFORM_DEVID_AUTO
+> to give the PHY drivers an option to use auto id.
+> 
+> [1] ->
+> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
+
+No, who cares about the id?  No one outside of the phy core ever should,
+because you pass back the only pointer that they really do care about,
+if they need to do anything with the device.  Use that, and then you can
+rip out all of the "search for a phy by a string" logic, as that's not
+needed either.  Just stick to the pointer, it's easier, and safer that
+way.
+
+> >> +static inline int phy_pm_runtime_get(struct phy *phy)
+> >> +{
+> >> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
+> >> +		return -EINVAL;
+> > 
+> > Why would phy ever not be valid and a error pointer?  And why dump the
+> > stack if that happens, that seems really extreme.
+> 
+> hmm.. there might be cases where the same controller in one soc needs PHY
+> control and in some other soc does not need PHY control. In such cases, we
+> might get error pointer here.
+> I'll change WARN to dev_err.
+
+I still don't understand.  You have control over the code that calls
+these functions, just ensure that they pass in a valid pointer, it's
+that simple.  Or am I missing something?
+
+thanks,
+
+greg k-h
