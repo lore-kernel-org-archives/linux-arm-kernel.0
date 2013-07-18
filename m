@@ -1,119 +1,182 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 22:20:54 +0200
-Subject: [PATCH v2 20/24] fs_enet: OF clock lookup (non-fatal),
- prepare and enable
+Date: Thu, 18 Jul 2013 22:20:50 +0200
+Subject: [PATCH v2 16/24] net: can: mscan: make mpc512x code use common clock
 In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
 References: <1374166855-7280-1-git-send-email-gsi@denx.de>
-Message-ID: <1374178858-8683-6-git-send-email-gsi@denx.de>
+Message-ID: <1374178858-8683-2-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-device tree based clock lookup, must prepare clocks before enabling
-them, unprepare after disable, error check in the clock setup, remove
-the pre-enable workaround in the MPC512x platform's clock driver
+extend the mscan(4) driver with alternative support for the COMMON_CLK
+approach which is an option in the MPC512x platform, keep the existing
+clock support implementation in place since the driver is shared with
+other MPC5xxx SoCs which don't have common clock support
 
-this change implements non-fatal clock lookup since not all platforms
-provide device tree specs for clocks, but failure to enable a specified
-clock is considered fatal
+one byproduct of this change is that the CAN driver no longer needs to
+access the SoC's clock control registers, which shall be the domain of
+the platform's clock driver
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/platforms/512x/clock-commonclk.c      |    1 -
- .../net/ethernet/freescale/fs_enet/fs_enet-main.c  |   27 +++++++++++++++++++-
- include/linux/fs_enet_pd.h                         |    3 +++
- 3 files changed, 29 insertions(+), 2 deletions(-)
+ drivers/net/can/mscan/mpc5xxx_can.c |  139 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 139 insertions(+)
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index 49c52bc..e9451a7 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -691,7 +691,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
- 	clk_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
- 	/* some are not yet acquired by their respective drivers */
- 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
--	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
- 	/*
- 	 * some have their individual clock subtree with separate clock
- 	 * items and their individual enable counters, yet share a
-diff --git a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-index 8de53a1..df92e12 100644
---- a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-+++ b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-@@ -1020,6 +1020,21 @@ static int fs_enet_probe(struct platform_device *ofdev)
- 		fpi->cp_command = *data;
- 	}
+diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+index bc422ba..dd26ab6 100644
+--- a/drivers/net/can/mscan/mpc5xxx_can.c
++++ b/drivers/net/can/mscan/mpc5xxx_can.c
+@@ -108,6 +108,143 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+ #endif /* CONFIG_PPC_MPC52xx */
  
-+	/* make clock lookup non-fatal (the driver is shared among platforms),
-+	 * but require enable to succeed when a clock was specified/found
+ #ifdef CONFIG_PPC_MPC512x
++
++#if IS_ENABLED(CONFIG_COMMON_CLK)
++
++static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
++				 const char *clock_source, int *mscan_clksrc)
++{
++	struct device_node *np;
++	u32 clockdiv;
++	enum {
++		CLK_FROM_AUTO,
++		CLK_FROM_IPS,
++		CLK_FROM_SYS,
++		CLK_FROM_REF,
++	} clk_from;
++	struct clk *clk_in, *clk_can;
++	unsigned long freq_calc;
++
++	/* the caller passed in the clock source spec that was read from
++	 * the device tree, get the optional clock divider as well
 +	 */
-+	fpi->clk_per = clk_get(&ofdev->dev, "per");
-+	if (IS_ERR(fpi->clk_per))
-+		fpi->clk_per = NULL;
-+	if (fpi->clk_per) {
-+		int err;
-+		err = clk_prepare_enable(fpi->clk_per);
-+		if (err) {
-+			ret = err;
-+			goto out_clk_put;
++	np = ofdev->dev.of_node;
++	clockdiv = 1;
++	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
++	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
++		clock_source ? clock_source : "<NULL>", clockdiv);
++
++	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
++	 * get set, and the 'ips' clock is the input to the MSCAN
++	 * component
++	 *
++	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
++	 * bit needs to get cleared, an optional clock-divider may have
++	 * been specified (the default value is 1), the appropriate
++	 * MSCAN related MCLK is the input to the MSCAN component
++	 *
++	 * in the absence of a clock-source spec, first an optimal clock
++	 * gets determined based on the 'sys' clock, if that fails the
++	 * 'ref' clock is used
++	 */
++	clk_from = CLK_FROM_AUTO;
++	if (clock_source) {
++		/* interpret the device tree's spec for the clock source */
++		if (!strcmp(clock_source, "ip"))
++			clk_from = CLK_FROM_IPS;
++		else if (!strcmp(clock_source, "sys"))
++			clk_from = CLK_FROM_SYS;
++		else if (!strcmp(clock_source, "ref"))
++			clk_from = CLK_FROM_REF;
++		else
++			goto err_invalid;
++		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
++	}
++	if (clk_from == CLK_FROM_AUTO) {
++		/* no spec so far, try the 'sys' clock; round to the
++		 * next MHz and see if we can get a multiple of 16MHz
++		 */
++		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
++		clk_in = clk_get(&ofdev->dev, "sys");
++		if (IS_ERR(clk_in))
++			goto err_notavail;
++		freq_calc = clk_get_rate(clk_in);
++		freq_calc +=  499999;
++		freq_calc /= 1000000;
++		freq_calc *= 1000000;
++		if ((freq_calc % 16000000) == 0) {
++			clk_from = CLK_FROM_SYS;
++			clockdiv = freq_calc / 16000000;
++			dev_dbg(&ofdev->dev,
++				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
++				freq_calc, clockdiv, freq_calc / clockdiv);
 +		}
 +	}
-+
- 	fpi->rx_ring = 32;
- 	fpi->tx_ring = 32;
- 	fpi->rx_copybreak = 240;
-@@ -1028,7 +1043,7 @@ static int fs_enet_probe(struct platform_device *ofdev)
- 	fpi->phy_node = of_parse_phandle(ofdev->dev.of_node, "phy-handle", 0);
- 	if ((!fpi->phy_node) && (!of_get_property(ofdev->dev.of_node, "fixed-link",
- 						  NULL)))
--		goto out_free_fpi;
-+		goto out_clk_dis;
- 
- 	if (of_device_is_compatible(ofdev->dev.of_node, "fsl,mpc5125-fec")) {
- 		phy_connection_type = of_get_property(ofdev->dev.of_node,
-@@ -1108,6 +1123,12 @@ out_free_dev:
- 	free_netdev(ndev);
- out_put:
- 	of_node_put(fpi->phy_node);
-+out_clk_dis:
-+	if (fpi->clk_per)
-+		clk_disable_unprepare(fpi->clk_per);
-+out_clk_put:
-+	if (fpi->clk_per)
-+		clk_put(fpi->clk_per);
- out_free_fpi:
- 	kfree(fpi);
- 	return ret;
-@@ -1124,6 +1145,10 @@ static int fs_enet_remove(struct platform_device *ofdev)
- 	fep->ops->cleanup_data(ndev);
- 	dev_set_drvdata(fep->dev, NULL);
- 	of_node_put(fep->fpi->phy_node);
-+	if (fep->fpi->clk_per) {
-+		clk_disable_unprepare(fep->fpi->clk_per);
-+		clk_put(fep->fpi->clk_per);
++	if (clk_from == CLK_FROM_AUTO) {
++		/* no spec so far, use the 'ref' clock */
++		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
++		clk_in = clk_get(&ofdev->dev, "ref");
++		if (IS_ERR(clk_in))
++			goto err_notavail;
++		clk_from = CLK_FROM_REF;
++		freq_calc = clk_get_rate(clk_in);
++		dev_dbg(&ofdev->dev,
++			"clk fit, ref[%lu] (no div) freq[%lu]\n",
++			freq_calc, freq_calc);
 +	}
- 	free_netdev(ndev);
- 	return 0;
- }
-diff --git a/include/linux/fs_enet_pd.h b/include/linux/fs_enet_pd.h
-index 51b7934..a978d0d 100644
---- a/include/linux/fs_enet_pd.h
-+++ b/include/linux/fs_enet_pd.h
-@@ -16,6 +16,7 @@
- #ifndef FS_ENET_PD_H
- #define FS_ENET_PD_H
- 
-+#include <linux/clk.h>
- #include <linux/string.h>
- #include <linux/of_mdio.h>
- #include <asm/types.h>
-@@ -142,6 +143,8 @@ struct fs_platform_info {
- 
- 	int use_rmii;		/* use RMII mode 	       */
- 	int has_phy;            /* if the network is phy container as well...*/
 +
-+	struct clk *clk_per;	/* 'per' clock for register access */
- };
- struct fs_mii_fec_platform_info {
- 	u32 irq[32];
++	/* select IPS or MCLK as the MSCAN input (returned to the caller),
++	 * setup the MCLK mux source and rate if applicable, apply the
++	 * optionally specified or derived above divider, and determine
++	 * the actual resulting clock rate to return to the caller
++	 */
++	switch (clk_from) {
++	case CLK_FROM_IPS:
++		clk_can = clk_get(&ofdev->dev, "ips");
++		if (IS_ERR(clk_can))
++			goto err_notavail;
++		clk_prepare_enable(clk_can);
++		freq_calc = clk_get_rate(clk_can);
++		*mscan_clksrc = MSCAN_CLKSRC_IPS;
++		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
++			*mscan_clksrc, freq_calc);
++		break;
++	case CLK_FROM_SYS:
++	case CLK_FROM_REF:
++		clk_can = clk_get(&ofdev->dev, "mclk");
++		if (IS_ERR(clk_can))
++			goto err_notavail;
++		clk_prepare_enable(clk_can);
++		if (clk_from == CLK_FROM_SYS)
++			clk_in = clk_get(&ofdev->dev, "sys");
++		if (clk_from == CLK_FROM_REF)
++			clk_in = clk_get(&ofdev->dev, "ref");
++		if (IS_ERR(clk_in))
++			goto err_notavail;
++		clk_set_parent(clk_can, clk_in);
++		freq_calc = clk_get_rate(clk_in);
++		freq_calc /= clockdiv;
++		clk_set_rate(clk_can, freq_calc);
++		freq_calc = clk_get_rate(clk_can);
++		*mscan_clksrc = MSCAN_CLKSRC_BUS;
++		dev_dbg(&ofdev->dev, "clk from MCLK, clksrc[%d] freq[%lu]\n",
++			*mscan_clksrc, freq_calc);
++		break;
++	default:
++		goto err_invalid;
++	}
++
++	return freq_calc;
++
++err_invalid:
++	dev_err(&ofdev->dev, "invalid clock source specification\n");
++	return 0;
++
++err_notavail:
++	dev_err(&ofdev->dev, "cannot acquire or setup clock source\n");
++	return 0;
++}
++#else	/* COMMON_CLK */
+ struct mpc512x_clockctl {
+ 	u32 spmr;		/* System PLL Mode Reg */
+ 	u32 sccr[2];		/* System Clk Ctrl Reg 1 & 2 */
+@@ -238,6 +375,8 @@ exit_put:
+ 	of_node_put(np_clock);
+ 	return freq;
+ }
++#endif	/* COMMON_CLK */
++
+ #else /* !CONFIG_PPC_MPC512x */
+ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 				 const char *clock_name, int *mscan_clksrc)
 -- 
 1.7.10.4
