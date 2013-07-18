@@ -1,51 +1,110 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 19:00:43 +0200
-Subject: [PATCH v2 12/24] serial: mpc512x: remove now obsolete clock lookup
- name
+Date: Thu, 18 Jul 2013 19:00:45 +0200
+Subject: [PATCH v2 14/24] serial: mpc512x: setup the PSC FIFO clock as well
 In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
 References: <1373914074-20889-1-git-send-email-gsi@denx.de>
  <1374166855-7280-1-git-send-email-gsi@denx.de>
-Message-ID: <1374166855-7280-13-git-send-email-gsi@denx.de>
+Message-ID: <1374166855-7280-15-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-after device tree based clock lookup became available, the peripheral
-driver need no longer construct clock names which include the PSC index,
-remove the "psc%d_mclk" template and unconditionally use "mclk"
+prepare and enable the FIFO clock upon PSC FIFO initialization,
+disable and unprepare the FIFO clock upon PSC FIFO uninitialization,
+remove the pre-enable workaround from the platform's clock driver
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/tty/serial/mpc52xx_uart.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/powerpc/platforms/512x/clock-commonclk.c |    2 --
+ drivers/tty/serial/mpc52xx_uart.c             |   39 +++++++++++++++++++++----
+ 2 files changed, 33 insertions(+), 8 deletions(-)
 
+diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
+index b822469..99d197d 100644
+--- a/arch/powerpc/platforms/512x/clock-commonclk.c
++++ b/arch/powerpc/platforms/512x/clock-commonclk.c
+@@ -689,8 +689,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
+ 	clk_prepare_enable(clks[MPC512x_CLK_MEM]);	/* SRAM */
+ 	clk_prepare_enable(clks[MPC512x_CLK_IPS]);	/* SoC periph */
+ 	clk_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
+-	/* some are required yet no dependencies were declared */
+-	clk_prepare_enable(clks[MPC512x_CLK_PSC_FIFO]);
+ 	/* some are not yet acquired by their respective drivers */
+ 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
+ 	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
 diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
-index 98a1f43..8643dcf 100644
+index 8643dcf..3fdadf9 100644
 --- a/drivers/tty/serial/mpc52xx_uart.c
 +++ b/drivers/tty/serial/mpc52xx_uart.c
-@@ -623,14 +623,11 @@ static struct clk *psc_mclk_clk[MPC52xx_PSC_MAXNUM];
- /* called from within the .request_port() callback (allocation) */
- static int mpc512x_psc_alloc_clock(struct uart_port *port)
- {
--	int psc_num;
--	char clk_name[16];
- 	struct clk *clk;
- 	int err;
-+	int psc_num;
+@@ -421,6 +421,7 @@ struct psc_fifoc {
  
--	psc_num = (port->mapbase & 0xf00) >> 8;
--	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
--	clk = clk_get(port->dev, clk_name);
-+	clk = clk_get(port->dev, "mclk");
- 	if (IS_ERR(clk)) {
- 		dev_err(port->dev, "Failed to get MCLK!\n");
- 		return PTR_ERR(clk);
-@@ -641,6 +638,7 @@ static int mpc512x_psc_alloc_clock(struct uart_port *port)
- 		clk_put(clk);
- 		return err;
+ static struct psc_fifoc __iomem *psc_fifoc;
+ static unsigned int psc_fifoc_irq;
++static struct clk *psc_fifoc_clk;
+ 
+ static void mpc512x_psc_fifo_init(struct uart_port *port)
+ {
+@@ -574,30 +575,56 @@ static int __init mpc512x_psc_fifoc_init(void)
+ 				     "fsl,mpc5121-psc-fifo");
+ 	if (!np) {
+ 		pr_err("%s: Can't find FIFOC node\n", __func__);
+-		return -ENODEV;
++		goto out_err;
++	}
++
++	psc_fifoc_clk = of_clk_get_by_name(np, "per");
++	if (IS_ERR(psc_fifoc_clk)) {
++		pr_err("%s: Can't lookup FIFO clock\n", __func__);
++		goto out_ofnode_put;
++	}
++	if (clk_prepare_enable(psc_fifoc_clk)) {
++		pr_err("%s: Can't enable FIFO clock\n", __func__);
++		goto out_clk_put;
  	}
-+	psc_num = (port->mapbase & 0xf00) >> 8;
- 	psc_mclk_clk[psc_num] = clk;
+ 
+ 	psc_fifoc = of_iomap(np, 0);
+ 	if (!psc_fifoc) {
+ 		pr_err("%s: Can't map FIFOC\n", __func__);
+-		of_node_put(np);
+-		return -ENODEV;
++		goto out_clk_disable;
+ 	}
+ 
+ 	psc_fifoc_irq = irq_of_parse_and_map(np, 0);
+-	of_node_put(np);
+ 	if (psc_fifoc_irq == 0) {
+ 		pr_err("%s: Can't get FIFOC irq\n", __func__);
+-		iounmap(psc_fifoc);
+-		return -ENODEV;
++		goto out_unmap;
+ 	}
+ 
++	of_node_put(np);
  	return 0;
++
++out_unmap:
++	iounmap(psc_fifoc);
++out_clk_disable:
++	clk_disable_unprepare(psc_fifoc_clk);
++out_clk_put:
++	clk_put(psc_fifoc_clk);
++out_ofnode_put:
++	of_node_put(np);
++out_err:
++	return -ENODEV;
  }
+ 
+ static void __exit mpc512x_psc_fifoc_uninit(void)
+ {
+ 	iounmap(psc_fifoc);
++
++	/* disable the clock, errors are not fatal */
++	if (psc_fifoc_clk && !IS_ERR(psc_fifoc_clk)) {
++		clk_disable_unprepare(psc_fifoc_clk);
++		clk_put(psc_fifoc_clk);
++		psc_fifoc_clk = NULL;
++	}
+ }
+ 
+ /* 512x specific interrupt handler. The caller holds the port lock */
 -- 
 1.7.10.4
