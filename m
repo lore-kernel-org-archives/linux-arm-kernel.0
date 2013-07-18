@@ -1,78 +1,67 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 18 Jul 2013 14:04:38 -0500
-Subject: [PATCH 2/3] ARM: dts: DRA: Add crossbar device binding
-In-Reply-To: <1374165830-6367-3-git-send-email-r.sricharan@ti.com>
-References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
- <1374165830-6367-3-git-send-email-r.sricharan@ti.com>
-Message-ID: <51E83C46.3040000@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 18 Jul 2013 13:21:02 -0600
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <20130718072034.GO7656@atomide.com>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost> <51E70953.1000601@wwwdotorg.org>
+ <20130718072034.GO7656@atomide.com>
+Message-ID: <51E8401E.8040705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 11:43 AM, Sricharan R wrote:
-> This adds the irq/dma crossbar device nodes.
->
-> There is a IRQ and DMA crossbar device in the soc, which
-> maps the irq/dma requests from the peripherals to the
-> mpu/dsp/ipu/eve interrupt and sdma/edma controller's inputs.
-> The Peripheral irq/dma requests are connected to only one crossbar
-> input and the output of the crossbar is connected to only one
-> controller's input line. On POR, there are some mappings which
-> are done by default. Those peripherals which do not have a
-> mapping on POR, should be configured to route its requests
-> using the crossbar control registers.
->
+On 07/18/2013 01:25 AM, Tony Lindgren wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [130717 14:21]:
+>> On 07/16/2013 03:05 AM, Tony Lindgren wrote:
+>>> To toggle dynamic states, let's add the optional active state in
+>>> addition to the static default state. Then if the optional active
+>>> state is defined, we can require that idle and sleep states cover
+>>> the same pingroups as the active state.
+>>>
+>>> Then let's add pinctrl_check_dynamic() and pinctrl_select_dynamic()
+>>> to use instead of pinctrl_select() to avoid breaking existing users.
+>>>
+>>> With pinctrl_check_dynamic() we can check that idle and sleep states
+>>> match the active state for pingroups during init, and don't need to
+>>> do it during runtime.
+>>>
+>>> Then with the states pre-validated, pinctrl_select_dynamic() can
+>>> just toggle between the dynamic states without extra checks.
+>>>
+>>> Note that pinctr_select_state() still has valid use cases, such as
+>>> changing states when the pins can be shared between two drivers
+>>> and don't necessarily cover the same pingroups. For dynamic runtime
+>>> toggling of pin states, we should eventually always use just
+>>> pinctrl_select_dynamic().
 
-What is POR? Plan on Record? I supppose, we just love our TLA?
+>>> @@ -1241,7 +1371,13 @@ static int pinctrl_pm_select_state(struct device *dev, struct pinctrl_state *sta
+>>>  		return 0;
+>>>  	if (IS_ERR(state))
+>>>  		return 0; /* No such state */
+>>> -	ret = pinctrl_select_state(pins->p, state);
+>>> +
+>>> +	/* Configured for proper dynamic muxing? */
+>>> +	if (!IS_ERR(dev->pins->active_state))
+>>> +		ret = pinctrl_select_dynamic(pins->p, state);
+>>> +	else
+>>> +		ret = pinctrl_select_state(pins->p, state);
+>>
+>> Hmmm. I'm not quite sure this is right... Surely this function should
+>> just do nothing if the dynamic states aren't defined? The system should
+>> just, and only, be in the "default" state and never do anything else.
+> 
+> This keeps the existing behaviour. We should be able to drop the
+> call to pinctrl_select_state() here after the existing use in
+> drivers has been fixed.
 
-> The irq/dma mapping for some peripherals are
-> added with the crossbar nodes here.
->
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
->   arch/arm/boot/dts/dra7.dtsi |   19 +++++++++++++++++++
->   1 file changed, 19 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index a5d9350..e6208b4 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -85,6 +85,25 @@
->   		ranges;
->   		ti,hwmods = "l3_main_1", "l3_main_2";
->
-> +		crossbar_mpu: mpuirq at 4a002a48 {
-> +			compatible = "crossbar";
-> +			crossbar-name = "mpu-irq";
-> +			reg = <0x4a002a48 0x0130>;
-> +			reg-width = <16>;
-> +			crossbar-lines = "mpu-irq", "rtc-ss-alarm", <0x9f 0xd9 0x12c>,
-> +					 "mpu-irq", "mcasp3-arevt", <0x9e 0x96 0x12a>,
-> +					 "mpu-irq", "mcasp3-axevt", <0x9d 0x97 0x128>;
+How many DT-based systems already have multiple of default/idle/sleep
+states defined in DT? Right now, since the kernel code uses
+pinctrl_select_state() to switch between those, the state definitions
+need to define /all/ pins used by those states, not just the dynamic
+ones. However, with this series in place, the default state should only
+include the static pins, and the active/idle/sleep states should only
+include the dynamic pins. That's a change to the DT bindings, since it
+changes how the DT must be written, and causes older DTs to be
+incompatible with newer kernels and vice-versa.
 
-a) I'd like to use UART10. oh, let me guess: we dont map all cross bar 
-options here.. just "certain ones"
-b) I like to use random 6 uarts out of the available 10 uarts on the fly.
-c) I'd like to use IRQCROSS bar such that i use all the hardware block 
-instances that dont have default GIC IRQ mapping.
-
-
-> +		};
-> +
-> +		crossbar_dma: dmareq at 4a002b78 {
-> +			compatible = "crossbar";
-> +			crossbar-name = "dma-req";
-> +			reg = <0x4a002b78 0x0100>;
-> +			reg-width = <16>;
-> +			crossbar-lines = "dma-req", "mcasp3-rx", <0x7e 0x84 0xfc>,
-> +					 "dma-req", "mcasp3-tx", <0x7d 0x85 0xfa>;
-> +		};
-> +
->   		counter32k: counter at 4ae04000 {
->   			compatible = "ti,omap-counter32k";
->   			reg = <0x4ae04000 0x40>;
->
-
-
--- 
-Regards,
-Nishanth Menon
+So, do we just ignore this DT ABI change again, or insist on doing it in
+some compatible way? DT ABI-ness is a PITA:-(
