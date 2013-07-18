@@ -1,29 +1,41 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 18 Jul 2013 14:38:20 +0800
-Subject: [PATCH] ASoC: wm8904: fix the typo error for LINER Mux
-Message-ID: <1374129500-5270-1-git-send-email-voice.shen@atmel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 18 Jul 2013 09:44:36 +0300
+Subject: [PATCH 0/3] ARM: OMAP2+: omap_device: add dynamic pinctrl handling
+In-Reply-To: <51E68E6C.60100@ti.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+ <51E686C1.8020801@ti.com> <51E68E6C.60100@ti.com>
+Message-ID: <51E78ED4.2020107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix the typo error, from "LINEL Mux" to "LINER Mux"
+On 07/17/2013 03:30 PM, Grygorii Strashko wrote:
+> On 07/17/2013 02:57 PM, Roger Quadros wrote:
+>> Hi Grygorii,
+>>
+>> On 07/17/2013 02:41 PM, Grygorii Strashko wrote:
+>>> Hi Tony, Kevin
+>>>
+>>> This patch series introduces dynamic pinctrl handling in OMAP device framework
+>>> in the same way as it was before switching to DT.
+>>> This allow OMAP devices driver's developers to simply add dynamic pinctrl
+>>> handling for "default", "active", "idle", "sleep" PIN states in their drivers
+>>> by modifying DT definitions only - no modifications in drivers code are not needed.
+>>>
+>>
+>> Overall I like the idea but can we make a provision for device drivers to override
+>> this default pin state handling?
+>>
+>> The OMAP EHCI driver is one such special case where the wakeup mechanism is tied to pinctrl states
+>> as it uses IO daisy chaining to implement wakeup.
+>> So depending on whether wakeup needs to be enabled or not I must be able to chose whether
+>> I put the pin in just "sleep" state or "sleep with wakeup" state.
+> 
+> I think, in this case you can't use default behavior and need to define
+> custom pins states like "sleep_wakeup"/"sleep_no_wakeup" and do not
+> define pins state with name "sleep', so Device core and OMAP device
+> framework will not touch your pins.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- sound/soc/codecs/wm8904.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, I think this should be fine. Thanks.
 
-diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
-index 3ff195c..bdd575a 100644
---- a/sound/soc/codecs/wm8904.c
-+++ b/sound/soc/codecs/wm8904.c
-@@ -1017,7 +1017,7 @@ static const struct soc_enum liner_enum =
- 	SOC_ENUM_SINGLE(WM8904_ANALOGUE_OUT12_ZC, 0, 2, out_mux_text);
- 
- static const struct snd_kcontrol_new liner_mux =
--	SOC_DAPM_ENUM("LINEL Mux", liner_enum);
-+	SOC_DAPM_ENUM("LINER Mux", liner_enum);
- 
- static const char *sidetone_text[] = {
- 	"None", "Left", "Right"
--- 
-1.7.9.5
+cheers,
+-roger
