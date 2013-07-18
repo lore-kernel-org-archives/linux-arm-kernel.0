@@ -1,285 +1,75 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 18 Jul 2013 11:26:26 +0200
-Subject: [PATCH v10] reset: Add driver for gpio-controlled reset pins
-Message-ID: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 18 Jul 2013 10:28:09 +0100
+Subject: [RFC PATCH v5 0/1] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <20130717210700.GA19864@zurbaran>
+References: <1373990743-23106-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130717210700.GA19864@zurbaran>
+Message-ID: <20130718092809.GA29977@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver implements a reset controller device that toggle a gpio
-connected to a reset pin of a peripheral IC. The delay between assertion
-and de-assertion of the reset signal can be configured via device tree.
+Hi Samuel,
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
----
-Changes since v9:
- - Use gpio_set_value_cansleep unconditionally. reset_controller_assert/deassert
-   should not be called from atomic context.
----
- .../devicetree/bindings/reset/gpio-reset.txt       |  35 ++++
- drivers/reset/Kconfig                              |  11 ++
- drivers/reset/Makefile                             |   1 +
- drivers/reset/gpio-reset.c                         | 184 +++++++++++++++++++++
- 4 files changed, 231 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/gpio-reset.txt
- create mode 100644 drivers/reset/gpio-reset.c
+On Wed, Jul 17, 2013 at 10:07:00PM +0100, Samuel Ortiz wrote:
+> Hi Lorenzo,
+> 
+> On Tue, Jul 16, 2013 at 05:05:42PM +0100, Lorenzo Pieralisi wrote:
+> > Hello,
+> > 
+> > version v5 of VExpress SPC driver, please read on the changelog for major
+> > changes and explanations.
+> > 
+> > The probing scheme is unchanged, since after trying the early platform
+> > devices approach it appeared that the end result was no better than the
+> > current one. The only clean solution relies either on changing how
+> > secondaries are brought up in the kernel (later than now) or enable
+> > early platform device registration through DT. Please check this
+> > thread for the related discussion:
+> > 
+> > https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036542.html
+> > 
+> > The interface was adapted to regmap and again reverted to old driver for
+> > the following reasons:
+> > 
+> > - Power down registers locking is hairy and requires arch spinlocks in
+> >   the MCPM back end to work properly, normal spinlocks cannot be used
+> > - Regmap adds unnecessary code to manage SPC since it is just a bunch of
+> >   registers used to control power management flags, the overhead is just
+> >   not worth it (talking about power down registers, not the vexpress config
+> >   interface)
+> > - The locking scheme behind regmap requires all registers in the map
+> >   to be protected with the same lock, which is not exactly what we want
+> >   here
+> > - Given the reasons above, adding a regmap interface buys us nothing from
+> >   a driver readability and maintainability perspective (again just talking
+> >   about the power interface, a few registers) because for the SPC it would
+> >   simply not be used
+> > 
+> > /drivers/mfd is probably not the right place for this code as it stands (but
+> > probably will be when the entire driver, with DVFS and config interface, is
+> > complete).
+> Could you please elaborate on how will the SPC driver extend into an MFD
+> driver?
 
-diff --git a/Documentation/devicetree/bindings/reset/gpio-reset.txt b/Documentation/devicetree/bindings/reset/gpio-reset.txt
-new file mode 100644
-index 0000000..bca5348
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/gpio-reset.txt
-@@ -0,0 +1,35 @@
-+GPIO reset controller
-+=====================
-+
-+A GPIO reset controller controls a single GPIO that is connected to the reset
-+pin of a peripheral IC. Please also refer to reset.txt in this directory for
-+common reset controller binding usage.
-+
-+Required properties:
-+- compatible: Should be "gpio-reset"
-+- reset-gpios: A gpio used as reset line. The gpio specifier for this property
-+               depends on the gpio controller that provides the gpio.
-+- #reset-cells: 0, see below
-+
-+Optional properties:
-+- reset-delay-us: delay in microseconds. The gpio reset line will be asserted for
-+                  this duration to reset.
-+- initially-in-reset: boolean. If not set, the initial state should be a
-+                      deasserted reset line. If this property exists, the
-+                      reset line should be kept in reset.
-+
-+example:
-+
-+sii902x_reset: gpio-reset {
-+	compatible = "gpio-reset";
-+	reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-+	reset-delay-us = <10000>;
-+	initially-in-reset;
-+	#reset-cells = <0>;
-+};
-+
-+/* Device with nRESET pin connected to GPIO5_0 */
-+sii902x at 39 {
-+	/* ... */
-+	resets = <&sii902x_reset>; /* active-low GPIO5_0, 10 ms delay */
-+};
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index c9d04f7..1a862df 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -11,3 +11,14 @@ menuconfig RESET_CONTROLLER
- 	  via GPIOs or SoC-internal reset controller modules.
- 
- 	  If unsure, say no.
-+
-+if RESET_CONTROLLER
-+
-+config RESET_GPIO
-+	tristate "GPIO reset controller support"
-+	depends on GPIOLIB && OF
-+	help
-+	  This driver provides support for reset lines that are controlled
-+	  directly by GPIOs.
-+
-+endif
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 1e2d83f..b854f20 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_RESET_CONTROLLER) += core.o
-+obj-$(CONFIG_RESET_GPIO) += gpio-reset.o
-diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
-new file mode 100644
-index 0000000..3049b22
---- /dev/null
-+++ b/drivers/reset/gpio-reset.c
-@@ -0,0 +1,184 @@
-+/*
-+ * GPIO Reset Controller driver
-+ *
-+ * Copyright 2013 Philipp Zabel, Pengutronix
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/gpio.h>
-+#include <linux/module.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+
-+struct gpio_reset_data {
-+	struct reset_controller_dev rcdev;
-+	unsigned int gpio;
-+	bool active_low;
-+	s32 delay_us;
-+};
-+
-+static void gpio_reset_set(struct reset_controller_dev *rcdev, int asserted)
-+{
-+	struct gpio_reset_data *drvdata = container_of(rcdev,
-+			struct gpio_reset_data, rcdev);
-+	int value = asserted;
-+
-+	if (drvdata->active_low)
-+		value = !value;
-+
-+	gpio_set_value_cansleep(drvdata->gpio, value);
-+}
-+
-+static int gpio_reset(struct reset_controller_dev *rcdev, unsigned long id)
-+{
-+	struct gpio_reset_data *drvdata = container_of(rcdev,
-+			struct gpio_reset_data, rcdev);
-+
-+	if (drvdata->delay_us < 0)
-+		return -ENOSYS;
-+
-+	gpio_reset_set(rcdev, 1);
-+	udelay(drvdata->delay_us);
-+	gpio_reset_set(rcdev, 0);
-+
-+	return 0;
-+}
-+
-+static int gpio_reset_assert(struct reset_controller_dev *rcdev,
-+		unsigned long id)
-+{
-+	gpio_reset_set(rcdev, 1);
-+
-+	return 0;
-+}
-+
-+static int gpio_reset_deassert(struct reset_controller_dev *rcdev,
-+		unsigned long id)
-+{
-+	gpio_reset_set(rcdev, 0);
-+
-+	return 0;
-+}
-+
-+static struct reset_control_ops gpio_reset_ops = {
-+	.reset = gpio_reset,
-+	.assert = gpio_reset_assert,
-+	.deassert = gpio_reset_deassert,
-+};
-+
-+static int of_gpio_reset_xlate(struct reset_controller_dev *rcdev,
-+			       const struct of_phandle_args *reset_spec)
-+{
-+	if (WARN_ON(reset_spec->args_count != 0))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static int gpio_reset_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct gpio_reset_data *drvdata;
-+	enum of_gpio_flags flags;
-+	unsigned long gpio_flags;
-+	bool initially_in_reset;
-+	int ret;
-+
-+	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
-+	if (drvdata == NULL)
-+		return -ENOMEM;
-+
-+	if (of_gpio_named_count(np, "reset-gpios") != 1) {
-+		dev_err(&pdev->dev,
-+			"reset-gpios property missing, or not a single gpio\n");
-+		return -EINVAL;
-+	}
-+
-+	drvdata->gpio = of_get_named_gpio_flags(np, "reset-gpios", 0, &flags);
-+	if (drvdata->gpio == -EPROBE_DEFER) {
-+		return drvdata->gpio;
-+	} else if (!gpio_is_valid(drvdata->gpio)) {
-+		dev_err(&pdev->dev, "invalid reset gpio: %d\n", drvdata->gpio);
-+		return drvdata->gpio;
-+	}
-+
-+	drvdata->active_low = flags & OF_GPIO_ACTIVE_LOW;
-+
-+	ret = of_property_read_u32(np, "reset-delay-us", &drvdata->delay_us);
-+	if (ret < 0)
-+		drvdata->delay_us = -1;
-+	else if (drvdata->delay_us < 0)
-+		dev_warn(&pdev->dev, "reset delay too high\n");
-+
-+	initially_in_reset = of_property_read_bool(np, "initially-in-reset");
-+	if (drvdata->active_low ^ initially_in_reset)
-+		gpio_flags = GPIOF_OUT_INIT_HIGH;
-+	else
-+		gpio_flags = GPIOF_OUT_INIT_LOW;
-+
-+	ret = devm_gpio_request_one(&pdev->dev, drvdata->gpio, gpio_flags, NULL);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to request gpio %d: %d\n",
-+			drvdata->gpio, ret);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, drvdata);
-+
-+	drvdata->rcdev.of_node = np;
-+	drvdata->rcdev.owner = THIS_MODULE;
-+	drvdata->rcdev.nr_resets = 1;
-+	drvdata->rcdev.ops = &gpio_reset_ops;
-+	drvdata->rcdev.of_xlate = of_gpio_reset_xlate;
-+	reset_controller_register(&drvdata->rcdev);
-+
-+	return 0;
-+}
-+
-+static int gpio_reset_remove(struct platform_device *pdev)
-+{
-+	struct gpio_reset_data *drvdata = platform_get_drvdata(pdev);
-+
-+	reset_controller_unregister(&drvdata->rcdev);
-+
-+	return 0;
-+}
-+
-+static struct of_device_id gpio_reset_dt_ids[] = {
-+	{ .compatible = "gpio-reset" },
-+	{ }
-+};
-+
-+static struct platform_driver gpio_reset_driver = {
-+	.probe = gpio_reset_probe,
-+	.remove = gpio_reset_remove,
-+	.driver = {
-+		.name = "gpio-reset",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(gpio_reset_dt_ids),
-+	},
-+};
-+
-+static int __init gpio_reset_init(void)
-+{
-+	return platform_driver_register(&gpio_reset_driver);
-+}
-+arch_initcall(gpio_reset_init);
-+
-+static void __exit gpio_reset_exit(void)
-+{
-+	platform_driver_unregister(&gpio_reset_driver);
-+}
-+module_exit(gpio_reset_exit);
-+
-+MODULE_AUTHOR("Philipp Zabel <p.zabel@pengutronix.de>");
-+MODULE_DESCRIPTION("gpio reset controller");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:gpio-reset");
-+MODULE_DEVICE_TABLE(of, gpio_reset_dt_ids);
--- 
-1.8.3.2
+Reading through the thread I noticed Nico explained details properly, I
+was about to mention a possible solution to the directory issue but I am
+pretty sure that what he did will turn out for the best.
+
+Usually, or better, historically, these pieces of code that program
+PMICs lived in arch/arm/mach-* directories and that's something we could
+have done as well (create a static mapping and write some functions to
+peek and poke a few registers), but we thought that it was not the proper
+way to go.
+
+On top of that, the SPC is part of a component whose register space maps
+disparate functions (config interface for voltage, clocks, energy probes,
+frequency scaling and power states management) and basically that's the
+reason we struggled to partition it properly (with further complexity
+implied by the way requests - config and frequency scaling - have to be
+serialized).
+
+I hope the end result is reasonable, and overall I think it was a debate
+that was worth having.
+
+Thank you,
+Lorenzo
