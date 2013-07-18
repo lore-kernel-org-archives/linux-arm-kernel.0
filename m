@@ -1,123 +1,294 @@
-From: ml@communistcode.co.uk (Jack Mitchell)
-Date: Thu, 18 Jul 2013 12:35:51 +0100
-Subject: [PATCH 0/4] Enable ethernet support for SOCFPGA
-In-Reply-To: <51E7B27F.2000304@communistcode.co.uk>
-References: <1374102623-4154-1-git-send-email-dinguyen@altera.com>
- <51E7B27F.2000304@communistcode.co.uk>
-Message-ID: <51E7D317.50101@communistcode.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 18 Jul 2013 13:43:30 +0200
+Subject: Audio issue on Kirkwood t5325: no sound
+Message-ID: <20130718134330.5aea00c5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/13 10:16, Jack Mitchell wrote:
-> On 18/07/13 00:10, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> Hello,
->>
->> These 4 patches are meant to enable ethernet and SD/MMC for the SOCFPGA
->> platform.
->>
->> patch (1/4): Adds select ARM_TWD for the platform
->> patch (2/4): Add platform specific initialization for the ethernet
->> controller.
->> patch (3/4): Commit 25c83b5c2 added "snps,phy-addr" for getting the
->> PHY addr.
->>          Set the ethernet clocks to be emac_0_clk and emac_1_clk so it
->> be gated.
->> patch (4/4): Update defconfig to support SD/MMC, ethernet, EXT3 and NFS.
->>
->> Thanks,
->>
->> Dinh Nguyen (4):
->>    arm: socfpga: Enable ARM_TWD for socfpga
->>    arm: socfpga: Add platform initialization for ethernet
->>    ARM: socfpga: dts: Fix entries for the ethernet entries.
->>    arm: socfpga: Add support for SD/MMC and ethernet to defconfig
->>
->>   arch/arm/boot/dts/socfpga.dtsi         |    4 +-
->>   arch/arm/boot/dts/socfpga_cyclone5.dts |    2 +-
->>   arch/arm/configs/socfpga_defconfig     |    8 +++
->>   arch/arm/mach-socfpga/Kconfig          |    1 +
->>   arch/arm/mach-socfpga/core.h           |    8 +++
->>   arch/arm/mach-socfpga/socfpga.c        |   85
->> +++++++++++++++++++++++++++++++-
->>   6 files changed, 104 insertions(+), 4 deletions(-)
->>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Olof Johansson <olof@lixom.net>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Cc: Pavel Machek <pavel@denx.de>
->> Cc: Jack Mitchell <jack.mitchell@dbbroadcast.co.uk>
->>
-> 
-> Hi Dinh,
-> 
-> What tree is this based against, or what patches are a pre-requisite to
-> this series? I applied the patches to linux-arm/master but the compile
-> failed.
-> 
-> arch/arm/mach-socfpga/socfpga.c: In function 'ksz9021rlrn_phy_fixup':
-> arch/arm/mach-socfpga/socfpga.c:85:21: error:
-> 'MICREL_KSZ9021_EXTREG_CTRL' undeclared (first use in this function)
->    phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
->                      ^
-> arch/arm/mach-socfpga/socfpga.c:85:21: note: each undeclared identifier
-> is reported only once for each function it appears in
-> arch/arm/mach-socfpga/socfpga.c:86:4: error:
-> 'MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW' undeclared (first use in this
-> function)
->     MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW | 0x8000);
->     ^
-> arch/arm/mach-socfpga/socfpga.c:87:21: error:
-> 'MICREL_KSZ9021_EXTREG_DATA_WRITE' undeclared (first use in this function)
->    phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
->                      ^
-> arch/arm/mach-socfpga/socfpga.c:91:4: error:
-> 'MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW' undeclared (first use in this
-> function)
->     MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW | 0x8000);
->     ^
-> arch/arm/mach-socfpga/socfpga.c: In function 'socfpga_cyclone5_init':
-> arch/arm/mach-socfpga/socfpga.c:193:30: error: 'PHY_ID_KSZ9021RLRN'
-> undeclared (first use in this function)
->    phy_register_fixup_for_uid(PHY_ID_KSZ9021RLRN,
->                               ^
-> Cheers,
-> Jack.
-> 
+Hello,
 
-Dinh,
+As part of some work around audio support on Marvell platforms, I've
+taken the Kirkwood-based HP t5325 thin client device that Martin
+Michlmayr kindly gave me and tried to use the audio part of it, with
+kernel 3.11-rc1. (My plan is to write the Device Tree binding for this
+audio driver, and then use it for Armada 370 based platforms).
 
-So I found your patch "phy: micrel: Add definitions for common Micrel
-PHY registers" and applied it, now the kernel compiles. I do however
-still run into the "Waiting for root device" issue. This is still on my
-Arrow SoCkit board, which may be a bit different to the Altera devkit;
-so please don't let this be a blocker if it works find with your kit. It
-is strange though that both boards can share the same 3.9-vendor
-dts/kernel without any changes...
+My kernel configuration has the following options enabled:
 
-Synopsys Designware Multimedia Card Interface Driver
-oprofile: no performance counters
-oprofile: using timer interrupt.
-TCP: cubic registered
-NET: Registered protocol family 17
-NET: Registered protocol family 15
-VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 4
-ThumbEE CPU extension supported.
-Registering SWP/SWPB emulation handler
-Waiting for root device /dev/mmcblk0p2...
+CONFIG_SND_SOC=y
+CONFIG_SND_KIRKWOOD_SOC=y
+CONFIG_SND_KIRKWOOD_SOC_I2S=y
+CONFIG_SND_KIRKWOOD_SOC_OPENRD=y
+CONFIG_SND_KIRKWOOD_SOC_T5325=y
+CONFIG_SND_SOC_I2C_AND_SPI=y
+CONFIG_SND_SOC_ALC5623=y
+CONFIG_SND_SOC_CS42L51=y
 
-Cheers,
-Jack.
+So both the Kirkwood audio driver is enabled, the t5325-specific
+machine audio driver, and the ALC5623 codec. When booting, the system
+says:
 
+t5325-audio t5325-audio:  alc5621-hifi <-> kirkwood-i2s mapping ok
+[...]
+ALSA device list:
+  #0: t5325
 
+I can actually use aplay to play a sound, it plays fine, except that
+nothing goes out on the headphone jack, as if it was muted:
 
+# aplay sensation.wav 
+Playing WAVE 'sensation.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Stereo
+#
 
+I've unmuted all volume controls, and pushed all of them to the max
+value, as can be seen from the following amixer output:
+
+# amixer 
+Simple mixer control 'Headphone',0
+  Capabilities: pvolume pswitch
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 31
+  Mono:
+  Front Left: Playback 31 [100%] [0.00dB] [on]
+  Front Right: Playback 31 [100%] [0.00dB] [on]
+Simple mixer control 'Speaker',0
+  Capabilities: pvolume pswitch
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 31
+  Mono:
+  Front Left: Playback 31 [100%] [0.00dB] [on]
+  Front Right: Playback 31 [100%] [0.00dB] [on]
+Simple mixer control 'Speaker Mix AUXI2SPK',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Speaker Mix DAC2SPK',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Speaker Mix LI2SPK',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Speaker Mix MIC12SPK',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Speaker Mix MIC22SPK',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'SpeakerOut Mux',0
+  Capabilities: enum
+  Items: 'Vmid' 'HPOut Mix' 'Speaker Mix' 'Mono Mix'
+  Item0: 'Vmid'
+Simple mixer control 'SpeakerOut N Mux',0
+  Capabilities: enum
+  Items: 'RN/-R' 'RP/+R' 'LN/-R' 'Vmid'
+  Item0: 'Vmid'
+Simple mixer control 'PCM',0
+  Capabilities: pvolume
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 31
+  Mono:
+  Front Left: Playback 31 [100%] [12.00dB]
+  Front Right: Playback 31 [100%] [12.00dB]
+Simple mixer control 'LineIn',0
+  Capabilities: cvolume
+  Capture channels: Front Left - Front Right
+  Limits: Capture 0 - 31
+  Front Left: Capture 31 [100%] [12.00dB]
+  Front Right: Capture 31 [100%] [12.00dB]
+Simple mixer control 'Mic 1 Boost',0
+  Capabilities: volume volume-joined
+  Playback channels: Mono
+  Capture channels: Mono
+  Limits: 0 - 2
+  Mono: 0 [0%] [0.00dB]
+Simple mixer control 'Mic 2 Boost',0
+  Capabilities: volume volume-joined
+  Playback channels: Mono
+  Capture channels: Mono
+  Limits: 0 - 2
+  Mono: 0 [0%] [0.00dB]
+Simple mixer control 'Mic1',0
+  Capabilities: cvolume cvolume-joined
+  Capture channels: Mono
+  Limits: Capture 0 - 31
+  Mono: Capture 23 [74%] [0.00dB]
+Simple mixer control 'Mic2',0
+  Capabilities: cvolume cvolume-joined
+  Capture channels: Mono
+  Limits: Capture 0 - 31
+  Mono: Capture 23 [74%] [0.00dB]
+Simple mixer control 'AuxI',0
+  Capabilities: cvolume
+  Capture channels: Front Left - Front Right
+  Limits: Capture 0 - 31
+  Front Left: Capture 23 [74%] [0.00dB]
+  Front Right: Capture 23 [74%] [0.00dB]
+Simple mixer control 'AuxOut Mux',0
+  Capabilities: enum
+  Items: 'Vmid' 'HPOut Mix' 'Speaker Mix' 'Mono Mix'
+  Item0: 'Vmid'
+Simple mixer control 'Auxout',0
+  Capabilities: pvolume pswitch
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 31
+  Mono:
+  Front Left: Playback 31 [100%] [0.00dB] [on]
+  Front Right: Playback 31 [100%] [0.00dB] [on]
+Simple mixer control 'Mono Mix ADC2MONO_L',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Mono Mix ADC2MONO_R',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Mono Mix AUXI2MONO',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Mono Mix DAC2MONO',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Mono Mix LI2MONO',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Mono Mix MIC12MONO',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Mono Mix MIC22MONO',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'AB-D Amp Mux',0
+  Capabilities: enum
+  Items: 'AB Amp' 'D Amp'
+  Item0: 'AB Amp'
+Simple mixer control 'Digital Boost',0
+  Capabilities: volume volume-joined
+  Playback channels: Mono
+  Capture channels: Mono
+  Limits: 0 - 3
+  Mono: 3 [100%] [18.00dB]
+Simple mixer control 'HP Mix AUXI2HP',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'HP Mix DAC2HP',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'HP Mix LI2HP',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'HP Mix MIC12HP',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'HP Mix MIC22HP',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'HPL Mix ADC2HP_L',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'HPR Mix ADC2HP_R',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'Left Capture Mix HPMixerL',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Left Capture Mix Left AuxI',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Left Capture Mix LineInL',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Left Capture Mix Mic1',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Left Capture Mix Mic2',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Left Capture Mix MonoMixer',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Left Capture Mix SPKMixer',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Left Headphone Mux',0
+  Capabilities: enum
+  Items: 'Vmid' 'HP Left Mix'
+  Item0: 'Vmid'
+Simple mixer control 'Rec',0
+  Capabilities: cvolume
+  Capture channels: Front Left - Front Right
+  Limits: Capture 0 - 31
+  Front Left: Capture 11 [35%] [0.00dB]
+  Front Right: Capture 11 [35%] [0.00dB]
+Simple mixer control 'Right Capture Mix HPMixerR',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Right Capture Mix LineInR',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Right Capture Mix Mic1',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Right Capture Mix Mic2',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Right Capture Mix MonoMixer',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Right Capture Mix Right AuxI',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Right Capture Mix SPKMixer',0
+  Capabilities: cswitch cswitch-joined
+  Capture channels: Mono
+  Mono: Capture [off]
+Simple mixer control 'Right Headphone Mux',0
+  Capabilities: enum
+  Items: 'Vmid' 'HP Right Mix'
+  Item0: 'Vmid'
+
+There are no kernel errors in the log, nothing that looks suspicious.
+Is there anything I've missed?
+
+I've posted the complete kernel configuration at:
+ http://free-electrons.com/~thomas/pub/kirkwood-audio-kernel.config
+
+And the complete kernel log at:
+ http://free-electrons.com/~thomas/pub/kirkwood-audio-kernel.log
+
+Thanks!
+
+Thomas
 -- 
-
-  Jack Mitchell (jack at embed.me.uk)
-  Embedded Systems Engineer
-  http://www.embed.me.uk
-
---
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
