@@ -1,81 +1,87 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 18 Jul 2013 12:02:12 -0500
-Subject: ARM: AM335x: Kernel oops when using EDMA and MMC
-In-Reply-To: <51E81C0E.6070709@gmail.com>
-References: <51E6BE84.6080905@newflow.co.uk> <51E6C88B.8090608@ti.com>
- <51E81A7E.9030805@ti.com> <51E81C0E.6070709@gmail.com>
-Message-ID: <51E81F94.7090804@ti.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 18 Jul 2013 19:00:38 +0200
+Subject: [PATCH v2 07/24] dts: mpc512x: introduce dt-bindings/clock/ header
+In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
+References: <1373914074-20889-1-git-send-email-gsi@denx.de>
+ <1374166855-7280-1-git-send-email-gsi@denx.de>
+Message-ID: <1374166855-7280-8-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 11:47 AM, Daniel Mack wrote:
-> Hi Balaji,
-> 
-> On 18.07.2013 18:40, Balaji T K wrote:
->> With DMA channel info retrieved from dt binding on 3.11rc1,
->> unused_chan_list is broken after hwmod cleanup removing mmc sdma
->> resource info, hence pdev resource wont have DMA resource populated.
->>
->> arch/arm/common/edma.c
->> static int prepare_unused_channel_list(struct device *dev, void *data)
->> {
->> 	struct platform_device *pdev = to_platform_device(dev);
->> 	int i, ctlr;
->>
->> 	for (i = 0; i < pdev->num_resources; i++) {
->> 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
->> 				(int)pdev->resource[i].start >= 0) {
->> 			ctlr = EDMA_CTLR(pdev->resource[i].start);
->> 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
->> 					edma_cc[ctlr]->edma_unused);
->> 		}
->> 	}
->>
->> 	return 0;
->> }
->>
->> int edma_alloc_channel(int channel,
->> 	if (!unused_chan_list_done) {
->> 		/*
->> 		 * Scan all the platform devices to find out the EDMA channels
->> 		 * used and clear them in the unused list, making the rest
->> 		 * available for ARM usage.
->> 		 */
->> 		ret = bus_for_each_dev(&platform_bus_type, NULL, NULL,
->> 				prepare_unused_channel_list);
->> 		if (ret < 0)
->> 			return ret;
->>
->> 		unused_chan_list_done = true;
->> 	}
->>
->> ===========
->>
->> with the below hack patch, edma is working fine with mmc on your 3.11rc1+ branch
->>
->> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
->> index a432e6c..5a19164 100644
->> --- a/arch/arm/common/edma.c
->> +++ b/arch/arm/common/edma.c
->> @@ -1262,8 +1262,8 @@ int edma_start(unsigned channel)
->>   		if (test_bit(channel, edma_cc[ctlr]->edma_unused)) {
->>   			pr_debug("EDMA: ESR%d %08x\n", j,
->>   				edma_shadow0_read_array(ctlr, SH_ESR, j));
->> -			edma_shadow0_write_array(ctlr, SH_ESR, j, mask);
->> -			return 0;
->> +//			edma_shadow0_write_array(ctlr, SH_ESR, j, mask);
->> +//			return 0;
->>   		}
->>
->>   		/* EDMA channel with event association */
->>
-> 
-> Yes, this in fact works for me as well. Thanks for the quick reply! What
-> would be the proper fix for this?
+introduce a dt-bindings/ header file for MPC512x clocks,
+providing symbolic identifiers for those SoC clocks which
+clients will reference from their device tree nodes
 
-Correct fix would be in the common EDMA driver to populate the unused
-channel list correctly as found by Balaji.
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ include/dt-bindings/clock/mpc512x-clock.h |   59 +++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 include/dt-bindings/clock/mpc512x-clock.h
 
-Thanks,
-
--Joel
+diff --git a/include/dt-bindings/clock/mpc512x-clock.h b/include/dt-bindings/clock/mpc512x-clock.h
+new file mode 100644
+index 0000000..46c560e
+--- /dev/null
++++ b/include/dt-bindings/clock/mpc512x-clock.h
+@@ -0,0 +1,59 @@
++/*
++ * This header provides constants for MPC512x clock specs in DT bindings.
++ *
++ * Unfortunately the clock number declaration cannot be an enum but
++ * needs to be a list of #define directives since when referenced from
++ * within DTS files they need to get resolved "at compile time".
++ */
++
++#ifndef _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
++#define _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
++
++#define MPC512x_CLK_DUMMY		0
++#define MPC512x_CLK_REF			1
++#define MPC512x_CLK_SYS			2
++#define MPC512x_CLK_DIU			3
++#define MPC512x_CLK_VIU			4
++#define MPC512x_CLK_CSB			5
++#define MPC512x_CLK_E300		6
++#define MPC512x_CLK_IPS			7
++#define MPC512x_CLK_FEC			8
++#define MPC512x_CLK_SATA		9
++#define MPC512x_CLK_PATA		10
++#define MPC512x_CLK_NFC			11
++#define MPC512x_CLK_LPC			12
++#define MPC512x_CLK_MBX_BUS		13
++#define MPC512x_CLK_MBX			14
++#define MPC512x_CLK_MBX_3D		15
++#define MPC512x_CLK_AXE			16
++#define MPC512x_CLK_USB1		17
++#define MPC512x_CLK_USB2		18
++#define MPC512x_CLK_I2C			19
++#define MPC512x_CLK_MSCAN0_MCLK		20
++#define MPC512x_CLK_MSCAN1_MCLK		21
++#define MPC512x_CLK_MSCAN2_MCLK		22
++#define MPC512x_CLK_MSCAN3_MCLK		23
++#define MPC512x_CLK_SDHC		24
++#define MPC512x_CLK_PCI			25
++#define MPC512x_CLK_PSC_MCLK_IN		26
++#define MPC512x_CLK_SPDIF_TX		27
++#define MPC512x_CLK_SPDIF_RX		28
++#define MPC512x_CLK_SPDIF_MCLK		29
++#define MPC512x_CLK_AC97		30
++#define MPC512x_CLK_PSC0_MCLK		31
++#define MPC512x_CLK_PSC1_MCLK		32
++#define MPC512x_CLK_PSC2_MCLK		33
++#define MPC512x_CLK_PSC3_MCLK		34
++#define MPC512x_CLK_PSC4_MCLK		35
++#define MPC512x_CLK_PSC5_MCLK		36
++#define MPC512x_CLK_PSC6_MCLK		37
++#define MPC512x_CLK_PSC7_MCLK		38
++#define MPC512x_CLK_PSC8_MCLK		39
++#define MPC512x_CLK_PSC9_MCLK		40
++#define MPC512x_CLK_PSC10_MCLK		41
++#define MPC512x_CLK_PSC11_MCLK		42
++#define MPC512x_CLK_PSC_FIFO		43
++
++#define MPC512x_CLK_LAST_PUBLIC		43
++
++#endif
+-- 
+1.7.10.4
