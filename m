@@ -1,60 +1,69 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 18 Jul 2013 00:34:08 -0700
-Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
- streaming format
-In-Reply-To: <CAMuHMdXzcRxEBqavTx-kEq6CNAx5fYug0w8kjDw=vNfS2iX4Fw@mail.gmail.com>
-References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
- <20130716004727.b60b2c96.akpm@linux-foundation.org>
- <20130716005611.e4ccab02.akpm@linux-foundation.org>
- <201307161008.07643.yann.morin.1998@free.fr>
- <20130716180408.GA19863@merkur.ravnborg.org>
- <20130717211649.GA5619@merkur.ravnborg.org>
- <20130717223033.GF3385@free.fr>
- <CAMuHMdXzcRxEBqavTx-kEq6CNAx5fYug0w8kjDw=vNfS2iX4Fw@mail.gmail.com>
-Message-ID: <20130718003408.bb9d5b51.akpm@linux-foundation.org>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu, 18 Jul 2013 09:34:42 +0200
+Subject: [PATCH v4 1/5] ARM: at91/tc/clocksource: replace clk_enable/disable
+ with clk_prepare_enable/disable_unprepare.
+In-Reply-To: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1374132882-15276-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Jul 2013 09:22:58 +0200 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+avoid common clk framework warnings.
 
-> On Thu, Jul 18, 2013 at 12:30 AM, Yann E. MORIN <yann.morin.1998@free.fr> wrote:
-> > On 2013-07-17 23:16 +0200, Sam Ravnborg spake thusly:
-> >> > We could extend the symbol option part to retreive values from a binary.
-> >> > Something like this:
-> >> >
-> >> > config FOOBAR
-> >> >         bool
-> >> >         option exec="true"
-> >> >
-> >> > FOOBAR would assume the value "y" if the command true has exit code == 0, otherwise "n".
-> >> > And similar conversions for other types.
-> >> >
-> >> > This only extendt Kconfig slightly - using an already present method to import
-> >> > external values.
-> >> >
-> >> > The drawback I see with this approach is that we may execute a lot of small programs
-> >> > where the value is never used.
-> >>
-> >> Following is a quick patch implmenting this idea.
-> >> You need to run gperf manually to enable this.
-> >>
-> >> "gperf -C scripts/kconfig/zconf.gperf > scripts/kconfig/zconf.hash.c"
-> >>
-> >> I did not figure out how to use the built-in rules to generate this file :-(
-> >
-> > make REGENERATE_PARSERS=y menuconfig
-> >
-> >> I have tested this lightly - as we should discuss if this is a viable way forward.
-> >
-> > Instead of extending the Kconfig language, I was thinking (as initially
-> > suggested by Andrew) of generating a Kconfig file before all config
-> > targets, and source that Kconfig file from $(TOPDIR)/Kconfig.
-> 
-> I also prefer the generated Kconfig file.
-> It keeps all these checks in a single place, instead of spreading it over all
-> Kconfig files. This allows to keep better control over the list of checks, and
-> notice when it gets out-of-hand.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/clocksource/tcb_clksrc.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-I prefer the "option exec" approach, actually.  That way the shell-outs
-are colocated with the code which uses them and they will only be executed
-if you've actually selected that subsystem for building (I think?).
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 8a61872..229c019 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+ 			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
+ 		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+ 		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+-		clk_disable(tcd->clk);
++		clk_disable_unprepare(tcd->clk);
+ 	}
+ 
+ 	switch (m) {
+@@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+ 	 * of oneshot, we get lower overhead and improved accuracy.
+ 	 */
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		clk_enable(tcd->clk);
++		clk_prepare_enable(tcd->clk);
+ 
+ 		/* slow clock, count up to RC, then irq and restart */
+ 		__raw_writel(timer_clock
+@@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+ 		break;
+ 
+ 	case CLOCK_EVT_MODE_ONESHOT:
+-		clk_enable(tcd->clk);
++		clk_prepare_enable(tcd->clk);
+ 
+ 		/* slow clock, count up to RC, then irq and stop */
+ 		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
+@@ -275,7 +275,7 @@ static int __init tcb_clksrc_init(void)
+ 	pdev = tc->pdev;
+ 
+ 	t0_clk = tc->clk[0];
+-	clk_enable(t0_clk);
++	clk_prepare_enable(t0_clk);
+ 
+ 	/* How fast will we be counting?  Pick something over 5 MHz.  */
+ 	rate = (u32) clk_get_rate(t0_clk);
+@@ -313,7 +313,7 @@ static int __init tcb_clksrc_init(void)
+ 		/* tclib will give us three clocks no matter what the
+ 		 * underlying platform supports.
+ 		 */
+-		clk_enable(tc->clk[1]);
++		clk_prepare_enable(tc->clk[1]);
+ 		/* setup both channel 0 & 1 */
+ 		tcb_setup_dual_chan(tc, best_divisor_idx);
+ 	}
+-- 
+1.7.9.5
