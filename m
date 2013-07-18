@@ -1,72 +1,41 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 19:00:37 +0200
-Subject: [PATCH v2 06/24] dts: mpc512x: prepare for preprocessor support
+Date: Thu, 18 Jul 2013 19:00:34 +0200
+Subject: [PATCH v2 03/24] mtd: mpc5121_nfc: prepare clocks before enabling them
 In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
 References: <1373914074-20889-1-git-send-email-gsi@denx.de>
  <1374166855-7280-1-git-send-email-gsi@denx.de>
-Message-ID: <1374166855-7280-7-git-send-email-gsi@denx.de>
+Message-ID: <1374166855-7280-4-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-prepare C preprocessor support when processing MPC512x DTS files
-- switch from DTS syntax to CPP syntax for include specs
-- create a symlink such that DTS processing can reference includes
+must prepare clocks before enabling them, unprepare after disable
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/ac14xx.dts          |    2 +-
- arch/powerpc/boot/dts/include/dt-bindings |    1 +
- arch/powerpc/boot/dts/mpc5121ads.dts      |    2 +-
- arch/powerpc/boot/dts/pdm360ng.dts        |    2 +-
- 4 files changed, 4 insertions(+), 3 deletions(-)
- create mode 120000 arch/powerpc/boot/dts/include/dt-bindings
+ drivers/mtd/nand/mpc5121_nfc.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-index a27a460..a543c40 100644
---- a/arch/powerpc/boot/dts/ac14xx.dts
-+++ b/arch/powerpc/boot/dts/ac14xx.dts
-@@ -10,7 +10,7 @@
-  */
+diff --git a/drivers/mtd/nand/mpc5121_nfc.c b/drivers/mtd/nand/mpc5121_nfc.c
+index 3c9cdcb..eb7771d 100644
+--- a/drivers/mtd/nand/mpc5121_nfc.c
++++ b/drivers/mtd/nand/mpc5121_nfc.c
+@@ -618,7 +618,7 @@ static void mpc5121_nfc_free(struct device *dev, struct mtd_info *mtd)
+ 	struct mpc5121_nfc_prv *prv = chip->priv;
  
+ 	if (prv->clk) {
+-		clk_disable(prv->clk);
++		clk_disable_unprepare(prv->clk);
+ 		clk_put(prv->clk);
+ 	}
  
--/include/ "mpc5121.dtsi"
-+#include <mpc5121.dtsi>
+@@ -737,7 +737,7 @@ static int mpc5121_nfc_probe(struct platform_device *op)
+ 		goto error;
+ 	}
  
- / {
- 	model = "ac14xx";
-diff --git a/arch/powerpc/boot/dts/include/dt-bindings b/arch/powerpc/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/powerpc/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/arch/powerpc/boot/dts/mpc5121ads.dts b/arch/powerpc/boot/dts/mpc5121ads.dts
-index 7d3cb79..c228a0a 100644
---- a/arch/powerpc/boot/dts/mpc5121ads.dts
-+++ b/arch/powerpc/boot/dts/mpc5121ads.dts
-@@ -9,7 +9,7 @@
-  * option) any later version.
-  */
+-	clk_enable(prv->clk);
++	clk_prepare_enable(prv->clk);
  
--/include/ "mpc5121.dtsi"
-+#include <mpc5121.dtsi>
- 
- / {
- 	model = "mpc5121ads";
-diff --git a/arch/powerpc/boot/dts/pdm360ng.dts b/arch/powerpc/boot/dts/pdm360ng.dts
-index 7433740..871c16d 100644
---- a/arch/powerpc/boot/dts/pdm360ng.dts
-+++ b/arch/powerpc/boot/dts/pdm360ng.dts
-@@ -13,7 +13,7 @@
-  * option) any later version.
-  */
- 
--/include/ "mpc5121.dtsi"
-+#include <mpc5121.dtsi>
- 
- / {
- 	model = "pdm360ng";
+ 	/* Reset NAND Flash controller */
+ 	nfc_set(mtd, NFC_CONFIG1, NFC_RESET);
 -- 
 1.7.10.4
