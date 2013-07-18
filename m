@@ -1,34 +1,62 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 18 Jul 2013 15:31:06 +0800
-Subject: [PATCH 0/4] ARM: imx6q: clean up board specific CLKO setup
-Message-ID: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 18 Jul 2013 15:31:09 +0800
+Subject: [PATCH 3/4] ARM: imx6q: add the missing cko output selection
+In-Reply-To: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
+References: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1374132670-791-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLKO is widely used by imx6q board designs to clock audio codec.
-Currently, imx6q-sabrelite and imx6qdl-sabresd set up CLKO in board
-specific hooks, while imx6qdl-wandboard handles that in U-Boot.
-Since most audio codecs accept 24 MHz frequency, the series adds missing
-CLKO pieces into clock driver, and initially sets up CLKO with OSC24M
-(cko <-- cko2 <-- osc).  Then those board specific CLKO setup for audio
-codec can be removed, while it improves the power efficiency@the same
-time by saving the use of PLL.
+The clock output on imx6q CCM_CLKO1 pad is not always cko1 clock, and
+there is a multiplexer to select between cko1 and cko2.  Add this
+missing selection as the clock cko.
 
-Shawn
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    1 +
+ arch/arm/mach-imx/clk-imx6q.c                      |    4 +++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-Shawn Guo (4):
-  ARM: imx6q: add spdif gate clock
-  ARM: imx6q: add cko2 clocks
-  ARM: imx6q: add the missing cko output selection
-  ARM: imx6q: remove board specific CLKO setup
-
- .../devicetree/bindings/clock/imx6q-clock.txt      |    5 ++
- arch/arm/boot/dts/imx6q-sabrelite.dts              |    2 +-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |    2 +-
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi           |    2 +-
- arch/arm/mach-imx/clk-imx6q.c                      |   30 ++++++++-
- arch/arm/mach-imx/mach-imx6q.c                     |   69 --------------------
- 6 files changed, 37 insertions(+), 73 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index c6d7e16..3066f181 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -213,6 +213,7 @@ clocks and IDs.
+ 	cko2_sel      		198
+ 	cko2_podf      		199
+ 	cko2      		200
++	cko      		201
+ 
+ Examples:
+ 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 924ed84..ed19b33 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -216,6 +216,7 @@ static const char *cko2_sels[] = {
+ 	"ldb_di0", "ldb_di1", "esai", "eim_slow",
+ 	"uart_serial", "spdif", "asrc", "hsi_tx",
+ };
++static const char *cko_sels[] = { "cko1", "cko2", };
+ 
+ enum mx6q_clks {
+ 	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
+@@ -250,7 +251,7 @@ enum mx6q_clks {
+ 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+ 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+ 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+-	spdif, cko2_sel, cko2_podf, cko2, clk_max
++	spdif, cko2_sel, cko2_podf, cko2, cko, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -409,6 +410,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[vpu_axi_sel]      = imx_clk_mux("vpu_axi_sel",      base + 0x18, 14, 2, vpu_axi_sels,      ARRAY_SIZE(vpu_axi_sels));
+ 	clk[cko1_sel]         = imx_clk_mux("cko1_sel",         base + 0x60, 0,  4, cko1_sels,         ARRAY_SIZE(cko1_sels));
+ 	clk[cko2_sel]         = imx_clk_mux("cko2_sel",         base + 0x60, 16, 5, cko2_sels,         ARRAY_SIZE(cko2_sels));
++	clk[cko]              = imx_clk_mux("cko",              base + 0x60, 8, 1,  cko_sels,          ARRAY_SIZE(cko_sels));
+ 
+ 	/*                              name         reg      shift width busy: reg, shift parent_names  num_parents */
+ 	clk[periph]  = imx_clk_busy_mux("periph",  base + 0x14, 25,  1,   base + 0x48, 5,  periph_sels,  ARRAY_SIZE(periph_sels));
 -- 
 1.7.9.5
