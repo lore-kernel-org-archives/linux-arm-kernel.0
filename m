@@ -1,68 +1,97 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 18 Jul 2013 14:56:50 +0100
-Subject: [PATCH v3] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <CACmBeS24smrJ4SLY7snv1_6SRcuXRkZ8t0PGMvBupUpKMMb43w@mail.gmail.com>
-References: <1372943292-6960-1-git-send-email-jonas.jensen@gmail.com>
- <1374067396-30155-1-git-send-email-jonas.jensen@gmail.com>
- <20130718095035.GA29153@e106331-lin.cambridge.arm.com>
- <CACmBeS2SnpiUtiQD6j9qyaXZ5-chHSHVeo4c5=UhitVonvkKtw@mail.gmail.com>
- <20130718110201.GB29153@e106331-lin.cambridge.arm.com>
- <CACmBeS24smrJ4SLY7snv1_6SRcuXRkZ8t0PGMvBupUpKMMb43w@mail.gmail.com>
-Message-ID: <20130718135650.GD29153@e106331-lin.cambridge.arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 18 Jul 2013 11:05:51 -0300
+Subject: [PATCH] ARM: Kirkwood: Fix the internal register ranges
+ translation
+In-Reply-To: <51E59639.3000207@keymile.com>
+References: <1371569479-31498-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <51E5145A.90404@keymile.com> <20130716125531.GD2317@localhost>
+ <51E59639.3000207@keymile.com>
+Message-ID: <20130718140550.GA3364@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 12:55:26PM +0100, Jonas Jensen wrote:
-> On 18 July 2013 13:02, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Ok. I'm just concerned that the linkage isn't explicit or obvious.
-> 
-> > This does leave apb-clock completely dependent on core-clock, and unless
-> > I've missed something there's no linkage between the two described in
-> > the dt.
-> 
-> I can add a description in the core-clock binding and also for
-> apb-clock pointing
-> out that it's set from core-clock.
-> 
-> > How does core-clock physically relate to apb-clock? Does it feed or is
-> > it fed by apb-clock?
-> 
-> apb-clock is entirely a DT construct used by drivers to get the fixed
-> rate 48MHz.
-> It's not fed by core-clock more than what happens in probe.
-> 
-> For UC-7112-LX, drivers using apb-clock are: clocksource, MMC, watchdog
-> 
-> Because clocksource relies on apb-clock, a successful probe of
-> core-clock is critical.
-> 
-> Commonly, drivers look up the apb-clock node and call clk_get_rate.
+Gerlando,
 
-When you say look up the apb-clock node, I assume they find it via their
-clocks property with of_clk_get or similar, rather than scanning the
-tree for a "moxart,moxa-apb-clock" node specifically?
+On Tue, Jul 16, 2013 at 08:51:37PM +0200, Gerlando Falauto wrote:
+[...]
+> >
+> > Also, speaking of "device bus" this nand node should be behind a devicebus node.
+> >
+> > 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000   /* internal-regs */
+> > 			  MBUS_ID(0x01, 0x2f) 0 0 0xf4000000 0x400>;
+> >
+> > 		devbus {
+> > 			status = "okay";
+> > 			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x400>;
+> >
+> > 			/* nand */
+> > 			nand {
+> > 				compatible = "marvell,orion-nand";
+> > 				reg = <0 0x400>;
+> > 			};
+> > 		};
+> 
+> I believe that makes a lot more sense this way... I guess this feature 
+> (device bus) requires your latest set of patches, right? (either v7 as 
+> you posted yesterday or your tree at 
+> git://github.com/MISL-EBU-System-SW/mainline-public.git/marvell-mvebu-mbus-v7)
+> 
 
-> 
-> > Are we always guaranteed to have core-clock if we have apb-clock, and is
-> > it part of the same block in hardware? If so we could describe the
-> > amalgamation as a provider with two clock outputs, with core-clock's
-> > registers for configuration at probe-time.
-> 
-> Yes, as described above, there can not be a apb-clock without core-clock.
-> 
-> 
-> I think drivers could find and use core-clock instead. Maybe the abstraction
-> of apb-clock is unnecessary?
+No, not really. The device-bus driver is already merged, so we only need
+to use it, and maybe extend it a bit to support kirkwood (in case it's
+needed). You can see in:
 
-Given the above, I think it would make more sense to have core-clock
-registered, and have it passed to the devices currently passed
-apb-clock.
+  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
 
-Thanks,
-Mark.
+for an example.
 
+I would prefer that to be done *after* the MBus is accepted...
+but that's just a personal preference.
+
+> > (notice this will allow you to relocate the base address of the NAND windows
+> > easily if it conflicts with your PCIe needs).
 > 
+> I sort of had the impression I could do already do that somehow, though 
+> I am not quite sure anymore...
 > 
-> Best regards,
-> Jonas
+
+Well, you can do it by patching and re-building the kernel as the
+MBus windows are created from C-files.
+
+With the MBus DT binding, all you need is to change the DT.
+
+> >> avoid a later incosistency between the "unit-address" and the first
+> >> "reg" address:
+> >>
+> >>>    		#address-cells = <1>;
+> >>>    		#size-cells = <1>;
+> >>> @@ -171,7 +172,7 @@
+> >>   >   		nand at 3000000 {
+> >> 		     ^^^^^^^
+> >
+> > Oh, this should be fixed. I just missed it, and nobody noticed either.
+> >
 > 
+> So, in the end, you think it's OK to have a set of nodes with "relative" 
+> addresses (gpio at 10140, serial at 12000 etc...) and some with "absolute" 
+> addresses (nand at 0xf4000000, where the ranges property does a 0-offset 
+> translation)?
+> Even though I understand this is just some transitional state, and it 
+> will all be fixed like your example above, once we get the rest of the 
+> rework merged (mbus/devbus).
+
+Mmm.. I see your point. In the end, it's just as you say, the current state
+is only transitional. There's no way to have a proper DT without the MBus DT
+binding.
+
+The reason for this mess is that the current layout mixes the actual
+address space. Feel free to take a look at the latest MBus series and
+try to add MBus DT binding for Kirkwood.
+
+If you do, don't hesitate in asking as many questions as you need and/or
+posting RFCs for us to look at.
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
