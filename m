@@ -1,57 +1,172 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 18 Jul 2013 09:04:02 +0200
-Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
-In-Reply-To: <20130715193829.GS14452@pengutronix.de>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1373914074-20889-6-git-send-email-gsi@denx.de>
- <20130715193829.GS14452@pengutronix.de>
-Message-ID: <20130718070402.GO7080@book.gsilab.sittig.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Jul 2013 00:05:09 -0700
+Subject: [PATCH 05/15] ARM: dts: omap: update usb_otg_hs data
+In-Reply-To: <1374129984-765-6-git-send-email-kishon@ti.com>
+References: <1374129984-765-1-git-send-email-kishon@ti.com>
+ <1374129984-765-6-git-send-email-kishon@ti.com>
+Message-ID: <20130718070508.GN7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 21:38 +0200, Sascha Hauer wrote:
+* Kishon Vijay Abraham I <kishon@ti.com> [130717 23:53]:
+> Updated the usb_otg_hs dt data to include the *phy* and *phy-names*
+> binding in order for the driver to use the new generic PHY framework.
+> Also updated the Documentation to include the binding information.
+> The PHY binding information can be found at
+> Documentation/devicetree/bindings/phy/phy-bindings.txt
 > 
-> On Mon, Jul 15, 2013 at 08:47:34PM +0200, Gerhard Sittig wrote:
-> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> > index 6d55eb2..2c07061 100644
-> > --- a/drivers/clk/clk-divider.c
-> > +++ b/drivers/clk/clk-divider.c
-> > @@ -104,7 +104,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
-> >  	struct clk_divider *divider = to_clk_divider(hw);
-> >  	unsigned int div, val;
-> >  
-> > -	val = readl(divider->reg) >> divider->shift;
-> > +	val = clk_readl(divider->reg) >> divider->shift;
-> >  	val &= div_mask(divider);
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+In general the .dts changes should be separate to avoid pointless
+merge conflicts. But sounds like things will stop working for
+USB unless we do it like this so:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+
+> ---
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |    5 +++++
+>  Documentation/devicetree/bindings/usb/usb-phy.txt  |    6 ++++++
+>  arch/arm/boot/dts/omap3-beagle-xm.dts              |    2 ++
+>  arch/arm/boot/dts/omap3-evm.dts                    |    2 ++
+>  arch/arm/boot/dts/omap3-overo.dtsi                 |    2 ++
+>  arch/arm/boot/dts/omap4.dtsi                       |    3 +++
+>  arch/arm/boot/dts/twl4030.dtsi                     |    1 +
+>  7 files changed, 21 insertions(+)
 > 
-> Would it be an option to use regmap for the generic dividers/muxes
-> instead? This should be suitable for ppc and also for people who want to
-> use the generic clocks on i2c devices.
-
-Some other thought crossed my mind regarding access to clock
-control registers that reside behind some communication channel
-like I2C:
-
-The common clock API assumes (it's part of the contract) that
-there are potentially expensive operations like get, put, prepare
-and unprepare, as well as swift and non-blocking operations like
-enable and disable.
-
-Would the regmap abstraction hide the potentially blocking nature
-of a register access (I understand that you can implement "local"
-as well as "remote" register sets by this mechanism)?  Or could
-you still meet the assumptions or requirements of the common
-clock API?
-
-It might as well be the responsibility of the clock driver's
-implementor to arrange for the availability of non-blocking
-enable/disable operations, just as it is today.  Such that
-expensive register access need not be forbidden in general.
-
-
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
+> index 57e71f6..825790d 100644
+> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
+> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+> @@ -19,6 +19,9 @@ OMAP MUSB GLUE
+>   - power : Should be "50". This signifies the controller can supply up to
+>     100mA when operating in host mode.
+>   - usb-phy : the phandle for the PHY device
+> + - phys : the phandle for the PHY device (used by generic PHY framework)
+> + - phy-names : the names of the PHY corresponding to the PHYs present in the
+> +   *phy* phandle.
+>  
+>  Optional properties:
+>   - ctrl-module : phandle of the control module this glue uses to write to
+> @@ -33,6 +36,8 @@ usb_otg_hs: usb_otg_hs at 4a0ab000 {
+>  	num-eps = <16>;
+>  	ram-bits = <12>;
+>  	ctrl-module = <&omap_control_usb>;
+> +	phys = <&usb2_phy>;
+> +	phy-names = "usb2-phy";
+>  };
+>  
+>  Board specific device node entry
+> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+> index 61496f5..c0245c8 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+> @@ -5,6 +5,8 @@ OMAP USB2 PHY
+>  Required properties:
+>   - compatible: Should be "ti,omap-usb2"
+>   - reg : Address and length of the register set for the device.
+> + - #phy-cells: determine the number of cells that should be given in the
+> +   phandle while referencing this phy.
+>  
+>  Optional properties:
+>   - ctrl-module : phandle of the control module used by PHY driver to power on
+> @@ -16,6 +18,7 @@ usb2phy at 4a0ad080 {
+>  	compatible = "ti,omap-usb2";
+>  	reg = <0x4a0ad080 0x58>;
+>  	ctrl-module = <&omap_control_usb>;
+> +	#phy-cells = <0>;
+>  };
+>  
+>  OMAP USB3 PHY
+> @@ -25,6 +28,8 @@ Required properties:
+>   - reg : Address and length of the register set for the device.
+>   - reg-names: The names of the register addresses corresponding to the registers
+>     filled in "reg".
+> + - #phy-cells: determine the number of cells that should be given in the
+> +   phandle while referencing this phy.
+>  
+>  Optional properties:
+>   - ctrl-module : phandle of the control module used by PHY driver to power on
+> @@ -39,4 +44,5 @@ usb3phy at 4a084400 {
+>  	      <0x4a084c00 0x40>;
+>  	reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+>  	ctrl-module = <&omap_control_usb>;
+> +	#phy-cells = <0>;
+>  };
+> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> index afdb164..533b2da 100644
+> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> @@ -144,6 +144,8 @@
+>  &usb_otg_hs {
+>  	interface-type = <0>;
+>  	usb-phy = <&usb2_phy>;
+> +	phys = <&usb2_phy>;
+> +	phy-names = "usb2-phy";
+>  	mode = <3>;
+>  	power = <50>;
+>  };
+> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+> index 7d4329d..4134dd0 100644
+> --- a/arch/arm/boot/dts/omap3-evm.dts
+> +++ b/arch/arm/boot/dts/omap3-evm.dts
+> @@ -70,6 +70,8 @@
+>  &usb_otg_hs {
+>  	interface-type = <0>;
+>  	usb-phy = <&usb2_phy>;
+> +	phys = <&usb2_phy>;
+> +	phy-names = "usb2-phy";
+>  	mode = <3>;
+>  	power = <50>;
+>  };
+> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+> index 8f1abec..a461d2f 100644
+> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+> @@ -76,6 +76,8 @@
+>  &usb_otg_hs {
+>  	interface-type = <0>;
+>  	usb-phy = <&usb2_phy>;
+> +	phys = <&usb2_phy>;
+> +	phy-names = "usb2-phy";
+>  	mode = <3>;
+>  	power = <50>;
+>  };
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 22d9f2b..1e8e2fe 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -520,6 +520,7 @@
+>  				compatible = "ti,omap-usb2";
+>  				reg = <0x4a0ad080 0x58>;
+>  				ctrl-module = <&omap_control_usb>;
+> +				#phy-cells = <0>;
+>  			};
+>  		};
+>  
+> @@ -658,6 +659,8 @@
+>  			interrupt-names = "mc", "dma";
+>  			ti,hwmods = "usb_otg_hs";
+>  			usb-phy = <&usb2_phy>;
+> +			phys = <&usb2_phy>;
+> +			phy-names = "usb2-phy";
+>  			multipoint = <1>;
+>  			num-eps = <16>;
+>  			ram-bits = <12>;
+> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+> index b3034da..ce4cd6f 100644
+> --- a/arch/arm/boot/dts/twl4030.dtsi
+> +++ b/arch/arm/boot/dts/twl4030.dtsi
+> @@ -80,6 +80,7 @@
+>  		usb1v8-supply = <&vusb1v8>;
+>  		usb3v1-supply = <&vusb3v1>;
+>  		usb_mode = <1>;
+> +		#phy-cells = <0>;
+>  	};
+>  
+>  	twl_pwm: pwm {
+> -- 
+> 1.7.10.4
+> 
