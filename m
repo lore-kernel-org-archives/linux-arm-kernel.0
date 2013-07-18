@@ -1,80 +1,63 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 18 Jul 2013 08:49:54 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <51E7AE88.3050007@ti.com>
-References: <1374129984-765-1-git-send-email-kishon@ti.com>
- <1374129984-765-2-git-send-email-kishon@ti.com>
- <20130718072004.GA16720@kroah.com> <51E7AE88.3050007@ti.com>
-Message-ID: <20130718154954.GA31961@kroah.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 18 Jul 2013 11:50:00 -0400 (EDT)
+Subject: [PATCH V3 2/6] USB: OHCI: make ohci-omap a separate driver
+In-Reply-To: <1372141408-9894-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1307181144480.1245-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 02:29:52PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Thursday 18 July 2013 12:50 PM, Greg KH wrote:
-> > On Thu, Jul 18, 2013 at 12:16:10PM +0530, Kishon Vijay Abraham I wrote:
-> >> +struct phy_provider *__of_phy_provider_register(struct device *dev,
-> >> +	struct module *owner, struct phy * (*of_xlate)(struct device *dev,
-> >> +	struct of_phandle_args *args));
-> >> +struct phy_provider *__devm_of_phy_provider_register(struct device *dev,
-> >> +	struct module *owner, struct phy * (*of_xlate)(struct device *dev,
-> >> +	struct of_phandle_args *args))
-> >> +
-> >> +__of_phy_provider_register and __devm_of_phy_provider_register can be used to
-> >> +register the phy_provider and it takes device, owner and of_xlate as
-> >> +arguments. For the dt boot case, all PHY providers should use one of the above
-> >> +2 APIs to register the PHY provider.
-> > 
-> > Why do you have __ for the prefix of a public function?  Is that really
-> > the way that OF handles this type of thing?
-> 
-> I have a macro of_phy_provider_register/devm_of_phy_provider_register that
-> calls these functions and should be used by the PHY drivers. Probably I should
-> make a mention of it in the Documentation.
+On Tue, 25 Jun 2013, Manjunath Goudar wrote:
 
-Yes, mention those as you never want to be calling __* functions
-directly, right?
+> Separate the  TI OHCI OMAP1/2 host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> it would be nice to have in 3.11.
+   
+I'm sorry it took so long to review this; I have been very busy. 
+    
+This patch is almost right.  There are just a couple of problems 
+involving the clock_power calls.
 
-> >> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
-> > 
-> > Your naming is odd, no "phy" anywhere in it?  You rely on the sender to
-> > never send a duplicate name.id pair?  Why not create your own ids based
-> > on the number of phys in the system, like almost all other classes and
-> > subsystems do?
-> 
-> hmm.. some PHY drivers use the id they provide to perform some of their
-> internal operation as in [1] (This is used only if a single PHY provider
-> implements multiple PHYS). Probably I'll add an option like PLATFORM_DEVID_AUTO
-> to give the PHY drivers an option to use auto id.
-> 
-> [1] ->
-> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
+> @@ -354,12 +358,6 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
+>  		goto err2;
+>  	}
+>  
+> -	ohci = hcd_to_ohci(hcd);
+> -	ohci_hcd_init(ohci);
+> -
+> -	host_initialized = 0;
+> -	host_enabled = 1;
+> -
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+>  		retval = -ENXIO;
+> @@ -369,11 +367,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
+>  	if (retval)
+>  		goto err3;
+>  
+> -	host_initialized = 1;
+> -
+> -	if (!host_enabled)
+> -		omap_ohci_clock_power(0);
+> -
+> +	omap_ohci_clock_power(0);
 
-No, who cares about the id?  No one outside of the phy core ever should,
-because you pass back the only pointer that they really do care about,
-if they need to do anything with the device.  Use that, and then you can
-rip out all of the "search for a phy by a string" logic, as that's not
-needed either.  Just stick to the pointer, it's easier, and safer that
-way.
+Since host_enabled was always 1 at this point, omap_ohci_clock_power()
+would never be called.  You should remove it.
 
-> >> +static inline int phy_pm_runtime_get(struct phy *phy)
-> >> +{
-> >> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
-> >> +		return -EINVAL;
-> > 
-> > Why would phy ever not be valid and a error pointer?  And why dump the
-> > stack if that happens, that seems really extreme.
-> 
-> hmm.. there might be cases where the same controller in one soc needs PHY
-> control and in some other soc does not need PHY control. In such cases, we
-> might get error pointer here.
-> I'll change WARN to dev_err.
+> @@ -402,6 +396,8 @@ err0:
+>  static inline void
+>  usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
+>  {
+> +	dev_dbg(hcd->self.controller, "stopping USB Controller\n");
+> +	omap_ohci_clock_power(0);
+>  	usb_remove_hcd(hcd);
+>  	if (!IS_ERR_OR_NULL(hcd->phy)) {
+>  		(void) otg_set_host(hcd->phy->otg, 0);
 
-I still don't understand.  You have control over the code that calls
-these functions, just ensure that they pass in a valid pointer, it's
-that simple.  Or am I missing something?
+omap_ohci_clock_power() should be called after usb_remove_hcd(), not
+before.  This reason is simple: Until usb_remove_hcd() is called, the
+controller is still running and therefore needs to have a valid clock
+signal.
 
-thanks,
-
-greg k-h
+Alan Stern
