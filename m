@@ -1,82 +1,106 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 18 Jul 2013 09:24:31 +0100
-Subject: [RFC PATCH v2 11/15] cpufreq: kirkwood-cpufreq: remove device
- tree parsing for cpu nodes
-In-Reply-To: <20130717144355.GE1026@lunn.ch>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374069984-20567-12-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130717144355.GE1026@lunn.ch>
-Message-ID: <51E7A63F.7020207@arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 18 Jul 2013 10:28:58 +0200
+Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
+In-Reply-To: <CAN8TOE_YfnQ5hK=xO28tH2h39Fb3KcVBFGM=XAFLHnRb0DFO3A@mail.gmail.com>
+References: <1372845034-5579-1-git-send-email-josh.wu@atmel.com>
+ <1372845034-5579-7-git-send-email-josh.wu@atmel.com>
+ <CAN8TOE_YfnQ5hK=xO28tH2h39Fb3KcVBFGM=XAFLHnRb0DFO3A@mail.gmail.com>
+Message-ID: <20130718082858.GF16015@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/13 15:43, Andrew Lunn wrote:
-> On Wed, Jul 17, 2013 at 03:06:20PM +0100, Sudeep.KarkadaNagesha at arm.com wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Now that the cpu device registration initialises the of_node(if available)
->> appropriately for all the cpus, parsing here is redundant.
->>
->> This patch removes all DT parsing and uses cpu->of_node instead.
->>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> ---
->>  drivers/cpufreq/kirkwood-cpufreq.c | 14 ++++++++++++--
->>  1 file changed, 12 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
->> index c233ea6..18aa3eb 100644
->> --- a/drivers/cpufreq/kirkwood-cpufreq.c
->> +++ b/drivers/cpufreq/kirkwood-cpufreq.c
->> @@ -13,6 +13,7 @@
->>  #include <linux/module.h>
->>  #include <linux/clk.h>
->>  #include <linux/clk-provider.h>
->> +#include <linux/cpu.h>
->>  #include <linux/cpufreq.h>
->>  #include <linux/of.h>
->>  #include <linux/platform_device.h>
->> @@ -165,6 +166,7 @@ static struct cpufreq_driver kirkwood_cpufreq_driver = {
->>  static int kirkwood_cpufreq_probe(struct platform_device *pdev)
->>  {
->>  	struct device_node *np;
->> +	struct device *cpu_dev;
->>  	struct resource *res;
->>  	int err;
->>  
->> @@ -175,9 +177,17 @@ static int kirkwood_cpufreq_probe(struct platform_device *pdev)
->>  	if (IS_ERR(priv.base))
->>  		return PTR_ERR(priv.base);
->>  
->> -	np = of_find_node_by_path("/cpus/cpu at 0");
->> -	if (!np)
->> +	cpu_dev = get_cpu_device(0);
->> +	if (!cpu_dev) {
->> +		dev_err(&pdev->dev, "failed to get cpu device\n");
->>  		return -ENODEV;
->> +	}
->> +
->> +	np = of_node_get(cpu_dev->of_node);
->> +	if (!np) {
->> +		dev_err(&pdev->dev, "failed to get cpu device node\n");
->> +		return -ENODEV;
->> +	}
+On 00:14 Thu 18 Jul     , Brian Norris wrote:
+> Adding device tree list, keeping patch context
 > 
-> Hi Sudeep
+> On Wed, Jul 3, 2013 at 2:50 AM, Josh Wu <josh.wu@atmel.com> wrote:
+> > In case that the nand device will support some features like Nand Flash
+> > Controller, we want to make the sub feature as a sub node of nand device.
+> >
+> > Use such organization it is easy to enable/disable feature, also it is back
+> > compatible and more readable.
+> >
+> > If the sub-node has a compatible property then it is a driver not partition.
+> >
+> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
 > 
-> Are we not going a bit backwards here? You are replacing two lines
-> with 10 lines.
+> I just came back to this patch series. I think this patch might be
+> deserving of a review by the device-tree mailing list. (It also
+> doesn't deserve to die in MTD purgatory.)
 > 
-> How about putting these 10 lines into some helper,
-> of_get_cpu_device()?  It would be useful for spear, kirkwood and
-> imx6q, and maybe others.
+> BTW, it looks good to me, so:
 > 
-Yes I realised that after making changes to this and pmac32 drivers. I
-have already made those changes in v3. I am waiting for more response
-before posting them.
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Regards,
-Sudeep
+Rob can take a look on it
+
+Best Regards,
+J.
+> 
+> Thanks,
+> Brian
+> 
+> > ---
+> > v3 --> v4:
+> >   - remove the 'len' parameter, just use NULL.
+> >   - refine the commit message.
+> >   - also add a NOTE in devicetree/bindings/mtd/partition.txt.
+> >
+> >  .../devicetree/bindings/mtd/partition.txt          |    1 +
+> >  drivers/mtd/ofpart.c                               |   13 ++++++++++++-
+> >  2 files changed, 13 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/mtd/partition.txt b/Documentation/devicetree/bindings/mtd/partition.txt
+> > index 9315ac9..8e5557d 100644
+> > --- a/Documentation/devicetree/bindings/mtd/partition.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/partition.txt
+> > @@ -4,6 +4,7 @@ Partitions can be represented by sub-nodes of an mtd device. This can be used
+> >  on platforms which have strong conventions about which portions of a flash are
+> >  used for what purposes, but which don't use an on-flash partition table such
+> >  as RedBoot.
+> > +NOTE: if the sub-node has a compatible string, then it is not a partition.
+> >
+> >  #address-cells & #size-cells must both be present in the mtd device. There are
+> >  two valid values for both:
+> > diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
+> > index 553d6d6..30fcea1 100644
+> > --- a/drivers/mtd/ofpart.c
+> > +++ b/drivers/mtd/ofpart.c
+> > @@ -20,6 +20,10 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/mtd/partitions.h>
+> >
+> > +static bool node_has_compatible(struct device_node *pp)
+> > +{
+> > +       return of_get_property(pp, "compatible", NULL);
+> > +}
+> >  static int parse_ofpart_partitions(struct mtd_info *master,
+> >                                    struct mtd_partition **pparts,
+> >                                    struct mtd_part_parser_data *data)
+> > @@ -40,8 +44,12 @@ static int parse_ofpart_partitions(struct mtd_info *master,
+> >         /* First count the subnodes */
+> >         pp = NULL;
+> >         nr_parts = 0;
+> > -       while ((pp = of_get_next_child(node, pp)))
+> > +       while ((pp = of_get_next_child(node, pp))) {
+> > +               if (node_has_compatible(pp))
+> > +                       continue;
+> > +
+> >                 nr_parts++;
+> > +       }
+> >
+> >         if (nr_parts == 0)
+> >                 return 0;
+> > @@ -57,6 +65,9 @@ static int parse_ofpart_partitions(struct mtd_info *master,
+> >                 int len;
+> >                 int a_cells, s_cells;
+> >
+> > +               if (node_has_compatible(pp))
+> > +                       continue;
+> > +
+> >                 reg = of_get_property(pp, "reg", &len);
+> >                 if (!reg) {
+> >                         nr_parts--;
+> > --
+> > 1.7.9.5
+> >
