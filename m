@@ -1,75 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 18 Jul 2013 10:06:57 +0200
-Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
-In-Reply-To: <20130718070402.GO7080@book.gsilab.sittig.org>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1373914074-20889-6-git-send-email-gsi@denx.de>
- <20130715193829.GS14452@pengutronix.de>
- <20130718070402.GO7080@book.gsilab.sittig.org>
-Message-ID: <20130718080657.GI10380@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Jul 2013 01:09:53 -0700
+Subject: [PATCH 3/3] ARM: dts: omap4-sdp: add dynamic pin states for
+ uart3/4
+In-Reply-To: <51E6C939.40208@ti.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+ <1374061312-25469-4-git-send-email-grygorii.strashko@ti.com>
+ <20130717153248.GI7656@atomide.com> <51E6C939.40208@ti.com>
+Message-ID: <20130718080953.GR7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 09:04:02AM +0200, Gerhard Sittig wrote:
-> On Mon, Jul 15, 2013 at 21:38 +0200, Sascha Hauer wrote:
-> > 
-> > On Mon, Jul 15, 2013 at 08:47:34PM +0200, Gerhard Sittig wrote:
-> > > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> > > index 6d55eb2..2c07061 100644
-> > > --- a/drivers/clk/clk-divider.c
-> > > +++ b/drivers/clk/clk-divider.c
-> > > @@ -104,7 +104,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
-> > >  	struct clk_divider *divider = to_clk_divider(hw);
-> > >  	unsigned int div, val;
-> > >  
-> > > -	val = readl(divider->reg) >> divider->shift;
-> > > +	val = clk_readl(divider->reg) >> divider->shift;
-> > >  	val &= div_mask(divider);
-> > 
-> > Would it be an option to use regmap for the generic dividers/muxes
-> > instead? This should be suitable for ppc and also for people who want to
-> > use the generic clocks on i2c devices.
+* Grygorii Strashko <grygorii.strashko@ti.com> [130717 09:48]:
+> Hi,
 > 
-> Some other thought crossed my mind regarding access to clock
-> control registers that reside behind some communication channel
-> like I2C:
+> On 07/17/2013 06:32 PM, Tony Lindgren wrote:
+> >* Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
+> >>Add dynamic "active"/"idle" pin states for uart3/4 which will be applied
+> >>when uart3/4 state is switched from active to idle and back by Runtime
+> >>PM or during system suspend.
+> >
+> >This is good for testing code, but should not be merged because
+> >omap4 has the iopad wake-ups available for uarts. So those can
+> >be always enabled.
 > 
-> The common clock API assumes (it's part of the contract) that
-> there are potentially expensive operations like get, put, prepare
-> and unprepare, as well as swift and non-blocking operations like
-> enable and disable.
-> 
-> Would the regmap abstraction hide the potentially blocking nature
-> of a register access (I understand that you can implement "local"
-> as well as "remote" register sets by this mechanism)?  Or could
-> you still meet the assumptions or requirements of the common
-> clock API?
-> 
-> It might as well be the responsibility of the clock driver's
-> implementor to arrange for the availability of non-blocking
-> enable/disable operations, just as it is today.  Such that
-> expensive register access need not be forbidden in general.
+> In this case, 2 IRQ will be received per each UART RX event - one from
+> PRCM and from UART - and that's not good from PM perspective (It will
+> affect on CPUIdle and CPUFreq at least).
 
-regmap for mmio uses a spinlock for read/modify/write operations, just
-like you have to use a spinlock in the common clk dividers/gates. This
-part wouldn't change with regmap.
+Oh I see, that's because I accidentally left the debug code enabled
+to make it easier to test the wake-up events without having to
+have working off-idle. The wake flags can be kept on always for
+sure.
 
-For i2c connected clocks where a spinlock doesn't work due to the
-nonatomic nature of i2c devices we would have to move the enable/disble
-stuff to prepare/unprepare in the common gate code. This can be left
-for someone who works on i2c clocks though.
+The patch below should sort out the issue of getting wake-up interrupts
+during runtime as long as you don't have DEBUG defined.
 
-I think regmap has the potential to solve a number of issues like the
-hardcoded readl/writel in the common clock blocks, issues with i2c
-clocks and your endianess issue. The biggest question probably is how
-to get there without putting too much of a burden on you. It's probably
-not an option to convert all users to regmap, so it seems additional
-functions like clk_register_gate_regmap are better to handle.
+Regards,
 
-Sascha
+Tony
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--- a/drivers/pinctrl/pinctrl-single-omap.c
++++ b/drivers/pinctrl/pinctrl-single-omap.c
+@@ -140,9 +140,17 @@ static irqreturn_t pcs_omap_handle_irq(int irq, void *data)
+ 		if ((val & OMAP_WAKEUP_EVENT_MASK) == OMAP_WAKEUP_EVENT_MASK)
+ 			generic_handle_irq(wakeirq);
+ 	}
+-
++#ifdef DEBUG
++	/*
++	 * This enables wake-up interrupts during runtime also
++	 * causing duplicate interrupts. But it also makes debugging
++	 * the wake-up events easy as deeper idle states often are
++	 * not working for new devices while the drivers are being
++	 * developed.
++	 */
+ 	if (pcso->reconfigure_io_chain)
+ 		pcso->reconfigure_io_chain();
++#endif
+ 
+ 	return IRQ_HANDLED;
+ }
