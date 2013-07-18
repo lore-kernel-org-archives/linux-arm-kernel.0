@@ -1,23 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 18 Jul 2013 14:18:34 -0600
-Subject: [PATCH v2 15/22] iommu/tegra: smmu: Calculate ASID register offset
- by ID
-In-Reply-To: <1373021097-32420-16-git-send-email-hdoyu@nvidia.com>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
- <1373021097-32420-16-git-send-email-hdoyu@nvidia.com>
-Message-ID: <51E84D9A.2080507@wwwdotorg.org>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 18 Jul 2013 22:20:49 +0200
+Subject: [PATCH v2 15/24] net: can: mscan: add a comment on reg to idx mapping
+In-Reply-To: <1374166855-7280-1-git-send-email-gsi@denx.de>
+References: <1374166855-7280-1-git-send-email-gsi@denx.de>
+Message-ID: <1374178858-8683-1-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> Calculate ASID register offset by ID so that we can get rid of SoC
-> specific MACROs. This is needed for the unified SMMU driver over Tegra
-> SoCs.
+add a comment about the magic of deriving an MSCAN component index
+from the peripheral's physical address / register offset
 
-> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ drivers/net/can/mscan/mpc5xxx_can.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-> -#define HWGRP_ASID_REG(x) (smmu_hwgrp_asid_reg[x])
-> +#define HWGRP_ASID_REG(x) ((x) * sizeof(u32) + SMMU_AFI_ASID)
-
-I think this removes the last use of smmu_hwgrp_asid_reg[]. Don't you
-want to delete that in this patch?
+diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+index 5b0ee8e..bc422ba 100644
+--- a/drivers/net/can/mscan/mpc5xxx_can.c
++++ b/drivers/net/can/mscan/mpc5xxx_can.c
+@@ -148,7 +148,10 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 		goto exit_put;
+ 	}
+ 
+-	/* Determine the MSCAN device index from the physical address */
++	/* Determine the MSCAN device index from the peripheral's
++	 * physical address. Register address offsets against the
++	 * IMMR base are:  0x1300, 0x1380, 0x2300, 0x2380
++	 */
+ 	pval = of_get_property(ofdev->dev.of_node, "reg", &plen);
+ 	BUG_ON(!pval || plen < sizeof(*pval));
+ 	clockidx = (*pval & 0x80) ? 1 : 0;
+-- 
+1.7.10.4
