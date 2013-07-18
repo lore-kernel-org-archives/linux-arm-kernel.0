@@ -1,174 +1,200 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 18 Jul 2013 16:59:31 -0700
-Subject: [PATCH v4 4/5] clocksource: arch_timer: Push the read/write wrappers
- deeper
+Date: Thu, 18 Jul 2013 16:59:28 -0700
+Subject: [PATCH v4 1/5] clocksource: arch_timer: Make register accessors less
+ error-prone
 In-Reply-To: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
 References: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1374191972-18015-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374191972-18015-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're going to introduce support to read and write the memory
-mapped timer registers in the next patch, so push the cp15
-read/write functions one level deeper. This simplifies the next
-patch and makes it clearer what's going on.
+Using an enum for the register we wish to access allows newer
+compilers to determine if we've forgotten a case in our switch
+statement. This allows us to remove the BUILD_BUG() instances in
+the arm64 port, avoiding problems where optimizations may not
+happen.
 
+To try and force better code generation we're currently marking
+the accessor functions as inline, but newer compilers can ignore
+the inline keyword unless it's marked __always_inline. Luckily on
+arm and arm64 inline is __always_inline, but let's make
+everything __always_inline to be explicit.
+
+Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Marc Zyngier <Marc.Zyngier@arm.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/include/asm/arch_timer.h    |  4 ++--
- arch/arm64/include/asm/arch_timer.h  |  4 ++--
- drivers/clocksource/arm_arch_timer.c | 46 ++++++++++++++++++++++++------------
- 3 files changed, 35 insertions(+), 19 deletions(-)
+ arch/arm/include/asm/arch_timer.h    | 14 ++++++--------
+ arch/arm64/include/asm/arch_timer.h  | 23 +++++++++--------------
+ drivers/clocksource/arm_arch_timer.c |  6 +++---
+ include/clocksource/arm_arch_timer.h |  6 ++++--
+ 4 files changed, 22 insertions(+), 27 deletions(-)
 
 diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index aeb93f3..5560946 100644
+index accefe0..aeb93f3 100644
 --- a/arch/arm/include/asm/arch_timer.h
 +++ b/arch/arm/include/asm/arch_timer.h
-@@ -18,7 +18,7 @@ int arch_timer_arch_init(void);
+@@ -17,7 +17,8 @@ int arch_timer_arch_init(void);
+  * nicely work out which register we want, and chuck away the rest of
   * the code. At least it does so with a recent GCC (4.6.3).
   */
- static __always_inline
--void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val)
-+void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+-static inline void arch_timer_reg_write(const int access, const int reg, u32 val)
++static __always_inline
++void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val)
  {
  	if (access == ARCH_TIMER_PHYS_ACCESS) {
  		switch (reg) {
-@@ -44,7 +44,7 @@ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val)
+@@ -28,9 +29,7 @@ static inline void arch_timer_reg_write(const int access, const int reg, u32 val
+ 			asm volatile("mcr p15, 0, %0, c14, c2, 0" : : "r" (val));
+ 			break;
+ 		}
+-	}
+-
+-	if (access == ARCH_TIMER_VIRT_ACCESS) {
++	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+ 		switch (reg) {
+ 		case ARCH_TIMER_REG_CTRL:
+ 			asm volatile("mcr p15, 0, %0, c14, c3, 1" : : "r" (val));
+@@ -44,7 +43,8 @@ static inline void arch_timer_reg_write(const int access, const int reg, u32 val
+ 	isb();
  }
  
- static __always_inline
--u32 arch_timer_reg_read(int access, enum arch_timer_reg reg)
-+u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
+-static inline u32 arch_timer_reg_read(const int access, const int reg)
++static __always_inline
++u32 arch_timer_reg_read(int access, enum arch_timer_reg reg)
  {
  	u32 val = 0;
  
+@@ -57,9 +57,7 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
+ 			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
+ 			break;
+ 		}
+-	}
+-
+-	if (access == ARCH_TIMER_VIRT_ACCESS) {
++	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+ 		switch (reg) {
+ 		case ARCH_TIMER_REG_CTRL:
+ 			asm volatile("mrc p15, 0, %0, c14, c3, 1" : "=r" (val));
 diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index dbca771..7181e77 100644
+index d56ed11..dbca771 100644
 --- a/arch/arm64/include/asm/arch_timer.h
 +++ b/arch/arm64/include/asm/arch_timer.h
-@@ -32,7 +32,7 @@
-  * the code.
-  */
- static __always_inline
--void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val)
-+void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+@@ -26,7 +26,13 @@
+ 
+ #include <clocksource/arm_arch_timer.h>
+ 
+-static inline void arch_timer_reg_write(int access, int reg, u32 val)
++/*
++ * These register accessors are marked inline so the compiler can
++ * nicely work out which register we want, and chuck away the rest of
++ * the code.
++ */
++static __always_inline
++void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val)
  {
  	if (access == ARCH_TIMER_PHYS_ACCESS) {
  		switch (reg) {
-@@ -58,7 +58,7 @@ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val)
+@@ -36,8 +42,6 @@ static inline void arch_timer_reg_write(int access, int reg, u32 val)
+ 		case ARCH_TIMER_REG_TVAL:
+ 			asm volatile("msr cntp_tval_el0, %0" : : "r" (val));
+ 			break;
+-		default:
+-			BUILD_BUG();
+ 		}
+ 	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+ 		switch (reg) {
+@@ -47,17 +51,14 @@ static inline void arch_timer_reg_write(int access, int reg, u32 val)
+ 		case ARCH_TIMER_REG_TVAL:
+ 			asm volatile("msr cntv_tval_el0, %0" : : "r" (val));
+ 			break;
+-		default:
+-			BUILD_BUG();
+ 		}
+-	} else {
+-		BUILD_BUG();
+ 	}
+ 
+ 	isb();
  }
  
- static __always_inline
--u32 arch_timer_reg_read(int access, enum arch_timer_reg reg)
-+u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
+-static inline u32 arch_timer_reg_read(int access, int reg)
++static __always_inline
++u32 arch_timer_reg_read(int access, enum arch_timer_reg reg)
  {
  	u32 val;
  
+@@ -69,8 +70,6 @@ static inline u32 arch_timer_reg_read(int access, int reg)
+ 		case ARCH_TIMER_REG_TVAL:
+ 			asm volatile("mrs %0, cntp_tval_el0" : "=r" (val));
+ 			break;
+-		default:
+-			BUILD_BUG();
+ 		}
+ 	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+ 		switch (reg) {
+@@ -80,11 +79,7 @@ static inline u32 arch_timer_reg_read(int access, int reg)
+ 		case ARCH_TIMER_REG_TVAL:
+ 			asm volatile("mrs %0, cntv_tval_el0" : "=r" (val));
+ 			break;
+-		default:
+-			BUILD_BUG();
+ 		}
+-	} else {
+-		BUILD_BUG();
+ 	}
+ 
+ 	return val;
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 7624ba5..a9ca284 100644
+index 053d846..aa07038 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -43,14 +43,28 @@ static bool arch_timer_use_virtual = true;
+@@ -43,7 +43,7 @@ static bool arch_timer_use_virtual = true;
   * Architected system timer support.
   */
  
-+static __always_inline
-+void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
-+		struct clock_event_device *clk)
-+{
-+	arch_timer_reg_write_cp15(access, reg, val);
-+}
-+
-+static __always_inline
-+u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
-+		struct clock_event_device *clk)
-+{
-+	return arch_timer_reg_read_cp15(access, reg);
-+}
-+
- static __always_inline irqreturn_t timer_handler(const int access,
+-static inline irqreturn_t timer_handler(const int access,
++static __always_inline irqreturn_t timer_handler(const int access,
  					struct clock_event_device *evt)
  {
  	unsigned long ctrl;
--	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
-+	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, evt);
- 	if (ctrl & ARCH_TIMER_CTRL_IT_STAT) {
- 		ctrl |= ARCH_TIMER_CTRL_IT_MASK;
--		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
-+		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, evt);
- 		evt->event_handler(evt);
- 		return IRQ_HANDLED;
- 	}
-@@ -72,15 +86,16 @@ static irqreturn_t arch_timer_handler_phys(int irq, void *dev_id)
+@@ -72,7 +72,7 @@ static irqreturn_t arch_timer_handler_phys(int irq, void *dev_id)
  	return timer_handler(ARCH_TIMER_PHYS_ACCESS, evt);
  }
  
--static __always_inline void timer_set_mode(const int access, int mode)
-+static __always_inline void timer_set_mode(const int access, int mode,
-+				  struct clock_event_device *clk)
+-static inline void timer_set_mode(const int access, int mode)
++static __always_inline void timer_set_mode(const int access, int mode)
  {
  	unsigned long ctrl;
  	switch (mode) {
- 	case CLOCK_EVT_MODE_UNUSED:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
--		ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
-+		ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
- 		ctrl &= ~ARCH_TIMER_CTRL_ENABLE;
--		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
-+		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
- 		break;
- 	default:
- 		break;
-@@ -90,36 +105,37 @@ static __always_inline void timer_set_mode(const int access, int mode)
- static void arch_timer_set_mode_virt(enum clock_event_mode mode,
- 				     struct clock_event_device *clk)
- {
--	timer_set_mode(ARCH_TIMER_VIRT_ACCESS, mode);
-+	timer_set_mode(ARCH_TIMER_VIRT_ACCESS, mode, clk);
+@@ -99,7 +99,7 @@ static void arch_timer_set_mode_phys(enum clock_event_mode mode,
+ 	timer_set_mode(ARCH_TIMER_PHYS_ACCESS, mode);
  }
  
- static void arch_timer_set_mode_phys(enum clock_event_mode mode,
- 				     struct clock_event_device *clk)
- {
--	timer_set_mode(ARCH_TIMER_PHYS_ACCESS, mode);
-+	timer_set_mode(ARCH_TIMER_PHYS_ACCESS, mode, clk);
- }
- 
--static __always_inline void set_next_event(const int access, unsigned long evt)
-+static __always_inline void set_next_event(const int access, unsigned long evt,
-+				  struct clock_event_device *clk)
+-static inline void set_next_event(const int access, unsigned long evt)
++static __always_inline void set_next_event(const int access, unsigned long evt)
  {
  	unsigned long ctrl;
--	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
-+	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
- 	ctrl |= ARCH_TIMER_CTRL_ENABLE;
- 	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
--	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt);
--	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
-+	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
-+	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
- }
+ 	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index c463ce9..f3da817 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -23,8 +23,10 @@
+ #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
+ #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
  
- static int arch_timer_set_next_event_virt(unsigned long evt,
--					  struct clock_event_device *unused)
-+					  struct clock_event_device *clk)
- {
--	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt);
-+	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
- 	return 0;
- }
+-#define ARCH_TIMER_REG_CTRL		0
+-#define ARCH_TIMER_REG_TVAL		1
++enum arch_timer_reg {
++	ARCH_TIMER_REG_CTRL,
++	ARCH_TIMER_REG_TVAL,
++};
  
- static int arch_timer_set_next_event_phys(unsigned long evt,
--					  struct clock_event_device *unused)
-+					  struct clock_event_device *clk)
- {
--	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt);
-+	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
- 	return 0;
- }
- 
+ #define ARCH_TIMER_PHYS_ACCESS		0
+ #define ARCH_TIMER_VIRT_ACCESS		1
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
