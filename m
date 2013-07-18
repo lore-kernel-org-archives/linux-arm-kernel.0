@@ -1,56 +1,46 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Jul 2013 13:47:22 -0400 (EDT)
-Subject: [PATCH v1 05/24] clk: wrap I/O access for improved portability
-In-Reply-To: <20130718091735.GW24642@n2100.arm.linux.org.uk>
-References: <1373914074-20889-1-git-send-email-gsi@denx.de>
- <1373914074-20889-6-git-send-email-gsi@denx.de>
- <20130715193829.GS14452@pengutronix.de>
- <20130718070402.GO7080@book.gsilab.sittig.org>
- <20130718091735.GW24642@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1307181330520.14924@syhkavp.arg>
+Date: Thu, 18 Jul 2013 13:53:06 -0400 (EDT)
+Subject: [PATCH] ARM: locks: remove opencoded #16 for ticket shift
+In-Reply-To: <20130718172159.GC9837@mudshark.cambridge.arm.com>
+References: <1373894879-30559-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307170952580.14924@syhkavp.arg>
+ <20130718172159.GC9837@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1307181350440.14924@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Jul 2013, Russell King - ARM Linux wrote:
+On Thu, 18 Jul 2013, Will Deacon wrote:
 
-> 1. clk_get() and clk_put() are NOT part of the common clock API.
->    They're separate - they're part of the clk API, and the infrastructure
->    behind that is clkdev, which is a separately owned thing (by me.)
+> On Wed, Jul 17, 2013 at 02:56:59PM +0100, Nicolas Pitre wrote:
+> > On Mon, 15 Jul 2013, Will Deacon wrote:
+> > 
+> > > The ticket width of our spinlocks is defined by TICKET_SHIFT, so remove
+> > > the opencoded #16 from the trylock implementation.
+> > > 
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > This is pointless.
 > 
-> 2. The "contract" of the clk API is defined by the clk API, not by some
->    random implementation like the common clock API.  The clk API is
->    maintained by myself, and is described in include/linux/clk.h
+> I disagree (see below).
 > 
-> 3. clk_prepare() and clk_unprepare() are functions MUST only be called
->    from contexts where sleeping is permitted.  These functions MAY sleep
->    for whatever reason they require to, and as long as they require to.
->    (This is the whole reason these two functions were created in the
->    first place.)
+> > >  		"	ldrex	%0, [%3]\n"
+> > >  		"	mov	%2, #0\n"
+> > > -		"	subs	%1, %0, %0, ror #16\n"
+> > 
+> > Any value other than 16 would break that code.  You'd rather ensure it 
+> > never gets defined to anything else.
 > 
-> 4. clk_enable() and clk_disable() MAY be called from any context, but
->    MUST never sleep.  If you need to talk over a non-atomic bus for these,
->    then these functions should be no-ops, and the code which does that
->    must be executed from the clk_prepare()/clk_unprepare() operations.
+> There are two aspects to the ticket lock:
+> 
+>   1. The size of each ticket
+>   2. The location of the next ticket within the 32-bit lock word
+> 
+> TICKET_SHIFT actually defines (2) and could be 0 or 16, hence why I was
+> making this small cosmetic change.
 
-Could the above be included in some form in Documentation/clk.txt (this 
-is likely one of the first location people look for information) and 
-elsewhere if appropriate please?
-
-A *lot* of people are confused by the prepare-enable-disable-unprepare 
-sequence and when I try to find some rational for the prepare/enable 
-split I can only direct them to mail archive posts since this is nowhere 
-to be found in the kernel.
-
-The comments in include/linux/clk.h, while correct, are very terse and 
-don't provide any insight to the reason why there is a split in the API.
-
-The content of Documentation/clk.txt does refer to prepare and enable 
-(and their counterparts) but again doesn't provide any clue about the 
-reason for their existence.
-
-Since there've been several good posts with usage example now buried 
-into list archives, I think this would go a long way helping people get 
-it right if those were part of the kernel documentation as well.
+Doesn't matter where the location of the next ticket is.  Whether it is 
+0 or 16, for the above code to work, it *must* always perform a ror #16.  
+Hence tying the ror constant with TICKET_SHIFT is wrong.
 
 
 Nicolas
