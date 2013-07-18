@@ -1,40 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Jul 2013 14:36:23 +0200
-Subject: [PATCH V2 5/8] serial: at91: support run time switch transfer mode
-In-Reply-To: <51E7B37C.5090105@atmel.com>
-References: <1373942627-7121-1-git-send-email-elen.song@atmel.com>
- <1373942627-7121-6-git-send-email-elen.song@atmel.com>
- <20130718081520.GC16015@ns203013.ovh.net> <51E7B37C.5090105@atmel.com>
-Message-ID: <51E7E147.30104@atmel.com>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 18 Jul 2013 14:38:09 +0200
+Subject: [PATCH] ARM: omap2: fix musb usage for n8x0
+In-Reply-To: <51E7D950.60900@gmail.com>
+References: <1374000777-5626-1-git-send-email-zonque@gmail.com>
+ <51E7B1FF.6000301@denx.de> <51E7B2FA.7020206@ti.com> <51E7B81A.70103@denx.de>
+ <51E7D950.60900@gmail.com>
+Message-ID: <51E7E1B1.4070407@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/2013 11:21, elen.song :
-> Hi JC:
-> On 7/18/2013 4:15 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 10:43 Tue 16 Jul     , Elen Song wrote:
->>> We will switch to pio mode when request of dma or pdc fail.
->>> But soon or later, when the request is success, the transfer mode can switch to them at
->>> next open serial port action.
->>> So in startup stage, we should get original transfer mode.
->> You need to update the Documentation of the binding to said the driver support
->> dmas bindings for the new IP
->
-> one question, it seems the document should write like:
->
-> use DMA:
->       usart0: serial at f001c000{
->           compatible = "atmel,at91sam9260-usart";
->           dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
->                        <&dma0 2
-> (AT91_DMA_CFG_PER_ID(3)|AT91_DMA_CFG_FIFOCFG_ASAP)>;
->           dma-names = "tx","rx";
-> };
->
-> Should I replace macros with typical values?
+On 07/18/2013 02:02 PM, Daniel Mack wrote:
+> On 18.07.2013 11:40, Stefan Roese wrote:
+>> On 07/18/2013 11:18 AM, Kishon Vijay Abraham I wrote:
+>>>> I'm testing musb as OTG on beagleboard (old one, not Beagle-xm). And
+>>>> using the latest kernel.org version with this patch applied I see the
+>>>> following messages while booting (repeatedly):
+>>>>
+>>>> [    4.998168] usb usb1: bus auto-suspend, wakeup 1
+>>>> [    5.003112] musb_bus_suspend 2457: trying to suspend as b_idle while active
+>>>> [    5.010498] usb usb1: bus suspend fail, err -16
+>>>> [    5.015289] hub 1-0:1.0: hub_resume
+>>>> [    5.019073] hub 1-0:1.0: state 7 ports 1 chg 0000 evt 0000
+>>>> [    5.024963] hub 1-0:1.0: hub_suspend
+>>>> [    5.028778] usb usb1: bus auto-suspend, wakeup 1
+>>>> ...
+>>>>
+>>>> This is without a cable connected to the OTG port.
+>>>>
+>>>> Any ideas what might be missing here?
+>>>
+>>> Even I observed these prints when I have dual mode enabled. When kept as gadget
+>>> only mode I dint see these prints.
+>>
+>> Yes. With gadget-only I don't see those messages. Thanks for the hint.
+> 
+> So in which mode does your port operate then? Gadget or dual-role?
 
-Yes. That is the common rule for DT documentation.
+Its the original Beagleboard (revision C2), so I suppose its dual-role.
+Or am I mistaken here?
 
-Bye,
--- 
-Nicolas Ferre
+> And I
+> take it this does not happen with 3.10?
+
+I just checked v3.10 as again. No, I'm not seeing these messages here.
+
+Thanks,
+Stefan
