@@ -1,31 +1,29 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 18 Jul 2013 13:57:33 +0200
-Subject: [PATCH] reset: allow drivers to request probe deferral
-Message-ID: <1374148653-14009-1-git-send-email-p.zabel@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 18 Jul 2013 19:59:18 +0800
+Subject: [RFC] Split i.MX pinctrl groups
+In-Reply-To: <1374133571-7660-1-git-send-email-s.hauer@pengutronix.de>
+References: <1374133571-7660-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130718115915.GB16328@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the requested reset controller is not yet available, have reset_control_get
-and device_reset return -EPROBE_DEFER so the driver can decide to request
-probe deferral.
+On Thu, Jul 18, 2013 at 09:46:07AM +0200, Sascha Hauer wrote:
+> We currently introduce completely new pinctrl groups for each slight
+> variant of the pinctrl setup of a device. For several devices the
+> groups can be split into smaller groups to increase the flexibility
+> and to reduce the devicetree sizes (both source and dtb).
+> 
+> For example SDHC controller groups can be split into a base group
+> and an 8bit extension. The FEC groups can be split into base group
+> and several MDIO groups. The UARTs can be split into a base group
+> and RTS/CTS extensions.
+> 
+> Doing this makes the group names more obvious. Instead of having
+> just index _1, _2 and so on we now have base_1, 8bit_1.
+> 
+> This is not meant for inclusion right now, just some preliminary
+> patches to demonstrate the idea to see if this is acceptable/desired.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/reset/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, it makes sense to me.
 
-diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-index d1b6089..b3d99a1 100644
---- a/drivers/reset/core.c
-+++ b/drivers/reset/core.c
-@@ -167,7 +167,7 @@ struct reset_control *reset_control_get(struct device *dev, const char *id)
- 
- 	if (!rcdev) {
- 		mutex_unlock(&reset_controller_list_mutex);
--		return ERR_PTR(-ENODEV);
-+		return ERR_PTR(-EPROBE_DEFER);
- 	}
- 
- 	rstc_id = rcdev->of_xlate(rcdev, &args);
--- 
-1.8.3.2
+Shawn
