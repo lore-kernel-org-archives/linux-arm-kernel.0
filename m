@@ -1,60 +1,32 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 18 Jul 2013 16:51:17 -0400 (EDT)
-Subject: [PATCH V3 5/6] USB: OHCI: make ohci-at91 a separate driver
-In-Reply-To: <1372141408-9894-6-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1307181647240.1245-100000@iolanthe.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 18 Jul 2013 14:04:44 -0700
+Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
+In-Reply-To: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
+References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
+Message-ID: <51E8586C.7040808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jun 2013, Manjunath Goudar wrote:
+On 06/20/13 23:14, Mike Turquette wrote:
+> This series introduces binding definitions for common register-mapped
+> clock multiplexer, divider and gate IP blocks along with the
+> corresponding setup functions for matching DT data.  The bindings are
+> similar to the struct definitions but please don't hold that against the
+> binding: the struct definitions closely model the hardware register
+> layout.
 
-> Separate the  TI OHCI Atmel host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.11.
+I know there was some discussion about clock bindings and how they
+should and should not be done at Linaro Connect Europe last week. Can
+someone in that discussion reply to the mailing list with what came out
+of that? I only have second hand knowledge about the discussion so it
+would be good for me and others to know what was discussed. I'm
+especially curious because the arm soc update etherpad[1] says "DT
+describes what HW is (location, type, attributes), not how HW works
+(register descriptions, bitmasks, etc)." but these proposed generic
+clock bindings are describing registers and bitmasks.
 
-This looks okay except for some very minor issues.
+[1] http://pad.linaro.org/p/LCE13_ARM_SOC_Tree_Consolidation_Update
 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 46c2f42..e4dc9ab 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -390,6 +390,14 @@ config USB_OHCI_HCD_SPEAR
->            Enables support for the on-chip OHCI controller on
->            ST SPEAr chips.
->  
-> +config USB_OHCI_HCD_AT91
-> +        tristate  "Support for Atmel on-chip OHCI USB controller"
-> +        depends on USB_OHCI_HCD && ARCH_AT91
-> +        default y
-> +        ---help---
-> +          Enables support for the on-chip OHCI controller on
-> +          Atmel chips.
-
-Get rid of the extra space after "tristate".
-
-> @@ -686,7 +630,11 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
->  	 * REVISIT: some boards will be able to turn VBUS off...
->  	 */
->  	if (at91_suspend_entering_slow_clock()) {
-> -		ohci_usb_reset (ohci);
-> +		ohci->hc_control = ohci_readl (ohci, &ohci->regs->control);
-> +		ohci->hc_control &= OHCI_CTRL_RWC;
-> +		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
-> +		ohci->rh_state = OHCI_RH_HALTED;
-
-Even though you're just copying the code, don't also copy its mistakes.
-Get rid of the extra spaces before the '(' characters.
-
-> +static void __exit ohci_at91_cleanup(void)
-> +{
-> +	platform_driver_unregister(&ohci_hcd_at91_driver);
-> +}
-> +module_exit(ohci_at91_cleanup);
-> +
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> +MODULE_LICENSE("GPL");
-
-Please move the existing MODULE_ALIAS line down here with these lines.
-
-Alan Stern
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
