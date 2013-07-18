@@ -1,111 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Jul 2013 12:17:09 +0100
-Subject: [PATCH] ASoC: atmel: add wm8904 based audio machine driver
-In-Reply-To: <1374132483-25375-1-git-send-email-voice.shen@atmel.com>
-References: <1374132483-25375-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20130718111709.GL22506@sirena.org.uk>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 18 Jul 2013 14:22:02 +0300
+Subject: [PATCH 2/3] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <20130718081405.GS7656@atomide.com>
+References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
+ <1374061312-25469-3-git-send-email-grygorii.strashko@ti.com>
+ <20130717153838.GJ7656@atomide.com> <51E6CCB6.2000907@ti.com>
+ <20130718081405.GS7656@atomide.com>
+Message-ID: <51E7CFDA.6070600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 03:28:03PM +0800, Bo Shen wrote:
-> add wm8904 based audio machine driver
-> 
-> the following ek board based on it
->   - at91sam9n12ek
->   - sama5d3xek (d31, d33, d34, d35)
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+On 07/18/2013 11:14 AM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [130717 10:11]:
+>> On 07/17/2013 06:38 PM, Tony Lindgren wrote:
+>>> * Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
+>>>> Before switching to DT pinctrl states of OMAP IPs have been handled by hwmod
+>>>> framework. After switching to DT-boot the pinctrl handling was dropped from
+>>>> hwmod framework and, as it was recommended, OMAP IP's drivers have to be updated
+>>>> to handle pinctrl states by itself using pinctrl_pm_select_xx() helpers
+>>>> (see http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173514.html)
+>>>>
+>>>> But this is not right for OMAP2+ SoC where real IPs state is controlled
+>>>> by omap_device core which enables/disables modules & clocks actually.
+>>>
+>>> I'm not convinced we should try to handle this in a generic way
+>>> as only some devices need dynamic remuxing of some pins.
+>>>
+>>>> For example, if OMAP I2C driver will handle pinctrl state during system wide
+>>>> suspend the following issue may occure:
+>>>> - suspend_noirq - I2C device can be still active because of PM auto-suspend
+>>>>    |-_od_suspend_noirq
+>>>>       |- omap_i2c_suspend_noirq
+>>>>          |- PINs state set to SLEEP
+>>>>    |- pm_generic_runtime_suspend
+>>>>       |- omap_i2c_runtime_suspend()
+>>>>          |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and not SLEEP
+>>>>    |- omap_device_idle()
+>>>>       |- omap_hwmod_idle()
+>>>>          |- _idle()
+>>>>             |- disbale module (sysc&clocks)
 
-Looks pretty good, a few fairly small issues below.
+Above call sequence explains what's going on when .suspend_noirq() is 
+called - .suspend_noirq() handler ==> _od_suspend_noirq() and it's set 
+for all OMAP2+ devices.
 
-The binding document should be CCed to devicetree-discuss for review.
 
-> +	atmel,audio-routing =
-> +		"Headphone Jack", "HPOUTL",
-> +		"Headphone Jack", "HPOUTR",
-> +		"IN2L", "Line In Jack",
-> +		"IN2R", "Line In Jack",
-> +		"Mic", "MICBIAS",
-> +		"IN1L", "Mic";
+>>>
+>>> And in this example you are assuming that you need separate idle and
+>>> sleep states, which is not true at least for most cases I've seen.
+>>
+>> I don't need both states (at least right now) :), but
+>> - if any OMAP2+ driver will have two states defined: "idle" and "sleep"
+>> - and if it will try to manage them from drivers callbacks only using
+>>    pure calls to pinctrl_pm_select_xx() helpers
+>>
+>> the "idle" state will be selected during suspend and *not* "sleep".
+>
+> But the drivers have separate calls for runtime PM and suspend/resume?
 
-The widgets defined by the board should be documented in this binding.
-Those from the CODEC should be documented in the CODEC binding.
+Yes, but for OMAP2+ everything is handled by OMAP device framework :)
 
-> +#define MCLK_RATE 32768
-> +
-> +static struct clk *mclk;
-
-This should be in driver data for the board.  Shouldn't the clock be
-referenced using the clock bindings?
-
-> +static int atmel_asoc_wm8904_init(struct snd_soc_pcm_runtime *rtd)
-> +{
-> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-> +	int ret;
-> +
-> +	ret = snd_soc_dai_set_sysclk(codec_dai, WM8904_CLK_FLL,
-> +			12000000, SND_SOC_CLOCK_IN);
-> +	if (ret < 0) {
-> +		pr_err("%s -failed to set wm8904 SYSCLK\n", __func__);
-> +		return ret;
-> +	}
-
-This is an odd thing to set the clock rate to and limits the sample
-rates the board can play back.  It would be better to set the clock rate
-based on the requested sample rate in hw_params - you're using the FLL
-so may as well take advantage of the ability it offers to support all
-sample rates.
-
-> +static int atmel_asoc_wm8904_params(struct snd_pcm_substream *substream,
-> +		struct snd_pcm_hw_params *params)
-> +{
-> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-> +	int ret;
-> +
-> +	ret = snd_soc_dai_set_pll(codec_dai, WM8904_FLL_MCLK, WM8904_FLL_MCLK,
-> +		32768, params_rate(params) * 256);
-
-Ah, in fact you do actually do that - it'd be clearer to put the
-set_sysclk() after this.
-
-> +	switch (level) {
-> +	case SND_SOC_BIAS_ON:
-> +	case SND_SOC_BIAS_PREPARE:
-> +		if (!mclk_on) {
-> +			ret = clk_prepare_enable(mclk);
-> +			if (ret == 0)
-> +				mclk_on = 1;
-> +		}
-> +		break;
-> +	case SND_SOC_BIAS_STANDBY:
-> +	case SND_SOC_BIAS_OFF:
-> +		if (mclk_on)
-> +			clk_disable_unprepare(mclk);
-> +		mclk_on = 0;
-> +		break;
-> +	}
-
-It's better to write this using the previous state than to have the
-mclk_on flag - you want to enable on the standby->prepare transition and
-disable on the standby->off transition.
-
-> +static int atmel_asoc_wm8904_dt_init(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *codec_np, *cpu_np;
-> +	struct snd_soc_card *card = &atmel_asoc_wm8904_card;
-> +	struct snd_soc_dai_link *dailink = &atmel_asoc_wm8904_dailink;
-> +	int ret;
-> +
-> +	if (!np)
-> +		return -1;
-
-Return a real error code here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130718/3d976bad/attachment.sig>
+>
+>>> It is possible that am33xx needs separate idle and sleep states, but
+>>> most likely only for some pins. For omap[345] we can get away with
+>>> just the default state for most cases.
+>>>
+>>
+>>
+>> In case, if only "default" state is defined for device - nothing will
+>>   be done by OMAP device framework for it (I mean any call to
+>> pinctrl_pm_select_xx() will do nothing - it just checks that there is
+>> no state and returns 0).
+>
+> If we want to automate something, it should be done at Linux generic
+> level rather than at omap "bus" level. That sort of relates to drivers
+> needing to know when they've lost context too, which should be
+> implemented in Linux generic way.
+>
+> Regards,
+>
+> Tony
+>
