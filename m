@@ -1,61 +1,115 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 18 Jul 2013 00:42:40 -0300
-Subject: [PATCH 2/2] ARM: dts: mx6: Add support for imx6dl nitrogen board
-In-Reply-To: <1374118960-19060-1-git-send-email-festevam@gmail.com>
-References: <1374118960-19060-1-git-send-email-festevam@gmail.com>
-Message-ID: <1374118960-19060-2-git-send-email-festevam@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 18 Jul 2013 11:33:17 +0530
+Subject: [PATCH v9 1/8] drivers: phy: add generic PHY framework
+In-Reply-To: <20130717172510.GB17093@kroah.com>
+References: <1372247257-30186-1-git-send-email-kishon@ti.com>
+ <1372247257-30186-2-git-send-email-kishon@ti.com>
+ <20130717062944.GA24968@kroah.com> <51E664CB.8050906@ti.com>
+ <20130717172510.GB17093@kroah.com>
+Message-ID: <51E78525.9000802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/imx6dl-nitrogen.dts | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-nitrogen.dts
+On Wednesday 17 July 2013 10:55 PM, Greg KH wrote:
+> On Wed, Jul 17, 2013 at 03:02:59PM +0530, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Wednesday 17 July 2013 11:59 AM, Greg KH wrote:
+>>> On Wed, Jun 26, 2013 at 05:17:29PM +0530, Kishon Vijay Abraham I wrote:
+>>>> +menuconfig GENERIC_PHY
+>>>> +	tristate "PHY Subsystem"
+>>>> +	help
+>>>> +	  Generic PHY support.
+>>>> +
+>>>> +	  This framework is designed to provide a generic interface for PHY
+>>>> +	  devices present in the kernel. This layer will have the generic
+>>>> +	  API by which phy drivers can create PHY using the phy framework and
+>>>> +	  phy users can obtain reference to the PHY.
+>>>
+>>> Shouldn't this be something that other drivers select?  How will anyone
+>>> know if they need this or not?
+>>
+>> All the PHY drivers should go here. So only if *GENERIC_PHY* is enabled those
+>> PHY drivers can be selected like in [1].
+>> The PHY consumer driver should ideally use *depends on* in their Kconfig.
+>>
+>> [1] ->
+>> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
+> 
+> No, switch it around the other way.  How would I even _know_ that I need
+> to enable the generic PHY subsystem in the first place?  How can I
+> determine that I need this for my hardware?  You need to give hints to
+> someone who doesn't even know what a PHY is, otherwise they will always
+> disable it and move on.
+> 
+>>>> --- /dev/null
+>>>> +++ b/drivers/phy/phy-core.c
+>>>> @@ -0,0 +1,544 @@
+>>>> +/*
+>>>> + * phy-core.c  --  Generic Phy framework.
+>>>> + *
+>>>> + * Copyright (C) 2013 Texas Instruments
+>>>> + *
+>>>> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> + *
+>>>> + * This program is free software; you can redistribute  it and/or modify it
+>>>> + * under  the terms of  the GNU General  Public License as published by the
+>>>> + * Free Software Foundation;  either version 2 of the  License, or (at your
+>>>> + * option) any later version.
+>>>
+>>> You really mean "any later version" (I have to ask)?
+>>
+>> That was copied from somewhere :-s
+> 
+> So, is that what you really mean to have for this code?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index eeb2275..3f1a75d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -124,6 +124,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx53-mba53.dtb \
- 	imx53-qsb.dtb \
- 	imx53-smd.dtb \
-+	imx6dl-nitrogen.dtb \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabresd.dtb \
- 	imx6dl-wandboard.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-nitrogen.dts b/arch/arm/boot/dts/imx6dl-nitrogen.dts
-new file mode 100644
-index 0000000..4f29207
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-nitrogen.dts
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-nitrogen.dtsi"
-+
-+/ {
-+	model = "Boundary Devices i.MX6 Dual Lite Nitrogen Board";
-+	compatible = "boundary,imx6dl-nitrogen", "fsl,imx6dl";
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+};
--- 
-1.8.1.2
+indeed.
+> 
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + *
+>>>> + * You should have received a copy of the GNU General Public License
+>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>
+>>> Are these two paragraphs needed?  This isn't a "program", and they got a
+>>> copy of the GPL already with the kernel.
+>>
+>> hmm.. I can remove that.
+>>>
+>>>> +static struct class *phy_class;
+>>>
+>>> Why do you need a class?
+>>
+>> Wanted to group all the PHY drivers to be used by different subsystems
+>> (SATA/USB/PCIE/HDMI/VIDEO) into a single entity. There were some comments in my
+>> initial version [3] on using a bus_type instead of class but then it was
+>> decided to go with class itself.
+>>
+>> [3] -> http://lkml.indiana.edu/hypermail/linux/kernel/1302.2/01389.html
+> 
+> Ok, but what does the class usage get you?
+
+hmm.. actually I use class only to iterate through the list of devices in *phy*
+class which could very well be implemented using list. Just that I wont have a
+/sys/class/phy/ entry to find the list of phys added in the system. I dont
+think I want to add any other stuff to expose to the user space at this point
+of time.
+> 
+>>> When modifying/adding new sysfs stuff, you need a Documentation/ABI/
+>>> entry as well.
+>>
+>> I'm not actually adding any new sysfs entry other than what a *class_create*
+>> must have created. Do I need to add one for that?
+> 
+> If you are not creating anything in sysfs at all, why use the driver
+> model?  (hint, I think you need to do something here to justify it...)
+
+Well.. it helps me to use pm_runtime to enable clocks utilizing the
+parent-child relationship.
+
+Thanks
+Kishon
