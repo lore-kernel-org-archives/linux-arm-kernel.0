@@ -1,41 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 18 Jul 2013 18:21:59 +0100
-Subject: [PATCH] ARM: locks: remove opencoded #16 for ticket shift
-In-Reply-To: <alpine.LFD.2.03.1307170952580.14924@syhkavp.arg>
-References: <1373894879-30559-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1307170952580.14924@syhkavp.arg>
-Message-ID: <20130718172159.GC9837@mudshark.cambridge.arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 18 Jul 2013 18:24:11 +0100
+Subject: [PATCH] arm: choose debug/uncompress.h include when uncompress
+ debug is disabledo
+In-Reply-To: <20130718165007.GA24642@n2100.arm.linux.org.uk>
+References: <1373897706-15331-1-git-send-email-julien.grall@linaro.org>
+ <alpine.DEB.2.02.1307171420350.8258@kaball.uk.xensource.com>
+ <20130717151148.GM24642@n2100.arm.linux.org.uk> <51E81B39.2030805@linaro.org>
+ <20130718165007.GA24642@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1307181755371.8258@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 02:56:59PM +0100, Nicolas Pitre wrote:
-> On Mon, 15 Jul 2013, Will Deacon wrote:
-> 
-> > The ticket width of our spinlocks is defined by TICKET_SHIFT, so remove
-> > the opencoded #16 from the trylock implementation.
+On Thu, 18 Jul 2013, Russell King - ARM Linux wrote:
+> On Thu, Jul 18, 2013 at 05:43:37PM +0100, Julien Grall wrote:
+> > When Xen will boot, it will use one UART, given by the user, to be able
+> > to log its information. Xen will not map the UART region and the IRQ to
+> > dom0. Of course it will not be present in the device tree either. So if
+> > Linux tries to access to this memory region, it will crash.
 > > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > When Linux will boot as dom0, it will either use an hvc console or
+> > another UART.
+> > 
+> > In case of multi-platform environments, there is no issue because when
+> > CONFIG_DEBUG_UNCOMPRESS is disabled.
+> > 
+> > Now, in non-multiplatform environment, the decompressor will use a
+> > pre-defined UART. This UART may be already used by Xen and Linux will
+> > abort at the first access.
+> > 
+> > I think, the decompressor should be able to detect if the UART exists
+> > (I'm not sure it's possible) or disabled at compile time uncompress log.
+> > 
+> > Do you have any better ideas?
 > 
-> This is pointless.
-
-I disagree (see below).
-
-> >  		"	ldrex	%0, [%3]\n"
-> >  		"	mov	%2, #0\n"
-> > -		"	subs	%1, %0, %0, ror #16\n"
+> Let me get this straight.
 > 
-> Any value other than 16 would break that code.  You'd rather ensure it 
-> never gets defined to anything else.
+> 1. You want to run an _existing_ platforms kernel under Xen, where the
+>    platform assumes that it has various devices at various locations,
+>    and will make direct accesses to those devices.
+> 
+> 2. You don't want to provide some of those devices, and you arrange for
+>    those unprovided devices to fault.
+> 
+> Excuse me if I think that's really silly.
 
-There are two aspects to the ticket lock:
+Unfortunately not all the platforms are available on multiplatform
+kernels.
+Also by the same argument, we wouldn't need device tree on
+non-multiplatform kernels because we could hardcode almost anything.
 
-  1. The size of each ticket
-  2. The location of the next ticket within the 32-bit lock word
 
-TICKET_SHIFT actually defines (2) and could be 0 or 16, hence why I was
-making this small cosmetic change. I admit that the naming isn't very good
-and I should change the commit message to reflect what's actually going on.
+> Lastly, aren't all ARMv7 kernels (therefore Xen supporting kernels)
+> supposed to be part of the multiplatform kernel stuff now?
 
-Cheers,
-
-Will
+Most of them, yes. However some of them, like exynos5250, are not yet.
