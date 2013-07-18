@@ -1,165 +1,55 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 18 Jul 2013 11:53:05 +0300
-Subject: [PATCH 1/6] usb: phy-nop: Use RESET Controller for managing the reset
- line
+Date: Thu, 18 Jul 2013 11:53:06 +0300
+Subject: [PATCH 2/6] ARM: dts: omap3-beagle: Use reset-gpio driver for
+ hsusb2_reset
 In-Reply-To: <1374137590-17865-1-git-send-email-rogerq@ti.com>
 References: <1374137590-17865-1-git-send-email-rogerq@ti.com>
-Message-ID: <1374137590-17865-2-git-send-email-rogerq@ti.com>
+Message-ID: <1374137590-17865-3-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Till now we were modelling the RESET line as a voltage regulator and
-using the regulator framework to manage it.
-
-[1] introduces a GPIO based reset controller driver. We use that
-to manage the PHY reset line, at least for DT boots. For legacy boots,
-will still need to use the regulator framework for reset lines.
-
-[1] - http://thread.gmane.org/gmane.linux.drivers.devicetree/41348
+We no longer need to model a RESET line as a regulator since
+we have the reset-gpio driver available.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   10 +++--
- drivers/usb/phy/Kconfig                            |    1 +
- drivers/usb/phy/phy-nop.c                          |   48 +++++++++++++++-----
- 3 files changed, 44 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/omap3-beagle.dts |   17 ++++++++---------
+ 1 files changed, 8 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-index d7e2726..5c3e978 100644
---- a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-@@ -15,7 +15,9 @@ Optional properties:
- 
- - vcc-supply: phandle to the regulator that provides RESET to the PHY.
- 
--- reset-supply: phandle to the regulator that provides power to the PHY.
-+- resets: phandle to the reset controller.
-+
-+- reset-names: must be "reset"
- 
- Example:
- 
-@@ -25,10 +27,10 @@ Example:
- 		clocks = <&osc 0>;
- 		clock-names = "main_clk";
- 		vcc-supply = <&hsusb1_vcc_regulator>;
--		reset-supply = <&hsusb1_reset_regulator>;
-+		resets = <&hsusb1_reset>;
-+		reset-names = "reset"
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index dfd8310..01fbad6 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -45,14 +45,12 @@
  	};
  
- hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
- and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
--hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
--controls RESET.
-+hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset controls RESET.
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 3622fff..213b5ad 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -58,6 +58,7 @@ config MV_U3D_PHY
+ 	/* HS USB Port 2 RESET */
+-	hsusb2_reset: hsusb2_reset_reg {
+-		compatible = "regulator-fixed";
+-		regulator-name = "hsusb2_reset";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio5 19 0>;	/* gpio_147 */
+-		startup-delay-us = <70000>;
+-		enable-active-high;
++	hsusb2_reset: hsusb2_reset {
++		compatible = "gpio-reset";
++		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>; /* gpio_147 */
++		reset-delay-us = <70000>;
++		initially-in-reset;
++		#reset-cells = <0>;
+ 	};
  
- config NOP_USB_XCEIV
- 	tristate "NOP USB Transceiver Driver"
-+	depends on RESET_CONTROLLER
- 	help
- 	  This driver is to be used by all the usb transceiver which are either
- 	  built-in with usb ip or which are autonomous and doesn't require any
-diff --git a/drivers/usb/phy/phy-nop.c b/drivers/usb/phy/phy-nop.c
-index 55445e5d..a2cbda5 100644
---- a/drivers/usb/phy/phy-nop.c
-+++ b/drivers/usb/phy/phy-nop.c
-@@ -35,13 +35,15 @@
- #include <linux/clk.h>
- #include <linux/regulator/consumer.h>
- #include <linux/of.h>
-+#include <linux/reset.h>
+ 	/* HS USB Port 2 Power */
+@@ -68,7 +66,8 @@
+ 	/* HS USB Host PHY on PORT 2 */
+ 	hsusb2_phy: hsusb2_phy {
+ 		compatible = "usb-nop-xceiv";
+-		reset-supply = <&hsusb2_reset>;
++		resets = <&hsusb2_reset>;
++		reset-names = "reset";
+ 		vcc-supply = <&hsusb2_power>;
+ 	};
  
- struct nop_usb_xceiv {
- 	struct usb_phy phy;
- 	struct device *dev;
- 	struct clk *clk;
- 	struct regulator *vcc;
--	struct regulator *reset;
-+	struct regulator *reset_reg; /* only used for non-DT boot */
-+	struct reset_control *reset;
- };
- 
- static struct platform_device *pd;
-@@ -82,9 +84,14 @@ static int nop_init(struct usb_phy *phy)
- 	if (!IS_ERR(nop->clk))
- 		clk_enable(nop->clk);
- 
-+	/* De-assert RESET */
-+	if (!IS_ERR(nop->reset_reg)) {
-+		if (regulator_enable(nop->reset_reg))
-+			dev_err(phy->dev, "Failed to de-assert reset\n");
-+	}
-+
- 	if (!IS_ERR(nop->reset)) {
--		/* De-assert RESET */
--		if (regulator_enable(nop->reset))
-+		if (reset_control_deassert(nop->reset))
- 			dev_err(phy->dev, "Failed to de-assert reset\n");
- 	}
- 
-@@ -95,9 +102,14 @@ static void nop_shutdown(struct usb_phy *phy)
- {
- 	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
- 
-+	/* Assert RESET */
-+	if (!IS_ERR(nop->reset_reg)) {
-+		if (regulator_disable(nop->reset_reg))
-+			dev_err(phy->dev, "Failed to assert reset\n");
-+	}
-+
- 	if (!IS_ERR(nop->reset)) {
--		/* Assert RESET */
--		if (regulator_disable(nop->reset))
-+		if (reset_control_assert(nop->reset))
- 			dev_err(phy->dev, "Failed to assert reset\n");
- 	}
- 
-@@ -166,7 +178,7 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
- 			clk_rate = 0;
- 
- 		needs_vcc = of_property_read_bool(node, "vcc-supply");
--		needs_reset = of_property_read_bool(node, "reset-supply");
-+		needs_reset = of_property_read_bool(node, "resets");
- 
- 	} else if (pdata) {
- 		type = pdata->type;
-@@ -205,12 +217,26 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
- 			return -EPROBE_DEFER;
- 	}
- 
--	nop->reset = devm_regulator_get(&pdev->dev, "reset");
--	if (IS_ERR(nop->reset)) {
--		dev_dbg(&pdev->dev, "Error getting reset regulator: %ld\n",
-+	nop->reset_reg = ERR_PTR(-EINVAL);
-+	nop->reset = ERR_PTR(-EINVAL);
-+
-+	if (dev->of_node) {
-+		nop->reset = devm_reset_control_get(dev, "reset");
-+		if (IS_ERR(nop->reset)) {
-+			dev_dbg(dev, "Couldn't get reset controller: %ld\n",
- 					PTR_ERR(nop->reset));
--		if (needs_reset)
--			return -EPROBE_DEFER;
-+			if (needs_reset && PTR_ERR(nop->reset) == -ENODEV)
-+				return -EPROBE_DEFER;
-+		}
-+
-+	} else {
-+		nop->reset_reg = devm_regulator_get(&pdev->dev, "reset");
-+		if (IS_ERR(nop->reset_reg)) {
-+			dev_dbg(&pdev->dev, "Error getting reset regulator: %ld\n",
-+					PTR_ERR(nop->reset_reg));
-+			if (needs_reset)
-+				return -EPROBE_DEFER;
-+		}
- 	}
- 
- 	nop->dev		= &pdev->dev;
 -- 
 1.7.4.1
