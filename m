@@ -1,133 +1,106 @@
-From: gioh.kim@lge.com (Gioh Kim)
-Date: Thu, 18 Jul 2013 10:30:31 +0900
-Subject: [PATCH] [RFC] EHCI: add to memory barrier to updating hw_next
-In-Reply-To: <CACVXFVOu-2q74JmHLEo3mCVSAzfc7n8GmqPDMPhEDp0wL37w_w@mail.gmail.com>
-References: <000001ce82aa$feac9ee0$fc05dca0$@lge.com>
- <CACVXFVOu-2q74JmHLEo3mCVSAzfc7n8GmqPDMPhEDp0wL37w_w@mail.gmail.com>
-Message-ID: <000101ce8356$65011940$2f034bc0$@lge.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Jul 2013 03:35:16 +0200
+Subject: [PATCH V2 5/5] ARM: remove #gpio-ranges-cells property
+In-Reply-To: <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
+References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
+ <1373913629-32179-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1425430.efevqzjIZK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your reply.
+Hi Stephen,
 
-> -----Original Message-----
-> From: Ming Lei [mailto:tom.leiming at gmail.com]
-> Sent: Wednesday, July 17, 2013 5:52 PM
-> To: ???
-> Cc: Alan Stern; linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
-> Mark Salter; namhyung.kim at lge.com; Minchan Kim; Chanho Min; Jong-Sung Kim;
-> linux-arm-kernel
-> Subject: Re: [PATCH] [RFC] EHCI: add to memory barrier to updating hw_next
+On Monday 15 July 2013 12:40:29 Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Cc: ARM list
+> This property is no longer required by the GPIO binding. Remove it.
 > 
-> On Wed, Jul 17, 2013 at 1:03 PM, ??? <gioh.kim@lge.com> wrote:
-> > Hi,
-> >
-> > I have a missing urb completion problem on ARMv7 based platform.
-> >
-> > I thought the above problem was caused by coherent memory between the
-> > EHCI device and CPU so I tryied to allocates device type memory for
-> > EHCI via dma_declare_coherent_memory at machine initialization step so
-> > that EHCI always allocates from those device type memory.
-> > It seems to solve the issue because I didn't see any problem.
-> >
-> > But I am not sure it is acceptable solution. So I applied the patch
-> > https://lkml.org/lkml/2011/8/31/344.
-> > But it could not solve the problem so that I added another wmb() as my
-> > patch, and now my platform works fine.
-> 
-> I remember the previous problem reported on Pandaboard firstly was fixed
-> by Will's commit 11ed0ba1(ARM: 7161/1: errata: no automatic store buffer
-> drain), so could you try to enable PL310_ERRATA_769419 and see if your
-> problem can be fixed?
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+> This should presumably be applied along with the previous changes
 
+The mach-shmobile tree includes patches for v3.12 that will add the #gpio-
+ranges-cells to several .dtsi files. I can get that fixed locally (most 
+probably through a rebase), could you please ping me when this series will be 
+accepted for upstream merge ?
 
-I also know the errata but it didn't work for my platform.
+> v2: Squash spear and mxc changes into a single patch; there's no
+> need to keep vf610.dtsi separate now that this series will go into
+> v3.12 or later, and that file is part of v3.11-rc1.
+> ---
+>  arch/arm/boot/dts/spear1310.dtsi | 1 -
+>  arch/arm/boot/dts/spear1340.dtsi | 1 -
+>  arch/arm/boot/dts/spear310.dtsi  | 1 -
+>  arch/arm/boot/dts/spear320.dtsi  | 2 --
+>  arch/arm/boot/dts/vf610.dtsi     | 1 -
+>  5 files changed, 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/spear1310.dtsi
+> b/arch/arm/boot/dts/spear1310.dtsi index 122ae94..90e99b5 100644
+> --- a/arch/arm/boot/dts/spear1310.dtsi
+> +++ b/arch/arm/boot/dts/spear1310.dtsi
+> @@ -89,7 +89,6 @@
+>  		pinmux: pinmux at e0700000 {
+>  			compatible = "st,spear1310-pinmux";
+>  			reg = <0xe0700000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+> 
+>  		apb {
+> diff --git a/arch/arm/boot/dts/spear1340.dtsi
+> b/arch/arm/boot/dts/spear1340.dtsi index 54d128d..5003013 100644
+> --- a/arch/arm/boot/dts/spear1340.dtsi
+> +++ b/arch/arm/boot/dts/spear1340.dtsi
+> @@ -63,7 +63,6 @@
+>  		pinmux: pinmux at e0700000 {
+>  			compatible = "st,spear1340-pinmux";
+>  			reg = <0xe0700000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+> 
+>  		pwm: pwm at e0180000 {
+> diff --git a/arch/arm/boot/dts/spear310.dtsi
+> b/arch/arm/boot/dts/spear310.dtsi index 9537208..1e1318e 100644
+> --- a/arch/arm/boot/dts/spear310.dtsi
+> +++ b/arch/arm/boot/dts/spear310.dtsi
+> @@ -25,7 +25,6 @@
+>  		pinmux: pinmux at b4000000 {
+>  			compatible = "st,spear310-pinmux";
+>  			reg = <0xb4000000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+> 
+>  		fsmc: flash at 44000000 {
+> diff --git a/arch/arm/boot/dts/spear320.dtsi
+> b/arch/arm/boot/dts/spear320.dtsi index ffea342..f630d0c 100644
+> --- a/arch/arm/boot/dts/spear320.dtsi
+> +++ b/arch/arm/boot/dts/spear320.dtsi
+> @@ -1,4 +1,3 @@
+> -/*
+>   * DTS file for SPEAr320 SoC
+>   *
+>   * Copyright 2012 Viresh Kumar <viresh.linux@gmail.com>
+> @@ -24,7 +23,6 @@
+>  		pinmux: pinmux at b3000000 {
+>  			compatible = "st,spear320-pinmux";
+>  			reg = <0xb3000000 0x1000>;
+> -			#gpio-range-cells = <3>;
+>  		};
+> 
+>  		clcd at 90000000 {
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index e1eb7da..8577780 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -162,7 +162,6 @@
+>  			iomuxc: iomuxc at 40048000 {
+>  				compatible = "fsl,vf610-iomuxc";
+>  				reg = <0x40048000 0x1000>;
+> -				#gpio-range-cells = <3>;
+> 
+>  				/* functions and groups pins */
+-- 
+Regards,
 
-
-> 
-> >
-> > I am not sure what's the exact problem and what wmb I added could
-> > solve but I just think the problem is related to store buffer flush of
-> hw_next.
-> 
-> Yes, per the above commit, but it might be one hardware problem.
-> 
-> > Anyway, important thing is that it fixed my problem so I expect you
-> > expert guys could find what I am missing and a right solution.
-> > IMHO, the patch might miss updating hw_next pointer.
-> > Am I correct?
-> >
-> > I understand the wmb() is just memory barrier, not write-buffer flush.
-> > But it is true that wmb() can flush write buffer in ARM.
-> > Anyhow I think that memory type, "normal memory, non-cacheable", may
-> > have a problem for some devices that needs device type memory.
-> 
-> Currently on ARMv7 DMA coherent buffer has to be bufferable, in theory we
-> might need one API to flush CPU write buffer, as described in
-> Documentation/DMA-API-HOWTO.txt:
-> 
->              Also, on some platforms your driver may need to flush CPU write
->              buffers in much the same way as it needs to flush write buffers
->              found in PCI bridges (such as by reading a register's value
->              after writing it).
-> 
-> But actually on hardware without the problem(such as A15), I don't see any
-> effect without flushing store buffer explicitly.
-
-
-The problem of my platform is occurring when it has very heavy traffic such as
-HD video streaming service or very many small images display.
-I guess that HC could have a use-after-free problem like following situation.
-
-1. A qtd which is not at the queue head should be removed in qh_completions().
-2. The last->hw_next become be pointing at the next qtd but the hw_next value is delayed in write-buffer.
-3. The qtd is removed in the list.
-4. The qtd is freed into DMA pool and re-allocated for another urb.
-5. HC try to process last->hw_next and it is pointing re-allocated qtd.
-
-What do you think about it? Is it possible?
-
-
-> 
-> >
-> > I cannot get conclusion from the discussion at
-> > https://lkml.org/lkml/2011/8/31/344.
-> > Which can I do for my platform, wmb() or dma_coherent_write_sync()?
-> 
-> If your hardware is covered by PL310_ERRATA_769419, maybe it is better to
-> enable the errata.
-> 
-> >
-> > Signed-off-by: Gioh Kim <gioh.kim@lge.com>
-> > ---
-> >  drivers/usb/host/ehci-q.c |    1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
-> > index d34b399..779d9e8 100644
-> > --- a/drivers/usb/host/ehci-q.c
-> > +++ b/drivers/usb/host/ehci-q.c
-> > @@ -501,6 +501,7 @@ qh_completions (struct ehci_hcd *ehci, struct
-> ehci_qh *qh)
-> >                         last = list_entry (qtd->qtd_list.prev,
-> >                                         struct ehci_qtd, qtd_list);
-> >                         last->hw_next = qtd->hw_next;
-> > +                       wmb();
-> >                 }
-> >
-> >                 /* remove qtd; it's recycled after possible urb
-> > completion */
-> > --
-> > 1.7.9.5
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-usb"
-> > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> Thanks,
-> --
-> Ming Lei
+Laurent Pinchart
