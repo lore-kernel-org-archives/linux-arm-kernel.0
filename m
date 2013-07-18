@@ -1,64 +1,60 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 19 Jul 2013 01:56:36 +0400
+Date: Fri, 19 Jul 2013 02:02:34 +0400
 Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
-In-Reply-To: <51D171E4.3080108@cogentembedded.com>
+In-Reply-To: <CANqRtoTCaJfbECSpX7nMZoV8SPeQqs-xrJQ0-+-smA+bx3QG=w@mail.gmail.com>
 References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
  <201306300245.58486.sergei.shtylyov@cogentembedded.com>
- <87ehbij4wc.wl%kuninori.morimoto.gx@renesas.com>
- <51D171E4.3080108@cogentembedded.com>
-Message-ID: <51E86494.5050906@cogentembedded.com>
+ <CANqRtoTCaJfbECSpX7nMZoV8SPeQqs-xrJQ0-+-smA+bx3QG=w@mail.gmail.com>
+Message-ID: <51E865FA.9000706@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 07/01/2013 04:11 PM, Sergei Shtylyov wrote:
+On 07/02/2013 08:59 AM, Magnus Damm wrote:
 
->>> From: Max Filippov <max.filippov@cogentembedded.com>
+>> From: Max Filippov <max.filippov@cogentembedded.com>
 
->>> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
+>> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
 
->>> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
->>> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+>> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
->>> ---
->>>   arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
->>>   1 file changed, 24 insertions(+), 1 deletion(-)
+>> ---
+>>   arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
+>>   1 file changed, 24 insertions(+), 1 deletion(-)
 
->>> Index: renesas/arch/arm/mach-shmobile/include/mach/dma.h
->>> ===================================================================
->>> --- renesas.orig/arch/arm/mach-shmobile/include/mach/dma.h
->>> +++ renesas/arch/arm/mach-shmobile/include/mach/dma.h
->>> @@ -1 +1,24 @@
->>> -/* empty */
->>> +/*
->>> + * Copyright (C) 2011-2013 Renesas Electronics Corporation
->>> + * Copyright (C) 2013 Cogent Embedded, Inc.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2
->>> + * as published by the Free Software Foundation.
->>> + */
->>> +
->>> +#ifndef __MACH_DMA_H
->>> +#define __MACH_DMA_H
->>> +
->>> +/* HPB-DMA slave IDs */
->>> +enum {
->>> +    HPBDMA_SLAVE_DUMMY,
->>> +    HPBDMA_SLAVE_SDHI0_TX,
->>> +    HPBDMA_SLAVE_SDHI0_RX,
->>> +    HPBDMA_SLAVE_SSI0_TX_ST,
->>> +    HPBDMA_SLAVE_SSI0_TX_MN,
->>> +    HPBDMA_SLAVE_SSI1_RX_ST,
->>> +    HPBDMA_SLAVE_SSI1_RX_MN,
->>> +};
+> Thanks for your patch. Can you please explain the reason why you put
+> this shared information under mach/?
 
->> it should be in r8a7778.h
+    I'm afraid that's more a question to the original author, Phil Edworthy.
+He put this stuff into <mach/hpb-dmae.h>.
 
->     It will be shared with R8A7779.
+>  From my point of view we should really have as few special things as
+> possible under mach/. Starting to share DMA stuff here looks special.
+> I would like mach-shmobile to be as standard as possible (basically
+> only ARM code in the future), and in the case we have I/O devices or
+> other IOMMUs or DMA controllers then we should use include/linux or
+> that recently added platform data directory if needed. We need to make
+> sure that our headers stay compatible with multiplatform support.
 
-    Apparently not anymore as this file is gone now.
+> I realize you may want to share this header between multiple SoCs, but
+> I really want to avoid creating local common code under arch/arm/ that
+> has nothing to do with ARM. Also, this is IMO a total non-issue,
+> instead of merging code and making back porting more difficult for any
+> particular SoC, then how about spending effort on the ling term
+> instead, like DMA DT?
+
+> So my recommendation is to keep this information together with each
+> SoC. And also work on DT. In between have a coffee or work on DT, but
+> please do not spend time on merging short term per-SoC information and
+> making back porting more difficult.
+
+    OK. DT would be a next step I guess.
+
+> Thanks,
+
+> / magnus
 
 WBR, Sergei
