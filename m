@@ -1,44 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Jul 2013 16:42:06 +0100
-Subject: Audio issue on Kirkwood t5325: no sound
-In-Reply-To: <20130718173727.2cfa38d3@skate>
-References: <20130718134330.5aea00c5@skate>
- <20130718142009.GX24642@n2100.arm.linux.org.uk>
- <20130718173727.2cfa38d3@skate>
-Message-ID: <20130718154206.GY24642@n2100.arm.linux.org.uk>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 18 Jul 2013 08:45:03 -0700
+Subject: [PATCH 3/3] arm: zynq: slcr: Use read-modify-write for register
+ writes
+In-Reply-To: <20130718072106.GB15514@pengutronix.de>
+References: <1374081015-31431-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1374081015-31431-4-git-send-email-soren.brinkmann@xilinx.com>
+ <20130718072106.GB15514@pengutronix.de>
+Message-ID: <a57f684c-8983-48d2-8e99-8c9712383091@TX2EHSMHS024.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 05:37:27PM +0200, Thomas Petazzoni wrote:
-> # for i in /sys/kernel/debug/asoc/t5325/dapm/* ; do echo $i ; cat "$i" ; done
-> /sys/kernel/debug/asoc/t5325/dapm/Headphone Jack
-> Headphone Jack: Off  in 2 out 1
->  in  "static" "HPR"
->  in  "static" "HPL"
-> /sys/kernel/debug/asoc/t5325/dapm/Mic Jack
-> Mic Jack: Off  in 1 out 0
->  out "static" "MIC2"
->  out "static" "MIC1"
-> /sys/kernel/debug/asoc/t5325/dapm/Speaker
-> Speaker: Off  in 2 out 1
->  in  "static" "SPKOUTN"
->  in  "static" "SPKOUT"
-> /sys/kernel/debug/asoc/t5325/dapm/bias_level
-> Off
+On Thu, Jul 18, 2013 at 09:21:06AM +0200, Steffen Trumtrar wrote:
+> On Wed, Jul 17, 2013 at 10:10:15AM -0700, S?ren Brinkmann wrote:
+> > zynq_slcr_cpu_start/stop() ignored the current register state when
+> > writing to a register. Fixing this by implementing proper
+> > read-modify-write.
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >  arch/arm/mach-zynq/slcr.c | 16 ++++++++--------
+> >  1 file changed, 8 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+> > index 44a4ab6..1836d5a 100644
+> > --- a/arch/arm/mach-zynq/slcr.c
+> > +++ b/arch/arm/mach-zynq/slcr.c
+> > @@ -61,11 +61,11 @@ void zynq_slcr_system_reset(void)
+> >   */
+> >  void zynq_slcr_cpu_start(int cpu)
+> >  {
+> > -	/* enable CPUn */
+> > -	writel(SLCR_A9_CPU_CLKSTOP << cpu,
+> > -	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> > -	/* enable CLK for CPUn */
+> > -	writel(0x0 << cpu, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> > +	u32 reg = readl(zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> > +	reg &= ~(SLCR_A9_CPU_RST << cpu);
+> > +	writel(reg, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> > +	reg &= ~(SLCR_A9_CPU_CLKSTOP << cpu);
+> > +	writel(reg, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> >  }
+> >  
+> >  /**
+> > @@ -74,9 +74,9 @@ void zynq_slcr_cpu_start(int cpu)
+> >   */
+> >  void zynq_slcr_cpu_stop(int cpu)
+> >  {
+> > -	/* stop CLK and reset CPUn */
+> > -	writel((SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu,
+> > -	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> > +	u32 reg = readl(zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> > +	reg |= (SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu;
+> > +	writel(reg, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL_OFFSET);
+> >  }
+> >  
 > 
-> I don't see anything that looks unreasonable in there, but I've never
-> played with DAPM and related things, so it is very possible that my
-> reasonable-guesser might be wrong on this.
+> Hi!
+> 
+> Why do you also remove the comments? In my opinion they can stay.
+I found the #defines descriptive enough
 
-The last one.  I've seen that with the UDA134x driver too, where the bias
-level stays in a low power state, resulting in no audio output.  I fixed
-it by adding DAPM to the UDA134x and my SA11x0 driver.  Mark mentioned
-something about virtual DAPM support must not be working correctly.
-
-This needs an understanding of the DAPM code, which I'm told is just a
-graph walk.  However, trying to work out where stuff starts and how to
-follow the code through the stages of state changes in soc-dapm.c has
-proved to be quite an onerous task.  I think there's only one or maybe
-two people on this planet who understands that chunk of code.
-
-At this point, you need Mark or Liam to sort this out.
+	S?ren
