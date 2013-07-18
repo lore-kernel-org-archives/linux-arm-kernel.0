@@ -1,44 +1,163 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 18 Jul 2013 10:36:03 +0200
-Subject: [PATCH 4/4] ARM: imx6q: remove board specific CLKO setup
-In-Reply-To: <1374132670-791-5-git-send-email-shawn.guo@linaro.org>
-References: <1374132670-791-1-git-send-email-shawn.guo@linaro.org>
- <1374132670-791-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130718083603.GK10380@pengutronix.de>
+From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
+Date: Thu, 18 Jul 2013 11:36:42 +0300
+Subject: [PATCH v5 2/2] iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
+In-Reply-To: <51E6DCB5.3070302@metafoo.de>
+References: <1374059564-6872-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <1374059564-6872-3-git-send-email-oleksandr.kozaruk@ti.com>
+ <51E6DCB5.3070302@metafoo.de>
+Message-ID: <CAPb7_muAzO-jRqgcm89fcKT-hTLq38Aj2p0WAWjGjN9DoQUwPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 03:31:10PM +0800, Shawn Guo wrote:
-> The CLKO is widely used by imx6q board designs to clock audio codec.
-> Since most codecs accept 24 MHz frequency, let's initially set up CLKO
-> with OSC24M (cko <-- cko2 <-- osc).  Then those board specific CLKO
-> setup for audio codec can be removed.
-> 
-> The board dts files also need an update on cko reference in codec node.
-> 
-> +	/*
-> +	 * Let's initially set up CLKO with OSC24M, since this configuration
-> +	 * is widely used by imx6q board designs to clock audio codec.
-> +	 */
-> +	ret = clk_set_parent(clk[cko2_sel], clk[osc]);
-> +	if (!ret)
-> +		ret = clk_set_parent(clk[cko], clk[cko2]);
-> +	if (ret)
-> +		pr_warn("failed to set up CLKO: %d\n", ret);
+Hello Lars,
 
+On Wed, Jul 17, 2013 at 9:04 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>> +static int twl6032_calibration(struct twl6030_gpadc_data *gpadc)
+>> +{
+>> +     int chn, d1 = 0, d2 = 0, temp;
+>> +     u8 trim_regs[17];
+>> +     int ret;
+>> +
+>> +     ret = twl_i2c_read(TWL6030_MODULE_ID2, trim_regs + 1,
+>> +                     TWL6030_GPADC_TRIM1, 16);
+>> +     if (ret < 0) {
+>> +             dev_err(gpadc->dev, "calibration failed\n");
+>> +             return ret;
+>> +     }
+>> +
+>> +     /*
+>> +      * Loop to calculate the value needed for returning voltages from
+>> +      * GPADC not values.
+>> +      *
+>> +      * gain is calculated to 3 decimal places fixed point.
+>> +      */
+>> +     for (chn = 0; chn < TWL6032_GPADC_MAX_CHANNELS; chn++) {
+>> +
+>> +             switch (chn) {
+>> +             case 0:
+>> +             case 1:
+>> +             case 2:
+>> +             case 3:
+>> +             case 4:
+>> +             case 5:
+>> +             case 6:
+>> +             case 11:
+>> +             case 12:
+>> +             case 13:
+>> +             case 14:
+>> +                     /* D1 */
+>> +                     d1 = (trim_regs[3] & 0x1F) << 2;
+>> +                     d1 |= (trim_regs[1] & 0x06) >> 1;
+>> +                     if (trim_regs[1] & 0x01)
+>> +                             d1 = -d1;
+>> +
+>> +                     /* D2 */
+>> +                     d2 = (trim_regs[4] & 0x3F) << 2;
+>> +                     d2 |= (trim_regs[2] & 0x06) >> 1;
+>> +                     if (trim_regs[2] & 0x01)
+>> +                             d2 = -d2;
+>> +                     break;
+>> +             case 8:
+>> +                     /* D1 */
+>> +                     temp = (trim_regs[3] & 0x1F) << 2;
+>> +                     temp |= (trim_regs[1] & 0x06) >> 1;
+>> +                     if (trim_regs[1] & 0x01)
+>> +                             temp = -temp;
+>> +
+>> +                     d1 = (trim_regs[8] & 0x18) << 1;
+>> +                     d1 |= (trim_regs[7] & 0x1E) >> 1;
+>> +                     if (trim_regs[7] & 0x01)
+>> +                             d1 = -d1;
+>> +
+>> +                     d1 += temp;
+>> +
+>> +                     /* D2 */
+>> +                     temp = (trim_regs[4] & 0x3F) << 2;
+>> +                     temp |= (trim_regs[2] & 0x06) >> 1;
+>> +                     if (trim_regs[2] & 0x01)
+>> +                             temp = -temp;
+>> +
+>> +                     d2 = (trim_regs[10] & 0x1F) << 2;
+>> +                     d2 |= (trim_regs[8] & 0x06) >> 1;
+>> +                     if (trim_regs[8] & 0x01)
+>> +                             d2 = -d2;
+>> +
+>> +                     d2 += temp;
+>> +                     break;
+>> +             case 9:
+>> +                     /* D1 */
+>> +                     temp = (trim_regs[3] & 0x1F) << 2;
+>> +                     temp |= (trim_regs[1] & 0x06) >> 1;
+>> +                     if (trim_regs[1] & 0x01)
+>> +                             temp = -temp;
+>> +
+>> +                     d1 = (trim_regs[14] & 0x18) << 1;
+>> +                     d1 |= (trim_regs[12] & 0x1E) >> 1;
+>> +                     if (trim_regs[12] & 0x01)
+>> +                             d1 = -d1;
+>> +
+>> +                     d1 += temp;
+>> +
+>> +                     /* D2 */
+>> +                     temp = (trim_regs[4] & 0x3F) << 2;
+>> +                     temp |= (trim_regs[2] & 0x06) >> 1;
+>> +                     if (trim_regs[2] & 0x01)
+>> +                             temp = -temp;
+>> +
+>> +                     d2 = (trim_regs[16] & 0x1F) << 2;
+>> +                     d2 |= (trim_regs[14] & 0x06) >> 1;
+>> +                     if (trim_regs[14] & 0x01)
+>> +                             d2 = -d2;
+>> +
+>> +                     d2 += temp;
+>> +             case 10:
+>> +                     /* D1 */
+>> +                     d1 = (trim_regs[11] & 0x0F) << 3;
+>> +                     d1 |= (trim_regs[9] & 0x0E) >> 1;
+>> +                     if (trim_regs[9] & 0x01)
+>> +                             d1 = -d1;
+>> +
+>> +                     /* D2 */
+>> +                     d2 = (trim_regs[15] & 0x0F) << 3;
+>> +                     d2 |= (trim_regs[13] & 0x0E) >> 1;
+>> +                     if (trim_regs[13] & 0x01)
+>> +                             d2 = -d2;
+>> +                     break;
+>> +             case 7:
+>> +             case 18:
+>> +                     /* D1 */
+>> +                     temp = (trim_regs[3] & 0x1F) << 2;
+>> +                     temp |= (trim_regs[1] & 0x06) >> 1;
+>> +                     if (trim_regs[1] & 0x01)
+>> +                             temp = -temp;
+>> +
+>> +                     d1 = (trim_regs[5] & 0x7E) >> 1;
+>> +                     if (trim_regs[5] & 0x01)
+>> +                             d1 = -d1;
+>> +.
+>> +                     d1 += temp;
+>> +
+>> +                     /* D2 */
+>> +                     temp = (trim_regs[4] & 0x3F) << 2;
+>> +                     temp |= (trim_regs[2] & 0x06) >> 1;
+>> +                     if (trim_regs[2] & 0x01)
+>> +                             temp = -temp;
+>> +
+>> +                     d2 = (trim_regs[6] & 0xFE) >> 1;
+>> +                     if (trim_regs[6] & 0x01)
+>> +                             d2 = -d2;
+>> +
+>> +                     d2 += temp;
+>> +                     break;
+>
+>
+> There is quite a bit of copy paste in here. Putting the bit swizziling into
+> a helper function should also improbe legibility.
 
-I don't really like that the clock setup code fiddles with clocks it has
-no knowledge about just because it happens to be correct for several
-boards.
+Trimming bits are scattered randomly between registers and in
+different bit positions.
+I don't see any commonalities, that could be generalized. as Graeme
+said about it "it's a bane of my life".
 
-I currently have no example where this bites me, so I think I can live
-with it for now. I just wonder what I should do when this clock is used
-for something vital to the system (clocking an FPGA for example?).
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+OK.
