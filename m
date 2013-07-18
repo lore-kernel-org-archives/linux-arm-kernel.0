@@ -1,36 +1,33 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 18 Jul 2013 15:19:12 +0100
-Subject: Can't get FIQ interrupt to work on i.mx233
-In-Reply-To: <51E69F42.2060106@gmail.com>
-References: <CAF-Ht3z3GQLwEWoB+UgOGepHfMFUD7pTRHfYWR9Ynk3rM4dD=Q@mail.gmail.com>
- <20130716081132.GB24642@n2100.arm.linux.org.uk>
- <51E5322B.8080602@gmail.com>
- <20130716161643.GB3428@localhost.localdomain>
- <51E69F42.2060106@gmail.com>
-Message-ID: <20130718141905.GA2655@localhost.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Jul 2013 15:20:09 +0100
+Subject: Audio issue on Kirkwood t5325: no sound
+In-Reply-To: <20130718134330.5aea00c5@skate>
+References: <20130718134330.5aea00c5@skate>
+Message-ID: <20130718142009.GX24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 10:42:26PM +0900, Juha Lumme wrote:
-> Hi Dave,
-> 
-> Thanks for the idea, that's indeed a dead simple way to find out.
-> Being sure that I will get stuck in FIQ handler, I started
-> experimenting different things, and it seems that if instead of
-> calling mxs_icoll_set_irq_fiq(31) (which only sets FIQ bit), I
-> directly set bits 4 (FIQ) and 2 (ENABLE) in HW_ICOLL_INTERRUPT31
-> register, my interrupt starts working as expected. Maybe I can also
-> leave enable_fiq out this way.
-> 
-> So it currently seems like mxs_icoll_set_irq_fiq (which I patched
-> in) and enable_fiq (already there) are not working as expected
-> currently in freescale's mainline 3.10.
-> I will try to find out the reason, and create patches for this - but
-> if you have any pointers on what might help me on a right path, I
-> would appreciate it.
+On Thu, Jul 18, 2013 at 01:43:30PM +0200, Thomas Petazzoni wrote:
+> As part of some work around audio support on Marvell platforms, I've
+> taken the Kirkwood-based HP t5325 thin client device that Martin
+> Michlmayr kindly gave me and tried to use the audio part of it, with
+> kernel 3.11-rc1. (My plan is to write the Device Tree binding for this
+> audio driver, and then use it for Armada 370 based platforms).
 
-It sounds like you're on the right track -- I can't comment on the
-details though, since I'm not familiar with this board.
+A couple of basic things to check:
 
-Cheers
----Dave
+1. /proc/asound/card0/pcm0p/sub0/status
+
+Does this indicate that the hw_ptr and appl_ptr are updating ?
+
+2. /proc/interrupts
+
+Are you getting interrupts for kirkwood-i2s ?
+
+That will confirm whether the I2S unit is reading data from the ring
+buffer.  I suspect these will be a positive yes, given that aplay
+appears to work normally except being muted.
+
+Another thing to check is the DAPM status, which you can find buried
+in /sys/kernel/debug/asoc - check all the DAPM status you can find
+below there, and check whether you think it's reasonable.
