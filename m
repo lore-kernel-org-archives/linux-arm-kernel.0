@@ -1,77 +1,108 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 18 Jul 2013 18:47:10 +0200
-Subject: ARM: AM335x: Kernel oops when using EDMA and MMC
-In-Reply-To: <51E81A7E.9030805@ti.com>
-References: <51E6BE84.6080905@newflow.co.uk> <51E6C88B.8090608@ti.com>
- <51E81A7E.9030805@ti.com>
-Message-ID: <51E81C0E.6070709@gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 18 Jul 2013 11:46:39 -0500
+Subject: [PATCH 1/3] dmaengine: add dma_get_slave_sg_limits()
+In-Reply-To: <1374166001-31340-1-git-send-email-joelf@ti.com>
+References: <1374166001-31340-1-git-send-email-joelf@ti.com>
+Message-ID: <1374166001-31340-2-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Balaji,
+From: Matt Porter <mporter@ti.com>
 
-On 18.07.2013 18:40, Balaji T K wrote:
-> With DMA channel info retrieved from dt binding on 3.11rc1,
-> unused_chan_list is broken after hwmod cleanup removing mmc sdma
-> resource info, hence pdev resource wont have DMA resource populated.
-> 
-> arch/arm/common/edma.c
-> static int prepare_unused_channel_list(struct device *dev, void *data)
-> {
-> 	struct platform_device *pdev = to_platform_device(dev);
-> 	int i, ctlr;
-> 
-> 	for (i = 0; i < pdev->num_resources; i++) {
-> 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
-> 				(int)pdev->resource[i].start >= 0) {
-> 			ctlr = EDMA_CTLR(pdev->resource[i].start);
-> 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
-> 					edma_cc[ctlr]->edma_unused);
-> 		}
-> 	}
-> 
-> 	return 0;
-> }
-> 
-> int edma_alloc_channel(int channel,
-> 	if (!unused_chan_list_done) {
-> 		/*
-> 		 * Scan all the platform devices to find out the EDMA channels
-> 		 * used and clear them in the unused list, making the rest
-> 		 * available for ARM usage.
-> 		 */
-> 		ret = bus_for_each_dev(&platform_bus_type, NULL, NULL,
-> 				prepare_unused_channel_list);
-> 		if (ret < 0)
-> 			return ret;
-> 
-> 		unused_chan_list_done = true;
-> 	}
-> 
-> ===========
-> 
-> with the below hack patch, edma is working fine with mmc on your 3.11rc1+ branch
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index a432e6c..5a19164 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -1262,8 +1262,8 @@ int edma_start(unsigned channel)
->   		if (test_bit(channel, edma_cc[ctlr]->edma_unused)) {
->   			pr_debug("EDMA: ESR%d %08x\n", j,
->   				edma_shadow0_read_array(ctlr, SH_ESR, j));
-> -			edma_shadow0_write_array(ctlr, SH_ESR, j, mask);
-> -			return 0;
-> +//			edma_shadow0_write_array(ctlr, SH_ESR, j, mask);
-> +//			return 0;
->   		}
-> 
->   		/* EDMA channel with event association */
-> 
+Add a dmaengine API to retrieve slave SG transfer limits.
 
-Yes, this in fact works for me as well. Thanks for the quick reply! What
-would be the proper fix for this?
+The API is optionally implemented by dmaengine drivers and when
+unimplemented will return a NULL pointer. A client driver using
+this API provides the required dma channel, address width, and
+burst size of the transfer. dma_get_slave_sg_limits() returns an
+SG limits structure with the maximum number and size of SG segments
+that the given channel can handle.
 
+[Joel Fernandes <joelf@ti.com>: Changes to allocate limits
+structure in client and fill up in DMAEngine implementation.]
+Signed-off-by: Matt Porter <mporter@ti.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+Cc: Mark Jackson <mpfj-list@newflow.co.uk>
+---
+ include/linux/dmaengine.h |   45 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-Best,
-Daniel
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 96d3e4a..2985878 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -371,6 +371,18 @@ struct dma_slave_config {
+ 	unsigned int slave_id;
+ };
+ 
++/* struct dma_slave_sg_limits - expose SG transfer limits of a channel
++ *
++ * @max_seg_nr: maximum number of SG segments supported on a SG/SLAVE
++ *	    channel (0 for no maximum or not a SG/SLAVE channel)
++ * @max_seg_len: maximum length of SG segments supported on a SG/SLAVE
++ *	     channel (0 for no maximum or not a SG/SLAVE channel)
++ */
++struct dma_slave_sg_limits {
++	u32 max_seg_nr;
++	u32 max_seg_len;
++};
++
+ static inline const char *dma_chan_name(struct dma_chan *chan)
+ {
+ 	return dev_name(&chan->dev->device);
+@@ -534,6 +546,7 @@ struct dma_tx_state {
+  *	struct with auxiliary transfer status information, otherwise the call
+  *	will just return a simple status code
+  * @device_issue_pending: push pending transactions to hardware
++ * @device_slave_sg_limits: return the slave SG capabilities
+  */
+ struct dma_device {
+ 
+@@ -602,6 +615,10 @@ struct dma_device {
+ 					    dma_cookie_t cookie,
+ 					    struct dma_tx_state *txstate);
+ 	void (*device_issue_pending)(struct dma_chan *chan);
++	int (*device_slave_sg_limits)(struct dma_chan *chan,
++		enum dma_slave_buswidth addr_width,
++		u32 maxburst,
++		struct dma_slave_sg_limits *sg_limits);
+ };
+ 
+ static inline int dmaengine_device_control(struct dma_chan *chan,
+@@ -963,6 +980,34 @@ dma_set_tx_state(struct dma_tx_state *st, dma_cookie_t last, dma_cookie_t used,
+ 	}
+ }
+ 
++/**
++ * dma_get_slave_sg_limits - get DMAC SG transfer capabilities
++ * @chan: target DMA channel
++ * @addr_width: address width of the DMA transfer
++ * @maxburst: maximum DMA transfer burst size
++ * @sg_limits: point to sg_limits struct to populate with limit info
++ *
++ * Get SG transfer capabilities for a specified channel. If the dmaengine
++ * driver does not implement SG transfer capabilities then NULL is
++ * returned.
++ */
++static inline int
++dma_get_slave_sg_limits(struct dma_chan *chan,
++		       enum dma_slave_buswidth addr_width,
++		       u32 maxburst,
++		       struct dma_slave_sg_limits *sg_limits)
++
++{
++
++	if (chan->device->device_slave_sg_limits && sg_limits)
++		return chan->device->device_slave_sg_limits(chan,
++							  addr_width,
++							  maxburst,
++							  sg_limits);
++
++	return -EINVAL;
++}
++
+ enum dma_status dma_sync_wait(struct dma_chan *chan, dma_cookie_t cookie);
+ #ifdef CONFIG_DMA_ENGINE
+ enum dma_status dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx);
+-- 
+1.7.9.5
