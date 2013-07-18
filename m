@@ -1,120 +1,128 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Jul 2013 08:15:04 -0700
-Subject: [PATCH 1/4] pinctrl: Remove duplicate code in
- pinctrl_pm_select_state functions
+Date: Thu, 18 Jul 2013 08:15:07 -0700
+Subject: [PATCH 2/4] pinctrl: Allow pinctrl to have multiple active states
 In-Reply-To: <20130718151213.30990.45828.stgit@localhost>
 References: <20130718151213.30990.45828.stgit@localhost>
-Message-ID: <20130718151504.30990.96819.stgit@localhost>
+Message-ID: <20130718151507.30990.67174.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to duplicate essentially the same functions. Let's
-introduce static int pinctrl_pm_select_state() and make the other
-related functions call that.
+It's quite common that we need to dynamically change some pins for a
+device for runtime PM, or toggle a pin between rx and tx. Changing all
+the pins for a device is not efficient way of doing it.
 
-This allows us to add support later on for multiple active states,
-and more optimized dynamic remuxing.
-
-Note that we still need to export the various pinctrl_pm_select
-functions as we want to keep struct pinctrl_state private to the
-pinctrl code, and cannot replace those with inline functions.
+So let's allow setting up multiple active states for pinctrl. Currently
+we only need PINCTRL_STATIC and PINCTRL_DYNAMIC, where PINCTRL_STATIC
+covers the current default pins, and PINCTRL_DYNAMIC holds the dynamic
+pins that need to be toggled.
 
 Cc: Felipe Balbi <balbi@ti.com>
+Cc: Grygorii Strashko <grygorii.strashko@ti.com>
 Cc: Stephen Warren <swarren@wwwdotorg.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/pinctrl/core.c |   55 ++++++++++++++++++++++++------------------------
- 1 file changed, 27 insertions(+), 28 deletions(-)
+ drivers/pinctrl/core.c |   18 ++++++++++--------
+ drivers/pinctrl/core.h |   10 ++++++++--
+ 2 files changed, 18 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 5b272bf..a97b717 100644
+index a97b717..c9b709b 100644
 --- a/drivers/pinctrl/core.c
 +++ b/drivers/pinctrl/core.c
-@@ -1227,23 +1227,36 @@ EXPORT_SYMBOL_GPL(pinctrl_force_default);
- #ifdef CONFIG_PM
- 
- /**
-- * pinctrl_pm_select_default_state() - select default pinctrl state for PM
-+ * pinctrl_pm_select_state() - select pinctrl state for PM
-  * @dev: device to select default state for
-+ * @state: state to set
-  */
--int pinctrl_pm_select_default_state(struct device *dev)
-+static int pinctrl_pm_select_state(struct device *dev,
-+				   struct pinctrl_state *state)
+@@ -885,7 +885,8 @@ static void pinctrl_free(struct pinctrl *p, bool inlist)
+ 	mutex_lock(&pinctrl_list_mutex);
+ 	list_for_each_entry_safe(state, n1, &p->states, node) {
+ 		list_for_each_entry_safe(setting, n2, &state->settings, node) {
+-			pinctrl_free_setting(state == p->state, setting);
++			pinctrl_free_setting(state == p->state[PINCTRL_STATIC],
++					     setting);
+ 			list_del(&setting->node);
+ 			kfree(setting);
+ 		}
+@@ -955,13 +956,13 @@ EXPORT_SYMBOL_GPL(pinctrl_lookup_state);
+ int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
  {
- 	struct dev_pin_info *pins = dev->pins;
+ 	struct pinctrl_setting *setting, *setting2;
+-	struct pinctrl_state *old_state = p->state;
++	struct pinctrl_state *old_state = p->state[PINCTRL_STATIC];
  	int ret;
  
--	if (!pins)
--		return 0;
--	if (IS_ERR(pins->default_state))
--		return 0; /* No default state */
--	ret = pinctrl_select_state(pins->p, pins->default_state);
-+	if (IS_ERR(state))
-+		return 0; /* No such state */
-+	ret = pinctrl_select_state(pins->p, state);
- 	if (ret)
--		dev_err(dev, "failed to activate default pinctrl state\n");
-+		dev_err(dev, "failed to activate pinctrl state %s\n",
-+			state->name);
- 	return ret;
- }
-+
-+/**
-+ * pinctrl_pm_select_default_state() - select default pinctrl state for PM
-+ * @dev: device to select default state for
-+ */
-+int pinctrl_pm_select_default_state(struct device *dev)
-+{
-+	if (!dev->pins)
-+		return 0;
-+
-+	return pinctrl_pm_select_state(dev, dev->pins->default_state);
-+}
- EXPORT_SYMBOL_GPL(pinctrl_pm_select_default_state);
- 
- /**
-@@ -1252,17 +1265,10 @@ EXPORT_SYMBOL_GPL(pinctrl_pm_select_default_state);
-  */
- int pinctrl_pm_select_sleep_state(struct device *dev)
- {
--	struct dev_pin_info *pins = dev->pins;
--	int ret;
--
--	if (!pins)
-+	if (!dev->pins)
+-	if (p->state == state)
++	if (old_state == state)
  		return 0;
--	if (IS_ERR(pins->sleep_state))
--		return 0; /* No sleep state */
--	ret = pinctrl_select_state(pins->p, pins->sleep_state);
--	if (ret)
--		dev_err(dev, "failed to activate pinctrl sleep state\n");
--	return ret;
-+
-+	return pinctrl_pm_select_state(dev, dev->pins->sleep_state);
- }
- EXPORT_SYMBOL_GPL(pinctrl_pm_select_sleep_state);
  
-@@ -1272,17 +1278,10 @@ EXPORT_SYMBOL_GPL(pinctrl_pm_select_sleep_state);
-  */
- int pinctrl_pm_select_idle_state(struct device *dev)
- {
--	struct dev_pin_info *pins = dev->pins;
--	int ret;
--
--	if (!pins)
-+	if (!dev->pins)
- 		return 0;
--	if (IS_ERR(pins->idle_state))
--		return 0; /* No idle state */
--	ret = pinctrl_select_state(pins->p, pins->idle_state);
--	if (ret)
--		dev_err(dev, "failed to activate pinctrl idle state\n");
--	return ret;
-+
-+	return pinctrl_pm_select_state(dev, dev->pins->idle_state);
- }
- EXPORT_SYMBOL_GPL(pinctrl_pm_select_idle_state);
+-	if (p->state) {
++	if (old_state) {
+ 		/*
+ 		 * The set of groups with a mux configuration in the old state
+ 		 * may not be identical to the set of groups with a mux setting
+@@ -971,7 +972,7 @@ int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
+ 		 * but not in the new state, this code puts that group into a
+ 		 * safe/disabled state.
+ 		 */
+-		list_for_each_entry(setting, &p->state->settings, node) {
++		list_for_each_entry(setting, &old_state->settings, node) {
+ 			bool found = false;
+ 			if (setting->type != PIN_MAP_TYPE_MUX_GROUP)
+ 				continue;
+@@ -989,7 +990,7 @@ int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
+ 		}
+ 	}
+ 
+-	p->state = NULL;
++	p->state[PINCTRL_STATIC] = NULL;
+ 
+ 	/* Apply all the settings for the new state */
+ 	list_for_each_entry(setting, &state->settings, node) {
+@@ -1011,7 +1012,7 @@ int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
+ 		}
+ 	}
+ 
+-	p->state = state;
++	p->state[PINCTRL_STATIC] = state;
+ 
+ 	return 0;
+ 
+@@ -1492,7 +1493,8 @@ static int pinctrl_show(struct seq_file *s, void *what)
+ 	list_for_each_entry(p, &pinctrl_list, node) {
+ 		seq_printf(s, "device: %s current state: %s\n",
+ 			   dev_name(p->dev),
+-			   p->state ? p->state->name : "none");
++			   p->state[PINCTRL_STATIC] ?
++			   p->state[PINCTRL_STATIC]->name : "none");
+ 
+ 		list_for_each_entry(state, &p->states, node) {
+ 			seq_printf(s, "  state: %s\n", state->name);
+diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
+index 75476b3..ac5a269 100644
+--- a/drivers/pinctrl/core.h
++++ b/drivers/pinctrl/core.h
+@@ -53,12 +53,18 @@ struct pinctrl_dev {
  #endif
+ };
+ 
++enum pinctrl_states {
++	PINCTRL_STATIC,
++	PINCTRL_DYNAMIC,
++	PINCTRL_NR_STATES,
++};
++
+ /**
+  * struct pinctrl - per-device pin control state holder
+  * @node: global list node
+  * @dev: the device using this pin control handle
+  * @states: a list of states for this device
+- * @state: the current state
++ * @state: the current state(s)
+  * @dt_maps: the mapping table chunks dynamically parsed from device tree for
+  *	this device, if any
+  * @users: reference count
+@@ -67,7 +73,7 @@ struct pinctrl {
+ 	struct list_head node;
+ 	struct device *dev;
+ 	struct list_head states;
+-	struct pinctrl_state *state;
++	struct pinctrl_state *state[PINCTRL_NR_STATES];
+ 	struct list_head dt_maps;
+ 	struct kref users;
+ };
