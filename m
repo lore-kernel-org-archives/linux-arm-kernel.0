@@ -1,273 +1,126 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 19 Jul 2013 12:23:22 +0200
-Subject: [PATCH v4] watchdog: Add MOXA ART watchdog driver
-In-Reply-To: <1374053091-5907-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374053091-5907-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1374229402-20432-1-git-send-email-jonas.jensen@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 19 Jul 2013 11:28:49 +0100
+Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
+In-Reply-To: <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
+References: <1374118116-16836-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374118116-16836-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130718150408.GB2655@localhost.localdomain>
+ <alpine.LFD.2.03.1307181231510.14924@syhkavp.arg>
+ <20130718180323.GC2655@localhost.localdomain>
+ <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
+Message-ID: <20130719102844.GA3746@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog driver for MOXA ART SoCs.
+On Thu, Jul 18, 2013 at 02:59:06PM -0400, Nicolas Pitre wrote:
+> On Thu, 18 Jul 2013, Dave Martin wrote:
+> 
+> > On Thu, Jul 18, 2013 at 01:24:48PM -0400, Nicolas Pitre wrote:
+> > > [ added Russell for his opinion on the patch below ]
+> > 
+> > [...]
+> > 
+> > > commit 390cf8b9b83eeeebdfef51912f5003a6a9b84115
+> > > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > > Date:   Thu Jul 18 13:12:48 2013 -0400
+> > > 
+> > >     ARM: cacheflush: consolidate single-CPU ARMv7 cache disabling code
+> > >     
+> > >     This code is becoming duplicated in many places.  So let's consolidate
+> > >     it into a handy macro that is known to be right and available for reuse.
+> > >     
+> > >     Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > 
+> > > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+> > > index 17d0ae8672..8a76933e80 100644
+> > > --- a/arch/arm/include/asm/cacheflush.h
+> > > +++ b/arch/arm/include/asm/cacheflush.h
+> > > @@ -436,4 +436,33 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
+> > >  #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
+> > >  #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
+> > >  
+> > > +/*
+> > > + * Disabling cache access for one CPU in an ARMv7 SMP system is tricky.
+> > > + * To do so we must:
+> > > + *
+> > > + * - Clear the SCTLR.C bit to prevent further cache allocations
+> > > + * - Flush the desired level of cache
+> > > + * - Clear the ACTLR "SMP" bit to disable local coherency
+> > > + *
+> > > + * ... and so without any intervening memory access in between those steps,
+> > > + * not even to the stack.
+> > > + *
+> > > + * The clobber list is dictated by the call to v7_flush_dcache_*.
+> > > + */
+> > > +#define v7_disable_flush_cache(level) \
+> > > +	asm volatile( \
+> > > +	"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t" \
+> > > +	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
+> > > +	"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t" \
+> > > +	"isb	\n\t" \
+> > > +	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
+> > > +	"clrex	\n\t" \
+> > > +	"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t" \
+> > > +	"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t" \
+> > > +	"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t" \
+> > > +	"isb	\n\t" \
+> > > +	"dsb	" \
+> > > +	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
+> > > +	      "r9","r10","r11","lr","memory" )
+> > > +
+> > >  #endif
+> > 
+> > That's roughly what I had in mind, though it might belong somewhere more
+> > obscure than cacheflush.h(?)
+> 
+> Any suggestions for that?  Maybe asm/mcpm.h but that might be used in 
+> other circumstances as well.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+I don't really have a better idea...  if nobody objects strongly to
+putting it in cacheflush.h, I happy to go with that.
+> 
+> > "disable_flush_cache" sounds a too general-purpose for my liking.
+> > 
+> > "v7" isn't really right because we touch the ACTLR.  This only works
+> > on certain CPUs and when Linux is running Secure.  Maybe saying "a15"
+> > instead of "a7" is reasonable, since a7 is supposed to be an a15
+> > workalike in most places.
+> 
+> Isn't this how this should be done on an A9 too?  Lorenzo asked me to do 
 
-Notes:
-    v4 should fix remaining issues pointed out by Guenter.
-    
-    Changes since v3:
-    
-    1. remove unnecessary header includes:
-       linux/of.h
-       linux/of_address.h
-       linux/err.h
-       linux/init.h
-       linux/kernel.h,
-       linux/moduleparam.h
-       linux/types.h
-       asm/system_misc.h
-    2. move clock_frequency to moxart_wdt_dev
-    3. remove local pointer "void __iomem *wdt_base" use moxart_wdt->base instead
-    4. get clock_frequency from watchdog_get_drvdata
-    5. move max_timeout variable to moxart_wdt_probe
-    6. check for division by zero moxart_wdt->clock_frequency
-    7. if devm_kzalloc fails, return -ENOMEM instead of -EINVAL
-    
-    Applies to next-20130716
+Quite possibly -- the point is, it's not guaranteed that all v7 CPUs will
+work the same way, especially the custom implementations.   Third-party v7
+implementations like Snapdragon etc. need not be in any way the same as
+ARM's CPUs with regard to details like the SMP bit.
 
- .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
- drivers/watchdog/Kconfig                           |  10 ++
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/moxart_wdt.c                      | 166 +++++++++++++++++++++
- 4 files changed, 192 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
- create mode 100644 drivers/watchdog/moxart_wdt.c
+> it this way, by fear of seeing people copy the previous implementation, 
+> so the same sequence works on A9 as well as A15.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-new file mode 100644
-index 0000000..5507f2b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-@@ -0,0 +1,15 @@
-+MOXA ART Watchdog timer
-+
-+Required properties:
-+
-+- compatible : Should be "moxa,moxart-watchdog"
-+- reg : Should contain registers location and length
-+- clocks : Should contain phandle for the MOXA ART core clock "coreclk"
-+
-+Example:
-+
-+	watchdog: watchdog at 98500000 {
-+		compatible = "moxa,moxart-watchdog";
-+		reg = <0x98500000 0x10>;
-+		clocks = <&coreclk>;
-+	};
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 362085d..6883aab 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -382,6 +382,16 @@ config RETU_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called retu_wdt.
- 
-+config MOXART_WDT
-+	tristate "MOXART watchdog"
-+	depends on ARCH_MOXART
-+	help
-+	  Say Y here to include Watchdog timer support for the watchdog
-+	  existing on the MOXA ART SoC series platforms.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called moxart_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 2f26a0b..7cab53a 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
- obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
- obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
- obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-+obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
-new file mode 100644
-index 0000000..9a59c3d
---- /dev/null
-+++ b/drivers/watchdog/moxart_wdt.c
-@@ -0,0 +1,166 @@
-+/*
-+ * MOXA ART SoCs watchdog driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/watchdog.h>
-+
-+#define REG_COUNT			0x4
-+#define REG_MODE			0x8
-+#define REG_ENABLE			0xC
-+
-+struct moxart_wdt_dev {
-+	struct watchdog_device dev;
-+	void __iomem *base;
-+	unsigned int clock_frequency;
-+};
-+
-+static int heartbeat;
-+
-+static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+
-+	writel(0, moxart_wdt->base + REG_ENABLE);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_start(struct watchdog_device *wdt_dev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+
-+	writel(moxart_wdt->clock_frequency * moxart_wdt->dev.timeout,
-+	       moxart_wdt->base + REG_COUNT);
-+	writel(0x5ab9, moxart_wdt->base + REG_MODE);
-+	writel(0x03, moxart_wdt->base + REG_ENABLE);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
-+				  unsigned int timeout)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+
-+	dev_dbg(wdt_dev->dev, "%s: timeout=%u\n", __func__, timeout);
-+
-+	moxart_wdt->dev.timeout = timeout;
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_info moxart_wdt_info = {
-+	.identity       = "moxart-wdt",
-+	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
-+			  WDIOF_MAGICCLOSE,
-+};
-+
-+static const struct watchdog_ops moxart_wdt_ops = {
-+	.owner          = THIS_MODULE,
-+	.start          = moxart_wdt_start,
-+	.stop           = moxart_wdt_stop,
-+	.set_timeout    = moxart_wdt_set_timeout,
-+};
-+
-+static int moxart_wdt_probe(struct platform_device *pdev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *node = dev->of_node;
-+	struct resource *res;
-+	struct clk *clk;
-+	int err;
-+	unsigned int max_timeout;
-+	bool nowayout = WATCHDOG_NOWAYOUT;
-+
-+	moxart_wdt = devm_kzalloc(&pdev->dev, sizeof(*moxart_wdt), GFP_KERNEL);
-+	if (!moxart_wdt)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, moxart_wdt);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	moxart_wdt->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(moxart_wdt->base))
-+		return PTR_ERR(moxart_wdt->base);
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: of_clk_get failed\n", __func__);
-+		return PTR_ERR(clk);
-+	}
-+
-+	moxart_wdt->clock_frequency = clk_get_rate(clk);
-+	if (moxart_wdt->clock_frequency == 0) {
-+		pr_err("%s: incorrect clock frequency\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
-+
-+	moxart_wdt->dev.info = &moxart_wdt_info;
-+	moxart_wdt->dev.ops = &moxart_wdt_ops;
-+	moxart_wdt->dev.timeout = max_timeout;
-+	moxart_wdt->dev.min_timeout = 1;
-+	moxart_wdt->dev.max_timeout = max_timeout;
-+	moxart_wdt->dev.parent = &pdev->dev;
-+
-+	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, &pdev->dev);
-+	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
-+
-+	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
-+
-+	err = watchdog_register_device(&moxart_wdt->dev);
-+	if (unlikely(err))
-+		return err;
-+
-+	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
-+		moxart_wdt->dev.timeout, nowayout);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_remove(struct platform_device *pdev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
-+
-+	moxart_wdt_stop(&moxart_wdt->dev);
-+	watchdog_unregister_device(&moxart_wdt->dev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id moxart_watchdog_match[] = {
-+	{ .compatible = "moxa,moxart-watchdog" },
-+	{ },
-+};
-+
-+static struct platform_driver moxart_wdt_driver = {
-+	.probe      = moxart_wdt_probe,
-+	.remove     = moxart_wdt_remove,
-+	.driver     = {
-+		.name		= "moxart-watchdog",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= moxart_watchdog_match,
-+	},
-+};
-+module_platform_driver(moxart_wdt_driver);
-+
-+module_param(heartbeat, int, 0);
-+MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
-+
-+MODULE_DESCRIPTION("MOXART watchdog driver");
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
--- 
-1.8.2.1
+Would it make sense to have things like
+
+#define a15_something() asm(volatile ... )
+#define a7_something() a15_something()
+#define a9_something() a15_something()
+
+(where the correct one to call for a b.L system would probably be the
+one corresponding to the big cluster)
+
+... or just call is something like
+
+cortex_a_something()
+
+with a big comment (or alias macros, as above) documenting which CPUs we
+know it works for, and warning people to stop and think before using it
+on some other CPU.
+
+> > I had other names in mind, like "coherency_exit" or "cache_exit".
+> > Those are not very intelligible, but that might at least make people
+> > pause and think before blindly using it.
+> 
+> Good point.  It should still embody the architecture name for which it 
+> is valid though.
+
+Sure, I was assuming something would be pasted on the start of the name.
+
+Cheers
+---Dave
