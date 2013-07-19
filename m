@@ -1,85 +1,105 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Fri, 19 Jul 2013 03:49:02 +0000
-Subject: [PATCH v2 0/5] ARM: vf610: Add DCU framebuffer driver for
- Vybrid VF610 platform
-In-Reply-To: <1373609276-14566-1-git-send-email-b18965@freescale.com>
-References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D83AA3AE@039-SN1MPN1-004.039d.mgd.msft.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 19 Jul 2013 11:50:04 +0800
+Subject: [PATCH] [RFC] EHCI: add to memory barrier to updating hw_next
+In-Reply-To: <Pine.LNX.4.44L0.1307181004190.1245-100000@iolanthe.rowland.org>
+References: <CACVXFVNV-hGZpcy2ANQaca1K5yXJ88EOq1PTkJUEHEkFk9Btvw@mail.gmail.com>
+ <Pine.LNX.4.44L0.1307181004190.1245-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVNXAJe363O2OFHJ927BT23hCzedbG1Yt41xbDxV_d_oOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jean-Christophe,
+On Thu, Jul 18, 2013 at 10:08 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 18 Jul 2013, Ming Lei wrote:
+>
+>> > I guess that HC could have a use-after-free problem like following situation.
+>> >
+>> > 1. A qtd which is not at the queue head should be removed in qh_completions().
+>> > 2. The last->hw_next become be pointing at the next qtd but the hw_next value is delayed in write-buffer.
+>> > 3. The qtd is removed in the list.
+>> > 4. The qtd is freed into DMA pool and re-allocated for another urb.
+>> > 5. HC try to process last->hw_next and it is pointing re-allocated qtd.
+>> >
+>> > What do you think about it? Is it possible?
+>>
+>> I understand it might not be possible because:  when 'stopped' is set, that
+>> said the HC might not advance the queue. But I don't understand why
+>> 'last->hw_next' is patched here under 'stopped' situation.
+>
+> It should not be possible.  When "stopped" is set, the QH gets unlinked
+> and relinked before it can start up again.  Relinking involves some
+> memory barriers, so the qTD will not be accessed again by the HC.
+>
+> last->hw_next gets patched because the qTD might belong to some URB in
+> the middle of the queue that is being unlinked.  The URBs before it and
+> after it will still be active, so the queue link has to be updated.
 
-      Could you please help to review these patches? 
+'stopped' is set under below situations:
 
-      Thanks a lot!
+     - unlink over or shutdown
+     - halt
+     - short packet(URB_SHORT_NOT_OK)
+
+Looks EHCI won't advance the queue(qh) any more on above situations, so I
+think last->hw_next might not need patching.
+
+>
+>> Even the 'stopped' case may be seldom triggered, do you know under
+>> which condition the stopped is triggered in your problem?(stall, short read
+>> or others)
+>
+> I was going to ask the same question.  This particular piece of code
+> gets executed _only_ when an URB is unlinked.  Not during any other
+> kind of error.
+
+The code may run under 'halt' or short packet(URB_SHORT_NOT_OK) too.
+If Gioh's problem falls to these two situations, below patch might be helpful.
+
+Because the qh will be unlinked when there is fault in the endpoint(halt, short
+packet), maybe it is safer to complete these URBs after the qh becomes
+unlinked,  like what the blew patch does:
+
+diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
+index b637a65..6a65e0a 100644
+--- a/drivers/usb/host/ehci-q.c
++++ b/drivers/usb/host/ehci-q.c
+@@ -454,6 +454,10 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
+ 			}
+ 		}
+
++		/* complete URBs after unlinking */
++		if (stopped && state != QH_STATE_IDLE)
++			goto exit;
++
+ 		/* unless we already know the urb's status, collect qtd status
+ 		 * and update count of bytes transferred.  in common short read
+ 		 * cases with only one data qtd (including control transfers),
+@@ -489,15 +493,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
+ 			}
+ 		}
+
+-		/* if we're removing something not at the queue head,
+-		 * patch the hardware queue pointer.
+-		 */
+-		if (stopped && qtd->qtd_list.prev != &qh->qtd_list) {
+-			last = list_entry (qtd->qtd_list.prev,
+-					struct ehci_qtd, qtd_list);
+-			last->hw_next = qtd->hw_next;
+-		}
+-
+ 		/* remove qtd; it's recycled after possible urb completion */
+ 		list_del (&qtd->qtd_list);
+ 		last = qtd;
+@@ -520,7 +515,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
+
+ 		/* Otherwise the caller must unlink the QH. */
+ 	}
+-
++ exit:
+ 	/* restore original state; caller must unlink or relink */
+ 	qh->qh_state = state;
 
 
-Best Regards,
-Alison Wang
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Alison Wang
-> Sent: Friday, July 12, 2013 2:08 PM
-> To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com; shawn.guo at linaro.org;
-> Estevam Fabio-R49496; linux-fbdev at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Jin Zhengxiong-R64188
-> Subject: [PATCH v2 0/5] ARM: vf610: Add DCU framebuffer driver for
-> Vybrid VF610 platform
-> 
-> This series contain DCU framebuffer driver for Freescale Vybrid VF610
-> platform.
-> 
-> The Display Controller Unit (DCU) module is a system master that
-> fetches graphics stored in internal or external memory and displays
-> them on a TFT LCD panel. A wide range of panel sizes is supported and
-> the timing of the interface signals is highly configurable.
-> Graphics are read directly from memory and then blended in real-time,
-> which allows for dynamic content creation with minimal CPU intervention.
-> 
-> The features:
-> 
-> (1) Full RGB888 output to TFT LCD panel.
-> (2) For the current LCD panel, WQVGA "480x272" is tested.
-> (3) Blending of each pixel using up to 4 source layers dependent on
-> size of panel.
-> (4) Each graphic layer can be placed with one pixel resolution in
-> either axis.
-> (5) Each graphic layer support RGB565 and RGB888 direct colors without
-> alpha channel and BGRA8888 direct colors with an alpha channel.
-> (6) Each graphic layer support alpha blending with 8-bit resolution.
-> 
-> Changes in v2:
-> - Add a document for DCU framebuffer driver under
-> Documentation/devicetree/bindings/fb/.
-> 
-> ----------------------------------------------------------------
-> Alison Wang (5):
->       ARM: dts: vf610: Add DCU and TCON nodes
->       ARM: dts: vf610-twr: Enable DCU and TCON devices
->       ARM: clk: vf610: Add DCU and TCON clock support
->       fb: Add DCU framebuffer driver for Vybrid VF610 platform
->       Documentation: DT: Add DCU framebuffer driver
-> 
->  Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt |   36 ++++
->  arch/arm/boot/dts/vf610-twr.dts                     |   10 +
->  arch/arm/boot/dts/vf610.dtsi                        |   19 +-
->  arch/arm/mach-imx/clk-vf610.c                       |    5 +
->  drivers/video/Kconfig                               |    9 +
->  drivers/video/Makefile                              |    1 +
->  drivers/video/fsl-dcu-fb.c                          | 1091
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> +++++++++++++++++++++++++
->  include/dt-bindings/clock/vf610-clock.h             |    3 +-
->  8 files changed, 1172 insertions(+), 2 deletions(-)  create mode
-> 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
->  create mode 100644 drivers/video/fsl-dcu-fb.c
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+-- 
+Ming Lei
