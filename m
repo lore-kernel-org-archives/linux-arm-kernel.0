@@ -1,32 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Jul 2013 10:05:03 +0100
-Subject: [PATCH] ARM: locks: remove opencoded #16 for ticket shift
-In-Reply-To: <alpine.LFD.2.03.1307181350440.14924@syhkavp.arg>
-References: <1373894879-30559-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1307170952580.14924@syhkavp.arg>
- <20130718172159.GC9837@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1307181350440.14924@syhkavp.arg>
-Message-ID: <20130719090503.GB18139@mudshark.cambridge.arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 19 Jul 2013 12:23:19 +0300
+Subject: [PATCH v4 04/17] sched_clock: Add support for >32 bit sched_clock
+In-Reply-To: <1374189690-10810-5-git-send-email-sboyd@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <1374189690-10810-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130719092319.GA4681@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 06:53:06PM +0100, Nicolas Pitre wrote:
-> On Thu, 18 Jul 2013, Will Deacon wrote:
-> > There are two aspects to the ticket lock:
-> > 
-> >   1. The size of each ticket
-> >   2. The location of the next ticket within the 32-bit lock word
-> > 
-> > TICKET_SHIFT actually defines (2) and could be 0 or 16, hence why I was
-> > making this small cosmetic change.
+Hi Stephen,
+
+On Thu, Jul 18, 2013 at 04:21:17PM -0700, Stephen Boyd wrote:
+> The ARM architected system counter has at least 56 usable bits.
+> Add support for counters with more than 32 bits to the generic
+> sched_clock implementation so we can increase the time between
+> wakeups due to dealing with wrap-around on these devices while
+> benefiting from the irqtime accounting and suspend/resume
+> handling that the generic sched_clock code already has. On my
+> system using 56 bits over 32 bits changes the wraparound time
+> from a few minutes to an hour. For faster running counters (GHz
+> range) this is even more important because we may not be able to
+> execute the timer in time to deal with the wraparound if only 32
+> bits are used.
 > 
-> Doesn't matter where the location of the next ticket is.  Whether it is 
-> 0 or 16, for the above code to work, it *must* always perform a ror #16.  
-> Hence tying the ror constant with TICKET_SHIFT is wrong.
+> We choose a maxsec value of 3600 seconds because we assume no
+> system will go idle for more than an hour. In the future we may
+> need to increase this value.
+> 
+> Note: All users should switch over to the 64-bit read function so
+> we can remove setup_sched_clock() in favor of sched_clock_register().
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-You're right; we always need to refer to the higher ticket, rather than
-`owner' or `next'. Patch dropped.
+[..]
 
-Cheers,
+> @@ -110,14 +123,13 @@ void __init setup_sched_clock(u32 (*read)(void), int
+>   bits, unsigned long rate)
+>  	if (cd.rate > rate)
+>  		return;
+>  
+> -	BUG_ON(bits > 32);
+>  	WARN_ON(!irqs_disabled());
+>  	read_sched_clock = read;
+> -	sched_clock_mask = (1 << bits) - 1;
+> +	sched_clock_mask = CLOCKSOURCE_MASK(bits);
 
-Will
+Note that this conflicts with my integer overflow fix 
+(http://article.gmane.org/gmane.linux.ports.arm.kernel/252498) that I hope 
+will get merged before 3.11 is out.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
