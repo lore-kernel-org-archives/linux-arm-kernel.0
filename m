@@ -1,59 +1,115 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:34:48 +0900
-Subject: [GIT 0/7] Renesas ARM and SH based SoC backlight drivers for v3.12
-Message-ID: <cover.1374207161.git.horms+renesas@verge.net.au>
+Date: Fri, 19 Jul 2013 13:35:29 +0900
+Subject: [PATCH 4/7] ARM: mach-shmobile: mackerel: Use gpio-backlight
+In-Reply-To: <cover.1374207161.git.horms+renesas@verge.net.au>
+References: <cover.1374207161.git.horms+renesas@verge.net.au>
+Message-ID: <14bd03e08831a52035e601ae85b05a4849214ec4.1374207161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-please consider the following backlight drivers for v3.12.
+Replace the backlight callback with a gpio-backlight platform device.
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-mackerel.c |   34 +++++++++++++++----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-backlight-for-v3.12
-
-for you to fetch changes up to 0fb19cdabfc3f8884bac53fd81b02bf61c7904af:
-
-  ARM: mach-shmobile: ag5evm: Use bd6107 backlight driver (2013-07-17 10:06:18 +0900)
-
-----------------------------------------------------------------
-Renesas ARM and SH based SoC backlight drivers for v3.12
-
-Backlight drivers used by SH and ARM SH-Mobile boards.
-
-----------------------------------------------------------------
-Laurent Pinchart (7):
-      backlight: Add GPIO-based backlight driver
-      backlight: Add Sanyo LV5207LP backlight driver
-      backlight: Add ROHM BD6107 backlight driver
-      ARM: mach-shmobile: mackerel: Use gpio-backlight
-      sh: ecovec24: Use gpio-backlight
-      sh: kfr2r09: Use lv5207lp backlight
-      ARM: mach-shmobile: ag5evm: Use bd6107 backlight driver
-
- arch/arm/mach-shmobile/board-ag5evm.c        |   65 ++------
- arch/arm/mach-shmobile/board-mackerel.c      |   34 ++--
- arch/sh/boards/mach-ecovec24/setup.c         |   37 +++--
- arch/sh/boards/mach-kfr2r09/lcd_wqvga.c      |   48 ------
- arch/sh/boards/mach-kfr2r09/setup.c          |   19 ++-
- arch/sh/include/mach-kfr2r09/mach/kfr2r09.h  |    2 -
- drivers/video/backlight/Kconfig              |   19 +++
- drivers/video/backlight/Makefile             |    3 +
- drivers/video/backlight/bd6107.c             |  213 ++++++++++++++++++++++++++
- drivers/video/backlight/gpio_backlight.c     |  133 ++++++++++++++++
- drivers/video/backlight/lv5207lp.c           |  171 +++++++++++++++++++++
- include/linux/platform_data/bd6107.h         |   19 +++
- include/linux/platform_data/gpio_backlight.h |   21 +++
- include/linux/platform_data/lv5207lp.h       |   19 +++
- 14 files changed, 665 insertions(+), 138 deletions(-)
- create mode 100644 drivers/video/backlight/bd6107.c
- create mode 100644 drivers/video/backlight/gpio_backlight.c
- create mode 100644 drivers/video/backlight/lv5207lp.c
- create mode 100644 include/linux/platform_data/bd6107.h
- create mode 100644 include/linux/platform_data/gpio_backlight.h
- create mode 100644 include/linux/platform_data/lv5207lp.h
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 85f51a8..af06753 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -41,6 +41,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/mtd/sh_flctl.h>
+ #include <linux/pinctrl/machine.h>
++#include <linux/platform_data/gpio_backlight.h>
+ #include <linux/pm_clock.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+@@ -49,7 +50,6 @@
+ #include <linux/tca6416_keypad.h>
+ #include <linux/usb/renesas_usbhs.h>
+ #include <linux/dma-mapping.h>
+-
+ #include <video/sh_mobile_hdmi.h>
+ #include <video/sh_mobile_lcdc.h>
+ #include <media/sh_mobile_ceu.h>
+@@ -346,7 +346,7 @@ static struct platform_device meram_device = {
+ 	},
+ };
+ 
+-/* LCDC */
++/* LCDC and backlight */
+ static struct fb_videomode mackerel_lcdc_modes[] = {
+ 	{
+ 		.name		= "WVGA Panel",
+@@ -362,13 +362,6 @@ static struct fb_videomode mackerel_lcdc_modes[] = {
+ 	},
+ };
+ 
+-static int mackerel_set_brightness(int brightness)
+-{
+-	gpio_set_value(31, brightness);
+-
+-	return 0;
+-}
+-
+ static const struct sh_mobile_meram_cfg lcd_meram_cfg = {
+ 	.icb[0] = {
+ 		.meram_size     = 0x40,
+@@ -393,11 +386,6 @@ static struct sh_mobile_lcdc_info lcdc_info = {
+ 			.width		= 152,
+ 			.height		= 91,
+ 		},
+-		.bl_info = {
+-			.name = "sh_mobile_lcdc_bl",
+-			.max_brightness = 1,
+-			.set_brightness = mackerel_set_brightness,
+-		},
+ 		.meram_cfg = &lcd_meram_cfg,
+ 	}
+ };
+@@ -425,6 +413,20 @@ static struct platform_device lcdc_device = {
+ 	},
+ };
+ 
++static struct gpio_backlight_platform_data gpio_backlight_data = {
++	.fbdev = &lcdc_device.dev,
++	.gpio = 31,
++	.def_value = 1,
++	.name = "backlight",
++};
++
++static struct platform_device gpio_backlight_device = {
++	.name = "gpio-backlight",
++	.dev = {
++		.platform_data = &gpio_backlight_data,
++	},
++};
++
+ /* HDMI */
+ static struct sh_mobile_hdmi_info hdmi_info = {
+ 	.flags		= HDMI_SND_SRC_SPDIF,
+@@ -1231,6 +1233,7 @@ static struct platform_device *mackerel_devices[] __initdata = {
+ 	&nor_flash_device,
+ 	&smc911x_device,
+ 	&lcdc_device,
++	&gpio_backlight_device,
+ 	&usbhs0_device,
+ 	&usbhs1_device,
+ 	&leds_device,
+@@ -1441,9 +1444,6 @@ static void __init mackerel_init(void)
+ 				  ARRAY_SIZE(mackerel_pinctrl_map));
+ 	sh7372_pinmux_init();
+ 
+-	/* backlight, off by default */
+-	gpio_request_one(31, GPIOF_OUT_INIT_LOW, NULL);
+-
+ 	gpio_request_one(151, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
+ 
+ 	/* USBHS0 */
+-- 
+1.7.10.4
