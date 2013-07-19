@@ -1,54 +1,50 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 19 Jul 2013 13:12:59 +0200
-Subject: [PATCH] ARM: clocksource: moxart: documentation: update device tree
- bindings document
-In-Reply-To: <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1374232379-20900-1-git-send-email-jonas.jensen@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 19 Jul 2013 15:17:39 +0400
+Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
+In-Reply-To: <87txjrbe11.wl%kuninori.morimoto.gx@renesas.com>
+References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+ <201306300245.58486.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoTCaJfbECSpX7nMZoV8SPeQqs-xrJQ0-+-smA+bx3QG=w@mail.gmail.com>
+ <51E865FA.9000706@cogentembedded.com>
+ <87txjrbe11.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <51E92053.5080103@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update device tree bindings document with the correct clock name.
+Hello.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+On 19-07-2013 4:16, Kuninori Morimoto wrote:
 
-Notes:
-    Hi Daniel,
-    
-    I apologize in advance if this causes trouble..
-    
-    One of the device tree bindings files you merged
-    git://git.linaro.org/people/dlezcano/clockevents.git timers/clockevents-next
-    now needs an update.
-    
-    This patch can be applied directly to timers/clockevents-next.
-    
-    Best regards,
-    Jonas
+>>>> From: Max Filippov <max.filippov@cogentembedded.com>
 
- Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+>>>> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
 
-diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-index 77c4cfa..ad0bf7f 100644
---- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-@@ -5,7 +5,7 @@ Required properties:
- - compatible : Should be "moxa,moxart-timer"
- - reg : Should contain registers location and length
- - interrupts : Should contain the timer interrupt number
--- clocks : Should contain phandle for APB clock "clkapb"
-+- clocks : Should contain phandle for the MOXA ART core clock "coreclk"
- 
- Example:
- 
-@@ -13,5 +13,5 @@ Example:
- 		compatible = "moxa,moxart-timer";
- 		reg = <0x98400000 0x42>;
- 		interrupts = <19 1>;
--		clocks = <&clkapb>;
-+		clocks = <&coreclk>;
- 	};
--- 
-1.8.2.1
+>>>> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+>>>> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>>>> ---
+>>>>    arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
+>>>>    1 file changed, 24 insertions(+), 1 deletion(-)
+
+>>> Thanks for your patch. Can you please explain the reason why you put
+>>> this shared information under mach/?
+
+>>      I'm afraid that's more a question to the original author, Phil Edworthy.
+>> He put this stuff into <mach/hpb-dmae.h>.
+
+> Then, why you could send this patch instead of original author,
+
+    Ask Phil why didn't he upstream his stuff. We, unlike him, do have 
+obligation to upstream it.
+
+> even though you can't answer any question about it ?
+
+    I'm not the author of the patch, let me remind you, Max Filippov is.
+He was on vacations.
+
+> Best regards
+> ---
+> Kuninori Morimoto
+
+WBR, Sergei
