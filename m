@@ -1,124 +1,68 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 19 Jul 2013 10:39:43 +0800
-Subject: [PATCH] ASoC: atmel: add wm8904 based audio machine driver
-In-Reply-To: <20130718111709.GL22506@sirena.org.uk>
-References: <1374132483-25375-1-git-send-email-voice.shen@atmel.com>
- <20130718111709.GL22506@sirena.org.uk>
-Message-ID: <51E8A6EF.4040608@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 19 Jul 2013 11:23:30 +0800
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <CAOesGMgi0j_mPyeBLVHb_QW+DwtAPoFY697eQO3-yp9tnP1vmA@mail.gmail.com>
+References: <20130716015038.GD28375@S2101-09.ap.freescale.net>
+ <51E4BF98.8030604@wwwdotorg.org>
+ <20130716041056.GA30067@S2101-09.ap.freescale.net>
+ <51E56AA7.7020103@wwwdotorg.org>
+ <20130717030246.GA4541@S2101-09.ap.freescale.net>
+ <51E6CCE4.20705@wwwdotorg.org>
+ <20130717213836.GA13324@amd.pavel.ucw.cz>
+ <51E719A6.6070105@wwwdotorg.org>
+ <20130718112555.GB1021@amd.pavel.ucw.cz>
+ <CAOesGMgi0j_mPyeBLVHb_QW+DwtAPoFY697eQO3-yp9tnP1vmA@mail.gmail.com>
+Message-ID: <20130719032328.GB20889@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, Jul 18, 2013 at 11:45:29AM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Thu, Jul 18, 2013 at 4:25 AM, Pavel Machek <pavel@denx.de> wrote:
+> 
+> > It sound to me like keeping ammount of -EPROBE_DEFER to minimum is
+> > still preferred.
+> 
+> Hand-crafting initcall level ordering of various drivers and subsystem
+> is probably an even greater evil though. We've done it in the past,
+> but now that we have deferred probe we have the option of not having
+> to do it every time, such as this.
+> 
+> You're spending an awful lot of energy arguing over this, but nobody
+> has actually shown data of how much deferral is happening -- and that
+> it's a real problem. Until someone does so there's no reason to change
+> it from the default module init level at all, I'd say.
 
-On 07/18/2013 07:17 PM, Mark Brown wrote:
-> On Thu, Jul 18, 2013 at 03:28:03PM +0800, Bo Shen wrote:
->> add wm8904 based audio machine driver
->>
->> the following ek board based on it
->>    - at91sam9n12ek
->>    - sama5d3xek (d31, d33, d34, d35)
->>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->
-> Looks pretty good, a few fairly small issues below.
->
-> The binding document should be CCed to devicetree-discuss for review.
+On imx6qdl-sabreauto board, there are 3 MAX7310 units as IO expanders to
+output 3 x 8 = 24 GPIOs.  18 of them are used for resets, enables and
+pin steering for various peripherals on the board.
 
-OK, I will cc the devicetree-discuss next version.
+  BACKLITE_ON
+  SAT_SHUTDN_B
+  CPU_PER_RST_B
+  MAIN_PER_RST_B
+  IPOD_RST_B
+  MLB_RST_B
+  SSI_STEERING
+  GPS_RST_B
+  
+  GPS_PWREN
+  VIDEO_ADC_PWRDN_B
+  ENET_CAN1_STEER
+  EIMD30_BTUART3_STEER
+  CAN_STBY
+  CAN_EN
+  USB_H1_PWR
+  
+  USB_OTG_PWR_ON
+  SAT_RST_B
+  NAND_BT_WIFI_STEER
 
->> +	atmel,audio-routing =
->> +		"Headphone Jack", "HPOUTL",
->> +		"Headphone Jack", "HPOUTR",
->> +		"IN2L", "Line In Jack",
->> +		"IN2R", "Line In Jack",
->> +		"Mic", "MICBIAS",
->> +		"IN1L", "Mic";
->
-> The widgets defined by the board should be documented in this binding.
-> Those from the CODEC should be documented in the CODEC binding.
+Most of these GPIOs need to set up properly at client device driver's
+probe stage - module_init() time.  So if we have all these service
+providers resets/enables/steering API registered at module_init() too,
+the probes of all these client device drivers stand a good chance to be
+deferred.
 
-OK, I will separate this and put need information in this binding document.
-
->> +#define MCLK_RATE 32768
->> +
->> +static struct clk *mclk;
->
-> This should be in driver data for the board.  Shouldn't the clock be
-> referenced using the clock bindings?
-
-I will try to implement this in next version.
-
->> +static int atmel_asoc_wm8904_init(struct snd_soc_pcm_runtime *rtd)
->> +{
->> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
->> +	int ret;
->> +
->> +	ret = snd_soc_dai_set_sysclk(codec_dai, WM8904_CLK_FLL,
->> +			12000000, SND_SOC_CLOCK_IN);
->> +	if (ret < 0) {
->> +		pr_err("%s -failed to set wm8904 SYSCLK\n", __func__);
->> +		return ret;
->> +	}
->
-> This is an odd thing to set the clock rate to and limits the sample
-> rates the board can play back.  It would be better to set the clock rate
-> based on the requested sample rate in hw_params - you're using the FLL
-> so may as well take advantage of the ability it offers to support all
-> sample rates.
->> +static int atmel_asoc_wm8904_params(struct snd_pcm_substream *substream,
->> +		struct snd_pcm_hw_params *params)
->> +{
->> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
->> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
->> +	int ret;
->> +
->> +	ret = snd_soc_dai_set_pll(codec_dai, WM8904_FLL_MCLK, WM8904_FLL_MCLK,
->> +		32768, params_rate(params) * 256);
->
-> Ah, in fact you do actually do that - it'd be clearer to put the
-> set_sysclk() after this.
-
-OK, I will put set_sysclk here.
-
->> +	switch (level) {
->> +	case SND_SOC_BIAS_ON:
->> +	case SND_SOC_BIAS_PREPARE:
->> +		if (!mclk_on) {
->> +			ret = clk_prepare_enable(mclk);
->> +			if (ret == 0)
->> +				mclk_on = 1;
->> +		}
->> +		break;
->> +	case SND_SOC_BIAS_STANDBY:
->> +	case SND_SOC_BIAS_OFF:
->> +		if (mclk_on)
->> +			clk_disable_unprepare(mclk);
->> +		mclk_on = 0;
->> +		break;
->> +	}
->
-> It's better to write this using the previous state than to have the
-> mclk_on flag - you want to enable on the standby->prepare transition and
-> disable on the standby->off transition.
-
-OK, I will implement it in next version.
-
->> +static int atmel_asoc_wm8904_dt_init(struct platform_device *pdev)
->> +{
->> +	struct device_node *np = pdev->dev.of_node;
->> +	struct device_node *codec_np, *cpu_np;
->> +	struct snd_soc_card *card = &atmel_asoc_wm8904_card;
->> +	struct snd_soc_dai_link *dailink = &atmel_asoc_wm8904_dailink;
->> +	int ret;
->> +
->> +	if (!np)
->> +		return -1;
->
-> Return a real error code here.
-
-Sure.
-
-Thanks,
-
-Best Reards,
-Bo Shen
+Shawn
