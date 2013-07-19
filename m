@@ -1,721 +1,337 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 19 Jul 2013 19:07:20 +0800
-Subject: [PATCH 4/6] ASoC: sirf-soc-inner: add drivers for both CPU and Codec
- DAIs
+Date: Fri, 19 Jul 2013 19:07:21 +0800
+Subject: [PATCH 5/6] ASoC: sirf-inner: add mach driver for SiRFSoC internal
+ codec
 In-Reply-To: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
 References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1374232042-26088-5-git-send-email-Baohua.Song@csr.com>
+Message-ID: <1374232042-26088-6-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rongjun Ying <Rongjun.Ying@csr.com>
 
-there is an internal codec embedded in the SiRF SoC. this is not
-a typical user scenerios of ASoC. but we can still get benefit by
-sharing platform DMA codes instead of implementing a pure ALSA
-driver.
-This driver adds DAI drivers for this internal codec.
-
-The features of  Internal Codec Controller include:
-Support two channel 16-bit resolution playback with fix 48KHz sample rate
-Support two channel 16-bit resolution record with fix 48KHz sample rate
-Use dedicated Internal Codec TXFIFO and Internal Codec RXFIFO
-Supports two DMA channels for Internal Codec TXFIFO and Internal Codec RXFIFO
+This connects DMA, CPU DAI and Codec DAI together and works
+as a mach driver.
 
 Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- sound/soc/sirf/Kconfig          |   3 +
- sound/soc/sirf/Makefile         |   2 +
- sound/soc/sirf/sirf-soc-inner.c | 653 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 658 insertions(+)
- create mode 100644 sound/soc/sirf/sirf-soc-inner.c
+ sound/soc/sirf/Kconfig      |   7 +-
+ sound/soc/sirf/Makefile     |   2 +
+ sound/soc/sirf/sirf-inner.c | 267 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 275 insertions(+), 1 deletion(-)
+ create mode 100644 sound/soc/sirf/sirf-inner.c
 
 diff --git a/sound/soc/sirf/Kconfig b/sound/soc/sirf/Kconfig
-index 3606614..60b8857 100644
+index 60b8857..ce3c025 100644
 --- a/sound/soc/sirf/Kconfig
 +++ b/sound/soc/sirf/Kconfig
-@@ -6,5 +6,8 @@ config SND_SIRF_SOC
+@@ -2,7 +2,7 @@ config SND_SIRF_SOC
+ 	tristate "Platform DMA driver for the SiRF SoC chips"
+ 	depends on ARCH_SIRF && SND_SOC
+ 	select SND_SOC_DMAENGINE_PCM
+-
++	
  config SND_SOC_SIRF_I2S
  	tristate
  
-+config SND_SIRF_SOC_INNER
-+	tristate
-+
+@@ -11,3 +11,8 @@ config SND_SIRF_SOC_INNER
+ 
  config SND_SOC_SIRF_USP
  	tristate
++
++config SND_SIRF_INNER
++	tristate "SoC Audio support for SiRF inner codec of SiRF EVB"
++	depends on SND_SIRF_SOC
++	select SND_SIRF_SOC_INNER
 diff --git a/sound/soc/sirf/Makefile b/sound/soc/sirf/Makefile
-index 630c9be..8517c67 100644
+index 8517c67..80abdf6 100644
 --- a/sound/soc/sirf/Makefile
 +++ b/sound/soc/sirf/Makefile
-@@ -1,7 +1,9 @@
+@@ -1,9 +1,11 @@
  snd-soc-sirf-objs := sirf-pcm.o
-+snd-soc-sirf-soc-inner-objs := sirf-soc-inner.o
++snd-soc-sirf-inner-objs := sirf-inner.o
+ snd-soc-sirf-soc-inner-objs := sirf-soc-inner.o
  snd-soc-sirf-i2s-objs := sirf-i2s.o
  snd-soc-sirf-usp-objs := sirf-usp.o
  
  obj-$(CONFIG_SND_SIRF_SOC) += snd-soc-sirf.o
-+obj-$(CONFIG_SND_SIRF_SOC_INNER) += snd-soc-sirf-soc-inner.o
++obj-$(CONFIG_SND_SIRF_INNER) += snd-soc-sirf-inner.o
+ obj-$(CONFIG_SND_SIRF_SOC_INNER) += snd-soc-sirf-soc-inner.o
  obj-$(CONFIG_SND_SOC_SIRF_I2S) += snd-soc-sirf-i2s.o
  obj-$(CONFIG_SND_SOC_SIRF_USP) += snd-soc-sirf-usp.o
-diff --git a/sound/soc/sirf/sirf-soc-inner.c b/sound/soc/sirf/sirf-soc-inner.c
+diff --git a/sound/soc/sirf/sirf-inner.c b/sound/soc/sirf/sirf-inner.c
 new file mode 100644
-index 0000000..96bf59b
+index 0000000..a8f2765
 --- /dev/null
-+++ b/sound/soc/sirf/sirf-soc-inner.c
-@@ -0,0 +1,653 @@
++++ b/sound/soc/sirf/sirf-inner.c
+@@ -0,0 +1,267 @@
 +/*
-+ * SiRF inner audio codec driver
++ * SiRF inner audio device driver
 + *
 + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
 + *
-+ * Licensed under GPLv2 or later.*
++ * Licensed under GPLv2 or later.
 + */
 +
-+#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/rtc/sirfsoc_rtciobrg.h>
++#include <linux/module.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++
 +#include <sound/core.h>
 +#include <sound/pcm.h>
-+#include <sound/pcm_params.h>
-+#include <sound/initval.h>
 +#include <sound/soc.h>
++#include <sound/jack.h>
 +
-+#include "sirf-audio.h"
-+#include "sirf-pcm.h"
-+
-+struct sirf_soc_inner_audio_reg_bits {
-+	u32 dig_mic_en_bits;
-+	u32 dig_mic_freq_bits;
-+	u32 adc14b_12_bits;
-+	u32 firdac_hsl_en_bits;
-+	u32 firdac_hsr_en_bits;
-+	u32 firdac_lout_en_bits;
-+	u32 por_bits;
-+	u32 codec_clk_en_bits;
-+	u32 hp_3db_boost_bits;
-+	u32 adc_left_gain_shift;
-+	u32 adc_right_gain_shift;
-+	u32 adc_gain_mask;
-+	u32 mic_max_gain;
++struct sirf_inner_card {
++	unsigned int            gpio_hp_pa;
++	unsigned int            gpio_spk_pa;
++	/*
++	 * Android platform uses switch gpio instead of jack.
++	 */
++#ifndef CONFIG_ANDROID
++	unsigned int            gpio_hp_detect;
++	struct snd_soc_jack     hp_jack;
++#endif
 +};
 +
-+struct sirf_soc_inner_audio {
-+	void __iomem            *base;
-+	unsigned int            playing;
-+	struct clk              *clk;
-+	spinlock_t              lock;
-+	u32			sys_pwrc_reg_base;
-+	struct sirf_soc_inner_audio_reg_bits *reg_bits;
-+};
++#ifndef CONFIG_ANDROID
++static int sirf_inner_jack_status_check(void);
 +
-+static struct sirf_soc_inner_audio_reg_bits sirf_soc_inner_audio_reg_bits_prima2 = {
-+	20, 21, 22, 23, 24, 25, 26, 27, 28, 15, 10, 0x1f, 0x19,
-+};
-+
-+static struct sirf_soc_inner_audio_reg_bits sirf_soc_inner_audio_reg_bits_atlas6 = {
-+	22, 23, 24, 25, 26, 27, 28, 29, 30, 16, 10, 0x3f, 0x39,
-+};
-+
-+static int sirf_inner_control(struct snd_kcontrol *kcontrol,
-+		struct snd_ctl_elem_value *ucontrol,
-+		int get, char *name)
-+{
-+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-+	struct snd_soc_card *card = codec->card;
-+	int i;
-+	for (i = 0; i < card->num_controls; i++) {
-+		if (!strcmp(card->controls[i].name, name)) {
-+			if (card->controls[i].get && get)
-+				return card->controls[i].get(kcontrol, ucontrol);
-+			else if (card->controls[i].put && !get)
-+				return card->controls[i].put(kcontrol, ucontrol);
-+		}
-+	}
-+	return 0;
-+}
-+
-+static int sirf_inner_snd_speaker_get(struct snd_kcontrol *kcontrol,
-+		struct snd_ctl_elem_value *ucontrol)
-+{
-+	sirf_inner_control(kcontrol, ucontrol, 1, "Speaker Out");
-+	return 0;
-+}
-+
-+static int sirf_inner_snd_speaker_set(struct snd_kcontrol *kcontrol,
-+		struct snd_ctl_elem_value *ucontrol)
-+{
-+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-+	struct sirf_soc_inner_audio *sinner_audio = dev_get_drvdata(codec->dev);
-+
-+	spin_lock(&sinner_audio->lock);
-+	sirf_inner_control(kcontrol, ucontrol, 0, "Speaker Out");
-+
-+	if (ucontrol->value.integer.value[0]) {
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				| IC_RDACEN | IC_SPSELR,
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) |
-+				(1 << sinner_audio->reg_bits->firdac_lout_en_bits),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+
-+		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) |
-+					IC_SPEN), sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	} else {
-+		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+					& ~(IC_SPEN | IC_SPSELR)),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+				& ~(1 << sinner_audio->reg_bits->firdac_lout_en_bits),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+	}
-+
-+	spin_unlock(&sinner_audio->lock);
-+
-+	return 0;
-+}
-+
-+static int sirf_inner_snd_headphone_get(struct snd_kcontrol *kcontrol,
-+		struct snd_ctl_elem_value *ucontrol)
-+{
-+	sirf_inner_control(kcontrol, ucontrol, 1, "Headphone Out");
-+	return 0;
-+}
-+
-+static int sirf_inner_snd_headphone_set(struct snd_kcontrol *kcontrol,
-+		struct snd_ctl_elem_value *ucontrol)
-+{
-+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-+	struct sirf_soc_inner_audio *sinner_audio = dev_get_drvdata(codec->dev);
-+
-+	spin_lock(&sinner_audio->lock);
-+	sirf_inner_control(kcontrol, ucontrol, 0, "Headphone Out");
-+	if (ucontrol->value.integer.value[0])
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				| IC_HSLEN | IC_HSREN | IC_HPRSELR
-+				| IC_HPLSELL,
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	else
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				& ~(IC_HSLEN | IC_HSREN | IC_HPRSELR
-+					| IC_HPLSELL),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	spin_unlock(&sinner_audio->lock);
-+	return 0;
-+}
-+
-+static struct snd_kcontrol_new snd_sirf_inner_volume_controls_atlas6[] = {
-+	SOC_DOUBLE("Speaker Volume", AUDIO_IC_CODEC_CTRL0, 21, 14,
-+			0x7F, 0),
-+	SOC_DOUBLE("Capture Volume", AUDIO_IC_CODEC_CTRL1, 16, 10,
-+			0x3F, 0),
-+	SOC_DOUBLE("Capture Switch", AUDIO_IC_CODEC_CTRL1, 0, 1,
-+			1, 0),
-+	SOC_SINGLE_BOOL_EXT("Speaker Switch", 0, sirf_inner_snd_speaker_get,
-+			sirf_inner_snd_speaker_set),
-+	SOC_SINGLE_BOOL_EXT("Headphone Switch", 0, sirf_inner_snd_headphone_get,
-+			sirf_inner_snd_headphone_set),
-+};
-+
-+static struct snd_kcontrol_new snd_sirf_inner_volume_controls_prima2[] = {
-+	SOC_DOUBLE("Speaker Volume", AUDIO_IC_CODEC_CTRL0, 21, 14,
-+			0x7F, 0),
-+	SOC_DOUBLE("Capture Volume", AUDIO_IC_CODEC_CTRL1, 15, 10,
-+			0x1F, 0),
-+	SOC_DOUBLE("Capture Switch", AUDIO_IC_CODEC_CTRL1, 0, 1,
-+			1, 0),
-+	SOC_SINGLE_BOOL_EXT("Speaker Switch", 0, sirf_inner_snd_speaker_get,
-+			sirf_inner_snd_speaker_set),
-+	SOC_SINGLE_BOOL_EXT("Headphone Switch", 0, sirf_inner_snd_headphone_get,
-+			sirf_inner_snd_headphone_set),
-+};
-+
-+static int sirf_inner_codec_startup(struct snd_pcm_substream *substream,
-+		struct snd_soc_dai *dai)
-+{
-+	struct sirf_soc_inner_audio *sinner_audio = snd_soc_dai_get_drvdata(dai);
-+	u32 adc_gain_mask = sinner_audio->reg_bits->adc_gain_mask;
-+	u32 adc_left_gain_shift = sinner_audio->reg_bits->adc_left_gain_shift;
-+	u32 adc_right_gain_shift = sinner_audio->reg_bits->adc_right_gain_shift;
-+	u32 mic_max_gain = sinner_audio->reg_bits->mic_max_gain;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+					| (1 << sinner_audio->reg_bits->codec_clk_en_bits) |
-+					(1 << sinner_audio->reg_bits->por_bits)),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+
-+		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_HSINVEN)
-+				& ~IC_MONOR,
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+
-+		msleep(50);
-+
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_RDACEN |
-+				IC_LDACEN | IC_HPRSELR | IC_HPLSELL,
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) |
-+					(1 << sinner_audio->reg_bits->firdac_hsl_en_bits) |
-+					(1 << sinner_audio->reg_bits->firdac_hsr_en_bits),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+
-+		usleep_range(300, 1000);
-+
-+		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+					| IC_HSREN | IC_HSLEN),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+
-+		/* avoid break noise when sound loud, set RX gain -1dB */
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) &
-+				~((IC_RXPGAR_MASK << IC_RXPGAR_SHIFT) |
-+					(IC_RXPGAL_MASK << IC_RXPGAL_SHIFT)),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) |
-+				((IC_RXPGAR << IC_RXPGAR_SHIFT) |
-+				 (IC_RXPGAL << IC_RXPGAL_SHIFT)),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-+#define PWRC_PDN_CTRL_OFFSET    0
-+#define AUDIO_POWER_EN_BIT      14
-+		sirfsoc_rtc_iobrg_writel(sirfsoc_rtc_iobrg_readl(
-+			(sinner_audio->sys_pwrc_reg_base +
-+			PWRC_PDN_CTRL_OFFSET))
-+			| (1 << AUDIO_POWER_EN_BIT),
-+			sinner_audio->sys_pwrc_reg_base +
-+			PWRC_PDN_CTRL_OFFSET);
-+
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) |
-+			(1 << sinner_audio->reg_bits->codec_clk_en_bits) |
-+			(1 << sinner_audio->reg_bits->por_bits),
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+		msleep(50);
-+
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_PWR) |
-+			MICBIASEN, sinner_audio->base + AUDIO_IC_CODEC_PWR);
-+		usleep_range(300, 1000);
-+
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+			| IC_MICINREN | IC_MICINLEN,
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+		usleep_range(100, 200);
-+		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) | IC_RADCEN |
-+			IC_LADCEN, sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+		usleep_range(100, 200);
-+		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) | IC_MICIN1SEL
-+			| IC_MICDIFSEL) & (~IC_MICIN2SEL),
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+
-+		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) &
-+			~(adc_gain_mask << adc_left_gain_shift) &
-+			~(adc_gain_mask << adc_right_gain_shift)) |
-+			(mic_max_gain << adc_left_gain_shift) |
-+			(mic_max_gain << adc_right_gain_shift),
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+	}
-+	return 0;
-+}
-+
-+static void sirf_inner_codec_shutdown(struct snd_pcm_substream *substream,
-+		struct snd_soc_dai *dai)
-+{
-+}
-+
-+static int sirf_inner_codec_hw_params(struct snd_pcm_substream *substream,
-+		struct snd_pcm_hw_params *params,
-+		struct snd_soc_dai *dai)
-+{
-+	return 0;
-+}
-+
-+static int sirf_inner_codec_trigger(struct snd_pcm_substream *substream,
-+		int cmd,
-+		struct snd_soc_dai *dai)
-+{
-+	struct sirf_soc_inner_audio *sinner_audio = snd_soc_dai_get_drvdata(dai);
-+	int playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
-+
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		spin_lock(&sinner_audio->lock);
-+		if (playback) {
-+			writel(readl(sinner_audio->base + AUDIO_CTRL_IC_CODEC_TX_CTRL)
-+				& ~IC_TX_ENABLE,
-+				sinner_audio->base + AUDIO_CTRL_IC_CODEC_TX_CTRL);
-+			sinner_audio->playing = false;
-+			writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				& ~(IC_SPEN | IC_SPSELR | IC_HSLEN)),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+			writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+				& ~(1 << sinner_audio->reg_bits->firdac_lout_en_bits),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+			writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				& ~(IC_HSLEN | IC_HSREN | IC_HPRSELR | IC_HPLSELL),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+		} else {
-+			writel(readl(sinner_audio->base + AUDIO_CTRL_IC_CODEC_RX_CTRL)
-+				& ~IC_RX_ENABLE,
-+				sinner_audio->base + AUDIO_CTRL_IC_CODEC_RX_CTRL);
-+		}
-+		spin_unlock(&sinner_audio->lock);
-+		break;
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		spin_lock(&sinner_audio->lock);
-+		if (playback) {
-+			writel(0, sinner_audio->base + AUDIO_CTRL_IC_TXFIFO_INT_MSK);
-+			writel(AUDIO_FIFO_START,
-+				sinner_audio->base + AUDIO_CTRL_IC_TXFIFO_OP);
-+			writel(IC_TX_ENABLE,
-+				sinner_audio->base + AUDIO_CTRL_IC_CODEC_TX_CTRL);
-+			sinner_audio->playing = true;
-+			writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				| IC_RDACEN | IC_SPSELR,
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+
-+			writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+				| (1 << sinner_audio->reg_bits->firdac_lout_en_bits),
-+				sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+
-+			writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				| IC_SPEN, sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+			writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-+				| IC_HSLEN | IC_HSREN
-+				| IC_HPRSELR | IC_HPLSELL,
-+				sinner_audio->base
-+				+ AUDIO_IC_CODEC_CTRL0);
-+		} else {
-+			/* unmask rx fifo interrupt */
-+			writel(0, sinner_audio->base
-+				+ AUDIO_CTRL_IC_RXFIFO_INT_MSK);
-+
-+				/* First start the FIFO, then enable the tx/rx */
-+			writel(AUDIO_FIFO_START, sinner_audio->base
-+				+ AUDIO_CTRL_IC_RXFIFO_OP);
-+			/* mono capture from dacr*/
-+			if (substream->runtime->channels == 1)
-+				writel(0x01, sinner_audio->base
-+					+ AUDIO_CTRL_IC_CODEC_RX_CTRL);
-+			else
-+				writel(IC_RX_ENABLE, sinner_audio->base
-+					+ AUDIO_CTRL_IC_CODEC_RX_CTRL);
-+		}
-+		spin_unlock(&sinner_audio->lock);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+struct snd_soc_dai_ops sirf_inner_codec_dai_ops = {
-+	.startup = sirf_inner_codec_startup,
-+	.hw_params = sirf_inner_codec_hw_params,
-+	.shutdown = sirf_inner_codec_shutdown,
-+	.trigger = sirf_inner_codec_trigger,
-+};
-+
-+struct snd_soc_dai_driver sirf_inner_codec_dai = {
-+	.name = "sirf-soc-inner",
-+	.playback = {
-+		.stream_name = "Audio Playback",
-+		.channels_min = 2,
-+		.channels_max = 2,
-+		.rates = SNDRV_PCM_RATE_48000,
-+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+	},
-+	.capture = {
-+		.stream_name = "Audio Capture",
-+		.channels_min = 1,
-+		.channels_max = 2,
-+		.rates = SNDRV_PCM_RATE_48000,
-+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+	},
-+	.ops = &sirf_inner_codec_dai_ops,
-+};
-+EXPORT_SYMBOL_GPL(sirf_inner_codec_dai);
-+
-+static int sirf_inner_codec_probe(struct snd_soc_codec *codec)
-+{
-+	if (of_device_is_compatible(codec->dev->of_node, "sirf,prima2-audio"))
-+		return snd_soc_add_codec_controls(codec,
-+			snd_sirf_inner_volume_controls_prima2,
-+			ARRAY_SIZE(snd_sirf_inner_volume_controls_prima2));
-+	if (of_device_is_compatible(codec->dev->of_node, "sirf,atlas6-audio"))
-+		return snd_soc_add_codec_controls(codec,
-+			snd_sirf_inner_volume_controls_atlas6,
-+			ARRAY_SIZE(snd_sirf_inner_volume_controls_atlas6));
-+
-+	return -EINVAL;
-+}
-+
-+static int sirf_inner_codec_remove(struct snd_soc_codec *codec)
-+{
-+	return 0;
-+}
-+
-+static unsigned int sirf_inner_codec_reg_read(struct snd_soc_codec *codec,
-+		unsigned int reg)
-+{
-+	struct sirf_soc_inner_audio *sinner_audio = dev_get_drvdata(codec->dev);
-+	return readl(sinner_audio->base + reg);
-+}
-+
-+static int sirf_inner_codec_reg_write(struct snd_soc_codec *codec,
-+	unsigned int reg, unsigned int val)
-+{
-+	struct sirf_soc_inner_audio *sinner_audio = dev_get_drvdata(codec->dev);
-+	writel(val, sinner_audio->base + reg);
-+	return 0;
-+}
-+
-+
-+static struct snd_soc_codec_driver soc_codec_device_sirf_inner_codec = {
-+	.probe = sirf_inner_codec_probe,
-+	.remove = sirf_inner_codec_remove,
-+	.read = sirf_inner_codec_reg_read,
-+	.write = sirf_inner_codec_reg_write,
-+};
-+
-+static struct sirf_pcm_dma_data sirf_soc_inner_dai_dma_data[2] = {
++static struct snd_soc_jack_gpio hp_jack_gpios[] = {
 +	{
-+		.name = "Audio Playback",
-+	}, {
-+		.name = "Audio Capture",
++		.name = "hpdet-gpio",
++		.report = SND_JACK_HEADPHONE,
++		.debounce_time = 200,
++		.jack_status_check = sirf_inner_jack_status_check,
 +	},
 +};
 +
-+static int sirf_soc_inner_dai_startup(struct snd_pcm_substream *substream,
-+		struct snd_soc_dai *dai)
++static int sirf_inner_jack_status_check(void)
 +{
-+	snd_soc_dai_set_dma_data(dai, substream,
-+			&sirf_soc_inner_dai_dma_data[substream->stream]);
-+	return 0;
++	int spk_out = 0;
++	struct snd_soc_codec *codec = hp_jack_gpios[0].jack->codec;
++	struct snd_soc_card *card = codec->card;
++	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
++	int hp_report = 0;
++
++	if (gpio_is_valid(sinner_card->gpio_hp_detect))
++		spk_out = gpio_get_value(sinner_card->gpio_hp_detect);
++
++	if (gpio_is_valid(sinner_card->gpio_hp_pa))
++		gpio_direction_output(sinner_card->gpio_hp_pa, !spk_out);
++
++	if (gpio_is_valid(sinner_card->gpio_spk_pa))
++		gpio_direction_output(sinner_card->gpio_spk_pa, spk_out);
++
++	if (!spk_out)
++		hp_report |= SND_JACK_HEADPHONE;
++
++	return hp_report;
 +}
 +
-+static int sirf_soc_inner_dai_hw_params(struct snd_pcm_substream *substream,
-+		struct snd_pcm_hw_params *params,
-+		struct snd_soc_dai *dai)
++static int sirf_inner_init(struct snd_soc_pcm_runtime *rtd)
 +{
-+	int playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
-+	struct sirf_soc_inner_audio *sinner_audio =
-+			snd_soc_dai_get_drvdata(dai);
-+	if (playback) {
-+		writel(AUDIO_FIFO_RESET,
-+				sinner_audio->base + AUDIO_CTRL_IC_TXFIFO_OP);
-+
-+		writel(0x00,
-+				sinner_audio->base + AUDIO_CTRL_IC_TXFIFO_OP);
-+	} else {
-+		writel(AUDIO_FIFO_RESET,
-+				sinner_audio->base + AUDIO_CTRL_IC_RXFIFO_OP);
-+
-+		writel(0x00,
-+				sinner_audio->base + AUDIO_CTRL_IC_RXFIFO_OP);
-+	}
-+	return 0;
-+}
-+
-+static const struct snd_soc_dai_ops sirf_soc_inner_dai_ops = {
-+	.startup        = sirf_soc_inner_dai_startup,
-+	.hw_params      = sirf_soc_inner_dai_hw_params,
-+};
-+
-+static struct snd_soc_dai_driver sirf_soc_inner_dai = {
-+	.name		= "sirf-soc-inner",
-+	.id			= 0,
-+	.playback = {
-+		.stream_name = "inner Playback",
-+		.channels_min = 2,
-+		.channels_max = 2,
-+		.rates = SNDRV_PCM_RATE_48000,
-+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+	},
-+	.capture = {
-+		.stream_name = "inner Capture",
-+		.channels_min = 1,
-+		.channels_max = 2,
-+		.rates = SNDRV_PCM_RATE_48000,
-+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+	},
-+	.ops = &sirf_soc_inner_dai_ops,
-+};
-+
-+static const struct snd_soc_component_driver sirf_soc_inner_component = {
-+	.name		= "sirf-soc-inner",
-+};
-+
-+static const struct of_device_id sirf_soc_inner_of_match[] = {
-+	{ .compatible = "sirf,prima2-audio", .data = &sirf_soc_inner_audio_reg_bits_prima2 },
-+	{ .compatible = "sirf,atlas6-audio", .data = &sirf_soc_inner_audio_reg_bits_atlas6 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, sirf_soc_inner_of_match);
-+
-+static int sirf_soc_inner_probe(struct platform_device *pdev)
-+{
++	struct snd_soc_codec *codec = rtd->codec;
++	struct snd_soc_card *card = codec->card;
++	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
 +	int ret;
-+	u32 rx_dma_ch, tx_dma_ch;
-+	struct sirf_soc_inner_audio *sinner_audio;
-+	struct resource *mem_res;
-+	struct device_node *dn = NULL;
-+	const struct of_device_id *match;
-+
-+	match = of_match_node(sirf_soc_inner_of_match, pdev->dev.of_node);
-+
-+	sinner_audio = devm_kzalloc(&pdev->dev,
-+		sizeof(struct sirf_soc_inner_audio), GFP_KERNEL);
-+	if (!sinner_audio)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, sinner_audio);
-+
-+	ret = of_property_read_u32(pdev->dev.of_node,
-+			"sirf,inner-audio-dma-rx-channel", &rx_dma_ch);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Unable to audio capture dma channel\n");
++	hp_jack_gpios[0].gpio = sinner_card->gpio_hp_detect;
++	ret = snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
++			&sinner_card->hp_jack);
++	if (ret)
 +		return ret;
-+	}
-+	ret = of_property_read_u32(pdev->dev.of_node,
-+			"sirf,inner-audio-dma-tx-channel", &tx_dma_ch);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Unable to audio playback dma channel\n");
-+		return ret;
-+	}
-+	sirf_soc_inner_dai_dma_data[0].dma_req = tx_dma_ch;
-+	sirf_soc_inner_dai_dma_data[1].dma_req = rx_dma_ch;
-+
-+	dn = of_find_compatible_node(dn, NULL, "sirf,prima2-pwrc");
-+	if (!dn) {
-+		dev_err(&pdev->dev, "Failed to get sirf,prima2-pwrc  node!\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = of_property_read_u32(dn, "reg", &sinner_audio->sys_pwrc_reg_base);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed tp get pwrc register base address\n");
-+		return -EINVAL;
-+	}
-+
-+	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	sinner_audio->base = devm_ioremap_resource(&pdev->dev, mem_res);
-+	if (sinner_audio->base == NULL)
-+		return -ENOMEM;
-+
-+	sinner_audio->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(sinner_audio->clk)) {
-+		dev_err(&pdev->dev, "Get clock failed.\n");
-+		return PTR_ERR(sinner_audio->clk);
-+	}
-+	clk_prepare_enable(sinner_audio->clk);
-+
-+	ret = snd_soc_register_component(&pdev->dev, &sirf_soc_inner_component,
-+		&sirf_soc_inner_dai, 1);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Register Audio SoC dai failed.\n");
-+		goto err_clk_put;
-+	}
-+
-+	ret = snd_soc_register_codec(&(pdev->dev),
-+			&soc_codec_device_sirf_inner_codec,
-+			&sirf_inner_codec_dai, 1);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Register Audio Codec dai failed.\n");
-+		goto err_com_unreg;
-+	}
-+
-+	sinner_audio->reg_bits = (struct sirf_soc_inner_audio_reg_bits *)match->data;
-+
-+	spin_lock_init(&sinner_audio->lock);
-+	writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+				| (1 << sinner_audio->reg_bits->codec_clk_en_bits)),
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+	writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+			| (1 << sinner_audio->reg_bits->adc14b_12_bits)),
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+	writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_CPFREQ,
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_CPEN,
-+			sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	return 0;
-+
-+err_com_unreg:
-+	snd_soc_unregister_component(&pdev->dev);
-+err_clk_put:
-+	clk_disable_unprepare(sinner_audio->clk);
-+	return ret;
++	return snd_soc_jack_add_gpios(&sinner_card->hp_jack,
++			ARRAY_SIZE(hp_jack_gpios),
++			hp_jack_gpios);
 +}
-+
-+static int sirf_soc_inner_remove(struct platform_device *pdev)
-+{
-+	struct sirf_soc_inner_audio *sinner_audio = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(sinner_audio->clk);
-+	snd_soc_unregister_codec(&(pdev->dev));
-+	snd_soc_unregister_component(&pdev->dev);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int sirf_soc_inner_suspend(struct platform_device *pdev,
-+		pm_message_t msg)
-+{
-+	struct sirf_soc_inner_audio *sinner_audio = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(sinner_audio->clk);
-+	return 0;
-+}
-+
-+static int sirf_soc_inner_resume(struct platform_device *pdev)
-+{
-+	struct sirf_soc_inner_audio *sinner_audio = platform_get_drvdata(pdev);
-+
-+	clk_prepare_enable(sinner_audio->clk);
-+
-+	writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+		| (1 << sinner_audio->reg_bits->codec_clk_en_bits)),
-+		sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+	writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-+		| (1 << sinner_audio->reg_bits->adc14b_12_bits)),
-+		sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-+	writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_CPFREQ,
-+		sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_CPEN,
-+		sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-+	return 0;
-+}
-+#else
-+#define sirf_soc_inner_suspend NULL
-+#define sirf_soc_inner_resume NULL
 +#endif
 +
-+static struct platform_driver sirf_soc_inner_driver = {
-+	.driver = {
-+		.name = "sirf-soc-inner",
-+		.owner = THIS_MODULE,
-+		.of_match_table = sirf_soc_inner_of_match,
++/* Digital audio interface glue - connects codec <--> CPU */
++static struct snd_soc_dai_link sirf_inner_dai_links[] = {
++	{
++		.name = "SiRF inner",
++		.stream_name = "SiRF inner",
++		.codec_dai_name = "sirf-soc-inner",
++#ifndef CONFIG_ANDROID
++		.init = sirf_inner_init,
++#endif
 +	},
-+	.probe = sirf_soc_inner_probe,
-+	.remove = sirf_soc_inner_remove,
-+	.suspend = sirf_soc_inner_suspend,
-+	.resume = sirf_soc_inner_resume,
 +};
 +
-+module_platform_driver(sirf_soc_inner_driver);
++static int sirf_inner_headphone_out_get(struct snd_kcontrol *kcontrol,
++		struct snd_ctl_elem_value *ucontrol)
++{
++	int hp_out = 0;
++	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
++	struct snd_soc_card *card = codec->card;
++	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
 +
-+MODULE_DESCRIPTION("SiRF SoC inner bus and codec driver");
-+MODULE_AUTHOR("RongJun Ying <Rongjun.Ying@csr.com>");
++	if (gpio_is_valid(sinner_card->gpio_hp_pa))
++		hp_out = gpio_get_value(sinner_card->gpio_hp_pa);
++
++	*ucontrol->value.integer.value = hp_out;
++	return 0;
++}
++
++static int sirf_inner_headphone_out_put(struct snd_kcontrol *kcontrol,
++		struct snd_ctl_elem_value *ucontrol)
++{
++	int is_hp_out = ucontrol->value.integer.value[0];
++	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
++	struct snd_soc_card *card = codec->card;
++	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
++
++	if (gpio_is_valid(sinner_card->gpio_hp_pa))
++		gpio_direction_output(sinner_card->gpio_hp_pa, is_hp_out);
++
++	return 0;
++}
++
++static int sirf_inner_speaker_out_get(struct snd_kcontrol *kcontrol,
++		struct snd_ctl_elem_value *ucontrol)
++{
++	int spk_out = 0;
++	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
++	struct snd_soc_card *card = codec->card;
++	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
++
++	if (gpio_is_valid(sinner_card->gpio_spk_pa))
++		spk_out = gpio_get_value(sinner_card->gpio_spk_pa);
++
++	*ucontrol->value.integer.value = spk_out;
++	return 0;
++}
++
++static int sirf_inner_speaker_out_put(struct snd_kcontrol *kcontrol,
++		struct snd_ctl_elem_value *ucontrol)
++{
++	int is_spk_out = ucontrol->value.integer.value[0];
++	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
++	struct snd_soc_card *card = codec->card;
++	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
++
++	if (gpio_is_valid(sinner_card->gpio_spk_pa))
++		gpio_direction_output(sinner_card->gpio_spk_pa, is_spk_out);
++	return 0;
++}
++
++static int sirf_inner_speaker_out_info(struct snd_kcontrol *kcontrol,
++		struct snd_ctl_elem_info *uinfo)
++{
++	return 0;
++}
++
++static int sirf_inner_headphone_out_info(struct snd_kcontrol *kcontrol,
++		struct snd_ctl_elem_info *uinfo)
++{
++	return 0;
++}
++
++static struct snd_kcontrol_new snd_sirf_inner_out_route_controls[] = {
++	{
++		.iface          =       SNDRV_CTL_ELEM_IFACE_MIXER,
++		.name           =       "Speaker Out",
++		.index          =       0,
++		.access         =       SNDRV_CTL_ELEM_ACCESS_READWRITE,
++		.info           =	sirf_inner_speaker_out_info,
++		.get            =       sirf_inner_speaker_out_get,
++		.put            =       sirf_inner_speaker_out_put,
++	}, {
++		.iface          =       SNDRV_CTL_ELEM_IFACE_MIXER,
++		.name           =       "Headphone Out",
++		.index          =       0,
++		.access         =       SNDRV_CTL_ELEM_ACCESS_READWRITE,
++		.info           =	sirf_inner_headphone_out_info,
++		.get            =       sirf_inner_headphone_out_get,
++		.put            =       sirf_inner_headphone_out_put,
++	},
++};
++
++/* Audio machine driver */
++static struct snd_soc_card snd_soc_sirf_inner_card = {
++	.name = "SiRF inner",
++	.owner = THIS_MODULE,
++	.dai_link = sirf_inner_dai_links,
++	.num_links = ARRAY_SIZE(sirf_inner_dai_links),
++	.controls = snd_sirf_inner_out_route_controls,
++	.num_controls = ARRAY_SIZE(snd_sirf_inner_out_route_controls),
++};
++
++static int sirf_inner_probe(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = &snd_soc_sirf_inner_card;
++	struct sirf_inner_card *sinner_card;
++	sinner_card = devm_kzalloc(&pdev->dev, sizeof(struct sirf_inner_card),
++			GFP_KERNEL);
++	if (sinner_card == NULL)
++		return -ENOMEM;
++
++	sirf_inner_dai_links[0].platform_of_node =
++		of_find_compatible_node(NULL, NULL, "sirf,pcm-audio");
++	sirf_inner_dai_links[0].cpu_of_node =
++		of_parse_phandle(pdev->dev.of_node, "sirf,inner-platform", 0);
++	sirf_inner_dai_links[0].codec_of_node =
++		of_parse_phandle(pdev->dev.of_node, "sirf,inner-codec", 0);
++	sinner_card->gpio_spk_pa = of_get_named_gpio(pdev->dev.of_node,
++			"spk-pa-gpios", 0);
++	sinner_card->gpio_hp_pa =  of_get_named_gpio(pdev->dev.of_node,
++			"hp-pa-gpios", 0);
++#ifndef CONFIG_ANDROID
++	sinner_card->gpio_hp_detect = of_get_named_gpio(pdev->dev.of_node,
++			"hp-switch-gpios", 0);
++#endif
++	if (gpio_is_valid(sinner_card->gpio_spk_pa))
++		gpio_request(sinner_card->gpio_spk_pa, "SPA_PA_SD");
++	if (gpio_is_valid(sinner_card->gpio_hp_pa))
++		gpio_request(sinner_card->gpio_hp_pa, "HP_PA_SD");
++
++	card->dev = &pdev->dev;
++	snd_soc_card_set_drvdata(card, sinner_card);
++	platform_set_drvdata(pdev, card);
++	if (gpio_is_valid(sinner_card->gpio_hp_pa))
++		gpio_direction_output(sinner_card->gpio_hp_pa, 0);
++	if (gpio_is_valid(sinner_card->gpio_spk_pa))
++		gpio_direction_output(sinner_card->gpio_spk_pa, 0);
++
++	return snd_soc_register_card(card);
++}
++
++static int sirf_inner_remove(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = platform_get_drvdata(pdev);
++	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
++
++	if (gpio_is_valid(sinner_card->gpio_hp_pa))
++		gpio_free(sinner_card->gpio_hp_pa);
++	if (gpio_is_valid(sinner_card->gpio_spk_pa))
++		gpio_free(sinner_card->gpio_spk_pa);
++
++	snd_soc_unregister_card(card);
++	return 0;
++}
++
++static const struct of_device_id sirf_inner_of_match[] = {
++	{.compatible = "sirf,sirf-inner-audio", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, sirf_inner_of_match);
++
++static struct platform_driver sirf_inner_driver = {
++	.driver = {
++		.name = "sirf-inner-audio",
++		.owner = THIS_MODULE,
++		.of_match_table = sirf_inner_of_match,
++	},
++	.probe = sirf_inner_probe,
++	.remove = sirf_inner_remove,
++};
++module_platform_driver(sirf_inner_driver);
++
++MODULE_AUTHOR("RongJun Ying <RongJun.Ying@csr.com>");
++MODULE_DESCRIPTION("ALSA SoC SIRF inner AUDIO driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 1.8.2.3
