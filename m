@@ -1,84 +1,50 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 19 Jul 2013 18:03:01 +0200
-Subject: [PATCH 2/4] ARM: exynos: cpuidle: Use the common cpuidle register
- routine
-In-Reply-To: <1374152070-21008-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
- <1374152070-21008-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <4097491.3y6BBYmzze@amdc1032>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Jul 2013 17:03:50 +0100
+Subject: [GIT PULL] arm64 fixes for 3.11-rc2
+Message-ID: <20130719160336.GA22565@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
-Hi,
+Please pull the arm64 fixes below. Thanks.
 
-On Thursday, July 18, 2013 02:54:28 PM Daniel Lezcano wrote:
-> Now we have the same routine than the one handled by the cpuidle framework.
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-Small nitpick:
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
-To be exact the routine is not the same, on error cpuidle_register() does
-complete unregister operation of the cpuidle driver, exynos4_init_cpuidle()
-just stops the registration procedure. 
+are available in the git repository at:
 
-The change itself is okay but the patch description could be better.
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
 
-Anyway all patches (#1-4) look fine to me. Thanks for this work.
+for you to fetch changes up to ff701306cd49aaff80fb852323b387812bc76491:
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
- 
-> Let's use it.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-exynos/cpuidle.c |   24 +-----------------------
->  1 file changed, 1 insertion(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index cc4b097..d8fc1a2 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -41,8 +41,6 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
->  				struct cpuidle_driver *drv,
->  				int index);
->  
-> -static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
-> -
->  static struct cpuidle_driver exynos4_idle_driver = {
->  	.name			= "exynos4_idle",
->  	.owner			= THIS_MODULE,
-> @@ -188,29 +186,9 @@ static void __init exynos5_core_down_clk(void)
->  
->  static int __init exynos4_init_cpuidle(void)
->  {
-> -	int cpu_id, ret;
-> -	struct cpuidle_device *device;
-> -
->  	if (soc_is_exynos5250())
->  		exynos5_core_down_clk();
->  
-> -	ret = cpuidle_register_driver(&exynos4_idle_driver);
-> -	if (ret) {
-> -		printk(KERN_ERR "CPUidle failed to register driver\n");
-> -		return ret;
-> -	}
-> -
-> -	for_each_online_cpu(cpu_id) {
-> -		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
-> -		device->cpu = cpu_id;
-> -
-> -		ret = cpuidle_register_device(device);
-> -		if (ret) {
-> -			printk(KERN_ERR "CPUidle register device failed\n");
-> -			return ret;
-> -		}
-> -	}
-> -
-> -	return 0;
-> +	return cpuidle_register(&exynos4_idle_driver, NULL);
->  }
->  device_initcall(exynos4_init_cpuidle);
+  arm64: use common reboot infrastructure (2013-07-19 15:57:08 +0100)
+
+----------------------------------------------------------------
+- Post -rc1 update to the common reboot infrastructure.
+- Fixes (user cache maintenance fault handling, !COMPAT compilation, CPU
+  online and interrupt hanlding).
+
+----------------------------------------------------------------
+Catalin Marinas (1):
+      arm64: Only enable local interrupts after the CPU is marked online
+
+Chen Gang (1):
+      arm64: add '#ifdef CONFIG_COMPAT' for aarch32_break_handler()
+
+Marc Zyngier (1):
+      arm64: use common reboot infrastructure
+
+Will Deacon (1):
+      arm64: mm: don't treat user cache maintenance faults as writes
+
+ arch/arm64/include/asm/debug-monitors.h |  7 -----
+ arch/arm64/include/asm/system_misc.h    |  3 ++-
+ arch/arm64/kernel/process.c             |  2 +-
+ arch/arm64/kernel/smp.c                 | 15 ++++++-----
+ arch/arm64/mm/fault.c                   | 46 ++++++++++++++-------------------
+ 5 files changed, 31 insertions(+), 42 deletions(-)
+
+-- 
+Catalin
