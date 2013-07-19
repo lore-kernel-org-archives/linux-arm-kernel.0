@@ -1,39 +1,27 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 18 Jul 2013 17:16:05 -0700 (PDT)
-Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
-In-Reply-To: <51E865FA.9000706@cogentembedded.com>
-References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
- <201306300245.58486.sergei.shtylyov@cogentembedded.com>
- <CANqRtoTCaJfbECSpX7nMZoV8SPeQqs-xrJQ0-+-smA+bx3QG=w@mail.gmail.com>
- <51E865FA.9000706@cogentembedded.com>
-Message-ID: <87txjrbe11.wl%kuninori.morimoto.gx@renesas.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 18 Jul 2013 17:18:28 -0700
+Subject: [PATCH v4 08/17] ocksource: dbx500-prcmu: Switch to
+ sched_clock_register()
+In-Reply-To: <1374189690-10810-9-git-send-email-sboyd@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <1374189690-10810-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130719001828.GE27430@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/18, Stephen Boyd wrote:
+> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
+> the 64 bit function to allow us to remove the 32 bit registration
+> interface.
+> 
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-Hi
+Hmph, the subject got messed up. If I don't resend please correct
+to clocksource.
 
-> >> From: Max Filippov <max.filippov@cogentembedded.com>
-> 
-> >> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
-> 
-> >> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-> >> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
-> >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >> ---
-> >>   arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
-> >>   1 file changed, 24 insertions(+), 1 deletion(-)
-> 
-> > Thanks for your patch. Can you please explain the reason why you put
-> > this shared information under mach/?
-> 
->     I'm afraid that's more a question to the original author, Phil Edworthy.
-> He put this stuff into <mach/hpb-dmae.h>.
-
-Then, why you could send this patch instead of original author,
-even though you can't answer any question about it ?
-
-Best regards
----
-Kuninori Morimoto
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
