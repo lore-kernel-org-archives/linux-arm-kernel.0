@@ -1,27 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Jul 2013 09:33:09 -0600
-Subject: [PATCH V3 RFT] ARM: tegra: enable palmas device for dalmore
-In-Reply-To: <1374199992-27947-1-git-send-email-ldewangan@nvidia.com>
-References: <1374199992-27947-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <51E95C35.7060502@wwwdotorg.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 19 Jul 2013 18:40:27 +0300
+Subject: [PATCH v6 1/2] ARM: dts: twl: Add GPADC data to device tree
+In-Reply-To: <51E94F97.40002@cogentembedded.com>
+References: <1374226039-16943-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <1374226039-16943-2-git-send-email-oleksandr.kozaruk@ti.com>
+ <51E94F97.40002@cogentembedded.com>
+Message-ID: <51E95DEB.7010702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 08:13 PM, Laxman Dewangan wrote:
-> Make the entry of Dalmore Power Management Unit device TPS65913
-> in dalmore DTS file. The Palma driver support this device.
-> 
-> Enable following submodule of the TPS65913:
-> - GPIO driver
-> - RTC driver.
-> - Power regulator driver.
+On 07/19/2013 05:39 PM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 19-07-2013 13:27, Oleksandr Kozaruk wrote:
+>
+>> GPADC is the general purpose ADC present on twl6030.
+>> The dt data is interrupt used to trigger end of ADC
+>> conversion.
+>
+>> Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
+>> ---
+>>   arch/arm/boot/dts/twl6030.dtsi | 6 ++++++
+>>   1 file changed, 6 insertions(+)
+>
+>> diff --git a/arch/arm/boot/dts/twl6030.dtsi
+>> b/arch/arm/boot/dts/twl6030.dtsi
+>> index 2e3bd31..d7d4c28 100644
+>> --- a/arch/arm/boot/dts/twl6030.dtsi
+>> +++ b/arch/arm/boot/dts/twl6030.dtsi
+>> @@ -103,4 +103,10 @@
+>>           compatible = "ti,twl6030-pwmled";
+>>           #pwm-cells = <2>;
+>>       };
+>> +
+>> +    adc: gpadc {
+>
+>     Read my lips: the node should be called just "adc", not "gpadc".
+       ^^^^^^^^^^^^ Are you sure?
 
-OK, this version works fine. Applied to Tegra's for-3.12/dt branch.
+Why? The name was selected according to the documentation on device 
+"General purpose analog-to-digital converter (GPADC)".
 
-> Changes from V2:
-> - Made LDO9 as always ON for sd card functionality.
+PS. Following your logic - "GPIO" need to renamed to "IO" everywhere ;P
 
-We really need to start hooking up the regulators to the SDHCI
-controller nodes sometime soon... I let it slide here because it's at
-least consistent with the regulators we already have in place on other
-boards.
+>
+> WBR, Sergei
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Regards,
+- grygorii
