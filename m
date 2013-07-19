@@ -1,69 +1,61 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 19 Jul 2013 17:25:23 +0800
-Subject: [PATCH V4 1/4] Revert "ARM: tegra: add cpu_disable for hotplug"
+Date: Fri, 19 Jul 2013 17:25:25 +0800
+Subject: [PATCH V4 3/4] ARM: tegra114: add low level support for CPU idle
+ powered-down mode
 In-Reply-To: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
 References: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1374225926-26832-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1374225926-26832-4-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 510bb595de26f90e5bb7c4a1e2a584e38398cf00.
+The flow controller would take care the power sequence when CPU idle in
+powered-down mode. It powered gate the CPU when CPU runs into WFI
+instruction. And wake up the CPU when event be triggered.
 
-The Tegra114 support CPU0 hotplug function in HW physically, but it needs
-other software to make it work normally after we add CPU idle power down
-mode support. So remove them for now.
+The sequence is below.
+* setting wfi bitmap for the CPU as the halt event in the
+  FLOW_CTRL_CPU_HALT_REG to monitor the CPU running into WFI,then power
+  gate it
+* setting IRQ and FIQ as wake up event to wake up CPU when event triggered
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V4:
-* remove the CPU0 hot plug support due to miss of SW support
+* no change
+V3:
+* no change
+V2:
+* no change
 ---
- arch/arm/mach-tegra/common.h  |  1 -
- arch/arm/mach-tegra/hotplug.c | 11 -----------
- arch/arm/mach-tegra/platsmp.c |  1 -
- 3 files changed, 13 deletions(-)
+ arch/arm/mach-tegra/flowctrl.h      | 2 ++
+ arch/arm/mach-tegra/sleep-tegra30.S | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
-index 32f8eb3..5900cc4 100644
---- a/arch/arm/mach-tegra/common.h
-+++ b/arch/arm/mach-tegra/common.h
-@@ -2,4 +2,3 @@ extern struct smp_operations tegra_smp_ops;
- 
- extern int tegra_cpu_kill(unsigned int cpu);
- extern void tegra_cpu_die(unsigned int cpu);
--extern int tegra_cpu_disable(unsigned int cpu);
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index a52c10e..d07f152 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -46,17 +46,6 @@ void __ref tegra_cpu_die(unsigned int cpu)
- 	BUG();
- }
- 
--int tegra_cpu_disable(unsigned int cpu)
--{
--	switch (tegra_chip_id) {
--	case TEGRA20:
--	case TEGRA30:
--		return cpu == 0 ? -EPERM : 0;
--	default:
--		return 0;
--	}
--}
--
- void __init tegra_hotplug_init(void)
- {
- 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 97b33a2..2d02036 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -196,6 +196,5 @@ struct smp_operations tegra_smp_ops __initdata = {
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_kill		= tegra_cpu_kill,
- 	.cpu_die		= tegra_cpu_die,
--	.cpu_disable		= tegra_cpu_disable,
- #endif
- };
+diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
+index 7a29bae..e56a950 100644
+--- a/arch/arm/mach-tegra/flowctrl.h
++++ b/arch/arm/mach-tegra/flowctrl.h
+@@ -28,6 +28,8 @@
+ #define FLOW_CTRL_SCLK_RESUME		(1 << 27)
+ #define FLOW_CTRL_HALT_CPU_IRQ		(1 << 10)
+ #define	FLOW_CTRL_HALT_CPU_FIQ		(1 << 8)
++#define FLOW_CTRL_HALT_GIC_IRQ		(1 << 9)
++#define FLOW_CTRL_HALT_GIC_FIQ		(1 << 8)
+ #define FLOW_CTRL_CPU0_CSR		0x8
+ #define	FLOW_CTRL_CSR_INTR_FLAG		(1 << 15)
+ #define FLOW_CTRL_CSR_EVENT_FLAG	(1 << 14)
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index ada8821..5877f26 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -99,6 +99,8 @@ flow_ctrl_setting_for_lp2:
+ 	cmp	r10, #TEGRA30
+ 	moveq   r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT	@ For LP2
+ 	movne	r3, #FLOW_CTRL_WAITEVENT
++	orrne	r3, r3, #FLOW_CTRL_HALT_GIC_IRQ
++	orrne	r3, r3, #FLOW_CTRL_HALT_GIC_FIQ
+ flow_ctrl_done:
+ 	cmp	r10, #TEGRA30
+ 	str	r3, [r2]
 -- 
 1.8.3.2
