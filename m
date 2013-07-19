@@ -1,137 +1,46 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 19 Jul 2013 19:35:03 +0100
-Subject: [PATCH 4/6] ASoC: sirf-soc-inner: add drivers for both CPU and
- Codec DAIs
-In-Reply-To: <1374232042-26088-5-git-send-email-Baohua.Song@csr.com>
+Date: Fri, 19 Jul 2013 19:51:01 +0100
+Subject: [PATCH 5/6] ASoC: sirf-inner: add mach driver for SiRFSoC
+ internal codec
+In-Reply-To: <1374232042-26088-6-git-send-email-Baohua.Song@csr.com>
 References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
- <1374232042-26088-5-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130719183503.GU9858@sirena.org.uk>
+ <1374232042-26088-6-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130719185101.GV9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 07:07:20PM +0800, Barry Song wrote:
+On Fri, Jul 19, 2013 at 07:07:21PM +0800, Barry Song wrote:
 
-> there is an internal codec embedded in the SiRF SoC. this is not
-> a typical user scenerios of ASoC. but we can still get benefit by
-> sharing platform DMA codes instead of implementing a pure ALSA
-> driver.
-> This driver adds DAI drivers for this internal codec.
-
-To be honest this shouldn't be too exciting from an ASoC point of view -
-just a normal CODEC driver with some stub DAIs.  It looks like it might
-benefit from regmap-mmio and DAPM.
-
-> +static int sirf_inner_control(struct snd_kcontrol *kcontrol,
-> +		struct snd_ctl_elem_value *ucontrol,
-> +		int get, char *name)
-> +{
-> +	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-> +	struct snd_soc_card *card = codec->card;
-> +	int i;
-> +	for (i = 0; i < card->num_controls; i++) {
-> +		if (!strcmp(card->controls[i].name, name)) {
-> +			if (card->controls[i].get && get)
-> +				return card->controls[i].get(kcontrol, ucontrol);
-> +			else if (card->controls[i].put && !get)
-> +				return card->controls[i].put(kcontrol, ucontrol);
-> +		}
-> +	}
-> +	return 0;
-> +}
-
-What is all this about?  I don't quite understand what the goal is and
-there's no comments.
-
-> +static int sirf_inner_snd_speaker_set(struct snd_kcontrol *kcontrol,
-> +		struct snd_ctl_elem_value *ucontrol)
-> +{
-> +	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-> +	struct sirf_soc_inner_audio *sinner_audio = dev_get_drvdata(codec->dev);
-> +
-> +	spin_lock(&sinner_audio->lock);
-> +	sirf_inner_control(kcontrol, ucontrol, 0, "Speaker Out");
-> +
-> +	if (ucontrol->value.integer.value[0]) {
-> +		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0)
-> +				| IC_RDACEN | IC_SPSELR,
-> +				sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-> +
-> +		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) |
-> +				(1 << sinner_audio->reg_bits->firdac_lout_en_bits),
-> +				sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-> +
-> +		writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) |
-> +					IC_SPEN), sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-
-Is this possibly some supplies plus a power bit?
-
-> +static int sirf_inner_codec_startup(struct snd_pcm_substream *substream,
-> +		struct snd_soc_dai *dai)
-> +{
-> +	struct sirf_soc_inner_audio *sinner_audio = snd_soc_dai_get_drvdata(dai);
-> +	u32 adc_gain_mask = sinner_audio->reg_bits->adc_gain_mask;
-> +	u32 adc_left_gain_shift = sinner_audio->reg_bits->adc_left_gain_shift;
-> +	u32 adc_right_gain_shift = sinner_audio->reg_bits->adc_right_gain_shift;
-> +	u32 mic_max_gain = sinner_audio->reg_bits->mic_max_gain;
-
-Would regmap_field help here?
-
-> +		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1) |
-> +			(1 << sinner_audio->reg_bits->codec_clk_en_bits) |
-> +			(1 << sinner_audio->reg_bits->por_bits),
-> +			sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-> +		msleep(50);
-> +
-> +		writel(readl(sinner_audio->base + AUDIO_IC_CODEC_PWR) |
-> +			MICBIASEN, sinner_audio->base + AUDIO_IC_CODEC_PWR);
-> +		usleep_range(300, 1000);
-
-This all looks a lot like a normal CODEC power up sequence that's been
-open coded but could use DAPM?
-
-> +static void sirf_inner_codec_shutdown(struct snd_pcm_substream *substream,
-> +		struct snd_soc_dai *dai)
-> +{
-> +}
-> +
-> +static int sirf_inner_codec_hw_params(struct snd_pcm_substream *substream,
-> +		struct snd_pcm_hw_params *params,
-> +		struct snd_soc_dai *dai)
-> +{
-> +	return 0;
-> +}
-
-Remove empty functions.
-
-> +static int sirf_soc_inner_resume(struct platform_device *pdev)
-> +{
-> +	struct sirf_soc_inner_audio *sinner_audio = platform_get_drvdata(pdev);
-> +
-> +	clk_prepare_enable(sinner_audio->clk);
-> +
-> +	writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-> +		| (1 << sinner_audio->reg_bits->codec_clk_en_bits)),
-> +		sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-> +	writel((readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL1)
-> +		| (1 << sinner_audio->reg_bits->adc14b_12_bits)),
-> +		sinner_audio->base + AUDIO_IC_CODEC_CTRL1);
-> +	writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_CPFREQ,
-> +		sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-> +	writel(readl(sinner_audio->base + AUDIO_IC_CODEC_CTRL0) | IC_CPEN,
-> +		sinner_audio->base + AUDIO_IC_CODEC_CTRL0);
-> +	return 0;
-> +}
-> +#else
-> +#define sirf_soc_inner_suspend NULL
-> +#define sirf_soc_inner_resume NULL
+> +#ifndef CONFIG_ANDROID
+> +	unsigned int            gpio_hp_detect;
+> +	struct snd_soc_jack     hp_jack;
 > +#endif
 
-Standard runtime PM question and this definitely does look like
-regmap-mmio will help - you've essentially open coded some of it.
+Not for mainline.  I'd suggest setting it up for extcon anyway
+especially if it's just a simple accessory, that should work for both
+Android and mainline.
+
+> +static int sirf_inner_speaker_out_put(struct snd_kcontrol *kcontrol,
+> +		struct snd_ctl_elem_value *ucontrol)
+> +{
+> +	int is_spk_out = ucontrol->value.integer.value[0];
+> +	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+> +	struct snd_soc_card *card = codec->card;
+> +	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
+> +
+> +	if (gpio_is_valid(sinner_card->gpio_spk_pa))
+> +		gpio_direction_output(sinner_card->gpio_spk_pa, is_spk_out);
+> +	return 0;
+> +}
+
+Oh, right.  If this is doing what I think this is doing you want to use
+DAPM within the CODEC then this can just become a pin switch or you can
+hook in directly if you continue to use soc-jack - it has DAPM
+integration.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/2b23f3dd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/df529a7f/attachment.sig>
