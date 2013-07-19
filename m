@@ -1,50 +1,69 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 19 Jul 2013 17:25:22 +0800
-Subject: [PATCH V4 0/4] ARM: tegra114: cpuidle: add power down state
-Message-ID: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
+Date: Fri, 19 Jul 2013 17:25:23 +0800
+Subject: [PATCH V4 1/4] Revert "ARM: tegra: add cpu_disable for hotplug"
+In-Reply-To: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
+References: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1374225926-26832-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduce CPU core power down state for CPU idle. When CPU go
-into this state, it saves it's context and needs a proper configuration
-in flow controller to power gate the CPU when CPU runs into WFI
-instruction. And the CPU also needs to set the IRQ as CPU power down idle
-wake up event in flow controller.
+This reverts commit 510bb595de26f90e5bb7c4a1e2a584e38398cf00.
 
-To prevent race conditions and ensure proper interrupt routing on
-Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
-call-back to reprogram the GIC CPU interface on PM entry. The
-GIC CPU interface will be reset back to its normal state by
-the common GIC CPU PM exit callback when the CPU wakes up.
+The Tegra114 support CPU0 hotplug function in HW physically, but it needs
+other software to make it work normally after we add CPU idle power down
+mode support. So remove them for now.
 
-And the Tegra114 support CPU0 hotplug function in HW physically, but it
-needs other software to make it work normally after we add CPU idle power
-down mode support. But we don't support that yet, removing them for now.
-
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
 V4:
 * remove the CPU0 hot plug support due to miss of SW support
-* postpone to use CPUIDLE_FLAG_TIMER_STOP flag, because it still has some
-  issues
-V3:
-* use CPUIDLE_FLAG_TIMER_STOP flag
-V2:
-* clean up the CPUidle driver to make it more generic
+---
+ arch/arm/mach-tegra/common.h  |  1 -
+ arch/arm/mach-tegra/hotplug.c | 11 -----------
+ arch/arm/mach-tegra/platsmp.c |  1 -
+ 3 files changed, 13 deletions(-)
 
-Joseph Lo (4):
-  Revert "ARM: tegra: add cpu_disable for hotplug"
-  ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on CPU PM
-    entry
-  ARM: tegra114: add low level support for CPU idle powered-down mode
-  ARM: tegra114: cpuidle: add powered-down state
-
- arch/arm/mach-tegra/common.h           |  1 -
- arch/arm/mach-tegra/cpuidle-tegra114.c | 51 +++++++++++++++++++++++++++++++++-
- arch/arm/mach-tegra/flowctrl.h         |  2 ++
- arch/arm/mach-tegra/hotplug.c          | 11 --------
- arch/arm/mach-tegra/irq.c              | 40 ++++++++++++++++++++++++++
- arch/arm/mach-tegra/platsmp.c          |  1 -
- arch/arm/mach-tegra/sleep-tegra30.S    |  2 ++
- 7 files changed, 94 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
+index 32f8eb3..5900cc4 100644
+--- a/arch/arm/mach-tegra/common.h
++++ b/arch/arm/mach-tegra/common.h
+@@ -2,4 +2,3 @@ extern struct smp_operations tegra_smp_ops;
+ 
+ extern int tegra_cpu_kill(unsigned int cpu);
+ extern void tegra_cpu_die(unsigned int cpu);
+-extern int tegra_cpu_disable(unsigned int cpu);
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index a52c10e..d07f152 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -46,17 +46,6 @@ void __ref tegra_cpu_die(unsigned int cpu)
+ 	BUG();
+ }
+ 
+-int tegra_cpu_disable(unsigned int cpu)
+-{
+-	switch (tegra_chip_id) {
+-	case TEGRA20:
+-	case TEGRA30:
+-		return cpu == 0 ? -EPERM : 0;
+-	default:
+-		return 0;
+-	}
+-}
+-
+ void __init tegra_hotplug_init(void)
+ {
+ 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 97b33a2..2d02036 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -196,6 +196,5 @@ struct smp_operations tegra_smp_ops __initdata = {
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= tegra_cpu_kill,
+ 	.cpu_die		= tegra_cpu_die,
+-	.cpu_disable		= tegra_cpu_disable,
+ #endif
+ };
 -- 
 1.8.3.2
