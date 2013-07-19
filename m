@@ -1,98 +1,138 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Fri, 19 Jul 2013 17:08:55 +0530
-Subject: alignment handler instruction endian-ness (Ben Dooks)
-Message-ID: <CALicx6tS2B_itZHdFh2YrQ2VZOoacx-MuO5vkNfqypH9v5rEiQ@mail.gmail.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 19 Jul 2013 21:01:51 +0900
+Subject: [PATCH v7 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <CAG8rG2y8ZN4ahv7DqJ11=FhJpVVxcbAbTaViyi-D4GH=p3xg=A@mail.gmail.com>
+References: <002801ce797b$3d2fbc80$b78f3580$@samsung.com>
+ <CAG8rG2y8ZN4ahv7DqJ11=FhJpVVxcbAbTaViyi-D4GH=p3xg=A@mail.gmail.com>
+Message-ID: <004301ce8477$c1172fe0$43458fa0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 5:06 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
->> Message: 4
->> Date: Fri, 19 Jul 2013 11:58:45 +0100
->> From: Ben Dooks <ben.dooks@codethink.co.uk>
->> To: "linux-arm-kernel at lists.infradead.org"
->>         <linux-arm-kernel@lists.infradead.org>
->> Subject: alignment handler instruction endian-ness
->> Message-ID: <51E91BE5.8070809@codethink.co.uk>
->> Content-Type: text/plain; charset=ISO-8859-1; format=flowed
->>
->> I ran in to an issue with the alignment handler when running BE8 where
->> it loads instructions and fails to swap.
->>
->> Is there a better way of swapping instructions for ARM when loading
->> from arbitrary places? Have I missed any other places this could happen?
->>
->> The following patch is my first attempt at solving the problem for the
->> alignment handler:
->>
->>> Author: Ben Dooks <ben.dooks@codethink.co.uk>
->>> Date:   Thu Jul 18 21:10:56 2013 +0100
->>>
->>>     arm: alignment: deal with be8 mode when decoding instructions
->>>
->>>     If we are in BE8 mode, we must deal with the instruction stream being
->>>     in LE order when data is being loaded in BE order. Ensure the data is
->>>     swapped before processing to avoid thre following:
->>>
->>>     Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
->>>     Unhandled fault: alignment exception (0x001) at 0xbfa09567
->>>
->>>     Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->>  >
->>> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
->>> index db26e2e..e8793a7 100644
->>> --- a/arch/arm/mm/alignment.c
->>> +++ b/arch/arm/mm/alignment.c
->>> @@ -87,6 +87,12 @@ core_param(alignment, ai_usermode, int, 0600);
->>>  #define UM_FIXUP       (1 << 1)
->>>  #define UM_SIGNAL      (1 << 2)
->>>
->>> +#ifdef CONFIG_CPU_ENDIAN_BE8
->>> +#define need_swap()    true
->>> +#else
->>> +#define need_swap()    false
->>> +#endif
->>> +
->>>  /* Return true if and only if the ARMv6 unaligned access model is in use. */
->>>  static bool cpu_is_v6_unaligned(void)
->>>  {
->>> @@ -762,12 +768,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct
->>>         if (thumb_mode(regs)) {
->>>                 u16 *ptr = (u16 *)(instrptr & ~1);
->>>                 fault = probe_kernel_address(ptr, tinstr);
->>> +               if (need_swap())
->>> +                       tinstr = cpu_to_le16(tinstr);
->>>                 if (!fault) {
->>>                         if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
->>>                             IS_T32(tinstr)) {
->>>                                 /* Thumb-2 32-bit */
->>>                                 u16 tinst2 = 0;
->>>                                 fault = probe_kernel_address(ptr + 1, tinst2);
->>> +                               if (need_swap())
->>> +                                       tinst2 = cpu_to_le16(tinst2);
->>>                                 instr = (tinstr << 16) | tinst2;
->>>                                 thumb2_32b = 1;
->>>                         } else {
->>> @@ -775,8 +785,11 @@ do_alignment(unsigned long addr, unsigned int fsr, struct p
->>>                                 instr = thumb2arm(tinstr);
->>>                         }
->>>                 }
->>> -       } else
->>> +       } else {
->>>                 fault = probe_kernel_address(instrptr, instr);
->>> +               if (need_swap())
->>> +                       instr = cpu_to_le32(instr);
->>> +       }
->>>
->>>         if (fault) {
->>>                 type = TYPE_FAULT;
->>
->>
->
- I think some changes are required in arch/arm/kernel/traps.c
- for handling undefined instruction as well
->
->> --
->> Ben Dooks                               http://www.codethink.co.uk/
->> Senior Engineer                         Codethink - Providing Genius
->>
->>
+> -----Original Message-----
+> From: Antonios Motakis [mailto:a.motakis at virtualopensystems.com]
+> Sent: Friday, July 19, 2013 1:25 AM
+> 
+> Hello Cho,
+> 
+> I have been trying out the Exynos System MMU driver including your
+> fixes, however I notice that if you try to get the iommu_group of a
+> device (i.e. iommu_group_get(&pdev->dev)) this will not work. Since
+> each device is behind its own System MMU I would expect a distinct
+> iommu_group for that device, instead I get NULL (I tried this with the
+> MFC).
+> 
+> Indeed, it looks like this is not currently implemented in the driver.
+> Is this something that is on the roadmap?
+> 
+
+I have not implemented anything about iommu_group
+since a System MMU is dedicated to a single master device.
+I also did not find any reason to implement something about iommu_group.
+I would like to know why you need to call iommu_group_get().
+Do you need some information in user-space?
+
+Thank you.
+
+Cho KyongHo.
+
+> Best regards,
+> Antonios Motakis
+> 
+> On Fri, Jul 5, 2013 at 2:29 PM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> > The current exynos-iommu(System MMU) driver does not work autonomously
+> > since it is lack of support for power management of peripheral blocks.
+> > For example, MFC device driver must ensure that its System MMU is disabled
+> > before MFC block is power-down not to invalidate IOTLB in the System MMU
+> > when I/O memory mapping is changed. Because A System MMU is resides in the
+> > same H/W block, access to control registers of System MMU while the H/W
+> > block is turned off must be prohibited.
+> >
+> > This set of changes solves the above problem with setting each System MMUs
+> > as the parent of the device which owns the System MMU to recieve the
+> > information when the device is turned off or turned on.
+> >
+> > Another big change to the driver is the support for devicetree.
+> > The bindings for System MMU is described in
+> > Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+> >
+> > In addition, this patchset also includes several bug fixes and enhancements
+> > of the current driver.
+> >
+> > Change log:
+> > v7:
+> > - Rebased on the stable 3.10
+> > - Registered PM domains and gate clocks with DT
+> > - Changed connection method between a System MMU and its master H/W
+> >    'mmu-master' property in the node of System MMU
+> >    --> 'iommu' property in the node of master H/W
+> > - Marking device descriptor of master H/W of a System MMU with bus notifier.
+> > - Power management (PM_RUNTIME, PM_SLEEP) of System MMUs with gpd_dev_ops
+> >    of Generic IO Powerdomain. gpd_dev_ops are set to the master H/Ws
+> >    before they are probed in the bus notifier.
+> > - Removed additional debugging features like debugfs entries and
+> >    version names.
+> > - Removed support for advanced features of System MMU 3.2 and 3.3
+> >    the current IOMMU API cannot handle the feature
+> >   (A kind of L2 TLB that fetches several consequence page table entries.
+> >    It must be initialized by the driver of master H/W whenever it works.)
+> >
+> > v6:
+> > - Rebased on the branch, next/iommu-exynos of
+> >   git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> >
+> > v5:
+> > - new bugfix: patch 01
+> > - Reordered patches
+> >   * patch 01 ~ 05: Bugfix and enhancements of the existing driver
+> >   * patch 06 ~ 10: Device Tree support and callbacks for power management
+> >   * patch 11     : System MMU 3.2 and 3.3 support
+> >   * patch 12 ~ 14: Debugging features
+> > - Additional code compaction
+> >
+> > v4:
+> > - Remove Change-Id from v3 patches
+> > - Change the order of the third and the first patch
+> >   Thanks to Kukjin Kim.
+> > - Fix memory leak when allocating and assigning exynos_iommu_owner to client
+> >   device if the client device has multiple System MMUs.
+> >   Thanks to Rahul Sharma.
+> >
+> > v3:
+> > - Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
+> > - Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
+> >   Thanks to Prathyush.
+> >
+> > v2:
+> > - Split the patch to iommu/exynos into 9 patches
+> > - Support for System MMU 3.3
+> > - Some code compaction
+> >
+> > Patch summary:
+> > [PATCH v7 1/9] iommu/exynos: do not include removed header
+> > [PATCH v7 2/9] iommu/exynos: add missing cache flush for removed page table entries
+> > [PATCH v7 3/9] iommu/exynos: fix page table maintenance
+> > [PATCH v7 4/9] iommu/exynos: allocate lv2 page table from own slab
+> > [PATCH v7 5/9] iommu/exynos: change rwlock to spinlock
+> > [PATCH v7 6/9] clk: exynos5250: add gate clock descriptions of System MMU
+> > [PATCH v7 7/9] ARM: dts: Add description of System MMU of Exynos SoCs
+> > [PATCH v7 8/9] iommu/exynos: support for device tree
+> > [PATCH v7 9/9] iommu/exynos: add bus notifier for registering System MMU
+> >
+> > Diffstats:
+> > .../devicetree/bindings/clock/exynos5250-clock.txt |   28 +-
+> > .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 ++
+> > arch/arm/boot/dts/exynos4.dtsi                     |  122 +++
+> > arch/arm/boot/dts/exynos4210.dtsi                  |   25 +
+> > arch/arm/boot/dts/exynos4x12.dtsi                  |   76 ++
+> > arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++
+> > drivers/clk/samsung/clk-exynos5250.c               |   57 +-
+> > drivers/iommu/Kconfig                              |    5 +-
+> > drivers/iommu/exynos-iommu.c                       | 1011 +++++++++++++-------
+> > 9 files changed, 1382 insertions(+), 336 deletions(-)
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
