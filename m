@@ -1,131 +1,149 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:35:32 +0900
-Subject: [PATCH 7/7] ARM: mach-shmobile: ag5evm: Use bd6107 backlight driver
+Date: Fri, 19 Jul 2013 13:35:31 +0900
+Subject: [PATCH 6/7] sh: kfr2r09: Use lv5207lp backlight
 In-Reply-To: <cover.1374207161.git.horms+renesas@verge.net.au>
 References: <cover.1374207161.git.horms+renesas@verge.net.au>
-Message-ID: <0fb19cdabfc3f8884bac53fd81b02bf61c7904af.1374207161.git.horms+renesas@verge.net.au>
+Message-ID: <3f3bee2e31f6fbf8ac09b58b8e87374d24387cef.1374207161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the backlight callback with a bd6107 backlight platform device.
+Replace the backlight callback with a lv5207lp backlight platform
+device.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ag5evm.c |   65 ++++++++-------------------------
- 1 file changed, 16 insertions(+), 49 deletions(-)
+ arch/sh/boards/mach-kfr2r09/lcd_wqvga.c     |   48 ---------------------------
+ arch/sh/boards/mach-kfr2r09/setup.c         |   19 ++++++++---
+ arch/sh/include/mach-kfr2r09/mach/kfr2r09.h |    2 --
+ 3 files changed, 14 insertions(+), 55 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index c754071..f6d6449 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -41,6 +41,7 @@
- #include <linux/mmc/sh_mmcif.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+#include <linux/platform_data/bd6107.h>
- #include <linux/sh_clk.h>
- #include <linux/irqchip/arm-gic.h>
- #include <video/sh_mobile_lcdc.h>
-@@ -291,47 +292,7 @@ static struct platform_device mipidsi0_device = {
- 	},
- };
- 
--static unsigned char lcd_backlight_seq[3][2] = {
--	{ 0x04, 0x07 },
--	{ 0x23, 0x80 },
--	{ 0x03, 0x01 },
--};
+diff --git a/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c b/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c
+index c620503..355a78a 100644
+--- a/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c
++++ b/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c
+@@ -276,51 +276,3 @@ void kfr2r09_lcd_start(void *sohandle, struct sh_mobile_lcdc_sys_bus_ops *so)
+ {
+ 	write_memory_start(sohandle, so);
+ }
 -
--static int lcd_backlight_set_brightness(int brightness)
+-#define CTRL_CKSW       0x10
+-#define CTRL_C10        0x20
+-#define CTRL_CPSW       0x80
+-#define MAIN_MLED4      0x40
+-#define MAIN_MSW        0x80
+-
+-int kfr2r09_lcd_set_brightness(int brightness)
 -{
--	struct i2c_adapter *adap;
+-	struct i2c_adapter *a;
 -	struct i2c_msg msg;
--	unsigned int i;
+-	unsigned char buf[2];
 -	int ret;
 -
--	if (brightness == 0) {
--		/* Reset the chip */
--		gpio_set_value(235, 0);
--		mdelay(24);
--		gpio_set_value(235, 1);
--		return 0;
--	}
--
--	adap = i2c_get_adapter(1);
--	if (adap == NULL)
+-	a = i2c_get_adapter(0);
+-	if (!a)
 -		return -ENODEV;
 -
--	for (i = 0; i < ARRAY_SIZE(lcd_backlight_seq); i++) {
--		msg.addr = 0x6d;
--		msg.buf = &lcd_backlight_seq[i][0];
--		msg.len = 2;
--		msg.flags = 0;
+-	buf[0] = 0x00;
+-	if (brightness)
+-		buf[1] = CTRL_CPSW | CTRL_C10 | CTRL_CKSW;
+-	else
+-		buf[1] = 0;
 -
--		ret = i2c_transfer(adap, &msg, 1);
--		if (ret < 0)
--			break;
--	}
+-	msg.addr = 0x75;
+-	msg.buf = buf;
+-	msg.len = 2;
+-	msg.flags = 0;
+-	ret = i2c_transfer(a, &msg, 1);
+-	if (ret != 1)
+-		return -ENODEV;
 -
--	i2c_put_adapter(adap);
--	return ret < 0 ? ret : 0;
+-	buf[0] = 0x01;
+-	if (brightness)
+-		buf[1] = MAIN_MSW | MAIN_MLED4 | 0x0c;
+-	else
+-		buf[1] = 0;
+-
+-	msg.addr = 0x75;
+-	msg.buf = buf;
+-	msg.len = 2;
+-	msg.flags = 0;
+-	ret = i2c_transfer(a, &msg, 1);
+-	if (ret != 1)
+-		return -ENODEV;
+-
+-	return 0;
 -}
--
--/* LCDC0 */
-+/* LCDC0 and backlight */
- static const struct fb_videomode lcdc0_modes[] = {
- 	{
- 		.name		= "R63302(QHD)",
-@@ -361,11 +322,6 @@ static struct sh_mobile_lcdc_info lcdc0_info = {
- 			.width = 44,
- 			.height = 79,
+diff --git a/arch/sh/boards/mach-kfr2r09/setup.c b/arch/sh/boards/mach-kfr2r09/setup.c
+index ab502f12..1df4398 100644
+--- a/arch/sh/boards/mach-kfr2r09/setup.c
++++ b/arch/sh/boards/mach-kfr2r09/setup.c
+@@ -21,6 +21,7 @@
+ #include <linux/input.h>
+ #include <linux/input/sh_keysc.h>
+ #include <linux/i2c.h>
++#include <linux/platform_data/lv5207lp.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/usb/r8a66597.h>
+@@ -159,11 +160,6 @@ static struct sh_mobile_lcdc_info kfr2r09_sh_lcdc_info = {
+ 			.setup_sys = kfr2r09_lcd_setup,
+ 			.start_transfer = kfr2r09_lcd_start,
  		},
 -		.bl_info = {
 -			.name = "sh_mobile_lcdc_bl",
 -			.max_brightness = 1,
--			.set_brightness = lcd_backlight_set_brightness,
+-			.set_brightness = kfr2r09_lcd_set_brightness,
 -		},
- 		.tx_dev = &mipidsi0_device,
- 	}
- };
-@@ -394,6 +350,17 @@ static struct platform_device lcdc0_device = {
+ 		.sys_bus_cfg = {
+ 			.ldmt2r = 0x07010904,
+ 			.ldmt3r = 0x14012914,
+@@ -195,6 +191,17 @@ static struct platform_device kfr2r09_sh_lcdc_device = {
  	},
  };
  
-+static struct bd6107_platform_data backlight_data = {
-+	.fbdev = &lcdc0_device.dev,
-+	.reset = 235,
-+	.def_value = 0,
++static struct lv5207lp_platform_data kfr2r09_backlight_data = {
++	.fbdev = &kfr2r09_sh_lcdc_device.dev,
++	.def_value = 13,
++	.max_value = 13,
 +};
 +
-+static struct i2c_board_info backlight_board_info = {
-+	I2C_BOARD_INFO("bd6107", 0x6d),
-+	.platform_data = &backlight_data,
++static struct i2c_board_info kfr2r09_backlight_board_info = {
++	I2C_BOARD_INFO("lv5207lp", 0x75),
++	.platform_data = &kfr2r09_backlight_data,
 +};
 +
- /* Fixed 2.8V regulators to be used by SDHI0 */
- static struct regulator_consumer_supply fixed2v8_power_consumers[] =
- {
-@@ -648,15 +615,15 @@ static void __init ag5evm_init(void)
- 	gpio_set_value(217, 1);
- 	mdelay(100);
+ static struct r8a66597_platdata kfr2r09_usb0_gadget_data = {
+ 	.on_chip = 1,
+ };
+@@ -627,6 +634,8 @@ static int __init kfr2r09_devices_setup(void)
+ 	gpio_request(GPIO_FN_SDHI0CMD, NULL);
+ 	gpio_request(GPIO_FN_SDHI0CLK, NULL);
  
--	/* LCD backlight controller */
--	gpio_request_one(235, GPIOF_OUT_INIT_LOW, NULL); /* RESET */
--	lcd_backlight_set_brightness(0);
- 
- #ifdef CONFIG_CACHE_L2X0
- 	/* Shared attribute override enable, 64K*8way */
- 	l2x0_init(IOMEM(0xf0100000), 0x00460000, 0xc2000fff);
- #endif
- 	sh73a0_add_standard_devices();
++	i2c_register_board_info(0, &kfr2r09_backlight_board_info, 1);
 +
-+	i2c_register_board_info(1, &backlight_board_info, 1);
-+
- 	platform_add_devices(ag5evm_devices, ARRAY_SIZE(ag5evm_devices));
+ 	return platform_add_devices(kfr2r09_devices,
+ 				    ARRAY_SIZE(kfr2r09_devices));
  }
+diff --git a/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h b/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h
+index c20c9e5..79f154e 100644
+--- a/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h
++++ b/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h
+@@ -4,13 +4,11 @@
+ #include <video/sh_mobile_lcdc.h>
  
+ #if defined(CONFIG_FB_SH_MOBILE_LCDC) || defined(CONFIG_FB_SH_MOBILE_LCDC_MODULE)
+-int kfr2r09_lcd_set_brightness(int brightness);
+ int kfr2r09_lcd_setup(void *sys_ops_handle,
+ 		      struct sh_mobile_lcdc_sys_bus_ops *sys_ops);
+ void kfr2r09_lcd_start(void *sys_ops_handle,
+ 		       struct sh_mobile_lcdc_sys_bus_ops *sys_ops);
+ #else
+-static int kfr2r09_lcd_set_brightness(int brightness) {}
+ static int kfr2r09_lcd_setup(void *sys_ops_handle,
+ 				struct sh_mobile_lcdc_sys_bus_ops *sys_ops)
+ {
 -- 
 1.7.10.4
