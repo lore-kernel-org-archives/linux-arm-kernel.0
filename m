@@ -1,31 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Jul 2013 10:03:28 +0100
-Subject: [PATCH v4 02/17] sched_clock: Use seqcount instead of rolling
- our own
-In-Reply-To: <1374189690-10810-3-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130719090328.GA18139@mudshark.cambridge.arm.com>
+Date: Fri, 19 Jul 2013 10:05:03 +0100
+Subject: [PATCH] ARM: locks: remove opencoded #16 for ticket shift
+In-Reply-To: <alpine.LFD.2.03.1307181350440.14924@syhkavp.arg>
+References: <1373894879-30559-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307170952580.14924@syhkavp.arg>
+ <20130718172159.GC9837@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307181350440.14924@syhkavp.arg>
+Message-ID: <20130719090503.GB18139@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 12:21:15AM +0100, Stephen Boyd wrote:
-> We're going to increase the cyc value to 64 bits in the near
-> future. Doing that is going to break the custom seqcount
-> implementation in the sched_clock code because 64 bit numbers
-> aren't guaranteed to be atomic. Replace the cyc_copy with a
-> seqcount to avoid this problem.
+On Thu, Jul 18, 2013 at 06:53:06PM +0100, Nicolas Pitre wrote:
+> On Thu, 18 Jul 2013, Will Deacon wrote:
+> > There are two aspects to the ticket lock:
+> > 
+> >   1. The size of each ticket
+> >   2. The location of the next ticket within the 32-bit lock word
+> > 
+> > TICKET_SHIFT actually defines (2) and could be 0 or 16, hence why I was
+> > making this small cosmetic change.
 > 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  kernel/time/sched_clock.c | 27 ++++++++-------------------
->  1 file changed, 8 insertions(+), 19 deletions(-)
+> Doesn't matter where the location of the next ticket is.  Whether it is 
+> 0 or 16, for the above code to work, it *must* always perform a ror #16.  
+> Hence tying the ror constant with TICKET_SHIFT is wrong.
 
-Looks good to me. The current scheme would be very fiddly to extend to
-64-bit values on 32-bit architectures without cheap atomic doubleword
-accesses.
+You're right; we always need to refer to the higher ticket, rather than
+`owner' or `next'. Patch dropped.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Cheers,
 
 Will
