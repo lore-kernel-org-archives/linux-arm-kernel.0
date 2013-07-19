@@ -1,33 +1,39 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 18 Jul 2013 16:59:44 -0700
-Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
-In-Reply-To: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51E88170.3080505@linaro.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 18 Jul 2013 17:16:05 -0700 (PDT)
+Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
+In-Reply-To: <51E865FA.9000706@cogentembedded.com>
+References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
+ <201306300245.58486.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoTCaJfbECSpX7nMZoV8SPeQqs-xrJQ0-+-smA+bx3QG=w@mail.gmail.com>
+ <51E865FA.9000706@cogentembedded.com>
+Message-ID: <87txjrbe11.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 04:21 PM, Stephen Boyd wrote:
-> This patchset adds support for 64 bit counters in the generic
-> sched_clock code and converts drivers over to use it. Based
-> on v3.11-rc1.
->
-> Changes since v3:
->   * Move to use seqcount to fix issues with 64-bit cyc counters
->   * Move to hrtimer to fix underflow/overflow errors in wraparound
->     calculation
->   * Use of 1 hour in clocks_calc_mult_shift
->   * Converted over drivers in drivers/clocksource
 
-I've not been able to take a deep review yet, but this looks pretty much 
-like what we discussed last week, so I'm happy with it so far. Has this 
-gotten much testing (on both 32 and 64bit systems?)
+Hi
 
-One detail: Most of this is likely to go in via tip/timers/core, but the 
-5/17 "arch_timer: Move to generic sched_clock" will need some 
-synchronization with Catalin to make sure its ok to go in via tip. Not 
-sure what other arm64 changes are pending that would depend or collide 
-with that change.
+> >> From: Max Filippov <max.filippov@cogentembedded.com>
+> 
+> >> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
+> 
+> >> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+> >> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
+> >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >> ---
+> >>   arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
+> >>   1 file changed, 24 insertions(+), 1 deletion(-)
+> 
+> > Thanks for your patch. Can you please explain the reason why you put
+> > this shared information under mach/?
+> 
+>     I'm afraid that's more a question to the original author, Phil Edworthy.
+> He put this stuff into <mach/hpb-dmae.h>.
 
-thanks
--john
+Then, why you could send this patch instead of original author,
+even though you can't answer any question about it ?
+
+Best regards
+---
+Kuninori Morimoto
