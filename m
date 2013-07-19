@@ -1,87 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jul 2013 14:53:54 +0100
-Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
-In-Reply-To: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
-References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 19 Jul 2013 14:58:32 +0100
+Subject: [PATCH 01/22] ARM: ux500: Remove '0x's from HREF v60+ DTS file
+Message-ID: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, when a guest executes WFE (like when waiting for a spinlock
-to become unlocked), we don't do a thing and let it run uninterrupted.
-
-Another option is to trap a blocking WFE and offer the opportunity
-to the scheduler to switch to another task, potentially giving the
-vcpu holding the spinlock a chance to run sooner.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm64/include/asm/kvm_arm.h |  6 ++++--
- arch/arm64/kvm/handle_exit.c     | 18 +++++++++++++-----
- 2 files changed, 17 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/hrefv60plus.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index a5f28e2..ac1ea05 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -63,6 +63,7 @@
-  * TAC:		Trap ACTLR
-  * TSC:		Trap SMC
-  * TSW:		Trap cache operations by set/way
-+ * TWE:		Trap WFE
-  * TWI:		Trap WFI
-  * TIDCP:	Trap L2CTLR/L2ECTLR
-  * BSU_IS:	Upgrade barriers to the inner shareable domain
-@@ -72,8 +73,9 @@
-  * FMO:		Override CPSR.F and enable signaling with VF
-  * SWIO:	Turn set/way invalidates into set/way clean+invalidate
-  */
--#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
--			 HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
-+#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
-+			 HCR_BSU_IS | HCR_FB | HCR_TAC | \
-+			 HCR_AMO | HCR_IMO | HCR_FMO | \
- 			 HCR_SWIO | HCR_TIDCP | HCR_RW)
- #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+index 3d580d6..46fd8af 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -26,7 +26,7 @@
  
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 9beaca03..b0098c2 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -47,21 +47,29 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- }
- 
- /**
-- * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
-+ * kvm_handle_wfx - handle a wait-for-interrupts or wait-for-event
-+ *		    instruction executed by a guest
-+ *
-  * @vcpu:	the vcpu pointer
-  *
-- * Simply call kvm_vcpu_block(), which will halt execution of
-+ * WFE: Yield the CPU and come back to this vcpu when the scheduler
-+ * decides to.
-+ * WFI: Simply call kvm_vcpu_block(), which will halt execution of
-  * world-switches and schedule other host processes until there is an
-  * incoming IRQ or FIQ to the VM.
-  */
--static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	kvm_vcpu_block(vcpu);
-+	if (kvm_vcpu_get_hsr(vcpu) & 1)
-+		cond_resched();
-+	else
-+		kvm_vcpu_block(vcpu);
-+
- 	return 1;
- }
- 
- static exit_handle_fn arm_exit_handlers[] = {
--	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
-+	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
- 	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
- 	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
- 	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
+ 	soc {
+ 		i2c at 80110000 {
+-			bu21013_tp at 0x5c {
++			bu21013_tp at 5c {
+ 				reset-gpio = <&gpio4 15 0x4>;
+ 			};
+ 		};
 -- 
-1.8.2.3
+1.8.1.2
