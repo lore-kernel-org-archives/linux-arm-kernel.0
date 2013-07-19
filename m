@@ -1,17 +1,18 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Jul 2013 13:34:53 -0600
-Subject: [PATCH v4 07/17] clocksource: bcm2835: Switch to
- sched_clock_register()
-In-Reply-To: <1374189690-10810-8-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-8-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51E994DD.6010305@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Jul 2013 22:49:07 +0100
+Subject: [PATCH 10/22] ARM: ux500: Remove '0x's from Exynos5420 DTS file
+In-Reply-To: <1374242333-6852-10-git-send-email-lee.jones@linaro.org>
+References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
+ <1374242333-6852-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130719214907.GI24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 05:21 PM, Stephen Boyd wrote:
-> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
-> the 64 bit function to allow us to remove the 32 bit registration
-> interface.
+On Fri, Jul 19, 2013 at 02:58:41PM +0100, Lee Jones wrote:
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi | 2 +-
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+One question.  What have all these files got to do with ux500 ?
