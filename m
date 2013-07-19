@@ -1,105 +1,59 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Fri, 19 Jul 2013 11:50:04 +0800
-Subject: [PATCH] [RFC] EHCI: add to memory barrier to updating hw_next
-In-Reply-To: <Pine.LNX.4.44L0.1307181004190.1245-100000@iolanthe.rowland.org>
-References: <CACVXFVNV-hGZpcy2ANQaca1K5yXJ88EOq1PTkJUEHEkFk9Btvw@mail.gmail.com>
- <Pine.LNX.4.44L0.1307181004190.1245-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVNXAJe363O2OFHJ927BT23hCzedbG1Yt41xbDxV_d_oOg@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 19 Jul 2013 13:34:48 +0900
+Subject: [GIT 0/7] Renesas ARM and SH based SoC backlight drivers for v3.12
+Message-ID: <cover.1374207161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 10:08 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 18 Jul 2013, Ming Lei wrote:
->
->> > I guess that HC could have a use-after-free problem like following situation.
->> >
->> > 1. A qtd which is not at the queue head should be removed in qh_completions().
->> > 2. The last->hw_next become be pointing at the next qtd but the hw_next value is delayed in write-buffer.
->> > 3. The qtd is removed in the list.
->> > 4. The qtd is freed into DMA pool and re-allocated for another urb.
->> > 5. HC try to process last->hw_next and it is pointing re-allocated qtd.
->> >
->> > What do you think about it? Is it possible?
->>
->> I understand it might not be possible because:  when 'stopped' is set, that
->> said the HC might not advance the queue. But I don't understand why
->> 'last->hw_next' is patched here under 'stopped' situation.
->
-> It should not be possible.  When "stopped" is set, the QH gets unlinked
-> and relinked before it can start up again.  Relinking involves some
-> memory barriers, so the qTD will not be accessed again by the HC.
->
-> last->hw_next gets patched because the qTD might belong to some URB in
-> the middle of the queue that is being unlinked.  The URBs before it and
-> after it will still be active, so the queue link has to be updated.
+Hi Olof, Hi Arnd,
 
-'stopped' is set under below situations:
+please consider the following backlight drivers for v3.12.
 
-     - unlink over or shutdown
-     - halt
-     - short packet(URB_SHORT_NOT_OK)
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-Looks EHCI won't advance the queue(qh) any more on above situations, so I
-think last->hw_next might not need patching.
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
->
->> Even the 'stopped' case may be seldom triggered, do you know under
->> which condition the stopped is triggered in your problem?(stall, short read
->> or others)
->
-> I was going to ask the same question.  This particular piece of code
-> gets executed _only_ when an URB is unlinked.  Not during any other
-> kind of error.
+are available in the git repository at:
 
-The code may run under 'halt' or short packet(URB_SHORT_NOT_OK) too.
-If Gioh's problem falls to these two situations, below patch might be helpful.
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-backlight-for-v3.12
 
-Because the qh will be unlinked when there is fault in the endpoint(halt, short
-packet), maybe it is safer to complete these URBs after the qh becomes
-unlinked,  like what the blew patch does:
+for you to fetch changes up to 0fb19cdabfc3f8884bac53fd81b02bf61c7904af:
 
-diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
-index b637a65..6a65e0a 100644
---- a/drivers/usb/host/ehci-q.c
-+++ b/drivers/usb/host/ehci-q.c
-@@ -454,6 +454,10 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
- 			}
- 		}
+  ARM: mach-shmobile: ag5evm: Use bd6107 backlight driver (2013-07-17 10:06:18 +0900)
 
-+		/* complete URBs after unlinking */
-+		if (stopped && state != QH_STATE_IDLE)
-+			goto exit;
-+
- 		/* unless we already know the urb's status, collect qtd status
- 		 * and update count of bytes transferred.  in common short read
- 		 * cases with only one data qtd (including control transfers),
-@@ -489,15 +493,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
- 			}
- 		}
+----------------------------------------------------------------
+Renesas ARM and SH based SoC backlight drivers for v3.12
 
--		/* if we're removing something not at the queue head,
--		 * patch the hardware queue pointer.
--		 */
--		if (stopped && qtd->qtd_list.prev != &qh->qtd_list) {
--			last = list_entry (qtd->qtd_list.prev,
--					struct ehci_qtd, qtd_list);
--			last->hw_next = qtd->hw_next;
--		}
--
- 		/* remove qtd; it's recycled after possible urb completion */
- 		list_del (&qtd->qtd_list);
- 		last = qtd;
-@@ -520,7 +515,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
+Backlight drivers used by SH and ARM SH-Mobile boards.
 
- 		/* Otherwise the caller must unlink the QH. */
- 	}
--
-+ exit:
- 	/* restore original state; caller must unlink or relink */
- 	qh->qh_state = state;
+----------------------------------------------------------------
+Laurent Pinchart (7):
+      backlight: Add GPIO-based backlight driver
+      backlight: Add Sanyo LV5207LP backlight driver
+      backlight: Add ROHM BD6107 backlight driver
+      ARM: mach-shmobile: mackerel: Use gpio-backlight
+      sh: ecovec24: Use gpio-backlight
+      sh: kfr2r09: Use lv5207lp backlight
+      ARM: mach-shmobile: ag5evm: Use bd6107 backlight driver
 
-
-
-Thanks,
--- 
-Ming Lei
+ arch/arm/mach-shmobile/board-ag5evm.c        |   65 ++------
+ arch/arm/mach-shmobile/board-mackerel.c      |   34 ++--
+ arch/sh/boards/mach-ecovec24/setup.c         |   37 +++--
+ arch/sh/boards/mach-kfr2r09/lcd_wqvga.c      |   48 ------
+ arch/sh/boards/mach-kfr2r09/setup.c          |   19 ++-
+ arch/sh/include/mach-kfr2r09/mach/kfr2r09.h  |    2 -
+ drivers/video/backlight/Kconfig              |   19 +++
+ drivers/video/backlight/Makefile             |    3 +
+ drivers/video/backlight/bd6107.c             |  213 ++++++++++++++++++++++++++
+ drivers/video/backlight/gpio_backlight.c     |  133 ++++++++++++++++
+ drivers/video/backlight/lv5207lp.c           |  171 +++++++++++++++++++++
+ include/linux/platform_data/bd6107.h         |   19 +++
+ include/linux/platform_data/gpio_backlight.h |   21 +++
+ include/linux/platform_data/lv5207lp.h       |   19 +++
+ 14 files changed, 665 insertions(+), 138 deletions(-)
+ create mode 100644 drivers/video/backlight/bd6107.c
+ create mode 100644 drivers/video/backlight/gpio_backlight.c
+ create mode 100644 drivers/video/backlight/lv5207lp.c
+ create mode 100644 include/linux/platform_data/bd6107.h
+ create mode 100644 include/linux/platform_data/gpio_backlight.h
+ create mode 100644 include/linux/platform_data/lv5207lp.h
