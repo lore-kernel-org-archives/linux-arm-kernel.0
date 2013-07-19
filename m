@@ -1,9 +1,9 @@
 From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 19 Jul 2013 10:07:58 +0200
-Subject: [PATCH v4] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <1374067396-30155-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374067396-30155-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1374221278-18204-1-git-send-email-jonas.jensen@gmail.com>
+Date: Fri, 19 Jul 2013 10:17:17 +0200
+Subject: [PATCH v5] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1374221278-18204-1-git-send-email-jonas.jensen@gmail.com>
+References: <1374221278-18204-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1374221837-23773-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,18 +13,16 @@ Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 ---
 
 Notes:
-    Changes since v3:
+    Changes since v4:
     
-    1. remove apb-clock
-    2. read clock-output-names of property
-    3. update device tree bindings document
+    1. remove unnecessary header includes
     
     Applies to next-20130716
 
- .../bindings/clock/moxa,moxart-core-clock.txt      | 23 +++++++
+ .../bindings/clock/moxa,moxart-core-clock.txt      | 23 ++++++++
  drivers/clk/Makefile                               |  1 +
- drivers/clk/clk-moxart.c                           | 74 ++++++++++++++++++++++
- 3 files changed, 98 insertions(+)
+ drivers/clk/clk-moxart.c                           | 69 ++++++++++++++++++++++
+ 3 files changed, 93 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
  create mode 100644 drivers/clk/clk-moxart.c
 
@@ -71,10 +69,10 @@ index 4038c2b..933622f 100644
  obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
 diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
 new file mode 100644
-index 0000000..a7a1e7b
+index 0000000..5559371
 --- /dev/null
 +++ b/drivers/clk/clk-moxart.c
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,69 @@
 +/*
 + * MOXA ART SoCs clock driver.
 + *
@@ -87,12 +85,7 @@ index 0000000..a7a1e7b
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/platform_device.h>
-+#include <linux/clk.h>
 +#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/module.h>
 +#include <linux/io.h>
 +#include <linux/of_address.h>
 +#include <linux/clkdev.h>
