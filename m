@@ -1,29 +1,56 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Fri, 19 Jul 2013 20:14:16 +0200
-Subject: N900 device tree conversion: how to do first step
-In-Reply-To: <20130609015944.GA23559@amd.pavel.ucw.cz>
-References: <20130609015944.GA23559@amd.pavel.ucw.cz>
-Message-ID: <20130719181416.GA1204@earth.universe>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 19 Jul 2013 22:18:56 +0400
+Subject: [PATCH v6 1/2] ARM: dts: twl: Add GPADC data to device tree
+In-Reply-To: <51E95DEB.7010702@ti.com>
+References: <1374226039-16943-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <1374226039-16943-2-git-send-email-oleksandr.kozaruk@ti.com>
+ <51E94F97.40002@cogentembedded.com> <51E95DEB.7010702@ti.com>
+Message-ID: <51E98310.7020103@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Sun, Jun 09, 2013 at 03:59:44AM +0200, Pavel Machek wrote:
-> I'd like to convert Nokia N900 to device tree.
-> 
-> Unfortunately, serial port is not easily available (very special cable
-> would be needed, does someone know where to get one?)
+On 07/19/2013 07:40 PM, Grygorii Strashko wrote:
 
-One way to get one is building it yourself. I finished mine yesterday:
+>>> GPADC is the general purpose ADC present on twl6030.
+>>> The dt data is interrupt used to trigger end of ADC
+>>> conversion.
 
-http://elektranox.org/n900/adapter/index.html
+>>> Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
+>>> ---
+>>>   arch/arm/boot/dts/twl6030.dtsi | 6 ++++++
+>>>   1 file changed, 6 insertions(+)
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/70ad0e59/attachment.sig>
+>>> diff --git a/arch/arm/boot/dts/twl6030.dtsi
+>>> b/arch/arm/boot/dts/twl6030.dtsi
+>>> index 2e3bd31..d7d4c28 100644
+>>> --- a/arch/arm/boot/dts/twl6030.dtsi
+>>> +++ b/arch/arm/boot/dts/twl6030.dtsi
+>>> @@ -103,4 +103,10 @@
+>>>           compatible = "ti,twl6030-pwmled";
+>>>           #pwm-cells = <2>;
+>>>       };
+>>> +
+>>> +    adc: gpadc {
+
+>>     Read my lips: the node should be called just "adc", not "gpadc".
+>        ^^^^^^^^^^^^ Are you sure?
+
+    I didn't know how to express my disappointment from Oleksandr's inability 
+to understand what I wanted to convey to him from 2 attempts... first, he 
+changed the label instead of the node name, then he only dropped "twl6030_" 
+prefix from the name. I should probably have been even more specific before.
+
+> Why? The name was selected according to the documentation on device "General
+> purpose analog-to-digital converter (GPADC)".
+
+    Sigh, we simply don't care whether this ADC is general-purpose or not.
+The main thing it is ADC.
+
+> PS. Following your logic - "GPIO" need to renamed to "IO" everywhere ;P
+
+    GPIO is well known and established abbreviation, contrasted to GPADC.
+Moreover, ePAPR spec lists "gpio" as a generic node name.
+
+WBR, Sergei
