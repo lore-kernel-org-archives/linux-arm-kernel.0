@@ -1,48 +1,31 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 19 Jul 2013 14:15:02 +0530
-Subject: [PATCH v2 0/4] usb: musb: fix USB enumeration issue in OMAP3
- platform
-In-Reply-To: <20130716124227.GC15036@arwen.pp.htv.fi>
-References: <1373282057-20181-1-git-send-email-kishon@ti.com>
- <51E4DFA6.2010501@ti.com> <20130716124227.GC15036@arwen.pp.htv.fi>
-Message-ID: <51E8FC8E.7090302@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Jul 2013 10:03:28 +0100
+Subject: [PATCH v4 02/17] sched_clock: Use seqcount instead of rolling
+ our own
+In-Reply-To: <1374189690-10810-3-git-send-email-sboyd@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <1374189690-10810-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130719090328.GA18139@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
-
-On Tuesday 16 July 2013 06:12 PM, Felipe Balbi wrote:
-> Hi,
+On Fri, Jul 19, 2013 at 12:21:15AM +0100, Stephen Boyd wrote:
+> We're going to increase the cyc value to 64 bits in the near
+> future. Doing that is going to break the custom seqcount
+> implementation in the sched_clock code because 64 bit numbers
+> aren't guaranteed to be atomic. Replace the cyc_copy with a
+> seqcount to avoid this problem.
 > 
-> On Tue, Jul 16, 2013 at 11:22:38AM +0530, Kishon Vijay Abraham I wrote:
->> Tony,
->>
->> On Monday 08 July 2013 04:44 PM, Kishon Vijay Abraham I wrote:
->>> This series fixes the USB enumeration issue caused because of the controller
->>> not able to get a reference to the PHY because of incorrect binding in the
->>> board file.
->>>
->>> In the case of non-dt boot, the platform specific initialization file
->>> (board file) will do usb_bind_phy that binds the usb controller with the
->>> PHY using device names. After the device names are created using 
->>> PLATFORM_DEVID_AUTO, our original method of binding by device names doesn't
->>> work reliably (since the device name changes). Hence the usb controller
->>> is made to use labels for getting the PHY.
->>>
->>> Here the PHY name is added in the plat data of USB controller device which
->>> should be used by the controller driver to get the PHY.
->>> Two new APIs usb_get_phy_by_name and devm_usb_get_phy_by_name are added to
->>> be used by the controller to get the PHY by name.
->>
->> You haven't picked this patch series?
-> 
-> yeah and now it's too much to send during the -rc series. Here's what we
-> can do, we can to minimum fix for -rc series (patching the names again)
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  kernel/time/sched_clock.c | 27 ++++++++-------------------
+>  1 file changed, 8 insertions(+), 19 deletions(-)
 
-There are a lot of different boards available using OMAP3 and the device names
-(PHY and MUSB) vary across each board (apparently). It will be difficult to
-find the device names (for PHY and MUSB) for all the different boards available
-(partly because of non-availability of all the boards) and test it.
+Looks good to me. The current scheme would be very fiddly to extend to
+64-bit values on 32-bit architectures without cheap atomic doubleword
+accesses.
 
-Thanks
-Kishon
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
