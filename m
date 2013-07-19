@@ -1,41 +1,50 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 19 Jul 2013 15:50:12 +0100
-Subject: alignment handler instruction endian-ness
-In-Reply-To: <20130719140513.GF24642@n2100.arm.linux.org.uk>
-References: <51E91BE5.8070809@codethink.co.uk>
- <20130719110947.GD24642@n2100.arm.linux.org.uk>
- <1374242462.3406.59.camel@linaro1.home>
- <20130719140513.GF24642@n2100.arm.linux.org.uk>
-Message-ID: <51E95224.9010306@codethink.co.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Jul 2013 15:53:28 +0100
+Subject: [PATCH 2/4] arm64: KVM: add missing dsb before invalidating
+ Stage-2 TLBs
+In-Reply-To: <20130719143229.GG18139@mudshark.cambridge.arm.com>
+References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
+ <1374242035-13199-3-git-send-email-marc.zyngier@arm.com>
+ <20130719143229.GG18139@mudshark.cambridge.arm.com>
+Message-ID: <51E952E8.6020503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/13 15:05, Russell King - ARM Linux wrote:
-> On Fri, Jul 19, 2013 at 03:01:02PM +0100, Jon Medhurst (Tixy) wrote:
->> On Fri, 2013-07-19 at 12:09 +0100, Russell King - ARM Linux wrote:
->>> On Fri, Jul 19, 2013 at 11:58:45AM +0100, Ben Dooks wrote:
->>>> I ran in to an issue with the alignment handler when running BE8 where
->>>> it loads instructions and fails to swap.
->>>>
->>>> Is there a better way of swapping instructions for ARM when loading
->>>> from arbitrary places? Have I missed any other places this could happen?
->>>
->>> Maybe we need a macro which deals with this automatically?
+On 19/07/13 15:32, Will Deacon wrote:
+> On Fri, Jul 19, 2013 at 02:53:53PM +0100, Marc Zyngier wrote:
+>> When performing a Stage-2 TLB invalidation, it is necessary to
+>> make sure the write to the page tables is observable by all CPUs.
 >>
->> Like the stuff in arch/arm/include/asm/opcodes.h ?
->
-> Not like asm/opcodes.h does at the moment, because there's really no
-> reason whatsoever that it isn't using the standard swab stuff, which
-> will automatically use the rev/rev16 instructions where available.
->
-> There's really no reason to open code that stuff.
+>> For this purpose, add a dsb instruction to __kvm_tlb_flush_vmid_ipa
+>> before doing the TLB invalidation itself.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp.S | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index 218802f..e1ccfcc 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -604,6 +604,8 @@ END(__kvm_vcpu_run)
+>>  
+>>  // void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>>  ENTRY(__kvm_tlb_flush_vmid_ipa)
+>> +	dsb	ishst	// Make sure previous writes are observable
+>> +
+>>  	kern_hyp_va	x0
+>>  	ldr	x2, [x0, #KVM_VTTBR]
+>>  	msr	vttbr_el2, x2
+>> -- 
+>> 1.8.2.3
+> 
+> I don't think the comment adds anything to this code. Also, why don't you
+> need similar barriers for the cases where you clobber the entire TLB (e.g.
+> __kvm_flush_vm_context)?
 
-It seems it is only open coded for the __ASSEMBLY__ version,
-it does use swabXX() for the !__ASSEMBLY__ case.
+I think they are required as well. I'll respin the patch.
 
-Should we use __mem_to_opcode_arm() in the aligned and abort
-handlers?
-
+	M.
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Jazz is not dead. It just smells funny...
