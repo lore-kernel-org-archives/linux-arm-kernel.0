@@ -1,102 +1,128 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 19 Jul 2013 17:25:26 +0800
-Subject: [PATCH V4 4/4] ARM: tegra114: cpuidle: add powered-down state
+Date: Fri, 19 Jul 2013 17:25:24 +0800
+Subject: [PATCH V4 2/4] ARM: tegra114: Reprogram GIC CPU interface to bypass
+ IRQ on CPU PM entry
 In-Reply-To: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
 References: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1374225926-26832-5-git-send-email-josephl@nvidia.com>
+Message-ID: <1374225926-26832-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This supports CPU core power down on each CPU when CPU idle. When CPU go
-into this state, it saves it's context and needs a proper configuration
-in flow controller to power gate the CPU when CPU runs into WFI
-instruction. And the CPU also needs to set the IRQ as CPU power down idle
-wake up event in flow controller.
+There is a difference between GICv1 and v2 when CPU in power management
+mode (aka CPU power down on Tegra). For GICv1, IRQ/FIQ interrupt lines
+going to CPU are same lines which are also used for wake-interrupt.
+Therefore, we cannot disable the GIC CPU interface if we need to use same
+interrupts for CPU wake purpose. This creates a race condition for CPU
+power off entry. Also, in GICv1, disabling GICv1 CPU interface puts GICv1
+into bypass mode such that incoming legacy IRQ/FIQ are sent to CPU, which
+means disabling GIC CPU interface doesn't really disable IRQ/FIQ to CPU.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+GICv2 provides a wake IRQ/FIQ (for wake-event purpose), which are not
+disabled by GIC CPU interface. This is done by adding a bypass override
+capability when the interrupts are disabled at the CPU interface. To
+support this, there are four bits about IRQ/FIQ BypassDisable in CPU
+interface Control Register. When the IRQ/FIQ not being driver by the
+CPU interface, each interrupt output signal can be deasserted rather
+than being driven by the legacy interrupt input.
+
+So the wake-event can be used as wakeup signals to SoC (system power
+controller).
+
+To prevent race conditions and ensure proper interrupt routing on
+Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
+call-back to reprogram the GIC CPU interface on PM entry. The
+GIC CPU interface will be reset back to its normal state by
+the common GIC CPU PM exit callback when the CPU wakes up.
+
+Based on the work by: Scott Williams <scwilliams@nvidia.com>
+
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V4:
-* postpone to use CPUIDLE_FLAG_TIMER_STOP flag, because it still has some
-  issues
+* no change
 V3:
-* use CPUIDLE_FLAG_TIMER_STOP flag
+* no change
 V2:
-* remove some redundant code of memory barrier
-* remove the function declaration by rearranging the coding sequence 
+* no change
 ---
- arch/arm/mach-tegra/cpuidle-tegra114.c | 51 +++++++++++++++++++++++++++++++++-
- 1 file changed, 50 insertions(+), 1 deletion(-)
+ arch/arm/mach-tegra/irq.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-index 1d1c602..e0b8730 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -17,15 +17,64 @@
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 0de4eed..1a74d56 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -18,10 +18,12 @@
+  */
+ 
  #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/cpuidle.h>
 +#include <linux/cpu_pm.h>
-+#include <linux/clockchips.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/syscore_ops.h>
  
- #include <asm/cpuidle.h>
-+#include <asm/suspend.h>
-+#include <asm/smp_plat.h>
+@@ -65,6 +67,7 @@ static u32 cpu_ier[TEGRA_MAX_NUM_ICTLRS];
+ static u32 cpu_iep[TEGRA_MAX_NUM_ICTLRS];
+ 
+ static u32 ictlr_wake_mask[TEGRA_MAX_NUM_ICTLRS];
++static void __iomem *tegra_gic_cpu_base;
+ #endif
+ 
+ bool tegra_pending_sgi(void)
+@@ -213,8 +216,43 @@ int tegra_legacy_irq_syscore_init(void)
+ 
+ 	return 0;
+ }
 +
-+#include "pm.h"
-+#include "sleep.h"
-+
-+#ifdef CONFIG_PM_SLEEP
-+#define TEGRA114_MAX_STATES 2
-+#else
-+#define TEGRA114_MAX_STATES 1
-+#endif
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int tegra114_idle_power_down(struct cpuidle_device *dev,
-+				    struct cpuidle_driver *drv,
-+				    int index)
++static int tegra_gic_notifier(struct notifier_block *self,
++			      unsigned long cmd, void *v)
 +{
-+	local_fiq_disable();
++	switch (cmd) {
++	case CPU_PM_ENTER:
++		writel_relaxed(0x1E0, tegra_gic_cpu_base + GIC_CPU_CTRL);
++		break;
++	}
 +
-+	tegra_set_cpu_in_lp2();
-+	cpu_pm_enter();
-+
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+
-+	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
-+
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+
-+	cpu_pm_exit();
-+	tegra_clear_cpu_in_lp2();
-+
-+	local_fiq_enable();
-+
-+	return index;
++	return NOTIFY_OK;
 +}
-+#endif
++
++static struct notifier_block tegra_gic_notifier_block = {
++	.notifier_call = tegra_gic_notifier,
++};
++
++static const struct of_device_id tegra114_dt_gic_match[] __initconst = {
++	{ .compatible = "arm,cortex-a15-gic" },
++	{ }
++};
++
++static void tegra114_gic_cpu_pm_registration(void)
++{
++	struct device_node *dn;
++
++	dn = of_find_matching_node(NULL, tegra114_dt_gic_match);
++	if (!dn)
++		return;
++
++	tegra_gic_cpu_base = of_iomap(dn, 1);
++
++	cpu_pm_register_notifier(&tegra_gic_notifier_block);
++}
+ #else
+ #define tegra_set_wake NULL
++static void tegra114_gic_cpu_pm_registration(void) { }
+ #endif
  
- static struct cpuidle_driver tegra_idle_driver = {
- 	.name = "tegra_idle",
- 	.owner = THIS_MODULE,
--	.state_count = 1,
-+	.state_count = TEGRA114_MAX_STATES,
- 	.states = {
- 		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
-+#ifdef CONFIG_PM_SLEEP
-+		[1] = {
-+			.enter			= tegra114_idle_power_down,
-+			.exit_latency		= 500,
-+			.target_residency	= 1000,
-+			.power_usage		= 0,
-+			.flags			= CPUIDLE_FLAG_TIME_VALID,
-+			.name			= "powered-down",
-+			.desc			= "CPU power gated",
-+		},
-+#endif
- 	},
- };
- 
+ void __init tegra_init_irq(void)
+@@ -252,4 +290,6 @@ void __init tegra_init_irq(void)
+ 	if (!of_have_populated_dt())
+ 		gic_init(0, 29, distbase,
+ 			IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
++
++	tegra114_gic_cpu_pm_registration();
+ }
 -- 
 1.8.3.2
