@@ -1,55 +1,92 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 19 Jul 2013 18:17:10 +0200
-Subject: [PATCH 3/3] ARM: Kconfig: allow virt CPU accounting
-In-Reply-To: <1372876601-23881-4-git-send-email-khilman@linaro.org>
-References: <1372876601-23881-1-git-send-email-khilman@linaro.org>
- <1372876601-23881-4-git-send-email-khilman@linaro.org>
-Message-ID: <20130719161708.GB21752@somewhere>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 19 Jul 2013 18:25:36 +0200
+Subject: [PATCH RESEND 1/2] ARM: mmp: Add compatible entries for OLPC XO
+ laptops
+In-Reply-To: <20130716180605.A63C7FAAF3@dev.laptop.org>
+References: <20130716180605.A63C7FAAF3@dev.laptop.org>
+Message-ID: <20130719162536.GH16015@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 03, 2013 at 11:36:41AM -0700, Kevin Hilman wrote:
-> With the 64-bit requirement removed from virt CPU accounting,
-> allow ARM platforms to enable it.
+On 14:06 Tue 16 Jul     , Daniel Drake wrote:
+> Add compatible entries to enable booting of OLPC XO-1.75 (MMP2) and
+> OLPC XO-4 (MMP3).
 > 
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Chris Ball <cjb@laptop.org>
+> Signed-off-by: Daniel Drake <dsd@laptop.org>
 > ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/arm/mrvl/intc.txt | 4 ++--
+>  Documentation/devicetree/bindings/arm/mrvl/mrvl.txt | 8 ++++++++
+>  arch/arm/mach-mmp/irq.c                             | 1 +
+>  arch/arm/mach-mmp/mmp2-dt.c                         | 2 ++
+>  4 files changed, 13 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 136f263..7850612 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -61,6 +61,7 @@ config ARM
->  	select OLD_SIGSUSPEND3
->  	select OLD_SIGACTION
->  	select HAVE_CONTEXT_TRACKING
-> +	select HAVE_VIRT_CPU_ACCOUNTING
+> Resending after 1 month with no response.
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mrvl/intc.txt b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+> index 8b53273..3554fb9 100644
+> --- a/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+> +++ b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+> @@ -1,8 +1,8 @@
+>  * Marvell MMP Interrupt controller
+>  
+>  Required properties:
+> -- compatible : Should be "mrvl,mmp-intc", "mrvl,mmp2-intc" or
+> -  "mrvl,mmp2-mux-intc"
+> +- compatible : One of: mrvl,mmp-intc mrvl,mmp2-intc mrvl,mmp3-intc
+> +  mrvl,mmp2-mux-intc
+>  - reg : Address and length of the register set of the interrupt controller.
+>    If the interrupt controller is intc, address and length means the range
+>    of the whold interrupt controller. If the interrupt controller is mux-intc,
+> diff --git a/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt b/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt
+> index 117d741..236e884 100644
+> --- a/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt
+> +++ b/Documentation/devicetree/bindings/arm/mrvl/mrvl.txt
+> @@ -12,3 +12,11 @@ Required root node properties:
+>  MMP2 Brownstone Board
+>  Required root node properties:
+>  	- compatible = "mrvl,mmp2-brownstone";
+> +
+> +OLPC XO-1.75 (CL2) based on MMP2
+> +Required root node properties:
+> +	- compatible = "olpc,xo-1.75";
+> +
+> +OLPC XO-4 (CL4) based on MMP3
+> +Required root node properties:
+> +	- compatible = "olpc,xo-cl4";
+documentation not consistnt with code
 
-I think you got confused here. HAVE_VIRT_CPU_ACCOUNTING is the arch capability
-for VIRT_CPU_ACCOUNTING_NATIVE, not for VIRT_CPU_ACCOUNTING_GEN that only requires
-support for context tracking.
-
-That's my bad, all those names start to be confusing now.
-The VIRT based Kconfig naming is a bit weird, that doesn't really reflect what the feature
-is doing. "Virtual cputime accounting" just doesn't give any clue, except perhaps suggesting
-the stuff deals with virtualization while it actually has nothing to do with.
-I don't even know what virtual refers to here.
-
-Same goes for vtime based APIs. In fact I just based my work on the legacy that was
-there and expanded further the non-sense ;-)
-
-I'll need to do a big renaming one day.
-
-But to begin with I should rename s/HAVE_VIRT_CPU_ACCOUNTING/HAVE_VIRT_CPU_ACCOUNTING_NATIVE.
-
-
-
->  	help
->  	  The ARM series is a line of low-power-consumption RISC chip designs
->  	  licensed by ARM Ltd and targeted at embedded applications and
+Best Regards,
+J.
+> diff --git a/arch/arm/mach-mmp/irq.c b/arch/arm/mach-mmp/irq.c
+> index 3c71246..d60b85a 100644
+> --- a/arch/arm/mach-mmp/irq.c
+> +++ b/arch/arm/mach-mmp/irq.c
+> @@ -329,6 +329,7 @@ void __init mmp2_init_icu(void)
+>  static const struct of_device_id intc_ids[] __initconst = {
+>  	{ .compatible = "mrvl,mmp-intc", .data = &mmp_conf },
+>  	{ .compatible = "mrvl,mmp2-intc", .data = &mmp2_conf },
+> +	{ .compatible = "mrvl,mmp3-intc", .data = &mmp2_conf },
+>  	{}
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
+> index 4ac2567..e67bd9f 100644
+> --- a/arch/arm/mach-mmp/mmp2-dt.c
+> +++ b/arch/arm/mach-mmp/mmp2-dt.c
+> @@ -44,6 +44,8 @@ static void __init mmp2_dt_init(void)
+>  
+>  static const char *mmp2_dt_board_compat[] __initdata = {
+>  	"mrvl,mmp2-brownstone",
+> +	"olpc,xo-1.75",
+> +	"olpc,xo-cl4",
+>  	NULL,
+>  };
+>  
 > -- 
-> 1.8.3
+> 1.8.1.4
 > 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
