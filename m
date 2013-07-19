@@ -1,86 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jul 2013 14:53:55 +0100
-Subject: [PATCH 4/4] arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
+Date: Fri, 19 Jul 2013 14:53:53 +0100
+Subject: [PATCH 2/4] arm64: KVM: add missing dsb before invalidating Stage-2
+ TLBs
 In-Reply-To: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
 References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1374242035-13199-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1374242035-13199-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have __hyp_text_{start,end} to express the boundaries
-of the HYP text section, and __kvm_hyp_code_{start,end} are getting
-in the way of a more modular world switch code.
+When performing a Stage-2 TLB invalidation, it is necessary to
+make sure the write to the page tables is observable by all CPUs.
 
-Just turn __kvm_hyp_code_{start,end} into #defines mapping the
-linker-emited symbols.
+For this purpose, add a dsb instruction to __kvm_tlb_flush_vmid_ipa
+before doing the TLB invalidation itself.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 6 ++++--
- arch/arm64/include/asm/virt.h    | 4 ++++
- arch/arm64/kvm/hyp.S             | 6 ------
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm64/kvm/hyp.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index b25763b..dddb345 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -18,6 +18,8 @@
- #ifndef __ARM_KVM_ASM_H__
- #define __ARM_KVM_ASM_H__
- 
-+#include <asm/virt.h>
-+
- /*
-  * 0 is reserved as an invalid value.
-  * Order *must* be kept in sync with the hyp switch code.
-@@ -95,8 +97,8 @@ extern char __kvm_hyp_init_end[];
- 
- extern char __kvm_hyp_vector[];
- 
--extern char __kvm_hyp_code_start[];
--extern char __kvm_hyp_code_end[];
-+#define	__kvm_hyp_code_start	__hyp_text_start
-+#define	__kvm_hyp_code_end	__hyp_text_end
- 
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 4398272..59d67f3 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -49,6 +49,10 @@ static inline bool is_hyp_mode_mismatched(void)
- 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
- }
- 
-+/* The section containing the hypervisor text */
-+extern char __hyp_text_start[];
-+extern char __hyp_text_end[];
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* ! __ASM__VIRT_H */
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index e1ccfcc..19ccf48 100644
+index 218802f..e1ccfcc 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -36,9 +36,6 @@
- 	.pushsection	.hyp.text, "ax"
- 	.align	PAGE_SHIFT
+@@ -604,6 +604,8 @@ END(__kvm_vcpu_run)
  
--__kvm_hyp_code_start:
--	.globl __kvm_hyp_code_start
--
- .macro save_common_regs
- 	// x2: base address for cpu context
- 	// x3: tmp register
-@@ -837,7 +834,4 @@ ENTRY(__kvm_hyp_vector)
- 	ventry	el1_error_invalid		// Error 32-bit EL1
- ENDPROC(__kvm_hyp_vector)
- 
--__kvm_hyp_code_end:
--	.globl	__kvm_hyp_code_end
--
- 	.popsection
+ // void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+ ENTRY(__kvm_tlb_flush_vmid_ipa)
++	dsb	ishst	// Make sure previous writes are observable
++
+ 	kern_hyp_va	x0
+ 	ldr	x2, [x0, #KVM_VTTBR]
+ 	msr	vttbr_el2, x2
 -- 
 1.8.2.3
