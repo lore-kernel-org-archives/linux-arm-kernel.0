@@ -1,44 +1,41 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 19 Jul 2013 12:26:24 +0100
-Subject: alignment handler instruction endian-ness
-In-Reply-To: <20130719110947.GD24642@n2100.arm.linux.org.uk>
-References: <51E91BE5.8070809@codethink.co.uk>
- <20130719110947.GD24642@n2100.arm.linux.org.uk>
-Message-ID: <51E92260.1060101@codethink.co.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 19 Jul 2013 13:29:13 +0200
+Subject: [PATCH v2 0/4] Add PWM polarity flag macro for DT
+In-Reply-To: <51E81E1C.20708@wwwdotorg.org>
+References: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <51E81E1C.20708@wwwdotorg.org>
+Message-ID: <10033310.z2U2FSCElN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/13 12:09, Russell King - ARM Linux wrote:
-> On Fri, Jul 19, 2013 at 11:58:45AM +0100, Ben Dooks wrote:
->> I ran in to an issue with the alignment handler when running BE8 where
->> it loads instructions and fails to swap.
->>
->> Is there a better way of swapping instructions for ARM when loading
->> from arbitrary places? Have I missed any other places this could happen?
->
-> Maybe we need a macro which deals with this automatically?
->
-> 	arm_instr_to_cpu(x)
-> 	thumb_instr_to_cpu(x)
->
-> These should probably make use of the swab*() macros when an endian swap
-> is needed.
->
->> The following patch is my first attempt at solving the problem for the
->> alignment handler:
->
-> I'd suggest checking this with sparse too - you have some type errors here.
+Hi Stephen,
 
-Very probably, I needed this in a hurry and was after some input on how
-it could be improved.
+On Thursday 18 July 2013 10:55:56 Stephen Warren wrote:
+> On 07/17/2013 04:54 PM, Laurent Pinchart wrote:
+> > Hello,
+> > 
+> > Here's a small patch set that replaces PWM polarity numerical constants
+> > with macros in DT.
+> 
+> The series,
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> 
+> I'm (very very) slightly hesitant about patch 3/4, since it's moving towards
+> all PWMs having to use the same specifier format, whereas specifiers are at
+> least potentially binding-specific, not device-type-specific. However,
+> consistency is good; there's no need to do something different just for the
+> heck of it. Equally, there's nothing actually stopping a new binding from
+> defining its own format rather than simply deferring to pwm.txt if it
+> absolutely has to, so I think this will turn out fine.
 
-The only issue I was thinking of for having those functions would be if
-the userspace was running BE32 and the kernel was LE. I don't think this
-is very likely, so it can probably be discounted.
+Exactly, that's why I don't think it's an issue. pwm.txt defines a common 
+format, individual bindings are free to use it or not.
 
-I could not find where the kernel's relocation code does this to see if
-it also needed changing.
+Thierry, if you're fine with the patches, could you take them in your tree 
+with Stephen's Reviewed-by, or should I report them and send you a pull 
+request ?
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Regards,
+
+Laurent Pinchart
