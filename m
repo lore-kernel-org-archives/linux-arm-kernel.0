@@ -1,162 +1,76 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 19 Jul 2013 09:34:47 +0200
-Subject: [PATCH v2 16/24] net: can: mscan: make mpc512x code use common
- clock
-In-Reply-To: <1374178858-8683-2-git-send-email-gsi@denx.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374178858-8683-2-git-send-email-gsi@denx.de>
-Message-ID: <51E8EC17.9060703@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Jul 2013 00:39:58 -0700
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <51E84180.6080902@wwwdotorg.org>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+ <51E70B5D.6030802@wwwdotorg.org>
+ <20130718073638.GP7656@atomide.com>
+ <51E84180.6080902@wwwdotorg.org>
+Message-ID: <20130719073957.GZ7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 10:20 PM, Gerhard Sittig wrote:
-> extend the mscan(4) driver with alternative support for the COMMON_CLK
-> approach which is an option in the MPC512x platform, keep the existing
-> clock support implementation in place since the driver is shared with
-> other MPC5xxx SoCs which don't have common clock support
+* Stephen Warren <swarren@wwwdotorg.org> [130718 12:33]:
+> On 07/18/2013 01:36 AM, Tony Lindgren wrote:
+> > * Stephen Warren <swarren@wwwdotorg.org> [130717 14:30]:
+> >> On 07/16/2013 03:05 AM, Tony Lindgren wrote:
+> ...
+> >> Why shouldn't e.g. a pinctrl-based I2C mux also be able to do runtime
+> >> PM? Does the mux setting select which states are used for runtime PM, or
+> >> does runtime PM override the basic mux setting, or must the pincrl-I2C
+> >> mux manually implement custom runtime-PM/pinctrl interaction since
+> >> there's no generic answer to those questions? How many more custom
+> >> exceptions will there be?
+> > 
+> > The idea is that runtime PM will never touch the basic mux settings
+> > at all. The "default" state should be considered a static state
+> > that is claimed during driver probe, and released when the driver
+> > is unloaded. This is typically let's say 90% of the pins for any
+> > device.
+> > 
+> > For runtime PM, we can just toggle the PM related pinctrl states as
+> > they have been verified to match the active state during init.
+> > 
+> > So I don't see why pinctrl-I2C would have to do anything specific.
+> > All that is required is that the pins are grouped for the consumer
+> > driver, and we can provide some automated checks on the states for
+> > runtime PM.
 > 
-> one byproduct of this change is that the CAN driver no longer needs to
-> access the SoC's clock control registers, which shall be the domain of
-> the platform's clock driver
+> So, consider a pinctrl-based I2C mux. It has 2 states to cover two I2C
+> buses:
 > 
-> Signed-off-by: Gerhard Sittig <gsi@denx.de>
-> ---
->  drivers/net/can/mscan/mpc5xxx_can.c |  139 +++++++++++++++++++++++++++++++++++
->  1 file changed, 139 insertions(+)
+> a) bus 1: I2C controller is muxed out onto one set of pins.
 > 
-> diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-> index bc422ba..dd26ab6 100644
-> --- a/drivers/net/can/mscan/mpc5xxx_can.c
-> +++ b/drivers/net/can/mscan/mpc5xxx_can.c
-> @@ -108,6 +108,143 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
->  #endif /* CONFIG_PPC_MPC52xx */
->  
->  #ifdef CONFIG_PPC_MPC512x
-> +
-> +#if IS_ENABLED(CONFIG_COMMON_CLK)
-> +
-> +static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
-> +				 const char *clock_source, int *mscan_clksrc)
-> +{
-> +	struct device_node *np;
-> +	u32 clockdiv;
-> +	enum {
-> +		CLK_FROM_AUTO,
-> +		CLK_FROM_IPS,
-> +		CLK_FROM_SYS,
-> +		CLK_FROM_REF,
-> +	} clk_from;
-> +	struct clk *clk_in, *clk_can;
-> +	unsigned long freq_calc;
-> +
-> +	/* the caller passed in the clock source spec that was read from
-> +	 * the device tree, get the optional clock divider as well
-> +	 */
-> +	np = ofdev->dev.of_node;
-> +	clockdiv = 1;
-> +	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
-> +	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
-> +		clock_source ? clock_source : "<NULL>", clockdiv);
-> +
-> +	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
-> +	 * get set, and the 'ips' clock is the input to the MSCAN
-> +	 * component
-> +	 *
-> +	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
-> +	 * bit needs to get cleared, an optional clock-divider may have
-> +	 * been specified (the default value is 1), the appropriate
-> +	 * MSCAN related MCLK is the input to the MSCAN component
-> +	 *
-> +	 * in the absence of a clock-source spec, first an optimal clock
-> +	 * gets determined based on the 'sys' clock, if that fails the
-> +	 * 'ref' clock is used
-> +	 */
-> +	clk_from = CLK_FROM_AUTO;
-> +	if (clock_source) {
-> +		/* interpret the device tree's spec for the clock source */
-> +		if (!strcmp(clock_source, "ip"))
-> +			clk_from = CLK_FROM_IPS;
-> +		else if (!strcmp(clock_source, "sys"))
-> +			clk_from = CLK_FROM_SYS;
-> +		else if (!strcmp(clock_source, "ref"))
-> +			clk_from = CLK_FROM_REF;
-> +		else
-> +			goto err_invalid;
-> +		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
-> +	}
-> +	if (clk_from == CLK_FROM_AUTO) {
-> +		/* no spec so far, try the 'sys' clock; round to the
-> +		 * next MHz and see if we can get a multiple of 16MHz
-> +		 */
-> +		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
-> +		clk_in = clk_get(&ofdev->dev, "sys");
-> +		if (IS_ERR(clk_in))
-> +			goto err_notavail;
-> +		freq_calc = clk_get_rate(clk_in);
-> +		freq_calc +=  499999;
-> +		freq_calc /= 1000000;
-> +		freq_calc *= 1000000;
-> +		if ((freq_calc % 16000000) == 0) {
-> +			clk_from = CLK_FROM_SYS;
-> +			clockdiv = freq_calc / 16000000;
-> +			dev_dbg(&ofdev->dev,
-> +				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
-> +				freq_calc, clockdiv, freq_calc / clockdiv);
-> +		}
-> +	}
-> +	if (clk_from == CLK_FROM_AUTO) {
-> +		/* no spec so far, use the 'ref' clock */
-> +		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
-> +		clk_in = clk_get(&ofdev->dev, "ref");
-> +		if (IS_ERR(clk_in))
-> +			goto err_notavail;
-> +		clk_from = CLK_FROM_REF;
-> +		freq_calc = clk_get_rate(clk_in);
-> +		dev_dbg(&ofdev->dev,
-> +			"clk fit, ref[%lu] (no div) freq[%lu]\n",
-> +			freq_calc, freq_calc);
-> +	}
-> +
-> +	/* select IPS or MCLK as the MSCAN input (returned to the caller),
-> +	 * setup the MCLK mux source and rate if applicable, apply the
-> +	 * optionally specified or derived above divider, and determine
-> +	 * the actual resulting clock rate to return to the caller
-> +	 */
-> +	switch (clk_from) {
-> +	case CLK_FROM_IPS:
-> +		clk_can = clk_get(&ofdev->dev, "ips");
-> +		if (IS_ERR(clk_can))
-> +			goto err_notavail;
-> +		clk_prepare_enable(clk_can);
+> b) bus 2: I2C controller is muxed out onto another set of pins.
+> 
+> Now, the system could go idle in either of those 2 states, and then
+> later need to return to one of those states. I just don't see how that
+> would work, since the runtime PM code in this series switches to *an*
+> active state when the device becomes non-idle. If the definition of the
+> idle state switches the mux function for both sets of pins to some
+> idle/quiescent value, then you'd need to do different reprogramming when
+> going back to "the" active state; I guess the system would need to
+> remember which state was active before switching to idle, then switch
+> back to that same state rather than hard-coding the active state name as
+> "active"...
 
-Where is the corresponding clk_disable_unprepare()?a
+I think the only sane way to deal with this is to make the I2C controller
+to show up as two separate I2C controller instances. Then use runtime
+PM to save and restore the state for each instance, and locking between
+the two driver instances.
 
-> +		freq_calc = clk_get_rate(clk_can);
-> +		*mscan_clksrc = MSCAN_CLKSRC_IPS;
-> +		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
-> +			*mscan_clksrc, freq_calc);
-> +		break;
-> +	case CLK_FROM_SYS:
-> +	case CLK_FROM_REF:
-> +		clk_can = clk_get(&ofdev->dev, "mclk");
-> +		if (IS_ERR(clk_can))
-> +			goto err_notavail;
-> +		clk_prepare_enable(clk_can);
+For the pin muxing part, I'd do this:
 
-dito
+			i2c1 instance	i2c2 instance	notes
+default_state		0 pins		0 pins		(or dedicated pins only)
+active_state		all pins	alls pins
+idle_state		safe mode	safe mode
 
-Marc
+Then when i2c1 instance is done, it's runtime PM suspend muxes the pins
+to safe mode, or some nop state. Then when i2c2 instance is woken, it's
+runtime PM resume muxes pins to i2c2.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Regards,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/2115e02f/attachment.sig>
+Tony
