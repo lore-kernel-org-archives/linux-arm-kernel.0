@@ -1,60 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:36:29 +0900
-Subject: [GIT 00/19] Renesas ARM based SoC pinmux updates for v3.12
-Message-ID: <cover.1374208262.git.horms+renesas@verge.net.au>
+Date: Fri, 19 Jul 2013 13:36:57 +0900
+Subject: [PATCH 03/19] ARM: shmobile: r8a7778: Add pin control device to
+ device tree
+In-Reply-To: <cover.1374208262.git.horms+renesas@verge.net.au>
+References: <cover.1374208262.git.horms+renesas@verge.net.au>
+Message-ID: <2754bfad53d2a5eb2a824c0c8f65564cf0d7b57c.1374208262.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+Add a pfc node to the r8a7778 device tree.
 
-are available in the git repository at:
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7778.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux-for-v3.12
-
-for you to fetch changes up to 838a7070ce8bfff11e19ed434edd9a4423b478bd:
-
-  ARM: shmobile: kzm9g-reference: Add LED1-LED4 to the device tree (2013-07-16 12:55:04 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC pinmux updates for v3.12
-
-SH Mobile pinctrl DT support
-
-----------------------------------------------------------------
-Laurent Pinchart (19):
-      ARM: shmobile: r8a73a4: Add pin control device to device tree
-      ARM: shmobile: r8a7740: Add pin control device to device tree
-      ARM: shmobile: r8a7778: Add pin control device to device tree
-      ARM: shmobile: r8a7778: Add GPIO controller devices to device tree
-      ARM: shmobile: r8a7779: Add pin control device to device tree
-      ARM: shmobile: r8a7779: Add GPIO controller devices to device tree
-      ARM: shmobile: r8a7790: Add pin control device to device tree
-      ARM: shmobile: r8a7790: Add GPIO controller devices to device tree
-      ARM: shmobile: sh7372: Add pin control device to device tree
-      ARM: shmobile: sh73a0: Add pin control device to device tree
-      ARM: shmobile: armadillo-reference: Move pinctrl mappings to device tree
-      ARM: shmobile: armadillo-reference: Add st1232 pin mappings
-      ARM: shmobile: armadillo-reference: Move st1232 reset GPIO to DT
-      ARM: shmobile: armadillo-reference: Add LED1-LED4 to the device tree
-      ARM: shmobile: marzen-reference: Move pinctrl mappings to device tree
-      ARM: shmobile: marzen-reference: Add LED2-LED4 to the device tree
-      ARM: shmobile: kzm9g-reference: Move pinctrl mappings to device tree
-      ARM: shmobile: kzm9g-reference: Move SDHI regulators to DT
-      ARM: shmobile: kzm9g-reference: Add LED1-LED4 to the device tree
-
- arch/arm/boot/dts/r8a73a4.dtsi                     |   88 +++++++++++++++++++
- .../boot/dts/r8a7740-armadillo800eva-reference.dts |   34 ++++++++
- arch/arm/boot/dts/r8a7740.dtsi                     |    8 ++
- arch/arm/boot/dts/r8a7778.dtsi                     |   66 ++++++++++++++
- arch/arm/boot/dts/r8a7779-marzen-reference.dts     |   49 +++++++++++
- arch/arm/boot/dts/r8a7779.dtsi                     |   90 ++++++++++++++++++++
- arch/arm/boot/dts/r8a7790.dtsi                     |   78 +++++++++++++++++
- arch/arm/boot/dts/sh7372.dtsi                      |    8 ++
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   90 +++++++++++++++++++-
- arch/arm/boot/dts/sh73a0.dtsi                      |    8 ++
- .../board-armadillo800eva-reference.c              |   18 +---
- arch/arm/mach-shmobile/board-kzm9g-reference.c     |   47 ----------
- arch/arm/mach-shmobile/board-marzen-reference.c    |   28 ------
- 13 files changed, 518 insertions(+), 94 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index 4743735..c8dbf14 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -32,4 +32,9 @@
+ 		reg = <0xfe438000 0x1000>,
+ 		      <0xfe430000 0x100>;
+ 	};
++
++	pfc: pfc at fffc0000 {
++		compatible = "renesas,pfc-r8a7778";
++		reg = <0xfffc000 0x118>;
++	};
+ };
+-- 
+1.7.10.4
