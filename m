@@ -1,149 +1,155 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:35:31 +0900
-Subject: [PATCH 6/7] sh: kfr2r09: Use lv5207lp backlight
-In-Reply-To: <cover.1374207161.git.horms+renesas@verge.net.au>
-References: <cover.1374207161.git.horms+renesas@verge.net.au>
-Message-ID: <3f3bee2e31f6fbf8ac09b58b8e87374d24387cef.1374207161.git.horms+renesas@verge.net.au>
+Date: Fri, 19 Jul 2013 13:36:07 +0900
+Subject: [PATCH] clocksource: sh_cmt: 32-bit control register support
+In-Reply-To: <cover.1374207810.git.horms+renesas@verge.net.au>
+References: <cover.1374207810.git.horms+renesas@verge.net.au>
+Message-ID: <2792cc6f22031110f6959c02d42d7b6116105a71.1374207810.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-Replace the backlight callback with a lv5207lp backlight platform
-device.
+Add support for CMT hardware with 32-bit control and counter
+registers, as found on r8a73a4 and r8a7790. To use the CMT
+with 32-bit hardware a second I/O memory resource needs to
+point out the CMSTR register and it needs to be 32 bit wide.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/sh/boards/mach-kfr2r09/lcd_wqvga.c     |   48 ---------------------------
- arch/sh/boards/mach-kfr2r09/setup.c         |   19 ++++++++---
- arch/sh/include/mach-kfr2r09/mach/kfr2r09.h |    2 --
- 3 files changed, 14 insertions(+), 55 deletions(-)
+ drivers/clocksource/sh_cmt.c |   50 ++++++++++++++++++++++++++++++------------
+ 1 file changed, 36 insertions(+), 14 deletions(-)
 
-diff --git a/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c b/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c
-index c620503..355a78a 100644
---- a/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c
-+++ b/arch/sh/boards/mach-kfr2r09/lcd_wqvga.c
-@@ -276,51 +276,3 @@ void kfr2r09_lcd_start(void *sohandle, struct sh_mobile_lcdc_sys_bus_ops *so)
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index 08d0c41..0965e98 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -37,6 +37,7 @@
+ 
+ struct sh_cmt_priv {
+ 	void __iomem *mapbase;
++	void __iomem *mapbase_str;
+ 	struct clk *clk;
+ 	unsigned long width; /* 16 or 32 bit version of hardware block */
+ 	unsigned long overflow_bit;
+@@ -79,6 +80,12 @@ struct sh_cmt_priv {
+  * CMCSR 0xffca0060 16-bit
+  * CMCNT 0xffca0064 32-bit
+  * CMCOR 0xffca0068 32-bit
++ *
++ * "32-bit counter and 32-bit control" as found on r8a73a4 and r8a7790:
++ * CMSTR 0xffca0500 32-bit
++ * CMCSR 0xffca0510 32-bit
++ * CMCNT 0xffca0514 32-bit
++ * CMCOR 0xffca0518 32-bit
+  */
+ 
+ static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
+@@ -109,9 +116,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
+ 
+ static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
  {
- 	write_memory_start(sohandle, so);
+-	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+-
+-	return p->read_control(p->mapbase - cfg->channel_offset, 0);
++	return p->read_control(p->mapbase_str, 0);
  }
--
--#define CTRL_CKSW       0x10
--#define CTRL_C10        0x20
--#define CTRL_CPSW       0x80
--#define MAIN_MLED4      0x40
--#define MAIN_MSW        0x80
--
--int kfr2r09_lcd_set_brightness(int brightness)
--{
--	struct i2c_adapter *a;
--	struct i2c_msg msg;
--	unsigned char buf[2];
--	int ret;
--
--	a = i2c_get_adapter(0);
--	if (!a)
--		return -ENODEV;
--
--	buf[0] = 0x00;
--	if (brightness)
--		buf[1] = CTRL_CPSW | CTRL_C10 | CTRL_CKSW;
--	else
--		buf[1] = 0;
--
--	msg.addr = 0x75;
--	msg.buf = buf;
--	msg.len = 2;
--	msg.flags = 0;
--	ret = i2c_transfer(a, &msg, 1);
--	if (ret != 1)
--		return -ENODEV;
--
--	buf[0] = 0x01;
--	if (brightness)
--		buf[1] = MAIN_MSW | MAIN_MLED4 | 0x0c;
--	else
--		buf[1] = 0;
--
--	msg.addr = 0x75;
--	msg.buf = buf;
--	msg.len = 2;
--	msg.flags = 0;
--	ret = i2c_transfer(a, &msg, 1);
--	if (ret != 1)
--		return -ENODEV;
--
--	return 0;
--}
-diff --git a/arch/sh/boards/mach-kfr2r09/setup.c b/arch/sh/boards/mach-kfr2r09/setup.c
-index ab502f12..1df4398 100644
---- a/arch/sh/boards/mach-kfr2r09/setup.c
-+++ b/arch/sh/boards/mach-kfr2r09/setup.c
-@@ -21,6 +21,7 @@
- #include <linux/input.h>
- #include <linux/input/sh_keysc.h>
- #include <linux/i2c.h>
-+#include <linux/platform_data/lv5207lp.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
- #include <linux/usb/r8a66597.h>
-@@ -159,11 +160,6 @@ static struct sh_mobile_lcdc_info kfr2r09_sh_lcdc_info = {
- 			.setup_sys = kfr2r09_lcd_setup,
- 			.start_transfer = kfr2r09_lcd_start,
- 		},
--		.bl_info = {
--			.name = "sh_mobile_lcdc_bl",
--			.max_brightness = 1,
--			.set_brightness = kfr2r09_lcd_set_brightness,
--		},
- 		.sys_bus_cfg = {
- 			.ldmt2r = 0x07010904,
- 			.ldmt3r = 0x14012914,
-@@ -195,6 +191,17 @@ static struct platform_device kfr2r09_sh_lcdc_device = {
- 	},
- };
  
-+static struct lv5207lp_platform_data kfr2r09_backlight_data = {
-+	.fbdev = &kfr2r09_sh_lcdc_device.dev,
-+	.def_value = 13,
-+	.max_value = 13,
-+};
-+
-+static struct i2c_board_info kfr2r09_backlight_board_info = {
-+	I2C_BOARD_INFO("lv5207lp", 0x75),
-+	.platform_data = &kfr2r09_backlight_data,
-+};
-+
- static struct r8a66597_platdata kfr2r09_usb0_gadget_data = {
- 	.on_chip = 1,
- };
-@@ -627,6 +634,8 @@ static int __init kfr2r09_devices_setup(void)
- 	gpio_request(GPIO_FN_SDHI0CMD, NULL);
- 	gpio_request(GPIO_FN_SDHI0CLK, NULL);
- 
-+	i2c_register_board_info(0, &kfr2r09_backlight_board_info, 1);
-+
- 	return platform_add_devices(kfr2r09_devices,
- 				    ARRAY_SIZE(kfr2r09_devices));
- }
-diff --git a/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h b/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h
-index c20c9e5..79f154e 100644
---- a/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h
-+++ b/arch/sh/include/mach-kfr2r09/mach/kfr2r09.h
-@@ -4,13 +4,11 @@
- #include <video/sh_mobile_lcdc.h>
- 
- #if defined(CONFIG_FB_SH_MOBILE_LCDC) || defined(CONFIG_FB_SH_MOBILE_LCDC_MODULE)
--int kfr2r09_lcd_set_brightness(int brightness);
- int kfr2r09_lcd_setup(void *sys_ops_handle,
- 		      struct sh_mobile_lcdc_sys_bus_ops *sys_ops);
- void kfr2r09_lcd_start(void *sys_ops_handle,
- 		       struct sh_mobile_lcdc_sys_bus_ops *sys_ops);
- #else
--static int kfr2r09_lcd_set_brightness(int brightness) {}
- static int kfr2r09_lcd_setup(void *sys_ops_handle,
- 				struct sh_mobile_lcdc_sys_bus_ops *sys_ops)
+ static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
+@@ -127,9 +132,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
+ static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
+ 				      unsigned long value)
  {
+-	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+-
+-	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
++	p->write_control(p->mapbase_str, 0, value);
+ }
+ 
+ static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
+@@ -676,7 +679,7 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
+ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ {
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+-	struct resource *res;
++	struct resource *res, *res2;
+ 	int irq, ret;
+ 	ret = -ENXIO;
+ 
+@@ -694,6 +697,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err0;
+ 	}
+ 
++	/* optional resource for the shared timer start/stop register */
++	res2 = platform_get_resource(p->pdev, IORESOURCE_MEM, 1);
++
+ 	irq = platform_get_irq(p->pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(&p->pdev->dev, "failed to get irq\n");
+@@ -707,6 +713,15 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err0;
+ 	}
+ 
++	/* map second resource for CMSTR */
++	p->mapbase_str = ioremap_nocache(res2 ? res2->start :
++					 res->start - cfg->channel_offset,
++					 res2 ? resource_size(res2) : 2);
++	if (p->mapbase_str == NULL) {
++		dev_err(&p->pdev->dev, "failed to remap I/O second memory\n");
++		goto err1;
++	}
++
+ 	/* request irq using setup_irq() (too early for request_irq()) */
+ 	p->irqaction.name = dev_name(&p->pdev->dev);
+ 	p->irqaction.handler = sh_cmt_interrupt;
+@@ -719,11 +734,17 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 	if (IS_ERR(p->clk)) {
+ 		dev_err(&p->pdev->dev, "cannot get clock\n");
+ 		ret = PTR_ERR(p->clk);
+-		goto err1;
++		goto err2;
+ 	}
+ 
+-	p->read_control = sh_cmt_read16;
+-	p->write_control = sh_cmt_write16;
++	if (res2 && (resource_size(res2) == 4)) {
++		/* assume both CMSTR and CMCSR to be 32-bit */
++		p->read_control = sh_cmt_read32;
++		p->write_control = sh_cmt_write32;
++	} else {
++		p->read_control = sh_cmt_read16;
++		p->write_control = sh_cmt_write16;
++	}
+ 
+ 	if (resource_size(res) == 6) {
+ 		p->width = 16;
+@@ -752,22 +773,23 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 			      cfg->clocksource_rating);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "registration failed\n");
+-		goto err2;
++		goto err3;
+ 	}
+ 	p->cs_enabled = false;
+ 
+ 	ret = setup_irq(irq, &p->irqaction);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+-		goto err2;
++		goto err3;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, p);
+ 
+ 	return 0;
+-err2:
++err3:
+ 	clk_put(p->clk);
+-
++err2:
++	iounmap(p->mapbase_str);
+ err1:
+ 	iounmap(p->mapbase);
+ err0:
 -- 
 1.7.10.4
