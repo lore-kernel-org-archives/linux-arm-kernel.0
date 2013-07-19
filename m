@@ -1,50 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 19 Jul 2013 15:17:39 +0400
-Subject: [PATCH 1/3] ARM: shmobile: use common platform header for HPB-DMAC
-In-Reply-To: <87txjrbe11.wl%kuninori.morimoto.gx@renesas.com>
-References: <201306300243.57180.sergei.shtylyov@cogentembedded.com>
- <201306300245.58486.sergei.shtylyov@cogentembedded.com>
- <CANqRtoTCaJfbECSpX7nMZoV8SPeQqs-xrJQ0-+-smA+bx3QG=w@mail.gmail.com>
- <51E865FA.9000706@cogentembedded.com>
- <87txjrbe11.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <51E92053.5080103@cogentembedded.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 19 Jul 2013 12:26:24 +0100
+Subject: alignment handler instruction endian-ness
+In-Reply-To: <20130719110947.GD24642@n2100.arm.linux.org.uk>
+References: <51E91BE5.8070809@codethink.co.uk>
+ <20130719110947.GD24642@n2100.arm.linux.org.uk>
+Message-ID: <51E92260.1060101@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 19/07/13 12:09, Russell King - ARM Linux wrote:
+> On Fri, Jul 19, 2013 at 11:58:45AM +0100, Ben Dooks wrote:
+>> I ran in to an issue with the alignment handler when running BE8 where
+>> it loads instructions and fails to swap.
+>>
+>> Is there a better way of swapping instructions for ARM when loading
+>> from arbitrary places? Have I missed any other places this could happen?
+>
+> Maybe we need a macro which deals with this automatically?
+>
+> 	arm_instr_to_cpu(x)
+> 	thumb_instr_to_cpu(x)
+>
+> These should probably make use of the swab*() macros when an endian swap
+> is needed.
+>
+>> The following patch is my first attempt at solving the problem for the
+>> alignment handler:
+>
+> I'd suggest checking this with sparse too - you have some type errors here.
 
-On 19-07-2013 4:16, Kuninori Morimoto wrote:
+Very probably, I needed this in a hurry and was after some input on how
+it could be improved.
 
->>>> From: Max Filippov <max.filippov@cogentembedded.com>
+The only issue I was thinking of for having those functions would be if
+the userspace was running BE32 and the kernel was LE. I don't think this
+is very likely, so it can probably be discounted.
 
->>>> Use previously empty <mach/dma.h> to declare HPB-DMA slave IDs.
+I could not find where the kernel's relocation code does this to see if
+it also needed changing.
 
->>>> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
->>>> [Sergei: changed the guard macro name, fixed comment, extended copyright.]
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->>>> ---
->>>>    arch/arm/mach-shmobile/include/mach/dma.h |   25 ++++++++++++++++++++++++-
->>>>    1 file changed, 24 insertions(+), 1 deletion(-)
-
->>> Thanks for your patch. Can you please explain the reason why you put
->>> this shared information under mach/?
-
->>      I'm afraid that's more a question to the original author, Phil Edworthy.
->> He put this stuff into <mach/hpb-dmae.h>.
-
-> Then, why you could send this patch instead of original author,
-
-    Ask Phil why didn't he upstream his stuff. We, unlike him, do have 
-obligation to upstream it.
-
-> even though you can't answer any question about it ?
-
-    I'm not the author of the patch, let me remind you, Max Filippov is.
-He was on vacations.
-
-> Best regards
-> ---
-> Kuninori Morimoto
-
-WBR, Sergei
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
