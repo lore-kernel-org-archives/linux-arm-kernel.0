@@ -1,106 +1,273 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 19 Jul 2013 11:12:11 +0100
-Subject: [PATCH] arm: choose debug/uncompress.h include when uncompress
- debug is disabled
-In-Reply-To: <alpine.DEB.2.02.1307191103520.8258@kaball.uk.xensource.com>
-References: <1373897706-15331-1-git-send-email-julien.grall@linaro.org>
- <alpine.DEB.2.02.1307171420350.8258@kaball.uk.xensource.com>
- <CAPnVf8yH7PBOSSC57qJv+pWmsinRUxGr81QUPH9GoOkKw2oo3Q@mail.gmail.com>
- <1374222736.26728.128.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1307191049070.8258@kaball.uk.xensource.com>
- <1374228043.13645.44.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1307191103520.8258@kaball.uk.xensource.com>
-Message-ID: <1374228731.13645.45.camel@kazak.uk.xensource.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 19 Jul 2013 12:23:22 +0200
+Subject: [PATCH v4] watchdog: Add MOXA ART watchdog driver
+In-Reply-To: <1374053091-5907-1-git-send-email-jonas.jensen@gmail.com>
+References: <1374053091-5907-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1374229402-20432-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-07-19 at 11:06 +0100, Stefano Stabellini wrote:
-> On Fri, 19 Jul 2013, Ian Campbell wrote:
-> > On Fri, 2013-07-19 at 10:52 +0100, Stefano Stabellini wrote:
-> > > On Fri, 19 Jul 2013, Ian Campbell wrote:
-> > > > On Thu, 2013-07-18 at 17:15 +0100, Julien Grall wrote:
-> > > > > On 17 July 2013 14:25, Stefano Stabellini
-> > > > > <stefano.stabellini@eu.citrix.com> wrote:
-> > > > > > On Mon, 15 Jul 2013, Julien Grall wrote:
-> > > > > >> Even if uncompress debug is disabled, some board will continue to print
-> > > > > >> information during uncompress step.
-> > > > > >
-> > > > > > Are you talking about DEBUG_UNCOMPRESS?
-> > > > > > Should I read the sentence as "even if DEBUG_UNCOMPRESS is not selected,
-> > > > > > some board will continue to print information during the uncompress step"?
-> > > > > 
-> > > > > Yes. On the arndale, uncompress log are directly output on UART-2.
-> > > > > This is annoying because Xen doesn't expose the UART to dom0.
-> > > > 
-> > > > This is because Xen wants/tries to use the UART as its own console,
-> > > > right?
-> > > > 
-> > > > There are at least two other options: Either Xen uses a different UART
-> > > > to that configured statically into the kernel image (depends on how many
-> > > > UARTs the platform exposes) or Xen uses no serial console at all.
-> > > > 
-> > > > Of course long term we just need to wait for the exynos stuff to get
-> > > > integrated into the multiplatform kernel.
-> > > > 
-> > > > Having no Xen serial console is not as bad as it seems for actual
-> > > > deployment, it is actually already the default on x86 (a serial console
-> > > > needs to be explicitly configured). The Xen console would still be
-> > > > available via the "xl dmesg" command and for debug environments people
-> > > > can just hack around the issue for now (until MP kernels arrive for the
-> > > > platform).
-> > > > 
-> > > > Perhaps a useful compromise would be for Xen to initially use the
-> > > > console but to hand it over to dom0 once it starts (similar to how we
-> > > > handle VGA where it is present), Xen could also steal it back on panic
-> > > > (since dom0 isn't going to be using it after that...).
-> > > 
-> > > I like this last option, it looks like the best compromise.
-> > > 
-> > > 
-> > > > Alternatively, since these early UART routines tend to be pretty simple
-> > > > polled affairs, we could also consider extending the existing vpl011
-> > > > code to have platform configurable addresses for the output and status
-> > > > registers and a configurable fixed value for the read of the status
-> > > > register. I'm not keen to have this code turn into a full "emulator" but
-> > > > so long as it stays within the remit given in vpl011.c:
-> > > >         /*
-> > > >          * This is not intended to be a full emulation of a PL011
-> > > >          * device. Rather it is intended to provide a sufficient veneer of one
-> > > >          * that early code (such as Linux's boot time decompressor) which
-> > > >          * hardcodes output directly to such a device are able to make progress.
-> > > >          *
-> > > >          * This device is not intended to be enumerable or exposed to the OS
-> > > >          * (e.g. via Device Tree).
-> > > >          */
-> > > > then I think I could live with it getting a bit more flexible about
-> > > > where the registers live in order to be able to handle more UART
-> > > > variants.
-> > >  
-> > > We could end up emulating way too many devices and not all the platforms
-> > > expect a pl011 uart.
-> > 
-> > My point was that all of these debug routines expect exactly two things:
-> >   * An output register where they can write a character
-> >   * A status register which when read indicates that a new byte can be 
-> >     sent
-> > 
-> > The existing pl011.c could be extended to provide this level of
-> > functionality for *any* UART, at least to the degree required by this
-> > code, almost trivially, by simply making the two addresses and the
-> > static status register value configurable.
-> > 
-> > The status register value is static for us because we have no FIFOs and
-> > just accumulate into a buffer to be sent to the real console, so it is
-> > always possible to send another byte.
-> > 
-> > ISTR some talk of doing something similar for the early-printk stuff via
-> > DT, might have imagined that though...
->  
-> That's interesting but what about the meaning of the various bits of the
-> status register? It's not going to be always the same for the various
-> uarts, we would need to take into account at least that.
+Add watchdog driver for MOXA ART SoCs.
 
-Yes, hence making the static value read from the status register
-configurable too.
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Ian.
+Notes:
+    v4 should fix remaining issues pointed out by Guenter.
+    
+    Changes since v3:
+    
+    1. remove unnecessary header includes:
+       linux/of.h
+       linux/of_address.h
+       linux/err.h
+       linux/init.h
+       linux/kernel.h,
+       linux/moduleparam.h
+       linux/types.h
+       asm/system_misc.h
+    2. move clock_frequency to moxart_wdt_dev
+    3. remove local pointer "void __iomem *wdt_base" use moxart_wdt->base instead
+    4. get clock_frequency from watchdog_get_drvdata
+    5. move max_timeout variable to moxart_wdt_probe
+    6. check for division by zero moxart_wdt->clock_frequency
+    7. if devm_kzalloc fails, return -ENOMEM instead of -EINVAL
+    
+    Applies to next-20130716
+
+ .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
+ drivers/watchdog/Kconfig                           |  10 ++
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/moxart_wdt.c                      | 166 +++++++++++++++++++++
+ 4 files changed, 192 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+ create mode 100644 drivers/watchdog/moxart_wdt.c
+
+diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+new file mode 100644
+index 0000000..5507f2b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+@@ -0,0 +1,15 @@
++MOXA ART Watchdog timer
++
++Required properties:
++
++- compatible : Should be "moxa,moxart-watchdog"
++- reg : Should contain registers location and length
++- clocks : Should contain phandle for the MOXA ART core clock "coreclk"
++
++Example:
++
++	watchdog: watchdog at 98500000 {
++		compatible = "moxa,moxart-watchdog";
++		reg = <0x98500000 0x10>;
++		clocks = <&coreclk>;
++	};
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 362085d..6883aab 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -382,6 +382,16 @@ config RETU_WATCHDOG
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called retu_wdt.
+ 
++config MOXART_WDT
++	tristate "MOXART watchdog"
++	depends on ARCH_MOXART
++	help
++	  Say Y here to include Watchdog timer support for the watchdog
++	  existing on the MOXA ART SoC series platforms.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called moxart_wdt.
++
+ # AVR32 Architecture
+ 
+ config AT32AP700X_WDT
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 2f26a0b..7cab53a 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+ obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+ obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
+ obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
++obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
+ 
+ # AVR32 Architecture
+ obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
+new file mode 100644
+index 0000000..9a59c3d
+--- /dev/null
++++ b/drivers/watchdog/moxart_wdt.c
+@@ -0,0 +1,166 @@
++/*
++ * MOXA ART SoCs watchdog driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/watchdog.h>
++
++#define REG_COUNT			0x4
++#define REG_MODE			0x8
++#define REG_ENABLE			0xC
++
++struct moxart_wdt_dev {
++	struct watchdog_device dev;
++	void __iomem *base;
++	unsigned int clock_frequency;
++};
++
++static int heartbeat;
++
++static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
++{
++	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
++
++	writel(0, moxart_wdt->base + REG_ENABLE);
++
++	return 0;
++}
++
++static int moxart_wdt_start(struct watchdog_device *wdt_dev)
++{
++	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
++
++	writel(moxart_wdt->clock_frequency * moxart_wdt->dev.timeout,
++	       moxart_wdt->base + REG_COUNT);
++	writel(0x5ab9, moxart_wdt->base + REG_MODE);
++	writel(0x03, moxart_wdt->base + REG_ENABLE);
++
++	return 0;
++}
++
++static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
++				  unsigned int timeout)
++{
++	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
++
++	dev_dbg(wdt_dev->dev, "%s: timeout=%u\n", __func__, timeout);
++
++	moxart_wdt->dev.timeout = timeout;
++
++	return 0;
++}
++
++static const struct watchdog_info moxart_wdt_info = {
++	.identity       = "moxart-wdt",
++	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
++			  WDIOF_MAGICCLOSE,
++};
++
++static const struct watchdog_ops moxart_wdt_ops = {
++	.owner          = THIS_MODULE,
++	.start          = moxart_wdt_start,
++	.stop           = moxart_wdt_stop,
++	.set_timeout    = moxart_wdt_set_timeout,
++};
++
++static int moxart_wdt_probe(struct platform_device *pdev)
++{
++	struct moxart_wdt_dev *moxart_wdt;
++	struct device *dev = &pdev->dev;
++	struct device_node *node = dev->of_node;
++	struct resource *res;
++	struct clk *clk;
++	int err;
++	unsigned int max_timeout;
++	bool nowayout = WATCHDOG_NOWAYOUT;
++
++	moxart_wdt = devm_kzalloc(&pdev->dev, sizeof(*moxart_wdt), GFP_KERNEL);
++	if (!moxart_wdt)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, moxart_wdt);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	moxart_wdt->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(moxart_wdt->base))
++		return PTR_ERR(moxart_wdt->base);
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk)) {
++		pr_err("%s: of_clk_get failed\n", __func__);
++		return PTR_ERR(clk);
++	}
++
++	moxart_wdt->clock_frequency = clk_get_rate(clk);
++	if (moxart_wdt->clock_frequency == 0) {
++		pr_err("%s: incorrect clock frequency\n", __func__);
++		return -EINVAL;
++	}
++
++	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
++
++	moxart_wdt->dev.info = &moxart_wdt_info;
++	moxart_wdt->dev.ops = &moxart_wdt_ops;
++	moxart_wdt->dev.timeout = max_timeout;
++	moxart_wdt->dev.min_timeout = 1;
++	moxart_wdt->dev.max_timeout = max_timeout;
++	moxart_wdt->dev.parent = &pdev->dev;
++
++	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, &pdev->dev);
++	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
++
++	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
++
++	err = watchdog_register_device(&moxart_wdt->dev);
++	if (unlikely(err))
++		return err;
++
++	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
++		moxart_wdt->dev.timeout, nowayout);
++
++	return 0;
++}
++
++static int moxart_wdt_remove(struct platform_device *pdev)
++{
++	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
++
++	moxart_wdt_stop(&moxart_wdt->dev);
++	watchdog_unregister_device(&moxart_wdt->dev);
++
++	return 0;
++}
++
++static const struct of_device_id moxart_watchdog_match[] = {
++	{ .compatible = "moxa,moxart-watchdog" },
++	{ },
++};
++
++static struct platform_driver moxart_wdt_driver = {
++	.probe      = moxart_wdt_probe,
++	.remove     = moxart_wdt_remove,
++	.driver     = {
++		.name		= "moxart-watchdog",
++		.owner		= THIS_MODULE,
++		.of_match_table	= moxart_watchdog_match,
++	},
++};
++module_platform_driver(moxart_wdt_driver);
++
++module_param(heartbeat, int, 0);
++MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
++
++MODULE_DESCRIPTION("MOXART watchdog driver");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+-- 
+1.8.2.1
