@@ -1,165 +1,97 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 19 Jul 2013 06:52:16 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10
-Message-ID: <alpine.DEB.2.02.1307190320560.15248@utopia.booyaka.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 19 Jul 2013 15:14:24 +0800
+Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
+In-Reply-To: <51E7E27B.9090605@linaro.org>
+References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
+ <51E439BC.9030608@wwwdotorg.org>
+ <1373973447.8538.80.camel@jlo-ubuntu-64.nvidia.com>
+ <51E5A438.10004@wwwdotorg.org>
+ <1374056130.10997.16.camel@jlo-ubuntu-64.nvidia.com>
+ <51E6FF0B.5000708@wwwdotorg.org>
+ <1374145726.5610.73.camel@jlo-ubuntu-64.nvidia.com>
+ <51E7E27B.9090605@linaro.org>
+Message-ID: <1374218064.24607.1.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2013-07-18 at 20:41 +0800, Daniel Lezcano wrote:
+> On 07/18/2013 01:08 PM, Joseph Lo wrote:
+> > On Thu, 2013-07-18 at 04:31 +0800, Stephen Warren wrote:
+> >> On 07/17/2013 04:15 AM, Joseph Lo wrote:
+> >>> On Wed, 2013-07-17 at 03:51 +0800, Stephen Warren wrote:
+> >>>> On 07/16/2013 05:17 AM, Joseph Lo wrote:
+> >>>>> On Tue, 2013-07-16 at 02:04 +0800, Stephen Warren wrote:
+> >>>>>> On 06/25/2013 03:23 AM, Joseph Lo wrote:
+> >>>>>>> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
+> >>>>>>> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
+> >>>>>>> this state.
+> >> ... [ discussion of issues with Joesph's patches applied]
+> >>>
+> >>> OK. I did more stress tests last night and today. I found it cause by
+> >>> the patch "ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag" and
+> >>> only impact the Tegra20 platform. The hot plug regression seems due to
+> >>> this patch. After dropping this patch on top of v3.11-rc1, the Tegra20
+> >>> can back to normal.
+> >>>
+> >>> And the hop plug and suspend stress test can pass on Tegra30/114 too.
+> >>>
+> >>> Can the other two patch series for Tegra114 to support CPU idle power
+> >>> down mode and system suspend still moving forward, not be blocked by
+> >>> this patch?
+> >>>
+> >>> Looks the CPUIDLE_FLAG_TIMER_STOP flag still cause some other issue for
+> >>> hot plug on Tegra20, I will continue to check this. You can just drop
+> >>> this patch.
+> >>
+> >> OK, if I drop that patch, then everything on Tegra20 and Tegra30 seems
+> >> fine again.
+> >>
+> >> However, I've found some new and exciting issue on Tegra114!
+> >>
+> >> With unmodified v3.11-rc1, I can do the following without issue:
+> >>
+> >> * Unplug/replug CPUs, so that I had all combinations of CPU 1, 2, 3
+> >> plugged/unpplugged (with CPU 0 always plugged).
+> >>
+> >> * Unplug/replug CPUs, so that I had all combinations of CPU 0, 1, 2, 3
+> >> plugged/unpplugged (with the obvious exception of never having all CPUs
+> >> unplugged).
+> >>
+> >> However, if I try this with your Tegra114 cpuidle and suspend patches
+> >> applied, I see the following issues:
+> >>
+> >> 1) If I boot, unplug CPU 0, then replug CPU 0, the system immediately
+> >> hard-hangs.
+> >>
+> > Sorry, I didn't apply the hotplug stress test on CPU0 too much. Because
+> > all of our use cases and stress tests are focused on secondary CPUs
+> > only.
+> >
+> > After doing some tests, here is my summary. This issue happens after we
+> > support CPU idle power-down mode and relates to PMC or flow controller I
+> > believe.
+> >
+> > i) on top of v3.11-rc1 (only support WFI in CPU idle)
+> > When hot unplug CPU0, the PMC can power gate and put it into reset
+> > state. This is what I expect and also true on all the other secondary
+> > CPUs. The flow controller can maintain the CPU power state machine as
+> > what we want.
+> >
+> > ii) on top of v3.11-rc1 + CPU idle power down mode support
+> > a) I saw most of the time the CPU0,1,2,3 were in power down and reset
+> > status. That means the idle power down mode works fine.
+> >
+> > b) Testing with the CPU hotplug stress test with the secondary CPUs (not
+> > include CPU0), the result is good too.
+> >
+> > c) Testing hot plug on CPU0 with CPUIDLE_FLAG_TIMER_STOP apply or not
+> > apply (Note 1), the result shows not good to me. The CPU0 have already
+> > gone into WFI and the flow controller is set as WAITFOREVENT mode. But
+> > the PMC always can't power gate CPU0 and sometimes can put it into
+> > reset, but sometimes can't. That's why you can see it hanging after
+> > unplug CPU0 sometimes.
+> 
+> Are sure coupled idle state support hotplug and especially the cpu0
+> hotplug ?
 
-Here are some basic OMAP test results for Linux v3.10.
-Logs and other details at:
-
-    http://www.pwsan.com/omap/testlogs/test_v3.10/20130717134228/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass (16/16): am33xx_only, n800_multi_omap2xxx, n800_only_a,
-                  omap1_defconfig, omap1_defconfig_1510innovator_only, 
-                  omap1_defconfig_5912osk_only, omap2plus_defconfig, 
-                  omap2plus_defconfig_2430sdp_only
-                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm, 
-                  omap2plus_defconfig_omap2_4_only, 
-                  omap2plus_defconfig_omap3_4_only, 
-                  rmk_omap3430_ldp_allnoconfig, 
-                  rmk_omap3430_ldp_oldconfig, 
-                  rmk_omap4430_sdp_allnoconfig, 
-                  rmk_omap4430_sdp_oldconfig
-
-Build: zImage:
-    Pass ( 1/ 1): omap2plus_defconfig
-
-Boot to userspace:
-    FAIL ( 1/12): 37xxevm
-    Pass (11/12): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-                  3730beaglexm, 4430es2panda, 4460pandaes, 5912osk,
-                  am335xbone, am335xbonelt, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 6): 2430sdp, 37xxevm, 4430es2panda
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 3530es3beagle
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 3530es3beagle
-
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-* 37xx EVM: boot fails
-  - as of v3.10-rc1
-  - Fixed by http://marc.info/?l=linux-arm-kernel&m=137112093431021&w=2
-  
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-  - Longstanding bug
-  - Not currently part of the automated test suite
-
-Boot warnings:
-
-* 2420N800, 2430sdp: failed to get counter_32k resource
-  - "omap2_sync32k_clocksource_init: failed to get counter_32k resource"
-  - Cause unknown
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-* 3730 Beagle XM, 3517EVM, CM-T3517: uart4_rx.uart4_rx mux failure
-  - Cause unknown
-  - May be related to the OMAP serial driver and/or DT mux data
-  - http://marc.info/?l=linux-arm-kernel&m=137121357528854&w=2
-
-PM tests:
-
-* 2430sdp: power domains not entering retention
-  - Cause unknown
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock-gate ("debug ignore_loglevel")
-  - Cause unknown
-  - Not yet part of the automated test suite
-  - Re-tested at v3.7; still failing:
-    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
-
-* 4430es2panda: pwrdm state mismatch on CAM, DSS
-
-* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
-  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
-    per discussion with Tero Kristo
-  - Likely dependent on the bootloader version
-    - fails with 2012.07-00136-g755de79
-  - http://marc.info/?l=linux-arm-kernel&m=136432340618226&w=2
-
-* 4430es2panda: MPU, ABE didn't enter target state
-  - New for v3.10-rc
-
-* 4460pandaes: pwrdm state mismatch on DSS, ABE, IVAHD, TESLA
-
-* 4460pandaes: chip not entering retention in dynamic idle
-  - Presumably 4430es2panda also fails this
-  - Suspend-to-RAM enters full chip retention
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter and Santosh Shilimkar report this does not appear with
-    the same X-loader/bootloader on his 4430ES2.3 Panda, so could be
-    ES-level dependent
-
-
-Failing tests: reported by others 
----------------------------------
-
-- RTC wakeup from suspend broken on 3730beaglexm
-  - as of v3.10-rc1
-  - discussion here: http://marc.info/?l=linux-omap&m=136915841625434&w=2
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.10-rc7 
-(9e895ace5d82df8929b16f58e9f515f6d54ab82d)):
-   text     data      bss    total  kernel
-   +103       +8        0     +111  am33xx_only
-    +12        0        0      +12  n800_multi_omap2xxx
-    +44        0        0      +44  n800_only_a
-    +51      +32        0      +83  omap1_defconfig
-    +51        0        0      +51  omap1_defconfig_1510innovator_only
-    +51        0        0      +51  omap1_defconfig_5912osk_only
-   +227      +80        0     +307  omap2plus_defconfig
-   -129       +8        0     -121  omap2plus_defconfig_2430sdp_only
-   +227      +16        0     +243  omap2plus_defconfig_cpupm
-   +163      -16        0     +147  omap2plus_defconfig_no_pm
-   -157      +80        0      -77  omap2plus_defconfig_omap2_4_only
-   +227      +48        0     +275  omap2plus_defconfig_omap3_4_only
-    +24        0      -24        0  rmk_omap3430_ldp_allnoconfig
-    -45      +16        0      -29  rmk_omap3430_ldp_oldconfig
-    +24        0      -24        0  rmk_omap4430_sdp_allnoconfig
-   +611      +72        0     +683  rmk_omap4430_sdp_oldconfig
+Tegra114 didn't use coupled idle framework.
