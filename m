@@ -1,44 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 19 Jul 2013 09:24:35 +0200
-Subject: [GIT PULL] Remove ARM local timer API
-In-Reply-To: <51E71202.5060207@codeaurora.org>
-References: <20130625200211.GA11625@codeaurora.org>
- <20130628000853.GB11547@quad.lixom.net> <20130708153528.GB830@codeaurora.org>
- <51E71202.5060207@codeaurora.org>
-Message-ID: <40771222-cc0f-4826-b14f-8dcdb4abb673@email.android.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Jul 2013 00:29:27 -0700
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <51E8401E.8040705@wwwdotorg.org>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+ <51E70953.1000601@wwwdotorg.org>
+ <20130718072034.GO7656@atomide.com>
+ <51E8401E.8040705@wwwdotorg.org>
+Message-ID: <20130719072927.GY7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Stephen Warren <swarren@wwwdotorg.org> [130718 12:27]:
+> On 07/18/2013 01:25 AM, Tony Lindgren wrote:
+> > * Stephen Warren <swarren@wwwdotorg.org> [130717 14:21]:
+> >> On 07/16/2013 03:05 AM, Tony Lindgren wrote:
+> >>> To toggle dynamic states, let's add the optional active state in
+> >>> addition to the static default state. Then if the optional active
+> >>> state is defined, we can require that idle and sleep states cover
+> >>> the same pingroups as the active state.
+> >>>
+> >>> Then let's add pinctrl_check_dynamic() and pinctrl_select_dynamic()
+> >>> to use instead of pinctrl_select() to avoid breaking existing users.
+> >>>
+> >>> With pinctrl_check_dynamic() we can check that idle and sleep states
+> >>> match the active state for pingroups during init, and don't need to
+> >>> do it during runtime.
+> >>>
+> >>> Then with the states pre-validated, pinctrl_select_dynamic() can
+> >>> just toggle between the dynamic states without extra checks.
+> >>>
+> >>> Note that pinctr_select_state() still has valid use cases, such as
+> >>> changing states when the pins can be shared between two drivers
+> >>> and don't necessarily cover the same pingroups. For dynamic runtime
+> >>> toggling of pin states, we should eventually always use just
+> >>> pinctrl_select_dynamic().
+> 
+> >>> @@ -1241,7 +1371,13 @@ static int pinctrl_pm_select_state(struct device *dev, struct pinctrl_state *sta
+> >>>  		return 0;
+> >>>  	if (IS_ERR(state))
+> >>>  		return 0; /* No such state */
+> >>> -	ret = pinctrl_select_state(pins->p, state);
+> >>> +
+> >>> +	/* Configured for proper dynamic muxing? */
+> >>> +	if (!IS_ERR(dev->pins->active_state))
+> >>> +		ret = pinctrl_select_dynamic(pins->p, state);
+> >>> +	else
+> >>> +		ret = pinctrl_select_state(pins->p, state);
+> >>
+> >> Hmmm. I'm not quite sure this is right... Surely this function should
+> >> just do nothing if the dynamic states aren't defined? The system should
+> >> just, and only, be in the "default" state and never do anything else.
+> > 
+> > This keeps the existing behaviour. We should be able to drop the
+> > call to pinctrl_select_state() here after the existing use in
+> > drivers has been fixed.
+> 
+> How many DT-based systems already have multiple of default/idle/sleep
+> states defined in DT? Right now, since the kernel code uses
+> pinctrl_select_state() to switch between those, the state definitions
+> need to define /all/ pins used by those states, not just the dynamic
+> ones. However, with this series in place, the default state should only
+> include the static pins, and the active/idle/sleep states should only
+> include the dynamic pins. That's a change to the DT bindings, since it
+> changes how the DT must be written, and causes older DTs to be
+> incompatible with newer kernels and vice-versa.
 
+Well we can keep the current behaviour with pinctrl_select_state() around
+as long as needed. For the legacy cases, there is no active state defined
+and we fall back to pinctrl_select_state().
+ 
+> So, do we just ignore this DT ABI change again, or insist on doing it in
+> some compatible way? DT ABI-ness is a PITA:-(
 
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+I'd vote for keeping the existing behaviour with pinctrl_select_state()
+when no active state is defined.
 
->On 07/08/13 08:35, Stephen Boyd wrote:
->> On 06/27, Olof Johansson wrote:
->>> On Tue, Jun 25, 2013 at 01:02:12PM -0700, Stephen Boyd wrote:
->>>> Olof/Arnd,
->>>>
->>>> These patches remove the ARM local timer API. The ARM architected
->>>> timers have already moved away from this API so this series
->>>> migrates the rest of the users allowing us to remove the API
->>>> entirely. Thomas has been kind enough to take the first two
->>>> patches into timers/core in the tip tree (thanks Thomas!) so I've
->>>> merged that into v3.10-rc1 and then applied the rest of the
->>>> patches on top. Let me know if this is acceptable.
->>> We need guarantees from Thomas that the branch is stable and will
->never be
->>> rebased before it hit Linus tree, or we'll be in a world of pain for
->>> dependencies like these.
->>>
->>> Thomas, is this branch stable or do you anticipate a rebase?
->>>
->> This branch has merged into Linus' tree. Can this go through the
->> arm-soc tree now?
->>
->
->The merge window is over now. Can this be merged for 3.12?
+Regards,
 
-Yes, I am still traveling and haven't done any merges for 3.12 yet. This is first in the queue, I should get to it over the weekend or early next week.
-
-
--Olof
+Tony
