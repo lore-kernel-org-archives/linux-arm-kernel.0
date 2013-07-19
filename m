@@ -1,47 +1,151 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 19 Jul 2013 03:36:47 +0200
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
- with ARM CPU
-In-Reply-To: <51E56839.8010205@hauke-m.de>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716172023.64337690@skate> <51E56839.8010205@hauke-m.de>
-Message-ID: <20130719013646.GA16615@glitch>
+From: anup@brainfault.org (Anup Patel)
+Date: Fri, 19 Jul 2013 07:19:59 +0530
+Subject: [PATCH V3] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
+ host
+In-Reply-To: <20130718160605.GB18520@e106331-lin.cambridge.arm.com>
+References: <1374048718-9455-1-git-send-email-anup.patel@linaro.org>
+ <20130718160605.GB18520@e106331-lin.cambridge.arm.com>
+Message-ID: <CAAhSdy25vrO4ep_atQaS6p3LN1xzYfSBry-gjjbQT7qws0Ddsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 05:35:21PM +0200, Hauke Mehrtens wrote:
-> On 07/16/2013 05:20 PM, Thomas Petazzoni wrote:
-> > 
-> >> diff --git a/arch/arm/mach-bcm53xx/Kconfig b/arch/arm/mach-bcm53xx/Kconfig
-> >> new file mode 100644
-> >> index 0000000..1e16e87
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-bcm53xx/Kconfig
-> >> @@ -0,0 +1,10 @@
-> >> +config ARCH_BCM53XX
-> >> +	bool "Broadcom BCM47XX / BCM53XX ARM SoC"
-> > 
-> > So the directory is named mach-bcm53xx, but you also handle BCM47xx
-> > SoCs. This doesn't sound really easy to follow.
-
-At the time of the BCM281XX merge we considered that such directories would
-mostly contain board files only, being these new entries DT based. Hence
-the choice of mach-bcm to collect all of them.
-
-I think you should then put this stuff there.
-
-> Yes the BCM53XX and BCM47XX SoCs are technically from the same line. I
-> do not know why there are two different names, probably marketing.
+On Thu, Jul 18, 2013 at 9:36 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Jul 17, 2013 at 09:11:58AM +0100, Anup Patel wrote:
+>> This patch allows us to have X-Gene guest VCPU when using KVM arm64
+>> on APM X-Gene host.
+>>
+>> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
+>> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
+>> when running on X-Gene host with Potenza core.
+>>
+>> V3:
+>>  - Reduce multiple "return -EINVAL" in kvm_target_cpu()
+>>
+>> V2:
+>>  - Renamed KVM_ARM_TARGET_XGENE_V8 to KVM_ARM_TARGET_XGENE_POTENZA
+>>
+>> V1:
+>>  - Initial patch with target named as KVM_ARM_TARGET_XGENE_V8
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> ---
+>>  arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
+>>  arch/arm64/kvm/guest.c               |   36 ++++++++++++++++++++++------------
+>>  arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
+>>  3 files changed, 29 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index 5031f42..d9f026b 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -55,8 +55,9 @@ struct kvm_regs {
+>>  #define KVM_ARM_TARGET_AEM_V8                0
+>>  #define KVM_ARM_TARGET_FOUNDATION_V8 1
+>>  #define KVM_ARM_TARGET_CORTEX_A57    2
+>> +#define KVM_ARM_TARGET_XGENE_POTENZA 3
+>>
+>> -#define KVM_ARM_NUM_TARGETS          3
+>> +#define KVM_ARM_NUM_TARGETS          4
+>>
+>>  /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+>>  #define KVM_ARM_DEVICE_TYPE_SHIFT    0
+>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+>> index 2c3ff67..143d179 100644
+>> --- a/arch/arm64/kvm/guest.c
+>> +++ b/arch/arm64/kvm/guest.c
+>> @@ -207,20 +207,32 @@ int __attribute_const__ kvm_target_cpu(void)
+>>       unsigned long implementor = read_cpuid_implementor();
+>>       unsigned long part_number = read_cpuid_part_number();
+>>
+>> -     if (implementor != ARM_CPU_IMP_ARM)
+>> -             return -EINVAL;
+>> -
+>> -     switch (part_number) {
+>> -     case ARM_CPU_PART_AEM_V8:
+>> -             return KVM_ARM_TARGET_AEM_V8;
+>> -     case ARM_CPU_PART_FOUNDATION:
+>> -             return KVM_ARM_TARGET_FOUNDATION_V8;
+>> -     case ARM_CPU_PART_CORTEX_A57:
+>> -             /* Currently handled by the generic backend */
+>> -             return KVM_ARM_TARGET_CORTEX_A57;
+>> +     switch (implementor) {
+>> +     case ARM_CPU_IMP_ARM:
+>> +             switch (part_number) {
+>> +             case ARM_CPU_PART_AEM_V8:
+>> +                     return KVM_ARM_TARGET_AEM_V8;
+>> +             case ARM_CPU_PART_FOUNDATION:
+>> +                     return KVM_ARM_TARGET_FOUNDATION_V8;
+>> +             case ARM_CPU_PART_CORTEX_A57:
+>> +                     return KVM_ARM_TARGET_CORTEX_A57;
+>> +             default:
+>> +                     break;
 >
-> Earlier versions of these SoC lines (also BCM47XX and BCM53XX) used a
-> MIPS core and they are supported by arch/mips/bcm47xx/. I use BCM53XX to
-> not conflict with the MIPS part now. I know this could still cause
-> problems and people will get confused, but I do not know a better name.
+> This can go, the break outside the switch will handle it.
 
-I'll throw also BCM476x (bcm4760 and bcm4761) on the table. These are ARM11,
-single-core SoCs.
+Ok, I will update this accordingly.
 
-Can we agree on a nice naming so that we actually clarify this silliness?
+>
+>> +             }
+>> +             break;
+>> +     case ARM_CPU_IMP_APM:
+>> +             switch (part_number) {
+>> +             case APM_CPU_PART_POTENZA:
+>> +                     return KVM_ARM_TARGET_XGENE_POTENZA;
+>> +             default:
+>> +                     break;
+>
+> This one too.
+
+Ok.
+
+>
+>> +             }
+>> +             break;
+>>       default:
+>> -             return -EINVAL;
+>> +             break;
+>
+> Given we'll fall out of the switch for an unknown implementor, we don't
+> need the final break.
+>
+> Thanks,
+> Mark.
+>
+>>       }
+>> +
+>> +     return -EINVAL;
+>>  }
+>>
+>>  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+>> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+>> index 4268ab9..8fe6f76 100644
+>> --- a/arch/arm64/kvm/sys_regs_generic_v8.c
+>> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+>> @@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
+>>                                         &genericv8_target_table);
+>>       kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+>>                                         &genericv8_target_table);
+>> +     kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
+>> +                                       &genericv8_target_table);
+>> +
+>>       return 0;
+>>  }
+>>  late_initcall(sys_reg_genericv8_init);
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 Regards,
-Domenico
+Anup
