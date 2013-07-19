@@ -1,190 +1,172 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 19 Jul 2013 12:46:05 +0200
-Subject: [PATCH v2 16/24] net: can: mscan: make mpc512x code use common
- clock
-In-Reply-To: <20130719094143.GQ7080@book.gsilab.sittig.org>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374178858-8683-2-git-send-email-gsi@denx.de>
- <51E8EC17.9060703@pengutronix.de>
- <20130719094143.GQ7080@book.gsilab.sittig.org>
-Message-ID: <51E918ED.80002@pengutronix.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 19 Jul 2013 16:18:11 +0530
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <CAGo_u6rO0SjHzXhMBPeSmWykqqpf9phLEPBEaeFtS9bkHoq8qg@mail.gmail.com>
+References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
+ <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
+ <51E83A4F.5080904@ti.com> <51E87C98.5030001@ti.com>
+ <CAGo_u6rO0SjHzXhMBPeSmWykqqpf9phLEPBEaeFtS9bkHoq8qg@mail.gmail.com>
+Message-ID: <51E9196B.3070900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2013 11:41 AM, Gerhard Sittig wrote:
-> On Fri, Jul 19, 2013 at 09:34 +0200, Marc Kleine-Budde wrote:
->>
->> On 07/18/2013 10:20 PM, Gerhard Sittig wrote:
->>> extend the mscan(4) driver with alternative support for the COMMON_CLK
->>> approach which is an option in the MPC512x platform, keep the existing
->>> clock support implementation in place since the driver is shared with
->>> other MPC5xxx SoCs which don't have common clock support
+Hi,
+
+On Friday 19 July 2013 05:43 AM, Nishanth Menon wrote:
+> On Thu, Jul 18, 2013 at 6:39 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Thursday 18 July 2013 02:56 PM, Nishanth Menon wrote:
+>>> On 07/18/2013 11:43 AM, Sricharan R wrote:
+>>>> Some socs have a large number of interrupts/dma requests to service
+>>>> the needs of its many peripherals and subsystems. All of the
+>>>> requests lines from the subsystems are not needed at the same
+>>>> time, so they have to be muxed to the controllers appropriately.
+>>>> In such places a interrupt/dma controllers are preceded by an
+>>>> IRQ/DMA CROSSBAR that provides flexibility in muxing the device
+>>>> requests to the controller inputs.
+>>>>
+>>>> The Peripheral irq/dma requests are connected to one crossbar's input
+>>>> and the output of the crossbar is connected to controller's input
+>>>> line. On POR, there are some mappings which are done by default.
+>>>> Those peripherals which do not have a mapping on POR, should be configured
+>>>> to route its requests using the crossbar.
+>>>>
+>>>> The drivers identifies every controller's crossbar as individual devices.
+>>>> The mappings can be specified from the DT crossbar nodes and those gets mapped
+>>>> during the crossbar device's probe. The mappings can also be specified by adding
+>>>> the crossbar lines to the peripheral device nodes and map it with
+>>>> crossbar_map/unmap apis.
+>>>>
+>>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>>>> ---
+>>>>   .../devicetree/bindings/arm/omap/crossbar.txt      |   24 ++
+>>>>   drivers/misc/Kconfig                               |    8 +
+>>>>   drivers/misc/Makefile                              |    1 +
+>>>>   drivers/misc/crossbar.c                            |  258 ++++++++++++++++++++
+>>>>   include/linux/crossbar.h                           |   71 ++++++
+>>>>   5 files changed, 362 insertions(+)
+>>>>   create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>>>   create mode 100644 drivers/misc/crossbar.c
+>>>>   create mode 100644 include/linux/crossbar.h
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>>> new file mode 100644
+>>>> index 0000000..02a8a28
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>>> @@ -0,0 +1,24 @@
+>>>> +* TI - IRQ/DMA Crossbar
+>>>> +
+>>>> +This version is an implementation of the Crossbar IRQ/DMA IP
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible : Should be "ti,dra-crossbar"
+>>>> +- crossbar-name: Name of the controller to which crossbar output is routed
+>>>> +- reg:    Contains crossbar register address range
+>>>> +- reg-width: Represents the width of the individual registers
+>>>> +- crossbar-lines:  Default mappings.Should contain the crossbar-name
+>>>> +           device name, int/dma request number, crossbar number,
+>>>> +           register offset in the same order.
+>>>> +
+>>>> +Examples:
+>>>> +        crossbar_mpu: mpuirq at 4a002a48 {
+>>>> +            compatible = "crossbar";
+>>>> +            crossbar-name = "mpu-irq";
+>>>> +            reg = <0x4a002a48 0x0130>;
+>>>> +            reg-width = <16>;
+>>>> +            crossbar-lines = "mpu-irq", "rtc-ss-alarm", <0x9f 0xd9 0x12c>,
+>>>> +                     "mpu-irq", "mcasp3-arevt", <0x9e 0x96 0x12a>,
+>>>> +                     "mpu-irq", "mcasp3-axevt", <0x9d 0x97 0x128>;
+>>>> +        };
+>>> I carry forward my TI internal objection to this approach:
 >>>
->>> one byproduct of this change is that the CAN driver no longer needs to
->>> access the SoC's clock control registers, which shall be the domain of
->>> the platform's clock driver
+>>> NAK.
 >>>
->>> Signed-off-by: Gerhard Sittig <gsi@denx.de>
->>> ---
->>>  drivers/net/can/mscan/mpc5xxx_can.c |  139 +++++++++++++++++++++++++++++++++++
->>>  1 file changed, 139 insertions(+)
+>>> DRA7 uses a cross bar to map a line to GIC interrupt. Flow of interrupt is as follows:
+>>> hardware IP block -interrupt line-> IRQ Cross bar -> GIC IRQ line --> MPU IRQ.
 >>>
->>> diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
->>> index bc422ba..dd26ab6 100644
->>> --- a/drivers/net/can/mscan/mpc5xxx_can.c
->>> +++ b/drivers/net/can/mscan/mpc5xxx_can.c
->>> @@ -108,6 +108,143 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
->>>  #endif /* CONFIG_PPC_MPC52xx */
->>>  
->>>  #ifdef CONFIG_PPC_MPC512x
->>> +
->>> +#if IS_ENABLED(CONFIG_COMMON_CLK)
->>> +
->>> +static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
->>> +				 const char *clock_source, int *mscan_clksrc)
->>> +{
->>> +	struct device_node *np;
->>> +	u32 clockdiv;
->>> +	enum {
->>> +		CLK_FROM_AUTO,
->>> +		CLK_FROM_IPS,
->>> +		CLK_FROM_SYS,
->>> +		CLK_FROM_REF,
->>> +	} clk_from;
->>> +	struct clk *clk_in, *clk_can;
->>> +	unsigned long freq_calc;
->>> +
->>> +	/* the caller passed in the clock source spec that was read from
->>> +	 * the device tree, get the optional clock divider as well
->>> +	 */
->>> +	np = ofdev->dev.of_node;
->>> +	clockdiv = 1;
->>> +	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
->>> +	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
->>> +		clock_source ? clock_source : "<NULL>", clockdiv);
->>> +
->>> +	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
->>> +	 * get set, and the 'ips' clock is the input to the MSCAN
->>> +	 * component
->>> +	 *
->>> +	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
->>> +	 * bit needs to get cleared, an optional clock-divider may have
->>> +	 * been specified (the default value is 1), the appropriate
->>> +	 * MSCAN related MCLK is the input to the MSCAN component
->>> +	 *
->>> +	 * in the absence of a clock-source spec, first an optimal clock
->>> +	 * gets determined based on the 'sys' clock, if that fails the
->>> +	 * 'ref' clock is used
->>> +	 */
->>> +	clk_from = CLK_FROM_AUTO;
->>> +	if (clock_source) {
->>> +		/* interpret the device tree's spec for the clock source */
->>> +		if (!strcmp(clock_source, "ip"))
->>> +			clk_from = CLK_FROM_IPS;
->>> +		else if (!strcmp(clock_source, "sys"))
->>> +			clk_from = CLK_FROM_SYS;
->>> +		else if (!strcmp(clock_source, "ref"))
->>> +			clk_from = CLK_FROM_REF;
->>> +		else
->>> +			goto err_invalid;
->>> +		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
->>> +	}
->>> +	if (clk_from == CLK_FROM_AUTO) {
->>> +		/* no spec so far, try the 'sys' clock; round to the
->>> +		 * next MHz and see if we can get a multiple of 16MHz
->>> +		 */
->>> +		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
->>> +		clk_in = clk_get(&ofdev->dev, "sys");
->>> +		if (IS_ERR(clk_in))
->>> +			goto err_notavail;
->>> +		freq_calc = clk_get_rate(clk_in);
->>> +		freq_calc +=  499999;
->>> +		freq_calc /= 1000000;
->>> +		freq_calc *= 1000000;
->>> +		if ((freq_calc % 16000000) == 0) {
->>> +			clk_from = CLK_FROM_SYS;
->>> +			clockdiv = freq_calc / 16000000;
->>> +			dev_dbg(&ofdev->dev,
->>> +				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
->>> +				freq_calc, clockdiv, freq_calc / clockdiv);
->>> +		}
->>> +	}
->>> +	if (clk_from == CLK_FROM_AUTO) {
->>> +		/* no spec so far, use the 'ref' clock */
->>> +		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
->>> +		clk_in = clk_get(&ofdev->dev, "ref");
->>> +		if (IS_ERR(clk_in))
->>> +			goto err_notavail;
->>> +		clk_from = CLK_FROM_REF;
->>> +		freq_calc = clk_get_rate(clk_in);
->>> +		dev_dbg(&ofdev->dev,
->>> +			"clk fit, ref[%lu] (no div) freq[%lu]\n",
->>> +			freq_calc, freq_calc);
->>> +	}
->>> +
->>> +	/* select IPS or MCLK as the MSCAN input (returned to the caller),
->>> +	 * setup the MCLK mux source and rate if applicable, apply the
->>> +	 * optionally specified or derived above divider, and determine
->>> +	 * the actual resulting clock rate to return to the caller
->>> +	 */
->>> +	switch (clk_from) {
->>> +	case CLK_FROM_IPS:
->>> +		clk_can = clk_get(&ofdev->dev, "ips");
->>> +		if (IS_ERR(clk_can))
->>> +			goto err_notavail;
->>> +		clk_prepare_enable(clk_can);
->>
->> Where is the corresponding clk_disable_unprepare()?a
-> 
-> It's missing, as I could not find the counterpart of the
-> .get_clock() callback where the get and prepare/enable was added
-> to.  And it appears that neither are enable errors checked for.
-> This patch clearly needs an update as well, but already should be
-> the last part of the series in a currently inacceptable state.
-> 
-> This .get_clock() routine is supposed to determine the clock
-> source, setup the desired rate and return the actual rate.  The
-> callback's API is rather limited in that it does communicate
-> clock rate values, but cannot access a location to store handles
-> to.
+>>>
+>>> What we have done today for DRA is to provide IRQ numbers as direct maps from hardware IP block to GIC based on default IRQ cross bar mapping.
+>>>
+>>> Lets see what happens as a result of this:
+>>>
+>>> https://patchwork.kernel.org/patch/2825148/ (introducing DTS for DRA7)
+>>> uart1 to uart6 is defined. while in fact 10 uarts exist on IP block.
+>>> uart1: serial at 4806a000 {
+>>> <snip>
+>>> +            interrupts = <0 72 0x4>;
+>>> Assumes that GIC interrupt by default mapping used.
+>>>
+>>> Now, think of a product that wants to use UART10 instead of UART1, SoC design allows you do that by doing a remapping of GIC interrupt to UART10 - which is awesome.
+>>>
+>>> Option 1: u-boot/bootloader
+>>> mw.l IRQ_CROSSBAR_address with value to map uart10 to GIC IRQ for UART1,
+>>>
+>>> Option 2: in kernel do a raw_writel version of option 1.
+>>> This patch does option 1 in kernel in a "fancy way" - why the heck would I want to do that when u-boot allows me to do the same thing in uEnv.txt
+>>>
+>>> Option 3: map GIC interrupt to IRQ CROSS bar dynamically.
+>>> a) Allows us to define every single IP available on DRA7 SoC.
+>>> b) GIC allocation happens dynamically
+>>> c) allow products use IPs as needed.
+>>>
+>>> Sorry, Conceptually option 3 is the right approach in my view.
+>>> instead of doing
+>>> uart1: serial at 4806a000 {
+>>> <snip>
+>>> +            interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+>>>
+>>> we should be able to do the following:
+>>> uart1: serial at 4806a000 {
+>>> <snip>
+>>> +            interrupts = <TI_IRQ_CROSSBAR 192 IRQ_TYPE_LEVEL_HIGH>;
+>>>
+>>> and not worry about the GIC interrupt number used
+>>>
+>>>
+>> Since the cross-bar is not limited t0 IRQ lines and applicable for
+>> DMA request lines as well, making it IRQ chip doesn't make sense. Its
+>> not typical pin control functionality either but at least that framework
+>> is much closer to consider as an option.
+> The core concept is that this is a trivial mapping problem and if can
+> extrapolate pinctrl to be mapping for SoC internal signals, oh great!
+>
+> pinctrl solved a problem where we are not absolutely sure how to
+> reallocate SoC *external* pins to board interface. pinctrl works in
+> more complex world, each SoC pinout has A options, but not all B SoC
+> signals can or will routed there - in fact, inside one single SoC
+> family, there never was a pattern even as it all depended on how the
+> board manufacturer wanted to do it - and yep, it was easy - a signal
+> just had limited number of options it could go to review and pinctrl
+> options to do that was simple as well!
+>
+> The problem here IMHO is different. it is a simple X->Y mapping, where
+> X > Y, but any of X can be mapped to any of Y - so, now with a static
+> map, you need be sure that you do not map double even by mistake - so
+> what ever number of GIC mappings need to be evaluated always every
+> time we do a static map change to ensure no conflicts w.r.t board
+> usage etc. Doable? sure! Right way to solve a simple X->Y mapping
+> problem? I personally don't think so.
+>
+> <rant>
+>
+> Now, if we want to force every single DRA7 product board designers and
+> s/w board support guy to consider how the DRA internal signals are
+> mapped using dts - yes, we are proposing to solve the problem of a
+> trivial resource allocation problem with a framework meant to handle
+> much more complex muxing problem and ensured that all DRA7 product
+> guys will wonder "what the heck were these guys thinking"?
+>
+> </rant>
+  The problems to be solved with Dynamic mappings are
+  1) How to populate the drivers resources with the dynamically allocated
+       data? This also means that all the drivers should
+     be adapted to use crossbar before it does a request_irq.
 
-I think the API is sufficient, the ofdev links via drv data to the
-netdev
-(http://lxr.free-electrons.com/source/drivers/net/can/mscan/mpc5xxx_can.c#L305)
-and you get from the netdev to the mscan_priv
-(http://lxr.free-electrons.com/source/drivers/net/can/mscan/mpc5xxx_can.c#L281).
+ 2) How to get a dynamic line when there is no "free" line.
+      That is how to decide runtime which one to replace.
+      We can do this in dts because we know what peripheral is not used
+      in a board.
 
-BTW: You should prepare_enable the clock in the ndo_open() callback,
-i.e. mscan_open() and disable_unprepare in mscan_close(). Doing this you
-maximize the power saving effect by not powering the mscan IP core if
-the CAN device is not up.
-
-> Are the introduction of a .put_clock() callback and passing the
-> 'priv' handle to both get and put routines acceptable?  As this
-> would hook up clock handling to probe() and remove() just as
-> memory mapping gets approached.
-
-I think an additional priv parameter is not needed. get_ and put_clock()
-in probe() and remove() is good, but put the
-prepare_enable()/disable_unprepare() in open()/close().
-
-> Below is a patch on top of the CAN related patch in v2 of the
-> series.  If this approach is acceptable (maybe modulo how the
-> "unused" warnings get silenced), I'll fold it into the
-> introduction of common clock support in the mscan(4) driver.
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/a63fef52/attachment-0001.sig>
+Regards,
+ Sricharan
