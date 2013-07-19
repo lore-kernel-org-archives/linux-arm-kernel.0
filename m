@@ -1,351 +1,70 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Fri, 19 Jul 2013 11:41:43 +0200
-Subject: [PATCH v2 16/24] net: can: mscan: make mpc512x code use common
- clock
-In-Reply-To: <51E8EC17.9060703@pengutronix.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374178858-8683-2-git-send-email-gsi@denx.de>
- <51E8EC17.9060703@pengutronix.de>
-Message-ID: <20130719094143.GQ7080@book.gsilab.sittig.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 19 Jul 2013 11:42:11 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
+ Security ID fuses
+In-Reply-To: <20130717161758.GA9822@kroah.com>
+References: <51C8B84C.3020200@schinagl.nl> <20130624214615.GA17604@kroah.com>
+ <51CAA709.4060801@schinagl.nl> <20130626175144.GC2222@kroah.com>
+ <51D674BF.9030207@schinagl.nl> <20130706193646.GB9778@kroah.com>
+ <51E466A3.4010503@schinagl.nl> <20130716064107.GA10868@kroah.com>
+ <20130717114650.GN3125@lukather> <20130717161758.GA9822@kroah.com>
+Message-ID: <20130719094211.GD5106@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 09:34 +0200, Marc Kleine-Budde wrote:
-> 
-> On 07/18/2013 10:20 PM, Gerhard Sittig wrote:
-> > extend the mscan(4) driver with alternative support for the COMMON_CLK
-> > approach which is an option in the MPC512x platform, keep the existing
-> > clock support implementation in place since the driver is shared with
-> > other MPC5xxx SoCs which don't have common clock support
+On Wed, Jul 17, 2013 at 09:17:58AM -0700, Greg KH wrote:
+> On Wed, Jul 17, 2013 at 01:46:50PM +0200, Maxime Ripard wrote:
+> > On Mon, Jul 15, 2013 at 11:41:07PM -0700, Greg KH wrote:
+> > > On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
+> > > > So using these new patches for binary attributes, how can I pass data 
+> > > > between my driver and the sysfs files using a platform_driver? Or are 
+> > > > other 'hacks' needed and using the .groups attribute from 
+> > > > platform_driver->device_driver->groups is really the wrong approach.
+> > > > 
+> > > > I did ask around and still haven't figured it out so far, so I do 
+> > > > apologize if you feel I'm wasting your precious time.
+> > > 
+> > > How is the platform device not the same thing that was passed to your
+> > > probe function?
 > > 
-> > one byproduct of this change is that the CAN driver no longer needs to
-> > access the SoC's clock control registers, which shall be the domain of
-> > the platform's clock driver
-> > 
-> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
-> > ---
-> >  drivers/net/can/mscan/mpc5xxx_can.c |  139 +++++++++++++++++++++++++++++++++++
-> >  1 file changed, 139 insertions(+)
-> > 
-> > diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-> > index bc422ba..dd26ab6 100644
-> > --- a/drivers/net/can/mscan/mpc5xxx_can.c
-> > +++ b/drivers/net/can/mscan/mpc5xxx_can.c
-> > @@ -108,6 +108,143 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
-> >  #endif /* CONFIG_PPC_MPC52xx */
-> >  
-> >  #ifdef CONFIG_PPC_MPC512x
-> > +
-> > +#if IS_ENABLED(CONFIG_COMMON_CLK)
-> > +
-> > +static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
-> > +				 const char *clock_source, int *mscan_clksrc)
-> > +{
-> > +	struct device_node *np;
-> > +	u32 clockdiv;
-> > +	enum {
-> > +		CLK_FROM_AUTO,
-> > +		CLK_FROM_IPS,
-> > +		CLK_FROM_SYS,
-> > +		CLK_FROM_REF,
-> > +	} clk_from;
-> > +	struct clk *clk_in, *clk_can;
-> > +	unsigned long freq_calc;
-> > +
-> > +	/* the caller passed in the clock source spec that was read from
-> > +	 * the device tree, get the optional clock divider as well
-> > +	 */
-> > +	np = ofdev->dev.of_node;
-> > +	clockdiv = 1;
-> > +	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
-> > +	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
-> > +		clock_source ? clock_source : "<NULL>", clockdiv);
-> > +
-> > +	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
-> > +	 * get set, and the 'ips' clock is the input to the MSCAN
-> > +	 * component
-> > +	 *
-> > +	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
-> > +	 * bit needs to get cleared, an optional clock-divider may have
-> > +	 * been specified (the default value is 1), the appropriate
-> > +	 * MSCAN related MCLK is the input to the MSCAN component
-> > +	 *
-> > +	 * in the absence of a clock-source spec, first an optimal clock
-> > +	 * gets determined based on the 'sys' clock, if that fails the
-> > +	 * 'ref' clock is used
-> > +	 */
-> > +	clk_from = CLK_FROM_AUTO;
-> > +	if (clock_source) {
-> > +		/* interpret the device tree's spec for the clock source */
-> > +		if (!strcmp(clock_source, "ip"))
-> > +			clk_from = CLK_FROM_IPS;
-> > +		else if (!strcmp(clock_source, "sys"))
-> > +			clk_from = CLK_FROM_SYS;
-> > +		else if (!strcmp(clock_source, "ref"))
-> > +			clk_from = CLK_FROM_REF;
-> > +		else
-> > +			goto err_invalid;
-> > +		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
-> > +	}
-> > +	if (clk_from == CLK_FROM_AUTO) {
-> > +		/* no spec so far, try the 'sys' clock; round to the
-> > +		 * next MHz and see if we can get a multiple of 16MHz
-> > +		 */
-> > +		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
-> > +		clk_in = clk_get(&ofdev->dev, "sys");
-> > +		if (IS_ERR(clk_in))
-> > +			goto err_notavail;
-> > +		freq_calc = clk_get_rate(clk_in);
-> > +		freq_calc +=  499999;
-> > +		freq_calc /= 1000000;
-> > +		freq_calc *= 1000000;
-> > +		if ((freq_calc % 16000000) == 0) {
-> > +			clk_from = CLK_FROM_SYS;
-> > +			clockdiv = freq_calc / 16000000;
-> > +			dev_dbg(&ofdev->dev,
-> > +				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
-> > +				freq_calc, clockdiv, freq_calc / clockdiv);
-> > +		}
-> > +	}
-> > +	if (clk_from == CLK_FROM_AUTO) {
-> > +		/* no spec so far, use the 'ref' clock */
-> > +		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
-> > +		clk_in = clk_get(&ofdev->dev, "ref");
-> > +		if (IS_ERR(clk_in))
-> > +			goto err_notavail;
-> > +		clk_from = CLK_FROM_REF;
-> > +		freq_calc = clk_get_rate(clk_in);
-> > +		dev_dbg(&ofdev->dev,
-> > +			"clk fit, ref[%lu] (no div) freq[%lu]\n",
-> > +			freq_calc, freq_calc);
-> > +	}
-> > +
-> > +	/* select IPS or MCLK as the MSCAN input (returned to the caller),
-> > +	 * setup the MCLK mux source and rate if applicable, apply the
-> > +	 * optionally specified or derived above divider, and determine
-> > +	 * the actual resulting clock rate to return to the caller
-> > +	 */
-> > +	switch (clk_from) {
-> > +	case CLK_FROM_IPS:
-> > +		clk_can = clk_get(&ofdev->dev, "ips");
-> > +		if (IS_ERR(clk_can))
-> > +			goto err_notavail;
-> > +		clk_prepare_enable(clk_can);
+> > One thing I don't get here is why it should be set in the
+> > platform_driver structure. From my understanding of the device model,
+> > and since what Oliver is trying to do is exposing a few bytes of memory
+> > to sysfs, shouldn't the sysfs file be attached to the device instead?
 > 
-> Where is the corresponding clk_disable_unprepare()?a
-
-It's missing, as I could not find the counterpart of the
-.get_clock() callback where the get and prepare/enable was added
-to.  And it appears that neither are enable errors checked for.
-This patch clearly needs an update as well, but already should be
-the last part of the series in a currently inacceptable state.
-
-This .get_clock() routine is supposed to determine the clock
-source, setup the desired rate and return the actual rate.  The
-callback's API is rather limited in that it does communicate
-clock rate values, but cannot access a location to store handles
-to.
-
-Are the introduction of a .put_clock() callback and passing the
-'priv' handle to both get and put routines acceptable?  As this
-would hook up clock handling to probe() and remove() just as
-memory mapping gets approached.
-
-Below is a patch on top of the CAN related patch in v2 of the
-series.  If this approach is acceptable (maybe modulo how the
-"unused" warnings get silenced), I'll fold it into the
-introduction of common clock support in the mscan(4) driver.
-
-diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-index cf5e4cfc..16ca712 100644
---- a/drivers/net/can/mscan/mpc5xxx_can.c
-+++ b/drivers/net/can/mscan/mpc5xxx_can.c
-@@ -39,7 +39,9 @@
- struct mpc5xxx_can_data {
- 	unsigned int type;
- 	u32 (*get_clock)(struct platform_device *ofdev, const char *clock_name,
--			 int *mscan_clksrc);
-+			 int *mscan_clksrc, struct mscan_priv *priv);
-+	void (*put_clock)(struct platform_device *ofdev,
-+			  struct mscan_priv *priv);
- };
- 
- #ifdef CONFIG_PPC_MPC52xx
-@@ -49,7 +51,8 @@ static struct of_device_id mpc52xx_cdm_ids[] = {
- };
- 
- static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
--				 const char *clock_name, int *mscan_clksrc)
-+				 const char *clock_name, int *mscan_clksrc,
-+				 struct mscan_priv *priv)
- {
- 	unsigned int pvr;
- 	struct mpc52xx_cdm  __iomem *cdm;
-@@ -101,15 +104,24 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
- }
- #else /* !CONFIG_PPC_MPC52xx */
- static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
--				 const char *clock_name, int *mscan_clksrc)
-+				 const char *clock_name, int *mscan_clksrc,
-+				 struct mscan_priv *priv)
- {
- 	return 0;
- }
- #endif /* CONFIG_PPC_MPC52xx */
-+static void mpc52xx_can_put_clock(struct platform_device *ofdev,
-+				  struct mscan_priv *priv)
-+{
-+	/* EMPTY */
-+	(void)ofdev;
-+	(void)priv;
-+}
- 
- #ifdef CONFIG_PPC_MPC512x
- static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
--				 const char *clock_source, int *mscan_clksrc)
-+				 const char *clock_source, int *mscan_clksrc,
-+				 struct mscan_priv *priv)
- {
- 	struct device_node *np;
- 	u32 clockdiv;
-@@ -200,7 +212,9 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
- 		clk_can = clk_get(&ofdev->dev, "ips");
- 		if (IS_ERR(clk_can))
- 			goto err_notavail;
--		clk_prepare_enable(clk_can);
-+		if (clk_prepare_enable(clk_can))
-+			goto err_notavail;
-+		priv->clk_can = clk_can;
- 		freq_calc = clk_get_rate(clk_can);
- 		*mscan_clksrc = MSCAN_CLKSRC_IPS;
- 		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
-@@ -211,7 +225,9 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
- 		clk_can = clk_get(&ofdev->dev, "mclk");
- 		if (IS_ERR(clk_can))
- 			goto err_notavail;
--		clk_prepare_enable(clk_can);
-+		if (clk_prepare_enable(clk_can))
-+			goto err_notavail;
-+		priv->clk_can = clk_can;
- 		if (clk_from == CLK_FROM_SYS)
- 			clk_in = clk_get(&ofdev->dev, "sys");
- 		if (clk_from == CLK_FROM_REF)
-@@ -241,12 +257,31 @@ err_notavail:
- 	dev_err(&ofdev->dev, "cannot acquire or setup clock source\n");
- 	return 0;
- }
-+
-+static void mpc512x_can_put_clock(struct platform_device *ofdev,
-+				  struct mscan_priv *priv)
-+{
-+	(void)ofdev;
-+	if (priv->clk_can) {
-+		clk_disable_unprepare(priv->clk_can);
-+		clk_put(priv->clk_can);
-+	}
-+}
- #else /* !CONFIG_PPC_MPC512x */
- static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
--				 const char *clock_name, int *mscan_clksrc)
-+				 const char *clock_name, int *mscan_clksrc,
-+				 struct mscan_priv *priv)
- {
- 	return 0;
- }
-+
-+static void mpc512x_can_put_clock(struct platform_device *ofdev,
-+				  struct mscan_priv *priv)
-+{
-+	(void)ofdev;
-+	(void)priv;
-+	/* EMPTY */
-+}
- #endif /* CONFIG_PPC_MPC512x */
- 
- static const struct of_device_id mpc5xxx_can_table[];
-@@ -293,7 +328,7 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
- 	BUG_ON(!data);
- 	priv->type = data->type;
- 	priv->can.clock.freq = data->get_clock(ofdev, clock_name,
--					       &mscan_clksrc);
-+					       &mscan_clksrc, priv);
- 	if (!priv->can.clock.freq) {
- 		dev_err(&ofdev->dev, "couldn't get MSCAN clock properties\n");
- 		goto exit_free_mscan;
-@@ -327,10 +362,17 @@ exit_unmap_mem:
- 
- static int mpc5xxx_can_remove(struct platform_device *ofdev)
- {
-+	const struct of_device_id *match;
-+	const struct mpc5xxx_can_data *data;
- 	struct net_device *dev = platform_get_drvdata(ofdev);
- 	struct mscan_priv *priv = netdev_priv(dev);
- 
-+	match = of_match_device(mpc5xxx_can_table, &ofdev->dev);
-+	data = match ? match->data : NULL;
-+
- 	unregister_mscandev(dev);
-+	if (data)
-+		data->put_clock(ofdev, priv);
- 	iounmap(priv->reg_base);
- 	irq_dispose_mapping(dev->irq);
- 	free_candev(dev);
-@@ -383,11 +425,13 @@ static int mpc5xxx_can_resume(struct platform_device *ofdev)
- static const struct mpc5xxx_can_data mpc5200_can_data = {
- 	.type = MSCAN_TYPE_MPC5200,
- 	.get_clock = mpc52xx_can_get_clock,
-+	.put_clock = mpc52xx_can_put_clock,
- };
- 
- static const struct mpc5xxx_can_data mpc5121_can_data = {
- 	.type = MSCAN_TYPE_MPC5121,
- 	.get_clock = mpc512x_can_get_clock,
-+	.put_clock = mpc512x_can_put_clock,
- };
- 
- static const struct of_device_id mpc5xxx_can_table[] = {
-diff --git a/drivers/net/can/mscan/mscan.h b/drivers/net/can/mscan/mscan.h
-index af2ed8b..f32e190 100644
---- a/drivers/net/can/mscan/mscan.h
-+++ b/drivers/net/can/mscan/mscan.h
-@@ -21,6 +21,7 @@
- #ifndef __MSCAN_H__
- #define __MSCAN_H__
- 
-+#include <linux/clk.h>
- #include <linux/types.h>
- 
- /* MSCAN control register 0 (CANCTL0) bits */
-@@ -283,6 +284,7 @@ struct mscan_priv {
- 	unsigned int type; 	/* MSCAN type variants */
- 	unsigned long flags;
- 	void __iomem *reg_base;	/* ioremap'ed address to registers */
-+	struct clk *clk_can;	/* clock for registers or bitrates */
- 	u8 shadow_statflg;
- 	u8 shadow_canrier;
- 	u8 cur_pri;
-
-> > +		freq_calc = clk_get_rate(clk_can);
-> > +		*mscan_clksrc = MSCAN_CLKSRC_IPS;
-> > +		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
-> > +			*mscan_clksrc, freq_calc);
-> > +		break;
-> > +	case CLK_FROM_SYS:
-> > +	case CLK_FROM_REF:
-> > +		clk_can = clk_get(&ofdev->dev, "mclk");
-> > +		if (IS_ERR(clk_can))
-> > +			goto err_notavail;
-> > +		clk_prepare_enable(clk_can);
+> It will be created by the driver core for any device attached to the
+> driver automatically.
 > 
-> dito
+> > I mean, here, the sysfs file will be created under something like
+> > .../drivers/sunxi-sid/eeprom. What happens when you have several
+> > instances of that driver loaded? I'd expect it to have several sysfs
+> > files created, one for each instance. So to me, it should be in the
+> > device structure, not the driver one.
+> 
+> You can't have multiple drivers with the same name loaded (or the same
+> module loaded multiple times.)  You can have multiple devices for a
+> single driver, which is what we do all the time.
 
-yes, both problems of not checking for errors and dropping the
-reference, will address this as well
+Yes, I know that, and it's actually my point.
+With the current oliver's code he pasted earlier in this thread:
 
+# find /sys/ -name eeprom
+/sys/bus/platform/drivers/sunxi-sid/eeprom
 
-virtually yours
-Gerhard Sittig
+While I'd expect the eeprom file to be located in
+/sys/bus/platform/devices/X.eeprom/eeprom like it used to be in the v4,
+since it's an instance-specific content.
+
+Maxime
+
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/02c9c251/attachment-0001.sig>
