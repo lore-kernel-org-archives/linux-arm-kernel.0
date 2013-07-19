@@ -1,38 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jul 2013 15:29:45 +0100
-Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
-In-Reply-To: <20130719142524.GF18139@mudshark.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Jul 2013 15:32:30 +0100
+Subject: [PATCH 2/4] arm64: KVM: add missing dsb before invalidating
+ Stage-2 TLBs
+In-Reply-To: <1374242035-13199-3-git-send-email-marc.zyngier@arm.com>
 References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
- <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
- <20130719142524.GF18139@mudshark.cambridge.arm.com>
-Message-ID: <51E94D59.9010607@arm.com>
+ <1374242035-13199-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130719143229.GG18139@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/13 15:25, Will Deacon wrote:
-> On Fri, Jul 19, 2013 at 02:53:54PM +0100, Marc Zyngier wrote:
->> So far, when a guest executes WFE (like when waiting for a spinlock
->> to become unlocked), we don't do a thing and let it run uninterrupted.
->>
->> Another option is to trap a blocking WFE and offer the opportunity
->> to the scheduler to switch to another task, potentially giving the
->> vcpu holding the spinlock a chance to run sooner.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Fri, Jul 19, 2013 at 02:53:53PM +0100, Marc Zyngier wrote:
+> When performing a Stage-2 TLB invalidation, it is necessary to
+> make sure the write to the page tables is observable by all CPUs.
 > 
-> [...]
+> For this purpose, add a dsb instruction to __kvm_tlb_flush_vmid_ipa
+> before doing the TLB invalidation itself.
 > 
->> +static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  {
->> -	kvm_vcpu_block(vcpu);
->> +	if (kvm_vcpu_get_hsr(vcpu) & 1)
->> +		cond_resched();
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp.S | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> The hardcoded `1' doesn't make it obvious that we're treating wfi and wfe
-> differently. Could you use a #define for that bit in hsr.iss please?
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 218802f..e1ccfcc 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -604,6 +604,8 @@ END(__kvm_vcpu_run)
+>  
+>  // void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>  ENTRY(__kvm_tlb_flush_vmid_ipa)
+> +	dsb	ishst	// Make sure previous writes are observable
+> +
+>  	kern_hyp_va	x0
+>  	ldr	x2, [x0, #KVM_VTTBR]
+>  	msr	vttbr_el2, x2
+> -- 
+> 1.8.2.3
 
-Good point. I'll rework that part.
+I don't think the comment adds anything to this code. Also, why don't you
+need similar barriers for the cases where you clobber the entire TLB (e.g.
+__kvm_flush_vm_context)?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
