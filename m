@@ -1,46 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:37:11 +0900
-Subject: [PATCH 12/19] ARM: shmobile: armadillo-reference: Add st1232 pin
- mappings
+Date: Fri, 19 Jul 2013 13:37:13 +0900
+Subject: [PATCH 14/19] ARM: shmobile: armadillo-reference: Add LED1-LED4 to
+ the device tree
 In-Reply-To: <cover.1374208262.git.horms+renesas@verge.net.au>
 References: <cover.1374208262.git.horms+renesas@verge.net.au>
-Message-ID: <448bd4531a795df3d7541a4dbe40d3fab5f1f68c.1374208262.git.horms+renesas@verge.net.au>
+Message-ID: <35b235cac74f549e0e7b71c42234566b26ecb90f.1374208262.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Add pin mappings for the st1232 device to the device tree and reference
-them as the default state for the device.
+LED1 to LED4 are GPIO LEDs. Add corresponding DT nodes.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 4a7ae32..a6c6606 100644
+index 8ec4cd1..366f729 100644
 --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
 +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -41,6 +41,8 @@
- 		reg = <0x55>;
- 		interrupt-parent = <&irqpin1>;
- 		interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
-+		pinctrl-0 = <&st1232_pins>;
-+		pinctrl-names = "default";
+@@ -34,6 +34,21 @@
+ 		regulator-boot-on;
  	};
- };
  
-@@ -52,4 +54,9 @@
- 		renesas,groups = "scifa1_data";
- 		renesas,function = "scifa1";
- 	};
-+
-+	st1232_pins: st1232 {
-+		renesas,groups = "intc_irq10";
-+		renesas,function = "intc";
++	leds {
++		compatible = "gpio-leds";
++		led1 {
++			gpios = <&pfc 102 GPIO_ACTIVE_HIGH>;
++		};
++		led2 {
++			gpios = <&pfc 111 GPIO_ACTIVE_HIGH>;
++		};
++		led3 {
++			gpios = <&pfc 110 GPIO_ACTIVE_HIGH>;
++		};
++		led4 {
++			gpios = <&pfc 177 GPIO_ACTIVE_HIGH>;
++		};
 +	};
  };
+ 
+ &i2c0 {
 -- 
 1.7.10.4
