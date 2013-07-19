@@ -1,57 +1,30 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 19 Jul 2013 14:58:50 +0100
-Subject: [PATCH 19/22] ARM: ux500: Remove '0x's from R8A7779 DTS file
+Date: Fri, 19 Jul 2013 14:58:51 +0100
+Subject: [PATCH 20/22] ARM: ux500: Remove '0x's from Spear 300 DTS file
 In-Reply-To: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
 References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1374242333-6852-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <1374242333-6852-20-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/spear300.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 7f146c6..86bd487 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -65,7 +65,7 @@
- 		sense-bitfield-width = <2>;
- 	};
+diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
+index f79b3df..8970a4a 100644
+--- a/arch/arm/boot/dts/spear300.dtsi
++++ b/arch/arm/boot/dts/spear300.dtsi
+@@ -52,7 +52,7 @@
+ 			status = "disabled";
+ 		};
  
--	i2c0: i2c at 0xffc70000 {
-+	i2c0: i2c at ffc70000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "renesas,rmobile-iic";
-@@ -74,7 +74,7 @@
- 		interrupts = <0 79 0x4>;
- 	};
- 
--	i2c1: i2c at 0xffc71000 {
-+	i2c1: i2c at ffc71000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "renesas,rmobile-iic";
-@@ -83,7 +83,7 @@
- 		interrupts = <0 82 0x4>;
- 	};
- 
--	i2c2: i2c at 0xffc72000 {
-+	i2c2: i2c at ffc72000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "renesas,rmobile-iic";
-@@ -92,7 +92,7 @@
- 		interrupts = <0 80 0x4>;
- 	};
- 
--	i2c3: i2c at 0xffc73000 {
-+	i2c3: i2c at ffc73000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "renesas,rmobile-iic";
+-		shirq: interrupt-controller at 0x50000000 {
++		shirq: interrupt-controller at 50000000 {
+ 			compatible = "st,spear300-shirq";
+ 			reg = <0x50000000 0x1000>;
+ 			interrupts = <28>;
 -- 
 1.8.1.2
