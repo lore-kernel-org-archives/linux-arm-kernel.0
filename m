@@ -1,37 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 19 Jul 2013 19:06:40 +0100
-Subject: [PATCH] ASoC: atmel: add wm8904 based audio machine driver
-In-Reply-To: <1374226977-10188-1-git-send-email-voice.shen@atmel.com>
-References: <1374226977-10188-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20130719180640.GS9858@sirena.org.uk>
+From: systemprogrammierung.brunner@gmail.com (Markus Brunner)
+Date: Fri, 19 Jul 2013 20:07:00 +0200
+Subject: [PATCH] remove vlan tags in CPSW dual emac mode
+In-Reply-To: <51E42B43.8060307@ti.com>
+References: <4699400.vD3TdgH1nR@localhost> <5176C4FE.4080305@ti.com>
+ <51E00B2F.6050406@newflow.co.uk> <51E04C89.8030202@ti.com>
+ <51E0582D.4090306@newflow.co.uk> <51E3EEE7.9030508@ti.com>
+ <51E41A34.4030000@newflow.co.uk> <51E42B43.8060307@ti.com>
+Message-ID: <CAOFKi=amD5Ho0LpOm+G-2pQezUjJMgSgH0XxHXQ_md57c3FwVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 05:42:57PM +0800, Bo Shen wrote:
-> Add wm8904 based audio machine driver for Atmel EK board
+On Mon, Jul 15, 2013 at 7:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+> On 7/15/2013 9:20 PM, Mark Jackson wrote:
+>> On 15/07/13 13:45, Mugunthan V N wrote:
+>>> On 7/13/2013 12:55 AM, Mark Jackson wrote:
+>>>> On 12/07/13 19:35, Mugunthan V N wrote:
+>>>>> On 7/12/2013 7:27 PM, Mark Jackson wrote:
+>>>> [snip]
+>>>>
+>>>>>> Just to update this (old) thread ...
+>>>>>>
+>>>>>> I can still confirm that *without* the above patch, I am *unable* to use both network
+>>>>>> ports on our AM335x board.
 
-Applied, thanks though...
+I can confirm that. Windows won't strip away the vlan header like linux does.
 
-> +	mclk = clk_get(NULL, "pck0");
-> +	if (IS_ERR(mclk)) {
-> +		dev_err(&pdev->dev, "failed to get pck0\n");
-> +		ret = PTR_ERR(mclk);
-> +		goto err_set_audio;
-> +	}
-> +
-> +	clk_src = clk_get(NULL, "clk32k");
-> +	if (IS_ERR(clk_src)) {
-> +		dev_err(&pdev->dev, "failed to get clk32k\n");
-> +		ret = PTR_ERR(clk_src);
-> +		goto err_set_audio;
-> +	}
+[snip]
+>>>> Markus, are you still using this patch ?
 
-These should really be devm_clk_get()s and use a device.  This can be
-revisited after the common clock framework conversion though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/11eb3e56/attachment.sig>
+yes.
+
+>>>>
+>>> Today I have tested the Dual EMAC on my am335x-evmsk and its working fine with
+>>> net/master branch.
+>>> I had 3 patches additional to net/master in which two for basic boot of EVMsk
+>>> and one for enabling Dual EMAC. I had pushed the branch in the below repo
+>>> repo:
+>>> git://git.ti.com/~mugunthanvnm/ti-linux-kernel/mugunth-connectivity-linux-feature-tree.git
+>>> branch: dual-emac
+
+I tested it and it has the same problem as with 3.9 - 3.11-rc1.
+
+>> Okay ... I can't test that at the moment as I can only boot from MMC as there's
+>> currently no support for MMC booting in the mainline kernel.
+>>
+>> So ... the code works for you, but not for me.
+>>
+>> I guess the other difference is that I'm not using the same PHY (we use a 10/100
+>> SMSC 8710A, not the GbE Atheros part).
+>>
+>> Could that make any difference ?
+>>
+>> Markus, are you still seeing the same issue ?  What PHY are you using ?
+
+I', using a Micrel ksz8895mq, which is actually a switch, however one
+phy is connected directly, so bootstrapping can work and even if I
+don't enable the switch I have the same issue on that port. I doubt
+the phy will change anything.
+
+Regards,
+Markus
