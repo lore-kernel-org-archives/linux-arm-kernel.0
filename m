@@ -1,9 +1,9 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 19 Jul 2013 14:58:43 +0100
-Subject: [PATCH 12/22] ARM: ux500: Remove '0x's from OMAP2420 H4 DTS file
+Date: Fri, 19 Jul 2013 14:58:44 +0100
+Subject: [PATCH 13/22] ARM: ux500: Remove '0x's from OMAP3 IGEP0020 DTS file
 In-Reply-To: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
 References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1374242333-6852-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1374242333-6852-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,31 +12,36 @@ Cc: Tony Lindgren <tony@atomide.com>
 Cc: linux-omap at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/omap2420-h4.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/omap3-igep0020.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
-index 224c08f..34cdecb 100644
---- a/arch/arm/boot/dts/omap2420-h4.dts
-+++ b/arch/arm/boot/dts/omap2420-h4.dts
-@@ -50,15 +50,15 @@
- 			label = "bootloader";
- 			reg = <0 0x20000>;
+diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+index e8c4828..f7a8122 100644
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -99,19 +99,19 @@
+ 			label = "SPL";
+ 			reg = <0 0x100000>;
  		};
--		partition at 0x20000 {
-+		partition at 20000 {
- 			label = "params";
- 			reg = <0x20000 0x20000>;
+-		partition at 0x80000 {
++		partition at 80000 {
+ 			label = "U-Boot";
+ 			reg = <0x100000 0x180000>;
  		};
--		partition at 0x40000 {
-+		partition at 40000 {
- 			label = "kernel";
- 			reg = <0x40000 0x200000>;
+-		partition at 0x1c0000 {
++		partition at 1c0000 {
+ 			label = "Environment";
+ 			reg = <0x280000 0x100000>;
  		};
--		partition at 0x240000 {
-+		partition at 240000 {
- 			label = "file-system";
- 			reg = <0x240000 0x3dc0000>;
+-		partition at 0x280000 {
++		partition at 280000 {
+ 			label = "Kernel";
+ 			reg = <0x380000 0x300000>;
+ 		};
+-		partition at 0x780000 {
++		partition at 780000 {
+ 			label = "Filesystem";
+ 			reg = <0x680000 0x1f980000>;
  		};
 -- 
 1.8.1.2
