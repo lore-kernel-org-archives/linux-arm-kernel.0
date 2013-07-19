@@ -1,52 +1,98 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Fri, 19 Jul 2013 12:27:00 +0100
-Subject: [PATCH v2] xen/arm: disable cpuidle and cpufreq when linux is running
- as dom0
-Message-ID: <1374233220-13770-1-git-send-email-julien.grall@linaro.org>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Fri, 19 Jul 2013 17:08:55 +0530
+Subject: alignment handler instruction endian-ness (Ben Dooks)
+Message-ID: <CALicx6tS2B_itZHdFh2YrQ2VZOoacx-MuO5vkNfqypH9v5rEiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When linux is running as dom0, Xen doesn't show the physical cpu but a
-virtual CPU.
-On some ARM SOC (for instance the exynos 5250), linux registers callbacks
-for cpuidle and cpufreq. When these callbacks are called, they will modify
-directly the physical cpu not the virtual one. It can impact the whole board
-instead of only dom0.
-
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
-
----
-    Changes in v2:
-        - Disable cpufreq
----
- arch/arm/xen/enlighten.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 49839d8..af82792 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -24,6 +24,8 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
-+#include <linux/cpuidle.h>
-+#include <linux/cpufreq.h>
- 
- #include <linux/mm.h>
- 
-@@ -292,6 +294,12 @@ static int __init xen_pm_init(void)
- {
- 	pm_power_off = xen_power_off;
- 	arm_pm_restart = xen_restart;
-+	/*
-+	 * Making sure board specific code will not set up ops for
-+	 * cpu idle and cpu freq.
-+	 */
-+	disable_cpuidle();
-+	disable_cpufreq();
- 
- 	return 0;
- }
--- 
-1.7.10.4
+On Fri, Jul 19, 2013 at 5:06 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+>> Message: 4
+>> Date: Fri, 19 Jul 2013 11:58:45 +0100
+>> From: Ben Dooks <ben.dooks@codethink.co.uk>
+>> To: "linux-arm-kernel at lists.infradead.org"
+>>         <linux-arm-kernel@lists.infradead.org>
+>> Subject: alignment handler instruction endian-ness
+>> Message-ID: <51E91BE5.8070809@codethink.co.uk>
+>> Content-Type: text/plain; charset=ISO-8859-1; format=flowed
+>>
+>> I ran in to an issue with the alignment handler when running BE8 where
+>> it loads instructions and fails to swap.
+>>
+>> Is there a better way of swapping instructions for ARM when loading
+>> from arbitrary places? Have I missed any other places this could happen?
+>>
+>> The following patch is my first attempt at solving the problem for the
+>> alignment handler:
+>>
+>>> Author: Ben Dooks <ben.dooks@codethink.co.uk>
+>>> Date:   Thu Jul 18 21:10:56 2013 +0100
+>>>
+>>>     arm: alignment: deal with be8 mode when decoding instructions
+>>>
+>>>     If we are in BE8 mode, we must deal with the instruction stream being
+>>>     in LE order when data is being loaded in BE order. Ensure the data is
+>>>     swapped before processing to avoid thre following:
+>>>
+>>>     Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
+>>>     Unhandled fault: alignment exception (0x001) at 0xbfa09567
+>>>
+>>>     Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>  >
+>>> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+>>> index db26e2e..e8793a7 100644
+>>> --- a/arch/arm/mm/alignment.c
+>>> +++ b/arch/arm/mm/alignment.c
+>>> @@ -87,6 +87,12 @@ core_param(alignment, ai_usermode, int, 0600);
+>>>  #define UM_FIXUP       (1 << 1)
+>>>  #define UM_SIGNAL      (1 << 2)
+>>>
+>>> +#ifdef CONFIG_CPU_ENDIAN_BE8
+>>> +#define need_swap()    true
+>>> +#else
+>>> +#define need_swap()    false
+>>> +#endif
+>>> +
+>>>  /* Return true if and only if the ARMv6 unaligned access model is in use. */
+>>>  static bool cpu_is_v6_unaligned(void)
+>>>  {
+>>> @@ -762,12 +768,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct
+>>>         if (thumb_mode(regs)) {
+>>>                 u16 *ptr = (u16 *)(instrptr & ~1);
+>>>                 fault = probe_kernel_address(ptr, tinstr);
+>>> +               if (need_swap())
+>>> +                       tinstr = cpu_to_le16(tinstr);
+>>>                 if (!fault) {
+>>>                         if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+>>>                             IS_T32(tinstr)) {
+>>>                                 /* Thumb-2 32-bit */
+>>>                                 u16 tinst2 = 0;
+>>>                                 fault = probe_kernel_address(ptr + 1, tinst2);
+>>> +                               if (need_swap())
+>>> +                                       tinst2 = cpu_to_le16(tinst2);
+>>>                                 instr = (tinstr << 16) | tinst2;
+>>>                                 thumb2_32b = 1;
+>>>                         } else {
+>>> @@ -775,8 +785,11 @@ do_alignment(unsigned long addr, unsigned int fsr, struct p
+>>>                                 instr = thumb2arm(tinstr);
+>>>                         }
+>>>                 }
+>>> -       } else
+>>> +       } else {
+>>>                 fault = probe_kernel_address(instrptr, instr);
+>>> +               if (need_swap())
+>>> +                       instr = cpu_to_le32(instr);
+>>> +       }
+>>>
+>>>         if (fault) {
+>>>                 type = TYPE_FAULT;
+>>
+>>
+>
+ I think some changes are required in arch/arm/kernel/traps.c
+ for handling undefined instruction as well
+>
+>> --
+>> Ben Dooks                               http://www.codethink.co.uk/
+>> Senior Engineer                         Codethink - Providing Genius
+>>
+>>
