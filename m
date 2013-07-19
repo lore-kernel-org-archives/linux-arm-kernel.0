@@ -1,39 +1,190 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Jul 2013 03:45:38 -0700
-Subject: [GIT PULL] omap fixes against v3.11-rc1
-Message-ID: <20130719104538.GE7656@atomide.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 19 Jul 2013 12:46:05 +0200
+Subject: [PATCH v2 16/24] net: can: mscan: make mpc512x code use common
+ clock
+In-Reply-To: <20130719094143.GQ7080@book.gsilab.sittig.org>
+References: <1374166855-7280-1-git-send-email-gsi@denx.de>
+ <1374178858-8683-2-git-send-email-gsi@denx.de>
+ <51E8EC17.9060703@pengutronix.de>
+ <20130719094143.GQ7080@book.gsilab.sittig.org>
+Message-ID: <51E918ED.80002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/19/2013 11:41 AM, Gerhard Sittig wrote:
+> On Fri, Jul 19, 2013 at 09:34 +0200, Marc Kleine-Budde wrote:
+>>
+>> On 07/18/2013 10:20 PM, Gerhard Sittig wrote:
+>>> extend the mscan(4) driver with alternative support for the COMMON_CLK
+>>> approach which is an option in the MPC512x platform, keep the existing
+>>> clock support implementation in place since the driver is shared with
+>>> other MPC5xxx SoCs which don't have common clock support
+>>>
+>>> one byproduct of this change is that the CAN driver no longer needs to
+>>> access the SoC's clock control registers, which shall be the domain of
+>>> the platform's clock driver
+>>>
+>>> Signed-off-by: Gerhard Sittig <gsi@denx.de>
+>>> ---
+>>>  drivers/net/can/mscan/mpc5xxx_can.c |  139 +++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 139 insertions(+)
+>>>
+>>> diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+>>> index bc422ba..dd26ab6 100644
+>>> --- a/drivers/net/can/mscan/mpc5xxx_can.c
+>>> +++ b/drivers/net/can/mscan/mpc5xxx_can.c
+>>> @@ -108,6 +108,143 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+>>>  #endif /* CONFIG_PPC_MPC52xx */
+>>>  
+>>>  #ifdef CONFIG_PPC_MPC512x
+>>> +
+>>> +#if IS_ENABLED(CONFIG_COMMON_CLK)
+>>> +
+>>> +static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+>>> +				 const char *clock_source, int *mscan_clksrc)
+>>> +{
+>>> +	struct device_node *np;
+>>> +	u32 clockdiv;
+>>> +	enum {
+>>> +		CLK_FROM_AUTO,
+>>> +		CLK_FROM_IPS,
+>>> +		CLK_FROM_SYS,
+>>> +		CLK_FROM_REF,
+>>> +	} clk_from;
+>>> +	struct clk *clk_in, *clk_can;
+>>> +	unsigned long freq_calc;
+>>> +
+>>> +	/* the caller passed in the clock source spec that was read from
+>>> +	 * the device tree, get the optional clock divider as well
+>>> +	 */
+>>> +	np = ofdev->dev.of_node;
+>>> +	clockdiv = 1;
+>>> +	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
+>>> +	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
+>>> +		clock_source ? clock_source : "<NULL>", clockdiv);
+>>> +
+>>> +	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
+>>> +	 * get set, and the 'ips' clock is the input to the MSCAN
+>>> +	 * component
+>>> +	 *
+>>> +	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
+>>> +	 * bit needs to get cleared, an optional clock-divider may have
+>>> +	 * been specified (the default value is 1), the appropriate
+>>> +	 * MSCAN related MCLK is the input to the MSCAN component
+>>> +	 *
+>>> +	 * in the absence of a clock-source spec, first an optimal clock
+>>> +	 * gets determined based on the 'sys' clock, if that fails the
+>>> +	 * 'ref' clock is used
+>>> +	 */
+>>> +	clk_from = CLK_FROM_AUTO;
+>>> +	if (clock_source) {
+>>> +		/* interpret the device tree's spec for the clock source */
+>>> +		if (!strcmp(clock_source, "ip"))
+>>> +			clk_from = CLK_FROM_IPS;
+>>> +		else if (!strcmp(clock_source, "sys"))
+>>> +			clk_from = CLK_FROM_SYS;
+>>> +		else if (!strcmp(clock_source, "ref"))
+>>> +			clk_from = CLK_FROM_REF;
+>>> +		else
+>>> +			goto err_invalid;
+>>> +		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
+>>> +	}
+>>> +	if (clk_from == CLK_FROM_AUTO) {
+>>> +		/* no spec so far, try the 'sys' clock; round to the
+>>> +		 * next MHz and see if we can get a multiple of 16MHz
+>>> +		 */
+>>> +		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
+>>> +		clk_in = clk_get(&ofdev->dev, "sys");
+>>> +		if (IS_ERR(clk_in))
+>>> +			goto err_notavail;
+>>> +		freq_calc = clk_get_rate(clk_in);
+>>> +		freq_calc +=  499999;
+>>> +		freq_calc /= 1000000;
+>>> +		freq_calc *= 1000000;
+>>> +		if ((freq_calc % 16000000) == 0) {
+>>> +			clk_from = CLK_FROM_SYS;
+>>> +			clockdiv = freq_calc / 16000000;
+>>> +			dev_dbg(&ofdev->dev,
+>>> +				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
+>>> +				freq_calc, clockdiv, freq_calc / clockdiv);
+>>> +		}
+>>> +	}
+>>> +	if (clk_from == CLK_FROM_AUTO) {
+>>> +		/* no spec so far, use the 'ref' clock */
+>>> +		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
+>>> +		clk_in = clk_get(&ofdev->dev, "ref");
+>>> +		if (IS_ERR(clk_in))
+>>> +			goto err_notavail;
+>>> +		clk_from = CLK_FROM_REF;
+>>> +		freq_calc = clk_get_rate(clk_in);
+>>> +		dev_dbg(&ofdev->dev,
+>>> +			"clk fit, ref[%lu] (no div) freq[%lu]\n",
+>>> +			freq_calc, freq_calc);
+>>> +	}
+>>> +
+>>> +	/* select IPS or MCLK as the MSCAN input (returned to the caller),
+>>> +	 * setup the MCLK mux source and rate if applicable, apply the
+>>> +	 * optionally specified or derived above divider, and determine
+>>> +	 * the actual resulting clock rate to return to the caller
+>>> +	 */
+>>> +	switch (clk_from) {
+>>> +	case CLK_FROM_IPS:
+>>> +		clk_can = clk_get(&ofdev->dev, "ips");
+>>> +		if (IS_ERR(clk_can))
+>>> +			goto err_notavail;
+>>> +		clk_prepare_enable(clk_can);
+>>
+>> Where is the corresponding clk_disable_unprepare()?a
+> 
+> It's missing, as I could not find the counterpart of the
+> .get_clock() callback where the get and prepare/enable was added
+> to.  And it appears that neither are enable errors checked for.
+> This patch clearly needs an update as well, but already should be
+> the last part of the series in a currently inacceptable state.
+> 
+> This .get_clock() routine is supposed to determine the clock
+> source, setup the desired rate and return the actual rate.  The
+> callback's API is rather limited in that it does communicate
+> clock rate values, but cannot access a location to store handles
+> to.
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+I think the API is sufficient, the ofdev links via drv data to the
+netdev
+(http://lxr.free-electrons.com/source/drivers/net/can/mscan/mpc5xxx_can.c#L305)
+and you get from the netdev to the mscan_priv
+(http://lxr.free-electrons.com/source/drivers/net/can/mscan/mpc5xxx_can.c#L281).
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+BTW: You should prepare_enable the clock in the ndo_open() callback,
+i.e. mscan_open() and disable_unprepare in mscan_close(). Doing this you
+maximize the power saving effect by not powering the mscan IP core if
+the CAN device is not up.
 
-are available in the git repository at:
+> Are the introduction of a .put_clock() callback and passing the
+> 'priv' handle to both get and put routines acceptable?  As this
+> would hook up clock handling to probe() and remove() just as
+> memory mapping gets approached.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-against-rc1
+I think an additional priv parameter is not needed. get_ and put_clock()
+in probe() and remove() is good, but put the
+prepare_enable()/disable_unprepare() in open()/close().
 
-for you to fetch changes up to 7956c487e407bdbf7f8c8a570fd5d4d089973692:
+> Below is a patch on top of the CAN related patch in v2 of the
+> series.  If this approach is acceptable (maybe modulo how the
+> "unused" warnings get silenced), I'll fold it into the
+> introduction of common clock support in the mscan(4) driver.
 
-  Merge branch 'omap-for-v3.11/dt-fixes' into omap-for-v3.11/fixes (2013-07-19 03:28:35 -0700)
+Marc
 
-----------------------------------------------------------------
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Omap fixes mostly to deal with the dropping of platform
-data for omap4, and to make v7_defconfig bootable on omap4
-SDP with nfsroot.
-
-----------------------------------------------------------------
-Roger Quadros (1):
-      ARM: OMAP2+: Provide alias to USB PHY clock
-
-Tony Lindgren (3):
-      ARM: multi_v7: Enabled omap4430 sdp nfsroot
-      ARM: dts: Add missing vmmc2 regulator for twl
-      Merge branch 'omap-for-v3.11/dt-fixes' into omap-for-v3.11/fixes
-
- arch/arm/boot/dts/twl4030.dtsi      |  6 ++++++
- arch/arm/configs/multi_v7_defconfig |  3 +++
- arch/arm/mach-omap2/board-generic.c | 23 ++++++++++++++++++++++-
- 3 files changed, 31 insertions(+), 1 deletion(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/a63fef52/attachment-0001.sig>
