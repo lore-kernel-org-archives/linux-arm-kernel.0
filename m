@@ -1,128 +1,224 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:35:30 +0900
-Subject: [PATCH 5/7] sh: ecovec24: Use gpio-backlight
+Date: Fri, 19 Jul 2013 13:35:26 +0900
+Subject: [PATCH 1/7] backlight: Add GPIO-based backlight driver
 In-Reply-To: <cover.1374207161.git.horms+renesas@verge.net.au>
 References: <cover.1374207161.git.horms+renesas@verge.net.au>
-Message-ID: <fe79f919f47eabf6eae08414dcc078b0d89dfd8e.1374207161.git.horms+renesas@verge.net.au>
+Message-ID: <8b770e3c9824c98eafe67950ad6e41e09ec9c98a.1374207161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the backlight callback with a gpio-backlight platform device.
+The GPIO backlight driver controls the backlight in on/off mode through
+a single GPIO.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/sh/boards/mach-ecovec24/setup.c |   37 ++++++++++++++++++----------------
- 1 file changed, 20 insertions(+), 17 deletions(-)
+ drivers/video/backlight/Kconfig              |    7 ++
+ drivers/video/backlight/Makefile             |    1 +
+ drivers/video/backlight/gpio_backlight.c     |  133 ++++++++++++++++++++++++++
+ include/linux/platform_data/gpio_backlight.h |   21 ++++
+ 4 files changed, 162 insertions(+)
+ create mode 100644 drivers/video/backlight/gpio_backlight.c
+ create mode 100644 include/linux/platform_data/gpio_backlight.h
 
-diff --git a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24/setup.c
-index 61fade0..bcbb86b 100644
---- a/arch/sh/boards/mach-ecovec24/setup.c
-+++ b/arch/sh/boards/mach-ecovec24/setup.c
-@@ -30,6 +30,7 @@
- #include <linux/spi/mmc_spi.h>
- #include <linux/input.h>
- #include <linux/input/sh_keysc.h>
+diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+index d5ab658..5ab6423 100644
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -425,6 +425,13 @@ config BACKLIGHT_AS3711
+ 	  If you have an Austrian Microsystems AS3711 say Y to enable the
+ 	  backlight driver.
+ 
++config BACKLIGHT_GPIO
++	tristate "Generic GPIO based Backlight Driver"
++	depends on GPIOLIB
++	help
++	  If you have a LCD backlight adjustable by GPIO, say Y to enable
++	  this driver.
++
+ endif # BACKLIGHT_CLASS_DEVICE
+ 
+ endif # BACKLIGHT_LCD_SUPPORT
+diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
+index 92711fe..65698a8 100644
+--- a/drivers/video/backlight/Makefile
++++ b/drivers/video/backlight/Makefile
+@@ -32,6 +32,7 @@ obj-$(CONFIG_BACKLIGHT_DA903X)		+= da903x_bl.o
+ obj-$(CONFIG_BACKLIGHT_DA9052)		+= da9052_bl.o
+ obj-$(CONFIG_BACKLIGHT_EP93XX)		+= ep93xx_bl.o
+ obj-$(CONFIG_BACKLIGHT_GENERIC)		+= generic_bl.o
++obj-$(CONFIG_BACKLIGHT_GPIO)		+= gpio_backlight.o
+ obj-$(CONFIG_BACKLIGHT_HP680)		+= hp680_bl.o
+ obj-$(CONFIG_BACKLIGHT_HP700)		+= jornada720_bl.o
+ obj-$(CONFIG_BACKLIGHT_LM3533)		+= lm3533_bl.o
+diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
+new file mode 100644
+index 0000000..5fa217f
+--- /dev/null
++++ b/drivers/video/backlight/gpio_backlight.c
+@@ -0,0 +1,133 @@
++/*
++ * gpio_backlight.c - Simple GPIO-controlled backlight
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/backlight.h>
++#include <linux/err.h>
++#include <linux/fb.h>
++#include <linux/gpio.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
 +#include <linux/platform_data/gpio_backlight.h>
- #include <linux/sh_eth.h>
- #include <linux/sh_intc.h>
- #include <linux/videodev2.h>
-@@ -303,7 +304,7 @@ static struct platform_device usbhs_device = {
- 	.resource	= usbhs_resources,
- };
- 
--/* LCDC */
-+/* LCDC and backlight */
- static const struct fb_videomode ecovec_lcd_modes[] = {
- 	{
- 		.name		= "Panel",
-@@ -334,13 +335,6 @@ static const struct fb_videomode ecovec_dvi_modes[] = {
- 	},
- };
- 
--static int ecovec24_set_brightness(int brightness)
--{
--	gpio_set_value(GPIO_PTR1, brightness);
--
--	return 0;
--}
--
- static struct sh_mobile_lcdc_info lcdc_info = {
- 	.ch[0] = {
- 		.interface_type = RGB18,
-@@ -350,11 +344,6 @@ static struct sh_mobile_lcdc_info lcdc_info = {
- 			.width = 152,
- 			.height = 91,
- 		},
--		.bl_info = {
--			.name = "sh_mobile_lcdc_bl",
--			.max_brightness = 1,
--			.set_brightness = ecovec24_set_brightness,
--		},
- 	}
- };
- 
-@@ -380,6 +369,20 @@ static struct platform_device lcdc_device = {
- 	},
- };
- 
-+static struct gpio_backlight_platform_data gpio_backlight_data = {
-+	.fbdev = &lcdc_device.dev,
-+	.gpio = GPIO_PTR1,
-+	.def_value = 1,
-+	.name = "backlight",
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++struct gpio_backlight {
++	struct device *dev;
++	struct device *fbdev;
++
++	int gpio;
++	int active;
 +};
 +
-+static struct platform_device gpio_backlight_device = {
-+	.name = "gpio-backlight",
-+	.dev = {
-+		.platform_data = &gpio_backlight_data,
++static int gpio_backlight_update_status(struct backlight_device *bl)
++{
++	struct gpio_backlight *gbl = bl_get_data(bl);
++	int brightness = bl->props.brightness;
++
++	if (bl->props.power != FB_BLANK_UNBLANK ||
++	    bl->props.fb_blank != FB_BLANK_UNBLANK ||
++	    bl->props.state & (BL_CORE_SUSPENDED | BL_CORE_FBBLANK))
++		brightness = 0;
++
++	gpio_set_value(gbl->gpio, brightness ? gbl->active : !gbl->active);
++
++	return 0;
++}
++
++static int gpio_backlight_get_brightness(struct backlight_device *bl)
++{
++	return bl->props.brightness;
++}
++
++static int gpio_backlight_check_fb(struct backlight_device *bl,
++				   struct fb_info *info)
++{
++	struct gpio_backlight *gbl = bl_get_data(bl);
++
++	return gbl->fbdev == NULL || gbl->fbdev == info->dev;
++}
++
++static const struct backlight_ops gpio_backlight_ops = {
++	.options	= BL_CORE_SUSPENDRESUME,
++	.update_status	= gpio_backlight_update_status,
++	.get_brightness	= gpio_backlight_get_brightness,
++	.check_fb	= gpio_backlight_check_fb,
++};
++
++static int gpio_backlight_probe(struct platform_device *pdev)
++{
++	struct gpio_backlight_platform_data *pdata = pdev->dev.platform_data;
++	struct backlight_properties props;
++	struct backlight_device *bl;
++	struct gpio_backlight *gbl;
++	int ret;
++
++	if (!pdata) {
++		dev_err(&pdev->dev, "failed to find platform data\n");
++		return -ENODEV;
++	}
++
++	gbl = devm_kzalloc(&pdev->dev, sizeof(*gbl), GFP_KERNEL);
++	if (gbl == NULL)
++		return -ENOMEM;
++
++	gbl->dev = &pdev->dev;
++	gbl->fbdev = pdata->fbdev;
++	gbl->gpio = pdata->gpio;
++	gbl->active = pdata->active_low ? 0 : 1;
++
++	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
++				    (gbl->active ? GPIOF_INIT_LOW
++						 : GPIOF_INIT_HIGH),
++				    pdata->name);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "unable to request GPIO\n");
++		return ret;
++	}
++
++	memset(&props, 0, sizeof(props));
++	props.type = BACKLIGHT_RAW;
++	props.max_brightness = 1;
++	bl = backlight_device_register(dev_name(&pdev->dev), &pdev->dev, gbl,
++				       &gpio_backlight_ops, &props);
++	if (IS_ERR(bl)) {
++		dev_err(&pdev->dev, "failed to register backlight\n");
++		return PTR_ERR(bl);
++	}
++
++	bl->props.brightness = pdata->def_value;
++	backlight_update_status(bl);
++
++	platform_set_drvdata(pdev, bl);
++	return 0;
++}
++
++static int gpio_backlight_remove(struct platform_device *pdev)
++{
++	struct backlight_device *bl = platform_get_drvdata(pdev);
++
++	backlight_device_unregister(bl);
++	return 0;
++}
++
++static struct platform_driver gpio_backlight_driver = {
++	.driver		= {
++		.name		= "gpio-backlight",
++		.owner		= THIS_MODULE,
 +	},
++	.probe		= gpio_backlight_probe,
++	.remove		= gpio_backlight_remove,
 +};
 +
- /* CEU0 */
- static struct sh_mobile_ceu_info sh_mobile_ceu0_info = {
- 	.flags = SH_CEU_FLAG_USE_8BIT_BUS,
-@@ -1049,6 +1052,7 @@ static struct platform_device *ecovec_devices[] __initdata = {
- 	&usb1_common_device,
- 	&usbhs_device,
- 	&lcdc_device,
-+	&gpio_backlight_device,
- 	&ceu0_device,
- 	&ceu1_device,
- 	&keysc_device,
-@@ -1239,11 +1243,9 @@ static int __init arch_setup(void)
- 
- 	gpio_request(GPIO_PTE6, NULL);
- 	gpio_request(GPIO_PTU1, NULL);
--	gpio_request(GPIO_PTR1, NULL);
- 	gpio_request(GPIO_PTA2, NULL);
- 	gpio_direction_input(GPIO_PTE6);
- 	gpio_direction_output(GPIO_PTU1, 0);
--	gpio_direction_output(GPIO_PTR1, 0);
- 	gpio_direction_output(GPIO_PTA2, 0);
- 
- 	/* I/O buffer drive ability is high */
-@@ -1256,6 +1258,9 @@ static int __init arch_setup(void)
- 		lcdc_info.ch[0].lcd_modes		= ecovec_dvi_modes;
- 		lcdc_info.ch[0].num_modes		= ARRAY_SIZE(ecovec_dvi_modes);
- 
-+		/* No backlight */
-+		gpio_backlight_data.fbdev = NULL;
++module_platform_driver(gpio_backlight_driver);
 +
- 		gpio_set_value(GPIO_PTA2, 1);
- 		gpio_set_value(GPIO_PTU1, 1);
- 	} else {
-@@ -1265,8 +1270,6 @@ static int __init arch_setup(void)
- 		lcdc_info.ch[0].lcd_modes		= ecovec_lcd_modes;
- 		lcdc_info.ch[0].num_modes		= ARRAY_SIZE(ecovec_lcd_modes);
- 
--		gpio_set_value(GPIO_PTR1, 1);
--
- 		/* FIXME
- 		 *
- 		 * LCDDON control is needed for Panel,
++MODULE_AUTHOR("Laurent Pinchart <laurent.pinchart@ideasonboard.com>");
++MODULE_DESCRIPTION("GPIO-based Backlight Driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:gpio-backlight");
+diff --git a/include/linux/platform_data/gpio_backlight.h b/include/linux/platform_data/gpio_backlight.h
+new file mode 100644
+index 0000000..5ae0d9c
+--- /dev/null
++++ b/include/linux/platform_data/gpio_backlight.h
+@@ -0,0 +1,21 @@
++/*
++ * gpio_backlight.h - Simple GPIO-controlled backlight
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __GPIO_BACKLIGHT_H__
++#define __GPIO_BACKLIGHT_H__
++
++struct device;
++
++struct gpio_backlight_platform_data {
++	struct device *fbdev;
++	int gpio;
++	int def_value;
++	bool active_low;
++	const char *name;
++};
++
++#endif
 -- 
 1.7.10.4
