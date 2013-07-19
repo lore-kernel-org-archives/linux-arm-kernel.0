@@ -1,36 +1,85 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:36:57 +0900
-Subject: [PATCH 03/19] ARM: shmobile: r8a7778: Add pin control device to
+Date: Fri, 19 Jul 2013 13:36:59 +0900
+Subject: [PATCH 05/19] ARM: shmobile: r8a7779: Add pin control device to
  device tree
 In-Reply-To: <cover.1374208262.git.horms+renesas@verge.net.au>
 References: <cover.1374208262.git.horms+renesas@verge.net.au>
-Message-ID: <2754bfad53d2a5eb2a824c0c8f65564cf0d7b57c.1374208262.git.horms+renesas@verge.net.au>
+Message-ID: <c829db7cacd0a5dd857bf59f74db1c5e1d3f32f6.1374208262.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Add a pfc node to the r8a7778 device tree.
+Add a pfc node to the r8a7779 device tree and remove manual pinmux
+initialization from the corresponding board files.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/r8a7779.dtsi                  |    5 +++++
+ arch/arm/mach-shmobile/board-marzen-reference.c |   17 ++++++++---------
+ 2 files changed, 13 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 4743735..c8dbf14 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -32,4 +32,9 @@
- 		reg = <0xfe438000 0x1000>,
- 		      <0xfe430000 0x100>;
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 7f146c6..9dfc438 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -101,6 +101,11 @@
+ 		interrupts = <0 81 0x4>;
  	};
-+
+ 
 +	pfc: pfc at fffc0000 {
-+		compatible = "renesas,pfc-r8a7778";
-+		reg = <0xfffc000 0x118>;
++		compatible = "renesas,pfc-r8a7779";
++		reg = <0xfffc0000 0x23c>;
 +	};
++
+ 	thermal at ffc48000 {
+ 		compatible = "renesas,rcar-thermal";
+ 		reg = <0xffc48000 0x38>;
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index 480d882..94804f3 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -28,24 +28,24 @@
+ 
+ static const struct pinctrl_map marzen_pinctrl_map[] = {
+ 	/* SCIF2 (CN18: DEBUG0) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "fffc0000.pfc",
+ 				  "scif2_data_c", "scif2"),
+ 	/* SCIF4 (CN19: DEBUG1) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "fffc0000.pfc",
+ 				  "scif4_data", "scif4"),
+ 	/* SDHI0 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_data4", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_ctrl", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_cd", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_wp", "sdhi0"),
+ 	/* SMSC */
+-	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "fffc0000.pfc",
+ 				  "intc_irq1_b", "intc"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "fffc0000.pfc",
+ 				  "lbsc_ex_cs0", "lbsc"),
  };
+ 
+@@ -53,7 +53,6 @@ static void __init marzen_init(void)
+ {
+ 	pinctrl_register_mappings(marzen_pinctrl_map,
+ 				  ARRAY_SIZE(marzen_pinctrl_map));
+-	r8a7779_pinmux_init();
+ 
+ 	r8a7779_add_standard_devices_dt();
+ }
 -- 
 1.7.10.4
