@@ -1,30 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 19 Jul 2013 14:58:53 +0100
-Subject: [PATCH 22/22] ARM: ux500: Remove '0x's from Spear 320 DTS file
-In-Reply-To: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
-References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1374242333-6852-22-git-send-email-lee.jones@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 19 Jul 2013 15:01:02 +0100
+Subject: alignment handler instruction endian-ness
+In-Reply-To: <20130719110947.GD24642@n2100.arm.linux.org.uk>
+References: <51E91BE5.8070809@codethink.co.uk>
+ <20130719110947.GD24642@n2100.arm.linux.org.uk>
+Message-ID: <1374242462.3406.59.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/spear320.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, 2013-07-19 at 12:09 +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 19, 2013 at 11:58:45AM +0100, Ben Dooks wrote:
+> > I ran in to an issue with the alignment handler when running BE8 where
+> > it loads instructions and fails to swap.
+> >
+> > Is there a better way of swapping instructions for ARM when loading
+> > from arbitrary places? Have I missed any other places this could happen?
+> 
+> Maybe we need a macro which deals with this automatically?
 
-diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
-index ffea342..a82d76e5 100644
---- a/arch/arm/boot/dts/spear320.dtsi
-+++ b/arch/arm/boot/dts/spear320.dtsi
-@@ -55,7 +55,7 @@
- 			status = "disabled";
- 		};
- 
--		shirq: interrupt-controller at 0xb3000000 {
-+		shirq: interrupt-controller at b3000000 {
- 			compatible = "st,spear320-shirq";
- 			reg = <0xb3000000 0x1000>;
- 			interrupts = <30 28 29 1>;
--- 
-1.8.1.2
+Like the stuff in arch/arm/include/asm/opcodes.h ?
+
+> 	arm_instr_to_cpu(x)
+> 	thumb_instr_to_cpu(x)
+> 
+> These should probably make use of the swab*() macros when an endian swap
+> is needed.
+> 
+> > The following patch is my first attempt at solving the problem for the
+> > alignment handler:
+> 
+> I'd suggest checking this with sparse too - you have some type errors here.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
