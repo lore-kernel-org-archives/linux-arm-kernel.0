@@ -1,32 +1,48 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri, 19 Jul 2013 10:16:44 -0700
-Subject: [PATCH 1/2] clk/zynq/pll: Fix documentation for PLL register function
-Message-ID: <1374254205-9912-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Fri, 19 Jul 2013 10:16:45 -0700
+Subject: [PATCH 2/2] clk/zynq/pll: Use #defines for fbdiv min/max values
+In-Reply-To: <1374254205-9912-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1374254205-9912-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1374254205-9912-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use more descriptive #defines for the minimum and maximum PLL
+feedback divider.
+
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/clk/zynq/pll.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/clk/zynq/pll.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clk/zynq/pll.c b/drivers/clk/zynq/pll.c
-index 47e307c..67f1b5e 100644
+index 67f1b5e..26a8d8b 100644
 --- a/drivers/clk/zynq/pll.c
 +++ b/drivers/clk/zynq/pll.c
-@@ -182,7 +182,12 @@ static const struct clk_ops zynq_pll_ops = {
+@@ -50,6 +50,9 @@ struct zynq_pll {
+ #define PLLCTRL_RESET_MASK	1
+ #define PLLCTRL_RESET_SHIFT	0
  
++#define PLL_FBDIV_MIN	13
++#define PLL_FBDIV_MAX	66
++
  /**
-  * clk_register_zynq_pll() - Register PLL with the clock framework
-- * @np	Pointer to the DT device node
-+ * @name	PLL name
-+ * @parent	Parent clock name
-+ * @pll_ctrl	Pointer to PLL control register
-+ * @pll_status	Pointer to PLL status register
-+ * @lock_index	Bit index to this PLL's lock status bit in @pll_status
-+ * @lock	Register lock
-  */
- struct clk *clk_register_zynq_pll(const char *name, const char *parent,
- 		void __iomem *pll_ctrl, void __iomem *pll_status, u8 lock_index,
+  * zynq_pll_round_rate() - Round a clock frequency
+  * @hw:		Handle between common and hardware-specific interfaces
+@@ -63,10 +66,10 @@ static long zynq_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	u32 fbdiv;
+ 
+ 	fbdiv = DIV_ROUND_CLOSEST(rate, *prate);
+-	if (fbdiv < 13)
+-		fbdiv = 13;
+-	else if (fbdiv > 66)
+-		fbdiv = 66;
++	if (fbdiv < PLL_FBDIV_MIN)
++		fbdiv = PLL_FBDIV_MIN;
++	else if (fbdiv > PLL_FBDIV_MAX)
++		fbdiv = PLL_FBDIV_MAX;
+ 
+ 	return *prate * fbdiv;
+ }
 -- 
 1.8.3.3
