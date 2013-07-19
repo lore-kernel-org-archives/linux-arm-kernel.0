@@ -1,23 +1,59 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 19 Jul 2013 14:16:48 +0200
-Subject: [PATCH] ARM: clocksource: moxart: documentation: update device
- tree bindings document
-In-Reply-To: <1374232379-20900-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
- <1374232379-20900-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <51E92E30.5090907@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 19 Jul 2013 16:32:42 +0400
+Subject: [PATCH 01/19] ARM: shmobile: r8a73a4: Add pin control device
+ to device tree
+In-Reply-To: <c173e780f82e5dea3da21f9eda47bc48aa3f57b1.1374208262.git.horms+renesas@verge.net.au>
+References: <cover.1374208262.git.horms+renesas@verge.net.au>
+ <c173e780f82e5dea3da21f9eda47bc48aa3f57b1.1374208262.git.horms+renesas@verge.net.au>
+Message-ID: <51E931EA.6010805@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2013 01:12 PM, Jonas Jensen wrote:
-> Update device tree bindings document with the correct clock name.
+Hello.
 
-Ok, pushed.
+On 19-07-2013 8:36, Simon Horman wrote:
 
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> Add a pfc node to the r8a73a4 device tree.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+    This patch looks strange...
+
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/boot/dts/r8a73a4.dtsi |   88 ++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 88 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+> index 4ff2019..f1a35d5 100644
+> --- a/arch/arm/boot/dts/r8a73a4.dtsi
+> +++ b/arch/arm/boot/dts/r8a73a4.dtsi
+> @@ -85,4 +85,92 @@
+>   		interrupt-parent = <&gic>;
+>   		interrupts = <0 69 4>;
+>   	};
+> +
+> +	i2c0: i2c at e6500000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "renesas,rmobile-iic";
+> +		reg = <0 0xe6500000 0 0x428>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 174 0x4>;
+> +	};
+[...]
+> +	i2c8: i2c at e6570000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "renesas,rmobile-iic";
+> +		reg = <0 0xe6570000 0 0x428>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 173 0x4>;
+> +	};
+> +
+
+    Hm, this also adds a bunch of I2C controllers which is not mentioned in 
+the changelog at all.
+
+WBR, Sergei
