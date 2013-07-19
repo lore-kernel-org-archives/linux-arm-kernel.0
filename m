@@ -1,29 +1,118 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Jul 2013 10:52:33 -0600
-Subject: [PATCH V4 0/4] ARM: tegra114: cpuidle: add power down state
-In-Reply-To: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
-References: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51E96ED1.9020300@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 19 Jul 2013 17:52:46 +0100
+Subject: [PATCH 2/6] ASoC: sirf: add I2S CPU DAI driver
+In-Reply-To: <1374232042-26088-3-git-send-email-Baohua.Song@csr.com>
+References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
+ <1374232042-26088-3-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130719165246.GL9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2013 03:25 AM, Joseph Lo wrote:
-> This series introduce CPU core power down state for CPU idle. When CPU go
-> into this state, it saves it's context and needs a proper configuration
-> in flow controller to power gate the CPU when CPU runs into WFI
-> instruction. And the CPU also needs to set the IRQ as CPU power down idle
-> wake up event in flow controller.
-> 
-> To prevent race conditions and ensure proper interrupt routing on
-> Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
-> call-back to reprogram the GIC CPU interface on PM entry. The
-> GIC CPU interface will be reset back to its normal state by
-> the common GIC CPU PM exit callback when the CPU wakes up.
-> 
-> And the Tegra114 support CPU0 hotplug function in HW physically, but it
-> needs other software to make it work normally after we add CPU idle power
-> down mode support. But we don't support that yet, removing them for now.
+On Fri, Jul 19, 2013 at 07:07:18PM +0800, Barry Song wrote:
 
-OK, this version works fine, so I have applied it to Tegra's
-for-3.12/soc. I hope we can resolve the issues with
-CPUIDLE_FLAG_TIMER_STOP and CPU0 hot plug soon though.
+Pretty good overall - there's a few things below but should all be
+fairly small.
+
+> +static int sirf_i2s_startup(struct snd_pcm_substream *substream,
+> +		struct snd_soc_dai *dai)
+> +{
+> +
+> +	struct sirf_i2s *si2s = snd_soc_dai_get_drvdata(dai);
+> +
+> +	if (si2s->master_mode)
+> +		pwm_enable(si2s->mclk_pwm);
+> +	clk_prepare_enable(si2s->clk);
+> +
+> +	device_reset(dai->dev);
+> +	snd_soc_dai_set_dma_data(dai, substream,
+> +		&sirf_i2s_dai_dma_data[substream->stream]);
+> +	return 0;
+> +}
+
+device_reset() sounds like it's not going to work for simultaneous
+playback and capture.
+
+> +static int sirf_i2s_trigger(struct snd_pcm_substream *substream,
+> +		int cmd, struct snd_soc_dai *dai)
+> +{
+> +	struct sirf_i2s *si2s = snd_soc_dai_get_drvdata(dai);
+> +	int playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
+> +
+> +	switch (cmd) {
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		spin_lock(&si2s->lock);
+> +
+> +		if (playback) {
+> +			/* First start the FIFO, then enable the tx/rx */
+> +			writel(AUDIO_FIFO_RESET,
+> +				si2s->base + AUDIO_CTRL_EXT_TXFIFO1_OP);
+> +			mdelay(1);
+> +			writel(AUDIO_FIFO_START,
+> +				si2s->base + AUDIO_CTRL_EXT_TXFIFO1_OP);
+> +			mdelay(1);
+
+Do we really need these 1ms delays?  They're very long for the
+context...
+
+> +static int sirf_i2s_prepare(struct snd_pcm_substream *substream,
+> +			struct snd_soc_dai *dai)
+> +{
+> +	struct snd_pcm_runtime *runtime = substream->runtime;
+> +	struct sirf_i2s *si2s = snd_soc_dai_get_drvdata(dai);
+> +	u32 ctrl = readl(si2s->base + AUDIO_CTRL_I2S_CTRL);
+> +
+> +	if (runtime->channels == 2)
+> +		ctrl &= ~I2S_SIX_CHANNELS;
+> +	else
+> +		ctrl |= I2S_SIX_CHANNELS;
+
+A switch statement for the number of channels would make me happier
+here.
+
+> +	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> +	case SND_SOC_DAIFMT_CBM_CFM:
+> +		ctrl = readl(si2s->base + AUDIO_CTRL_I2S_CTRL);
+> +		ctrl |= I2S_SLAVE_MODE;
+> +		writel(ctrl, si2s->base + AUDIO_CTRL_I2S_CTRL);
+> +		si2s->master_mode = 0;
+> +		break;
+
+Do we need locking on all these register updates?
+
+> +	case SND_SOC_DAIFMT_CBS_CFS:
+> +		si2s->master_mode = 1;
+> +		return -EINVAL;
+
+Should this be undoing the work done for _CBM_CFM?
+
+> +#ifdef CONFIG_PM
+> +static int sirf_i2s_suspend(struct platform_device *pdev,
+> +		pm_message_t state)
+> +{
+> +	struct sirf_i2s *si2s = platform_get_drvdata(pdev);
+> +
+> +	si2s->i2s_ctrl = readl(si2s->base+AUDIO_CTRL_I2S_CTRL);
+> +
+> +	clk_disable_unprepare(si2s->clk);
+> +
+> +	if (si2s->master_mode)
+> +		pwm_disable(si2s->mclk_pwm);
+> +	return 0;
+> +}
+
+Should these be runtime PM calls as well?  Seems like the bus could be
+unclocked whenever audio is not playing.  If you need the clock to write
+conifguraiton perhaps regmap-mmio could help?
+
+> +	spin_lock_init(&si2s->lock);
+
+What is this lock actually protecting?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/727ea2f8/attachment.sig>
