@@ -1,9 +1,9 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 19 Jul 2013 14:58:47 +0100
-Subject: [PATCH 16/22] ARM: ux500: Remove '0x's from OMAP3430 SDP DTS file
+Date: Fri, 19 Jul 2013 14:58:49 +0100
+Subject: [PATCH 18/22] ARM: ux500: Remove '0x's from OMAP5 DTS file
 In-Reply-To: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
 References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1374242333-6852-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1374242333-6852-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,79 +12,30 @@ Cc: Tony Lindgren <tony@atomide.com>
 Cc: linux-omap at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/omap3430-sdp.dts | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/omap5.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-index e2249bc..281914e 100644
---- a/arch/arm/boot/dts/omap3430-sdp.dts
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -84,15 +84,15 @@
- 			label = "bootloader-nor";
- 			reg = <0 0x40000>;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index e643620..be58604 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -604,7 +604,7 @@
+ 			ti,hwmods = "wd_timer2";
  		};
--		partition at 0x40000 {
-+		partition at 40000 {
- 			label = "params-nor";
- 			reg = <0x40000 0x40000>;
+ 
+-		emif1: emif at 0x4c000000 {
++		emif1: emif at 4c000000 {
+ 			compatible	= "ti,emif-4d5";
+ 			ti,hwmods	= "emif1";
+ 			phy-type	= <2>; /* DDR PHY type: Intelli PHY */
+@@ -615,7 +615,7 @@
+ 			hw-caps-temp-alert;
  		};
--		partition at 0x80000 {
-+		partition at 80000 {
- 			label = "kernel-nor";
- 			reg = <0x80000 0x200000>;
- 		};
--		partition at 0x280000 {
-+		partition at 280000 {
- 			label = "filesystem-nor";
- 			reg = <0x240000 0x7d80000>;
- 		};
-@@ -125,19 +125,19 @@
- 			label = "xloader-nand";
- 			reg = <0 0x80000>;
- 		};
--		partition at 0x80000 {
-+		partition at 80000 {
- 			label = "bootloader-nand";
- 			reg = <0x80000 0x140000>;
- 		};
--		partition at 0x1c0000 {
-+		partition at 1c0000 {
- 			label = "params-nand";
- 			reg = <0x1c0000 0xc0000>;
- 		};
--		partition at 0x280000 {
-+		partition at 280000 {
- 			label = "kernel-nand";
- 			reg = <0x280000 0x500000>;
- 		};
--		partition at 0x780000 {
-+		partition at 780000 {
- 			label = "filesystem-nand";
- 			reg = <0x780000 0x7880000>;
- 		};
-@@ -170,19 +170,19 @@
- 			label = "xloader-onenand";
- 			reg = <0 0x80000>;
- 		};
--		partition at 0x80000 {
-+		partition at 80000 {
- 			label = "bootloader-onenand";
- 			reg = <0x80000 0x40000>;
- 		};
--		partition at 0xc0000 {
-+		partition at c0000 {
- 			label = "params-onenand";
- 			reg = <0xc0000 0x20000>;
- 		};
--		partition at 0xe0000 {
-+		partition at e0000 {
- 			label = "kernel-onenand";
- 			reg = <0xe0000 0x200000>;
- 		};
--		partition at 0x2e0000 {
-+		partition at 2e0000 {
- 			label = "filesystem-onenand";
- 			reg = <0x2e0000 0xfd20000>;
- 		};
+ 
+-		emif2: emif at 0x4d000000 {
++		emif2: emif at 4d000000 {
+ 			compatible	= "ti,emif-4d5";
+ 			ti,hwmods	= "emif2";
+ 			phy-type	= <2>; /* DDR PHY type: Intelli PHY */
 -- 
 1.8.1.2
