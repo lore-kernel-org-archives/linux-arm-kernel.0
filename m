@@ -1,97 +1,84 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Jul 2013 09:45:20 -0600
-Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <20130719032328.GB20889@S2101-09.ap.freescale.net>
-References: <20130716015038.GD28375@S2101-09.ap.freescale.net>
- <51E4BF98.8030604@wwwdotorg.org>
- <20130716041056.GA30067@S2101-09.ap.freescale.net>
- <51E56AA7.7020103@wwwdotorg.org>
- <20130717030246.GA4541@S2101-09.ap.freescale.net>
- <51E6CCE4.20705@wwwdotorg.org> <20130717213836.GA13324@amd.pavel.ucw.cz>
- <51E719A6.6070105@wwwdotorg.org> <20130718112555.GB1021@amd.pavel.ucw.cz>
- <CAOesGMgi0j_mPyeBLVHb_QW+DwtAPoFY697eQO3-yp9tnP1vmA@mail.gmail.com>
- <20130719032328.GB20889@S2101-09.ap.freescale.net>
-Message-ID: <51E95F10.5070006@wwwdotorg.org>
+Date: Fri, 19 Jul 2013 09:54:29 -0600
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <51E8DE51.1060404@ti.com>
+References: <1374129984-765-1-git-send-email-kishon@ti.com>
+ <1374129984-765-2-git-send-email-kishon@ti.com>
+ <20130718072004.GA16720@kroah.com> <51E7AE88.3050007@ti.com>
+ <20130718154954.GA31961@kroah.com> <51E8D086.809@ti.com>
+ <20130719054311.GA14638@kroah.com> <51E8D4E0.8060200@ti.com>
+ <20130719062941.GA23611@kroah.com> <51E8DE51.1060404@ti.com>
+Message-ID: <51E96135.9090108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 09:23 PM, Shawn Guo wrote:
-> On Thu, Jul 18, 2013 at 11:45:29AM -0700, Olof Johansson wrote:
-...
->> You're spending an awful lot of energy arguing over this, but nobody
->> has actually shown data of how much deferral is happening -- and that
->> it's a real problem. Until someone does so there's no reason to change
->> it from the default module init level at all, I'd say.
+On 07/19/2013 12:36 AM, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> On imx6qdl-sabreauto board, there are 3 MAX7310 units as IO expanders to
-> output 3 x 8 = 24 GPIOs.  18 of them are used for resets, enables and
-> pin steering for various peripherals on the board.
+> On Friday 19 July 2013 11:59 AM, Greg KH wrote:
+>> On Fri, Jul 19, 2013 at 11:25:44AM +0530, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Friday 19 July 2013 11:13 AM, Greg KH wrote:
+>>>> On Fri, Jul 19, 2013 at 11:07:10AM +0530, Kishon Vijay Abraham I wrote:
+>>>>>>>>> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
+>>>>>>>>
+>>>>>>>> Your naming is odd, no "phy" anywhere in it?  You rely on the sender to
+>>>>>>>> never send a duplicate name.id pair?  Why not create your own ids based
+>>>>>>>> on the number of phys in the system, like almost all other classes and
+>>>>>>>> subsystems do?
+>>>>>>>
+>>>>>>> hmm.. some PHY drivers use the id they provide to perform some of their
+>>>>>>> internal operation as in [1] (This is used only if a single PHY provider
+>>>>>>> implements multiple PHYS). Probably I'll add an option like PLATFORM_DEVID_AUTO
+>>>>>>> to give the PHY drivers an option to use auto id.
+>>>>>>>
+>>>>>>> [1] ->
+>>>>>>> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
+>>>>>>
+>>>>>> No, who cares about the id?  No one outside of the phy core ever should,
+>>>>>> because you pass back the only pointer that they really do care about,
+>>>>>> if they need to do anything with the device.  Use that, and then you can
+>>>>>
+>>>>> hmm.. ok.
+>>>>>
+>>>>>> rip out all of the "search for a phy by a string" logic, as that's not
+>>>>>
+>>>>> Actually this is needed for non-dt boot case. In the case of dt boot, we use a
+>>>>> phandle by which the controller can get a reference to the phy. But in the case
+>>>>> of non-dt boot, the controller can get a reference to the phy only by label.
+>>>>
+>>>> I don't understand.  They registered the phy, and got back a pointer to
+>>>> it.  Why can't they save it in their local structure to use it again
+>>>> later if needed?  They should never have to "ask" for the device, as the
+>>>
+>>> One is a *PHY provider* driver which is a driver for some PHY device. This will
+>>> use phy_create to create the phy.
+>>> The other is a *PHY consumer* driver which might be any controller driver (can
+>>> be USB/SATA/PCIE). The PHY consumer will use phy_get to get a reference to the
+>>> phy (by *phandle* in the case of dt boot and *label* in the case of non-dt boot).
+>>>> device id might be unknown if there are multiple devices in the system.
+>>>
+>>> I agree with you on the device id part. That need not be known to the PHY driver.
+>>
+>> How does a consumer know which "label" to use in a non-dt system if
+>> there are multiple PHYs in the system?
 > 
->   BACKLITE_ON
->   SAT_SHUTDN_B
->   CPU_PER_RST_B
->   MAIN_PER_RST_B
->   IPOD_RST_B
->   MLB_RST_B
->   SSI_STEERING
->   GPS_RST_B
->   
->   GPS_PWREN
->   VIDEO_ADC_PWRDN_B
->   ENET_CAN1_STEER
->   EIMD30_BTUART3_STEER
->   CAN_STBY
->   CAN_EN
->   USB_H1_PWR
->   
->   USB_OTG_PWR_ON
->   SAT_RST_B
->   NAND_BT_WIFI_STEER
-> 
-> Most of these GPIOs need to set up properly at client device driver's
-> probe stage - module_init() time.  So if we have all these service
-> providers resets/enables/steering API registered at module_init() too,
-> the probes of all these client device drivers stand a good chance to be
-> deferred.
+> That should be passed using platform data.
 
-That sounds like it /could/ well be an issue. Do you have all that
-actually hooked up through device tree so you can demonstrate the amount
-of deferred probing that /actually/ happens though?
+I don't think that's right. That's just like passing clock names in
+platform data, which I believe is frowned upon.
 
-In order to push the probe order in the right direction, I would
-personally prefer to see some kind of explicit hinting or outright
-representation of probe order in the DT.
+Instead, why not take the approach that e.g. regulators have taken? Each
+driver defines the names of the objects that it requires. There is a
+table (registered by a board file) that has lookup key (device name,
+regulator name), and the output is the regulator device (or global
+regulator name).
 
-If we fiddle with initcall levels to do this, (a) it won't always work;
-what may be optimal for one board/SoC may not be optimal for another,
-and with multi-platform kernels, we have to take a broader view, (b) the
-only beneficiary is Linux; if we add information to DT for this, every
-OS could benefit in the same way.
+This is almost the same way that DT works, except that in DT, the table
+is represented as properties in the DT. The DT binding defines the names
+of those properties, or the strings that must be in the foo-names
+properties, just like a driver in non-DT Linux is going to define the
+names it expects to be provided with.
 
-My view is that when one HW object depends on another (e.g. it's reset
-by some other module, sends an interrupt to another module, is affected
-by a pin controller module, etc.), that really is a HW issue, and hence
-is appropriate to represent in device tree.
-
-In fact, we already do represent the dependencies in device tree; e.g. a
-foo-gpios/foo-reset/... property already indicates this. The issue is
-that there's no standard naming/structure across all types of DT binding
-(GPIO, reset, ...), and hence the only way to parse these dependencies
-is to do exactly what deferred probe is doing; try probing each driver,
-which then encompasses all device-specific and subsystem-specific naming
-and DT structure in its actions, and if it fails, then defer probe.
-
-If we had some explicit information re: dependencies in the DT, in an
-entirely standard format, perhaps the device core or similar could parse
-this and not even attempt probe until the relevant devices had completed
-probe. If the information turned out to be bogus (e.g. loops, missing
-drivers), we could always fall back to pure deferred probe later in the
-boot sequence.
-
-Or perhaps we should revisit whether DT node order should be defined as
-having a guaranteed influence on probe order. We could enforce that the
-source order has no influence, but then run a post-processing tool that
-finds all the dependencies from the phandles in the DT, and then
-re-sorts the DTB to get the probing order right? That would probably
-require every single driver to be module_initcall, or to ignore driver
-registration order and only probe devices in the order they appear in DT.
+That way, you don't need platform data to define the names.
