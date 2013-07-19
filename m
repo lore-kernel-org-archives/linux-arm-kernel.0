@@ -1,151 +1,253 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Fri, 19 Jul 2013 07:19:59 +0530
-Subject: [PATCH V3] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
- host
-In-Reply-To: <20130718160605.GB18520@e106331-lin.cambridge.arm.com>
-References: <1374048718-9455-1-git-send-email-anup.patel@linaro.org>
- <20130718160605.GB18520@e106331-lin.cambridge.arm.com>
-Message-ID: <CAAhSdy25vrO4ep_atQaS6p3LN1xzYfSBry-gjjbQT7qws0Ddsw@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 19 Jul 2013 07:43:11 +0530
+Subject: [PATCH V3 RFT] ARM: tegra: enable palmas device for dalmore
+Message-ID: <1374199992-27947-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 9:36 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jul 17, 2013 at 09:11:58AM +0100, Anup Patel wrote:
->> This patch allows us to have X-Gene guest VCPU when using KVM arm64
->> on APM X-Gene host.
->>
->> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
->> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
->> when running on X-Gene host with Potenza core.
->>
->> V3:
->>  - Reduce multiple "return -EINVAL" in kvm_target_cpu()
->>
->> V2:
->>  - Renamed KVM_ARM_TARGET_XGENE_V8 to KVM_ARM_TARGET_XGENE_POTENZA
->>
->> V1:
->>  - Initial patch with target named as KVM_ARM_TARGET_XGENE_V8
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> ---
->>  arch/arm64/include/uapi/asm/kvm.h    |    3 ++-
->>  arch/arm64/kvm/guest.c               |   36 ++++++++++++++++++++++------------
->>  arch/arm64/kvm/sys_regs_generic_v8.c |    3 +++
->>  3 files changed, 29 insertions(+), 13 deletions(-)
->>
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 5031f42..d9f026b 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -55,8 +55,9 @@ struct kvm_regs {
->>  #define KVM_ARM_TARGET_AEM_V8                0
->>  #define KVM_ARM_TARGET_FOUNDATION_V8 1
->>  #define KVM_ARM_TARGET_CORTEX_A57    2
->> +#define KVM_ARM_TARGET_XGENE_POTENZA 3
->>
->> -#define KVM_ARM_NUM_TARGETS          3
->> +#define KVM_ARM_NUM_TARGETS          4
->>
->>  /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
->>  #define KVM_ARM_DEVICE_TYPE_SHIFT    0
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->> index 2c3ff67..143d179 100644
->> --- a/arch/arm64/kvm/guest.c
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -207,20 +207,32 @@ int __attribute_const__ kvm_target_cpu(void)
->>       unsigned long implementor = read_cpuid_implementor();
->>       unsigned long part_number = read_cpuid_part_number();
->>
->> -     if (implementor != ARM_CPU_IMP_ARM)
->> -             return -EINVAL;
->> -
->> -     switch (part_number) {
->> -     case ARM_CPU_PART_AEM_V8:
->> -             return KVM_ARM_TARGET_AEM_V8;
->> -     case ARM_CPU_PART_FOUNDATION:
->> -             return KVM_ARM_TARGET_FOUNDATION_V8;
->> -     case ARM_CPU_PART_CORTEX_A57:
->> -             /* Currently handled by the generic backend */
->> -             return KVM_ARM_TARGET_CORTEX_A57;
->> +     switch (implementor) {
->> +     case ARM_CPU_IMP_ARM:
->> +             switch (part_number) {
->> +             case ARM_CPU_PART_AEM_V8:
->> +                     return KVM_ARM_TARGET_AEM_V8;
->> +             case ARM_CPU_PART_FOUNDATION:
->> +                     return KVM_ARM_TARGET_FOUNDATION_V8;
->> +             case ARM_CPU_PART_CORTEX_A57:
->> +                     return KVM_ARM_TARGET_CORTEX_A57;
->> +             default:
->> +                     break;
->
-> This can go, the break outside the switch will handle it.
+Make the entry of Dalmore Power Management Unit device TPS65913
+in dalmore DTS file. The Palma driver support this device.
 
-Ok, I will update this accordingly.
+Enable following submodule of the TPS65913:
+- GPIO driver
+- RTC driver.
+- Power regulator driver.
 
->
->> +             }
->> +             break;
->> +     case ARM_CPU_IMP_APM:
->> +             switch (part_number) {
->> +             case APM_CPU_PART_POTENZA:
->> +                     return KVM_ARM_TARGET_XGENE_POTENZA;
->> +             default:
->> +                     break;
->
-> This one too.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+Changes from V1:
+- renames nodes from palams_* to simple as gpio, rtc, pmic etc.
+- Added line gap properly.
+- Remove comment for palams-gpio reference as the entry itself explain.
+- Remove unit address for tps65913.
 
-Ok.
+Changes from V2:
+- Made LDO9 as always ON for sd card functionality.
 
->
->> +             }
->> +             break;
->>       default:
->> -             return -EINVAL;
->> +             break;
->
-> Given we'll fall out of the switch for an unknown implementor, we don't
-> need the final break.
->
-> Thanks,
-> Mark.
->
->>       }
->> +
->> +     return -EINVAL;
->>  }
->>
->>  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
->> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
->> index 4268ab9..8fe6f76 100644
->> --- a/arch/arm64/kvm/sys_regs_generic_v8.c
->> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
->> @@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
->>                                         &genericv8_target_table);
->>       kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
->>                                         &genericv8_target_table);
->> +     kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
->> +                                       &genericv8_target_table);
->> +
->>       return 0;
->>  }
->>  late_initcall(sys_reg_genericv8_init);
->> --
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hi Stephen,
+I observed that if sd card is not initailised in bootloader then it will not get
+enumerated in the kernel also. In my case, I am using fastboot and hence it is not
+observed that sd card is getting initialised.
+But today I use the uboot and on this, sd card is getting enumerated. And observer that
+LDO9 is getting disabled in late init call due to full constraint and it can create
+issue for sd card. With this modified patch I make the LDO9 as always ON.
 
-Regards,
-Anup
+I am not able to validate this througly as the kernel crash in the method of uboot. Need
+more debugging.
+
+ arch/arm/boot/dts/tegra114-dalmore.dts |  186 +++++++++++++++++++++++++++++++-
+ 1 files changed, 185 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index a42bfa4..d5728ff 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -791,7 +791,7 @@
+ 					regulator-boot-on;
+ 				};
+ 
+-				dcdc3 {
++				tps65090_dcdc3_reg: dcdc3 {
+ 					regulator-name = "vdd-ao";
+ 					regulator-always-on;
+ 					regulator-boot-on;
+@@ -836,6 +836,180 @@
+ 				};
+ 			};
+ 		};
++
++		palmas: tps65913 {
++			compatible = "ti,palmas";
++			reg = <0x58>;
++			interrupts = <0 86 0x4>;
++
++			#interrupt-cells = <2>;
++			interrupt-controller;
++
++			palmas_gpio: gpio {
++				compatible = "ti,palmas-gpio";
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++
++			rtc {
++				compatible = "ti,palmas-rtc";
++				interrupt-parent = <&palmas>;
++				interrupts = <8 0>;
++			};
++
++			pmic {
++			    compatible = "ti,tps65913-pmic", "ti,palmas-pmic";
++			    smps1-in-supply = <&tps65090_dcdc3_reg>;
++			    smps3-in-supply = <&tps65090_dcdc3_reg>;
++			    smps4-in-supply = <&tps65090_dcdc2_reg>;
++			    smps7-in-supply = <&tps65090_dcdc2_reg>;
++			    smps8-in-supply = <&tps65090_dcdc2_reg>;
++			    smps9-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo1-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo2-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo3-in-supply = <&palmas_smps3_reg>;
++			    ldo4-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo5-in-supply = <&vdd_ac_bat_reg>;
++			    ldo6-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo7-in-supply = <&tps65090_dcdc2_reg>;
++			    ldo8-in-supply = <&tps65090_dcdc3_reg>;
++			    ldo9-in-supply = <&palmas_smps9_reg>;
++			    ldoln-in-supply = <&tps65090_dcdc1_reg>;
++			    ldousb-in-supply = <&tps65090_dcdc1_reg>;
++
++			    regulators {
++				smps12 {
++					regulator-name = "vddio-ddr";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				palmas_smps3_reg: smps3 {
++					regulator-name = "vddio-1v8";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps45 {
++					regulator-name = "vdd-core";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps457 {
++					regulator-name = "vdd-core";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps8 {
++					regulator-name = "avdd-pll";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				palmas_smps9_reg: smps9 {
++					regulator-name = "sdhci-vdd-sd-slot";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo1 {
++					regulator-name = "avdd-cam1";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo2 {
++					regulator-name = "avdd-cam2";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo3 {
++					regulator-name = "avdd-dsi-csi";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo4 {
++					regulator-name = "vpp-fuse";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				ldo6 {
++					regulator-name = "vdd-sensor-2v85";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++				};
++
++				ldo7 {
++					regulator-name = "vdd-af-cam1";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo8 {
++					regulator-name = "vdd-rtc";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <900000>;
++					regulator-always-on;
++					regulator-boot-on;
++					ti,enable-ldo8-tracking;
++				};
++
++				ldo9 {
++					regulator-name = "vddio-sdmmc-2";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldoln {
++					regulator-name = "hvdd-usb";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldousb {
++					regulator-name = "avdd-usb";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				regen1 {
++					regulator-name = "rail-3v3";
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				regen2 {
++					regulator-name = "rail-5v0";
++					regulator-max-microvolt = <5000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++			    };
++			};
++		};
+ 	};
+ 
+ 	spi at 7000da00 {
+@@ -980,6 +1154,16 @@
+ 			gpio = <&gpio TEGRA_GPIO(K, 1) GPIO_ACTIVE_HIGH>;
+ 			vin-supply = <&tps65090_dcdc1_reg>;
+ 		};
++
++		vdd_cam_1v8_reg: regulator at 6 {
++			compatible = "regulator-fixed";
++			reg = <6>;
++			regulator-name = "vdd_cam_1v8_reg";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			enable-active-high;
++			gpio = <&palmas_gpio 6 0>;
++		};
+ 	};
+ 
+ 	sound {
+-- 
+1.7.1.1
