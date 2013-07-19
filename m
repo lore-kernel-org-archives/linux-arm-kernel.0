@@ -1,69 +1,74 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 19 Jul 2013 16:49:44 -0700
-Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <20130719094211.GD5106@lukather>
-References: <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
- <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
- <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
- <20130716064107.GA10868@kroah.com> <20130717114650.GN3125@lukather>
- <20130717161758.GA9822@kroah.com> <20130719094211.GD5106@lukather>
-Message-ID: <20130719234944.GA11498@kroah.com>
+Date: Fri, 19 Jul 2013 16:50:55 -0700
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <51E8DE51.1060404@ti.com>
+References: <1374129984-765-1-git-send-email-kishon@ti.com>
+ <1374129984-765-2-git-send-email-kishon@ti.com>
+ <20130718072004.GA16720@kroah.com> <51E7AE88.3050007@ti.com>
+ <20130718154954.GA31961@kroah.com> <51E8D086.809@ti.com>
+ <20130719054311.GA14638@kroah.com> <51E8D4E0.8060200@ti.com>
+ <20130719062941.GA23611@kroah.com> <51E8DE51.1060404@ti.com>
+Message-ID: <20130719235055.GB11498@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 11:42:11AM +0200, Maxime Ripard wrote:
-> On Wed, Jul 17, 2013 at 09:17:58AM -0700, Greg KH wrote:
-> > On Wed, Jul 17, 2013 at 01:46:50PM +0200, Maxime Ripard wrote:
-> > > On Mon, Jul 15, 2013 at 11:41:07PM -0700, Greg KH wrote:
-> > > > On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
-> > > > > So using these new patches for binary attributes, how can I pass data 
-> > > > > between my driver and the sysfs files using a platform_driver? Or are 
-> > > > > other 'hacks' needed and using the .groups attribute from 
-> > > > > platform_driver->device_driver->groups is really the wrong approach.
-> > > > > 
-> > > > > I did ask around and still haven't figured it out so far, so I do 
-> > > > > apologize if you feel I'm wasting your precious time.
-> > > > 
-> > > > How is the platform device not the same thing that was passed to your
-> > > > probe function?
-> > > 
-> > > One thing I don't get here is why it should be set in the
-> > > platform_driver structure. From my understanding of the device model,
-> > > and since what Oliver is trying to do is exposing a few bytes of memory
-> > > to sysfs, shouldn't the sysfs file be attached to the device instead?
-> > 
-> > It will be created by the driver core for any device attached to the
-> > driver automatically.
-> > 
-> > > I mean, here, the sysfs file will be created under something like
-> > > .../drivers/sunxi-sid/eeprom. What happens when you have several
-> > > instances of that driver loaded? I'd expect it to have several sysfs
-> > > files created, one for each instance. So to me, it should be in the
-> > > device structure, not the driver one.
-> > 
-> > You can't have multiple drivers with the same name loaded (or the same
-> > module loaded multiple times.)  You can have multiple devices for a
-> > single driver, which is what we do all the time.
+On Fri, Jul 19, 2013 at 12:06:01PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> Yes, I know that, and it's actually my point.
-> With the current oliver's code he pasted earlier in this thread:
+> On Friday 19 July 2013 11:59 AM, Greg KH wrote:
+> > On Fri, Jul 19, 2013 at 11:25:44AM +0530, Kishon Vijay Abraham I wrote:
+> >> Hi,
+> >>
+> >> On Friday 19 July 2013 11:13 AM, Greg KH wrote:
+> >>> On Fri, Jul 19, 2013 at 11:07:10AM +0530, Kishon Vijay Abraham I wrote:
+> >>>>>>>> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
+> >>>>>>>
+> >>>>>>> Your naming is odd, no "phy" anywhere in it?  You rely on the sender to
+> >>>>>>> never send a duplicate name.id pair?  Why not create your own ids based
+> >>>>>>> on the number of phys in the system, like almost all other classes and
+> >>>>>>> subsystems do?
+> >>>>>>
+> >>>>>> hmm.. some PHY drivers use the id they provide to perform some of their
+> >>>>>> internal operation as in [1] (This is used only if a single PHY provider
+> >>>>>> implements multiple PHYS). Probably I'll add an option like PLATFORM_DEVID_AUTO
+> >>>>>> to give the PHY drivers an option to use auto id.
+> >>>>>>
+> >>>>>> [1] ->
+> >>>>>> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
+> >>>>>
+> >>>>> No, who cares about the id?  No one outside of the phy core ever should,
+> >>>>> because you pass back the only pointer that they really do care about,
+> >>>>> if they need to do anything with the device.  Use that, and then you can
+> >>>>
+> >>>> hmm.. ok.
+> >>>>
+> >>>>> rip out all of the "search for a phy by a string" logic, as that's not
+> >>>>
+> >>>> Actually this is needed for non-dt boot case. In the case of dt boot, we use a
+> >>>> phandle by which the controller can get a reference to the phy. But in the case
+> >>>> of non-dt boot, the controller can get a reference to the phy only by label.
+> >>>
+> >>> I don't understand.  They registered the phy, and got back a pointer to
+> >>> it.  Why can't they save it in their local structure to use it again
+> >>> later if needed?  They should never have to "ask" for the device, as the
+> >>
+> >> One is a *PHY provider* driver which is a driver for some PHY device. This will
+> >> use phy_create to create the phy.
+> >> The other is a *PHY consumer* driver which might be any controller driver (can
+> >> be USB/SATA/PCIE). The PHY consumer will use phy_get to get a reference to the
+> >> phy (by *phandle* in the case of dt boot and *label* in the case of non-dt boot).
+> >>> device id might be unknown if there are multiple devices in the system.
+> >>
+> >> I agree with you on the device id part. That need not be known to the PHY driver.
+> > 
+> > How does a consumer know which "label" to use in a non-dt system if
+> > there are multiple PHYs in the system?
 > 
-> # find /sys/ -name eeprom
-> /sys/bus/platform/drivers/sunxi-sid/eeprom
-> 
-> While I'd expect the eeprom file to be located in
-> /sys/bus/platform/devices/X.eeprom/eeprom like it used to be in the v4,
-> since it's an instance-specific content.
+> That should be passed using platform data.
 
-Oh crap.  You are totally right.  That's why we added the new device
-create call, to allow this to work properly.
+Ick, don't pass strings around, pass pointers.  If you have platform
+data you can get to, then put the pointer there, don't use a "name".
 
-Right now you are getting the kobject of the driver, not the device, in
-the callback, which is not what you want (sure, if you only have once
-instance, you can work around it, but don't it's the driver core's fault
-for not giving you the correct api...)
-
-Let me go look at how I can make this work "easier", give me a few days.
+thanks,
 
 greg k-h
