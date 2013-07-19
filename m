@@ -1,46 +1,86 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 19 Jul 2013 19:51:01 +0100
-Subject: [PATCH 5/6] ASoC: sirf-inner: add mach driver for SiRFSoC
- internal codec
-In-Reply-To: <1374232042-26088-6-git-send-email-Baohua.Song@csr.com>
-References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
- <1374232042-26088-6-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130719185101.GV9858@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 19 Jul 2013 12:52:28 -0600
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <20130719072927.GY7656@atomide.com>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost> <51E70953.1000601@wwwdotorg.org>
+ <20130718072034.GO7656@atomide.com> <51E8401E.8040705@wwwdotorg.org>
+ <20130719072927.GY7656@atomide.com>
+Message-ID: <51E98AEC.5000802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 07:07:21PM +0800, Barry Song wrote:
+On 07/19/2013 01:29 AM, Tony Lindgren wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [130718 12:27]:
+>> On 07/18/2013 01:25 AM, Tony Lindgren wrote:
+>>> * Stephen Warren <swarren@wwwdotorg.org> [130717 14:21]:
+>>>> On 07/16/2013 03:05 AM, Tony Lindgren wrote:
+>>>>> To toggle dynamic states, let's add the optional active state in
+>>>>> addition to the static default state. Then if the optional active
+>>>>> state is defined, we can require that idle and sleep states cover
+>>>>> the same pingroups as the active state.
+>>>>>
+>>>>> Then let's add pinctrl_check_dynamic() and pinctrl_select_dynamic()
+>>>>> to use instead of pinctrl_select() to avoid breaking existing users.
+>>>>>
+>>>>> With pinctrl_check_dynamic() we can check that idle and sleep states
+>>>>> match the active state for pingroups during init, and don't need to
+>>>>> do it during runtime.
+>>>>>
+>>>>> Then with the states pre-validated, pinctrl_select_dynamic() can
+>>>>> just toggle between the dynamic states without extra checks.
+>>>>>
+>>>>> Note that pinctr_select_state() still has valid use cases, such as
+>>>>> changing states when the pins can be shared between two drivers
+>>>>> and don't necessarily cover the same pingroups. For dynamic runtime
+>>>>> toggling of pin states, we should eventually always use just
+>>>>> pinctrl_select_dynamic().
+>>
+>>>>> @@ -1241,7 +1371,13 @@ static int pinctrl_pm_select_state(struct device *dev, struct pinctrl_state *sta
+>>>>>  		return 0;
+>>>>>  	if (IS_ERR(state))
+>>>>>  		return 0; /* No such state */
+>>>>> -	ret = pinctrl_select_state(pins->p, state);
+>>>>> +
+>>>>> +	/* Configured for proper dynamic muxing? */
+>>>>> +	if (!IS_ERR(dev->pins->active_state))
+>>>>> +		ret = pinctrl_select_dynamic(pins->p, state);
+>>>>> +	else
+>>>>> +		ret = pinctrl_select_state(pins->p, state);
+>>>>
+>>>> Hmmm. I'm not quite sure this is right... Surely this function should
+>>>> just do nothing if the dynamic states aren't defined? The system should
+>>>> just, and only, be in the "default" state and never do anything else.
+>>>
+>>> This keeps the existing behaviour. We should be able to drop the
+>>> call to pinctrl_select_state() here after the existing use in
+>>> drivers has been fixed.
+>>
+>> How many DT-based systems already have multiple of default/idle/sleep
+>> states defined in DT? Right now, since the kernel code uses
+>> pinctrl_select_state() to switch between those, the state definitions
+>> need to define /all/ pins used by those states, not just the dynamic
+>> ones. However, with this series in place, the default state should only
+>> include the static pins, and the active/idle/sleep states should only
+>> include the dynamic pins. That's a change to the DT bindings, since it
+>> changes how the DT must be written, and causes older DTs to be
+>> incompatible with newer kernels and vice-versa.
+> 
+> Well we can keep the current behaviour with pinctrl_select_state() around
+> as long as needed. For the legacy cases, there is no active state defined
+> and we fall back to pinctrl_select_state().
+>  
+>> So, do we just ignore this DT ABI change again, or insist on doing it in
+>> some compatible way? DT ABI-ness is a PITA:-(
+> 
+> I'd vote for keeping the existing behaviour with pinctrl_select_state()
+> when no active state is defined.
 
-> +#ifndef CONFIG_ANDROID
-> +	unsigned int            gpio_hp_detect;
-> +	struct snd_soc_jack     hp_jack;
-> +#endif
+Yes, I think that will work, since the active state cannot exist before
+this new scheme is in place.
 
-Not for mainline.  I'd suggest setting it up for extcon anyway
-especially if it's just a simple accessory, that should work for both
-Android and mainline.
-
-> +static int sirf_inner_speaker_out_put(struct snd_kcontrol *kcontrol,
-> +		struct snd_ctl_elem_value *ucontrol)
-> +{
-> +	int is_spk_out = ucontrol->value.integer.value[0];
-> +	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-> +	struct snd_soc_card *card = codec->card;
-> +	struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
-> +
-> +	if (gpio_is_valid(sinner_card->gpio_spk_pa))
-> +		gpio_direction_output(sinner_card->gpio_spk_pa, is_spk_out);
-> +	return 0;
-> +}
-
-Oh, right.  If this is doing what I think this is doing you want to use
-DAPM within the CODEC then this can just become a pin switch or you can
-hook in directly if you continue to use soc-jack - it has DAPM
-integration.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/df529a7f/attachment.sig>
+But, this needs to be very clearly spell out in the DT binding
+documentation: If you have states default/idle/sleep, they're complete
+alternatives, whereas if you have states default/active/idle/sleep, the
+latter 3 are alternatives that build on top of the first. I foresee mass
+confusion, but perhaps I'm being pessimistic.
