@@ -1,62 +1,68 @@
-From: systemprogrammierung.brunner@gmail.com (Markus Brunner)
-Date: Fri, 19 Jul 2013 20:07:00 +0200
-Subject: [PATCH] remove vlan tags in CPSW dual emac mode
-In-Reply-To: <51E42B43.8060307@ti.com>
-References: <4699400.vD3TdgH1nR@localhost> <5176C4FE.4080305@ti.com>
- <51E00B2F.6050406@newflow.co.uk> <51E04C89.8030202@ti.com>
- <51E0582D.4090306@newflow.co.uk> <51E3EEE7.9030508@ti.com>
- <51E41A34.4030000@newflow.co.uk> <51E42B43.8060307@ti.com>
-Message-ID: <CAOFKi=amD5Ho0LpOm+G-2pQezUjJMgSgH0XxHXQ_md57c3FwVA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 19 Jul 2013 19:13:13 +0100
+Subject: [PATCH 3/6] ASoC: usp-pcm: add CPU DAI driver for PCM simulated
+ from USP
+In-Reply-To: <1374232042-26088-4-git-send-email-Baohua.Song@csr.com>
+References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
+ <1374232042-26088-4-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130719181313.GT9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 7:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
-> On 7/15/2013 9:20 PM, Mark Jackson wrote:
->> On 15/07/13 13:45, Mugunthan V N wrote:
->>> On 7/13/2013 12:55 AM, Mark Jackson wrote:
->>>> On 12/07/13 19:35, Mugunthan V N wrote:
->>>>> On 7/12/2013 7:27 PM, Mark Jackson wrote:
->>>> [snip]
->>>>
->>>>>> Just to update this (old) thread ...
->>>>>>
->>>>>> I can still confirm that *without* the above patch, I am *unable* to use both network
->>>>>> ports on our AM335x board.
+On Fri, Jul 19, 2013 at 07:07:19PM +0800, Barry Song wrote:
 
-I can confirm that. Windows won't strip away the vlan header like linux does.
+> +static int sirf_usp_pcm_divider(struct snd_soc_dai *dai, int div_id, int rate)
+> +{
+> +	struct sirf_usp *susp = snd_soc_dai_get_drvdata(dai);
+> +
+> +	u32 clk_rate = clk_get_rate(susp->clk);
+> +	u32 clk_div = (clk_rate/(2*rate)) - 1;
+> +	u32 clk_div_hi = (clk_div & 0xC00)>>10;
+> +	u32 clk_div_lo = (clk_div & 0x3FF);
+> +
+> +	writel((clk_div_lo<<21) | readl(susp->base + USP_MODE2),
+> +		susp->base + USP_MODE2);
+> +	writel((clk_div_hi<<30) | readl(susp->base + USP_TX_FRAME_CTRL),
+> +		susp->base + USP_TX_FRAME_CTRL);
+> +
+> +	return 0;
+> +}
 
-[snip]
->>>> Markus, are you still using this patch ?
+I'd be happier if this did some validation on the supplied rate (for
+example, checking that it's less than the master rate) and had arguments
+specifying which clock was being affected (in case there's more in
+future revisions).
 
-yes.
+Also what exactly is the rate being set - can the driver just figure
+this out automatically from the sample rate?
 
->>>>
->>> Today I have tested the Dual EMAC on my am335x-evmsk and its working fine with
->>> net/master branch.
->>> I had 3 patches additional to net/master in which two for basic boot of EVMsk
->>> and one for enabling Dual EMAC. I had pushed the branch in the below repo
->>> repo:
->>> git://git.ti.com/~mugunthanvnm/ti-linux-kernel/mugunth-connectivity-linux-feature-tree.git
->>> branch: dual-emac
+> +#ifdef CONFIG_PM
+> +static int sirf_usp_pcm_suspend(struct platform_device *pdev,
+> +	pm_message_t state)
+> +{
+> +	struct sirf_usp *susp = platform_get_drvdata(pdev);
+> +
+> +	susp->mode1_reg = readl(susp->base + USP_MODE1);
+> +	susp->mode2_reg = readl(susp->base + USP_MODE2);
+> +	sirf_usp_controller_uninit(susp);
+> +	clk_disable_unprepare(susp->clk);
+> +
+> +	return 0;
+> +}
 
-I tested it and it has the same problem as with 3.9 - 3.11-rc1.
+Can this be done as runtime PM as well?  Seems like it'd save power.
 
->> Okay ... I can't test that at the moment as I can only boot from MMC as there's
->> currently no support for MMC booting in the mainline kernel.
->>
->> So ... the code works for you, but not for me.
->>
->> I guess the other difference is that I'm not using the same PHY (we use a 10/100
->> SMSC 8710A, not the GbE Atheros part).
->>
->> Could that make any difference ?
->>
->> Markus, are you still seeing the same issue ?  What PHY are you using ?
+> +	susp->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(susp->clk)) {
+> +		dev_err(&pdev->dev, "Get clock failed.\n");
+> +		return PTR_ERR(susp->clk);
+> +	}
 
-I', using a Micrel ksz8895mq, which is actually a switch, however one
-phy is connected directly, so bootstrapping can work and even if I
-don't enable the switch I have the same issue on that port. I doubt
-the phy will change anything.
-
-Regards,
-Markus
+devm_clk_get().
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130719/e8735988/attachment.sig>
