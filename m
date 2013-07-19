@@ -1,116 +1,351 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 19 Jul 2013 17:29:12 +0800
-Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
-In-Reply-To: <51E7E27B.9090605@linaro.org>
-References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
- <51E439BC.9030608@wwwdotorg.org>
- <1373973447.8538.80.camel@jlo-ubuntu-64.nvidia.com>
- <51E5A438.10004@wwwdotorg.org>
- <1374056130.10997.16.camel@jlo-ubuntu-64.nvidia.com>
- <51E6FF0B.5000708@wwwdotorg.org>
- <1374145726.5610.73.camel@jlo-ubuntu-64.nvidia.com>
- <51E7E27B.9090605@linaro.org>
-Message-ID: <1374226153.24607.3.camel@jlo-ubuntu-64.nvidia.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Fri, 19 Jul 2013 11:41:43 +0200
+Subject: [PATCH v2 16/24] net: can: mscan: make mpc512x code use common
+ clock
+In-Reply-To: <51E8EC17.9060703@pengutronix.de>
+References: <1374166855-7280-1-git-send-email-gsi@denx.de>
+ <1374178858-8683-2-git-send-email-gsi@denx.de>
+ <51E8EC17.9060703@pengutronix.de>
+Message-ID: <20130719094143.GQ7080@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-07-18 at 20:41 +0800, Daniel Lezcano wrote:
-> On 07/18/2013 01:08 PM, Joseph Lo wrote:
-> > On Thu, 2013-07-18 at 04:31 +0800, Stephen Warren wrote:
-> >> On 07/17/2013 04:15 AM, Joseph Lo wrote:
-> >>> On Wed, 2013-07-17 at 03:51 +0800, Stephen Warren wrote:
-> >>>> On 07/16/2013 05:17 AM, Joseph Lo wrote:
-> >>>>> On Tue, 2013-07-16 at 02:04 +0800, Stephen Warren wrote:
-> >>>>>> On 06/25/2013 03:23 AM, Joseph Lo wrote:
-> >>>>>>> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
-> >>>>>>> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
-> >>>>>>> this state.
-> >> ... [ discussion of issues with Joesph's patches applied]
-> >>>
-> >> 2) If I run the hotplug test script, leaving CPU 0 always present, I
-> >> sometimes see:
-> >>
-> >>> root at localhost:~# for i in `seq 1 50`; do echo ITERATION $i; ./cpuonline.py; done
-> >>> ITERATION 1
-> >>> echo 0 > /sys/devices/system/cpu/cpu2/online
-> >>> [  458.910054] CPU2: shutdown
-> >>> echo 0 > /sys/devices/system/cpu/cpu1/online
-> >>> [  461.004371] CPU1: shutdown
-> >>> echo 0 > /sys/devices/system/cpu/cpu3/online
-> >>> [  463.027341] CPU3: shutdown
-> >>> echo 1 > /sys/devices/system/cpu/cpu1/online
-> >>> [  465.061412] CPU1: Booted secondary processor
-> >>> echo 1 > /sys/devices/system/cpu/cpu2/online
-> >>> [  467.095313] CPU2: Booted secondary processor
-> >>> [  467.113243] ------------[ cut here ]------------
-> >>> [  467.117948] WARNING: CPU: 2 PID: 0 at kernel/time/tick-broadcast.c:667 tick_broadcast_oneshot_control+0x19c/0x1c4()
-> >>> [  467.128352] Modules linked in:
-> >>> [  467.131455] CPU: 2 PID: 0 Comm: swapper/2 Not tainted 3.11.0-rc1-00022-g7487363-dirty #49
-> >>> [  467.139678] [<c0015620>] (unwind_backtrace+0x0/0xf8) from [<c001154c>] (show_stack+0x10/0x14)
-> >>> [  467.148228] [<c001154c>] (show_stack+0x10/0x14) from [<c05135a8>] (dump_stack+0x80/0xc4)
-> >>> [  467.156336] [<c05135a8>] (dump_stack+0x80/0xc4) from [<c0024590>] (warn_slowpath_common+0x64/0x88)
-> >>> [  467.165300] [<c0024590>] (warn_slowpath_common+0x64/0x88) from [<c00245d0>] (warn_slowpath_null+0x1c/0x24)
-> >>> [  467.174959] [<c00245d0>] (warn_slowpath_null+0x1c/0x24) from [<c00695e4>] (tick_broadcast_oneshot_control+0x19c/0x1c4)
-> >>> [  467.185659] [<c00695e4>] (tick_broadcast_oneshot_control+0x19c/0x1c4) from [<c0067cdc>] (clockevents_notify+0x1b0/0x1dc)
-> >>> [  467.196538] [<c0067cdc>] (clockevents_notify+0x1b0/0x1dc) from [<c034f348>] (cpuidle_idle_call+0x11c/0x168)
-> >>> [  467.206292] [<c034f348>] (cpuidle_idle_call+0x11c/0x168) from [<c000f134>] (arch_cpu_idle+0x8/0x38)
-> >>> [  467.215359] [<c000f134>] (arch_cpu_idle+0x8/0x38) from [<c0061038>] (cpu_startup_entry+0x60/0x134)
-> >>> [  467.224325] [<c0061038>] (cpu_startup_entry+0x60/0x134) from [<800083d8>] (0x800083d8)
-> >>> [  467.232227] ---[ end trace ea579be22a00e7fb ]---
-> >>> echo 0 > /sys/devices/system/cpu/cpu1/online
-> >>> [  469.126682] CPU1: shutdown
-> >
-> > Hmm. It's hard to reproduce. But finally, I also can repro with CPU
-> > hotplug stress test. And some strange issues after apply
-> > CPUIDLE_FLAG_TIMER_STOP on Tegra20, can we postpone to apply this?
-> > I need more time to investigate how does this flag impact system.
-> >
+On Fri, Jul 19, 2013 at 09:34 +0200, Marc Kleine-Budde wrote:
 > 
-Daniel,
+> On 07/18/2013 10:20 PM, Gerhard Sittig wrote:
+> > extend the mscan(4) driver with alternative support for the COMMON_CLK
+> > approach which is an option in the MPC512x platform, keep the existing
+> > clock support implementation in place since the driver is shared with
+> > other MPC5xxx SoCs which don't have common clock support
+> > 
+> > one byproduct of this change is that the CAN driver no longer needs to
+> > access the SoC's clock control registers, which shall be the domain of
+> > the platform's clock driver
+> > 
+> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> > ---
+> >  drivers/net/can/mscan/mpc5xxx_can.c |  139 +++++++++++++++++++++++++++++++++++
+> >  1 file changed, 139 insertions(+)
+> > 
+> > diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+> > index bc422ba..dd26ab6 100644
+> > --- a/drivers/net/can/mscan/mpc5xxx_can.c
+> > +++ b/drivers/net/can/mscan/mpc5xxx_can.c
+> > @@ -108,6 +108,143 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+> >  #endif /* CONFIG_PPC_MPC52xx */
+> >  
+> >  #ifdef CONFIG_PPC_MPC512x
+> > +
+> > +#if IS_ENABLED(CONFIG_COMMON_CLK)
+> > +
+> > +static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+> > +				 const char *clock_source, int *mscan_clksrc)
+> > +{
+> > +	struct device_node *np;
+> > +	u32 clockdiv;
+> > +	enum {
+> > +		CLK_FROM_AUTO,
+> > +		CLK_FROM_IPS,
+> > +		CLK_FROM_SYS,
+> > +		CLK_FROM_REF,
+> > +	} clk_from;
+> > +	struct clk *clk_in, *clk_can;
+> > +	unsigned long freq_calc;
+> > +
+> > +	/* the caller passed in the clock source spec that was read from
+> > +	 * the device tree, get the optional clock divider as well
+> > +	 */
+> > +	np = ofdev->dev.of_node;
+> > +	clockdiv = 1;
+> > +	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
+> > +	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
+> > +		clock_source ? clock_source : "<NULL>", clockdiv);
+> > +
+> > +	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
+> > +	 * get set, and the 'ips' clock is the input to the MSCAN
+> > +	 * component
+> > +	 *
+> > +	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
+> > +	 * bit needs to get cleared, an optional clock-divider may have
+> > +	 * been specified (the default value is 1), the appropriate
+> > +	 * MSCAN related MCLK is the input to the MSCAN component
+> > +	 *
+> > +	 * in the absence of a clock-source spec, first an optimal clock
+> > +	 * gets determined based on the 'sys' clock, if that fails the
+> > +	 * 'ref' clock is used
+> > +	 */
+> > +	clk_from = CLK_FROM_AUTO;
+> > +	if (clock_source) {
+> > +		/* interpret the device tree's spec for the clock source */
+> > +		if (!strcmp(clock_source, "ip"))
+> > +			clk_from = CLK_FROM_IPS;
+> > +		else if (!strcmp(clock_source, "sys"))
+> > +			clk_from = CLK_FROM_SYS;
+> > +		else if (!strcmp(clock_source, "ref"))
+> > +			clk_from = CLK_FROM_REF;
+> > +		else
+> > +			goto err_invalid;
+> > +		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
+> > +	}
+> > +	if (clk_from == CLK_FROM_AUTO) {
+> > +		/* no spec so far, try the 'sys' clock; round to the
+> > +		 * next MHz and see if we can get a multiple of 16MHz
+> > +		 */
+> > +		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
+> > +		clk_in = clk_get(&ofdev->dev, "sys");
+> > +		if (IS_ERR(clk_in))
+> > +			goto err_notavail;
+> > +		freq_calc = clk_get_rate(clk_in);
+> > +		freq_calc +=  499999;
+> > +		freq_calc /= 1000000;
+> > +		freq_calc *= 1000000;
+> > +		if ((freq_calc % 16000000) == 0) {
+> > +			clk_from = CLK_FROM_SYS;
+> > +			clockdiv = freq_calc / 16000000;
+> > +			dev_dbg(&ofdev->dev,
+> > +				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
+> > +				freq_calc, clockdiv, freq_calc / clockdiv);
+> > +		}
+> > +	}
+> > +	if (clk_from == CLK_FROM_AUTO) {
+> > +		/* no spec so far, use the 'ref' clock */
+> > +		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
+> > +		clk_in = clk_get(&ofdev->dev, "ref");
+> > +		if (IS_ERR(clk_in))
+> > +			goto err_notavail;
+> > +		clk_from = CLK_FROM_REF;
+> > +		freq_calc = clk_get_rate(clk_in);
+> > +		dev_dbg(&ofdev->dev,
+> > +			"clk fit, ref[%lu] (no div) freq[%lu]\n",
+> > +			freq_calc, freq_calc);
+> > +	}
+> > +
+> > +	/* select IPS or MCLK as the MSCAN input (returned to the caller),
+> > +	 * setup the MCLK mux source and rate if applicable, apply the
+> > +	 * optionally specified or derived above divider, and determine
+> > +	 * the actual resulting clock rate to return to the caller
+> > +	 */
+> > +	switch (clk_from) {
+> > +	case CLK_FROM_IPS:
+> > +		clk_can = clk_get(&ofdev->dev, "ips");
+> > +		if (IS_ERR(clk_can))
+> > +			goto err_notavail;
+> > +		clk_prepare_enable(clk_can);
+> 
+> Where is the corresponding clk_disable_unprepare()?a
 
-How do you think about this fix?
+It's missing, as I could not find the counterpart of the
+.get_clock() callback where the get and prepare/enable was added
+to.  And it appears that neither are enable errors checked for.
+This patch clearly needs an update as well, but already should be
+the last part of the series in a currently inacceptable state.
 
-diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-index d75040d..0b8878b 100644
---- a/drivers/cpuidle/cpuidle.c
-+++ b/drivers/cpuidle/cpuidle.c
-@@ -81,8 +81,16 @@ int cpuidle_enter_state(struct cpuidle_device *dev,
-struct cpuidle_driver *drv,
+This .get_clock() routine is supposed to determine the clock
+source, setup the desired rate and return the actual rate.  The
+callback's API is rather limited in that it does communicate
+clock rate values, but cannot access a location to store handles
+to.
+
+Are the introduction of a .put_clock() callback and passing the
+'priv' handle to both get and put routines acceptable?  As this
+would hook up clock handling to probe() and remove() just as
+memory mapping gets approached.
+
+Below is a patch on top of the CAN related patch in v2 of the
+series.  If this approach is acceptable (maybe modulo how the
+"unused" warnings get silenced), I'll fold it into the
+introduction of common clock support in the mscan(4) driver.
+
+diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+index cf5e4cfc..16ca712 100644
+--- a/drivers/net/can/mscan/mpc5xxx_can.c
++++ b/drivers/net/can/mscan/mpc5xxx_can.c
+@@ -39,7 +39,9 @@
+ struct mpc5xxx_can_data {
+ 	unsigned int type;
+ 	u32 (*get_clock)(struct platform_device *ofdev, const char *clock_name,
+-			 int *mscan_clksrc);
++			 int *mscan_clksrc, struct mscan_priv *priv);
++	void (*put_clock)(struct platform_device *ofdev,
++			  struct mscan_priv *priv);
+ };
  
-        time_start = ktime_get();
+ #ifdef CONFIG_PPC_MPC52xx
+@@ -49,7 +51,8 @@ static struct of_device_id mpc52xx_cdm_ids[] = {
+ };
  
-+       if (drv->states[next_state].flags & CPUIDLE_FLAG_TIMER_STOP)
-+               clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER,
-+                                  &dev->cpu);
+ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+-				 const char *clock_name, int *mscan_clksrc)
++				 const char *clock_name, int *mscan_clksrc,
++				 struct mscan_priv *priv)
+ {
+ 	unsigned int pvr;
+ 	struct mpc52xx_cdm  __iomem *cdm;
+@@ -101,15 +104,24 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+ }
+ #else /* !CONFIG_PPC_MPC52xx */
+ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+-				 const char *clock_name, int *mscan_clksrc)
++				 const char *clock_name, int *mscan_clksrc,
++				 struct mscan_priv *priv)
+ {
+ 	return 0;
+ }
+ #endif /* CONFIG_PPC_MPC52xx */
++static void mpc52xx_can_put_clock(struct platform_device *ofdev,
++				  struct mscan_priv *priv)
++{
++	/* EMPTY */
++	(void)ofdev;
++	(void)priv;
++}
+ 
+ #ifdef CONFIG_PPC_MPC512x
+ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+-				 const char *clock_source, int *mscan_clksrc)
++				 const char *clock_source, int *mscan_clksrc,
++				 struct mscan_priv *priv)
+ {
+ 	struct device_node *np;
+ 	u32 clockdiv;
+@@ -200,7 +212,9 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 		clk_can = clk_get(&ofdev->dev, "ips");
+ 		if (IS_ERR(clk_can))
+ 			goto err_notavail;
+-		clk_prepare_enable(clk_can);
++		if (clk_prepare_enable(clk_can))
++			goto err_notavail;
++		priv->clk_can = clk_can;
+ 		freq_calc = clk_get_rate(clk_can);
+ 		*mscan_clksrc = MSCAN_CLKSRC_IPS;
+ 		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
+@@ -211,7 +225,9 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 		clk_can = clk_get(&ofdev->dev, "mclk");
+ 		if (IS_ERR(clk_can))
+ 			goto err_notavail;
+-		clk_prepare_enable(clk_can);
++		if (clk_prepare_enable(clk_can))
++			goto err_notavail;
++		priv->clk_can = clk_can;
+ 		if (clk_from == CLK_FROM_SYS)
+ 			clk_in = clk_get(&ofdev->dev, "sys");
+ 		if (clk_from == CLK_FROM_REF)
+@@ -241,12 +257,31 @@ err_notavail:
+ 	dev_err(&ofdev->dev, "cannot acquire or setup clock source\n");
+ 	return 0;
+ }
 +
-        entered_state = target_state->enter(dev, drv, index);
- 
-+       if (drv->states[next_state].flags & CPUIDLE_FLAG_TIMER_STOP)
-+               clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
-+                                  &dev->cpu);
++static void mpc512x_can_put_clock(struct platform_device *ofdev,
++				  struct mscan_priv *priv)
++{
++	(void)ofdev;
++	if (priv->clk_can) {
++		clk_disable_unprepare(priv->clk_can);
++		clk_put(priv->clk_can);
++	}
++}
+ #else /* !CONFIG_PPC_MPC512x */
+ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+-				 const char *clock_name, int *mscan_clksrc)
++				 const char *clock_name, int *mscan_clksrc,
++				 struct mscan_priv *priv)
+ {
+ 	return 0;
+ }
 +
-        time_end = ktime_get();
++static void mpc512x_can_put_clock(struct platform_device *ofdev,
++				  struct mscan_priv *priv)
++{
++	(void)ofdev;
++	(void)priv;
++	/* EMPTY */
++}
+ #endif /* CONFIG_PPC_MPC512x */
  
-        local_irq_enable();
-@@ -144,20 +152,12 @@ int cpuidle_idle_call(void)
+ static const struct of_device_id mpc5xxx_can_table[];
+@@ -293,7 +328,7 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
+ 	BUG_ON(!data);
+ 	priv->type = data->type;
+ 	priv->can.clock.freq = data->get_clock(ofdev, clock_name,
+-					       &mscan_clksrc);
++					       &mscan_clksrc, priv);
+ 	if (!priv->can.clock.freq) {
+ 		dev_err(&ofdev->dev, "couldn't get MSCAN clock properties\n");
+ 		goto exit_free_mscan;
+@@ -327,10 +362,17 @@ exit_unmap_mem:
  
-        trace_cpu_idle_rcuidle(next_state, dev->cpu);
+ static int mpc5xxx_can_remove(struct platform_device *ofdev)
+ {
++	const struct of_device_id *match;
++	const struct mpc5xxx_can_data *data;
+ 	struct net_device *dev = platform_get_drvdata(ofdev);
+ 	struct mscan_priv *priv = netdev_priv(dev);
  
--       if (drv->states[next_state].flags & CPUIDLE_FLAG_TIMER_STOP)
--               clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER,
--                                  &dev->cpu);
--
-        if (cpuidle_state_is_coupled(dev, drv, next_state))
-                entered_state = cpuidle_enter_state_coupled(dev, drv,
-                                                            next_state);
-        else
-                entered_state = cpuidle_enter_state(dev, drv,
-next_state);
++	match = of_match_device(mpc5xxx_can_table, &ofdev->dev);
++	data = match ? match->data : NULL;
++
+ 	unregister_mscandev(dev);
++	if (data)
++		data->put_clock(ofdev, priv);
+ 	iounmap(priv->reg_base);
+ 	irq_dispose_mapping(dev->irq);
+ 	free_candev(dev);
+@@ -383,11 +425,13 @@ static int mpc5xxx_can_resume(struct platform_device *ofdev)
+ static const struct mpc5xxx_can_data mpc5200_can_data = {
+ 	.type = MSCAN_TYPE_MPC5200,
+ 	.get_clock = mpc52xx_can_get_clock,
++	.put_clock = mpc52xx_can_put_clock,
+ };
  
--       if (drv->states[next_state].flags & CPUIDLE_FLAG_TIMER_STOP)
--               clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
--                                  &dev->cpu);
--
-        trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, dev->cpu);
+ static const struct mpc5xxx_can_data mpc5121_can_data = {
+ 	.type = MSCAN_TYPE_MPC5121,
+ 	.get_clock = mpc512x_can_get_clock,
++	.put_clock = mpc512x_can_put_clock,
+ };
  
-        /* give the governor an opportunity to reflect on the outcome */
+ static const struct of_device_id mpc5xxx_can_table[] = {
+diff --git a/drivers/net/can/mscan/mscan.h b/drivers/net/can/mscan/mscan.h
+index af2ed8b..f32e190 100644
+--- a/drivers/net/can/mscan/mscan.h
++++ b/drivers/net/can/mscan/mscan.h
+@@ -21,6 +21,7 @@
+ #ifndef __MSCAN_H__
+ #define __MSCAN_H__
+ 
++#include <linux/clk.h>
+ #include <linux/types.h>
+ 
+ /* MSCAN control register 0 (CANCTL0) bits */
+@@ -283,6 +284,7 @@ struct mscan_priv {
+ 	unsigned int type; 	/* MSCAN type variants */
+ 	unsigned long flags;
+ 	void __iomem *reg_base;	/* ioremap'ed address to registers */
++	struct clk *clk_can;	/* clock for registers or bitrates */
+ 	u8 shadow_statflg;
+ 	u8 shadow_canrier;
+ 	u8 cur_pri;
+
+> > +		freq_calc = clk_get_rate(clk_can);
+> > +		*mscan_clksrc = MSCAN_CLKSRC_IPS;
+> > +		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
+> > +			*mscan_clksrc, freq_calc);
+> > +		break;
+> > +	case CLK_FROM_SYS:
+> > +	case CLK_FROM_REF:
+> > +		clk_can = clk_get(&ofdev->dev, "mclk");
+> > +		if (IS_ERR(clk_can))
+> > +			goto err_notavail;
+> > +		clk_prepare_enable(clk_can);
+> 
+> dito
+
+yes, both problems of not checking for errors and dropping the
+reference, will address this as well
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
