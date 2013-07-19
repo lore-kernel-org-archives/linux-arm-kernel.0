@@ -1,67 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jul 2013 13:35:26 +0900
-Subject: [PATCH 1/7] backlight: Add GPIO-based backlight driver
+Date: Fri, 19 Jul 2013 13:35:27 +0900
+Subject: [PATCH 2/7] backlight: Add Sanyo LV5207LP backlight driver
 In-Reply-To: <cover.1374207161.git.horms+renesas@verge.net.au>
 References: <cover.1374207161.git.horms+renesas@verge.net.au>
-Message-ID: <8b770e3c9824c98eafe67950ad6e41e09ec9c98a.1374207161.git.horms+renesas@verge.net.au>
+Message-ID: <82e5c40d88f928afffe7bd4027719d3184433908.1374207161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The GPIO backlight driver controls the backlight in on/off mode through
-a single GPIO.
+The LV5207LP is a multi-purpose 7 LEDs driver for the mobile market.
+Only the main LED is supported by this driver.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Jingoo Han <jg1.han@samsung.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/video/backlight/Kconfig              |    7 ++
- drivers/video/backlight/Makefile             |    1 +
- drivers/video/backlight/gpio_backlight.c     |  133 ++++++++++++++++++++++++++
- include/linux/platform_data/gpio_backlight.h |   21 ++++
- 4 files changed, 162 insertions(+)
- create mode 100644 drivers/video/backlight/gpio_backlight.c
- create mode 100644 include/linux/platform_data/gpio_backlight.h
+ drivers/video/backlight/Kconfig        |    6 ++
+ drivers/video/backlight/Makefile       |    1 +
+ drivers/video/backlight/lv5207lp.c     |  171 ++++++++++++++++++++++++++++++++
+ include/linux/platform_data/lv5207lp.h |   19 ++++
+ 4 files changed, 197 insertions(+)
+ create mode 100644 drivers/video/backlight/lv5207lp.c
+ create mode 100644 include/linux/platform_data/lv5207lp.h
 
 diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-index d5ab658..5ab6423 100644
+index 5ab6423..b304e07 100644
 --- a/drivers/video/backlight/Kconfig
 +++ b/drivers/video/backlight/Kconfig
-@@ -425,6 +425,13 @@ config BACKLIGHT_AS3711
- 	  If you have an Austrian Microsystems AS3711 say Y to enable the
- 	  backlight driver.
+@@ -432,6 +432,12 @@ config BACKLIGHT_GPIO
+ 	  If you have a LCD backlight adjustable by GPIO, say Y to enable
+ 	  this driver.
  
-+config BACKLIGHT_GPIO
-+	tristate "Generic GPIO based Backlight Driver"
-+	depends on GPIOLIB
++config BACKLIGHT_LV5207LP
++	tristate "Sanyo LV5207LP Backlight"
++	depends on I2C
 +	help
-+	  If you have a LCD backlight adjustable by GPIO, say Y to enable
-+	  this driver.
++	  If you have a Sanyo LV5207LP say Y to enable the backlight driver.
 +
  endif # BACKLIGHT_CLASS_DEVICE
  
  endif # BACKLIGHT_LCD_SUPPORT
 diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
-index 92711fe..65698a8 100644
+index 65698a8..4e5e811 100644
 --- a/drivers/video/backlight/Makefile
 +++ b/drivers/video/backlight/Makefile
-@@ -32,6 +32,7 @@ obj-$(CONFIG_BACKLIGHT_DA903X)		+= da903x_bl.o
- obj-$(CONFIG_BACKLIGHT_DA9052)		+= da9052_bl.o
- obj-$(CONFIG_BACKLIGHT_EP93XX)		+= ep93xx_bl.o
- obj-$(CONFIG_BACKLIGHT_GENERIC)		+= generic_bl.o
-+obj-$(CONFIG_BACKLIGHT_GPIO)		+= gpio_backlight.o
- obj-$(CONFIG_BACKLIGHT_HP680)		+= hp680_bl.o
- obj-$(CONFIG_BACKLIGHT_HP700)		+= jornada720_bl.o
- obj-$(CONFIG_BACKLIGHT_LM3533)		+= lm3533_bl.o
-diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
+@@ -41,6 +41,7 @@ obj-$(CONFIG_BACKLIGHT_LM3639)		+= lm3639_bl.o
+ obj-$(CONFIG_BACKLIGHT_LOCOMO)		+= locomolcd.o
+ obj-$(CONFIG_BACKLIGHT_LP855X)		+= lp855x_bl.o
+ obj-$(CONFIG_BACKLIGHT_LP8788)		+= lp8788_bl.o
++obj-$(CONFIG_BACKLIGHT_LV5207LP)	+= lv5207lp.o
+ obj-$(CONFIG_BACKLIGHT_MAX8925)		+= max8925_bl.o
+ obj-$(CONFIG_BACKLIGHT_OMAP1)		+= omap1_bl.o
+ obj-$(CONFIG_BACKLIGHT_OT200)		+= ot200_bl.o
+diff --git a/drivers/video/backlight/lv5207lp.c b/drivers/video/backlight/lv5207lp.c
 new file mode 100644
-index 0000000..5fa217f
+index 0000000..498fd73
 --- /dev/null
-+++ b/drivers/video/backlight/gpio_backlight.c
-@@ -0,0 +1,133 @@
++++ b/drivers/video/backlight/lv5207lp.c
+@@ -0,0 +1,171 @@
 +/*
-+ * gpio_backlight.c - Simple GPIO-controlled backlight
++ * Sanyo LV5207LP LED Driver
++ *
++ * Copyright (C) 2013 Ideas on board SPRL
++ *
++ * Contact: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -71,152 +74,184 @@ index 0000000..5fa217f
 +#include <linux/backlight.h>
 +#include <linux/err.h>
 +#include <linux/fb.h>
-+#include <linux/gpio.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
++#include <linux/i2c.h>
 +#include <linux/module.h>
-+#include <linux/platform_data/gpio_backlight.h>
-+#include <linux/platform_device.h>
++#include <linux/platform_data/lv5207lp.h>
 +#include <linux/slab.h>
 +
-+struct gpio_backlight {
-+	struct device *dev;
-+	struct device *fbdev;
++#define LV5207LP_CTRL1			0x00
++#define LV5207LP_CPSW			(1 << 7)
++#define LV5207LP_SCTEN			(1 << 6)
++#define LV5207LP_C10			(1 << 5)
++#define LV5207LP_CKSW			(1 << 4)
++#define LV5207LP_RSW			(1 << 3)
++#define LV5207LP_GSW			(1 << 2)
++#define LV5207LP_BSW			(1 << 1)
++#define LV5207LP_CTRL2			0x01
++#define LV5207LP_MSW			(1 << 7)
++#define LV5207LP_MLED4			(1 << 6)
++#define LV5207LP_RED			0x02
++#define LV5207LP_GREEN			0x03
++#define LV5207LP_BLUE			0x04
 +
-+	int gpio;
-+	int active;
++#define LV5207LP_MAX_BRIGHTNESS		32
++
++struct lv5207lp {
++	struct i2c_client *client;
++	struct backlight_device *backlight;
++	struct lv5207lp_platform_data *pdata;
 +};
 +
-+static int gpio_backlight_update_status(struct backlight_device *bl)
++static int lv5207lp_write(struct lv5207lp *lv, u8 reg, u8 data)
 +{
-+	struct gpio_backlight *gbl = bl_get_data(bl);
-+	int brightness = bl->props.brightness;
++	return i2c_smbus_write_byte_data(lv->client, reg, data);
++}
 +
-+	if (bl->props.power != FB_BLANK_UNBLANK ||
-+	    bl->props.fb_blank != FB_BLANK_UNBLANK ||
-+	    bl->props.state & (BL_CORE_SUSPENDED | BL_CORE_FBBLANK))
++static int lv5207lp_backlight_update_status(struct backlight_device *backlight)
++{
++	struct lv5207lp *lv = bl_get_data(backlight);
++	int brightness = backlight->props.brightness;
++
++	if (backlight->props.power != FB_BLANK_UNBLANK ||
++	    backlight->props.fb_blank != FB_BLANK_UNBLANK ||
++	    backlight->props.state & (BL_CORE_SUSPENDED | BL_CORE_FBBLANK))
 +		brightness = 0;
 +
-+	gpio_set_value(gbl->gpio, brightness ? gbl->active : !gbl->active);
++	if (brightness) {
++		lv5207lp_write(lv, LV5207LP_CTRL1,
++			       LV5207LP_CPSW | LV5207LP_C10 | LV5207LP_CKSW);
++		lv5207lp_write(lv, LV5207LP_CTRL2,
++			       LV5207LP_MSW | LV5207LP_MLED4 |
++			       (brightness - 1));
++	} else {
++		lv5207lp_write(lv, LV5207LP_CTRL1, 0);
++		lv5207lp_write(lv, LV5207LP_CTRL2, 0);
++	}
 +
 +	return 0;
 +}
 +
-+static int gpio_backlight_get_brightness(struct backlight_device *bl)
++static int lv5207lp_backlight_get_brightness(struct backlight_device *backlight)
 +{
-+	return bl->props.brightness;
++	return backlight->props.brightness;
 +}
 +
-+static int gpio_backlight_check_fb(struct backlight_device *bl,
-+				   struct fb_info *info)
++static int lv5207lp_backlight_check_fb(struct backlight_device *backlight,
++				       struct fb_info *info)
 +{
-+	struct gpio_backlight *gbl = bl_get_data(bl);
++	struct lv5207lp *lv = bl_get_data(backlight);
 +
-+	return gbl->fbdev == NULL || gbl->fbdev == info->dev;
++	return lv->pdata->fbdev == NULL || lv->pdata->fbdev == info->dev;
 +}
 +
-+static const struct backlight_ops gpio_backlight_ops = {
++static const struct backlight_ops lv5207lp_backlight_ops = {
 +	.options	= BL_CORE_SUSPENDRESUME,
-+	.update_status	= gpio_backlight_update_status,
-+	.get_brightness	= gpio_backlight_get_brightness,
-+	.check_fb	= gpio_backlight_check_fb,
++	.update_status	= lv5207lp_backlight_update_status,
++	.get_brightness	= lv5207lp_backlight_get_brightness,
++	.check_fb	= lv5207lp_backlight_check_fb,
 +};
 +
-+static int gpio_backlight_probe(struct platform_device *pdev)
++static int lv5207lp_probe(struct i2c_client *client,
++			  const struct i2c_device_id *id)
 +{
-+	struct gpio_backlight_platform_data *pdata = pdev->dev.platform_data;
++	struct lv5207lp_platform_data *pdata = client->dev.platform_data;
++	struct backlight_device *backlight;
 +	struct backlight_properties props;
-+	struct backlight_device *bl;
-+	struct gpio_backlight *gbl;
-+	int ret;
++	struct lv5207lp *lv;
 +
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "failed to find platform data\n");
-+		return -ENODEV;
++	if (pdata == NULL) {
++		dev_err(&client->dev, "No platform data supplied\n");
++		return -EINVAL;
 +	}
 +
-+	gbl = devm_kzalloc(&pdev->dev, sizeof(*gbl), GFP_KERNEL);
-+	if (gbl == NULL)
++	if (!i2c_check_functionality(client->adapter,
++				     I2C_FUNC_SMBUS_BYTE_DATA)) {
++		dev_warn(&client->dev,
++			 "I2C adapter doesn't support I2C_FUNC_SMBUS_BYTE\n");
++		return -EIO;
++	}
++
++	lv = devm_kzalloc(&client->dev, sizeof(*lv), GFP_KERNEL);
++	if (!lv)
 +		return -ENOMEM;
 +
-+	gbl->dev = &pdev->dev;
-+	gbl->fbdev = pdata->fbdev;
-+	gbl->gpio = pdata->gpio;
-+	gbl->active = pdata->active_low ? 0 : 1;
-+
-+	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
-+				    (gbl->active ? GPIOF_INIT_LOW
-+						 : GPIOF_INIT_HIGH),
-+				    pdata->name);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "unable to request GPIO\n");
-+		return ret;
-+	}
++	lv->client = client;
++	lv->pdata = pdata;
 +
 +	memset(&props, 0, sizeof(props));
 +	props.type = BACKLIGHT_RAW;
-+	props.max_brightness = 1;
-+	bl = backlight_device_register(dev_name(&pdev->dev), &pdev->dev, gbl,
-+				       &gpio_backlight_ops, &props);
-+	if (IS_ERR(bl)) {
-+		dev_err(&pdev->dev, "failed to register backlight\n");
-+		return PTR_ERR(bl);
++	props.max_brightness = min_t(unsigned int, pdata->max_value,
++				     LV5207LP_MAX_BRIGHTNESS);
++	props.brightness = clamp_t(unsigned int, pdata->def_value, 0,
++				   props.max_brightness);
++
++	backlight = backlight_device_register(dev_name(&client->dev),
++					      &lv->client->dev, lv,
++					      &lv5207lp_backlight_ops, &props);
++	if (IS_ERR(backlight)) {
++		dev_err(&client->dev, "failed to register backlight\n");
++		return PTR_ERR(backlight);
 +	}
 +
-+	bl->props.brightness = pdata->def_value;
-+	backlight_update_status(bl);
++	backlight_update_status(backlight);
++	i2c_set_clientdata(client, backlight);
 +
-+	platform_set_drvdata(pdev, bl);
 +	return 0;
 +}
 +
-+static int gpio_backlight_remove(struct platform_device *pdev)
++static int lv5207lp_remove(struct i2c_client *client)
 +{
-+	struct backlight_device *bl = platform_get_drvdata(pdev);
++	struct backlight_device *backlight = i2c_get_clientdata(client);
 +
-+	backlight_device_unregister(bl);
++	backlight->props.brightness = 0;
++	backlight_update_status(backlight);
++	backlight_device_unregister(backlight);
++
 +	return 0;
 +}
 +
-+static struct platform_driver gpio_backlight_driver = {
-+	.driver		= {
-+		.name		= "gpio-backlight",
-+		.owner		= THIS_MODULE,
++static const struct i2c_device_id lv5207lp_ids[] = {
++	{ "lv5207lp", 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, lv5207lp_ids);
++
++static struct i2c_driver lv5207lp_driver = {
++	.driver = {
++		.name = "lv5207lp",
 +	},
-+	.probe		= gpio_backlight_probe,
-+	.remove		= gpio_backlight_remove,
++	.probe = lv5207lp_probe,
++	.remove = lv5207lp_remove,
++	.id_table = lv5207lp_ids,
 +};
 +
-+module_platform_driver(gpio_backlight_driver);
++module_i2c_driver(lv5207lp_driver);
 +
++MODULE_DESCRIPTION("Sanyo LV5207LP Backlight Driver");
 +MODULE_AUTHOR("Laurent Pinchart <laurent.pinchart@ideasonboard.com>");
-+MODULE_DESCRIPTION("GPIO-based Backlight Driver");
 +MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:gpio-backlight");
-diff --git a/include/linux/platform_data/gpio_backlight.h b/include/linux/platform_data/gpio_backlight.h
+diff --git a/include/linux/platform_data/lv5207lp.h b/include/linux/platform_data/lv5207lp.h
 new file mode 100644
-index 0000000..5ae0d9c
+index 0000000..7dc4d9a
 --- /dev/null
-+++ b/include/linux/platform_data/gpio_backlight.h
-@@ -0,0 +1,21 @@
++++ b/include/linux/platform_data/lv5207lp.h
+@@ -0,0 +1,19 @@
 +/*
-+ * gpio_backlight.h - Simple GPIO-controlled backlight
++ * lv5207lp.h - Sanyo LV5207LP LEDs Driver
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+#ifndef __GPIO_BACKLIGHT_H__
-+#define __GPIO_BACKLIGHT_H__
++#ifndef __LV5207LP_H__
++#define __LV5207LP_H__
 +
 +struct device;
 +
-+struct gpio_backlight_platform_data {
++struct lv5207lp_platform_data {
 +	struct device *fbdev;
-+	int gpio;
-+	int def_value;
-+	bool active_low;
-+	const char *name;
++	unsigned int max_value;
++	unsigned int def_value;
 +};
 +
 +#endif
