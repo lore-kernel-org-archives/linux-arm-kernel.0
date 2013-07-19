@@ -1,138 +1,54 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 19 Jul 2013 21:01:51 +0900
-Subject: [PATCH v7 00/12] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <CAG8rG2y8ZN4ahv7DqJ11=FhJpVVxcbAbTaViyi-D4GH=p3xg=A@mail.gmail.com>
-References: <002801ce797b$3d2fbc80$b78f3580$@samsung.com>
- <CAG8rG2y8ZN4ahv7DqJ11=FhJpVVxcbAbTaViyi-D4GH=p3xg=A@mail.gmail.com>
-Message-ID: <004301ce8477$c1172fe0$43458fa0$@samsung.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 19 Jul 2013 13:15:33 +0100
+Subject: alignment handler instruction endian-ness
+In-Reply-To: <20130719110947.GD24642@n2100.arm.linux.org.uk>
+References: <51E91BE5.8070809@codethink.co.uk>
+ <20130719110947.GD24642@n2100.arm.linux.org.uk>
+Message-ID: <51E92DE5.6090404@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Antonios Motakis [mailto:a.motakis at virtualopensystems.com]
-> Sent: Friday, July 19, 2013 1:25 AM
-> 
-> Hello Cho,
-> 
-> I have been trying out the Exynos System MMU driver including your
-> fixes, however I notice that if you try to get the iommu_group of a
-> device (i.e. iommu_group_get(&pdev->dev)) this will not work. Since
-> each device is behind its own System MMU I would expect a distinct
-> iommu_group for that device, instead I get NULL (I tried this with the
-> MFC).
-> 
-> Indeed, it looks like this is not currently implemented in the driver.
-> Is this something that is on the roadmap?
-> 
+On 19/07/13 12:09, Russell King - ARM Linux wrote:
+> On Fri, Jul 19, 2013 at 11:58:45AM +0100, Ben Dooks wrote:
+>> I ran in to an issue with the alignment handler when running BE8 where
+>> it loads instructions and fails to swap.
+>>
+>> Is there a better way of swapping instructions for ARM when loading
+>> from arbitrary places? Have I missed any other places this could happen?
+>
+> Maybe we need a macro which deals with this automatically?
+>
+> 	arm_instr_to_cpu(x)
+> 	thumb_instr_to_cpu(x)
+>
+> These should probably make use of the swab*() macros when an endian swap
+> is needed.
+>
+>> The following patch is my first attempt at solving the problem for the
+>> alignment handler:
+>
+> I'd suggest checking this with sparse too - you have some type errors here.
 
-I have not implemented anything about iommu_group
-since a System MMU is dedicated to a single master device.
-I also did not find any reason to implement something about iommu_group.
-I would like to know why you need to call iommu_group_get().
-Do you need some information in user-space?
+How about:
 
-Thank you.
+diff --git a/arch/arm/include/uapi/asm/byteorder.h 
+b/arch/arm/include/uapi/asm/b
+index 7737974..9e63a00 100644
+--- a/arch/arm/include/uapi/asm/byteorder.h
++++ b/arch/arm/include/uapi/asm/byteorder.h
+@@ -21,5 +21,13 @@
+  #include <linux/byteorder/little_endian.h>
+  #endif
 
-Cho KyongHo.
 
-> Best regards,
-> Antonios Motakis
-> 
-> On Fri, Jul 5, 2013 at 2:29 PM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> > The current exynos-iommu(System MMU) driver does not work autonomously
-> > since it is lack of support for power management of peripheral blocks.
-> > For example, MFC device driver must ensure that its System MMU is disabled
-> > before MFC block is power-down not to invalidate IOTLB in the System MMU
-> > when I/O memory mapping is changed. Because A System MMU is resides in the
-> > same H/W block, access to control registers of System MMU while the H/W
-> > block is turned off must be prohibited.
-> >
-> > This set of changes solves the above problem with setting each System MMUs
-> > as the parent of the device which owns the System MMU to recieve the
-> > information when the device is turned off or turned on.
-> >
-> > Another big change to the driver is the support for devicetree.
-> > The bindings for System MMU is described in
-> > Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
-> >
-> > In addition, this patchset also includes several bug fixes and enhancements
-> > of the current driver.
-> >
-> > Change log:
-> > v7:
-> > - Rebased on the stable 3.10
-> > - Registered PM domains and gate clocks with DT
-> > - Changed connection method between a System MMU and its master H/W
-> >    'mmu-master' property in the node of System MMU
-> >    --> 'iommu' property in the node of master H/W
-> > - Marking device descriptor of master H/W of a System MMU with bus notifier.
-> > - Power management (PM_RUNTIME, PM_SLEEP) of System MMUs with gpd_dev_ops
-> >    of Generic IO Powerdomain. gpd_dev_ops are set to the master H/Ws
-> >    before they are probed in the bus notifier.
-> > - Removed additional debugging features like debugfs entries and
-> >    version names.
-> > - Removed support for advanced features of System MMU 3.2 and 3.3
-> >    the current IOMMU API cannot handle the feature
-> >   (A kind of L2 TLB that fetches several consequence page table entries.
-> >    It must be initialized by the driver of master H/W whenever it works.)
-> >
-> > v6:
-> > - Rebased on the branch, next/iommu-exynos of
-> >   git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >
-> > v5:
-> > - new bugfix: patch 01
-> > - Reordered patches
-> >   * patch 01 ~ 05: Bugfix and enhancements of the existing driver
-> >   * patch 06 ~ 10: Device Tree support and callbacks for power management
-> >   * patch 11     : System MMU 3.2 and 3.3 support
-> >   * patch 12 ~ 14: Debugging features
-> > - Additional code compaction
-> >
-> > v4:
-> > - Remove Change-Id from v3 patches
-> > - Change the order of the third and the first patch
-> >   Thanks to Kukjin Kim.
-> > - Fix memory leak when allocating and assigning exynos_iommu_owner to client
-> >   device if the client device has multiple System MMUs.
-> >   Thanks to Rahul Sharma.
-> >
-> > v3:
-> > - Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
-> > - Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
-> >   Thanks to Prathyush.
-> >
-> > v2:
-> > - Split the patch to iommu/exynos into 9 patches
-> > - Support for System MMU 3.3
-> > - Some code compaction
-> >
-> > Patch summary:
-> > [PATCH v7 1/9] iommu/exynos: do not include removed header
-> > [PATCH v7 2/9] iommu/exynos: add missing cache flush for removed page table entries
-> > [PATCH v7 3/9] iommu/exynos: fix page table maintenance
-> > [PATCH v7 4/9] iommu/exynos: allocate lv2 page table from own slab
-> > [PATCH v7 5/9] iommu/exynos: change rwlock to spinlock
-> > [PATCH v7 6/9] clk: exynos5250: add gate clock descriptions of System MMU
-> > [PATCH v7 7/9] ARM: dts: Add description of System MMU of Exynos SoCs
-> > [PATCH v7 8/9] iommu/exynos: support for device tree
-> > [PATCH v7 9/9] iommu/exynos: add bus notifier for registering System MMU
-> >
-> > Diffstats:
-> > .../devicetree/bindings/clock/exynos5250-clock.txt |   28 +-
-> > .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 ++
-> > arch/arm/boot/dts/exynos4.dtsi                     |  122 +++
-> > arch/arm/boot/dts/exynos4210.dtsi                  |   25 +
-> > arch/arm/boot/dts/exynos4x12.dtsi                  |   76 ++
-> > arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++
-> > drivers/clk/samsung/clk-exynos5250.c               |   57 +-
-> > drivers/iommu/Kconfig                              |    5 +-
-> > drivers/iommu/exynos-iommu.c                       | 1011 +++++++++++++-------
-> > 9 files changed, 1382 insertions(+), 336 deletions(-)
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
++#ifdef CONFIG_CPU_ENDIAN_BE8
++#define cpu_to_arm_instr(__instr)      swab32(__instr)
++#define cpu_to_thum_instr(__instr)     swab16(__instr)
++#else
++#define cpu_to_arm_instr(__instr)      (__instr)
++#define cpu_to_thum_instr(__instr)     (__instr)
++#endif
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
