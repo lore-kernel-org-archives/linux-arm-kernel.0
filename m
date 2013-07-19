@@ -1,37 +1,19 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 19 Jul 2013 18:39:19 +0400
-Subject: [PATCH v6 1/2] ARM: dts: twl: Add GPADC data to device tree
-In-Reply-To: <1374226039-16943-2-git-send-email-oleksandr.kozaruk@ti.com>
-References: <1374226039-16943-1-git-send-email-oleksandr.kozaruk@ti.com>
- <1374226039-16943-2-git-send-email-oleksandr.kozaruk@ti.com>
-Message-ID: <51E94F97.40002@cogentembedded.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 19 Jul 2013 20:20:11 +0530
+Subject: [PATCH v3 2/5] ARM: davinci: da850: override device name of UART
+ in DT kernel
+In-Reply-To: <1371633342-1210-3-git-send-email-prakash.pm@ti.com>
+References: <1371633342-1210-1-git-send-email-prakash.pm@ti.com>
+ <1371633342-1210-3-git-send-email-prakash.pm@ti.com>
+Message-ID: <51E95223.30704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wednesday 19 June 2013 02:45 PM, Manjunathappa, Prakash wrote:
+> Populate OF_DEV_AUXDATA with desired device name so as to prevent
+> clk_get failures.
 
-On 19-07-2013 13:27, Oleksandr Kozaruk wrote:
+This can be folded into 1/5 itself.
 
-> GPADC is the general purpose ADC present on twl6030.
-> The dt data is interrupt used to trigger end of ADC
-> conversion.
-
-> Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
-> ---
->   arch/arm/boot/dts/twl6030.dtsi | 6 ++++++
->   1 file changed, 6 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-> index 2e3bd31..d7d4c28 100644
-> --- a/arch/arm/boot/dts/twl6030.dtsi
-> +++ b/arch/arm/boot/dts/twl6030.dtsi
-> @@ -103,4 +103,10 @@
->   		compatible = "ti,twl6030-pwmled";
->   		#pwm-cells = <2>;
->   	};
-> +
-> +	adc: gpadc {
-
-    Read my lips: the node should be called just "adc", not "gpadc".
-
-WBR, Sergei
+Thanks,
+Sekhar
