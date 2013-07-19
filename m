@@ -1,59 +1,50 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 19 Jul 2013 12:23:19 +0300
-Subject: [PATCH v4 04/17] sched_clock: Add support for >32 bit sched_clock
-In-Reply-To: <1374189690-10810-5-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130719092319.GA4681@tarshish>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 19 Jul 2013 17:25:22 +0800
+Subject: [PATCH V4 0/4] ARM: tegra114: cpuidle: add power down state
+Message-ID: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+This series introduce CPU core power down state for CPU idle. When CPU go
+into this state, it saves it's context and needs a proper configuration
+in flow controller to power gate the CPU when CPU runs into WFI
+instruction. And the CPU also needs to set the IRQ as CPU power down idle
+wake up event in flow controller.
 
-On Thu, Jul 18, 2013 at 04:21:17PM -0700, Stephen Boyd wrote:
-> The ARM architected system counter has at least 56 usable bits.
-> Add support for counters with more than 32 bits to the generic
-> sched_clock implementation so we can increase the time between
-> wakeups due to dealing with wrap-around on these devices while
-> benefiting from the irqtime accounting and suspend/resume
-> handling that the generic sched_clock code already has. On my
-> system using 56 bits over 32 bits changes the wraparound time
-> from a few minutes to an hour. For faster running counters (GHz
-> range) this is even more important because we may not be able to
-> execute the timer in time to deal with the wraparound if only 32
-> bits are used.
-> 
-> We choose a maxsec value of 3600 seconds because we assume no
-> system will go idle for more than an hour. In the future we may
-> need to increase this value.
-> 
-> Note: All users should switch over to the 64-bit read function so
-> we can remove setup_sched_clock() in favor of sched_clock_register().
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+To prevent race conditions and ensure proper interrupt routing on
+Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
+call-back to reprogram the GIC CPU interface on PM entry. The
+GIC CPU interface will be reset back to its normal state by
+the common GIC CPU PM exit callback when the CPU wakes up.
 
-[..]
+And the Tegra114 support CPU0 hotplug function in HW physically, but it
+needs other software to make it work normally after we add CPU idle power
+down mode support. But we don't support that yet, removing them for now.
 
-> @@ -110,14 +123,13 @@ void __init setup_sched_clock(u32 (*read)(void), int
->   bits, unsigned long rate)
->  	if (cd.rate > rate)
->  		return;
->  
-> -	BUG_ON(bits > 32);
->  	WARN_ON(!irqs_disabled());
->  	read_sched_clock = read;
-> -	sched_clock_mask = (1 << bits) - 1;
-> +	sched_clock_mask = CLOCKSOURCE_MASK(bits);
+V4:
+* remove the CPU0 hot plug support due to miss of SW support
+* postpone to use CPUIDLE_FLAG_TIMER_STOP flag, because it still has some
+  issues
+V3:
+* use CPUIDLE_FLAG_TIMER_STOP flag
+V2:
+* clean up the CPUidle driver to make it more generic
 
-Note that this conflicts with my integer overflow fix 
-(http://article.gmane.org/gmane.linux.ports.arm.kernel/252498) that I hope 
-will get merged before 3.11 is out.
+Joseph Lo (4):
+  Revert "ARM: tegra: add cpu_disable for hotplug"
+  ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on CPU PM
+    entry
+  ARM: tegra114: add low level support for CPU idle powered-down mode
+  ARM: tegra114: cpuidle: add powered-down state
 
-baruch
+ arch/arm/mach-tegra/common.h           |  1 -
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 51 +++++++++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/flowctrl.h         |  2 ++
+ arch/arm/mach-tegra/hotplug.c          | 11 --------
+ arch/arm/mach-tegra/irq.c              | 40 ++++++++++++++++++++++++++
+ arch/arm/mach-tegra/platsmp.c          |  1 -
+ arch/arm/mach-tegra/sleep-tegra30.S    |  2 ++
+ 7 files changed, 94 insertions(+), 14 deletions(-)
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.8.3.2
