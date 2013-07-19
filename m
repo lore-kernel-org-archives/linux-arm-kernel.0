@@ -1,58 +1,31 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 19 Jul 2013 09:50:50 -0400
-Subject: [PATCH v2] xen/arm: disable cpuidle and cpufreq when linux is
- running as dom0
-In-Reply-To: <1374233220-13770-1-git-send-email-julien.grall@linaro.org>
-References: <1374233220-13770-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <20130719135050.GA12144@localhost.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Jul 2013 14:53:51 +0100
+Subject: [PATCH 0/4] KVM/arm64 fixes for 3.11
+Message-ID: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 12:27:00PM +0100, Julien Grall wrote:
-> When linux is running as dom0, Xen doesn't show the physical cpu but a
-> virtual CPU.
-> On some ARM SOC (for instance the exynos 5250), linux registers callbacks
-> for cpuidle and cpufreq. When these callbacks are called, they will modify
-> directly the physical cpu not the virtual one. It can impact the whole board
-> instead of only dom0.
-> 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+This series contains a small number of patches for KVM/arm64. The
+first two are the arm64 equivalent of AArch32 fixes that have already
+been merged, and the next two are more related to performance
+optimisation and code cleanup.
 
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> 
-> ---
->     Changes in v2:
->         - Disable cpufreq
-> ---
->  arch/arm/xen/enlighten.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 49839d8..af82792 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -24,6 +24,8 @@
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_address.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/cpufreq.h>
->  
->  #include <linux/mm.h>
->  
-> @@ -292,6 +294,12 @@ static int __init xen_pm_init(void)
->  {
->  	pm_power_off = xen_power_off;
->  	arm_pm_restart = xen_restart;
-> +	/*
-> +	 * Making sure board specific code will not set up ops for
-> +	 * cpu idle and cpu freq.
-> +	 */
-> +	disable_cpuidle();
-> +	disable_cpufreq();
->  
->  	return 0;
->  }
-> -- 
-> 1.7.10.4
-> 
+The patches are also available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/fixes-3.11-rc1
+
+Marc Zyngier (4):
+  arm64: KVM: perform save/restore of PAR_EL1
+  arm64: KVM: add missing dsb before invalidating Stage-2 TLBs
+  arm64: KVM: let other tasks run when hitting WFE
+  arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
+
+ arch/arm64/include/asm/kvm_arm.h |  6 ++++--
+ arch/arm64/include/asm/kvm_asm.h | 23 ++++++++++++++---------
+ arch/arm64/include/asm/virt.h    |  4 ++++
+ arch/arm64/kvm/handle_exit.c     | 18 +++++++++++++-----
+ arch/arm64/kvm/hyp.S             | 18 ++++++++++++------
+ arch/arm64/kvm/sys_regs.c        |  3 +++
+ 6 files changed, 50 insertions(+), 22 deletions(-)
+
+-- 
+1.8.2.3
