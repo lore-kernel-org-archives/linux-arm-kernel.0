@@ -1,152 +1,151 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 20 Jul 2013 23:42:11 +0200
-Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
-In-Reply-To: <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+Date: Sat, 20 Jul 2013 23:48:30 +0200
+Subject: [PATCH 06/10] ARM: clps711x: Add CLPS711X clocksource driver
+In-Reply-To: <20130720074441.9882b71183e5eadd535da6c1@mail.ru>
 References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-9-git-send-email-shc_work@mail.ru>
-Message-ID: <51EB0433.3050308@linaro.org>
+ <1374172501-26796-7-git-send-email-shc_work@mail.ru>
+ <51E94F7E.4030404@linaro.org>
+ <20130720074441.9882b71183e5eadd535da6c1@mail.ru>
+Message-ID: <51EB05AE.2050105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
-> This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
-> Designed primarily for migration CLPS711X subarch for multiplatform & DT.
+On 07/20/2013 05:44 AM, Alexander Shiyan wrote:
+> On Fri, 19 Jul 2013 16:38:54 +0200
+> Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> (Added Thomas and John in Cc in case they want to review the patch).
+>>
+>> On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
+>>> This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
+>>> Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+>>> for this as the "OF" and "not-OF" calls implemented.
+>>
+>> When a new driver is submitted, I ask for a more detailed changelog
+>> about the driver itself: how it works, any specificities, etc ...
+>>
+>> That will help people to understand the code better at least for the review.
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  drivers/cpuidle/Kconfig            |  6 +++
->  drivers/cpuidle/Makefile           |  1 +
->  drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 87 insertions(+)
->  create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
+> Basically, this series is a port of the CLPS711X subsystems in places specially
+> designed for this purpose. Additionally added to the standard description of the
+> subsystem for use with DT.
+> As for specs, I'm a little confused by this question. In this case, I'm doing
+> is not anything new for this CPU. The CPU has two timers and I use both to
+> provide the correct time sources.
+
+I understand there is nothing extra in the code but I was talking about
+some specificity of the driver if there are (eg. timer must be disabled
+with disable/enable irq).
+
+>>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+>>> ---
+>>>  arch/arm/Kconfig                      |   2 -
+>>>  drivers/clocksource/Kconfig           |   6 ++
+>>>  drivers/clocksource/Makefile          |   1 +
+>>>  drivers/clocksource/clps711x-clksrc.c | 151 ++++++++++++++++++++++++++++++++++
+>>>  4 files changed, 158 insertions(+), 2 deletions(-)
+>>>  create mode 100644 drivers/clocksource/clps711x-clksrc.c
+> [...]
+>>> +#define CLPS711X_SYSCON1	(0x0100)
+>>> +#define CLPS711X_TC1D		(0x0300)
+>>> +#define CLPS711X_TC2D		(0x0340)
+>>
+>> Alignment.
 > 
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> index 0e2cd5c..c68a0cf 100644
-> --- a/drivers/cpuidle/Kconfig
-> +++ b/drivers/cpuidle/Kconfig
-> @@ -36,6 +36,12 @@ config CPU_IDLE_CALXEDA
->  	help
->  	  Select this to enable cpuidle on Calxeda processors.
->  
-> +config CPU_IDLE_CLPS711X
-> +	bool "CPU Idle Driver for CLPS711X processors"
-> +	depends on ARCH_CLPS711X
-> +	help
-> +	  Select this to enable cpuidle on Cirrus Logic CLPS711X processors.
-> +
->  config CPU_IDLE_ZYNQ
->  	bool "CPU Idle Driver for Xilinx Zynq processors"
->  	depends on ARCH_ZYNQ
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index 8767a7b..d07d2cb 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -6,5 +6,6 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
->  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->  
->  obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
-> +obj-$(CONFIG_CPU_IDLE_CLPS711X)	+= cpuidle-clps711x.o
->  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
->  obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
-> diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
-> new file mode 100644
-> index 0000000..9f0129f
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-clps711x.c
-> @@ -0,0 +1,80 @@
-> +/*
-> + *  CLPS711X CPU idle driver
-> + *
-> + *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/cpuidle.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +static void __iomem *clps711x_halt;
-> +
-> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
-> +				 struct cpuidle_driver *drv, int index)
-> +{
-> +	writel(1, clps711x_halt);
+> Alignment? Do not see any problems.
+> Wrong alignment in this case is the result of quote.
 
-In what the 'clps711x_halt' differs from the usual WFI (cpu_do_idle) ?
+Ok.
 
-> +	asm volatile ("mov r0, r0");
-> +	asm volatile ("mov r0, r0");
+>>> +static struct {
+>>> +	void __iomem	*tc1d;
+>>> +	int		irq;
+>>> +} *clps711x_clksrc;
+>>
+>> You don't need to define this structure, the struct clock_event_device
+>> already contains a field with irq.
+> 
+> Thank you, I will know.
+> 
+> [...]
+>>> +static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
+>>> +					 struct clock_event_device *evt)
+>>> +{
+>>> +	disable_irq(clps711x_clksrc->irq);
+>>
+>> Do you really need to disable the interrupt to re-enable it right after ?
+> 
+> That was the original implementation. Perhaps the best solution is to disable
+> interrupt by CLOCK_EVT_MODE_SHUTDOWN and enable it back by CLOCK_EVT_MODE_RESUME.
+> 
+>>> +> +	switch (mode) {
+>>> +	case CLOCK_EVT_MODE_PERIODIC:
+>>> +		enable_irq(clps711x_clksrc->irq);
+>>> +		break;
+>>> +	case CLOCK_EVT_MODE_ONESHOT:
+>>> +		/* Not supported */
+>>> +	case CLOCK_EVT_MODE_SHUTDOWN:
+>>> +	case CLOCK_EVT_MODE_UNUSED:
+>>> +	case CLOCK_EVT_MODE_RESUME:
+>>> +		/* Left event sources disabled, no more interrupts appear */
+>>> +		break;
+>>> +	}
+>>> +}
+>>
+>> I am not expert in interrupts, but it is possible this interrupt could
+>> be shared ?
+> 
+> Timer interrupt? No.
+> 
+>> There isn't a register to enable/disable the timer ?
+> 
+> Unfortunately, no. The timer is running always, except STDBY CPU state,
+> so we can control it only by enable/disable interrupt.
 
-Why are needed these two volatile ?
+Ok.
 
-> +	return index;
-> +}
-> +
-> +static struct cpuidle_driver clps711x_idle_driver = {
-> +	.name			= "clps711x_idle",
-> +	.owner			= THIS_MODULE,
-> +	.state_count		= 1,
-> +	.states[0]	= {
-> +		.name		= "HALT",
-> +		.desc		= "CLPS711X WFI",
-> +		.enter		= clps711x_cpuidle_halt,
-> +		.exit_latency	= 1,
-> +	},
-> +};
-> +
-> +static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(clps711x_halt))
-> +		return PTR_ERR(clps711x_halt);
-> +
-> +	return cpuidle_register(&clps711x_idle_driver, NULL);
-> +}
-> +
-> +static int clps711x_cpuidle_remove(struct platform_device *pdev)
-> +{
-> +	cpuidle_unregister(&clps711x_idle_driver);
-> +
-> +	return 0;
-> +}
+> [...]
+>>> +static struct irqaction clps711x_timer_irq = {
+>>> +	.name		= "clps711x-timer",
+>>> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>>
+>> Why do you need IRQF_IRQPOOL ?
+> 
+> linux/interrupt.h:
+>  * IRQF_IRQPOLL - Interrupt is used for polling (only the interrupt that is
+>  *                registered first in an shared interrupt is considered for
+>  *                performance reasons)
+> 
+> I do not see need this flag, but in fact, this flag is traditionally used
+> in almost all subsystems of this type.
 
-The driver is not compiled as module, will this function be called ?
+So IIUC, IRQPOLL is to switch to polling mode when a lot of interrupts
+occur, right ?
 
-> +
-> +static const struct of_device_id clps711x_cpuidle_dt_ids[] = {
-> +	{ .compatible = "cirrus,clps711x-cpuidle", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, clps711x_cpuidle_dt_ids);
-> +
-> +static struct platform_driver clps711x_cpuidle_driver = {
-> +	.driver	= {
-> +		.name		= "clps711x-cpuidle",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= clps711x_cpuidle_dt_ids,
-> +	},
-> +	.remove	= clps711x_cpuidle_remove,
-> +};
-> +module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
+> [...]
+>>> +	tmp = readl(syscon1);
+>>> +	/* TC1 in free running mode */
+>>> +	tmp &= ~SYSCON1_TC1M;
+>>> +	/* TC2 in prescale mode */
+>>> +	tmp |= SYSCON1_TC2M;
+>>> +	writel(tmp, syscon1);
+>>
+>> Could you encapsulate these calls inside a static inline function with a
+>> more detailed comment please ?
+> 
+> Why static inline?
+> There is a comment line for each bit, You think this is not enough?
 
-+1
+I prefer to encapsulate readl/writel calls inside a small function with
+an explicit name, comments are still welcome.
 
-> +
-> +MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
-> +MODULE_DESCRIPTION("CLPS711X CPU idle driver");
-> +MODULE_LICENSE("GPL");
+> [...]
+>>> +void __init clps711x_clksrc_init(phys_addr_t phys_base, int irq)
+>>
+>> Is this function called somewhere ? I don't see the function definition ?
+> 
+> It is defined in the patch [9/10] for non-DT case.
 
-
+Ok, thanks.
 
 
 -- 
