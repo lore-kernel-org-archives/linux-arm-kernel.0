@@ -1,35 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 20 Jul 2013 06:25:37 +0100
-Subject: [PATCH] DT: add vendor prefixes for hisilicon
-In-Reply-To: <1371445499-27265-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1371445499-27265-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20130720052537.5BB403E16CD@localhost>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 20 Jul 2013 16:18:01 +0400
+Subject: [RFC v2] ARM: i.MX pllv1: Implement set_rate
+In-Reply-To: <20130720115829.GD29785@pengutronix.de>
+References: <1374308975-20596-1-git-send-email-shc_work@mail.ru>
+ <20130720111639.GA29785@pengutronix.de>
+ <20130720153104.96b6723a20bde172a8ea1ba1@mail.ru>
+ <20130720115829.GD29785@pengutronix.de>
+Message-ID: <20130720161801.380bb0d9db75155f5401730b@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Jun 2013 13:04:59 +0800, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+On Sat, 20 Jul 2013 13:58:29 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Applied.
-
-g.
-
-> ---
->  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
->  1 file changed, 1 insertion(+)
+> > > On Sat, Jul 20, 2013 at 12:29:35PM +0400, Alexander Shiyan wrote:
+> > > > This patch implements frequency change for i.MX pllv1.
+> > > > Selection of the values of the registers is not optimal, since is
+> > > > made by simple enumeration of all possible values.
+> > > 
+> > > You do not mention why you want to adjust the rate. Normally we've been
+> > > happy with the static values from the bootloader.
+> > 
+> > For CPUfreq.
+> > Only one barrier to make it workable.
 > 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 6931c43..e18f3ad 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -25,6 +25,7 @@ est	ESTeem Wireless Modems
->  fsl	Freescale Semiconductor
->  GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
->  gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
-> +hisilicon	Hisilicon Limited.
->  hp	Hewlett Packard
->  ibm	International Business Machines (IBM)
->  idt	Integrated Device Technologies, Inc.
-> -- 
-> 1.7.9.5
-> 
+> Isn't it better to adjust the dividers only? I haven't made good
+> experience with adjusting the PLLs.
+
+The frequency value after booting can be quite arbitrary.
+
+Since we define possible frequencies for the CPU (266 and 399 MHz),
+I can offer as variant to use a fixed constant values for PLL.
+
+-- 
+Alexander Shiyan <shc_work@mail.ru>
