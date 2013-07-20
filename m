@@ -1,89 +1,112 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 20 Jul 2013 15:00:06 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <51EA01C4.2010006@ti.com>
-References: <20130718072004.GA16720@kroah.com> <51E7AE88.3050007@ti.com>
- <20130718154954.GA31961@kroah.com> <51E8D086.809@ti.com>
- <20130719054311.GA14638@kroah.com> <51E8D4E0.8060200@ti.com>
- <20130719062941.GA23611@kroah.com> <51E8DE51.1060404@ti.com>
- <20130719235055.GB11498@kroah.com> <51EA01C4.2010006@ti.com>
-Message-ID: <20130720220006.GA7977@kroah.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 20 Jul 2013 23:04:05 +0100
+Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
+In-Reply-To: <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
+References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
+ <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130720220405.GC35165@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 20, 2013 at 08:49:32AM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
+On Fri, Jul 19, 2013 at 02:53:54PM +0100, Marc Zyngier wrote:
+> So far, when a guest executes WFE (like when waiting for a spinlock
+> to become unlocked), we don't do a thing and let it run uninterrupted.
 > 
-> On Saturday 20 July 2013 05:20 AM, Greg KH wrote:
-> >On Fri, Jul 19, 2013 at 12:06:01PM +0530, Kishon Vijay Abraham I wrote:
-> >>Hi,
-> >>
-> >>On Friday 19 July 2013 11:59 AM, Greg KH wrote:
-> >>>On Fri, Jul 19, 2013 at 11:25:44AM +0530, Kishon Vijay Abraham I wrote:
-> >>>>Hi,
-> >>>>
-> >>>>On Friday 19 July 2013 11:13 AM, Greg KH wrote:
-> >>>>>On Fri, Jul 19, 2013 at 11:07:10AM +0530, Kishon Vijay Abraham I wrote:
-> >>>>>>>>>>+	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
-> >>>>>>>>>
-> >>>>>>>>>Your naming is odd, no "phy" anywhere in it?  You rely on the sender to
-> >>>>>>>>>never send a duplicate name.id pair?  Why not create your own ids based
-> >>>>>>>>>on the number of phys in the system, like almost all other classes and
-> >>>>>>>>>subsystems do?
-> >>>>>>>>
-> >>>>>>>>hmm.. some PHY drivers use the id they provide to perform some of their
-> >>>>>>>>internal operation as in [1] (This is used only if a single PHY provider
-> >>>>>>>>implements multiple PHYS). Probably I'll add an option like PLATFORM_DEVID_AUTO
-> >>>>>>>>to give the PHY drivers an option to use auto id.
-> >>>>>>>>
-> >>>>>>>>[1] ->
-> >>>>>>>>http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
-> >>>>>>>
-> >>>>>>>No, who cares about the id?  No one outside of the phy core ever should,
-> >>>>>>>because you pass back the only pointer that they really do care about,
-> >>>>>>>if they need to do anything with the device.  Use that, and then you can
-> >>>>>>
-> >>>>>>hmm.. ok.
-> >>>>>>
-> >>>>>>>rip out all of the "search for a phy by a string" logic, as that's not
-> >>>>>>
-> >>>>>>Actually this is needed for non-dt boot case. In the case of dt boot, we use a
-> >>>>>>phandle by which the controller can get a reference to the phy. But in the case
-> >>>>>>of non-dt boot, the controller can get a reference to the phy only by label.
-> >>>>>
-> >>>>>I don't understand.  They registered the phy, and got back a pointer to
-> >>>>>it.  Why can't they save it in their local structure to use it again
-> >>>>>later if needed?  They should never have to "ask" for the device, as the
-> >>>>
-> >>>>One is a *PHY provider* driver which is a driver for some PHY device. This will
-> >>>>use phy_create to create the phy.
-> >>>>The other is a *PHY consumer* driver which might be any controller driver (can
-> >>>>be USB/SATA/PCIE). The PHY consumer will use phy_get to get a reference to the
-> >>>>phy (by *phandle* in the case of dt boot and *label* in the case of non-dt boot).
-> >>>>>device id might be unknown if there are multiple devices in the system.
-> >>>>
-> >>>>I agree with you on the device id part. That need not be known to the PHY driver.
-> >>>
-> >>>How does a consumer know which "label" to use in a non-dt system if
-> >>>there are multiple PHYs in the system?
-> >>
-> >>That should be passed using platform data.
-> >
-> >Ick, don't pass strings around, pass pointers.  If you have platform
-> >data you can get to, then put the pointer there, don't use a "name".
+> Another option is to trap a blocking WFE and offer the opportunity
+> to the scheduler to switch to another task, potentially giving the
+> vcpu holding the spinlock a chance to run sooner.
 > 
-> I don't think I understood you here :-s We wont have phy pointer
-> when we create the device for the controller no?(it'll be done in
-> board file). Probably I'm missing something.
 
-Why will you not have that pointer?  You can't rely on the "name" as the
-device id will not match up, so you should be able to rely on the
-pointer being in the structure that the board sets up, right?
+I'm curious if we have any data supporting this to be a good idea?
 
-Don't use names, especially as ids can, and will, change, that is going
-to cause big problems.  Use pointers, this is C, we are supposed to be
-doing that :)
+My intuition here is that waiting for a spinlock really shouldn't be
+something a guest is doing for a long time - we always try to avoid too
+much contention on spinlocks, no?  The theory that it would unlock the
+spinlock sooner is really only supported if the CPU resources are
+grossly oversubscribed - are we optimizing for this case?
 
-thanks,
+So, how many cycles do we anticipate a world-switch back and forward
+between a VM and the host to be compared to the average number of spin
+cycles for a spinlock?
 
-greg k-h
+Finally, for the case where a waiting vcpu is only going to spin for a
+couple of cycles, aren't we adding significant overhead?  I would expect
+this to be the most common case.
+
+
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h |  6 ++++--
+>  arch/arm64/kvm/handle_exit.c     | 18 +++++++++++++-----
+>  2 files changed, 17 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index a5f28e2..ac1ea05 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -63,6 +63,7 @@
+>   * TAC:		Trap ACTLR
+>   * TSC:		Trap SMC
+>   * TSW:		Trap cache operations by set/way
+> + * TWE:		Trap WFE
+>   * TWI:		Trap WFI
+>   * TIDCP:	Trap L2CTLR/L2ECTLR
+>   * BSU_IS:	Upgrade barriers to the inner shareable domain
+> @@ -72,8 +73,9 @@
+>   * FMO:		Override CPSR.F and enable signaling with VF
+>   * SWIO:	Turn set/way invalidates into set/way clean+invalidate
+>   */
+> -#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
+> -			 HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
+> +#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+> +			 HCR_BSU_IS | HCR_FB | HCR_TAC | \
+> +			 HCR_AMO | HCR_IMO | HCR_FMO | \
+>  			 HCR_SWIO | HCR_TIDCP | HCR_RW)
+>  #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+>  
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 9beaca03..b0098c2 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -47,21 +47,29 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  }
+>  
+>  /**
+> - * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
+> + * kvm_handle_wfx - handle a wait-for-interrupts or wait-for-event
+> + *		    instruction executed by a guest
+> + *
+>   * @vcpu:	the vcpu pointer
+>   *
+> - * Simply call kvm_vcpu_block(), which will halt execution of
+> + * WFE: Yield the CPU and come back to this vcpu when the scheduler
+> + * decides to.
+> + * WFI: Simply call kvm_vcpu_block(), which will halt execution of
+>   * world-switches and schedule other host processes until there is an
+>   * incoming IRQ or FIQ to the VM.
+>   */
+> -static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	kvm_vcpu_block(vcpu);
+> +	if (kvm_vcpu_get_hsr(vcpu) & 1)
+> +		cond_resched();
+> +	else
+> +		kvm_vcpu_block(vcpu);
+> +
+>  	return 1;
+>  }
+>  
+>  static exit_handle_fn arm_exit_handlers[] = {
+> -	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
+> +	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
+>  	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
+>  	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
+>  	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
+> -- 
+> 1.8.2.3
+> 
+> 
+
+-- 
+Christoffer
