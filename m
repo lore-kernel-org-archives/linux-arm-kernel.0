@@ -1,28 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Sat, 20 Jul 2013 12:42:20 +0100
-Subject: [PATCH 10/22] ARM: ux500: Remove '0x's from Exynos5420 DTS file
-In-Reply-To: <20130719214907.GI24642@n2100.arm.linux.org.uk>
+Date: Sat, 20 Jul 2013 12:43:37 +0100
+Subject: [PATCH 20/22] ARM: ux500: Remove '0x's from Spear 300 DTS file
+In-Reply-To: <CAOh2x==EBzy6MMy0Jv1=VSAD7Kdw7=Jag8g4oz-kfRH0XafGaw@mail.gmail.com>
 References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
- <1374242333-6852-10-git-send-email-lee.jones@linaro.org>
- <20130719214907.GI24642@n2100.arm.linux.org.uk>
-Message-ID: <20130720114220.GB4681@laptop>
+ <1374242333-6852-20-git-send-email-lee.jones@linaro.org>
+ <CAOh2x==EBzy6MMy0Jv1=VSAD7Kdw7=Jag8g4oz-kfRH0XafGaw@mail.gmail.com>
+Message-ID: <20130720114337.GC4681@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Jul 2013, Russell King - ARM Linux wrote:
+On Sat, 20 Jul 2013, Viresh Kumar wrote:
 
-> On Fri, Jul 19, 2013 at 02:58:41PM +0100, Lee Jones wrote:
-> > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> > Cc: linux-samsung-soc at vger.kernel.org
+> On Fri, Jul 19, 2013 at 7:28 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > > ---
-> >  arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+> >  arch/arm/boot/dts/spear300.dtsi | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
+> > index f79b3df..8970a4a 100644
+> > --- a/arch/arm/boot/dts/spear300.dtsi
+> > +++ b/arch/arm/boot/dts/spear300.dtsi
+> > @@ -52,7 +52,7 @@
+> >                         status = "disabled";
+> >                 };
+> >
+> > -               shirq: interrupt-controller at 0x50000000 {
+> > +               shirq: interrupt-controller at 50000000 {
+> >                         compatible = "st,spear300-shirq";
+> >                         reg = <0x50000000 0x1000>;
+> >                         interrupts = <28>;
 > 
-> One question.  What have all these files got to do with ux500 ?
+> Should Ux500 come in subject line? And please write Spear as
+> SPEAr.
 
-They don't, sorry about that. Force of habit.
+Yes, you're right, I will correct them.
 
-I'll resubmit on Monday.
+I did this for all twenty odd patches, whoops!
+
+> Otherwise all three patches look fine.
+> 
+> Ackedy-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+Thanks.
 
 -- 
 Lee Jones
