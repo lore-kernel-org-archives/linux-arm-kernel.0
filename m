@@ -1,54 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Jul 2013 15:03:25 +0200
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC with
- ARM CPU
-In-Reply-To: <20130716151435.GB3871@linaro.org>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716151435.GB3871@linaro.org>
-Message-ID: <201307191503.25382.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 20 Jul 2013 13:16:39 +0200
+Subject: [RFC v2] ARM: i.MX pllv1: Implement set_rate
+In-Reply-To: <1374308975-20596-1-git-send-email-shc_work@mail.ru>
+References: <1374308975-20596-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130720111639.GA29785@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 July 2013, Matt Porter wrote:
+On Sat, Jul 20, 2013 at 12:29:35PM +0400, Alexander Shiyan wrote:
+> This patch implements frequency change for i.MX pllv1.
+> Selection of the values of the registers is not optimal, since is
+> made by simple enumeration of all possible values.
 
-> > diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-> > new file mode 100644
-> > index 0000000..638350d
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-> > @@ -0,0 +1,72 @@
-> > +/*
-> > + * Broadcom BCM47XX / BCM53XX ARM platform code.
-> > + *
-> > + * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
-> > + *
-> > + * Licensed under the GNU/GPL. See COPYING for details.
-> > + */
-> > +
-> > +/include/ "skeleton.dtsi"
-> > +
-> > +/ {
-> > +	compatible = "brcm,bcm5301x";
-> 
-> Ok, this was nagging at me before I went on my very long vacation. I see
-> the "brcm" vendor prefix as a real consistency problem. I noticed on the
-> bcm281xx/kona family, we have been using "bcm" which is not logged in
-> vendor-prefixes.txt as a legitimate prefix. I see that bcm2835 had
-> already established use of "brcm" before any of the bcm281xx support
-> came in. Ideally, the vendor prefix should change to "bcm" since every
-> reference in the family names is BCM. However, if others want the least
-> amount of churn in making this consistent, we might have to go with
-> "brcm" across the board.
-> 
-> Arnd, any thoughts here?
+You do not mention why you want to adjust the rate. Normally we've been
+happy with the static values from the bootloader.
 
-No strong feelings on the bcm vs brcm side, but please make it consistent.
+> -static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+> -		unsigned long parent_rate)
+> +static unsigned long _clk_pllv1_recalc_rate(unsigned int mfi, unsigned int mfn,
+> +					    unsigned int mfd, unsigned int pd,
+> +					    unsigned long parent_rate)
+>  {
+> -	struct clk_pllv1 *pll = to_clk_pllv1(hw);
+> -	long long ll;
+> -	int mfn_abs;
+> -	unsigned int mfi, mfn, mfd, pd;
+> -	u32 reg;
+>  	unsigned long rate;
+> -
+> -	reg = readl(pll->base);
+> +	int mfn_abs = mfn;
+> +	long long ll;
+>  
+>  	/*
+>  	 * Get the resulting clock rate from a PLL register value and the input
+> @@ -47,15 +45,6 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  	 *                        pd + 1
+>  	 */
+>  
+> -	mfi = (reg >> 10) & 0xf;
+> -	mfn = reg & 0x3ff;
+> -	mfd = (reg >> 16) & 0x3ff;
+> -	pd =  (reg >> 26) & 0xf;
+> -
+> -	mfi = mfi <= 5 ? 5 : mfi;
+> -
+> -	mfn_abs = mfn;
+> -
+>  	/*
+>  	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+>  	 * 2's complements number
+> @@ -78,8 +67,99 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  	return ll;
+>  }
+>  
+> +static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+> +		unsigned long parent_rate)
+> +{
+> +	struct clk_pllv1 *pll = to_clk_pllv1(hw);
+> +	unsigned int mfi, mfn, mfd, pd;
+> +	u32 reg = readl(pll->base);
+> +
+> +	/* Avoid i.MX27 TO2 SPCTL0 bug */
+> +	if (cpu_is_mx27() && (mx27_revision() == IMX_CHIP_REVISION_2_0))
+> +		writel(reg, pll->base);
 
-> Last thing, compatible strings are not to have wildcards in them. See
-> http://devicetree.org/Device_Tree_Usage#Understanding_the_compatible_Property
-> and note the Warning at the bottom. Also see how bcm2835.txt and
-> bcm11351.txt use a specific model.
+I remember this was fixed and got lost. If you want to have fixed it
+again this should be a separate paatch along with a description of the
+bug in the commit log.
 
-+1
+> +
+> +	mfi = (reg >> 10) & 0xf;
+> +	mfn = reg & 0x3ff;
+> +	mfd = (reg >> 16) & 0x3ff;
+> +	pd =  (reg >> 26) & 0xf;
+> +
+> +	mfi = mfi <= 5 ? 5 : mfi;
+> +
+> +	return _clk_pllv1_recalc_rate(mfi, mfn, mfd, pd, parent_rate);
+> +}
+> +
+> +static void _clk_pllv1_set_rate(unsigned long rate, unsigned long parent_rate,
+> +				unsigned int *reg)
+> +{
+> +	unsigned int pd, mfi, mfn, mfd, mfn_offs = 0;
+> +	long tmp, res, best = 0;
+> +
+> +	pd = (parent_rate * 2 * 5) / rate;
+> +	if (pd > 15)
+> +		pd = 15;
+> +	mfi = rate / (parent_rate * 2 * (pd + 1));
+> +	if (mfi < 5)
+> +		mfi = 5;
+> +	if (mfi < 15) {
+> +		tmp = parent_rate * 2;
+> +		tmp /= pd + 1;
+> +		tmp *= mfi;
+> +		if (tmp / parent_rate) {
+> +			mfi++;
+> +			/* Use negative values */
+> +			mfn_offs = 0x200;
+> +		}
+> +	} else if (mfi > 15)
+> +		mfi = 15;
 
-	Arnd
+Use braces on both branches here.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
