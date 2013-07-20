@@ -1,19 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Jul 2013 21:45:59 +0200
-Subject: [RESEND PATCH v7 00/22] MBus DT binding: The return of PCIe
-In-Reply-To: <20130720185443.GB21460@localhost>
-References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130720165855.GB26625@lunn.ch> <20130720173847.GC26625@lunn.ch>
- <20130720185443.GB21460@localhost>
-Message-ID: <20130720194559.GA27517@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 20 Jul 2013 22:51:09 +0200
+Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
+In-Reply-To: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdauSuk9xDSzUFN=OO0yVWZXSMTUuYTVDZb2_zYb=YMW_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The patchset works only for Armada 370 and Armada XP SoC, not for Kirkwood.
-> For some reason I was completely sure there wasn't any DT-enabled Kirkwood
-> boards with PCIe support.
+On Fri, Jul 19, 2013 at 1:21 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-I had a quick look at Dove and Orion5x. It looks like there are none
-with PCIe support. So only Kirkwood is broken.
+> This patchset adds support for 64 bit counters in the generic
+> sched_clock code and converts drivers over to use it. Based
+> on v3.11-rc1.
+>
+> Changes since v3:
 
-	Andrew
+>   ocksource: dbx500-prcmu: Switch to sched_clock_register()
+
+Fix subject.
+
+>   clocksource: nomadik: Switch to sched_clock_register()
+
+Apart from that Acked-by: Linus Walleij <linus.walleij@linaro.org>
+for these two drivers.
+
+BTW: why are you not patching arch/arm/mach-u300/timer.c?
+Please make sure to grep for all setup_sched_clock() if you're
+going to do this.
+
+Yours,
+Linus Walleij
