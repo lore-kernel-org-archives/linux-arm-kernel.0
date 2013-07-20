@@ -1,52 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Sat, 20 Jul 2013 12:43:37 +0100
-Subject: [PATCH 20/22] ARM: ux500: Remove '0x's from Spear 300 DTS file
-In-Reply-To: <CAOh2x==EBzy6MMy0Jv1=VSAD7Kdw7=Jag8g4oz-kfRH0XafGaw@mail.gmail.com>
-References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
- <1374242333-6852-20-git-send-email-lee.jones@linaro.org>
- <CAOh2x==EBzy6MMy0Jv1=VSAD7Kdw7=Jag8g4oz-kfRH0XafGaw@mail.gmail.com>
-Message-ID: <20130720114337.GC4681@laptop>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 20 Jul 2013 13:58:29 +0200
+Subject: [RFC v2] ARM: i.MX pllv1: Implement set_rate
+In-Reply-To: <20130720153104.96b6723a20bde172a8ea1ba1@mail.ru>
+References: <1374308975-20596-1-git-send-email-shc_work@mail.ru>
+ <20130720111639.GA29785@pengutronix.de>
+ <20130720153104.96b6723a20bde172a8ea1ba1@mail.ru>
+Message-ID: <20130720115829.GD29785@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Jul 2013, Viresh Kumar wrote:
-
-> On Fri, Jul 19, 2013 at 7:28 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/spear300.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
-> > index f79b3df..8970a4a 100644
-> > --- a/arch/arm/boot/dts/spear300.dtsi
-> > +++ b/arch/arm/boot/dts/spear300.dtsi
-> > @@ -52,7 +52,7 @@
-> >                         status = "disabled";
-> >                 };
-> >
-> > -               shirq: interrupt-controller at 0x50000000 {
-> > +               shirq: interrupt-controller at 50000000 {
-> >                         compatible = "st,spear300-shirq";
-> >                         reg = <0x50000000 0x1000>;
-> >                         interrupts = <28>;
+On Sat, Jul 20, 2013 at 03:31:04PM +0400, Alexander Shiyan wrote:
+> On Sat, 20 Jul 2013 13:16:39 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > 
-> Should Ux500 come in subject line? And please write Spear as
-> SPEAr.
-
-Yes, you're right, I will correct them.
-
-I did this for all twenty odd patches, whoops!
-
-> Otherwise all three patches look fine.
+> > On Sat, Jul 20, 2013 at 12:29:35PM +0400, Alexander Shiyan wrote:
+> > > This patch implements frequency change for i.MX pllv1.
+> > > Selection of the values of the registers is not optimal, since is
+> > > made by simple enumeration of all possible values.
+> > 
+> > You do not mention why you want to adjust the rate. Normally we've been
+> > happy with the static values from the bootloader.
 > 
-> Ackedy-by: Viresh Kumar <viresh.kumar@linaro.org>
+> For CPUfreq.
+> Only one barrier to make it workable.
 
-Thanks.
+Isn't it better to adjust the dividers only? I haven't made good
+experience with adjusting the PLLs.
+
+Sascha
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
