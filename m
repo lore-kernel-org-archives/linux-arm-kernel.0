@@ -1,81 +1,77 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Sat, 20 Jul 2013 08:49:32 +0530
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <20130719235055.GB11498@kroah.com>
-References: <1374129984-765-1-git-send-email-kishon@ti.com>
- <1374129984-765-2-git-send-email-kishon@ti.com>
- <20130718072004.GA16720@kroah.com> <51E7AE88.3050007@ti.com>
- <20130718154954.GA31961@kroah.com> <51E8D086.809@ti.com>
- <20130719054311.GA14638@kroah.com> <51E8D4E0.8060200@ti.com>
- <20130719062941.GA23611@kroah.com> <51E8DE51.1060404@ti.com>
- <20130719235055.GB11498@kroah.com>
-Message-ID: <51EA01C4.2010006@ti.com>
+From: jld@mozilla.com (Jed Davis)
+Date: Fri, 19 Jul 2013 20:43:21 -0700
+Subject: [PATCH] ARM: perf: Implement perf_arch_fetch_caller_regs
+In-Reply-To: <20130715135342.GF10000@mudshark.cambridge.arm.com>
+References: <1373685434-1581-1-git-send-email-jld@mozilla.com>
+ <20130715135342.GF10000@mudshark.cambridge.arm.com>
+Message-ID: <20130720034321.GB9433@mozilla.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 15, 2013 at 02:53:42PM +0100, Will Deacon wrote:
+> On Sat, Jul 13, 2013 at 04:17:14AM +0100, Jed Davis wrote:
+[...]
+> > +#ifdef CONFIG_THUMB2_KERNEL
+> > +#define perf_arch_fetch_caller_regs(regs, ip)				\
+> > +	do {								\
+> > +		__u32 _cpsr, _pc;					\
+> > +		__asm__ __volatile__("str r7, [%[_regs], #(7 * 4)]\n\t" \
+> > +				     "str r13, [%[_regs], #(13 * 4)]\n\t" \
+> > +				     "str r14, [%[_regs], #(14 * 4)]\n\t" \
+> 
+> Is this safe? How can we be sure that the registers haven't been clobbered
+> by the callee before this macro is expanded? For example, you can end up
+> with the following code:
 
-On Saturday 20 July 2013 05:20 AM, Greg KH wrote:
-> On Fri, Jul 19, 2013 at 12:06:01PM +0530, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Friday 19 July 2013 11:59 AM, Greg KH wrote:
->>> On Fri, Jul 19, 2013 at 11:25:44AM +0530, Kishon Vijay Abraham I wrote:
->>>> Hi,
->>>>
->>>> On Friday 19 July 2013 11:13 AM, Greg KH wrote:
->>>>> On Fri, Jul 19, 2013 at 11:07:10AM +0530, Kishon Vijay Abraham I wrote:
->>>>>>>>>> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
->>>>>>>>>
->>>>>>>>> Your naming is odd, no "phy" anywhere in it?  You rely on the sender to
->>>>>>>>> never send a duplicate name.id pair?  Why not create your own ids based
->>>>>>>>> on the number of phys in the system, like almost all other classes and
->>>>>>>>> subsystems do?
->>>>>>>>
->>>>>>>> hmm.. some PHY drivers use the id they provide to perform some of their
->>>>>>>> internal operation as in [1] (This is used only if a single PHY provider
->>>>>>>> implements multiple PHYS). Probably I'll add an option like PLATFORM_DEVID_AUTO
->>>>>>>> to give the PHY drivers an option to use auto id.
->>>>>>>>
->>>>>>>> [1] ->
->>>>>>>> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
->>>>>>>
->>>>>>> No, who cares about the id?  No one outside of the phy core ever should,
->>>>>>> because you pass back the only pointer that they really do care about,
->>>>>>> if they need to do anything with the device.  Use that, and then you can
->>>>>>
->>>>>> hmm.. ok.
->>>>>>
->>>>>>> rip out all of the "search for a phy by a string" logic, as that's not
->>>>>>
->>>>>> Actually this is needed for non-dt boot case. In the case of dt boot, we use a
->>>>>> phandle by which the controller can get a reference to the phy. But in the case
->>>>>> of non-dt boot, the controller can get a reference to the phy only by label.
->>>>>
->>>>> I don't understand.  They registered the phy, and got back a pointer to
->>>>> it.  Why can't they save it in their local structure to use it again
->>>>> later if needed?  They should never have to "ask" for the device, as the
->>>>
->>>> One is a *PHY provider* driver which is a driver for some PHY device. This will
->>>> use phy_create to create the phy.
->>>> The other is a *PHY consumer* driver which might be any controller driver (can
->>>> be USB/SATA/PCIE). The PHY consumer will use phy_get to get a reference to the
->>>> phy (by *phandle* in the case of dt boot and *label* in the case of non-dt boot).
->>>>> device id might be unknown if there are multiple devices in the system.
->>>>
->>>> I agree with you on the device id part. That need not be known to the PHY driver.
->>>
->>> How does a consumer know which "label" to use in a non-dt system if
->>> there are multiple PHYs in the system?
->>
->> That should be passed using platform data.
->
-> Ick, don't pass strings around, pass pointers.  If you have platform
-> data you can get to, then put the pointer there, don't use a "name".
+They might be clobbered, but if they are, then...
 
-I don't think I understood you here :-s We wont have phy pointer when we 
-create the device for the controller no?(it'll be done in board file). 
-Probably I'm missing something.
+> 00000058 <perf_ftrace_function_call>:
+>   58:   e92d 43f0       stmdb   sp!, {r4, r5, r6, r7, r8, r9, lr}
+>   5c:   b09b            sub     sp, #108        ; 0x6c
+>   5e:   ac08            add     r4, sp, #32
+>   60:   4681            mov     r9, r0
+>   62:   4688            mov     r8, r1
+>   64:   4620            mov     r0, r4
+>   66:   2148            movs    r1, #72 ; 0x48
+>   68:   f7ff fffe       bl      0 <__memzero>
+>   6c:   61e7            str     r7, [r4, #28]
+>   6e:   f8c4 d034       str.w   sp, [r4, #52]   ; 0x34
+>   72:   f8c4 e038       str.w   lr, [r4, #56]   ; 0x38
+> 
+> but the call to __memzero will have corrupted the lr.
 
-Thanks
-Kishon
+...the function's unwinding entry will restore them from the stack, and
+can't assume anything about their values before then.  It's the same
+problem as if the code was interrupted by a profiler timer at that point
+and we tried unwinding from the trap state.
+
+Hopefully.  It's hard to be as rigorous as I'd like about this, because
+the Exception Handling ABI was meant for exception handling, so as
+specified it only needs to work at points where C++ exceptions can be
+thrown, as I understand it.  Fortunately GCC isn't limited to that, but
+there are more issues, because -fasynchronous-unwind-tables doesn't
+actually make things work from *any* instruction as documented (which is
+not entirely bad, because working correctly would significantly increase
+the size of .extab/.exidx).
+
+All that said, the unwinding program for a function should work at any
+point after the prologue and before the epilogue.
+
+> > +				     "mov %[_pc],  r15\n\t"		\
+> > +				     "mrs %[_cpsr], cpsr\n\t"		\
+> > +				     : [_cpsr] "=r" (_cpsr),		\
+> > +				       [_pc] "=r" (_pc)			\
+> > +				     : [_regs] "r" (&(regs)->uregs)	\
+> 
+> It would be cleaner to pass a separate argument for each register, using the
+> ARM_rN macros rather than calculating the offset by hand.
+
+I'll do that.  If there were more arguments there might be a problem
+at -O0, because the naive translation can run out of registers in
+some cases, but that shouldn't be a problem here.  (Nor if someone
+later extends this to all the core registers, because {r0-r13} can and
+presumably should use a store-multiple.)
+
+Thanks for the quick review, and sorry for the delay in responding.
+
+--Jed
