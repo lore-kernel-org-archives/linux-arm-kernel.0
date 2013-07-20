@@ -1,41 +1,50 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 20 Jul 2013 15:31:04 +0400
-Subject: [RFC v2] ARM: i.MX pllv1: Implement set_rate
-In-Reply-To: <20130720111639.GA29785@pengutronix.de>
-References: <1374308975-20596-1-git-send-email-shc_work@mail.ru>
- <20130720111639.GA29785@pengutronix.de>
-Message-ID: <20130720153104.96b6723a20bde172a8ea1ba1@mail.ru>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 20 Jul 2013 13:34:18 +0200
+Subject: [GIT PULL] Nomadik defconfig updates
+Message-ID: <CACRpkdZxSkLrKY1rZwdbo2ZJpVqExu7GRyhWN5T8V+aR_jx2Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Jul 2013 13:16:39 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Hi ARM SoC folks,
 
-> On Sat, Jul 20, 2013 at 12:29:35PM +0400, Alexander Shiyan wrote:
-> > This patch implements frequency change for i.MX pllv1.
-> > Selection of the values of the registers is not optimal, since is
-> > made by simple enumeration of all possible values.
-> 
-> You do not mention why you want to adjust the rate. Normally we've been
-> happy with the static values from the bootloader.
+now we are past -rc1 and I'd like to have these defconfig changes for
+the Nomadik pulled in. It is similar in scope to the ux500 defconfig
+updates I sent the other week, and all have been circulated on the
+mailing list.
 
-For CPUfreq.
-Only one barrier to make it workable.
+Please pull them in!
 
-[...]
-> > +	/* Avoid i.MX27 TO2 SPCTL0 bug */
-> > +	if (cpu_is_mx27() && (mx27_revision() == IMX_CHIP_REVISION_2_0))
-> > +		writel(reg, pll->base);
-> 
-> I remember this was fixed and got lost. If you want to have fixed it
-> again this should be a separate paatch along with a description of the
-> bug in the commit log.
+Yours,
+Linus Walleij
 
-This part of the patch can be completely removed ;)
-I'm more interested in a more efficient algorithm for finding the best
-values for the PLL.
 
-[...]
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/nomadik-defconfig-for-arm-soc
+
+for you to fetch changes up to fec57e15527ab2e3d22cfbf04f2b98f823f294ff:
+
+  ARM: nomadik: configure for NO_HZ and HRTIMERS (2013-07-20 11:59:45 +0200)
+
+----------------------------------------------------------------
+This updates the Nomadik defconfig post-v3.11-rc1:
+- Update the baseline so we need not rely on make
+  oldconfig so much
+- MMC defconfig updates
+- Activate NO_HZ_IDLE and HRTIMERS
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      ARM: nomadik: update defconfig base
+      ARM: nomadik: configure for NO_HZ and HRTIMERS
+
+Ulf Hansson (1):
+      ARM: nomadik: Update MMC defconfigs
+
+ arch/arm/configs/nhk8815_defconfig | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
