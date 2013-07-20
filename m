@@ -1,137 +1,48 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 20 Jul 2013 07:44:41 +0400
-Subject: [PATCH 06/10] ARM: clps711x: Add CLPS711X clocksource driver
-In-Reply-To: <51E94F7E.4030404@linaro.org>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-7-git-send-email-shc_work@mail.ru>
- <51E94F7E.4030404@linaro.org>
-Message-ID: <20130720074441.9882b71183e5eadd535da6c1@mail.ru>
+From: jld@mozilla.com (Jed Davis)
+Date: Fri, 19 Jul 2013 21:46:55 -0700
+Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
+In-Reply-To: <20130715135420.GG10000@mudshark.cambridge.arm.com>
+References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+ <20130715135420.GG10000@mudshark.cambridge.arm.com>
+Message-ID: <20130720044655.GC9433@mozilla.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Jul 2013 16:38:54 +0200
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> (Added Thomas and John in Cc in case they want to review the patch).
-> 
-> On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
-> > This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
-> > Designed primarily for migration CLPS711X subarch for multiplatform & DT,
-> > for this as the "OF" and "not-OF" calls implemented.
-> 
-> When a new driver is submitted, I ask for a more detailed changelog
-> about the driver itself: how it works, any specificities, etc ...
-> 
-> That will help people to understand the code better at least for the review.
-
-Basically, this series is a port of the CLPS711X subsystems in places specially
-designed for this purpose. Additionally added to the standard description of the
-subsystem for use with DT.
-As for specs, I'm a little confused by this question. In this case, I'm doing
-is not anything new for this CPU. The CPU has two timers and I use both to
-provide the correct time sources.
-
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/Kconfig                      |   2 -
-> >  drivers/clocksource/Kconfig           |   6 ++
-> >  drivers/clocksource/Makefile          |   1 +
-> >  drivers/clocksource/clps711x-clksrc.c | 151 ++++++++++++++++++++++++++++++++++
-> >  4 files changed, 158 insertions(+), 2 deletions(-)
-> >  create mode 100644 drivers/clocksource/clps711x-clksrc.c
+On Mon, Jul 15, 2013 at 02:54:20PM +0100, Will Deacon wrote:
+> On Sat, Jul 13, 2013 at 04:18:20AM +0100, Jed Davis wrote:
 [...]
-> > +#define CLPS711X_SYSCON1	(0x0100)
-> > +#define CLPS711X_TC1D		(0x0300)
-> > +#define CLPS711X_TC2D		(0x0340)
-> 
-> Alignment.
-
-Alignment? Do not see any problems.
-Wrong alignment in this case is the result of quote.
-
-> > +static struct {
-> > +	void __iomem	*tc1d;
-> > +	int		irq;
-> > +} *clps711x_clksrc;
-> 
-> You don't need to define this structure, the struct clock_event_device
-> already contains a field with irq.
-
-Thank you, I will know.
-
+> > Effects of this are probably limited to failure of EHABI unwinding when
+> > starting from a function that uses r7 to restore its stack pointer, but
+> > the possibility for further breakage (which would be invisible on
+> > non-Thumb kernels) is worrying.
 [...]
-> > +static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
-> > +					 struct clock_event_device *evt)
-> > +{
-> > +	disable_irq(clps711x_clksrc->irq);
-> 
-> Do you really need to disable the interrupt to re-enable it right after ?
+> I'm struggling to understand exactly the problem that this patch is trying
+> to address. If it's just a code consistency issue, I don't think it's worth
+> it (I actually find it less confusing the way we currently have things) but
+> if there is a real bug, perhaps you could provide a testcase?
 
-That was the original implementation. Perhaps the best solution is to disable
-interrupt by CLOCK_EVT_MODE_SHUTDOWN and enable it back by CLOCK_EVT_MODE_RESUME.
+There is a real bug here, but my commit message wasn't very clear.  This
+was breaking PERF_COUNT_SW_CONTEXT_SWITCHES with CONFIG_THUMB2_KERNEL=y
+(with my other recently posted patch applied), because kernel/sched.c is
+built with -fno-omit-frame-pointer (which is wrong, but that's a problem
+for another patch) and so __schedule's EHABI entry uses 0x97 (mov sp, r7),
+and somewhere along the line the unwinder gets the r11 value instead.
+This would also apply to any function with a variable-length array, but
+__schedule happens to have the perf hook I was trying to use.
 
-> > +> +	switch (mode) {
-> > +	case CLOCK_EVT_MODE_PERIODIC:
-> > +		enable_irq(clps711x_clksrc->irq);
-> > +		break;
-> > +	case CLOCK_EVT_MODE_ONESHOT:
-> > +		/* Not supported */
-> > +	case CLOCK_EVT_MODE_SHUTDOWN:
-> > +	case CLOCK_EVT_MODE_UNUSED:
-> > +	case CLOCK_EVT_MODE_RESUME:
-> > +		/* Left event sources disabled, no more interrupts appear */
-> > +		break;
-> > +	}
-> > +}
-> 
-> I am not expert in interrupts, but it is possible this interrupt could
-> be shared ?
+I should add that this bug doesn't affect me directly at the moment,
+because we're not currently using CONFIG_THUMB2_KERNEL on Firefox OS,
+because our kernels are assorted older versions with hardware vendors'
+changes and there are some issues with it.  But I felt it was worth
+tracking this down before trying to send changes upstream.
 
-Timer interrupt? No.
+The "right" thing to do here might be to just include all the registers,
+or at least {r4-pc}, in struct stackframe.  The parts that aren't {fp,
+sp, lr, pc} could be ifdef'ed if we're concerned enough about the
+overhead in kernels using APCS frame pointer unwinding.
 
-> There isn't a register to enable/disable the timer ?
+I agree that a test case would be good -- I'm more than a little worried
+of regressions without one -- but I could use some advice on how best to
+do that.
 
-Unfortunately, no. The timer is running always, except STDBY CPU state,
-so we can control it only by enable/disable interrupt.
-
-[...]
-> > +static struct irqaction clps711x_timer_irq = {
-> > +	.name		= "clps711x-timer",
-> > +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-> 
-> Why do you need IRQF_IRQPOOL ?
-
-linux/interrupt.h:
- * IRQF_IRQPOLL - Interrupt is used for polling (only the interrupt that is
- *                registered first in an shared interrupt is considered for
- *                performance reasons)
-
-I do not see need this flag, but in fact, this flag is traditionally used
-in almost all subsystems of this type.
-
-[...]
-> > +	tmp = readl(syscon1);
-> > +	/* TC1 in free running mode */
-> > +	tmp &= ~SYSCON1_TC1M;
-> > +	/* TC2 in prescale mode */
-> > +	tmp |= SYSCON1_TC2M;
-> > +	writel(tmp, syscon1);
-> 
-> Could you encapsulate these calls inside a static inline function with a
-> more detailed comment please ?
-
-Why static inline?
-There is a comment line for each bit, You think this is not enough?
-
-[...]
-> > +void __init clps711x_clksrc_init(phys_addr_t phys_base, int irq)
-> 
-> Is this function called somewhere ? I don't see the function definition ?
-
-It is defined in the patch [9/10] for non-DT case.
-
-[...]
-
-Thanks.
-
--- 
-Alexander Shiyan <shc_work@mail.ru>
+--Jed
