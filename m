@@ -1,10 +1,10 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 20 Jul 2013 15:36:30 -0300
+Date: Sat, 20 Jul 2013 15:54:44 -0300
 Subject: [RESEND PATCH v7 00/22] MBus DT binding: The return of PCIe
 In-Reply-To: <20130720173847.GC26625@lunn.ch>
 References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
  <20130720165855.GB26625@lunn.ch> <20130720173847.GC26625@lunn.ch>
-Message-ID: <20130720183629.GA21460@localhost>
+Message-ID: <20130720185443.GB21460@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,8 +29,6 @@ On Sat, Jul 20, 2013 at 07:38:47PM +0200, Andrew Lunn wrote:
 > > > it easier for those courageous enough, I've pushed a public branch:
 > > > 
 > > >   https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-mvebu-mbus-v7
-> > 
-> > Hi Ezequiel
 > > 
 > > I just tried this in my Kirkwood QNAP.
 > > 
@@ -76,36 +74,30 @@ On Sat, Jul 20, 2013 at 07:38:47PM +0200, Andrew Lunn wrote:
 > > Feroceon L2: Enabling L2
 > > Feroceon L2: Cache support initialised.
 > > bio: create slab <bio-0> at 0
+[...]
 > > mvebu-pcie pcie-controller.1: PCIe0.0: cannot get tgt/attr for mem window
 > > mvebu-pcie pcie-controller.1: PCIe1.0: cannot get tgt/attr for mem window
-> 
-> Hi Ezequiel
-> 
-> I just put some debug into mvebu_get_tgt_attr():
-> 
-> slot 0, PCI_SLOT(devfn) 1
-> type 512, rtype 512
-> slot 0, PCI_SLOT(devfn) 1
-> type 512, rtype 512
-> slot 0, PCI_SLOT(devfn) 1
-> type 512, rtype 512
-> slot 0, PCI_SLOT(devfn) 1
-> type 512, rtype 256
-> mvebu-pcie pcie-controller.1: PCIe0.0: cannot get tgt/attr for mem window -2
-> slot 0, PCI_SLOT(devfn) 2
-> type 512, rtype 512
-> slot 0, PCI_SLOT(devfn) 2
-> type 512, rtype 512
-> slot 0, PCI_SLOT(devfn) 2
-> type 512, rtype 512
-> slot 0, PCI_SLOT(devfn) 2
-> type 512, rtype 256
+[...]
 > 
 > Any ideas?
 > 
 
-Thanks a lot for testing this! I'll take a look and let you know...
+The patchset works only for Armada 370 and Armada XP SoC, not for Kirkwood.
+For some reason I was completely sure there wasn't any DT-enabled Kirkwood
+boards with PCIe support.
 
+I apologize for not noticing this before!
+
+My plan was to get this patchset acked/merged and then add MBus DT to Kirkwood.
+The reason for this is that it's a simple change, but probably *very* intrusive
+on the DTS files.
+Of course, this plan was based on the assumption that the wasn't breaking
+anything.
+
+However, now I guess there's no other solution than adding Kirkwood to the
+patchset. So unless anyone has any better idea, I'll be sending a v8.
+
+Thanks again for the test!
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
