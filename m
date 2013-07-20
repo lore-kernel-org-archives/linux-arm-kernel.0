@@ -1,36 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 20 Jul 2013 13:58:29 +0200
-Subject: [RFC v2] ARM: i.MX pllv1: Implement set_rate
-In-Reply-To: <20130720153104.96b6723a20bde172a8ea1ba1@mail.ru>
-References: <1374308975-20596-1-git-send-email-shc_work@mail.ru>
- <20130720111639.GA29785@pengutronix.de>
- <20130720153104.96b6723a20bde172a8ea1ba1@mail.ru>
-Message-ID: <20130720115829.GD29785@pengutronix.de>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 20 Jul 2013 06:44:39 +0100
+Subject: [PATCH] of: match the compatible in the order set by the dts file
+In-Reply-To: <51DBC58D.90002@freescale.com>
+References: <1373013818-11365-1-git-send-email-b32955@freescale.com>
+ <20130709070541.GQ516@pengutronix.de> <51DBBFDA.70302@freescale.com>
+ <20130709075124.GR516@pengutronix.de> <51DBC58D.90002@freescale.com>
+Message-ID: <20130720054439.308B33E13F0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 20, 2013 at 03:31:04PM +0400, Alexander Shiyan wrote:
-> On Sat, 20 Jul 2013 13:16:39 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Tue, 9 Jul 2013 16:10:53 +0800, Huang Shijie <b32955@freescale.com> wrote:
+> ??? 2013???07???09??? 15:51, Sascha Hauer ??????:
+> > On Tue, Jul 09, 2013 at 03:46:34PM +0800, Huang Shijie wrote:
+> >> ??? 2013???07???09??? 15:05, Sascha Hauer ??????:
+> >>> Why don't you set the matching order in the driver the way you want it
+> >>> to be, i.e.:
+> >>>
+> >>> 	{ .compatible = "fsl,imx6q-uart", ... },
+> >>> 	{ .compatible = "fsl,imx21-uart", ... },
+> >>> 	{ .compatible = "fsl,imx1-uart", ... },
+> >>>
+> >> yes. i can set it like this.
+> >>
+> >> but this method looks like a ugly workaround.
+> > If a driver has different ways of supporting a single device, then
+> > putting the preferred or most feature rich on top doesn't look very ugly
+> > to me.
+> this method makes it much _coupled_ between the driver and the dts file.
 > 
-> > On Sat, Jul 20, 2013 at 12:29:35PM +0400, Alexander Shiyan wrote:
-> > > This patch implements frequency change for i.MX pllv1.
-> > > Selection of the values of the registers is not optimal, since is
-> > > made by simple enumeration of all possible values.
-> > 
-> > You do not mention why you want to adjust the rate. Normally we've been
-> > happy with the static values from the bootloader.
+> IMHO, it's an unnecessary _burden_ to the driver programmer:
+>     he should puts the most feature compatible on the top.
 > 
-> For CPUfreq.
-> Only one barrier to make it workable.
+> it's much graceful if we let the driver programmer be transparent about 
+> this.
 
-Isn't it better to adjust the dividers only? I haven't made good
-experience with adjusting the PLLs.
+Absolutely true. Applied, thanks.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+g.
