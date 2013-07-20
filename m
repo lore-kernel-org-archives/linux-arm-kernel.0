@@ -1,39 +1,35 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 20 Jul 2013 06:44:39 +0100
-Subject: [PATCH] of: match the compatible in the order set by the dts file
-In-Reply-To: <51DBC58D.90002@freescale.com>
-References: <1373013818-11365-1-git-send-email-b32955@freescale.com>
- <20130709070541.GQ516@pengutronix.de> <51DBBFDA.70302@freescale.com>
- <20130709075124.GR516@pengutronix.de> <51DBC58D.90002@freescale.com>
-Message-ID: <20130720054439.308B33E13F0@localhost>
+Date: Sat, 20 Jul 2013 06:39:45 +0100
+Subject: [PATCH v2] of: Specify initrd location using 64-bit
+In-Reply-To: <51D1F5E2.6070609@gmail.com>
+References: <1372702835-5333-1-git-send-email-santosh.shilimkar@ti.com>
+ <51D1F5E2.6070609@gmail.com>
+Message-ID: <20130720053945.C7AC63E0C52@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Jul 2013 16:10:53 +0800, Huang Shijie <b32955@freescale.com> wrote:
-> ??? 2013???07???09??? 15:51, Sascha Hauer ??????:
-> > On Tue, Jul 09, 2013 at 03:46:34PM +0800, Huang Shijie wrote:
-> >> ??? 2013???07???09??? 15:05, Sascha Hauer ??????:
-> >>> Why don't you set the matching order in the driver the way you want it
-> >>> to be, i.e.:
-> >>>
-> >>> 	{ .compatible = "fsl,imx6q-uart", ... },
-> >>> 	{ .compatible = "fsl,imx21-uart", ... },
-> >>> 	{ .compatible = "fsl,imx1-uart", ... },
-> >>>
-> >> yes. i can set it like this.
-> >>
-> >> but this method looks like a ugly workaround.
-> > If a driver has different ways of supporting a single device, then
-> > putting the preferred or most feature rich on top doesn't look very ugly
-> > to me.
-> this method makes it much _coupled_ between the driver and the dts file.
+On Mon, 01 Jul 2013 16:34:26 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On 07/01/2013 01:20 PM, Santosh Shilimkar wrote:
+> > On some PAE architectures, the entire range of physical memory could reside
+> > outside the 32-bit limit.  These systems need the ability to specify the
+> > initrd location using 64-bit numbers.
+> > 
+> > This patch globally modifies the early_init_dt_setup_initrd_arch() function to
+> > use 64-bit numbers instead of the current unsigned long.
+> > 
+> > There has been quite a bit of debate about whether to use u64 or phys_addr_t.
+> > It was concluded to stick to u64 to be consistent with rest of the device
+> > tree code. As summarized by Geert, "The address to load the initrd is decided
+> > by the bootloader/user and set at that point later in time. The dtb should not
+> > be tied to the kernel you are booting"
 > 
-> IMHO, it's an unnecessary _burden_ to the driver programmer:
->     he should puts the most feature compatible on the top.
+> That was quoting me. Otherwise:
 > 
-> it's much graceful if we let the driver programmer be transparent about 
-> this.
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> 
+> Unless Grant feels compelled to pick this up for 3.11, I think it has to
+> wait for 3.12.
 
-Absolutely true. Applied, thanks.
+Nope, 3.12 is fine. Applied.
 
 g.
