@@ -1,74 +1,51 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 19 Jul 2013 16:50:55 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <51E8DE51.1060404@ti.com>
-References: <1374129984-765-1-git-send-email-kishon@ti.com>
- <1374129984-765-2-git-send-email-kishon@ti.com>
- <20130718072004.GA16720@kroah.com> <51E7AE88.3050007@ti.com>
- <20130718154954.GA31961@kroah.com> <51E8D086.809@ti.com>
- <20130719054311.GA14638@kroah.com> <51E8D4E0.8060200@ti.com>
- <20130719062941.GA23611@kroah.com> <51E8DE51.1060404@ti.com>
-Message-ID: <20130719235055.GB11498@kroah.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 20 Jul 2013 02:04:13 +0200
+Subject: [PATCH v4 01/20] clocksource: samsung_pwm_timer: Do not request PWM
+ mem region
+In-Reply-To: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1374278673-25615-2-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 12:06:01PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Friday 19 July 2013 11:59 AM, Greg KH wrote:
-> > On Fri, Jul 19, 2013 at 11:25:44AM +0530, Kishon Vijay Abraham I wrote:
-> >> Hi,
-> >>
-> >> On Friday 19 July 2013 11:13 AM, Greg KH wrote:
-> >>> On Fri, Jul 19, 2013 at 11:07:10AM +0530, Kishon Vijay Abraham I wrote:
-> >>>>>>>> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
-> >>>>>>>
-> >>>>>>> Your naming is odd, no "phy" anywhere in it?  You rely on the sender to
-> >>>>>>> never send a duplicate name.id pair?  Why not create your own ids based
-> >>>>>>> on the number of phys in the system, like almost all other classes and
-> >>>>>>> subsystems do?
-> >>>>>>
-> >>>>>> hmm.. some PHY drivers use the id they provide to perform some of their
-> >>>>>> internal operation as in [1] (This is used only if a single PHY provider
-> >>>>>> implements multiple PHYS). Probably I'll add an option like PLATFORM_DEVID_AUTO
-> >>>>>> to give the PHY drivers an option to use auto id.
-> >>>>>>
-> >>>>>> [1] ->
-> >>>>>> http://archive.arm.linux.org.uk/lurker/message/20130628.134308.4a8f7668.ca.html
-> >>>>>
-> >>>>> No, who cares about the id?  No one outside of the phy core ever should,
-> >>>>> because you pass back the only pointer that they really do care about,
-> >>>>> if they need to do anything with the device.  Use that, and then you can
-> >>>>
-> >>>> hmm.. ok.
-> >>>>
-> >>>>> rip out all of the "search for a phy by a string" logic, as that's not
-> >>>>
-> >>>> Actually this is needed for non-dt boot case. In the case of dt boot, we use a
-> >>>> phandle by which the controller can get a reference to the phy. But in the case
-> >>>> of non-dt boot, the controller can get a reference to the phy only by label.
-> >>>
-> >>> I don't understand.  They registered the phy, and got back a pointer to
-> >>> it.  Why can't they save it in their local structure to use it again
-> >>> later if needed?  They should never have to "ask" for the device, as the
-> >>
-> >> One is a *PHY provider* driver which is a driver for some PHY device. This will
-> >> use phy_create to create the phy.
-> >> The other is a *PHY consumer* driver which might be any controller driver (can
-> >> be USB/SATA/PCIE). The PHY consumer will use phy_get to get a reference to the
-> >> phy (by *phandle* in the case of dt boot and *label* in the case of non-dt boot).
-> >>> device id might be unknown if there are multiple devices in the system.
-> >>
-> >> I agree with you on the device id part. That need not be known to the PHY driver.
-> > 
-> > How does a consumer know which "label" to use in a non-dt system if
-> > there are multiple PHYs in the system?
-> 
-> That should be passed using platform data.
+PWM registers are shared between clocksource and PWM drivers and so can
+not be claimed for exclusive use.
 
-Ick, don't pass strings around, pass pointers.  If you have platform
-data you can get to, then put the pointer there, don't use a "name".
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/clocksource/samsung_pwm_timer.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-thanks,
-
-greg k-h
+diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
+index 584b547..3fa5b07 100644
+--- a/drivers/clocksource/samsung_pwm_timer.c
++++ b/drivers/clocksource/samsung_pwm_timer.c
+@@ -404,7 +404,6 @@ void __init samsung_pwm_clocksource_init(void __iomem *base,
+ static void __init samsung_pwm_alloc(struct device_node *np,
+ 				     const struct samsung_pwm_variant *variant)
+ {
+-	struct resource res;
+ 	struct property *prop;
+ 	const __be32 *cur;
+ 	u32 val;
+@@ -423,17 +422,9 @@ static void __init samsung_pwm_alloc(struct device_node *np,
+ 		pwm.variant.output_mask |= 1 << val;
+ 	}
+ 
+-	of_address_to_resource(np, 0, &res);
+-	if (!request_mem_region(res.start,
+-				resource_size(&res), "samsung-pwm")) {
+-		pr_err("%s: failed to request IO mem region\n", __func__);
+-		return;
+-	}
+-
+-	pwm.base = ioremap(res.start, resource_size(&res));
++	pwm.base = of_iomap(np, 0);
+ 	if (!pwm.base) {
+ 		pr_err("%s: failed to map PWM registers\n", __func__);
+-		release_mem_region(res.start, resource_size(&res));
+ 		return;
+ 	}
+ 
+-- 
+1.8.3.2
