@@ -1,140 +1,37 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Sat, 20 Jul 2013 11:51:05 +0530
-Subject: [PATCH v3 1/2] media: i2c: adv7343: make the platform data members as
- array
-In-Reply-To: <1374301266-26726-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1374301266-26726-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1374301266-26726-2-git-send-email-prabhakar.csengg@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 20 Jul 2013 12:32:15 +0530
+Subject: [PATCH 20/22] ARM: ux500: Remove '0x's from Spear 300 DTS file
+In-Reply-To: <1374242333-6852-20-git-send-email-lee.jones@linaro.org>
+References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
+ <1374242333-6852-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAOh2x==EBzy6MMy0Jv1=VSAD7Kdw7=Jag8g4oz-kfRH0XafGaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+On Fri, Jul 19, 2013 at 7:28 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/spear300.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
+> index f79b3df..8970a4a 100644
+> --- a/arch/arm/boot/dts/spear300.dtsi
+> +++ b/arch/arm/boot/dts/spear300.dtsi
+> @@ -52,7 +52,7 @@
+>                         status = "disabled";
+>                 };
+>
+> -               shirq: interrupt-controller at 0x50000000 {
+> +               shirq: interrupt-controller at 50000000 {
+>                         compatible = "st,spear300-shirq";
+>                         reg = <0x50000000 0x1000>;
+>                         interrupts = <28>;
 
-This patch makes the platform data members as array wherever
-possible, so as this makes easier while collecting the data
-in DT case and read the entire array at once.
+Should Ux500 come in subject line? And please write Spear as
+SPEAr.
 
-This patch also makes appropriate changes to board-da850-evm.c
+Otherwise all three patches look fine.
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/mach-davinci/board-da850-evm.c |    6 ++----
- drivers/media/i2c/adv7343.c             |   28 ++++++++++++++--------------
- include/media/adv7343.h                 |   20 ++++----------------
- 3 files changed, 20 insertions(+), 34 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index e6f5b5d..ab6bdbe 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -733,12 +733,10 @@ static struct tvp514x_platform_data tvp5146_pdata = {
- 
- static struct adv7343_platform_data adv7343_pdata = {
- 	.mode_config = {
--		.dac_3 = 1,
--		.dac_2 = 1,
--		.dac_1 = 1,
-+		.dac = { 1, 1, 1 },
- 	},
- 	.sd_config = {
--		.sd_dac_out1 = 1,
-+		.sd_dac_out = { 1 },
- 	},
- };
- 
-diff --git a/drivers/media/i2c/adv7343.c b/drivers/media/i2c/adv7343.c
-index 8080c2c..f0238fb 100644
---- a/drivers/media/i2c/adv7343.c
-+++ b/drivers/media/i2c/adv7343.c
-@@ -227,12 +227,12 @@ static int adv7343_setoutput(struct v4l2_subdev *sd, u32 output_type)
- 	else
- 		val = state->pdata->mode_config.sleep_mode << 0 |
- 		      state->pdata->mode_config.pll_control << 1 |
--		      state->pdata->mode_config.dac_3 << 2 |
--		      state->pdata->mode_config.dac_2 << 3 |
--		      state->pdata->mode_config.dac_1 << 4 |
--		      state->pdata->mode_config.dac_6 << 5 |
--		      state->pdata->mode_config.dac_5 << 6 |
--		      state->pdata->mode_config.dac_4 << 7;
-+		      state->pdata->mode_config.dac[2] << 2 |
-+		      state->pdata->mode_config.dac[1] << 3 |
-+		      state->pdata->mode_config.dac[0] << 4 |
-+		      state->pdata->mode_config.dac[5] << 5 |
-+		      state->pdata->mode_config.dac[4] << 6 |
-+		      state->pdata->mode_config.dac[3] << 7;
- 
- 	err = adv7343_write(sd, ADV7343_POWER_MODE_REG, val);
- 	if (err < 0)
-@@ -251,15 +251,15 @@ static int adv7343_setoutput(struct v4l2_subdev *sd, u32 output_type)
- 	/* configure SD DAC Output 2 and SD DAC Output 1 bit to zero */
- 	val = state->reg82 & (SD_DAC_1_DI & SD_DAC_2_DI);
- 
--	if (state->pdata && state->pdata->sd_config.sd_dac_out1)
--		val = val | (state->pdata->sd_config.sd_dac_out1 << 1);
--	else if (state->pdata && !state->pdata->sd_config.sd_dac_out1)
--		val = val & ~(state->pdata->sd_config.sd_dac_out1 << 1);
-+	if (state->pdata && state->pdata->sd_config.sd_dac_out[0])
-+		val = val | (state->pdata->sd_config.sd_dac_out[0] << 1);
-+	else if (state->pdata && !state->pdata->sd_config.sd_dac_out[0])
-+		val = val & ~(state->pdata->sd_config.sd_dac_out[0] << 1);
- 
--	if (state->pdata && state->pdata->sd_config.sd_dac_out2)
--		val = val | (state->pdata->sd_config.sd_dac_out2 << 2);
--	else if (state->pdata && !state->pdata->sd_config.sd_dac_out2)
--		val = val & ~(state->pdata->sd_config.sd_dac_out2 << 2);
-+	if (state->pdata && state->pdata->sd_config.sd_dac_out[1])
-+		val = val | (state->pdata->sd_config.sd_dac_out[1] << 2);
-+	else if (state->pdata && !state->pdata->sd_config.sd_dac_out[1])
-+		val = val & ~(state->pdata->sd_config.sd_dac_out[1] << 2);
- 
- 	err = adv7343_write(sd, ADV7343_SD_MODE_REG2, val);
- 	if (err < 0)
-diff --git a/include/media/adv7343.h b/include/media/adv7343.h
-index 944757b..e4142b1 100644
---- a/include/media/adv7343.h
-+++ b/include/media/adv7343.h
-@@ -28,12 +28,7 @@
-  * @pll_control: PLL and oversampling control. This control allows internal
-  *		 PLL 1 circuit to be powered down and the oversampling to be
-  *		 switched off.
-- * @dac_1: power on/off DAC 1.
-- * @dac_2: power on/off DAC 2.
-- * @dac_3: power on/off DAC 3.
-- * @dac_4: power on/off DAC 4.
-- * @dac_5: power on/off DAC 5.
-- * @dac_6: power on/off DAC 6.
-+ * @dac: array to configure power on/off DAC's 1..6
-  *
-  * Power mode register (Register 0x0), for more info refer REGISTER MAP ACCESS
-  * section of datasheet[1], table 17 page no 30.
-@@ -43,23 +38,16 @@
- struct adv7343_power_mode {
- 	bool sleep_mode;
- 	bool pll_control;
--	bool dac_1;
--	bool dac_2;
--	bool dac_3;
--	bool dac_4;
--	bool dac_5;
--	bool dac_6;
-+	u32 dac[6];
- };
- 
- /**
-  * struct adv7343_sd_config - SD Only Output Configuration.
-- * @sd_dac_out1: Configure SD DAC Output 1.
-- * @sd_dac_out2: Configure SD DAC Output 2.
-+ * @sd_dac_out: array configuring SD DAC Outputs 1 and 2
-  */
- struct adv7343_sd_config {
- 	/* SD only Output Configuration */
--	bool sd_dac_out1;
--	bool sd_dac_out2;
-+	u32 sd_dac_out[2];
- };
- 
- /**
--- 
-1.7.9.5
+Ackedy-by: Viresh Kumar <viresh.kumar@linaro.org>
