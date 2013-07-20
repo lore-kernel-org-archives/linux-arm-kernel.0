@@ -1,35 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 Jul 2013 22:45:29 +0200
-Subject: [PATCH v9] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
-References: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
- <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <CACRpkdYktthfRsn9=9GjphXUbOEAswdCZCM48KFK2WRgBdj-Qw@mail.gmail.com>
+Date: Sat, 20 Jul 2013 22:54:42 +0200
+Subject: [PATCH 0/3] MSM gpio fixes
+In-Reply-To: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
+References: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <CACRpkdbOO8fFEx+PxsdJ9F1dqD6V4_RPZThvTufo9+XhhyuHOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 10:04 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+On Thu, Jul 18, 2013 at 10:07 PM, David Brown <davidb@codeaurora.org> wrote:
 
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqreturn.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/io.h>
-> +#include <linux/clocksource.h>
+> Rohit sent these three fixes out on June 18.  I still need a
+> devicetree ack for the first patch, and would like these to get pulled
+> in for v3.11
+>
+> Rohit Vaswani (3):
+>   ARM: msm: dts: Fix the gpio register address for msm8960
+>   drivers: gpio: msm: Fix the error condition for reading ngpio
 
-#include <linux/bitops.h>
+OK for these two...
 
-> +#define TIMEREG_CR_1_ENABLE    BIT(0)
+>   ARM: msm: Consolidate gpiomux for older architectures
 
-Because BIT() comes from there. And we shall not rely on
-implicit #inclusion.
-
-Apart from that:
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+This does not look like a fix? Surely this can wait for v3.12?
 
 Yours,
 Linus Walleij
