@@ -1,725 +1,327 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 20 Jul 2013 02:04:31 +0200
-Subject: [PATCH v4 18/20] ARM: SAMSUNG: Remove pwm-clock infrastructure
+Date: Sat, 20 Jul 2013 02:04:24 +0200
+Subject: [PATCH v4 11/20] ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
 In-Reply-To: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
 References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1374278673-25615-20-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1374278673-25615-13-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all the used PWM prescalers and dividers configuration has been
-moved to appropriate drivers, the pwm-clock infrastructure is now
-unused and so this patch removes it.
+From: Tomasz Figa <t.figa@samsung.com>
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+As the need for an IRQ chip handling PWM timer interrupt chaining is
+gone now, this patch removes all the code made unnecessary.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s3c24xx/clock-s3c2410.c          |   1 -
- arch/arm/mach-s3c24xx/clock-s3c2412.c          |   1 -
- arch/arm/mach-s3c24xx/clock-s3c2416.c          |   2 -
- arch/arm/mach-s3c24xx/clock-s3c2443.c          |   2 -
- arch/arm/mach-s3c64xx/clock.c                  |   2 -
- arch/arm/mach-s5p64x0/clock-s5p6440.c          |   2 -
- arch/arm/mach-s5p64x0/clock-s5p6450.c          |   2 -
- arch/arm/mach-s5pc100/clock.c                  |   2 -
- arch/arm/mach-s5pv210/clock.c                  |   1 -
- arch/arm/plat-samsung/Makefile                 |   1 -
- arch/arm/plat-samsung/include/plat/clock.h     |   4 -
- arch/arm/plat-samsung/include/plat/pwm-clock.h |  81 -----
- arch/arm/plat-samsung/pwm-clock.c              | 474 -------------------------
- 13 files changed, 575 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/include/plat/pwm-clock.h
- delete mode 100644 arch/arm/plat-samsung/pwm-clock.c
+ arch/arm/Kconfig                                   |  1 -
+ arch/arm/mach-s3c64xx/include/mach/irqs.h          |  8 --
+ arch/arm/mach-s5p64x0/include/mach/irqs.h          |  2 -
+ arch/arm/mach-s5pc100/include/mach/irqs.h          |  2 -
+ arch/arm/mach-s5pv210/include/mach/irqs.h          |  2 -
+ arch/arm/plat-samsung/Kconfig                      |  6 --
+ arch/arm/plat-samsung/Makefile                     |  1 -
+ arch/arm/plat-samsung/devs.c                       | 25 ++----
+ arch/arm/plat-samsung/include/plat/irq-vic-timer.h | 13 ---
+ arch/arm/plat-samsung/include/plat/irqs.h          |  9 --
+ arch/arm/plat-samsung/irq-vic-timer.c              | 98 ----------------------
+ 11 files changed, 6 insertions(+), 161 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+ delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
 
-diff --git a/arch/arm/mach-s3c24xx/clock-s3c2410.c b/arch/arm/mach-s3c24xx/clock-s3c2410.c
-index 34fffdf..afa0267 100644
---- a/arch/arm/mach-s3c24xx/clock-s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/clock-s3c2410.c
-@@ -246,6 +246,5 @@ int __init s3c2410_baseclk_add(void)
- 	       (clkslow & S3C2410_CLKSLOW_MPLL_OFF) ? "off" : "on",
- 	       (clkslow & S3C2410_CLKSLOW_UCLK_OFF) ? "off" : "on");
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 486ab0a..fa7ffca 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -739,7 +739,6 @@ config ARCH_S3C64XX
+ 	select SAMSUNG_ATAGS
+ 	select SAMSUNG_CLKSRC
+ 	select SAMSUNG_GPIOLIB_4BIT
+-	select SAMSUNG_IRQ_VIC_TIMER
+ 	select SAMSUNG_WDT_RESET
+ 	select USB_ARCH_HAS_OHCI
+ 	help
+diff --git a/arch/arm/mach-s3c64xx/include/mach/irqs.h b/arch/arm/mach-s3c64xx/include/mach/irqs.h
+index 96d60e0..67bbd1d 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/irqs.h
++++ b/arch/arm/mach-s3c64xx/include/mach/irqs.h
+@@ -107,14 +107,6 @@
+ #define IRQ_TC			IRQ_PENDN
+ #define IRQ_ADC			S3C64XX_IRQ_VIC1(31)
  
--	s3c_pwmclk_init();
- 	return 0;
- }
-diff --git a/arch/arm/mach-s3c24xx/clock-s3c2412.c b/arch/arm/mach-s3c24xx/clock-s3c2412.c
-index 2cc017d..d8f253f 100644
---- a/arch/arm/mach-s3c24xx/clock-s3c2412.c
-+++ b/arch/arm/mach-s3c24xx/clock-s3c2412.c
-@@ -757,6 +757,5 @@ int __init s3c2412_baseclk_add(void)
- 	}
- 
- 	clkdev_add_table(s3c2412_clk_lookup, ARRAY_SIZE(s3c2412_clk_lookup));
--	s3c_pwmclk_init();
- 	return 0;
- }
-diff --git a/arch/arm/mach-s3c24xx/clock-s3c2416.c b/arch/arm/mach-s3c24xx/clock-s3c2416.c
-index 036056ce..d421a72 100644
---- a/arch/arm/mach-s3c24xx/clock-s3c2416.c
-+++ b/arch/arm/mach-s3c24xx/clock-s3c2416.c
-@@ -168,6 +168,4 @@ void __init s3c2416_init_clocks(int xtal)
- 	s3c24xx_register_clock(&hsmmc0_clk);
- 	clkdev_add_table(s3c2416_clk_lookup, ARRAY_SIZE(s3c2416_clk_lookup));
- 
--	s3c_pwmclk_init();
+-#define S3C64XX_TIMER_IRQ(x)	S3C_IRQ(64 + (x))
 -
- }
-diff --git a/arch/arm/mach-s3c24xx/clock-s3c2443.c b/arch/arm/mach-s3c24xx/clock-s3c2443.c
-index 0a53051..76cd31f 100644
---- a/arch/arm/mach-s3c24xx/clock-s3c2443.c
-+++ b/arch/arm/mach-s3c24xx/clock-s3c2443.c
-@@ -209,6 +209,4 @@ void __init s3c2443_init_clocks(int xtal)
- 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
- 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
- 	clkdev_add_table(s3c2443_clk_lookup, ARRAY_SIZE(s3c2443_clk_lookup));
+-#define IRQ_TIMER0		S3C64XX_TIMER_IRQ(0)
+-#define IRQ_TIMER1		S3C64XX_TIMER_IRQ(1)
+-#define IRQ_TIMER2		S3C64XX_TIMER_IRQ(2)
+-#define IRQ_TIMER3		S3C64XX_TIMER_IRQ(3)
+-#define IRQ_TIMER4		S3C64XX_TIMER_IRQ(4)
 -
--	s3c_pwmclk_init();
- }
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 8499415..c1bcc4a 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -1004,6 +1004,4 @@ void __init s3c64xx_register_clocks(unsigned long xtal,
- 	for (cnt = 0; cnt < ARRAY_SIZE(clksrc_cdev); cnt++)
- 		s3c_register_clksrc(clksrc_cdev[cnt], 1);
- 	clkdev_add_table(s3c64xx_clk_lookup, ARRAY_SIZE(s3c64xx_clk_lookup));
--
--	s3c_pwmclk_init();
- }
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index 35378152..ae34a1d 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -629,6 +629,4 @@ void __init s5p6440_register_clocks(void)
- 	clkdev_add_table(s5p6440_clk_lookup, ARRAY_SIZE(s5p6440_clk_lookup));
+ /* compatibility for device defines */
  
- 	s3c24xx_register_clock(&dummy_apb_pclk);
--
--	s3c_pwmclk_init();
- }
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index af384dd..0b3ca2e 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -698,6 +698,4 @@ void __init s5p6450_register_clocks(void)
- 	clkdev_add_table(s5p6450_clk_lookup, ARRAY_SIZE(s5p6450_clk_lookup));
+ #define IRQ_IIC1		IRQ_S3C6410_IIC1
+diff --git a/arch/arm/mach-s5p64x0/include/mach/irqs.h b/arch/arm/mach-s5p64x0/include/mach/irqs.h
+index 5b845e8..53982db 100644
+--- a/arch/arm/mach-s5p64x0/include/mach/irqs.h
++++ b/arch/arm/mach-s5p64x0/include/mach/irqs.h
+@@ -141,8 +141,6 @@
  
- 	s3c24xx_register_clock(&dummy_apb_pclk);
--
--	s3c_pwmclk_init();
- }
-diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
-index a206dc3..d0dc10e 100644
---- a/arch/arm/mach-s5pc100/clock.c
-+++ b/arch/arm/mach-s5pc100/clock.c
-@@ -1358,6 +1358,4 @@ void __init s5pc100_register_clocks(void)
- 		s3c_disable_clocks(clk_cdev[ptr], 1);
+ #define IRQ_EINT_GROUP(grp, x)	(IRQ_EINT_GROUP##grp##_BASE + (x))
  
- 	s3c24xx_register_clock(&dummy_apb_pclk);
+-#define IRQ_TIMER_BASE		(11)
 -
--	s3c_pwmclk_init();
- }
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index f051f53..ca46372 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -1362,5 +1362,4 @@ void __init s5pv210_register_clocks(void)
- 	for (ptr = 0; ptr < ARRAY_SIZE(clk_cdev); ptr++)
- 		s3c_disable_clocks(clk_cdev[ptr], 1);
+ /* Set the default NR_IRQS */
  
--	s3c_pwmclk_init();
- }
+ #define NR_IRQS			(IRQ_EINT_GROUP8_BASE + IRQ_EINT_GROUP8_NR + 1)
+diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-s5pc100/include/mach/irqs.h
+index 2870f12..d2eb475 100644
+--- a/arch/arm/mach-s5pc100/include/mach/irqs.h
++++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
+@@ -97,8 +97,6 @@
+ #define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
+ #define IRQ_VIC_END		S5P_IRQ_VIC2(31)
+ 
+-#define IRQ_TIMER_BASE		(11)
+-
+ #define S5P_EINT_BASE1		(S5P_IRQ_VIC0(0))
+ #define S5P_EINT_BASE2		(IRQ_VIC_END + 1)
+ 
+diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
+index e777e01..5e0de3a 100644
+--- a/arch/arm/mach-s5pv210/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+@@ -118,8 +118,6 @@
+ #define IRQ_MDNIE3		S5P_IRQ_VIC3(8)
+ #define IRQ_VIC_END		S5P_IRQ_VIC3(31)
+ 
+-#define IRQ_TIMER_BASE		(11)
+-
+ #define S5P_EINT_BASE1		(S5P_IRQ_VIC0(0))
+ #define S5P_EINT_BASE2		(IRQ_VIC_END + 1)
+ 
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 3e880b7..b21d9d5 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -25,7 +25,6 @@ config PLAT_S5P
+ 	select S5P_GPIO_DRVSTR
+ 	select SAMSUNG_CLKSRC if !COMMON_CLK
+ 	select SAMSUNG_GPIOLIB_4BIT
+-	select SAMSUNG_IRQ_VIC_TIMER
+ 	help
+ 	  Base platform code for Samsung's S5P series SoC.
+ 
+@@ -91,11 +90,6 @@ config S5P_CLOCK
+ 
+ # options for IRQ support
+ 
+-config SAMSUNG_IRQ_VIC_TIMER
+-       bool
+-       help
+-         Internal configuration to build the VIC timer interrupt code.
+-
+ config S5P_IRQ
+ 	def_bool (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210)
+ 	help
 diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index aafbe56..5d7f839 100644
+index cf41bf9..aafbe56 100644
 --- a/arch/arm/plat-samsung/Makefile
 +++ b/arch/arm/plat-samsung/Makefile
-@@ -14,7 +14,6 @@ obj-				:=
- obj-y				+= init.o cpu.o
- 
- obj-$(CONFIG_SAMSUNG_CLOCK)	+= clock.o
--obj-$(CONFIG_SAMSUNG_CLOCK)	+= pwm-clock.o
- 
+@@ -19,7 +19,6 @@ obj-$(CONFIG_SAMSUNG_CLOCK)	+= pwm-clock.o
  obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
  obj-$(CONFIG_S5P_CLOCK)		+= s5p-clock.o
-diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-index a62753d..254c3dd 100644
---- a/arch/arm/plat-samsung/include/plat/clock.h
-+++ b/arch/arm/plat-samsung/include/plat/clock.h
-@@ -140,10 +140,6 @@ extern int s3c2443_clkcon_enable_s(struct clk *clk, int enable);
  
- extern int s3c64xx_sclk_ctrl(struct clk *clk, int enable);
+-obj-$(CONFIG_SAMSUNG_IRQ_VIC_TIMER) += irq-vic-timer.o
+ obj-$(CONFIG_S5P_IRQ)		+= s5p-irq.o
+ obj-$(CONFIG_S5P_EXT_INT)	+= s5p-irq-eint.o
+ obj-$(CONFIG_S5P_GPIO_INT)	+= s5p-irq-gpioint.o
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index bba6d78..290f63a 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -1099,22 +1099,9 @@ arch_initcall(s5p_pmu_init);
  
--/* Init for pwm clock code */
+ #ifdef CONFIG_SAMSUNG_DEV_PWM
+ 
+-#define TIMER_RESOURCE_SIZE (1)
 -
--extern void s3c_pwmclk_init(void);
+-#define TIMER_RESOURCE(_tmr, _irq)			\
+-	(struct resource [TIMER_RESOURCE_SIZE]) {	\
+-		[0] = {					\
+-			.start	= _irq,			\
+-			.end	= _irq,			\
+-			.flags	= IORESOURCE_IRQ	\
+-		}					\
+-	}
 -
- /* Global watchdog clock used by arch_wtd_reset() callback */
+-#define DEFINE_S3C_TIMER(_tmr_no, _irq)			\
++#define DEFINE_S3C_TIMER(_tmr_no)			\
+ 	.name		= "s3c24xx-pwm",		\
+ 	.id		= _tmr_no,			\
+-	.num_resources	= TIMER_RESOURCE_SIZE,		\
+-	.resource	= TIMER_RESOURCE(_tmr_no, _irq),	\
  
- extern struct clk *s3c2410_wdtclk;
-diff --git a/arch/arm/plat-samsung/include/plat/pwm-clock.h b/arch/arm/plat-samsung/include/plat/pwm-clock.h
+ /*
+  * since we already have an static mapping for the timer,
+@@ -1122,11 +1109,11 @@ arch_initcall(s5p_pmu_init);
+  */
+ 
+ struct platform_device s3c_device_timer[] = {
+-	[0] = { DEFINE_S3C_TIMER(0, IRQ_TIMER0) },
+-	[1] = { DEFINE_S3C_TIMER(1, IRQ_TIMER1) },
+-	[2] = { DEFINE_S3C_TIMER(2, IRQ_TIMER2) },
+-	[3] = { DEFINE_S3C_TIMER(3, IRQ_TIMER3) },
+-	[4] = { DEFINE_S3C_TIMER(4, IRQ_TIMER4) },
++	[0] = { DEFINE_S3C_TIMER(0) },
++	[1] = { DEFINE_S3C_TIMER(1) },
++	[2] = { DEFINE_S3C_TIMER(2) },
++	[3] = { DEFINE_S3C_TIMER(3) },
++	[4] = { DEFINE_S3C_TIMER(4) },
+ };
+ 
+ static struct resource samsung_pwm_resource[] = {
+diff --git a/arch/arm/plat-samsung/include/plat/irq-vic-timer.h b/arch/arm/plat-samsung/include/plat/irq-vic-timer.h
 deleted file mode 100644
-index bf6a60e..0000000
---- a/arch/arm/plat-samsung/include/plat/pwm-clock.h
+index 5b9c42f..0000000
+--- a/arch/arm/plat-samsung/include/plat/irq-vic-timer.h
 +++ /dev/null
-@@ -1,81 +0,0 @@
--/* linux/arch/arm/plat-samsung/include/plat/pwm-clock.h
+@@ -1,13 +0,0 @@
+-/* arch/arm/plat-samsung/include/plat/irq-vic-timer.h
 - *
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
+- * Copyright (c) 2010 Simtec Electronics
+- *	Ben Dooks <ben@simtec.co.uk>
 - *
-- * Copyright 2008 Openmoko, Inc.
-- * Copyright 2008 Simtec Electronics
-- *      Ben Dooks <ben@simtec.co.uk>
-- *      http://armlinux.simtec.co.uk/
-- *
-- * SAMSUNG - pwm clock and timer support
+- * Header file for Samsung SoC IRQ VIC timer
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 -*/
 -
--#ifndef __ASM_PLAT_PWM_CLOCK_H
--#define __ASM_PLAT_PWM_CLOCK_H __FILE__
+-extern void s3c_init_vic_timer_irq(unsigned int num, unsigned int timer_irq);
+diff --git a/arch/arm/plat-samsung/include/plat/irqs.h b/arch/arm/plat-samsung/include/plat/irqs.h
+index df46b77..039001c 100644
+--- a/arch/arm/plat-samsung/include/plat/irqs.h
++++ b/arch/arm/plat-samsung/include/plat/irqs.h
+@@ -44,15 +44,6 @@
+ #define S5P_IRQ_VIC2(x)		(S5P_VIC2_BASE + (x))
+ #define S5P_IRQ_VIC3(x)		(S5P_VIC3_BASE + (x))
+ 
+-#define S5P_TIMER_IRQ(x)	(IRQ_TIMER_BASE + (x))
 -
--/**
-- * pwm_cfg_src_is_tclk() - return whether the given mux config is a tclk
-- * @tcfg: The timer TCFG1 register bits shifted down to 0.
-- *
-- * Return true if the given configuration from TCFG1 is a TCLK instead
-- * any of the TDIV clocks.
-- */
--static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
--{
--	if (soc_is_s3c24xx())
--		return tcfg == S3C2410_TCFG1_MUX_TCLK;
--	else if (soc_is_s3c64xx() || soc_is_s5pc100())
--		return tcfg >= S3C64XX_TCFG1_MUX_TCLK;
--	else if (soc_is_s5p6440() || soc_is_s5p6450())
--		return 0;
--	else
--		return tcfg == S3C64XX_TCFG1_MUX_TCLK;
--}
+-#define IRQ_TIMER0		S5P_TIMER_IRQ(0)
+-#define IRQ_TIMER1		S5P_TIMER_IRQ(1)
+-#define IRQ_TIMER2		S5P_TIMER_IRQ(2)
+-#define IRQ_TIMER3		S5P_TIMER_IRQ(3)
+-#define IRQ_TIMER4		S5P_TIMER_IRQ(4)
+-#define IRQ_TIMER_COUNT		(5)
 -
--/**
-- * tcfg_to_divisor() - convert tcfg1 setting to a divisor
-- * @tcfg1: The tcfg1 setting, shifted down.
-- *
-- * Get the divisor value for the given tcfg1 setting. We assume the
-- * caller has already checked to see if this is not a TCLK source.
-- */
--static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
--{
--	if (soc_is_s3c24xx())
--		return 1 << (tcfg1 + 1);
--	else
--		return 1 << tcfg1;
--}
--
--/**
-- * pwm_tdiv_has_div1() - does the tdiv setting have a /1
-- *
-- * Return true if we have a /1 in the tdiv setting.
-- */
--static inline unsigned int pwm_tdiv_has_div1(void)
--{
--	if (soc_is_s3c24xx())
--		return 0;
--	else
--		return 1;
--}
--
--/**
-- * pwm_tdiv_div_bits() - calculate TCFG1 divisor value.
-- * @div: The divisor to calculate the bit information for.
-- *
-- * Turn a divisor into the necessary bit field for TCFG1.
-- */
--static inline unsigned long pwm_tdiv_div_bits(unsigned int div)
--{
--	if (soc_is_s3c24xx())
--		return ilog2(div) - 1;
--	else
--		return ilog2(div);
--}
--#endif /* __ASM_PLAT_PWM_CLOCK_H */
-diff --git a/arch/arm/plat-samsung/pwm-clock.c b/arch/arm/plat-samsung/pwm-clock.c
+ #define IRQ_EINT(x)		((x) < 16 ? ((x) + S5P_EINT_BASE1) \
+ 					: ((x) - 16 + S5P_EINT_BASE2))
+ 
+diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-samsung/irq-vic-timer.c
 deleted file mode 100644
-index a35ff3b..0000000
---- a/arch/arm/plat-samsung/pwm-clock.c
+index 0fceb42..0000000
+--- a/arch/arm/plat-samsung/irq-vic-timer.c
 +++ /dev/null
-@@ -1,474 +0,0 @@
--/* linux/arch/arm/plat-s3c24xx/pwm-clock.c
+@@ -1,98 +0,0 @@
+-/* arch/arm/plat-samsung/irq-vic-timer.c
+- *	originally part of arch/arm/plat-s3c64xx/irq.c
 - *
-- * Copyright (c) 2007 Simtec Electronics
-- * Copyright (c) 2007, 2008 Ben Dooks
-- *	Ben Dooks <ben-linux@fluff.org>
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- *      Ben Dooks <ben@simtec.co.uk>
+- *      http://armlinux.simtec.co.uk/
+- *
+- * S3C64XX - Interrupt handling
 - *
 - * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License.
--*/
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
 -
--#include <linux/init.h>
--#include <linux/module.h>
 -#include <linux/kernel.h>
--#include <linux/list.h>
--#include <linux/errno.h>
--#include <linux/log2.h>
--#include <linux/clk.h>
--#include <linux/err.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/irqchip/chained_irq.h>
 -#include <linux/io.h>
 -
--#include <mach/hardware.h>
 -#include <mach/map.h>
--#include <asm/irq.h>
--
--#include <plat/clock.h>
+-#include <mach/irqs.h>
 -#include <plat/cpu.h>
--
+-#include <plat/irq-vic-timer.h>
 -#include <plat/regs-timer.h>
--#include <plat/pwm-clock.h>
 -
--/* Each of the timers 0 through 5 go through the following
-- * clock tree, with the inputs depending on the timers.
-- *
-- * pclk ---- [ prescaler 0 ] -+---> timer 0
-- *			      +---> timer 1
-- *
-- * pclk ---- [ prescaler 1 ] -+---> timer 2
-- *			      +---> timer 3
-- *			      \---> timer 4
-- *
-- * Which are fed into the timers as so:
-- *
-- * prescaled 0 ---- [ div 2,4,8,16 ] ---\
-- *				       [mux] -> timer 0
-- * tclk 0 ------------------------------/
-- *
-- * prescaled 0 ---- [ div 2,4,8,16 ] ---\
-- *				       [mux] -> timer 1
-- * tclk 0 ------------------------------/
-- *
-- *
-- * prescaled 1 ---- [ div 2,4,8,16 ] ---\
-- *				       [mux] -> timer 2
-- * tclk 1 ------------------------------/
-- *
-- * prescaled 1 ---- [ div 2,4,8,16 ] ---\
-- *				       [mux] -> timer 3
-- * tclk 1 ------------------------------/
-- *
-- * prescaled 1 ---- [ div 2,4,8, 16 ] --\
-- *				       [mux] -> timer 4
-- * tclk 1 ------------------------------/
-- *
-- * Since the mux and the divider are tied together in the
-- * same register space, it is impossible to set the parent
-- * and the rate at the same time. To avoid this, we add an
-- * intermediate 'prescaled-and-divided' clock to select
-- * as the parent for the timer input clock called tdiv.
-- *
-- * prescaled clk --> pwm-tdiv ---\
-- *                             [ mux ] --> timer X
-- * tclk -------------------------/
--*/
--
--static struct clk clk_timer_scaler[];
--
--static unsigned long clk_pwm_scaler_get_rate(struct clk *clk)
+-static void s3c_irq_demux_vic_timer(unsigned int irq, struct irq_desc *desc)
 -{
--	unsigned long tcfg0 = __raw_readl(S3C2410_TCFG0);
--
--	if (clk == &clk_timer_scaler[1]) {
--		tcfg0 &= S3C2410_TCFG_PRESCALER1_MASK;
--		tcfg0 >>= S3C2410_TCFG_PRESCALER1_SHIFT;
--	} else {
--		tcfg0 &= S3C2410_TCFG_PRESCALER0_MASK;
--	}
--
--	return clk_get_rate(clk->parent) / (tcfg0 + 1);
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	chained_irq_enter(chip, desc);
+-	generic_handle_irq((int)desc->irq_data.handler_data);
+-	chained_irq_exit(chip, desc);
 -}
 -
--static unsigned long clk_pwm_scaler_round_rate(struct clk *clk,
--					       unsigned long rate)
+-/* We assume the IRQ_TIMER0..IRQ_TIMER4 range is continuous. */
+-static void s3c_irq_timer_ack(struct irq_data *d)
 -{
--	unsigned long parent_rate = clk_get_rate(clk->parent);
--	unsigned long divisor = parent_rate / rate;
+-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+-	u32 mask = (1 << 5) << (d->irq - gc->irq_base);
 -
--	if (divisor > 256)
--		divisor = 256;
--	else if (divisor < 2)
--		divisor = 2;
--
--	return parent_rate / divisor;
--}
--
--static int clk_pwm_scaler_set_rate(struct clk *clk, unsigned long rate)
--{
--	unsigned long round = clk_pwm_scaler_round_rate(clk, rate);
--	unsigned long tcfg0;
--	unsigned long divisor;
--	unsigned long flags;
--
--	divisor = clk_get_rate(clk->parent) / round;
--	divisor--;
--
--	local_irq_save(flags);
--	tcfg0 = __raw_readl(S3C2410_TCFG0);
--
--	if (clk == &clk_timer_scaler[1]) {
--		tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
--		tcfg0 |= divisor << S3C2410_TCFG_PRESCALER1_SHIFT;
--	} else {
--		tcfg0 &= ~S3C2410_TCFG_PRESCALER0_MASK;
--		tcfg0 |= divisor;
--	}
--
--	__raw_writel(tcfg0, S3C2410_TCFG0);
--	local_irq_restore(flags);
--
--	return 0;
--}
--
--static struct clk_ops clk_pwm_scaler_ops = {
--	.get_rate	= clk_pwm_scaler_get_rate,
--	.set_rate	= clk_pwm_scaler_set_rate,
--	.round_rate	= clk_pwm_scaler_round_rate,
--};
--
--static struct clk clk_timer_scaler[] = {
--	[0]	= {
--		.name		= "pwm-scaler0",
--		.id		= -1,
--		.ops		= &clk_pwm_scaler_ops,
--	},
--	[1]	= {
--		.name		= "pwm-scaler1",
--		.id		= -1,
--		.ops		= &clk_pwm_scaler_ops,
--	},
--};
--
--static struct clk clk_timer_tclk[] = {
--	[0]	= {
--		.name		= "pwm-tclk0",
--		.id		= -1,
--	},
--	[1]	= {
--		.name		= "pwm-tclk1",
--		.id		= -1,
--	},
--};
--
--struct pwm_tdiv_clk {
--	struct clk	clk;
--	unsigned int	divisor;
--};
--
--static inline struct pwm_tdiv_clk *to_tdiv(struct clk *clk)
--{
--	return container_of(clk, struct pwm_tdiv_clk, clk);
--}
--
--static unsigned long clk_pwm_tdiv_get_rate(struct clk *clk)
--{
--	unsigned long tcfg1 = __raw_readl(S3C2410_TCFG1);
--	unsigned int divisor;
--
--	tcfg1 >>= S3C2410_TCFG1_SHIFT(clk->id);
--	tcfg1 &= S3C2410_TCFG1_MUX_MASK;
--
--	if (pwm_cfg_src_is_tclk(tcfg1))
--		divisor = to_tdiv(clk)->divisor;
--	else
--		divisor = tcfg_to_divisor(tcfg1);
--
--	return clk_get_rate(clk->parent) / divisor;
--}
--
--static unsigned long clk_pwm_tdiv_round_rate(struct clk *clk,
--					     unsigned long rate)
--{
--	unsigned long parent_rate;
--	unsigned long divisor;
--
--	parent_rate = clk_get_rate(clk->parent);
--	divisor = parent_rate / rate;
--
--	if (divisor <= 1 && pwm_tdiv_has_div1())
--		divisor = 1;
--	else if (divisor <= 2)
--		divisor = 2;
--	else if (divisor <= 4)
--		divisor = 4;
--	else if (divisor <= 8)
--		divisor = 8;
--	else
--		divisor = 16;
--
--	return parent_rate / divisor;
--}
--
--static unsigned long clk_pwm_tdiv_bits(struct pwm_tdiv_clk *divclk)
--{
--	return pwm_tdiv_div_bits(divclk->divisor);
--}
--
--static void clk_pwm_tdiv_update(struct pwm_tdiv_clk *divclk)
--{
--	unsigned long tcfg1 = __raw_readl(S3C2410_TCFG1);
--	unsigned long bits = clk_pwm_tdiv_bits(divclk);
--	unsigned long flags;
--	unsigned long shift =  S3C2410_TCFG1_SHIFT(divclk->clk.id);
--
--	local_irq_save(flags);
--
--	tcfg1 = __raw_readl(S3C2410_TCFG1);
--	tcfg1 &= ~(S3C2410_TCFG1_MUX_MASK << shift);
--	tcfg1 |= bits << shift;
--	__raw_writel(tcfg1, S3C2410_TCFG1);
--
--	local_irq_restore(flags);
--}
--
--static int clk_pwm_tdiv_set_rate(struct clk *clk, unsigned long rate)
--{
--	struct pwm_tdiv_clk *divclk = to_tdiv(clk);
--	unsigned long tcfg1 = __raw_readl(S3C2410_TCFG1);
--	unsigned long parent_rate = clk_get_rate(clk->parent);
--	unsigned long divisor;
--
--	tcfg1 >>= S3C2410_TCFG1_SHIFT(clk->id);
--	tcfg1 &= S3C2410_TCFG1_MUX_MASK;
--
--	rate = clk_round_rate(clk, rate);
--	divisor = parent_rate / rate;
--
--	if (divisor > 16)
--		return -EINVAL;
--
--	divclk->divisor = divisor;
--
--	/* Update the current MUX settings if we are currently
--	 * selected as the clock source for this clock. */
--
--	if (!pwm_cfg_src_is_tclk(tcfg1))
--		clk_pwm_tdiv_update(divclk);
--
--	return 0;
--}
--
--static struct clk_ops clk_tdiv_ops = {
--	.get_rate	= clk_pwm_tdiv_get_rate,
--	.set_rate	= clk_pwm_tdiv_set_rate,
--	.round_rate	= clk_pwm_tdiv_round_rate,
--};
--
--static struct pwm_tdiv_clk clk_timer_tdiv[] = {
--	[0]	= {
--		.clk	= {
--			.name	= "pwm-tdiv",
--			.devname	= "s3c24xx-pwm.0",
--			.ops	= &clk_tdiv_ops,
--			.parent	= &clk_timer_scaler[0],
--		},
--	},
--	[1]	= {
--		.clk	= {
--			.name	= "pwm-tdiv",
--			.devname	= "s3c24xx-pwm.1",
--			.ops	= &clk_tdiv_ops,
--			.parent	= &clk_timer_scaler[0],
--		}
--	},
--	[2]	= {
--		.clk	= {
--			.name	= "pwm-tdiv",
--			.devname	= "s3c24xx-pwm.2",
--			.ops	= &clk_tdiv_ops,
--			.parent	= &clk_timer_scaler[1],
--		},
--	},
--	[3]	= {
--		.clk	= {
--			.name	= "pwm-tdiv",
--			.devname	= "s3c24xx-pwm.3",
--			.ops	= &clk_tdiv_ops,
--			.parent	= &clk_timer_scaler[1],
--		},
--	},
--	[4]	= {
--		.clk	= {
--			.name	= "pwm-tdiv",
--			.devname	= "s3c24xx-pwm.4",
--			.ops	= &clk_tdiv_ops,
--			.parent	= &clk_timer_scaler[1],
--		},
--	},
--};
--
--static int __init clk_pwm_tdiv_register(unsigned int id)
--{
--	struct pwm_tdiv_clk *divclk = &clk_timer_tdiv[id];
--	unsigned long tcfg1 = __raw_readl(S3C2410_TCFG1);
--
--	tcfg1 >>= S3C2410_TCFG1_SHIFT(id);
--	tcfg1 &= S3C2410_TCFG1_MUX_MASK;
--
--	divclk->clk.id = id;
--	divclk->divisor = tcfg_to_divisor(tcfg1);
--
--	return s3c24xx_register_clock(&divclk->clk);
--}
--
--static inline struct clk *s3c24xx_pwmclk_tclk(unsigned int id)
--{
--	return (id >= 2) ? &clk_timer_tclk[1] : &clk_timer_tclk[0];
--}
--
--static inline struct clk *s3c24xx_pwmclk_tdiv(unsigned int id)
--{
--	return &clk_timer_tdiv[id].clk;
--}
--
--static int clk_pwm_tin_set_parent(struct clk *clk, struct clk *parent)
--{
--	unsigned int id = clk->id;
--	unsigned long tcfg1;
--	unsigned long flags;
--	unsigned long bits;
--	unsigned long shift = S3C2410_TCFG1_SHIFT(id);
--
--	unsigned long mux_tclk;
--
--	if (soc_is_s3c24xx())
--		mux_tclk = S3C2410_TCFG1_MUX_TCLK;
--	else if (soc_is_s5p6440() || soc_is_s5p6450())
--		mux_tclk = 0;
--	else
--		mux_tclk = S3C64XX_TCFG1_MUX_TCLK;
--
--	if (parent == s3c24xx_pwmclk_tclk(id))
--		bits = mux_tclk << shift;
--	else if (parent == s3c24xx_pwmclk_tdiv(id))
--		bits = clk_pwm_tdiv_bits(to_tdiv(parent)) << shift;
--	else
--		return -EINVAL;
--
--	clk->parent = parent;
--
--	local_irq_save(flags);
--
--	tcfg1 = __raw_readl(S3C2410_TCFG1);
--	tcfg1 &= ~(S3C2410_TCFG1_MUX_MASK << shift);
--	__raw_writel(tcfg1 | bits, S3C2410_TCFG1);
--
--	local_irq_restore(flags);
--
--	return 0;
--}
--
--static struct clk_ops clk_tin_ops = {
--	.set_parent	= clk_pwm_tin_set_parent,
--};
--
--static struct clk clk_tin[] = {
--	[0]	= {
--		.name	= "pwm-tin",
--		.devname	= "s3c24xx-pwm.0",
--		.id	= 0,
--		.ops	= &clk_tin_ops,
--	},
--	[1]	= {
--		.name	= "pwm-tin",
--		.devname	= "s3c24xx-pwm.1",
--		.id	= 1,
--		.ops	= &clk_tin_ops,
--	},
--	[2]	= {
--		.name	= "pwm-tin",
--		.devname	= "s3c24xx-pwm.2",
--		.id	= 2,
--		.ops	= &clk_tin_ops,
--	},
--	[3]	= {
--		.name	= "pwm-tin",
--		.devname	= "s3c24xx-pwm.3",
--		.id	= 3,
--		.ops	= &clk_tin_ops,
--	},
--	[4]	= {
--		.name	= "pwm-tin",
--		.devname	= "s3c24xx-pwm.4",
--		.id	= 4,
--		.ops	= &clk_tin_ops,
--	},
--};
--
--static __init int clk_pwm_tin_register(struct clk *pwm)
--{
--	unsigned long tcfg1 = __raw_readl(S3C2410_TCFG1);
--	unsigned int id = pwm->id;
--
--	struct clk *parent;
--	int ret;
--
--	ret = s3c24xx_register_clock(pwm);
--	if (ret < 0)
--		return ret;
--
--	tcfg1 >>= S3C2410_TCFG1_SHIFT(id);
--	tcfg1 &= S3C2410_TCFG1_MUX_MASK;
--
--	if (pwm_cfg_src_is_tclk(tcfg1))
--		parent = s3c24xx_pwmclk_tclk(id);
--	else
--		parent = s3c24xx_pwmclk_tdiv(id);
--
--	return clk_set_parent(pwm, parent);
+-	irq_reg_writel(mask | gc->mask_cache, gc->reg_base);
 -}
 -
 -/**
-- * s3c_pwmclk_init() - initialise pwm clocks
+- * s3c_init_vic_timer_irq() - initialise timer irq chanined off VIC.\
+- * @num: Number of timers to initialize
+- * @timer_irq: Base IRQ number to be used for the timers.
 - *
-- * Initialise and register the clocks which provide the inputs for the
-- * pwm timer blocks.
-- *
-- * Note, this call is required by the time core, so must be called after
-- * the base clocks are added and before any of the initcalls are run.
+- * Register the necessary IRQ chaining and support for the timer IRQs
+- * chained of the VIC.
 - */
--__init void s3c_pwmclk_init(void)
+-void __init s3c_init_vic_timer_irq(unsigned int num, unsigned int timer_irq)
 -{
--	struct clk *clk_timers;
--	unsigned int clk;
--	int ret;
+-	unsigned int pirq[5] = { IRQ_TIMER0_VIC, IRQ_TIMER1_VIC, IRQ_TIMER2_VIC,
+-				 IRQ_TIMER3_VIC, IRQ_TIMER4_VIC };
+-	struct irq_chip_generic *s3c_tgc;
+-	struct irq_chip_type *ct;
+-	unsigned int i;
 -
--	clk_timers = clk_get(NULL, "timers");
--	if (IS_ERR(clk_timers)) {
--		printk(KERN_ERR "%s: no parent clock\n", __func__);
+-#ifdef CONFIG_ARCH_EXYNOS
+-	if (soc_is_exynos5250()) {
+-		pirq[0] = EXYNOS5_IRQ_TIMER0_VIC;
+-		pirq[1] = EXYNOS5_IRQ_TIMER1_VIC;
+-		pirq[2] = EXYNOS5_IRQ_TIMER2_VIC;
+-		pirq[3] = EXYNOS5_IRQ_TIMER3_VIC;
+-		pirq[4] = EXYNOS5_IRQ_TIMER4_VIC;
+-	} else {
+-		pirq[0] = EXYNOS4_IRQ_TIMER0_VIC;
+-		pirq[1] = EXYNOS4_IRQ_TIMER1_VIC;
+-		pirq[2] = EXYNOS4_IRQ_TIMER2_VIC;
+-		pirq[3] = EXYNOS4_IRQ_TIMER3_VIC;
+-		pirq[4] = EXYNOS4_IRQ_TIMER4_VIC;
+-	}
+-#endif
+-	s3c_tgc = irq_alloc_generic_chip("s3c-timer", 1, timer_irq,
+-					 S3C64XX_TINT_CSTAT, handle_level_irq);
+-
+-	if (!s3c_tgc) {
+-		pr_err("%s: irq_alloc_generic_chip for IRQ %d failed\n",
+-		       __func__, timer_irq);
 -		return;
 -	}
 -
--	for (clk = 0; clk < ARRAY_SIZE(clk_timer_scaler); clk++)
--		clk_timer_scaler[clk].parent = clk_timers;
+-	ct = s3c_tgc->chip_types;
+-	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+-	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+-	ct->chip.irq_ack = s3c_irq_timer_ack;
+-	irq_setup_generic_chip(s3c_tgc, IRQ_MSK(num), IRQ_GC_INIT_MASK_CACHE,
+-			       IRQ_NOREQUEST | IRQ_NOPROBE, 0);
+-	/* Clear the upper bits of the mask_cache*/
+-	s3c_tgc->mask_cache &= 0x1f;
 -
--	s3c_register_clocks(clk_timer_scaler, ARRAY_SIZE(clk_timer_scaler));
--	s3c_register_clocks(clk_timer_tclk, ARRAY_SIZE(clk_timer_tclk));
--
--	for (clk = 0; clk < ARRAY_SIZE(clk_timer_tdiv); clk++) {
--		ret = clk_pwm_tdiv_register(clk);
--
--		if (ret < 0) {
--			printk(KERN_ERR "error adding pwm%d tdiv clock\n", clk);
--			return;
--		}
--	}
--
--	for (clk = 0; clk < ARRAY_SIZE(clk_tin); clk++) {
--		ret = clk_pwm_tin_register(&clk_tin[clk]);
--		if (ret < 0) {
--			printk(KERN_ERR "error adding pwm%d tin clock\n", clk);
--			return;
--		}
+-	for (i = 0; i < num; i++, timer_irq++) {
+-		irq_set_chained_handler(pirq[i], s3c_irq_demux_vic_timer);
+-		irq_set_handler_data(pirq[i], (void *)timer_irq);
 -	}
 -}
 -- 
