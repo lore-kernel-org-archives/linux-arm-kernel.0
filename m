@@ -1,32 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 Jul 2013 22:51:09 +0200
-Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
-In-Reply-To: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CACRpkdauSuk9xDSzUFN=OO0yVWZXSMTUuYTVDZb2_zYb=YMW_A@mail.gmail.com>
+Date: Sat, 20 Jul 2013 22:45:29 +0200
+Subject: [PATCH v9] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
+References: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
+ <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CACRpkdYktthfRsn9=9GjphXUbOEAswdCZCM48KFK2WRgBdj-Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 1:21 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Wed, Jul 17, 2013 at 10:04 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
 
-> This patchset adds support for 64 bit counters in the generic
-> sched_clock code and converts drivers over to use it. Based
-> on v3.11-rc1.
->
-> Changes since v3:
+> +#include <linux/clk.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqreturn.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/io.h>
+> +#include <linux/clocksource.h>
 
->   ocksource: dbx500-prcmu: Switch to sched_clock_register()
+#include <linux/bitops.h>
 
-Fix subject.
+> +#define TIMEREG_CR_1_ENABLE    BIT(0)
 
->   clocksource: nomadik: Switch to sched_clock_register()
+Because BIT() comes from there. And we shall not rely on
+implicit #inclusion.
 
-Apart from that Acked-by: Linus Walleij <linus.walleij@linaro.org>
-for these two drivers.
-
-BTW: why are you not patching arch/arm/mach-u300/timer.c?
-Please make sure to grep for all setup_sched_clock() if you're
-going to do this.
+Apart from that:
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
