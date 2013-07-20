@@ -1,156 +1,142 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 20 Jul 2013 23:48:30 +0200
-Subject: [PATCH 06/10] ARM: clps711x: Add CLPS711X clocksource driver
-In-Reply-To: <20130720074441.9882b71183e5eadd535da6c1@mail.ru>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-7-git-send-email-shc_work@mail.ru>
- <51E94F7E.4030404@linaro.org>
- <20130720074441.9882b71183e5eadd535da6c1@mail.ru>
-Message-ID: <51EB05AE.2050105@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 20 Jul 2013 22:51:47 +0100
+Subject: [PATCH 1/4] arm64: KVM: perform save/restore of PAR_EL1
+In-Reply-To: <1374242035-13199-2-git-send-email-marc.zyngier@arm.com>
+References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
+ <1374242035-13199-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130720215147.GB35165@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2013 05:44 AM, Alexander Shiyan wrote:
-> On Fri, 19 Jul 2013 16:38:54 +0200
-> Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->> (Added Thomas and John in Cc in case they want to review the patch).
->>
->> On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
->>> This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
->>> Designed primarily for migration CLPS711X subarch for multiplatform & DT,
->>> for this as the "OF" and "not-OF" calls implemented.
->>
->> When a new driver is submitted, I ask for a more detailed changelog
->> about the driver itself: how it works, any specificities, etc ...
->>
->> That will help people to understand the code better at least for the review.
+On Fri, Jul 19, 2013 at 02:53:52PM +0100, Marc Zyngier wrote:
+> Not saving PAR_EL1 is an unfortunate oversight. If the guest
+> performs an AT* operation and gets scheduled out before reading
+> the result of the translation from PAREL1, it could become
+> corrupted by another guest or the host.
 > 
-> Basically, this series is a port of the CLPS711X subsystems in places specially
-> designed for this purpose. Additionally added to the standard description of the
-> subsystem for use with DT.
-> As for specs, I'm a little confused by this question. In this case, I'm doing
-> is not anything new for this CPU. The CPU has two timers and I use both to
-> provide the correct time sources.
-
-I understand there is nothing extra in the code but I was talking about
-some specificity of the driver if there are (eg. timer must be disabled
-with disable/enable irq).
-
->>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->>> ---
->>>  arch/arm/Kconfig                      |   2 -
->>>  drivers/clocksource/Kconfig           |   6 ++
->>>  drivers/clocksource/Makefile          |   1 +
->>>  drivers/clocksource/clps711x-clksrc.c | 151 ++++++++++++++++++++++++++++++++++
->>>  4 files changed, 158 insertions(+), 2 deletions(-)
->>>  create mode 100644 drivers/clocksource/clps711x-clksrc.c
-> [...]
->>> +#define CLPS711X_SYSCON1	(0x0100)
->>> +#define CLPS711X_TC1D		(0x0300)
->>> +#define CLPS711X_TC2D		(0x0340)
->>
->> Alignment.
+> Saving this register is made slightly more complicated as KVM also
+> uses it on the permission fault handling path, leading to an ugly
+> "stash and restore" sequence. Fortunately, this is already a slow
+> path so we don't really care. Also, Linux doesn't do any AT*
+> operation, so Linux guests are not impacted by this bug.
 > 
-> Alignment? Do not see any problems.
-> Wrong alignment in this case is the result of quote.
-
-Ok.
-
->>> +static struct {
->>> +	void __iomem	*tc1d;
->>> +	int		irq;
->>> +} *clps711x_clksrc;
->>
->> You don't need to define this structure, the struct clock_event_device
->> already contains a field with irq.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_asm.h | 17 ++++++++++-------
+>  arch/arm64/kvm/hyp.S             | 10 ++++++++++
+>  arch/arm64/kvm/sys_regs.c        |  3 +++
+>  3 files changed, 23 insertions(+), 7 deletions(-)
 > 
-> Thank you, I will know.
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index c92de41..b25763b 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -42,14 +42,15 @@
+>  #define	TPIDR_EL1	18	/* Thread ID, Privileged */
+>  #define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
+>  #define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
+> +#define	PAR_EL1		21	/* Physical Address Register */
+>  /* 32bit specific registers. Keep them at the end of the range */
+> -#define	DACR32_EL2	21	/* Domain Access Control Register */
+> -#define	IFSR32_EL2	22	/* Instruction Fault Status Register */
+> -#define	FPEXC32_EL2	23	/* Floating-Point Exception Control Register */
+> -#define	DBGVCR32_EL2	24	/* Debug Vector Catch Register */
+> -#define	TEECR32_EL1	25	/* ThumbEE Configuration Register */
+> -#define	TEEHBR32_EL1	26	/* ThumbEE Handler Base Register */
+> -#define	NR_SYS_REGS	27
+> +#define	DACR32_EL2	22	/* Domain Access Control Register */
+> +#define	IFSR32_EL2	23	/* Instruction Fault Status Register */
+> +#define	FPEXC32_EL2	24	/* Floating-Point Exception Control Register */
+> +#define	DBGVCR32_EL2	25	/* Debug Vector Catch Register */
+> +#define	TEECR32_EL1	26	/* ThumbEE Configuration Register */
+> +#define	TEEHBR32_EL1	27	/* ThumbEE Handler Base Register */
+> +#define	NR_SYS_REGS	28
+>  
+>  /* 32bit mapping */
+>  #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
+> @@ -69,6 +70,8 @@
+>  #define c5_AIFSR	(AFSR1_EL1 * 2)	/* Auxiliary Instr Fault Status R */
+>  #define c6_DFAR		(FAR_EL1 * 2)	/* Data Fault Address Register */
+>  #define c6_IFAR		(c6_DFAR + 1)	/* Instruction Fault Address Register */
+> +#define c7_PAR		(PAR_EL1 * 2)	/* Physical Address Register */
+> +#define c7_PAR_high	(c7_PAR + 1)	/* PAR top 32 bits */
+>  #define c10_PRRR	(MAIR_EL1 * 2)	/* Primary Region Remap Register */
+>  #define c10_NMRR	(c10_PRRR + 1)	/* Normal Memory Remap Register */
+>  #define c12_VBAR	(VBAR_EL1 * 2)	/* Vector Base Address Register */
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index ff985e3..218802f 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -214,6 +214,7 @@ __kvm_hyp_code_start:
+>  	mrs	x21,	tpidr_el1
+>  	mrs	x22, 	amair_el1
+>  	mrs	x23, 	cntkctl_el1
+> +	mrs	x24,	par_el1
+>  
+>  	stp	x4, x5, [x3]
+>  	stp	x6, x7, [x3, #16]
+> @@ -225,6 +226,7 @@ __kvm_hyp_code_start:
+>  	stp	x18, x19, [x3, #112]
+>  	stp	x20, x21, [x3, #128]
+>  	stp	x22, x23, [x3, #144]
+> +	str	x24, [x3, #160]
+>  .endm
+>  
+>  .macro restore_sysregs
+> @@ -243,6 +245,7 @@ __kvm_hyp_code_start:
+>  	ldp	x18, x19, [x3, #112]
+>  	ldp	x20, x21, [x3, #128]
+>  	ldp	x22, x23, [x3, #144]
+> +	ldr	x24, [x3, #160]
+>  
+>  	msr	vmpidr_el2,	x4
+>  	msr	csselr_el1,	x5
+> @@ -264,6 +267,7 @@ __kvm_hyp_code_start:
+>  	msr	tpidr_el1,	x21
+>  	msr	amair_el1,	x22
+>  	msr	cntkctl_el1,	x23
+> +	msr	par_el1,	x24
+>  .endm
+>  
+>  .macro skip_32bit_state tmp, target
+> @@ -753,6 +757,10 @@ el1_trap:
+>  	 */
+>  	tbnz	x1, #7, 1f	// S1PTW is set
+>  
+> +	/* Preserve PAR_EL1 */
+> +	mrs	x3, par_el1
+> +	push	x3, xzr
+> +
+>  	/*
+>  	 * Permission fault, HPFAR_EL2 is invalid.
+>  	 * Resolve the IPA the hard way using the guest VA.
+> @@ -766,6 +774,8 @@ el1_trap:
+>  
+>  	/* Read result */
+>  	mrs	x3, par_el1
+> +	pop	x0, xzr			// Restore PAR_EL1 from the stack
+> +	msr	par_el1, x0
+>  	tbnz	x3, #0, 3f		// Bail out if we failed the translation
+>  	ubfx	x3, x3, #12, #36	// Extract IPA
+>  	lsl	x3, x3, #4		// and present it like HPFAR
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 9492360..02e9d09 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -211,6 +211,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	/* FAR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
+>  	  NULL, reset_unknown, FAR_EL1 },
+> +	/* PAR_EL1 */
+> +	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
+> +	  NULL, reset_unknown, PAR_EL1 },
+>  
+>  	/* PMINTENSET_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+> -- 
+> 1.8.2.3
 > 
-> [...]
->>> +static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
->>> +					 struct clock_event_device *evt)
->>> +{
->>> +	disable_irq(clps711x_clksrc->irq);
->>
->> Do you really need to disable the interrupt to re-enable it right after ?
 > 
-> That was the original implementation. Perhaps the best solution is to disable
-> interrupt by CLOCK_EVT_MODE_SHUTDOWN and enable it back by CLOCK_EVT_MODE_RESUME.
-> 
->>> +> +	switch (mode) {
->>> +	case CLOCK_EVT_MODE_PERIODIC:
->>> +		enable_irq(clps711x_clksrc->irq);
->>> +		break;
->>> +	case CLOCK_EVT_MODE_ONESHOT:
->>> +		/* Not supported */
->>> +	case CLOCK_EVT_MODE_SHUTDOWN:
->>> +	case CLOCK_EVT_MODE_UNUSED:
->>> +	case CLOCK_EVT_MODE_RESUME:
->>> +		/* Left event sources disabled, no more interrupts appear */
->>> +		break;
->>> +	}
->>> +}
->>
->> I am not expert in interrupts, but it is possible this interrupt could
->> be shared ?
-> 
-> Timer interrupt? No.
-> 
->> There isn't a register to enable/disable the timer ?
-> 
-> Unfortunately, no. The timer is running always, except STDBY CPU state,
-> so we can control it only by enable/disable interrupt.
 
-Ok.
-
-> [...]
->>> +static struct irqaction clps711x_timer_irq = {
->>> +	.name		= "clps711x-timer",
->>> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->>
->> Why do you need IRQF_IRQPOOL ?
-> 
-> linux/interrupt.h:
->  * IRQF_IRQPOLL - Interrupt is used for polling (only the interrupt that is
->  *                registered first in an shared interrupt is considered for
->  *                performance reasons)
-> 
-> I do not see need this flag, but in fact, this flag is traditionally used
-> in almost all subsystems of this type.
-
-So IIUC, IRQPOLL is to switch to polling mode when a lot of interrupts
-occur, right ?
-
-> [...]
->>> +	tmp = readl(syscon1);
->>> +	/* TC1 in free running mode */
->>> +	tmp &= ~SYSCON1_TC1M;
->>> +	/* TC2 in prescale mode */
->>> +	tmp |= SYSCON1_TC2M;
->>> +	writel(tmp, syscon1);
->>
->> Could you encapsulate these calls inside a static inline function with a
->> more detailed comment please ?
-> 
-> Why static inline?
-> There is a comment line for each bit, You think this is not enough?
-
-I prefer to encapsulate readl/writel calls inside a small function with
-an explicit name, comments are still welcome.
-
-> [...]
->>> +void __init clps711x_clksrc_init(phys_addr_t phys_base, int irq)
->>
->> Is this function called somewhere ? I don't see the function definition ?
-> 
-> It is defined in the patch [9/10] for non-DT case.
-
-Ok, thanks.
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Looks good to me,
+-Christoffer
