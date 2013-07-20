@@ -1,45 +1,34 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Sat, 20 Jul 2013 07:27:25 +0000
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
- system
-In-Reply-To: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EEB180B@DBDE04.ent.ti.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Sat, 20 Jul 2013 10:48:08 +0300
+Subject: [PATCH] Documentation: dt: bindings: TI WiLink modules
+In-Reply-To: <1698879.DLaB5pbe5M@avalon>
+References: <1372149330-24335-1-git-send-email-coelho@ti.com>
+ <1372425670.21065.61.camel@cumari.coelho.fi>
+ <1372682370.21065.68.camel@cumari.coelho.fi> <1698879.DLaB5pbe5M@avalon>
+Message-ID: <1374306488.8385.56.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2013-07-18 at 01:58 +0200, Laurent Pinchart wrote:
+> Hi Luciano,
 
-On Sat, Jul 06, 2013 at 05:09:33, Stephen Boyd wrote:
-> In a uniprocessor implementation the interrupt processor targets
-> registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-> gic_get_cpumask() will print a critical message saying
-> 
->  GIC CPU mask not found - kernel will fail to boot.
-> 
-> if these registers all read as zero, but there won't actually be
-> a problem on uniprocessor systems and the kernel will boot just
-> fine. Skip this check if we're running a UP kernel or if we
-> detect that the hardware only supports a single processor.
-> 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Maybe we should just drop the check entirely? It looks like it may
-> just be debug code that won't ever trigger in practice, even on the
-> 11MPCore that caused this code to be introduced.
-> 
+Hi Laurent,
 
-Apologies if I missed v2 of this patch if there was one. I could not
-locate it in my inbox or the list archives.
+> On Monday 01 July 2013 15:39:30 Luciano Coelho wrote:
+> > The only thing I can come up with is to make a small clock driver (maybe
+> > even inside the WiLink module itself) that registers a new type of
+> > clock, "ti,wilink-clock" or something.  But this would really be
+> > overkill, wouldn't it?
+> > 
+> > Any other ideas?
+> 
+> One possibility would be to just call clk_get_rate() on the clock from the 
+> WiLink driver, which would return the fixed frequency specified in DT, and 
+> configure the WiLink hardware accordingly. This might be a bit hackish though.
 
-We have a yet to be released single-core A9 MPCore system (AM437x) which
-needs to co-exist in omap2plus_defconfig wherein NR_CPUS is set to 2. 
-This currently leads to the "GIC CPU mask not found..." being printed
-twice during bootup. If the check is really some debug code, can it be
-completely dropped?
+The problem is not get the rate itself, the problem is knowing whether
+the clock is XTAL or not.  The WiLink chip uses the clock in a slightly
+different way if it is XTAL, due to some stabilization time constraints.
 
-Regards,
-Vaibhav B.
+--
+Luca.
