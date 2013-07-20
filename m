@@ -1,47 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 20 Jul 2013 18:40:52 +0200
-Subject: [PATCH v4] watchdog: Add MOXA ART watchdog driver
-In-Reply-To: <1374229402-20432-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374053091-5907-1-git-send-email-jonas.jensen@gmail.com>
- <1374229402-20432-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <201307201840.52455.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 20 Jul 2013 18:43:32 +0200
+Subject: [PATCH RFC v2 0/14] Clean up debugging support
+In-Reply-To: <20130717170406.GR24642@n2100.arm.linux.org.uk>
+References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
+ <20130717170406.GR24642@n2100.arm.linux.org.uk>
+Message-ID: <20130720164332.GA26625@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 July 2013, Jonas Jensen wrote:
-> diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-> new file mode 100644
-> index 0000000..5507f2b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-> @@ -0,0 +1,15 @@
-> +MOXA ART Watchdog timer
-> +
-> +Required properties:
-> +
-> +- compatible : Should be "moxa,moxart-watchdog"
-> +- reg : Should contain registers location and length
-> +- clocks : Should contain phandle for the MOXA ART core clock "coreclk"
-> +
-> +Example:
-> +
-> +       watchdog: watchdog at 98500000 {
-> +               compatible = "moxa,moxart-watchdog";
-> +               reg = <0x98500000 0x10>;
-> +               clocks = <&coreclk>;
-> +       };
+On Wed, Jul 17, 2013 at 06:04:06PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 16, 2013 at 05:32:43PM +0100, Russell King - ARM Linux wrote:
+> > This is the second posting of this series, with a few additional patches
+> > on top to go a little further.  Changes since the last posting:
+> 
+> Okay, I think everyone is happy with this, and it's time to go into
+> linux-next, so it'll be visible in my tree from tomorrow.
+> 
+> Please keep the tested-by/acked-by etc coming.
 
-I think the property descriptions need to be clarified here:
+Hi Russell
 
-* I think "should" makes no sense for the "compatible" property since it is
-  required here, you probably mean "must", see http://www.ietf.org/rfc/rfc2119.txt. 
+Maybe i'm blind, but i don't seem to be able to see this in linux
+next, or your git tree.
 
-* for the clock, make sure that the description is from the point of view of
-  the device you are describing, not from the perspective of the clock controller.
-  The device should not make any assumptions about who provides a clock, only
-  what it is used for, and it sounds like "coreclk" is an SoC-wide identifier,
-  not the name of the clock input of the watchdog device. This is not as important
-  as you don't define a "clock-names" property here, butsomething to keep in
-  mind anyway.
+Has it been pushed out yet?
 
-	Arnd
+Thanks
+	Andrew
