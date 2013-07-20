@@ -1,50 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 Jul 2013 13:34:18 +0200
-Subject: [GIT PULL] Nomadik defconfig updates
-Message-ID: <CACRpkdZxSkLrKY1rZwdbo2ZJpVqExu7GRyhWN5T8V+aR_jx2Dw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sat, 20 Jul 2013 12:42:20 +0100
+Subject: [PATCH 10/22] ARM: ux500: Remove '0x's from Exynos5420 DTS file
+In-Reply-To: <20130719214907.GI24642@n2100.arm.linux.org.uk>
+References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
+ <1374242333-6852-10-git-send-email-lee.jones@linaro.org>
+ <20130719214907.GI24642@n2100.arm.linux.org.uk>
+Message-ID: <20130720114220.GB4681@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Fri, 19 Jul 2013, Russell King - ARM Linux wrote:
 
-now we are past -rc1 and I'd like to have these defconfig changes for
-the Nomadik pulled in. It is similar in scope to the ux500 defconfig
-updates I sent the other week, and all have been circulated on the
-mailing list.
+> On Fri, Jul 19, 2013 at 02:58:41PM +0100, Lee Jones wrote:
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: linux-samsung-soc at vger.kernel.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+> 
+> One question.  What have all these files got to do with ux500 ?
 
-Please pull them in!
+They don't, sorry about that. Force of habit.
 
-Yours,
-Linus Walleij
+I'll resubmit on Monday.
 
-
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
-
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-defconfig-for-arm-soc
-
-for you to fetch changes up to fec57e15527ab2e3d22cfbf04f2b98f823f294ff:
-
-  ARM: nomadik: configure for NO_HZ and HRTIMERS (2013-07-20 11:59:45 +0200)
-
-----------------------------------------------------------------
-This updates the Nomadik defconfig post-v3.11-rc1:
-- Update the baseline so we need not rely on make
-  oldconfig so much
-- MMC defconfig updates
-- Activate NO_HZ_IDLE and HRTIMERS
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      ARM: nomadik: update defconfig base
-      ARM: nomadik: configure for NO_HZ and HRTIMERS
-
-Ulf Hansson (1):
-      ARM: nomadik: Update MMC defconfigs
-
- arch/arm/configs/nhk8815_defconfig | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
