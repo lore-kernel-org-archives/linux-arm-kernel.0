@@ -1,35 +1,35 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 20 Jul 2013 06:39:45 +0100
-Subject: [PATCH v2] of: Specify initrd location using 64-bit
-In-Reply-To: <51D1F5E2.6070609@gmail.com>
-References: <1372702835-5333-1-git-send-email-santosh.shilimkar@ti.com>
- <51D1F5E2.6070609@gmail.com>
-Message-ID: <20130720053945.C7AC63E0C52@localhost>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 20 Jul 2013 06:25:37 +0100
+Subject: [PATCH] DT: add vendor prefixes for hisilicon
+In-Reply-To: <1371445499-27265-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1371445499-27265-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20130720052537.5BB403E16CD@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 01 Jul 2013 16:34:26 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On 07/01/2013 01:20 PM, Santosh Shilimkar wrote:
-> > On some PAE architectures, the entire range of physical memory could reside
-> > outside the 32-bit limit.  These systems need the ability to specify the
-> > initrd location using 64-bit numbers.
-> > 
-> > This patch globally modifies the early_init_dt_setup_initrd_arch() function to
-> > use 64-bit numbers instead of the current unsigned long.
-> > 
-> > There has been quite a bit of debate about whether to use u64 or phys_addr_t.
-> > It was concluded to stick to u64 to be consistent with rest of the device
-> > tree code. As summarized by Geert, "The address to load the initrd is decided
-> > by the bootloader/user and set at that point later in time. The dtb should not
-> > be tied to the kernel you are booting"
-> 
-> That was quoting me. Otherwise:
-> 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> 
-> Unless Grant feels compelled to pick this up for 3.11, I think it has to
-> wait for 3.12.
+On Mon, 17 Jun 2013 13:04:59 +0800, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-Nope, 3.12 is fine. Applied.
+Applied.
 
 g.
+
+> ---
+>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 6931c43..e18f3ad 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -25,6 +25,7 @@ est	ESTeem Wireless Modems
+>  fsl	Freescale Semiconductor
+>  GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+>  gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+> +hisilicon	Hisilicon Limited.
+>  hp	Hewlett Packard
+>  ibm	International Business Machines (IBM)
+>  idt	Integrated Device Technologies, Inc.
+> -- 
+> 1.7.9.5
+> 
