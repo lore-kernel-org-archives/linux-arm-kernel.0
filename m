@@ -1,81 +1,45 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Sat, 20 Jul 2013 16:51:33 +0200
-Subject: [PATCH] pinctrl: at91: choose appropriate handler for level interrupts
-Message-ID: <1374331893-16009-1-git-send-email-b.brezillon@overkiz.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 20 Jul 2013 12:44:05 -0300
+Subject: [RESEND PATCH v7 00/22] MBus DT binding: The return of PCIe
+In-Reply-To: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130720154404.GD24504@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation handle both edge and level interrupts with the
-'handle_simple_irq' handler.
+Hi Grant, Arnd, Jason:
 
-Level interrupts are active as long as the pin stays at the configured
-level (low or high). In this case we have to use 'handle_level_irq' which
-mask the interrupt until the handle has treated it.
+On Mon, Jul 15, 2013 at 11:57:29AM -0300, Ezequiel Garcia wrote:
+> Here's the new MBus DT binding, implementing the changes proposed
+> by Thomas when we discussed the previous patchset:
+> 
+>   http://www.spinics.net/lists/arm-kernel/msg257170.html
+> 
+> As far as I know, this round fixes *all* the concerns raised in the past
+> and therefore I'd like to get Acked-by's from all the parties involved
+> on the respective patches, and particularly for the DT binding.
+> 
+> If there's anything left to review, we'll be glad to fix it quickly,
+> so don't hesitate in providing your feedback!
+> 
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/pinctrl/pinctrl-at91.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+Can you comment on this DT binding? Notice this is the outcome of a
+lengthy discussion and has been already agreed by Arnd and Jason Gunthorpe.
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 5d7529e..76e108d 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1241,18 +1241,22 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
- 
- 	switch (type) {
- 	case IRQ_TYPE_EDGE_RISING:
-+		irq_set_handler(d->irq, handle_simple_irq);
- 		writel_relaxed(mask, pio + PIO_ESR);
- 		writel_relaxed(mask, pio + PIO_REHLSR);
- 		break;
- 	case IRQ_TYPE_EDGE_FALLING:
-+		irq_set_handler(d->irq, handle_simple_irq);
- 		writel_relaxed(mask, pio + PIO_ESR);
- 		writel_relaxed(mask, pio + PIO_FELLSR);
- 		break;
- 	case IRQ_TYPE_LEVEL_LOW:
-+		irq_set_handler(d->irq, handle_level_irq);
- 		writel_relaxed(mask, pio + PIO_LSR);
- 		writel_relaxed(mask, pio + PIO_FELLSR);
- 		break;
- 	case IRQ_TYPE_LEVEL_HIGH:
-+		irq_set_handler(d->irq, handle_level_irq);
- 		writel_relaxed(mask, pio + PIO_LSR);
- 		writel_relaxed(mask, pio + PIO_REHLSR);
- 		break;
-@@ -1261,6 +1265,7 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
- 		 * disable additional interrupt modes:
- 		 * fall back to default behavior
- 		 */
-+		irq_set_handler(d->irq, handle_simple_irq);
- 		writel_relaxed(mask, pio + PIO_AIMDR);
- 		return 0;
- 	case IRQ_TYPE_NONE:
-@@ -1402,6 +1407,8 @@ static int at91_gpio_irq_map(struct irq_domain *h, unsigned int virq,
- 							irq_hw_number_t hw)
- {
- 	struct at91_gpio_chip	*at91_gpio = h->host_data;
-+	void __iomem		*pio = at91_gpio->regbase;
-+	u32			mask = 1 << hw;
- 
- 	irq_set_lockdep_class(virq, &gpio_lock_class);
- 
-@@ -1409,8 +1416,13 @@ static int at91_gpio_irq_map(struct irq_domain *h, unsigned int virq,
- 	 * Can use the "simple" and not "edge" handler since it's
- 	 * shorter, and the AIC handles interrupts sanely.
- 	 */
--	irq_set_chip_and_handler(virq, &gpio_irqchip,
--				 handle_simple_irq);
-+	irq_set_chip(virq, &gpio_irqchip);
-+	if ((at91_gpio->ops == &at91sam9x5_ops) &&
-+	    (readl_relaxed(pio + PIO_AIMMR) & mask) &&
-+	    (readl_relaxed(pio + PIO_ELSR) & mask))
-+		irq_set_handler(virq, handle_level_irq);
-+	else
-+		irq_set_handler(virq, handle_simple_irq);
- 	set_irq_flags(virq, IRQF_VALID);
- 	irq_set_chip_data(virq, at91_gpio);
- 
+If it looks OK, I'd like to have formal Acked-by's so Jason Cooper can merge it.
+
+On the other side, given we've decided to mark some bindings as 'unstable'
+or 'staging' maybe Jason can merge it so it can be in linux-next.
+This way developers can actually start using this, and complaining if
+there's anything to complain.
+
+If we leave it as a patchset floating in mailing-lists it's hardly going
+to get tested.
+
+Does this approach make sense?
+
+Thanks a lot!
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
