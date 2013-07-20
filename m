@@ -1,77 +1,137 @@
-From: jld@mozilla.com (Jed Davis)
-Date: Fri, 19 Jul 2013 20:43:21 -0700
-Subject: [PATCH] ARM: perf: Implement perf_arch_fetch_caller_regs
-In-Reply-To: <20130715135342.GF10000@mudshark.cambridge.arm.com>
-References: <1373685434-1581-1-git-send-email-jld@mozilla.com>
- <20130715135342.GF10000@mudshark.cambridge.arm.com>
-Message-ID: <20130720034321.GB9433@mozilla.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 20 Jul 2013 07:44:41 +0400
+Subject: [PATCH 06/10] ARM: clps711x: Add CLPS711X clocksource driver
+In-Reply-To: <51E94F7E.4030404@linaro.org>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <1374172501-26796-7-git-send-email-shc_work@mail.ru>
+ <51E94F7E.4030404@linaro.org>
+Message-ID: <20130720074441.9882b71183e5eadd535da6c1@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 02:53:42PM +0100, Will Deacon wrote:
-> On Sat, Jul 13, 2013 at 04:17:14AM +0100, Jed Davis wrote:
+On Fri, 19 Jul 2013 16:38:54 +0200
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> (Added Thomas and John in Cc in case they want to review the patch).
+> 
+> On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
+> > This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
+> > Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+> > for this as the "OF" and "not-OF" calls implemented.
+> 
+> When a new driver is submitted, I ask for a more detailed changelog
+> about the driver itself: how it works, any specificities, etc ...
+> 
+> That will help people to understand the code better at least for the review.
+
+Basically, this series is a port of the CLPS711X subsystems in places specially
+designed for this purpose. Additionally added to the standard description of the
+subsystem for use with DT.
+As for specs, I'm a little confused by this question. In this case, I'm doing
+is not anything new for this CPU. The CPU has two timers and I use both to
+provide the correct time sources.
+
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  arch/arm/Kconfig                      |   2 -
+> >  drivers/clocksource/Kconfig           |   6 ++
+> >  drivers/clocksource/Makefile          |   1 +
+> >  drivers/clocksource/clps711x-clksrc.c | 151 ++++++++++++++++++++++++++++++++++
+> >  4 files changed, 158 insertions(+), 2 deletions(-)
+> >  create mode 100644 drivers/clocksource/clps711x-clksrc.c
 [...]
-> > +#ifdef CONFIG_THUMB2_KERNEL
-> > +#define perf_arch_fetch_caller_regs(regs, ip)				\
-> > +	do {								\
-> > +		__u32 _cpsr, _pc;					\
-> > +		__asm__ __volatile__("str r7, [%[_regs], #(7 * 4)]\n\t" \
-> > +				     "str r13, [%[_regs], #(13 * 4)]\n\t" \
-> > +				     "str r14, [%[_regs], #(14 * 4)]\n\t" \
+> > +#define CLPS711X_SYSCON1	(0x0100)
+> > +#define CLPS711X_TC1D		(0x0300)
+> > +#define CLPS711X_TC2D		(0x0340)
 > 
-> Is this safe? How can we be sure that the registers haven't been clobbered
-> by the callee before this macro is expanded? For example, you can end up
-> with the following code:
+> Alignment.
 
-They might be clobbered, but if they are, then...
+Alignment? Do not see any problems.
+Wrong alignment in this case is the result of quote.
 
-> 00000058 <perf_ftrace_function_call>:
->   58:   e92d 43f0       stmdb   sp!, {r4, r5, r6, r7, r8, r9, lr}
->   5c:   b09b            sub     sp, #108        ; 0x6c
->   5e:   ac08            add     r4, sp, #32
->   60:   4681            mov     r9, r0
->   62:   4688            mov     r8, r1
->   64:   4620            mov     r0, r4
->   66:   2148            movs    r1, #72 ; 0x48
->   68:   f7ff fffe       bl      0 <__memzero>
->   6c:   61e7            str     r7, [r4, #28]
->   6e:   f8c4 d034       str.w   sp, [r4, #52]   ; 0x34
->   72:   f8c4 e038       str.w   lr, [r4, #56]   ; 0x38
+> > +static struct {
+> > +	void __iomem	*tc1d;
+> > +	int		irq;
+> > +} *clps711x_clksrc;
 > 
-> but the call to __memzero will have corrupted the lr.
+> You don't need to define this structure, the struct clock_event_device
+> already contains a field with irq.
 
-...the function's unwinding entry will restore them from the stack, and
-can't assume anything about their values before then.  It's the same
-problem as if the code was interrupted by a profiler timer at that point
-and we tried unwinding from the trap state.
+Thank you, I will know.
 
-Hopefully.  It's hard to be as rigorous as I'd like about this, because
-the Exception Handling ABI was meant for exception handling, so as
-specified it only needs to work at points where C++ exceptions can be
-thrown, as I understand it.  Fortunately GCC isn't limited to that, but
-there are more issues, because -fasynchronous-unwind-tables doesn't
-actually make things work from *any* instruction as documented (which is
-not entirely bad, because working correctly would significantly increase
-the size of .extab/.exidx).
-
-All that said, the unwinding program for a function should work at any
-point after the prologue and before the epilogue.
-
-> > +				     "mov %[_pc],  r15\n\t"		\
-> > +				     "mrs %[_cpsr], cpsr\n\t"		\
-> > +				     : [_cpsr] "=r" (_cpsr),		\
-> > +				       [_pc] "=r" (_pc)			\
-> > +				     : [_regs] "r" (&(regs)->uregs)	\
+[...]
+> > +static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
+> > +					 struct clock_event_device *evt)
+> > +{
+> > +	disable_irq(clps711x_clksrc->irq);
 > 
-> It would be cleaner to pass a separate argument for each register, using the
-> ARM_rN macros rather than calculating the offset by hand.
+> Do you really need to disable the interrupt to re-enable it right after ?
 
-I'll do that.  If there were more arguments there might be a problem
-at -O0, because the naive translation can run out of registers in
-some cases, but that shouldn't be a problem here.  (Nor if someone
-later extends this to all the core registers, because {r0-r13} can and
-presumably should use a store-multiple.)
+That was the original implementation. Perhaps the best solution is to disable
+interrupt by CLOCK_EVT_MODE_SHUTDOWN and enable it back by CLOCK_EVT_MODE_RESUME.
 
-Thanks for the quick review, and sorry for the delay in responding.
+> > +> +	switch (mode) {
+> > +	case CLOCK_EVT_MODE_PERIODIC:
+> > +		enable_irq(clps711x_clksrc->irq);
+> > +		break;
+> > +	case CLOCK_EVT_MODE_ONESHOT:
+> > +		/* Not supported */
+> > +	case CLOCK_EVT_MODE_SHUTDOWN:
+> > +	case CLOCK_EVT_MODE_UNUSED:
+> > +	case CLOCK_EVT_MODE_RESUME:
+> > +		/* Left event sources disabled, no more interrupts appear */
+> > +		break;
+> > +	}
+> > +}
+> 
+> I am not expert in interrupts, but it is possible this interrupt could
+> be shared ?
 
---Jed
+Timer interrupt? No.
+
+> There isn't a register to enable/disable the timer ?
+
+Unfortunately, no. The timer is running always, except STDBY CPU state,
+so we can control it only by enable/disable interrupt.
+
+[...]
+> > +static struct irqaction clps711x_timer_irq = {
+> > +	.name		= "clps711x-timer",
+> > +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+> 
+> Why do you need IRQF_IRQPOOL ?
+
+linux/interrupt.h:
+ * IRQF_IRQPOLL - Interrupt is used for polling (only the interrupt that is
+ *                registered first in an shared interrupt is considered for
+ *                performance reasons)
+
+I do not see need this flag, but in fact, this flag is traditionally used
+in almost all subsystems of this type.
+
+[...]
+> > +	tmp = readl(syscon1);
+> > +	/* TC1 in free running mode */
+> > +	tmp &= ~SYSCON1_TC1M;
+> > +	/* TC2 in prescale mode */
+> > +	tmp |= SYSCON1_TC2M;
+> > +	writel(tmp, syscon1);
+> 
+> Could you encapsulate these calls inside a static inline function with a
+> more detailed comment please ?
+
+Why static inline?
+There is a comment line for each bit, You think this is not enough?
+
+[...]
+> > +void __init clps711x_clksrc_init(phys_addr_t phys_base, int irq)
+> 
+> Is this function called somewhere ? I don't see the function definition ?
+
+It is defined in the patch [9/10] for non-DT case.
+
+[...]
+
+Thanks.
+
+-- 
+Alexander Shiyan <shc_work@mail.ru>
