@@ -1,41 +1,153 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 20 Jul 2013 23:34:29 +0200
-Subject: [PATCH v9] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <CACRpkdYktthfRsn9=9GjphXUbOEAswdCZCM48KFK2WRgBdj-Qw@mail.gmail.com>
-References: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
- <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
- <CACRpkdYktthfRsn9=9GjphXUbOEAswdCZCM48KFK2WRgBdj-Qw@mail.gmail.com>
-Message-ID: <51EB0265.2030508@linaro.org>
+Date: Sat, 20 Jul 2013 23:42:11 +0200
+Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
+In-Reply-To: <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+Message-ID: <51EB0433.3050308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2013 10:45 PM, Linus Walleij wrote:
-> On Wed, Jul 17, 2013 at 10:04 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
+> This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
+> Designed primarily for migration CLPS711X subarch for multiplatform & DT.
 > 
->> +#include <linux/clk.h>
->> +#include <linux/clockchips.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqreturn.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/io.h>
->> +#include <linux/clocksource.h>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/cpuidle/Kconfig            |  6 +++
+>  drivers/cpuidle/Makefile           |  1 +
+>  drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 87 insertions(+)
+>  create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
 > 
-> #include <linux/bitops.h>
-> 
->> +#define TIMEREG_CR_1_ENABLE    BIT(0)
-> 
-> Because BIT() comes from there. And we shall not rely on
-> implicit #inclusion.
+> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+> index 0e2cd5c..c68a0cf 100644
+> --- a/drivers/cpuidle/Kconfig
+> +++ b/drivers/cpuidle/Kconfig
+> @@ -36,6 +36,12 @@ config CPU_IDLE_CALXEDA
+>  	help
+>  	  Select this to enable cpuidle on Calxeda processors.
+>  
+> +config CPU_IDLE_CLPS711X
+> +	bool "CPU Idle Driver for CLPS711X processors"
+> +	depends on ARCH_CLPS711X
+> +	help
+> +	  Select this to enable cpuidle on Cirrus Logic CLPS711X processors.
+> +
+>  config CPU_IDLE_ZYNQ
+>  	bool "CPU Idle Driver for Xilinx Zynq processors"
+>  	depends on ARCH_ZYNQ
+> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+> index 8767a7b..d07d2cb 100644
+> --- a/drivers/cpuidle/Makefile
+> +++ b/drivers/cpuidle/Makefile
+> @@ -6,5 +6,6 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+>  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>  
+>  obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+> +obj-$(CONFIG_CPU_IDLE_CLPS711X)	+= cpuidle-clps711x.o
+>  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+>  obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+> diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
+> new file mode 100644
+> index 0000000..9f0129f
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-clps711x.c
+> @@ -0,0 +1,80 @@
+> +/*
+> + *  CLPS711X CPU idle driver
+> + *
+> + *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/cpuidle.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +static void __iomem *clps711x_halt;
+> +
+> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
+> +				 struct cpuidle_driver *drv, int index)
+> +{
+> +	writel(1, clps711x_halt);
 
-Hi Jonas,
+In what the 'clps711x_halt' differs from the usual WFI (cpu_do_idle) ?
 
-as the patchset is already merged could you fix it with a separate patch ?
+> +	asm volatile ("mov r0, r0");
+> +	asm volatile ("mov r0, r0");
 
-Thanks
-  -- Daniel
+Why are needed these two volatile ?
+
+> +	return index;
+> +}
+> +
+> +static struct cpuidle_driver clps711x_idle_driver = {
+> +	.name			= "clps711x_idle",
+> +	.owner			= THIS_MODULE,
+> +	.state_count		= 1,
+> +	.states[0]	= {
+> +		.name		= "HALT",
+> +		.desc		= "CLPS711X WFI",
+> +		.enter		= clps711x_cpuidle_halt,
+> +		.exit_latency	= 1,
+> +	},
+> +};
+> +
+> +static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(clps711x_halt))
+> +		return PTR_ERR(clps711x_halt);
+> +
+> +	return cpuidle_register(&clps711x_idle_driver, NULL);
+> +}
+> +
+> +static int clps711x_cpuidle_remove(struct platform_device *pdev)
+> +{
+> +	cpuidle_unregister(&clps711x_idle_driver);
+> +
+> +	return 0;
+> +}
+
+The driver is not compiled as module, will this function be called ?
+
+> +
+> +static const struct of_device_id clps711x_cpuidle_dt_ids[] = {
+> +	{ .compatible = "cirrus,clps711x-cpuidle", },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, clps711x_cpuidle_dt_ids);
+> +
+> +static struct platform_driver clps711x_cpuidle_driver = {
+> +	.driver	= {
+> +		.name		= "clps711x-cpuidle",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= clps711x_cpuidle_dt_ids,
+> +	},
+> +	.remove	= clps711x_cpuidle_remove,
+> +};
+> +module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
+
++1
+
+> +
+> +MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
+> +MODULE_DESCRIPTION("CLPS711X CPU idle driver");
+> +MODULE_LICENSE("GPL");
+
+
+
 
 -- 
  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
