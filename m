@@ -1,32 +1,60 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 20 Jul 2013 11:17:56 +0400
-Subject: [PATCH 3/6] ARM: dts: i.MX27: Add label to CPU node
+Date: Sat, 20 Jul 2013 11:17:59 +0400
+Subject: [PATCH 6/6] ARM: dts: imx27-phytec-phycore-som: Fix regulator settings
 In-Reply-To: <1374304679-27338-1-git-send-email-shc_work@mail.ru>
 References: <1374304679-27338-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1374304679-27338-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1374304679-27338-6-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a label to i.MX27 CPU node. This change allows the reuse this node
-in the upper levels of the DTS.
+Outputs regulator SW1A and SW1A, SW2A and SW2B are connected together,
+so it determined as "joined" operation for MC13783. Separate work of
+these outputs in this case would be wrong, so we define only one of
+the outputs.
+Additionally, define the full range of voltages for the CPU (1.2v - 1.52v).
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 7cf954b..a8e0c7e 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -53,7 +53,7 @@
- 		#size-cells = <0>;
- 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+index 22d0d27..aa70ad7 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+@@ -38,28 +38,16 @@
+ 		fsl,mc13xxx-uses-rtc;
  
--		cpu {
-+		cpu: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,arm926ej-s";
- 			operating-points = <
+ 		regulators {
+-			sw1a_reg: sw1a {
++			/* SW1A and SW1B joined operation */
++			sw1_reg: sw1a {
+ 				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <1200000>;
++				regulator-max-microvolt = <1520000>;
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 			};
+ 
+-			sw1b_reg: sw1b {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <1200000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-
+-			sw2a_reg: sw2a {
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-
+-			sw2b_reg: sw2b {
++			/* SW2A and SW2B joined operation */
++			sw2_reg: sw2a {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
+ 				regulator-always-on;
 -- 
 1.8.1.5
