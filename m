@@ -1,27 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 Jul 2013 22:54:42 +0200
-Subject: [PATCH 0/3] MSM gpio fixes
-In-Reply-To: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
-References: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <CACRpkdbOO8fFEx+PxsdJ9F1dqD6V4_RPZThvTufo9+XhhyuHOg@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sat, 20 Jul 2013 23:34:29 +0200
+Subject: [PATCH v9] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <CACRpkdYktthfRsn9=9GjphXUbOEAswdCZCM48KFK2WRgBdj-Qw@mail.gmail.com>
+References: <1373985880-23469-1-git-send-email-jonas.jensen@gmail.com>
+ <1374048297-4321-1-git-send-email-jonas.jensen@gmail.com>
+ <CACRpkdYktthfRsn9=9GjphXUbOEAswdCZCM48KFK2WRgBdj-Qw@mail.gmail.com>
+Message-ID: <51EB0265.2030508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 10:07 PM, David Brown <davidb@codeaurora.org> wrote:
+On 07/20/2013 10:45 PM, Linus Walleij wrote:
+> On Wed, Jul 17, 2013 at 10:04 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> 
+>> +#include <linux/clk.h>
+>> +#include <linux/clockchips.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/irqreturn.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/io.h>
+>> +#include <linux/clocksource.h>
+> 
+> #include <linux/bitops.h>
+> 
+>> +#define TIMEREG_CR_1_ENABLE    BIT(0)
+> 
+> Because BIT() comes from there. And we shall not rely on
+> implicit #inclusion.
 
-> Rohit sent these three fixes out on June 18.  I still need a
-> devicetree ack for the first patch, and would like these to get pulled
-> in for v3.11
->
-> Rohit Vaswani (3):
->   ARM: msm: dts: Fix the gpio register address for msm8960
->   drivers: gpio: msm: Fix the error condition for reading ngpio
+Hi Jonas,
 
-OK for these two...
+as the patchset is already merged could you fix it with a separate patch ?
 
->   ARM: msm: Consolidate gpiomux for older architectures
+Thanks
+  -- Daniel
 
-This does not look like a fix? Surely this can wait for v3.12?
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Yours,
-Linus Walleij
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
