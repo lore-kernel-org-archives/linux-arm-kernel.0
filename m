@@ -1,44 +1,22 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Mon, 22 Jul 2013 01:42:56 +0200
-Subject: [PATCH 1/5] ARM: bcm4760: Add platform infrastructure
-In-Reply-To: <20130721002713.512199844@gmail.com>
-References: <20130721002320.730568671@gmail.com>
- <20130721002713.512199844@gmail.com>
-Message-ID: <20130721234256.GA5537@glitch>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 22 Jul 2013 00:57:08 +0100
+Subject: [PATCH] ASoC: tegra: correct playback_dma_data setup
+In-Reply-To: <1374374049-30732-1-git-send-email-rizhao@nvidia.com>
+References: <1374374049-30732-1-git-send-email-rizhao@nvidia.com>
+Message-ID: <20130721235708.GF9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Christian Daudt  (Christian, you've not an entry in MAINTAINERS)
+On Sun, Jul 21, 2013 at 10:34:09AM +0800, Richard Zhao wrote:
+> The errors were caused by copy/paste mistake in below commit
+> since v3.10:
+> 3489d50 ASoC: tegra: Use common DAI DMA data struct
 
-On Sun, Jul 21, 2013 at 02:23:21AM +0200, Domenico Andreoli wrote:
-> From: Domenico Andreoli <domenico.andreoli@linux.com>
-> 
-> Platform infrastructure for the Broadcom BCM4760 based ARM11 SoCs.
-> 
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
-> ---
-> Index: b/arch/arm/Makefile
-> ===================================================================
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -147,6 +147,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x0020
->  machine-$(CONFIG_ARCH_AT91)		+= at91
->  machine-$(CONFIG_ARCH_BCM)		+= bcm
->  machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
-> +machine-$(CONFIG_ARCH_BCM4760)		+= bcm
->  machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
->  machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
->  machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
-
-I've noticed that enabling both CONFIG_ARCH_BCM and CONFIG_ARCH_BCM4760
-makes the linker complain of duplicate symbols.
-
-Shouldn't the mach-bcm subdir be included always and let then Makefile
-therein sort what to build?
-
-As I side note, I think this CONFIG_ARCH_BCM option is misnamed, shouldn't be
-something like CONFIG_ARCH_BCM281XX? It looks about this ARMv7 family only.
-
-Thanks,
-Domenico
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/7b2696ea/attachment.sig>
