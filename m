@@ -1,51 +1,67 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 20 Jul 2013 19:59:10 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
-References: <20130720220006.GA7977@kroah.com>
- <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
-Message-ID: <20130721025910.GA23043@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sat, 20 Jul 2013 21:44:10 -0600
+Subject: Issue with gpio and pinmux
+In-Reply-To: <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
+ <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+Message-ID: <51EB590A.4010600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 20, 2013 at 10:32:26PM -0400, Alan Stern wrote:
-> On Sat, 20 Jul 2013, Greg KH wrote:
+On 07/20/2013 04:44 PM, Linus Walleij wrote:
+> On Thu, Jul 18, 2013 at 8:11 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > 
-> > > >>That should be passed using platform data.
-> > > >
-> > > >Ick, don't pass strings around, pass pointers.  If you have platform
-> > > >data you can get to, then put the pointer there, don't use a "name".
-> > > 
-> > > I don't think I understood you here :-s We wont have phy pointer
-> > > when we create the device for the controller no?(it'll be done in
-> > > board file). Probably I'm missing something.
-> > 
-> > Why will you not have that pointer?  You can't rely on the "name" as the
-> > device id will not match up, so you should be able to rely on the
-> > pointer being in the structure that the board sets up, right?
-> > 
-> > Don't use names, especially as ids can, and will, change, that is going
-> > to cause big problems.  Use pointers, this is C, we are supposed to be
-> > doing that :)
+>> The issue is that some HW muxes groups of pins at a time, so simply
+>> because that group of pins is "claimed" by a mux function, implies
+>> nothing about which specific pins in that group are actually used; some
+>> may actually still be free for usage as a GPIO.
 > 
-> Kishon, I think what Greg means is this:  The name you are using must
-> be stored somewhere in a data structure constructed by the board file,
-> right?  Or at least, associated with some data structure somehow.  
-> Otherwise the platform code wouldn't know which PHY hardware
-> corresponded to a particular name.
+> This we need to get into the documentation.
 > 
-> Greg's suggestion is that you store the address of that data structure 
-> in the platform data instead of storing the name string.  Have the 
-> consumer pass the data structure's address when it calls phy_create, 
-> instead of passing the name.  Then you don't have to worry about two 
-> PHYs accidentally ending up with the same name or any other similar 
-> problems.
+>> The solution here may be one of:
+>>
+>> a) Modify pinctrl /not/ to allow both a GPIO and a mux function to claim
+>> a pin *if* the group that contains the pin only contains a single pin.
+>> This is a bit of a hacky special case though; there are other situations
+>> where "dual claiming" shouldn't be allowed, and this doesn't solve those.
+>>
+>> b) Ignore the issue; if the system configuration is correct, the issue
+>> won't cause problems in practice, since nothing will be configured to
+>> "dual claim" any pin.
+>>
+>> c) Enhance pinctrl with extra information, so it knows which pins in a
+>> group are usable as GPIO even when the group is claimed by a mux
+>> function. The list of pins could theoretically vary per mux function, so
+>> you'd need a table with lookup key (pin group, mux function) and output
+>> data (list of pins that can be "dual claimed"). This would be a complete
+>> solution. If a list wasn't provided, the pinctrl core could assume that
+>> mean no dual claim was allowed.
+> 
+> I guess (b) is what we have.
+> 
+> But it really feels incomplete does it not? IIRC the system was strict
+> not to allow simultaneous use of pins for GPIO and other functions
+> at all until the above corner case made it necessary to relax this
+> restriction.
+> 
+> A simple way to get (a) would be to just add a flag like ".strict"
+> to struct pinmux_ops but it feels cheap.
+> 
+> What do we need for (c)? I think we can refactor this as the Tegra
+> and U300 should be the two platforms with such tricky groups so
+> the impact should be fairly small right now. I'm just worried it would
+> be a complex and memory-consuming thing :-/
 
-Close, but the issue is that whatever returns from phy_create() should
-then be used, no need to call any "find" functions, as you can just use
-the pointer that phy_create() returns.  Much like all other class api
-functions in the kernel work.
+Actually, a better way to do (c) might be to just add an extra "op" to
+struct pinmux_ops; something like validate_gpio_mux(), passing in
+information such as whether a mux function is in effect on that pin,
+whether the pin is already claimed as a GPIO, and whether the function
+is being called to check a GPIO-claim or mux-claim operation . If the op
+is missing, no "dual claim" is allowed. If the op is present, the code
+in the op validates whether the particular GPIO is allowed to be claimed
+while the particular mux function is active.
 
-thanks,
-
-greg k-h
+That way, I think any driver that doesn't want to allow dual-claim
+doesn't have to do anything, but the few drivers that do can code up
+whatever algorithm they want; for Tegra, I'd just allow everything for
+simplicity, but we could always enhance that later if we want.
