@@ -1,44 +1,44 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 22 Jul 2013 00:36:17 +0100
-Subject: [PATCH] of: match the compatible in the order set by the dts file
-In-Reply-To: <51EC4859.5000007@gmail.com>
-References: <1373013818-11365-1-git-send-email-b32955@freescale.com>
- <20130709070541.GQ516@pengutronix.de> <51DBBFDA.70302@freescale.com>
- <20130709075124.GR516@pengutronix.de> <51DBC58D.90002@freescale.com>
- <20130720054439.308B33E13F0@localhost> <51EC4859.5000007@gmail.com>
-Message-ID: <CACxGe6s2UjFkZBOUKVP5=4kW9a=vKT3kQA8YrtitPgC4PLj6jw@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Mon, 22 Jul 2013 01:42:56 +0200
+Subject: [PATCH 1/5] ARM: bcm4760: Add platform infrastructure
+In-Reply-To: <20130721002713.512199844@gmail.com>
+References: <20130721002320.730568671@gmail.com>
+ <20130721002713.512199844@gmail.com>
+Message-ID: <20130721234256.GA5537@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 21, 2013 at 9:45 PM, Rob Herring <robherring2@gmail.com> wrote:
-> We can debate whether the driver order matters or not, but either way
-> I'm not sure this patch does the right thing. It doesn't really look
-> correct to me, but I haven't dug into it.
->
-> We've already tried to fix matching and reverted the fix once before
-> (commit below). So this patch needs careful review and thought about
-> cases where the name and/or type is used to match.
++ Christian Daudt  (Christian, you've not an entry in MAINTAINERS)
 
-The rules have always been well established. This patch /shouldn't/
-cause any regression that cannot be narrowed down to a fixable driver
-bug.
+On Sun, Jul 21, 2013 at 02:23:21AM +0200, Domenico Andreoli wrote:
+> From: Domenico Andreoli <domenico.andreoli@linux.com>
+> 
+> Platform infrastructure for the Broadcom BCM4760 based ARM11 SoCs.
+> 
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+> ---
+> Index: b/arch/arm/Makefile
+> ===================================================================
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -147,6 +147,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x0020
+>  machine-$(CONFIG_ARCH_AT91)		+= at91
+>  machine-$(CONFIG_ARCH_BCM)		+= bcm
+>  machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
+> +machine-$(CONFIG_ARCH_BCM4760)		+= bcm
+>  machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
+>  machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
+>  machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
 
-A harder problem to solve however is dealing with the case when
-multiple drivers will potentially bind against the same device. Making
-that work requires getting all of the match tables into the kernel
-early so that the kernel can select the correct driver of many. Can't
-be that big a problem though since we've never actually tried to solve
-it.  :-)
+I've noticed that enabling both CONFIG_ARCH_BCM and CONFIG_ARCH_BCM4760
+makes the linker complain of duplicate symbols.
 
-[...]
->     Rob Herring explains:
->      "The problem is match combinations of compatible plus name and/or type
->       fail to match correctly.  I have a fix for this, but given how late it
->       is for 3.5 I think it is best to revert this for now.  There could be
->       other cases that rely on the current although wrong behavior.  I will
->       post an updated version for 3.6."
+Shouldn't the mach-bcm subdir be included always and let then Makefile
+therein sort what to build?
 
-I don't believe the fix ever got posted. Do you still have it? Or can
-you describe what needs to be done?
+As I side note, I think this CONFIG_ARCH_BCM option is misnamed, shouldn't be
+something like CONFIG_ARCH_BCM281XX? It looks about this ARMv7 family only.
 
-g.
+Thanks,
+Domenico
