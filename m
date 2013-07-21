@@ -1,115 +1,41 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Sat, 20 Jul 2013 18:40:14 -0700
-Subject: [PATCH] ARM: kexec: validate CPU hotplug support
-In-Reply-To: <1373582931-11956-1-git-send-email-swarren@wwwdotorg.org>
- (Stephen Warren's message of "Thu, 11 Jul 2013 16:48:51 -0600")
-References: <1373582931-11956-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <87ehas7ksh.fsf@xmission.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 20 Jul 2013 22:32:26 -0400 (EDT)
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <20130720220006.GA7977@kroah.com>
+Message-ID: <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On Sat, 20 Jul 2013, Greg KH wrote:
 
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Architectures should fully validate whether kexec is possible as part of
-> machine_kexec_prepare(), so that user-space's kexec_load() operation can
-> report any problems. Performing validation in machine_kexec() itself is
-> too late, since it is not allowed to return.
->
-> Prior to this patch, ARM's machine_kexec() was testing after-the-fact
-> whether machine_kexec_prepare() was able to disable all but one CPU.
-> Instead, modify machine_kexec_prepare() to validate all conditions
-> necessary for machine_kexec_prepare()'s to succeed. BUG if the validation
-> succeeded, yet disabling the CPUs didn't actually work.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > >>That should be passed using platform data.
+> > >
+> > >Ick, don't pass strings around, pass pointers.  If you have platform
+> > >data you can get to, then put the pointer there, don't use a "name".
+> > 
+> > I don't think I understood you here :-s We wont have phy pointer
+> > when we create the device for the controller no?(it'll be done in
+> > board file). Probably I'm missing something.
+> 
+> Why will you not have that pointer?  You can't rely on the "name" as the
+> device id will not match up, so you should be able to rely on the
+> pointer being in the structure that the board sets up, right?
+> 
+> Don't use names, especially as ids can, and will, change, that is going
+> to cause big problems.  Use pointers, this is C, we are supposed to be
+> doing that :)
 
-At a quick skim this looks good to me.
+Kishon, I think what Greg means is this:  The name you are using must
+be stored somewhere in a data structure constructed by the board file,
+right?  Or at least, associated with some data structure somehow.  
+Otherwise the platform code wouldn't know which PHY hardware
+corresponded to a particular name.
 
-Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+Greg's suggestion is that you store the address of that data structure 
+in the platform data instead of storing the name string.  Have the 
+consumer pass the data structure's address when it calls phy_create, 
+instead of passing the name.  Then you don't have to worry about two 
+PHYs accidentally ending up with the same name or any other similar 
+problems.
 
-> ---
-> Russell, does it make sense for this to be cc: stable as a follow-up to
-> 19ab428 "ARM: 7759/1: decouple CPU offlining from reboot/shutdown"?
->
->  arch/arm/include/asm/smp_plat.h |  3 +++
->  arch/arm/kernel/machine_kexec.c | 20 ++++++++++++++++----
->  arch/arm/kernel/smp.c           |  8 ++++++++
->  3 files changed, 27 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-> index 6462a72..a252c0b 100644
-> --- a/arch/arm/include/asm/smp_plat.h
-> +++ b/arch/arm/include/asm/smp_plat.h
-> @@ -88,4 +88,7 @@ static inline u32 mpidr_hash_size(void)
->  {
->  	return 1 << mpidr_hash.bits;
->  }
-> +
-> +extern int platform_can_cpu_hotplug(void);
-> +
->  #endif
-> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-> index 4fb074c..d7c82df 100644
-> --- a/arch/arm/kernel/machine_kexec.c
-> +++ b/arch/arm/kernel/machine_kexec.c
-> @@ -15,6 +15,7 @@
->  #include <asm/mmu_context.h>
->  #include <asm/cacheflush.h>
->  #include <asm/mach-types.h>
-> +#include <asm/smp_plat.h>
->  #include <asm/system_misc.h>
->  
->  extern const unsigned char relocate_new_kernel[];
-> @@ -39,6 +40,14 @@ int machine_kexec_prepare(struct kimage *image)
->  	int i, err;
->  
->  	/*
-> +	 * Validate that if the current HW supports SMP, then the SW supports
-> +	 * and implements CPU hotplug for the current HW. If not, we won't be
-> +	 * able to kexec reliably, so fail the prepare operation.
-> +	 */
-> +	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
-> +		return -EINVAL;
-> +
-> +	/*
->  	 * No segment at default ATAGs address. try to locate
->  	 * a dtb using magic.
->  	 */
-> @@ -134,10 +143,13 @@ void machine_kexec(struct kimage *image)
->  	unsigned long reboot_code_buffer_phys;
->  	void *reboot_code_buffer;
->  
-> -	if (num_online_cpus() > 1) {
-> -		pr_err("kexec: error: multiple CPUs still online\n");
-> -		return;
-> -	}
-> +	/*
-> +	 * This can only happen if machine_shutdown() failed to disable some
-> +	 * CPU, and that can only happen if the checks in
-> +	 * machine_kexec_prepare() were not correct. If this fails, we can't
-> +	 * reliably kexec anyway, so BUG_ON is appropriate.
-> +	 */
-> +	BUG_ON(num_online_cpus() > 1);
->  
->  	page_list = image->head & PAGE_MASK;
->  
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index c2b4f8f..5b9e501 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -145,6 +145,14 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	return -ENOSYS;
->  }
->  
-> +int platform_can_cpu_hotplug(void)
-> +{
-> +	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU) || !smp_ops.cpu_kill)
-> +		return 0;
-> +
-> +	return 1;
-> +}
-> +
->  #ifdef CONFIG_HOTPLUG_CPU
->  static void percpu_timer_stop(void);
+Alan Stern
