@@ -1,75 +1,30 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sun, 21 Jul 2013 08:48:08 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <20130721102248.GE29785@pengutronix.de>
-References: <20130720220006.GA7977@kroah.com>
- <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
- <20130721025910.GA23043@kroah.com>
- <20130721102248.GE29785@pengutronix.de>
-Message-ID: <20130721154808.GH16598@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 21 Jul 2013 18:15:03 +0200
+Subject: [PATCH 1/5] gpio: pxa: remove dead code
+In-Reply-To: <1373555877-29887-2-git-send-email-zonque@gmail.com>
+References: <1373555877-29887-1-git-send-email-zonque@gmail.com>
+ <1373555877-29887-2-git-send-email-zonque@gmail.com>
+Message-ID: <CACRpkdaB7JnWzoLKpQ1eLWAi7yFz9CanhbhwtiCnEtcNWzX3RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 21, 2013 at 12:22:48PM +0200, Sascha Hauer wrote:
-> On Sat, Jul 20, 2013 at 07:59:10PM -0700, Greg KH wrote:
-> > On Sat, Jul 20, 2013 at 10:32:26PM -0400, Alan Stern wrote:
-> > > On Sat, 20 Jul 2013, Greg KH wrote:
-> > > 
-> > > > > >>That should be passed using platform data.
-> > > > > >
-> > > > > >Ick, don't pass strings around, pass pointers.  If you have platform
-> > > > > >data you can get to, then put the pointer there, don't use a "name".
-> > > > > 
-> > > > > I don't think I understood you here :-s We wont have phy pointer
-> > > > > when we create the device for the controller no?(it'll be done in
-> > > > > board file). Probably I'm missing something.
-> > > > 
-> > > > Why will you not have that pointer?  You can't rely on the "name" as the
-> > > > device id will not match up, so you should be able to rely on the
-> > > > pointer being in the structure that the board sets up, right?
-> > > > 
-> > > > Don't use names, especially as ids can, and will, change, that is going
-> > > > to cause big problems.  Use pointers, this is C, we are supposed to be
-> > > > doing that :)
-> > > 
-> > > Kishon, I think what Greg means is this:  The name you are using must
-> > > be stored somewhere in a data structure constructed by the board file,
-> > > right?  Or at least, associated with some data structure somehow.  
-> > > Otherwise the platform code wouldn't know which PHY hardware
-> > > corresponded to a particular name.
-> > > 
-> > > Greg's suggestion is that you store the address of that data structure 
-> > > in the platform data instead of storing the name string.  Have the 
-> > > consumer pass the data structure's address when it calls phy_create, 
-> > > instead of passing the name.  Then you don't have to worry about two 
-> > > PHYs accidentally ending up with the same name or any other similar 
-> > > problems.
-> > 
-> > Close, but the issue is that whatever returns from phy_create() should
-> > then be used, no need to call any "find" functions, as you can just use
-> > the pointer that phy_create() returns.  Much like all other class api
-> > functions in the kernel work.
-> 
-> I think the problem here is to connect two from the bus structure
-> completely independent devices. Several frameworks (ASoC, soc-camera)
-> had this problem and this wasn't solved until the advent of devicetrees
-> and their phandles.
-> phy_create might be called from the probe function of some i2c device
-> (the phy device) and the resulting pointer is then needed in some other
-> platform devices (the user of the phy) probe function.
-> The best solution we have right now is implemented in the clk framework
-> which uses a string matching of the device names in clk_get() (at least
-> in the non-dt case).
+On Thu, Jul 11, 2013 at 5:17 PM, Daniel Mack <zonque@gmail.com> wrote:
 
-I would argue that clocks are wrong here as well, as others have already
-pointed out.
+> Commit f87311743 ("ARM: mmp: add more compatible names in gpio driver")
+> changed the driver logic to determine the number of available GPIOs from
+> the compatible string, and hence obsoleted the (undocumented) child
+> nodes that were previously necessary. However, it left some remainder
+> which can be safely removed now.
+>
+> Also, this patch makes pxa_gpio_probe_dt() return the correct value in
+> case irq_alloc_descs() fails.
+>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
 
-What's wrong with the platform_data structure, why can't that be used
-for this?
+Tentatively applied, Haojian, does this look allright?
 
-Or, if not, we can always add pointers to the platform device structure,
-or even the main 'struct device' as well, that's what it is there for.
-
-thanks,
-
-greg k-h
+Yours,
+Linus Walleij
