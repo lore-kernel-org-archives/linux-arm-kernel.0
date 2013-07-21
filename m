@@ -1,55 +1,51 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Sun, 21 Jul 2013 10:34:09 +0800
-Subject: [PATCH] ASoC: tegra: correct playback_dma_data setup
-Message-ID: <1374374049-30732-1-git-send-email-rizhao@nvidia.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 20 Jul 2013 19:59:10 -0700
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
+References: <20130720220006.GA7977@kroah.com>
+ <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
+Message-ID: <20130721025910.GA23043@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The errors were caused by copy/paste mistake in below commit
-since v3.10:
-3489d50 ASoC: tegra: Use common DAI DMA data struct
+On Sat, Jul 20, 2013 at 10:32:26PM -0400, Alan Stern wrote:
+> On Sat, 20 Jul 2013, Greg KH wrote:
+> 
+> > > >>That should be passed using platform data.
+> > > >
+> > > >Ick, don't pass strings around, pass pointers.  If you have platform
+> > > >data you can get to, then put the pointer there, don't use a "name".
+> > > 
+> > > I don't think I understood you here :-s We wont have phy pointer
+> > > when we create the device for the controller no?(it'll be done in
+> > > board file). Probably I'm missing something.
+> > 
+> > Why will you not have that pointer?  You can't rely on the "name" as the
+> > device id will not match up, so you should be able to rely on the
+> > pointer being in the structure that the board sets up, right?
+> > 
+> > Don't use names, especially as ids can, and will, change, that is going
+> > to cause big problems.  Use pointers, this is C, we are supposed to be
+> > doing that :)
+> 
+> Kishon, I think what Greg means is this:  The name you are using must
+> be stored somewhere in a data structure constructed by the board file,
+> right?  Or at least, associated with some data structure somehow.  
+> Otherwise the platform code wouldn't know which PHY hardware
+> corresponded to a particular name.
+> 
+> Greg's suggestion is that you store the address of that data structure 
+> in the platform data instead of storing the name string.  Have the 
+> consumer pass the data structure's address when it calls phy_create, 
+> instead of passing the name.  Then you don't have to worry about two 
+> PHYs accidentally ending up with the same name or any other similar 
+> problems.
 
-It also corrects slave_id initialization in tegra20_ac97 driver.
+Close, but the issue is that whatever returns from phy_create() should
+then be used, no need to call any "find" functions, as you can just use
+the pointer that phy_create() returns.  Much like all other class api
+functions in the kernel work.
 
-Signed-off-by: Richard Zhao <rizhao@nvidia.com>
-Cc: Lars-Peter Clausen <lars@metafoo.de>
-Cc: <stable@vger.kernel.org> # 3.10
----
- sound/soc/tegra/tegra20_ac97.c  | 6 +++---
- sound/soc/tegra/tegra20_spdif.c | 4 ++--
- 2 files changed, 5 insertions(+), 5 deletions(-)
+thanks,
 
-diff --git a/sound/soc/tegra/tegra20_ac97.c b/sound/soc/tegra/tegra20_ac97.c
-index e58233f..6c48662 100644
---- a/sound/soc/tegra/tegra20_ac97.c
-+++ b/sound/soc/tegra/tegra20_ac97.c
-@@ -389,9 +389,9 @@ static int tegra20_ac97_platform_probe(struct platform_device *pdev)
- 	ac97->capture_dma_data.slave_id = of_dma[1];
- 
- 	ac97->playback_dma_data.addr = mem->start + TEGRA20_AC97_FIFO_TX1;
--	ac97->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--	ac97->capture_dma_data.maxburst = 4;
--	ac97->capture_dma_data.slave_id = of_dma[0];
-+	ac97->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	ac97->playback_dma_data.maxburst = 4;
-+	ac97->playback_dma_data.slave_id = of_dma[1];
- 
- 	ret = tegra_asoc_utils_init(&ac97->util_data, &pdev->dev);
- 	if (ret)
-diff --git a/sound/soc/tegra/tegra20_spdif.c b/sound/soc/tegra/tegra20_spdif.c
-index 5eaa12c..551b3c9 100644
---- a/sound/soc/tegra/tegra20_spdif.c
-+++ b/sound/soc/tegra/tegra20_spdif.c
-@@ -323,8 +323,8 @@ static int tegra20_spdif_platform_probe(struct platform_device *pdev)
- 	}
- 
- 	spdif->playback_dma_data.addr = mem->start + TEGRA20_SPDIF_DATA_OUT;
--	spdif->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--	spdif->capture_dma_data.maxburst = 4;
-+	spdif->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	spdif->playback_dma_data.maxburst = 4;
- 	spdif->playback_dma_data.slave_id = dmareq->start;
- 
- 	pm_runtime_enable(&pdev->dev);
--- 
-1.8.1.5
+greg k-h
