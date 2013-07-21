@@ -1,61 +1,83 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Sun, 21 Jul 2013 17:40:23 +0100
-Subject: [PATCH 1/2] arm: ixp4xx: set cohorent_dma_mask for ethernet
- platform devices
-In-Reply-To: <m3ip04ezty.fsf@intrepid.localdomain>
-References: <1374315339-31469-1-git-send-email-jogo@openwrt.org>
- <1374315339-31469-2-git-send-email-jogo@openwrt.org>
- <m3ip04ezty.fsf@intrepid.localdomain>
-Message-ID: <1374424823.2804.25.camel@deadeye.wl.decadent.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 21 Jul 2013 18:49:40 +0200
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <51E83A4F.5080904@ti.com>
+References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
+ <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
+ <51E83A4F.5080904@ti.com>
+Message-ID: <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2013-07-21 at 16:45 +0200, Krzysztof Halasa wrote:
-> Jonas Gorski <jogo@openwrt.org> writes:
-> 
-> > ARM requires the cohorent_dma_mask set, so set it for the platform
-> > devices so that the ethernet driver has access to it.
-> 
-> I recognize the need to fix this issue and I appreciate your efforts,
-> but... I think this patch tries to make the driver functional again at
-> all costs and this a very bad idea. The IXP4xx Ethernet MACs are not
-> normal platform devices, they are in fact built-in CPU resources.
+On Thu, Jul 18, 2013 at 8:56 PM, Nishanth Menon <nm@ti.com> wrote:
 
-Sounds like a normal platform device to me...
+> I carry forward my TI internal objection to this approach:
 
-> The
-> platform device structs are only used to set parameters. What the patch
-> does is unneeded and IMHO harmful code duplication. It makes completely
-> no sense to set DMA masks in code for individual platforms as it's not
-> something platforms can decide, or *even should know of*. It's simply
-> a CPU attribute, a value that is shared by all IXP4xx CPUs and thus all
-> platforms and systems using it.
-> 
-> This is against the "line of code" count rules (or "rules").
-> 
-> Also the dev->dev.parent is IMHO a bad idea. The queue numbers and MAC
-> addresses are in no way "parents" of Ethernet controllers,
+It is actually a very good sign of FOSS-maturity that you as a company
+take unresolved architectural issues to the community. Kudos!
 
-Well, those are the platform data.
+> Lets see what happens as a result of this:
+>
+> https://patchwork.kernel.org/patch/2825148/ (introducing DTS for DRA7)
+> uart1 to uart6 is defined. while in fact 10 uarts exist on IP block.
+> uart1: serial at 4806a000 {
+> <snip>
+> +                       interrupts = <0 72 0x4>;
+> Assumes that GIC interrupt by default mapping used.
 
-> and even if
-> they somehow were, I find it rather hard to believe they can have DMA
-> masks.
+So introducing this inbetween the GIC lines and its actual device IRQ
+lines inevitably means that the GIC three-cell concept is completely
+ill-devised to handle this.
 
-I think the problem is that the platform device and the platform data
-have not been properly separated.  The machine-specific setup functions
-should be passing the eth_plat_info and MAC ID into a common ixp4xx
-function which would then create the platform device with the correct
-DMA mask etc.
+For routing IRQs, I think the proper solution would be to use a
+cascaded struct irqchip, which in turn contains an irqdomain
+translation to remux the signal onto the GIC inputs.
 
-Ben.
+I.e. the interrupt-controller given to that serial would be the
+crossbar irqchip, and that in turn will hog and allocate apropriate
+lines from the gic to it would probably itself list *all* the IRQs
+of the GIC as "its" IRQs.
 
-> I think the previous patch (which sets the masks in one place, in
-> Ethernet driver code) was better, though not perfect.
-> 
-> My fault is I haven't fixed it yet. Will try to invent something.
+We already have plenty of cascading irqchips such as GPIO
+controller providing IRQs, just that they only multiplex on a
+single GIC line instead of the whole lot.
 
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+Mock example:
+
+                intc: interrupt-controller at 0 {
+                        compatible = "arm,cortex-a9-gic";
+                        #interrupt-cells = <3>;
+                        #address-cells = <1>;
+                        interrupt-controller;
+                        reg = ...;
+                };
+
+                crossbar: crossbar at 0 {
+                        compatible = "...";
+                        interrupt-controller;
+                        #interrupt-cells = <1>;
+                        interrupt-parent = <&intc>;
+                        interrupts = <0 0 IRQ_TYPE_LEVEL_HIGH>,
+                                          <0 1 IRQ_TYPE_LEVEL_HIGH>,
+                                          <0 2 IRQ_TYPE_LEVEL_HIGH>,
+                                          ....
+                                          <0 n IRQ_TYPE_LEVEL_HIGH>;
+                };
+
+                uart0: serial at 0 {
+                        compatible = "...";
+                        interrupt-parent = <&crossbar>;
+                        interrupts = <1234>;
+                 };
+
+Maybe the interrupts provided from crossbar cannot even be
+specified by a number, maybe a line name need to be used
+or so. I don't know the particulars.
+
+Whether this as a whole is a good idea, I don't know,
+but you would have to go about it something like this.
+
+What happens if there is no line to mux in a certain IRQ?
+
+Yours,
+Linus Walleij
