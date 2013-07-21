@@ -1,135 +1,55 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Jul 2013 00:24:27 +0200
-Subject: [PATCH v4 07/20] ARM: SAMSUNG: Add new PWM platform device
-In-Reply-To: <3579759.6nJBcZTDZ4@flatron>
+Date: Mon, 22 Jul 2013 00:25:21 +0200
+Subject: [PATCH v4 00/20] Samsung PWM support cleanup
+In-Reply-To: <51EC5F18.8040007@gmail.com>
 References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <51EC3A81.7050001@gmail.com> <3579759.6nJBcZTDZ4@flatron>
-Message-ID: <3807808.Lo7Q7WGM8g@flatron>
+ <51EC5F18.8040007@gmail.com>
+Message-ID: <9102768.ef8LAvpunv@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 21 of July 2013 23:51:24 Tomasz Figa wrote:
-> Hi Sylwester,
-> 
-> On Sunday 21 of July 2013 21:46:09 Sylwester Nawrocki wrote:
-> > Hi Tomasz,
+On Monday 22 of July 2013 00:22:16 Sylwester Nawrocki wrote:
+> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
+> > Since we now have a proper Samsung PWM clocksource driver in place,
+> > we can proceed with further cleanup of PWM timers support on Samsung
+> > SoCs.> 
+> > This series attempts to achieve this goal by:
+> >   1) fixing up few things in samsung_pwm_timer clocksource driver,
+> >   2) moving remaining Samsung platforms to the new clocksource driver,
+> >   3) removing old clocksource driver,
+> >   4) adding new multiplatform- and DT-aware PWM driver,
+> >   5) moving all Samsung platforms to use the new PWM driver,
+> >   6) removing old PWM driver,
+> >   7) removing all PWM-related code that is not used anymore.
 > > 
-> > On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> > > This patch adds new samsung_device_pwm platform device that
-> > > represents
-> > > the whole PWM/timer block and includes memory and IRQ resources.
-> > > 
-> > > Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
-> > > ---
-> > > 
-> > >   arch/arm/plat-samsung/devs.c                  | 17
-> > >   +++++++++++++++++
-> > >   arch/arm/plat-samsung/include/plat/devs.h     |  1 +
-> > >   arch/arm/plat-samsung/include/plat/pwm-core.h | 24
-> > >   ++++++++++++++++++++++++ 3 files changed, 42 insertions(+)
-> > >   create mode 100644 arch/arm/plat-samsung/include/plat/pwm-core.h
-> > > 
-> > > diff --git a/arch/arm/plat-samsung/devs.c
-> > > b/arch/arm/plat-samsung/devs.c index 0f9c3f4..bba6d78 100644
-> > > --- a/arch/arm/plat-samsung/devs.c
-> > > +++ b/arch/arm/plat-samsung/devs.c
-> > > @@ -58,6 +58,7 @@
-> > > 
-> > >   #include<plat/keypad.h>
-> > >   #include<linux/platform_data/mmc-s3cmci.h>
-> > >   #include<linux/platform_data/mtd-nand-s3c2410.h>
-> > > 
-> > > +#include<plat/pwm-core.h>
-> > > 
-> > >   #include<plat/sdhci.h>
-> > >   #include<linux/platform_data/touchscreen-s3c2410.h>
-> > >   #include<linux/platform_data/usb-s3c2410_udc.h>
-> > > 
-> > > @@ -1127,6 +1128,22 @@ struct platform_device s3c_device_timer[] = {
-> > > 
-> > >   	[3] = { DEFINE_S3C_TIMER(3, IRQ_TIMER3) },
-> > >   	[4] = { DEFINE_S3C_TIMER(4, IRQ_TIMER4) },
-> > >   
-> > >   };
-> > > 
-> > > +
-> > > +static struct resource samsung_pwm_resource[] = {
-> > > +	DEFINE_RES_MEM(SAMSUNG_PA_TIMER, SZ_4K),
-> > > +};
-> > > +
-> > > +struct platform_device samsung_device_pwm = {
-> > > +	.name		= "samsung-pwm",
-> > > +	.id		= -1,
-> > > +	.num_resources	= ARRAY_SIZE(samsung_pwm_resource),
-> > > +	.resource	= samsung_pwm_resource,
-> > > +};
-> > > +
-> > > +void __init samsung_pwm_set_platdata(struct samsung_pwm_variant
-> > > *pd)
-> > > +{
-> > > +	samsung_device_pwm.dev.platform_data = pd;
-> > > +}
-> > > 
-> > >   #endif /* CONFIG_SAMSUNG_DEV_PWM */
-> > >   
-> > >   /* RTC */
-> > > 
-> > > diff --git a/arch/arm/plat-samsung/include/plat/devs.h
-> > > b/arch/arm/plat-samsung/include/plat/devs.h index 87d501f..0dc4ac4
-> > > 100644
-> > > --- a/arch/arm/plat-samsung/include/plat/devs.h
-> > > +++ b/arch/arm/plat-samsung/include/plat/devs.h
-> > > @@ -134,6 +134,7 @@ extern struct platform_device
-> > > exynos4_device_spdif;
-> > > 
-> > >   extern struct platform_device samsung_asoc_idma;
-> > >   extern struct platform_device samsung_device_keypad;
-> > > 
-> > > +extern struct platform_device samsung_device_pwm;
-> > > 
-> > >   /* s3c2440 specific devices */
-> > > 
-> > > diff --git a/arch/arm/plat-samsung/include/plat/pwm-core.h
-> > > b/arch/arm/plat-samsung/include/plat/pwm-core.h new file mode 100644
-> > > index 0000000..df50f5c
-> > > --- /dev/null
-> > > +++ b/arch/arm/plat-samsung/include/plat/pwm-core.h
-> > > @@ -0,0 +1,24 @@
-> > > +/*
-> > > + * linux/arch/arm/plat-samsung/onenand-core.h
+> > Cleaning up the PWM driver is a bit tricky, because the design of
+> > current driver makes it completely unsuitable for DT and
+> > multiplatform and would require a heavy rework to make it usable,
+> > breaking any existing Samsung PWM users by the way. To avoid any
+> > breakage this series first renames the old driver, then adds new one
+> > using original name, migrates all platforms to use it and then
+> > finally removes the old driver.
 > > 
-> > Are such full file path names really useful, especially we are never
-> > sure they are up to date ? I guess this line could be removed.
-> 
-> No, they are not. This is a copy-pasto I missed (notice
-> onenand-core...).
-> > > + *  Copyright (c) 2013 Tomasz Figa<tomasz.figa@gmail.com>
-> > > + *
-> > > + * Samsung PWM Controller core functions
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or
-> > > modify + * it under the terms of the GNU General Public License
-> > > version 2 as + * published by the Free Software Foundation.
-> > > +*/
-> > > +
-> > > +#ifndef __ASM_ARCH_PWM_CORE_H
-> > > +#define __ASM_ARCH_PWM_CORE_H __FILE__
-> > > +
-> > > +#include<clocksource/samsung_pwm.h>
-> > > +
-> > > +#ifdef CONFIG_SAMSUNG_DEV_PWM
-> > > +extern void samsung_pwm_set_platdata(struct samsung_pwm_variant
-> > > *pd);
+> > See particular patches for more detailed descriptions.
 > > 
-> > nit: 'extern' is implicit for function declarations, it could be
-> > omitted here.
+> > [On S3C6410-based Tiny6410 (Mini6410-compatible) with pwm-beeper,
+> > SMDK6410 with PWM backlight and Exynos4210-based Origen board (with
+> > PWM0 attached to a scope)]
+> > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+> > 
+> > [On S3C2440-based Mini2440 board]
+> > Tested-by: Sylwester Nawrocki<sylvester.nawrocki@gmail.com>
 > 
-> The extern kernel is used widely over the kernel (including headers in
-> plat-samsung) and I prefer adding it for clarity.
+> I have retested this series on top of v3.11-rc1 with pwm-backlight (and
+> buzzer
+> as the output :)) on Mini2440. It seems to work well - generated
+> frequencies are correct. I'll check pulse widths with a scope tomorrow,
+> as it's a bit late
+> now. FWIW you can add to this series my:
+> 
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-s/extern kernel/extern keyword/
-
-I guess it's time to sleep.
+Thanks. I hope we can finally get this series merged soon.
 
 Best regards,
 Tomasz
