@@ -1,45 +1,52 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Sun, 21 Jul 2013 21:59:22 +0100
-Subject: [PATCH v2] xen/arm: enable PV control for ARM
-In-Reply-To: <alpine.DEB.2.02.1307211535210.4893@kaball.uk.xensource.com>
-References: <1374239399-2498-1-git-send-email-julien.grall@linaro.org>
- <alpine.DEB.2.02.1307211535210.4893@kaball.uk.xensource.com>
-Message-ID: <CAPnVf8yG4VecBkk8py_cyOiFkFMqiLYydicKcM2PgYYm+gKd8w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 21 Jul 2013 22:37:53 +0100
+Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
+In-Reply-To: <20130720044655.GC9433@mozilla.com>
+References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+ <20130715135420.GG10000@mudshark.cambridge.arm.com>
+ <20130720044655.GC9433@mozilla.com>
+Message-ID: <20130721213753.GA29879@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2013 15:54, Stefano Stabellini
-<stefano.stabellini@eu.citrix.com> wrote:
-> On Fri, 19 Jul 2013, Julien Grall wrote:
->> Enable power management from the toolstack for ARM guest.
->>
->> Signed-off-by: Julien Grall <julien.grall@linaro.org>
->>
->> ---
->>     Changes in v2:
->>         - Don't compile xen/cpu_hotplug.o with ARM64
->> ---
->>  drivers/xen/Makefile |    5 ++---
->>  1 file changed, 2 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
->> index 2bf461a..b550a94 100644
->> --- a/drivers/xen/Makefile
->> +++ b/drivers/xen/Makefile
->> @@ -1,9 +1,8 @@
->> -ifneq ($(CONFIG_ARM),y)
->> -obj-y        += manage.o
->> +ifneq ($(filter y, ($CONFIG_ARM) $(CONFIG_ARM64)),y
->
-> This is wrong: ifneq is checking for the opposite condition of what we want, and
-> beside you have the $ in the wrong place for CONFIG_ARM.
->
-> Please test you patches before sending them.
+Hello Jed,
 
-My apologies, I tried without any issue on ARM (certainly, because of
-the $ in wrong place).
+Thanks for the reply.
 
-I will send a new patch.
+On Sat, Jul 20, 2013 at 05:46:55AM +0100, Jed Davis wrote:
+> On Mon, Jul 15, 2013 at 02:54:20PM +0100, Will Deacon wrote:
+> > On Sat, Jul 13, 2013 at 04:18:20AM +0100, Jed Davis wrote:
+> [...]
+> > > Effects of this are probably limited to failure of EHABI unwinding when
+> > > starting from a function that uses r7 to restore its stack pointer, but
+> > > the possibility for further breakage (which would be invisible on
+> > > non-Thumb kernels) is worrying.
+> [...]
+> > I'm struggling to understand exactly the problem that this patch is trying
+> > to address. If it's just a code consistency issue, I don't think it's worth
+> > it (I actually find it less confusing the way we currently have things) but
+> > if there is a real bug, perhaps you could provide a testcase?
+> 
+> There is a real bug here, but my commit message wasn't very clear.  This
+> was breaking PERF_COUNT_SW_CONTEXT_SWITCHES with CONFIG_THUMB2_KERNEL=y
+> (with my other recently posted patch applied), because kernel/sched.c is
+> built with -fno-omit-frame-pointer (which is wrong, but that's a problem
+> for another patch) and so __schedule's EHABI entry uses 0x97 (mov sp, r7),
+> and somewhere along the line the unwinder gets the r11 value instead.
+> This would also apply to any function with a variable-length array, but
+> __schedule happens to have the perf hook I was trying to use.
 
---
-Julien Grall
+Ok, I think I'm with you now. I also think that a better solution would be
+to try and limit the r7/fp confusion to one place, perhaps behind something
+like:
+
+void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame);
+
+then that function can act as the bridge between pt_regs (where we leave
+everything as it is) and stackframe (where we assign either r7 or fp into
+the fp member). Then we just fix up the call sites to pass the regs they're
+interested in to our new function.
+
+What do you think?
+
+Will
