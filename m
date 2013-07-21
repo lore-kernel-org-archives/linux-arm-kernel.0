@@ -1,83 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 21 Jul 2013 18:49:40 +0200
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <51E83A4F.5080904@ti.com>
-References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
- <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
- <51E83A4F.5080904@ti.com>
-Message-ID: <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sun, 21 Jul 2013 19:14:54 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <20130721154808.GH16598@kroah.com>
+References: <20130720220006.GA7977@kroah.com>
+ <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
+ <20130721025910.GA23043@kroah.com> <20130721102248.GE29785@pengutronix.de>
+ <20130721154808.GH16598@kroah.com>
+Message-ID: <51EC170E.3080201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 8:56 PM, Nishanth Menon <nm@ti.com> wrote:
-
-> I carry forward my TI internal objection to this approach:
-
-It is actually a very good sign of FOSS-maturity that you as a company
-take unresolved architectural issues to the community. Kudos!
-
-> Lets see what happens as a result of this:
+On 07/21/2013 05:48 PM, Greg KH wrote:
+> On Sun, Jul 21, 2013 at 12:22:48PM +0200, Sascha Hauer wrote:
+>> On Sat, Jul 20, 2013 at 07:59:10PM -0700, Greg KH wrote:
+>>> On Sat, Jul 20, 2013 at 10:32:26PM -0400, Alan Stern wrote:
+>>>> On Sat, 20 Jul 2013, Greg KH wrote:
+>>>>
+>>>>>>>> That should be passed using platform data.
+>>>>>>>
+>>>>>>> Ick, don't pass strings around, pass pointers.  If you have platform
+>>>>>>> data you can get to, then put the pointer there, don't use a "name".
+>>>>>>
+>>>>>> I don't think I understood you here :-s We wont have phy pointer
+>>>>>> when we create the device for the controller no?(it'll be done in
+>>>>>> board file). Probably I'm missing something.
+>>>>>
+>>>>> Why will you not have that pointer?  You can't rely on the "name" as the
+>>>>> device id will not match up, so you should be able to rely on the
+>>>>> pointer being in the structure that the board sets up, right?
+>>>>>
+>>>>> Don't use names, especially as ids can, and will, change, that is going
+>>>>> to cause big problems.  Use pointers, this is C, we are supposed to be
+>>>>> doing that :)
+>>>>
+>>>> Kishon, I think what Greg means is this:  The name you are using must
+>>>> be stored somewhere in a data structure constructed by the board file,
+>>>> right?  Or at least, associated with some data structure somehow.
+>>>> Otherwise the platform code wouldn't know which PHY hardware
+>>>> corresponded to a particular name.
+>>>>
+>>>> Greg's suggestion is that you store the address of that data structure
+>>>> in the platform data instead of storing the name string.  Have the
+>>>> consumer pass the data structure's address when it calls phy_create,
+>>>> instead of passing the name.  Then you don't have to worry about two
+>>>> PHYs accidentally ending up with the same name or any other similar
+>>>> problems.
+>>>
+>>> Close, but the issue is that whatever returns from phy_create() should
+>>> then be used, no need to call any "find" functions, as you can just use
+>>> the pointer that phy_create() returns.  Much like all other class api
+>>> functions in the kernel work.
+>>
+>> I think the problem here is to connect two from the bus structure
+>> completely independent devices. Several frameworks (ASoC, soc-camera)
+>> had this problem and this wasn't solved until the advent of devicetrees
+>> and their phandles.
+>> phy_create might be called from the probe function of some i2c device
+>> (the phy device) and the resulting pointer is then needed in some other
+>> platform devices (the user of the phy) probe function.
+>> The best solution we have right now is implemented in the clk framework
+>> which uses a string matching of the device names in clk_get() (at least
+>> in the non-dt case).
 >
-> https://patchwork.kernel.org/patch/2825148/ (introducing DTS for DRA7)
-> uart1 to uart6 is defined. while in fact 10 uarts exist on IP block.
-> uart1: serial at 4806a000 {
-> <snip>
-> +                       interrupts = <0 72 0x4>;
-> Assumes that GIC interrupt by default mapping used.
+> I would argue that clocks are wrong here as well, as others have already
+> pointed out.
+>
+> What's wrong with the platform_data structure, why can't that be used
+> for this?
 
-So introducing this inbetween the GIC lines and its actual device IRQ
-lines inevitably means that the GIC three-cell concept is completely
-ill-devised to handle this.
+At the point the platform data of some driver is initialized, e.g. in
+board setup code the PHY pointer is not known, since the PHY supplier
+driver has not initialized yet.  Even though we wanted to pass pointer
+to a PHY through some notifier call, it would have been not clear
+which PHY user driver should match on such notifier.  A single PHY
+supplier driver can create M PHY objects and this needs to be mapped
+to N PHY user drivers.  This mapping needs to be defined somewhere by
+the system integrator.  It works well with device tree, but except that
+there seems to be no other reliable infrastructure in the kernel to
+define links/dependencies between devices, since device identifiers are
+not known in advance in all cases.
 
-For routing IRQs, I think the proper solution would be to use a
-cascaded struct irqchip, which in turn contains an irqdomain
-translation to remux the signal onto the GIC inputs.
+What Tomasz proposed seems currently most reasonable to me for non-dt.
 
-I.e. the interrupt-controller given to that serial would be the
-crossbar irqchip, and that in turn will hog and allocate apropriate
-lines from the gic to it would probably itself list *all* the IRQs
-of the GIC as "its" IRQs.
+> Or, if not, we can always add pointers to the platform device structure,
+> or even the main 'struct device' as well, that's what it is there for.
 
-We already have plenty of cascading irqchips such as GPIO
-controller providing IRQs, just that they only multiplex on a
-single GIC line instead of the whole lot.
+Still we would need to solve a problem which platform device structure
+gets which PHY pointer.
 
-Mock example:
-
-                intc: interrupt-controller at 0 {
-                        compatible = "arm,cortex-a9-gic";
-                        #interrupt-cells = <3>;
-                        #address-cells = <1>;
-                        interrupt-controller;
-                        reg = ...;
-                };
-
-                crossbar: crossbar at 0 {
-                        compatible = "...";
-                        interrupt-controller;
-                        #interrupt-cells = <1>;
-                        interrupt-parent = <&intc>;
-                        interrupts = <0 0 IRQ_TYPE_LEVEL_HIGH>,
-                                          <0 1 IRQ_TYPE_LEVEL_HIGH>,
-                                          <0 2 IRQ_TYPE_LEVEL_HIGH>,
-                                          ....
-                                          <0 n IRQ_TYPE_LEVEL_HIGH>;
-                };
-
-                uart0: serial at 0 {
-                        compatible = "...";
-                        interrupt-parent = <&crossbar>;
-                        interrupts = <1234>;
-                 };
-
-Maybe the interrupts provided from crossbar cannot even be
-specified by a number, maybe a line name need to be used
-or so. I don't know the particulars.
-
-Whether this as a whole is a good idea, I don't know,
-but you would have to go about it something like this.
-
-What happens if there is no line to mux in a certain IRQ?
-
-Yours,
-Linus Walleij
+--
+Regards,
+Sylwester
