@@ -1,75 +1,48 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sun, 21 Jul 2013 21:50:47 +0200
-Subject: [PATCH v4 13/20] pwm: Add new pwm-samsung driver
-In-Reply-To: <1374278673-25615-15-git-send-email-tomasz.figa@gmail.com>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1374278673-25615-15-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <51EC3B97.3040107@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 21 Jul 2013 14:53:37 -0500
+Subject: [PATCH] ARM: highbank: Only touch common coherency control register
+ fields
+Message-ID: <1374436417-29761-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> This patch introduces new Samsung PWM driver, which uses Samsung
-> PWM/timer master driver to control shared parts of the hardware.
->
-> Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
-> ---
->   drivers/pwm/Makefile      |   1 +
->   drivers/pwm/pwm-samsung.c | 606 ++++++++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 607 insertions(+)
->   create mode 100644 drivers/pwm/pwm-samsung.c
-[...]
-> +static const struct samsung_pwm_variant s3c64xx_variant = {
-> +	.bits		= 32,
-> +	.div_base	= 0,
+From: Rob Herring <rob.herring@calxeda.com>
 
-Initialization to 0 could be omitted, since it is implicit.
+Midway adds new register fields to the coherency control registers, so
+writing absolute values will break on Midway. Change the register
+accesses to only modify the necessary and common fields in order to
+support both Midway and Highbank.
 
-> +	.has_tint_cstat	= true,
-> +	.tclk_mask	= BIT(7) | BIT(6) | BIT(5),
-> +};
-> +
-> +static const struct samsung_pwm_variant s5p64x0_variant = {
-> +	.bits		= 32,
-> +	.div_base	= 0,
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/mach-highbank/highbank.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Ditto.
-
-> +	.has_tint_cstat	= true,
-> +};
-> +
-> +static const struct samsung_pwm_variant s5p_variant = {
-> +	.bits		= 32,
-> +	.div_base	= 0,
-
-Ditto.
-
-> +	.has_tint_cstat	= true,
-> +	.tclk_mask	= BIT(5),
-> +};
-> +
-[...]
-> +static int pwm_samsung_remove(struct platform_device *pdev)
-> +{
-> +	struct samsung_pwm_chip *chip = platform_get_drvdata(pdev);
-> +	int ret;
-> +
-> +	ret = pwmchip_remove(&chip->chip);
-> +	if (ret<  0)
-> +		return ret;
-
-Since return value of the remove() callback is happily ignored by
-the driver core I think there is no point in returning an error
-here like this. Wouldn't it be more sensible to just call all the
-cleanup functions unconditionally ? At least potentially wrong state
-of the clock could be avoided.
-
-> +
-> +	clk_disable_unprepare(chip->base_clk);
-> +
-> +	return 0;
-> +}
-
---
-Regards,
-Sylwester
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index dc5d6be..8881579 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -115,6 +115,7 @@ static int highbank_platform_notifier(struct notifier_block *nb,
+ {
+ 	struct resource *res;
+ 	int reg = -1;
++	u32 val;
+ 	struct device *dev = __dev;
+ 
+ 	if (event != BUS_NOTIFY_ADD_DEVICE)
+@@ -141,10 +142,10 @@ static int highbank_platform_notifier(struct notifier_block *nb,
+ 		return NOTIFY_DONE;
+ 
+ 	if (of_property_read_bool(dev->of_node, "dma-coherent")) {
+-		writel(0xff31, sregs_base + reg);
++		val = readl(sregs_base + reg);
++		writel(val | 0xff01, sregs_base + reg);
+ 		set_dma_ops(dev, &arm_coherent_dma_ops);
+-	} else
+-		writel(0, sregs_base + reg);
++	}
+ 
+ 	return NOTIFY_OK;
+ }
+-- 
+1.8.1.2
