@@ -1,41 +1,47 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 21 Jul 2013 16:45:45 +0200
-Subject: [PATCH 1/2] arm: ixp4xx: set cohorent_dma_mask for ethernet
- platform devices
-In-Reply-To: <1374315339-31469-2-git-send-email-jogo@openwrt.org> (Jonas
- Gorski's message of "Sat, 20 Jul 2013 12:15:38 +0200")
-References: <1374315339-31469-1-git-send-email-jogo@openwrt.org>
- <1374315339-31469-2-git-send-email-jogo@openwrt.org>
-Message-ID: <m3ip04ezty.fsf@intrepid.localdomain>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sun, 21 Jul 2013 15:54:24 +0100
+Subject: [PATCH v2] xen/arm: enable PV control for ARM
+In-Reply-To: <1374239399-2498-1-git-send-email-julien.grall@linaro.org>
+References: <1374239399-2498-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <alpine.DEB.2.02.1307211535210.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonas Gorski <jogo@openwrt.org> writes:
+On Fri, 19 Jul 2013, Julien Grall wrote:
+> Enable power management from the toolstack for ARM guest.
+> 
+> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> 
+> ---
+>     Changes in v2:
+>         - Don't compile xen/cpu_hotplug.o with ARM64
+> ---
+>  drivers/xen/Makefile |    5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index 2bf461a..b550a94 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -1,9 +1,8 @@
+> -ifneq ($(CONFIG_ARM),y)
+> -obj-y	+= manage.o
+> +ifneq ($(filter y, ($CONFIG_ARM) $(CONFIG_ARM64)),y
 
-> ARM requires the cohorent_dma_mask set, so set it for the platform
-> devices so that the ethernet driver has access to it.
+This is wrong: ifneq is checking for the opposite condition of what we want, and
+beside you have the $ in the wrong place for CONFIG_ARM.
 
-I recognize the need to fix this issue and I appreciate your efforts,
-but... I think this patch tries to make the driver functional again at
-all costs and this a very bad idea. The IXP4xx Ethernet MACs are not
-normal platform devices, they are in fact built-in CPU resources. The
-platform device structs are only used to set parameters. What the patch
-does is unneeded and IMHO harmful code duplication. It makes completely
-no sense to set DMA masks in code for individual platforms as it's not
-something platforms can decide, or *even should know of*. It's simply
-a CPU attribute, a value that is shared by all IXP4xx CPUs and thus all
-platforms and systems using it.
+Please test you patches before sending them.
 
-This is against the "line of code" count rules (or "rules").
 
-Also the dev->dev.parent is IMHO a bad idea. The queue numbers and MAC
-addresses are in no way "parents" of Ethernet controllers, and even if
-they somehow were, I find it rather hard to believe they can have DMA
-masks.
-
-I think the previous patch (which sets the masks in one place, in
-Ethernet driver code) was better, though not perfect.
-
-My fault is I haven't fixed it yet. Will try to invent something.
--- 
-Krzysztof Halasa
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+>  endif
+>  obj-$(CONFIG_X86)			+= fallback.o
+> -obj-y	+= grant-table.o features.o events.o balloon.o time.o
+> +obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
+>  obj-y	+= xenbus/
+>  
+>  nostackp := $(call cc-option, -fno-stack-protector)
+> -- 
+> 1.7.10.4
+> 
