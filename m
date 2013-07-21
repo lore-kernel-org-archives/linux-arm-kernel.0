@@ -1,48 +1,23 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 21 Jul 2013 14:53:37 -0500
-Subject: [PATCH] ARM: highbank: Only touch common coherency control register
- fields
-Message-ID: <1374436417-29761-1-git-send-email-robherring2@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 22 Jul 2013 00:39:29 +0400
+Subject: [PATCH] xen/arm and xen/arm64: update xen_restart after
+ ff701306cd49
+In-Reply-To: <1374420257-19467-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <1374420257-19467-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <51EC4701.8020502@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hello.
 
-Midway adds new register fields to the coherency control registers, so
-writing absolute values will break on Midway. Change the register
-accesses to only modify the necessary and common fields in order to
-support both Midway and Highbank.
+On 21-07-2013 19:24, Stefano Stabellini wrote:
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-highbank/highbank.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+> Commit ff701306cd49 changes the prototype of arm_pm_restart.
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index dc5d6be..8881579 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -115,6 +115,7 @@ static int highbank_platform_notifier(struct notifier_block *nb,
- {
- 	struct resource *res;
- 	int reg = -1;
-+	u32 val;
- 	struct device *dev = __dev;
- 
- 	if (event != BUS_NOTIFY_ADD_DEVICE)
-@@ -141,10 +142,10 @@ static int highbank_platform_notifier(struct notifier_block *nb,
- 		return NOTIFY_DONE;
- 
- 	if (of_property_read_bool(dev->of_node, "dma-coherent")) {
--		writel(0xff31, sregs_base + reg);
-+		val = readl(sregs_base + reg);
-+		writel(val | 0xff01, sregs_base + reg);
- 		set_dma_ops(dev, &arm_coherent_dma_ops);
--	} else
--		writel(0, sregs_base + reg);
-+	}
- 
- 	return NOTIFY_OK;
- }
--- 
-1.8.1.2
+    Please also specify the summary line of that commit in parens.
+
+> Update xen_restart accordingly.
+
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+WBR, Sergei
