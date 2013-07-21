@@ -1,30 +1,32 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Sun, 21 Jul 2013 16:24:17 +0100
-Subject: [PATCH] xen/arm and xen/arm64: update xen_restart after ff701306cd49
-Message-ID: <1374420257-19467-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 21 Jul 2013 17:27:00 +0200
+Subject: [RESEND PATCH v7 00/22] MBus DT binding: The return of PCIe
+In-Reply-To: <20130720194559.GA27517@lunn.ch>
+References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130720165855.GB26625@lunn.ch> <20130720173847.GC26625@lunn.ch>
+ <20130720185443.GB21460@localhost> <20130720194559.GA27517@lunn.ch>
+Message-ID: <20130721172700.6bd14e58@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ff701306cd49 changes the prototype of arm_pm_restart.
-Update xen_restart accordingly.
+Dear Andrew Lunn,
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/enlighten.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Sat, 20 Jul 2013 21:45:59 +0200, Andrew Lunn wrote:
+> > The patchset works only for Armada 370 and Armada XP SoC, not for Kirkwood.
+> > For some reason I was completely sure there wasn't any DT-enabled Kirkwood
+> > boards with PCIe support.
+> 
+> I had a quick look at Dove and Orion5x. It looks like there are none
+> with PCIe support. So only Kirkwood is broken.
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index f71c37e..c9770ba 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -172,7 +172,7 @@ static void __init xen_percpu_init(void *unused)
- 	enable_percpu_irq(xen_events_irq, 0);
- }
- 
--static void xen_restart(char str, const char *cmd)
-+static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
- {
- 	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
- 	int rc;
+There are some Dove and Orion5x with PCIe support, but none of them are
+using the new PCIe driver yet.
+
+Best regards,
+
+Thomas
 -- 
-1.7.2.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
