@@ -1,32 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 21 Jul 2013 17:27:00 +0200
-Subject: [RESEND PATCH v7 00/22] MBus DT binding: The return of PCIe
-In-Reply-To: <20130720194559.GA27517@lunn.ch>
-References: <1373900271-4722-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130720165855.GB26625@lunn.ch> <20130720173847.GC26625@lunn.ch>
- <20130720185443.GB21460@localhost> <20130720194559.GA27517@lunn.ch>
-Message-ID: <20130721172700.6bd14e58@skate>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sun, 21 Jul 2013 16:38:43 +0100
+Subject: [PATCH v2] xen/arm: disable cpuidle and cpufreq when linux is
+ running as dom0
+In-Reply-To: <alpine.DEB.2.02.1307211508520.4893@kaball.uk.xensource.com>
+References: <1374233220-13770-1-git-send-email-julien.grall@linaro.org>
+ <alpine.DEB.2.02.1307211508520.4893@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1307211638260.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
-
-On Sat, 20 Jul 2013 21:45:59 +0200, Andrew Lunn wrote:
-> > The patchset works only for Armada 370 and Armada XP SoC, not for Kirkwood.
-> > For some reason I was completely sure there wasn't any DT-enabled Kirkwood
-> > boards with PCIe support.
+On Sun, 21 Jul 2013, Stefano Stabellini wrote:
+> On Fri, 19 Jul 2013, Julien Grall wrote:
+> > When linux is running as dom0, Xen doesn't show the physical cpu but a
+> > virtual CPU.
+> > On some ARM SOC (for instance the exynos 5250), linux registers callbacks
+> > for cpuidle and cpufreq. When these callbacks are called, they will modify
+> > directly the physical cpu not the virtual one. It can impact the whole board
+> > instead of only dom0.
+> > 
+> > Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> > 
 > 
-> I had a quick look at Dove and Orion5x. It looks like there are none
-> with PCIe support. So only Kirkwood is broken.
+> Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-There are some Dove and Orion5x with PCIe support, but none of them are
-using the new PCIe driver yet.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I added the patch to my queue
