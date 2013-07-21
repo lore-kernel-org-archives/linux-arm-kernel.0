@@ -1,84 +1,60 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 21 Jul 2013 23:58:04 +0200
-Subject: [PATCH v4 13/20] pwm: Add new pwm-samsung driver
-In-Reply-To: <51EC3B97.3040107@gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Mon, 22 Jul 2013 00:22:16 +0200
+Subject: [PATCH v4 00/20] Samsung PWM support cleanup
+In-Reply-To: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
 References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1374278673-25615-15-git-send-email-tomasz.figa@gmail.com>
- <51EC3B97.3040107@gmail.com>
-Message-ID: <4551618.l5Bs8czD9o@flatron>
+Message-ID: <51EC5F18.8040007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 21 of July 2013 21:50:47 Sylwester Nawrocki wrote:
-> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> > This patch introduces new Samsung PWM driver, which uses Samsung
-> > PWM/timer master driver to control shared parts of the hardware.
-> > 
-> > Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
-> > ---
-> > 
-> >   drivers/pwm/Makefile      |   1 +
-> >   drivers/pwm/pwm-samsung.c | 606
-> >   ++++++++++++++++++++++++++++++++++++++++++++++ 2 files changed, 607
-> >   insertions(+)
-> >   create mode 100644 drivers/pwm/pwm-samsung.c
-> 
-> [...]
-> 
-> > +static const struct samsung_pwm_variant s3c64xx_variant = {
-> > +	.bits		= 32,
-> > +	.div_base	= 0,
-> 
-> Initialization to 0 could be omitted, since it is implicit.
+On 07/20/2013 02:04 AM, Tomasz Figa wrote:
+> Since we now have a proper Samsung PWM clocksource driver in place,
+> we can proceed with further cleanup of PWM timers support on Samsung SoCs.
+>
+> This series attempts to achieve this goal by:
+>   1) fixing up few things in samsung_pwm_timer clocksource driver,
+>   2) moving remaining Samsung platforms to the new clocksource driver,
+>   3) removing old clocksource driver,
+>   4) adding new multiplatform- and DT-aware PWM driver,
+>   5) moving all Samsung platforms to use the new PWM driver,
+>   6) removing old PWM driver,
+>   7) removing all PWM-related code that is not used anymore.
+>
+> Cleaning up the PWM driver is a bit tricky, because the design of current
+> driver makes it completely unsuitable for DT and multiplatform and would
+> require a heavy rework to make it usable, breaking any existing Samsung PWM
+> users by the way. To avoid any breakage this series first renames the old
+> driver, then adds new one using original name, migrates all platforms to
+> use it and then finally removes the old driver.
+>
+> See particular patches for more detailed descriptions.
+>
+> [On S3C6410-based Tiny6410 (Mini6410-compatible) with pwm-beeper, SMDK6410
+> with PWM backlight and Exynos4210-based Origen board (with PWM0 attached
+> to a scope)]
+> Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+>
+> [On S3C2440-based Mini2440 board]
+> Tested-by: Sylwester Nawrocki<sylvester.nawrocki@gmail.com>
 
-Well, I'd prefer keeping this as is, for clarity. It improves code 
-readability, because you don't have to look at struct definition to see 
-all the fields.
+I have retested this series on top of v3.11-rc1 with pwm-backlight (and 
+buzzer
+as the output :)) on Mini2440. It seems to work well - generated frequencies
+are correct. I'll check pulse widths with a scope tomorrow, as it's a 
+bit late
+now. FWIW you can add to this series my:
 
-> > +	.has_tint_cstat	= true,
-> > +	.tclk_mask	= BIT(7) | BIT(6) | BIT(5),
-> > +};
-> > +
-> > +static const struct samsung_pwm_variant s5p64x0_variant = {
-> > +	.bits		= 32,
-> > +	.div_base	= 0,
-> 
-> Ditto.
-> 
-> > +	.has_tint_cstat	= true,
-> > +};
-> > +
-> > +static const struct samsung_pwm_variant s5p_variant = {
-> > +	.bits		= 32,
-> > +	.div_base	= 0,
-> 
-> Ditto.
-> 
-> > +	.has_tint_cstat	= true,
-> > +	.tclk_mask	= BIT(5),
-> > +};
-> > +
-> 
-> [...]
-> 
-> > +static int pwm_samsung_remove(struct platform_device *pdev)
-> > +{
-> > +	struct samsung_pwm_chip *chip = platform_get_drvdata(pdev);
-> > +	int ret;
-> > +
-> > +	ret = pwmchip_remove(&chip->chip);
-> > +	if (ret < 0)
-> > +		return ret;
-> 
-> Since return value of the remove() callback is happily ignored by
-> the driver core I think there is no point in returning an error
-> here like this. Wouldn't it be more sensible to just call all the
-> cleanup functions unconditionally ? At least potentially wrong state
-> of the clock could be avoided.
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-IMHO handling the errors correctly here is more future-proof. Driver core 
-might be modified to handle errors in future and this driver will not need 
-to be modified.
+> [On a s3c2416 based machine]
+> Tested-by: Heiko Stuebner<heiko@sntech.de>
+>
+> [Also not sure on what boards, but still]
+> Tested-by: Mark Brown<broonie@linaro.org>
+>
+> Acked-by: Arnd Bergmann<arnd@arndb.de>
+> Acked-by: Thierry Reding<thierry.reding@gmail.com>
+> Acked-by: Heiko Stuebner<heiko@sntech.de>
 
-Best regards,
-Tomasz
+Thanks,
+Sylwester
