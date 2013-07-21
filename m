@@ -1,99 +1,102 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 21 Jul 2013 10:32:31 +0200
-Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
-In-Reply-To: <20130721081138.75cf5437bc30f42284f12e47@mail.ru>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-9-git-send-email-shc_work@mail.ru>
- <51EB0433.3050308@linaro.org>
- <20130721081138.75cf5437bc30f42284f12e47@mail.ru>
-Message-ID: <51EB9C9F.5040405@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 21 Jul 2013 09:36:36 +0000 (UTC)
+Subject: OMAP baseline test results for v3.11-rc1
+Message-ID: <alpine.DEB.2.02.1307210933330.15337@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2013 06:11 AM, Alexander Shiyan wrote:
-> On Sat, 20 Jul 2013 23:42:11 +0200
-> Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> 
->> On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
->>> This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
->>> Designed primarily for migration CLPS711X subarch for multiplatform & DT.
->>>
->>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->>> ---
->>>  drivers/cpuidle/Kconfig            |  6 +++
->>>  drivers/cpuidle/Makefile           |  1 +
->>>  drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 87 insertions(+)
->>>  create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
-> [...]
->>> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
->>> +				 struct cpuidle_driver *drv, int index)
->>> +{
->>> +	writel(1, clps711x_halt);
->>
->> In what the 'clps711x_halt' differs from the usual WFI (cpu_do_idle) ?
-> 
-> AFAIK, ARM720T does not implement the WFI instruction.
-> "HALT" register in CLPS711X do the same:
-> "A write to this location will put the system into the Idle State by
-> halting the clock to the processor until an interrupt is generated."
-
-I am wondering if you are not using more states, may be you can consider
-to add a clps711x idle function for the 'arm_pm_idle' callback instead
-of creating a new driver.
-
->>> +	asm volatile ("mov r0, r0");
->>> +	asm volatile ("mov r0, r0");
->>
->> Why are needed these two volatile ?
-> 
-> Two NOP instructions necessary following the enable or disable of the MMU.
-> Documentation not say anything about using this for "HALT", maybe it's the
-> remnants of the old code. I will remove it.
-
-Ok.
-
-> [...]
->>> +static int clps711x_cpuidle_remove(struct platform_device *pdev)
->>> +{
->>> +	cpuidle_unregister(&clps711x_idle_driver);
->>> +
->>> +	return 0;
->>> +}
->>
->> The driver is not compiled as module, will this function be called ?
-> 
-> You're right. I will remove it.
-> 
->>> +static const struct of_device_id clps711x_cpuidle_dt_ids[] = {
->>> +	{ .compatible = "cirrus,clps711x-cpuidle", },
->>> +	{ }
->>> +};
->>> +MODULE_DEVICE_TABLE(of, clps711x_cpuidle_dt_ids);
->>> +
->>> +static struct platform_driver clps711x_cpuidle_driver = {
->>> +	.driver	= {
->>> +		.name		= "clps711x-cpuidle",
->>> +		.owner		= THIS_MODULE,
->>> +		.of_match_table	= clps711x_cpuidle_dt_ids,
->>> +	},
->>> +	.remove	= clps711x_cpuidle_remove,
->>> +};
->>> +module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
->>
->> +1
-> 
-> ??? What here?
-
-I like the approach :)
-
-Thanks
-  -- Daniel
 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Here are some basic OMAP test results for Linux v3.11-rc1.
+Logs and other details at:
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+    http://www.pwsan.com/omap/testlogs/test_v3.11-rc1/20130721020309/
+
+
+Test summary
+------------
+
+Build: uImage:
+    Pass (14/14): n800_multi_omap2xxx, n800_only_a, omap1_defconfig,
+		  omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
+
+Build: uImage+dtb:
+    Pass ( 3/ 3): am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
+
+Build: zImage:
+    Pass ( 1/ 1): omap2plus_defconfig
+
+Boot to userspace:
+    FAIL ( 5/ 11): 2430sdp, 3530es3beagle, 3730beaglexm, 5912osk, am335xbonelt
+    Pass ( 6/ 11): 3517evm, 37xxevm, 4430es2panda, 4460pandaes, am335xbone, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 4/ 6): 2430sdp, 3530es3beagle, 3730beaglexm, 4430es2panda
+    Pass ( 2/ 6): 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 5/ 6): 2430sdp, 3530es3beagle, 3730beaglexm, 4430es2panda, 4460pandaes
+    Pass ( 1/ 6): 37xxevm
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 3/ 4): 3530es3beagle, 4430es2panda, 4460pandaes
+    Pass ( 1/ 4): 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 3530es3beagle, 4430es2panda, 4460pandaes
+    Pass ( 1/ 4): 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.10 (8bb495e3f02401ee6f76d1b1d77f3ac9f079e376)):
+   text     data      bss    total  kernel
++105416    +2632    +2000  +110048  am33xx_only
+ +42013    +1728     +960   +44701  n800_multi_omap2xxx
+ +41993    +1592     +960   +44545  n800_only_a
+ +45499     +832     +472   +46803  omap1_defconfig
+ +50118    +2584     +472   +53174  omap1_defconfig_1510innovator_only
+ +53938    +2648     +440   +57026  omap1_defconfig_5912osk_only
++159173    -2456    +1680  +158397  omap2plus_defconfig
++156519    +8608    +2752  +167879  omap2plus_defconfig_2430sdp_only
++144258    -4400    +1680  +141538  omap2plus_defconfig_cpupm
++155750    -2800    +1744  +154694  omap2plus_defconfig_no_pm
++155973   -27688    +1936  +130221  omap2plus_defconfig_omap2_4_only
++103989   -55072    +1616   +50533  omap2plus_defconfig_omap3_4_only
+ -30840  -110588     -736  -142164  rmk_omap3430_ldp_allnoconfig
+ +41080   -28816    +3988   +16252  rmk_omap3430_ldp_oldconfig
+ -60468  -176540     +560  -236448  rmk_omap4430_sdp_allnoconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.10 (8bb495e3f02401ee6f76d1b1d77f3ac9f079e376))
+  avail  rsrvd   high  freed  board          kconfig
+   -44k    44k      .    -4k  2420n800       n800_only_a
+ -98412k -32660k      .  -392k  2430sdp        omap2plus_defconfig
+  -152k  -872k      .   -12k  3517evm        omap2plus_defconfig
+  -152k  -872k      .   -12k  3530es3beagle  omap2plus_defconfig
+  -152k  -872k      .   -12k  3730beaglexm   omap2plus_defconfig
+  -216k  -808k      .   -12k  4430es2panda   omap2plus_defconfig
+  -204k  -820k      .   -12k  4460pandaes    omap2plus_defconfig
+   -48k    48k      .      .  5912osk        omap1_defconfig
+  -116k   116k      .     4k  am335xbone     am33xx_only
+  -152k  -872k      .   -12k  am335xbonelt   am33xx_only
+
+
+OMAP4 platforms have been switched to DT boots, since board file-based 
+booting was deprecated for OMAP4 after v3.10.
