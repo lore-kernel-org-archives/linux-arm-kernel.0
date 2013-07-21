@@ -1,59 +1,68 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 21 Jul 2013 14:04:52 +0400
-Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
-In-Reply-To: <51EB9C9F.5040405@linaro.org>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-9-git-send-email-shc_work@mail.ru>
- <51EB0433.3050308@linaro.org>
- <20130721081138.75cf5437bc30f42284f12e47@mail.ru>
- <51EB9C9F.5040405@linaro.org>
-Message-ID: <20130721140452.826cb0b8f8f5ab01867aec90@mail.ru>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 21 Jul 2013 12:22:48 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <20130721025910.GA23043@kroah.com>
+References: <20130720220006.GA7977@kroah.com>
+ <Pine.LNX.4.44L0.1307202223430.8250-100000@netrider.rowland.org>
+ <20130721025910.GA23043@kroah.com>
+Message-ID: <20130721102248.GE29785@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 21 Jul 2013 10:32:31 +0200
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-
-> On 07/21/2013 06:11 AM, Alexander Shiyan wrote:
-> > On Sat, 20 Jul 2013 23:42:11 +0200
-> > Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On Sat, Jul 20, 2013 at 07:59:10PM -0700, Greg KH wrote:
+> On Sat, Jul 20, 2013 at 10:32:26PM -0400, Alan Stern wrote:
+> > On Sat, 20 Jul 2013, Greg KH wrote:
 > > 
-> >> On 07/18/2013 08:34 PM, Alexander Shiyan wrote:
-> >>> This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
-> >>> Designed primarily for migration CLPS711X subarch for multiplatform & DT.
-> >>>
-> >>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> >>> ---
-> >>>  drivers/cpuidle/Kconfig            |  6 +++
-> >>>  drivers/cpuidle/Makefile           |  1 +
-> >>>  drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
-> >>>  3 files changed, 87 insertions(+)
-> >>>  create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
-> > [...]
-> >>> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
-> >>> +				 struct cpuidle_driver *drv, int index)
-> >>> +{
-> >>> +	writel(1, clps711x_halt);
-> >>
-> >> In what the 'clps711x_halt' differs from the usual WFI (cpu_do_idle) ?
+> > > > >>That should be passed using platform data.
+> > > > >
+> > > > >Ick, don't pass strings around, pass pointers.  If you have platform
+> > > > >data you can get to, then put the pointer there, don't use a "name".
+> > > > 
+> > > > I don't think I understood you here :-s We wont have phy pointer
+> > > > when we create the device for the controller no?(it'll be done in
+> > > > board file). Probably I'm missing something.
+> > > 
+> > > Why will you not have that pointer?  You can't rely on the "name" as the
+> > > device id will not match up, so you should be able to rely on the
+> > > pointer being in the structure that the board sets up, right?
+> > > 
+> > > Don't use names, especially as ids can, and will, change, that is going
+> > > to cause big problems.  Use pointers, this is C, we are supposed to be
+> > > doing that :)
 > > 
-> > AFAIK, ARM720T does not implement the WFI instruction.
-> > "HALT" register in CLPS711X do the same:
-> > "A write to this location will put the system into the Idle State by
-> > halting the clock to the processor until an interrupt is generated."
+> > Kishon, I think what Greg means is this:  The name you are using must
+> > be stored somewhere in a data structure constructed by the board file,
+> > right?  Or at least, associated with some data structure somehow.  
+> > Otherwise the platform code wouldn't know which PHY hardware
+> > corresponded to a particular name.
+> > 
+> > Greg's suggestion is that you store the address of that data structure 
+> > in the platform data instead of storing the name string.  Have the 
+> > consumer pass the data structure's address when it calls phy_create, 
+> > instead of passing the name.  Then you don't have to worry about two 
+> > PHYs accidentally ending up with the same name or any other similar 
+> > problems.
 > 
-> I am wondering if you are not using more states, may be you can consider
-> to add a clps711x idle function for the 'arm_pm_idle' callback instead
-> of creating a new driver.
+> Close, but the issue is that whatever returns from phy_create() should
+> then be used, no need to call any "find" functions, as you can just use
+> the pointer that phy_create() returns.  Much like all other class api
+> functions in the kernel work.
 
-Currently, this is exactly what is done :)
-But I really would like to further add a second mode (STDBY),
-which allow to use all PM features.
-At this time add this mode is too hard, because there are some barriers
-for this, which will be resolved when all drivers for this platform will
-contains DT-support.
+I think the problem here is to connect two from the bus structure
+completely independent devices. Several frameworks (ASoC, soc-camera)
+had this problem and this wasn't solved until the advent of devicetrees
+and their phandles.
+phy_create might be called from the probe function of some i2c device
+(the phy device) and the resulting pointer is then needed in some other
+platform devices (the user of the phy) probe function.
+The best solution we have right now is implemented in the clk framework
+which uses a string matching of the device names in clk_get() (at least
+in the non-dt case).
 
-[...]
+Sascha
 
 -- 
-Alexander Shiyan <shc_work@mail.ru>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
