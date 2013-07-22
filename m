@@ -1,44 +1,92 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 22 Jul 2013 12:40:13 +0300
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <20130708142103.GX21614@n2100.arm.linux.org.uk>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
- <20130706133627.GV21614@n2100.arm.linux.org.uk>
- <20130708093410.GT5523@atomide.com>
- <20130708142103.GX21614@n2100.arm.linux.org.uk>
-Message-ID: <51ECFDFD.60102@ti.com>
+From: manjunath.goudar@linaro.org (manjunath)
+Date: Mon, 22 Jul 2013 15:11:50 +0530
+Subject: [PATCH  V4 0/6] USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+ <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <51ECFE5E.20300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/13 17:21, Russell King - ARM Linux wrote:
+On Monday 22 July 2013 02:49 PM, Manjunath Goudar wrote:
+> These patches are for separating the SOC On-Chip ohci host controller
+> from ohci-hcd host code into its own driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> it would be nice to have in 3.12.
+>
+> V2:
+>    In patch 5/6 and 6/6:
+>    -Set non-standard fields in hc_driver manually, rather than
+>     relying on an expanded struct ohci_driver_overrides.
+>    -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+>     relying on ohci_hub_control and hub_status_data being exported.
+>
+>    In patch 1/6 to 4/6
+>    -ohci_setup() has been removed because it is called in .reset member
+>     of the ohci_hc_driver structure.
+>
+> V3:
+>   In patch 5/6 and 6/6:
+>   -ohci_setup() has been removed because it is called in .reset member
+>    of the ohci_hc_driver structure.
+>
+>   In patch 5/6:
+>   -The ohci_restart() function is not required in  current scenario,
+>    only discarding connection state of integrated transceivers is sufficient,
+>    for this directly handling ohci->hc_control.
+>
+>   In patch 2/6 :
+>   -rewritten if (config->otg || config->rwc) block statements into
+>    two separate 'if blocks' to handle below scenarios
+>    1. config->otg set scenario.
+>    2. if any of these (config->otg, config->rwc) are set, this
+>       scenario should be handled only after ohci_setup()
+>
+>   In patch 1/6 and 4/6:
+>    No change.
+>
+> V4:
+>   In patch 1/6 and 4/6:
+>    No change.
+>   
+>   In patch 2/6 :
+>   -usb_remove_hcd() function is required a valid clock that is what
+>    omap_ohci_clock_power(0) is called after hcd shutdown.
+>
+>   In patch 3/6 :
+>   -V3 modification revert back, only ohci->regs setting write()
+>    function has been removed because ohci->regs doesn't get set until
+>    usb_add_hcd.
+>
+>   In patch 5/6 :
+>   - Removed extra space after "tristate".
+>   - Removed extra space between function name  and '(' characters.
+>   - MODULE_ALIAS line moved to last statement of ohci-at91 file.
+>
+>   In patch 6/6 :
+>   - Removed extra space before the '='.
+>   - Moved  /* forward definitions */ line before the declarations of functions.
+>
+> Manjunath Goudar (6):
+>    USB: OHCI: make ohci-exynos a separate driver
+>    USB: OHCI: make ohci-omap a separate driver
+>    USB: OHCI: make ohci-omap3 a separate driver
+>    USB: OHCI: make ohci-spear a separate driver
+>    USB: OHCI: make ohci-at91 a separate driver
+>    USB: OHCI: make ohci-s3c2410 a separate driver
+>
+>   drivers/usb/host/Kconfig        |   30 ++++++-
+>   drivers/usb/host/Makefile       |    6 ++
+>   drivers/usb/host/ohci-at91.c    |  153 ++++++++++++++++-------------------
+>   drivers/usb/host/ohci-exynos.c  |  167 ++++++++++++++++-----------------------
+>   drivers/usb/host/ohci-hcd.c     |  108 -------------------------
+>   drivers/usb/host/ohci-omap.c    |  156 +++++++++++++-----------------------
+>   drivers/usb/host/ohci-omap3.c   |  118 +++++++++------------------
+>   drivers/usb/host/ohci-s3c2410.c |  128 +++++++++++++-----------------
+>   drivers/usb/host/ohci-spear.c   |  140 +++++++++++++-------------------
+>   9 files changed, 374 insertions(+), 632 deletions(-)
+>
+I am very sorry, this is patch V4 series.
 
-> Also looks like the nonfunctional video stuff is even more nonfunctional
-> than usual:
-> 
-> omapdss DSI error: can't get VDDS_DSI regulator
-> omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
-
-Those should be followed by "...requests probe deferral", and the driver
-is probed again later.
-
-The log
-http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=946
-shows "taal display2: panel revision e3.83.7d" which hints that the
-panel (and DSS) was initialized properly.
-
-Those error prints should probably be tuned down a bit now that the
-driver uses probe deferral.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/b1fe83e3/attachment.sig>
+Thanks
+Manjunath Goudar
