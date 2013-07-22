@@ -1,87 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Jul 2013 06:44:37 +0200
-Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
-In-Reply-To: <1374468208.15946.17.camel@jlo-ubuntu-64.nvidia.com>
-References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
- <51E439BC.9030608@wwwdotorg.org>
- <1373973447.8538.80.camel@jlo-ubuntu-64.nvidia.com>
- <51E5A438.10004@wwwdotorg.org>
- <1374056130.10997.16.camel@jlo-ubuntu-64.nvidia.com>
- <51E6FF0B.5000708@wwwdotorg.org>
- <1374145726.5610.73.camel@jlo-ubuntu-64.nvidia.com>
- <51E7E27B.9090605@linaro.org>
- <1374218064.24607.1.camel@jlo-ubuntu-64.nvidia.com>
- <51E91A72.6070708@linaro.org>
- <1374462916.15946.14.camel@jlo-ubuntu-64.nvidia.com>
- <51ECB223.5000002@linaro.org>
- <1374467085.15946.16.camel@jlo-ubuntu-64.nvidia.com>
- <51ECB5C1.600@linaro.org>
- <1374468208.15946.17.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <51ECB8B5.4020002@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 22 Jul 2013 10:00:14 +0530
+Subject: [PATCH v2 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+Message-ID: <1374467414-25801-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 06:43 AM, Joseph Lo wrote:
-> On Mon, 2013-07-22 at 12:32 +0800, Daniel Lezcano wrote:
->> On 07/22/2013 06:24 AM, Joseph Lo wrote:
->>> On Mon, 2013-07-22 at 12:16 +0800, Daniel Lezcano wrote:
->>>> On 07/22/2013 05:15 AM, Joseph Lo wrote:
->>>>> On Fri, 2013-07-19 at 18:52 +0800, Daniel Lezcano wrote:
->>>>>> On 07/19/2013 09:14 AM, Joseph Lo wrote:
->>>>>>> On Thu, 2013-07-18 at 20:41 +0800, Daniel Lezcano wrote:
->>>>>>>> On 07/18/2013 01:08 PM, Joseph Lo wrote:
->>>>>>>>> On Thu, 2013-07-18 at 04:31 +0800, Stephen Warren wrote:
->>>>>>>>>> On 07/17/2013 04:15 AM, Joseph Lo wrote:
->>>>>>>>>>> On Wed, 2013-07-17 at 03:51 +0800, Stephen Warren wrote:
->>>>>>>>>>>> On 07/16/2013 05:17 AM, Joseph Lo wrote:
->>>>>>>>>>>>> On Tue, 2013-07-16 at 02:04 +0800, Stephen Warren wrote:
->>>>>>>>>>>>>> On 06/25/2013 03:23 AM, Joseph Lo wrote:
->>>>>>>>>>>>>>> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
->>>>>>>>>>>>>>> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
->>>>>>>>>>>>>>> this state.
->>>>>>>>>> ... [ discussion of issues with Joesph's patches applied]
->>>>>>>>>>>
->>> [...]
->>>>>>
->>>>>> Ok, so the problem occurs with the CPUIDLE_FLAG_TIMER_STOP flag only on
->>>>>> tegra114, right ?
->>>>>>
->>>>>> Sorry, I am a bit lost :)
->>>>>>
->>>>> Here are the issues that happen after apply CPUIDLE_FLAG_TIMER_STOP.
->>>>> 1) Tegra114/30
->>>>> The warning message at kernel/time/tick-broadcast.c:667
->>>>> tick_broadcast_oneshot_control could be triggered when doing CPU hot
->>>>> plug stress test.
->>>>
->>>> With the fix for tick-broadcast.c [1] ?
->>> Yes.
->>>
->>>>
->>>>> 2) Tegra20
->>>>> The system is easy to stick or become lag.
->>>>> The CPU hot plug is easy to cause system stick too.
->>>>>
->>>>> The fix I suggested in another mail looks can fix all the issues above.
->>>>> I verified it again today on 3 different Tegra SoC platforms.
->>>>
->>>> Not sure your patch fixes the problem.
->>>>
->>>> I am wondering if there isn't a underlaying problem which surface with
->>>> the flag.
->>
->> Does the attached patch changes something ?
->>
-> No, the result is the same.
+With the recent cleanup in Exynos platform code notably commits
+17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
+more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
+of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
+Exynos4412 which have more than the default number of GPIOs. Thus define
+this number in KConfig file. Without this patch we get the following errors
+during boot:
 
-Ok, thanks for testing.
+gpiochip_add: gpios 251..258 (gpv0) failed to register
+samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
+error code: -22
+samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
 
-I will look more closely to the issue in the next days.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: Tomasz Figa <t.figa@samsung.com>
+---
+Changes since v1:
+* Changed default number to 285 (as required by 4412).
+---
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ba412e0..f4841a2 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1605,6 +1605,7 @@ config ARCH_NR_GPIO
+ 	default 392 if ARCH_U8500
+ 	default 352 if ARCH_VT8500
+ 	default 288 if ARCH_SUNXI
++	default 285 if ARCH_EXYNOS
+ 	default 264 if MACH_H4700
+ 	default 0
+ 	help
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
