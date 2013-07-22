@@ -1,17 +1,17 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Mon, 22 Jul 2013 15:02:42 +0530
-Subject: [PATCH 07/11] USB: OHCI: Properly handle ohci-omap suspend
+Date: Mon, 22 Jul 2013 15:02:45 +0530
+Subject: [PATCH 10/11] USB: OHCI: Properly handle ohci-sm501 suspend
 In-Reply-To: <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
  <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1374485566-3997-8-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1374485566-3997-11-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-omap glue was not
+Suspend scenario in case of ohci-sm501 glue was not
 properly handled as it was not suspending generic part
 of ohci controller. Calling explicitly the ohci_suspend()
-routine in ohci_omap_suspend() will ensure proper
+routine in ohci_sm501_suspend() will ensure proper
 handling of suspend scenario.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
@@ -23,31 +23,27 @@ Cc: linux-usb at vger.kernel.org
 V2:
  -Incase ohci_suspend() fails, return right away without
   executing further.
-
 V3:
  -Aligned variable "do_wakeup" and "ret".
 
-V4:
+-V4:
  -The do_wakeup and ret variable alignment is removed.
 ---
- drivers/usb/host/ohci-omap.c |   13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+ drivers/usb/host/ohci-sm501.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
-index 8149ef0..d13fb4f 100644
---- a/drivers/usb/host/ohci-omap.c
-+++ b/drivers/usb/host/ohci-omap.c
-@@ -431,16 +431,23 @@ static int ohci_hcd_omap_drv_remove(struct platform_device *dev)
- 
- #ifdef	CONFIG_PM
- 
--static int ohci_omap_suspend(struct platform_device *dev, pm_message_t message)
-+static int ohci_omap_suspend(struct platform_device *pdev, pm_message_t message)
+diff --git a/drivers/usb/host/ohci-sm501.c b/drivers/usb/host/ohci-sm501.c
+index d479d5d..2a5de5f 100644
+--- a/drivers/usb/host/ohci-sm501.c
++++ b/drivers/usb/host/ohci-sm501.c
+@@ -216,14 +216,21 @@ static int ohci_hcd_sm501_drv_remove(struct platform_device *pdev)
+ static int ohci_sm501_suspend(struct platform_device *pdev, pm_message_t msg)
  {
--	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(dev));
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
-+	bool do_wakeup = device_may_wakeup(&pdev->dev);
+ 	struct device *dev = &pdev->dev;
+-	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(pdev));
++	struct usb_hcd  *hcd = platform_get_drvdata(pdev);
++	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	bool do_wakeup = device_may_wakeup(dev);
 +	int ret;
  
  	if (time_before(jiffies, ohci->next_statechange))
@@ -58,11 +54,11 @@ index 8149ef0..d13fb4f 100644
 +	if (ret)
 +		return ret;
 +
- 	omap_ohci_clock_power(0);
+ 	sm501_unit_power(dev->parent, SM501_GATE_USB_HOST, 0);
 -	return 0;
 +	return ret;
  }
  
- static int ohci_omap_resume(struct platform_device *dev)
+ static int ohci_sm501_resume(struct platform_device *pdev)
 -- 
 1.7.9.5
