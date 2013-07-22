@@ -1,96 +1,656 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 22 Jul 2013 13:48:20 -0700
-Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
-In-Reply-To: <51ED80E7.4050606@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
- <51ED781F.6060300@linaro.org> <51ED7DD5.8010000@codeaurora.org>
- <51ED80E7.4050606@codeaurora.org>
-Message-ID: <51ED9A94.3030204@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 22 Jul 2013 22:50:40 +0200
+Subject: [PATCH v5 13/20] pwm: Add new pwm-samsung driver
+In-Reply-To: <1374278673-25615-15-git-send-email-tomasz.figa@gmail.com>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1374278673-25615-15-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1478465.17AL5GbAI8@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 11:58 AM, Stephen Boyd wrote:
-> On 07/22/13 11:45, Stephen Boyd wrote:
->> On 07/22/13 11:21, John Stultz wrote:
->>> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
->>>> In the next patch we're going to increase the number of bits that
->>>> the generic sched_clock can handle to be greater than 32. With
->>>> more than 32 bits the wraparound time can be larger than what can
->>>> fit into the units that msecs_to_jiffies takes (unsigned int).
->>>> Luckily, the wraparound is initially calculated in nanoseconds
->>>> which we can easily use with hrtimers, so switch to using an
->>>> hrtimer.
->>>>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> Hrmm. So in my testing (under qemu), this patch causes bootup to hang.
->>>
->>> qemu-system-arm -kernel zImage-arm -M vexpress-a9 -cpu cortex-a9
->>> -nographic -m 1024  -append 'root=/dev/mmcblk0p2 rw mem=1024M
->>> raid=noautodetect console=ttyAMA0,38400n8 rootwait vmalloc=256MB
->>> devtmpfs.mount=0' -sd test-arm.img -redir tcp:4300::22
->>>
->>> Config file attached.
->>>
->>> I haven't gotten a chance to look very closely, but it seems the
->>> folowing patch resolves the issue. I'm not sure if we're seeing
->>> callers to setup_sched_clock happen after sched_clock_postinit or
->>> what, but it probably needs another look over.
->>>
->>> thanks
->>> -john
->>>
->>>
->>> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
->>> index a269890b..c018ffc 100644
->>> --- a/kernel/time/sched_clock.c
->>> +++ b/kernel/time/sched_clock.c
->>> @@ -138,12 +138,6 @@ void __init setup_sched_clock(u32 (*read)(void),
->>> int bits, unsigned long rate)
->>>       pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns,
->>> wraps every %lluns\n",
->>>           bits, r, r_unit, res, wrap);
->>>   
->>> -    /*
->>> -     * Start the timer to keep sched_clock() properly updated and
->>> -     * sets the initial epoch.
->>> -     */
->>> -    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
->>> -    sched_clock_timer.function = sched_clock_poll;
->>>       update_sched_clock();
->>>   
->>>       /*
->>> @@ -175,6 +169,13 @@ void __init sched_clock_postinit(void)
->>>           setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
->>>   
->>>       update_sched_clock();
->>> +
->>> +    /*
->>> +     * Start the timer to keep sched_clock() properly updated and
->>> +     * sets the initial epoch.
->>> +     */
->>> +    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
->>> +    sched_clock_timer.function = sched_clock_poll;
->>>       hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
->>>   }
->>>   
->>>
->> Hmm. Is it too early to use hrtimers? Moving the hrtimer_start() into
->> sched_clock_register() also causes the same crash.
-> Yes that seems to be the problem. The vexpress board is setting up the
-> sched_clock in setup_arch() (via v2m_init_early) which runs before
-> hrtimers_init(). I've only tested this on boards that setup the timer in
-> the time_init() callback which runs after hrtimers_init(). Your patch
-> should be fine, although it would be nice if we didn't have callers
-> setting up the sched_clock so early.
+This patch introduces new Samsung PWM driver, which uses Samsung
+PWM/timer master driver to control shared parts of the hardware.
 
-Although as Russell pointed out, setting up sched_clock later isn't 
-really a good option (although I'd like it best if we could handle 
-switching sched_clocks dynamically as needed so there were less 
-constraints on when it has to be registered).
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/pwm/Makefile      |   1 +
+ drivers/pwm/pwm-samsung.c | 611 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 612 insertions(+)
+ create mode 100644 drivers/pwm/pwm-samsung.c
 
-So I'll probably fold in my change into the patch if you're ok with that?
+Changes since v4:
+ - made definition of TCON_AUTORELOAD macro more readable,
+ - renamed s5p_variant to s5pc100_variant,
+ - replaced overlooked pr_err() with dev_err().
 
-thanks
--john
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index aa94807..86a5771 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_PWM_PUV3)		+= pwm-puv3.o
+ obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
+ obj-$(CONFIG_PWM_RENESAS_TPU)	+= pwm-renesas-tpu.o
+ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung-legacy.o
++obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+ obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+ obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+ obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
+diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
+new file mode 100644
+index 0000000..9836a98
+--- /dev/null
++++ b/drivers/pwm/pwm-samsung.c
+@@ -0,0 +1,611 @@
++/*
++ * Copyright (c) 2007 Ben Dooks
++ * Copyright (c) 2008 Simtec Electronics
++ *     Ben Dooks <ben@simtec.co.uk>, <ben-linux@fluff.org>
++ * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * PWM driver for Samsung SoCs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ */
++
++#include <linux/bitops.h>
++#include <linux/clk.h>
++#include <linux/export.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/time.h>
++
++/* For struct samsung_timer_variant and samsung_pwm_lock. */
++#include <clocksource/samsung_pwm.h>
++
++#define REG_TCFG0			0x00
++#define REG_TCFG1			0x04
++#define REG_TCON			0x08
++
++#define REG_TCNTB(tmr)			(0x0c + ((tmr) * 0xc))
++#define REG_TCMPB(tmr)			(0x10 + ((tmr) * 0xc))
++
++#define TCFG0_PRESCALER_MASK		0xff
++#define TCFG0_PRESCALER1_SHIFT		8
++
++#define TCFG1_MUX_MASK			0xf
++#define TCFG1_SHIFT(x)			((x) * 4)
++
++#define TCON_START(chan)		(1 << (4 * (chan) + 0))
++#define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
++#define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
++#define _TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
++#define _TCON_AUTORELOAD4(chan)		(1 << (4 * (chan) + 2))
++/* Position of autoreload bit of channel 4 (5 in TCON reg.) is different. */
++#define TCON_AUTORELOAD(chan)		\
++	((chan < 5) ? _TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
++
++/**
++ * struct samsung_pwm_channel - private data of PWM channel
++ * @period_ns:	current period in nanoseconds programmed to the hardware
++ * @duty_ns:	current duty time in nanoseconds programmed to the hardware
++ * @tin_ns:	time of one timer tick in nanoseconds with current timer rate
++ */
++struct samsung_pwm_channel {
++	u32 period_ns;
++	u32 duty_ns;
++	u32 tin_ns;
++};
++
++/**
++ * struct samsung_pwm_chip - private data of PWM chip
++ * @chip:		generic PWM chip
++ * @variant:		local copy of hardware variant data
++ * @inverter_mask:	inverter status for all channels - one bit per channel
++ * @base:		base address of mapped PWM registers
++ * @base_clk:		base clock used to drive the timers
++ * @tclk0:		external clock 0 (can be ERR_PTR if not present)
++ * @tclk1:		external clock 1 (can be ERR_PTR if not present)
++ */
++struct samsung_pwm_chip {
++	struct pwm_chip chip;
++	struct samsung_pwm_variant variant;
++	u8 inverter_mask;
++
++	void __iomem *base;
++	struct clk *base_clk;
++	struct clk *tclk0;
++	struct clk *tclk1;
++};
++
++#ifndef CONFIG_CLKSRC_SAMSUNG_PWM
++/*
++ * PWM block is shared between pwm-samsung and samsung_pwm_timer drivers
++ * and some registers need access synchronization. If both drivers are
++ * compiled in, the spinlock is defined in the clocksource driver,
++ * otherwise following definition is used.
++ *
++ * Currently we do not need any more complex synchronization method
++ * because all the supported SoCs contain only one instance of the PWM
++ * IP. Should this change, both drivers will need to be modified to
++ * properly synchronize accesses to particular instances.
++ */
++static DEFINE_SPINLOCK(samsung_pwm_lock);
++#endif
++
++static inline
++struct samsung_pwm_chip *to_samsung_pwm_chip(struct pwm_chip *chip)
++{
++	return container_of(chip, struct samsung_pwm_chip, chip);
++}
++
++static inline unsigned int to_tcon_channel(unsigned int channel)
++{
++	/* TCON register has a gap of 4 bits (1 channel) */
++	return (channel == 0) ? 0 : (channel + 1);
++}
++
++static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
++				    unsigned int channel, u8 divisor)
++{
++	u8 shift = TCFG1_SHIFT(channel);
++	unsigned long flags;
++	u32 reg;
++	u8 bits;
++
++	bits = (fls(divisor) - 1) - pwm->variant.div_base;
++
++	spin_lock_irqsave(&samsung_pwm_lock, flags);
++
++	reg = readl(pwm->base + REG_TCFG1);
++	reg &= ~(TCFG1_MUX_MASK << shift);
++	reg |= bits << shift;
++	writel(reg, pwm->base + REG_TCFG1);
++
++	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
++}
++
++static int pwm_samsung_is_tdiv(struct samsung_pwm_chip *chip, unsigned int chan)
++{
++	struct samsung_pwm_variant *variant = &chip->variant;
++	u32 reg;
++
++	reg = readl(chip->base + REG_TCFG1);
++	reg >>= TCFG1_SHIFT(chan);
++	reg &= TCFG1_MUX_MASK;
++
++	return (BIT(reg) & variant->tclk_mask) == 0;
++}
++
++static unsigned long pwm_samsung_get_tin_rate(struct samsung_pwm_chip *chip,
++					      unsigned int chan)
++{
++	unsigned long rate;
++	u32 reg;
++
++	rate = clk_get_rate(chip->base_clk);
++
++	reg = readl(chip->base + REG_TCFG0);
++	if (chan >= 2)
++		reg >>= TCFG0_PRESCALER1_SHIFT;
++	reg &= TCFG0_PRESCALER_MASK;
++
++	return rate / (reg + 1);
++}
++
++static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
++					  unsigned int chan, unsigned long freq)
++{
++	struct samsung_pwm_variant *variant = &chip->variant;
++	unsigned long rate;
++	struct clk *clk;
++	u8 div;
++
++	if (!pwm_samsung_is_tdiv(chip, chan)) {
++		clk = (chan < 2) ? chip->tclk0 : chip->tclk1;
++		if (!IS_ERR(clk)) {
++			rate = clk_get_rate(clk);
++			if (rate)
++				return rate;
++		}
++
++		dev_warn(chip->chip.dev,
++			"tclk of PWM %d is inoperational, using tdiv\n", chan);
++	}
++
++	rate = pwm_samsung_get_tin_rate(chip, chan);
++	dev_dbg(chip->chip.dev, "tin parent at %lu\n", rate);
++
++	/*
++	 * Compare minimum PWM frequency that can be achieved with possible
++	 * divider settings and choose the lowest divisor that can generate
++	 * frequencies lower than requested.
++	 */
++	for (div = variant->div_base; div < 4; ++div)
++		if ((rate >> (variant->bits + div)) < freq)
++			break;
++
++	pwm_samsung_set_divisor(chip, chan, BIT(div));
++
++	return rate >> div;
++}
++
++static int pwm_samsung_request(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct samsung_pwm_chip *our_chip = to_samsung_pwm_chip(chip);
++	struct samsung_pwm_channel *our_chan;
++
++	if (!(our_chip->variant.output_mask & BIT(pwm->hwpwm))) {
++		dev_warn(chip->dev,
++			"tried to request PWM channel %d without output\n",
++			pwm->hwpwm);
++		return -EINVAL;
++	}
++
++	our_chan = devm_kzalloc(chip->dev, sizeof(*our_chan), GFP_KERNEL);
++	if (!our_chan)
++		return -ENOMEM;
++
++	pwm_set_chip_data(pwm, our_chan);
++
++	return 0;
++}
++
++static void pwm_samsung_free(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	pwm_set_chip_data(pwm, NULL);
++	devm_kfree(chip->dev, pwm_get_chip_data(pwm));
++}
++
++static int pwm_samsung_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct samsung_pwm_chip *our_chip = to_samsung_pwm_chip(chip);
++	unsigned int tcon_chan = to_tcon_channel(pwm->hwpwm);
++	unsigned long flags;
++	u32 tcon;
++
++	spin_lock_irqsave(&samsung_pwm_lock, flags);
++
++	tcon = readl(our_chip->base + REG_TCON);
++
++	tcon &= ~TCON_START(tcon_chan);
++	tcon |= TCON_MANUALUPDATE(tcon_chan);
++	writel(tcon, our_chip->base + REG_TCON);
++
++	tcon &= ~TCON_MANUALUPDATE(tcon_chan);
++	tcon |= TCON_START(tcon_chan) | TCON_AUTORELOAD(tcon_chan);
++	writel(tcon, our_chip->base + REG_TCON);
++
++	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
++
++	return 0;
++}
++
++static void pwm_samsung_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct samsung_pwm_chip *our_chip = to_samsung_pwm_chip(chip);
++	unsigned int tcon_chan = to_tcon_channel(pwm->hwpwm);
++	unsigned long flags;
++	u32 tcon;
++
++	spin_lock_irqsave(&samsung_pwm_lock, flags);
++
++	tcon = readl(our_chip->base + REG_TCON);
++	tcon &= ~TCON_AUTORELOAD(tcon_chan);
++	writel(tcon, our_chip->base + REG_TCON);
++
++	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
++}
++
++static int pwm_samsung_config(struct pwm_chip *chip, struct pwm_device *pwm,
++			      int duty_ns, int period_ns)
++{
++	struct samsung_pwm_chip *our_chip = to_samsung_pwm_chip(chip);
++	struct samsung_pwm_channel *chan = pwm_get_chip_data(pwm);
++	u32 tin_ns = chan->tin_ns, tcnt, tcmp;
++
++	/*
++	 * We currently avoid using 64bit arithmetic by using the
++	 * fact that anything faster than 1Hz is easily representable
++	 * by 32bits.
++	 */
++	if (period_ns > NSEC_PER_SEC)
++		return -ERANGE;
++
++	if (period_ns == chan->period_ns && duty_ns == chan->duty_ns)
++		return 0;
++
++	tcnt = readl(our_chip->base + REG_TCNTB(pwm->hwpwm));
++
++	/* We need tick count for calculation, not last tick. */
++	++tcnt;
++
++	/* Check to see if we are changing the clock rate of the PWM. */
++	if (chan->period_ns != period_ns) {
++		unsigned long tin_rate;
++		u32 period;
++
++		period = NSEC_PER_SEC / period_ns;
++
++		dev_dbg(our_chip->chip.dev, "duty_ns=%d, period_ns=%d (%u)\n",
++						duty_ns, period_ns, period);
++
++		tin_rate = pwm_samsung_calc_tin(our_chip, pwm->hwpwm, period);
++
++		dev_dbg(our_chip->chip.dev, "tin_rate=%lu\n", tin_rate);
++
++		tin_ns = NSEC_PER_SEC / tin_rate;
++		tcnt = period_ns / tin_ns;
++	}
++
++	/* Period is too short. */
++	if (tcnt <= 1)
++		return -ERANGE;
++
++	/* Note that counters count down. */
++	tcmp = duty_ns / tin_ns;
++
++	/* 0% duty is not available */
++	if (!tcmp)
++		++tcmp;
++
++	tcmp = tcnt - tcmp;
++
++	/* Decrement to get tick numbers, instead of tick counts. */
++	--tcnt;
++	/* -1UL will give 100% duty. */
++	--tcmp;
++
++	dev_dbg(our_chip->chip.dev,
++				"tin_ns=%u, tcmp=%u/%u\n", tin_ns, tcmp, tcnt);
++
++	/* Update PWM registers. */
++	writel(tcnt, our_chip->base + REG_TCNTB(pwm->hwpwm));
++	writel(tcmp, our_chip->base + REG_TCMPB(pwm->hwpwm));
++
++	if (test_bit(PWMF_ENABLED, &pwm->flags))
++		pwm_samsung_enable(chip, pwm);
++
++	chan->period_ns = period_ns;
++	chan->tin_ns = tin_ns;
++	chan->duty_ns = duty_ns;
++
++	return 0;
++}
++
++static void pwm_samsung_set_invert(struct samsung_pwm_chip *chip,
++				   unsigned int channel, bool invert)
++{
++	unsigned int tcon_chan = to_tcon_channel(channel);
++	unsigned long flags;
++	u32 tcon;
++
++	spin_lock_irqsave(&samsung_pwm_lock, flags);
++
++	tcon = readl(chip->base + REG_TCON);
++
++	if (invert) {
++		chip->inverter_mask |= BIT(channel);
++		tcon |= TCON_INVERT(tcon_chan);
++	} else {
++		chip->inverter_mask &= ~BIT(channel);
++		tcon &= ~TCON_INVERT(tcon_chan);
++	}
++
++	writel(tcon, chip->base + REG_TCON);
++
++	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
++}
++
++static int pwm_samsung_set_polarity(struct pwm_chip *chip,
++				    struct pwm_device *pwm,
++				    enum pwm_polarity polarity)
++{
++	struct samsung_pwm_chip *our_chip = to_samsung_pwm_chip(chip);
++	bool invert = (polarity == PWM_POLARITY_NORMAL);
++
++	/* Inverted means normal in the hardware. */
++	pwm_samsung_set_invert(our_chip, pwm->hwpwm, invert);
++
++	return 0;
++}
++
++static const struct pwm_ops pwm_samsung_ops = {
++	.request	= pwm_samsung_request,
++	.free		= pwm_samsung_free,
++	.enable		= pwm_samsung_enable,
++	.disable	= pwm_samsung_disable,
++	.config		= pwm_samsung_config,
++	.set_polarity	= pwm_samsung_set_polarity,
++	.owner		= THIS_MODULE,
++};
++
++#ifdef CONFIG_OF
++static const struct samsung_pwm_variant s3c24xx_variant = {
++	.bits		= 16,
++	.div_base	= 1,
++	.has_tint_cstat	= false,
++	.tclk_mask	= BIT(4),
++};
++
++static const struct samsung_pwm_variant s3c64xx_variant = {
++	.bits		= 32,
++	.div_base	= 0,
++	.has_tint_cstat	= true,
++	.tclk_mask	= BIT(7) | BIT(6) | BIT(5),
++};
++
++static const struct samsung_pwm_variant s5p64x0_variant = {
++	.bits		= 32,
++	.div_base	= 0,
++	.has_tint_cstat	= true,
++	.tclk_mask	= 0,
++};
++
++static const struct samsung_pwm_variant s5pc100_variant = {
++	.bits		= 32,
++	.div_base	= 0,
++	.has_tint_cstat	= true,
++	.tclk_mask	= BIT(5),
++};
++
++static const struct of_device_id samsung_pwm_matches[] = {
++	{ .compatible = "samsung,s3c2410-pwm", .data = &s3c24xx_variant },
++	{ .compatible = "samsung,s3c6400-pwm", .data = &s3c64xx_variant },
++	{ .compatible = "samsung,s5p6440-pwm", .data = &s5p64x0_variant },
++	{ .compatible = "samsung,s5pc100-pwm", .data = &s5pc100_variant },
++	{ .compatible = "samsung,exynos4210-pwm", .data = &s5p64x0_variant },
++	{},
++};
++
++static int pwm_samsung_parse_dt(struct samsung_pwm_chip *chip)
++{
++	struct device_node *np = chip->chip.dev->of_node;
++	const struct of_device_id *match;
++	struct property *prop;
++	const __be32 *cur;
++	u32 val;
++
++	match = of_match_node(samsung_pwm_matches, np);
++	if (!match)
++		return -ENODEV;
++
++	memcpy(&chip->variant, match->data, sizeof(chip->variant));
++
++	of_property_for_each_u32(np, "samsung,pwm-outputs", prop, cur, val) {
++		if (val >= SAMSUNG_PWM_NUM) {
++			dev_err(chip->chip.dev,
++				"%s: invalid channel index in samsung,pwm-outputs property\n",
++								__func__);
++			continue;
++		}
++		chip->variant.output_mask |= BIT(val);
++	}
++
++	return 0;
++}
++#else
++static int pwm_samsung_parse_dt(struct samsung_pwm_chip *chip)
++{
++	return -ENODEV;
++}
++#endif
++
++static int pwm_samsung_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct samsung_pwm_chip *chip;
++	struct resource *res;
++	unsigned int chan;
++	int ret;
++
++	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
++	if (chip == NULL)
++		return -ENOMEM;
++
++	chip->chip.dev = &pdev->dev;
++	chip->chip.ops = &pwm_samsung_ops;
++	chip->chip.base = -1;
++	chip->chip.npwm = SAMSUNG_PWM_NUM;
++	chip->inverter_mask = BIT(SAMSUNG_PWM_NUM) - 1;
++
++	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
++		ret = pwm_samsung_parse_dt(chip);
++		if (ret)
++			return ret;
++
++		chip->chip.of_xlate = of_pwm_xlate_with_flags;
++		chip->chip.of_pwm_n_cells = 3;
++	} else {
++		if (!pdev->dev.platform_data) {
++			dev_err(&pdev->dev, "no platform data specified\n");
++			return -EINVAL;
++		}
++
++		memcpy(&chip->variant, pdev->dev.platform_data,
++							sizeof(chip->variant));
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	chip->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(chip->base))
++		return PTR_ERR(chip->base);
++
++	chip->base_clk = devm_clk_get(&pdev->dev, "timers");
++	if (IS_ERR(chip->base_clk)) {
++		dev_err(dev, "failed to get timer base clk\n");
++		return PTR_ERR(chip->base_clk);
++	}
++
++	ret = clk_prepare_enable(chip->base_clk);
++	if (ret < 0) {
++		dev_err(dev, "failed to enable base clock\n");
++		return ret;
++	}
++
++	for (chan = 0; chan < SAMSUNG_PWM_NUM; ++chan)
++		if (chip->variant.output_mask & BIT(chan))
++			pwm_samsung_set_invert(chip, chan, true);
++
++	/* Following clocks are optional. */
++	chip->tclk0 = devm_clk_get(&pdev->dev, "pwm-tclk0");
++	chip->tclk1 = devm_clk_get(&pdev->dev, "pwm-tclk1");
++
++	platform_set_drvdata(pdev, chip);
++
++	ret = pwmchip_add(&chip->chip);
++	if (ret < 0) {
++		dev_err(dev, "failed to register PWM chip\n");
++		clk_disable_unprepare(chip->base_clk);
++		return ret;
++	}
++
++	dev_dbg(dev, "base_clk at %lu, tclk0 at %lu, tclk1 at %lu\n",
++		clk_get_rate(chip->base_clk),
++		!IS_ERR(chip->tclk0) ? clk_get_rate(chip->tclk0) : 0,
++		!IS_ERR(chip->tclk1) ? clk_get_rate(chip->tclk1) : 0);
++
++	return 0;
++}
++
++static int pwm_samsung_remove(struct platform_device *pdev)
++{
++	struct samsung_pwm_chip *chip = platform_get_drvdata(pdev);
++	int ret;
++
++	ret = pwmchip_remove(&chip->chip);
++	if (ret < 0)
++		return ret;
++
++	clk_disable_unprepare(chip->base_clk);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int pwm_samsung_suspend(struct device *dev)
++{
++	struct samsung_pwm_chip *chip = dev_get_drvdata(dev);
++	unsigned int i;
++
++	/*
++	 * No one preserves these values during suspend so reset them.
++	 * Otherwise driver leaves PWM unconfigured if same values are
++	 * passed to pwm_config() next time.
++	 */
++	for (i = 0; i < SAMSUNG_PWM_NUM; ++i) {
++		struct pwm_device *pwm = &chip->chip.pwms[i];
++		struct samsung_pwm_channel *chan = pwm_get_chip_data(pwm);
++
++		if (!chan)
++			continue;
++
++		chan->period_ns = 0;
++		chan->duty_ns = 0;
++	}
++
++	return 0;
++}
++
++static int pwm_samsung_resume(struct device *dev)
++{
++	struct samsung_pwm_chip *chip = dev_get_drvdata(dev);
++	unsigned int chan;
++
++	/*
++	 * Inverter setting must be preserved across suspend/resume
++	 * as nobody really seems to configure it more than once.
++	 */
++	for (chan = 0; chan < SAMSUNG_PWM_NUM; ++chan) {
++		if (chip->variant.output_mask & BIT(chan))
++			pwm_samsung_set_invert(chip, chan,
++					chip->inverter_mask & BIT(chan));
++	}
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops pwm_samsung_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(pwm_samsung_suspend, pwm_samsung_resume)
++};
++
++static struct platform_driver pwm_samsung_driver = {
++	.driver		= {
++		.name	= "samsung-pwm",
++		.owner	= THIS_MODULE,
++		.pm	= &pwm_samsung_pm_ops,
++		.of_match_table = of_match_ptr(samsung_pwm_matches),
++	},
++	.probe		= pwm_samsung_probe,
++	.remove		= pwm_samsung_remove,
++};
++module_platform_driver(pwm_samsung_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Tomasz Figa <tomasz.figa@gmail.com>");
++MODULE_ALIAS("platform:samsung-pwm");
+-- 
+1.8.3.2
