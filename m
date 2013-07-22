@@ -1,27 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 22 Jul 2013 15:09:04 +0100
-Subject: [PATCH v3 01/31] spi: mpc512x: cleanup clock API use
-In-Reply-To: <1374495298-22019-2-git-send-email-gsi@denx.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1374495298-22019-2-git-send-email-gsi@denx.de>
-Message-ID: <20130722140904.GU9858@sirena.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 22 Jul 2013 15:09:10 +0100
+Subject: [PATCH v3] xen/arm: enable PV control for ARM
+In-Reply-To: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
+References: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <alpine.DEB.2.02.1307221508260.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 02:14:28PM +0200, Gerhard Sittig wrote:
+On Mon, 22 Jul 2013, Julien Grall wrote:
+> Enable power management from the toolstack for ARM guest.
+> 
+> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> 
 
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret) {
-> +		devm_clk_put(dev, clk);
-> +		goto free_irq;
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-The main point of the devm_ APIs is to avoid the need for explicit
-freeing so you should just remove these puts.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/d3cc5152/attachment.sig>
+
+>     Changes in v3:
+>         - Fix condition to compile cpu_hotplug.o
+>     Changes in v2:
+>         - Don't compile xen/cpu_hotplug.o with ARM64
+> ---
+>  drivers/xen/Makefile |    5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index 2bf461a..f185e8d 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -1,9 +1,8 @@
+> -ifneq ($(CONFIG_ARM),y)
+> -obj-y	+= manage.o
+> +ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+>  endif
+>  obj-$(CONFIG_X86)			+= fallback.o
+> -obj-y	+= grant-table.o features.o events.o balloon.o time.o
+> +obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
+>  obj-y	+= xenbus/
+>  
+>  nostackp := $(call cc-option, -fno-stack-protector)
+> -- 
+> 1.7.10.4
+> 
