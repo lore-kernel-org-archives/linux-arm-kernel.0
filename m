@@ -1,33 +1,39 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 22 Jul 2013 19:34:10 +0100
-Subject: alignment handler instruction endian-ness
-In-Reply-To: <alpine.LFD.2.03.1307221428050.15022@syhkavp.arg>
-References: <51E91BE5.8070809@codethink.co.uk>
- <20130719110947.GD24642@n2100.arm.linux.org.uk>
- <51E92DE5.6090404@codethink.co.uk>
- <20130719123249.GE24642@n2100.arm.linux.org.uk>
- <51E93CD0.3040302@codethink.co.uk>
- <alpine.LFD.2.03.1307221428050.15022@syhkavp.arg>
-Message-ID: <51ED7B22.9040104@codethink.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Jul 2013 19:43:26 +0100
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+Message-ID: <20130722184325.GA21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/13 19:31, Nicolas Pitre wrote:
-> On Fri, 19 Jul 2013, Ben Dooks wrote:
->> On 19/07/13 13:32, Russell King - ARM Linux wrote:
->>> If you value your soul, NEVER EVER EVER place stuff which is not part
->>> of the user API in a header file in a UAPI subdirectory.  And never
->>> modify a header file in a UAPI subdirectory without first having a
->>> good long think about how that modification may impact _userspace_.
->>
->> Sorry, searched for byteorder.h and just did not notice.
->>
->> Where is the best place for these to go?
->
-> You should really have a look at arch/arm/include/asm/opcodes.h.
+On Mon, Jul 22, 2013 at 06:07:47PM +0000, Paul Walmsley wrote:
+> After Linus's commit fb2af0020a51709ad87ea8055c325d3fbde04158 ("Merge 
+> branch 'for-linus' of git://git.linaro.org/people/rmk/linux-arm"), the 
+> OMAP2430 SDP here stopped booting.
+> 
+> Here's the bootlog at the commit before the merge, commit 790eac5640:
+> 
+> http://www.pwsan.com/omap/testlogs/bisect_2430sdp_hang_v3.11-rc/20130722015454/
+> 
+> and here's a log at commit fb2af0020a5:
+> 
+> http://www.pwsan.com/omap/testlogs/bisect_2430sdp_hang_v3.11-rc/20130722005921/
+> 
+> Any ideas as to what might have caused this?
 
-Yes, re-worked using <asm/opcodes.h> thanks.
+Bear in mind that I'm almost at the point of not boot-testing anything
+I sent to Linus because of the uselessness of the SDP4430 board now
+that it's DT only - the only platform which boot-tests anything I send
+is the 3430LDP board now.  If people care about that, maybe they can
+assist with sorting out the issues I've raised on these lists about
+the SDP4430 - and why the SDP4430 build remains disabled in my build
+and boot system.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Looking at the boot log, it just stops after uboot hands over control.
+With the lack of output from the decompressor, it's not possible to
+tell whether it's a decompressor problem or a kernel problem.
+
+I think you need to turn on the LL_DEBUG option, select the appropriate
+output option, and also get the decompressor to use the kernel's debug
+io functions to output it's stuff (I think the option is DEBUG_UNCOMPRESS).
