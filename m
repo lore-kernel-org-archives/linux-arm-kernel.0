@@ -1,37 +1,55 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 22 Jul 2013 19:10:41 +0200
-Subject: [PATCH RESEND] ARM: plat-samsung: Fix switching FIFO in
- arch_enable_uart_fifo function
-In-Reply-To: <1372792593-7457-1-git-send-email-shc_work@mail.ru>
-References: <1372792593-7457-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1786279.J430QToqzW@amdc1227>
+Date: Mon, 22 Jul 2013 19:14:53 +0200
+Subject: [PATCH] ARM: S3C24XX: Add missing clkdev entries for s3c2440 UART
+In-Reply-To: <1374435765-6747-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1374435765-6747-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <1877003.j5SlNHUNT8@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 of July 2013 23:16:33 Alexander Shiyan wrote:
-> When CONFIG_S3C_BOOT_UART_FORCE_FIFO symbol is set, we should
-> enable FIFO but actually switch command is missing in the code.
-> This patch adds this switching.
+On Sunday 21 of July 2013 21:42:45 Sylwester Nawrocki wrote:
+> This patch restores serial port operation which has been broken since
+> commit 60e93575476f90a72146b51283f514da655410a7
+> serial: samsung: enable clock before clearing pending interrupts during
+> init
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> That commit only uncovered the real issue which was missing clkdev
+> entries for the "uart" clocks on S3C2440. It went unnoticed so far
+> because return value of clk API calls were not being checked at all
+> in the samsung serial port driver.
+> 
+> This patch should be backported to at least 3.10 stable kernel, since
+> the serial port has not been working on s3c2440 since 3.10-rc5.
+> 
+> Cc: Chander Kashyap <chander.kashyap@linaro.org>
+> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> [on S3C2440 SoC based Mini2440 board]
+> Tested-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 > ---
->  arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
->  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h
-> b/arch/arm/plat-samsung/include/plat/uncompress.h index 4afc32f..f48dc0a
-> 100644
-> --- a/arch/arm/plat-samsung/include/plat/uncompress.h
-> +++ b/arch/arm/plat-samsung/include/plat/uncompress.h
-> @@ -145,6 +145,8 @@ static inline void arch_enable_uart_fifo(void)
->  			if (!(fifocon & S3C2410_UFCON_RESETBOTH))
->  				break;
->  		}
-> +
-> +		uart_wr(S3C2410_UFCON, S3C2410_UFCON_FIFOMODE);
->  	}
->  }
->  #else
+> There seems to be something wrong with the process, as things are
+> getting broken late in the -rc cycle.  It seems author of the above
+> mentioned commit didn't test all 6 SoC series that the samsung
+> serial driver handles.  While I can understand they might not have
+> all required hardware it's a bit irritating that the patch that
+> in practice caused regression appeared only on linux-serial mailing
+> list. And it's not evident it was even tried to test it on all
+> potentially affected platforms. It not clear on what platforms
+> the patch has been tested.
+> 
+> My humble suggestion is, _please_ do send patches that affect multiple
+> Samsung SoCs to linux-samsung at vger.kernel.org.  So there is better
+> review and test exposure.  And we can reduce mess like this happening
+> in the future.
+> 
+> Thanks!
+> Sylwester
+> ---
+>  arch/arm/mach-s3c24xx/clock-s3c2410.c      |  161
+> +++++++++++++++++----------- arch/arm/mach-s3c24xx/clock-s3c2440.c     
+> |    3 +
+>  arch/arm/plat-samsung/include/plat/clock.h |    5 +
+>  3 files changed, 106 insertions(+), 63 deletions(-)
 
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
