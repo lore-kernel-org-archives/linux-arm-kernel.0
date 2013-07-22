@@ -1,344 +1,776 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 01:49:24 +0200
-Subject: [PATCH v2 7/8] ARM: s3c64xx: Migrate clock handling to Common Clock
- Framework
+Date: Tue, 23 Jul 2013 01:49:20 +0200
+Subject: [PATCH v2 3/8] clk: samsung: Add clock driver for S3C64xx SoCs
 In-Reply-To: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
 References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1374536965-3545-8-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1374536965-3545-4-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch migrates the s3c64xx platform to use the new clock driver
-using Common Clock Framework.
+This patch adds new, Common Clock Framework-based clock driver for Samsung
+S3C64xx SoCs. The driver is just added, without actually letting the
+platforms use it yet, since this requires more intermediate steps.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/Kconfig                      |  2 +-
- arch/arm/mach-s3c64xx/Makefile        |  2 +-
- arch/arm/mach-s3c64xx/common.c        | 21 +++++++++++++++++----
- arch/arm/mach-s3c64xx/common.h        | 10 +++++-----
- arch/arm/mach-s3c64xx/mach-anw6410.c  |  2 +-
- arch/arm/mach-s3c64xx/mach-crag6410.c |  2 +-
- arch/arm/mach-s3c64xx/mach-hmt.c      |  2 +-
- arch/arm/mach-s3c64xx/mach-mini6410.c |  2 +-
- arch/arm/mach-s3c64xx/mach-ncp.c      |  2 +-
- arch/arm/mach-s3c64xx/mach-smartq.c   | 11 ++---------
- arch/arm/mach-s3c64xx/mach-smdk6400.c |  2 +-
- arch/arm/mach-s3c64xx/mach-smdk6410.c |  2 +-
- arch/arm/mach-s3c64xx/s3c6400.c       |  6 ------
- arch/arm/mach-s3c64xx/s3c6410.c       |  7 -------
- drivers/clk/samsung/Makefile          |  2 --
- 15 files changed, 33 insertions(+), 42 deletions(-)
+ .../bindings/clock/samsung,s3c64xx-clock.txt       |  77 ++++
+ drivers/clk/samsung/Makefile                       |   3 +
+ drivers/clk/samsung/clk-s3c64xx.c                  | 465 +++++++++++++++++++++
+ include/dt-bindings/clock/samsung,s3c64xx-clock.h  | 178 ++++++++
+ 4 files changed, 723 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
+ create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
+ create mode 100644 include/dt-bindings/clock/samsung,s3c64xx-clock.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fa7ffca..cfa7e59 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -724,6 +724,7 @@ config ARCH_S3C64XX
- 	select ARM_VIC
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_SAMSUNG_PWM
-+	select COMMON_CLK
- 	select CPU_V6
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_SAMSUNG
-@@ -737,7 +738,6 @@ config ARCH_S3C64XX
- 	select S3C_DEV_NAND
- 	select S3C_GPIO_TRACK
- 	select SAMSUNG_ATAGS
--	select SAMSUNG_CLKSRC
- 	select SAMSUNG_GPIOLIB_4BIT
- 	select SAMSUNG_WDT_RESET
- 	select USB_ARCH_HAS_OHCI
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 31d0c91..645a8fe 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -12,7 +12,7 @@ obj-				:=
- 
- # Core
- 
--obj-y				+= common.o clock.o
-+obj-y				+= common.o
- 
- # Core support
- 
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 73d79cf..7d3cb58 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -17,6 +17,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/module.h>
-+#include <linux/clk-provider.h>
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
- #include <linux/serial_core.h>
-@@ -38,7 +39,6 @@
- #include <mach/regs-gpio.h>
- 
- #include <plat/cpu.h>
--#include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/pm.h>
- #include <plat/gpio-cfg.h>
-@@ -50,6 +50,19 @@
- 
- #include "common.h"
- 
-+/* External clock frequency */
-+static unsigned long xtal_f = 12000000, xusbxti_f = 48000000;
+diff --git a/Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt b/Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
+new file mode 100644
+index 0000000..fa171dc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
+@@ -0,0 +1,77 @@
++* Samsung S3C64xx Clock Controller
 +
-+void __init s3c64xx_set_xtal_freq(unsigned long freq)
-+{
-+	xtal_f = freq;
-+}
++The S3C64xx clock controller generates and supplies clock to various controllers
++within the SoC. The clock binding described here is applicable to all SoCs in
++the S3C64xx family.
 +
-+void __init s3c64xx_set_xusbxti_freq(unsigned long freq)
-+{
-+	xusbxti_f = freq;
-+}
++Required Properties:
 +
- /* uart registration process */
- 
- static void __init s3c64xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
-@@ -67,7 +80,6 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idcode		= S3C6400_CPU_ID,
- 		.idmask		= S3C64XX_CPU_MASK,
- 		.map_io		= s3c6400_map_io,
--		.init_clocks	= s3c6400_init_clocks,
- 		.init_uarts	= s3c64xx_init_uarts,
- 		.init		= s3c6400_init,
- 		.name		= name_s3c6400,
-@@ -75,7 +87,6 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idcode		= S3C6410_CPU_ID,
- 		.idmask		= S3C64XX_CPU_MASK,
- 		.map_io		= s3c6410_map_io,
--		.init_clocks	= s3c6410_init_clocks,
- 		.init_uarts	= s3c64xx_init_uarts,
- 		.init		= s3c6410_init,
- 		.name		= name_s3c6410,
-@@ -213,8 +224,10 @@ void __init s3c64xx_init_irq(u32 vic0_valid, u32 vic1_valid)
- {
- 	/*
- 	 * FIXME: there is no better place to put this at the moment
--	 * (samsung_wdt_reset_init needs clocks)
-+	 * (s3c64xx_clk_init needs ioremap and must happen before init_time
-+	 * samsung_wdt_reset_init needs clocks)
- 	 */
-+	s3c64xx_clk_init(NULL, xtal_f, xusbxti_f, soc_is_s3c6400(), S3C_VA_SYS);
- 	samsung_wdt_reset_init(S3C_VA_WATCHDOG);
- 
- 	printk(KERN_DEBUG "%s: initialising interrupts\n", __func__);
-diff --git a/arch/arm/mach-s3c64xx/common.h b/arch/arm/mach-s3c64xx/common.h
-index e8f990b..a2af0e1 100644
---- a/arch/arm/mach-s3c64xx/common.h
-+++ b/arch/arm/mach-s3c64xx/common.h
-@@ -22,18 +22,19 @@
- void s3c64xx_init_irq(u32 vic0, u32 vic1);
- void s3c64xx_init_io(struct map_desc *mach_desc, int size);
- 
--void s3c64xx_register_clocks(unsigned long xtal, unsigned armclk_limit);
--void s3c64xx_setup_clocks(void);
--
- void s3c64xx_restart(enum reboot_mode mode, const char *cmd);
- void s3c64xx_init_late(void);
- 
-+void s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
-+	unsigned long xusbxti_f, bool is_s3c6400, void __iomem *reg_base);
-+void s3c64xx_set_xtal_freq(unsigned long freq);
-+void s3c64xx_set_xusbxti_freq(unsigned long freq);
++- compatible: should be one of the following.
++  - "samsung,s3c6400-clock" - controller compatible with S3C6400 SoC.
++  - "samsung,s3c6410-clock" - controller compatible with S3C6410 SoC.
 +
- #ifdef CONFIG_CPU_S3C6400
- 
- extern  int s3c6400_init(void);
- extern void s3c6400_init_irq(void);
- extern void s3c6400_map_io(void);
--extern void s3c6400_init_clocks(int xtal);
- 
- #else
- #define s3c6400_init_clocks NULL
-@@ -46,7 +47,6 @@ extern void s3c6400_init_clocks(int xtal);
- extern  int s3c6410_init(void);
- extern void s3c6410_init_irq(void);
- extern void s3c6410_map_io(void);
--extern void s3c6410_init_clocks(int xtal);
- 
- #else
- #define s3c6410_init_clocks NULL
-diff --git a/arch/arm/mach-s3c64xx/mach-anw6410.c b/arch/arm/mach-s3c64xx/mach-anw6410.c
-index 35e3f54..d266dd5 100644
---- a/arch/arm/mach-s3c64xx/mach-anw6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-anw6410.c
-@@ -207,7 +207,7 @@ static struct platform_device *anw6410_devices[] __initdata = {
- static void __init anw6410_map_io(void)
- {
- 	s3c64xx_init_io(anw6410_iodesc, ARRAY_SIZE(anw6410_iodesc));
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
- 	s3c24xx_init_uarts(anw6410_uartcfgs, ARRAY_SIZE(anw6410_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 28889cc..4d92e4d 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -743,7 +743,7 @@ static struct s3c2410_platform_i2c i2c1_pdata = {
- static void __init crag6410_map_io(void)
- {
- 	s3c64xx_init_io(NULL, 0);
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
- 	s3c24xx_init_uarts(crag6410_uartcfgs, ARRAY_SIZE(crag6410_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- 
-diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-index f39569e..e806404 100644
---- a/arch/arm/mach-s3c64xx/mach-hmt.c
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-@@ -247,7 +247,7 @@ static struct platform_device *hmt_devices[] __initdata = {
- static void __init hmt_map_io(void)
- {
- 	s3c64xx_init_io(hmt_iodesc, ARRAY_SIZE(hmt_iodesc));
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
- 	s3c24xx_init_uarts(hmt_uartcfgs, ARRAY_SIZE(hmt_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- }
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index 87f406e..3cceda2 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -231,7 +231,7 @@ static void __init mini6410_map_io(void)
- 	u32 tmp;
- 
- 	s3c64xx_init_io(NULL, 0);
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
- 	s3c24xx_init_uarts(mini6410_uartcfgs, ARRAY_SIZE(mini6410_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- 
-diff --git a/arch/arm/mach-s3c64xx/mach-ncp.c b/arch/arm/mach-s3c64xx/mach-ncp.c
-index 7e2c390..2067b0b 100644
---- a/arch/arm/mach-s3c64xx/mach-ncp.c
-+++ b/arch/arm/mach-s3c64xx/mach-ncp.c
-@@ -86,7 +86,7 @@ static struct map_desc ncp_iodesc[] __initdata = {};
- static void __init ncp_map_io(void)
- {
- 	s3c64xx_init_io(ncp_iodesc, ARRAY_SIZE(ncp_iodesc));
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
- 	s3c24xx_init_uarts(ncp_uartcfgs, ARRAY_SIZE(ncp_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- }
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index 86d980b..0f47237 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -337,13 +337,6 @@ err:
- 	return ret;
- }
- 
--static int __init smartq_usb_otg_init(void)
--{
--	clk_xusbxti.rate = 12000000;
--
--	return 0;
--}
--
- static int __init smartq_wifi_init(void)
- {
- 	int ret;
-@@ -377,7 +370,8 @@ static struct map_desc smartq_iodesc[] __initdata = {};
- void __init smartq_map_io(void)
- {
- 	s3c64xx_init_io(smartq_iodesc, ARRAY_SIZE(smartq_iodesc));
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
-+	s3c64xx_set_xusbxti_freq(12000000);
- 	s3c24xx_init_uarts(smartq_uartcfgs, ARRAY_SIZE(smartq_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- 
-@@ -399,7 +393,6 @@ void __init smartq_machine_init(void)
- 	WARN_ON(smartq_lcd_setup_gpio());
- 	WARN_ON(smartq_power_off_init());
- 	WARN_ON(smartq_usb_host_init());
--	WARN_ON(smartq_usb_otg_init());
- 	WARN_ON(smartq_wifi_init());
- 
- 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6400.c b/arch/arm/mach-s3c64xx/mach-smdk6400.c
-index d70c084..27381cf 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6400.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6400.c
-@@ -65,7 +65,7 @@ static struct map_desc smdk6400_iodesc[] = {};
- static void __init smdk6400_map_io(void)
- {
- 	s3c64xx_init_io(smdk6400_iodesc, ARRAY_SIZE(smdk6400_iodesc));
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
- 	s3c24xx_init_uarts(smdk6400_uartcfgs, ARRAY_SIZE(smdk6400_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- }
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index d90b450..2a7b32c 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -634,7 +634,7 @@ static void __init smdk6410_map_io(void)
- 	u32 tmp;
- 
- 	s3c64xx_init_io(smdk6410_iodesc, ARRAY_SIZE(smdk6410_iodesc));
--	s3c24xx_init_clocks(12000000);
-+	s3c64xx_set_xtal_freq(12000000);
- 	s3c24xx_init_uarts(smdk6410_uartcfgs, ARRAY_SIZE(smdk6410_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- 
-diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
-index 4869714..331fe8e 100644
---- a/arch/arm/mach-s3c64xx/s3c6400.c
-+++ b/arch/arm/mach-s3c64xx/s3c6400.c
-@@ -58,12 +58,6 @@ void __init s3c6400_map_io(void)
- 	s3c64xx_onenand1_setname("s3c6400-onenand");
- }
- 
--void __init s3c6400_init_clocks(int xtal)
--{
--	s3c64xx_register_clocks(xtal, S3C6400_CLKDIV0_ARM_MASK);
--	s3c64xx_setup_clocks();
--}
--
- void __init s3c6400_init_irq(void)
- {
- 	/* VIC0 does not have IRQS 5..7,
-diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
-index 31c29fd..7e6fa12 100644
---- a/arch/arm/mach-s3c64xx/s3c6410.c
-+++ b/arch/arm/mach-s3c64xx/s3c6410.c
-@@ -62,13 +62,6 @@ void __init s3c6410_map_io(void)
- 	s3c_cfcon_setname("s3c64xx-pata");
- }
- 
--void __init s3c6410_init_clocks(int xtal)
--{
--	printk(KERN_DEBUG "%s: initialising clocks\n", __func__);
--	s3c64xx_register_clocks(xtal, S3C6410_CLKDIV0_ARM_MASK);
--	s3c64xx_setup_clocks();
--}
--
- void __init s3c6410_init_irq(void)
- {
- 	/* VIC0 is missing IRQ7, VIC1 is fully populated. */
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- #clock-cells: should be 1.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. Some of the clocks are available only
++on a particular S3C64xx SoC and this is specified where applicable.
++
++All available clocks are defined as preprocessor macros in
++dt-bindings/clock/samsung,s3c64xx-clock.h header and can be used in device
++tree sources.
++
++External clocks:
++
++There are several clocks that are generated outside the SoC. It is expected
++that they are defined using standard clock bindings with following
++clock-output-names:
++ - "fin_pll" - PLL input clock (xtal/extclk) - required,
++ - "xusbxti" - USB xtal - required,
++ - "iiscdclk0" - I2S0 codec clock - optional,
++ - "iiscdclk1" - I2S1 codec clock - optional,
++ - "iiscdclk2" - I2S2 codec clock - optional,
++ - "pcmcdclk0" - PCM0 codec clock - optional,
++ - "pcmcdclk1" - PCM1 codec clock - optional, only S3C6410.
++
++Example: Clock controller node:
++
++	clock: clock-controller at 7e00f000 {
++		compatible = "samsung,s3c6410-clock";
++		reg = <0x7e00f000 0x1000>;
++		#clock-cells = <1>;
++	};
++
++Example: Required external clocks:
++
++	fin_pll: clock-fin-pll {
++		compatible = "fixed-clock";
++		clock-output-names = "fin_pll";
++		clock-frequency = <12000000>;
++		#clock-cells = <0>;
++	};
++
++	xusbxti: clock-xusbxti {
++		compatible = "fixed-clock";
++		clock-output-names = "xusbxti";
++		clock-frequency = <48000000>;
++		#clock-cells = <0>;
++	};
++
++Example: UART controller node that consumes the clock generated by the clock
++  controller (refer to the standard clock bindings for information about
++  "clocks" and "clock-names" properties):
++
++		uart0: serial at 7f005000 {
++			compatible = "samsung,s3c6400-uart";
++			reg = <0x7f005000 0x100>;
++			interrupt-parent = <&vic1>;
++			interrupts = <5>;
++			clock-names = "uart", "clk_uart_baud2",
++					"clk_uart_baud3";
++			clocks = <&clock PCLK_UART0>, <&clocks PCLK_UART0>,
++					<&clock SCLK_UART>;
++			status = "disabled";
++		};
 diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-index 3413380..8eb4799 100644
+index 5d4d432..3413380 100644
 --- a/drivers/clk/samsung/Makefile
 +++ b/drivers/clk/samsung/Makefile
-@@ -8,6 +8,4 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+@@ -8,3 +8,6 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
  obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
  obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
  obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
--ifdef CONFIG_COMMON_CLK
- obj-$(CONFIG_ARCH_S3C64XX)	+= clk-s3c64xx.o
--endif
++ifdef CONFIG_COMMON_CLK
++obj-$(CONFIG_ARCH_S3C64XX)	+= clk-s3c64xx.o
++endif
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+new file mode 100644
+index 0000000..6511f78
+--- /dev/null
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -0,0 +1,465 @@
++/*
++ * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Common Clock Framework support for all S3C64xx SoCs.
++*/
++
++#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#include <dt-bindings/clock/samsung,s3c64xx-clock.h>
++
++#include "clk.h"
++#include "clk-pll.h"
++
++/* S3C64xx clock controller register offsets. */
++#define APLL_LOCK		0x000
++#define MPLL_LOCK		0x004
++#define EPLL_LOCK		0x008
++#define APLL_CON		0x00c
++#define MPLL_CON		0x010
++#define EPLL_CON0		0x014
++#define EPLL_CON1		0x018
++#define CLK_SRC			0x01c
++#define CLK_DIV0		0x020
++#define CLK_DIV1		0x024
++#define CLK_DIV2		0x028
++#define HCLK_GATE		0x030
++#define PCLK_GATE		0x034
++#define SCLK_GATE		0x038
++#define MEM0_GATE		0x03c
++#define CLK_SRC2		0x10c
++#define OTHERS			0x900
++
++/* Helper macros to define clock arrays. */
++#define FIXED_RATE_CLOCKS(name)	\
++		static struct samsung_fixed_rate_clock name[]
++#define MUX_CLOCKS(name)	\
++		static struct samsung_mux_clock name[]
++#define DIV_CLOCKS(name)	\
++		static struct samsung_div_clock name[]
++#define GATE_CLOCKS(name)	\
++		static struct samsung_gate_clock name[]
++
++/* Helper macros for gate types present on S3C64xx. */
++#define GATE_BUS(_id, cname, pname, o, b) \
++		GATE(_id, cname, pname, o, b, 0, 0)
++#define GATE_SCLK(_id, cname, pname, o, b) \
++		GATE(_id, cname, pname, o, b, CLK_SET_RATE_PARENT, 0)
++#define GATE_ON(_id, cname, pname, o, b) \
++		GATE(_id, cname, pname, o, b, CLK_IGNORE_UNUSED, 0)
++
++/*
++ * List of controller registers to be saved and restored during
++ * a suspend/resume cycle.
++ */
++static __initdata unsigned long s3c64xx_clk_regs[] = {
++	APLL_LOCK,
++	MPLL_LOCK,
++	EPLL_LOCK,
++	APLL_CON,
++	MPLL_CON,
++	EPLL_CON0,
++	EPLL_CON1,
++	CLK_SRC,
++	CLK_DIV0,
++	CLK_DIV1,
++	CLK_DIV2,
++	HCLK_GATE,
++	PCLK_GATE,
++	SCLK_GATE,
++};
++
++static __initdata unsigned long s3c6410_clk_regs[] = {
++	CLK_SRC2,
++	MEM0_GATE,
++};
++
++/* List of parent clocks common for all S3C64xx SoCs. */
++PNAME(spi_mmc_p)	= { "mout_epll", "dout_mpll", "fin_pll", "clk27m" };
++PNAME(uart_p)		= { "mout_epll", "dout_mpll" };
++PNAME(audio0_p)		= { "mout_epll", "dout_mpll", "fin_pll", "iiscdclk0",
++				"pcmcdclk0", "none", "none", "none" };
++PNAME(audio1_p)		= { "mout_epll", "dout_mpll", "fin_pll", "iiscdclk1",
++				"pcmcdclk0", "none", "none", "none" };
++PNAME(mfc_p)		= { "hclkx2", "mout_epll" };
++PNAME(apll_p)		= { "fin_pll", "fout_apll" };
++PNAME(mpll_p)		= { "fin_pll", "fout_mpll" };
++PNAME(epll_p)		= { "fin_pll", "fout_epll" };
++PNAME(hclkx2_p)		= { "mout_mpll", "mout_apll" };
++
++/* S3C6400-specific parent clocks. */
++PNAME(scaler_lcd_p6400)	= { "mout_epll", "dout_mpll", "none", "none" };
++PNAME(irda_p6400)	= { "mout_epll", "dout_mpll", "none", "clk48m" };
++PNAME(uhost_p6400)	= { "clk48m", "mout_epll", "dout_mpll", "none" };
++
++/* S3C6410-specific parent clocks. */
++PNAME(clk27_p6410)	= { "clk27m", "fin_pll" };
++PNAME(scaler_lcd_p6410)	= { "mout_epll", "dout_mpll", "fin_pll", "none" };
++PNAME(irda_p6410)	= { "mout_epll", "dout_mpll", "fin_pll", "clk48m" };
++PNAME(uhost_p6410)	= { "clk48m", "mout_epll", "dout_mpll", "fin_pll" };
++PNAME(audio2_p6410)	= { "mout_epll", "dout_mpll", "fin_pll", "iiscdclk2",
++				"pcmcdclk1", "none", "none", "none" };
++
++/* Fixed rate clocks generated outside the SoC. */
++FIXED_RATE_CLOCKS(s3c64xx_fixed_rate_ext_clks) __initdata = {
++	FRATE(0, "fin_pll", NULL, CLK_IS_ROOT, 0),
++	FRATE(0, "xusbxti", NULL, CLK_IS_ROOT, 0),
++};
++
++/* Fixed rate clocks generated inside the SoC. */
++FIXED_RATE_CLOCKS(s3c64xx_fixed_rate_clks) __initdata = {
++	FRATE(CLK27M, "clk27m", NULL, CLK_IS_ROOT, 27000000),
++	FRATE(CLK48M, "clk48m", NULL, CLK_IS_ROOT, 48000000),
++};
++
++/* List of clock muxes present on all S3C64xx SoCs. */
++MUX_CLOCKS(s3c64xx_mux_clks) __initdata = {
++	MUX_F(0, "mout_syncmux", hclkx2_p, OTHERS, 6, 1, 0, CLK_MUX_READ_ONLY),
++	MUX(MOUT_APLL, "mout_apll", apll_p, CLK_SRC, 0, 1),
++	MUX(MOUT_MPLL, "mout_mpll", mpll_p, CLK_SRC, 1, 1),
++	MUX(MOUT_EPLL, "mout_epll", epll_p, CLK_SRC, 2, 1),
++	MUX(MOUT_MFC, "mout_mfc", mfc_p, CLK_SRC, 4, 1),
++	MUX(MOUT_AUDIO0, "mout_audio0", audio0_p, CLK_SRC, 7, 3),
++	MUX(MOUT_AUDIO1, "mout_audio1", audio1_p, CLK_SRC, 10, 3),
++	MUX(MOUT_UART, "mout_uart", uart_p, CLK_SRC, 13, 1),
++	MUX(MOUT_SPI0, "mout_spi0", spi_mmc_p, CLK_SRC, 14, 2),
++	MUX(MOUT_SPI1, "mout_spi1", spi_mmc_p, CLK_SRC, 16, 2),
++	MUX(MOUT_MMC0, "mout_mmc0", spi_mmc_p, CLK_SRC, 18, 2),
++	MUX(MOUT_MMC1, "mout_mmc1", spi_mmc_p, CLK_SRC, 20, 2),
++	MUX(MOUT_MMC2, "mout_mmc2", spi_mmc_p, CLK_SRC, 22, 2),
++};
++
++/* List of clock muxes present on S3C6400. */
++MUX_CLOCKS(s3c6400_mux_clks) __initdata = {
++	MUX(MOUT_UHOST, "mout_uhost", uhost_p6400, CLK_SRC, 5, 2),
++	MUX(MOUT_IRDA, "mout_irda", irda_p6400, CLK_SRC, 24, 2),
++	MUX(MOUT_LCD, "mout_lcd", scaler_lcd_p6400, CLK_SRC, 26, 2),
++	MUX(MOUT_SCALER, "mout_scaler", scaler_lcd_p6400, CLK_SRC, 28, 2),
++};
++
++/* List of clock muxes present on S3C6410. */
++MUX_CLOCKS(s3c6410_mux_clks) __initdata = {
++	MUX(MOUT_UHOST, "mout_uhost", uhost_p6410, CLK_SRC, 5, 2),
++	MUX(MOUT_IRDA, "mout_irda", irda_p6410, CLK_SRC, 24, 2),
++	MUX(MOUT_LCD, "mout_lcd", scaler_lcd_p6410, CLK_SRC, 26, 2),
++	MUX(MOUT_SCALER, "mout_scaler", scaler_lcd_p6410, CLK_SRC, 28, 2),
++	MUX(MOUT_DAC27, "mout_dac27", clk27_p6410, CLK_SRC, 30, 1),
++	MUX(MOUT_TV27, "mout_tv27", clk27_p6410, CLK_SRC, 31, 1),
++	MUX(MOUT_AUDIO2, "mout_audio2", audio2_p6410, CLK_SRC2, 0, 3),
++};
++
++/* List of clock dividers present on all S3C64xx SoCs. */
++DIV_CLOCKS(s3c64xx_div_clks) __initdata = {
++	DIV(DOUT_MPLL, "dout_mpll", "mout_mpll", CLK_DIV0, 4, 1),
++	DIV(HCLKX2, "hclkx2", "mout_syncmux", CLK_DIV0, 9, 3),
++	DIV(HCLK, "hclk", "hclkx2", CLK_DIV0, 8, 1),
++	DIV(PCLK, "pclk", "hclkx2", CLK_DIV0, 12, 4),
++	DIV(DOUT_SECUR, "dout_secur", "hclkx2", CLK_DIV0, 18, 2),
++	DIV(DOUT_CAM, "dout_cam", "hclkx2", CLK_DIV0, 20, 4),
++	DIV(DOUT_JPEG, "dout_jpeg", "hclkx2", CLK_DIV0, 24, 4),
++	DIV(DOUT_MFC, "dout_mfc", "mout_mfc", CLK_DIV0, 28, 4),
++	DIV(DOUT_MMC0, "dout_mmc0", "mout_mmc0", CLK_DIV1, 0, 4),
++	DIV(DOUT_MMC1, "dout_mmc1", "mout_mmc1", CLK_DIV1, 4, 4),
++	DIV(DOUT_MMC2, "dout_mmc2", "mout_mmc2", CLK_DIV1, 8, 4),
++	DIV(DOUT_LCD, "dout_lcd", "mout_lcd", CLK_DIV1, 12, 4),
++	DIV(DOUT_SCALER, "dout_scaler", "mout_scaler", CLK_DIV1, 16, 4),
++	DIV(DOUT_UHOST, "dout_uhost", "mout_uhost", CLK_DIV1, 20, 4),
++	DIV(DOUT_SPI0, "dout_spi0", "mout_spi0", CLK_DIV2, 0, 4),
++	DIV(DOUT_SPI1, "dout_spi1", "mout_spi1", CLK_DIV2, 4, 4),
++	DIV(DOUT_AUDIO0, "dout_audio0", "mout_audio0", CLK_DIV2, 8, 4),
++	DIV(DOUT_AUDIO1, "dout_audio1", "mout_audio1", CLK_DIV2, 12, 4),
++	DIV(DOUT_UART, "dout_uart", "mout_uart", CLK_DIV2, 16, 4),
++	DIV(DOUT_IRDA, "dout_irda", "mout_irda", CLK_DIV2, 20, 4),
++};
++
++/* List of clock dividers present on S3C6400. */
++DIV_CLOCKS(s3c6400_div_clks) __initdata = {
++	DIV(ARMCLK, "armclk", "mout_apll", CLK_DIV0, 0, 3),
++};
++
++/* List of clock dividers present on S3C6410. */
++DIV_CLOCKS(s3c6410_div_clks) __initdata = {
++	DIV(ARMCLK, "armclk", "mout_apll", CLK_DIV0, 0, 4),
++	DIV(DOUT_FIMC, "dout_fimc", "hclk", CLK_DIV1, 24, 4),
++	DIV(DOUT_AUDIO2, "dout_audio2", "mout_audio2", CLK_DIV2, 24, 4),
++};
++
++/* List of clock gates present on all S3C64xx SoCs. */
++GATE_CLOCKS(s3c64xx_gate_clks) __initdata = {
++	GATE_BUS(HCLK_UHOST, "hclk_uhost", "hclk", HCLK_GATE, 29),
++	GATE_BUS(HCLK_SECUR, "hclk_secur", "hclk", HCLK_GATE, 28),
++	GATE_BUS(HCLK_SDMA1, "hclk_sdma1", "hclk", HCLK_GATE, 27),
++	GATE_BUS(HCLK_SDMA0, "hclk_sdma0", "hclk", HCLK_GATE, 26),
++	GATE_ON(HCLK_DDR1, "hclk_ddr1", "hclk", HCLK_GATE, 24),
++	GATE_BUS(HCLK_USB, "hclk_usb", "hclk", HCLK_GATE, 20),
++	GATE_BUS(HCLK_HSMMC2, "hclk_hsmmc2", "hclk", HCLK_GATE, 19),
++	GATE_BUS(HCLK_HSMMC1, "hclk_hsmmc1", "hclk", HCLK_GATE, 18),
++	GATE_BUS(HCLK_HSMMC0, "hclk_hsmmc0", "hclk", HCLK_GATE, 17),
++	GATE_BUS(HCLK_MDP, "hclk_mdp", "hclk", HCLK_GATE, 16),
++	GATE_BUS(HCLK_DHOST, "hclk_dhost", "hclk", HCLK_GATE, 15),
++	GATE_BUS(HCLK_IHOST, "hclk_ihost", "hclk", HCLK_GATE, 14),
++	GATE_BUS(HCLK_DMA1, "hclk_dma1", "hclk", HCLK_GATE, 13),
++	GATE_BUS(HCLK_DMA0, "hclk_dma0", "hclk", HCLK_GATE, 12),
++	GATE_BUS(HCLK_JPEG, "hclk_jpeg", "hclk", HCLK_GATE, 11),
++	GATE_BUS(HCLK_CAMIF, "hclk_camif", "hclk", HCLK_GATE, 10),
++	GATE_BUS(HCLK_SCALER, "hclk_scaler", "hclk", HCLK_GATE, 9),
++	GATE_BUS(HCLK_2D, "hclk_2d", "hclk", HCLK_GATE, 8),
++	GATE_BUS(HCLK_TV, "hclk_tv", "hclk", HCLK_GATE, 7),
++	GATE_BUS(HCLK_POST0, "hclk_post0", "hclk", HCLK_GATE, 5),
++	GATE_BUS(HCLK_ROT, "hclk_rot", "hclk", HCLK_GATE, 4),
++	GATE_BUS(HCLK_LCD, "hclk_lcd", "hclk", HCLK_GATE, 3),
++	GATE_BUS(HCLK_TZIC, "hclk_tzic", "hclk", HCLK_GATE, 2),
++	GATE_ON(HCLK_INTC, "hclk_intc", "hclk", HCLK_GATE, 1),
++	GATE_ON(PCLK_SKEY, "pclk_skey", "pclk", PCLK_GATE, 24),
++	GATE_ON(PCLK_CHIPID, "pclk_chipid", "pclk", PCLK_GATE, 23),
++	GATE_BUS(PCLK_SPI1, "pclk_spi1", "pclk", PCLK_GATE, 22),
++	GATE_BUS(PCLK_SPI0, "pclk_spi0", "pclk", PCLK_GATE, 21),
++	GATE_BUS(PCLK_HSIRX, "pclk_hsirx", "pclk", PCLK_GATE, 20),
++	GATE_BUS(PCLK_HSITX, "pclk_hsitx", "pclk", PCLK_GATE, 19),
++	GATE_ON(PCLK_GPIO, "pclk_gpio", "pclk", PCLK_GATE, 18),
++	GATE_BUS(PCLK_IIC0, "pclk_iic0", "pclk", PCLK_GATE, 17),
++	GATE_BUS(PCLK_IIS1, "pclk_iis1", "pclk", PCLK_GATE, 16),
++	GATE_BUS(PCLK_IIS0, "pclk_iis0", "pclk", PCLK_GATE, 15),
++	GATE_BUS(PCLK_AC97, "pclk_ac97", "pclk", PCLK_GATE, 14),
++	GATE_BUS(PCLK_TZPC, "pclk_tzpc", "pclk", PCLK_GATE, 13),
++	GATE_BUS(PCLK_TSADC, "pclk_tsadc", "pclk", PCLK_GATE, 12),
++	GATE_BUS(PCLK_KEYPAD, "pclk_keypad", "pclk", PCLK_GATE, 11),
++	GATE_BUS(PCLK_IRDA, "pclk_irda", "pclk", PCLK_GATE, 10),
++	GATE_BUS(PCLK_PCM1, "pclk_pcm1", "pclk", PCLK_GATE, 9),
++	GATE_BUS(PCLK_PCM0, "pclk_pcm0", "pclk", PCLK_GATE, 8),
++	GATE_BUS(PCLK_PWM, "pclk_pwm", "pclk", PCLK_GATE, 7),
++	GATE_BUS(PCLK_RTC, "pclk_rtc", "pclk", PCLK_GATE, 6),
++	GATE_BUS(PCLK_WDT, "pclk_wdt", "pclk", PCLK_GATE, 5),
++	GATE_BUS(PCLK_UART3, "pclk_uart3", "pclk", PCLK_GATE, 4),
++	GATE_BUS(PCLK_UART2, "pclk_uart2", "pclk", PCLK_GATE, 3),
++	GATE_BUS(PCLK_UART1, "pclk_uart1", "pclk", PCLK_GATE, 2),
++	GATE_BUS(PCLK_UART0, "pclk_uart0", "pclk", PCLK_GATE, 1),
++	GATE_BUS(PCLK_MFC, "pclk_mfc", "pclk", PCLK_GATE, 0),
++	GATE_SCLK(SCLK_UHOST, "sclk_uhost", "dout_uhost", SCLK_GATE, 30),
++	GATE_SCLK(SCLK_MMC2_48, "sclk_mmc2_48", "clk48m", SCLK_GATE, 29),
++	GATE_SCLK(SCLK_MMC1_48, "sclk_mmc1_48", "clk48m", SCLK_GATE, 28),
++	GATE_SCLK(SCLK_MMC0_48, "sclk_mmc0_48", "clk48m", SCLK_GATE, 27),
++	GATE_SCLK(SCLK_MMC2, "sclk_mmc2", "dout_mmc2", SCLK_GATE, 26),
++	GATE_SCLK(SCLK_MMC1, "sclk_mmc1", "dout_mmc1", SCLK_GATE, 25),
++	GATE_SCLK(SCLK_MMC0, "sclk_mmc0", "dout_mmc0", SCLK_GATE, 24),
++	GATE_SCLK(SCLK_SPI1_48, "sclk_spi1_48", "clk48m", SCLK_GATE, 23),
++	GATE_SCLK(SCLK_SPI0_48, "sclk_spi0_48", "clk48m", SCLK_GATE, 22),
++	GATE_SCLK(SCLK_SPI1, "sclk_spi1", "dout_spi1", SCLK_GATE, 21),
++	GATE_SCLK(SCLK_SPI0, "sclk_spi0", "dout_spi0", SCLK_GATE, 20),
++	GATE_SCLK(SCLK_DAC27, "sclk_dac27", "mout_dac27", SCLK_GATE, 19),
++	GATE_SCLK(SCLK_TV27, "sclk_tv27", "mout_tv27", SCLK_GATE, 18),
++	GATE_SCLK(SCLK_SCALER27, "sclk_scaler27", "clk27m", SCLK_GATE, 17),
++	GATE_SCLK(SCLK_SCALER, "sclk_scaler", "dout_scaler", SCLK_GATE, 16),
++	GATE_SCLK(SCLK_LCD27, "sclk_lcd27", "clk27m", SCLK_GATE, 15),
++	GATE_SCLK(SCLK_LCD, "sclk_lcd", "dout_lcd", SCLK_GATE, 14),
++	GATE_SCLK(SCLK_POST0_27, "sclk_post0_27", "clk27m", SCLK_GATE, 12),
++	GATE_SCLK(SCLK_POST0, "sclk_post0", "dout_lcd", SCLK_GATE, 10),
++	GATE_SCLK(SCLK_AUDIO1, "sclk_audio1", "dout_audio1", SCLK_GATE, 9),
++	GATE_SCLK(SCLK_AUDIO0, "sclk_audio0", "dout_audio0", SCLK_GATE, 8),
++	GATE_SCLK(SCLK_SECUR, "sclk_secur", "dout_secur", SCLK_GATE, 7),
++	GATE_SCLK(SCLK_IRDA, "sclk_irda", "dout_irda", SCLK_GATE, 6),
++	GATE_SCLK(SCLK_UART, "sclk_uart", "dout_uart", SCLK_GATE, 5),
++	GATE_SCLK(SCLK_MFC, "sclk_mfc", "dout_mfc", SCLK_GATE, 3),
++	GATE_SCLK(SCLK_CAM, "sclk_cam", "dout_cam", SCLK_GATE, 2),
++	GATE_SCLK(SCLK_JPEG, "sclk_jpeg", "dout_jpeg", SCLK_GATE, 1),
++};
++
++/* List of clock gates present on S3C6400. */
++GATE_CLOCKS(s3c6400_gate_clks) __initdata = {
++	GATE_ON(HCLK_DDR0, "hclk_ddr0", "hclk", HCLK_GATE, 23),
++	GATE_SCLK(SCLK_ONENAND, "sclk_onenand", "parent", SCLK_GATE, 4),
++};
++
++/* List of clock gates present on S3C6410. */
++GATE_CLOCKS(s3c6410_gate_clks) __initdata = {
++	GATE_BUS(HCLK_3DSE, "hclk_3dse", "hclk", HCLK_GATE, 31),
++	GATE_ON(HCLK_IROM, "hclk_irom", "hclk", HCLK_GATE, 25),
++	GATE_ON(HCLK_MEM1, "hclk_mem1", "hclk", HCLK_GATE, 22),
++	GATE_ON(HCLK_MEM0, "hclk_mem0", "hclk", HCLK_GATE, 21),
++	GATE_BUS(HCLK_MFC, "hclk_mfc", "hclk", HCLK_GATE, 0),
++	GATE_BUS(PCLK_IIC1, "pclk_iic1", "pclk", PCLK_GATE, 27),
++	GATE_BUS(PCLK_IIS2, "pclk_iis2", "pclk", PCLK_GATE, 26),
++	GATE_SCLK(SCLK_FIMC, "sclk_fimc", "dout_fimc", SCLK_GATE, 13),
++	GATE_SCLK(SCLK_AUDIO2, "sclk_audio2", "dout_audio2", SCLK_GATE, 11),
++	GATE_BUS(MEM0_CFCON, "mem0_cfcon", "hclk_mem0", MEM0_GATE, 5),
++	GATE_BUS(MEM0_ONENAND1, "mem0_onenand1", "hclk_mem0", MEM0_GATE, 4),
++	GATE_BUS(MEM0_ONENAND0, "mem0_onenand0", "hclk_mem0", MEM0_GATE, 3),
++	GATE_BUS(MEM0_NFCON, "mem0_nfcon", "hclk_mem0", MEM0_GATE, 2),
++	GATE_ON(MEM0_SROM, "mem0_srom", "hclk_mem0", MEM0_GATE, 1),
++};
++
++/* Aliases for common s3c64xx clocks. */
++static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
++	ALIAS(MOUT_EPLL, NULL, "mout_epll"),
++	ALIAS(DOUT_MPLL, NULL, "dout_mpll"),
++	ALIAS(HCLKX2, NULL, "hclk2"),
++	ALIAS(HCLK, NULL, "hclk"),
++	ALIAS(PCLK, NULL, "pclk"),
++	ALIAS(PCLK, NULL, "clk_uart_baud2"),
++	ALIAS(ARMCLK, NULL, "armclk"),
++	ALIAS(HCLK_UHOST, "s3c2410-ohci", "usb-host"),
++	ALIAS(HCLK_USB, "s3c-hsotg", "otg"),
++	ALIAS(HCLK_HSMMC2, "s3c-sdhci.2", "hsmmc"),
++	ALIAS(HCLK_HSMMC2, "s3c-sdhci.2", "mmc_busclk.0"),
++	ALIAS(HCLK_HSMMC1, "s3c-sdhci.1", "hsmmc"),
++	ALIAS(HCLK_HSMMC1, "s3c-sdhci.1", "mmc_busclk.0"),
++	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "hsmmc"),
++	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "mmc_busclk.0"),
++	ALIAS(HCLK_DMA1, NULL, "dma1"),
++	ALIAS(HCLK_DMA0, NULL, "dma0"),
++	ALIAS(HCLK_CAMIF, "s3c-camif", "camif"),
++	ALIAS(HCLK_LCD, "s3c-fb", "lcd"),
++	ALIAS(PCLK_SPI1, "s3c6410-spi.1", "spi"),
++	ALIAS(PCLK_SPI0, "s3c6410-spi.0", "spi"),
++	ALIAS(PCLK_IIC0, "s3c2440-i2c.0", "i2c"),
++	ALIAS(PCLK_IIS1, "samsung-i2s.1", "iis"),
++	ALIAS(PCLK_IIS0, "samsung-i2s.0", "iis"),
++	ALIAS(PCLK_AC97, "samsung-ac97", "ac97"),
++	ALIAS(PCLK_TSADC, "s3c64xx-adc", "adc"),
++	ALIAS(PCLK_KEYPAD, "samsung-keypad", "keypad"),
++	ALIAS(PCLK_PCM1, "samsung-pcm.1", "pcm"),
++	ALIAS(PCLK_PCM0, "samsung-pcm.0", "pcm"),
++	ALIAS(PCLK_PWM, NULL, "timers"),
++	ALIAS(PCLK_RTC, "s3c64xx-rtc", "rtc"),
++	ALIAS(PCLK_WDT, NULL, "watchdog"),
++	ALIAS(PCLK_UART3, "s3c6400-uart.3", "uart"),
++	ALIAS(PCLK_UART2, "s3c6400-uart.2", "uart"),
++	ALIAS(PCLK_UART1, "s3c6400-uart.1", "uart"),
++	ALIAS(PCLK_UART0, "s3c6400-uart.0", "uart"),
++	ALIAS(SCLK_UHOST, "s3c2410-ohci", "usb-bus-host"),
++	ALIAS(SCLK_MMC2, "s3c-sdhci.2", "mmc_busclk.2"),
++	ALIAS(SCLK_MMC1, "s3c-sdhci.1", "mmc_busclk.2"),
++	ALIAS(SCLK_MMC0, "s3c-sdhci.0", "mmc_busclk.2"),
++	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi-bus"),
++	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi-bus"),
++	ALIAS(SCLK_AUDIO1, "samsung-pcm.1", "audio-bus"),
++	ALIAS(SCLK_AUDIO1, "samsung-i2s.1", "audio-bus"),
++	ALIAS(SCLK_AUDIO0, "samsung-pcm.0", "audio-bus"),
++	ALIAS(SCLK_AUDIO0, "samsung-i2s.0", "audio-bus"),
++	ALIAS(SCLK_UART, NULL, "clk_uart_baud3"),
++	ALIAS(SCLK_CAM, "s3c-camif", "camera"),
++};
++
++/* Aliases for s3c6400-specific clocks. */
++static struct samsung_clock_alias s3c6400_clock_aliases[] = {
++	/* Nothing to place here yet. */
++};
++
++/* Aliases for s3c6410-specific clocks. */
++static struct samsung_clock_alias s3c6410_clock_aliases[] = {
++	ALIAS(PCLK_IIC1, "s3c2440-i2c.1", "i2c"),
++	ALIAS(PCLK_IIS2, "samsung-i2s.2", "iis"),
++	ALIAS(SCLK_FIMC, "s3c-camif", "fimc"),
++	ALIAS(SCLK_AUDIO2, "samsung-i2s.2", "audio-bus"),
++	ALIAS(MEM0_SROM, NULL, "srom"),
++};
++
++static void __init s3c64xx_clk_register_fixed_ext(unsigned long fin_pll_f,
++							unsigned long xusbxti_f)
++{
++	s3c64xx_fixed_rate_ext_clks[0].fixed_rate = fin_pll_f;
++	s3c64xx_fixed_rate_ext_clks[1].fixed_rate = xusbxti_f;
++	samsung_clk_register_fixed_rate(s3c64xx_fixed_rate_ext_clks,
++				ARRAY_SIZE(s3c64xx_fixed_rate_ext_clks));
++}
++
++/* Register s3c64xx clocks. */
++void __init s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
++			     unsigned long xusbxti_f, bool is_s3c6400,
++			     void __iomem *reg_base)
++{
++	struct clk *clk;
++	unsigned long *soc_regs = NULL;
++	unsigned long nr_soc_regs = 0;
++
++	if (np) {
++		reg_base = of_iomap(np, 0);
++		if (!reg_base)
++			panic("%s: failed to map registers\n", __func__);
++	}
++
++	if (!is_s3c6400) {
++		soc_regs = s3c6410_clk_regs;
++		nr_soc_regs = ARRAY_SIZE(s3c6410_clk_regs);
++	}
++
++	samsung_clk_init(np, reg_base, NR_CLKS, s3c64xx_clk_regs,
++			ARRAY_SIZE(s3c64xx_clk_regs), soc_regs, nr_soc_regs);
++
++	/* Register external clocks. */
++	if (!np)
++		s3c64xx_clk_register_fixed_ext(xtal_f, xusbxti_f);
++
++	/* Register PLLs. */
++	clk = samsung_clk_register_pll6552("fout_apll",
++					"fin_pll", reg_base + APLL_LOCK);
++	samsung_clk_add_lookup(clk, FOUT_APLL);
++
++	clk = samsung_clk_register_pll6552("fout_mpll",
++					"fin_pll", reg_base + MPLL_LOCK);
++	samsung_clk_add_lookup(clk, FOUT_MPLL);
++
++	clk = samsung_clk_register_pll6553("fout_epll",
++					"fin_pll", reg_base + EPLL_LOCK);
++	samsung_clk_add_lookup(clk, FOUT_EPLL);
++
++	/* Register common internal clocks. */
++	samsung_clk_register_fixed_rate(s3c64xx_fixed_rate_clks,
++					ARRAY_SIZE(s3c64xx_fixed_rate_clks));
++	samsung_clk_register_mux(s3c64xx_mux_clks,
++					ARRAY_SIZE(s3c64xx_mux_clks));
++	samsung_clk_register_div(s3c64xx_div_clks,
++					ARRAY_SIZE(s3c64xx_div_clks));
++	samsung_clk_register_gate(s3c64xx_gate_clks,
++					ARRAY_SIZE(s3c64xx_gate_clks));
++
++	/* Register SoC-specific clocks. */
++	if (is_s3c6400) {
++		samsung_clk_register_mux(s3c6400_mux_clks,
++					ARRAY_SIZE(s3c6400_mux_clks));
++		samsung_clk_register_div(s3c6400_div_clks,
++					ARRAY_SIZE(s3c6400_div_clks));
++		samsung_clk_register_gate(s3c6400_gate_clks,
++					ARRAY_SIZE(s3c6400_gate_clks));
++		samsung_clk_register_alias(s3c6400_clock_aliases,
++					ARRAY_SIZE(s3c6400_clock_aliases));
++	} else {
++		samsung_clk_register_mux(s3c6410_mux_clks,
++					ARRAY_SIZE(s3c6410_mux_clks));
++		samsung_clk_register_div(s3c6410_div_clks,
++					ARRAY_SIZE(s3c6410_div_clks));
++		samsung_clk_register_gate(s3c6410_gate_clks,
++					ARRAY_SIZE(s3c6410_gate_clks));
++		samsung_clk_register_alias(s3c6410_clock_aliases,
++					ARRAY_SIZE(s3c6410_clock_aliases));
++	}
++
++	samsung_clk_register_alias(s3c64xx_clock_aliases,
++					ARRAY_SIZE(s3c64xx_clock_aliases));
++
++	pr_info("%s clocks: apll = %lu, mpll = %lu\n"
++		"\tepll = %lu, arm_clk = %lu\n",
++		is_s3c6400 ? "S3C6400" : "S3C6410",
++		_get_rate("fout_apll"),	_get_rate("fout_mpll"),
++		_get_rate("fout_epll"), _get_rate("armclk"));
++}
++
++static void __init s3c6400_clk_init(struct device_node *np)
++{
++	s3c64xx_clk_init(np, 0, 0, true, NULL);
++}
++CLK_OF_DECLARE(s3c6400_clk, "samsung,s3c6400-clock", s3c6400_clk_init);
++
++static void __init s3c6410_clk_init(struct device_node *np)
++{
++	s3c64xx_clk_init(np, 0, 0, false, NULL);
++}
++CLK_OF_DECLARE(s3c6410_clk, "samsung,s3c6410-clock", s3c6410_clk_init);
+diff --git a/include/dt-bindings/clock/samsung,s3c64xx-clock.h b/include/dt-bindings/clock/samsung,s3c64xx-clock.h
+new file mode 100644
+index 0000000..ad95c7f
+--- /dev/null
++++ b/include/dt-bindings/clock/samsung,s3c64xx-clock.h
+@@ -0,0 +1,178 @@
++/*
++ * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Device Tree binding constants for Samsung S3C64xx clock controller.
++*/
++
++#ifndef _DT_BINDINGS_CLOCK_SAMSUNG_S3C64XX_CLOCK_H
++#define _DT_BINDINGS_CLOCK_SAMSUNG_S3C64XX_CLOCK_H
++
++/*
++ * Let each exported clock get a unique index, which is used on DT-enabled
++ * platforms to lookup the clock from a clock specifier. These indices are
++ * therefore considered an ABI and so must not be changed. This implies
++ * that new clocks should be added either in free spaces between clock groups
++ * or at the end.
++ */
++
++/* Core clocks. */
++#define CLK27M			1
++#define CLK48M			2
++#define FOUT_APLL		3
++#define FOUT_MPLL		4
++#define FOUT_EPLL		5
++#define ARMCLK			6
++#define HCLKX2			7
++#define HCLK			8
++#define PCLK			9
++
++/* HCLK bus clocks. */
++#define HCLK_3DSE		16
++#define HCLK_UHOST		17
++#define HCLK_SECUR		18
++#define HCLK_SDMA1		19
++#define HCLK_SDMA0		20
++#define HCLK_IROM		21
++#define HCLK_DDR1		22
++#define HCLK_MEM1		23
++#define HCLK_MEM0		24
++#define HCLK_USB		25
++#define HCLK_HSMMC2		26
++#define HCLK_HSMMC1		27
++#define HCLK_HSMMC0		28
++#define HCLK_MDP		29
++#define HCLK_DHOST		30
++#define HCLK_IHOST		31
++#define HCLK_DMA1		32
++#define HCLK_DMA0		33
++#define HCLK_JPEG		34
++#define HCLK_CAMIF		35
++#define HCLK_SCALER		36
++#define HCLK_2D			37
++#define HCLK_TV			38
++#define HCLK_POST0		39
++#define HCLK_ROT		40
++#define HCLK_LCD		41
++#define HCLK_TZIC		42
++#define HCLK_INTC		43
++#define HCLK_MFC		44
++#define HCLK_DDR0		45
++
++/* PCLK bus clocks. */
++#define PCLK_IIC1		48
++#define PCLK_IIS2		49
++#define PCLK_SKEY		50
++#define PCLK_CHIPID		51
++#define PCLK_SPI1		52
++#define PCLK_SPI0		53
++#define PCLK_HSIRX		54
++#define PCLK_HSITX		55
++#define PCLK_GPIO		56
++#define PCLK_IIC0		57
++#define PCLK_IIS1		58
++#define PCLK_IIS0		59
++#define PCLK_AC97		60
++#define PCLK_TZPC		61
++#define PCLK_TSADC		62
++#define PCLK_KEYPAD		63
++#define PCLK_IRDA		64
++#define PCLK_PCM1		65
++#define PCLK_PCM0		66
++#define PCLK_PWM		67
++#define PCLK_RTC		68
++#define PCLK_WDT		69
++#define PCLK_UART3		70
++#define PCLK_UART2		71
++#define PCLK_UART1		72
++#define PCLK_UART0		73
++#define PCLK_MFC		74
++
++/* Special clocks. */
++#define SCLK_UHOST		80
++#define SCLK_MMC2_48		81
++#define SCLK_MMC1_48		82
++#define SCLK_MMC0_48		83
++#define SCLK_MMC2		84
++#define SCLK_MMC1		85
++#define SCLK_MMC0		86
++#define SCLK_SPI1_48		87
++#define SCLK_SPI0_48		88
++#define SCLK_SPI1		89
++#define SCLK_SPI0		90
++#define SCLK_DAC27		91
++#define SCLK_TV27		92
++#define SCLK_SCALER27		93
++#define SCLK_SCALER		94
++#define SCLK_LCD27		95
++#define SCLK_LCD		96
++#define SCLK_FIMC		97
++#define SCLK_POST0_27		98
++#define SCLK_AUDIO2		99
++#define SCLK_POST0		100
++#define SCLK_AUDIO1		101
++#define SCLK_AUDIO0		102
++#define SCLK_SECUR		103
++#define SCLK_IRDA		104
++#define SCLK_UART		105
++#define SCLK_MFC		106
++#define SCLK_CAM		107
++#define SCLK_JPEG		108
++#define SCLK_ONENAND		109
++
++/* MEM0 bus clocks - S3C6410-specific. */
++#define MEM0_CFCON		112
++#define MEM0_ONENAND1		113
++#define MEM0_ONENAND0		114
++#define MEM0_NFCON		115
++#define MEM0_SROM		116
++
++/* Muxes. */
++#define MOUT_APLL		128
++#define MOUT_MPLL		129
++#define MOUT_EPLL		130
++#define MOUT_MFC		131
++#define MOUT_AUDIO0		132
++#define MOUT_AUDIO1		133
++#define MOUT_UART		134
++#define MOUT_SPI0		135
++#define MOUT_SPI1		136
++#define MOUT_MMC0		137
++#define MOUT_MMC1		138
++#define MOUT_MMC2		139
++#define MOUT_UHOST		140
++#define MOUT_IRDA		141
++#define MOUT_LCD		142
++#define MOUT_SCALER		143
++#define MOUT_DAC27		144
++#define MOUT_TV27		145
++#define MOUT_AUDIO2		146
++
++/* Dividers. */
++#define DOUT_MPLL		160
++#define DOUT_SECUR		161
++#define DOUT_CAM		162
++#define DOUT_JPEG		163
++#define DOUT_MFC		164
++#define DOUT_MMC0		165
++#define DOUT_MMC1		166
++#define DOUT_MMC2		167
++#define DOUT_LCD		168
++#define DOUT_SCALER		169
++#define DOUT_UHOST		170
++#define DOUT_SPI0		171
++#define DOUT_SPI1		172
++#define DOUT_AUDIO0		173
++#define DOUT_AUDIO1		174
++#define DOUT_UART		175
++#define DOUT_IRDA		176
++#define DOUT_FIMC		177
++#define DOUT_AUDIO2		178
++
++/* Total number of clocks. */
++#define NR_CLKS			(DOUT_AUDIO2 + 1)
++
++#endif /* _DT_BINDINGS_CLOCK_SAMSUNG_S3C64XX_CLOCK_H */
 -- 
 1.8.3.2
