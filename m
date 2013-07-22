@@ -1,62 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Jul 2013 00:31:45 +0200
-Subject: [PATCH V2 1/5] gpio: clean up gpio-ranges documentation
-In-Reply-To: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
-References: <1373913629-32179-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CACRpkdYsZ0aMnANPpTiGuD1U23PCqyvVGS7vOOnOQUks5KSk9g@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 22 Jul 2013 15:41:01 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <20130722201348.GI453@xsjandreislx>
+References: <20130717210417.GP13667@xsjandreislx>
+ <51E72DCA.9070500@codeaurora.org>
+ <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+Message-ID: <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 8:40 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+Hi,
 
-> This change makes documentation of the the gpio-ranges property shorter
-> and more succinct, more consistent with the style of the rest of the
-> document, and not mention Linux-specifics such as the API
-> pinctrl_request_gpio(); DT binding documents should be OS independant
-> where at all possible.
+adding LKML and LAKML (which I forgot on the original email, sorry)
 
-This is all good.
+On Mon, Jul 22, 2013 at 01:13:48PM -0700, S?ren Brinkmann wrote:
+> On Mon, Jul 22, 2013 at 12:54:26PM -0700, Stephen Boyd wrote:
+> > On 07/22/13 11:25, S?ren Brinkmann wrote:
+> > > On Wed, Jul 17, 2013 at 06:22:35PM -0700, Stephen Boyd wrote:
+> > >> On 07/17/13 17:59, S?ren Brinkmann wrote:
+> > >>> Hi Stephen,
+> > >>>
+> > >>> On Wed, Jul 17, 2013 at 04:50:34PM -0700, Stephen Boyd wrote:
+> > >>>> On 07/17/13 14:04, S?ren Brinkmann wrote:
+> > >>>>> Hi all,
+> > >>>>>
+> > >>>>> I'm trying to enable the arm_global_timer on Zynq platforms with the
+> > >>>>> attached patch. Unfortunately that patch breaks booting up. It hangs
+> > >>>>> when handing over to init/early userspace (see attached boot.log).
+> > >>>>>
+> > >>>>> The funny thing is, if I remove either the global timer or the
+> > >>>>> arm,cortex-a9-twd-timer node from my dts, it works. So, it looks like
+> > >>>>> the two timer (drivers) interfere somehow. Does anybody have an idea of
+> > >>>>> what is going on and probably even how to resolve it?
+> > >>>>>
+> > >>>>> The patch is based on commit c0d15cc in Linus' tree.
+> > >>>> If you boot with one CPU does it hang? It looks like secondary CPUs
+> > >>>> aren't getting interrupts but I'm not sure why. Maybe you can try this
+> > >>>> patch and/or put some prints in the timer interrupt handler to see if
+> > >>>> interrupts are firing on secondary CPUs.
+> > >>> Your proposed patch does not seem to make a difference, but adding
+> > >>> 'maxcpus=1' to the kernel command line makes the system boot.
+> > >> Hmm I guess that doesn't really confirm much because TWD doesn't
+> > >> register itself on maxcpus=1 systems, so it's the same as removing the
+> > >> node from DT. Probably easier to put a printk in the interrupt handler
+> > >> and confirm that you're receiving interrupts on secondary CPUs.
+> > > Turns out it does work when I disable Zynq's cpuidle driver. I think I
+> > > can blame that driver.
+> > >
+> > 
+> > Hmm.. Perhaps the arm_global_timer driver also needs FEAT_C3_STOP added
+> > to it. Do you know if that timer is reset during low power modes?
+> 
+> Our cpudidle driver is not powering off anything, AFAIK. I think it just
+> executes 'wfi' on the CPU. I don't know how the timer core handles it,
+> but I'd expect the CPU should find the timer just a it was left before
+> entering idle (well, the timer continues to run I assume, but other than
+> that).
+> I'll do some debugging and see if I can find out what exactly causes the
+> hang.
 
-> This change also removes any mention of the #gpio-range-cells property.
-> Such properties are useful when one node references a second node, and
-> that second node dictates the format of the reference. However, that is
-> not the case here; the definition of gpio-ranges itself always dictates
-> its format entirely, and hence the value #gpio-range-cells must always
-> be 3, and hence there is no point requiring any referenced node to
-> include this property.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+So, what I found:
+The Zynq cpuidle driver provides two idle states, which are both
+basically just ARM wfi states. But the second one set's these flags:
+	.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_TIMER_STOP,
 
-Can this mention the newly introduced Backus-Naur Form
-description of the ranges.
+I don't know what these flags cause in detail. But the
+CPUIDLE_FLAG_TIMER_STOP seemed suspicious, since wfi does not have any
+effect on the timer. So, I removed that one and things are working.
 
-> ---
-> Patches 2-6 need to be applied in the same branch, since they all build
-> upon each-other.
-> ---
+I also tried the other approach: Leaving cpuidle as is and adding the
+C3STOP flag to the global timer. That solves it too.
 
-Still waiting for the OF maintainers to ACK so can't apply this. :-(
+Does anybody know what the correct solution is?
+In case the C3STOP flag is considered to be corret for the timer, I
+could prepare a patch for that and bundle it with the one to enable the
+timer for Zynq?
 
-> +It is useful to represent which GPIOs correspond to which pins on which pin
-> +controllers. The gpio-ranges property described below represents this, and
-> +contains information strucutres as follows:
+@Michal: What do we do about the cpuidle driver? If you asked me, we
+should rip out the second state completely. We have it as disabled
+placeholder in our vendor tree and it seems to break things having it
+enabled in mainline.
 
-speling of strucutres
 
-Should you mention that this is given in BNF?
-Or is that implicit for all bindings?
-
->
-> -This makes it logical to let gpio drivers announce their pin ranges to
-> -the pin ctrl subsystem and call 'pinctrl_request_gpio' in order to
-> -request the corresponding pin before any gpio usage.
-> +       gpio-range-list ::= <single-gpio-range> [gpio-range-list]
-> +       single-gpio-range ::=
-> +                       <pinctrl-phandle> <gpio-base> <pinctrl-base> <count>
-> +       gpio-phandle : phandle to pin controller node.
-> +       gpio-base : Base GPIO ID in the GPIO controller
-> +       pinctrl-base : Base pinctrl pin ID in the pin controller
-> +       count : The number of GPIOs/pins in this range
-
-Yours,
-Linus Walleij
+	S?ren
