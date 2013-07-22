@@ -1,86 +1,121 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Jul 2013 09:49:49 +0200
-Subject: [PATCH v4 00/20] Samsung PWM support cleanup
-In-Reply-To: <0ac901ce867f$638a7530$2a9f5f90$@org>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <9102768.ef8LAvpunv@flatron> <0ac901ce867f$638a7530$2a9f5f90$@org>
-Message-ID: <2036745.TWe3OlGh9t@flatron>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 22 Jul 2013 15:55:54 +0800
+Subject: [PATCH 1/2] ARM: dts: mx6: Add support for mx6q nitrogen board
+In-Reply-To: <1374118960-19060-1-git-send-email-festevam@gmail.com>
+References: <1374118960-19060-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130722075552.GB20271@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 of July 2013 11:01:32 Kukjin Kim wrote:
-> Kukjin Kim wrote:
-> > Tomasz Figa wrote:
-> > > On Monday 22 of July 2013 00:22:16 Sylwester Nawrocki wrote:
-> > > > On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> > > > > Since we now have a proper Samsung PWM clocksource driver in
-> > > > > place,
-> > > > > we can proceed with further cleanup of PWM timers support on
-> > > > > Samsung
-> > > > > SoCs.>
-> > > > > 
-> > > > > This series attempts to achieve this goal by:
-> > > > >   1) fixing up few things in samsung_pwm_timer clocksource
-> > > > >   driver,
-> > > > >   2) moving remaining Samsung platforms to the new clocksource
-> > 
-> > driver,
-> > 
-> > > > >   3) removing old clocksource driver,
-> > > > >   4) adding new multiplatform- and DT-aware PWM driver,
-> > > > >   5) moving all Samsung platforms to use the new PWM driver,
-> > > > >   6) removing old PWM driver,
-> > > > >   7) removing all PWM-related code that is not used anymore.
-> > > > > 
-> > > > > Cleaning up the PWM driver is a bit tricky, because the design
-> > > > > of
-> > > > > current driver makes it completely unsuitable for DT and
-> > > > > multiplatform and would require a heavy rework to make it
-> > > > > usable,
-> > > > > breaking any existing Samsung PWM users by the way. To avoid any
-> > > > > breakage this series first renames the old driver, then adds new
-> > > > > one
-> > > > > using original name, migrates all platforms to use it and then
-> > > > > finally removes the old driver.
-> > > > > 
-> > > > > See particular patches for more detailed descriptions.
-> > > > > 
-> > > > > [On S3C6410-based Tiny6410 (Mini6410-compatible) with
-> > > > > pwm-beeper,
-> > > > > SMDK6410 with PWM backlight and Exynos4210-based Origen board
-> > > > > (with
-> > > > > PWM0 attached to a scope)]
-> > > > > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
-> > > > > 
-> > > > > [On S3C2440-based Mini2440 board]
-> > > > > Tested-by: Sylwester Nawrocki<sylvester.nawrocki@gmail.com>
-> > > > 
-> > > > I have retested this series on top of v3.11-rc1 with pwm-backlight
-> > 
-> > (and
-> > 
-> > > > buzzer
-> > > > as the output :)) on Mini2440. It seems to work well - generated
-> > > > frequencies are correct. I'll check pulse widths with a scope
-> 
-> tomorrow,
-> 
-> > > > as it's a bit late
-> > > > now. FWIW you can add to this series my:
-> > > > 
-> > > > Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > > 
-> > > Thanks. I hope we can finally get this series merged soon.
-> > 
-> > Yes, this whole patches look good to me, and I'd like to take this
-> > whole patches into the samsung tree...but need to get any response
-> > from PWM guy, Thierry Reding. Let's wait for his response...
-> 
-> To be clarify, because his ack was on v3 and I remember he had a
-> comment. So would be better if we could get his ack on pwm change
-> again.
+On Thu, Jul 18, 2013 at 12:42:39AM -0300, Fabio Estevam wrote:
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio3 19 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> +	status = "okay";
+> +
+> +	flash: m25p80 at 0 {
+> +		compatible = "sst,sst25vf016b";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&ssi1 {
+> +	fsl,mode = "i2s-slave";
+> +	status = "okay";
+> +};
+> +
 
-Sure.
+Please take the chance to sort these node alphabetically.
 
-Best regards,
-Tomasz
+Shawn
+
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	hog {
+> +		pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_D6__GPIO2_IO06 0x80000000
+> +				MX6QDL_PAD_NANDF_D7__GPIO2_IO07 0x80000000
+> +				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
+> +				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
+> +				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x80000000
+> +				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0x1f0b0
+> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x80000000
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg_1>;
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	status = "okay";
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet_1>;
+> +	phy-mode = "rgmii";
+> +	phy-reset-gpios = <&gpio3 23 0>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3_2>;
+> +	cd-gpios = <&gpio7 0 0>;
+> +	wp-gpios = <&gpio7 1 0>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc4_2>;
+> +	cd-gpios = <&gpio2 6 0>;
+> +	wp-gpios = <&gpio2 7 0>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> +
+> +&audmux {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux_1>;
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2_1>;
+> +};
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1_1>;
+> +
+> +	codec: sgtl5000 at 0a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks 169>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +	};
+> +};
+> -- 
+> 1.8.1.2
+> 
