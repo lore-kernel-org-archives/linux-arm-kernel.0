@@ -1,103 +1,160 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 22 Jul 2013 14:14:35 +0200
-Subject: [PATCH v3 08/31] fs_enet: cleanup clock API use
+Date: Mon, 22 Jul 2013 14:14:38 +0200
+Subject: [PATCH v3 11/31] net: can: mscan: improve clock API use
 In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
 References: <1374166855-7280-1-git-send-email-gsi@denx.de>
  <1374495298-22019-1-git-send-email-gsi@denx.de>
-Message-ID: <1374495298-22019-9-git-send-email-gsi@denx.de>
+Message-ID: <1374495298-22019-12-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make the Freescale ethernet driver get, prepare and enable the FEC clock
-during probe(); disable, unprepare and put the clock upon remove(); hold
-a reference to the clock over the period of use; use devm_{get,put}_clk()
+the .get_clock() callback is run from probe() and might allocate
+resources, introduce a .put_clock() callback that is run from remove()
+to undo any allocation activities
 
-clock lookup is non-fatal as not all platforms provide clock specs in
-their device tree; failure to enable specified clocks is fatal
+use devm_get_clk() upon lookup (for SYS and REF) to have the clocks put
+upon driver unload
+
+assume that resources get prepared but not necessarily enabled in the
+setup phase, make the open() and close() callbacks of the CAN network
+device enable and disable a previously acquired and prepared clock
+
+store pointers to data structures upon successful allocation already
+instead of deferral until complete setup, such that subroutines in the
+setup sequence may access those data structures as well to track their
+resource acquisition
+
+since clock allocation remains optional, the release callback as well as
+the enable/disable calls in open/close are optional as well
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- .../net/ethernet/freescale/fs_enet/fs_enet-main.c  |   25 ++++++++++++++++++++
- include/linux/fs_enet_pd.h                         |    3 +++
- 2 files changed, 28 insertions(+)
+ drivers/net/can/mscan/mpc5xxx_can.c |   18 ++++++++++++------
+ drivers/net/can/mscan/mscan.c       |    9 +++++++++
+ drivers/net/can/mscan/mscan.h       |    2 ++
+ 3 files changed, 23 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-index c04eb3a..1f58f57 100644
---- a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-+++ b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-@@ -999,6 +999,8 @@ static int fs_enet_probe(struct platform_device *ofdev)
- 	struct fs_enet_private *fep;
- 	struct fs_platform_info *fpi;
- 	const u32 *data;
-+	struct clk *clk;
-+	int err;
- 	const u8 *mac_addr;
- 	const char *phy_connection_type;
- 	int privsize, len, ret = -ENODEV;
-@@ -1036,6 +1038,21 @@ static int fs_enet_probe(struct platform_device *ofdev)
- 			fpi->use_rmii = 1;
+diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+index bc422ba..e59b3a3 100644
+--- a/drivers/net/can/mscan/mpc5xxx_can.c
++++ b/drivers/net/can/mscan/mpc5xxx_can.c
+@@ -40,6 +40,7 @@ struct mpc5xxx_can_data {
+ 	unsigned int type;
+ 	u32 (*get_clock)(struct platform_device *ofdev, const char *clock_name,
+ 			 int *mscan_clksrc);
++	void (*put_clock)(struct platform_device *ofdev);
+ };
+ 
+ #ifdef CONFIG_PPC_MPC52xx
+@@ -180,7 +181,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 			clockdiv = 1;
+ 
+ 		if (!clock_name || !strcmp(clock_name, "sys")) {
+-			sys_clk = clk_get(&ofdev->dev, "sys_clk");
++			sys_clk = devm_clk_get(&ofdev->dev, "sys_clk");
+ 			if (IS_ERR(sys_clk)) {
+ 				dev_err(&ofdev->dev, "couldn't get sys_clk\n");
+ 				goto exit_unmap;
+@@ -203,7 +204,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+ 		}
+ 
+ 		if (clocksrc < 0) {
+-			ref_clk = clk_get(&ofdev->dev, "ref_clk");
++			ref_clk = devm_clk_get(&ofdev->dev, "ref_clk");
+ 			if (IS_ERR(ref_clk)) {
+ 				dev_err(&ofdev->dev, "couldn't get ref_clk\n");
+ 				goto exit_unmap;
+@@ -280,6 +281,8 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
+ 	dev = alloc_mscandev();
+ 	if (!dev)
+ 		goto exit_dispose_irq;
++	platform_set_drvdata(ofdev, dev);
++	SET_NETDEV_DEV(dev, &ofdev->dev);
+ 
+ 	priv = netdev_priv(dev);
+ 	priv->reg_base = base;
+@@ -296,8 +299,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
+ 		goto exit_free_mscan;
  	}
  
-+	/* make clock lookup non-fatal (the driver is shared among platforms),
-+	 * but require enable to succeed when a clock was specified/found,
-+	 * keep a reference to the clock upon successful acquisition
-+	 */
-+	clk = devm_clk_get(&ofdev->dev, "per");
-+	if (!IS_ERR(clk)) {
-+		err = clk_prepare_enable(clk);
-+		if (err) {
-+			devm_clk_put(&ofdev->dev, clk);
-+			ret = err;
-+			goto out_free_fpi;
-+		}
-+		fpi->clk_per = clk;
+-	SET_NETDEV_DEV(dev, &ofdev->dev);
+-
+ 	err = register_mscandev(dev, mscan_clksrc);
+ 	if (err) {
+ 		dev_err(&ofdev->dev, "registering %s failed (err=%d)\n",
+@@ -305,8 +306,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
+ 		goto exit_free_mscan;
+ 	}
+ 
+-	platform_set_drvdata(ofdev, dev);
+-
+ 	dev_info(&ofdev->dev, "MSCAN at 0x%p, irq %d, clock %d Hz\n",
+ 		 priv->reg_base, dev->irq, priv->can.clock.freq);
+ 
+@@ -324,10 +323,17 @@ exit_unmap_mem:
+ 
+ static int mpc5xxx_can_remove(struct platform_device *ofdev)
+ {
++	const struct of_device_id *match;
++	const struct mpc5xxx_can_data *data;
+ 	struct net_device *dev = platform_get_drvdata(ofdev);
+ 	struct mscan_priv *priv = netdev_priv(dev);
+ 
++	match = of_match_device(mpc5xxx_can_table, &ofdev->dev);
++	data = match ? match->data : NULL;
++
+ 	unregister_mscandev(dev);
++	if (data && data->put_clock)
++		data->put_clock(ofdev);
+ 	iounmap(priv->reg_base);
+ 	irq_dispose_mapping(dev->irq);
+ 	free_candev(dev);
+diff --git a/drivers/net/can/mscan/mscan.c b/drivers/net/can/mscan/mscan.c
+index e6b4095..1c08ffe 100644
+--- a/drivers/net/can/mscan/mscan.c
++++ b/drivers/net/can/mscan/mscan.c
+@@ -573,6 +573,12 @@ static int mscan_open(struct net_device *dev)
+ 	struct mscan_priv *priv = netdev_priv(dev);
+ 	struct mscan_regs __iomem *regs = priv->reg_base;
+ 
++	if (priv->clk_can) {
++		ret = clk_enable(priv->clk_can);
++		if (ret)
++			return ret;
 +	}
 +
- 	privsize = sizeof(*fep) +
- 	           sizeof(struct sk_buff **) *
- 	           (fpi->rx_ring + fpi->tx_ring);
-@@ -1107,6 +1124,10 @@ out_free_dev:
- 	free_netdev(ndev);
- out_put:
- 	of_node_put(fpi->phy_node);
-+	if (fpi->clk_per) {
-+		clk_disable_unprepare(fpi->clk_per);
-+		devm_clk_put(&ofdev->dev, fpi->clk_per);
-+	}
- out_free_fpi:
- 	kfree(fpi);
- 	return ret;
-@@ -1123,6 +1144,10 @@ static int fs_enet_remove(struct platform_device *ofdev)
- 	fep->ops->cleanup_data(ndev);
- 	dev_set_drvdata(fep->dev, NULL);
- 	of_node_put(fep->fpi->phy_node);
-+	if (fep->fpi->clk_per) {
-+		clk_disable_unprepare(fep->fpi->clk_per);
-+		devm_clk_put(&ofdev->dev, fep->fpi->clk_per);
-+	}
- 	free_netdev(ndev);
+ 	/* common open */
+ 	ret = open_candev(dev);
+ 	if (ret)
+@@ -621,6 +627,9 @@ static int mscan_close(struct net_device *dev)
+ 	close_candev(dev);
+ 	free_irq(dev->irq, dev);
+ 
++	if (priv->clk_can)
++		clk_disable(priv->clk_can);
++
  	return 0;
  }
-diff --git a/include/linux/fs_enet_pd.h b/include/linux/fs_enet_pd.h
-index 51b7934..a978d0d 100644
---- a/include/linux/fs_enet_pd.h
-+++ b/include/linux/fs_enet_pd.h
-@@ -16,6 +16,7 @@
- #ifndef FS_ENET_PD_H
- #define FS_ENET_PD_H
+ 
+diff --git a/drivers/net/can/mscan/mscan.h b/drivers/net/can/mscan/mscan.h
+index af2ed8b..f32e190 100644
+--- a/drivers/net/can/mscan/mscan.h
++++ b/drivers/net/can/mscan/mscan.h
+@@ -21,6 +21,7 @@
+ #ifndef __MSCAN_H__
+ #define __MSCAN_H__
  
 +#include <linux/clk.h>
- #include <linux/string.h>
- #include <linux/of_mdio.h>
- #include <asm/types.h>
-@@ -142,6 +143,8 @@ struct fs_platform_info {
+ #include <linux/types.h>
  
- 	int use_rmii;		/* use RMII mode 	       */
- 	int has_phy;            /* if the network is phy container as well...*/
-+
-+	struct clk *clk_per;	/* 'per' clock for register access */
- };
- struct fs_mii_fec_platform_info {
- 	u32 irq[32];
+ /* MSCAN control register 0 (CANCTL0) bits */
+@@ -283,6 +284,7 @@ struct mscan_priv {
+ 	unsigned int type; 	/* MSCAN type variants */
+ 	unsigned long flags;
+ 	void __iomem *reg_base;	/* ioremap'ed address to registers */
++	struct clk *clk_can;	/* clock for registers or bitrates */
+ 	u8 shadow_statflg;
+ 	u8 shadow_canrier;
+ 	u8 cur_pri;
 -- 
 1.7.10.4
