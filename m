@@ -1,125 +1,88 @@
-From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
-Date: Mon, 22 Jul 2013 12:12:07 +0300
-Subject: [PATCH v6 2/2] iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
-In-Reply-To: <51EA69DE.4080908@kernel.org>
-References: <1374226039-16943-1-git-send-email-oleksandr.kozaruk@ti.com>
- <1374226039-16943-3-git-send-email-oleksandr.kozaruk@ti.com>
- <51EA69DE.4080908@kernel.org>
-Message-ID: <CAPb7_mskrx9uKtYFi2sJiZu-r0Jb_JEm19e05ZmmjWTJ7Qnc+g@mail.gmail.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Mon, 22 Jul 2013 14:49:24 +0530
+Subject: [PATCH 0/6] USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+These patches are for separating the SOC On-Chip ohci host controller
+from ohci-hcd host code into its own driver module.
+This work is part of enabling multi-platform kernels on ARM;
+it would be nice to have in 3.12.
 
-On Sat, Jul 20, 2013 at 1:43 PM, Jonathan Cameron <jic23@kernel.org> wrote:
-> On 07/19/2013 10:27 AM, Oleksandr Kozaruk wrote:
->> The GPADC is general purpose ADC found on TWL6030, and TWL6032 PMIC,
->> known also as Phoenix and PhoenixLite.
->>
->> The TWL6030 and TWL6032 have GPADC with 17 and 19 channels
->> respectively. Some channels have current source and are used for
->> measuring voltage drop on resistive load for detecting battery ID
->> resistance, or measuring voltage drop on NTC resistors for external
->> temperature measurements. Some channels measure voltage, (i.e. battery
->> voltage), and have voltage dividers, thus, capable to scale voltage.
->> Some channels are dedicated for measuring die temperature.
->>
->> Some channels are calibrated in 2 points, having offsets from ideal
->> values kept in trim registers. This is used to correct measurements.
->>
->> The differences between GPADC in TWL6030 and TWL6032:
->> - 10 bit vs 12 bit ADC;
->> - 17 vs 19 channels;
->> - channels have different purpose(i.e. battery voltage
->>   channel 8 vs channel 18);
->> - trim values are interpreted differently.
->>
->> Based on the driver patched from Balaji TK, Graeme Gregory, Ambresh K,
->> Girish S Ghongdemath.
->>
->> Signed-off-by: Balaji T K <balajitk@ti.com>
->> Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
->> Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
-> A few little bits and bobs inline.
->
-> My only major query is about the lack of info for the temperature
-> channels.  How do you convert these to useful real world units?
+V2:
+  In patch 5/6 and 6/6:
+  -Set non-standard fields in hc_driver manually, rather than
+   relying on an expanded struct ohci_driver_overrides.
+  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+   relying on ohci_hub_control and hub_status_data being exported.
 
-If I get your question right: the ADC channels 1, 4 are dedicated for
-measuring resistive value.
-The temperature measurement will depend on:
-1) the ADC code(provided by the driver);
-2) value of the NTC resistor, its characteristics, the way it is
-plugged in the circuit,
-and may be some calibration data(platform dependent); How the driver can the
-drive take care of these?
-[...]
+  In patch 1/6 to 4/6
+  -ohci_setup() has been removed because it is called in .reset member
+   of the ohci_hc_driver structure.
 
->> +static int twl6030_gpadc_read_raw(struct iio_dev *indio_dev,
->> +                          const struct iio_chan_spec *chan,
->> +                          int *val, int *val2, long mask)
->> +{
->> +     struct twl6030_gpadc_data *gpadc = iio_priv(indio_dev);
->> +     int ret = -EINVAL;
-> I'm suprised you didn't get a warning about the assigment above
-> being pointless as you overwrite ret just below.
-Indeed, ret is overwritten, though, there is no warning from make C=2
-and checkpatch is silent.
-I'll remove the initialization.
-[...]
+V3:
+ In patch 5/6 and 6/6:
+ -ohci_setup() has been removed because it is called in .reset member
+  of the ohci_hc_driver structure.
 
->> +
->> +#define TWL6030_GPADC_CHAN(chn, _type, chan_info) {  \
->> +     .type = _type,                                  \
->> +     .channel = chn,                                 \
->> +     .info_mask_separate = BIT(chan_info),           \
->> +     .indexed = 1,                                   \
->> +}
->> +
->
->
-> Why list these at all?  I see they are no longer visible from
-> userspace, but they are still taking up memory etc without I
-> think ever being used?
-I've kept it because for twl6032 there is a gap if I drop channels 15, 16,
-as channels 17, 18 are used.
+ In patch 5/6:
+ -The ohci_restart() function is not required in  current scenario,
+  only discarding connection state of integrated transceivers is sufficient,
+  for this directly handling ohci->hc_control.
 
->> +/* internal test network channel */
->> +#define TWL6030_GPADC_TEST_CHAN(chn, chan_info) {    \
->> +     .type = IIO_VOLTAGE,                            \
->> +     .channel = chn,                                 \
->> +     .indexed = 1,                                   \
->> +}
->> +
->> +static const struct iio_chan_spec twl6030_gpadc_iio_channels[] = {
->> +     TWL6030_GPADC_CHAN(0, IIO_VOLTAGE, IIO_CHAN_INFO_PROCESSED),
->> +     TWL6030_GPADC_CHAN(1, IIO_TEMP, IIO_CHAN_INFO_RAW),
-> So we have no other information about the temp channels other than
-> raw adc counts?  If so, how are these useful?  I guess you might
-> be intending to use iio-hwmon to get these into hwmon the use
-> lm-sensors config files to convert to something useful.
-> Otherwise, you probably want to get the board specific info on
-> the calibration of these in here to make the data available to userspace
-> in a useful format...
+ In patch 2/6 :
+ -rewritten if (config->otg || config->rwc) block statements into
+  two separate 'if blocks' to handle below scenarios
+  1. config->otg set scenario.
+  2. if any of these (config->otg, config->rwc) are set, this
+     scenario should be handled only after ohci_setup()
 
-Hmm, it seems that info on the NTC type is board specific. And we
-should get it from device tree?
-I thought the driver just gives the ADC code, and consumer will know
-what to do with the ADC data.
-So, calculation for converting to temperature should be done in this driver?
-I don't know how yet.
-[...]
+ In patch 1/6 and 4/6:
+  No change.
 
->> +MODULE_AUTHOR("Texas Instruments Inc.");
->
-> I would normally expect an actual person for
-> the module author.  Is this TI policy or simply a case of no clear single
-> author?  Note I believe there is no problem with having multiple
-> MODULE_AUTHOR lines so that everyone who made a major contribution is
-> included.
+V4:
+ In patch 1/6 and 4/6:
+  No change.
+ 
+ In patch 2/6 :
+ -usb_remove_hcd() function is required a valid clock that is what
+  omap_ohci_clock_power(0) is called after hcd shutdown.
 
-Yes, this is because of having multiple authors. I will change it for
-Balaji, Graeme and myself.
+ In patch 3/6 :
+ -V3 modification revert back, only ohci->regs setting write()
+  function has been removed because ohci->regs doesn't get set until
+  usb_add_hcd.
 
-Regards,
-OK.
+ In patch 5/6 :
+ - Removed extra space after "tristate".
+ - Removed extra space between function name  and '(' characters.
+ - MODULE_ALIAS line moved to last statement of ohci-at91 file.
+
+ In patch 6/6 :
+ - Removed extra space before the '='.
+ - Moved  /* forward definitions */ line before the declarations of functions.
+
+Manjunath Goudar (6):
+  USB: OHCI: make ohci-exynos a separate driver
+  USB: OHCI: make ohci-omap a separate driver
+  USB: OHCI: make ohci-omap3 a separate driver
+  USB: OHCI: make ohci-spear a separate driver
+  USB: OHCI: make ohci-at91 a separate driver
+  USB: OHCI: make ohci-s3c2410 a separate driver
+
+ drivers/usb/host/Kconfig        |   30 ++++++-
+ drivers/usb/host/Makefile       |    6 ++
+ drivers/usb/host/ohci-at91.c    |  153 ++++++++++++++++-------------------
+ drivers/usb/host/ohci-exynos.c  |  167 ++++++++++++++++-----------------------
+ drivers/usb/host/ohci-hcd.c     |  108 -------------------------
+ drivers/usb/host/ohci-omap.c    |  156 +++++++++++++-----------------------
+ drivers/usb/host/ohci-omap3.c   |  118 +++++++++------------------
+ drivers/usb/host/ohci-s3c2410.c |  128 +++++++++++++-----------------
+ drivers/usb/host/ohci-spear.c   |  140 +++++++++++++-------------------
+ 9 files changed, 374 insertions(+), 632 deletions(-)
+
+-- 
+1.7.9.5
