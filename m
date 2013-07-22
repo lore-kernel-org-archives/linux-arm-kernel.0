@@ -1,58 +1,109 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Mon, 22 Jul 2013 15:56:09 +0900
-Subject: [PATCH] decompressors: fix "no limit" output buffer length
-Message-ID: <1374476169-32194-1-git-send-email-acourbot@nvidia.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Mon, 22 Jul 2013 07:02:56 +0000
+Subject: [v3 3/3] sata: imx: add ahci sata support on imx platforms
+In-Reply-To: <20130706020737.GA9029@mtj.dyndns.org>
+References: <1373017942-12583-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1373017942-12583-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20130705174305.GA28088@mtj.dyndns.org>
+ <0E83723C55F66F43A6041464FE31119D31432D@039-SN2MPN1-012.039d.mgd.msft.net>
+ <20130706020737.GA9029@mtj.dyndns.org>
+Message-ID: <0E83723C55F66F43A6041464FE31119D3441A3@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When decompressing into memory, the output buffer length is set to some
-arbitrarily high value (0x7fffffff) to indicate the output is,
-virtually, unlimited in size.
+Hi Tejun:
+Re-send this email to you and community.
+I'm afraid that you may be missed or don't receive it.
 
-The problem with this is that some platforms have their physical memory
-at high physical addresses (0x80000000 or more), and that the output
-buffer address and its "unlimited" length cannot be added without
-overflowing. An example of this can be found in inflate_fast():
+BTW, can you help to pick up the #2 and #3(reviewed and acked by Shawn) of the v7 patch-set of this serial?
+Thanks in advance.
 
-/* next_out is the output buffer address */
-out = strm->next_out - OFF;
-/* avail_out is the output buffer size. end will overflow if the output
- * address is >= 0x80000104 */
-end = out + (strm->avail_out - 257);
+2013/7/10 HongXing Zhu <richard.zhuhongxing@gmail.com>
 
-This has huge consequences on the performance of kernel decompression,
-since the following exit condition of inflate_fast() will be always
-true:
+    Hi Tejun:
+    There are some differences between generic AHCI controller and imx AHCI controller.
 
-} while (in < last && out < end);
+    The bits definitions of the HBA registers, the Vendor
+    Specific registers, and the AHCI PHY clock, and the PHY signal adjustment window.
 
-Indeed, "end" has overflowed and is now always lower than "out". As a
-result, inflate_fast() will return after processing one single byte of
-input data, and will thus need to be called an unreasonably high number
-of times. This probably went unnoticed because kernel decompression is
-fast enough even with this issue.
+     - CAP_SSS(bit20) of the HOST_CAP is writable, default
+     value is '0', should be configured to be '1'
+     - bit0 (only one AHCI SATA port on imx6q) of the
+     HOST_PORTS_IMPL should be set to be '1'.(default 0)
+     - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
+     should be configured regarding to the frequency of AHB
+     bus clock.
+     - Configurations of the AHCI PHY clock, and the signal
+     parameters of the GPR13
 
-Nonetheless, adjusting the output buffer length in such a way that the
-above pointer arithmetic never overflows results in a kernel
-decompression that is about 3 times faster on affected machines.
+    I'm afraid that the generic ahci_platform driver is not a good place to contain
+    imx6q ahci specific differences.
+    As I know that, the AHCI sata on imx53 doesn't have the PHY signal parameters
+    adjustment window, but the AHCI sata on imx6q does has one.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- lib/decompress_inflate.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+    On imx6q, the standard .port_ops = &ahci_platform_ops, is used, but
+    .port_ops       = &ahci_platform_retry_srst_ops, would be required by imx53 AHCI controller.
 
-diff --git a/lib/decompress_inflate.c b/lib/decompress_inflate.c
-index 19ff89e..d619b28 100644
---- a/lib/decompress_inflate.c
-+++ b/lib/decompress_inflate.c
-@@ -48,7 +48,7 @@ STATIC int INIT gunzip(unsigned char *buf, int len,
- 		out_len = 0x8000; /* 32 K */
- 		out_buf = malloc(out_len);
- 	} else {
--		out_len = 0x7fffffff; /* no limit */
-+		out_len = ((size_t)~0) - (size_t)out_buf; /* no limit */
- 	}
- 	if (!out_buf) {
- 		error("Out of memory while allocating output buffer");
--- 
-1.8.3.2
+    We can put all the imx AHCI(imx6q, imx53) specific difference into the sata_imx driver,
+    and keep ahci_platform as clean as possible, if the separate sata_imx driver can be created.
+
+    How do you think about that?
+
+    BTW, the version4 patch-set would be sent out  a moment later, any suggests and comments are appreciated.
+
+    Best Regards.
+
+
+    2013/7/6 Tejun Heo <tj@kernel.org>
+
+        Hello,
+
+        On Sat, Jul 06, 2013 at 02:03:30AM +0000, Zhu Richard-R65037 wrote:
+        > [Richard] Just like what we dicussed in the previous v1/v2
+        > patch-set.  Shawn has the concerns that the IP speicific codes
+        > shouldn't be put in the platform level.  So he suggested that setup
+        > a stand-alone driver, contained the imx6q ahci sata specific codes,
+        > and re-use the generic ahci_platform driver as much as possible.
+        > This imx6q standalone ahci sata driver just registers the platform
+        > data, and the others would be handled by ahci_platform driver.
+
+        Oh, I'm not objecting to the ahci specific part not being in platform
+        code.  I'm wondering whether specific handling for imx6q can be
+        included into ahci_platform rather than being in its own driver.  It
+        just seems that there aren't too many differences.  I could be
+        misreading it so if there are enough differences to warrant a separate
+        driver, please enlighten me.
+
+        Thanks!
+
+        --
+        tejun
+
+Best Regards
+Richard Zhu
+
+
+-----Original Message-----
+From: Tejun Heo [mailto:htejun at gmail.com] On Behalf Of Tejun Heo
+Sent: Saturday, July 06, 2013 10:08 AM
+To: Zhu Richard-R65037
+Cc: Richard Zhu; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; avorontsov at ru.mvista.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org
+Subject: Re: [v3 3/3] sata: imx: add ahci sata support on imx platforms
+
+Hello,
+
+On Sat, Jul 06, 2013 at 02:03:30AM +0000, Zhu Richard-R65037 wrote:
+> [Richard] Just like what we dicussed in the previous v1/v2 patch-set.  
+> Shawn has the concerns that the IP speicific codes shouldn't be put in 
+> the platform level.  So he suggested that setup a stand-alone driver, 
+> contained the imx6q ahci sata specific codes, and re-use the generic 
+> ahci_platform driver as much as possible.
+> This imx6q standalone ahci sata driver just registers the platform 
+> data, and the others would be handled by ahci_platform driver.
+
+Oh, I'm not objecting to the ahci specific part not being in platform code.  I'm wondering whether specific handling for imx6q can be included into ahci_platform rather than being in its own driver.  It just seems that there aren't too many differences.  I could be misreading it so if there are enough differences to warrant a separate driver, please enlighten me.
+
+Thanks!
+
+--
+tejun
