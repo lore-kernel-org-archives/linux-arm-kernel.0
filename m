@@ -1,27 +1,68 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Jul 2013 17:48:43 +0000 (UTC)
-Subject: [PATCH 3/4] ARM: OMAP2+: Avoid idling memory controllers with
- no drivers
-In-Reply-To: <1374487277-26099-4-git-send-email-rnayak@ti.com>
-References: <1374487277-26099-1-git-send-email-rnayak@ti.com>
- <1374487277-26099-4-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.02.1307221746430.10891@utopia.booyaka.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 22 Jul 2013 12:49:17 -0500
+Subject: [PATCH] ARM: EDMA: Fix clearing of unused list for DT DMA resources
+Message-ID: <1374515357-14574-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+HWMOD removal for MMC is breaking edma_start as the events are being manually
+triggered due to unused channel list not being clear, Thanks to Balaji TK for
+finding this issue.
 
-On Mon, 22 Jul 2013, Rajendra Nayak wrote:
+This patch fixes the issue, by reading the "dmas" property from the DT node if
+it exists and clearing the bits in the unused channel list.
 
-> Memory controllers in OMAP (like GPMC and EMIF) have the hwmods marked with
-> HWMOD_INIT_NO_IDLE and are left in enabled state post initial setup.
-> 
-> Even if they have drivers missing, avoid idling them as part of
-> omap_device_late_idle()
+Cc: Balaji T K <balajitk@ti.com>
+Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+Fixed pushed to git at github.com:joelagnel/linux-kernel.git
+   99b65c9..a411a81  master-rebase -> master-rebase
 
-Since this patch is intended for the -rc series, it's best if you explain 
-here what effects this patch will fix.  i.e., does this fix a crash, a 
-warning, etc?  Also maybe update your series description message?
+ arch/arm/common/edma.c |   31 +++++++++++++++++++++++--------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
 
-
-- Paul
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index a432e6c..720f958 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -561,14 +561,29 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+ static int prepare_unused_channel_list(struct device *dev, void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	int i, ctlr;
+-
+-	for (i = 0; i < pdev->num_resources; i++) {
+-		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+-				(int)pdev->resource[i].start >= 0) {
+-			ctlr = EDMA_CTLR(pdev->resource[i].start);
+-			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+-					edma_cc[ctlr]->edma_unused);
++	int i = 0, ctlr;
++	u32 dma_chan;
++	__be32 *dma_chan_p;
++	struct property *prop;
++
++	if (dev->of_node) {
++		of_property_for_each_u32(dev->of_node, "dmas", prop, \
++					 dma_chan_p, dma_chan) {
++			if (i++ & 1) {
++				ctlr = EDMA_CTLR(dma_chan);
++				clear_bit(EDMA_CHAN_SLOT(dma_chan),
++						edma_cc[ctlr]->edma_unused);
++			}
++		}
++	} else {
++		for (; i < pdev->num_resources; i++) {
++			if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
++			    (int)pdev->resource[i].start >= 0) {
++				ctlr = EDMA_CTLR(pdev->resource[i].start);
++				clear_bit(EDMA_CHAN_SLOT(
++					  pdev->resource[i].start),
++					  edma_cc[ctlr]->edma_unused);
++			}
+ 		}
+ 	}
+ 
+-- 
+1.7.9.5
