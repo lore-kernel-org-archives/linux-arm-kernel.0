@@ -1,51 +1,74 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 22 Jul 2013 15:31:16 +0530
-Subject: [PATCH 3/4] ARM: OMAP2+: Avoid idling memory controllers with no
- drivers
+Date: Mon, 22 Jul 2013 15:31:15 +0530
+Subject: [PATCH 2/4] serial: omap: enable PM runtime only when its fully
+ configured
 In-Reply-To: <1374487277-26099-1-git-send-email-rnayak@ti.com>
 References: <1374487277-26099-1-git-send-email-rnayak@ti.com>
-Message-ID: <1374487277-26099-4-git-send-email-rnayak@ti.com>
+Message-ID: <1374487277-26099-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory controllers in OMAP (like GPMC and EMIF) have the hwmods marked with
-HWMOD_INIT_NO_IDLE and are left in enabled state post initial setup.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Even if they have drivers missing, avoid idling them as part of
-omap_device_late_idle()
+If earlyprintk is enabled and current UART is console port the platform
+code can mark it as RPM_ACTIVE to sync real IP state with PM Runtime and
+avoid resuming of already active device, but now, driver initialization
+will be performed in the wrong way:
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+	pm_runtime_enable(&pdev->dev);
+    <-- PM runtime alowed (device state RPM_ACTIVE)
+	if (omap_up_info->autosuspend_timeout == 0)
+		omap_up_info->autosuspend_timeout = -1;
+	device_init_wakeup(up->dev, true);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	<-- update_autosuspend() will be called and it will disable device
+        (device state RPM_SUSPENDED)
+	pm_runtime_set_autosuspend_delay(&pdev->dev,
+			omap_up_info->autosuspend_timeout);
+	<-- update_autosuspend() will be called which will re-enable device
+        (device state RPM_ACTIVE), because autosuspend_timeout < 0
+
+	pm_runtime_irq_safe(&pdev->dev);
+	pm_runtime_get_sync(&pdev->dev);
+	<-- will do nothing
+
+Such behavior isn't expected by OMAP serial drivers and causes
+unpredictable calls of serial_omap_runtime_suspend() and
+serial_omap_runtime_resume().
+
+Hence, fix it by allowing PM runtime only after all its parameters are
+configured.
+
+CC: Tony Lindgren <tony@atomide.com>
+CC: Rajendra Nayak <rnayak@ti.com>
+CC: Felipe Balbi <balbi@ti.com>
+CC: Kevin Hilman <khilman@linaro.org>
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/mach-omap2/omap_device.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/tty/serial/omap-serial.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 5cc9287..1c82cde 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -842,6 +842,7 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_device *od = to_omap_device(pdev);
-+	int i;
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index b6d1728..f39bf0c 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1501,7 +1501,6 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
  
- 	if (!od)
- 		return 0;
-@@ -850,6 +851,15 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
- 	 * If omap_device state is enabled, but has no driver bound,
- 	 * idle it.
- 	 */
+ 	platform_set_drvdata(pdev, up);
+-	pm_runtime_enable(&pdev->dev);
+ 	if (omap_up_info->autosuspend_timeout == 0)
+ 		omap_up_info->autosuspend_timeout = -1;
+ 	device_init_wakeup(up->dev, true);
+@@ -1510,6 +1509,8 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 			omap_up_info->autosuspend_timeout);
+ 
+ 	pm_runtime_irq_safe(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
 +
-+	/*
-+	 * Some devices (like memory controllers) are always kept
-+	 * enabled, and should not be idled even with no drivers.
-+	 */
-+	for (i = 0; i < od->hwmods_cnt; i++)
-+		if (od->hwmods[i]->flags & HWMOD_INIT_NO_IDLE)
-+			return 0;
-+
- 	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
- 		if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
- 			dev_warn(dev, "%s: enabled but no driver.  Idling\n",
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	omap_serial_fill_features_erratas(up);
 -- 
 1.7.9.5
