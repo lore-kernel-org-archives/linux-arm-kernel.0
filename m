@@ -1,44 +1,31 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Jul 2013 11:52:24 +0100
-Subject: [PATCH 05/22] ARM: dts: bcm281xx: Remove '0x's from BCM11351 BRT DTS
- file
+Date: Mon, 22 Jul 2013 11:52:26 +0100
+Subject: [PATCH 07/22] ARM: exynos: Remove '0x's from Exynos4110 DTSI file
 In-Reply-To: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
 References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Christian Daudt <csd@broadcom.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/bcm11351-brt.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/exynos4210.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
-index 67ec524..fdace5d 100644
---- a/arch/arm/boot/dts/bcm11351-brt.dts
-+++ b/arch/arm/boot/dts/bcm11351-brt.dts
-@@ -27,18 +27,18 @@
- 		status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index b7f358a..53e2527 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -72,7 +72,7 @@
+ 		};
  	};
  
--	sdio0: sdio at 0x3f180000 {
-+	sdio0: sdio at 3f180000 {
- 		max-frequency = <48000000>;
- 		status = "okay";
- 	};
- 
--	sdio1: sdio at 0x3f190000 {
-+	sdio1: sdio at 3f190000 {
- 		non-removable;
- 		max-frequency = <48000000>;
- 		status = "okay";
- 	};
- 
--	sdio3: sdio at 0x3f1b0000 {
-+	sdio3: sdio at 3f1b0000 {
- 		max-frequency = <48000000>;
- 		status = "okay";
- 	};
+-	clock: clock-controller at 0x10030000 {
++	clock: clock-controller at 10030000 {
+ 		compatible = "samsung,exynos4210-clock";
+ 		reg = <0x10030000 0x20000>;
+ 		#clock-cells = <1>;
 -- 
 1.8.1.2
