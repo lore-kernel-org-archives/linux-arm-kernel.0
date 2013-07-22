@@ -1,38 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Jul 2013 12:24:33 +0100
-Subject: [PATCH] ARM: debug: use generic option for ep93xx PL10x debug port
-In-Reply-To: <201307171048.17430.hartleys@visionengravers.com>
-References: <201307171048.17430.hartleys@visionengravers.com>
-Message-ID: <20130722112433.GK24642@n2100.arm.linux.org.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 22 Jul 2013 12:32:14 +0100
+Subject: [PATCH v3 03/16] driver/core: cpu: initialize of_node in cpu's device
+ struture
+In-Reply-To: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374492747-13879-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 10:48:16AM -0700, H Hartley Sweeten wrote:
-> The generic option DEBUG_LL_UART_PL01X is now used to select the UART
-> type for the kernel low-level debugging on the ep93xx platform. This
-> enables two config options to provide the physical and virtual base
-> address of the debug UART.
-> 
-> Use the generic options instead of providing platform specific options
-> to select the debug UART.
-> 
-> UART1 is selected with:  DEBUG_UART_PHYS = 0x808c0000
->                          DEBUG_UART_VIRT = 0xfedc0000
-> 
-> UART2 is selected with:  DEBUG_UART_PHYS = 0x808d0000
->                          DEBUG_UART_VIRT = 0xfedd0000
-> 
-> UART3 is selected with:  DEBUG_UART_PHYS = 0x808e0000
->                          DEBUG_UART_VIRT = 0xfede0000
-> 
-> The selected UART must already be initialized by the bootloader. If it
-> isn't setup nothing will appear (which might be desired).
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> ---
-> This applies on top of Russell King's "Clean up the debugging support".
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Please put this in the patch system; I'll get a round tuit maybe later
-this week, if not next week.
+CPUs are also registered as devices but the of_node in these cpu
+devices are not initialized. Currently different drivers requiring
+to access cpu device node are parsing the nodes themselves and
+initialising the of_node in cpu device.
+
+The of_node in all the cpu devices needs to be initialized properly
+and at one place. The best place to update this is CPU subsystem
+driver when registering the cpu devices.
+
+The OF/DT core library now provides of_get_cpu_node to retrieve a cpu
+device node for a given logical index by abstracting the architecture
+specific details.
+
+This patch uses of_get_cpu_node to assign of_node when registering the
+cpu devices.
+
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ drivers/base/cpu.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+index 4c358bc..ea51c6d 100644
+--- a/drivers/base/cpu.c
++++ b/drivers/base/cpu.c
+@@ -14,6 +14,7 @@
+ #include <linux/slab.h>
+ #include <linux/percpu.h>
+ #include <linux/acpi.h>
++#include <linux/of.h>
+ 
+ #include "base.h"
+ 
+@@ -289,6 +290,7 @@ int register_cpu(struct cpu *cpu, int num)
+ 	cpu->dev.release = cpu_device_release;
+ 	cpu->dev.offline_disabled = !cpu->hotpluggable;
+ 	cpu->dev.offline = !cpu_online(num);
++	cpu->dev.of_node = of_get_cpu_node(num);
+ #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+ 	cpu->dev.bus->uevent = arch_cpu_uevent;
+ #endif
+-- 
+1.8.1.2
