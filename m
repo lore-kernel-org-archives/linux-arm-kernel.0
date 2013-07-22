@@ -1,130 +1,108 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Jul 2013 11:45:41 -0700
-Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
-In-Reply-To: <51ED781F.6060300@linaro.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
- <51ED781F.6060300@linaro.org>
-Message-ID: <51ED7DD5.8010000@codeaurora.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 22 Jul 2013 19:52:39 +0100
+Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
+In-Reply-To: <20130721213753.GA29879@mudshark.cambridge.arm.com>
+References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+ <20130715135420.GG10000@mudshark.cambridge.arm.com>
+ <20130720044655.GC9433@mozilla.com>
+ <20130721213753.GA29879@mudshark.cambridge.arm.com>
+Message-ID: <20130722185234.GA14519@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/13 11:21, John Stultz wrote:
-> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
->> In the next patch we're going to increase the number of bits that
->> the generic sched_clock can handle to be greater than 32. With
->> more than 32 bits the wraparound time can be larger than what can
->> fit into the units that msecs_to_jiffies takes (unsigned int).
->> Luckily, the wraparound is initially calculated in nanoseconds
->> which we can easily use with hrtimers, so switch to using an
->> hrtimer.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->
->
-> Hrmm. So in my testing (under qemu), this patch causes bootup to hang.
->
-> qemu-system-arm -kernel zImage-arm -M vexpress-a9 -cpu cortex-a9
-> -nographic -m 1024  -append 'root=/dev/mmcblk0p2 rw mem=1024M
-> raid=noautodetect console=ttyAMA0,38400n8 rootwait vmalloc=256MB
-> devtmpfs.mount=0' -sd test-arm.img -redir tcp:4300::22
->
-> Config file attached.
->
-> I haven't gotten a chance to look very closely, but it seems the
-> folowing patch resolves the issue. I'm not sure if we're seeing
-> callers to setup_sched_clock happen after sched_clock_postinit or
-> what, but it probably needs another look over.
->
-> thanks
-> -john
->
->
-> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-> index a269890b..c018ffc 100644
-> --- a/kernel/time/sched_clock.c
-> +++ b/kernel/time/sched_clock.c
-> @@ -138,12 +138,6 @@ void __init setup_sched_clock(u32 (*read)(void),
-> int bits, unsigned long rate)
->      pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns,
-> wraps every %lluns\n",
->          bits, r, r_unit, res, wrap);
->  
-> -    /*
-> -     * Start the timer to keep sched_clock() properly updated and
-> -     * sets the initial epoch.
-> -     */
-> -    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-> -    sched_clock_timer.function = sched_clock_poll;
->      update_sched_clock();
->  
->      /*
-> @@ -175,6 +169,13 @@ void __init sched_clock_postinit(void)
->          setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
->  
->      update_sched_clock();
-> +
-> +    /*
-> +     * Start the timer to keep sched_clock() properly updated and
-> +     * sets the initial epoch.
-> +     */
-> +    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-> +    sched_clock_timer.function = sched_clock_poll;
->      hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
->  }
->  
->
+On Sun, Jul 21, 2013 at 10:37:53PM +0100, Will Deacon wrote:
+> Hello Jed,
+> 
+> Thanks for the reply.
+> 
+> On Sat, Jul 20, 2013 at 05:46:55AM +0100, Jed Davis wrote:
+> > On Mon, Jul 15, 2013 at 02:54:20PM +0100, Will Deacon wrote:
+> > > On Sat, Jul 13, 2013 at 04:18:20AM +0100, Jed Davis wrote:
+> > [...]
+> > > > Effects of this are probably limited to failure of EHABI unwinding when
+> > > > starting from a function that uses r7 to restore its stack pointer, but
+> > > > the possibility for further breakage (which would be invisible on
+> > > > non-Thumb kernels) is worrying.
+> > [...]
+> > > I'm struggling to understand exactly the problem that this patch is trying
+> > > to address. If it's just a code consistency issue, I don't think it's worth
+> > > it (I actually find it less confusing the way we currently have things) but
+> > > if there is a real bug, perhaps you could provide a testcase?
+> > 
+> > There is a real bug here, but my commit message wasn't very clear.  This
+> > was breaking PERF_COUNT_SW_CONTEXT_SWITCHES with CONFIG_THUMB2_KERNEL=y
+> > (with my other recently posted patch applied), because kernel/sched.c is
+> > built with -fno-omit-frame-pointer (which is wrong, but that's a problem
+> > for another patch) and so __schedule's EHABI entry uses 0x97 (mov sp, r7),
+> > and somewhere along the line the unwinder gets the r11 value instead.
+> > This would also apply to any function with a variable-length array, but
+> > __schedule happens to have the perf hook I was trying to use.
+> 
+> Ok, I think I'm with you now. I also think that a better solution would be
+> to try and limit the r7/fp confusion to one place, perhaps behind something
+> like:
+> 
+> void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame);
+> 
+> then that function can act as the bridge between pt_regs (where we leave
+> everything as it is) and stackframe (where we assign either r7 or fp into
+> the fp member). Then we just fix up the call sites to pass the regs they're
+> interested in to our new function.
+> 
+> What do you think?
 
-Hmm. Is it too early to use hrtimers? Moving the hrtimer_start() into
-sched_clock_register() also causes the same crash.
+Do the ARM unwind tables guarantee not to need knowledge of any
+virtual registers for the purpose of processing the opcodes of a single
+function's unwind table entry, except those virtual regs that we happen
+to initialise?  Or do we just rely on luck?
 
-[    0.000000] Unable to handle kernel NULL pointer dereference at
-virtual address 00000000
-[    0.000000] pgd = c0004000
-[    0.000000] [00000000] *pgd=00000000
-[    0.000000] Internal error: Oops: 5 [#1] SMP ARM
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted
-3.11.0-rc1-00017-gecfb8ad-dirty #69
-[    0.000000] task: c063b600 ti: c0630000 task.ti: c0630000
-[    0.000000] PC is at _raw_spin_lock_irqsave+0xc/0x48
-[    0.000000] LR is at lock_hrtimer_base+0x20/0x4c
-[    0.000000] pc : [<c043b7f8>]    lr : [<c005edb8>]    psr: a00001d3
-[    0.000000] sp : c0631f40  ip : 00000001  fp : 00000000
-[    0.000000] r10: 00000000  r9 : 410fc090  r8 : c06e44c0
-[    0.000000] r7 : c063c508  r6 : c0631f7c  r5 : c06e44c0  r4 : c062e538
-[    0.000000] r3 : 00000024  r2 : 00000000  r1 : c0631f7c  r0 : a00001d3
-[    0.000000] Flags: NzCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM 
-Segment kernel
-[    0.000000] Control: 10c5387d  Table: 6000406a  DAC: 00000015
-[    0.000000] Process swapper/0 (pid: 0, stack limit = 0xc0630238)
-[    0.000000] Stack: (0xc0631f40 to 0xc0632000)
-[    0.000000] 1f40: c06be640 c06150a0 c0f05940 c005f344 00000000
-00989680 755552dc 00000024
-[    0.000000] 1f60: c063cd80 c0441354 755552dc 00000024 00000000
-00000000 c063cd80 00000002
-[    0.000000] 1f80: c0441354 c06be640 c06150a0 c0f05940 c063c508
-6000406a 410fc090 00000000
-[    0.000000] 1fa0: 00000000 c005f74c 00000000 00000001 00000001
-00000000 00000000 c05e5984
-[    0.000000] 1fc0: 00000001 c05c2e38 00000001 c05c06e0 ffffffff
-ffffffff c05c02ec 00000000
-[    0.000000] 1fe0: 00000000 c06150a0 10c5387d c0638418 c061509c
-60008074 00000000 00000000
-[    0.000000] [<c043b7f8>] (_raw_spin_lock_irqsave+0xc/0x48) from
-[<c005edb8>] (lock_hrtimer_base+0x20/0x4c)
-[    0.000000] [<c005edb8>] (lock_hrtimer_base+0x20/0x4c) from
-[<c005f344>] (__hrtimer_start_range_ns+0x1c/0x3d8)
-[    0.000000] [<c005f344>] (__hrtimer_start_range_ns+0x1c/0x3d8) from
-[<c005f74c>] (hrtimer_start+0x20/0x28)
-[    0.000000] [<c005f74c>] (hrtimer_start+0x20/0x28) from [<c05e5984>]
-(sched_clock_postinit+0x44/0x5c)
-[    0.000000] [<c05e5984>] (sched_clock_postinit+0x44/0x5c) from
-[<c05c06e0>] (start_kernel+0x1d0/0x31c)
-[    0.000000] [<c05c06e0>] (start_kernel+0x1d0/0x31c) from [<60008074>]
-(0x60008074)
-[    0.000000] Code: e12fff1e e1a02000 e10f0000 f10c0080 (e1923f9f)
+For compiler-generated unwind entries, sp is likely to be enough in most
+cases... but I think that may be more a gcc implementation detail than
+an ABI guarantee.  For custom unwind entries (we do have a few of those)
+I think all bets might be off... but again, there's a limit to how
+insane those are likely to be in practice, and there aren't many of
+them.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+If the unwind tables might need the value of r7 (or other random
+registers), then we need r7 (or all possible regs) in struct stackframe.
+
+
+Compiling a function with a simple runtime-sized array causes GCC
+to generate:
+
+        .setfp r7, sp, #0
+
+among the unwind annotations, so the unwind opcodes will definitely
+refer to r7 in that case.  But r7 is not a magic register in the ABI, so
+I think the compiler would be allowed to use any other register for the
+same purpose...
+
+Frames of this sort will be relatively unusual, which might be why this
+wasn't identified as a problem earlier.
+
+
+GCC's commitment to r7 if a frame pointer is needed in Thumb appears
+quite strong, even with -fomit-frame-pointer... but this is still
+an implementation detail of GCC and a legacy of Thumb-1, rather than
+ABI.
+
+A variable-sized frame seems to cause GCC to force r7 as a framepointer
+anyway.  Trying to clobber r7 from an asm within such a frame results
+in a compile error, even with -fomit-frame-pointer.
+
+
+The purist answer seems to be: we might need all the regs in struct
+stackframe.
+
+The pragmatic answer might be that we definitely need r7 for Thumb code,
+but given the nimbleness of GCC to evolve we might get away with not
+including extra registers for a long time yet.  Thumb code probably
+doesn't use r11 ("fp") in the same way, though that will be needed for
+ARM (with or without ARM_UNWIND).
+
+A review of existing custom unwind annotations might be a good idea
+anyway, to check whether any of them requires another register right now.
+
+
+Cheers
+---Dave
