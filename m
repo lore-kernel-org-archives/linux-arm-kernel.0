@@ -1,67 +1,53 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 22 Jul 2013 11:18:46 -0400 (EDT)
-Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
-In-Reply-To: <51ED30A8.10200@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1307221111410.1495-100000@iolanthe.rowland.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Mon, 22 Jul 2013 19:18:44 +0400
+Subject: [RFC v2] ARM: i.MX pllv1: Implement set_rate
+In-Reply-To: <20130721123759.GJ29785@pengutronix.de>
+References: <1374308975-20596-1-git-send-email-shc_work@mail.ru>
+ <20130720111639.GA29785@pengutronix.de>
+ <20130720153104.96b6723a20bde172a8ea1ba1@mail.ru>
+ <20130720115829.GD29785@pengutronix.de>
+ <20130720161801.380bb0d9db75155f5401730b@mail.ru>
+ <20130721123759.GJ29785@pengutronix.de>
+Message-ID: <20130722191844.56e60280573dcab51187c9f3@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jul 2013, Roger Quadros wrote:
+On Sun, 21 Jul 2013 14:37:59 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-> Right, I understand it now. How does the below code look?
+> On Sat, Jul 20, 2013 at 04:18:01PM +0400, Alexander Shiyan wrote:
+> > On Sat, 20 Jul 2013 13:58:29 +0200
+> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > 
+> > > > > On Sat, Jul 20, 2013 at 12:29:35PM +0400, Alexander Shiyan wrote:
+> > > > > > This patch implements frequency change for i.MX pllv1.
+> > > > > > Selection of the values of the registers is not optimal, since is
+> > > > > > made by simple enumeration of all possible values.
+> > > > > 
+> > > > > You do not mention why you want to adjust the rate. Normally we've been
+> > > > > happy with the static values from the bootloader.
+> > > > 
+> > > > For CPUfreq.
+> > > > Only one barrier to make it workable.
+> > > 
+> > > Isn't it better to adjust the dividers only? I haven't made good
+> > > experience with adjusting the PLLs.
+> > 
+> > The frequency value after booting can be quite arbitrary.
+> > 
+> > Since we define possible frequencies for the CPU (266 and 399 MHz),
+> > I can offer as variant to use a fixed constant values for PLL.
 > 
-> +static int omap_ehci_suspend(struct device *dev)
-> +{
-> +       struct usb_hcd *hcd = dev_get_drvdata(dev);
-> +       bool do_wakeup = device_may_wakeup(dev);
-> +       int ret;
-> +
-> +       dev_dbg(dev, "%s may_wakeup %d\n", __func__, do_wakeup);
-> +
-> +       if (pm_runtime_status_suspended(dev)) {
+> AFAIK the PLL should run at 800MHz. With dividers of 2, 3 and 6 we get
+> 400, 266 and 133MHz. I don't think having more fine grained control
+> about the CPU frequency is necessary from a power saving point of view.
+> Let's keep the variants to a minimum to make the whole stuff more
+> robust.
 
-You need to do this only when do_wakeup is false.
+What about switching the source?
+In any case, I have already made an efficient algorithm to calculate
+the PLL and after some tests, I will introduce it.
+Thanks.
 
-> +               pm_runtime_get_sync(dev);
-> +               ehci_resume(hcd, false);
-> +               ret = ehci_suspend(hcd, do_wakeup);
-> +               pm_runtime_put_sync(dev);
-
-It would be better to call pm_runtime_resume(dev) at the start instead
-of pm_runtime_get_sync(), and eliminate the last two lines.  Then the
-ehci_suspend() below could be moved outside the "if" statement.
-
-Alternatively, if you are able to turn off the wakeup setting without
-going through an entire resume/suspend cycle, that would be preferable.
-
-> +
-> +       } else {
-> +               ret = ehci_suspend(hcd, do_wakeup);
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +static int omap_ehci_resume(struct device *dev)
-> +{
-> +       struct usb_hcd *hcd = dev_get_drvdata(dev);
-> +       int ret;
-> +
-> +       dev_dbg(dev, "%s\n", __func__);
-> +
-> +       ret = ehci_resume(hcd, false);
-> +       if (!ret) {
-> +               /*
-> +                * Controller was powered ON so reflect state
-> +                */
-> +               pm_runtime_disable(dev);
-> +               pm_runtime_set_active(dev);
-> +               pm_runtime_enable(dev);
-> +       }
-> +
-> +       return ret;
-> +}
-
-All good.
-
-Alan Stern
+-- 
+Alexander Shiyan <shc_work@mail.ru>
