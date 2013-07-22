@@ -1,27 +1,62 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 22 Jul 2013 15:49:24 +0900
-Subject: [PATCH 0/3] device tree support for exynos rotator
-Message-ID: <1374475767-30085-1-git-send-email-chanho61.park@samsung.com>
+Date: Mon, 22 Jul 2013 15:49:26 +0900
+Subject: [PATCH 2/3] drm/exynos: add dt-binding documentation for rotator
+In-Reply-To: <1374475767-30085-1-git-send-email-chanho61.park@samsung.com>
+References: <1374475767-30085-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1374475767-30085-3-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset includes dt support for exynos rotator.
-The exynos4 platform is only dt-based since 3.10, we should convert driver data
-and ids to dt-based parsing methods. The rotator driver has a limit table to
-get size limit. The minimum size of RGB888 format is 8 x 8 and maximum size is
-8K x 8K. The other format, YCbCr420 2-Plane has 32 x 32 min size and 32K x 32K
-max size. Each format should be multiple of 'align' value.
+This patch adds a dt-binding document for exynos rotator. It describes which
+nodes should be defined to use the rotator.
 
-Chanho Park (3):
-  drm/exynos: add device tree support for rotator
-  drm/exynos: add dt-binding documentation for rotator
-  dts: ARM: add a rotator node for exynos4
-
- .../bindings/drm/exynos/samsung-rotator.txt        |   35 +++++++
- arch/arm/boot/dts/exynos4.dtsi                     |   23 ++++
- drivers/gpu/drm/exynos/exynos_drm_rotator.c        |  110 ++++++++++++++------
- 3 files changed, 138 insertions(+), 30 deletions(-)
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ .../bindings/drm/exynos/samsung-rotator.txt        |   35 ++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/drm/exynos/samsung-rotator.txt
 
+diff --git a/Documentation/devicetree/bindings/drm/exynos/samsung-rotator.txt b/Documentation/devicetree/bindings/drm/exynos/samsung-rotator.txt
+new file mode 100644
+index 0000000..6b1d704
+--- /dev/null
++++ b/Documentation/devicetree/bindings/drm/exynos/samsung-rotator.txt
+@@ -0,0 +1,35 @@
++* Samsung Image Rotator
++
++Required properties:
++  - compatible : value should be the "samsung,exynos4210".
++  - reg : Physical base address of the IP registers and length of memory
++	  mapped region.
++  - interrupts : interrupt number to the CPU.
++  - clocks : clock number of exynos4 rotator clock.
++  - clocks : clock name of rotator
++  - status : "okay" or "disabled"
++  - limit table for image formats : min_w/min_h/max_w/max_h for min/max of image
++
++Example:
++	rotator: rotator at 12810000 {
++		compatible = "samsung,exynos4210-rotator";
++		reg = <0x12810000 0x1000>;
++		interrupts = <0 83 0>;
++		clocks = <&clock 278>;
++		clock-names = "rotator";
++		status = "disabled";
++		ycbcr420_2p {
++			min_w = <32>;
++			min_h = <32>;
++			max_w = <32768>;
++			max_h = <32768>;
++			align = <3>;
++		};
++		rgb888 {
++			min_w = <8>;
++			min_h = <8>;
++			max_w = <8192>;
++			max_h = <8192>;
++			align = <2>;
++		};
++	};
 -- 
 1.7.9.5
