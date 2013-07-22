@@ -1,65 +1,37 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 01:49:18 +0200
-Subject: [PATCH v2 1/8] clk: mux: Add support for read-only muxes.
+Date: Tue, 23 Jul 2013 01:49:21 +0200
+Subject: [PATCH v2 4/8] ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
 In-Reply-To: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
 References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1374536965-3545-5-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms have read-only clock muxes that are preconfigured at
-reset and cannot be changed at runtime. This patch extends mux clock
-driver to allow handling such read-only muxes by adding new
-CLK_MUX_READ_ONLY mux flag.
+This patch adds soc_is_s3c6400() and soc_is_s3c6410() macros that allow
+to distinguish between specific SoCs from s3c64xx series that is needed
+to handle differences between them.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/clk/clk-mux.c        | 10 +++++++++-
- include/linux/clk-provider.h |  2 ++
- 2 files changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/plat-samsung/include/plat/cpu.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 614444c..92f1a1b 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -107,6 +107,11 @@ const struct clk_ops clk_mux_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_mux_ops);
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 4fb1f03..335beb3 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -87,8 +87,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+ #endif
  
-+const struct clk_ops clk_mux_ro_ops = {
-+	.get_parent = clk_mux_get_parent,
-+};
-+EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
-+
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
-@@ -133,7 +138,10 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 	}
+ #if defined(CONFIG_CPU_S3C6400) || defined(CONFIG_CPU_S3C6410)
++# define soc_is_s3c6400()	is_samsung_s3c6400()
++# define soc_is_s3c6410()	is_samsung_s3c6410()
+ # define soc_is_s3c64xx()	(is_samsung_s3c6400() || is_samsung_s3c6410())
+ #else
++# define soc_is_s3c6400()	0
++# define soc_is_s3c6410()	0
+ # define soc_is_s3c64xx()	0
+ #endif
  
- 	init.name = name;
--	init.ops = &clk_mux_ops;
-+	if (clk_mux_flags & CLK_MUX_READ_ONLY)
-+		init.ops = &clk_mux_ro_ops;
-+	else
-+		init.ops = &clk_mux_ops;
- 	init.flags = flags | CLK_IS_BASIC;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 1ec14a7..9487b96 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -327,8 +327,10 @@ struct clk_mux {
- #define CLK_MUX_INDEX_ONE		BIT(0)
- #define CLK_MUX_INDEX_BIT		BIT(1)
- #define CLK_MUX_HIWORD_MASK		BIT(2)
-+#define CLK_MUX_READ_ONLY	BIT(3) /* mux setting cannot be changed */
- 
- extern const struct clk_ops clk_mux_ops;
-+extern const struct clk_ops clk_mux_ro_ops;
- 
- struct clk *clk_register_mux(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
 -- 
 1.8.3.2
