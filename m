@@ -1,265 +1,156 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 22 Jul 2013 15:04:52 +0200
-Subject: [PATCH v3 27/31] net: can: mscan: add common clock support for
- mpc512x
-In-Reply-To: <1374495298-22019-28-git-send-email-gsi@denx.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1374495298-22019-28-git-send-email-gsi@denx.de>
-Message-ID: <51ED2DF4.2090606@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 22 Jul 2013 16:16:24 +0300
+Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
+In-Reply-To: <Pine.LNX.4.44L0.1307111106090.1276-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1307111106090.1276-100000@iolanthe.rowland.org>
+Message-ID: <51ED30A8.10200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 02:14 PM, Gerhard Sittig wrote:
-> implement a .get_clock() callback for the MPC512x platform which uses
-> the common clock infrastructure (eliminating direct access to the clock
-> control registers from within the CAN network driver), and provide the
-> corresponding .put_clock() callback to release resources after use
+Hi Alan,
+
+On 07/11/2013 06:14 PM, Alan Stern wrote:
+> On Thu, 11 Jul 2013, Roger Quadros wrote:
 > 
-> keep the previous implementation of MPC512x support in place during
-> migration, since common clock support is optional
+>>> The other two problems are both related to the interaction between
+>>> system PM and runtime PM.  Suppose the controller is already runtime
+>>> suspended when the system goes to sleep.  Because it is runtime
+>>> suspended, it is enabled for wakeup.  But device_may_wakeup() could
+>>> return false; if this happens then you have to do a runtime-resume in
+>>> omap_ehci_suspend() before calling ehci_suspend(), so that the
+>>> controller can be suspended again with wakeups disabled.  (Or you could
+>>> choose an alternative method for accomplishing the same result, such as
+>>> disabling the wakeup signal from the pad without going through a whole
+>>> EHCI resume/suspend cycle.)  Conversely, if device_may_wakeup() returns
+>>> true then you shouldn't do anything at all, because the controller is
+>>> already suspended with the correct wakeup setting.
+>>
+>> I think this case is taken care of by the Runtime PM core at least for the OMAP
+>> platform according to the documentation
+>>
+>> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/power/runtime_pm.txt#n647
 > 
-> this change is neutral to the MPC5200 platform
+> No; that section refers only to races, not to wakeup settings.
 > 
-> Signed-off-by: Gerhard Sittig <gsi@denx.de>
-> ---
->  drivers/net/can/mscan/mpc5xxx_can.c |  169 +++++++++++++++++++++++++++++++++++
->  1 file changed, 169 insertions(+)
+>> At the end of this mail is the log during system suspend/resume
+>>
+>> You can notice the following sequence
+>>
+>> -ehci runtime suspends
+>> -system suspend triggered
+>> -ehci runtime resumes
+>> -ehci suspends (uses new wakeup settings)
+>> -system wakeup triggered
+>> -ehci resumes
+>> -ehci runtime suspends
 > 
-> diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-> index e59b3a3..4897929 100644
-> --- a/drivers/net/can/mscan/mpc5xxx_can.c
-> +++ b/drivers/net/can/mscan/mpc5xxx_can.c
-> @@ -109,6 +109,167 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
->  #endif /* CONFIG_PPC_MPC52xx */
->  
->  #ifdef CONFIG_PPC_MPC512x
-> +
-> +#if IS_ENABLED(CONFIG_COMMON_CLK)
-> +
-> +static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
-> +				 const char *clock_source, int *mscan_clksrc)
-> +{
-> +	struct device_node *np;
-> +	u32 clockdiv;
-> +	enum {
-> +		CLK_FROM_AUTO,
-> +		CLK_FROM_IPS,
-> +		CLK_FROM_SYS,
-> +		CLK_FROM_REF,
-> +	} clk_from;
-> +	struct clk *clk_in, *clk_can;
-> +	unsigned long freq_calc;
-> +	struct mscan_priv *priv;
-> +
-> +	/* the caller passed in the clock source spec that was read from
-> +	 * the device tree, get the optional clock divider as well
-> +	 */
-> +	np = ofdev->dev.of_node;
-> +	clockdiv = 1;
-> +	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
-> +	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
-> +		clock_source ? clock_source : "<NULL>", clockdiv);
-> +
-> +	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
-> +	 * get set, and the 'ips' clock is the input to the MSCAN
-> +	 * component
-> +	 *
-> +	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
-> +	 * bit needs to get cleared, an optional clock-divider may have
-> +	 * been specified (the default value is 1), the appropriate
-> +	 * MSCAN related MCLK is the input to the MSCAN component
-> +	 *
-> +	 * in the absence of a clock-source spec, first an optimal clock
-> +	 * gets determined based on the 'sys' clock, if that fails the
-> +	 * 'ref' clock is used
-> +	 */
-> +	clk_from = CLK_FROM_AUTO;
-> +	if (clock_source) {
-> +		/* interpret the device tree's spec for the clock source */
-> +		if (!strcmp(clock_source, "ip"))
-> +			clk_from = CLK_FROM_IPS;
-> +		else if (!strcmp(clock_source, "sys"))
-> +			clk_from = CLK_FROM_SYS;
-> +		else if (!strcmp(clock_source, "ref"))
-> +			clk_from = CLK_FROM_REF;
-> +		else
-> +			goto err_invalid;
-> +		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
-> +	}
-> +	if (clk_from == CLK_FROM_AUTO) {
-> +		/* no spec so far, try the 'sys' clock; round to the
-> +		 * next MHz and see if we can get a multiple of 16MHz
-> +		 */
-> +		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
-> +		clk_in = devm_clk_get(&ofdev->dev, "sys");
-> +		if (IS_ERR(clk_in))
-> +			goto err_notavail;
-> +		freq_calc = clk_get_rate(clk_in);
-> +		freq_calc +=  499999;
-> +		freq_calc /= 1000000;
-> +		freq_calc *= 1000000;
-> +		if ((freq_calc % 16000000) == 0) {
-> +			clk_from = CLK_FROM_SYS;
-> +			clockdiv = freq_calc / 16000000;
-> +			dev_dbg(&ofdev->dev,
-> +				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
-> +				freq_calc, clockdiv, freq_calc / clockdiv);
-> +		}
-> +	}
-> +	if (clk_from == CLK_FROM_AUTO) {
-> +		/* no spec so far, use the 'ref' clock */
-> +		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
-> +		clk_in = devm_clk_get(&ofdev->dev, "ref");
-> +		if (IS_ERR(clk_in))
-> +			goto err_notavail;
-> +		clk_from = CLK_FROM_REF;
-> +		freq_calc = clk_get_rate(clk_in);
-> +		dev_dbg(&ofdev->dev,
-> +			"clk fit, ref[%lu] (no div) freq[%lu]\n",
-> +			freq_calc, freq_calc);
-> +	}
-> +
-> +	/* select IPS or MCLK as the MSCAN input (returned to the caller),
-> +	 * setup the MCLK mux source and rate if applicable, apply the
-> +	 * optionally specified or derived above divider, and determine
-> +	 * the actual resulting clock rate to return to the caller
-> +	 */
-> +	switch (clk_from) {
-> +	case CLK_FROM_IPS:
-> +		clk_can = devm_clk_get(&ofdev->dev, "ips");
-> +		if (IS_ERR(clk_can))
-> +			goto err_notavail;
-> +		if (clk_prepare(clk_can)) {
-
-I would just call prepare_enable in the main mscan driver, then we don't
-need a special "clock is prepared but not enabled" contract.
-
-> +			devm_clk_put(&ofdev->dev, clk_can);
-
-not needed, as this driver instance will fail, doesn't it?
-
-> +			goto err_notavail;
-> +		}
-> +		priv = netdev_priv(dev_get_drvdata(&ofdev->dev));
-> +		priv->clk_can = clk_can;
-> +		freq_calc = clk_get_rate(clk_can);
-> +		*mscan_clksrc = MSCAN_CLKSRC_IPS;
-> +		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
-> +			*mscan_clksrc, freq_calc);
-> +		break;
-> +	case CLK_FROM_SYS:
-> +	case CLK_FROM_REF:
-> +		clk_can = devm_clk_get(&ofdev->dev, "mclk");
-> +		if (IS_ERR(clk_can))
-> +			goto err_notavail;
-> +		if (clk_prepare(clk_can)) {
-> +			devm_clk_put(&ofdev->dev, clk_can);
-
-same here
-
-> +			goto err_notavail;
-> +		}
-> +		priv = netdev_priv(dev_get_drvdata(&ofdev->dev));
-> +		priv->clk_can = clk_can;
-> +		if (clk_from == CLK_FROM_SYS)
-> +			clk_in = devm_clk_get(&ofdev->dev, "sys");
-> +		if (clk_from == CLK_FROM_REF)
-> +			clk_in = devm_clk_get(&ofdev->dev, "ref");
-> +		if (IS_ERR(clk_in))
-> +			goto err_notavail;
-> +		clk_set_parent(clk_can, clk_in);
-> +		freq_calc = clk_get_rate(clk_in);
-> +		freq_calc /= clockdiv;
-> +		clk_set_rate(clk_can, freq_calc);
-> +		freq_calc = clk_get_rate(clk_can);
-> +		*mscan_clksrc = MSCAN_CLKSRC_BUS;
-> +		dev_dbg(&ofdev->dev, "clk from MCLK, clksrc[%d] freq[%lu]\n",
-> +			*mscan_clksrc, freq_calc);
-> +		break;
-> +	default:
-> +		goto err_invalid;
-> +	}
-> +
-> +	return freq_calc;
-> +
-> +err_invalid:
-> +	dev_err(&ofdev->dev, "invalid clock source specification\n");
-> +	return 0;
-
-return 0 in case of error? Please add a comment what this 0 means here.
-> +
-> +err_notavail:
-> +	dev_err(&ofdev->dev, "cannot acquire or setup clock source\n");
-> +	return 0;
-> +}
-> +
-> +static void mpc512x_can_put_clock(struct platform_device *ofdev)
-> +{
-> +	struct mscan_priv *priv;
-> +
-> +	priv = netdev_priv(dev_get_drvdata(&ofdev->dev));
-> +	if (priv->clk_can) {
-> +		clk_unprepare(priv->clk_can);
-> +		devm_clk_put(&ofdev->dev, priv->clk_can);
-
-devm_clk_put can be removed, it's called automatically.
-
-> +	}
-> +}
-> +
-> +#else	/* COMMON_CLK */
-> +
->  struct mpc512x_clockctl {
->  	u32 spmr;		/* System PLL Mode Reg */
->  	u32 sccr[2];		/* System Clk Ctrl Reg 1 & 2 */
-> @@ -239,12 +400,18 @@ exit_put:
->  	of_node_put(np_clock);
->  	return freq;
->  }
-> +
-> +#define mpc512x_can_put_clock NULL
-> +
-> +#endif	/* COMMON_CLK */
-> +
->  #else /* !CONFIG_PPC_MPC512x */
->  static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
->  				 const char *clock_name, int *mscan_clksrc)
->  {
->  	return 0;
->  }
-> +#define mpc512x_can_put_clock NULL
->  #endif /* CONFIG_PPC_MPC512x */
->  
->  static const struct of_device_id mpc5xxx_can_table[];
-> @@ -386,11 +553,13 @@ static int mpc5xxx_can_resume(struct platform_device *ofdev)
->  static const struct mpc5xxx_can_data mpc5200_can_data = {
->  	.type = MSCAN_TYPE_MPC5200,
->  	.get_clock = mpc52xx_can_get_clock,
-> +	/* .put_clock not applicable */
->  };
->  
->  static const struct mpc5xxx_can_data mpc5121_can_data = {
->  	.type = MSCAN_TYPE_MPC5121,
->  	.get_clock = mpc512x_can_get_clock,
-> +	.put_clock = mpc512x_can_put_clock,
->  };
->  
->  static const struct of_device_id mpc5xxx_can_table[] = {
+> This is because the root hub was runtime suspended with the wrong
+> wakeup setting.  The USB core, which is careful about these things,
+> resumed and re-suspended it with the proper wakeup setting.  In the 
+> process, the controller had to be runtime resumed as well.
+> 
+> Try doing the test over again, but this time with the root hub enabled 
+> for wakeup and the controller disabled.  (I know this is a bizarre 
+> combination, but try it anyway.)  Also, after the system wakes up, see 
+> whether the root hub and controller get runtime suspended.
 > 
 
-Marc
+The first part of the test caught the problem were we were trying to access
+EHCI registers when HW is not accessible. So this was a good test case.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+>>> For the third problem, suppose the controller was runtime suspended
+>>> when the system went to sleep.  When the system wakes up, the
+>>> controller will become active, so you have to inform the runtime PM
+>>> core about its change of state.  Basically, if omap_ehci_resume() sees
+>>> that ehci_resume() returned 0 then it must do:
+>>>
+>>> 	pm_runtime_disable(dev);
+>>> 	pm_runtime_set_active(dev);
+>>> 	pm_runtime_enable(dev);
+>>>
+>>> All of these issues are discussed (among lots of other material) in 
+>>> Documentation/power/runtime_pm.txt.
+>>
+>> Is this still applicable? Documentation claims
+>>
+>>    "During system resume it calls pm_runtime_enable() and pm_runtime_put_sync()
+>>     for every device right after executing the subsystem-level .resume_early()
+>>     callback and right after executing the subsystem-level .resume() callback
+>>     for it, respectively."
+> 
+> Yes, this is applicable, but it is irrelevant to the problem I 
+> described.  You still have to tell the runtime PM core that the device 
+> is now active.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/62e0a5f8/attachment-0001.sig>
+Right, I understand it now. How does the below code look?
+
++static int omap_ehci_suspend(struct device *dev)
++{
++       struct usb_hcd *hcd = dev_get_drvdata(dev);
++       bool do_wakeup = device_may_wakeup(dev);
++       int ret;
++
++       dev_dbg(dev, "%s may_wakeup %d\n", __func__, do_wakeup);
++
++       if (pm_runtime_status_suspended(dev)) {
++               pm_runtime_get_sync(dev);
++               ehci_resume(hcd, false);
++               ret = ehci_suspend(hcd, do_wakeup);
++               pm_runtime_put_sync(dev);
++
++       } else {
++               ret = ehci_suspend(hcd, do_wakeup);
++       }
++
++       return ret;
++}
++
++static int omap_ehci_resume(struct device *dev)
++{
++       struct usb_hcd *hcd = dev_get_drvdata(dev);
++       int ret;
++
++       dev_dbg(dev, "%s\n", __func__);
++
++       ret = ehci_resume(hcd, false);
++       if (!ret) {
++               /*
++                * Controller was powered ON so reflect state
++                */
++               pm_runtime_disable(dev);
++               pm_runtime_set_active(dev);
++               pm_runtime_enable(dev);
++       }
++
++       return ret;
++}
++
++static int omap_ehci_runtime_suspend(struct device *dev)
++{
++       struct usb_hcd *hcd = dev_get_drvdata(dev);
++       struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
++
++       dev_dbg(dev, "%s\n", __func__);
++
++       if (omap->bound)
++               ehci_suspend(hcd, true);
++
++       return 0;
++}
++
++static int omap_ehci_runtime_resume(struct device *dev)
++{
++       struct usb_hcd *hcd = dev_get_drvdata(dev);
++       struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
++
++       dev_dbg(dev, "%s\n", __func__);
++
++       if (omap->bound)
++               ehci_resume(hcd, false);
++
++       return 0;
++}
+
+
+cheers,
+-roger
