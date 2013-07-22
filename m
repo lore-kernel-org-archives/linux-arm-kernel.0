@@ -1,37 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Jul 2013 14:01:18 +0100
-Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
-In-Reply-To: <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
-References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
- <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
- <CAC4Lta17bmNjBck6LzziBeU0Xc36F1Jms2tQPv6+GaXvik6Wyg@mail.gmail.com>
- <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
-Message-ID: <20130722130118.GA30857@mudshark.cambridge.arm.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Mon, 22 Jul 2013 06:03:12 -0700
+Subject: [PATCH 05/22] ARM: dts: bcm281xx: Remove '0x's from
+ BCM11351 BRT DTS file
+In-Reply-To: <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <51ED2D90.4020209@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 01:51:52PM +0100, Christoffer Dall wrote:
-> On 22 July 2013 10:53, Raghavendra KT <raghavendra.kt.linux@gmail.com> wrote:
-> > On Fri, Jul 19, 2013 at 7:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> So far, when a guest executes WFE (like when waiting for a spinlock
-> >> to become unlocked), we don't do a thing and let it run uninterrupted.
-> >>
-> >> Another option is to trap a blocking WFE and offer the opportunity
-> >> to the scheduler to switch to another task, potentially giving the
-> >> vcpu holding the spinlock a chance to run sooner.
-> >>
-> >
-> > Idea looks to be correct from my experiments on x86. It does bring some
-> > percentage of benefits in overcommitted guests. Infact,
-> >
-> > https://lkml.org/lkml/2013/7/22/41 tries to do the same thing for x86.
-> > (this results in using ple handler heuristics in vcpu_block pach).
-> 
-> What about the adverse effect in the non-overcommitted case?
+On 13-07-22 03:52 AM, Lee Jones wrote:
+> Cc: Christian Daudt <csd@broadcom.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   arch/arm/boot/dts/bcm11351-brt.dts | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+> index 67ec524..fdace5d 100644
+> --- a/arch/arm/boot/dts/bcm11351-brt.dts
+> +++ b/arch/arm/boot/dts/bcm11351-brt.dts
+> @@ -27,18 +27,18 @@
+>   		status = "okay";
+>   	};
+>   
+> -	sdio0: sdio at 0x3f180000 {
+> +	sdio0: sdio at 3f180000 {
+>   		max-frequency = <48000000>;
+>   		status = "okay";
+>   	};
+>   
+> -	sdio1: sdio at 0x3f190000 {
+> +	sdio1: sdio at 3f190000 {
+>   		non-removable;
+>   		max-frequency = <48000000>;
+>   		status = "okay";
+>   	};
+>   
+> -	sdio3: sdio at 0x3f1b0000 {
+> +	sdio3: sdio at 3f1b0000 {
+>   		max-frequency = <48000000>;
+>   		status = "okay";
+>   	};
+Hi Lee,
+  Is this convention documented ? Someone called my attention to the 
+fact that this dts files was inconsistent in its use of 0x in names, but 
+I was not aware of a coding guideline for this.
 
-You might hope to reduce overall system latency, in the same way that
-PREEMPT kernels implement spin_lock in terms of spin_trylock. Marc might
-have some ideas about the practical performance of this, but he's currently
-on holiday and (assumedly) not reading the list!
-
-Will
+  Thanks,
+     csd
