@@ -1,28 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Jul 2013 20:07:17 +0100
-Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
-In-Reply-To: <51ED80E7.4050606@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
- <51ED781F.6060300@linaro.org> <51ED7DD5.8010000@codeaurora.org>
- <51ED80E7.4050606@codeaurora.org>
-Message-ID: <20130722190717.GO24642@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 22 Jul 2013 21:25:35 +0200
+Subject: [PATCH 07/22] ARM: exynos: Remove '0x's from Exynos4110 DTSI file
+In-Reply-To: <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <2350088.9z671SCjFz@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 11:58:47AM -0700, Stephen Boyd wrote:
-> On 07/22/13 11:45, Stephen Boyd wrote:
-> > Hmm. Is it too early to use hrtimers? Moving the hrtimer_start() into
-> > sched_clock_register() also causes the same crash.
-> 
-> Yes that seems to be the problem. The vexpress board is setting up the
-> sched_clock in setup_arch() (via v2m_init_early) which runs before
-> hrtimers_init(). I've only tested this on boards that setup the timer in
-> the time_init() callback which runs after hrtimers_init(). Your patch
-> should be fine, although it would be nice if we didn't have callers
-> setting up the sched_clock so early.
+Hi Lee,
 
-However, it _is_ the correct place to do it, as I've repeatedly stated.
-The reason for this is that the scheduler will have already read from
-sched_clock() by the time you get to timer_init() to seed its idea of
-the start time for PID0 - again, as I've explained multiple times.
+On Monday 22 of July 2013 11:52:26 Lee Jones wrote:
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos4210.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+> b/arch/arm/boot/dts/exynos4210.dtsi index b7f358a..53e2527 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -72,7 +72,7 @@
+>  		};
+>  	};
+> 
+> -	clock: clock-controller at 0x10030000 {
+> +	clock: clock-controller at 10030000 {
+>  		compatible = "samsung,exynos4210-clock";
+>  		reg = <0x10030000 0x20000>;
+>  		#clock-cells = <1>;
+
+This looks fine, but please fix commit message - it should be Exynos4210. 
+Also some explanation why this change is needed would be good, even if 
+it's obvious.
+
+Best regards,
+Tomasz
