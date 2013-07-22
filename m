@@ -1,41 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Jul 2013 14:45:15 +0100
-Subject: [PATCH] ARM: bugfix: Features of /proc/cpuinfo is wrong
-In-Reply-To: <20130718155115.GC9733@mudshark.cambridge.arm.com>
-References: <1374043709-24770-1-git-send-email-koba@kmckk.co.jp>
- <20130718155115.GC9733@mudshark.cambridge.arm.com>
-Message-ID: <20130722134515.GB30857@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Jul 2013 14:46:59 +0100
+Subject: linux startup
+In-Reply-To: <CANEcUBWUFA=nmoCOUbLPa=vfbfcaqaC=FStG_4hgk1oHR+mgYg@mail.gmail.com>
+References: <CANEcUBWUFA=nmoCOUbLPa=vfbfcaqaC=FStG_4hgk1oHR+mgYg@mail.gmail.com>
+Message-ID: <20130722134659.GM24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 04:51:15PM +0100, Will Deacon wrote:
-> On Wed, Jul 17, 2013 at 07:48:29AM +0100, Tetsuyuki Kobayashi wrote:
-> > Array hwcap_str[19] should be "vfpd32" and hwcap_str[20] should be "lpae".
-> > But actually "vfpd32" was missing and "lpae" was at wrong place.
-> > 
-> > Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+On Mon, Jul 22, 2013 at 09:30:44PM +0800, zhaobin xv wrote:
+> Hi
+> I recently read lernel source .
+> I have a question:In
+> folder:linux/arch/arm/boot/compressed/head.S(linux2.6.22.6):
 > 
-> [...]
 > 
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 63af9a7..96286cb 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -971,6 +971,7 @@ static const char *hwcap_str[] = {
-> >  	"vfpv4",
-> >  	"idiva",
-> >  	"idivt",
-> > +	"vfpd32",
-> >  	"lpae",
-> >  	NULL
-> >  };
-> > -- 
+> start:
+>         .type    start,#function
+>         .rept    8
+>         mov    r0, r0
+>         .endr
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+>         b    1f
+>         .word    0x016f2818        @ Magic numbers to help the loader
+>         .word    start            @ absolute load/run zImage address
+>         .word    _edata            @ zImage end address
+> 1:        mov    r7, r1            @ save architecture ID
+>         mov    r8, r2            @ save atags pointer
 > 
-> Please can you put this into the patch system? It needs to get in for 3.11.
+> 
+> I don't kown why the ?mov r0 r0 ? repeated  emergence 8 times.
 
-I still can't see this in the patch system. I've tested it on A5, A7, A9 and
-A15 and it works as expected.
+(a) boot loaders used to call the kernel at an offset of 32 bytes into
+the image, but now call at the start of the image.
+(b) the magic numbers are placed at a fixed position.
 
-Will
+So we need to fill the first 8 words with something.  They could have
+all been branches to '1f' instead of that instruction.  It makes little
+difference.
