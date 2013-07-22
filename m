@@ -1,32 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Jul 2013 12:06:56 +0100
-Subject: [PATCH RFC v2 0/14] Clean up debugging support
-In-Reply-To: <20130720164332.GA26625@lunn.ch>
-References: <20130716163243.GY21614@n2100.arm.linux.org.uk>
- <20130717170406.GR24642@n2100.arm.linux.org.uk>
- <20130720164332.GA26625@lunn.ch>
-Message-ID: <20130722110656.GJ24642@n2100.arm.linux.org.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 22 Jul 2013 12:21:19 +0100
+Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
+In-Reply-To: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 20, 2013 at 06:43:32PM +0200, Andrew Lunn wrote:
-> On Wed, Jul 17, 2013 at 06:04:06PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Jul 16, 2013 at 05:32:43PM +0100, Russell King - ARM Linux wrote:
-> > > This is the second posting of this series, with a few additional patches
-> > > on top to go a little further.  Changes since the last posting:
-> > 
-> > Okay, I think everyone is happy with this, and it's time to go into
-> > linux-next, so it'll be visible in my tree from tomorrow.
-> > 
-> > Please keep the tested-by/acked-by etc coming.
-> 
-> Hi Russell
-> 
-> Maybe i'm blind, but i don't seem to be able to see this in linux
-> next, or your git tree.
-> 
-> Has it been pushed out yet?
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-You are correct that I hadn't pushed it out.  I decided to wait for -rc2
-because I have a copy of a fix in my tree which was already applied after
--rc1, so wanted to rebase first.  Anyway, it's been pushed out now.
+This patch series adds support to configure the rate and enable the event
+stream for architected timer. Since the timer control register is reset to
+zero on warm boot, CPU PM notifier is added to re-initialse it.
+
+Changes v1->v2:
+1. Saved event stream divider value on cold reset path and re-used it
+   in CPU PM notifier instead of calculating every time.
+2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
+3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
+   arch_counter_set_user_access"(already done as part of __cpuinit*
+   deletion)
+
+Regards,
+Sudeep
+
+
+Sudeep KarkadaNagesha (2):
+  ARM: arch_timer: add macros for bits in control register
+  drivers: clocksource: add CPU PM notifier for ARM architected timer
+
+Will Deacon (1):
+  drivers: clocksource: configure event stream for ARM arch timer
+
+ arch/arm/include/asm/arch_timer.h    | 10 ++++++--
+ arch/arm64/include/asm/arch_timer.h  | 12 +++++++---
+ drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++++++++++++-
+ include/clocksource/arm_arch_timer.h | 10 ++++++++
+ 4 files changed, 71 insertions(+), 6 deletions(-)
+
+-- 
+1.8.1.2
