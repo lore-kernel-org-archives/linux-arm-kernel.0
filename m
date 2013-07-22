@@ -1,109 +1,36 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Mon, 22 Jul 2013 07:02:56 +0000
-Subject: [v3 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <20130706020737.GA9029@mtj.dyndns.org>
-References: <1373017942-12583-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373017942-12583-4-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130705174305.GA28088@mtj.dyndns.org>
- <0E83723C55F66F43A6041464FE31119D31432D@039-SN2MPN1-012.039d.mgd.msft.net>
- <20130706020737.GA9029@mtj.dyndns.org>
-Message-ID: <0E83723C55F66F43A6041464FE31119D3441A3@039-SN2MPN1-011.039d.mgd.msft.net>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 22 Jul 2013 15:14:06 +0800
+Subject: [PATCH 1/5] gpio: pxa: remove dead code
+In-Reply-To: <CACRpkdaB7JnWzoLKpQ1eLWAi7yFz9CanhbhwtiCnEtcNWzX3RQ@mail.gmail.com>
+References: <1373555877-29887-1-git-send-email-zonque@gmail.com>
+ <1373555877-29887-2-git-send-email-zonque@gmail.com>
+ <CACRpkdaB7JnWzoLKpQ1eLWAi7yFz9CanhbhwtiCnEtcNWzX3RQ@mail.gmail.com>
+Message-ID: <CAD6h2NS0p-kMUGyhbr93vd_oLSNyaB572riFB8mHt1cu5f-bGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun:
-Re-send this email to you and community.
-I'm afraid that you may be missed or don't receive it.
+On 22 July 2013 00:15, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Jul 11, 2013 at 5:17 PM, Daniel Mack <zonque@gmail.com> wrote:
+>
+>> Commit f87311743 ("ARM: mmp: add more compatible names in gpio driver")
+>> changed the driver logic to determine the number of available GPIOs from
+>> the compatible string, and hence obsoleted the (undocumented) child
+>> nodes that were previously necessary. However, it left some remainder
+>> which can be safely removed now.
+>>
+>> Also, this patch makes pxa_gpio_probe_dt() return the correct value in
+>> case irq_alloc_descs() fails.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>
+> Tentatively applied, Haojian, does this look allright?
+>
+> Yours,
+> Linus Walleij
 
-BTW, can you help to pick up the #2 and #3(reviewed and acked by Shawn) of the v7 patch-set of this serial?
-Thanks in advance.
+This patch is good.
 
-2013/7/10 HongXing Zhu <richard.zhuhongxing@gmail.com>
-
-    Hi Tejun:
-    There are some differences between generic AHCI controller and imx AHCI controller.
-
-    The bits definitions of the HBA registers, the Vendor
-    Specific registers, and the AHCI PHY clock, and the PHY signal adjustment window.
-
-     - CAP_SSS(bit20) of the HOST_CAP is writable, default
-     value is '0', should be configured to be '1'
-     - bit0 (only one AHCI SATA port on imx6q) of the
-     HOST_PORTS_IMPL should be set to be '1'.(default 0)
-     - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
-     should be configured regarding to the frequency of AHB
-     bus clock.
-     - Configurations of the AHCI PHY clock, and the signal
-     parameters of the GPR13
-
-    I'm afraid that the generic ahci_platform driver is not a good place to contain
-    imx6q ahci specific differences.
-    As I know that, the AHCI sata on imx53 doesn't have the PHY signal parameters
-    adjustment window, but the AHCI sata on imx6q does has one.
-
-    On imx6q, the standard .port_ops = &ahci_platform_ops, is used, but
-    .port_ops       = &ahci_platform_retry_srst_ops, would be required by imx53 AHCI controller.
-
-    We can put all the imx AHCI(imx6q, imx53) specific difference into the sata_imx driver,
-    and keep ahci_platform as clean as possible, if the separate sata_imx driver can be created.
-
-    How do you think about that?
-
-    BTW, the version4 patch-set would be sent out  a moment later, any suggests and comments are appreciated.
-
-    Best Regards.
-
-
-    2013/7/6 Tejun Heo <tj@kernel.org>
-
-        Hello,
-
-        On Sat, Jul 06, 2013 at 02:03:30AM +0000, Zhu Richard-R65037 wrote:
-        > [Richard] Just like what we dicussed in the previous v1/v2
-        > patch-set.  Shawn has the concerns that the IP speicific codes
-        > shouldn't be put in the platform level.  So he suggested that setup
-        > a stand-alone driver, contained the imx6q ahci sata specific codes,
-        > and re-use the generic ahci_platform driver as much as possible.
-        > This imx6q standalone ahci sata driver just registers the platform
-        > data, and the others would be handled by ahci_platform driver.
-
-        Oh, I'm not objecting to the ahci specific part not being in platform
-        code.  I'm wondering whether specific handling for imx6q can be
-        included into ahci_platform rather than being in its own driver.  It
-        just seems that there aren't too many differences.  I could be
-        misreading it so if there are enough differences to warrant a separate
-        driver, please enlighten me.
-
-        Thanks!
-
-        --
-        tejun
-
-Best Regards
-Richard Zhu
-
-
------Original Message-----
-From: Tejun Heo [mailto:htejun at gmail.com] On Behalf Of Tejun Heo
-Sent: Saturday, July 06, 2013 10:08 AM
-To: Zhu Richard-R65037
-Cc: Richard Zhu; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; avorontsov at ru.mvista.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org
-Subject: Re: [v3 3/3] sata: imx: add ahci sata support on imx platforms
-
-Hello,
-
-On Sat, Jul 06, 2013 at 02:03:30AM +0000, Zhu Richard-R65037 wrote:
-> [Richard] Just like what we dicussed in the previous v1/v2 patch-set.  
-> Shawn has the concerns that the IP speicific codes shouldn't be put in 
-> the platform level.  So he suggested that setup a stand-alone driver, 
-> contained the imx6q ahci sata specific codes, and re-use the generic 
-> ahci_platform driver as much as possible.
-> This imx6q standalone ahci sata driver just registers the platform 
-> data, and the others would be handled by ahci_platform driver.
-
-Oh, I'm not objecting to the ahci specific part not being in platform code.  I'm wondering whether specific handling for imx6q can be included into ahci_platform rather than being in its own driver.  It just seems that there aren't too many differences.  I could be misreading it so if there are enough differences to warrant a separate driver, please enlighten me.
-
-Thanks!
-
---
-tejun
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
