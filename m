@@ -1,57 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 22 Jul 2013 16:10:27 +0800
-Subject: [PATCH v4 10/17] clocksource: mxs_timer: Switch to
- sched_clock_register()
-In-Reply-To: <1374189690-10810-11-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-11-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130722081025.GE20271@S2101-09.ap.freescale.net>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Mon, 22 Jul 2013 17:12:30 +0900
+Subject: [PATCH] clk: exynos4: fix g2d/mdma clocks of exynos4x12
+Message-ID: <1374480750-30962-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 04:21:23PM -0700, Stephen Boyd wrote:
-> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
-> the 64 bit function to allow us to remove the 32 bit registration
-> interface.
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+The exynos4x12 has different address of GATE_IP_IMAGE reg. We should use
+EXYNOS4X12_GATE_IP_IMAGE for g2d gating clocks instead of 4210's reg.
+In case of mdma node, We don't use it for any exynos4 chipsets. I think we'll
+need to change it to 'none' or leave it on.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-BTW, will the series break setup_sched_clock() users that are not
-converted, like arch/arm/mach-imx/time.c?  I can understand that's the
-consequence of not moving things into drivers/ folder :)
-
-Shawn
-
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clocksource/mxs_timer.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clocksource/mxs_timer.c b/drivers/clocksource/mxs_timer.c
-> index 0f5e65f..445b68a 100644
-> --- a/drivers/clocksource/mxs_timer.c
-> +++ b/drivers/clocksource/mxs_timer.c
-> @@ -222,7 +222,7 @@ static struct clocksource clocksource_mxs = {
->  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
->  };
->  
-> -static u32 notrace mxs_read_sched_clock_v2(void)
-> +static u64 notrace mxs_read_sched_clock_v2(void)
->  {
->  	return ~readl_relaxed(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1));
->  }
-> @@ -236,7 +236,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
->  	else {
->  		clocksource_mmio_init(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1),
->  			"mxs_timer", c, 200, 32, clocksource_mmio_readl_down);
-> -		setup_sched_clock(mxs_read_sched_clock_v2, 32, c);
-> +		sched_clock_register(mxs_read_sched_clock_v2, 32, c);
->  	}
->  
->  	return 0;
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 1bdb882..6300c9d 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -820,8 +820,10 @@ struct samsung_gate_clock exynos4210_gate_clks[] __initdata = {
+ struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+ 	GATE(audss, "audss", "sclk_epll", E4X12_GATE_IP_MAUDIO, 0, 0, 0),
+ 	GATE(mdnie0, "mdnie0", "aclk160", GATE_IP_LCD0, 2, 0, 0),
++	GATE(g2d, "g2d", "aclk200", E4X12_GATE_IP_IMAGE, 0, 0, 0),
+ 	GATE(rotator, "rotator", "aclk200", E4X12_GATE_IP_IMAGE, 1, 0, 0),
+-	GATE(mdma2, "mdma2", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
++	GATE(mdma, "mdma", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
++	GATE(smmu_g2d, "smmu_g2d", "aclk200", E4X12_GATE_IP_IMAGE, 3, 0, 0),
+ 	GATE(smmu_mdma, "smmu_mdma", "aclk200", E4X12_GATE_IP_IMAGE, 5, 0, 0),
+ 	GATE(mipi_hsi, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
+ 	GATE(chipid, "chipid", "aclk100", E4X12_GATE_IP_PERIR, 0, 0, 0),
+-- 
+1.7.9.5
