@@ -1,69 +1,96 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 22 Jul 2013 17:47:29 -0300
-Subject: [PATCH] ARM: dts: mxs: Add spi alias
-Message-ID: <1374526049-29649-1-git-send-email-festevam@gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 22 Jul 2013 13:48:20 -0700
+Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
+In-Reply-To: <51ED80E7.4050606@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
+ <51ED781F.6060300@linaro.org> <51ED7DD5.8010000@codeaurora.org>
+ <51ED80E7.4050606@codeaurora.org>
+Message-ID: <51ED9A94.3030204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 07/22/2013 11:58 AM, Stephen Boyd wrote:
+> On 07/22/13 11:45, Stephen Boyd wrote:
+>> On 07/22/13 11:21, John Stultz wrote:
+>>> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
+>>>> In the next patch we're going to increase the number of bits that
+>>>> the generic sched_clock can handle to be greater than 32. With
+>>>> more than 32 bits the wraparound time can be larger than what can
+>>>> fit into the units that msecs_to_jiffies takes (unsigned int).
+>>>> Luckily, the wraparound is initially calculated in nanoseconds
+>>>> which we can easily use with hrtimers, so switch to using an
+>>>> hrtimer.
+>>>>
+>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> Hrmm. So in my testing (under qemu), this patch causes bootup to hang.
+>>>
+>>> qemu-system-arm -kernel zImage-arm -M vexpress-a9 -cpu cortex-a9
+>>> -nographic -m 1024  -append 'root=/dev/mmcblk0p2 rw mem=1024M
+>>> raid=noautodetect console=ttyAMA0,38400n8 rootwait vmalloc=256MB
+>>> devtmpfs.mount=0' -sd test-arm.img -redir tcp:4300::22
+>>>
+>>> Config file attached.
+>>>
+>>> I haven't gotten a chance to look very closely, but it seems the
+>>> folowing patch resolves the issue. I'm not sure if we're seeing
+>>> callers to setup_sched_clock happen after sched_clock_postinit or
+>>> what, but it probably needs another look over.
+>>>
+>>> thanks
+>>> -john
+>>>
+>>>
+>>> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+>>> index a269890b..c018ffc 100644
+>>> --- a/kernel/time/sched_clock.c
+>>> +++ b/kernel/time/sched_clock.c
+>>> @@ -138,12 +138,6 @@ void __init setup_sched_clock(u32 (*read)(void),
+>>> int bits, unsigned long rate)
+>>>       pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns,
+>>> wraps every %lluns\n",
+>>>           bits, r, r_unit, res, wrap);
+>>>   
+>>> -    /*
+>>> -     * Start the timer to keep sched_clock() properly updated and
+>>> -     * sets the initial epoch.
+>>> -     */
+>>> -    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+>>> -    sched_clock_timer.function = sched_clock_poll;
+>>>       update_sched_clock();
+>>>   
+>>>       /*
+>>> @@ -175,6 +169,13 @@ void __init sched_clock_postinit(void)
+>>>           setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
+>>>   
+>>>       update_sched_clock();
+>>> +
+>>> +    /*
+>>> +     * Start the timer to keep sched_clock() properly updated and
+>>> +     * sets the initial epoch.
+>>> +     */
+>>> +    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+>>> +    sched_clock_timer.function = sched_clock_poll;
+>>>       hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
+>>>   }
+>>>   
+>>>
+>> Hmm. Is it too early to use hrtimers? Moving the hrtimer_start() into
+>> sched_clock_register() also causes the same crash.
+> Yes that seems to be the problem. The vexpress board is setting up the
+> sched_clock in setup_arch() (via v2m_init_early) which runs before
+> hrtimers_init(). I've only tested this on boards that setup the timer in
+> the time_init() callback which runs after hrtimers_init(). Your patch
+> should be fine, although it would be nice if we didn't have callers
+> setting up the sched_clock so early.
 
-After providing spi alias, we can get the following message during probe:
+Although as Russell pointed out, setting up sched_clock later isn't 
+really a good option (although I'd like it best if we could handle 
+switching sched_clocks dynamically as needed so there were less 
+constraints on when it has to be registered).
 
-m25p80 spi1.0: sst25vf016b (2048 Kbytes)
+So I'll probably fold in my change into the patch if you're ok with that?
 
-,which looks better than the original one:
-
-m25p80 spi32766.0: sst25vf016b (2048 Kbytes)
-
-While at it, keep the alias entries in alphabetical order.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx23.dtsi | 2 ++
- arch/arm/boot/dts/imx28.dtsi | 6 ++++--
- 2 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 1e528db..28b5ce2 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -20,6 +20,8 @@
- 		gpio2 = &gpio2;
- 		serial0 = &auart0;
- 		serial1 = &auart1;
-+		spi0 = &ssp0;
-+		spi1 = &ssp1;
- 	};
- 
- 	cpus {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index db67eb6..89d98a1 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -15,6 +15,8 @@
- 	interrupt-parent = <&icoll>;
- 
- 	aliases {
-+		ethernet0 = &mac0;
-+		ethernet1 = &mac1;
- 		gpio0 = &gpio0;
- 		gpio1 = &gpio1;
- 		gpio2 = &gpio2;
-@@ -22,13 +24,13 @@
- 		gpio4 = &gpio4;
- 		saif0 = &saif0;
- 		saif1 = &saif1;
-+		spi0 = &ssp1;
-+		spi1 = &ssp2;
- 		serial0 = &auart0;
- 		serial1 = &auart1;
- 		serial2 = &auart2;
- 		serial3 = &auart3;
- 		serial4 = &auart4;
--		ethernet0 = &mac0;
--		ethernet1 = &mac1;
- 	};
- 
- 	cpus {
--- 
-1.8.1.2
+thanks
+-john
