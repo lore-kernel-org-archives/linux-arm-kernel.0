@@ -1,90 +1,146 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Jul 2013 04:01:57 +0000 (UTC)
-Subject: OMAP baseline test results for Linux v3.11-rc2
-Message-ID: <alpine.DEB.2.02.1307220400260.4804@utopia.booyaka.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 22 Jul 2013 13:02:53 +0900
+Subject: [PATCH] ARM: shmobile: Add lager defconfig
+Message-ID: <1374465773-8123-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is intended to be used until multi-arch is able to be
+used for the lager board at which time a more generic configuration
+will be used in place of this one.
 
-Here are some basic OMAP test results for Linux v3.11-rc2.
-Logs and other details at:
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/lager_defconfig | 121 +++++++++++++++++++++++++++++++++
+ 1 file changed, 121 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/lager_defconfig
 
-    http://www.pwsan.com/omap/testlogs/test_v3.11-rc2/20130721203314/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass (14/14): n800_multi_omap2xxx, n800_only_a, omap1_defconfig,
-		  omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
-
-Build: uImage+dtb:
-    Pass ( 3/ 3): am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
-
-Build: zImage:
-    Pass ( 1/ 1): omap2plus_defconfig
-
-Boot to userspace:
-    FAIL ( 5/11): 2430sdp, 3530es3beagle, 3730beaglexm, 5912osk,
-		  am335xbonelt
-    Pass ( 6/11): 3517evm, 37xxevm, 4430es2panda, 4460pandaes,
-		  am335xbone, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 4/ 6): 2430sdp, 3530es3beagle, 3730beaglexm, 4430es2panda
-    Pass ( 2/ 6): 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 5/ 6): 2430sdp, 3530es3beagle, 3730beaglexm, 4430es2panda,
-		  4460pandaes
-    Pass ( 1/ 6): 37xxevm
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 4): 3530es3beagle, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 3530es3beagle, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.11-rc1 (ad81f0545ef01ea651886dddac4bef6cec930092)):
-   text     data      bss    total  kernel
-   +658     +320        0     +978  am33xx_only
-   +350     +192        0     +542  n800_multi_omap2xxx
-   +318     +192        0     +510  n800_only_a
-   +490     +192        0     +682  omap1_defconfig
-   +554     +224        0     +778  omap1_defconfig_1510innovator_only
-   +490     +192        0     +682  omap1_defconfig_5912osk_only
-   +670     +320        0     +990  omap2plus_defconfig
-  +4834     +320        0    +5154  omap2plus_defconfig_2430sdp_only
-   +618     +384        0    +1002  omap2plus_defconfig_cpupm
-   +670     +256        0     +926  omap2plus_defconfig_no_pm
-   +670     +320        0     +990  omap2plus_defconfig_omap2_4_only
-   +670     +320        0     +990  omap2plus_defconfig_omap3_4_only
-   +336      +96      -72     +360  rmk_omap3430_ldp_allnoconfig
-   +318     +192        0     +510  rmk_omap3430_ldp_oldconfig
-   +288      +96      -24     +360  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.11-rc1 (ad81f0545ef01ea651886dddac4bef6cec930092))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+diff --git a/arch/arm/mach-shmobile/lager_defconfig b/arch/arm/mach-shmobile/lager_defconfig
+new file mode 100644
+index 0000000..ba839a2
+--- /dev/null
++++ b/arch/arm/mach-shmobile/lager_defconfig
+@@ -0,0 +1,121 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_R8A7790=y
++CONFIG_MACH_LAGER=y
++# CONFIG_SH_TIMER_TMU is not set
++# CONFIG_EM_TIMER_STI is not set
++# CONFIG_SWP_EMULATE is not set
++CONFIG_ARM_ERRATA_430973=y
++CONFIG_ARM_ERRATA_458693=y
++CONFIG_ARM_ERRATA_460075=y
++CONFIG_ARM_ERRATA_743622=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++# CONFIG_LOCAL_TIMERS is not set
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_FORCE_MAX_ZONEORDER=13
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_KEXEC=y
++CONFIG_AUTO_ZRELADDR=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_RUNTIME=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CORE is not set
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++CONFIG_SH_ETH=y
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=8
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
++CONFIG_I2C_SH_MOBILE=y
++CONFIG_GPIO_SH_PFC=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_RCAR=y
++# CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
++CONFIG_MMC_SH_MMCIF=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_SH_DMAE=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_ARM_UNWIND is not set
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
+-- 
+1.8.2.1
