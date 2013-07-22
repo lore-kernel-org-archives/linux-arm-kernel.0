@@ -1,34 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Jul 2013 20:07:04 +0000 (UTC)
-Subject: OMAP2430 SDP boot broken after Linus' rmk merge
-In-Reply-To: <20130722184325.GA21614@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 22 Jul 2013 22:13:17 +0200
+Subject: [PATCH v4 04/20] clocksource: samsung_pwm_timer: Do not use
+ clocksource_mmio
+In-Reply-To: <19090469.Cf6sbb33Ke@flatron>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1374278673-25615-6-git-send-email-tomasz.figa@gmail.com>
+ <51ECAD60.1000109@linaro.org> <19090469.Cf6sbb33Ke@flatron>
+Message-ID: <51ED925D.3060307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jul 2013, Russell King - ARM Linux wrote:
-
-> Bear in mind that I'm almost at the point of not boot-testing anything
-> I sent to Linus because of the uselessness of the SDP4430 board now
-> that it's DT only - the only platform which boot-tests anything I send
-> is the 3430LDP board now.  If people care about that, maybe they can
-> assist with sorting out the issues I've raised on these lists about
-> the SDP4430 - and why the SDP4430 build remains disabled in my build
-> and boot system.
-
-I understand completely...
-
-> Looking at the boot log, it just stops after uboot hands over control.
-> With the lack of output from the decompressor, it's not possible to
-> tell whether it's a decompressor problem or a kernel problem.
+On 07/22/2013 09:47 AM, Tomasz Figa wrote:
+> Hi Daniel,
 > 
-> I think you need to turn on the LL_DEBUG option, select the appropriate
-> output option, and also get the decompressor to use the kernel's debug
-> io functions to output it's stuff (I think the option is DEBUG_UNCOMPRESS).
+> On Monday 22 of July 2013 05:56:16 Daniel Lezcano wrote:
+>> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
+>>> In case of Samsung PWM timer, clocksource MMIO can not be used,
+>>> because
+>>> custom suspend/resume callbacks are required.
+>>>
+>>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+>>> ---
+>>
+>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> Thanks for review.
+> 
+>> Please in the future Cc me and Thomas Gleixner (clocksource/clockevent
+>> maintainers).
+> 
+> Oh, right, sorry. This series originally was not touching the clocksource 
+> driver and I just kept original recipient list.
+> 
+> Btw. Have you updated MAINTAINERS file? In latest linux-next I can still 
+> see only John Stultz and Thomas Gleixner as maintainers of 
+> drivers/clocksource.
 
-OK, will dig deeper here at the next opportunity.
+Yes, right last week :)
 
+https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/core&id=9222d247bcbaacc40fe15549158f9d67523c1ace
 
-- Paul
+Thanks
+  -- Daniel
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
