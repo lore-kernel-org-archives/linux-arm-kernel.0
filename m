@@ -1,31 +1,56 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 22 Jul 2013 10:47:44 +0100
-Subject: [PATCH v2] xen/arm and xen/arm64: update xen_restart after
- ff701306cd49
-Message-ID: <1374486464-25243-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: manjunath.goudar@linaro.org (manjunath)
+Date: Mon, 22 Jul 2013 15:21:31 +0530
+Subject: [PATCH V4 00/11] USB: OHCI:Properly handle ohci_suspend()routine
+ in bus glue
+In-Reply-To: <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <51ED00A3.8080004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ff701306cd49 (arm64: use common reboot infrastructure) changes
-the prototype of arm_pm_restart.  Update xen_restart accordingly.
+On Monday 22 July 2013 03:02 PM, Manjunath Goudar wrote:
+> Suspend scenario in case of ohci bus glue was not properly handled as
+> it was not suspending generic part of ohci controller. Calling
+> explicitly the ohci_suspend()routine will ensure proper handling
+> of suspend scenario.
+>
+> V2:
+>   -Incase ohci_suspend() fails, return right away without executing further.
+>
+> V3:
+>   -New patch 1/11 added, for generic ohci-hcd suspend code.
+>
+> V4:
+>   -Properly aligned "do_wakeup" and "ret" variables.
+>
+> Manjunath Goudar (11):
+>    USB: OHCI: Properly handle OHCI controller suspend
+>    USB: OHCI: Properly handle ohci-at91 suspend
+>    USB: OHCI: Properly handle ohci-s3c2410 suspend
+>    USB: OHCI: Properly handle ohci-da8xx suspend
+>    USB: OHCI: Properly handle ohci-ep93xx suspend
+>    USB: OHCI: Properly handle ohci-exynos suspend
+>    USB: OHCI: Properly handle ohci-omap suspend
+>    USB: OHCI: Properly handle ohci-platform suspend
+>    USB: OHCI: Properly handle ohci-pxa27x suspend
+>    USB: OHCI: Properly handle ohci-sm501 suspend
+>    USB: OHCI: Properly handle ohci-spear suspend
+>
+>   drivers/usb/host/ohci-at91.c     |   10 ++++++++--
+>   drivers/usb/host/ohci-da8xx.c    |   15 +++++++++++----
+>   drivers/usb/host/ohci-ep93xx.c   |    9 ++++++++-
+>   drivers/usb/host/ohci-exynos.c   |   20 +++++---------------
+>   drivers/usb/host/ohci-hcd.c      |    9 ++++++++-
+>   drivers/usb/host/ohci-omap.c     |   13 ++++++++++---
+>   drivers/usb/host/ohci-platform.c |    9 ++++++++-
+>   drivers/usb/host/ohci-pxa27x.c   |    8 +++++++-
+>   drivers/usb/host/ohci-s3c2410.c  |   19 ++++---------------
+>   drivers/usb/host/ohci-sm501.c    |   11 +++++++++--
+>   drivers/usb/host/ohci-spear.c    |   12 +++++++++---
+>   11 files changed, 87 insertions(+), 48 deletions(-)
+>
+I am sorry, not updated patch subject line. This is patch V4 series.
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/enlighten.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index f71c37e..c9770ba 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -172,7 +172,7 @@ static void __init xen_percpu_init(void *unused)
- 	enable_percpu_irq(xen_events_irq, 0);
- }
- 
--static void xen_restart(char str, const char *cmd)
-+static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
- {
- 	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
- 	int rc;
--- 
-1.7.2.5
+Thanks
+Manjunath Goudar
