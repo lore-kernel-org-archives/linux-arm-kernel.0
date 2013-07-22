@@ -1,25 +1,39 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Mon, 22 Jul 2013 16:49:27 +0200
-Subject: [PATCH 1/2] arm: ixp4xx: set cohorent_dma_mask for ethernet
- platform devices
-In-Reply-To: <1374424823.2804.25.camel@deadeye.wl.decadent.org.uk> (Ben
- Hutchings's message of "Sun, 21 Jul 2013 17:40:23 +0100")
-References: <1374315339-31469-1-git-send-email-jogo@openwrt.org>
- <1374315339-31469-2-git-send-email-jogo@openwrt.org>
- <m3ip04ezty.fsf@intrepid.localdomain>
- <1374424823.2804.25.camel@deadeye.wl.decadent.org.uk>
-Message-ID: <m3bo5uabuw.fsf@intrepid.localdomain>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 22 Jul 2013 10:50:02 -0400
+Subject: [PATCH v2] of: Specify initrd location using 64-bit
+In-Reply-To: <20130720053945.C7AC63E0C52@localhost>
+References: <1372702835-5333-1-git-send-email-santosh.shilimkar@ti.com>
+ <51D1F5E2.6070609@gmail.com> <20130720053945.C7AC63E0C52@localhost>
+Message-ID: <51ED469A.9000801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Hutchings <bhutchings@solarflare.com> writes:
+On Saturday 20 July 2013 01:39 AM, Grant Likely wrote:
+> On Mon, 01 Jul 2013 16:34:26 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>> On 07/01/2013 01:20 PM, Santosh Shilimkar wrote:
+>>> On some PAE architectures, the entire range of physical memory could reside
+>>> outside the 32-bit limit.  These systems need the ability to specify the
+>>> initrd location using 64-bit numbers.
+>>>
+>>> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
+>>> use 64-bit numbers instead of the current unsigned long.
+>>>
+>>> There has been quite a bit of debate about whether to use u64 or phys_addr_t.
+>>> It was concluded to stick to u64 to be consistent with rest of the device
+>>> tree code. As summarized by Geert, "The address to load the initrd is decided
+>>> by the bootloader/user and set at that point later in time. The dtb should not
+>>> be tied to the kernel you are booting"
+>>
+>> That was quoting me. Otherwise:
+>>
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Unless Grant feels compelled to pick this up for 3.11, I think it has to
+>> wait for 3.12.
+> 
+> Nope, 3.12 is fine. Applied.
+> 
+Thanks Grant.
 
-> I think the problem is that the platform device and the platform data
-> have not been properly separated.  The machine-specific setup functions
-> should be passing the eth_plat_info and MAC ID into a common ixp4xx
-> function which would then create the platform device with the correct
-> DMA mask etc.
-
-That's also my idea. Will look at this.
--- 
-Krzysztof Halasa
+Regards,
+Santosh
