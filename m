@@ -1,48 +1,48 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 22 Jul 2013 15:30:40 +0530
-Subject: [PATCH] clk: exynos4: fix g2d/mdma clocks of exynos4x12
-In-Reply-To: <1374480750-30962-1-git-send-email-chanho61.park@samsung.com>
-References: <1374480750-30962-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <CAK9yfHwNgZrZPT5c4DxfsDchWFXR2nWTVxCY2kZTEZW4PwyOng@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 22 Jul 2013 15:31:13 +0530
+Subject: [PATCH 0/4] OMAP2+: Fix boot hang with earlycon enabled
+Message-ID: <1374487277-26099-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanho,
+Boot on all OMAP2+ devices is broken with earlycon enabled
+as discussed here [1]
 
-On 22 July 2013 13:42, Chanho Park <chanho61.park@samsung.com> wrote:
-> The exynos4x12 has different address of GATE_IP_IMAGE reg. We should use
-> EXYNOS4X12_GATE_IP_IMAGE for g2d gating clocks instead of 4210's reg.
-> In case of mdma node, We don't use it for any exynos4 chipsets. I think we'll
-> need to change it to 'none' or leave it on.
->
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index 1bdb882..6300c9d 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -820,8 +820,10 @@ struct samsung_gate_clock exynos4210_gate_clks[] __initdata = {
->  struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
->         GATE(audss, "audss", "sclk_epll", E4X12_GATE_IP_MAUDIO, 0, 0, 0),
->         GATE(mdnie0, "mdnie0", "aclk160", GATE_IP_LCD0, 2, 0, 0),
-> +       GATE(g2d, "g2d", "aclk200", E4X12_GATE_IP_IMAGE, 0, 0, 0),
->         GATE(rotator, "rotator", "aclk200", E4X12_GATE_IP_IMAGE, 1, 0, 0),
-> -       GATE(mdma2, "mdma2", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
-> +       GATE(mdma, "mdma", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
-> +       GATE(smmu_g2d, "smmu_g2d", "aclk200", E4X12_GATE_IP_IMAGE, 3, 0, 0),
->         GATE(smmu_mdma, "smmu_mdma", "aclk200", E4X12_GATE_IP_IMAGE, 5, 0, 0),
->         GATE(mipi_hsi, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
->         GATE(chipid, "chipid", "aclk100", E4X12_GATE_IP_PERIR, 0, 0, 0),
+There were 2 issues which were rootcaused
+1. Issue caused due to hwmod doing a reset of console uart while
+earlycon was using it (seen only on am335x devices)
 
-Which kernel version is this patch based on? G2D clocks for 4x12 has
-already been added by commit 5cd644d837 ("clk: exynos4: Add additional
-G2D clocks").
+2. omap serial causing a NULL context restore with context loss
+count missing.
 
+This patch set attempts to fix both the issues and is one of the
+different approaches discussed [1] on how to fix these issues.
+
+Boot tested on omap4 panda es with and without earlycon (DT boot)
+Boot tested on am335x bone black with and without earlycon (DT boot)
+Boot tested on OMAP3 beagle XM with and without earlycon (non-DT boot)
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg91662.html
+
+Grygorii Strashko (1):
+  serial: omap: enable PM runtime only when its fully configured
+
+Rajendra Nayak (3):
+  ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with DEBUG_LL
+  ARM: OMAP2+: Avoid idling memory controllers with no drivers
+  ARM: OMAP2+: Sync hwmod state with the pm_runtime and omap_device
+    state
+
+ arch/arm/mach-omap2/omap_device.c                  |   18 ++++++++
+ arch/arm/mach-omap2/omap_hwmod.h                   |   48 ++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    6 +--
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    9 ++--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    5 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    3 +-
+ arch/arm/mach-omap2/serial.c                       |   11 -----
+ drivers/tty/serial/omap-serial.c                   |    3 +-
+ 9 files changed, 81 insertions(+), 24 deletions(-)
 
 -- 
-With warm regards,
-Sachin
+1.7.9.5
