@@ -1,72 +1,102 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Jul 2013 06:32:01 +0200
-Subject: [PATCH] ARM: tegra: cpuidle: use CPUIDLE_FLAG_TIMER_STOP flag
-In-Reply-To: <1374467085.15946.16.camel@jlo-ubuntu-64.nvidia.com>
-References: <1372152228-16199-1-git-send-email-josephl@nvidia.com>
- <51E439BC.9030608@wwwdotorg.org>
- <1373973447.8538.80.camel@jlo-ubuntu-64.nvidia.com>
- <51E5A438.10004@wwwdotorg.org>
- <1374056130.10997.16.camel@jlo-ubuntu-64.nvidia.com>
- <51E6FF0B.5000708@wwwdotorg.org>
- <1374145726.5610.73.camel@jlo-ubuntu-64.nvidia.com>
- <51E7E27B.9090605@linaro.org>
- <1374218064.24607.1.camel@jlo-ubuntu-64.nvidia.com>
- <51E91A72.6070708@linaro.org>
- <1374462916.15946.14.camel@jlo-ubuntu-64.nvidia.com>
- <51ECB223.5000002@linaro.org>
- <1374467085.15946.16.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <51ECB5C1.600@linaro.org>
+Date: Mon, 22 Jul 2013 06:36:46 +0200
+Subject: [PATCH 2/4] ARM: exynos: cpuidle: Use the common cpuidle register
+ routine
+In-Reply-To: <4097491.3y6BBYmzze@amdc1032>
+References: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
+ <1374152070-21008-2-git-send-email-daniel.lezcano@linaro.org>
+ <4097491.3y6BBYmzze@amdc1032>
+Message-ID: <51ECB6DE.9060701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 06:24 AM, Joseph Lo wrote:
-> On Mon, 2013-07-22 at 12:16 +0800, Daniel Lezcano wrote:
->> On 07/22/2013 05:15 AM, Joseph Lo wrote:
->>> On Fri, 2013-07-19 at 18:52 +0800, Daniel Lezcano wrote:
->>>> On 07/19/2013 09:14 AM, Joseph Lo wrote:
->>>>> On Thu, 2013-07-18 at 20:41 +0800, Daniel Lezcano wrote:
->>>>>> On 07/18/2013 01:08 PM, Joseph Lo wrote:
->>>>>>> On Thu, 2013-07-18 at 04:31 +0800, Stephen Warren wrote:
->>>>>>>> On 07/17/2013 04:15 AM, Joseph Lo wrote:
->>>>>>>>> On Wed, 2013-07-17 at 03:51 +0800, Stephen Warren wrote:
->>>>>>>>>> On 07/16/2013 05:17 AM, Joseph Lo wrote:
->>>>>>>>>>> On Tue, 2013-07-16 at 02:04 +0800, Stephen Warren wrote:
->>>>>>>>>>>> On 06/25/2013 03:23 AM, Joseph Lo wrote:
->>>>>>>>>>>>> Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
->>>>>>>>>>>>> to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
->>>>>>>>>>>>> this state.
->>>>>>>> ... [ discussion of issues with Joesph's patches applied]
->>>>>>>>>
-> [...]
->>>>
->>>> Ok, so the problem occurs with the CPUIDLE_FLAG_TIMER_STOP flag only on
->>>> tegra114, right ?
->>>>
->>>> Sorry, I am a bit lost :)
->>>>
->>> Here are the issues that happen after apply CPUIDLE_FLAG_TIMER_STOP.
->>> 1) Tegra114/30
->>> The warning message at kernel/time/tick-broadcast.c:667
->>> tick_broadcast_oneshot_control could be triggered when doing CPU hot
->>> plug stress test.
->>
->> With the fix for tick-broadcast.c [1] ?
-> Yes.
+On 07/19/2013 06:03 PM, Bartlomiej Zolnierkiewicz wrote:
 > 
->>
->>> 2) Tegra20
->>> The system is easy to stick or become lag.
->>> The CPU hot plug is easy to cause system stick too.
->>>
->>> The fix I suggested in another mail looks can fix all the issues above.
->>> I verified it again today on 3 different Tegra SoC platforms.
->>
->> Not sure your patch fixes the problem.
->>
->> I am wondering if there isn't a underlaying problem which surface with
->> the flag.
+> Hi,
+> 
+> On Thursday, July 18, 2013 02:54:28 PM Daniel Lezcano wrote:
+>> Now we have the same routine than the one handled by the cpuidle framework.
+> 
+> Small nitpick:
+> 
+> To be exact the routine is not the same, on error cpuidle_register() does
+> complete unregister operation of the cpuidle driver, exynos4_init_cpuidle()
+> just stops the registration procedure. 
+> 
+> The change itself is okay but the patch description could be better.
 
-Does the attached patch changes something ?
+Ok, I will fix the changelog.
+
+> Anyway all patches (#1-4) look fine to me. Thanks for this work.
+
+Thanks for the review. I assume it is an acked-by right ?
+
+> Best regards,
+
+Kukjin,
+
+shall I take the patchset in my tree ?
+
+Thanks
+  -- Daniel
+
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>  
+>> Let's use it.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/cpuidle.c |   24 +-----------------------
+>>  1 file changed, 1 insertion(+), 23 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+>> index cc4b097..d8fc1a2 100644
+>> --- a/arch/arm/mach-exynos/cpuidle.c
+>> +++ b/arch/arm/mach-exynos/cpuidle.c
+>> @@ -41,8 +41,6 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+>>  				struct cpuidle_driver *drv,
+>>  				int index);
+>>  
+>> -static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+>> -
+>>  static struct cpuidle_driver exynos4_idle_driver = {
+>>  	.name			= "exynos4_idle",
+>>  	.owner			= THIS_MODULE,
+>> @@ -188,29 +186,9 @@ static void __init exynos5_core_down_clk(void)
+>>  
+>>  static int __init exynos4_init_cpuidle(void)
+>>  {
+>> -	int cpu_id, ret;
+>> -	struct cpuidle_device *device;
+>> -
+>>  	if (soc_is_exynos5250())
+>>  		exynos5_core_down_clk();
+>>  
+>> -	ret = cpuidle_register_driver(&exynos4_idle_driver);
+>> -	if (ret) {
+>> -		printk(KERN_ERR "CPUidle failed to register driver\n");
+>> -		return ret;
+>> -	}
+>> -
+>> -	for_each_online_cpu(cpu_id) {
+>> -		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+>> -		device->cpu = cpu_id;
+>> -
+>> -		ret = cpuidle_register_device(device);
+>> -		if (ret) {
+>> -			printk(KERN_ERR "CPUidle register device failed\n");
+>> -			return ret;
+>> -		}
+>> -	}
+>> -
+>> -	return 0;
+>> +	return cpuidle_register(&exynos4_idle_driver, NULL);
+>>  }
+>>  device_initcall(exynos4_init_cpuidle);
+> 
 
 
 -- 
@@ -75,11 +105,3 @@ Does the attached patch changes something ?
 Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
 <http://twitter.com/#!/linaroorg> Twitter |
 <http://www.linaro.org/linaro-blog/> Blog
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0011-cpuidle-add-hotplug-support-to-initialize-the-timer-.patch
-Type: text/x-diff
-Size: 3462 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/66dbbf3f/attachment.bin>
