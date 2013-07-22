@@ -1,150 +1,61 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 22 Jul 2013 09:53:06 +0800
-Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
- support for Chipidea
-In-Reply-To: <201307220340.32263.marex@denx.de>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <201307220315.28821.marex@denx.de>
- <20130722012127.GA25817@nchen-desktop>
- <201307220340.32263.marex@denx.de>
-Message-ID: <20130722015305.GB25817@nchen-desktop>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Mon, 22 Jul 2013 10:55:39 +0900
+Subject: [PATCH v4 00/20] Samsung PWM support cleanup
+In-Reply-To: <9102768.ef8LAvpunv@flatron>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <51EC5F18.8040007@gmail.com> <9102768.ef8LAvpunv@flatron>
+Message-ID: <0ab601ce867e$90b95770$b22c0650$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 03:40:32AM +0200, Marek Vasut wrote:
-> Dear Peter Chen,
+Tomasz Figa wrote:
 > 
-> > On Mon, Jul 22, 2013 at 03:15:28AM +0200, Marek Vasut wrote:
-> > > Hi Peter,
-> > > 
-> > > > On Fri, Jul 12, 2013 at 03:18:31PM +0200, Marek Vasut wrote:
-> > > > > Hi Peter,
-> > > > > 
-> > > > > > On Fri, Jul 12, 2013 at 06:04:43AM +0200, Marek Vasut wrote:
-> > > > > > > Hi Peter,
-> > > > > > > 
-> > > > > > > > On Thu, Jul 11, 2013 at 07:57:19PM +0200, Marek Vasut wrote:
-> > > > > > > > > Hi Peter,
-> > > > > > > > > 
-> > > > > > > > > > This patchset adds tested otg id switch function and
-> > > > > > > > > > vbus connect and disconnect detection for chipidea driver.
-> > > > > > > > > > And fix kinds of bugs found at chipidea drivers after
-> > > > > > > > > > enabling id and vbus detection.
-> > > > > > > > > > 
-> > > > > > > > > > This patch is fully tested at imx6 sabresd platform.
-> > > > > > > > > > My chipidea repo:
-> > > > > > > > > > https://github.com/hzpeterchen/linux-usb.git
-> > > > > > > > > > 
-> > > > > > > > > > Changes for v12:
-> > > > > > > > > > - Rebased greg's usb-next tree (3.10.0-rc7+)
-> > > > > > > > > > - Split more small patches for single function and fix.
-> > > > > > > > > 
-> > > > > > > > > I tested the patchset. Here are the results:
-> > > > > > > > > 
-> > > > > > > > > - VBUS switching
-> > > > > > > > > 
-> > > > > > > > > I'm no longer getting any ID interrupts at all when I apply
-> > > > > > > > > the patch below. The board stays in HOST mode all the time.
-> > > > > > > > > If I configure it as peripheral, it works as peripheral.
-> > > > > > > > > Note with [1], I was able to switch from Peripheral->Host ,
-> > > > > > > > > not the other way around.
-> > > > > > > > 
-> > > > > > > > Thanks for your testing. But first, can you have me check
-> > > > > > > > if your ID wakeup is enabled?
-> > > > > > > 
-> > > > > > > ID wakeup? How do I check?
-> > > > > > 
-> > > > > > See otgsc at controller register, the ID wakeup enable is bit 24.
-> > > > > 
-> > > > > Yes, ID interrupt (IDIE) is set.
-> > > > > 
-> > > > > I noticed this backtrace in the kernel bootlog, but this only happens
-> > > > > if the dr_mode="otg" , it comes from the host-mode irq handler :
-> > > > > 
-> > > > > [    2.757563] irq 238: nobody cared (try booting with the "irqpoll"
-> > > > > option) [    2.764398] CPU: 0 PID: 1 Comm: swapper Not tainted
-> > > > > 3.10.0- next-20130711-00013-g011c4b3-dirty #703
-> > > > > [    2.773445] [<80013878>] (unwind_backtrace+0x0/0xe8) from
-> > > > > [<80011644>] (show_stack+0x10/0x14)
-> > > > > [    2.782027] [<80011644>] (show_stack+0x10/0x14) from [<800659f4>]
-> > > > > (__report_bad_irq.isra.6+0x20/0xe0)
-> > > > > [    2.791286] [<800659f4>] (__report_bad_irq.isra.6+0x20/0xe0) from
-> > > > > [<80065c98>] (note_interrupt+0x16c/0x230)
-> > > > > [    2.801063] [<80065c98>] (note_interrupt+0x16c/0x230) from
-> > > > > [<80064000>] (handle_irq_event_percpu+0x10c/0x1a4)
-> > > > > [    2.811010] [<80064000>] (handle_irq_event_percpu+0x10c/0x1a4)
-> > > > > from [<800640e8>] (handle_irq_event+0x50/0x78)
-> > > > > [    2.820958] [<800640e8>] (handle_irq_event+0x50/0x78) from
-> > > > > [<8006652c>] (handle_level_irq+0x88/0x10c)
-> > > > > [    2.830210] [<8006652c>] (handle_level_irq+0x88/0x10c) from
-> > > > > [<800638d0>] (generic_handle_irq+0x28/0x3c)
-> > > > > [    2.839637] [<800638d0>] (generic_handle_irq+0x28/0x3c) from
-> > > > > [<8000f84c>] (handle_IRQ+0x30/0x84)
-> > > > > [    2.848461] [<8000f84c>] (handle_IRQ+0x30/0x84) from [<80012160>]
-> > > > > (__irq_svc+0x40/0x6c)
-> > > > > [    2.856510] [<80012160>] (__irq_svc+0x40/0x6c) from [<80022a44>]
-> > > > > (__do_softirq+0x90/0x1d8)
-> > > > > [    2.864812] [<80022a44>] (__do_softirq+0x90/0x1d8) from
-> > > > > [<80022edc>] (irq_exit+0x98/0xd4)
-> > > > > [    2.873025] [<80022edc>] (irq_exit+0x98/0xd4) from [<8000f850>]
-> > > > > (handle_IRQ+0x34/0x84)
-> > > > > [    2.880980] [<8000f850>] (handle_IRQ+0x34/0x84) from [<80012160>]
-> > > > > (__irq_svc+0x40/0x6c)
-> > > > > [    2.889020] [<80012160>] (__irq_svc+0x40/0x6c) from [<8001d724>]
-> > > > > (vprintk_emit+0x1bc/0x524)
-> > > > > [    2.897411] [<8001d724>] (vprintk_emit+0x1bc/0x524) from
-> > > > > [<804da5a4>] (printk+0x30/0x40)
-> > > > > [    2.905551] [<804da5a4>] (printk+0x30/0x40) from [<80630138>]
-> > > > > (mousedev_init+0x4c/0x60)
-> > > > > [    2.913617] [<80630138>] (mousedev_init+0x4c/0x60) from
-> > > > > [<806178fc>] (do_one_initcall+0x94/0x14c)
-> > > > > [    2.922537] [<806178fc>] (do_one_initcall+0x94/0x14c) from
-> > > > > [<80617b20>] (kernel_init_freeable+0x16c/0x22c)
-> > > > > [    2.932230] [<80617b20>] (kernel_init_freeable+0x16c/0x22c) from
-> > > > > [<804d8cbc>] (kernel_init+0x8/0x150)
-> > > > > [    2.941486] [<804d8cbc>] (kernel_init+0x8/0x150) from [<8000ea70>]
-> > > > > (ret_from_fork+0x14/0x24)
-> > > > > [    2.949932] handlers:
-> > > > > [    2.952227] [<8033fc58>] ci_irq
-> > > > > [    2.955388] Disabling IRQ #238
-> > > > 
-> > > > Marek, I have a test at imx28evk (Freescale imx28evk) for this
-> > > > patchset, it works well for dual-role switch after adding below dts
-> > > > change. There is a kernel dump when works at udc mode(due to enable
-> > > > CONFIG_LOCKUP_DETECTOR), at the first connect, but it does not affect
-> > > > function, it should be a common chipidea problem, I will check later.
-> > > 
-> > > Sorry for the long delay. I finally got further with this, at least now I
-> > > can switch Periph->Host again, but if I do so the other way around
-> > > (unplug host adapter and plug computer cable) and dump the controller
-> > > registers, I still see the controller in "host" (according to USBMODE
-> > > register) mode. The controller stays in HOST mode even if I force it to
-> > > gadget mode by writing "gadget" into debugfs "role" entry. I will keep
-> > > poking.
-> > > 
-> > > In the meantime, I guess if it works on the EVK, it might be a hardware
-> > > error so I better stop stalling you. I'll drop you an email if I find
-> > > what this problem is.
-> > 
-> > No, the problem is you did not config the USB OTG ID pin.
-> > Do the same thing I have done at imx28evk, you probably will work
-> > if the ID pin is the same at your board.
+> On Monday 22 of July 2013 00:22:16 Sylwester Nawrocki wrote:
+> > On 07/20/2013 02:04 AM, Tomasz Figa wrote:
+> > > Since we now have a proper Samsung PWM clocksource driver in place,
+> > > we can proceed with further cleanup of PWM timers support on Samsung
+> > > SoCs.>
+> > > This series attempts to achieve this goal by:
+> > >   1) fixing up few things in samsung_pwm_timer clocksource driver,
+> > >   2) moving remaining Samsung platforms to the new clocksource driver,
+> > >   3) removing old clocksource driver,
+> > >   4) adding new multiplatform- and DT-aware PWM driver,
+> > >   5) moving all Samsung platforms to use the new PWM driver,
+> > >   6) removing old PWM driver,
+> > >   7) removing all PWM-related code that is not used anymore.
+> > >
+> > > Cleaning up the PWM driver is a bit tricky, because the design of
+> > > current driver makes it completely unsuitable for DT and
+> > > multiplatform and would require a heavy rework to make it usable,
+> > > breaking any existing Samsung PWM users by the way. To avoid any
+> > > breakage this series first renames the old driver, then adds new one
+> > > using original name, migrates all platforms to use it and then
+> > > finally removes the old driver.
+> > >
+> > > See particular patches for more detailed descriptions.
+> > >
+> > > [On S3C6410-based Tiny6410 (Mini6410-compatible) with pwm-beeper,
+> > > SMDK6410 with PWM backlight and Exynos4210-based Origen board (with
+> > > PWM0 attached to a scope)]
+> > > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+> > >
+> > > [On S3C2440-based Mini2440 board]
+> > > Tested-by: Sylwester Nawrocki<sylvester.nawrocki@gmail.com>
+> >
+> > I have retested this series on top of v3.11-rc1 with pwm-backlight (and
+> > buzzer
+> > as the output :)) on Mini2440. It seems to work well - generated
+> > frequencies are correct. I'll check pulse widths with a scope tomorrow,
+> > as it's a bit late
+> > now. FWIW you can add to this series my:
+> >
+> > Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
-> That one I have configured, exactly the same way you did (except that mine is 
-> MX28_PAD_PWM2__USB0_ID).
+> Thanks. I hope we can finally get this series merged soon.
 > 
-> If it was the OTG ID pin issue, would the manual switching not work ?
-> 
+Yes, this whole patches look good to me, and I'd like to take this whole
+patches into the samsung tree...but need to get any response from PWM guy,
+Thierry Reding. Let's wait for his response...
 
-I can't see at your imx28-m28evk.dts, besides, make sure this pin can be
-configed as USB OTG ID pin, and fsl,pull-up = <1>. Since you are still
-at host mode, I suspect it is the ID problem.
-You can check if there is ID INT when unplug out B-to-A cable.
-
-I have not tried the manual switching, but first, you need to close your
-vbus supply.
-
--- 
-
-Best Regards,
-Peter Chen
+Thanks,
+Kukjin
