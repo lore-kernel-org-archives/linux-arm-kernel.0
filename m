@@ -1,20 +1,62 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 22 Jul 2013 17:33:49 +0100
-Subject: updates for be8 patch series
-Message-ID: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
+Date: Mon, 22 Jul 2013 17:33:51 +0100
+Subject: [PATCH 2/4] ARM: traps: use <asm/opcodes.h> to get correct
+ instruction order
+In-Reply-To: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374510833-25716-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've updated the BE8 patch series after running further tests on the
-kernel. I found an issue with the alignment handler (and I believe the
-same issue with the trap handler).
+The trap handler needs to take into account the endian configuration of
+the system when loading instructions. Use <asm/opcodes.h> to provide the
+necessary conversion functions.
 
-I also ran tests with the module loader, which shows that if we are
-in BE8 that it needs to fix up the relocations. Also the modules need
-to be built --be8 otherwise they cannot be easily relocated when loaded.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+ arch/arm/kernel/traps.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Should patches 3 and 4 be together (ie, alter the LDFLAGS and the
-module.c) and have I got the correct LDLAGS?
-
-Comments and testing welcome. I will push out a new series later with
-these in and possibly rebased on 3.11-rc2.
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 1c08911..0a56e13 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -34,6 +34,7 @@
+ #include <asm/unwind.h>
+ #include <asm/tls.h>
+ #include <asm/system_misc.h>
++#include <asm/opcodes.h>
+ 
+ #include "signal.h"
+ 
+@@ -411,23 +412,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 	if (processor_mode(regs) == SVC_MODE) {
+ #ifdef CONFIG_THUMB2_KERNEL
+ 		if (thumb_mode(regs)) {
+-			instr = ((u16 *)pc)[0];
++			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
+ 			if (is_wide_instruction(instr)) {
+ 				instr <<= 16;
+-				instr |= ((u16 *)pc)[1];
++				instr |= __mem_to_opcode_thumb16(((u16 *)pc)[1]);
+ 			}
+ 		} else
+ #endif
+-			instr = *(u32 *) pc;
++			instr = __mem_to_opcode_arm(*(u32 *) pc);
+ 	} else if (thumb_mode(regs)) {
+ 		if (get_user(instr, (u16 __user *)pc))
+ 			goto die_sig;
++		instr = __mem_to_opcode_thumb16(instr);
+ 		if (is_wide_instruction(instr)) {
+ 			unsigned int instr2;
+ 			if (get_user(instr2, (u16 __user *)pc+1))
+ 				goto die_sig;
+ 			instr <<= 16;
+-			instr |= instr2;
++			instr |= __mem_to_opcode_thumb16(instr2);
+ 		}
+ 	} else if (get_user(instr, (u32 __user *)pc)) {
+ 		goto die_sig;
+-- 
+1.7.10.4
