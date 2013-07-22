@@ -1,82 +1,107 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Jul 2013 15:39:20 +0100
-Subject: [PATCH v3] xen/arm: enable PV control for ARM
-In-Reply-To: <alpine.DEB.2.02.1307221459200.4893@kaball.uk.xensource.com>
-References: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
- <20130722134934.GB32221@e106331-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1307221459200.4893@kaball.uk.xensource.com>
-Message-ID: <20130722143920.GC32221@e106331-lin.cambridge.arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 22 Jul 2013 10:44:39 -0400 (EDT)
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <51ECDE5E.3050104@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1307221028440.1495-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 03:09:35PM +0100, Stefano Stabellini wrote:
-> On Mon, 22 Jul 2013, Mark Rutland wrote:
-> > Hi,
+On Mon, 22 Jul 2013, Kishon Vijay Abraham I wrote:
+
+> > 	The PHY and the controller it is attached to are both physical
+> > 	devices.
 > > 
-> > [Adding Catalin to Cc]
+> > 	The connection between them is hardwired by the system
+> > 	manufacturer and cannot be changed by software.
 > > 
-> > On Mon, Jul 22, 2013 at 11:57:34AM +0100, Julien Grall wrote:
-> > > Enable power management from the toolstack for ARM guest.
-> > > 
-> > > Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> > > 
-> > > ---
-> > >     Changes in v3:
-> > >         - Fix condition to compile cpu_hotplug.o
-> > >     Changes in v2:
-> > >         - Don't compile xen/cpu_hotplug.o with ARM64
+> > 	PHYs are generally described by fixed system-specific board
+> > 	files or by Device Tree information.  Are they ever discovered
+> > 	dynamically?
+> 
+> No. They are created just like any other platform devices are created.
+
+Okay.  Are PHYs _always_ platform devices?
+
+> > 	Is the same true for the controllers attached to the PHYs?
+> > 	If not -- if both a PHY and a controller are discovered 
+> > 	dynamically -- how does the kernel know whether they are 
+> > 	connected to each other?
+> 
+> No differences here. Both PHY and controller will have dt information or hwmod
+> data using which platform devices will be created.
 > > 
-> > My arm64 cpu hotplug series is going to be dependent on not compiling
-> > xen/cpu_hotplug.o. Currently I'm not able to compile an arm64 kernel
-> > with my patches and Xen support.
+> > 	The kernel needs to know which controller is attached to which
+> > 	PHY.  Currently this information is represented by name or ID
+> > 	strings embedded in platform data.
+> 
+> right. It's embedded in the platform data of the controller.
+
+It must also be embedded in the PHY's platform data somehow.  
+Otherwise, how would the kernel know which PHY to use?
+
+> > 	The PHY's driver (the supplier) uses the platform data to 
+> > 	construct a platform_device structure that represents the PHY.  
+> 
+> Currently the driver assigns static labels (corresponding to the label used in
+> the platform data of the controller).
+> > 	Until this is done, the controller's driver (the client) cannot 
+> > 	use the PHY.
+> 
+> right.
 > > 
-> > How do you intend to push this? I'd like to ensure my cpu hotplug series
-> > is able to go in for the next merge window.
+> > 	Since there is no parent-child relation between the PHY and the 
+> > 	controller, there is no guarantee that the PHY's driver will be
+> > 	ready when the controller's driver wants to use it.  A deferred
+> > 	probe may be needed.
 > 
-> This patch does exactly that: it makes sure cpu_hotplug is not compiled
-> on ARM64.
-
-Sorry, what I meant was that my series is going to be entirely dependent
-on this patch or it'll break bisection. That'll make merging things a
-little painful as I'll need a stable branch with this patch to base my
-series upon.
-
-Another option would be to split this patch into two parts, one enabling
-power management and one fixing things up for HOTPLUG_CPU on arm64. That
-way I could take the arm64 HOTPLUG_CPU fix in my series adding arm64
-HOTPLUG_CPU support.
-
-Would that be acceptable? Have I missed something?
-
-> Given that this patch is for drivers/xen/Makefile, normally it goes via
-> Konrad's tree.
-> 
-> 
-> > > ---
-> > >  drivers/xen/Makefile |    5 ++---
-> > >  1 file changed, 2 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> > > index 2bf461a..f185e8d 100644
-> > > --- a/drivers/xen/Makefile
-> > > +++ b/drivers/xen/Makefile
-> > > @@ -1,9 +1,8 @@
-> > > -ifneq ($(CONFIG_ARM),y)
-> > > -obj-y	+= manage.o
-> > > +ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
-> > >  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
-> > >  endif
+> right.
 > > 
-> > Might it make sense to enable this based on a list the architectures
-> > that actually need this, rather than disabling it based on the list of
-> > architectures that don't?
+> > 	The issue (or one of the issues) in this discussion is that 
+> > 	Greg does not like the idea of using names or IDs to associate
+> > 	PHYs with controllers, because they are too prone to
+> > 	duplications or other errors.  Pointers are more reliable.
+> > 
+> > 	But pointers to what?  Since the only data known to be 
+> > 	available to both the PHY driver and controller driver is the
+> > 	platform data, the obvious answer is a pointer to platform data
+> > 	(either for the PHY or for the controller, or maybe both).
 > 
-> This is more philosophical than practical, but I would expect this
-> limitation to go away soon, and be able to compile cpu_hotplug without
-> issues on ARM and ARM64 too.
+> hmm.. it's not going to be simple though as the platform device for the PHY and
+> controller can be created in entirely different places. e.g., in some cases the
+> PHY device is a child of some mfd core device (the device will be created in
+> drivers/mfd) and the controller driver (usually) is created in board file. I
+> guess then we have to come up with something to share a pointer in two
+> different files.
+
+The ability for two different source files to share a pointer to a data 
+item defined in a third source file has been around since long before 
+the C language was invented.  :-)
+
+In this case, it doesn't matter where the platform_device structures 
+are created or where the driver source code is.  Let's take a simple 
+example.  Suppose the system design includes a PHY named "foo".  Then 
+the board file could contain:
+
+struct phy_info { ... } phy_foo;
+EXPORT_SYMBOL_GPL(phy_foo);
+
+and a header file would contain:
+
+extern struct phy_info phy_foo;
+
+The PHY supplier could then call phy_create(&phy_foo), and the PHY 
+client could call phy_find(&phy_foo).  Or something like that; make up 
+your own structure tags and function names.
+
+It's still possible to have conflicts, but now two PHYs with the same 
+name (or a misspelled name somewhere) will cause an error at link time.
+
+> > Probably some of the details above are wrong; please indicate where I
+> > have gone astray.  Also, I'm not clear about the role played by various 
+> > APIs.  For example, where does phy_create() fit into this picture?
 > 
+> phy_create is the API by which the PHY's driver (the supplier) hook into the
+> PHY framework. It's like the controller driver will always interact with the
+> PHY driver through the PHY framework.
 
-Ok, that's fine then.
-
-Thanks,
-Mark.
+Alan Stern
