@@ -1,44 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Jul 2013 16:37:00 +0900
-Subject: [PATCH 3/5] ARM: shmobile: Force ARM mode to compile reset vector for
- secondary CPUs
+Date: Mon, 22 Jul 2013 16:36:59 +0900
+Subject: [PATCH 2/5] ARM: shmobile: fix compile error when
+ CONFIG_THUMB2_KERNEL=y
 In-Reply-To: <cover.1374478336.git.horms+renesas@verge.net.au>
 References: <cover.1374478336.git.horms+renesas@verge.net.au>
-Message-ID: <c1d7e2e80079148626e6c411e56708d86311d31a.1374478336.git.horms+renesas@verge.net.au>
+Message-ID: <bdea6c657e15a709e666ea707e72327c555e8e04.1374478336.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-Instructions start from boot vector must be ARM mode.
-This patch specify ARM mode explicitly and use 'bx' instruction to be
-able to change to Thumb mode.
+On KZM-A9-GT board (SMP), when CONFIG_THUMB2_KERNEL=y it fails to compile
+
+  AS      arch/arm/mach-shmobile/headsmp-scu.o
+/proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S: Assembler messages:
+/proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S:41: Error: shift must be constant -- `bic r2,r2,r3,lsl r1'
+make[2]: *** [arch/arm/mach-shmobile/headsmp-scu.o] Error 1
+make[1]: *** [arch/arm/mach-shmobile] Error 2
+make: *** [sub-make] Error 2
+
+Instruction `bic r2,r2,r3,lsl r1' is not supported in thumb mode. This patch split it into 2 instructions.
 
 Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/headsmp.S | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/headsmp-scu.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index 559d1ce..afed58e 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -26,10 +26,13 @@ ENDPROC(shmobile_invalidate_start)
-  * This will be mapped at address 0 by SBAR register.
-  * We need _long_ jump to the physical address.
-  */
-+	.arm
- 	.align  12
- ENTRY(shmobile_boot_vector)
- 	ldr     r0, 2f
--	ldr     pc, 1f
-+	ldr     r1, 1f
-+	bx	r1
-+
- ENDPROC(shmobile_boot_vector)
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index 6f98654..5ce416c 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -38,7 +38,8 @@ ENTRY(shmobile_boot_scu)
+ 	lsl	r1, r1, #3		@ we will shift by cpu_id * 8 bits
+ 	ldr	r2, [r0, #8]		@ SCU Power Status Register
+ 	mov	r3, #3
+-	bic	r2, r2, r3, lsl r1	@ Clear bits of our CPU (Run Mode)
++	lsl	r3, r3, r1
++	bic	r2, r2, r3		@ Clear bits of our CPU (Run Mode)
+ 	str	r2, [r0, #8]		@ write back
  
- 	.globl	shmobile_boot_fn
+ 	b	shmobile_invalidate_start
 -- 
 1.8.2.1
