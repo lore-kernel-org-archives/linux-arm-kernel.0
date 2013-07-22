@@ -1,68 +1,60 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 22 Jul 2013 11:01:32 +0900
-Subject: [PATCH v4 00/20] Samsung PWM support cleanup
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <51EC5F18.8040007@gmail.com> <9102768.ef8LAvpunv@flatron>
-Message-ID: <0ac901ce867f$638a7530$2a9f5f90$@org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 22 Jul 2013 08:29:02 +0530
+Subject: [PATCH 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+In-Reply-To: <0ab301ce867d$9078c170$b16a4450$%kim@samsung.com>
+References: <1372054438-15693-1-git-send-email-sachin.kamat@linaro.org>
+ <0ab301ce867d$9078c170$b16a4450$%kim@samsung.com>
+Message-ID: <CAK9yfHzmF_oxc3DsuT5wtXX2C5O+wLxz4C2Ps3cVPnKLb8jOEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Tomasz Figa wrote:
-> >
-> > On Monday 22 of July 2013 00:22:16 Sylwester Nawrocki wrote:
-> > > On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> > > > Since we now have a proper Samsung PWM clocksource driver in place,
-> > > > we can proceed with further cleanup of PWM timers support on Samsung
-> > > > SoCs.>
-> > > > This series attempts to achieve this goal by:
-> > > >   1) fixing up few things in samsung_pwm_timer clocksource driver,
-> > > >   2) moving remaining Samsung platforms to the new clocksource
-> driver,
-> > > >   3) removing old clocksource driver,
-> > > >   4) adding new multiplatform- and DT-aware PWM driver,
-> > > >   5) moving all Samsung platforms to use the new PWM driver,
-> > > >   6) removing old PWM driver,
-> > > >   7) removing all PWM-related code that is not used anymore.
-> > > >
-> > > > Cleaning up the PWM driver is a bit tricky, because the design of
-> > > > current driver makes it completely unsuitable for DT and
-> > > > multiplatform and would require a heavy rework to make it usable,
-> > > > breaking any existing Samsung PWM users by the way. To avoid any
-> > > > breakage this series first renames the old driver, then adds new one
-> > > > using original name, migrates all platforms to use it and then
-> > > > finally removes the old driver.
-> > > >
-> > > > See particular patches for more detailed descriptions.
-> > > >
-> > > > [On S3C6410-based Tiny6410 (Mini6410-compatible) with pwm-beeper,
-> > > > SMDK6410 with PWM backlight and Exynos4210-based Origen board (with
-> > > > PWM0 attached to a scope)]
-> > > > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
-> > > >
-> > > > [On S3C2440-based Mini2440 board]
-> > > > Tested-by: Sylwester Nawrocki<sylvester.nawrocki@gmail.com>
-> > >
-> > > I have retested this series on top of v3.11-rc1 with pwm-backlight
-> (and
-> > > buzzer
-> > > as the output :)) on Mini2440. It seems to work well - generated
-> > > frequencies are correct. I'll check pulse widths with a scope
-tomorrow,
-> > > as it's a bit late
-> > > now. FWIW you can add to this series my:
-> > >
-> > > Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> >
-> > Thanks. I hope we can finally get this series merged soon.
-> >
-> Yes, this whole patches look good to me, and I'd like to take this whole
-> patches into the samsung tree...but need to get any response from PWM guy,
-> Thierry Reding. Let's wait for his response...
-> 
-To be clarify, because his ack was on v3 and I remember he had a comment. So
-would be better if we could get his ack on pwm change again.
+On 22 July 2013 07:18, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Sachin Kamat wrote:
+>>
+>> With the recent cleanup in Exynos platform code notably commits
+>> 17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
+>> more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
+>> of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
+>> Exynos4412 which have more (285) than the default number of GPIOs (255).
+>> Thus define this number in Kconfig file. Without this patch we get the
+>> following errors during boot:
+>>
+>> gpiochip_add: gpios 251..258 (gpv0) failed to register
+>> samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
+>> error code: -22
+>> samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> Cc: Tomasz Figa <t.figa@samsung.com>
+>> ---
+>> Based on Kukjin's for-next tree.
+>> ---
+>>  arch/arm/Kconfig |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index ddf2667..380a53b 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1578,6 +1578,7 @@ config ARCH_NR_GPIO
+>>       default 512 if SOC_OMAP5
+>>       default 392 if ARCH_U8500
+>>       default 352 if ARCH_VT8500
+>> +     default 288 if ARCH_EXYNOS
+>>       default 288 if ARCH_SUNXI
+>>       default 264 if MACH_H4700
+>>       default 0
+>> --
+>> 1.7.9.5
+>
+> Hmm, BTW, I'm wondering why it is 288 not 285 or other specific number...
 
-Thanks,
-Kukjin
+I wasn't really sure if we can have any number there. I chose the
+closest one (288) which was already used by other platform.
+If there is no problem to use 285 itself then I can resend with that
+number. Please let me know.
+
+
+-- 
+With warm regards,
+Sachin
