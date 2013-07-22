@@ -1,45 +1,40 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 22 Jul 2013 14:31:21 +0200
-Subject: [PATCH v3 11/31] net: can: mscan: improve clock API use
-In-Reply-To: <1374495298-22019-12-git-send-email-gsi@denx.de>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Mon, 22 Jul 2013 14:33:24 +0200
+Subject: [PATCH v3 00/31] add COMMON_CLK support for PowerPC MPC512x
+In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
 References: <1374166855-7280-1-git-send-email-gsi@denx.de>
  <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1374495298-22019-12-git-send-email-gsi@denx.de>
-Message-ID: <51ED2619.5040107@pengutronix.de>
+Message-ID: <20130722123324.GE19071@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 02:14 PM, Gerhard Sittig wrote:
-> the .get_clock() callback is run from probe() and might allocate
-> resources, introduce a .put_clock() callback that is run from remove()
-> to undo any allocation activities
+[ manually added devicetree at vger now ]
 
-looks good
+On Mon, Jul 22, 2013 at 14:14 +0200, Gerhard Sittig wrote:
+> 
+> this series
+> - fixes several drivers that are used in the MPC512x platform (UART,
+>   SPI, ethernet, PCI, USB, CAN, NAND flash, video capture) in how they
+>   handle clocks (appropriately acquire and setup them, hold references
+>   during use, release clocks after use)
+> - introduces support for the common clock framework (CCF, COMMON_CLK
+>   Kconfig option) in the PowerPC based MPC512x platform, which brings
+>   device tree based clock lookup as well
 
-> use devm_get_clk() upon lookup (for SYS and REF) to have the clocks put
-> upon driver unload
+Haven't noticed before that the ozlabs device tree list started
+actively rejecting reception.  And the scope of the series has
+widened to include clock related fixes in many more drivers while
+the initial submission only introduced CCF for MPC512x.
 
-fine
+Shall I resend (with vger devicetree included and more subsystems
+lists added)?  Which other lists to include without spamming too
+many channels?  Poor moderators have to ACK messages for lists
+that I'm not subscribed to.
 
-> assume that resources get prepared but not necessarily enabled in the
-> setup phase, make the open() and close() callbacks of the CAN network
-> device enable and disable a previously acquired and prepared clock
 
-I think you should call prepare_enable and disable_unprepare in the
-open/close functions.
-
-Marc
-
+virtually yours
+Gerhard Sittig
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/2eeb3687/attachment.sig>
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
