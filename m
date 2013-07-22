@@ -1,52 +1,90 @@
-From: mpfj-list@newflow.co.uk (Mark Jackson)
-Date: Mon, 22 Jul 2013 15:52:41 +0100
-Subject: [PATCH 0/4] OMAP2+: Fix boot hang with earlycon enabled
-In-Reply-To: <1374487277-26099-1-git-send-email-rnayak@ti.com>
-References: <1374487277-26099-1-git-send-email-rnayak@ti.com>
-Message-ID: <51ED4739.1090305@newflow.co.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 22 Jul 2013 11:03:51 -0400 (EDT)
+Subject: [PATCH 1/8] ARM: mm: LPAE: use phys_addr_t appropriately in p2v
+ and v2p conversions
+In-Reply-To: <1371858502-10083-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
+ <1371858502-10083-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.LFD.2.03.1307221103260.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/13 11:01, Rajendra Nayak wrote:
-> Boot on all OMAP2+ devices is broken with earlycon enabled
-> as discussed here [1]
-> 
-> There were 2 issues which were rootcaused
-> 1. Issue caused due to hwmod doing a reset of console uart while
-> earlycon was using it (seen only on am335x devices)
-> 
-> 2. omap serial causing a NULL context restore with context loss
-> count missing.
-> 
-> This patch set attempts to fix both the issues and is one of the
-> different approaches discussed [1] on how to fix these issues.
-> 
-> Boot tested on omap4 panda es with and without earlycon (DT boot)
-> Boot tested on am335x bone black with and without earlycon (DT boot)
-> Boot tested on OMAP3 beagle XM with and without earlycon (non-DT boot)
-> 
-> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg91662.html
-> 
-> Grygorii Strashko (1):
->   serial: omap: enable PM runtime only when its fully configured
-> 
-> Rajendra Nayak (3):
->   ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with DEBUG_LL
->   ARM: OMAP2+: Avoid idling memory controllers with no drivers
->   ARM: OMAP2+: Sync hwmod state with the pm_runtime and omap_device
->     state
-> 
->  arch/arm/mach-omap2/omap_device.c                  |   18 ++++++++
->  arch/arm/mach-omap2/omap_hwmod.h                   |   48 ++++++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    6 +--
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    2 +-
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    9 ++--
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    5 +-
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    3 +-
->  arch/arm/mach-omap2/serial.c                       |   11 -----
->  drivers/tty/serial/omap-serial.c                   |    3 +-
->  9 files changed, 81 insertions(+), 24 deletions(-)
- 
-This now fixes the boot hang for me so ...
+On Fri, 21 Jun 2013, Santosh Shilimkar wrote:
 
-Tested-by: Mark Jackson <mpfj-list@newflow.co.uk>
+> Fix remainder types used when converting back and forth between
+> physical and virtual addresses.
+> 
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+
+> ---
+>  arch/arm/include/asm/memory.h |   22 ++++++++++++++++------
+>  1 file changed, 16 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 584786f..93376e4 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -185,22 +185,32 @@ extern unsigned long __pv_phys_offset;
+>  	: "=r" (to)					\
+>  	: "r" (from), "I" (type))
+>  
+> -static inline unsigned long __virt_to_phys(unsigned long x)
+> +static inline phys_addr_t __virt_to_phys(unsigned long x)
+>  {
+>  	unsigned long t;
+>  	__pv_stub(x, t, "add", __PV_BITS_31_24);
+>  	return t;
+>  }
+>  
+> -static inline unsigned long __phys_to_virt(unsigned long x)
+> +static inline unsigned long __phys_to_virt(phys_addr_t x)
+>  {
+>  	unsigned long t;
+>  	__pv_stub(x, t, "sub", __PV_BITS_31_24);
+>  	return t;
+>  }
+> +
+>  #else
+> -#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+> -#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
+> +
+> +static inline phys_addr_t __virt_to_phys(unsigned long x)
+> +{
+> +	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+> +}
+> +
+> +static inline unsigned long __phys_to_virt(phys_addr_t x)
+> +{
+> +	return x - PHYS_OFFSET + PAGE_OFFSET;
+> +}
+> +
+>  #endif
+>  #endif
+>  #endif /* __ASSEMBLY__ */
+> @@ -238,14 +248,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
+>  
+>  static inline void *phys_to_virt(phys_addr_t x)
+>  {
+> -	return (void *)(__phys_to_virt((unsigned long)(x)));
+> +	return (void *)__phys_to_virt(x);
+>  }
+>  
+>  /*
+>   * Drivers should NOT use these either.
+>   */
+>  #define __pa(x)			__virt_to_phys((unsigned long)(x))
+> -#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
+> +#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+>  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+>  
+>  /*
+> -- 
+> 1.7.9.5
+> 
