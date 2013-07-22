@@ -1,39 +1,52 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 22 Jul 2013 10:50:02 -0400
-Subject: [PATCH v2] of: Specify initrd location using 64-bit
-In-Reply-To: <20130720053945.C7AC63E0C52@localhost>
-References: <1372702835-5333-1-git-send-email-santosh.shilimkar@ti.com>
- <51D1F5E2.6070609@gmail.com> <20130720053945.C7AC63E0C52@localhost>
-Message-ID: <51ED469A.9000801@ti.com>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Mon, 22 Jul 2013 15:52:41 +0100
+Subject: [PATCH 0/4] OMAP2+: Fix boot hang with earlycon enabled
+In-Reply-To: <1374487277-26099-1-git-send-email-rnayak@ti.com>
+References: <1374487277-26099-1-git-send-email-rnayak@ti.com>
+Message-ID: <51ED4739.1090305@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 July 2013 01:39 AM, Grant Likely wrote:
-> On Mon, 01 Jul 2013 16:34:26 -0500, Rob Herring <robherring2@gmail.com> wrote:
->> On 07/01/2013 01:20 PM, Santosh Shilimkar wrote:
->>> On some PAE architectures, the entire range of physical memory could reside
->>> outside the 32-bit limit.  These systems need the ability to specify the
->>> initrd location using 64-bit numbers.
->>>
->>> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
->>> use 64-bit numbers instead of the current unsigned long.
->>>
->>> There has been quite a bit of debate about whether to use u64 or phys_addr_t.
->>> It was concluded to stick to u64 to be consistent with rest of the device
->>> tree code. As summarized by Geert, "The address to load the initrd is decided
->>> by the bootloader/user and set at that point later in time. The dtb should not
->>> be tied to the kernel you are booting"
->>
->> That was quoting me. Otherwise:
->>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
->>
->> Unless Grant feels compelled to pick this up for 3.11, I think it has to
->> wait for 3.12.
+On 22/07/13 11:01, Rajendra Nayak wrote:
+> Boot on all OMAP2+ devices is broken with earlycon enabled
+> as discussed here [1]
 > 
-> Nope, 3.12 is fine. Applied.
+> There were 2 issues which were rootcaused
+> 1. Issue caused due to hwmod doing a reset of console uart while
+> earlycon was using it (seen only on am335x devices)
 > 
-Thanks Grant.
+> 2. omap serial causing a NULL context restore with context loss
+> count missing.
+> 
+> This patch set attempts to fix both the issues and is one of the
+> different approaches discussed [1] on how to fix these issues.
+> 
+> Boot tested on omap4 panda es with and without earlycon (DT boot)
+> Boot tested on am335x bone black with and without earlycon (DT boot)
+> Boot tested on OMAP3 beagle XM with and without earlycon (non-DT boot)
+> 
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg91662.html
+> 
+> Grygorii Strashko (1):
+>   serial: omap: enable PM runtime only when its fully configured
+> 
+> Rajendra Nayak (3):
+>   ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with DEBUG_LL
+>   ARM: OMAP2+: Avoid idling memory controllers with no drivers
+>   ARM: OMAP2+: Sync hwmod state with the pm_runtime and omap_device
+>     state
+> 
+>  arch/arm/mach-omap2/omap_device.c                  |   18 ++++++++
+>  arch/arm/mach-omap2/omap_hwmod.h                   |   48 ++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    6 +--
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    2 +-
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    9 ++--
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    5 +-
+>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    3 +-
+>  arch/arm/mach-omap2/serial.c                       |   11 -----
+>  drivers/tty/serial/omap-serial.c                   |    3 +-
+>  9 files changed, 81 insertions(+), 24 deletions(-)
+ 
+This now fixes the boot hang for me so ...
 
-Regards,
-Santosh
+Tested-by: Mark Jackson <mpfj-list@newflow.co.uk>
