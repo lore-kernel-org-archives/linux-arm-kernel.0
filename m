@@ -1,120 +1,56 @@
 From: elen.song@atmel.com (Elen Song)
-Date: Mon, 22 Jul 2013 16:30:30 +0800
-Subject: [PATCH 7/8 V3] serial: at91: make UART support dma and pdc transfers
+Date: Mon, 22 Jul 2013 16:30:31 +0800
+Subject: [PATCH 8/8 V3] serial: at91: add dma support in usart binding
+ descriptions
 In-Reply-To: <1374481831-24573-1-git-send-email-elen.song@atmel.com>
 References: <1374481831-24573-1-git-send-email-elen.song@atmel.com>
-Message-ID: <1374481831-24573-8-git-send-email-elen.song@atmel.com>
+Message-ID: <1374481831-24573-9-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the UART lack of receive timeout register, so we use a timer to trigger
-data receive.
-The DBGU is regarded as UART.
-
 Signed-off-by: Elen Song <elen.song@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/tty/serial/atmel_serial.c |   48 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 42 insertions(+), 6 deletions(-)
+ .../devicetree/bindings/tty/serial/atmel-usart.txt |   18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index c9c42fd..6ade3f6 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -41,6 +41,7 @@
- #include <linux/uaccess.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/platform_data/atmel.h>
-+#include <linux/timer.h>
+diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+index a49d9a1..2191dcb 100644
+--- a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+@@ -10,13 +10,18 @@ Required properties:
+ Optional properties:
+ - atmel,use-dma-rx: use of PDC or DMA for receiving data
+ - atmel,use-dma-tx: use of PDC or DMA for transmitting data
++- add dma bindings for dma transfer:
++	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
++		memory peripheral interface and USART DMA channel ID, FIFO configuration.
++		Refer to dma.txt and atmel-dma.txt for details.
++	- dma-names: "rx" for RX channel, "tx" for TX channel.
  
- #include <asm/io.h>
- #include <asm/ioctls.h>
-@@ -169,6 +170,7 @@ struct atmel_uart_port {
- 	struct serial_rs485	rs485;		/* rs485 settings */
- 	unsigned int		tx_done_mask;
- 	bool			is_usart;	/* usart or uart */
-+	struct timer_list	uart_timer;	/* uart timer */
- 	int (*prepare_rx)(struct uart_port *port);
- 	int (*prepare_tx)(struct uart_port *port);
- 	void (*schedule_rx)(struct uart_port *port);
-@@ -823,6 +825,9 @@ static void atmel_release_rx_dma(struct uart_port *port)
- 	atmel_port->desc_rx = NULL;
- 	atmel_port->chan_rx = NULL;
- 	atmel_port->cookie_rx = -EINVAL;
-+
-+	if (!atmel_port->is_usart)
-+		del_timer_sync(&atmel_port->uart_timer);
- }
+ <chip> compatible description:
+ - at91rm9200:  legacy USART support
+ - at91sam9260: generic USART implementation for SAM9 SoCs
  
- static void atmel_rx_from_dma(struct uart_port *port)
-@@ -952,6 +957,15 @@ chan_err:
- 	return -EINVAL;
- }
+ Example:
+-
++- use PDC:
+ 	usart0: serial at fff8c000 {
+ 		compatible = "atmel,at91sam9260-usart";
+ 		reg = <0xfff8c000 0x4000>;
+@@ -25,3 +30,14 @@ Example:
+ 		atmel,use-dma-tx;
+ 	};
  
-+static void atmel_uart_timer_callback(unsigned long data)
-+{
-+	struct uart_port *port = (void *)data;
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+
-+	tasklet_schedule(&atmel_port->tasklet);
-+	mod_timer(&atmel_port->uart_timer, jiffies + uart_poll_timeout(port));
-+}
-+
- /*
-  * receive interrupt handler.
-  */
-@@ -1215,6 +1229,9 @@ static void atmel_release_rx_pdc(struct uart_port *port)
- 				 DMA_FROM_DEVICE);
- 		kfree(pdc->buf);
- 	}
-+
-+	if (!atmel_port->is_usart)
-+		del_timer_sync(&atmel_port->uart_timer);
- }
- 
- static void atmel_rx_from_pdc(struct uart_port *port)
-@@ -1576,17 +1593,36 @@ static int atmel_startup(struct uart_port *port)
- 
- 	if (atmel_use_pdc_rx(port)) {
- 		/* set UART timeout */
--		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
--		UART_PUT_CR(port, ATMEL_US_STTTO);
-+		if (!atmel_port->is_usart) {
-+			setup_timer(&atmel_port->uart_timer,
-+					atmel_uart_timer_callback,
-+					(unsigned long)port);
-+			mod_timer(&atmel_port->uart_timer,
-+					jiffies + uart_poll_timeout(port));
-+		/* set USART timeout */
-+		} else {
-+			UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
-+			UART_PUT_CR(port, ATMEL_US_STTTO);
- 
--		UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
-+			UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
-+		}
- 		/* enable PDC controller */
- 		UART_PUT_PTCR(port, ATMEL_PDC_RXTEN);
- 	} else if (atmel_use_dma_rx(port)) {
--		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
--		UART_PUT_CR(port, ATMEL_US_STTTO);
-+		/* set UART timeout */
-+		if (!atmel_port->is_usart) {
-+			setup_timer(&atmel_port->uart_timer,
-+					atmel_uart_timer_callback,
-+					(unsigned long)port);
-+			mod_timer(&atmel_port->uart_timer,
-+					jiffies + uart_poll_timeout(port));
-+		/* set USART timeout */
-+		} else {
-+			UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
-+			UART_PUT_CR(port, ATMEL_US_STTTO);
- 
--		UART_PUT_IER(port, ATMEL_US_TIMEOUT);
-+			UART_PUT_IER(port, ATMEL_US_TIMEOUT);
-+		}
- 	} else {
- 		/* enable receive only */
- 		UART_PUT_IER(port, ATMEL_US_RXRDY);
++- use DMA:
++	usart0: serial at f001c000 {
++		compatible = "atmel,at91sam9260-usart";
++		reg = <0xf001c000 0x100>;
++		interrupts = <12 4 5>;
++		atmel,use-dma-rx;
++		atmel,use-dma-tx;
++		dmas = <&dma0 2 0x3>,
++		       <&dma0 2 0x204>;
++		dma-names = "tx", "rx";
++	};
 -- 
 1.7.9.5
