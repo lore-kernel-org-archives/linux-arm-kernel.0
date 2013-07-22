@@ -1,160 +1,327 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 22 Jul 2013 14:14:38 +0200
-Subject: [PATCH v3 11/31] net: can: mscan: improve clock API use
+Date: Mon, 22 Jul 2013 14:14:45 +0200
+Subject: [PATCH v3 18/31] dts: mpc512x: add clock specs for client lookups
 In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
 References: <1374166855-7280-1-git-send-email-gsi@denx.de>
  <1374495298-22019-1-git-send-email-gsi@denx.de>
-Message-ID: <1374495298-22019-12-git-send-email-gsi@denx.de>
+Message-ID: <1374495298-22019-19-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the .get_clock() callback is run from probe() and might allocate
-resources, introduce a .put_clock() callback that is run from remove()
-to undo any allocation activities
+this addresses the client side of device tree based clock lookups
 
-use devm_get_clk() upon lookup (for SYS and REF) to have the clocks put
-upon driver unload
+add clock specifiers to the mbx, nfc, mscan, sdhc, i2c, axe, diu, viu,
+mdio, fec, usb, pata, psc, psc fifo, and pci nodes in the shared
+mpc5121.dtsi include
 
-assume that resources get prepared but not necessarily enabled in the
-setup phase, make the open() and close() callbacks of the CAN network
-device enable and disable a previously acquired and prepared clock
-
-store pointers to data structures upon successful allocation already
-instead of deferral until complete setup, such that subroutines in the
-setup sequence may access those data structures as well to track their
-resource acquisition
-
-since clock allocation remains optional, the release callback as well as
-the enable/disable calls in open/close are optional as well
+these specs map 'clock-names' encoded in drivers to their respective
+'struct clk' items in the platform's clock driver
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/net/can/mscan/mpc5xxx_can.c |   18 ++++++++++++------
- drivers/net/can/mscan/mscan.c       |    9 +++++++++
- drivers/net/can/mscan/mscan.h       |    2 ++
- 3 files changed, 23 insertions(+), 6 deletions(-)
+ arch/powerpc/boot/dts/mpc5121.dtsi |   79 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
 
-diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-index bc422ba..e59b3a3 100644
---- a/drivers/net/can/mscan/mpc5xxx_can.c
-+++ b/drivers/net/can/mscan/mpc5xxx_can.c
-@@ -40,6 +40,7 @@ struct mpc5xxx_can_data {
- 	unsigned int type;
- 	u32 (*get_clock)(struct platform_device *ofdev, const char *clock_name,
- 			 int *mscan_clksrc);
-+	void (*put_clock)(struct platform_device *ofdev);
- };
+diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
+index 8f4cba0..3657ae6 100644
+--- a/arch/powerpc/boot/dts/mpc5121.dtsi
++++ b/arch/powerpc/boot/dts/mpc5121.dtsi
+@@ -51,6 +51,10 @@
+ 		compatible = "fsl,mpc5121-mbx";
+ 		reg = <0x20000000 0x4000>;
+ 		interrupts = <66 0x8>;
++		clocks = <&clks MPC512x_CLK_MBX_BUS>,
++			 <&clks MPC512x_CLK_MBX_3D>,
++			 <&clks MPC512x_CLK_MBX>;
++		clock-names = "mbx-bus", "mbx-3d", "mbx";
+ 	};
  
- #ifdef CONFIG_PPC_MPC52xx
-@@ -180,7 +181,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
- 			clockdiv = 1;
+ 	sram at 30000000 {
+@@ -64,6 +68,8 @@
+ 		interrupts = <6 8>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++		clocks = <&clks MPC512x_CLK_NFC>;
++		clock-names = "per";
+ 	};
  
- 		if (!clock_name || !strcmp(clock_name, "sys")) {
--			sys_clk = clk_get(&ofdev->dev, "sys_clk");
-+			sys_clk = devm_clk_get(&ofdev->dev, "sys_clk");
- 			if (IS_ERR(sys_clk)) {
- 				dev_err(&ofdev->dev, "couldn't get sys_clk\n");
- 				goto exit_unmap;
-@@ -203,7 +204,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
- 		}
+ 	localbus at 80000020 {
+@@ -153,12 +159,22 @@
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x1300 0x80>;
+ 			interrupts = <12 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN0_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
  
- 		if (clocksrc < 0) {
--			ref_clk = clk_get(&ofdev->dev, "ref_clk");
-+			ref_clk = devm_clk_get(&ofdev->dev, "ref_clk");
- 			if (IS_ERR(ref_clk)) {
- 				dev_err(&ofdev->dev, "couldn't get ref_clk\n");
- 				goto exit_unmap;
-@@ -280,6 +281,8 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
- 	dev = alloc_mscandev();
- 	if (!dev)
- 		goto exit_dispose_irq;
-+	platform_set_drvdata(ofdev, dev);
-+	SET_NETDEV_DEV(dev, &ofdev->dev);
+ 		can at 1380 {
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x1380 0x80>;
+ 			interrupts = <13 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN1_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
  
- 	priv = netdev_priv(dev);
- 	priv->reg_base = base;
-@@ -296,8 +299,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
- 		goto exit_free_mscan;
- 	}
+ 		sdhc at 1500 {
+@@ -167,6 +183,9 @@
+ 			interrupts = <8 0x8>;
+ 			dmas = <&dma0 30>;
+ 			dma-names = "rx-tx";
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SDHC>;
++			clock-names = "ipg", "per";
+ 		};
  
--	SET_NETDEV_DEV(dev, &ofdev->dev);
--
- 	err = register_mscandev(dev, mscan_clksrc);
- 	if (err) {
- 		dev_err(&ofdev->dev, "registering %s failed (err=%d)\n",
-@@ -305,8 +306,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
- 		goto exit_free_mscan;
- 	}
+ 		i2c at 1700 {
+@@ -175,6 +194,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1700 0x20>;
+ 			interrupts = <9 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "per";
+ 		};
  
--	platform_set_drvdata(ofdev, dev);
--
- 	dev_info(&ofdev->dev, "MSCAN at 0x%p, irq %d, clock %d Hz\n",
- 		 priv->reg_base, dev->irq, priv->can.clock.freq);
+ 		i2c at 1720 {
+@@ -183,6 +204,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1720 0x20>;
+ 			interrupts = <10 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "per";
+ 		};
  
-@@ -324,10 +323,17 @@ exit_unmap_mem:
+ 		i2c at 1740 {
+@@ -191,6 +214,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1740 0x20>;
+ 			interrupts = <11 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "per";
+ 		};
  
- static int mpc5xxx_can_remove(struct platform_device *ofdev)
- {
-+	const struct of_device_id *match;
-+	const struct mpc5xxx_can_data *data;
- 	struct net_device *dev = platform_get_drvdata(ofdev);
- 	struct mscan_priv *priv = netdev_priv(dev);
+ 		i2ccontrol at 1760 {
+@@ -202,30 +227,46 @@
+ 			compatible = "fsl,mpc5121-axe";
+ 			reg = <0x2000 0x100>;
+ 			interrupts = <42 0x8>;
++			clocks = <&clks MPC512x_CLK_AXE>;
++			clock-names = "per";
+ 		};
  
-+	match = of_match_device(mpc5xxx_can_table, &ofdev->dev);
-+	data = match ? match->data : NULL;
-+
- 	unregister_mscandev(dev);
-+	if (data && data->put_clock)
-+		data->put_clock(ofdev);
- 	iounmap(priv->reg_base);
- 	irq_dispose_mapping(dev->irq);
- 	free_candev(dev);
-diff --git a/drivers/net/can/mscan/mscan.c b/drivers/net/can/mscan/mscan.c
-index e6b4095..1c08ffe 100644
---- a/drivers/net/can/mscan/mscan.c
-+++ b/drivers/net/can/mscan/mscan.c
-@@ -573,6 +573,12 @@ static int mscan_open(struct net_device *dev)
- 	struct mscan_priv *priv = netdev_priv(dev);
- 	struct mscan_regs __iomem *regs = priv->reg_base;
+ 		display at 2100 {
+ 			compatible = "fsl,mpc5121-diu";
+ 			reg = <0x2100 0x100>;
+ 			interrupts = <64 0x8>;
++			clocks = <&clks MPC512x_CLK_DIU>;
++			clock-names = "per";
+ 		};
  
-+	if (priv->clk_can) {
-+		ret = clk_enable(priv->clk_can);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	/* common open */
- 	ret = open_candev(dev);
- 	if (ret)
-@@ -621,6 +627,9 @@ static int mscan_close(struct net_device *dev)
- 	close_candev(dev);
- 	free_irq(dev->irq, dev);
+ 		can at 2300 {
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x2300 0x80>;
+ 			interrupts = <90 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN2_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
  
-+	if (priv->clk_can)
-+		clk_disable(priv->clk_can);
-+
- 	return 0;
- }
+ 		can at 2380 {
+ 			compatible = "fsl,mpc5121-mscan";
+ 			reg = <0x2380 0x80>;
+ 			interrupts = <91 0x8>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN3_MCLK>;
++			clock-names = "ips", "sys", "ref", "mclk";
+ 		};
  
-diff --git a/drivers/net/can/mscan/mscan.h b/drivers/net/can/mscan/mscan.h
-index af2ed8b..f32e190 100644
---- a/drivers/net/can/mscan/mscan.h
-+++ b/drivers/net/can/mscan/mscan.h
-@@ -21,6 +21,7 @@
- #ifndef __MSCAN_H__
- #define __MSCAN_H__
+ 		viu at 2400 {
+ 			compatible = "fsl,mpc5121-viu";
+ 			reg = <0x2400 0x400>;
+ 			interrupts = <67 0x8>;
++			clocks = <&clks MPC512x_CLK_VIU>;
++			clock-names = "per";
+ 		};
  
-+#include <linux/clk.h>
- #include <linux/types.h>
+ 		mdio at 2800 {
+@@ -233,6 +274,8 @@
+ 			reg = <0x2800 0x800>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			clocks = <&clks MPC512x_CLK_FEC>;
++			clock-names = "per";
+ 		};
  
- /* MSCAN control register 0 (CANCTL0) bits */
-@@ -283,6 +284,7 @@ struct mscan_priv {
- 	unsigned int type; 	/* MSCAN type variants */
- 	unsigned long flags;
- 	void __iomem *reg_base;	/* ioremap'ed address to registers */
-+	struct clk *clk_can;	/* clock for registers or bitrates */
- 	u8 shadow_statflg;
- 	u8 shadow_canrier;
- 	u8 cur_pri;
+ 		eth0: ethernet at 2800 {
+@@ -241,6 +284,8 @@
+ 			reg = <0x2800 0x800>;
+ 			local-mac-address = [ 00 00 00 00 00 00 ];
+ 			interrupts = <4 0x8>;
++			clocks = <&clks MPC512x_CLK_FEC>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* USB1 using external ULPI PHY */
+@@ -252,6 +297,8 @@
+ 			interrupts = <43 0x8>;
+ 			dr_mode = "otg";
+ 			phy_type = "ulpi";
++			clocks = <&clks MPC512x_CLK_USB1>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* USB0 using internal UTMI PHY */
+@@ -263,6 +310,8 @@
+ 			interrupts = <44 0x8>;
+ 			dr_mode = "otg";
+ 			phy_type = "utmi_wide";
++			clocks = <&clks MPC512x_CLK_USB2>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* IO control */
+@@ -281,6 +330,8 @@
+ 			compatible = "fsl,mpc5121-pata";
+ 			reg = <0x10200 0x100>;
+ 			interrupts = <5 0x8>;
++			clocks = <&clks MPC512x_CLK_PATA>;
++			clock-names = "per";
+ 		};
+ 
+ 		/* 512x PSCs are not 52xx PSC compatible */
+@@ -292,6 +343,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC0_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC1 */
+@@ -301,6 +354,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC1_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC2 */
+@@ -310,6 +365,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC2_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC3 */
+@@ -319,6 +376,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC3_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC4 */
+@@ -328,6 +387,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC4_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC5 */
+@@ -337,6 +398,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC5_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC6 */
+@@ -346,6 +409,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC6_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC7 */
+@@ -355,6 +420,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC7_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC8 */
+@@ -364,6 +431,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC8_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC9 */
+@@ -373,6 +442,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC9_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC10 */
+@@ -382,6 +453,8 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC10_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		/* PSC11 */
+@@ -391,12 +464,16 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC11_MCLK>;
++			clock-names = "mclk";
+ 		};
+ 
+ 		pscfifo at 11f00 {
+ 			compatible = "fsl,mpc5121-psc-fifo";
+ 			reg = <0x11f00 0x100>;
+ 			interrupts = <40 0x8>;
++			clocks = <&clks MPC512x_CLK_PSC_FIFO>;
++			clock-names = "per";
+ 		};
+ 
+ 		dma0: dma at 14000 {
+@@ -414,6 +491,8 @@
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
+ 		#interrupt-cells = <1>;
++		clocks = <&clks MPC512x_CLK_PCI>;
++		clock-names = "per";
+ 
+ 		reg = <0x80008500 0x100	/* internal registers */
+ 		       0x80008300 0x8>;	/* config space access registers */
 -- 
 1.7.10.4
