@@ -1,30 +1,31 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 22 Jul 2013 08:04:33 +0800
-Subject: [PATCH 5/5] pinctrl: sirf: add freeze and restore entries for
- hibernation support
-In-Reply-To: <CACRpkdY-nxceQWugtrDOkKA3atBsb2y9qfp5qEAtrK=93yaNkA@mail.gmail.com>
-References: <1372924793-5579-1-git-send-email-Baohua.Song@csr.com>
- <CACRpkdY-nxceQWugtrDOkKA3atBsb2y9qfp5qEAtrK=93yaNkA@mail.gmail.com>
-Message-ID: <CAGsJ_4wxJ+LVtKwajybC6ytguzpEp-Men20hrhS92xB=XdQMQQ@mail.gmail.com>
+Date: Mon, 22 Jul 2013 08:06:55 +0800
+Subject: [PATCH 1/6] ASoC: sirf: add sirf platform driver which provides
+ DMA
+In-Reply-To: <20130719161252.GK9858@sirena.org.uk>
+References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
+ <1374232042-26088-2-git-send-email-Baohua.Song@csr.com>
+ <20130719161252.GK9858@sirena.org.uk>
+Message-ID: <CAGsJ_4yJoYJdRjZiVOPYgOA+kxGyU9eKjWQFK1B_AnQ6-7BDjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/22 Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, Jul 4, 2013 at 9:59 AM, Barry Song <Baohua.Song@csr.com> wrote:
+2013/7/20 Mark Brown <broonie@kernel.org>:
+> On Fri, Jul 19, 2013 at 07:07:17PM +0800, Barry Song wrote:
 >
->> this patch adds hibernation entries so that the sirf platform can
->> support suspend-to-disk.
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> index 0000000..3678aed
+>> --- /dev/null
+>> +++ b/sound/soc/sirf/Kconfig
+>> @@ -0,0 +1,4 @@
+>> +config SND_SIRF_SOC
+>> +     tristate "Platform DMA driver for the SiRF SoC chips"
+>> +     depends on ARCH_SIRF && SND_SOC
+>> +     select SND_SOC_DMAENGINE_PCM
 >
-> Are you really using this?
+> Does this have any actual platform build dependencies or can this be
+> ARCH_SIRF || COMPILE_TEST?
 
-yes, we do for quick boot requirement.
-
->
-> Applied anyway...
->
-> Yours,
-> Linus Walleij
+it depends on SIRF as it is specific to SiRFSoC, but i think it would
+be good to have " || COMPILE_TEST"
 
 -barry
