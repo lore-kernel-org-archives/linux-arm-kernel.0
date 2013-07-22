@@ -1,92 +1,29 @@
-From: manjunath.goudar@linaro.org (manjunath)
-Date: Mon, 22 Jul 2013 15:11:50 +0530
-Subject: [PATCH  V4 0/6] USB: OHCI: more bus glues as separate modules
-In-Reply-To: <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
- <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <51ECFE5E.20300@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 22 Jul 2013 10:45:35 +0100
+Subject: [PATCH] xen/arm and xen/arm64: update xen_restart after
+ ff701306cd49
+In-Reply-To: <51EC4701.8020502@cogentembedded.com>
+References: <1374420257-19467-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51EC4701.8020502@cogentembedded.com>
+Message-ID: <alpine.DEB.2.02.1307221045200.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 July 2013 02:49 PM, Manjunath Goudar wrote:
-> These patches are for separating the SOC On-Chip ohci host controller
-> from ohci-hcd host code into its own driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.12.
->
-> V2:
->    In patch 5/6 and 6/6:
->    -Set non-standard fields in hc_driver manually, rather than
->     relying on an expanded struct ohci_driver_overrides.
->    -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
->     relying on ohci_hub_control and hub_status_data being exported.
->
->    In patch 1/6 to 4/6
->    -ohci_setup() has been removed because it is called in .reset member
->     of the ohci_hc_driver structure.
->
-> V3:
->   In patch 5/6 and 6/6:
->   -ohci_setup() has been removed because it is called in .reset member
->    of the ohci_hc_driver structure.
->
->   In patch 5/6:
->   -The ohci_restart() function is not required in  current scenario,
->    only discarding connection state of integrated transceivers is sufficient,
->    for this directly handling ohci->hc_control.
->
->   In patch 2/6 :
->   -rewritten if (config->otg || config->rwc) block statements into
->    two separate 'if blocks' to handle below scenarios
->    1. config->otg set scenario.
->    2. if any of these (config->otg, config->rwc) are set, this
->       scenario should be handled only after ohci_setup()
->
->   In patch 1/6 and 4/6:
->    No change.
->
-> V4:
->   In patch 1/6 and 4/6:
->    No change.
->   
->   In patch 2/6 :
->   -usb_remove_hcd() function is required a valid clock that is what
->    omap_ohci_clock_power(0) is called after hcd shutdown.
->
->   In patch 3/6 :
->   -V3 modification revert back, only ohci->regs setting write()
->    function has been removed because ohci->regs doesn't get set until
->    usb_add_hcd.
->
->   In patch 5/6 :
->   - Removed extra space after "tristate".
->   - Removed extra space between function name  and '(' characters.
->   - MODULE_ALIAS line moved to last statement of ohci-at91 file.
->
->   In patch 6/6 :
->   - Removed extra space before the '='.
->   - Moved  /* forward definitions */ line before the declarations of functions.
->
-> Manjunath Goudar (6):
->    USB: OHCI: make ohci-exynos a separate driver
->    USB: OHCI: make ohci-omap a separate driver
->    USB: OHCI: make ohci-omap3 a separate driver
->    USB: OHCI: make ohci-spear a separate driver
->    USB: OHCI: make ohci-at91 a separate driver
->    USB: OHCI: make ohci-s3c2410 a separate driver
->
->   drivers/usb/host/Kconfig        |   30 ++++++-
->   drivers/usb/host/Makefile       |    6 ++
->   drivers/usb/host/ohci-at91.c    |  153 ++++++++++++++++-------------------
->   drivers/usb/host/ohci-exynos.c  |  167 ++++++++++++++++-----------------------
->   drivers/usb/host/ohci-hcd.c     |  108 -------------------------
->   drivers/usb/host/ohci-omap.c    |  156 +++++++++++++-----------------------
->   drivers/usb/host/ohci-omap3.c   |  118 +++++++++------------------
->   drivers/usb/host/ohci-s3c2410.c |  128 +++++++++++++-----------------
->   drivers/usb/host/ohci-spear.c   |  140 +++++++++++++-------------------
->   9 files changed, 374 insertions(+), 632 deletions(-)
->
-I am very sorry, this is patch V4 series.
+On Mon, 22 Jul 2013, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 21-07-2013 19:24, Stefano Stabellini wrote:
+> 
+> > Commit ff701306cd49 changes the prototype of arm_pm_restart.
+> 
+>    Please also specify the summary line of that commit in parens.
 
-Thanks
-Manjunath Goudar
+Good idea, I'll repost
+
+
+> > Update xen_restart accordingly.
+> 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> WBR, Sergei
+> 
