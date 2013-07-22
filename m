@@ -1,102 +1,202 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Jul 2013 23:11:30 +0200
-Subject: [PATCH v4 02/20] clocksource: samsung_pwm_timer: Correct
- definition of AUTORELOAD bit
-In-Reply-To: <51ED9C8C.10803@linaro.org>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <9612221.r4mx9bHE64@flatron> <51ED9C8C.10803@linaro.org>
-Message-ID: <1658534.7nG6RFjcTc@flatron>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Mon, 22 Jul 2013 23:14:35 +0200
+Subject: [PATCH 5/5] ARM: bcm4760: Add restart hook
+In-Reply-To: <201307211020.25966.arnd@arndb.de>
+References: <20130721002320.730568671@gmail.com>
+ <20130721002714.732402573@gmail.com>
+ <201307211020.25966.arnd@arndb.de>
+Message-ID: <20130722211434.GA6665@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 of July 2013 22:56:44 Daniel Lezcano wrote:
-> On 07/22/2013 09:43 AM, Tomasz Figa wrote:
-> > On Monday 22 of July 2013 05:50:09 Daniel Lezcano wrote:
-> >> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> >>> PWM channel 4 has its autoreload bit located at different position.
-> >>> This patch fixes the driver to account for that.
-> >>> 
-> >>> This fixes a problem with the clocksource hanging after it overflows
-> >>> because it is not reloaded any more.
-> >>> 
-> >>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> >>> ---
-> >>> 
-> >>>  drivers/clocksource/samsung_pwm_timer.c | 3 ++-
-> >>>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>> 
-> >>> diff --git a/drivers/clocksource/samsung_pwm_timer.c
-> >>> b/drivers/clocksource/samsung_pwm_timer.c index 3fa5b07..e238fb0
-> >>> 100644
-> >>> --- a/drivers/clocksource/samsung_pwm_timer.c
-> >>> +++ b/drivers/clocksource/samsung_pwm_timer.c
-> >>> @@ -47,7 +47,8 @@
-> >>> 
-> >>>  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
-> >>>  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
-> >>>  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
-> >>> 
-> >>> -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
-> >>> +#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) \
-> >>> +						+ (((chan) < 5) ? 3 : 2)))
-> >> 
-> >> This macro is not readable. Please, fix it up with a comment please.
+On Sun, Jul 21, 2013 at 10:20:25AM +0200, Arnd Bergmann wrote:
+> On Sunday 21 July 2013, Domenico Andreoli wrote:
+> > From: Domenico Andreoli <domenico.andreoli@linux.com>
 > > 
-> > /*
+> > Restart hook implementation for the Broadcom BCM4760 based ARM11 SoCs.
 > > 
-> >  * Channel 4 (logically 5 in TCON register) has different position
-> >  * of autoreload bit.
-> >  */
-> > 
-> > #define _TCON_AUTORELOAD(chan)			(1 << (4 * (chan) 
-+ 3))
-> > #define _TCON_AUTORELOAD4(chan)			(1 << (4 * (chan) 
-+ 2))
-> > #define TCON_AUTORELOAD(chan)			((chan < 5) ?
-> > 
-> > 		_TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
-> > 
-> > What do you think?
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+> > ---
+> >  Documentation/devicetree/bindings/watchdog/brcm,bcm4760-pm-wdt.txt |   14 ++
+> >  arch/arm/boot/dts/bcm4760.dtsi                                     |    5 +
+> >  arch/arm/mach-bcm/bcm4760.c                                        |   78 ++++++++++
+> >  3 files changed, 97 insertions(+)
 > 
-> I don't get the arithmetic here and the code is poor in comment. A nice
-> comment would valuable here.
+> The implementation looks ok to me, but I would prefer this to be part of a
+> watchdog device driver that overrides the pm_power_off hook.
 
-Each channel occupies 4 bits in TCON register, but there is a gap of 4 
-bits after channel 0. In addition for channel 4 the location of autoreload 
-bit in its set of bits is 2 as opposed to 3 for other channels. Here's the 
-layout of the register, for reference:
+I'd appreciate if I could keep this implementation, which I don't plan to
+develop further, but won't cry if it's left out.
 
-Timer 4 Auto Reload on/off	[22]
-Timer 4 Manual Update		[21]
-Timer 4 Start/Stop		[20]
+> It can probably be done at a later stage when you submit a watchdog driver.
 
-Timer 3 Auto Reload on/off	[19]
-Reserved			[18]
-Timer 3 Manual Update		[17]
-Timer 3 Start/Stop		[16]
+I should be able to reuse an existing ARM watchdog driver but I need to
+investigate further.
 
-Timer 2 Auto Reload on/off	[15]
-Reserved			[14]
-Timer 2 Manual Update		[13]
-Timer 2 Start/Stop		[12]
+BTW is it acceptable to loose the ability to reboot the board in case the
+proper watchdog driver is not configured?
 
-Timer 1 Auto Reload on/off	[11]
-Timer 1 Output Inverter on/off	[10]
-Timer 1 Manual Update		[9]
-Timer 1 Start/Stop		[8]
+Domenico
 
-Reserved			[7:5]
-Dead zone enable/disable	[4]
-
-Timer 0 Auto Reload on/off	[3]
-Timer 0 Output Inverter on/off	[2]
-Timer 0 Manual Update		[1]
-Timer 0 Start/Stop		[0]
-
-> May be you can replace 1 << bla by BIT(bla) ?
-
-Yes, BIT() would be nice here, but IMHO this is material for separate 
-patch as all the macros in this driver already use 1 << bla.
-
-Best regards,
-Tomasz
+> 
+> 	Arnd
+> 
+> > Index: b/Documentation/devicetree/bindings/watchdog/brcm,bcm4760-pm-wdt.txt
+> > ===================================================================
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/watchdog/brcm,bcm4760-pm-wdt.txt
+> > @@ -0,0 +1,14 @@
+> > +Broadcom BCM4760 watchdog timer device tree bindings
+> > +----------------------------------------------------
+> > +
+> > +Required properties:
+> > +
+> > +- compatible : should be "brcm,bcm4760-pm-wdt"
+> > +- reg : Specifies base physical address and size of the registers.
+> > +
+> > +Example:
+> > +
+> > +watchdog {
+> > +	compatible = "brcm,bcm4760-pm-wdt";
+> > +	reg = <0xbd000 0x1000>;
+> > +};
+> > Index: b/arch/arm/boot/dts/bcm4760.dtsi
+> > ===================================================================
+> > --- a/arch/arm/boot/dts/bcm4760.dtsi
+> > +++ b/arch/arm/boot/dts/bcm4760.dtsi
+> > @@ -23,6 +23,11 @@
+> >  			reg = <0xbc000 0x1000>;
+> >  		};
+> >  
+> > +		watchdog {
+> > +			compatible = "brcm,bcm4760-pm-wdt";
+> > +			reg = <0xbd000 0x1000>;
+> > +		};
+> > +
+> >  		vic0: interrupt-controller at 80000 {
+> >  			compatible = "brcm,bcm4760-pl192", "arm,pl192-vic", "arm,primecell";
+> >  			reg = <0x80000 0x1000>;
+> > Index: b/arch/arm/mach-bcm/bcm4760.c
+> > ===================================================================
+> > --- a/arch/arm/mach-bcm/bcm4760.c
+> > +++ b/arch/arm/mach-bcm/bcm4760.c
+> > @@ -16,7 +16,9 @@
+> >  
+> >  #include <linux/init.h>
+> >  #include <linux/irqchip.h>
+> > +#include <linux/delay.h>
+> >  #include <linux/of_irq.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/of_platform.h>
+> >  #include <linux/clk/bcm4760.h>
+> >  
+> > @@ -28,6 +30,17 @@
+> >  #define BCM4760_PERIPH_VIRT   IOMEM(0xd0080000)
+> >  #define BCM4760_PERIPH_SIZE   SZ_512K
+> >  
+> > +#define BCM4760_WDT_LOAD      0x000
+> > +#define BCM4760_WDT_CTRL      0x008
+> > +#define BCM4760_WDT_INTCLR    0x00c
+> > +#define BCM4760_WDT_LOCK      0xc00
+> > +
+> > +#define BCM4760_WDT_PASSWORD  0x1acce551
+> > +#define BCM4760_WDT_INTEN     BIT(0)
+> > +#define BCM4760_WDT_RESEN     BIT(1)
+> > +
+> > +static void __iomem *wdt_regs;
+> > +
+> >  static struct map_desc io_map __initdata = {
+> >  	.virtual = (unsigned long) BCM4760_PERIPH_VIRT,
+> >  	.pfn = __phys_to_pfn(BCM4760_PERIPH_PHYS),
+> > @@ -56,11 +69,75 @@ static void __init bcm4760_system_rev(vo
+> >  		system_rev = id0 << 8 | (id1 & 0xff);
+> >  }
+> >  
+> > +static const struct of_device_id bcm4760_pm_wdt_match[] __initconst = {
+> > +	{ .compatible = "brcm,bcm4760-pm-wdt" },
+> > +	{}
+> > +};
+> > +
+> > +/*
+> > + * The machine restart method can be called from an atomic context so we won't
+> > + * be able to ioremap the regs then.
+> > + */
+> > +static void __init bcm4760_setup_restart(void)
+> > +{
+> > +	struct device_node *node;
+> > +
+> > +	node = of_find_matching_node(NULL, bcm4760_pm_wdt_match);
+> > +	if (!node) {
+> > +		pr_info("No bcm4760 watchdog node\n");
+> > +		return;
+> > +	}
+> > +
+> > +	wdt_regs = of_iomap(node, 0);
+> > +	if (!wdt_regs) {
+> > +		pr_err("Can't remap watchdog registers\n");
+> > +		return;
+> > +	}
+> > +
+> > +	/* unlock watchdog registers */
+> > +	writel(BCM4760_WDT_PASSWORD, wdt_regs + BCM4760_WDT_LOCK);
+> > +	/* disable watchdog */
+> > +	writel(0, wdt_regs + BCM4760_WDT_CTRL);
+> > +	/* lock watchdog registers */
+> > +	writel(1, wdt_regs + BCM4760_WDT_LOCK);
+> > +}
+> > +
+> > +static void bcm4760_restart(enum reboot_mode mode, const char *cmd)
+> > +{
+> > +	if (!wdt_regs) {
+> > +		pr_err("No restart hook installed. ");
+> > +		return;
+> > +	}
+> > +
+> > +	/* unlock watchdog registers */
+> > +	writel(BCM4760_WDT_PASSWORD, wdt_regs + BCM4760_WDT_LOCK);
+> > +
+> > +	/* disable watchdog */
+> > +	writel(0, wdt_regs + BCM4760_WDT_CTRL);
+> > +	udelay(20);
+> > +
+> > +	/* clear the irq status */
+> > +	writel(1, wdt_regs + BCM4760_WDT_INTCLR);
+> > +	udelay(20);
+> > +
+> > +	/* expire after 5 cycles (~156us) */
+> > +	writel(5, wdt_regs + BCM4760_WDT_LOAD);
+> > +	/* enable watchdog */
+> > +	writel(BCM4760_WDT_INTEN | BCM4760_WDT_RESEN,
+> > +		wdt_regs + BCM4760_WDT_CTRL);
+> > +
+> > +	/* lock watchdog registers */
+> > +	writel(1, wdt_regs + BCM4760_WDT_LOCK);
+> > +	/* wait the bite */
+> > +	udelay(400);
+> > +}
+> > +
+> >  static void __init bcm4760_init(void)
+> >  {
+> >  	int err;
+> >  
+> >  	bcm4760_system_rev();
+> > +	bcm4760_setup_restart();
+> >  	bcm4760_init_clocks();
+> >  
+> >  	err = of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > @@ -78,5 +155,6 @@ static const char * const bcm4760_compat
+> >  DT_MACHINE_START(BCM4760, "Broadcom BCM4760")
+> >  	.map_io = bcm4760_map_io,
+> >  	.init_machine = bcm4760_init,
+> > +	.restart = bcm4760_restart,
+> >  	.dt_compat = bcm4760_compat
+> >  MACHINE_END
+> > 
+> > 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
