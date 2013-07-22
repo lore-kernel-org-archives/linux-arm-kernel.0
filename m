@@ -1,48 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 22 Jul 2013 16:02:45 -0400 (EDT)
-Subject: [GIT PULL] MCPM backends update
-Message-ID: <alpine.LFD.2.03.1307221521200.15022@syhkavp.arg>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Jul 2013 20:07:04 +0000 (UTC)
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <20130722184325.GA21614@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+ <20130722184325.GA21614@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello gents,
+On Mon, 22 Jul 2013, Russell King - ARM Linux wrote:
 
-Would you please pull the following into ARM-SOC:
+> Bear in mind that I'm almost at the point of not boot-testing anything
+> I sent to Linus because of the uselessness of the SDP4430 board now
+> that it's DT only - the only platform which boot-tests anything I send
+> is the 3430LDP board now.  If people care about that, maybe they can
+> assist with sorting out the issues I've raised on these lists about
+> the SDP4430 - and why the SDP4430 build remains disabled in my build
+> and boot system.
 
-	git://git.linaro.org/people/nico/linux mcpm+tc2
+I understand completely...
 
-This contains
+> Looking at the boot log, it just stops after uboot hands over control.
+> With the lack of output from the decompressor, it's not possible to
+> tell whether it's a decompressor problem or a kernel problem.
+> 
+> I think you need to turn on the LL_DEBUG option, select the appropriate
+> output option, and also get the decompressor to use the kernel's debug
+> io functions to output it's stuff (I think the option is DEBUG_UNCOMPRESS).
 
-- Fixes to the existing Vexpress DCSCB backend.
-
-- Lorenzo's minimal SPC driver required by the TC2 MCPM backend.
-  As discussed on the list, this is not considered to be a MFD driver.
-  This hardly qualify as a bus driver either.  Conceptually, this is
-  a very platform specific register multiplex driver allowing subsystem
-  drivers to hook into.  I therefore moved it to 
-  drivers/platform/vexpress/ which seems to please everyone.
-
-- The MCPM backend enabling SMP secondary boot and CPU hotplug
-  on the VExpress TC2 big.LITTLE platform.
-
-- MCPM suspend method to the TC2 backend allowing basic CPU 
-  idle/suspend.  The cpuidle driver that hooks into this will be 
-  submitted separately.
-
-This is based on v3.11-rc2.  The diffstat follows:
-
- .../devicetree/bindings/arm/vexpress-spc.txt       |  36 +++
- arch/arm/mach-vexpress/Kconfig                     |   9 +
- arch/arm/mach-vexpress/Makefile                    |   1 +
- arch/arm/mach-vexpress/dcscb.c                     |  58 ++--
- arch/arm/mach-vexpress/tc2_pm.c                    | 304 +++++++++++++++++++++
- drivers/platform/Kconfig                           |   4 +-
- drivers/platform/Makefile                          |   1 +
- drivers/platform/vexpress/Kconfig                  |   9 +
- drivers/platform/vexpress/Makefile                 |   1 +
- drivers/platform/vexpress/spc.c                    | 253 +++++++++++++++++
- include/linux/vexpress.h                           |  17 ++
- 11 files changed, 671 insertions(+), 22 deletions(-)
+OK, will dig deeper here at the next opportunity.
 
 
-Nicolas
+- Paul
