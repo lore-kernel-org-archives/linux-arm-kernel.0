@@ -1,89 +1,44 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 22 Jul 2013 14:14:43 +0200
-Subject: [PATCH v3 16/31] dts: mpc512x: add clock related device tree specs
+Date: Mon, 22 Jul 2013 14:14:49 +0200
+Subject: [PATCH v3 22/31] clk: mpc512x: remove clkdev registration (uart, spi)
 In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
 References: <1374166855-7280-1-git-send-email-gsi@denx.de>
  <1374495298-22019-1-git-send-email-gsi@denx.de>
-Message-ID: <1374495298-22019-17-git-send-email-gsi@denx.de>
+Message-ID: <1374495298-22019-23-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this addresses the clock driver aka provider's side of clocks
-- prepare for future '<&clks ID>' phandle references for device tree
-  based clock lookup in client drivers
-- introduce a 'clocks' subtree with an 'osc' node for the crystal
-  or oscillator SoC input (fixed frequency)
-- provide default values with 33MHz oscillator frequency in the
-  common include (the 66MHz IPS bus already was there), add
-  override values for the ifm AC14xx board which deviates from
-  the reference design (25MHz xtal, 80MHz IPS bus)
+after the UART and SPI peripheral drivers have switched to device tree
+based clock lookup and no longer construct clock names from their PSC
+component index, the "psc%d_mclk" alias names have become obsolete --
+remove the corresponding clk_register_clkdev() calls
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/ac14xx.dts   |    7 +++++++
- arch/powerpc/boot/dts/mpc5121.dtsi |   15 ++++++++++++++-
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ arch/powerpc/platforms/512x/clock-commonclk.c |   11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-index a543c40..a1b8837 100644
---- a/arch/powerpc/boot/dts/ac14xx.dts
-+++ b/arch/powerpc/boot/dts/ac14xx.dts
-@@ -139,7 +139,14 @@
- 		};
- 	};
+diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
+index 8b71ceb..a860ded 100644
+--- a/arch/powerpc/platforms/512x/clock-commonclk.c
++++ b/arch/powerpc/platforms/512x/clock-commonclk.c
+@@ -529,17 +529,6 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry)
+ 				entry->name_mclk,
+ 				entry->name_mux1, 1, 1);
+ 	}
+-
+-	/*
+-	 * without this "clock device" registration, "simple" lookups in
+-	 * the SPI master initialization and serial port setup will fail
+-	 *
+-	 * those drivers need to get adjusted to lookup their required
+-	 * clocks from device tree specs, and device tree nodes need to
+-	 * provide the clock specs, before this clkdev registration
+-	 * becomes obsolete
+-	 */
+-	clk_register_clkdev(clks[clks_idx_pub], entry->name_mclk, NULL);
+ }
  
-+	clocks {
-+		osc {
-+			clock-frequency = <25000000>;
-+		};
-+	};
-+
- 	soc at 80000000 {
-+		bus-frequency = <80000000>;	/* 80 MHz ips bus */
- 
- 		clock at f00 {
- 			compatible = "fsl,mpc5121rev2-clock", "fsl,mpc5121-clock";
-diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
-index bd14c00..8f4cba0 100644
---- a/arch/powerpc/boot/dts/mpc5121.dtsi
-+++ b/arch/powerpc/boot/dts/mpc5121.dtsi
-@@ -9,6 +9,8 @@
-  * option) any later version.
-  */
- 
-+#include <dt-bindings/clock/mpc512x-clock.h>
-+
- /dts-v1/;
- 
- / {
-@@ -73,6 +75,16 @@
- 		ranges = <0x0 0x0 0xfc000000 0x04000000>;
- 	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		osc {
-+			compatible = "fsl,mpc512x-osc", "fixed-clock";
-+			clock-frequency = <33000000>;
-+		};
-+	};
-+
- 	soc at 80000000 {
- 		compatible = "fsl,mpc5121-immr";
- 		#address-cells = <1>;
-@@ -118,9 +130,10 @@
- 		};
- 
- 		/* Clock control */
--		clock at f00 {
-+		clks: clock at f00 {
- 			compatible = "fsl,mpc5121-clock";
- 			reg = <0xf00 0x100>;
-+			#clock-cells = <1>;
- 		};
- 
- 		/* Power Management Controller */
+ static void mpc512x_clk_setup_mclks(struct mclk_setup_data *table, size_t count)
 -- 
 1.7.10.4
