@@ -1,39 +1,30 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Jul 2013 09:47:04 +0200
-Subject: [PATCH v4 04/20] clocksource: samsung_pwm_timer: Do not use
- clocksource_mmio
-In-Reply-To: <51ECAD60.1000109@linaro.org>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1374278673-25615-6-git-send-email-tomasz.figa@gmail.com>
- <51ECAD60.1000109@linaro.org>
-Message-ID: <19090469.Cf6sbb33Ke@flatron>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 22 Jul 2013 15:47:35 +0800
+Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51E95F10.5070006@wwwdotorg.org>
+References: <20130716041056.GA30067@S2101-09.ap.freescale.net>
+ <51E56AA7.7020103@wwwdotorg.org>
+ <20130717030246.GA4541@S2101-09.ap.freescale.net>
+ <51E6CCE4.20705@wwwdotorg.org>
+ <20130717213836.GA13324@amd.pavel.ucw.cz>
+ <51E719A6.6070105@wwwdotorg.org>
+ <20130718112555.GB1021@amd.pavel.ucw.cz>
+ <CAOesGMgi0j_mPyeBLVHb_QW+DwtAPoFY697eQO3-yp9tnP1vmA@mail.gmail.com>
+ <20130719032328.GB20889@S2101-09.ap.freescale.net>
+ <51E95F10.5070006@wwwdotorg.org>
+Message-ID: <20130722074733.GA20271@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Monday 22 of July 2013 05:56:16 Daniel Lezcano wrote:
-> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> > In case of Samsung PWM timer, clocksource MMIO can not be used,
-> > because
-> > custom suspend/resume callbacks are required.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > ---
+On Fri, Jul 19, 2013 at 09:45:20AM -0600, Stephen Warren wrote:
+> That sounds like it /could/ well be an issue. Do you have all that
+> actually hooked up through device tree so you can demonstrate the amount
+> of deferred probing that /actually/ happens though?
 > 
-> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> In order to push the probe order in the right direction, I would
+> personally prefer to see some kind of explicit hinting or outright
+> representation of probe order in the DT.
 
-Thanks for review.
+I do not have a kernel supporting all those devices yet.
 
-> Please in the future Cc me and Thomas Gleixner (clocksource/clockevent
-> maintainers).
-
-Oh, right, sorry. This series originally was not touching the clocksource 
-driver and I just kept original recipient list.
-
-Btw. Have you updated MAINTAINERS file? In latest linux-next I can still 
-see only John Stultz and Thomas Gleixner as maintainers of 
-drivers/clocksource.
-
-Best regards,
-Tomasz
+Shawn
