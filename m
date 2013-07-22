@@ -1,37 +1,61 @@
-From: raghavendra.kt@linux.vnet.ibm.com (Raghavendra K T)
-Date: Mon, 22 Jul 2013 19:27:58 +0530
-Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
-In-Reply-To: <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
-References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
- <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
- <CAC4Lta17bmNjBck6LzziBeU0Xc36F1Jms2tQPv6+GaXvik6Wyg@mail.gmail.com>
- <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
-Message-ID: <51ED3A66.4050407@linux.vnet.ibm.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Mon, 22 Jul 2013 15:53:53 +0200
+Subject: [PATCH 05/22] ARM: dts: bcm281xx: Remove '0x's from
+ BCM11351 BRT DTS file
+In-Reply-To: <20130722133852.GA26801@laptop>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
+ <51ED2D90.4020209@broadcom.com> <20130722133852.GA26801@laptop>
+Message-ID: <51ED3971.905@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 06:21 PM, Christoffer Dall wrote:
-> On 22 July 2013 10:53, Raghavendra KT <raghavendra.kt.linux@gmail.com> wrote:
->> On Fri, Jul 19, 2013 at 7:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> So far, when a guest executes WFE (like when waiting for a spinlock
->>> to become unlocked), we don't do a thing and let it run uninterrupted.
->>>
->>> Another option is to trap a blocking WFE and offer the opportunity
->>> to the scheduler to switch to another task, potentially giving the
->>> vcpu holding the spinlock a chance to run sooner.
->>>
->>
->> Idea looks to be correct from my experiments on x86. It does bring some
->> percentage of benefits in overcommitted guests. Infact,
->>
->> https://lkml.org/lkml/2013/7/22/41 tries to do the same thing for x86.
->> (this results in using ple handler heuristics in vcpu_block pach).
+On 07/22/2013 03:38 PM, Lee Jones wrote:
+> On Mon, 22 Jul 2013, Christian Daudt wrote:
 >
-> What about the adverse effect in the non-overcommitted case?
+>> On 13-07-22 03:52 AM, Lee Jones wrote:
+>>> Cc: Christian Daudt <csd@broadcom.com>
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>   arch/arm/boot/dts/bcm11351-brt.dts | 6 +++---
+>>>   1 file changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+>>> index 67ec524..fdace5d 100644
+>>> --- a/arch/arm/boot/dts/bcm11351-brt.dts
+>>> +++ b/arch/arm/boot/dts/bcm11351-brt.dts
+>>> @@ -27,18 +27,18 @@
+>>>   		status = "okay";
+>>>   	};
+>>> -	sdio0: sdio at 0x3f180000 {
+>>> +	sdio0: sdio at 3f180000 {
+>>>   		max-frequency = <48000000>;
+>>>   		status = "okay";
+>>>   	};
+>>> -	sdio1: sdio at 0x3f190000 {
+>>> +	sdio1: sdio at 3f190000 {
+>>>   		non-removable;
+>>>   		max-frequency = <48000000>;
+>>>   		status = "okay";
+>>>   	};
+>>> -	sdio3: sdio at 0x3f1b0000 {
+>>> +	sdio3: sdio at 3f1b0000 {
+>>>   		max-frequency = <48000000>;
+>>>   		status = "okay";
+>>>   	};
+>> Hi Lee,
+>>   Is this convention documented ? Someone called my attention to the
+>> fact that this dts files was inconsistent in its use of 0x in names,
+>> but I was not aware of a coding guideline for this.
 >
+> The best two places I can think of are:
+>
+> Documentation/devicetree/usage-model.txt
+> and
+> http://www.devicetree.org/Device_Tree_Usage
 
-Ideally is should fail to schedule any other task and comeback to halt
-loop. This should not hurt AFAICS. But I agree that, numbers needed to
-support this argument.
+And even those do not stick to a single convention, but that is what can 
+be expected of a twiki page :-p
 
-For x86, I had seen no side effects with the experiments.
+Regards,
+Arend
