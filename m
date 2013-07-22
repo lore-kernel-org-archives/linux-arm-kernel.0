@@ -1,54 +1,80 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 22 Jul 2013 11:15:30 -0700
-Subject: [PATCH 2/4] clk: exynos-audss: allow input clocks to be specified
- in device tree
-In-Reply-To: <1610421.OFFn8rqlxt@amdc1227>
-References: <1373458313-18970-1-git-send-email-padma.v@samsung.com>
- <1373458313-18970-3-git-send-email-padma.v@samsung.com>
- <1610421.OFFn8rqlxt@amdc1227>
-Message-ID: <20130722181530.7598.73318@quantum>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 22 Jul 2013 11:21:19 -0700
+Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
+In-Reply-To: <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51ED781F.6060300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2013-07-22 09:28:47)
-> Hi Padmavathi, Andrew,
-> 
-> On Wednesday 10 of July 2013 17:41:51 Padmavathi Venna wrote:
-> > From: Andrew Bresticker <abrestic@chromium.org>
-> > 
-> > This allows the input clocks to the Exynos AudioSS block to be specified
-> > via device-tree bindings.  Default names will be used when an input clock
-> > is not given.  This will be useful when adding support for the
-> > Exynos5420 where the audio bus clock is called "sclk_maudio0" instead of
-> > "sclk_audio0".
-> > 
-> > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> > Reviewed-on: https://gerrit.chromium.org/gerrit/57833
-> > Reviewed-by: Simon Glass <sjg@chromium.org>
-> > ---
-> >  .../devicetree/bindings/clock/clk-exynos-audss.txt |   31
-> > ++++++++++++++++++- drivers/clk/samsung/clk-exynos-audss.c             |
-> >   28 +++++++++++++++-- 2 files changed, 53 insertions(+), 6 deletions(-)
-> 
-> Well, this is basically how it should be done, but in current state of 
-> clock core I can see a problem: can we really rely on the order of clock 
-> initialization? I mean, we can't defer initialization of particular clock 
-> controller until all external clocks it needs are available, because there 
-> is no probing involved here.
+On 07/18/2013 04:21 PM, Stephen Boyd wrote:
+> In the next patch we're going to increase the number of bits that
+> the generic sched_clock can handle to be greater than 32. With
+> more than 32 bits the wraparound time can be larger than what can
+> fit into the units that msecs_to_jiffies takes (unsigned int).
+> Luckily, the wraparound is initially calculated in nanoseconds
+> which we can easily use with hrtimers, so switch to using an
+> hrtimer.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-The clock core allows registering clocks even if their parents are not
-yet registered. I test this path with some dummy clocks every so often
-to make sure the re-parenting operation are completed successfully after
-the parents eventually are registered.
 
-This feature was not used in practice until recently with the advent of
-multiple clock controllers getting registered and DT description of
-clocks / clock controllers that may be "out of order". If you find any
-bugs please let me know ;-)
+Hrmm. So in my testing (under qemu), this patch causes bootup to hang.
 
-Regards,
-Mike
+qemu-system-arm -kernel zImage-arm -M vexpress-a9 -cpu cortex-a9 
+-nographic -m 1024  -append 'root=/dev/mmcblk0p2 rw mem=1024M 
+raid=noautodetect console=ttyAMA0,38400n8 rootwait vmalloc=256MB 
+devtmpfs.mount=0' -sd test-arm.img -redir tcp:4300::22
 
-> 
-> Best regards,
-> Tomasz
+Config file attached.
+
+I haven't gotten a chance to look very closely, but it seems the 
+folowing patch resolves the issue. I'm not sure if we're seeing callers 
+to setup_sched_clock happen after sched_clock_postinit or what, but it 
+probably needs another look over.
+
+thanks
+-john
+
+
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index a269890b..c018ffc 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -138,12 +138,6 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+  	pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lluns\n",
+  		bits, r, r_unit, res, wrap);
+  
+-	/*
+-	 * Start the timer to keep sched_clock() properly updated and
+-	 * sets the initial epoch.
+-	 */
+-	hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+-	sched_clock_timer.function = sched_clock_poll;
+  	update_sched_clock();
+  
+  	/*
+@@ -175,6 +169,13 @@ void __init sched_clock_postinit(void)
+  		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
+  
+  	update_sched_clock();
++
++	/*
++	 * Start the timer to keep sched_clock() properly updated and
++	 * sets the initial epoch.
++	 */
++	hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
++	sched_clock_timer.function = sched_clock_poll;
+  	hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
+  }
+  
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config.vexpress-qemu.gz
+Type: application/gzip
+Size: 19985 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/8a938835/attachment-0001.gz>
