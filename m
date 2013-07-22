@@ -1,67 +1,43 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 22 Jul 2013 12:59:49 -0500
-Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA resources
-Message-ID: <1374515989-7391-1-git-send-email-joelf@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 22 Jul 2013 11:05:15 -0700
+Subject: [PATCH v2 0/6] clk: exynos: Some fixes and cleanup
+In-Reply-To: <1374141682-29432-1-git-send-email-sachin.kamat@linaro.org>
+References: <1374141682-29432-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <20130722180515.7598.56428@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HWMOD removal for MMC is breaking edma_start as the events are being manually
-triggered due to unused channel list not being clear, Thanks to Balaji TK for
-finding this issue.
+Quoting Sachin Kamat (2013-07-18 03:01:16)
+> Resending some of patches (1, 3 and 5) as per discussion in thread [1].
+> Other patches in the series are new.
+> 
+> [1] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
+> 
+> Changes since v1:
+> * Removed an unnecessary change in Patch 1 as pointed out by Kukjin Kim.
+> * Added Kukjin's ack to patches 3~6.
 
-This patch fixes the issue, by reading the "dmas" property from the DT node if
-it exists and clearing the bits in the unused channel list.
+Thanks for the fixes! Will take into clk-next unless you need them to go
+into -rc3, but I don't think there are any regression fixes here.
 
-Cc: Balaji T K <balajitk@ti.com>
-Cc: Pantel Antoniou <panto@antoniou-consulting.com>
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
-v2 changes: Fixed compiler warning
+Regards,
+Mike
 
- arch/arm/common/edma.c |   31 +++++++++++++++++++++++--------
- 1 file changed, 23 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index a432e6c..765d578 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -561,14 +561,29 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
- static int prepare_unused_channel_list(struct device *dev, void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	int i, ctlr;
--
--	for (i = 0; i < pdev->num_resources; i++) {
--		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
--				(int)pdev->resource[i].start >= 0) {
--			ctlr = EDMA_CTLR(pdev->resource[i].start);
--			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
--					edma_cc[ctlr]->edma_unused);
-+	int i = 0, ctlr;
-+	u32 dma_chan;
-+	const __be32 *dma_chan_p;
-+	struct property *prop;
-+
-+	if (dev->of_node) {
-+		of_property_for_each_u32(dev->of_node, "dmas", prop, \
-+					 dma_chan_p, dma_chan) {
-+			if (i++ & 1) {
-+				ctlr = EDMA_CTLR(dma_chan);
-+				clear_bit(EDMA_CHAN_SLOT(dma_chan),
-+						edma_cc[ctlr]->edma_unused);
-+			}
-+		}
-+	} else {
-+		for (; i < pdev->num_resources; i++) {
-+			if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
-+			    (int)pdev->resource[i].start >= 0) {
-+				ctlr = EDMA_CTLR(pdev->resource[i].start);
-+				clear_bit(EDMA_CHAN_SLOT(
-+					  pdev->resource[i].start),
-+					  edma_cc[ctlr]->edma_unused);
-+			}
- 		}
- 	}
- 
--- 
-1.7.9.5
+> 
+> Sachin Kamat (6):
+>   clk: exynos4: Staticize local symbols
+>   clk: exynos4: Remove unused function
+>   clk: exynos5250: Staticize local symbols
+>   clk: exynos5420: Staticize local symbols
+>   clk: exynos5440: Staticize local symbols
+>   clk: exynos-audss: Staticize exynos_audss_clk_init
+> 
+>  drivers/clk/samsung/clk-exynos-audss.c |    2 +-
+>  drivers/clk/samsung/clk-exynos4.c      |   42 ++++++++++++--------------------
+>  drivers/clk/samsung/clk-exynos5250.c   |   14 +++++------
+>  drivers/clk/samsung/clk-exynos5420.c   |   14 +++++------
+>  drivers/clk/samsung/clk-exynos5440.c   |   14 +++++------
+>  5 files changed, 37 insertions(+), 49 deletions(-)
+> 
+> -- 
+> 1.7.9.5
