@@ -1,79 +1,42 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Jul 2013 11:52:28 +0100
-Subject: [PATCH 09/22] ARM: dts: Remove '0x's from Exynos5250 DTS file
+Date: Mon, 22 Jul 2013 11:52:31 +0100
+Subject: [PATCH 12/22] ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
 In-Reply-To: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
 References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1374490361-25769-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1374490361-25769-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/exynos5250.dtsi | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/omap2420-h4.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index ef57277..24c0888 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -68,17 +68,17 @@
+diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
+index 224c08f..34cdecb 100644
+--- a/arch/arm/boot/dts/omap2420-h4.dts
++++ b/arch/arm/boot/dts/omap2420-h4.dts
+@@ -50,15 +50,15 @@
+ 			label = "bootloader";
+ 			reg = <0 0x20000>;
  		};
- 	};
- 
--	pd_gsc: gsc-power-domain at 0x10044000 {
-+	pd_gsc: gsc-power-domain at 10044000 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044000 0x20>;
- 	};
- 
--	pd_mfc: mfc-power-domain at 0x10044040 {
-+	pd_mfc: mfc-power-domain at 10044040 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044040 0x20>;
- 	};
- 
--	clock: clock-controller at 0x10010000 {
-+	clock: clock-controller at 10010000 {
- 		compatible = "samsung,exynos5250-clock";
- 		reg = <0x10010000 0x30000>;
- 		#clock-cells = <1>;
-@@ -562,7 +562,7 @@
+-		partition at 0x20000 {
++		partition at 20000 {
+ 			label = "params";
+ 			reg = <0x20000 0x20000>;
  		};
- 	};
- 
--	gsc_0:  gsc at 0x13e00000 {
-+	gsc_0:  gsc at 13e00000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e00000 0x1000>;
- 		interrupts = <0 85 0>;
-@@ -571,7 +571,7 @@
- 		clock-names = "gscl";
- 	};
- 
--	gsc_1:  gsc at 0x13e10000 {
-+	gsc_1:  gsc at 13e10000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e10000 0x1000>;
- 		interrupts = <0 86 0>;
-@@ -580,7 +580,7 @@
- 		clock-names = "gscl";
- 	};
- 
--	gsc_2:  gsc at 0x13e20000 {
-+	gsc_2:  gsc at 13e20000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e20000 0x1000>;
- 		interrupts = <0 87 0>;
-@@ -589,7 +589,7 @@
- 		clock-names = "gscl";
- 	};
- 
--	gsc_3:  gsc at 0x13e30000 {
-+	gsc_3:  gsc at 13e30000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e30000 0x1000>;
- 		interrupts = <0 88 0>;
+-		partition at 0x40000 {
++		partition at 40000 {
+ 			label = "kernel";
+ 			reg = <0x40000 0x200000>;
+ 		};
+-		partition at 0x240000 {
++		partition at 240000 {
+ 			label = "file-system";
+ 			reg = <0x240000 0x3dc0000>;
+ 		};
 -- 
 1.8.1.2
