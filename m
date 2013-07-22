@@ -1,82 +1,66 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 22 Jul 2013 12:32:20 +0100
-Subject: [PATCH v3 09/16] cpufreq: cpufreq-cpu0: remove device tree parsing
- for cpu nodes
+Date: Mon, 22 Jul 2013 12:32:18 +0100
+Subject: [PATCH v3 07/16] of/device: add helper to get cpu device node from
+ logical cpu index
 In-Reply-To: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
  <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374492747-13879-10-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374492747-13879-8-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Now that the cpu device registration initialises the of_node(if available)
-appropriately for all the cpus, parsing here is redundant.
+Multiple drivers need to get the cpu device node from the cpu logical
+index and then access the of_node.
 
-This patch removes all DT parsing and uses cpu->of_node instead.
+This patch adds helper function to fetch the device node directly.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- drivers/cpufreq/cpufreq-cpu0.c | 23 ++++-------------------
- 1 file changed, 4 insertions(+), 19 deletions(-)
+ include/linux/of_device.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index ad1fde2..5b05c26 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -174,29 +174,17 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
+diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+index 9d27475..82ce324 100644
+--- a/include/linux/of_device.h
++++ b/include/linux/of_device.h
+@@ -1,6 +1,7 @@
+ #ifndef _LINUX_OF_DEVICE_H
+ #define _LINUX_OF_DEVICE_H
  
- static int cpu0_cpufreq_probe(struct platform_device *pdev)
- {
--	struct device_node *np, *parent;
-+	struct device_node *np;
- 	int ret;
++#include <linux/cpu.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_platform.h> /* temporary until merge */
  
--	parent = of_find_node_by_path("/cpus");
--	if (!parent) {
--		pr_err("failed to find OF /cpus\n");
--		return -ENOENT;
--	}
--
--	for_each_child_of_node(parent, np) {
--		if (of_get_property(np, "operating-points", NULL))
--			break;
--	}
-+	cpu_dev = &pdev->dev;
- 
-+	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
- 		pr_err("failed to find cpu0 node\n");
--		ret = -ENOENT;
--		goto out_put_parent;
-+		return -ENOENT;
- 	}
- 
--	cpu_dev = &pdev->dev;
--	cpu_dev->of_node = np;
--
- 	cpu_reg = devm_regulator_get(cpu_dev, "cpu0");
- 	if (IS_ERR(cpu_reg)) {
- 		/*
-@@ -269,15 +257,12 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
- 	}
- 
- 	of_node_put(np);
--	of_node_put(parent);
- 	return 0;
- 
- out_free_table:
- 	opp_free_cpufreq_table(cpu_dev, &freq_table);
- out_put_node:
- 	of_node_put(np);
--out_put_parent:
--	of_node_put(parent);
- 	return ret;
+@@ -43,6 +44,15 @@ static inline void of_device_node_put(struct device *dev)
+ 	of_node_put(dev->of_node);
  }
  
++static inline struct device_node *of_cpu_device_node_get(int cpu)
++{
++	struct device *cpu_dev;
++	cpu_dev = get_cpu_device(cpu);
++	if (!cpu_dev)
++		return NULL;
++	return of_node_get(cpu_dev->of_node);
++}
++
+ #else /* CONFIG_OF */
+ 
+ static inline int of_driver_match_device(struct device *dev,
+@@ -67,6 +77,11 @@ static inline const struct of_device_id *of_match_device(
+ {
+ 	return NULL;
+ }
++
++static inline struct device_node *of_cpu_device_node_get(int cpu)
++{
++	return NULL;
++}
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_OF_DEVICE_H */
 -- 
 1.8.1.2
