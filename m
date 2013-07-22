@@ -1,305 +1,110 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Mon, 22 Jul 2013 16:30:25 +0800
-Subject: [PATCH 2/8 V3] serial: at91: use function pointer to choose pdc or pio
-In-Reply-To: <1374481831-24573-1-git-send-email-elen.song@atmel.com>
-References: <1374481831-24573-1-git-send-email-elen.song@atmel.com>
-Message-ID: <1374481831-24573-3-git-send-email-elen.song@atmel.com>
+From: christian.ruppert@abilis.com (Christian Ruppert)
+Date: Mon, 22 Jul 2013 10:35:36 +0200
+Subject: Issue with gpio and pinmux
+In-Reply-To: <51EB590A.4010600@wwwdotorg.org>
+References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
+ <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+ <51EB590A.4010600@wwwdotorg.org>
+Message-ID: <20130722083535.GA19685@ab42.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use function pointer can avoid define atmel_use_pdc_tx/rx everywhere.
-(*prepare_rx/tx)() is in setup transfer stage.
-(*schedule_rx/tx)() is in tasklet schedule stage.
-(*release_rx/tx)() is used when shutdown the transfer.
+On Sat, Jul 20, 2013 at 09:44:10PM -0600, Stephen Warren wrote:
+> On 07/20/2013 04:44 PM, Linus Walleij wrote:
+> > On Thu, Jul 18, 2013 at 8:11 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > 
+> >> The issue is that some HW muxes groups of pins at a time, so simply
+> >> because that group of pins is "claimed" by a mux function, implies
+> >> nothing about which specific pins in that group are actually used; some
+> >> may actually still be free for usage as a GPIO.
+> > 
+> > This we need to get into the documentation.
+> > 
+> >> The solution here may be one of:
+> >>
+> >> a) Modify pinctrl /not/ to allow both a GPIO and a mux function to claim
+> >> a pin *if* the group that contains the pin only contains a single pin.
+> >> This is a bit of a hacky special case though; there are other situations
+> >> where "dual claiming" shouldn't be allowed, and this doesn't solve those.
+> >>
+> >> b) Ignore the issue; if the system configuration is correct, the issue
+> >> won't cause problems in practice, since nothing will be configured to
+> >> "dual claim" any pin.
+> >>
+> >> c) Enhance pinctrl with extra information, so it knows which pins in a
+> >> group are usable as GPIO even when the group is claimed by a mux
+> >> function. The list of pins could theoretically vary per mux function, so
+> >> you'd need a table with lookup key (pin group, mux function) and output
+> >> data (list of pins that can be "dual claimed"). This would be a complete
+> >> solution. If a list wasn't provided, the pinctrl core could assume that
+> >> mean no dual claim was allowed.
+> > 
+> > I guess (b) is what we have.
+> > 
+> > But it really feels incomplete does it not? IIRC the system was strict
+> > not to allow simultaneous use of pins for GPIO and other functions
+> > at all until the above corner case made it necessary to relax this
+> > restriction.
+> > 
+> > A simple way to get (a) would be to just add a flag like ".strict"
+> > to struct pinmux_ops but it feels cheap.
+> > 
+> > What do we need for (c)? I think we can refactor this as the Tegra
+> > and U300 should be the two platforms with such tricky groups so
+> > the impact should be fairly small right now. I'm just worried it would
+> > be a complex and memory-consuming thing :-/
+> 
+> Actually, a better way to do (c) might be to just add an extra "op" to
+> struct pinmux_ops; something like validate_gpio_mux(), passing in
+> information such as whether a mux function is in effect on that pin,
+> whether the pin is already claimed as a GPIO, and whether the function
+> is being called to check a GPIO-claim or mux-claim operation . If the op
+> is missing, no "dual claim" is allowed. If the op is present, the code
+> in the op validates whether the particular GPIO is allowed to be claimed
+> while the particular mux function is active.
+> 
+> That way, I think any driver that doesn't want to allow dual-claim
+> doesn't have to do anything, but the few drivers that do can code up
+> whatever algorithm they want; for Tegra, I'd just allow everything for
+> simplicity, but we could always enhance that later if we want.
 
-Signed-off-by: Elen Song <elen.song@atmel.com>
----
- drivers/tty/serial/atmel_serial.c |  203 ++++++++++++++++++++++++-------------
- 1 file changed, 130 insertions(+), 73 deletions(-)
+[ An introductory note on terminology: in the following, "port" refers
+to a set of pins who's mux is controlled through the same bit field in
+the same register, "interface" refers to the set of pins comprising a
+functional unit, e.g. SCL and SDA of an I2C interface or the four pins
+of an SPI interface ]
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 81a8807..ae61f2b 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -155,6 +155,12 @@ struct atmel_uart_port {
- 
- 	struct serial_rs485	rs485;		/* rs485 settings */
- 	unsigned int		tx_done_mask;
-+	int (*prepare_rx)(struct uart_port *port);
-+	int (*prepare_tx)(struct uart_port *port);
-+	void (*schedule_rx)(struct uart_port *port);
-+	void (*schedule_tx)(struct uart_port *port);
-+	void (*release_rx)(struct uart_port *port);
-+	void (*release_tx)(struct uart_port *port);
- };
- 
- static struct atmel_uart_port atmel_ports[ATMEL_MAX_UART];
-@@ -658,6 +664,17 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
- 	return pass_counter ? IRQ_HANDLED : IRQ_NONE;
- }
- 
-+static void atmel_release_tx_pdc(struct uart_port *port)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
-+
-+	dma_unmap_single(port->dev,
-+			 pdc->dma_addr,
-+			 pdc->dma_size,
-+			 DMA_TO_DEVICE);
-+}
-+
- /*
-  * Called from tasklet with ENDTX and TXBUFE interrupts disabled.
-  */
-@@ -710,6 +727,23 @@ static void atmel_tx_pdc(struct uart_port *port)
- 		uart_write_wakeup(port);
- }
- 
-+static int atmel_prepare_tx_pdc(struct uart_port *port)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
-+	struct circ_buf *xmit = &port->state->xmit;
-+
-+	pdc->buf = xmit->buf;
-+	pdc->dma_addr = dma_map_single(port->dev,
-+					pdc->buf,
-+					UART_XMIT_SIZE,
-+					DMA_TO_DEVICE);
-+	pdc->dma_size = UART_XMIT_SIZE;
-+	pdc->ofs = 0;
-+
-+	return 0;
-+}
-+
- static void atmel_rx_from_ring(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-@@ -778,6 +812,22 @@ static void atmel_rx_from_ring(struct uart_port *port)
- 	spin_lock(&port->lock);
- }
- 
-+static void atmel_release_rx_pdc(struct uart_port *port)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	int i;
-+
-+	for (i = 0; i < 2; i++) {
-+		struct atmel_dma_buffer *pdc = &atmel_port->pdc_rx[i];
-+
-+		dma_unmap_single(port->dev,
-+				 pdc->dma_addr,
-+				 pdc->dma_size,
-+				 DMA_FROM_DEVICE);
-+		kfree(pdc->buf);
-+	}
-+}
-+
- static void atmel_rx_from_pdc(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-@@ -855,6 +905,45 @@ static void atmel_rx_from_pdc(struct uart_port *port)
- 	UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
- }
- 
-+static int atmel_prepare_rx_pdc(struct uart_port *port)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	int i;
-+
-+	for (i = 0; i < 2; i++) {
-+		struct atmel_dma_buffer *pdc = &atmel_port->pdc_rx[i];
-+
-+		pdc->buf = kmalloc(PDC_BUFFER_SIZE, GFP_KERNEL);
-+		if (pdc->buf == NULL) {
-+			if (i != 0) {
-+				dma_unmap_single(port->dev,
-+					atmel_port->pdc_rx[0].dma_addr,
-+					PDC_BUFFER_SIZE,
-+					DMA_FROM_DEVICE);
-+				kfree(atmel_port->pdc_rx[0].buf);
-+			}
-+			atmel_port->use_pdc_rx = 0;
-+			return -ENOMEM;
-+		}
-+		pdc->dma_addr = dma_map_single(port->dev,
-+						pdc->buf,
-+						PDC_BUFFER_SIZE,
-+						DMA_FROM_DEVICE);
-+		pdc->dma_size = PDC_BUFFER_SIZE;
-+		pdc->ofs = 0;
-+	}
-+
-+	atmel_port->pdc_rx_idx = 0;
-+
-+	UART_PUT_RPR(port, atmel_port->pdc_rx[0].dma_addr);
-+	UART_PUT_RCR(port, PDC_BUFFER_SIZE);
-+
-+	UART_PUT_RNPR(port, atmel_port->pdc_rx[1].dma_addr);
-+	UART_PUT_RNCR(port, PDC_BUFFER_SIZE);
-+
-+	return 0;
-+}
-+
- /*
-  * tasklet handling tty stuff outside the interrupt handler.
-  */
-@@ -868,10 +957,7 @@ static void atmel_tasklet_func(unsigned long data)
- 	/* The interrupt handler does not take the lock */
- 	spin_lock(&port->lock);
- 
--	if (atmel_use_pdc_tx(port))
--		atmel_tx_pdc(port);
--	else
--		atmel_tx_chars(port);
-+	atmel_port->schedule_tx(port);
- 
- 	status = atmel_port->irq_status;
- 	status_change = status ^ atmel_port->irq_status_prev;
-@@ -893,14 +979,36 @@ static void atmel_tasklet_func(unsigned long data)
- 		atmel_port->irq_status_prev = status;
- 	}
- 
--	if (atmel_use_pdc_rx(port))
--		atmel_rx_from_pdc(port);
--	else
--		atmel_rx_from_ring(port);
-+	atmel_port->schedule_rx(port);
- 
- 	spin_unlock(&port->lock);
- }
- 
-+static void atmel_set_ops(struct uart_port *port)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+
-+	if (atmel_use_pdc_rx(port)) {
-+		atmel_port->prepare_rx = &atmel_prepare_rx_pdc;
-+		atmel_port->schedule_rx = &atmel_rx_from_pdc;
-+		atmel_port->release_rx = &atmel_release_rx_pdc;
-+	} else {
-+		atmel_port->prepare_rx = NULL;
-+		atmel_port->schedule_rx = &atmel_rx_from_ring;
-+		atmel_port->release_rx = NULL;
-+	}
-+
-+	if (atmel_use_pdc_tx(port)) {
-+		atmel_port->prepare_tx = &atmel_prepare_tx_pdc;
-+		atmel_port->schedule_tx = &atmel_tx_pdc;
-+		atmel_port->release_tx = &atmel_release_tx_pdc;
-+	} else {
-+		atmel_port->prepare_tx = NULL;
-+		atmel_port->schedule_tx = &atmel_tx_chars;
-+		atmel_port->release_tx = NULL;
-+	}
-+}
-+
- /*
-  * Perform initialization and enable port for reception
-  */
-@@ -930,53 +1038,17 @@ static int atmel_startup(struct uart_port *port)
- 	/*
- 	 * Initialize DMA (if necessary)
- 	 */
--	if (atmel_use_pdc_rx(port)) {
--		int i;
--
--		for (i = 0; i < 2; i++) {
--			struct atmel_dma_buffer *pdc = &atmel_port->pdc_rx[i];
--
--			pdc->buf = kmalloc(PDC_BUFFER_SIZE, GFP_KERNEL);
--			if (pdc->buf == NULL) {
--				if (i != 0) {
--					dma_unmap_single(port->dev,
--						atmel_port->pdc_rx[0].dma_addr,
--						PDC_BUFFER_SIZE,
--						DMA_FROM_DEVICE);
--					kfree(atmel_port->pdc_rx[0].buf);
--				}
--				free_irq(port->irq, port);
--				return -ENOMEM;
--			}
--			pdc->dma_addr = dma_map_single(port->dev,
--						       pdc->buf,
--						       PDC_BUFFER_SIZE,
--						       DMA_FROM_DEVICE);
--			pdc->dma_size = PDC_BUFFER_SIZE;
--			pdc->ofs = 0;
--		}
--
--		atmel_port->pdc_rx_idx = 0;
--
--		UART_PUT_RPR(port, atmel_port->pdc_rx[0].dma_addr);
--		UART_PUT_RCR(port, PDC_BUFFER_SIZE);
--
--		UART_PUT_RNPR(port, atmel_port->pdc_rx[1].dma_addr);
--		UART_PUT_RNCR(port, PDC_BUFFER_SIZE);
-+	if (atmel_port->prepare_rx) {
-+		retval = atmel_port->prepare_rx(port);
-+		if (retval < 0)
-+			atmel_set_ops(port);
- 	}
--	if (atmel_use_pdc_tx(port)) {
--		struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
--		struct circ_buf *xmit = &port->state->xmit;
- 
--		pdc->buf = xmit->buf;
--		pdc->dma_addr = dma_map_single(port->dev,
--					       pdc->buf,
--					       UART_XMIT_SIZE,
--					       DMA_TO_DEVICE);
--		pdc->dma_size = UART_XMIT_SIZE;
--		pdc->ofs = 0;
-+	if (atmel_port->prepare_tx) {
-+		retval = atmel_port->prepare_tx(port);
-+		if (retval < 0)
-+			atmel_set_ops(port);
- 	}
--
- 	/*
- 	 * If there is a specific "open" function (to register
- 	 * control line interrupts)
-@@ -1031,27 +1103,10 @@ static void atmel_shutdown(struct uart_port *port)
- 	/*
- 	 * Shut-down the DMA.
- 	 */
--	if (atmel_use_pdc_rx(port)) {
--		int i;
--
--		for (i = 0; i < 2; i++) {
--			struct atmel_dma_buffer *pdc = &atmel_port->pdc_rx[i];
--
--			dma_unmap_single(port->dev,
--					 pdc->dma_addr,
--					 pdc->dma_size,
--					 DMA_FROM_DEVICE);
--			kfree(pdc->buf);
--		}
--	}
--	if (atmel_use_pdc_tx(port)) {
--		struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
--
--		dma_unmap_single(port->dev,
--				 pdc->dma_addr,
--				 pdc->dma_size,
--				 DMA_TO_DEVICE);
--	}
-+	if (atmel_port->release_rx)
-+		atmel_port->release_rx(port);
-+	if (atmel_port->release_tx)
-+		atmel_port->release_tx(port);
- 
- 	/*
- 	 * Disable all interrupts, port and break condition.
-@@ -1473,6 +1528,8 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
- 		atmel_port->rs485	= pdata->rs485;
- 	}
- 
-+	atmel_set_ops(port);
-+
- 	port->iotype		= UPIO_MEM;
- 	port->flags		= UPF_BOOT_AUTOCONF;
- 	port->ops		= &atmel_pops;
--- 
-1.7.9.5
+In my understanding, the problem stems from the fact that we always
+claim an entire port instead of just the pins required for a given
+functionality. The pinctrl core is already well equipped to manage
+claiming interfaces instead of ports and thus a fourth alternative would
+be to
+
+d) implement gpio/pin conflict management in the already existing
+callbacks inside the driver: Today, both enable and gpio_request_enable
+exist (and can refuse a request for a configuration/pin).
+If we only claim the pins used by a given interface instead of the
+entire port, conflict management becomes natural (see
+http://lkml.indiana.edu/hypermail/linux/kernel/1306.2/00749.html and the
+following).
+
+IMHO, the pinctrl drivers are the right place for everything but the
+most basic pin conflict management since constraints on what can be
+muxed at the same time are highly hardware implementation dependent. One
+could e.g. imagine an implementation where a GPIO can override and snoop
+a pin's output value in one mux configuration, just snoop the pin value
+in another and do neither in a third.
+
+I see two (independent) ways to enhance the pinctrl core in order to
+support drivers in this task:
+a) Add two functions pin_is_claimed and gpio_is_claimed which allow the
+pinctrl driver to query if a given pin/gpio is available for muxing.
+b) Add four functions lock_gpio/unlock_gpio and lock_pin/unlock_pin
+which allow the pinctrl driver to prevent the core from granting
+requests on GPIOs/pins.
+
+This solution also has the advantage that it doesn't modify the default
+behaviour of the core and it thus won't break existing drivers.
+
+Greetings,
+  Christian
