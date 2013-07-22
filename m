@@ -1,112 +1,71 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 22 Jul 2013 12:55:18 +0530
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <Pine.LNX.4.44L0.1307211453450.19133-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1307211453450.19133-100000@netrider.rowland.org>
-Message-ID: <51ECDE5E.3050104@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 22 Jul 2013 16:35:47 +0900
+Subject: [GIT 00/11] Renesas ARM-based SoC DT updates for v3.12
+Message-ID: <cover.1374478037.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Olof, Hi Arnd,
 
-On Monday 22 July 2013 12:52 AM, Alan Stern wrote:
-> On Sun, 21 Jul 2013, Sylwester Nawrocki wrote:
-> 
->>> What's wrong with the platform_data structure, why can't that be used
->>> for this?
->>
->> At the point the platform data of some driver is initialized, e.g. in
->> board setup code the PHY pointer is not known, since the PHY supplier
->> driver has not initialized yet.  Even though we wanted to pass pointer
->> to a PHY through some notifier call, it would have been not clear
->> which PHY user driver should match on such notifier.  A single PHY
->> supplier driver can create M PHY objects and this needs to be mapped
->> to N PHY user drivers.  This mapping needs to be defined somewhere by
->> the system integrator.  It works well with device tree, but except that
->> there seems to be no other reliable infrastructure in the kernel to
->> define links/dependencies between devices, since device identifiers are
->> not known in advance in all cases.
->>
->> What Tomasz proposed seems currently most reasonable to me for non-dt.
->>
->>> Or, if not, we can always add pointers to the platform device structure,
->>> or even the main 'struct device' as well, that's what it is there for.
->>
->> Still we would need to solve a problem which platform device structure
->> gets which PHY pointer.
-> 
-> Can you explain the issues in more detail?  I don't fully understand 
-> the situation.
-> 
-> Here's what I think I know:
-> 
-> 	The PHY and the controller it is attached to are both physical
-> 	devices.
-> 
-> 	The connection between them is hardwired by the system
-> 	manufacturer and cannot be changed by software.
-> 
-> 	PHYs are generally described by fixed system-specific board
-> 	files or by Device Tree information.  Are they ever discovered
-> 	dynamically?
+please consider the following DT updates for v3.12.
 
-No. They are created just like any other platform devices are created.
-> 
-> 	Is the same true for the controllers attached to the PHYs?
-> 	If not -- if both a PHY and a controller are discovered 
-> 	dynamically -- how does the kernel know whether they are 
-> 	connected to each other?
+This pull request is based on renesas-cleanup-for-v3.12 which I
+have already sent a pull request for.
 
-No differences here. Both PHY and controller will have dt information or hwmod
-data using which platform devices will be created.
-> 
-> 	The kernel needs to know which controller is attached to which
-> 	PHY.  Currently this information is represented by name or ID
-> 	strings embedded in platform data.
+The following changes since commit ebd9616f439a8a46b9dca9a272b342f34c5f3614:
 
-right. It's embedded in the platform data of the controller.
-> 
-> 	The PHY's driver (the supplier) uses the platform data to 
-> 	construct a platform_device structure that represents the PHY.  
+  ARM: shmobile: Remove unused mach/dma.h (2013-07-17 10:02:30 +0900)
 
-Currently the driver assigns static labels (corresponding to the label used in
-the platform data of the controller).
-> 	Until this is done, the controller's driver (the client) cannot 
-> 	use the PHY.
+are available in the git repository at:
 
-right.
-> 
-> 	Since there is no parent-child relation between the PHY and the 
-> 	controller, there is no guarantee that the PHY's driver will be
-> 	ready when the controller's driver wants to use it.  A deferred
-> 	probe may be needed.
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.12
 
-right.
-> 
-> 	The issue (or one of the issues) in this discussion is that 
-> 	Greg does not like the idea of using names or IDs to associate
-> 	PHYs with controllers, because they are too prone to
-> 	duplications or other errors.  Pointers are more reliable.
-> 
-> 	But pointers to what?  Since the only data known to be 
-> 	available to both the PHY driver and controller driver is the
-> 	platform data, the obvious answer is a pointer to platform data
-> 	(either for the PHY or for the controller, or maybe both).
+for you to fetch changes up to 66a5cab04d339d02b93a4671eadf8e251dbfdc2c:
 
-hmm.. it's not going to be simple though as the platform device for the PHY and
-controller can be created in entirely different places. e.g., in some cases the
-PHY device is a child of some mfd core device (the device will be created in
-drivers/mfd) and the controller driver (usually) is created in board file. I
-guess then we have to come up with something to share a pointer in two
-different files.
-> 
-> Probably some of the details above are wrong; please indicate where I
-> have gone astray.  Also, I'm not clear about the role played by various 
-> APIs.  For example, where does phy_create() fit into this picture?
+  ARM: shmobile: Add SMSC ethernet chip to KZM9D DT reference (2013-07-17 10:06:47 +0900)
 
-phy_create is the API by which the PHY's driver (the supplier) hook into the
-PHY framework. It's like the controller driver will always interact with the
-PHY driver through the PHY framework.
+----------------------------------------------------------------
+Renesas ARM-based SoC DT updates for v3.12
 
-Thanks
-Kishon
+* Reference implementation for kzm9d board
+* Add MMCIF and SDHI DT templates for r8a7790 and r8a73a4 SoCs
+* Use DT for SMP and GIC initialisation on emev2 SoC and kzm9d board
+* Add GIO to dtsi of emev2 SoC
+* Update dts command line of kzm9d board
+* Add CPUFreq support to ape6evm board
+* Add I2C controller DT nodes to r8a73a4 SoC
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (4):
+      ARM: shmobile: r8a73a4: add I2C controller DT nodes
+      ARM: shmobile: ape6evm: add CPUFreq support
+      ARM: shmobile: r8a73a4: add MMCIF and SDHI DT templates
+      ARM: shmobile: r8a7790: add MMCIF and SDHI DT templates
+
+Magnus Damm (7):
+      ARM: shmobile: Update KZM9D dts command line
+      ARM: shmobile: Add GIO to EMEV2 dtsi
+      ARM: shmobile: Use DT for GIC on EMEV2 and KZM9D
+      ARM: shmobile: Use DT for SMP on EMEV2 and KZM9D
+      ARM: shmobile: EMEV2 map_io update
+      ARM: shmobile: KZM9D DT reference implementation
+      ARM: shmobile: Add SMSC ethernet chip to KZM9D DT reference
+
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/emev2-kzm9d-reference.dts    |  57 +++++++++++
+ arch/arm/boot/dts/emev2-kzm9d.dts              |   2 +-
+ arch/arm/boot/dts/emev2.dtsi                   |  59 ++++++++++++
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts          |  22 +++++
+ arch/arm/boot/dts/r8a73a4.dtsi                 | 126 +++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7790.dtsi                 |  54 +++++++++++
+ arch/arm/mach-shmobile/Kconfig                 |  12 +++
+ arch/arm/mach-shmobile/Makefile                |   1 +
+ arch/arm/mach-shmobile/Makefile.boot           |   1 +
+ arch/arm/mach-shmobile/board-kzm9d-reference.c |  46 +++++++++
+ arch/arm/mach-shmobile/board-kzm9d.c           |   2 -
+ arch/arm/mach-shmobile/include/mach/emev2.h    |   1 -
+ arch/arm/mach-shmobile/setup-emev2.c           |  23 +----
+ arch/arm/mach-shmobile/smp-emev2.c             |  17 +---
+ 15 files changed, 384 insertions(+), 40 deletions(-)
+ create mode 100644 arch/arm/boot/dts/emev2-kzm9d-reference.dts
+ create mode 100644 arch/arm/mach-shmobile/board-kzm9d-reference.c
