@@ -1,225 +1,99 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 22 Jul 2013 21:20:23 +0900
-Subject: [PATCH 1/3] drm/exynos: add device tree support for rotator
-In-Reply-To: <1374475767-30085-2-git-send-email-chanho61.park@samsung.com>
-References: <1374475767-30085-1-git-send-email-chanho61.park@samsung.com>
- <1374475767-30085-2-git-send-email-chanho61.park@samsung.com>
-Message-ID: <025f01ce86d5$d7251210$856f3630$%dae@samsung.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 22 Jul 2013 17:50:21 +0530
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
+ <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
+ <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+Message-ID: <51ED2385.60108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
+On Sunday 21 July 2013 10:19 PM, Linus Walleij wrote:
+> On Thu, Jul 18, 2013 at 8:56 PM, Nishanth Menon <nm@ti.com> wrote:
+>
+>> I carry forward my TI internal objection to this approach:
+> It is actually a very good sign of FOSS-maturity that you as a company
+> take unresolved architectural issues to the community. Kudos!
+>
+>> Lets see what happens as a result of this:
+>>
+>> https://patchwork.kernel.org/patch/2825148/ (introducing DTS for DRA7)
+>> uart1 to uart6 is defined. while in fact 10 uarts exist on IP block.
+>> uart1: serial at 4806a000 {
+>> <snip>
+>> +                       interrupts = <0 72 0x4>;
+>> Assumes that GIC interrupt by default mapping used.
+> So introducing this inbetween the GIC lines and its actual device IRQ
+> lines inevitably means that the GIC three-cell concept is completely
+> ill-devised to handle this.
+>
+> For routing IRQs, I think the proper solution would be to use a
+> cascaded struct irqchip, which in turn contains an irqdomain
+> translation to remux the signal onto the GIC inputs.
+>
+> I.e. the interrupt-controller given to that serial would be the
+> crossbar irqchip, and that in turn will hog and allocate apropriate
+> lines from the gic to it would probably itself list *all* the IRQs
+> of the GIC as "its" IRQs.
+>
+> We already have plenty of cascading irqchips such as GPIO
+> controller providing IRQs, just that they only multiplex on a
+> single GIC line instead of the whole lot.
+>
+> Mock example:
+>
+>                 intc: interrupt-controller at 0 {
+>                         compatible = "arm,cortex-a9-gic";
+>                         #interrupt-cells = <3>;
+>                         #address-cells = <1>;
+>                         interrupt-controller;
+>                         reg = ...;
+>                 };
+>
+>                 crossbar: crossbar at 0 {
+>                         compatible = "...";
+>                         interrupt-controller;
+>                         #interrupt-cells = <1>;
+>                         interrupt-parent = <&intc>;
+>                         interrupts = <0 0 IRQ_TYPE_LEVEL_HIGH>,
+>                                           <0 1 IRQ_TYPE_LEVEL_HIGH>,
+>                                           <0 2 IRQ_TYPE_LEVEL_HIGH>,
+>                                           ....
+>                                           <0 n IRQ_TYPE_LEVEL_HIGH>;
+>                 };
+>
+>                 uart0: serial at 0 {
+>                         compatible = "...";
+>                         interrupt-parent = <&crossbar>;
+>                         interrupts = <1234>;
+>                  };
+>
+> Maybe the interrupts provided from crossbar cannot even be
+> specified by a number, maybe a line name need to be used
+> or so. I don't know the particulars.
+>
+> Whether this as a whole is a good idea, I don't know,
+> but you would have to go about it something like this.
+>
+> What happens if there is no line to mux in a certain IRQ?
+ Thanks for this.
+ Was thinking of a similar kind of approach with irqchip.
+ But then, there was a GAP since crossbar does not have an irq unlike
+ other irqchips. But as you said  this can be done by setting the crossbar
+ to map and receive the GIC interrupts and then direct to devices.
+ Only thing is, this is fine for IRQs, and something different has to be done
+ for DMA crossbars  again. Also when we allocate dynamically here,
+ finding out a irq line when there is no free line is a question.
 
+  With the other approach of using/extending  the pinctrl framework that you
+ gave, it is good to handle both irqs/dma.  I looked at the other example in
+ drivers/dma/amba-pl08x.c and i see that data is getting populated and passed
+ from the platform. I initially started with something similar, where the data
+ was passed statically from DT and a driver to use that.  So now it looks good
+ to extend the pinctrl fw. I will try a approach for that first and see how it looks.
 
-> -----Original Message-----
-> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-soc-
-> owner at vger.kernel.org] On Behalf Of Chanho Park
-> Sent: Monday, July 22, 2013 3:49 PM
-> To: inki.dae at samsung.com; kgene.kim at samsung.com
-> Cc: jy0922.shim at samsung.com; sw0312.kim at samsung.com;
-> kyungmin.park at samsung.com; dri-devel at lists.freedesktop.org; linux-samsung-
-> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; devicetree-
-> discuss at lists.ozlabs.org; Chanho Park
-> Subject: [PATCH 1/3] drm/exynos: add device tree support for rotator
-> 
-> The exynos4 platform is only dt-based since 3.10, we should convert driver
-> data
-> and ids to dt-based parsing methods. The rotator driver has a limit table
-> to get
-> size limit. The minimum size of RGB888 format is 8 x 8 and maximum size is
-> 8K x
-> 8K. The other format, YCbCr420 2-Plane has 32 x 32 min size and 32K x 32K
-> max
-> size. Each format should be multiple of 'align' value.
-> 
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_rotator.c |  110 +++++++++++++++++++---
-> -----
->  1 file changed, 80 insertions(+), 30 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> index 427640a..b353a10 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> @@ -96,7 +96,7 @@ struct rot_context {
->  	struct resource	*regs_res;
->  	void __iomem	*regs;
->  	struct clk	*clock;
-> -	struct rot_limit_table	*limit_tbl;
-> +	struct rot_limit_table	limit_tbl;
->  	int	irq;
->  	int	cur_buf_id[EXYNOS_DRM_OPS_MAX];
->  	bool	suspended;
-> @@ -167,7 +167,7 @@ static irqreturn_t rotator_irq_handler(int irq, void
-> *arg)
->  static void rotator_align_size(struct rot_context *rot, u32 fmt, u32
-> *hsize,
->  		u32 *vsize)
->  {
-> -	struct rot_limit_table *limit_tbl = rot->limit_tbl;
-> +	struct rot_limit_table *limit_tbl = &rot->limit_tbl;
->  	struct rot_limit *limit;
->  	u32 mask, val;
-> 
-> @@ -632,6 +632,72 @@ static int rotator_ippdrv_start(struct device *dev,
-> enum drm_exynos_ipp_cmd cmd)
->  	return 0;
->  }
-> 
-> +static const struct of_device_id exynos_rotator_match[] = {
-> +	{
-> +		.compatible = "samsung,exynos4210-rotator",
-> +	},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, exynos_rotator_match);
-
-Rotator device cannot be plugged in. Please remove the above
-MODULE_DEVICE_TABLE.
-
-
-> +
-> +static int rotator_parse_dt_tbl(struct device_node *np, struct rot_limit
-> *rlim)
-> +{
-> +	int ret;
-> +
-> +	ret = of_property_read_u32(np, "min_w", &rlim->min_w);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = of_property_read_u32(np, "min_h", &rlim->min_h);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = of_property_read_u32(np, "max_w", &rlim->max_w);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = of_property_read_u32(np, "max_h", &rlim->max_h);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = of_property_read_u32(np, "align", &rlim->align);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +static int rotator_parse_dt(struct device *dev, struct rot_context *rot)
-> +{
-> +	struct device_node *ycbcr_node, *rgb888_node;
-> +	int ret;
-> +
-> +	ycbcr_node = of_get_child_by_name(dev->of_node, "ycbcr420_2p");
-> +	if (!ycbcr_node) {
-> +		dev_err(dev, "can't find ycbcr420_2p node\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	rgb888_node = of_get_child_by_name(dev->of_node, "rgb888");
-> +	if (!rgb888_node) {
-> +		dev_err(dev, "can't find rgb888 node\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	ret = rotator_parse_dt_tbl(ycbcr_node, &rot->limit_tbl.ycbcr420_2p);
-> +	if (ret) {
-> +		dev_err(dev, "failed to parse ycbcr420 data\n");
-> +		return ret;
-> +	}
-> +	ret = rotator_parse_dt_tbl(rgb888_node, &rot->limit_tbl.rgb888);
-> +	if (ret) {
-> +		dev_err(dev, "failed to parse rgb888 data\n");
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int rotator_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -639,14 +705,23 @@ static int rotator_probe(struct platform_device
-> *pdev)
->  	struct exynos_drm_ippdrv *ippdrv;
->  	int ret;
-> 
-> +	if (!dev->of_node) {
-> +		dev_err(dev, "Cannot find device tree node\n");
-> +		return -ENODEV;
-> +	}
-> +
->  	rot = devm_kzalloc(dev, sizeof(*rot), GFP_KERNEL);
->  	if (!rot) {
->  		dev_err(dev, "failed to allocate rot\n");
->  		return -ENOMEM;
->  	}
-> 
-> -	rot->limit_tbl = (struct rot_limit_table *)
-> -				platform_get_device_id(pdev)->driver_data;
-> +	ret = rotator_parse_dt(dev, rot);
-> +	if (ret) {
-> +		dev_err(dev, "failed parse dt info\n");
-> +		devm_kfree(dev, rot);
-> +		return ret;
-> +	}
-> 
->  	rot->regs_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	rot->regs = devm_ioremap_resource(dev, rot->regs_res);
-> @@ -718,31 +793,6 @@ static int rotator_remove(struct platform_device
-> *pdev)
->  	return 0;
->  }
-> 
-> -static struct rot_limit_table rot_limit_tbl = {
-> -	.ycbcr420_2p = {
-> -		.min_w = 32,
-> -		.min_h = 32,
-> -		.max_w = SZ_32K,
-> -		.max_h = SZ_32K,
-> -		.align = 3,
-> -	},
-> -	.rgb888 = {
-> -		.min_w = 8,
-> -		.min_h = 8,
-> -		.max_w = SZ_8K,
-> -		.max_h = SZ_8K,
-> -		.align = 2,
-> -	},
-> -};
-> -
-> -static struct platform_device_id rotator_driver_ids[] = {
-> -	{
-> -		.name		= "exynos-rot",
-> -		.driver_data	= (unsigned long)&rot_limit_tbl,
-> -	},
-> -	{},
-> -};
-> -
->  static int rotator_clk_crtl(struct rot_context *rot, bool enable)
->  {
->  	if (enable) {
-> @@ -804,10 +854,10 @@ static const struct dev_pm_ops rotator_pm_ops = {
->  struct platform_driver rotator_driver = {
->  	.probe		= rotator_probe,
->  	.remove		= rotator_remove,
-> -	.id_table	= rotator_driver_ids,
->  	.driver		= {
->  		.name	= "exynos-rot",
->  		.owner	= THIS_MODULE,
->  		.pm	= &rotator_pm_ops,
-> +		.of_match_table = of_match_ptr(exynos_rotator_match),
->  	},
->  };
-> --
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
-> soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+ Sricharan
