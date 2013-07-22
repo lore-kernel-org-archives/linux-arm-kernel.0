@@ -1,68 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Jul 2013 14:49:34 +0100
-Subject: [PATCH v3] xen/arm: enable PV control for ARM
-In-Reply-To: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
-References: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <20130722134934.GB32221@e106331-lin.cambridge.arm.com>
+From: raghavendra.kt@linux.vnet.ibm.com (Raghavendra K T)
+Date: Mon, 22 Jul 2013 19:27:58 +0530
+Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
+In-Reply-To: <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
+References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
+ <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
+ <CAC4Lta17bmNjBck6LzziBeU0Xc36F1Jms2tQPv6+GaXvik6Wyg@mail.gmail.com>
+ <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
+Message-ID: <51ED3A66.4050407@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/22/2013 06:21 PM, Christoffer Dall wrote:
+> On 22 July 2013 10:53, Raghavendra KT <raghavendra.kt.linux@gmail.com> wrote:
+>> On Fri, Jul 19, 2013 at 7:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> So far, when a guest executes WFE (like when waiting for a spinlock
+>>> to become unlocked), we don't do a thing and let it run uninterrupted.
+>>>
+>>> Another option is to trap a blocking WFE and offer the opportunity
+>>> to the scheduler to switch to another task, potentially giving the
+>>> vcpu holding the spinlock a chance to run sooner.
+>>>
+>>
+>> Idea looks to be correct from my experiments on x86. It does bring some
+>> percentage of benefits in overcommitted guests. Infact,
+>>
+>> https://lkml.org/lkml/2013/7/22/41 tries to do the same thing for x86.
+>> (this results in using ple handler heuristics in vcpu_block pach).
+>
+> What about the adverse effect in the non-overcommitted case?
+>
 
-[Adding Catalin to Cc]
+Ideally is should fail to schedule any other task and comeback to halt
+loop. This should not hurt AFAICS. But I agree that, numbers needed to
+support this argument.
 
-On Mon, Jul 22, 2013 at 11:57:34AM +0100, Julien Grall wrote:
-> Enable power management from the toolstack for ARM guest.
-> 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> 
-> ---
->     Changes in v3:
->         - Fix condition to compile cpu_hotplug.o
->     Changes in v2:
->         - Don't compile xen/cpu_hotplug.o with ARM64
-
-My arm64 cpu hotplug series is going to be dependent on not compiling
-xen/cpu_hotplug.o. Currently I'm not able to compile an arm64 kernel
-with my patches and Xen support.
-
-How do you intend to push this? I'd like to ensure my cpu hotplug series
-is able to go in for the next merge window.
-
-> ---
->  drivers/xen/Makefile |    5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> index 2bf461a..f185e8d 100644
-> --- a/drivers/xen/Makefile
-> +++ b/drivers/xen/Makefile
-> @@ -1,9 +1,8 @@
-> -ifneq ($(CONFIG_ARM),y)
-> -obj-y	+= manage.o
-> +ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
->  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
->  endif
-
-Might it make sense to enable this based on a list the architectures
-that actually need this, rather than disabling it based on the list of
-architectures that don't?
-
-Thanks,
-Mark.
-
->  obj-$(CONFIG_X86)			+= fallback.o
-> -obj-y	+= grant-table.o features.o events.o balloon.o time.o
-> +obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
->  obj-y	+= xenbus/
->  
->  nostackp := $(call cc-option, -fno-stack-protector)
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+For x86, I had seen no side effects with the experiments.
