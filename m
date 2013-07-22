@@ -1,106 +1,30 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 22 Jul 2013 11:35:10 +0200
-Subject: [PATCH 2/4] ARM: exynos: cpuidle: Use the common cpuidle
- register routine
-In-Reply-To: <51ECB6DE.9060701@linaro.org>
-References: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
- <4097491.3y6BBYmzze@amdc1032> <51ECB6DE.9060701@linaro.org>
-Message-ID: <1445208.tM84QonONK@amdc1032>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 22 Jul 2013 15:07:16 +0530
+Subject: [PATCH v3 1/2] media: i2c: adv7343: make the platform data members
+ as array
+In-Reply-To: <1374301266-26726-2-git-send-email-prabhakar.csengg@gmail.com>
+References: <1374301266-26726-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1374301266-26726-2-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <51ECFD4C.8020407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 22, 2013 06:36:46 AM Daniel Lezcano wrote:
-> On 07/19/2013 06:03 PM, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Thursday, July 18, 2013 02:54:28 PM Daniel Lezcano wrote:
-> >> Now we have the same routine than the one handled by the cpuidle framework.
-> > 
-> > Small nitpick:
-> > 
-> > To be exact the routine is not the same, on error cpuidle_register() does
-> > complete unregister operation of the cpuidle driver, exynos4_init_cpuidle()
-> > just stops the registration procedure. 
-> > 
-> > The change itself is okay but the patch description could be better.
+On Saturday 20 July 2013 11:51 AM, Lad, Prabhakar wrote:
+> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 > 
-> Ok, I will fix the changelog.
+> This patch makes the platform data members as array wherever
+> possible, so as this makes easier while collecting the data
+> in DT case and read the entire array at once.
 > 
-> > Anyway all patches (#1-4) look fine to me. Thanks for this work.
+> This patch also makes appropriate changes to board-da850-evm.c
 > 
-> Thanks for the review. I assume it is an acked-by right ?
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Yes.
+For the board-da850-evm.c change:
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-> > Best regards,
-> 
-> Kukjin,
-> 
-> shall I take the patchset in my tree ?
-> 
-> Thanks
->   -- Daniel
-> 
-> > --
-> > Bartlomiej Zolnierkiewicz
-> > Samsung R&D Institute Poland
-> > Samsung Electronics
-> >  
-> >> Let's use it.
-> >>
-> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >> ---
-> >>  arch/arm/mach-exynos/cpuidle.c |   24 +-----------------------
-> >>  1 file changed, 1 insertion(+), 23 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> >> index cc4b097..d8fc1a2 100644
-> >> --- a/arch/arm/mach-exynos/cpuidle.c
-> >> +++ b/arch/arm/mach-exynos/cpuidle.c
-> >> @@ -41,8 +41,6 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
-> >>  				struct cpuidle_driver *drv,
-> >>  				int index);
-> >>  
-> >> -static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
-> >> -
-> >>  static struct cpuidle_driver exynos4_idle_driver = {
-> >>  	.name			= "exynos4_idle",
-> >>  	.owner			= THIS_MODULE,
-> >> @@ -188,29 +186,9 @@ static void __init exynos5_core_down_clk(void)
-> >>  
-> >>  static int __init exynos4_init_cpuidle(void)
-> >>  {
-> >> -	int cpu_id, ret;
-> >> -	struct cpuidle_device *device;
-> >> -
-> >>  	if (soc_is_exynos5250())
-> >>  		exynos5_core_down_clk();
-> >>  
-> >> -	ret = cpuidle_register_driver(&exynos4_idle_driver);
-> >> -	if (ret) {
-> >> -		printk(KERN_ERR "CPUidle failed to register driver\n");
-> >> -		return ret;
-> >> -	}
-> >> -
-> >> -	for_each_online_cpu(cpu_id) {
-> >> -		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
-> >> -		device->cpu = cpu_id;
-> >> -
-> >> -		ret = cpuidle_register_device(device);
-> >> -		if (ret) {
-> >> -			printk(KERN_ERR "CPUidle register device failed\n");
-> >> -			return ret;
-> >> -		}
-> >> -	}
-> >> -
-> >> -	return 0;
-> >> +	return cpuidle_register(&exynos4_idle_driver, NULL);
-> >>  }
-> >>  device_initcall(exynos4_init_cpuidle);
+Thanks,
+Sekhar
