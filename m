@@ -1,71 +1,90 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 22 Jul 2013 19:56:00 +0100
-Subject: [PATCH 4/4] ARM: set --be8 when linking modules
-In-Reply-To: <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
-References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374510833-25716-5-git-send-email-ben.dooks@codethink.co.uk>
- <20130722170500.GC19639@codeaurora.org> <51ED69CA.3030501@codethink.co.uk>
- <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
-Message-ID: <51ED8040.2020803@codethink.co.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 22 Jul 2013 11:58:47 -0700
+Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
+In-Reply-To: <51ED7DD5.8010000@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
+ <51ED781F.6060300@linaro.org> <51ED7DD5.8010000@codeaurora.org>
+Message-ID: <51ED80E7.4050606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/13 19:53, Nicolas Pitre wrote:
-> On Mon, 22 Jul 2013, Ben Dooks wrote:
->
->> On 22/07/13 18:05, Stephen Boyd wrote:
->>> On 07/22, Ben Dooks wrote:
->>>> To avoid having to make every text section swap the instruction order
->>>> of all instructions, make sure modules are built also built with --be8
->>>> (as is the current kernel final link).
->>>>
->>>> If we do not do this, we would end up having to swap all instructions
->>>> when loading a module, instead of just the instructions that we are
->>>> applying ELF relocations to.
->>>>
+On 07/22/13 11:45, Stephen Boyd wrote:
+> On 07/22/13 11:21, John Stultz wrote:
+>> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
+>>> In the next patch we're going to increase the number of bits that
+>>> the generic sched_clock can handle to be greater than 32. With
+>>> more than 32 bits the wraparound time can be larger than what can
+>>> fit into the units that msecs_to_jiffies takes (unsigned int).
+>>> Luckily, the wraparound is initially calculated in nanoseconds
+>>> which we can easily use with hrtimers, so switch to using an
+>>> hrtimer.
 >>>
->>> If someone tries to load a be8 module on a non-be8 kernel will it
->>> still work? Or should we add an extra version magic string in
->>> asm/module.h to prevent that?
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 >>
->> The ELF header changes the EI_DATA field in the ei_ident from
->> ELFDATA2LSB to ELFDATA2MSB when compiling so we should be able
->> to detect these when loading.
+>> Hrmm. So in my testing (under qemu), this patch causes bootup to hang.
 >>
->> I have not checked to see if the kernel correctly checks for this.
+>> qemu-system-arm -kernel zImage-arm -M vexpress-a9 -cpu cortex-a9
+>> -nographic -m 1024  -append 'root=/dev/mmcblk0p2 rw mem=1024M
+>> raid=noautodetect console=ttyAMA0,38400n8 rootwait vmalloc=256MB
+>> devtmpfs.mount=0' -sd test-arm.img -redir tcp:4300::22
 >>
->> I do not think it currently checks the ei_flags field for the
->> EF_ARM_BE8 in ABI 4 and 5. I am not sure if this is really important?
->
-> If the information is already there and easily accessible, then it
-> should be used.
->
->
-> Nicolas
+>> Config file attached.
+>>
+>> I haven't gotten a chance to look very closely, but it seems the
+>> folowing patch resolves the issue. I'm not sure if we're seeing
+>> callers to setup_sched_clock happen after sched_clock_postinit or
+>> what, but it probably needs another look over.
+>>
+>> thanks
+>> -john
+>>
+>>
+>> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+>> index a269890b..c018ffc 100644
+>> --- a/kernel/time/sched_clock.c
+>> +++ b/kernel/time/sched_clock.c
+>> @@ -138,12 +138,6 @@ void __init setup_sched_clock(u32 (*read)(void),
+>> int bits, unsigned long rate)
+>>      pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns,
+>> wraps every %lluns\n",
+>>          bits, r, r_unit, res, wrap);
+>>  
+>> -    /*
+>> -     * Start the timer to keep sched_clock() properly updated and
+>> -     * sets the initial epoch.
+>> -     */
+>> -    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+>> -    sched_clock_timer.function = sched_clock_poll;
+>>      update_sched_clock();
+>>  
+>>      /*
+>> @@ -175,6 +169,13 @@ void __init sched_clock_postinit(void)
+>>          setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
+>>  
+>>      update_sched_clock();
+>> +
+>> +    /*
+>> +     * Start the timer to keep sched_clock() properly updated and
+>> +     * sets the initial epoch.
+>> +     */
+>> +    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+>> +    sched_clock_timer.function = sched_clock_poll;
+>>      hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
+>>  }
+>>  
+>>
+> Hmm. Is it too early to use hrtimers? Moving the hrtimer_start() into
+> sched_clock_register() also causes the same crash.
 
-I have something like this, it does not mess things up loading
-BE8 binaries on my current system. I think we're building stuff
-for EABI4 but haven't checked.
-
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d0d1e83..3b0351c 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -34,6 +34,15 @@ int elf_check_arch(const struct elf32_hdr *x)
-                 if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & 
-HWCAP_VFP))
-                         return 0;
-         }
-+
-+       if ((eflags & EF_ARM_EABI_MASK) >= EF_ARM_EABI_VER4) {
-+               if (eflags & EF_ARM_BE8) {
-+                       if (!IS_ENABLED(CONFIG_ARM_CPU_BE8))
-+                               return 1;
-+               } else if (IS_ENABLED(CONFIG_ARM_CPU_BE8))
-+                       return 1;
-+       }
-+
+Yes that seems to be the problem. The vexpress board is setting up the
+sched_clock in setup_arch() (via v2m_init_early) which runs before
+hrtimers_init(). I've only tested this on boards that setup the timer in
+the time_init() callback which runs after hrtimers_init(). Your patch
+should be fine, although it would be nice if we didn't have callers
+setting up the sched_clock so early.
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
