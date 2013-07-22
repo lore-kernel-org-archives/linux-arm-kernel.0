@@ -1,11 +1,11 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 22 Jul 2013 12:32:19 +0100
-Subject: [PATCH v3 08/16] cpufreq: imx6q-cpufreq: remove device tree parsing
+Date: Mon, 22 Jul 2013 12:32:20 +0100
+Subject: [PATCH v3 09/16] cpufreq: cpufreq-cpu0: remove device tree parsing
  for cpu nodes
 In-Reply-To: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
  <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374492747-13879-9-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374492747-13879-10-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,51 +17,66 @@ appropriately for all the cpus, parsing here is redundant.
 This patch removes all DT parsing and uses cpu->of_node instead.
 
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/mach-imx/mach-imx6q.c  | 3 +--
- drivers/cpufreq/imx6q-cpufreq.c | 4 +---
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ drivers/cpufreq/cpufreq-cpu0.c | 23 ++++-------------------
+ 1 file changed, 4 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 7be13f8..a02f275 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -254,13 +254,12 @@ static void __init imx6q_opp_init(struct device *cpu_dev)
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index ad1fde2..5b05c26 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -174,29 +174,17 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
+ 
+ static int cpu0_cpufreq_probe(struct platform_device *pdev)
  {
- 	struct device_node *np;
+-	struct device_node *np, *parent;
++	struct device_node *np;
+ 	int ret;
  
--	np = of_find_node_by_path("/cpus/cpu at 0");
+-	parent = of_find_node_by_path("/cpus");
+-	if (!parent) {
+-		pr_err("failed to find OF /cpus\n");
+-		return -ENOENT;
+-	}
+-
+-	for_each_child_of_node(parent, np) {
+-		if (of_get_property(np, "operating-points", NULL))
+-			break;
+-	}
++	cpu_dev = &pdev->dev;
+ 
 +	np = of_node_get(cpu_dev->of_node);
  	if (!np) {
- 		pr_warn("failed to find cpu0 node\n");
- 		return;
+ 		pr_err("failed to find cpu0 node\n");
+-		ret = -ENOENT;
+-		goto out_put_parent;
++		return -ENOENT;
  	}
  
--	cpu_dev->of_node = np;
- 	if (of_init_opp_table(cpu_dev)) {
- 		pr_warn("failed to init OPP table\n");
- 		goto put_node;
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index e37cdae..b16632b 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -221,14 +221,12 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 
- 	cpu_dev = &pdev->dev;
- 
--	np = of_find_node_by_path("/cpus/cpu at 0");
-+	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
- 		dev_err(cpu_dev, "failed to find cpu0 node\n");
- 		return -ENOENT;
- 	}
- 
+-	cpu_dev = &pdev->dev;
 -	cpu_dev->of_node = np;
 -
- 	arm_clk = devm_clk_get(cpu_dev, "arm");
- 	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
- 	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
+ 	cpu_reg = devm_regulator_get(cpu_dev, "cpu0");
+ 	if (IS_ERR(cpu_reg)) {
+ 		/*
+@@ -269,15 +257,12 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	of_node_put(np);
+-	of_node_put(parent);
+ 	return 0;
+ 
+ out_free_table:
+ 	opp_free_cpufreq_table(cpu_dev, &freq_table);
+ out_put_node:
+ 	of_node_put(np);
+-out_put_parent:
+-	of_node_put(parent);
+ 	return ret;
+ }
+ 
 -- 
 1.8.1.2
