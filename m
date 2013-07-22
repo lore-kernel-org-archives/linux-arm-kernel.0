@@ -1,72 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Jul 2013 18:08:17 +0100
-Subject: [PATCH v4 0/5] Memory mapped architected timers
-In-Reply-To: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
-References: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 22 Jul 2013 19:10:26 +0200
+Subject: [PATCH v2 0/6] clk: exynos: Some fixes and cleanup
+In-Reply-To: <1374141682-29432-1-git-send-email-sachin.kamat@linaro.org>
+References: <1374141682-29432-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1648122.0DIdkVRanC@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Thursday 18 of July 2013 15:31:16 Sachin Kamat wrote:
+> Resending some of patches (1, 3 and 5) as per discussion in thread [1].
+> Other patches in the series are new.
+> 
+> [1] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
+> 
+> Changes since v1:
+> * Removed an unnecessary change in Patch 1 as pointed out by Kukjin Kim.
+> * Added Kukjin's ack to patches 3~6.
+> 
+> Sachin Kamat (6):
+>   clk: exynos4: Staticize local symbols
+>   clk: exynos4: Remove unused function
+>   clk: exynos5250: Staticize local symbols
+>   clk: exynos5420: Staticize local symbols
+>   clk: exynos5440: Staticize local symbols
+>   clk: exynos-audss: Staticize exynos_audss_clk_init
+> 
+>  drivers/clk/samsung/clk-exynos-audss.c |    2 +-
+>  drivers/clk/samsung/clk-exynos4.c      |   42
+> ++++++++++++-------------------- drivers/clk/samsung/clk-exynos5250.c  
+> |   14 +++++------
+>  drivers/clk/samsung/clk-exynos5420.c   |   14 +++++------
+>  drivers/clk/samsung/clk-exynos5440.c   |   14 +++++------
+>  5 files changed, 37 insertions(+), 49 deletions(-)
 
-On Fri, Jul 19, 2013 at 12:59:27AM +0100, Stephen Boyd wrote:
-> This patchset adds support for memory mapped architected timers. We
-> don't have any other global broadcast timer in our system, so we use the
-> mmio timer during low power modes. The first patch changes the register
-> accessor to an enum per Thomas' request. The second patch is the binding.
-> The next two patches lay some groundwork so that the last patch is simpler.
-> The final patch adds support for mmio timers.
-> 
-> Patches are based on v3.11-rc1.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Be aware that as of v3.11-rc2 this doesn't cleanly apply, as the
-__cpuinit removal broke the final patch's context in a couple of places.
-It would be nice to get rid of the new cpuinit additions too...
-
-With that cleaned up locally, I've gave this a spin on tc2 and a
-Foundation model to test the cp15/system timers, hotplugging CPUs and
-running a basic test (`time sleep 5`). That all seems to work.
-
-Unfortunately I have no way of testing the memory-mapped timer support,
-but I trust you've tested that locally.
-
-For the series:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> 
-> Updates since v3:
->  * Rebased onto v3.11-rc1
->  * New patch to use compiler warnings instead of BUILD_BUG_ON()
-> 
-> Updates since v2:
->  * Rebased onto v3.10-rc1
-> 
-> Updates since v1:
->  * Assigned counter reading function and commented why for arm64
->  * Updated DT binding to replace frame-id with frame-number and use status
->    property
-> 
-> 
-> Stephen Boyd (5):
->   clocksource: arch_timer: Make register accessors less error-prone
->   Documentation: Add memory mapped ARM architected timer binding
->   clocksource: arch_timer: Pass clock event to set_mode callback
->   clocksource: arch_timer: Push the read/write wrappers deeper
->   clocksource: arch_timer: Add support for memory mapped timers
-> 
->  .../devicetree/bindings/arm/arch_timer.txt         |  59 ++-
->  arch/arm/include/asm/arch_timer.h                  |  14 +-
->  arch/arm64/include/asm/arch_timer.h                |  23 +-
->  drivers/clocksource/arm_arch_timer.c               | 446 +++++++++++++++++----
->  include/clocksource/arm_arch_timer.h               |  10 +-
->  5 files changed, 455 insertions(+), 97 deletions(-)
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
+Best regards,
+Tomasz
