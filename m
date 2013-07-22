@@ -1,316 +1,158 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Mon, 22 Jul 2013 14:49:30 +0530
-Subject: [PATCH 6/6] USB: OHCI: make ohci-s3c2410 a separate driver
-In-Reply-To: <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
- <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1374484770-24531-7-git-send-email-manjunath.goudar@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 22 Jul 2013 10:21:38 +0100
+Subject: [PATCH v5] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1374221837-23773-1-git-send-email-jonas.jensen@gmail.com>
+References: <1374221278-18204-1-git-send-email-jonas.jensen@gmail.com>
+ <1374221837-23773-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130722092138.GB18731@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the Samsung OHCI S3CXXXX host controller driver from ohci-hcd
-host code so that it can be built as a separate driver module.
-This work is part of enabling multi-platform kernels on ARM;
-it would be nice to have in 3.12.
+On Fri, Jul 19, 2013 at 09:17:17AM +0100, Jonas Jensen wrote:
+> This patch adds MOXA ART SoCs clock driver support.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+> 
+> Notes:
+>     Changes since v4:
+>     
+>     1. remove unnecessary header includes
+>     
+>     Applies to next-20130716
+> 
+>  .../bindings/clock/moxa,moxart-core-clock.txt      | 23 ++++++++
+>  drivers/clk/Makefile                               |  1 +
+>  drivers/clk/clk-moxart.c                           | 69 ++++++++++++++++++++++
+>  3 files changed, 93 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
+>  create mode 100644 drivers/clk/clk-moxart.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
+> new file mode 100644
+> index 0000000..528c8b0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
+> @@ -0,0 +1,23 @@
+> +Device Tree Clock bindings for arch-moxart
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +MOXA ART SoCs allow to determine core clock frequencies by reading
+> +a register.
+> +
+> +Required properties:
+> +- compatible : Should be "moxa,moxart-core-clock"
+> +- #clock-cells : Should be 0
+> +- reg : Should contain registers location and length
+> +- clock-output-names : Should be "coreclk"
+> +
+> +For example:
+> +
+> +	coreclk: core-clock at 98100000 {
+> +		compatible = "moxa,moxart-core-clock";
+> +		#clock-cells = <0>;
+> +		reg = <0x98100000 0x34>;
+> +		clock-output-names = "coreclk";
+> +	};
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 4038c2b..933622f 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+>  
+>  # SoCs specific
+>  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+> +obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+>  obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+>  obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+>  obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
+> diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+> new file mode 100644
+> index 0000000..5559371
+> --- /dev/null
+> +++ b/drivers/clk/clk-moxart.c
+> @@ -0,0 +1,69 @@
+> +/*
+> + * MOXA ART SoCs clock driver.
+> + *
+> + * Copyright (C) 2013 Jonas Jensen
+> + *
+> + * Jonas Jensen <jonas.jensen@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clkdev.h>
+> +
+> +void __init moxart_of_clk_init(struct device_node *node)
+> +{
+> +	static void __iomem *base;
+> +	struct clk *clk;
+> +	unsigned long rate;
+> +	unsigned int mul, val, div;
+> +	const char *name;
+> +
+> +	base = of_iomap(node, 0);
+> +	if (IS_ERR(base))
+> +		panic("%s: of_iomap failed\n", node->full_name);
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
+As far as I'm aware, of_iomap returns NULL, not an ERR_PTR value.
 
-V2:
- -Set non-standard fields in ohci_s3c2410_hc_driver manually, rather than
-  relying on an expanded struct ohci_driver_overrides.
- -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
-  relying on ohci_hub_control and hub_status_data being exported.
+Also, is it necessary to panic() ? In v1 of the patch you used pr_err...
 
-V3:
- -Kconfig wrong parentheses discription fixed.
- -ohci_setup() has been removed because it is called in .reset member
-  of the ohci_hc_driver structure.
+Thanks,
+Mark.
 
-V4:
- - Removed extra space before the '='.
- - Moved  /* forward definitions */ line before the declarations of functions.
----
- drivers/usb/host/Kconfig        |    8 +++
- drivers/usb/host/Makefile       |    1 +
- drivers/usb/host/ohci-hcd.c     |   18 ------
- drivers/usb/host/ohci-s3c2410.c |  128 +++++++++++++++++----------------------
- 4 files changed, 66 insertions(+), 89 deletions(-)
-
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 693560a..795d14d 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -390,6 +390,14 @@ config USB_OHCI_HCD_SPEAR
-           Enables support for the on-chip OHCI controller on
-           ST SPEAr chips.
- 
-+config USB_OHCI_HCD_S3CXXXX
-+        tristate "Support for S3CXXXX on-chip OHCI USB controller"
-+        depends on USB_OHCI_HCD && (ARCH_S3C24XX || ARCH_S3C64XX)
-+        default y
-+        ---help---
-+          Enables support for the on-chip OHCI controller on
-+          S3CXXXX chips.
-+
- config USB_OHCI_HCD_AT91
-         tristate "Support for Atmel on-chip OHCI USB controller"
-         depends on USB_OHCI_HCD && ARCH_AT91
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index a70b044..9dffe81 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -51,6 +51,7 @@ obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
- obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
- obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
- obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
-+obj-$(CONFIG_USB_OHCI_HCD_S3CXXXX)	+= ohci-s3c2410.o
- 
- obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
- obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index b48c892..b69a49e 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1177,11 +1177,6 @@ MODULE_LICENSE ("GPL");
- #define SA1111_DRIVER		ohci_hcd_sa1111_driver
- #endif
- 
--#if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S3C64XX)
--#include "ohci-s3c2410.c"
--#define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
--#endif
--
- #if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
- #include "ohci-pxa27x.c"
- #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
-@@ -1293,12 +1288,6 @@ static int __init ohci_hcd_mod_init(void)
- 		goto error_tmio;
- #endif
- 
--#ifdef S3C2410_PLATFORM_DRIVER
--	retval = platform_driver_register(&S3C2410_PLATFORM_DRIVER);
--	if (retval < 0)
--		goto error_s3c2410;
--#endif
--
- #ifdef EP93XX_PLATFORM_DRIVER
- 	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
- 	if (retval < 0)
-@@ -1332,10 +1321,6 @@ static int __init ohci_hcd_mod_init(void)
- 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
-  error_ep93xx:
- #endif
--#ifdef S3C2410_PLATFORM_DRIVER
--	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
-- error_s3c2410:
--#endif
- #ifdef TMIO_OHCI_DRIVER
- 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
-  error_tmio:
-@@ -1382,9 +1367,6 @@ static void __exit ohci_hcd_mod_exit(void)
- #ifdef EP93XX_PLATFORM_DRIVER
- 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
- #endif
--#ifdef S3C2410_PLATFORM_DRIVER
--	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
--#endif
- #ifdef TMIO_OHCI_DRIVER
- 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
- #endif
-diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
-index e125770..48b5948 100644
---- a/drivers/usb/host/ohci-s3c2410.c
-+++ b/drivers/usb/host/ohci-s3c2410.c
-@@ -19,19 +19,36 @@
-  * This file is licenced under the GPL.
- */
- 
--#include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/platform_data/usb-ohci-s3c2410.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+
-+#include "ohci.h"
-+
- 
- #define valid_port(idx) ((idx) == 1 || (idx) == 2)
- 
- /* clock device associated with the hcd */
- 
-+
-+#define DRIVER_DESC "OHCI S3CXXXX driver"
-+
-+static const char hcd_name[] = "ohci-s3cxxxx";
-+
- static struct clk *clk;
- static struct clk *usb_clk;
- 
- /* forward definitions */
- 
-+static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
-+			u16 wValue, u16 wIndex, char *buf, u16 wLength);
-+static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
-+
- static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
- 
- /* conversion functions */
-@@ -93,7 +110,7 @@ ohci_s3c2410_hub_status_data(struct usb_hcd *hcd, char *buf)
- 	int orig;
- 	int portno;
- 
--	orig  = ohci_hub_status_data(hcd, buf);
-+	orig = orig_ohci_hub_status_data(hcd, buf);
- 
- 	if (info == NULL)
- 		return orig;
-@@ -164,7 +181,7 @@ static int ohci_s3c2410_hub_control(
- 	 * process the request straight away and exit */
- 
- 	if (info == NULL) {
--		ret = ohci_hub_control(hcd, typeReq, wValue,
-+		ret = orig_ohci_hub_control(hcd, typeReq, wValue,
- 				       wIndex, buf, wLength);
- 		goto out;
- 	}
-@@ -214,7 +231,7 @@ static int ohci_s3c2410_hub_control(
- 		break;
- 	}
- 
--	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
- 	if (ret)
- 		goto out;
- 
-@@ -373,8 +390,6 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
- 
- 	s3c2410_start_hc(dev, hcd);
- 
--	ohci_hcd_init(hcd_to_ohci(hcd));
--
- 	retval = usb_add_hcd(hcd, dev->resource[1].start, 0);
- 	if (retval != 0)
- 		goto err_ioremap;
-@@ -391,71 +406,7 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
- 
- /*-------------------------------------------------------------------------*/
- 
--static int
--ohci_s3c2410_start(struct usb_hcd *hcd)
--{
--	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
--	int ret;
--
--	ret = ohci_init(ohci);
--	if (ret < 0)
--		return ret;
--
--	ret = ohci_run(ohci);
--	if (ret < 0) {
--		dev_err(hcd->self.controller, "can't start %s\n",
--			hcd->self.bus_name);
--		ohci_stop(hcd);
--		return ret;
--	}
--
--	return 0;
--}
--
--
--static const struct hc_driver ohci_s3c2410_hc_driver = {
--	.description =		hcd_name,
--	.product_desc =		"S3C24XX OHCI",
--	.hcd_priv_size =	sizeof(struct ohci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq =			ohci_irq,
--	.flags =		HCD_USB11 | HCD_MEMORY,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.start =		ohci_s3c2410_start,
--	.stop =			ohci_stop,
--	.shutdown =		ohci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue =		ohci_urb_enqueue,
--	.urb_dequeue =		ohci_urb_dequeue,
--	.endpoint_disable =	ohci_endpoint_disable,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number =	ohci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data =	ohci_s3c2410_hub_status_data,
--	.hub_control =		ohci_s3c2410_hub_control,
--#ifdef	CONFIG_PM
--	.bus_suspend =		ohci_bus_suspend,
--	.bus_resume =		ohci_bus_resume,
--#endif
--	.start_port_reset =	ohci_start_port_reset,
--};
--
--/* device driver */
-+static struct hc_driver __read_mostly ohci_s3c2410_hc_driver;
- 
- static int ohci_hcd_s3c2410_drv_probe(struct platform_device *pdev)
- {
-@@ -532,4 +483,39 @@ static struct platform_driver ohci_hcd_s3c2410_driver = {
- 	},
- };
- 
-+static int __init ohci_s3cxxxx_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ohci_init_driver(&ohci_s3c2410_hc_driver, NULL);
-+
-+	/*
-+	 * The Samsung HW has some unusual quirks, which require
-+	 * Sumsung-specific workarounds. We override certain hc_driver
-+	 * functions here to achieve that. We explicitly do not enhance
-+	 * ohci_driver_overrides to allow this more easily, since this
-+	 * is an unusual case, and we don't want to encourage others to
-+	 * override these functions by making it too easy.
-+	 */
-+
-+	orig_ohci_hub_control = ohci_s3c2410_hc_driver.hub_control;
-+	orig_ohci_hub_status_data = ohci_s3c2410_hc_driver.hub_status_data;
-+
-+	ohci_s3c2410_hc_driver.hub_status_data	= ohci_s3c2410_hub_status_data;
-+	ohci_s3c2410_hc_driver.hub_control	= ohci_s3c2410_hub_control;
-+
-+	return platform_driver_register(&ohci_hcd_s3c2410_driver);
-+}
-+module_init(ohci_s3cxxxx_init);
-+
-+static void __exit ohci_s3cxxxx_cleanup(void)
-+{
-+	platform_driver_unregister(&ohci_hcd_s3c2410_driver);
-+}
-+module_exit(ohci_s3cxxxx_cleanup);
-+
-+MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:s3c2410-ohci");
--- 
-1.7.9.5
+> +
+> +	mul = (readl(base + 0x30) >> 3) & 0x1ff;
+> +	val = (readl(base + 0x0c) >> 4) & 0x7;
+> +
+> +	switch (val) {
+> +	case 1:
+> +		div = 3;
+> +		break;
+> +	case 2:
+> +		div = 4;
+> +		break;
+> +	case 3:
+> +		div = 6;
+> +		break;
+> +	case 4:
+> +		div = 8;
+> +		break;
+> +	default:
+> +		div = 2;
+> +		break;
+> +	}
+> +
+> +	/*
+> +	 * the rate calculation below is only tested and proven
+> +	 * to be true for UC-7112-LX
+> +	 *
+> +	 * UC-7112-LX: mul=80 val=0
+> +	 *
+> +	 * to support other moxart SoC hardware, this may need
+> +	 * a change, though it's possible it works there too
+> +	 */
+> +	rate = (mul * 1200000 / div);
+> +
+> +	of_property_read_string(node, "clock-output-names", &name);
+> +	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+> +	clk_register_clkdev(clk, NULL, name);
+> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +
+> +	iounmap(base);
+> +}
+> +CLK_OF_DECLARE(moxart_core_clock, "moxa,moxart-core-clock", moxart_of_clk_init);
+> -- 
+> 1.8.2.1
+> 
+> 
