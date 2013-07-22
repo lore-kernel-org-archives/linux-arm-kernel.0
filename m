@@ -1,99 +1,101 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Jul 2013 13:50:54 -0700
-Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
-In-Reply-To: <51ED9A94.3030204@linaro.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
- <51ED781F.6060300@linaro.org> <51ED7DD5.8010000@codeaurora.org>
- <51ED80E7.4050606@codeaurora.org> <51ED9A94.3030204@linaro.org>
-Message-ID: <51ED9B2E.2030502@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 22 Jul 2013 22:52:51 +0200
+Subject: [PATCH v5 07/20] ARM: SAMSUNG: Add new PWM platform device
+In-Reply-To: <1374278673-25615-9-git-send-email-tomasz.figa@gmail.com>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1374278673-25615-9-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <2424688.n7D1SHrQ2V@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/13 13:48, John Stultz wrote:
-> On 07/22/2013 11:58 AM, Stephen Boyd wrote:
->> On 07/22/13 11:45, Stephen Boyd wrote:
->>> On 07/22/13 11:21, John Stultz wrote:
->>>> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
->>>>> In the next patch we're going to increase the number of bits that
->>>>> the generic sched_clock can handle to be greater than 32. With
->>>>> more than 32 bits the wraparound time can be larger than what can
->>>>> fit into the units that msecs_to_jiffies takes (unsigned int).
->>>>> Luckily, the wraparound is initially calculated in nanoseconds
->>>>> which we can easily use with hrtimers, so switch to using an
->>>>> hrtimer.
->>>>>
->>>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>>> Hrmm. So in my testing (under qemu), this patch causes bootup to hang.
->>>>
->>>> qemu-system-arm -kernel zImage-arm -M vexpress-a9 -cpu cortex-a9
->>>> -nographic -m 1024  -append 'root=/dev/mmcblk0p2 rw mem=1024M
->>>> raid=noautodetect console=ttyAMA0,38400n8 rootwait vmalloc=256MB
->>>> devtmpfs.mount=0' -sd test-arm.img -redir tcp:4300::22
->>>>
->>>> Config file attached.
->>>>
->>>> I haven't gotten a chance to look very closely, but it seems the
->>>> folowing patch resolves the issue. I'm not sure if we're seeing
->>>> callers to setup_sched_clock happen after sched_clock_postinit or
->>>> what, but it probably needs another look over.
->>>>
->>>> thanks
->>>> -john
->>>>
->>>>
->>>> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
->>>> index a269890b..c018ffc 100644
->>>> --- a/kernel/time/sched_clock.c
->>>> +++ b/kernel/time/sched_clock.c
->>>> @@ -138,12 +138,6 @@ void __init setup_sched_clock(u32 (*read)(void),
->>>> int bits, unsigned long rate)
->>>>       pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns,
->>>> wraps every %lluns\n",
->>>>           bits, r, r_unit, res, wrap);
->>>>   -    /*
->>>> -     * Start the timer to keep sched_clock() properly updated and
->>>> -     * sets the initial epoch.
->>>> -     */
->>>> -    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC,
->>>> HRTIMER_MODE_REL);
->>>> -    sched_clock_timer.function = sched_clock_poll;
->>>>       update_sched_clock();
->>>>         /*
->>>> @@ -175,6 +169,13 @@ void __init sched_clock_postinit(void)
->>>>           setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
->>>>         update_sched_clock();
->>>> +
->>>> +    /*
->>>> +     * Start the timer to keep sched_clock() properly updated and
->>>> +     * sets the initial epoch.
->>>> +     */
->>>> +    hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC,
->>>> HRTIMER_MODE_REL);
->>>> +    sched_clock_timer.function = sched_clock_poll;
->>>>       hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
->>>>   }
->>>>  
->>> Hmm. Is it too early to use hrtimers? Moving the hrtimer_start() into
->>> sched_clock_register() also causes the same crash.
->> Yes that seems to be the problem. The vexpress board is setting up the
->> sched_clock in setup_arch() (via v2m_init_early) which runs before
->> hrtimers_init(). I've only tested this on boards that setup the timer in
->> the time_init() callback which runs after hrtimers_init(). Your patch
->> should be fine, although it would be nice if we didn't have callers
->> setting up the sched_clock so early.
->
-> Although as Russell pointed out, setting up sched_clock later isn't
-> really a good option (although I'd like it best if we could handle
-> switching sched_clocks dynamically as needed so there were less
-> constraints on when it has to be registered).
->
-> So I'll probably fold in my change into the patch if you're ok with that?
->
+This patch adds new samsung_device_pwm platform device that represents
+the whole PWM/timer block and includes memory and IRQ resources.
 
-Yes that's fine to fold it in.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ arch/arm/plat-samsung/devs.c                  | 17 +++++++++++++++++
+ arch/arm/plat-samsung/include/plat/devs.h     |  1 +
+ arch/arm/plat-samsung/include/plat/pwm-core.h | 22 ++++++++++++++++++++++
+ 3 files changed, 40 insertions(+)
+ create mode 100644 arch/arm/plat-samsung/include/plat/pwm-core.h
 
+Changes since v4:
+ - cleaned up header of pwm-core.h file.
+
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index 0f9c3f4..bba6d78 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -58,6 +58,7 @@
+ #include <plat/keypad.h>
+ #include <linux/platform_data/mmc-s3cmci.h>
+ #include <linux/platform_data/mtd-nand-s3c2410.h>
++#include <plat/pwm-core.h>
+ #include <plat/sdhci.h>
+ #include <linux/platform_data/touchscreen-s3c2410.h>
+ #include <linux/platform_data/usb-s3c2410_udc.h>
+@@ -1127,6 +1128,22 @@ struct platform_device s3c_device_timer[] = {
+ 	[3] = { DEFINE_S3C_TIMER(3, IRQ_TIMER3) },
+ 	[4] = { DEFINE_S3C_TIMER(4, IRQ_TIMER4) },
+ };
++
++static struct resource samsung_pwm_resource[] = {
++	DEFINE_RES_MEM(SAMSUNG_PA_TIMER, SZ_4K),
++};
++
++struct platform_device samsung_device_pwm = {
++	.name		= "samsung-pwm",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(samsung_pwm_resource),
++	.resource	= samsung_pwm_resource,
++};
++
++void __init samsung_pwm_set_platdata(struct samsung_pwm_variant *pd)
++{
++	samsung_device_pwm.dev.platform_data = pd;
++}
+ #endif /* CONFIG_SAMSUNG_DEV_PWM */
+ 
+ /* RTC */
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index 87d501f..0dc4ac4 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -134,6 +134,7 @@ extern struct platform_device exynos4_device_spdif;
+ 
+ extern struct platform_device samsung_asoc_idma;
+ extern struct platform_device samsung_device_keypad;
++extern struct platform_device samsung_device_pwm;
+ 
+ /* s3c2440 specific devices */
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/pwm-core.h b/arch/arm/plat-samsung/include/plat/pwm-core.h
+new file mode 100644
+index 0000000..77269a7
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/pwm-core.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * Samsung PWM controller platform data helpers.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_PWM_CORE_H
++#define __ASM_ARCH_PWM_CORE_H __FILE__
++
++#include <clocksource/samsung_pwm.h>
++
++#ifdef CONFIG_SAMSUNG_DEV_PWM
++extern void samsung_pwm_set_platdata(struct samsung_pwm_variant *pd);
++#else
++static inline void samsung_pwm_set_platdata(struct samsung_pwm_variant *pd) { }
++#endif
++
++#endif /* __ASM_ARCH_PWM_CORE_H */
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.3.2
