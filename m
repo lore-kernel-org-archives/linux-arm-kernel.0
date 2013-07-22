@@ -1,9 +1,9 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Jul 2013 11:52:36 +0100
-Subject: [PATCH 17/22] ARM: dts: Remove '0x's from OMAP4 DTS file
+Date: Mon, 22 Jul 2013 11:52:37 +0100
+Subject: [PATCH 18/22] ARM: dts: Remove '0x's from OMAP5 DTS file
 In-Reply-To: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
 References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1374490361-25769-17-git-send-email-lee.jones@linaro.org>
+Message-ID: <1374490361-25769-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +12,30 @@ Cc: Tony Lindgren <tony@atomide.com>
 Cc: linux-omap at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/omap4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/omap5.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 22d9f2b..45708e1 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -56,7 +56,7 @@
- 		cache-level = <2>;
- 	};
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index e643620..be58604 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -604,7 +604,7 @@
+ 			ti,hwmods = "wd_timer2";
+ 		};
  
--	local-timer at 0x48240600 {
-+	local-timer at 48240600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x48240600 0x20>;
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_HIGH)>;
+-		emif1: emif at 0x4c000000 {
++		emif1: emif at 4c000000 {
+ 			compatible	= "ti,emif-4d5";
+ 			ti,hwmods	= "emif1";
+ 			phy-type	= <2>; /* DDR PHY type: Intelli PHY */
+@@ -615,7 +615,7 @@
+ 			hw-caps-temp-alert;
+ 		};
+ 
+-		emif2: emif at 0x4d000000 {
++		emif2: emif at 4d000000 {
+ 			compatible	= "ti,emif-4d5";
+ 			ti,hwmods	= "emif2";
+ 			phy-type	= <2>; /* DDR PHY type: Intelli PHY */
 -- 
 1.8.1.2
