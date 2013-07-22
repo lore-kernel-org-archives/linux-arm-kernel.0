@@ -1,56 +1,48 @@
-From: manjunath.goudar@linaro.org (manjunath)
-Date: Mon, 22 Jul 2013 15:21:31 +0530
-Subject: [PATCH V4 00/11] USB: OHCI:Properly handle ohci_suspend()routine
- in bus glue
-In-Reply-To: <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <51ED00A3.8080004@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 22 Jul 2013 15:30:40 +0530
+Subject: [PATCH] clk: exynos4: fix g2d/mdma clocks of exynos4x12
+In-Reply-To: <1374480750-30962-1-git-send-email-chanho61.park@samsung.com>
+References: <1374480750-30962-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <CAK9yfHwNgZrZPT5c4DxfsDchWFXR2nWTVxCY2kZTEZW4PwyOng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 July 2013 03:02 PM, Manjunath Goudar wrote:
-> Suspend scenario in case of ohci bus glue was not properly handled as
-> it was not suspending generic part of ohci controller. Calling
-> explicitly the ohci_suspend()routine will ensure proper handling
-> of suspend scenario.
->
-> V2:
->   -Incase ohci_suspend() fails, return right away without executing further.
->
-> V3:
->   -New patch 1/11 added, for generic ohci-hcd suspend code.
->
-> V4:
->   -Properly aligned "do_wakeup" and "ret" variables.
->
-> Manjunath Goudar (11):
->    USB: OHCI: Properly handle OHCI controller suspend
->    USB: OHCI: Properly handle ohci-at91 suspend
->    USB: OHCI: Properly handle ohci-s3c2410 suspend
->    USB: OHCI: Properly handle ohci-da8xx suspend
->    USB: OHCI: Properly handle ohci-ep93xx suspend
->    USB: OHCI: Properly handle ohci-exynos suspend
->    USB: OHCI: Properly handle ohci-omap suspend
->    USB: OHCI: Properly handle ohci-platform suspend
->    USB: OHCI: Properly handle ohci-pxa27x suspend
->    USB: OHCI: Properly handle ohci-sm501 suspend
->    USB: OHCI: Properly handle ohci-spear suspend
->
->   drivers/usb/host/ohci-at91.c     |   10 ++++++++--
->   drivers/usb/host/ohci-da8xx.c    |   15 +++++++++++----
->   drivers/usb/host/ohci-ep93xx.c   |    9 ++++++++-
->   drivers/usb/host/ohci-exynos.c   |   20 +++++---------------
->   drivers/usb/host/ohci-hcd.c      |    9 ++++++++-
->   drivers/usb/host/ohci-omap.c     |   13 ++++++++++---
->   drivers/usb/host/ohci-platform.c |    9 ++++++++-
->   drivers/usb/host/ohci-pxa27x.c   |    8 +++++++-
->   drivers/usb/host/ohci-s3c2410.c  |   19 ++++---------------
->   drivers/usb/host/ohci-sm501.c    |   11 +++++++++--
->   drivers/usb/host/ohci-spear.c    |   12 +++++++++---
->   11 files changed, 87 insertions(+), 48 deletions(-)
->
-I am sorry, not updated patch subject line. This is patch V4 series.
+Hi Chanho,
 
-Thanks
-Manjunath Goudar
+On 22 July 2013 13:42, Chanho Park <chanho61.park@samsung.com> wrote:
+> The exynos4x12 has different address of GATE_IP_IMAGE reg. We should use
+> EXYNOS4X12_GATE_IP_IMAGE for g2d gating clocks instead of 4210's reg.
+> In case of mdma node, We don't use it for any exynos4 chipsets. I think we'll
+> need to change it to 'none' or leave it on.
+>
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos4.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index 1bdb882..6300c9d 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -820,8 +820,10 @@ struct samsung_gate_clock exynos4210_gate_clks[] __initdata = {
+>  struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+>         GATE(audss, "audss", "sclk_epll", E4X12_GATE_IP_MAUDIO, 0, 0, 0),
+>         GATE(mdnie0, "mdnie0", "aclk160", GATE_IP_LCD0, 2, 0, 0),
+> +       GATE(g2d, "g2d", "aclk200", E4X12_GATE_IP_IMAGE, 0, 0, 0),
+>         GATE(rotator, "rotator", "aclk200", E4X12_GATE_IP_IMAGE, 1, 0, 0),
+> -       GATE(mdma2, "mdma2", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
+> +       GATE(mdma, "mdma", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
+> +       GATE(smmu_g2d, "smmu_g2d", "aclk200", E4X12_GATE_IP_IMAGE, 3, 0, 0),
+>         GATE(smmu_mdma, "smmu_mdma", "aclk200", E4X12_GATE_IP_IMAGE, 5, 0, 0),
+>         GATE(mipi_hsi, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
+>         GATE(chipid, "chipid", "aclk100", E4X12_GATE_IP_PERIR, 0, 0, 0),
+
+Which kernel version is this patch based on? G2D clocks for 4x12 has
+already been added by commit 5cd644d837 ("clk: exynos4: Add additional
+G2D clocks").
+
+
+-- 
+With warm regards,
+Sachin
