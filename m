@@ -1,80 +1,28 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 22 Jul 2013 11:21:19 -0700
-Subject: [PATCH v4 03/17] sched_clock: Use an hrtimer instead of timer
-In-Reply-To: <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <1374189690-10810-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51ED781F.6060300@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 22 Jul 2013 14:31:00 -0400 (EDT)
+Subject: alignment handler instruction endian-ness
+In-Reply-To: <51E93CD0.3040302@codethink.co.uk>
+References: <51E91BE5.8070809@codethink.co.uk>
+ <20130719110947.GD24642@n2100.arm.linux.org.uk>
+ <51E92DE5.6090404@codethink.co.uk>
+ <20130719123249.GE24642@n2100.arm.linux.org.uk>
+ <51E93CD0.3040302@codethink.co.uk>
+Message-ID: <alpine.LFD.2.03.1307221428050.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 04:21 PM, Stephen Boyd wrote:
-> In the next patch we're going to increase the number of bits that
-> the generic sched_clock can handle to be greater than 32. With
-> more than 32 bits the wraparound time can be larger than what can
-> fit into the units that msecs_to_jiffies takes (unsigned int).
-> Luckily, the wraparound is initially calculated in nanoseconds
-> which we can easily use with hrtimers, so switch to using an
-> hrtimer.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Fri, 19 Jul 2013, Ben Dooks wrote:
+> On 19/07/13 13:32, Russell King - ARM Linux wrote:
+> > If you value your soul, NEVER EVER EVER place stuff which is not part
+> > of the user API in a header file in a UAPI subdirectory.  And never
+> > modify a header file in a UAPI subdirectory without first having a
+> > good long think about how that modification may impact _userspace_.
+> 
+> Sorry, searched for byteorder.h and just did not notice.
+> 
+> Where is the best place for these to go?
+
+You should really have a look at arch/arm/include/asm/opcodes.h.
 
 
-Hrmm. So in my testing (under qemu), this patch causes bootup to hang.
-
-qemu-system-arm -kernel zImage-arm -M vexpress-a9 -cpu cortex-a9 
--nographic -m 1024  -append 'root=/dev/mmcblk0p2 rw mem=1024M 
-raid=noautodetect console=ttyAMA0,38400n8 rootwait vmalloc=256MB 
-devtmpfs.mount=0' -sd test-arm.img -redir tcp:4300::22
-
-Config file attached.
-
-I haven't gotten a chance to look very closely, but it seems the 
-folowing patch resolves the issue. I'm not sure if we're seeing callers 
-to setup_sched_clock happen after sched_clock_postinit or what, but it 
-probably needs another look over.
-
-thanks
--john
-
-
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index a269890b..c018ffc 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -138,12 +138,6 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
-  	pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lluns\n",
-  		bits, r, r_unit, res, wrap);
-  
--	/*
--	 * Start the timer to keep sched_clock() properly updated and
--	 * sets the initial epoch.
--	 */
--	hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
--	sched_clock_timer.function = sched_clock_poll;
-  	update_sched_clock();
-  
-  	/*
-@@ -175,6 +169,13 @@ void __init sched_clock_postinit(void)
-  		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
-  
-  	update_sched_clock();
-+
-+	/*
-+	 * Start the timer to keep sched_clock() properly updated and
-+	 * sets the initial epoch.
-+	 */
-+	hrtimer_init(&sched_clock_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-+	sched_clock_timer.function = sched_clock_poll;
-  	hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
-  }
-  
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config.vexpress-qemu.gz
-Type: application/gzip
-Size: 19985 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130722/8a938835/attachment-0001.gz>
+Nicolas
