@@ -1,30 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 22 Jul 2013 18:56:11 -0300
-Subject: [PATCH v2 1/2] ARM: dts: mx6: Add support for mx6q nitrogen board
-In-Reply-To: <1374530056-31335-1-git-send-email-festevam@gmail.com>
-References: <1374530056-31335-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5Cecs7DTHr_2KWXSBeTPXSZ_xZK7xbOxE8M=MyN4HWBrg@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 22 Jul 2013 15:02:53 -0700
+Subject: [PATCH] clk: exynos4: Add CLK_GET_RATE_NOCACHE flag for the
+ Exynos4x12 ISP clocks
+In-Reply-To: <51ED2230.8080100@samsung.com>
+References: <1372099374-21008-1-git-send-email-s.nawrocki@samsung.com>
+ <51ED2230.8080100@samsung.com>
+Message-ID: <20130722220253.7598.5335@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Quoting Sylwester Nawrocki (2013-07-22 05:14:40)
+> On 06/24/2013 08:42 PM, Sylwester Nawrocki wrote:
+> > The ISP clock registers belong to the ISP power domain and may change
+> > their values if this power domain is switched off/on. Add
+> > CLK_GET_RATE_NOCACHE flags to ensure we do not rely on invalid cached
+> > data when setting or getting frequency of those clocks.
+> > 
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Mike,
+> 
+> would you consider queueing that patch for current -rc cycle ?
 
-On Mon, Jul 22, 2013 at 6:54 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> mx6q sabrelite and nitrogen boards are hardware compatible.
->
-> Boundary Devices have a line of nitrogen boards based on quad/dual-lite and solo
-> variants.
->
-> Let's consolidate the common peripheral nodes into imx6qdl-nitrogen.dtsi and
-> add support for the mx6 quad nitrogen board.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Taken into clk-fixes. Will probably get it out before -rc3, but if not
+definitely -rc4.
 
-I missed to add:
+Regards,
+Mike
 
-Changes since v1:
-
-- Put the nodes in alphabetical order
-- Also add sata node for sabrelite
+> 
+> Thanks,
+> Sylwester
