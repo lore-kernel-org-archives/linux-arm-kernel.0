@@ -1,100 +1,74 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 22 Jul 2013 14:14:33 +0200
-Subject: [PATCH v3 06/31] i2c: mpc: cleanup clock API use
+Date: Mon, 22 Jul 2013 14:14:36 +0200
+Subject: [PATCH v3 09/31] powerpc/fsl-pci: improve clock API use
 In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
 References: <1374166855-7280-1-git-send-email-gsi@denx.de>
  <1374495298-22019-1-git-send-email-gsi@denx.de>
-Message-ID: <1374495298-22019-7-git-send-email-gsi@denx.de>
+Message-ID: <1374495298-22019-10-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make the MPC I2C driver get, prepare and enable the peripheral clock
-('per' for access to the peripheral's registers) during probe;
-disable, unprepare and put the clock upon remove(); hold a reference
-to the clock over the period of use
+make the Freescale PCI driver get, prepare and enable the PCI clock
+during probe()
 
-clock lookup is non-fatal in this implementation as not all platforms
-may provide clock specs in their device tree, but enable errors for
-specified clocks are considered fatal
+clock lookup is non-fatal as not all platforms may provide clock specs
+in their device tree, but failure to enable specified clocks are fatal
+
+the driver appears to not have a remove() routine, so no reference to
+the clock is kept during use, and the clock isn't released (the devm
+approach will put the clock, but it won't get disabled or unprepared)
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/i2c/busses/i2c-mpc.c |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/powerpc/sysdev/fsl_pci.c |   23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
-index 7607dc0..9e837be 100644
---- a/drivers/i2c/busses/i2c-mpc.c
-+++ b/drivers/i2c/busses/i2c-mpc.c
-@@ -21,6 +21,7 @@
- #include <linux/of_i2c.h>
- #include <linux/slab.h>
- 
+diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
+index 46ac1dd..5e2f411 100644
+--- a/arch/powerpc/sysdev/fsl_pci.c
++++ b/arch/powerpc/sysdev/fsl_pci.c
+@@ -17,6 +17,8 @@
+  * Free Software Foundation;  either version 2 of the  License, or (at your
+  * option) any later version.
+  */
++
 +#include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/fsl_devices.h>
- #include <linux/i2c.h>
-@@ -67,6 +68,7 @@ struct mpc_i2c {
- #ifdef CONFIG_PM
- 	u8 fdr, dfsrr;
- #endif
-+	struct clk *clk_per;
- };
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/delay.h>
+@@ -926,12 +928,33 @@ void fsl_pci_assign_primary(void)
  
- struct mpc_i2c_divider {
-@@ -623,6 +625,8 @@ static int fsl_i2c_probe(struct platform_device *op)
- 	u32 clock = MPC_I2C_CLOCK_LEGACY;
- 	int result = 0;
- 	int plen;
+ static int fsl_pci_probe(struct platform_device *pdev)
+ {
 +	struct clk *clk;
-+	int err;
- 
- 	match = of_match_device(mpc_i2c_of_match, &op->dev);
- 	if (!match)
-@@ -653,6 +657,21 @@ static int fsl_i2c_probe(struct platform_device *op)
- 		}
- 	}
+ 	int ret;
+ 	struct device_node *node;
+ #ifdef CONFIG_SWIOTLB
+ 	struct pci_controller *hose;
+ #endif
  
 +	/*
-+	 * enable clock for the I2C peripheral (non fatal),
-+	 * keep a reference upon successful allocation
++	 * clock lookup is non-fatal since the driver is shared among
++	 * platforms and not all of them provide clocks specs in their
++	 * device tree, but failure to enable a specified clock is
++	 * considered fatal
 +	 */
-+	clk = devm_clk_get(&op->dev, "per");
++	clk = devm_clk_get(&pdev->dev, "per");
 +	if (!IS_ERR(clk)) {
-+		err = clk_prepare_enable(clk);
-+		if (err) {
-+			dev_err(&op->dev, "failed to enable clock\n");
-+			devm_clk_put(&op->dev, clk);
-+		} else {
-+			i2c->clk_per = clk;
++		ret = clk_prepare_enable(clk);
++		if (ret) {
++			dev_err(dev, "Could not enable peripheral clock\n");
++			devm_clk_put(&pdev->dev, clk);
++			return ret;
 +		}
++		/*
++		 * TODO where to store the 'clk' reference?  there appears
++		 * to be no remove() routine which undoes what probe() does
++		 */
 +	}
 +
- 	if (of_get_property(op->dev.of_node, "fsl,preserve-clocking", NULL)) {
- 		clock = MPC_I2C_CLOCK_PRESERVE;
- 	} else {
-@@ -696,6 +715,10 @@ static int fsl_i2c_probe(struct platform_device *op)
- 	return result;
- 
-  fail_add:
-+	if (i2c->clk_per) {
-+		clk_disable_unprepare(i2c->clk_per);
-+		devm_clk_put(&op->dev, i2c->clk_per);
-+	}
- 	free_irq(i2c->irq, i2c);
-  fail_request:
- 	irq_dispose_mapping(i2c->irq);
-@@ -711,6 +734,11 @@ static int fsl_i2c_remove(struct platform_device *op)
- 
- 	i2c_del_adapter(&i2c->adap);
- 
-+	if (i2c->clk_per) {
-+		clk_disable_unprepare(i2c->clk_per);
-+		devm_clk_put(&op->dev, i2c->clk_per);
-+	}
-+
- 	if (i2c->irq)
- 		free_irq(i2c->irq, i2c);
+ 	node = pdev->dev.of_node;
+ 	ret = fsl_add_bridge(pdev, fsl_pci_primary == node);
  
 -- 
 1.7.10.4
