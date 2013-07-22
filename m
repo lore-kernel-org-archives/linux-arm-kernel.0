@@ -1,53 +1,58 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 22 Jul 2013 15:49:27 +0900
-Subject: [PATCH 3/3] dts: ARM: add a rotator node for exynos4
-In-Reply-To: <1374475767-30085-1-git-send-email-chanho61.park@samsung.com>
-References: <1374475767-30085-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1374475767-30085-4-git-send-email-chanho61.park@samsung.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Mon, 22 Jul 2013 15:56:09 +0900
+Subject: [PATCH] decompressors: fix "no limit" output buffer length
+Message-ID: <1374476169-32194-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device node of rotator for exynos4 platform. It has proper
-register and clock information. It also has limit table to get restrictions of
-the image size.
+When decompressing into memory, the output buffer length is set to some
+arbitrarily high value (0x7fffffff) to indicate the output is,
+virtually, unlimited in size.
 
-Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+The problem with this is that some platforms have their physical memory
+at high physical addresses (0x80000000 or more), and that the output
+buffer address and its "unlimited" length cannot be added without
+overflowing. An example of this can be found in inflate_fast():
+
+/* next_out is the output buffer address */
+out = strm->next_out - OFF;
+/* avail_out is the output buffer size. end will overflow if the output
+ * address is >= 0x80000104 */
+end = out + (strm->avail_out - 257);
+
+This has huge consequences on the performance of kernel decompression,
+since the following exit condition of inflate_fast() will be always
+true:
+
+} while (in < last && out < end);
+
+Indeed, "end" has overflowed and is now always lower than "out". As a
+result, inflate_fast() will return after processing one single byte of
+input data, and will thus need to be called an unreasonably high number
+of times. This probably went unnoticed because kernel decompression is
+fast enough even with this issue.
+
+Nonetheless, adjusting the output buffer length in such a way that the
+above pointer arithmetic never overflows results in a kernel
+decompression that is about 3 times faster on affected machines.
+
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ lib/decompress_inflate.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 3f94fe8..7d7dcef 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -398,4 +398,27 @@
- 		samsung,power-domain = <&pd_lcd0>;
- 		status = "disabled";
- 	};
-+
-+	rotator: rotator at 12810000 {
-+		compatible = "samsung,exynos4210-rotator";
-+		reg = <0x12810000 0x1000>;
-+		interrupts = <0 83 0>;
-+		clocks = <&clock 278>;
-+		clock-names = "rotator";
-+		status = "disabled";
-+		ycbcr420_2p {
-+			min_w = <32>;
-+			min_h = <32>;
-+			max_w = <32768>;
-+			max_h = <32768>;
-+			align = <3>;
-+		};
-+		rgb888 {
-+			min_w = <8>;
-+			min_h = <8>;
-+			max_w = <8192>;
-+			max_h = <8192>;
-+			align = <2>;
-+		};
-+	};
- };
+diff --git a/lib/decompress_inflate.c b/lib/decompress_inflate.c
+index 19ff89e..d619b28 100644
+--- a/lib/decompress_inflate.c
++++ b/lib/decompress_inflate.c
+@@ -48,7 +48,7 @@ STATIC int INIT gunzip(unsigned char *buf, int len,
+ 		out_len = 0x8000; /* 32 K */
+ 		out_buf = malloc(out_len);
+ 	} else {
+-		out_len = 0x7fffffff; /* no limit */
++		out_len = ((size_t)~0) - (size_t)out_buf; /* no limit */
+ 	}
+ 	if (!out_buf) {
+ 		error("Out of memory while allocating output buffer");
 -- 
-1.7.9.5
+1.8.3.2
