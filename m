@@ -1,56 +1,39 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Jul 2013 09:43:23 +0200
-Subject: [PATCH v4 02/20] clocksource: samsung_pwm_timer: Correct
- definition of AUTORELOAD bit
-In-Reply-To: <51ECABF1.4040600@linaro.org>
+Date: Mon, 22 Jul 2013 09:47:04 +0200
+Subject: [PATCH v4 04/20] clocksource: samsung_pwm_timer: Do not use
+ clocksource_mmio
+In-Reply-To: <51ECAD60.1000109@linaro.org>
 References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1374278673-25615-4-git-send-email-tomasz.figa@gmail.com>
- <51ECABF1.4040600@linaro.org>
-Message-ID: <9612221.r4mx9bHE64@flatron>
+ <1374278673-25615-6-git-send-email-tomasz.figa@gmail.com>
+ <51ECAD60.1000109@linaro.org>
+Message-ID: <19090469.Cf6sbb33Ke@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 of July 2013 05:50:09 Daniel Lezcano wrote:
+Hi Daniel,
+
+On Monday 22 of July 2013 05:56:16 Daniel Lezcano wrote:
 > On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> > PWM channel 4 has its autoreload bit located at different position.
-> > This patch fixes the driver to account for that.
-> > 
-> > This fixes a problem with the clocksource hanging after it overflows
-> > because it is not reloaded any more.
+> > In case of Samsung PWM timer, clocksource MMIO can not be used,
+> > because
+> > custom suspend/resume callbacks are required.
 > > 
 > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 > > ---
-> > 
-> >  drivers/clocksource/samsung_pwm_timer.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clocksource/samsung_pwm_timer.c
-> > b/drivers/clocksource/samsung_pwm_timer.c index 3fa5b07..e238fb0
-> > 100644
-> > --- a/drivers/clocksource/samsung_pwm_timer.c
-> > +++ b/drivers/clocksource/samsung_pwm_timer.c
-> > @@ -47,7 +47,8 @@
-> > 
-> >  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
-> >  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
-> >  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
-> > 
-> > -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
-> > +#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) \
-> > +						+ (((chan) < 5) ? 3 : 2)))
 > 
-> This macro is not readable. Please, fix it up with a comment please.
+> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-/*
- * Channel 4 (logically 5 in TCON register) has different position
- * of autoreload bit.
- */
-#define _TCON_AUTORELOAD(chan)			(1 << (4 * (chan) + 3))
-#define _TCON_AUTORELOAD4(chan)			(1 << (4 * (chan) + 2))
-#define TCON_AUTORELOAD(chan)			((chan < 5) ? 
-		_TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
+Thanks for review.
 
-What do you think?
+> Please in the future Cc me and Thomas Gleixner (clocksource/clockevent
+> maintainers).
+
+Oh, right, sorry. This series originally was not touching the clocksource 
+driver and I just kept original recipient list.
+
+Btw. Have you updated MAINTAINERS file? In latest linux-next I can still 
+see only John Stultz and Thomas Gleixner as maintainers of 
+drivers/clocksource.
 
 Best regards,
 Tomasz
