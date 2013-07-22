@@ -1,146 +1,169 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Jul 2013 13:02:53 +0900
-Subject: [PATCH] ARM: shmobile: Add lager defconfig
-Message-ID: <1374465773-8123-1-git-send-email-horms+renesas@verge.net.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 22 Jul 2013 06:04:19 +0200
+Subject: [PATCH] clocksource: sh_cmt: 32-bit control register support
+In-Reply-To: <2792cc6f22031110f6959c02d42d7b6116105a71.1374207810.git.horms+renesas@verge.net.au>
+References: <cover.1374207810.git.horms+renesas@verge.net.au>
+ <2792cc6f22031110f6959c02d42d7b6116105a71.1374207810.git.horms+renesas@verge.net.au>
+Message-ID: <51ECAF43.80200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is intended to be used until multi-arch is able to be
-used for the lager board at which time a more generic configuration
-will be used in place of this one.
+On 07/19/2013 06:36 AM, Simon Horman wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Add support for CMT hardware with 32-bit control and counter
+> registers, as found on r8a73a4 and r8a7790. To use the CMT
+> with 32-bit hardware a second I/O memory resource needs to
+> point out the CMSTR register and it needs to be 32 bit wide.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/lager_defconfig | 121 +++++++++++++++++++++++++++++++++
- 1 file changed, 121 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/lager_defconfig
+In the future, can you Cc drivers/clocksource maintainers please ?
 
-diff --git a/arch/arm/mach-shmobile/lager_defconfig b/arch/arm/mach-shmobile/lager_defconfig
-new file mode 100644
-index 0000000..ba839a2
---- /dev/null
-+++ b/arch/arm/mach-shmobile/lager_defconfig
-@@ -0,0 +1,121 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
-+CONFIG_SLAB=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_SHMOBILE=y
-+CONFIG_ARCH_R8A7790=y
-+CONFIG_MACH_LAGER=y
-+# CONFIG_SH_TIMER_TMU is not set
-+# CONFIG_EM_TIMER_STI is not set
-+# CONFIG_SWP_EMULATE is not set
-+CONFIG_ARM_ERRATA_430973=y
-+CONFIG_ARM_ERRATA_458693=y
-+CONFIG_ARM_ERRATA_460075=y
-+CONFIG_ARM_ERRATA_743622=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=2
-+# CONFIG_LOCAL_TIMERS is not set
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+CONFIG_FORCE_MAX_ZONEORDER=13
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_KEXEC=y
-+CONFIG_AUTO_ZRELADDR=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CORE is not set
-+# CONFIG_NET_VENDOR_ARC is not set
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+CONFIG_SH_ETH=y
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_SH_SCI=y
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=8
-+CONFIG_SERIAL_SH_SCI_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_GPIO=y
-+CONFIG_I2C_SH_MOBILE=y
-+CONFIG_GPIO_SH_PFC=y
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_RCAR=y
-+# CONFIG_HWMON is not set
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHI=y
-+CONFIG_MMC_SH_MMCIF=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_DMADEVICES=y
-+CONFIG_SH_DMAE=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_CONFIGFS_FS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_NFS_V4_1=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+# CONFIG_ARM_UNWIND is not set
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+>  drivers/clocksource/sh_cmt.c |   50 ++++++++++++++++++++++++++++++------------
+>  1 file changed, 36 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+> index 08d0c41..0965e98 100644
+> --- a/drivers/clocksource/sh_cmt.c
+> +++ b/drivers/clocksource/sh_cmt.c
+> @@ -37,6 +37,7 @@
+>  
+>  struct sh_cmt_priv {
+>  	void __iomem *mapbase;
+> +	void __iomem *mapbase_str;
+>  	struct clk *clk;
+>  	unsigned long width; /* 16 or 32 bit version of hardware block */
+>  	unsigned long overflow_bit;
+> @@ -79,6 +80,12 @@ struct sh_cmt_priv {
+>   * CMCSR 0xffca0060 16-bit
+>   * CMCNT 0xffca0064 32-bit
+>   * CMCOR 0xffca0068 32-bit
+> + *
+> + * "32-bit counter and 32-bit control" as found on r8a73a4 and r8a7790:
+> + * CMSTR 0xffca0500 32-bit
+> + * CMCSR 0xffca0510 32-bit
+> + * CMCNT 0xffca0514 32-bit
+> + * CMCOR 0xffca0518 32-bit
+>   */
+>  
+>  static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
+> @@ -109,9 +116,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
+>  
+>  static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
+>  {
+> -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> -
+> -	return p->read_control(p->mapbase - cfg->channel_offset, 0);
+> +	return p->read_control(p->mapbase_str, 0);
+>  }
+>  
+>  static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
+> @@ -127,9 +132,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
+>  static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
+>  				      unsigned long value)
+>  {
+> -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> -
+> -	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
+> +	p->write_control(p->mapbase_str, 0, value);
+>  }
+>  
+>  static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
+> @@ -676,7 +679,7 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
+>  static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+>  {
+>  	struct sh_timer_config *cfg = pdev->dev.platform_data;
+> -	struct resource *res;
+> +	struct resource *res, *res2;
+>  	int irq, ret;
+>  	ret = -ENXIO;
+>  
+> @@ -694,6 +697,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+>  		goto err0;
+>  	}
+>  
+> +	/* optional resource for the shared timer start/stop register */
+> +	res2 = platform_get_resource(p->pdev, IORESOURCE_MEM, 1);
+> +
+>  	irq = platform_get_irq(p->pdev, 0);
+>  	if (irq < 0) {
+>  		dev_err(&p->pdev->dev, "failed to get irq\n");
+> @@ -707,6 +713,15 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+>  		goto err0;
+>  	}
+>  
+> +	/* map second resource for CMSTR */
+> +	p->mapbase_str = ioremap_nocache(res2 ? res2->start :
+> +					 res->start - cfg->channel_offset,
+> +					 res2 ? resource_size(res2) : 2);
+> +	if (p->mapbase_str == NULL) {
+> +		dev_err(&p->pdev->dev, "failed to remap I/O second memory\n");
+> +		goto err1;
+> +	}
+> +
+>  	/* request irq using setup_irq() (too early for request_irq()) */
+>  	p->irqaction.name = dev_name(&p->pdev->dev);
+>  	p->irqaction.handler = sh_cmt_interrupt;
+> @@ -719,11 +734,17 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+>  	if (IS_ERR(p->clk)) {
+>  		dev_err(&p->pdev->dev, "cannot get clock\n");
+>  		ret = PTR_ERR(p->clk);
+> -		goto err1;
+> +		goto err2;
+>  	}
+>  
+> -	p->read_control = sh_cmt_read16;
+> -	p->write_control = sh_cmt_write16;
+> +	if (res2 && (resource_size(res2) == 4)) {
+> +		/* assume both CMSTR and CMCSR to be 32-bit */
+> +		p->read_control = sh_cmt_read32;
+> +		p->write_control = sh_cmt_write32;
+> +	} else {
+> +		p->read_control = sh_cmt_read16;
+> +		p->write_control = sh_cmt_write16;
+> +	}
+>  
+>  	if (resource_size(res) == 6) {
+>  		p->width = 16;
+> @@ -752,22 +773,23 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+>  			      cfg->clocksource_rating);
+>  	if (ret) {
+>  		dev_err(&p->pdev->dev, "registration failed\n");
+> -		goto err2;
+> +		goto err3;
+>  	}
+>  	p->cs_enabled = false;
+>  
+>  	ret = setup_irq(irq, &p->irqaction);
+>  	if (ret) {
+>  		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+> -		goto err2;
+> +		goto err3;
+>  	}
+>  
+>  	platform_set_drvdata(pdev, p);
+>  
+>  	return 0;
+> -err2:
+> +err3:
+>  	clk_put(p->clk);
+> -
+> +err2:
+> +	iounmap(p->mapbase_str);
+>  err1:
+>  	iounmap(p->mapbase);
+>  err0:
+> 
+
+
 -- 
-1.8.2.1
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
