@@ -1,36 +1,55 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 22 Jul 2013 14:38:35 +0900
-Subject: [PATCH] dts: arm: add arm-pmu node for exynos4412
-Message-ID: <1374471515-12403-1-git-send-email-chanho61.park@samsung.com>
+From: sathyap@ti.com (Sathya Prakash M R)
+Date: Mon, 22 Jul 2013 11:33:17 +0530
+Subject: [PATCH 2/2] ARM: DTS: AM43x: Add DSS node
+In-Reply-To: <1374472997-9653-1-git-send-email-sathyap@ti.com>
+References: <1374472997-9653-1-git-send-email-sathyap@ti.com>
+Message-ID: <1374472997-9653-3-git-send-email-sathyap@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos4412 has 4 cpus and each has a performance counter.
-Thus, we should define 4 interrupts which are combined by irq-combiner for arm
-pmu.
+Add device node for DSS module for AM43x
 
-Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
 ---
- arch/arm/boot/dts/exynos4412.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/am4372.dtsi |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index e743e67..cfad655 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -35,6 +35,12 @@
- 			     <0 107 0>, <0 108 0>, <0 48 0>, <0 42 0>;
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
-+	};
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index ddc1df7..f10fc0a 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -64,5 +64,32 @@
+ 			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+ 			reg = <0x44e86000 0x40>;
+ 		};
 +
- 	mct at 10050000 {
- 		compatible = "samsung,exynos4412-mct";
- 		reg = <0x10050000 0x800>;
++		dss: dss at 4832A000 {
++			compatible = "ti,omap3-dss", "simple-bus";
++			reg = <0x4832A000 0x200>;
++			ti,hwmods = "dss_core";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			dispc at 4832A400 {
++				compatible = "ti,omap3-dispc";
++				reg = <0x4832A400 0x400>;
++				interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
++				ti,hwmods = "dss_dispc";
++			};
++
++			dpi: dpi {
++				compatible = "ti,omap3-dpi";
++			};
++
++			rfbi: rfbi at 4832A800 {
++				compatible = "ti,omap3-rfbi";
++				reg = <0x4832A800 0x100>;
++				ti,hwmods = "dss_rfbi";
++			};
++
++		};
+ 	};
+ };
 -- 
 1.7.9.5
