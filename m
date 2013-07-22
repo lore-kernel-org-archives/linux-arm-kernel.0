@@ -1,158 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Jul 2013 10:21:38 +0100
-Subject: [PATCH v5] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <1374221837-23773-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374221278-18204-1-git-send-email-jonas.jensen@gmail.com>
- <1374221837-23773-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130722092138.GB18731@e106331-lin.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 22 Jul 2013 12:30:20 +0300
+Subject: linux-3.11-rc1: Internal error: Oops - undefined instruction: 0 [#1]
+ SMP ARM on OMAP3/AM335x
+Message-ID: <51ECFBAC.7090900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 09:17:17AM +0100, Jonas Jensen wrote:
-> This patch adds MOXA ART SoCs clock driver support.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
-> 
-> Notes:
->     Changes since v4:
->     
->     1. remove unnecessary header includes
->     
->     Applies to next-20130716
-> 
->  .../bindings/clock/moxa,moxart-core-clock.txt      | 23 ++++++++
->  drivers/clk/Makefile                               |  1 +
->  drivers/clk/clk-moxart.c                           | 69 ++++++++++++++++++++++
->  3 files changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
->  create mode 100644 drivers/clk/clk-moxart.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
-> new file mode 100644
-> index 0000000..528c8b0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
-> @@ -0,0 +1,23 @@
-> +Device Tree Clock bindings for arch-moxart
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +MOXA ART SoCs allow to determine core clock frequencies by reading
-> +a register.
-> +
-> +Required properties:
-> +- compatible : Should be "moxa,moxart-core-clock"
-> +- #clock-cells : Should be 0
-> +- reg : Should contain registers location and length
-> +- clock-output-names : Should be "coreclk"
-> +
-> +For example:
-> +
-> +	coreclk: core-clock at 98100000 {
-> +		compatible = "moxa,moxart-core-clock";
-> +		#clock-cells = <0>;
-> +		reg = <0x98100000 0x34>;
-> +		clock-output-names = "coreclk";
-> +	};
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 4038c2b..933622f 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
->  
->  # SoCs specific
->  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-> +obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
->  obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
->  obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
->  obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
-> diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-> new file mode 100644
-> index 0000000..5559371
-> --- /dev/null
-> +++ b/drivers/clk/clk-moxart.c
-> @@ -0,0 +1,69 @@
-> +/*
-> + * MOXA ART SoCs clock driver.
-> + *
-> + * Copyright (C) 2013 Jonas Jensen
-> + *
-> + * Jonas Jensen <jonas.jensen@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clkdev.h>
-> +
-> +void __init moxart_of_clk_init(struct device_node *node)
-> +{
-> +	static void __iomem *base;
-> +	struct clk *clk;
-> +	unsigned long rate;
-> +	unsigned int mul, val, div;
-> +	const char *name;
-> +
-> +	base = of_iomap(node, 0);
-> +	if (IS_ERR(base))
-> +		panic("%s: of_iomap failed\n", node->full_name);
+Hi,
 
-As far as I'm aware, of_iomap returns NULL, not an ERR_PTR value.
+I observe the following problem on booting v3.11-rc1 on OMAP3 beagle board.
 
-Also, is it necessary to panic() ? In v1 of the patch you used pr_err...
+[    5.888946] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+[    5.896057] Modules linked in:
+[    5.899322] CPU: 0 PID: 9 Comm: rcu_sched Not tainted 3.11.0-rc2-00001-g1ea701a #876
+[    5.907501] task: ce0720c0 ti: ce07a000 task.ti: ce07a000
+[    5.913208] PC is at check_and_switch_context+0x130/0x4dc
+[    5.918914] LR is at check_and_switch_context+0xd8/0x4dc
+[    5.924530] pc : [<c0023d1c>]    lr : [<c0023cc4>]    psr: 40000193
+[    5.924530] sp : ce07bd70  ip : 00000000  fp : c078d7b0
+[    5.936645] r10: ce5084c0  r9 : 00000000  r8 : 00000201
+[    5.942169] r7 : 00000000  r6 : 00000000  r5 : 00000000  r4 : c081de04
+[    5.949066] r3 : 00000000  r2 : d0091010  r1 : 00000000  r0 : 00000001
+[    5.955963] Flags: nZcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    5.963775] Control: 10c5387d  Table: 80004019  DAC: 00000017
+[    5.969848] Process rcu_sched (pid: 9, stack limit = 0xce07a240)
+[    5.976165] Stack: (0xce07bd70 to 0xce07c000)
+[    5.980773] bd60:                                     c078c990 961b12b4 00000000 ce508658
+[    5.989440] bd80: c0780510 20000193 00000200 00000000 c078c944 c0780510 c0780518 ce5084c0
+[    5.998077] bda0: c0f90fc0 ce425440 ce5084c0 c078fd08 ce0720c0 ce184a40 ce07a000 c0f90fc0
+[    6.006713] bdc0: ce07be74 c05065bc c081fe24 ce0720c0 ce072558 00000000 5efa46d6 00000001
+[    6.015350] bde0: 00000000 c050331c c0782fc0 c0782fc0 c0782fc0 c0782fc0 0007735a 00000000
+[    6.023986] be00: c0782fc0 c0782fc0 00000000 00000000 60000193 00000498 00000000 c08304c0
+[    6.032623] be20: a0000113 c00531b8 ce07be78 ce07a000 ce0720c0 c05080dc 00000001 c07860c0
+[    6.041259] be40: ce07bf00 ce07a000 00000064 c0097bfc a0000113 ce07be7c c08304c0 ffff8d19
+[    6.049926] be60: c08304c0 c07860c0 ce07bf00 ce07a000 00000064 c050331c a0000113 c08305b8
+[    6.058563] be80: c08305b8 ffff8d19 c08304c0 c005329c ce0720c0 ffffffff ffffffff 00000000
+[    6.067199] bea0: 00000000 00000000 00000000 00000000 c083150c 00000000 00000000 c0663d9c
+[    6.075836] bec0: c078d1e0 ce07a000 c07e4c50 c078d1e0 00000001 00000002 c07e4b40 c00aed80
+[    6.084472] bee0: 00000000 ce07bf00 c07e4cb8 c07e4c00 00000001 00000000 ce0720c0 c006749c
+[    6.093109] bf00: c07e4c70 c07e4c70 60000153 ce04be8c 00000000 c07e4b40 c00aeacc 00000000
+[    6.101745] bf20: 00000000 00000000 00000000 c0066b74 00000001 00000000 00000000 c07e4b40
+[    6.110382] bf40: 00000000 00000000 dead4ead ffffffff ffffffff c08323fc 00000000 00000000
+[    6.119049] bf60: c0662544 ce07bf64 ce07bf64 00000000 00000000 dead4ead ffffffff ffffffff
+[    6.127685] bf80: c08323fc 00000000 00000000 c0662544 ce07bf90 ce07bf90 ce072a80 ce04be8c
+[    6.136322] bfa0: c0066ad0 00000000 00000000 c0013ea8 00000000 00000000 00000000 00000000
+[    6.144958] bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    6.153594] bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 01ffdf08 20ffde24
+[    6.162261] [<c0023d1c>] (check_and_switch_context+0x130/0x4dc) from [<c05065bc>] (__schedule+0x334/0x7f4)
+[    6.172454] [<c05065bc>] (__schedule+0x334/0x7f4) from [<c050331c>] (schedule_timeout+0x124/0x214)
+[    6.181945] [<c050331c>] (schedule_timeout+0x124/0x214) from [<c00aed80>] (rcu_gp_kthread+0x2b4/0x52c)
+[    6.191772] [<c00aed80>] (rcu_gp_kthread+0x2b4/0x52c) from [<c0066b74>] (kthread+0xa4/0xb0)
+[    6.200622] [<c0066b74>] (kthread+0xa4/0xb0) from [<c0013ea8>] (ret_from_fork+0x14/0x2c)
+[    6.209167] Code: e3120602 1e083f13 ee073f9a ee073f95 (ee083f33) 
+[    6.215606] ---[ end trace bad27cd834df5662 ]---
 
-Thanks,
-Mark.
+I'm suspecting the issue to be caused by the below commit
 
-> +
-> +	mul = (readl(base + 0x30) >> 3) & 0x1ff;
-> +	val = (readl(base + 0x0c) >> 4) & 0x7;
-> +
-> +	switch (val) {
-> +	case 1:
-> +		div = 3;
-> +		break;
-> +	case 2:
-> +		div = 4;
-> +		break;
-> +	case 3:
-> +		div = 6;
-> +		break;
-> +	case 4:
-> +		div = 8;
-> +		break;
-> +	default:
-> +		div = 2;
-> +		break;
-> +	}
-> +
-> +	/*
-> +	 * the rate calculation below is only tested and proven
-> +	 * to be true for UC-7112-LX
-> +	 *
-> +	 * UC-7112-LX: mul=80 val=0
-> +	 *
-> +	 * to support other moxart SoC hardware, this may need
-> +	 * a change, though it's possible it works there too
-> +	 */
-> +	rate = (mul * 1200000 / div);
-> +
-> +	of_property_read_string(node, "clock-output-names", &name);
-> +	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
-> +	clk_register_clkdev(clk, NULL, name);
-> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +
-> +	iounmap(base);
-> +}
-> +CLK_OF_DECLARE(moxart_core_clock, "moxa,moxart-core-clock", moxart_of_clk_init);
-> -- 
-> 1.8.2.1
-> 
-> 
+commit 93dc68876b608da041fe40ed39424b0fcd5aa2fb
+Author: Catalin Marinas <catalin.marinas@arm.com>
+Date:   Tue Mar 26 23:35:04 2013 +0100
+
+    ARM: 7684/1: errata: Workaround for Cortex-A15 erratum 798181 (TLBI/DSB operations)
+
+It seems that in check_and_switch_context(), we call dummy_flush_tlb_a15_erratum() which an A15 instruction
+without A15 revision check.
+
+cheers,
+-roger
