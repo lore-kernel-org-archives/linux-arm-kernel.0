@@ -1,96 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Jul 2013 16:36:16 +0900
-Subject: [PATCH 04/11] ARM: shmobile: Add GIO to EMEV2 dtsi
+Date: Mon, 22 Jul 2013 16:36:13 +0900
+Subject: [PATCH 01/11] ARM: shmobile: r8a73a4: add I2C controller DT nodes
 In-Reply-To: <cover.1374478037.git.horms+renesas@verge.net.au>
 References: <cover.1374478037.git.horms+renesas@verge.net.au>
-Message-ID: <12d035b13b224ee69886b64fd33d1c1224e79187.1374478037.git.horms+renesas@verge.net.au>
+Message-ID: <f98c1069bf1748ffa18cbebbc3a9f88dfc19a631.1374478037.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Add GIO0->GIO4 device nodes to the EMEV2 dtsi file.
+Add Device Tree nodes for the 9 I2C controllers on r8a73a4, compatible with
+the i2c-sh_mobile.c driver.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2.dtsi | 59 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ arch/arm/boot/dts/r8a73a4.dtsi | 81 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
-index c8a8c08..99ad2b2 100644
---- a/arch/arm/boot/dts/emev2.dtsi
-+++ b/arch/arm/boot/dts/emev2.dtsi
-@@ -14,6 +14,14 @@
- 	compatible = "renesas,emev2";
- 	interrupt-parent = <&gic>;
- 
-+	aliases {
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+		gpio2 = &gpio2;
-+		gpio3 = &gpio3;
-+		gpio4 = &gpio4;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -67,4 +75,55 @@
- 		reg = <0xe1050000 0x38>;
- 		interrupts = <0 11 0>;
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 4ff2019..4e1ddf0 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -85,4 +85,85 @@
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 69 4>;
  	};
 +
-+	gpio0: gpio at e0050000 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050000 0x2c>, <0xe0050040 0x20>;
-+		interrupts = <0 67 0>, <0 68 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++	i2c0: i2c at e6500000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6500000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 174 0x4>;
 +	};
-+	gpio1: gpio at e0050080 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050080 0x2c>, <0xe00500c0 0x20>;
-+		interrupts = <0 69 0>, <0 70 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++
++	i2c1: i2c at e6510000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6510000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 175 0x4>;
 +	};
-+	gpio2: gpio at e0050100 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050100 0x2c>, <0xe0050140 0x20>;
-+		interrupts = <0 71 0>, <0 72 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++
++	i2c2: i2c at e6520000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6520000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 176 0x4>;
 +	};
-+	gpio3: gpio at e0050180 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050180 0x2c>, <0xe00501c0 0x20>;
-+		interrupts = <0 73 0>, <0 74 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <32>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++
++	i2c3: i2c at e6530000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6530000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 177 0x4>;
 +	};
-+	gpio4: gpio at e0050200 {
-+		compatible = "renesas,em-gio";
-+		reg = <0xe0050200 0x2c>, <0xe0050240 0x20>;
-+		interrupts = <0 75 0>, <0 76 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		ngpios = <31>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++
++	i2c4: i2c at e6540000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6540000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 178 0x4>;
++	};
++
++	i2c5: i2c at e60b0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe60b0000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 179 0x4>;
++	};
++
++	i2c6: i2c at e6550000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6550000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 184 0x4>;
++	};
++
++	i2c7: i2c at e6560000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6560000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 185 0x4>;
++	};
++
++	i2c8: i2c at e6570000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0 0xe6570000 0 0x428>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 173 0x4>;
 +	};
  };
 -- 
