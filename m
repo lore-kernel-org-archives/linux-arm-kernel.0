@@ -1,56 +1,27 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 22 Jul 2013 15:31:17 +0530
-Subject: [PATCH 4/4] ARM: OMAP2+: Sync hwmod state with the pm_runtime and
- omap_device state
-In-Reply-To: <1374487277-26099-1-git-send-email-rnayak@ti.com>
-References: <1374487277-26099-1-git-send-email-rnayak@ti.com>
-Message-ID: <1374487277-26099-5-git-send-email-rnayak@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 22 Jul 2013 15:33:13 +0530
+Subject: [PATCH v3 3/5] ARM: davinci: da850: do not specify clock_frequency
+ for UART DT node
+In-Reply-To: <1371633342-1210-4-git-send-email-prakash.pm@ti.com>
+References: <1371633342-1210-1-git-send-email-prakash.pm@ti.com>
+ <1371633342-1210-4-git-send-email-prakash.pm@ti.com>
+Message-ID: <51ED0361.9020604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some hwmods which are marked with HWMOD_INIT_NO_IDLE are left in enabled
-state post setup(). When a omap_device gets created for such hwmods
-make sure the omap_device and pm_runtime states are also in sync for such
-hwmods by doing a omap_device_enable() and pm_runtime_set_active() for the
-device.
+On Wednesday 19 June 2013 02:45 PM, Manjunathappa, Prakash wrote:
+> DT kernel on da850-evm comes up with garbled UART logs. This is because
+> of mismatch in actual module clock rate and rate specified(clock-frequency)
+> in DT blob. kernel should not assume or depend on bootloaders clock
+> configuration, instead let it find the clock rate at runtime.
+> 
+> Issue discussed here before arriving on this implementation:
+> "ARM: davinci: da850 evm: update clock rate for UART 1/2 DT nodes"
+> https://patchwork.kernel.org/patch/2162271/
+> 
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/omap_device.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Adding to v3.12/soc branch of my tree.
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 1c82cde..f99f68e 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -129,6 +129,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 	struct device_node *node = pdev->dev.of_node;
- 	const char *oh_name;
- 	int oh_cnt, i, ret = 0;
-+	bool device_active = false;
- 
- 	oh_cnt = of_property_count_strings(node, "ti,hwmods");
- 	if (oh_cnt <= 0) {
-@@ -152,6 +153,8 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 			goto odbfd_exit1;
- 		}
- 		hwmods[i] = oh;
-+		if (oh->flags & HWMOD_INIT_NO_IDLE)
-+			device_active = true;
- 	}
- 
- 	od = omap_device_alloc(pdev, hwmods, oh_cnt);
-@@ -172,6 +175,11 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 
- 	pdev->dev.pm_domain = &omap_device_pm_domain;
- 
-+	if (device_active) {
-+		omap_device_enable(pdev);
-+		pm_runtime_set_active(&pdev->dev);
-+	}
-+
- odbfd_exit1:
- 	kfree(hwmods);
- odbfd_exit:
--- 
-1.7.9.5
+Thanks,
+Sekhar
