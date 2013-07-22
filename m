@@ -1,70 +1,106 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Mon, 22 Jul 2013 15:02:46 +0530
-Subject: [PATCH 11/11] USB: OHCI: Properly handle ohci-spear suspend
-In-Reply-To: <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1374485566-3997-12-git-send-email-manjunath.goudar@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 22 Jul 2013 11:35:10 +0200
+Subject: [PATCH 2/4] ARM: exynos: cpuidle: Use the common cpuidle
+ register routine
+In-Reply-To: <51ECB6DE.9060701@linaro.org>
+References: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
+ <4097491.3y6BBYmzze@amdc1032> <51ECB6DE.9060701@linaro.org>
+Message-ID: <1445208.tM84QonONK@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-spear glue was not
-properly handled as it was not suspending generic part
-of ohci controller. Calling explicitly the ohci_suspend()
-routine in spear_ohci_hcd_drv_suspend() will ensure proper
-handling of suspend scenario.
+On Monday, July 22, 2013 06:36:46 AM Daniel Lezcano wrote:
+> On 07/19/2013 06:03 PM, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> > 
+> > On Thursday, July 18, 2013 02:54:28 PM Daniel Lezcano wrote:
+> >> Now we have the same routine than the one handled by the cpuidle framework.
+> > 
+> > Small nitpick:
+> > 
+> > To be exact the routine is not the same, on error cpuidle_register() does
+> > complete unregister operation of the cpuidle driver, exynos4_init_cpuidle()
+> > just stops the registration procedure. 
+> > 
+> > The change itself is okay but the patch description could be better.
+> 
+> Ok, I will fix the changelog.
+> 
+> > Anyway all patches (#1-4) look fine to me. Thanks for this work.
+> 
+> Thanks for the review. I assume it is an acked-by right ?
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
+Yes.
 
-V2:
- -Incase ohci_suspend() fails, return right away without
-  executing further.
-V3:
- -Aligned variable "do_wakeup" and "ret".
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-V4:
- -The do_wakeup and ret variable alignment is removed.
----
- drivers/usb/host/ohci-spear.c |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
-index 31ff3fc..41148f8 100644
---- a/drivers/usb/host/ohci-spear.c
-+++ b/drivers/usb/host/ohci-spear.c
-@@ -130,20 +130,26 @@ static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
- }
- 
- #if defined(CONFIG_PM)
--static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
-+static int spear_ohci_hcd_drv_suspend(struct platform_device *pdev,
- 		pm_message_t message)
- {
--	struct usb_hcd *hcd = platform_get_drvdata(dev);
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
- 	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
-+	bool do_wakeup = device_may_wakeup(&pdev->dev);
-+	int ret;
- 
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
- 
-+	ret = ohci_suspend(hcd, do_wakeup);
-+	if (ret)
-+		return ret;
-+
- 	clk_disable_unprepare(sohci_p->clk);
- 
--	return 0;
-+	return ret;
- }
- 
- static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
--- 
-1.7.9.5
+> > Best regards,
+> 
+> Kukjin,
+> 
+> shall I take the patchset in my tree ?
+> 
+> Thanks
+>   -- Daniel
+> 
+> > --
+> > Bartlomiej Zolnierkiewicz
+> > Samsung R&D Institute Poland
+> > Samsung Electronics
+> >  
+> >> Let's use it.
+> >>
+> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> ---
+> >>  arch/arm/mach-exynos/cpuidle.c |   24 +-----------------------
+> >>  1 file changed, 1 insertion(+), 23 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> >> index cc4b097..d8fc1a2 100644
+> >> --- a/arch/arm/mach-exynos/cpuidle.c
+> >> +++ b/arch/arm/mach-exynos/cpuidle.c
+> >> @@ -41,8 +41,6 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> >>  				struct cpuidle_driver *drv,
+> >>  				int index);
+> >>  
+> >> -static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+> >> -
+> >>  static struct cpuidle_driver exynos4_idle_driver = {
+> >>  	.name			= "exynos4_idle",
+> >>  	.owner			= THIS_MODULE,
+> >> @@ -188,29 +186,9 @@ static void __init exynos5_core_down_clk(void)
+> >>  
+> >>  static int __init exynos4_init_cpuidle(void)
+> >>  {
+> >> -	int cpu_id, ret;
+> >> -	struct cpuidle_device *device;
+> >> -
+> >>  	if (soc_is_exynos5250())
+> >>  		exynos5_core_down_clk();
+> >>  
+> >> -	ret = cpuidle_register_driver(&exynos4_idle_driver);
+> >> -	if (ret) {
+> >> -		printk(KERN_ERR "CPUidle failed to register driver\n");
+> >> -		return ret;
+> >> -	}
+> >> -
+> >> -	for_each_online_cpu(cpu_id) {
+> >> -		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+> >> -		device->cpu = cpu_id;
+> >> -
+> >> -		ret = cpuidle_register_device(device);
+> >> -		if (ret) {
+> >> -			printk(KERN_ERR "CPUidle register device failed\n");
+> >> -			return ret;
+> >> -		}
+> >> -	}
+> >> -
+> >> -	return 0;
+> >> +	return cpuidle_register(&exynos4_idle_driver, NULL);
+> >>  }
+> >>  device_initcall(exynos4_init_cpuidle);
