@@ -1,72 +1,33 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 22 Jul 2013 14:14:41 +0200
-Subject: [PATCH v3 14/31] dts: mpc512x: prepare for preprocessor support
-In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
-Message-ID: <1374495298-22019-15-git-send-email-gsi@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 22 Jul 2013 20:42:16 +0800
+Subject: [PATCH 2/2] ARM: dts: mx6: Add support for imx6dl nitrogen board
+In-Reply-To: <CAOMZO5C8Zz27KQOQxnurRmEUqUPw6VZNPGc3g4oXEUZUDxtYVQ@mail.gmail.com>
+References: <1374118960-19060-1-git-send-email-festevam@gmail.com>
+ <1374118960-19060-2-git-send-email-festevam@gmail.com>
+ <20130722075736.GC20271@S2101-09.ap.freescale.net>
+ <CAOMZO5C8Zz27KQOQxnurRmEUqUPw6VZNPGc3g4oXEUZUDxtYVQ@mail.gmail.com>
+Message-ID: <20130722124213.GJ20271@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-prepare C preprocessor support when processing MPC512x DTS files
-- switch from DTS syntax to CPP syntax for include specs
-- create a symlink such that DTS processing can reference includes
+On Mon, Jul 22, 2013 at 09:21:20AM -0300, Fabio Estevam wrote:
+> Hi Shawn,
+> 
+> On Mon, Jul 22, 2013 at 4:57 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+> >> +/ {
+> >> +     model = "Boundary Devices i.MX6 Dual Lite Nitrogen Board";
+> >> +     compatible = "boundary,imx6dl-nitrogen", "fsl,imx6dl";
+> >> +
+> >> +     memory {
+> >> +             reg = <0x10000000 0x40000000>;
+> >> +     };
+> >
+> > This memory configuration is also common, right?
+> 
+> The reason I put the memory configuration in this file is because we
+> also have nitrogen quad and dual-lite versions with 2GB.
 
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/boot/dts/ac14xx.dts          |    2 +-
- arch/powerpc/boot/dts/include/dt-bindings |    1 +
- arch/powerpc/boot/dts/mpc5121ads.dts      |    2 +-
- arch/powerpc/boot/dts/pdm360ng.dts        |    2 +-
- 4 files changed, 4 insertions(+), 3 deletions(-)
- create mode 120000 arch/powerpc/boot/dts/include/dt-bindings
+Fine, then.
 
-diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-index a27a460..a543c40 100644
---- a/arch/powerpc/boot/dts/ac14xx.dts
-+++ b/arch/powerpc/boot/dts/ac14xx.dts
-@@ -10,7 +10,7 @@
-  */
- 
- 
--/include/ "mpc5121.dtsi"
-+#include <mpc5121.dtsi>
- 
- / {
- 	model = "ac14xx";
-diff --git a/arch/powerpc/boot/dts/include/dt-bindings b/arch/powerpc/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/powerpc/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/arch/powerpc/boot/dts/mpc5121ads.dts b/arch/powerpc/boot/dts/mpc5121ads.dts
-index 7d3cb79..c228a0a 100644
---- a/arch/powerpc/boot/dts/mpc5121ads.dts
-+++ b/arch/powerpc/boot/dts/mpc5121ads.dts
-@@ -9,7 +9,7 @@
-  * option) any later version.
-  */
- 
--/include/ "mpc5121.dtsi"
-+#include <mpc5121.dtsi>
- 
- / {
- 	model = "mpc5121ads";
-diff --git a/arch/powerpc/boot/dts/pdm360ng.dts b/arch/powerpc/boot/dts/pdm360ng.dts
-index 7433740..871c16d 100644
---- a/arch/powerpc/boot/dts/pdm360ng.dts
-+++ b/arch/powerpc/boot/dts/pdm360ng.dts
-@@ -13,7 +13,7 @@
-  * option) any later version.
-  */
- 
--/include/ "mpc5121.dtsi"
-+#include <mpc5121.dtsi>
- 
- / {
- 	model = "pdm360ng";
--- 
-1.7.10.4
+Shawn
