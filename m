@@ -1,73 +1,69 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 22 Jul 2013 21:26:35 +0100
-Subject: [PATCH 4/4] ARM: set --be8 when linking modules
-In-Reply-To: <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
-References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374510833-25716-5-git-send-email-ben.dooks@codethink.co.uk>
- <20130722170500.GC19639@codeaurora.org> <51ED69CA.3030501@codethink.co.uk>
- <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
-Message-ID: <51ED957B.80105@codethink.co.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 22 Jul 2013 17:47:29 -0300
+Subject: [PATCH] ARM: dts: mxs: Add spi alias
+Message-ID: <1374526049-29649-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/13 19:53, Nicolas Pitre wrote:
-> On Mon, 22 Jul 2013, Ben Dooks wrote:
->
->> On 22/07/13 18:05, Stephen Boyd wrote:
->>> On 07/22, Ben Dooks wrote:
->>>> To avoid having to make every text section swap the instruction order
->>>> of all instructions, make sure modules are built also built with --be8
->>>> (as is the current kernel final link).
->>>>
->>>> If we do not do this, we would end up having to swap all instructions
->>>> when loading a module, instead of just the instructions that we are
->>>> applying ELF relocations to.
->>>>
->>>
->>> If someone tries to load a be8 module on a non-be8 kernel will it
->>> still work? Or should we add an extra version magic string in
->>> asm/module.h to prevent that?
->>
->> The ELF header changes the EI_DATA field in the ei_ident from
->> ELFDATA2LSB to ELFDATA2MSB when compiling so we should be able
->> to detect these when loading.
->>
->> I have not checked to see if the kernel correctly checks for this.
->>
->> I do not think it currently checks the ei_flags field for the
->> EF_ARM_BE8 in ABI 4 and 5. I am not sure if this is really important?
->
-> If the information is already there and easily accessible, then it
-> should be used.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I added this, which seems to actually work unlike my last effort.
+After providing spi alias, we can get the following message during probe:
 
-I do not think it actually gets triggered, the ELF format contains
-the endian-ness of the system it was built for and therefore fails
-somewhere else.
+m25p80 spi1.0: sst25vf016b (2048 Kbytes)
 
+,which looks better than the original one:
 
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d0d1e83..37c8e66 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -34,6 +34,17 @@ int elf_check_arch(const struct elf32_hdr *x)
-                 if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & 
-HWCAP_VFP))
-                         return 0;
-         }
-+
-+       if ((eflags & EF_ARM_EABI_MASK) >= EF_ARM_EABI_VER4) {
-+               bool is_be8 = IS_ENABLED(CONFIG_CPU_ENDIAN_BE8);
-+
-+               /* do some simple endian-ness verifications */
-+               if (eflags & EF_ARM_BE8 && !is_be8)
-+                       return 0;
-+               if (eflags & EF_ARM_LE8 && is_be8)
-+                       return 0;
-+       }
-+
+m25p80 spi32766.0: sst25vf016b (2048 Kbytes)
 
+While at it, keep the alias entries in alphabetical order.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx23.dtsi | 2 ++
+ arch/arm/boot/dts/imx28.dtsi | 6 ++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 1e528db..28b5ce2 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -20,6 +20,8 @@
+ 		gpio2 = &gpio2;
+ 		serial0 = &auart0;
+ 		serial1 = &auart1;
++		spi0 = &ssp0;
++		spi1 = &ssp1;
+ 	};
+ 
+ 	cpus {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index db67eb6..89d98a1 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -15,6 +15,8 @@
+ 	interrupt-parent = <&icoll>;
+ 
+ 	aliases {
++		ethernet0 = &mac0;
++		ethernet1 = &mac1;
+ 		gpio0 = &gpio0;
+ 		gpio1 = &gpio1;
+ 		gpio2 = &gpio2;
+@@ -22,13 +24,13 @@
+ 		gpio4 = &gpio4;
+ 		saif0 = &saif0;
+ 		saif1 = &saif1;
++		spi0 = &ssp1;
++		spi1 = &ssp2;
+ 		serial0 = &auart0;
+ 		serial1 = &auart1;
+ 		serial2 = &auart2;
+ 		serial3 = &auart3;
+ 		serial4 = &auart4;
+-		ethernet0 = &mac0;
+-		ethernet1 = &mac1;
+ 	};
+ 
+ 	cpus {
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.8.1.2
