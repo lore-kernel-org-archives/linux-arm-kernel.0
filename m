@@ -1,69 +1,56 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Jul 2013 16:37:01 +0900
-Subject: [PATCH 4/5] ARM: shmobile: Insert align directives before 4 bytes data
-In-Reply-To: <cover.1374478336.git.horms+renesas@verge.net.au>
-References: <cover.1374478336.git.horms+renesas@verge.net.au>
-Message-ID: <0b933cb305e7a987e0a711ee15457bd70055d682.1374478336.git.horms+renesas@verge.net.au>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 22 Jul 2013 09:43:23 +0200
+Subject: [PATCH v4 02/20] clocksource: samsung_pwm_timer: Correct
+ definition of AUTORELOAD bit
+In-Reply-To: <51ECABF1.4040600@linaro.org>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1374278673-25615-4-git-send-email-tomasz.figa@gmail.com>
+ <51ECABF1.4040600@linaro.org>
+Message-ID: <9612221.r4mx9bHE64@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+On Monday 22 of July 2013 05:50:09 Daniel Lezcano wrote:
+> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
+> > PWM channel 4 has its autoreload bit located at different position.
+> > This patch fixes the driver to account for that.
+> > 
+> > This fixes a problem with the clocksource hanging after it overflows
+> > because it is not reloaded any more.
+> > 
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > ---
+> > 
+> >  drivers/clocksource/samsung_pwm_timer.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clocksource/samsung_pwm_timer.c
+> > b/drivers/clocksource/samsung_pwm_timer.c index 3fa5b07..e238fb0
+> > 100644
+> > --- a/drivers/clocksource/samsung_pwm_timer.c
+> > +++ b/drivers/clocksource/samsung_pwm_timer.c
+> > @@ -47,7 +47,8 @@
+> > 
+> >  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
+> >  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
+> >  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
+> > 
+> > -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
+> > +#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) \
+> > +						+ (((chan) < 5) ? 3 : 2)))
+> 
+> This macro is not readable. Please, fix it up with a comment please.
 
-In thumb2 mode instructions are not align to 4 byte. This patch insert
-align directives before putting 4 byte data.
+/*
+ * Channel 4 (logically 5 in TCON register) has different position
+ * of autoreload bit.
+ */
+#define _TCON_AUTORELOAD(chan)			(1 << (4 * (chan) + 3))
+#define _TCON_AUTORELOAD4(chan)			(1 << (4 * (chan) + 2))
+#define TCON_AUTORELOAD(chan)			((chan < 5) ? 
+		_TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
 
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/headsmp-scu.S  | 1 +
- arch/arm/mach-shmobile/headsmp.S      | 1 +
- arch/arm/mach-shmobile/sleep-sh7372.S | 2 ++
- 3 files changed, 4 insertions(+)
+What do you think?
 
-diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index 5ce416c..0a77488 100644
---- a/arch/arm/mach-shmobile/headsmp-scu.S
-+++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -46,6 +46,7 @@ ENTRY(shmobile_boot_scu)
- ENDPROC(shmobile_boot_scu)
- 
- 	.text
-+	.align	2
- 	.globl	shmobile_scu_base
- shmobile_scu_base:
- 	.space	4
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index afed58e..dfb41df 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -35,6 +35,7 @@ ENTRY(shmobile_boot_vector)
- 
- ENDPROC(shmobile_boot_vector)
- 
-+	.align	2
- 	.globl	shmobile_boot_fn
- shmobile_boot_fn:
- 1:	.space	4
-diff --git a/arch/arm/mach-shmobile/sleep-sh7372.S b/arch/arm/mach-shmobile/sleep-sh7372.S
-index 53f4840..9782862 100644
---- a/arch/arm/mach-shmobile/sleep-sh7372.S
-+++ b/arch/arm/mach-shmobile/sleep-sh7372.S
-@@ -41,6 +41,7 @@
- sh7372_resume_core_standby_sysc:
- 	ldr     pc, 1f
- 
-+	.align	2
- 	.globl	sh7372_cpu_resume
- sh7372_cpu_resume:
- 1:	.space	4
-@@ -96,6 +97,7 @@ sh7372_do_idle_sysc:
- 1:
- 	b      1b
- 
-+	.align	2
- kernel_flush:
- 	.word v7_flush_dcache_all
- #endif
--- 
-1.8.2.1
+Best regards,
+Tomasz
