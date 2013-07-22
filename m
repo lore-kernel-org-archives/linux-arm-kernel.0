@@ -1,108 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Jul 2013 16:36:58 +0900
-Subject: [PATCH 1/5] ARM: shmobile: Update romImage to relocate appended DTB
+Date: Mon, 22 Jul 2013 16:37:01 +0900
+Subject: [PATCH 4/5] ARM: shmobile: Insert align directives before 4 bytes data
 In-Reply-To: <cover.1374478336.git.horms+renesas@verge.net.au>
 References: <cover.1374478336.git.horms+renesas@verge.net.au>
-Message-ID: <2c408d149299e99c89fc4be80fb4fe00a7016f02.1374478336.git.horms+renesas@verge.net.au>
+Message-ID: <0b933cb305e7a987e0a711ee15457bd70055d682.1374478336.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-Instead of relying of MACH_TYPE for board identification,
-update the romImage code to relocate an appended DTB to
-the beginning of RAM. This implementation is independent
-of ARM_APPENDED_DTB, this because it is necessary to copy
-the DTB to memory so the kernel can access it.
+In thumb2 mode instructions are not align to 4 byte. This patch insert
+align directives before putting 4 byte data.
 
-Without this patch Mackerel does not boot via the Mask ROM
-over USB (r_usb_boot) - this since non-DT boot was broken
-ages ago in commit:
-
-0ce53cd ARM: mach-shmobile: Use DT_MACHINE for mackerel
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/compressed/head-shmobile.S    | 43 ++++++++++++++++++++++++++---
- arch/arm/mach-shmobile/include/mach/zboot.h |  2 --
- 2 files changed, 39 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/headsmp-scu.S  | 1 +
+ arch/arm/mach-shmobile/headsmp.S      | 1 +
+ arch/arm/mach-shmobile/sleep-sh7372.S | 2 ++
+ 3 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
-index e2d6363..e7f8092 100644
---- a/arch/arm/boot/compressed/head-shmobile.S
-+++ b/arch/arm/boot/compressed/head-shmobile.S
-@@ -55,12 +55,47 @@ __tmp_stack:
- __continue:
- #endif /* CONFIG_ZBOOT_ROM_MMC || CONFIG_ZBOOT_ROM_SH_MOBILE_SDHI */
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index 5ce416c..0a77488 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -46,6 +46,7 @@ ENTRY(shmobile_boot_scu)
+ ENDPROC(shmobile_boot_scu)
  
--	/* Set board ID necessary for boot */
--	ldr	r7, 1f				@ Set machine type register
--	mov	r8, #0				@ pass null pointer as atag
-+	adr	r0, dtb_info
-+	ldmia	r0, {r1, r3, r4, r5, r7}
-+
-+	sub	r0, r0, r1		@ calculate the delta offset
-+	add	r5, r5, r0		@ _edata
-+
-+	ldr	lr, [r5, #0]		@ check if valid DTB is present
-+	cmp	lr, r3
-+	bne	0f
-+
-+	add	r9, r7, #31		@ rounded up to a multiple
-+	bic	r9, r9, #31		@ ... of 32 bytes
-+
-+	add	r6, r9, r5		@ copy from _edata
-+	add	r9, r9, r4		@ to MEMORY_START
-+
-+1:	ldmdb	r6!, {r0 - r3, r10 - r12, lr}
-+	cmp	r6, r5
-+	stmdb	r9!, {r0 - r3, r10 - r12, lr}
-+	bhi	1b
-+
-+	/* Success: Zero board ID, pointer to start of memory for atag/dtb */
-+	mov	r7, #0
-+	mov	r8, r4
- 	b	2f
- 
--1 :	.long MACH_TYPE
+ 	.text
 +	.align	2
-+dtb_info:
-+	.word	dtb_info
-+#ifndef __ARMEB__
-+	.word	0xedfe0dd0		@ sig is 0xd00dfeed big endian
-+#else
-+	.word	0xd00dfeed
-+#endif
-+	.word	MEMORY_START
-+	.word	_edata
-+	.word	0x4000			@ maximum DTB size
-+0:
-+	/* Failure: Zero board ID, NULL atag/dtb */
-+	mov 	r7, #0
-+	mov	r8, #0			@ pass null pointer as atag
- 2 :
+ 	.globl	shmobile_scu_base
+ shmobile_scu_base:
+ 	.space	4
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index afed58e..dfb41df 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -35,6 +35,7 @@ ENTRY(shmobile_boot_vector)
  
- #endif /* CONFIG_ZBOOT_ROM */
-diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
-index f2d8744..c3c4669 100644
---- a/arch/arm/mach-shmobile/include/mach/zboot.h
-+++ b/arch/arm/mach-shmobile/include/mach/zboot.h
-@@ -1,7 +1,6 @@
- #ifndef ZBOOT_H
- #define ZBOOT_H
+ ENDPROC(shmobile_boot_vector)
  
--#include <asm/mach-types.h>
- #include <mach/zboot_macros.h>
++	.align	2
+ 	.globl	shmobile_boot_fn
+ shmobile_boot_fn:
+ 1:	.space	4
+diff --git a/arch/arm/mach-shmobile/sleep-sh7372.S b/arch/arm/mach-shmobile/sleep-sh7372.S
+index 53f4840..9782862 100644
+--- a/arch/arm/mach-shmobile/sleep-sh7372.S
++++ b/arch/arm/mach-shmobile/sleep-sh7372.S
+@@ -41,6 +41,7 @@
+ sh7372_resume_core_standby_sysc:
+ 	ldr     pc, 1f
  
- /**************************************************
-@@ -11,7 +10,6 @@
-  **************************************************/
++	.align	2
+ 	.globl	sh7372_cpu_resume
+ sh7372_cpu_resume:
+ 1:	.space	4
+@@ -96,6 +97,7 @@ sh7372_do_idle_sysc:
+ 1:
+ 	b      1b
  
- #ifdef CONFIG_MACH_MACKEREL
--#define MACH_TYPE	MACH_TYPE_MACKEREL
- #define MEMORY_START	0x40000000
- #include "mach/head-mackerel.txt"
- #else
++	.align	2
+ kernel_flush:
+ 	.word v7_flush_dcache_all
+ #endif
 -- 
 1.8.2.1
