@@ -1,67 +1,67 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Jul 2013 22:56:44 +0200
-Subject: [PATCH v4 02/20] clocksource: samsung_pwm_timer: Correct
- definition of AUTORELOAD bit
-In-Reply-To: <9612221.r4mx9bHE64@flatron>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1374278673-25615-4-git-send-email-tomasz.figa@gmail.com>
- <51ECABF1.4040600@linaro.org> <9612221.r4mx9bHE64@flatron>
-Message-ID: <51ED9C8C.10803@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 22 Jul 2013 17:57:01 -0300
+Subject: [PATCH v2] ARM: dts: mxs: Add spi alias
+Message-ID: <1374526621-29874-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 09:43 AM, Tomasz Figa wrote:
-> On Monday 22 of July 2013 05:50:09 Daniel Lezcano wrote:
->> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
->>> PWM channel 4 has its autoreload bit located at different position.
->>> This patch fixes the driver to account for that.
->>>
->>> This fixes a problem with the clocksource hanging after it overflows
->>> because it is not reloaded any more.
->>>
->>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
->>> ---
->>>
->>>  drivers/clocksource/samsung_pwm_timer.c | 3 ++-
->>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clocksource/samsung_pwm_timer.c
->>> b/drivers/clocksource/samsung_pwm_timer.c index 3fa5b07..e238fb0
->>> 100644
->>> --- a/drivers/clocksource/samsung_pwm_timer.c
->>> +++ b/drivers/clocksource/samsung_pwm_timer.c
->>> @@ -47,7 +47,8 @@
->>>
->>>  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
->>>  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
->>>  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
->>>
->>> -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
->>> +#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) \
->>> +						+ (((chan) < 5) ? 3 : 2)))
->>
->> This macro is not readable. Please, fix it up with a comment please.
-> 
-> /*
->  * Channel 4 (logically 5 in TCON register) has different position
->  * of autoreload bit.
->  */
-> #define _TCON_AUTORELOAD(chan)			(1 << (4 * (chan) + 3))
-> #define _TCON_AUTORELOAD4(chan)			(1 << (4 * (chan) + 2))
-> #define TCON_AUTORELOAD(chan)			((chan < 5) ? 
-> 		_TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
-> 
-> What do you think?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I don't get the arithmetic here and the code is poor in comment. A nice
-comment would valuable here.
+After providing spi alias, we can get the following message during probe:
 
-May be you can replace 1 << bla by BIT(bla) ?
+m25p80 spi1.0: sst25vf016b (2048 Kbytes)
 
+,which looks better than the original one:
 
+m25p80 spi32766.0: sst25vf016b (2048 Kbytes)
+
+While at it, keep the alias entries in alphabetical order.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Fix the alphabetical order 
+
+ arch/arm/boot/dts/imx23.dtsi | 2 ++
+ arch/arm/boot/dts/imx28.dtsi | 6 ++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 1e528db..28b5ce2 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -20,6 +20,8 @@
+ 		gpio2 = &gpio2;
+ 		serial0 = &auart0;
+ 		serial1 = &auart1;
++		spi0 = &ssp0;
++		spi1 = &ssp1;
+ 	};
+ 
+ 	cpus {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index db67eb6..47fc5ef 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -15,6 +15,8 @@
+ 	interrupt-parent = <&icoll>;
+ 
+ 	aliases {
++		ethernet0 = &mac0;
++		ethernet1 = &mac1;
+ 		gpio0 = &gpio0;
+ 		gpio1 = &gpio1;
+ 		gpio2 = &gpio2;
+@@ -27,8 +29,8 @@
+ 		serial2 = &auart2;
+ 		serial3 = &auart3;
+ 		serial4 = &auart4;
+-		ethernet0 = &mac0;
+-		ethernet1 = &mac1;
++		spi0 = &ssp1;
++		spi1 = &ssp2;
+ 	};
+ 
+ 	cpus {
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.1.2
