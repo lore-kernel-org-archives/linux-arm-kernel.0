@@ -1,62 +1,65 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 22 Jul 2013 17:33:51 +0100
-Subject: [PATCH 2/4] ARM: traps: use <asm/opcodes.h> to get correct
- instruction order
+Date: Mon, 22 Jul 2013 17:33:50 +0100
+Subject: [PATCH 1/4] ARM: alignment: correctly decode instructions in BE8 mode.
 In-Reply-To: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374510833-25716-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374510833-25716-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The trap handler needs to take into account the endian configuration of
-the system when loading instructions. Use <asm/opcodes.h> to provide the
-necessary conversion functions.
+If we are in BE8 mode, we must deal with the instruction stream being
+in LE order when data is being loaded in BE order. Ensure the data is
+swapped before processing to avoid thre following:
+
+Change to using <asm/opcodes.h> to provide the necessary conversion
+functions to change the byte ordering.
+
+Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
+Unhandled fault: alignment exception (0x001) at 0xbfa09567
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/traps.c |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mm/alignment.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 1c08911..0a56e13 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -34,6 +34,7 @@
- #include <asm/unwind.h>
- #include <asm/tls.h>
- #include <asm/system_misc.h>
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index db26e2e..295d615 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -25,6 +25,7 @@
+ #include <asm/cp15.h>
+ #include <asm/system_info.h>
+ #include <asm/unaligned.h>
 +#include <asm/opcodes.h>
  
- #include "signal.h"
+ #include "fault.h"
  
-@@ -411,23 +412,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	if (processor_mode(regs) == SVC_MODE) {
- #ifdef CONFIG_THUMB2_KERNEL
- 		if (thumb_mode(regs)) {
--			instr = ((u16 *)pc)[0];
-+			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
- 			if (is_wide_instruction(instr)) {
- 				instr <<= 16;
--				instr |= ((u16 *)pc)[1];
-+				instr |= __mem_to_opcode_thumb16(((u16 *)pc)[1]);
+@@ -762,21 +763,24 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	if (thumb_mode(regs)) {
+ 		u16 *ptr = (u16 *)(instrptr & ~1);
+ 		fault = probe_kernel_address(ptr, tinstr);
++		tinstr = __mem_to_opcode_thumb16(tinstr);
+ 		if (!fault) {
+ 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+ 			    IS_T32(tinstr)) {
+ 				/* Thumb-2 32-bit */
+ 				u16 tinst2 = 0;
+ 				fault = probe_kernel_address(ptr + 1, tinst2);
++				tinst2 = __mem_to_opcode_thumb16(tinst2);
+ 				instr = (tinstr << 16) | tinst2;
+ 				thumb2_32b = 1;
+ 			} else {
+ 				isize = 2;
+-				instr = thumb2arm(tinstr);
  			}
- 		} else
- #endif
--			instr = *(u32 *) pc;
-+			instr = __mem_to_opcode_arm(*(u32 *) pc);
- 	} else if (thumb_mode(regs)) {
- 		if (get_user(instr, (u16 __user *)pc))
- 			goto die_sig;
-+		instr = __mem_to_opcode_thumb16(instr);
- 		if (is_wide_instruction(instr)) {
- 			unsigned int instr2;
- 			if (get_user(instr2, (u16 __user *)pc+1))
- 				goto die_sig;
- 			instr <<= 16;
--			instr |= instr2;
-+			instr |= __mem_to_opcode_thumb16(instr2);
  		}
- 	} else if (get_user(instr, (u32 __user *)pc)) {
- 		goto die_sig;
+-	} else
++	} else {
+ 		fault = probe_kernel_address(instrptr, instr);
++		instr = __mem_to_opcode_arm(instr);
++	}
+ 
+ 	if (fault) {
+ 		type = TYPE_FAULT;
 -- 
 1.7.10.4
