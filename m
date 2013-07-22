@@ -1,29 +1,31 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 22 Jul 2013 10:45:35 +0100
-Subject: [PATCH] xen/arm and xen/arm64: update xen_restart after
+Date: Mon, 22 Jul 2013 10:47:44 +0100
+Subject: [PATCH v2] xen/arm and xen/arm64: update xen_restart after
  ff701306cd49
-In-Reply-To: <51EC4701.8020502@cogentembedded.com>
-References: <1374420257-19467-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <51EC4701.8020502@cogentembedded.com>
-Message-ID: <alpine.DEB.2.02.1307221045200.4893@kaball.uk.xensource.com>
+Message-ID: <1374486464-25243-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jul 2013, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 21-07-2013 19:24, Stefano Stabellini wrote:
-> 
-> > Commit ff701306cd49 changes the prototype of arm_pm_restart.
-> 
->    Please also specify the summary line of that commit in parens.
+Commit ff701306cd49 (arm64: use common reboot infrastructure) changes
+the prototype of arm_pm_restart.  Update xen_restart accordingly.
 
-Good idea, I'll repost
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/enlighten.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-
-> > Update xen_restart accordingly.
-> 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
-> WBR, Sergei
-> 
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index f71c37e..c9770ba 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -172,7 +172,7 @@ static void __init xen_percpu_init(void *unused)
+ 	enable_percpu_irq(xen_events_irq, 0);
+ }
+ 
+-static void xen_restart(char str, const char *cmd)
++static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
+ {
+ 	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
+ 	int rc;
+-- 
+1.7.2.5
