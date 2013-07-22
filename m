@@ -1,89 +1,118 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Jul 2013 05:56:16 +0200
-Subject: [PATCH v4 04/20] clocksource: samsung_pwm_timer: Do not use
- clocksource_mmio
-In-Reply-To: <1374278673-25615-6-git-send-email-tomasz.figa@gmail.com>
+Date: Mon, 22 Jul 2013 05:57:33 +0200
+Subject: [PATCH v4 05/20] clocksource: samsung_pwm_timer: Handle
+ suspend/resume correctly
+In-Reply-To: <1374278673-25615-7-git-send-email-tomasz.figa@gmail.com>
 References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1374278673-25615-6-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <51ECAD60.1000109@linaro.org>
+ <1374278673-25615-7-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <51ECADAD.3040303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> In case of Samsung PWM timer, clocksource MMIO can not be used, because
-> custom suspend/resume callbacks are required.
+> Current suspend/resume handling of the driver was broken, because:
+>  - periodic timer was being enabled in CLOCK_EVT_MODE_RESUME mode, which
+>    does not seem to be correct behavior looking at other platforms,
+>  - PWM divisors need to be restored, but they were not,
+>  - clockevent interrupt mask needs to be restored, but it was not,
+>  - clocksource was being restored in clockevent resume callback.
+> 
+> This patch fixes issues mentioned above, making suspend/resume handling
+> in the driver correct.
 > 
 > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 > ---
 
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Please in the future Cc me and Thomas Gleixner (clocksource/clockevent
-maintainers).
-
-Thanks
-  -- Daniel
-
->  drivers/clocksource/Kconfig             |  1 -
->  drivers/clocksource/samsung_pwm_timer.c | 19 +++++++++++++++----
->  2 files changed, 15 insertions(+), 5 deletions(-)
+>  drivers/clocksource/samsung_pwm_timer.c | 42 ++++++++++++++++++++++-----------
+>  1 file changed, 28 insertions(+), 14 deletions(-)
 > 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index b7b9b04..41c6946 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -99,7 +99,6 @@ config CLKSRC_EXYNOS_MCT
->  
->  config CLKSRC_SAMSUNG_PWM
->  	bool
-> -	select CLKSRC_MMIO
->  	help
->  	  This is a new clocksource driver for the PWM timer found in
->  	  Samsung S3C, S5P and Exynos SoCs, replacing an earlier driver
 > diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
-> index 823279b..753ffec 100644
+> index 753ffec..282e0e2 100644
 > --- a/drivers/clocksource/samsung_pwm_timer.c
 > +++ b/drivers/clocksource/samsung_pwm_timer.c
-> @@ -288,6 +288,18 @@ static void __init samsung_clockevent_init(void)
+> @@ -197,17 +197,6 @@ static int samsung_set_next_event(unsigned long cycles,
+>  	return 0;
+>  }
+>  
+> -static void samsung_timer_resume(void)
+> -{
+> -	/* event timer restart */
+> -	samsung_time_setup(pwm.event_id, pwm.clock_count_per_tick - 1);
+> -	samsung_time_start(pwm.event_id, true);
+> -
+> -	/* source timer restart */
+> -	samsung_time_setup(pwm.source_id, pwm.tcnt_max);
+> -	samsung_time_start(pwm.source_id, true);
+> -}
+> -
+>  static void samsung_set_mode(enum clock_event_mode mode,
+>  				struct clock_event_device *evt)
+>  {
+> @@ -224,20 +213,29 @@ static void samsung_set_mode(enum clock_event_mode mode,
+>  
+>  	case CLOCK_EVT_MODE_UNUSED:
+>  	case CLOCK_EVT_MODE_SHUTDOWN:
+> -		break;
+> -
+>  	case CLOCK_EVT_MODE_RESUME:
+> -		samsung_timer_resume();
+>  		break;
 >  	}
 >  }
 >  
-> +static cycle_t samsung_clocksource_read(struct clocksource *c)
+> +static void samsung_clockevent_resume(struct clock_event_device *cev)
 > +{
-> +	return ~readl_relaxed(pwm.source_reg);
+> +	samsung_timer_set_prescale(pwm.event_id, pwm.tscaler_div);
+> +	samsung_timer_set_divisor(pwm.event_id, pwm.tdiv);
+> +
+> +	if (pwm.variant.has_tint_cstat) {
+> +		u32 mask = (1 << pwm.event_id);
+> +		writel(mask | (mask << 5), pwm.base + REG_TINT_CSTAT);
+> +	}
 > +}
 > +
-> +static struct clocksource samsung_clocksource = {
-> +	.name		= "samsung_clocksource_timer",
-> +	.rating		= 250,
-> +	.read		= samsung_clocksource_read,
-> +	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> +};
+>  static struct clock_event_device time_event_device = {
+>  	.name		= "samsung_event_timer",
+>  	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+>  	.rating		= 200,
+>  	.set_next_event	= samsung_set_next_event,
+>  	.set_mode	= samsung_set_mode,
+> +	.resume		= samsung_clockevent_resume,
+>  };
+>  
+>  static irqreturn_t samsung_clock_event_isr(int irq, void *dev_id)
+> @@ -288,6 +286,20 @@ static void __init samsung_clockevent_init(void)
+>  	}
+>  }
+>  
+> +static void samsung_clocksource_suspend(struct clocksource *cs)
+> +{
+> +	samsung_time_stop(pwm.source_id);
+> +}
 > +
->  /*
->   * Override the global weak sched_clock symbol with this
->   * local implementation which uses the clocksource to get some
-> @@ -297,7 +309,7 @@ static void __init samsung_clockevent_init(void)
->   */
->  static u32 notrace samsung_read_sched_clock(void)
+> +static void samsung_clocksource_resume(struct clocksource *cs)
+> +{
+> +	samsung_timer_set_prescale(pwm.source_id, pwm.tscaler_div);
+> +	samsung_timer_set_divisor(pwm.source_id, pwm.tdiv);
+> +
+> +	samsung_time_setup(pwm.source_id, pwm.tcnt_max);
+> +	samsung_time_start(pwm.source_id, true);
+> +}
+> +
+>  static cycle_t samsung_clocksource_read(struct clocksource *c)
 >  {
-> -	return ~__raw_readl(pwm.source_reg);
-> +	return samsung_clocksource_read(NULL);
->  }
+>  	return ~readl_relaxed(pwm.source_reg);
+> @@ -297,6 +309,8 @@ static struct clocksource samsung_clocksource = {
+>  	.name		= "samsung_clocksource_timer",
+>  	.rating		= 250,
+>  	.read		= samsung_clocksource_read,
+> +	.suspend	= samsung_clocksource_suspend,
+> +	.resume		= samsung_clocksource_resume,
+>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>  };
 >  
->  static void __init samsung_clocksource_init(void)
-> @@ -324,9 +336,8 @@ static void __init samsung_clocksource_init(void)
->  	setup_sched_clock(samsung_read_sched_clock,
->  						pwm.variant.bits, clock_rate);
->  
-> -	ret = clocksource_mmio_init(pwm.source_reg, "samsung_clocksource_timer",
-> -					clock_rate, 250, pwm.variant.bits,
-> -					clocksource_mmio_readl_down);
-> +	samsung_clocksource.mask = CLOCKSOURCE_MASK(pwm.variant.bits);
-> +	ret = clocksource_register_hz(&samsung_clocksource, clock_rate);
->  	if (ret)
->  		panic("samsung_clocksource_timer: can't register clocksource\n");
->  }
 > 
 
 
