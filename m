@@ -1,31 +1,77 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 22 Jul 2013 09:21:20 -0300
-Subject: [PATCH 2/2] ARM: dts: mx6: Add support for imx6dl nitrogen board
-In-Reply-To: <20130722075736.GC20271@S2101-09.ap.freescale.net>
-References: <1374118960-19060-1-git-send-email-festevam@gmail.com>
- <1374118960-19060-2-git-send-email-festevam@gmail.com>
- <20130722075736.GC20271@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5C8Zz27KQOQxnurRmEUqUPw6VZNPGc3g4oXEUZUDxtYVQ@mail.gmail.com>
+From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
+Date: Mon, 22 Jul 2013 15:22:50 +0300
+Subject: [PATCH v7 0/2] TWL6030, TWL6032 GPADC driver
+Message-ID: <1374495772-17758-1-git-send-email-oleksandr.kozaruk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hello,
 
-On Mon, Jul 22, 2013 at 4:57 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+v7 - addressed clean up comments, removed test channels
+v6 - addressed comments about trim bits, checkpatch clean up
+v5 - gpadc DT node renamed from "gpadc" to generic "adc", added
+     temperature channels; raw code is corracted with calibration
+     data.
+v4 - addressed comments: fixed style violation, bug in freeing memory,
+     added comments explaining calibration method, removed test network
+     channels from exposing to userspace, error handling for 
+     wait_for_complition
+v3 - fixed compiler warning
+v2 - the driver put in drivers/iio, and
+converted using iio facilities as suggested by Graeme.
 
->> +/ {
->> +     model = "Boundary Devices i.MX6 Dual Lite Nitrogen Board";
->> +     compatible = "boundary,imx6dl-nitrogen", "fsl,imx6dl";
->> +
->> +     memory {
->> +             reg = <0x10000000 0x40000000>;
->> +     };
->
-> This memory configuration is also common, right?
+TWL603[02] GPADC is used to measure battery voltage,
+battery temperature, battery presence ID, and could
+be used to measure twl603[02] die temperature.
+This is used on TI blaze, blaze tablet platforms.
 
-The reason I put the memory configuration in this file is because we
-also have nitrogen quad and dual-lite versions with 2GB.
+The TWL6030/TWL6032 is a PMIC that has a GPADC with 17/19
+channels respectively. Some channels have current
+source and are used for measuring voltage drop
+on resistive load for detecting battery ID resistance,
+or measuring voltage drop on NTC resistors for external
+temperature measurements, other channels measure voltage,
+(i.e. battery voltage), and have inbuilt voltage dividers,
+thus, capable to scale voltage. Some channels are dedicated
+for measuring die temperature.
 
-Regards,
+Some channels could be calibrated in 2 points, having
+offsets from ideal values in trim registers.
 
-Fabio Estevam
+The difference between GPADC in TWL6030 and TWL6032:
+- 10 bit vs 12 bit ADC;
+- 17 vs 19 channels;
+- channels have different purpose(i. e. battery voltage
+  channel 8 vs channel 18);
+- trim values are interpreted differently.
+
+The driver is derived from git://git.omapzoom.org/kernel/omap.git
+The original driver's authors and contributors are Balaji T K,
+Graeme Gregory, Ambresh K, Girish S Ghongdemath.
+
+The changes to the original driver:
+- device tree adaptation;
+- drop ioctl support - never been used;
+- unified measurement method for both devices;
+- get rid of "if (device == X)" code style to data driven;
+- drop polling end of conversion and use interrupt instead;
+- iio framework is used
+
+Tested with on blaze tablet 2 with OMAP4430(twl6030), and
+OMAP4470(twl6032) SOMs.
+
+The patches were tested against 3.11-rc2
+
+Oleksandr Kozaruk (2):
+  ARM: dts: twl: Add GPADC data to device tree
+  iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
+
+ arch/arm/boot/dts/twl6030.dtsi  |   6 +
+ drivers/iio/adc/Kconfig         |  14 +
+ drivers/iio/adc/Makefile        |   1 +
+ drivers/iio/adc/twl6030-gpadc.c | 981 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 1002 insertions(+)
+ create mode 100644 drivers/iio/adc/twl6030-gpadc.c
+
+-- 
+1.8.1.2
