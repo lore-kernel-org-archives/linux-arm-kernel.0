@@ -1,156 +1,79 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 22 Jul 2013 17:33:52 +0100
-Subject: [PATCH 3/4] ARM: module: correctly relocate instructions in BE8
-In-Reply-To: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374510833-25716-4-git-send-email-ben.dooks@codethink.co.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Jul 2013 18:45:31 +0200
+Subject: [GIT PULL] ARM: kernel mode NEON support
+In-Reply-To: <20130722163155.GN24642@n2100.arm.linux.org.uk>
+References: <CAKv+Gu_0XXdCw4-V6LLHCiaH4Wc+=4DTzP6gwgV_h-Qb90gYTA@mail.gmail.com>
+ <20130722163155.GN24642@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu9=7tg0u-X59u_wpZEk=w+uUQW_TWXNppfn1u24nm4oNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When in BE8 mode, our instructions are not in the same ordering as the
-data, so use <asm/opcodes.h> to take this into account.
+On 22 July 2013 18:31, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Mon, Jul 08, 2013 at 11:23:11PM +0100, Ard Biesheuvel wrote:
+>> The following changes since commit 8bb495e3f02401ee6f76d1b1d77f3ac9f079e376:
+>>
+>>   Linux 3.10 (2013-06-30 15:13:29 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.linaro.org/people/ardbiesheuvel/linux-arm.git for-rmk
+>>
+>> for you to fetch changes up to 7d11965ddb9b9b1e0a5d13c58345ada1ccbc663b:
+>>
+>>   lib/raid6: add ARM-NEON accelerated syndrome calculation (2013-07-08
+>> 22:09:18 +0100)
+>
+> I'm assuming that the comments in your previous postings are valid as I've
+> included those in the merge commit:
+>
 
-Note, also requires modules to be built --be8
+I think they're close enough. I did remove the BUG() call in the
+kernel mode FP exception handler, as just returning from that function
+will cause an oops to be triggered anyway.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/kernel/module.c |   57 +++++++++++++++++++++++++++-------------------
- 1 file changed, 34 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 1e9be5d..7e13787 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -24,6 +24,7 @@
- #include <asm/sections.h>
- #include <asm/smp_plat.h>
- #include <asm/unwind.h>
-+#include <asm/opcodes.h>
- 
- #ifdef CONFIG_XIP_KERNEL
- /*
-@@ -60,6 +61,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 		Elf32_Sym *sym;
- 		const char *symname;
- 		s32 offset;
-+		u32 tmp;
- #ifdef CONFIG_THUMB2_KERNEL
- 		u32 upper, lower, sign, j1, j2;
- #endif
-@@ -95,7 +97,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 		case R_ARM_PC24:
- 		case R_ARM_CALL:
- 		case R_ARM_JUMP24:
--			offset = (*(u32 *)loc & 0x00ffffff) << 2;
-+			offset = __mem_to_opcode_arm(*(u32 *)loc);
-+			offset = (offset & 0x00ffffff) << 2;
- 			if (offset & 0x02000000)
- 				offset -= 0x04000000;
- 
-@@ -111,9 +114,10 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			}
- 
- 			offset >>= 2;
-+			offset &= 0x00ffffff;
- 
--			*(u32 *)loc &= 0xff000000;
--			*(u32 *)loc |= offset & 0x00ffffff;
-+			*(u32 *)loc &= __opcode_to_mem_arm(0xff000000);
-+			*(u32 *)loc |= __opcode_to_mem_arm(offset);
- 			break;
- 
- 	       case R_ARM_V4BX:
-@@ -121,8 +125,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			* other bits to re-code instruction as
- 			* MOV PC,Rm.
- 			*/
--		       *(u32 *)loc &= 0xf000000f;
--		       *(u32 *)loc |= 0x01a0f000;
-+		       *(u32 *)loc &= __opcode_to_mem_arm(0xf000000f);
-+		       *(u32 *)loc |= __opcode_to_mem_arm(0x01a0f000);
- 		       break;
- 
- 		case R_ARM_PREL31:
-@@ -132,7 +136,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 
- 		case R_ARM_MOVW_ABS_NC:
- 		case R_ARM_MOVT_ABS:
--			offset = *(u32 *)loc;
-+			offset = tmp = __mem_to_opcode_arm(*(u32 *)loc);
- 			offset = ((offset & 0xf0000) >> 4) | (offset & 0xfff);
- 			offset = (offset ^ 0x8000) - 0x8000;
- 
-@@ -140,16 +144,18 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			if (ELF32_R_TYPE(rel->r_info) == R_ARM_MOVT_ABS)
- 				offset >>= 16;
- 
--			*(u32 *)loc &= 0xfff0f000;
--			*(u32 *)loc |= ((offset & 0xf000) << 4) |
--					(offset & 0x0fff);
-+			tmp &= 0xfff0f000;
-+			tmp |= ((offset & 0xf000) << 4) |
-+				(offset & 0x0fff);
-+
-+			*(u32 *)loc = __opcode_to_mem_arm(tmp);
- 			break;
- 
- #ifdef CONFIG_THUMB2_KERNEL
- 		case R_ARM_THM_CALL:
- 		case R_ARM_THM_JUMP24:
--			upper = *(u16 *)loc;
--			lower = *(u16 *)(loc + 2);
-+			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
-+			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
- 
- 			/*
- 			 * 25 bit signed address range (Thumb-2 BL and B.W
-@@ -198,17 +204,20 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			sign = (offset >> 24) & 1;
- 			j1 = sign ^ (~(offset >> 23) & 1);
- 			j2 = sign ^ (~(offset >> 22) & 1);
--			*(u16 *)loc = (u16)((upper & 0xf800) | (sign << 10) |
-+			upper = (u16)((upper & 0xf800) | (sign << 10) |
- 					    ((offset >> 12) & 0x03ff));
--			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
--						  (j1 << 13) | (j2 << 11) |
--						  ((offset >> 1) & 0x07ff));
-+			lower = (u16)((lower & 0xd000) |
-+				      (j1 << 13) | (j2 << 11) |
-+				      ((offset >> 1) & 0x07ff));
-+
-+			*(u16 *)loc = __opcode_to_mem_thumb16(upper);
-+			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16(lower);
- 			break;
- 
- 		case R_ARM_THM_MOVW_ABS_NC:
- 		case R_ARM_THM_MOVT_ABS:
--			upper = *(u16 *)loc;
--			lower = *(u16 *)(loc + 2);
-+			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
-+			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
- 
- 			/*
- 			 * MOVT/MOVW instructions encoding in Thumb-2:
-@@ -229,12 +238,14 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
- 				offset >>= 16;
- 
--			*(u16 *)loc = (u16)((upper & 0xfbf0) |
--					    ((offset & 0xf000) >> 12) |
--					    ((offset & 0x0800) >> 1));
--			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
--						  ((offset & 0x0700) << 4) |
--						  (offset & 0x00ff));
-+			upper = (u16)((upper & 0xfbf0) |
-+				      ((offset & 0xf000) >> 12) |
-+				      ((offset & 0x0800) >> 1));
-+			lower = (u16)((lower & 0x8f00) |
-+				      ((offset & 0x0700) << 4) |
-+				      (offset & 0x00ff));
-+			*(u16 *)loc = __opcode_to_mem_thumb16(upper);
-+			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16(lower);
- 			break;
- #endif
- 
+Cheers,
 -- 
-1.7.10.4
+Ard.
+
+>     I have included two use cases that I have been using, XOR and RAID-6
+>     checksumming. The former gets a 60% performance boost on the NEON, the
+>     latter over 400%.
+>
+>     ARM: add support for kernel mode NEON
+>
+>     Adds kernel_neon_begin/end (renamed from kernel_vfp_begin/end in the
+>     previous version to de-emphasize the VFP part as VFP code that needs
+>     software assistance is not supported currently.)
+>
+>     Introduces <asm/neon.h> and the Kconfig symbol KERNEL_MODE_NEON. This
+>     has been aligned with Catalin for arm64, so any NEON code that does
+>     not use assembly but intrinsics or the GCC vectorizer (such as my
+>     examples) can potentially be shared between arm and arm64 archs.
+>
+>     ARM: move VFP init to an earlier boot stage
+>
+>     This is needed so the NEON is enabled when the XOR and RAID-6 algo
+>     boot time benchmarks are run.
+>
+>     ARM: be strict about FP exceptions in kernel mode
+>
+>     This adds a check to vfp_support_entry() to flag unsupported uses of
+>     the NEON/VFP in kernel mode. FP exceptions (bounces) are flagged as
+>     a BUG(), this is because of their potentially intermittent nature.
+>     Exceptions caused by the fact that kernel_neon_begin has not been
+>     called are just routed through the undef handler.
+>
+>     ARM: crypto: add NEON accelerated XOR implementation
+>
+>     This is the xor_blocks() implementation built with -ftree-vectorize,
+>     60% faster than optimized ARM code. It calls in_interrupt() to check
+>     whether the NEON flavor can be used: this should really not be
+>     necessary, but due to xor_blocks'squite generic nature, there is no
+>     telling how exactly people may be using it in the real world.
+>
+>     lib/raid6: add ARM-NEON accelerated syndrome calculation
+>
+>     This is a port of the RAID-6 checksumming code in altivec.uc ported
+>     to use NEON intrinsics. It is about 4x faster than the sequential
+>     code.
+>
