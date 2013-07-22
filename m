@@ -1,67 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 22 Jul 2013 17:57:01 -0300
-Subject: [PATCH v2] ARM: dts: mxs: Add spi alias
-Message-ID: <1374526621-29874-1-git-send-email-festevam@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 Jul 2013 23:00:07 +0200
+Subject: [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+In-Reply-To: <51E0227E.2000008@ti.com>
+References: <1371826990-25820-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdY=m1b9Lh27+wHP8FQ4SbVZKmAOCGhxe59aP+TcuR9QaA@mail.gmail.com>
+ <20130625065811.GZ5523@atomide.com> <51CAEA90.90200@ti.com>
+ <CACRpkdbKgEcfF67oO9HrczvDp4Po3Xt1hFajJ1vO8kEvsZH4jA@mail.gmail.com>
+ <51CC45D3.2000305@ti.com>
+ <CACRpkdYU13bhPaL2ZG9CT9JRv9sKQ+1N3zCUPizk571+LQqB4A@mail.gmail.com>
+ <51E0227E.2000008@ti.com>
+Message-ID: <CACRpkdYrXcYvXO=vJ1RxLkv4ou_08M3tS_gffDnwqEtod-68Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jul 12, 2013 at 5:36 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> On 07/10/2013 11:36 PM, Linus Walleij wrote:
+>>
+>> I guess we need a patch set prepared which adds the "active" state
+>> and helper function as the first patch, i.e. this:
+>> http://marc.info/?l=linux-kernel&m=137094012703340&w=2
+>> Can I have your ACK on this patch?
+>
+> I've verified combination of
+> [PATCH] drivers: pinctrl: add active state to core
+> [RFC] ARM: OMAP2+: omap_device: add pinctrl handling
+> on OMAP4 SDP board+UARTs and going to send patches on Monday.
+>
+> So, Acked/Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> (I can't reply directly to thread - not signed to those lists :))
+>
+> What is the best branch to base my patches on?
 
-After providing spi alias, we can get the following message during probe:
+I suggest you coordinate that with Tony. He can take my patch
+with your ACK if it helps, but it seems he's already up to
+optimizing the pinctrl core :-)
 
-m25p80 spi1.0: sst25vf016b (2048 Kbytes)
-
-,which looks better than the original one:
-
-m25p80 spi32766.0: sst25vf016b (2048 Kbytes)
-
-While at it, keep the alias entries in alphabetical order.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Fix the alphabetical order 
-
- arch/arm/boot/dts/imx23.dtsi | 2 ++
- arch/arm/boot/dts/imx28.dtsi | 6 ++++--
- 2 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 1e528db..28b5ce2 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -20,6 +20,8 @@
- 		gpio2 = &gpio2;
- 		serial0 = &auart0;
- 		serial1 = &auart1;
-+		spi0 = &ssp0;
-+		spi1 = &ssp1;
- 	};
- 
- 	cpus {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index db67eb6..47fc5ef 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -15,6 +15,8 @@
- 	interrupt-parent = <&icoll>;
- 
- 	aliases {
-+		ethernet0 = &mac0;
-+		ethernet1 = &mac1;
- 		gpio0 = &gpio0;
- 		gpio1 = &gpio1;
- 		gpio2 = &gpio2;
-@@ -27,8 +29,8 @@
- 		serial2 = &auart2;
- 		serial3 = &auart3;
- 		serial4 = &auart4;
--		ethernet0 = &mac0;
--		ethernet1 = &mac1;
-+		spi0 = &ssp1;
-+		spi1 = &ssp2;
- 	};
- 
- 	cpus {
--- 
-1.8.1.2
+Yours,
+Linus Walleij
