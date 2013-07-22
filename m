@@ -1,38 +1,49 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 22 Jul 2013 11:40:38 +0800
-Subject: [PATCH] ARM64: include: asm: use 'int' instead of 'u32' for variable
- 'target' in kvm_host.h.
-Message-ID: <51ECA9B6.3010808@asianux.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 22 Jul 2013 05:50:09 +0200
+Subject: [PATCH v4 02/20] clocksource: samsung_pwm_timer: Correct
+ definition of AUTORELOAD bit
+In-Reply-To: <1374278673-25615-4-git-send-email-tomasz.figa@gmail.com>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1374278673-25615-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <51ECABF1.4040600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'target' will be set to '-1' in kvm_arch_vcpu_init(), and it need check
-'target' whether less than zero or not in kvm_vcpu_initialized().
+On 07/20/2013 02:04 AM, Tomasz Figa wrote:
+> PWM channel 4 has its autoreload bit located at different position. This
+> patch fixes the driver to account for that.
+> 
+> This fixes a problem with the clocksource hanging after it overflows because
+> it is not reloaded any more.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  drivers/clocksource/samsung_pwm_timer.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
+> index 3fa5b07..e238fb0 100644
+> --- a/drivers/clocksource/samsung_pwm_timer.c
+> +++ b/drivers/clocksource/samsung_pwm_timer.c
+> @@ -47,7 +47,8 @@
+>  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
+>  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
+>  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
+> -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
+> +#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) \
+> +						+ (((chan) < 5) ? 3 : 2)))
 
-So need define target as 'int' instead of 'u32', just like ARM has done.
+This macro is not readable. Please, fix it up with a comment please.
+
+>  
+>  DEFINE_SPINLOCK(samsung_pwm_lock);
+>  EXPORT_SYMBOL(samsung_pwm_lock);
+> 
 
 
-The related warning:
-
-  arch/arm64/kvm/../../../arch/arm/kvm/arm.c:497:2: warning: comparison of unsigned expression >= 0 is always true [-Wtype-limits]
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/include/asm/kvm_host.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 644d739..0859a4d 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -129,7 +129,7 @@ struct kvm_vcpu_arch {
- 	struct kvm_mmu_memory_cache mmu_page_cache;
- 
- 	/* Target CPU and feature flags */
--	u32 target;
-+	int target;
- 	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
- 
- 	/* Detect first run of a vcpu */
 -- 
-1.7.7.6
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
