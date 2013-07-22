@@ -1,36 +1,51 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 22 Jul 2013 14:14:37 +0200
-Subject: [PATCH v3 10/31] net: can: mscan: add a comment on reg to idx mapping
+Date: Mon, 22 Jul 2013 14:14:48 +0200
+Subject: [PATCH v3 21/31] serial: mpc512x: remove now obsolete clock lookup
+ name
 In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
 References: <1374166855-7280-1-git-send-email-gsi@denx.de>
  <1374495298-22019-1-git-send-email-gsi@denx.de>
-Message-ID: <1374495298-22019-11-git-send-email-gsi@denx.de>
+Message-ID: <1374495298-22019-22-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a comment about the magic of deriving an MSCAN component index
-from the peripheral's physical address / register offset
+after device tree based clock lookup became available, the peripheral
+driver need no longer construct clock names which include the PSC index,
+remove the "psc%d_mclk" template and unconditionally use "mclk"
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/net/can/mscan/mpc5xxx_can.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/tty/serial/mpc52xx_uart.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-index 5b0ee8e..bc422ba 100644
---- a/drivers/net/can/mscan/mpc5xxx_can.c
-+++ b/drivers/net/can/mscan/mpc5xxx_can.c
-@@ -148,7 +148,10 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
- 		goto exit_put;
- 	}
+diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
+index 8f16ed9..04dc564 100644
+--- a/drivers/tty/serial/mpc52xx_uart.c
++++ b/drivers/tty/serial/mpc52xx_uart.c
+@@ -623,14 +623,11 @@ static struct clk *psc_mclk_clk[MPC52xx_PSC_MAXNUM];
+ /* called from within the .request_port() callback (allocation) */
+ static int mpc512x_psc_alloc_clock(struct uart_port *port)
+ {
+-	int psc_num;
+-	char clk_name[16];
+ 	struct clk *clk;
+ 	int err;
++	int psc_num;
  
--	/* Determine the MSCAN device index from the physical address */
-+	/* Determine the MSCAN device index from the peripheral's
-+	 * physical address. Register address offsets against the
-+	 * IMMR base are:  0x1300, 0x1380, 0x2300, 0x2380
-+	 */
- 	pval = of_get_property(ofdev->dev.of_node, "reg", &plen);
- 	BUG_ON(!pval || plen < sizeof(*pval));
- 	clockidx = (*pval & 0x80) ? 1 : 0;
+-	psc_num = (port->mapbase & 0xf00) >> 8;
+-	snprintf(clk_name, sizeof(clk_name), "psc%d_mclk", psc_num);
+-	clk = devm_clk_get(port->dev, clk_name);
++	clk = devm_clk_get(port->dev, "mclk");
+ 	if (IS_ERR(clk)) {
+ 		dev_err(port->dev, "Failed to get MCLK!\n");
+ 		return PTR_ERR(clk);
+@@ -641,6 +638,7 @@ static int mpc512x_psc_alloc_clock(struct uart_port *port)
+ 		devm_clk_put(port->dev, clk);
+ 		return err;
+ 	}
++	psc_num = (port->mapbase & 0xf00) >> 8;
+ 	psc_mclk_clk[psc_num] = clk;
+ 	return 0;
+ }
 -- 
 1.7.10.4
