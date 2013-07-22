@@ -1,39 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Jul 2013 14:46:59 +0100
-Subject: linux startup
-In-Reply-To: <CANEcUBWUFA=nmoCOUbLPa=vfbfcaqaC=FStG_4hgk1oHR+mgYg@mail.gmail.com>
-References: <CANEcUBWUFA=nmoCOUbLPa=vfbfcaqaC=FStG_4hgk1oHR+mgYg@mail.gmail.com>
-Message-ID: <20130722134659.GM24642@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 22 Jul 2013 14:49:34 +0100
+Subject: [PATCH v3] xen/arm: enable PV control for ARM
+In-Reply-To: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
+References: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <20130722134934.GB32221@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 09:30:44PM +0800, zhaobin xv wrote:
-> Hi
-> I recently read lernel source .
-> I have a question:In
-> folder:linux/arch/arm/boot/compressed/head.S(linux2.6.22.6):
-> 
-> 
-> start:
->         .type    start,#function
->         .rept    8
->         mov    r0, r0
->         .endr
-> 
->         b    1f
->         .word    0x016f2818        @ Magic numbers to help the loader
->         .word    start            @ absolute load/run zImage address
->         .word    _edata            @ zImage end address
-> 1:        mov    r7, r1            @ save architecture ID
->         mov    r8, r2            @ save atags pointer
-> 
-> 
-> I don't kown why the ?mov r0 r0 ? repeated  emergence 8 times.
+Hi,
 
-(a) boot loaders used to call the kernel at an offset of 32 bytes into
-the image, but now call at the start of the image.
-(b) the magic numbers are placed at a fixed position.
+[Adding Catalin to Cc]
 
-So we need to fill the first 8 words with something.  They could have
-all been branches to '1f' instead of that instruction.  It makes little
-difference.
+On Mon, Jul 22, 2013 at 11:57:34AM +0100, Julien Grall wrote:
+> Enable power management from the toolstack for ARM guest.
+> 
+> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> 
+> ---
+>     Changes in v3:
+>         - Fix condition to compile cpu_hotplug.o
+>     Changes in v2:
+>         - Don't compile xen/cpu_hotplug.o with ARM64
+
+My arm64 cpu hotplug series is going to be dependent on not compiling
+xen/cpu_hotplug.o. Currently I'm not able to compile an arm64 kernel
+with my patches and Xen support.
+
+How do you intend to push this? I'd like to ensure my cpu hotplug series
+is able to go in for the next merge window.
+
+> ---
+>  drivers/xen/Makefile |    5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index 2bf461a..f185e8d 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -1,9 +1,8 @@
+> -ifneq ($(CONFIG_ARM),y)
+> -obj-y	+= manage.o
+> +ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+>  endif
+
+Might it make sense to enable this based on a list the architectures
+that actually need this, rather than disabling it based on the list of
+architectures that don't?
+
+Thanks,
+Mark.
+
+>  obj-$(CONFIG_X86)			+= fallback.o
+> -obj-y	+= grant-table.o features.o events.o balloon.o time.o
+> +obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
+>  obj-y	+= xenbus/
+>  
+>  nostackp := $(call cc-option, -fno-stack-protector)
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
