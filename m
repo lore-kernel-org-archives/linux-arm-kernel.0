@@ -1,90 +1,33 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Jul 2013 11:03:51 -0400 (EDT)
-Subject: [PATCH 1/8] ARM: mm: LPAE: use phys_addr_t appropriately in p2v
- and v2p conversions
-In-Reply-To: <1371858502-10083-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
- <1371858502-10083-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.LFD.2.03.1307221103260.15022@syhkavp.arg>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 22 Jul 2013 08:04:58 -0700
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <51ECDE5E.3050104@ti.com>
+References: <Pine.LNX.4.44L0.1307211453450.19133-100000@netrider.rowland.org>
+ <51ECDE5E.3050104@ti.com>
+Message-ID: <20130722150458.GA18181@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Jun 2013, Santosh Shilimkar wrote:
-
-> Fix remainder types used when converting back and forth between
-> physical and virtual addresses.
+On Mon, Jul 22, 2013 at 12:55:18PM +0530, Kishon Vijay Abraham I wrote:
+> > 	The issue (or one of the issues) in this discussion is that 
+> > 	Greg does not like the idea of using names or IDs to associate
+> > 	PHYs with controllers, because they are too prone to
+> > 	duplications or other errors.  Pointers are more reliable.
+> > 
+> > 	But pointers to what?  Since the only data known to be 
+> > 	available to both the PHY driver and controller driver is the
+> > 	platform data, the obvious answer is a pointer to platform data
+> > 	(either for the PHY or for the controller, or maybe both).
 > 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> hmm.. it's not going to be simple though as the platform device for the PHY and
+> controller can be created in entirely different places. e.g., in some cases the
+> PHY device is a child of some mfd core device (the device will be created in
+> drivers/mfd) and the controller driver (usually) is created in board file. I
+> guess then we have to come up with something to share a pointer in two
+> different files.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+What's wrong with using the platform_data structure that is unique to
+all boards (see include/platform_data/ for examples)?  Isn't that what
+this structure is there for?
 
-
-
-> ---
->  arch/arm/include/asm/memory.h |   22 ++++++++++++++++------
->  1 file changed, 16 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 584786f..93376e4 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -185,22 +185,32 @@ extern unsigned long __pv_phys_offset;
->  	: "=r" (to)					\
->  	: "r" (from), "I" (type))
->  
-> -static inline unsigned long __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys(unsigned long x)
->  {
->  	unsigned long t;
->  	__pv_stub(x, t, "add", __PV_BITS_31_24);
->  	return t;
->  }
->  
-> -static inline unsigned long __phys_to_virt(unsigned long x)
-> +static inline unsigned long __phys_to_virt(phys_addr_t x)
->  {
->  	unsigned long t;
->  	__pv_stub(x, t, "sub", __PV_BITS_31_24);
->  	return t;
->  }
-> +
->  #else
-> -#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
-> -#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-> +
-> +static inline phys_addr_t __virt_to_phys(unsigned long x)
-> +{
-> +	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> +}
-> +
-> +static inline unsigned long __phys_to_virt(phys_addr_t x)
-> +{
-> +	return x - PHYS_OFFSET + PAGE_OFFSET;
-> +}
-> +
->  #endif
->  #endif
->  #endif /* __ASSEMBLY__ */
-> @@ -238,14 +248,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
->  
->  static inline void *phys_to_virt(phys_addr_t x)
->  {
-> -	return (void *)(__phys_to_virt((unsigned long)(x)));
-> +	return (void *)__phys_to_virt(x);
->  }
->  
->  /*
->   * Drivers should NOT use these either.
->   */
->  #define __pa(x)			__virt_to_phys((unsigned long)(x))
-> -#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-> +#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
->  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
->  
->  /*
-> -- 
-> 1.7.9.5
-> 
+greg k-h
