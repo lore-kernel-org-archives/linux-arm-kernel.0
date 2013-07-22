@@ -1,33 +1,28 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 22 Jul 2013 17:49:04 +0100
-Subject: updates for be8 patch series
-In-Reply-To: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <51ED6280.7020901@codethink.co.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Jul 2013 16:55:29 +0000 (UTC)
+Subject: linux-3.11-rc1: Internal error: Oops - undefined instruction:
+ 0 [#1] SMP ARM on OMAP3/AM335x
+In-Reply-To: <51ECFBAC.7090900@ti.com>
+References: <51ECFBAC.7090900@ti.com>
+Message-ID: <alpine.DEB.2.02.1307221652350.10891@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/13 17:33, Ben Dooks wrote:
-> I've updated the BE8 patch series after running further tests on the
-> kernel. I found an issue with the alignment handler (and I believe the
-> same issue with the trap handler).
->
-> I also ran tests with the module loader, which shows that if we are
-> in BE8 that it needs to fix up the relocations. Also the modules need
-> to be built --be8 otherwise they cannot be easily relocated when loaded.
->
-> Should patches 3 and 4 be together (ie, alter the LDFLAGS and the
-> module.c) and have I got the correct LDLAGS?
->
-> Comments and testing welcome. I will push out a new series later with
-> these in and possibly rebased on 3.11-rc2.
+On Mon, 22 Jul 2013, Roger Quadros wrote:
 
-New series based on 3.10 at:
+> I observe the following problem on booting v3.11-rc1 on OMAP3 beagle board.
+> 
+> [    5.888946] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> [    5.896057] Modules linked in:
+> [    5.899322] CPU: 0 PID: 9 Comm: rcu_sched Not tainted 3.11.0-rc2-00001-g1ea701a #876
+> [    5.907501] task: ce0720c0 ti: ce07a000 task.ti: ce07a000
+> [    5.913208] PC is at check_and_switch_context+0x130/0x4dc
+> [    5.918914] LR is at check_and_switch_context+0xd8/0x4dc
 
-	git://git.baserock.org/delta/linux.git
-		baserock/311/be/core-v3
-		baserock/311/be/atags-v3
+It affects 3730beaglexm and am335xbonelt here too.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+http://www.pwsan.com/omap/testlogs/test_v3.11-rc2/20130721203314/boot/am335xbonelt/am335x-bone/am335xbonelt_log.txt
+http://www.pwsan.com/omap/testlogs/test_v3.11-rc2/20130721203314/boot/3730beaglexm/3730beaglexm_log.txt
+
+
+- Paul
