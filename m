@@ -1,41 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Jul 2013 09:24:34 -0700
-Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
-In-Reply-To: <CACRpkdauSuk9xDSzUFN=OO0yVWZXSMTUuYTVDZb2_zYb=YMW_A@mail.gmail.com>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <CACRpkdauSuk9xDSzUFN=OO0yVWZXSMTUuYTVDZb2_zYb=YMW_A@mail.gmail.com>
-Message-ID: <20130722162434.GB19639@codeaurora.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 22 Jul 2013 18:28:47 +0200
+Subject: [PATCH 2/4] clk: exynos-audss: allow input clocks to be specified
+ in device tree
+In-Reply-To: <1373458313-18970-3-git-send-email-padma.v@samsung.com>
+References: <1373458313-18970-1-git-send-email-padma.v@samsung.com>
+ <1373458313-18970-3-git-send-email-padma.v@samsung.com>
+Message-ID: <1610421.OFFn8rqlxt@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20, Linus Walleij wrote:
-> On Fri, Jul 19, 2013 at 1:21 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > This patchset adds support for 64 bit counters in the generic
-> > sched_clock code and converts drivers over to use it. Based
-> > on v3.11-rc1.
-> >
-> > Changes since v3:
-> 
-> >   ocksource: dbx500-prcmu: Switch to sched_clock_register()
-> 
-> Fix subject.
-> 
-> >   clocksource: nomadik: Switch to sched_clock_register()
-> 
-> Apart from that Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> for these two drivers.
-> 
-> BTW: why are you not patching arch/arm/mach-u300/timer.c?
-> Please make sure to grep for all setup_sched_clock() if you're
-> going to do this.
+Hi Padmavathi, Andrew,
 
-Thanks.
+On Wednesday 10 of July 2013 17:41:51 Padmavathi Venna wrote:
+> From: Andrew Bresticker <abrestic@chromium.org>
+> 
+> This allows the input clocks to the Exynos AudioSS block to be specified
+> via device-tree bindings.  Default names will be used when an input clock
+> is not given.  This will be useful when adding support for the
+> Exynos5420 where the audio bus clock is called "sclk_maudio0" instead of
+> "sclk_audio0".
+> 
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Reviewed-on: https://gerrit.chromium.org/gerrit/57833
+> Reviewed-by: Simon Glass <sjg@chromium.org>
+> ---
+>  .../devicetree/bindings/clock/clk-exynos-audss.txt |   31
+> ++++++++++++++++++- drivers/clk/samsung/clk-exynos-audss.c             |
+>   28 +++++++++++++++-- 2 files changed, 53 insertions(+), 6 deletions(-)
 
-I'll convert the arch/arm users once this series is accepted into
-the tip tree. Then send off the rest through the arm-soc tree.
+Well, this is basically how it should be done, but in current state of 
+clock core I can see a problem: can we really rely on the order of clock 
+initialization? I mean, we can't defer initialization of particular clock 
+controller until all external clocks it needs are available, because there 
+is no probing involved here.
 
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Tomasz
