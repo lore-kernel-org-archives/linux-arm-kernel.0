@@ -1,242 +1,225 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 22 Jul 2013 14:14:55 +0200
-Subject: [PATCH v3 28/31] powerpc/mpc512x: improve DIU related clock setup
-In-Reply-To: <1374495298-22019-1-git-send-email-gsi@denx.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
-Message-ID: <1374495298-22019-29-git-send-email-gsi@denx.de>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 22 Jul 2013 21:20:23 +0900
+Subject: [PATCH 1/3] drm/exynos: add device tree support for rotator
+In-Reply-To: <1374475767-30085-2-git-send-email-chanho61.park@samsung.com>
+References: <1374475767-30085-1-git-send-email-chanho61.park@samsung.com>
+ <1374475767-30085-2-git-send-email-chanho61.park@samsung.com>
+Message-ID: <025f01ce86d5$d7251210$856f3630$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adapt the DIU clock initialization to the COMMON_CLK approach: device
-tree based clock lookup, prepare and unprepare for clocks, work with
-frequencies not dividers, call the appropriate clk_*() routines and
-don't access CCM registers, remove the pre-enable workaround in the
-platform's clock driver
 
-the "best clock" determination now completely relies on the platform's
-clock driver to pick a frequency close to what the caller requests, and
-merely checks whether the desired frequency was met (is acceptable since
-it meets the tolerance of the monitor) -- this approach shall succeed
-upon first try in the usual case, will test a few less desirable yet
-acceptable frequencies in edge cases, and will fallback to "best effort"
-if none of the previously tried frequencies pass the test
 
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/platforms/512x/clock-commonclk.c |    1 -
- arch/powerpc/platforms/512x/mpc512x_shared.c  |  165 +++++++++++++------------
- 2 files changed, 88 insertions(+), 78 deletions(-)
+> -----Original Message-----
+> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-soc-
+> owner at vger.kernel.org] On Behalf Of Chanho Park
+> Sent: Monday, July 22, 2013 3:49 PM
+> To: inki.dae at samsung.com; kgene.kim at samsung.com
+> Cc: jy0922.shim at samsung.com; sw0312.kim at samsung.com;
+> kyungmin.park at samsung.com; dri-devel at lists.freedesktop.org; linux-samsung-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; devicetree-
+> discuss at lists.ozlabs.org; Chanho Park
+> Subject: [PATCH 1/3] drm/exynos: add device tree support for rotator
+> 
+> The exynos4 platform is only dt-based since 3.10, we should convert driver
+> data
+> and ids to dt-based parsing methods. The rotator driver has a limit table
+> to get
+> size limit. The minimum size of RGB888 format is 8 x 8 and maximum size is
+> 8K x
+> 8K. The other format, YCbCr420 2-Plane has 32 x 32 min size and 32K x 32K
+> max
+> size. Each format should be multiple of 'align' value.
+> 
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_rotator.c |  110 +++++++++++++++++++---
+> -----
+>  1 file changed, 80 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> index 427640a..b353a10 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> @@ -96,7 +96,7 @@ struct rot_context {
+>  	struct resource	*regs_res;
+>  	void __iomem	*regs;
+>  	struct clk	*clock;
+> -	struct rot_limit_table	*limit_tbl;
+> +	struct rot_limit_table	limit_tbl;
+>  	int	irq;
+>  	int	cur_buf_id[EXYNOS_DRM_OPS_MAX];
+>  	bool	suspended;
+> @@ -167,7 +167,7 @@ static irqreturn_t rotator_irq_handler(int irq, void
+> *arg)
+>  static void rotator_align_size(struct rot_context *rot, u32 fmt, u32
+> *hsize,
+>  		u32 *vsize)
+>  {
+> -	struct rot_limit_table *limit_tbl = rot->limit_tbl;
+> +	struct rot_limit_table *limit_tbl = &rot->limit_tbl;
+>  	struct rot_limit *limit;
+>  	u32 mask, val;
+> 
+> @@ -632,6 +632,72 @@ static int rotator_ippdrv_start(struct device *dev,
+> enum drm_exynos_ipp_cmd cmd)
+>  	return 0;
+>  }
+> 
+> +static const struct of_device_id exynos_rotator_match[] = {
+> +	{
+> +		.compatible = "samsung,exynos4210-rotator",
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, exynos_rotator_match);
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index f047d4c..893fbe5 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -696,7 +696,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
- 	clk_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
- 	/* some are not yet acquired by their respective drivers */
- 	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
--	clk_prepare_enable(clks[MPC512x_CLK_DIU]);	/* display */
- 	/*
- 	 * some have their individual clock subtree with separate clock
- 	 * items and their individual enable counters, yet share a
-diff --git a/arch/powerpc/platforms/512x/mpc512x_shared.c b/arch/powerpc/platforms/512x/mpc512x_shared.c
-index a82a41b..3381eea 100644
---- a/arch/powerpc/platforms/512x/mpc512x_shared.c
-+++ b/arch/powerpc/platforms/512x/mpc512x_shared.c
-@@ -12,6 +12,7 @@
-  * (at your option) any later version.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/kernel.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -70,98 +71,108 @@ struct fsl_diu_shared_fb {
- 	bool		in_use;
- };
- 
--#define DIU_DIV_MASK	0x000000ff
-+/* receives a pixel clock spec in pico seconds, adjusts the DIU clock rate */
- void mpc512x_set_pixel_clock(unsigned int pixclock)
- {
--	unsigned long bestval, bestfreq, speed, busfreq;
--	unsigned long minpixclock, maxpixclock, pixval;
--	struct mpc512x_ccm __iomem *ccm;
- 	struct device_node *np;
--	u32 temp;
--	long err;
--	int i;
-+	struct clk *clk_diu;
-+	unsigned long epsilon, minpixclock, maxpixclock;
-+	unsigned long offset, want, got, delta;
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,mpc5121-clock");
-+	/* lookup and enable the DIU clock */
-+	np = of_find_compatible_node(NULL, NULL, "fsl,mpc5121-diu");
- 	if (!np) {
--		pr_err("Can't find clock control module.\n");
-+		pr_err("Could not find DIU device tree node.\n");
- 		return;
- 	}
--
--	ccm = of_iomap(np, 0);
-+	clk_diu = of_clk_get_by_name(np, "per");
- 	of_node_put(np);
--	if (!ccm) {
--		pr_err("Can't map clock control module reg.\n");
-+	if (IS_ERR(clk_diu)) {
-+		pr_err("Could not lookup DIU clock.\n");
- 		return;
- 	}
--
--	np = of_find_node_by_type(NULL, "cpu");
--	if (np) {
--		const unsigned int *prop =
--			of_get_property(np, "bus-frequency", NULL);
--
--		of_node_put(np);
--		if (prop) {
--			busfreq = *prop;
--		} else {
--			pr_err("Can't get bus-frequency property\n");
--			return;
--		}
--	} else {
--		pr_err("Can't find 'cpu' node.\n");
-+	if (clk_prepare_enable(clk_diu)) {
-+		pr_err("Could not enable DIU clock.\n");
- 		return;
- 	}
- 
--	/* Pixel Clock configuration */
--	pr_debug("DIU: Bus Frequency = %lu\n", busfreq);
--	speed = busfreq * 4; /* DIU_DIV ratio is 4 * CSB_CLK / DIU_CLK */
--
--	/* Calculate the pixel clock with the smallest error */
--	/* calculate the following in steps to avoid overflow */
--	pr_debug("DIU pixclock in ps - %d\n", pixclock);
--	temp = (1000000000 / pixclock) * 1000;
--	pixclock = temp;
--	pr_debug("DIU pixclock freq - %u\n", pixclock);
--
--	temp = temp / 20; /* pixclock * 0.05 */
--	pr_debug("deviation = %d\n", temp);
--	minpixclock = pixclock - temp;
--	maxpixclock = pixclock + temp;
--	pr_debug("DIU minpixclock - %lu\n", minpixclock);
--	pr_debug("DIU maxpixclock - %lu\n", maxpixclock);
--	pixval = speed/pixclock;
--	pr_debug("DIU pixval = %lu\n", pixval);
--
--	err = LONG_MAX;
--	bestval = pixval;
--	pr_debug("DIU bestval = %lu\n", bestval);
--
--	bestfreq = 0;
--	for (i = -1; i <= 1; i++) {
--		temp = speed / (pixval+i);
--		pr_debug("DIU test pixval i=%d, pixval=%lu, temp freq. = %u\n",
--			i, pixval, temp);
--		if ((temp < minpixclock) || (temp > maxpixclock))
--			pr_debug("DIU exceeds monitor range (%lu to %lu)\n",
--				minpixclock, maxpixclock);
--		else if (abs(temp - pixclock) < err) {
--			pr_debug("Entered the else if block %d\n", i);
--			err = abs(temp - pixclock);
--			bestval = pixval + i;
--			bestfreq = temp;
--		}
-+	/*
-+	 * convert the picoseconds spec into the desired clock rate,
-+	 * determine the acceptable clock range for the monitor (+/- 5%),
-+	 * do the calculation in steps to avoid integer overflow
-+	 */
-+	pr_debug("DIU pixclock in ps - %u\n", pixclock);
-+	pixclock = (1000000000 / pixclock) * 1000;
-+	pr_debug("DIU pixclock freq  - %u\n", pixclock);
-+	epsilon = pixclock / 20; /* pixclock * 0.05 */
-+	pr_debug("DIU deviation      - %lu\n", epsilon);
-+	minpixclock = pixclock - epsilon;
-+	maxpixclock = pixclock + epsilon;
-+	pr_debug("DIU minpixclock    - %lu\n", minpixclock);
-+	pr_debug("DIU maxpixclock    - %lu\n", maxpixclock);
-+
-+	/*
-+	 * check whether the DIU supports the desired pixel clock
-+	 *
-+	 * - simply request the desired clock and see what the
-+	 *   platform's clock driver will make of it, assuming that it
-+	 *   will setup the best approximation of the requested value
-+	 * - try other candidate frequencies in the order of decreasing
-+	 *   preference (i.e. with increasing distance from the desired
-+	 *   pixel clock, and checking the lower frequency before the
-+	 *   higher frequency to not overload the hardware) until the
-+	 *   first match is found -- any potential subsequent match
-+	 *   would only be as good as the former match or typically
-+	 *   would be less preferrable
-+	 *
-+	 * the offset increment of pixelclock divided by 64 is an
-+	 * arbitrary choice -- it's simple to calculate, in the typical
-+	 * case we expect the first check to succeed already, in the
-+	 * worst case seven frequencies get tested (the exact center and
-+	 * three more values each to the left and to the right) before
-+	 * the 5% tolerance window is exceeded, resulting in fast enough
-+	 * execution yet high enough probability of finding a suitable
-+	 * value, while the error rate will be in the order of single
-+	 * percents
-+	 */
-+	for (offset = 0; offset <= epsilon; offset += pixclock / 64) {
-+		want = pixclock - offset;
-+		pr_debug("DIU checking clock - %lu\n", want);
-+		clk_set_rate(clk_diu, want);
-+		got = clk_get_rate(clk_diu);
-+		delta = abs(pixclock - got);
-+		if (delta < epsilon)
-+			break;
-+		if (!offset)
-+			continue;
-+		want = pixclock + offset;
-+		pr_debug("DIU checking clock - %lu\n", want);
-+		clk_set_rate(clk_diu, want);
-+		got = clk_get_rate(clk_diu);
-+		delta = abs(pixclock - got);
-+		if (delta < epsilon)
-+			break;
- 	}
-+	if (offset <= epsilon) {
-+		pr_debug("DIU clock accepted - %lu\n", want);
-+		pr_debug("DIU pixclock want %u, got %lu, delta %lu, eps %lu\n",
-+			 pixclock, got, delta, epsilon);
-+		return;
-+	}
-+	pr_warn("DIU pixclock auto search unsuccessful\n");
- 
--	pr_debug("DIU chose = %lx\n", bestval);
--	pr_debug("DIU error = %ld\n NomPixClk ", err);
--	pr_debug("DIU: Best Freq = %lx\n", bestfreq);
--	/* Modify DIU_DIV in CCM SCFR1 */
--	temp = in_be32(&ccm->scfr1);
--	pr_debug("DIU: Current value of SCFR1: 0x%08x\n", temp);
--	temp &= ~DIU_DIV_MASK;
--	temp |= (bestval & DIU_DIV_MASK);
--	out_be32(&ccm->scfr1, temp);
--	pr_debug("DIU: Modified value of SCFR1: 0x%08x\n", temp);
--	iounmap(ccm);
-+	/*
-+	 * what is the most appropriate action to take when the search
-+	 * for an available pixel clock which is acceptable to the
-+	 * monitor has failed?  disable the DIU (clock) or just provide
-+	 * a "best effort"?  we go with the latter
-+	 */
-+	pr_warn("DIU pixclock best effort fallback (backend's choice)\n");
-+	clk_set_rate(clk_diu, pixclock);
-+	got = clk_get_rate(clk_diu);
-+	delta = abs(pixclock - got);
-+	pr_debug("DIU pixclock want %u, got %lu, delta %lu, eps %lu\n",
-+		 pixclock, got, delta, epsilon);
- }
- 
- enum fsl_diu_monitor_port
--- 
-1.7.10.4
+Rotator device cannot be plugged in. Please remove the above
+MODULE_DEVICE_TABLE.
+
+
+> +
+> +static int rotator_parse_dt_tbl(struct device_node *np, struct rot_limit
+> *rlim)
+> +{
+> +	int ret;
+> +
+> +	ret = of_property_read_u32(np, "min_w", &rlim->min_w);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = of_property_read_u32(np, "min_h", &rlim->min_h);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = of_property_read_u32(np, "max_w", &rlim->max_w);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = of_property_read_u32(np, "max_h", &rlim->max_h);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = of_property_read_u32(np, "align", &rlim->align);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static int rotator_parse_dt(struct device *dev, struct rot_context *rot)
+> +{
+> +	struct device_node *ycbcr_node, *rgb888_node;
+> +	int ret;
+> +
+> +	ycbcr_node = of_get_child_by_name(dev->of_node, "ycbcr420_2p");
+> +	if (!ycbcr_node) {
+> +		dev_err(dev, "can't find ycbcr420_2p node\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	rgb888_node = of_get_child_by_name(dev->of_node, "rgb888");
+> +	if (!rgb888_node) {
+> +		dev_err(dev, "can't find rgb888 node\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = rotator_parse_dt_tbl(ycbcr_node, &rot->limit_tbl.ycbcr420_2p);
+> +	if (ret) {
+> +		dev_err(dev, "failed to parse ycbcr420 data\n");
+> +		return ret;
+> +	}
+> +	ret = rotator_parse_dt_tbl(rgb888_node, &rot->limit_tbl.rgb888);
+> +	if (ret) {
+> +		dev_err(dev, "failed to parse rgb888 data\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int rotator_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -639,14 +705,23 @@ static int rotator_probe(struct platform_device
+> *pdev)
+>  	struct exynos_drm_ippdrv *ippdrv;
+>  	int ret;
+> 
+> +	if (!dev->of_node) {
+> +		dev_err(dev, "Cannot find device tree node\n");
+> +		return -ENODEV;
+> +	}
+> +
+>  	rot = devm_kzalloc(dev, sizeof(*rot), GFP_KERNEL);
+>  	if (!rot) {
+>  		dev_err(dev, "failed to allocate rot\n");
+>  		return -ENOMEM;
+>  	}
+> 
+> -	rot->limit_tbl = (struct rot_limit_table *)
+> -				platform_get_device_id(pdev)->driver_data;
+> +	ret = rotator_parse_dt(dev, rot);
+> +	if (ret) {
+> +		dev_err(dev, "failed parse dt info\n");
+> +		devm_kfree(dev, rot);
+> +		return ret;
+> +	}
+> 
+>  	rot->regs_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	rot->regs = devm_ioremap_resource(dev, rot->regs_res);
+> @@ -718,31 +793,6 @@ static int rotator_remove(struct platform_device
+> *pdev)
+>  	return 0;
+>  }
+> 
+> -static struct rot_limit_table rot_limit_tbl = {
+> -	.ycbcr420_2p = {
+> -		.min_w = 32,
+> -		.min_h = 32,
+> -		.max_w = SZ_32K,
+> -		.max_h = SZ_32K,
+> -		.align = 3,
+> -	},
+> -	.rgb888 = {
+> -		.min_w = 8,
+> -		.min_h = 8,
+> -		.max_w = SZ_8K,
+> -		.max_h = SZ_8K,
+> -		.align = 2,
+> -	},
+> -};
+> -
+> -static struct platform_device_id rotator_driver_ids[] = {
+> -	{
+> -		.name		= "exynos-rot",
+> -		.driver_data	= (unsigned long)&rot_limit_tbl,
+> -	},
+> -	{},
+> -};
+> -
+>  static int rotator_clk_crtl(struct rot_context *rot, bool enable)
+>  {
+>  	if (enable) {
+> @@ -804,10 +854,10 @@ static const struct dev_pm_ops rotator_pm_ops = {
+>  struct platform_driver rotator_driver = {
+>  	.probe		= rotator_probe,
+>  	.remove		= rotator_remove,
+> -	.id_table	= rotator_driver_ids,
+>  	.driver		= {
+>  		.name	= "exynos-rot",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= &rotator_pm_ops,
+> +		.of_match_table = of_match_ptr(exynos_rotator_match),
+>  	},
+>  };
+> --
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
