@@ -1,45 +1,61 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 22 Jul 2013 15:09:10 +0100
+Date: Mon, 22 Jul 2013 15:09:35 +0100
 Subject: [PATCH v3] xen/arm: enable PV control for ARM
-In-Reply-To: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
+In-Reply-To: <20130722134934.GB32221@e106331-lin.cambridge.arm.com>
 References: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <alpine.DEB.2.02.1307221508260.4893@kaball.uk.xensource.com>
+ <20130722134934.GB32221@e106331-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1307221459200.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jul 2013, Julien Grall wrote:
-> Enable power management from the toolstack for ARM guest.
+On Mon, 22 Jul 2013, Mark Rutland wrote:
+> Hi,
 > 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> [Adding Catalin to Cc]
 > 
+> On Mon, Jul 22, 2013 at 11:57:34AM +0100, Julien Grall wrote:
+> > Enable power management from the toolstack for ARM guest.
+> > 
+> > Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> > 
+> > ---
+> >     Changes in v3:
+> >         - Fix condition to compile cpu_hotplug.o
+> >     Changes in v2:
+> >         - Don't compile xen/cpu_hotplug.o with ARM64
+> 
+> My arm64 cpu hotplug series is going to be dependent on not compiling
+> xen/cpu_hotplug.o. Currently I'm not able to compile an arm64 kernel
+> with my patches and Xen support.
+> 
+> How do you intend to push this? I'd like to ensure my cpu hotplug series
+> is able to go in for the next merge window.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+This patch does exactly that: it makes sure cpu_hotplug is not compiled
+on ARM64.
+Given that this patch is for drivers/xen/Makefile, normally it goes via
+Konrad's tree.
 
 
->     Changes in v3:
->         - Fix condition to compile cpu_hotplug.o
->     Changes in v2:
->         - Don't compile xen/cpu_hotplug.o with ARM64
-> ---
->  drivers/xen/Makefile |    5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+> > ---
+> >  drivers/xen/Makefile |    5 ++---
+> >  1 file changed, 2 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> > index 2bf461a..f185e8d 100644
+> > --- a/drivers/xen/Makefile
+> > +++ b/drivers/xen/Makefile
+> > @@ -1,9 +1,8 @@
+> > -ifneq ($(CONFIG_ARM),y)
+> > -obj-y	+= manage.o
+> > +ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
+> >  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+> >  endif
 > 
-> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> index 2bf461a..f185e8d 100644
-> --- a/drivers/xen/Makefile
-> +++ b/drivers/xen/Makefile
-> @@ -1,9 +1,8 @@
-> -ifneq ($(CONFIG_ARM),y)
-> -obj-y	+= manage.o
-> +ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
->  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
->  endif
->  obj-$(CONFIG_X86)			+= fallback.o
-> -obj-y	+= grant-table.o features.o events.o balloon.o time.o
-> +obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
->  obj-y	+= xenbus/
->  
->  nostackp := $(call cc-option, -fno-stack-protector)
-> -- 
-> 1.7.10.4
-> 
+> Might it make sense to enable this based on a list the architectures
+> that actually need this, rather than disabling it based on the list of
+> architectures that don't?
+
+This is more philosophical than practical, but I would expect this
+limitation to go away soon, and be able to compile cpu_hotplug without
+issues on ARM and ARM64 too.
