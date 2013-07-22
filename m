@@ -1,28 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Jul 2013 16:55:29 +0000 (UTC)
-Subject: linux-3.11-rc1: Internal error: Oops - undefined instruction:
- 0 [#1] SMP ARM on OMAP3/AM335x
-In-Reply-To: <51ECFBAC.7090900@ti.com>
-References: <51ECFBAC.7090900@ti.com>
-Message-ID: <alpine.DEB.2.02.1307221652350.10891@utopia.booyaka.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 22 Jul 2013 18:57:07 +0200
+Subject: [PATCH 04/22] ARM: at91: dt: Remove '0x's from Animeo IP DTS file
+In-Reply-To: <1374490361-25769-4-git-send-email-lee.jones@linaro.org>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130722165707.GJ16015@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jul 2013, Roger Quadros wrote:
+On 11:52 Mon 22 Jul     , Lee Jones wrote:
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-> I observe the following problem on booting v3.11-rc1 on OMAP3 beagle board.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/animeo_ip.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> [    5.888946] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
-> [    5.896057] Modules linked in:
-> [    5.899322] CPU: 0 PID: 9 Comm: rcu_sched Not tainted 3.11.0-rc2-00001-g1ea701a #876
-> [    5.907501] task: ce0720c0 ti: ce07a000 task.ti: ce07a000
-> [    5.913208] PC is at check_and_switch_context+0x130/0x4dc
-> [    5.918914] LR is at check_and_switch_context+0xd8/0x4dc
-
-It affects 3730beaglexm and am335xbonelt here too.
-
-http://www.pwsan.com/omap/testlogs/test_v3.11-rc2/20130721203314/boot/am335xbonelt/am335x-bone/am335xbonelt_log.txt
-http://www.pwsan.com/omap/testlogs/test_v3.11-rc2/20130721203314/boot/3730beaglexm/3730beaglexm_log.txt
-
-
-- Paul
+> diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+> index 3a1de9e..4cb0342 100644
+> --- a/arch/arm/boot/dts/animeo_ip.dts
+> +++ b/arch/arm/boot/dts/animeo_ip.dts
+> @@ -105,7 +105,7 @@
+>  				reg = <0x48000 0x8000>;
+>  			};
+>  
+> -			user_block at 0x50000 {
+> +			user_block at 50000 {
+>  				label = "user_block";
+>  				reg = <0x50000 0xb0000>;
+>  			};
+> -- 
+> 1.8.1.2
+> 
