@@ -1,61 +1,27 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Mon, 22 Jul 2013 15:53:53 +0200
-Subject: [PATCH 05/22] ARM: dts: bcm281xx: Remove '0x's from
- BCM11351 BRT DTS file
-In-Reply-To: <20130722133852.GA26801@laptop>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
- <51ED2D90.4020209@broadcom.com> <20130722133852.GA26801@laptop>
-Message-ID: <51ED3971.905@broadcom.com>
+From: rric@kernel.org (Robert Richter)
+Date: Mon, 22 Jul 2013 15:56:39 +0200
+Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
+In-Reply-To: <20130721213753.GA29879@mudshark.cambridge.arm.com>
+References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+ <20130715135420.GG10000@mudshark.cambridge.arm.com>
+ <20130720044655.GC9433@mozilla.com>
+ <20130721213753.GA29879@mudshark.cambridge.arm.com>
+Message-ID: <20130722135639.GA6927@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 03:38 PM, Lee Jones wrote:
-> On Mon, 22 Jul 2013, Christian Daudt wrote:
->
->> On 13-07-22 03:52 AM, Lee Jones wrote:
->>> Cc: Christian Daudt <csd@broadcom.com>
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>   arch/arm/boot/dts/bcm11351-brt.dts | 6 +++---
->>>   1 file changed, 3 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
->>> index 67ec524..fdace5d 100644
->>> --- a/arch/arm/boot/dts/bcm11351-brt.dts
->>> +++ b/arch/arm/boot/dts/bcm11351-brt.dts
->>> @@ -27,18 +27,18 @@
->>>   		status = "okay";
->>>   	};
->>> -	sdio0: sdio at 0x3f180000 {
->>> +	sdio0: sdio at 3f180000 {
->>>   		max-frequency = <48000000>;
->>>   		status = "okay";
->>>   	};
->>> -	sdio1: sdio at 0x3f190000 {
->>> +	sdio1: sdio at 3f190000 {
->>>   		non-removable;
->>>   		max-frequency = <48000000>;
->>>   		status = "okay";
->>>   	};
->>> -	sdio3: sdio at 0x3f1b0000 {
->>> +	sdio3: sdio at 3f1b0000 {
->>>   		max-frequency = <48000000>;
->>>   		status = "okay";
->>>   	};
->> Hi Lee,
->>   Is this convention documented ? Someone called my attention to the
->> fact that this dts files was inconsistent in its use of 0x in names,
->> but I was not aware of a coding guideline for this.
->
-> The best two places I can think of are:
->
-> Documentation/devicetree/usage-model.txt
-> and
-> http://www.devicetree.org/Device_Tree_Usage
+On 21.07.13 22:37:53, Will Deacon wrote:
+> Ok, I think I'm with you now. I also think that a better solution would be
+> to try and limit the r7/fp confusion to one place, perhaps behind something
+> like:
+> 
+> void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame);
 
-And even those do not stick to a single convention, but that is what can 
-be expected of a twiki page :-p
+In unwind_backtrace() there is already common code to do this and also
+to get it from a task_struct. This could be ripped out. I would prefer
+then the following function:
 
-Regards,
-Arend
+ void init_stackframe(struct stackframe *frame, struct pt_regs *regs,
+      		      struct task_struct *tsk)
+
+-Robert
