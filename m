@@ -1,38 +1,21 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Mon, 22 Jul 2013 11:57:34 +0100
-Subject: [PATCH v3] xen/arm: enable PV control for ARM
-Message-ID: <1374490654-13373-1-git-send-email-julien.grall@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 22 Jul 2013 16:37:08 +0530
+Subject: [PATCH 20/22] ARM: SPEAr3xx: DT: Remove '0x's from Spear 300 DTS
+ file
+In-Reply-To: <1374490361-25769-20-git-send-email-lee.jones@linaro.org>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAKohponyAzjehntxVr75qXDV9=j9_aBzK=w10QZYBXtg+w+q9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable power management from the toolstack for ARM guest.
+On 22 July 2013 16:22, Lee Jones <lee.jones@linaro.org> wrote:
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/spear300.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
+For all three SPEAr Patches.
 
----
-    Changes in v3:
-        - Fix condition to compile cpu_hotplug.o
-    Changes in v2:
-        - Don't compile xen/cpu_hotplug.o with ARM64
----
- drivers/xen/Makefile |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index 2bf461a..f185e8d 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -1,9 +1,8 @@
--ifneq ($(CONFIG_ARM),y)
--obj-y	+= manage.o
-+ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
- obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
- endif
- obj-$(CONFIG_X86)			+= fallback.o
--obj-y	+= grant-table.o features.o events.o balloon.o time.o
-+obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
- obj-y	+= xenbus/
- 
- nostackp := $(call cc-option, -fno-stack-protector)
--- 
-1.7.10.4
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
