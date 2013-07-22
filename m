@@ -1,46 +1,108 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Jul 2013 16:36:59 +0900
-Subject: [PATCH 2/5] ARM: shmobile: fix compile error when
- CONFIG_THUMB2_KERNEL=y
+Date: Mon, 22 Jul 2013 16:36:58 +0900
+Subject: [PATCH 1/5] ARM: shmobile: Update romImage to relocate appended DTB
 In-Reply-To: <cover.1374478336.git.horms+renesas@verge.net.au>
 References: <cover.1374478336.git.horms+renesas@verge.net.au>
-Message-ID: <bdea6c657e15a709e666ea707e72327c555e8e04.1374478336.git.horms+renesas@verge.net.au>
+Message-ID: <2c408d149299e99c89fc4be80fb4fe00a7016f02.1374478336.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+From: Magnus Damm <damm@opensource.se>
 
-On KZM-A9-GT board (SMP), when CONFIG_THUMB2_KERNEL=y it fails to compile
+Instead of relying of MACH_TYPE for board identification,
+update the romImage code to relocate an appended DTB to
+the beginning of RAM. This implementation is independent
+of ARM_APPENDED_DTB, this because it is necessary to copy
+the DTB to memory so the kernel can access it.
 
-  AS      arch/arm/mach-shmobile/headsmp-scu.o
-/proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S: Assembler messages:
-/proj/koba/kernel/arm-soc/arch/arm/mach-shmobile/headsmp-scu.S:41: Error: shift must be constant -- `bic r2,r2,r3,lsl r1'
-make[2]: *** [arch/arm/mach-shmobile/headsmp-scu.o] Error 1
-make[1]: *** [arch/arm/mach-shmobile] Error 2
-make: *** [sub-make] Error 2
+Without this patch Mackerel does not boot via the Mask ROM
+over USB (r_usb_boot) - this since non-DT boot was broken
+ages ago in commit:
 
-Instruction `bic r2,r2,r3,lsl r1' is not supported in thumb mode. This patch split it into 2 instructions.
+0ce53cd ARM: mach-shmobile: Use DT_MACHINE for mackerel
 
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/headsmp-scu.S | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/compressed/head-shmobile.S    | 43 ++++++++++++++++++++++++++---
+ arch/arm/mach-shmobile/include/mach/zboot.h |  2 --
+ 2 files changed, 39 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index 6f98654..5ce416c 100644
---- a/arch/arm/mach-shmobile/headsmp-scu.S
-+++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -38,7 +38,8 @@ ENTRY(shmobile_boot_scu)
- 	lsl	r1, r1, #3		@ we will shift by cpu_id * 8 bits
- 	ldr	r2, [r0, #8]		@ SCU Power Status Register
- 	mov	r3, #3
--	bic	r2, r2, r3, lsl r1	@ Clear bits of our CPU (Run Mode)
-+	lsl	r3, r3, r1
-+	bic	r2, r2, r3		@ Clear bits of our CPU (Run Mode)
- 	str	r2, [r0, #8]		@ write back
+diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
+index e2d6363..e7f8092 100644
+--- a/arch/arm/boot/compressed/head-shmobile.S
++++ b/arch/arm/boot/compressed/head-shmobile.S
+@@ -55,12 +55,47 @@ __tmp_stack:
+ __continue:
+ #endif /* CONFIG_ZBOOT_ROM_MMC || CONFIG_ZBOOT_ROM_SH_MOBILE_SDHI */
  
- 	b	shmobile_invalidate_start
+-	/* Set board ID necessary for boot */
+-	ldr	r7, 1f				@ Set machine type register
+-	mov	r8, #0				@ pass null pointer as atag
++	adr	r0, dtb_info
++	ldmia	r0, {r1, r3, r4, r5, r7}
++
++	sub	r0, r0, r1		@ calculate the delta offset
++	add	r5, r5, r0		@ _edata
++
++	ldr	lr, [r5, #0]		@ check if valid DTB is present
++	cmp	lr, r3
++	bne	0f
++
++	add	r9, r7, #31		@ rounded up to a multiple
++	bic	r9, r9, #31		@ ... of 32 bytes
++
++	add	r6, r9, r5		@ copy from _edata
++	add	r9, r9, r4		@ to MEMORY_START
++
++1:	ldmdb	r6!, {r0 - r3, r10 - r12, lr}
++	cmp	r6, r5
++	stmdb	r9!, {r0 - r3, r10 - r12, lr}
++	bhi	1b
++
++	/* Success: Zero board ID, pointer to start of memory for atag/dtb */
++	mov	r7, #0
++	mov	r8, r4
+ 	b	2f
+ 
+-1 :	.long MACH_TYPE
++	.align	2
++dtb_info:
++	.word	dtb_info
++#ifndef __ARMEB__
++	.word	0xedfe0dd0		@ sig is 0xd00dfeed big endian
++#else
++	.word	0xd00dfeed
++#endif
++	.word	MEMORY_START
++	.word	_edata
++	.word	0x4000			@ maximum DTB size
++0:
++	/* Failure: Zero board ID, NULL atag/dtb */
++	mov 	r7, #0
++	mov	r8, #0			@ pass null pointer as atag
+ 2 :
+ 
+ #endif /* CONFIG_ZBOOT_ROM */
+diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
+index f2d8744..c3c4669 100644
+--- a/arch/arm/mach-shmobile/include/mach/zboot.h
++++ b/arch/arm/mach-shmobile/include/mach/zboot.h
+@@ -1,7 +1,6 @@
+ #ifndef ZBOOT_H
+ #define ZBOOT_H
+ 
+-#include <asm/mach-types.h>
+ #include <mach/zboot_macros.h>
+ 
+ /**************************************************
+@@ -11,7 +10,6 @@
+  **************************************************/
+ 
+ #ifdef CONFIG_MACH_MACKEREL
+-#define MACH_TYPE	MACH_TYPE_MACKEREL
+ #define MEMORY_START	0x40000000
+ #include "mach/head-mackerel.txt"
+ #else
 -- 
 1.8.2.1
