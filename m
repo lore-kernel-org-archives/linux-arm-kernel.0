@@ -1,50 +1,38 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 22 Jul 2013 12:32:27 +0100
-Subject: [PATCH v3 16/16] cpufreq: pmac32-cpufreq: remove device tree parsing
- for cpu nodes
-In-Reply-To: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374492747-13879-17-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Jul 2013 12:40:10 +0100
+Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
+In-Reply-To: <20130721081138.75cf5437bc30f42284f12e47@mail.ru>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+ <51EB0433.3050308@linaro.org>
+ <20130721081138.75cf5437bc30f42284f12e47@mail.ru>
+Message-ID: <20130722114010.GL24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On Sun, Jul 21, 2013 at 08:11:38AM +0400, Alexander Shiyan wrote:
+> > > +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
+> > > +				 struct cpuidle_driver *drv, int index)
+> > > +{
+> > > +	writel(1, clps711x_halt);
+> > 
+> > In what the 'clps711x_halt' differs from the usual WFI (cpu_do_idle) ?
+> 
+> AFAIK, ARM720T does not implement the WFI instruction.
+> "HALT" register in CLPS711X do the same:
+> "A write to this location will put the system into the Idle State by
+> halting the clock to the processor until an interrupt is generated."
+> 
+> > > +	asm volatile ("mov r0, r0");
+> > > +	asm volatile ("mov r0, r0");
+> > 
+> > Why are needed these two volatile ?
+> 
+> Two NOP instructions necessary following the enable or disable of the MMU.
+> Documentation not say anything about using this for "HALT", maybe it's the
+> remnants of the old code. I will remove it.
 
-Now that the cpu device registration initialises the of_node(if available)
-appropriately for all the cpus, parsing here is redundant.
-
-This patch removes DT parsing and uses cpu->of_node instead.
-
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- drivers/cpufreq/pmac32-cpufreq.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/cpufreq/pmac32-cpufreq.c b/drivers/cpufreq/pmac32-cpufreq.c
-index 3104fad..56bfb6f 100644
---- a/drivers/cpufreq/pmac32-cpufreq.c
-+++ b/drivers/cpufreq/pmac32-cpufreq.c
-@@ -25,6 +25,7 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/hardirq.h>
-+#include <linux/of_device.h>
- #include <asm/prom.h>
- #include <asm/machdep.h>
- #include <asm/irq.h>
-@@ -649,8 +650,8 @@ static int __init pmac_cpufreq_setup(void)
- 	if (strstr(cmd_line, "nocpufreq"))
- 		return 0;
- 
--	/* Assume only one CPU */
--	cpunode = of_find_node_by_type(NULL, "cpu");
-+	/* Get first CPU node */
-+	cpunode = of_cpu_device_node_get(0);
- 	if (!cpunode)
- 		goto out;
- 
--- 
-1.8.1.2
+However, bear in mind that this is not how you insert two nops after
+something; the compiler is free to add anything it likes before,
+between separate asm() statements, or after them, even if they're
+marked volatile.
