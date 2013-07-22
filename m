@@ -1,37 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Jul 2013 16:36:15 +0900
-Subject: [PATCH 03/11] ARM: shmobile: Update KZM9D dts command line
+Date: Mon, 22 Jul 2013 16:36:14 +0900
+Subject: [PATCH 02/11] ARM: shmobile: ape6evm: add CPUFreq support
 In-Reply-To: <cover.1374478037.git.horms+renesas@verge.net.au>
 References: <cover.1374478037.git.horms+renesas@verge.net.au>
-Message-ID: <8f675493f4706a9f92a822121fe38892a08e0161.1374478037.git.horms+renesas@verge.net.au>
+Message-ID: <463a2432a435ea3eda4714626f231b7b22f0ac3d.1374478037.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Update the KZM9D DTS command line to remove following cruft:
- - console=tty0 - no graphic support upstream anyway
- - earlyprintk= - not supported by the 8250-em driver anyway
- - mem= - this is provided via DT anyway
+This patch adds OPPs to the CA15 DT node and a max8973 DT node to support
+clock and voltage scaling, using the cpufreq-cpu0 CPUFreq driver.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index b9b3241..dda13bc 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -21,6 +21,6 @@
- 	};
- 
- 	chosen {
--		bootargs = "console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
-+		bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index f603c69..e657a9d 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -50,3 +50,25 @@
+ 		};
  	};
  };
++
++&i2c5 {
++	vdd_dvfs: max8973 at 1b {
++		compatible = "maxim,max8973";
++		reg = <0x1b>;
++
++		regulator-min-microvolt = <935000>;
++		regulator-max-microvolt = <1200000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
++&cpu0 {
++	cpu0-supply = <&vdd_dvfs>;
++	operating-points = <
++		/* kHz  uV */
++		1950000 1115000
++		1462500  995000
++	>;
++	voltage-tolerance = <1>; /* 1% */
++};
 -- 
 1.8.2.1
