@@ -1,49 +1,73 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Jul 2013 22:17:23 +0200
-Subject: [PATCH v4 04/20] clocksource: samsung_pwm_timer: Do not use
- clocksource_mmio
-In-Reply-To: <51ED925D.3060307@linaro.org>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <19090469.Cf6sbb33Ke@flatron> <51ED925D.3060307@linaro.org>
-Message-ID: <7854904.Q0hSxIdabT@flatron>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 22 Jul 2013 21:26:35 +0100
+Subject: [PATCH 4/4] ARM: set --be8 when linking modules
+In-Reply-To: <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
+References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374510833-25716-5-git-send-email-ben.dooks@codethink.co.uk>
+ <20130722170500.GC19639@codeaurora.org> <51ED69CA.3030501@codethink.co.uk>
+ <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
+Message-ID: <51ED957B.80105@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 of July 2013 22:13:17 Daniel Lezcano wrote:
-> On 07/22/2013 09:47 AM, Tomasz Figa wrote:
-> > Hi Daniel,
-> > 
-> > On Monday 22 of July 2013 05:56:16 Daniel Lezcano wrote:
-> >> On 07/20/2013 02:04 AM, Tomasz Figa wrote:
-> >>> In case of Samsung PWM timer, clocksource MMIO can not be used,
-> >>> because
-> >>> custom suspend/resume callbacks are required.
-> >>> 
-> >>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> >>> ---
-> >> 
-> >> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > 
-> > Thanks for review.
-> > 
-> >> Please in the future Cc me and Thomas Gleixner
-> >> (clocksource/clockevent
-> >> maintainers).
-> > 
-> > Oh, right, sorry. This series originally was not touching the
-> > clocksource driver and I just kept original recipient list.
-> > 
-> > Btw. Have you updated MAINTAINERS file? In latest linux-next I can
-> > still see only John Stultz and Thomas Gleixner as maintainers of
-> > drivers/clocksource.
-> 
-> Yes, right last week :)
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timer
-> s/core&id=9222d247bcbaacc40fe15549158f9d67523c1ace
+On 22/07/13 19:53, Nicolas Pitre wrote:
+> On Mon, 22 Jul 2013, Ben Dooks wrote:
+>
+>> On 22/07/13 18:05, Stephen Boyd wrote:
+>>> On 07/22, Ben Dooks wrote:
+>>>> To avoid having to make every text section swap the instruction order
+>>>> of all instructions, make sure modules are built also built with --be8
+>>>> (as is the current kernel final link).
+>>>>
+>>>> If we do not do this, we would end up having to swap all instructions
+>>>> when loading a module, instead of just the instructions that we are
+>>>> applying ELF relocations to.
+>>>>
+>>>
+>>> If someone tries to load a be8 module on a non-be8 kernel will it
+>>> still work? Or should we add an extra version magic string in
+>>> asm/module.h to prevent that?
+>>
+>> The ELF header changes the EI_DATA field in the ei_ident from
+>> ELFDATA2LSB to ELFDATA2MSB when compiling so we should be able
+>> to detect these when loading.
+>>
+>> I have not checked to see if the kernel correctly checks for this.
+>>
+>> I do not think it currently checks the ei_flags field for the
+>> EF_ARM_BE8 in ABI 4 and 5. I am not sure if this is really important?
+>
+> If the information is already there and easily accessible, then it
+> should be used.
 
-OK, great, just wanted to make sure. Apparently linux-next did not pick 
-this up.
+I added this, which seems to actually work unlike my last effort.
 
-Best regards,
-Tomasz
+I do not think it actually gets triggered, the ELF format contains
+the endian-ness of the system it was built for and therefore fails
+somewhere else.
+
+
+diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
+index d0d1e83..37c8e66 100644
+--- a/arch/arm/kernel/elf.c
++++ b/arch/arm/kernel/elf.c
+@@ -34,6 +34,17 @@ int elf_check_arch(const struct elf32_hdr *x)
+                 if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & 
+HWCAP_VFP))
+                         return 0;
+         }
++
++       if ((eflags & EF_ARM_EABI_MASK) >= EF_ARM_EABI_VER4) {
++               bool is_be8 = IS_ENABLED(CONFIG_CPU_ENDIAN_BE8);
++
++               /* do some simple endian-ness verifications */
++               if (eflags & EF_ARM_BE8 && !is_be8)
++                       return 0;
++               if (eflags & EF_ARM_LE8 && is_be8)
++                       return 0;
++       }
++
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
