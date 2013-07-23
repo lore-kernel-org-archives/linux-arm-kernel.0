@@ -1,73 +1,342 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 23 Jul 2013 09:16:39 +0100
-Subject: [PATCH 4/4] ARM: set --be8 when linking modules
-In-Reply-To: <51ED8040.2020803@codethink.co.uk>
-References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374510833-25716-5-git-send-email-ben.dooks@codethink.co.uk>
- <20130722170500.GC19639@codeaurora.org> <51ED69CA.3030501@codethink.co.uk>
- <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
- <51ED8040.2020803@codethink.co.uk>
-Message-ID: <51EE3BE7.2030706@codethink.co.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 23 Jul 2013 10:23:17 +0200
+Subject: [PATCH 6/6] USB: OHCI: make ohci-s3c2410 a separate driver
+In-Reply-To: <1374484770-24531-7-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+ <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
+ <1374484770-24531-7-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <3454167.krWglU43Yy@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/13 19:56, Ben Dooks wrote:
-> On 22/07/13 19:53, Nicolas Pitre wrote:
->> On Mon, 22 Jul 2013, Ben Dooks wrote:
->>
->>> On 22/07/13 18:05, Stephen Boyd wrote:
->>>> On 07/22, Ben Dooks wrote:
->>>>> To avoid having to make every text section swap the instruction order
->>>>> of all instructions, make sure modules are built also built with --be8
->>>>> (as is the current kernel final link).
->>>>>
->>>>> If we do not do this, we would end up having to swap all instructions
->>>>> when loading a module, instead of just the instructions that we are
->>>>> applying ELF relocations to.
->>>>>
->>>>
->>>> If someone tries to load a be8 module on a non-be8 kernel will it
->>>> still work? Or should we add an extra version magic string in
->>>> asm/module.h to prevent that?
->>>
->>> The ELF header changes the EI_DATA field in the ei_ident from
->>> ELFDATA2LSB to ELFDATA2MSB when compiling so we should be able
->>> to detect these when loading.
->>>
->>> I have not checked to see if the kernel correctly checks for this.
->>>
->>> I do not think it currently checks the ei_flags field for the
->>> EF_ARM_BE8 in ABI 4 and 5. I am not sure if this is really important?
->>
->> If the information is already there and easily accessible, then it
->> should be used.
->>
->>
->> Nicolas
->
-> I have something like this, it does not mess things up loading
-> BE8 binaries on my current system. I think we're building stuff
-> for EABI4 but haven't checked.
->
-> diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-> index d0d1e83..3b0351c 100644
-> --- a/arch/arm/kernel/elf.c
-> +++ b/arch/arm/kernel/elf.c
-> @@ -34,6 +34,15 @@ int elf_check_arch(const struct elf32_hdr *x)
-> if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & HWCAP_VFP))
-> return 0;
-> }
+Hi Manjunath,
+
+Please see some comments inline.
+
+On Monday 22 of July 2013 14:49:30 Manjunath Goudar wrote:
+> Separate the Samsung OHCI S3CXXXX host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> it would be nice to have in 3.12.
+> 
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: linux-usb at vger.kernel.org
+> 
+> V2:
+>  -Set non-standard fields in ohci_s3c2410_hc_driver manually, rather
+> than relying on an expanded struct ohci_driver_overrides.
+>  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+>   relying on ohci_hub_control and hub_status_data being exported.
+> 
+> V3:
+>  -Kconfig wrong parentheses discription fixed.
+>  -ohci_setup() has been removed because it is called in .reset member
+>   of the ohci_hc_driver structure.
+> 
+> V4:
+>  - Removed extra space before the '='.
+>  - Moved  /* forward definitions */ line before the declarations of
+> functions. ---
+>  drivers/usb/host/Kconfig        |    8 +++
+>  drivers/usb/host/Makefile       |    1 +
+>  drivers/usb/host/ohci-hcd.c     |   18 ------
+>  drivers/usb/host/ohci-s3c2410.c |  128
+> +++++++++++++++++---------------------- 4 files changed, 66
+> insertions(+), 89 deletions(-)
+> 
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 693560a..795d14d 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -390,6 +390,14 @@ config USB_OHCI_HCD_SPEAR
+>            Enables support for the on-chip OHCI controller on
+>            ST SPEAr chips.
+> 
+> +config USB_OHCI_HCD_S3CXXXX
+> +        tristate "Support for S3CXXXX on-chip OHCI USB controller"
+> +        depends on USB_OHCI_HCD && (ARCH_S3C24XX || ARCH_S3C64XX)
+> +        default y
+> +        ---help---
+> +          Enables support for the on-chip OHCI controller on
+> +          S3CXXXX chips.
 > +
-> + if ((eflags & EF_ARM_EABI_MASK) >= EF_ARM_EABI_VER4) {
-> + if (eflags & EF_ARM_BE8) {
-> + if (!IS_ENABLED(CONFIG_ARM_CPU_BE8))
-> + return 1;
-> + } else if (IS_ENABLED(CONFIG_ARM_CPU_BE8))
-> + return 1;
-> + }
 
-dis-regard this, it does not work. I blame the heat.
+Please keep the name s3c2410 for consistency. Having all the names come 
+from the first SoC with this hardware is somewhat deterministic as opposed 
+to some other naming methods, e.g. ohci-exynos2, while later on a 
+different SoC from Exynos 2 shows up that needs a different driver.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+>  config USB_OHCI_HCD_AT91
+>          tristate "Support for Atmel on-chip OHCI USB controller"
+>          depends on USB_OHCI_HCD && ARCH_AT91
+> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+> index a70b044..9dffe81 100644
+> --- a/drivers/usb/host/Makefile
+> +++ b/drivers/usb/host/Makefile
+> @@ -51,6 +51,7 @@ obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
+>  obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
+>  obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
+>  obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
+> +obj-$(CONFIG_USB_OHCI_HCD_S3CXXXX)	+= ohci-s3c2410.o
+> 
+>  obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
+>  obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
+> diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+> index b48c892..b69a49e 100644
+> --- a/drivers/usb/host/ohci-hcd.c
+> +++ b/drivers/usb/host/ohci-hcd.c
+> @@ -1177,11 +1177,6 @@ MODULE_LICENSE ("GPL");
+>  #define SA1111_DRIVER		ohci_hcd_sa1111_driver
+>  #endif
+> 
+> -#if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S3C64XX)
+> -#include "ohci-s3c2410.c"
+> -#define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
+> -#endif
+> -
+>  #if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
+>  #include "ohci-pxa27x.c"
+>  #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
+> @@ -1293,12 +1288,6 @@ static int __init ohci_hcd_mod_init(void)
+>  		goto error_tmio;
+>  #endif
+> 
+> -#ifdef S3C2410_PLATFORM_DRIVER
+> -	retval = platform_driver_register(&S3C2410_PLATFORM_DRIVER);
+> -	if (retval < 0)
+> -		goto error_s3c2410;
+> -#endif
+> -
+>  #ifdef EP93XX_PLATFORM_DRIVER
+>  	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
+>  	if (retval < 0)
+> @@ -1332,10 +1321,6 @@ static int __init ohci_hcd_mod_init(void)
+>  	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+>   error_ep93xx:
+>  #endif
+> -#ifdef S3C2410_PLATFORM_DRIVER
+> -	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
+> - error_s3c2410:
+> -#endif
+>  #ifdef TMIO_OHCI_DRIVER
+>  	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+>   error_tmio:
+> @@ -1382,9 +1367,6 @@ static void __exit ohci_hcd_mod_exit(void)
+>  #ifdef EP93XX_PLATFORM_DRIVER
+>  	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+>  #endif
+> -#ifdef S3C2410_PLATFORM_DRIVER
+> -	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
+> -#endif
+>  #ifdef TMIO_OHCI_DRIVER
+>  	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+>  #endif
+> diff --git a/drivers/usb/host/ohci-s3c2410.c
+> b/drivers/usb/host/ohci-s3c2410.c index e125770..48b5948 100644
+> --- a/drivers/usb/host/ohci-s3c2410.c
+> +++ b/drivers/usb/host/ohci-s3c2410.c
+> @@ -19,19 +19,36 @@
+>   * This file is licenced under the GPL.
+>  */
+> 
+> -#include <linux/platform_device.h>
+>  #include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/platform_data/usb-ohci-s3c2410.h>
+> +#include <linux/usb.h>
+> +#include <linux/usb/hcd.h>
+> +
+> +#include "ohci.h"
+> +
+> 
+>  #define valid_port(idx) ((idx) == 1 || (idx) == 2)
+> 
+>  /* clock device associated with the hcd */
+> 
+> +
+> +#define DRIVER_DESC "OHCI S3CXXXX driver"
+> +
+> +static const char hcd_name[] = "ohci-s3cxxxx";
+> +
+
+Ditto.
+
+>  static struct clk *clk;
+>  static struct clk *usb_clk;
+> 
+>  /* forward definitions */
+> 
+> +static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
+> +			u16 wValue, u16 wIndex, char *buf, u16 wLength);
+> +static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char
+> *buf); +
+>  static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
+> 
+>  /* conversion functions */
+> @@ -93,7 +110,7 @@ ohci_s3c2410_hub_status_data(struct usb_hcd *hcd,
+> char *buf) int orig;
+>  	int portno;
+> 
+> -	orig  = ohci_hub_status_data(hcd, buf);
+> +	orig = orig_ohci_hub_status_data(hcd, buf);
+> 
+>  	if (info == NULL)
+>  		return orig;
+> @@ -164,7 +181,7 @@ static int ohci_s3c2410_hub_control(
+>  	 * process the request straight away and exit */
+> 
+>  	if (info == NULL) {
+> -		ret = ohci_hub_control(hcd, typeReq, wValue,
+> +		ret = orig_ohci_hub_control(hcd, typeReq, wValue,
+>  				       wIndex, buf, wLength);
+>  		goto out;
+>  	}
+> @@ -214,7 +231,7 @@ static int ohci_s3c2410_hub_control(
+>  		break;
+>  	}
+> 
+> -	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, 
+wLength);
+> +	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex, buf,
+> wLength); if (ret)
+>  		goto out;
+> 
+> @@ -373,8 +390,6 @@ static int usb_hcd_s3c2410_probe(const struct
+> hc_driver *driver,
+> 
+>  	s3c2410_start_hc(dev, hcd);
+> 
+> -	ohci_hcd_init(hcd_to_ohci(hcd));
+> -
+>  	retval = usb_add_hcd(hcd, dev->resource[1].start, 0);
+>  	if (retval != 0)
+>  		goto err_ioremap;
+> @@ -391,71 +406,7 @@ static int usb_hcd_s3c2410_probe(const struct
+> hc_driver *driver,
+> 
+>  /*---------------------------------------------------------------------
+> ----*/
+> 
+> -static int
+> -ohci_s3c2410_start(struct usb_hcd *hcd)
+> -{
+> -	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+> -	int ret;
+> -
+> -	ret = ohci_init(ohci);
+> -	if (ret < 0)
+> -		return ret;
+> -
+> -	ret = ohci_run(ohci);
+> -	if (ret < 0) {
+> -		dev_err(hcd->self.controller, "can't start %s\n",
+> -			hcd->self.bus_name);
+> -		ohci_stop(hcd);
+> -		return ret;
+> -	}
+> -
+> -	return 0;
+> -}
+> -
+> -
+> -static const struct hc_driver ohci_s3c2410_hc_driver = {
+> -	.description =		hcd_name,
+> -	.product_desc =		"S3C24XX OHCI",
+> -	.hcd_priv_size =	sizeof(struct ohci_hcd),
+> -
+> -	/*
+> -	 * generic hardware linkage
+> -	 */
+> -	.irq =			ohci_irq,
+> -	.flags =		HCD_USB11 | HCD_MEMORY,
+> -
+> -	/*
+> -	 * basic lifecycle operations
+> -	 */
+> -	.start =		ohci_s3c2410_start,
+> -	.stop =			ohci_stop,
+> -	.shutdown =		ohci_shutdown,
+> -
+> -	/*
+> -	 * managing i/o requests and associated device resources
+> -	 */
+> -	.urb_enqueue =		ohci_urb_enqueue,
+> -	.urb_dequeue =		ohci_urb_dequeue,
+> -	.endpoint_disable =	ohci_endpoint_disable,
+> -
+> -	/*
+> -	 * scheduling support
+> -	 */
+> -	.get_frame_number =	ohci_get_frame,
+> -
+> -	/*
+> -	 * root hub support
+> -	 */
+> -	.hub_status_data =	ohci_s3c2410_hub_status_data,
+> -	.hub_control =		ohci_s3c2410_hub_control,
+> -#ifdef	CONFIG_PM
+> -	.bus_suspend =		ohci_bus_suspend,
+> -	.bus_resume =		ohci_bus_resume,
+> -#endif
+> -	.start_port_reset =	ohci_start_port_reset,
+> -};
+> -
+> -/* device driver */
+> +static struct hc_driver __read_mostly ohci_s3c2410_hc_driver;
+> 
+>  static int ohci_hcd_s3c2410_drv_probe(struct platform_device *pdev)
+>  {
+> @@ -532,4 +483,39 @@ static struct platform_driver
+> ohci_hcd_s3c2410_driver = { },
+>  };
+> 
+> +static int __init ohci_s3cxxxx_init(void)
+> +{
+> +	if (usb_disabled())
+> +		return -ENODEV;
+> +
+> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
+> +	ohci_init_driver(&ohci_s3c2410_hc_driver, NULL);
+> +
+> +	/*
+> +	 * The Samsung HW has some unusual quirks, which require
+> +	 * Sumsung-specific workarounds. We override certain hc_driver
+> +	 * functions here to achieve that. We explicitly do not enhance
+> +	 * ohci_driver_overrides to allow this more easily, since this
+> +	 * is an unusual case, and we don't want to encourage others to
+> +	 * override these functions by making it too easy.
+> +	 */
+> +
+> +	orig_ohci_hub_control = ohci_s3c2410_hc_driver.hub_control;
+> +	orig_ohci_hub_status_data = 
+ohci_s3c2410_hc_driver.hub_status_data;
+> +
+> +	ohci_s3c2410_hc_driver.hub_status_data	= 
+ohci_s3c2410_hub_status_data;
+> +	ohci_s3c2410_hc_driver.hub_control	= 
+ohci_s3c2410_hub_control; +
+> +	return platform_driver_register(&ohci_hcd_s3c2410_driver);
+> +}
+> +module_init(ohci_s3cxxxx_init);
+> +
+> +static void __exit ohci_s3cxxxx_cleanup(void)
+> +{
+> +	platform_driver_unregister(&ohci_hcd_s3c2410_driver);
+> +}
+> +module_exit(ohci_s3cxxxx_cleanup);
+> +
+> +MODULE_DESCRIPTION(DRIVER_DESC);
+> +MODULE_LICENSE("GPL");
+>  MODULE_ALIAS("platform:s3c2410-ohci");
+
+Otherwise looks good to me. I will try to test this on S3C6410 in next 
+days.
+
+Best regards,
+Tomasz
