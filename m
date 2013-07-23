@@ -1,34 +1,74 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jul 2013 12:09:13 +0100
-Subject: [PATCH v3 01/12] ARM: mm: remove redundant dsb() prior to range TLB
- invalidation
+Date: Tue, 23 Jul 2013 12:09:20 +0100
+Subject: [PATCH v3 08/12] ARM: spinlock: use inner-shareable dsb variant prior
+ to sev instruction
 In-Reply-To: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
 References: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374577764-32480-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1374577764-32480-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel TLB range invalidation functions already contain dsb
-instructions before and after the maintenance, so there is no need to
-introduce additional barriers.
+When unlocking a spinlock, we use the sev instruction to signal other
+CPUs waiting on the lock. Since sev is not a memory access instruction,
+we require a dsb in order to ensure that the sev is not issued ahead
+of the store placing the lock in an unlocked state.
+
+However, as sev is only concerned with other processors in a
+multiprocessor system, we can restrict the scope of the preceding dsb
+to the inner-shareable domain. Furthermore, we can restrict the scope to
+consider only stores, since there are no independent loads on the unlock
+path.
+
+A side-effect of this change is that a spin_unlock operation no longer
+forces completion of pending TLB invalidation, something which we rely
+on when unlocking runqueues to ensure that CPU migration during TLB
+maintenance routines doesn't cause us to continue before the operation
+has completed.
+
+This patch adds the -ishst suffix to the ARMv7 definition of dsb_sev()
+and adds an inner-shareable dsb to the context-switch path when running
+a preemptible, SMP, v7 kernel.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/dma-mapping.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/include/asm/spinlock.h  |  2 +-
+ arch/arm/include/asm/switch_to.h | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7f9b179..0c17f69 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -455,7 +455,6 @@ static void __dma_remap(struct page *page, size_t size, pgprot_t prot)
- 	unsigned end = start + size;
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index f8b8965..2c1e748 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -46,7 +46,7 @@ static inline void dsb_sev(void)
+ {
+ #if __LINUX_ARM_ARCH__ >= 7
+ 	__asm__ __volatile__ (
+-		"dsb\n"
++		"dsb ishst\n"
+ 		SEV
+ 	);
+ #else
+diff --git a/arch/arm/include/asm/switch_to.h b/arch/arm/include/asm/switch_to.h
+index fa09e6b..c99e259 100644
+--- a/arch/arm/include/asm/switch_to.h
++++ b/arch/arm/include/asm/switch_to.h
+@@ -4,6 +4,16 @@
+ #include <linux/thread_info.h>
  
- 	apply_to_page_range(&init_mm, start, size, __dma_update_pte, &prot);
--	dsb();
- 	flush_tlb_kernel_range(start, end);
- }
- 
+ /*
++ * For v7 SMP cores running a preemptible kernel we may be pre-empted
++ * during a TLB maintenance operation, so execute an inner-shareable dsb
++ * to ensure that the maintenance completes in case we migrate to another
++ * CPU.
++ */
++#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP) && defined(CONFIG_CPU_V7)
++#define finish_arch_switch(prev)	dsb(ish)
++#endif
++
++/*
+  * switch_to(prev, next) should switch from task `prev' to `next'
+  * `prev' will never be the same as `next'.  schedule() itself
+  * contains the memory barrier to tell GCC not to cache `current'.
 -- 
 1.8.2.2
