@@ -1,46 +1,48 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 22 Jul 2013 20:02:01 -0700
-Subject: [PATCH] ARM: footbridge: fix overlapping PCI mappings
-In-Reply-To: <CAL_JsqKaha08U0fN1FruEEfsH=jAGzsxeJATJqeDvburd6EDjw@mail.gmail.com>
-References: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
- <CAL_JsqKaha08U0fN1FruEEfsH=jAGzsxeJATJqeDvburd6EDjw@mail.gmail.com>
-Message-ID: <20130723030201.GB16733@quad.lixom.net>
+Date: Mon, 22 Jul 2013 20:03:46 -0700
+Subject: [GIT PULL] Nomadik defconfig updates
+In-Reply-To: <CACRpkdZxSkLrKY1rZwdbo2ZJpVqExu7GRyhWN5T8V+aR_jx2Dw@mail.gmail.com>
+References: <CACRpkdZxSkLrKY1rZwdbo2ZJpVqExu7GRyhWN5T8V+aR_jx2Dw@mail.gmail.com>
+Message-ID: <20130723030346.GC16733@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 03:52:12PM -0500, Rob Herring wrote:
-> On Thu, Jun 27, 2013 at 9:42 PM, Mike Frysinger <vapier@gentoo.org> wrote:
-> > Commit 8ef6e6201b26cb9fde79c1baa08145af6aca2815 (ARM: footbridge: use
-> > fixed PCI i/o mapping) broke booting on my netwinder.  Before that,
-> > everything boots fine.  Since then, it crashes on boot.
-> >
-> > With earlyprintk, I see it BUG-ing like so:
-> > kernel BUG at lib/ioremap.c:27!
-> > Internal error: Oops - BUG: 0 [#1] ARM
-> > ...
-> > [<c0139b54>] (ioremap_page_range+0x128/0x154) from [<c02e6a6c>] (dc21285_setup+0xd0/0x114)
-> > [<c02e6a6c>] (dc21285_setup+0xd0/0x114) from [<c02e4874>] (pci_common_init+0xa0/0x298)
-> > [<c02e4874>] (pci_common_init+0xa0/0x298) from [<c02e793c>] (netwinder_pci_init+0xc/0x18)
-> > [<c02e793c>] (netwinder_pci_init+0xc/0x18) from [<c02e27d0>] (do_one_initcall+0xb4/0x180)
-> > ...
-> >
-> > Russell points out it's because of overlapping PCI mappings that was
-> > added with the aforementioned commit.  Rob thought the code would re-use
-> > the static mapping, but that turns out to not be the case and instead
-> > hits the BUG further down.
-> >
-> > After deleting this hunk as suggested by Russel, the system boots up fine
-> > again and all my PCI devices work (IDE, ethernet, the DC21285).
-> >
-> > Signed-off-by: Mike Frysinger <vapier@gentoo.org>
+On Sat, Jul 20, 2013 at 01:34:18PM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> now we are past -rc1 and I'd like to have these defconfig changes for
+> the Nomadik pulled in. It is similar in scope to the ux500 defconfig
+> updates I sent the other week, and all have been circulated on the
+> mailing list.
 > 
-> Olof, Kevin,
+> Please pull them in!
 > 
-> Please apply and add stable.
+> Yours,
+> Linus Walleij
+> 
+> 
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> 
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+> tags/nomadik-defconfig-for-arm-soc
+> 
+> for you to fetch changes up to fec57e15527ab2e3d22cfbf04f2b98f823f294ff:
+> 
+>   ARM: nomadik: configure for NO_HZ and HRTIMERS (2013-07-20 11:59:45 +0200)
+> 
+> ----------------------------------------------------------------
+> This updates the Nomadik defconfig post-v3.11-rc1:
+> - Update the baseline so we need not rely on make
+>   oldconfig so much
+> - MMC defconfig updates
+> - Activate NO_HZ_IDLE and HRTIMERS
 
-Done (stable v3.5+). Thanks.
+Pulled, thanks. Next time feel free to post these kind of patches as soon as
+the bulk of our merge has been done so we can get it in during -rc1 or -rc2.
 
 
 -Olof
