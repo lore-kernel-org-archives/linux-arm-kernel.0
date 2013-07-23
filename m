@@ -1,49 +1,59 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 23 Jul 2013 10:52:31 -0700
-Subject: [PATCH] arm64: Change kernel stack size to 16K.
-Message-ID: <1374601951-4091-1-git-send-email-fkan@apm.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 23 Jul 2013 10:53:04 -0700
+Subject: updates for be8 patch series
+In-Reply-To: <51EEC002.9070808@codethink.co.uk>
+References: <CAA3XUr3h5C0oJVrN5iXsM=NFkLMz_Tssp28CysZfwMNS5KvO-Q@mail.gmail.com>
+ <51EEC002.9070808@codethink.co.uk>
+Message-ID: <CAA3XUr2oDEDD6LFjnZ_N0JGTFUMDZG6O9b3JoeJ8AELrK2KDiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Written by Catalin Marinas, tested by APM on storm platform. This is needed 
-because of the failures encountered when running SpecWeb benchmark test.
+On 23 July 2013 10:40, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 23/07/13 18:24, Victor Kamensky wrote:
+>>
+>> Hi Ben,
+>>
+>> Wrt BE8 little endian instructions you will need to fix couple more
+>> places:
+>>      ftrace arch/arm/kernel/ftrace.c
+>>      kprobes arch/arm/kernel/kprobes.c
+>> Also in big endian mode atomic64_xxx function will need fixes, otherwise
+>> perf
+>> counters will be truncated on max of 32bit values
+>>      atomic64 arch/arm/include/asm/atomic.h
+>
+>
+> Hmm, thought ftrace already did the right endian-ness conversions,
+> although it is possible it could have missed one.
+>
+> The atomic instructions should work fine for BE8, they're using
+> STRD which should be correct.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Acked-by: Kumar Sankaran <ksankaran@apm.com>
----
- arch/arm64/include/asm/thread_info.h |    4 ++--
- arch/arm64/kernel/entry.S            |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+atomic64_read and atomic64_set are fine, but atomic64_add,
+atomic64_add_return, atomic64_sub, atomic64_sub_return, etc are not OK.
+The issue is in arithmetic operations not load/store.
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 3659e46..23a3c47 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -24,10 +24,10 @@
- #include <linux/compiler.h>
- 
- #ifndef CONFIG_ARM64_64K_PAGES
--#define THREAD_SIZE_ORDER	1
-+#define THREAD_SIZE_ORDER	2
- #endif
- 
--#define THREAD_SIZE		8192
-+#define THREAD_SIZE		16384
- #define THREAD_START_SP		(THREAD_SIZE - 16)
- 
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 1d13142..6ad781b 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -121,7 +121,7 @@
- 
- 	.macro	get_thread_info, rd
- 	mov	\rd, sp
--	and	\rd, \rd, #~((1 << 13) - 1)	// top of 8K stack
-+	and	\rd, \rd, #~(THREAD_SIZE - 1)	// top of stack
- 	.endm
- 
- /*
--- 
-1.7.6.1
+Thanks,
+Victor
+
+>
+>> I've attached board independent (core) patch from my work that made
+>> Pandaboard ES
+>> kernel run in BE mode. You can check my version of fixes for above
+>> issues in the
+>> patch. Look for corresponding files changes. Please rework them
+>> according to style
+>> and rules of your patch series. Note the patch itself contains fixes for
+>> few other
+>> issues that already fixed in your series. I'll cross check and compare
+>> individual
+>> areas latter. I think you may find attached patch interesting as well,
+>> it was developed
+>> independent from yours but matches its very well.
+>
+>
+>>
+>
+> --
+> Ben Dooks                               http://www.codethink.co.uk/
+> Senior Engineer                         Codethink - Providing Genius
