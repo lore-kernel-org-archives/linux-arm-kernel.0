@@ -1,76 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 Jul 2013 00:25:06 +0200
-Subject: [PATCH 04/10] ARM: sun6i: Add restart code for the A31
+Date: Wed, 24 Jul 2013 00:25:04 +0200
+Subject: [PATCH 02/10] clk: sunxi: fix initialization of basic clocks
 In-Reply-To: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1374618312-19001-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1374618312-19001-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31 has a sligthly different watchdog that requires a
-different restart code.
+From: Emilio L?pez <emilio@elopez.com.ar>
 
+With the recent move towards CLK_OF_DECLARE(...), the driver stopped
+initializing osc32k, which is compatible "fixed-clock". This is because
+we never called of_clk_init(NULL). Fix this by moving the only other
+simple clock (osc24M) to use CLK_OF_DECLARE(...) and call of_clk_init(NULL)
+to initialize both of them.
+
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-sunxi/sunxi.c | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/clk/sunxi/clk-sunxi.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 11326d9..c18ef3a 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -32,6 +32,15 @@
- #define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
- #define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 412912b..fe1528e 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -409,12 +409,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
  
-+#define SUN6I_WATCHDOG1_IRQ_REG		0x00
-+#define SUN6I_WATCHDOG1_CTRL_REG	0x10
-+#define SUN6I_WATCHDOG1_CTRL_RESTART		(1 << 0)
-+#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
-+#define SUN6I_WATCHDOG1_CONFIG_RESTART		(1 << 0)
-+#define SUN6I_WATCHDOG1_CONFIG_IRQ		(1 << 1)
-+#define SUN6I_WATCHDOG1_MODE_REG	0x18
-+#define SUN6I_WATCHDOG1_MODE_ENABLE		(1 << 0)
-+
- static void __iomem *wdt_base;
- 
- static void sun4i_restart(enum reboot_mode mode, const char *cmd)
-@@ -56,8 +65,36 @@ static void sun4i_restart(enum reboot_mode mode, const char *cmd)
- 	}
+ 	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
  }
+-
+-/* Matches for of_clk_init */
+-static const __initconst struct of_device_id clk_match[] = {
+-	{.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
+-	{}
+-};
++CLK_OF_DECLARE(sunxi_osc, "allwinner,sun4i-osc-clk", sunxi_osc_clk_setup);
  
-+static void sun6i_restart(char mode, const char *cmd)
-+{
-+	if (!wdt_base)
-+		return;
-+
-+	/* Disable interrupts */
-+	writel(0, wdt_base + SUN6I_WATCHDOG1_IRQ_REG);
-+
-+	/* We want to disable the IRQ and just reset the whole system */
-+	writel(SUN6I_WATCHDOG1_CONFIG_RESTART,
-+		wdt_base + SUN6I_WATCHDOG1_CONFIG_REG);
-+
-+	/* Enable timer. The default and lowest interval value is 0.5s */
-+	writel(SUN6I_WATCHDOG1_MODE_ENABLE,
-+		wdt_base + SUN6I_WATCHDOG1_MODE_REG);
-+
-+	/* Restart the watchdog. */
-+	writel(SUN6I_WATCHDOG1_CTRL_RESTART,
-+		wdt_base + SUN6I_WATCHDOG1_CTRL_REG);
-+
-+	while (1) {
-+		mdelay(5);
-+		writel(SUN6I_WATCHDOG1_MODE_ENABLE,
-+			wdt_base + SUN6I_WATCHDOG1_MODE_REG);
-+	}
-+}
-+
- static struct of_device_id sunxi_restart_ids[] = {
- 	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
-+	{ .compatible = "allwinner,sun6i-wdt", .data = sun6i_restart },
- 	{ /*sentinel*/ }
- };
+ /* Matches for factors clocks */
+ static const __initconst struct of_device_id clk_factors_match[] = {
+@@ -467,8 +462,8 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
  
+ void __init sunxi_init_clocks(void)
+ {
+-	/* Register all the simple sunxi clocks on DT */
+-	of_clk_init(clk_match);
++	/* Register all the simple and basic clocks on DT */
++	of_clk_init(NULL);
+ 
+ 	/* Register factor clocks */
+ 	of_sunxi_table_clock_setup(clk_factors_match, sunxi_factors_clk_setup);
 -- 
 1.8.3.2
