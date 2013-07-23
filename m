@@ -1,50 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jul 2013 11:33:33 +0100
-Subject: [PATCH v2 1/3] drivers: clocksource: configure event stream for
- ARM arch timer
-In-Reply-To: <20130723102334.GC3748@MacBook-Pro.local>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492082-13686-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130723102334.GC3748@MacBook-Pro.local>
-Message-ID: <20130723103333.GB30942@mudshark.cambridge.arm.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 23 Jul 2013 11:33:55 +0100
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+Message-ID: <51EE5C13.1000004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 11:23:34AM +0100, Catalin Marinas wrote:
-> On Mon, Jul 22, 2013 at 12:21:20PM +0100, Sudeep KarkadaNagesha wrote:
-> > From: Will Deacon <will.deacon@arm.com>
-> > 
-> > The ARM architected timer can generate events (used for waking up
-> > CPUs executing the wfe instruction) at a frequency represented as a
-> > power-of-2 divisor of the clock rate.
-> > 
-> > This patch configures the event stream, aiming for a period of 100us
-> > between events. This can be used to implement wfe-based timeouts for
-> > userspace locking implementations.
-> ...
-> > --- a/include/clocksource/arm_arch_timer.h
-> > +++ b/include/clocksource/arm_arch_timer.h
-> > @@ -29,6 +29,8 @@
-> >  #define ARCH_TIMER_PHYS_ACCESS		0
-> >  #define ARCH_TIMER_VIRT_ACCESS		1
-> >  
-> > +#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
-> 
-> BTW, if user-space starts using this, it will become an ABI. Is this the
-> right frequency?
+Hi Paul,
 
-It doesn't quite become ABI; not all platforms will use the architected
-timers and not all timers can support an arbitrary frequency. The best we
-can do is calculate something as close to the target value as possible.
+On 22/07/13 19:07, Paul Walmsley wrote:
+>
+> Hi,
+>
+> After Linus's commit fb2af0020a51709ad87ea8055c325d3fbde04158 ("Merge
+> branch 'for-linus' of git://git.linaro.org/people/rmk/linux-arm"), the
+> OMAP2430 SDP here stopped booting.
+>
+> Here's the bootlog at the commit before the merge, commit 790eac5640:
+>
+> http://www.pwsan.com/omap/testlogs/bisect_2430sdp_hang_v3.11-rc/20130722015454/
+>
+> and here's a log at commit fb2af0020a5:
+>
+> http://www.pwsan.com/omap/testlogs/bisect_2430sdp_hang_v3.11-rc/20130722005921/
+>
+> Any ideas as to what might have caused this?
+>
 
-I spoke to both tools developers and some HSA driver guys about the frequency,
-and this is what ended up being suggested.
+I've just had a quick go at booting 3.11-rc2 on an integrator-cp (1136) 
+in the hope that we might be able to reproduce this on those boards, but 
+I'm afraid the integrator works...
 
-> In addition, do we want to expose this via hwcap? Something like
-> HWCAP_EVSTR100US?
+I took your config, modified it as little as possible to switch to 
+Integrator and turn on earlyprintk, and then tried to boot. That *did* 
+require switching away from ARCH_MULTIPLATFORM, so it isn't as similar 
+as I'd like, though...
 
-Hmm, maybe, but we don't want people to try and use this for any accurate
-time measurements, so I wouldn't include the period.
+So I think we can at least say that this is not 1136 specific... Sorry 
+not to be more helpful...
 
-Will
+Jonny
