@@ -1,374 +1,506 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 23 Jul 2013 10:31:26 -0300
-Subject: [PATCH v8 22/28] ARM: mvebu: Relocate Armada 370/XP DeviceBus device
- tree nodes
+Date: Tue, 23 Jul 2013 10:31:29 -0300
+Subject: [PATCH v8 25/28] ARM: kirkwood: Use the preprocessor on device tree
+ files
 In-Reply-To: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374586292-4941-23-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374586292-4941-26-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that mbus has been added to the device tree, it's possible to
-move the DeviceBus out of internal registers, placing it directly
-below the mbus. This is a more accurate representation of the hardware.
-
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi             | 94 +++++++++++++-----------
- arch/arm/boot/dts/armada-xp-db.dts               | 59 +++++++--------
- arch/arm/boot/dts/armada-xp-gp.dts               | 60 +++++++--------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 65 ++++++++--------
- 4 files changed, 140 insertions(+), 138 deletions(-)
+ arch/arm/boot/dts/kirkwood-cloudbox.dts                | 4 ++--
+ arch/arm/boot/dts/kirkwood-db-88f6281.dts              | 4 ++--
+ arch/arm/boot/dts/kirkwood-db-88f6282.dts              | 4 ++--
+ arch/arm/boot/dts/kirkwood-db.dtsi                     | 2 +-
+ arch/arm/boot/dts/kirkwood-dns320.dts                  | 2 +-
+ arch/arm/boot/dts/kirkwood-dns325.dts                  | 2 +-
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi                  | 4 ++--
+ arch/arm/boot/dts/kirkwood-dockstar.dts                | 4 ++--
+ arch/arm/boot/dts/kirkwood-dreamplug.dts               | 4 ++--
+ arch/arm/boot/dts/kirkwood-goflexnet.dts               | 4 ++--
+ arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts    | 4 ++--
+ arch/arm/boot/dts/kirkwood-ib62x0.dts                  | 4 ++--
+ arch/arm/boot/dts/kirkwood-iconnect.dts                | 4 ++--
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts          | 4 ++--
+ arch/arm/boot/dts/kirkwood-is2.dts                     | 2 +-
+ arch/arm/boot/dts/kirkwood-km_kirkwood.dts             | 4 ++--
+ arch/arm/boot/dts/kirkwood-lschlv2.dts                 | 2 +-
+ arch/arm/boot/dts/kirkwood-lsxhl.dts                   | 2 +-
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi                   | 4 ++--
+ arch/arm/boot/dts/kirkwood-mplcec4.dts                 | 4 ++--
+ arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 4 ++--
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi             | 4 ++--
+ arch/arm/boot/dts/kirkwood-ns2.dts                     | 2 +-
+ arch/arm/boot/dts/kirkwood-ns2lite.dts                 | 2 +-
+ arch/arm/boot/dts/kirkwood-ns2max.dts                  | 2 +-
+ arch/arm/boot/dts/kirkwood-ns2mini.dts                 | 2 +-
+ arch/arm/boot/dts/kirkwood-nsa310.dts                  | 4 ++--
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts           | 4 ++--
+ arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi      | 4 ++--
+ arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts        | 2 +-
+ arch/arm/boot/dts/kirkwood-sheevaplug.dts              | 2 +-
+ arch/arm/boot/dts/kirkwood-topkick.dts                 | 4 ++--
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts              | 6 +++---
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts              | 6 +++---
+ 34 files changed, 58 insertions(+), 58 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 62639b4..073dd20 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -45,6 +45,56 @@
- 		controller = <&mbusc>;
- 		interrupt-parent = <&mpic>;
+diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+index 00c48d2..9bf139c 100644
+--- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
++++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
  
-+		devbus-bootcs {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10400 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs0 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10408 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3e) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs1 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10410 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3d) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs2 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10418 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3b) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs3 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10420 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x37) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
- 		internal-regs {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -200,50 +250,6 @@
- 				status = "disabled";
- 			};
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
  
--			devbus-bootcs at 10400 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10400 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
--
--			devbus-cs0 at 10408 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10408 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
--
--			devbus-cs1 at 10410 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10410 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
--
--			devbus-cs2 at 10418 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10418 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
--
--			devbus-cs3 at 10420 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10420 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
- 		};
- 	};
-  };
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 857f272..76ae1a9 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -31,7 +31,36 @@
+ / {
+ 	model = "LaCie CloudBox";
+diff --git a/arch/arm/boot/dts/kirkwood-db-88f6281.dts b/arch/arm/boot/dts/kirkwood-db-88f6281.dts
+index 9d777ed..f420cbe 100644
+--- a/arch/arm/boot/dts/kirkwood-db-88f6281.dts
++++ b/arch/arm/boot/dts/kirkwood-db-88f6281.dts
+@@ -11,8 +11,8 @@
  
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 16 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x1000000>;
-+				bank-width = <2>;
-+			};
-+		};
+ /dts-v1/;
  
- 		internal-regs {
- 			serial at 12000 {
-@@ -160,34 +189,6 @@
- 				};
- 			};
+-/include/ "kirkwood-db.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood-db.dtsi"
++#include "kirkwood-6281.dtsi"
  
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x1000000>;
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 16 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x1000000>;
--					bank-width = <2>;
--				};
--			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 934dc46..8c0de20 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -40,7 +40,36 @@
+ / {
+ 	model = "Marvell DB-88F6281-BP Development Board";
+diff --git a/arch/arm/boot/dts/kirkwood-db-88f6282.dts b/arch/arm/boot/dts/kirkwood-db-88f6282.dts
+index f4c8528..c5df866 100644
+--- a/arch/arm/boot/dts/kirkwood-db-88f6282.dts
++++ b/arch/arm/boot/dts/kirkwood-db-88f6282.dts
+@@ -11,8 +11,8 @@
  
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 16 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x1000000>;
-+				bank-width = <2>;
-+			};
-+		};
+ /dts-v1/;
  
- 		internal-regs {
- 			serial at 12000 {
-@@ -126,35 +155,6 @@
- 				};
- 			};
+-/include/ "kirkwood-db.dtsi"
+-/include/ "kirkwood-6282.dtsi"
++#include "kirkwood-db.dtsi"
++#include "kirkwood-6282.dtsi"
  
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 16 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x1000000>;
--					bank-width = <2>;
--				};
--			};
--
- 			pcie-controller {
- 				status = "okay";
+ / {
+ 	model = "Marvell DB-88F6282-BP Development Board";
+diff --git a/arch/arm/boot/dts/kirkwood-db.dtsi b/arch/arm/boot/dts/kirkwood-db.dtsi
+index c87cfb8..29bd98e 100644
+--- a/arch/arm/boot/dts/kirkwood-db.dtsi
++++ b/arch/arm/boot/dts/kirkwood-db.dtsi
+@@ -12,7 +12,7 @@
+  * and 6282 variants of the Marvell Kirkwood Development Board.
+  */
  
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 1700f6f..2b60ee0 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -28,7 +28,36 @@
+-/include/ "kirkwood.dtsi"
++#include "kirkwood.dtsi"
  
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 128 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x8000000>;
-+				bank-width = <2>;
-+			};
-+		};
+ / {
+ 	memory {
+diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
+index 14d4cee..e112ca6 100644
+--- a/arch/arm/boot/dts/kirkwood-dns320.dts
++++ b/arch/arm/boot/dts/kirkwood-dns320.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
  
- 		internal-regs {
- 			serial at 12000 {
-@@ -148,40 +177,6 @@
- 				status = "okay";
- 			};
+-/include/ "kirkwood-dnskw.dtsi"
++#include "kirkwood-dnskw.dtsi"
  
--			/* USB interface in the mini-PCIe connector */
--			usb at 52000 {
--				status = "okay";
--			};
--
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 128 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x8000000>;
--					bank-width = <2>;
--				};
--			};
--
- 			pcie-controller {
- 				status = "okay";
- 				/* Internal mini-PCIe connector */
+ / {
+ 	model = "D-Link DNS-320 NAS (Rev A1)";
+diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
+index 6387257..5119fb8 100644
+--- a/arch/arm/boot/dts/kirkwood-dns325.dts
++++ b/arch/arm/boot/dts/kirkwood-dns325.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-dnskw.dtsi"
++#include "kirkwood-dnskw.dtsi"
+ 
+ / {
+ 	model = "D-Link DNS-325 NAS (Rev A1)";
+diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+index 0afe1d0..2e04284 100644
+--- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
++++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+@@ -1,5 +1,5 @@
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "D-Link DNS NASes (kirkwood-based)";
+diff --git a/arch/arm/boot/dts/kirkwood-dockstar.dts b/arch/arm/boot/dts/kirkwood-dockstar.dts
+index 7714742..4387ae8 100644
+--- a/arch/arm/boot/dts/kirkwood-dockstar.dts
++++ b/arch/arm/boot/dts/kirkwood-dockstar.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "Seagate FreeAgent Dockstar";
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 36c7ba3..c628378 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "Globalscale Technologies Dreamplug";
+diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+index 31caa64..e571180 100644
+--- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
++++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "Seagate GoFlex Net";
+diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+index 1e642f3..2c5673a 100644
+--- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
++++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "Globalscale Technologies Guruplug Server Plus";
+diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+index 20c4b08..158161f 100644
+--- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
++++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "RaidSonic ICY BOX IB-NAS62x0 (Rev B)";
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index 441204e..1a98487 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "Iomega Iconnect";
+diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+index 00a7bfe..fd7f053 100644
+--- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
++++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "Iomega StorCenter ix2-200";
+diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
+index c3f036b..bd88a23 100644
+--- a/arch/arm/boot/dts/kirkwood-is2.dts
++++ b/arch/arm/boot/dts/kirkwood-is2.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-ns2-common.dtsi"
++#include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+ 	model = "LaCie Internet Space v2";
+diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
+index 5d9f5ea..b071d37 100644
+--- a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
++++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-98dx4122.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-98dx4122.dtsi"
+ 
+ / {
+ 	model = "Keymile Kirkwood Reference Design";
+diff --git a/arch/arm/boot/dts/kirkwood-lschlv2.dts b/arch/arm/boot/dts/kirkwood-lschlv2.dts
+index 9f55d95..e2fa368 100644
+--- a/arch/arm/boot/dts/kirkwood-lschlv2.dts
++++ b/arch/arm/boot/dts/kirkwood-lschlv2.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-lsxl.dtsi"
++#include "kirkwood-lsxl.dtsi"
+ 
+ / {
+ 	model = "Buffalo Linkstation LS-CHLv2";
+diff --git a/arch/arm/boot/dts/kirkwood-lsxhl.dts b/arch/arm/boot/dts/kirkwood-lsxhl.dts
+index 5c84c11..8d89cdf 100644
+--- a/arch/arm/boot/dts/kirkwood-lsxhl.dts
++++ b/arch/arm/boot/dts/kirkwood-lsxhl.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-lsxl.dtsi"
++#include "kirkwood-lsxl.dtsi"
+ 
+ / {
+ 	model = "Buffalo Linkstation LS-XHL";
+diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+index 31b17f5..f7e247c 100644
+--- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
++++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+@@ -1,5 +1,5 @@
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	chosen {
+diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+index 6179333..382ad99 100644
+--- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
++++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "MPL CEC4";
+diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+index ad6ade7..8be68bd 100644
+--- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
++++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6282.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6282.dtsi"
+ 
+ / {
+ 	model = "NETGEAR ReadyNAS Duo v2";
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+index 2afac04..d0fb34d 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -1,5 +1,5 @@
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	chosen {
+diff --git a/arch/arm/boot/dts/kirkwood-ns2.dts b/arch/arm/boot/dts/kirkwood-ns2.dts
+index b50e93d..0599f3c 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-ns2-common.dtsi"
++#include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+ 	model = "LaCie Network Space v2";
+diff --git a/arch/arm/boot/dts/kirkwood-ns2lite.dts b/arch/arm/boot/dts/kirkwood-ns2lite.dts
+index af8259f..b0e1798 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2lite.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2lite.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-ns2-common.dtsi"
++#include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+ 	model = "LaCie Network Space Lite v2";
+diff --git a/arch/arm/boot/dts/kirkwood-ns2max.dts b/arch/arm/boot/dts/kirkwood-ns2max.dts
+index 85f24d2..d4f6a58 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2max.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2max.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-ns2-common.dtsi"
++#include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+ 	model = "LaCie Network Space Max v2";
+diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+index 329e530..f30e05a 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood-ns2-common.dtsi"
++#include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+ 	/* This machine is embedded in the first LaCie CloudBox product. */
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index 6900359..8fd683c 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "ZyXEL NSA310";
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+index 38dc851..365b792 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6282.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6282.dtsi"
+ 
+ / {
+ 	model = "Plat'Home OpenBlocksA6";
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+index f7143f1..0cc5f26 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+@@ -6,8 +6,8 @@
+  * Licensed under GPLv2
+  */
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
+ 
+ / {
+ 	memory {
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
+index f620ce4..eac6a21 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
+@@ -8,7 +8,7 @@
+ 
+ /dts-v1/;
+ 
+-/include/ "kirkwood-sheevaplug-common.dtsi"
++#include "kirkwood-sheevaplug-common.dtsi"
+ 
+ / {
+ 	model = "Globalscale Technologies eSATA SheevaPlug";
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug.dts b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+index bf1dff2..bb61918 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug.dts
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+@@ -8,7 +8,7 @@
+ 
+ /dts-v1/;
+ 
+-/include/ "kirkwood-sheevaplug-common.dtsi"
++#include "kirkwood-sheevaplug-common.dtsi"
+ 
+ / {
+ 	model = "Globalscale Technologies SheevaPlug";
+diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+index f2052d7..974f1e0 100644
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6282.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6282.dtsi"
+ 
+ / {
+ 	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
+diff --git a/arch/arm/boot/dts/kirkwood-ts219-6281.dts b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
+index 6dd1038..3867ae3 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219-6281.dts
++++ b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
+@@ -1,8 +1,8 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
+-/include/ "kirkwood-ts219.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
++#include "kirkwood-ts219.dtsi"
+ 
+ / {
+ 	ocp at f1000000 {
+diff --git a/arch/arm/boot/dts/kirkwood-ts219-6282.dts b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
+index 6fdc5ff..7d6cc86 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219-6282.dts
++++ b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
+@@ -1,8 +1,8 @@
+ /dts-v1/;
+ 
+-/include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6282.dtsi"
+-/include/ "kirkwood-ts219.dtsi"
++#include "kirkwood.dtsi"
++#include "kirkwood-6282.dtsi"
++#include "kirkwood-ts219.dtsi"
+ 
+ / {
+ 	ocp at f1000000 {
 -- 
 1.8.1.5
