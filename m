@@ -1,47 +1,137 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 23 Jul 2013 10:09:40 +0200
-Subject: [PATCH 2/2] ARM: dts: mx6: Add support for imx6dl nitrogen board
-In-Reply-To: <CAOMZO5C8Zz27KQOQxnurRmEUqUPw6VZNPGc3g4oXEUZUDxtYVQ@mail.gmail.com>
-References: <1374118960-19060-1-git-send-email-festevam@gmail.com>
- <1374118960-19060-2-git-send-email-festevam@gmail.com>
- <20130722075736.GC20271@S2101-09.ap.freescale.net>
- <CAOMZO5C8Zz27KQOQxnurRmEUqUPw6VZNPGc3g4oXEUZUDxtYVQ@mail.gmail.com>
-Message-ID: <20974.14916.259380.424120@ipc1.ka-ro>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 23 Jul 2013 11:13:58 +0300
+Subject: [PATCH] ARM: Do not run dummy_flush_tlb_a15_erratum() on
+ non-Cortex-A15
+In-Reply-To: <1374556774-18795-1-git-send-email-festevam@gmail.com>
+References: <1374556774-18795-1-git-send-email-festevam@gmail.com>
+Message-ID: <51EE3B46.7020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Fabio,
 
-Fabio Estevam writes:
-> Hi Shawn,
+On 07/23/2013 08:19 AM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> On Mon, Jul 22, 2013 at 4:57 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15 erratum 798181 
+> (TLBI/DSB operations)) causes the following undefined instruction error on a
+> mx53 (Cortex-A8):
 > 
-> >> +/ {
-> >> +     model = "Boundary Devices i.MX6 Dual Lite Nitrogen Board";
-> >> +     compatible = "boundary,imx6dl-nitrogen", "fsl,imx6dl";
-> >> +
-> >> +     memory {
-> >> +             reg = <0x10000000 0x40000000>;
-> >> +     };
-> >
-> > This memory configuration is also common, right?
+> Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> CPU: 0 PID: 275 Comm: modprobe Not tainted 3.11.0-rc2-next-20130722-00009-g9b0f371 #881
+> task: df46cc00 ti: df48e000 task.ti: df48e000
+> PC is at check_and_switch_context+0x17c/0x4d0
+> LR is at check_and_switch_context+0xdc/0x4d0
 > 
-> The reason I put the memory configuration in this file is because we
-> also have nitrogen quad and dual-lite versions with 2GB.
+> This problem happens because check_and_switch_context() calls 
+> dummy_flush_tlb_a15_erratum() without checking if we are really running on a 
+> Cortex-A15 or not. 
 > 
-U-Boot is able to fill in these according to the actual amount of
-memory detected.
+> To avoid this issue, always check if we are running on a Cortex-A15 or not 
+> (via erratum_a15_798181()) inside dummy_flush_tlb_a15_erratum(), so that we do 
+> not need to keep doing the same check in all occurrences of 
+> dummy_flush_tlb_a15_erratum().
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/include/asm/tlbflush.h | 18 ++++++++++++++++++
+>  arch/arm/kernel/smp_tlb.c       | 23 -----------------------
+>  2 files changed, 18 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+> index fdbb9e3..2478b6f 100644
+> --- a/arch/arm/include/asm/tlbflush.h
+> +++ b/arch/arm/include/asm/tlbflush.h
+> @@ -443,9 +443,22 @@ static inline void local_flush_bp_all(void)
+>  		isb();
+>  }
+>  
+> +#include <asm/cputype.h>
+>  #ifdef CONFIG_ARM_ERRATA_798181
+> +static inline int erratum_a15_798181(void)
+> +{
+> +	unsigned int midr = read_cpuid_id();
+> +
+> +	/* Cortex-A15 r0p0..r3p2 affected */
+> +	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+> +		return 0;
+> +	return 1;
+> +}
+> +
+>  static inline void dummy_flush_tlb_a15_erratum(void)
+>  {
+> +	if (!erratum_a15_798181())
+> +		return;
+>  	/*
+>  	 * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
+>  	 */
+> @@ -453,6 +466,11 @@ static inline void dummy_flush_tlb_a15_erratum(void)
+>  	dsb();
+>  }
+>  #else
+> +static inline int erratum_a15_798181(void)
+> +{
+> +	return 0;
+> +}
+> +
+>  static inline void dummy_flush_tlb_a15_erratum(void)
+>  {
+>  }
+> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+> index a98b62d..29e9038 100644
+> --- a/arch/arm/kernel/smp_tlb.c
+> +++ b/arch/arm/kernel/smp_tlb.c
+> @@ -70,23 +70,6 @@ static inline void ipi_flush_bp_all(void *ignored)
+>  	local_flush_bp_all();
+>  }
+>  
+> -#ifdef CONFIG_ARM_ERRATA_798181
+> -static int erratum_a15_798181(void)
+> -{
+> -	unsigned int midr = read_cpuid_id();
+> -
+> -	/* Cortex-A15 r0p0..r3p2 affected */
+> -	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+> -		return 0;
+> -	return 1;
+> -}
+> -#else
+> -static int erratum_a15_798181(void)
+> -{
+> -	return 0;
+> -}
+> -#endif
+> -
+>  static void ipi_flush_tlb_a15_erratum(void *arg)
+>  {
+>  	dmb();
+> @@ -94,9 +77,6 @@ static void ipi_flush_tlb_a15_erratum(void *arg)
+>  
+>  static void broadcast_tlb_a15_erratum(void)
+>  {
+> -	if (!erratum_a15_798181())
+> -		return;
+> -
 
+Removing this if statement will cause "ipi_flush_tlb_a15_erratum" to be called
+on non A15 platforms. So I would just keep it to be safe.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+>  	dummy_flush_tlb_a15_erratum();
+>  	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
+>  }
+> @@ -106,9 +86,6 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
+>  	int this_cpu;
+>  	cpumask_t mask = { CPU_BITS_NONE };
+>  
+> -	if (!erratum_a15_798181())
+> -		return;
+> -
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+same here.
+>  	dummy_flush_tlb_a15_erratum();
+>  	this_cpu = get_cpu();
+>  	a15_erratum_get_cpumask(this_cpu, mm, &mask);
+> 
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+cheers,
+-roger
