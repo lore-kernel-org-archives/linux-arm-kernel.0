@@ -1,58 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Jul 2013 11:37:04 +0100
-Subject: scatterlist: sg_set_buf() argument must be in linear mapping
- (sha1: ac4e97abce9b80c020e7113325f49e58b7b15e3f)
-In-Reply-To: <87ppua9feh.fsf@rustcorp.com.au>
-References: <51E64C6B.3080306@monstr.eu> <87siz7xt4z.fsf@rustcorp.com.au>
- <51ED2C74.7050502@monstr.eu> <87ppua9feh.fsf@rustcorp.com.au>
-Message-ID: <20130723103704.GS24642@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Jul 2013 11:41:14 +0100
+Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
+In-Reply-To: <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
+References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
+ <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
+ <CAC4Lta17bmNjBck6LzziBeU0Xc36F1Jms2tQPv6+GaXvik6Wyg@mail.gmail.com>
+ <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
+Message-ID: <20130723104113.GE3748@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 12:00:30PM +0930, Rusty Russell wrote:
-> Michal Simek <monstr@monstr.eu> writes:
-> > Let me take some code from virtio_rpmsg_bus.c to show that problematic part.
+On Mon, Jul 22, 2013 at 01:51:52PM +0100, Christoffer Dall wrote:
+> On 22 July 2013 10:53, Raghavendra KT <raghavendra.kt.linux@gmail.com> wrote:
+> > On Fri, Jul 19, 2013 at 7:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> So far, when a guest executes WFE (like when waiting for a spinlock
+> >> to become unlocked), we don't do a thing and let it run uninterrupted.
+> >>
+> >> Another option is to trap a blocking WFE and offer the opportunity
+> >> to the scheduler to switch to another task, potentially giving the
+> >> vcpu holding the spinlock a chance to run sooner.
+> >>
 > >
-> > bufs_va = dma_alloc_coherent(vdev->dev.parent->parent,
-> > 				RPMSG_TOTAL_BUF_SPACE,
-> > 				&vrp->bufs_dma, GFP_KERNEL);
-> > vrp->rbufs = bufs_va;
-> > for (i = 0; i < RPMSG_NUM_BUFS / 2; i++) {
-> > 	struct scatterlist sg;
-> > 	void *cpu_addr = vrp->rbufs + i * RPMSG_BUF_SIZE;
+> > Idea looks to be correct from my experiments on x86. It does bring some
+> > percentage of benefits in overcommitted guests. Infact,
 > >
-> > 	sg_init_one(&sg, cpu_addr, RPMSG_BUF_SIZE);
-> > }
+> > https://lkml.org/lkml/2013/7/22/41 tries to do the same thing for x86.
+> > (this results in using ple handler heuristics in vcpu_block pach).
 > 
-> Hmm.  Looking at arch/arm/include/asm/memory.h:
-> 
-> #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
-> #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
-> 
-> pfn_to_page in ARM seems to be the asm-generic one, which depends on
-> CONFIG_SPARSEMEM/CONFIG_DISCONTIGMEM/CONFIG_FLATMEM etc.
-> 
-> Perhaps virt_addr_valid() is wrong for your config?  It's pretty clear
-> that you shouldn't call virt_to_page() on something for which
-> !virt_addr_valid().
+> What about the adverse effect in the non-overcommitted case?
 
-The above code fragment is just wrong.  You can't make any assumptions about
-the memory returned from dma_alloc_coherent(), because:
+Could we not detect overcommitment and only set the TWE bit in this case
+(per VCPU scheduled to run)?
 
-- On x86, it is kernel direct mapped memory, where things like
-  virt_to_phys(cpuaddr) will work fine with it.
+The advantage of a properly para-virtualised lock is that you can target
+which VCPU to wake up. I don't think we can do this currently (without
+assumptions about the underlying OS and how the compiler allocates
+registers in the ticket spinlocks).
 
-- On any architecture which needs to remap memory to make it coherent
-  with the DMA device, the key word there is "remap" - it's not kernel
-  direct mapped memory, and virt_to_phys(cpuaddr) on it is illegal.
+There have been suggestions to use WFE in user-space for a more power
+efficient busy loop (usually in user-only locking, I think some
+PostreSQL does that) together with an automatic even stream for waking
+up the WFE (Sudeep posted some patches recently for enabling 100us event
+stream). If such feature gets used, we have a new meaning for WFE and we
+may not want to trap it all the time.
 
-The only valid operation with scatterlists and such memory returned from
-dma_alloc_coherent() is:
+Question for Will - do we have a PMU counter for WFE? (don't ask why ;))
 
-	sg_dma_address(sg) = dma_address;
-	sg_dma_len(sg) = dma_length;
-
-and not to use the virtual address(es) at all in the scatterlist.  And
-it is very very important to realise that you must not mix the streaming
-and coherent DMA APIs - you must never pass coherent memory into the
-dma_map_* functions.
+-- 
+Catalin
