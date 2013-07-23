@@ -1,61 +1,57 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 23 Jul 2013 17:41:51 +0100
-Subject: [PATCH resend] ARM: nommu: remove ARCH_MULTIPLATFORM's dependency on
- CONFIG_MMU
-Message-ID: <1374597712-18112-1-git-send-email-jonathan.austin@arm.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Tue, 23 Jul 2013 11:43:24 -0500
+Subject: [PATCH] dma: edma: add device_slave_caps() support
+Message-ID: <1374597804-3961-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Implement device_slave_caps(). EDMA has a limited number of slots.
+Slave drivers such as omap_hsmmc will query the driver to make
+sure they don't pass in more than these many scatter segments.
 
-ARCH_MULTIPLATFORM currently requires CONFIG_MMU to be set, however it is
-intended that all future V6/V7 platforms are compatible with
-ARCH_MULTIPLATFORM, and so this requirement precludes that addition of new
-!MMU platforms.
-
-Furthermore, this requirement creates unnecessary differences between the MMU
-and !MMU worlds, which is undesirable.
-
-This patch allows ARCH_MULTIPLATFORM to remain selected in a !MMU
-configuration. There is still a need to hardcode CONFIG_DRAM_BASE and other
-parameters relating to the system, so this patch is less about making an
-actual multiplatform kernel for !MMU and more about consistency across the
-kernel.
-
-Along with the nommu-fixes, R7 support and MPU support already sent to this
-list, this patch is sufficient to allow building and booting of kernel for a
-Cortex-R7 core on a Versatile Express platform.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
+Vinod, or Dan- If this patch looks ok, can you please merge in for
+-rc cycle? This patch is required to fix MMC support on AM33xx. This
+patch is blocking 3 other patches which fix various MMC things. Thanks!
 
-This patch was written by Arnd and after some discussion/testing at my end he
-asked me to send it to the list with a full description.
+Notes:
+(1) this approach is temporary and only for -rc cycle to fix MMC on
+AM335x. It will be replace by the RFC series in future kernels:
+http://www.spinics.net/lists/arm-kernel/msg260094.html
 
-I'm resending this after testing it still allows R7 to boot on 3.11.
+(2) Patch depends Vinod's patch at:
+http://permalink.gmane.org/gmane.linux.kernel/1525112
 
-Assuming no comments, I'll drop this in the patch system shortly. Any calls for
-Cc-ing stable?
+ drivers/dma/edma.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Jonny
-
- arch/arm/Kconfig |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..5a61686 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -289,8 +289,7 @@ choice
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 7222cbe..81d5429 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -517,6 +517,14 @@ static void edma_issue_pending(struct dma_chan *chan)
+ 	spin_unlock_irqrestore(&echan->vchan.lock, flags);
+ }
  
- config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
--	depends on MMU
--	select ARM_PATCH_PHYS_VIRT
-+	select ARM_PATCH_PHYS_VIRT if MMU
- 	select AUTO_ZRELADDR
- 	select COMMON_CLK
- 	select MULTI_IRQ_HANDLER
++static inline int edma_slave_caps(struct dma_chan *chan,
++	struct dma_slave_caps *caps)
++{
++	caps->max_sg_nr = MAX_NR_SG;
++
++	return 0;
++}
++
+ static size_t edma_desc_size(struct edma_desc *edesc)
+ {
+ 	int i;
+@@ -594,6 +602,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+ 	dma->device_issue_pending = edma_issue_pending;
+ 	dma->device_tx_status = edma_tx_status;
+ 	dma->device_control = edma_control;
++	dma->device_slave_caps = edma_slave_caps;
+ 	dma->dev = dev;
+ 
+ 	INIT_LIST_HEAD(&dma->channels);
 -- 
 1.7.9.5
