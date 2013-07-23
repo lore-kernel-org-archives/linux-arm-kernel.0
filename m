@@ -1,93 +1,48 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 23 Jul 2013 10:20:07 +0300
-Subject: [PATCHv4 12/33] CLK: omap: add omap5 clock init file
+Date: Tue, 23 Jul 2013 10:20:10 +0300
+Subject: [PATCHv4 15/33] CLK: OMAP: DPLL: add support for DT property ti,
+ dpll-no-gate
 In-Reply-To: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1374564028-11352-13-git-send-email-t-kristo@ti.com>
+Message-ID: <1374564028-11352-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk-54xx.c now contains the clock init functionality for omap5, including
-DT clock registration and adding of static clkdev entries.
+AM335x has DPLL clocks that should never be attempted to be gated. Adding
+ti,dpll-no-gate property for them handles this situation.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/omap/Makefile   |    2 +-
- drivers/clk/omap/clk-54xx.c |   58 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/omap/clk-54xx.c
+ drivers/clk/omap/dpll.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
-index 9ad10be..74385f2 100644
---- a/drivers/clk/omap/Makefile
-+++ b/drivers/clk/omap/Makefile
-@@ -1,2 +1,2 @@
- obj-y					+= clk.o dpll.o autoidle.o gate.o \
--					   clk-44xx.o
-+					   clk-44xx.o clk-54xx.o
-diff --git a/drivers/clk/omap/clk-54xx.c b/drivers/clk/omap/clk-54xx.c
-new file mode 100644
-index 0000000..ade0481
---- /dev/null
-+++ b/drivers/clk/omap/clk-54xx.c
-@@ -0,0 +1,58 @@
-+/*
-+ * OMAP5 Clock init
-+ *
-+ * Copyright (C) 2013 Texas Instruments, Inc.
-+ *
-+ * Tero Kristo (t-kristo at ti.com)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/list.h>
-+#include <linux/clk-private.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/clk/omap.h>
-+
-+#define OMAP5_DPLL_ABE_DEFFREQ				98304000
-+
-+static struct omap_dt_clk omap54xx_clks[] = {
-+	DT_CLK(NULL, "timer_32k_ck", "sys_32k_ck"),
-+	DT_CLK("omap_timer.1", "sys_ck", "sys_clkin"),
-+	DT_CLK("omap_timer.2", "sys_ck", "sys_clkin"),
-+	DT_CLK("omap_timer.3", "sys_ck", "sys_clkin"),
-+	DT_CLK("omap_timer.4", "sys_ck", "sys_clkin"),
-+	DT_CLK("omap_timer.9", "sys_ck", "sys_clkin"),
-+	DT_CLK("omap_timer.10", "sys_ck", "sys_clkin"),
-+	DT_CLK("omap_timer.11", "sys_ck", "sys_clkin"),
-+	DT_CLK("omap_timer.5", "sys_ck", "dss_syc_gfclk_div"),
-+	DT_CLK("omap_timer.6", "sys_ck", "dss_syc_gfclk_div"),
-+	DT_CLK("omap_timer.7", "sys_ck", "dss_syc_gfclk_div"),
-+	DT_CLK("omap_timer.8", "sys_ck", "dss_syc_gfclk_div"),
+diff --git a/drivers/clk/omap/dpll.c b/drivers/clk/omap/dpll.c
+index 66e82be..1d24feada 100644
+--- a/drivers/clk/omap/dpll.c
++++ b/drivers/clk/omap/dpll.c
+@@ -54,6 +54,13 @@ static const struct clk_ops dpll_x2_ck_ops = {
+ 	.recalc_rate	= &omap3_clkoutx2_recalc,
+ };
+ 
++static const struct clk_ops dpll_no_gate_ck_ops = {
++	.recalc_rate	= &omap3_dpll_recalc,
++	.get_parent	= &omap2_init_dpll_parent,
++	.round_rate	= &omap2_dpll_round_rate,
++	.set_rate	= &omap3_noncore_dpll_set_rate,
 +};
 +
-+int __init omap5xxx_clk_init(void)
-+{
-+	int rc;
-+	struct clk *abe_dpll_ref, *abe_dpll, *sys_32k_ck;
+ struct clk *omap_clk_register_dpll(struct device *dev, const char *name,
+ 		const char **parent_names, int num_parents, unsigned long flags,
+ 		struct dpll_data *dpll_data, const char *clkdm_name,
+@@ -288,6 +295,9 @@ __init void of_omap4_dpll_setup(struct device_node *node)
+ 		return;
+ 	}
+ 
++	if (of_property_read_bool(node, "ti,dpll-no-gate"))
++		ops = &dpll_no_gate_ck_ops;
 +
-+	dt_omap_clk_init();
-+
-+	omap_dt_clocks_register(omap54xx_clks, ARRAY_SIZE(omap54xx_clks));
-+
-+	omap2_clk_disable_autoidle_all();
-+
-+	abe_dpll_ref = clk_get_sys(NULL, "abe_dpll_clk_mux");
-+	sys_32k_ck = clk_get_sys(NULL, "sys_32k_ck");
-+	rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
-+	abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
-+	if (!rc)
-+		rc = clk_set_rate(abe_dpll, OMAP5_DPLL_ABE_DEFFREQ);
-+	if (rc)
-+		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
-+
-+	return 0;
-+}
+ 	of_omap_dpll_setup(node, ops);
+ }
+ EXPORT_SYMBOL_GPL(of_omap4_dpll_setup);
 -- 
 1.7.9.5
