@@ -1,45 +1,80 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 23 Jul 2013 15:34:25 -0400 (EDT)
-Subject: linux setup
-In-Reply-To: <20130723102554.GD3748@MacBook-Pro.local>
-References: <CANEcUBXMPhTjgVYbRN7NY+EUjh7DDGpKnZ8_LXY-ZLcfbH65Ug@mail.gmail.com>
- <20130723102554.GD3748@MacBook-Pro.local>
-Message-ID: <alpine.LFD.2.03.1307231530080.15022@syhkavp.arg>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 23 Jul 2013 15:36:00 -0400 (EDT)
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <1446965.6APW5ZgLBW@amdc1227>
+Message-ID: <Pine.LNX.4.44L0.1307231518310.1304-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jul 2013, Catalin Marinas wrote:
+On Tue, 23 Jul 2013, Tomasz Figa wrote:
 
-> On Mon, Jul 22, 2013 at 02:28:50PM +0100, zhaobin xv wrote:
-> > I recently read lernel source .
-> > I have a question:In
-> > folder:linux/arch/arm/boot/compressed/head.S(linux2.6.22.6):
-> > 
-> > 
-> > start:
-> >         .type    start,#function
-> >         .rept    8
-> >         mov    r0, r0
-> >         .endr
-> > 
-> >         b    1f
-> >         .word    0x016f2818        @ Magic numbers to help the loader
-> >         .word    start            @ absolute load/run zImage address
-> >         .word    _edata            @ zImage end address
-> > 1:        mov    r7, r1            @ save architecture ID
-> >         mov    r8, r2            @ save atags pointer
-> > 
-> > 
-> > I don't kown why the ?mov r0 r0 ? repeated  emergence 8 times.
+> IMHO it would be better if you provided some code example, but let's try to 
+> check if I understood you correctly.
 > 
-> I think some people used that in the past to be able to modify the
-> zImage binary directly and work around wrong register values passed by
-> the boot loader. I've never used it myself but I saw it mentioned once.
+> 8><------------------------------------------------------------------------
+> 
+> [Board file]
+> 
+> static struct phy my_phy;
+> 
+> static struct platform_device phy_pdev = {
+> 	/* ... */
+> 	.platform_data = &my_phy;
+> 	/* ... */
+> };
+> 
+> static struct platform_device phy_pdev = {
 
-The whole reason for this is because in a distant past the kernel image 
-was an a.out binary containing a 32-bytes header.  Those nops are simply 
-padding so to be compatible with those bootloaders expecting the kernel 
-code to start at an offset of 32.
+This should be controller_pdev, not phy_pdev, yes?
 
+> 	/* ... */
+> 	.platform_data = &my_phy;
+> 	/* ... */
+> };
+> 
+> [Provider driver]
+> 
+> struct phy *phy = pdev->dev.platform_data;
+> 
+> ret = phy_create(phy);
+> 
+> [Consumer driver]
+> 
+> struct phy *phy = pdev->dev.platform_data;
+> 
+> ret = phy_get(&pdev->dev, phy);
 
-Nicolas
+Or even just phy_get(&pdev->dev), because phy_get() could be smart 
+enough to to set phy = dev->platform_data.
+
+> ------------------------------------------------------------------------><8
+> 
+> Is this what you mean?
+
+That's what I was going to suggest too.  The struct phy is defined in
+the board file, which already knows about all the PHYs that exist in
+the system.  (Or perhaps it is allocated dynamically, so that when many
+board files are present in the same kernel, only the entries listed in
+the board file for the current system get created.)  Then the
+structure's address is stored in the platform data and made available
+to both the provider and the consumer.
+
+Even though the struct phy is defined (or allocated) in the board file,
+its contents don't get filled in until the PHY driver provides the
+details.
+
+> It's technically correct, but quality of this solution isn't really nice, 
+> because it's a layering violation (at least if I understood what you mean). 
+> This is because you need to have full definition of struct phy in board file 
+> and a structure that is used as private data in PHY core comes from 
+> platform code.
+
+You don't have to have a full definition in the board file.  Just a 
+partial definition -- most of the contents can be filled in later, when 
+the PHY driver is ready to store the private data.
+
+It's not a layering violation for one region of the kernel to store 
+private data in a structure defined by another part of the kernel.  
+This happens all the time (e.g., dev_set_drvdata).
+
+Alan Stern
