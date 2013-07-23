@@ -1,78 +1,65 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 23 Jul 2013 12:18:52 +0300
-Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
-In-Reply-To: <Pine.LNX.4.44L0.1307221111410.1495-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1307221111410.1495-100000@iolanthe.rowland.org>
-Message-ID: <51EE4A7C.2020709@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 23 Jul 2013 11:25:16 +0200
+Subject: [PATCH v3 12/16] cpufreq: kirkwood-cpufreq: remove device tree
+ parsing for cpu nodes
+In-Reply-To: <1374492747-13879-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492747-13879-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <20130723092516.GC6846@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 06:18 PM, Alan Stern wrote:
-> On Mon, 22 Jul 2013, Roger Quadros wrote:
+On Mon, Jul 22, 2013 at 12:32:23PM +0100, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
->> Right, I understand it now. How does the below code look?
->>
->> +static int omap_ehci_suspend(struct device *dev)
->> +{
->> +       struct usb_hcd *hcd = dev_get_drvdata(dev);
->> +       bool do_wakeup = device_may_wakeup(dev);
->> +       int ret;
->> +
->> +       dev_dbg(dev, "%s may_wakeup %d\n", __func__, do_wakeup);
->> +
->> +       if (pm_runtime_status_suspended(dev)) {
+> Now that the cpu device registration initialises the of_node(if available)
+> appropriately for all the cpus, parsing here is redundant.
 > 
-> You need to do this only when do_wakeup is false.
-
-Right. Missed that.
+> This patch removes all DT parsing and uses cpu->of_node instead.
 > 
->> +               pm_runtime_get_sync(dev);
->> +               ehci_resume(hcd, false);
->> +               ret = ehci_suspend(hcd, do_wakeup);
->> +               pm_runtime_put_sync(dev);
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  drivers/cpufreq/kirkwood-cpufreq.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
 > 
-> It would be better to call pm_runtime_resume(dev) at the start instead
-> of pm_runtime_get_sync(), and eliminate the last two lines.  Then the
-> ehci_suspend() below could be moved outside the "if" statement.
+> diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
+> index c233ea6..25ac2cb 100644
+> --- a/drivers/cpufreq/kirkwood-cpufreq.c
+> +++ b/drivers/cpufreq/kirkwood-cpufreq.c
+> @@ -14,7 +14,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/clk-provider.h>
+>  #include <linux/cpufreq.h>
+> -#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/io.h>
+>  #include <asm/proc-fns.h>
+> @@ -175,9 +175,11 @@ static int kirkwood_cpufreq_probe(struct platform_device *pdev)
+>  	if (IS_ERR(priv.base))
+>  		return PTR_ERR(priv.base);
+>  
+> -	np = of_find_node_by_path("/cpus/cpu at 0");
+> -	if (!np)
+> +	np = of_cpu_device_node_get(0);
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "failed to get cpu device node\n");
+>  		return -ENODEV;
+> +	}
+>  
+>  	priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
+>  	if (IS_ERR(priv.cpu_clk)) {
+> -- 
+> 1.8.1.2
 
-Why do I find pm_runtime_* so confusing ;)
+Hi Sudeep
 
-> 
-> Alternatively, if you are able to turn off the wakeup setting without
-> going through an entire resume/suspend cycle, that would be preferable.
-> 
+I've not had chance to test it, but it looks O.K.
 
-As we don't rely on the EHCI controller's interrupt any more after we
-power it down, maybe ehci_resume/suspend cycle is not required at all on OMAP,
-even if the wakeup setting is disabled during system suspend.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-As the wakeup is controlled entirely by pad wakeup, all we need to do is make sure
-the IO pad wakeup is configured correctly based on do_wakeup. How this is done
-is still in transition but it might be turn out to be as simple as irq_set_irq_wake()
-
-So IMHO, for ehci-omap this should suffice
-
-static int omap_ehci_suspend(struct device *dev)
-{
-	struct usb_hcd *hcd = dev_get_drvdata(dev);
-	bool do_wakeup = device_may_wakeup(dev);
-	int ret = 0;
-
-	if (!pm_runtime_status_suspended(dev))
-		ret = ehci_suspend(hcd, do_wakeup);
-
-	/* Not tested yet */
-	irq_set_irq_wake(hcd->irq, do_wakeup);
-
-	return ret;
-}
-
-What do you think?
-
-As the OMAP IO pad wakeup management code [1] is still in transition, I'll wait till
-that gets settled and then resend this series.
-
-cheers,
--roger
-
-[1] - http://thread.gmane.org/gmane.linux.ports.arm.omap/99010
+	  Andrew
