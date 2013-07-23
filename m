@@ -1,115 +1,87 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 23 Jul 2013 10:31:10 -0300
-Subject: [PATCH v8 06/28] ARM: dove: Move to ID based window creation
+Date: Tue, 23 Jul 2013 10:31:11 -0300
+Subject: [PATCH v8 07/28] bus: mvebu-mbus: Factor out initialization details
 In-Reply-To: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374586292-4941-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374586292-4941-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-With the introduction of the ID based MBus API, it's better
-to switch to use it instead of the current name based scheme.
-
-This will allow to deprecate the name based API, once every
-user is removed.
+We introduce a common initialization function mvebu_mbus_common_init()
+that will be used by both legacy and device-tree initialization code.
+This patch is an intermediate step, which will allow to introduce the
+DT binding for this driver in a less intrusive way.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/mach-dove/common.c | 68 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 45 insertions(+), 23 deletions(-)
+ drivers/bus/mvebu-mbus.c | 47 ++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index 00247c7..bc22056 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -27,6 +27,22 @@
- #include <plat/time.h>
- #include "common.h"
- 
-+/* These can go away once Dove uses the mvebu-mbus DT binding */
-+#define DOVE_MBUS_PCIE0_MEM_TARGET    0x4
-+#define DOVE_MBUS_PCIE0_MEM_ATTR      0xe8
-+#define DOVE_MBUS_PCIE0_IO_TARGET     0x4
-+#define DOVE_MBUS_PCIE0_IO_ATTR       0xe0
-+#define DOVE_MBUS_PCIE1_MEM_TARGET    0x8
-+#define DOVE_MBUS_PCIE1_MEM_ATTR      0xe8
-+#define DOVE_MBUS_PCIE1_IO_TARGET     0x8
-+#define DOVE_MBUS_PCIE1_IO_ATTR       0xe0
-+#define DOVE_MBUS_CESA_TARGET         0x3
-+#define DOVE_MBUS_CESA_ATTR           0x1
-+#define DOVE_MBUS_BOOTROM_TARGET      0x1
-+#define DOVE_MBUS_BOOTROM_ATTR        0xfd
-+#define DOVE_MBUS_SCRATCHPAD_TARGET   0xd
-+#define DOVE_MBUS_SCRATCHPAD_ATTR     0x0
-+
- /*****************************************************************************
-  * I/O Address Mapping
-  ****************************************************************************/
-@@ -332,34 +348,40 @@ void __init dove_setup_cpu_wins(void)
- {
- 	/*
- 	 * The PCIe windows will no longer be statically allocated
--	 * here once Dove is migrated to the pci-mvebu driver.
-+	 * here once Dove is migrated to the pci-mvebu driver. The
-+	 * non-PCIe windows will no longer be created here once Dove
-+	 * fully moves to DT.
- 	 */
--	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+	mvebu_mbus_add_window_remap_by_id(DOVE_MBUS_PCIE0_IO_TARGET,
-+					  DOVE_MBUS_PCIE0_IO_ATTR,
- 					  DOVE_PCIE0_IO_PHYS_BASE,
- 					  DOVE_PCIE0_IO_SIZE,
--					  DOVE_PCIE0_IO_BUS_BASE,
--					  MVEBU_MBUS_PCI_IO);
--	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  DOVE_PCIE0_IO_BUS_BASE);
-+	mvebu_mbus_add_window_remap_by_id(DOVE_MBUS_PCIE1_IO_TARGET,
-+					  DOVE_MBUS_PCIE1_IO_ATTR,
- 					  DOVE_PCIE1_IO_PHYS_BASE,
- 					  DOVE_PCIE1_IO_SIZE,
--					  DOVE_PCIE1_IO_BUS_BASE,
--					  MVEBU_MBUS_PCI_IO);
--	mvebu_mbus_add_window_remap_flags("pcie0.0",
--					  DOVE_PCIE0_MEM_PHYS_BASE,
--					  DOVE_PCIE0_MEM_SIZE,
--					  MVEBU_MBUS_NO_REMAP,
--					  MVEBU_MBUS_PCI_MEM);
--	mvebu_mbus_add_window_remap_flags("pcie1.0",
--					  DOVE_PCIE1_MEM_PHYS_BASE,
--					  DOVE_PCIE1_MEM_SIZE,
--					  MVEBU_MBUS_NO_REMAP,
--					  MVEBU_MBUS_PCI_MEM);
--	mvebu_mbus_add_window("cesa", DOVE_CESA_PHYS_BASE,
--			      DOVE_CESA_SIZE);
--	mvebu_mbus_add_window("bootrom", DOVE_BOOTROM_PHYS_BASE,
--			      DOVE_BOOTROM_SIZE);
--	mvebu_mbus_add_window("scratchpad", DOVE_SCRATCHPAD_PHYS_BASE,
--			      DOVE_SCRATCHPAD_SIZE);
-+					  DOVE_PCIE1_IO_BUS_BASE);
-+	mvebu_mbus_add_window_by_id(DOVE_MBUS_PCIE0_MEM_TARGET,
-+				    DOVE_MBUS_PCIE0_MEM_ATTR,
-+				    DOVE_PCIE0_MEM_PHYS_BASE,
-+				    DOVE_PCIE0_MEM_SIZE);
-+	mvebu_mbus_add_window_by_id(DOVE_MBUS_PCIE1_MEM_TARGET,
-+				    DOVE_MBUS_PCIE1_MEM_ATTR,
-+				    DOVE_PCIE1_MEM_PHYS_BASE,
-+				    DOVE_PCIE1_MEM_SIZE);
-+	mvebu_mbus_add_window_by_id(DOVE_MBUS_CESA_TARGET,
-+				    DOVE_MBUS_CESA_ATTR,
-+				    DOVE_CESA_PHYS_BASE,
-+				    DOVE_CESA_SIZE);
-+	mvebu_mbus_add_window_by_id(DOVE_MBUS_BOOTROM_TARGET,
-+				    DOVE_MBUS_BOOTROM_ATTR,
-+				    DOVE_BOOTROM_PHYS_BASE,
-+				    DOVE_BOOTROM_SIZE);
-+	mvebu_mbus_add_window_by_id(DOVE_MBUS_SCRATCHPAD_TARGET,
-+				    DOVE_MBUS_SCRATCHPAD_ATTR,
-+				    DOVE_SCRATCHPAD_PHYS_BASE,
-+				    DOVE_SCRATCHPAD_SIZE);
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 827468a..1b17954 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -847,26 +847,14 @@ static __init int mvebu_mbus_debugfs_init(void)
  }
+ fs_initcall(mvebu_mbus_debugfs_init);
  
- void __init dove_init(void)
+-int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+-			   size_t mbuswins_size,
+-			   phys_addr_t sdramwins_phys_base,
+-			   size_t sdramwins_size)
++static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
++					 phys_addr_t mbuswins_phys_base,
++					 size_t mbuswins_size,
++					 phys_addr_t sdramwins_phys_base,
++					 size_t sdramwins_size)
+ {
+-	struct mvebu_mbus_state *mbus = &mbus_state;
+-	const struct of_device_id *of_id;
+ 	int win;
+ 
+-	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
+-		if (!strcmp(of_id->compatible, soc))
+-			break;
+-
+-	if (!of_id->compatible) {
+-		pr_err("could not find a matching SoC family\n");
+-		return -ENODEV;
+-	}
+-
+-	mbus->soc = of_id->data;
+-
+ 	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
+ 	if (!mbus->mbuswins_base)
+ 		return -ENOMEM;
+@@ -887,3 +875,28 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 
+ 	return 0;
+ }
++
++int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
++			   size_t mbuswins_size,
++			   phys_addr_t sdramwins_phys_base,
++			   size_t sdramwins_size)
++{
++	const struct of_device_id *of_id;
++
++	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
++		if (!strcmp(of_id->compatible, soc))
++			break;
++
++	if (!of_id->compatible) {
++		pr_err("could not find a matching SoC family\n");
++		return -ENODEV;
++	}
++
++	mbus_state.soc = of_id->data;
++
++	return mvebu_mbus_common_init(&mbus_state,
++			mbuswins_phys_base,
++			mbuswins_size,
++			sdramwins_phys_base,
++			sdramwins_size);
++}
 -- 
 1.8.1.5
