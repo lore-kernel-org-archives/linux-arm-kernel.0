@@ -1,61 +1,111 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jul 2013 12:09:12 +0100
-Subject: [PATCH v3 00/12] Make use of v7 barriers variants in Linux
-Message-ID: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
+Date: Tue, 23 Jul 2013 12:09:17 +0100
+Subject: [PATCH v3 05/12] ARM: barrier: allow options to be passed to memory
+ barrier instructions
+In-Reply-To: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
+References: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1374577764-32480-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On ARMv7, the memory barrier instructions take an optional `option'
+field which can be used to constrain the effects of a memory barrier
+based on shareability and access type.
 
-This is the third version of the patches I previously posted here:
+This patch allows the caller to pass these options if required, and
+updates the smp_*() barriers to request inner-shareable barriers,
+affecting only stores for the _wmb variant. wmb() is also changed to
+use the -st version of dsb.
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173952.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/178583.html
+Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/assembler.h |  4 ++--
+ arch/arm/include/asm/barrier.h   | 32 ++++++++++++++++----------------
+ 2 files changed, 18 insertions(+), 18 deletions(-)
 
-The only change since v2 is that the series is now based on 3.11-rc2.
-I plan to send a pull request to Russell targetting 3.12 pending no
-further feedback.
-
-Cheers,
-
-Will
-
-
-Will Deacon (12):
-  ARM: mm: remove redundant dsb() prior to range TLB invalidation
-  ARM: tlb: don't perform inner-shareable invalidation for local TLB ops
-  ARM: tlb: don't bother with barriers for branch predictor maintenance
-  ARM: tlb: don't perform inner-shareable invalidation for local BP ops
-  ARM: barrier: allow options to be passed to memory barrier
-    instructions
-  ARM: tlb: reduce scope of barrier domains for TLB invalidation
-  ARM: mm: use inner-shareable barriers for TLB and user cache
-    operations
-  ARM: spinlock: use inner-shareable dsb variant prior to sev
-    instruction
-  ARM: kvm: use inner-shareable barriers after TLB flushing
-  ARM: mcpm: use -st dsb option prior to sev instructions
-  ARM: l2x0: use -st dsb option for ordering writel_relaxed with unlock
-  ARM: cacheflush: use -ishst dsb variant for ensuring flush completion
-
- arch/arm/common/mcpm_head.S       |   2 +-
- arch/arm/common/vlock.S           |   4 +-
- arch/arm/include/asm/assembler.h  |   4 +-
- arch/arm/include/asm/barrier.h    |  32 +++----
- arch/arm/include/asm/cacheflush.h |   2 +-
- arch/arm/include/asm/spinlock.h   |   2 +-
- arch/arm/include/asm/switch_to.h  |  10 +++
- arch/arm/include/asm/tlbflush.h   | 181 +++++++++++++++++++++++++++++++-------
- arch/arm/kernel/smp_tlb.c         |  10 +--
- arch/arm/kvm/init.S               |   2 +-
- arch/arm/kvm/interrupts.S         |   4 +-
- arch/arm/mm/cache-l2x0.c          |   2 +-
- arch/arm/mm/cache-v7.S            |   4 +-
- arch/arm/mm/context.c             |   6 +-
- arch/arm/mm/dma-mapping.c         |   1 -
- arch/arm/mm/proc-v7.S             |   2 +-
- arch/arm/mm/tlb-v7.S              |   8 +-
- 17 files changed, 199 insertions(+), 77 deletions(-)
-
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index a5fef71..fcc1b5b 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -220,9 +220,9 @@
+ #ifdef CONFIG_SMP
+ #if __LINUX_ARM_ARCH__ >= 7
+ 	.ifeqs "\mode","arm"
+-	ALT_SMP(dmb)
++	ALT_SMP(dmb	ish)
+ 	.else
+-	ALT_SMP(W(dmb))
++	ALT_SMP(W(dmb)	ish)
+ 	.endif
+ #elif __LINUX_ARM_ARCH__ == 6
+ 	ALT_SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 8dcd9c7..60f15e2 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -14,27 +14,27 @@
+ #endif
+ 
+ #if __LINUX_ARM_ARCH__ >= 7
+-#define isb() __asm__ __volatile__ ("isb" : : : "memory")
+-#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
+-#define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
++#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
++#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
++#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
+ #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
+-#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
++#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
++#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+ 				    : : "r" (0) : "memory")
+ #elif defined(CONFIG_CPU_FA526)
+-#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
++#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("" : : : "memory")
++#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ #else
+-#define isb() __asm__ __volatile__ ("" : : : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define isb(x) __asm__ __volatile__ ("" : : : "memory")
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("" : : : "memory")
++#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ #endif
+ 
+ #ifdef CONFIG_ARCH_HAS_BARRIERS
+@@ -42,7 +42,7 @@
+ #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+ #define mb()		do { dsb(); outer_sync(); } while (0)
+ #define rmb()		dsb()
+-#define wmb()		mb()
++#define wmb()		do { dsb(st); outer_sync(); } while (0)
+ #else
+ #define mb()		barrier()
+ #define rmb()		barrier()
+@@ -54,9 +54,9 @@
+ #define smp_rmb()	barrier()
+ #define smp_wmb()	barrier()
+ #else
+-#define smp_mb()	dmb()
+-#define smp_rmb()	dmb()
+-#define smp_wmb()	dmb()
++#define smp_mb()	dmb(ish)
++#define smp_rmb()	smp_mb()
++#define smp_wmb()	dmb(ishst)
+ #endif
+ 
+ #define read_barrier_depends()		do { } while(0)
 -- 
 1.8.2.2
