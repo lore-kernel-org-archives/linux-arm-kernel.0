@@ -1,145 +1,70 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 16:50:52 +0200
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
-Message-ID: <2147402.ggVzZLIPLp@amdc1227>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 23 Jul 2013 10:03:20 -0500
+Subject: [PATCH 4/5] ARM: highbank: remove redundant smp_init_cpus
+ definition
+In-Reply-To: <1374579164-30255-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374579164-30255-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <51EE9B38.5030003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 of July 2013 10:37:05 Alan Stern wrote:
-> On Tue, 23 Jul 2013, Tomasz Figa wrote:
-> > On Tuesday 23 of July 2013 09:29:32 Tomasz Figa wrote:
-> > > Hi Alan,
+On 07/23/2013 06:32 AM, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
-> Thanks for helping to clarify the issues here.
-> 
-> > > > Okay.  Are PHYs _always_ platform devices?
-> > > 
-> > > They can be i2c, spi or any other device types as well.
-> 
-> In those other cases, presumably there is no platform data associated
-> with the PHY since it isn't a platform device.  Then how does the
-> kernel know which controller is attached to the PHY?  Is this spelled
-> out in platform data associated with the PHY's i2c/spi/whatever parent?
-> 
-> > > > > > 	PHY.  Currently this information is represented by name or
-> > 
-> > ID
-> > 
-> > > > > > 	strings embedded in platform data.
-> > > > > 
-> > > > > right. It's embedded in the platform data of the controller.
-> > > > 
-> > > > It must also be embedded in the PHY's platform data somehow.
-> > > > Otherwise, how would the kernel know which PHY to use?
-> > > 
-> > > By using a PHY lookup as Stephen and I suggested in our previous
-> > > replies. Without any extra data in platform data. (I have even posted
-> > > a
-> > > code example.)
-> 
-> I don't understand, because I don't know what "a PHY lookup" does.
+> arm_dt_init_cpu_maps is called before smp_init_cpus, which sets the
+> cpu_possible_mask appropriately. Since highbank_smp_init_cpus does
+> nothing extra, it can be removed.
 
-I have provided a code example in [1]. Feel free to ask questions about 
-those code snippets.
+This is all going to get removed in my PSCI support series. Trying to
+get an updated version out soon.
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/252813/focus=20889
+Rob
 
-> > > > In this case, it doesn't matter where the platform_device
-> > > > structures
-> > > > are created or where the driver source code is.  Let's take a
-> > > > simple
-> > > > example.  Suppose the system design includes a PHY named "foo". 
-> > > > Then
-> > > > the board file could contain:
-> > > > 
-> > > > struct phy_info { ... } phy_foo;
-> > > > EXPORT_SYMBOL_GPL(phy_foo);
-> > > > 
-> > > > and a header file would contain:
-> > > > 
-> > > > extern struct phy_info phy_foo;
-> > > > 
-> > > > The PHY supplier could then call phy_create(&phy_foo), and the PHY
-> > > > client could call phy_find(&phy_foo).  Or something like that; make
-> > > > up
-> > > > your own structure tags and function names.
-> > > > 
-> > > > It's still possible to have conflicts, but now two PHYs with the
-> > > > same
-> > > > name (or a misspelled name somewhere) will cause an error at link
-> > > > time.
-> > > 
-> > > This is incorrect, sorry. First of all it's a layering violation -
-> > > you
-> > > export random driver-specific symbols from one driver to another.
-> > > Then
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  arch/arm/mach-highbank/platsmp.c | 22 ----------------------
+>  1 file changed, 22 deletions(-)
 > 
-> No, that's not what I said.  Neither the PHY driver nor the controller
-> driver exports anything to the other.  Instead, both drivers use data
-> exported by the board file.
-
-It's still a random, driver-specific global symbol exported from board file 
-to drivers.
-
-> > > imagine 4 SoCs - A, B, C, D. There are two PHY types PHY1 and PHY2
-> > > and
-> > > there are two types of consumer drivers (e.g. USB host controllers).
-> > > Now
-> > > consider following mapping:
-> > > 
-> > > SoC	PHY	consumer
-> > > A	PHY1	HOST1
-> > > B	PHY1	HOST2
-> > > C	PHY2	HOST1
-> > > D	PHY2	HOST2
-> > > 
-> > > So we have to be able to use any of the PHYs with any of the host
-> > > drivers. This means you would have to export symbol with the same
-> > > name
-> > > from both PHY drivers, which obviously would not work in this case,
-> > > because having both drivers enabled (in a multiplatform aware
-> > > configuration) would lead to linking conflict.
+> diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+> index 32d75cf5..25b0bae 100644
+> --- a/arch/arm/mach-highbank/platsmp.c
+> +++ b/arch/arm/mach-highbank/platsmp.c
+> @@ -31,27 +31,6 @@ static int highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	return 0;
+>  }
+>  
+> -/*
+> - * Initialise the CPU possible map early - this describes the CPUs
+> - * which may be present or become present in the system.
+> - */
+> -static void __init highbank_smp_init_cpus(void)
+> -{
+> -	unsigned int i, ncores = 4;
+> -
+> -	/* sanity check */
+> -	if (ncores > NR_CPUS) {
+> -		printk(KERN_WARNING
+> -		       "highbank: no. of cores (%d) greater than configured "
+> -		       "maximum of %d - clipping\n",
+> -		       ncores, NR_CPUS);
+> -		ncores = NR_CPUS;
+> -	}
+> -
+> -	for (i = 0; i < ncores; i++)
+> -		set_cpu_possible(i, true);
+> -}
+> -
+>  static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	if (scu_base_addr)
+> @@ -59,7 +38,6 @@ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+>  }
+>  
+>  struct smp_operations highbank_smp_ops __initdata = {
+> -	.smp_init_cpus		= highbank_smp_init_cpus,
+>  	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
+>  	.smp_boot_secondary	= highbank_boot_secondary,
+>  #ifdef CONFIG_HOTPLUG_CPU
 > 
-> You're right; the scheme was too simple.  Instead, the board file must
-> export two types of data structures, one for PHYs and one for
-> controllers.  Like this:
-> 
-> struct phy_info {
-> 	/* Info for the controller attached to this PHY */
-> 	struct controller_info	*hinfo;
-> };
-> 
-> struct controller_info {
-> 	/* Info for the PHY which this controller is attached to */
-> 	struct phy_info		*pinfo;
-> };
-> 
-> The board file for SoC A would contain:
-> 
-> struct phy_info phy1 = {&host1);
-> EXPORT_SYMBOL(phy1);
-> struct controller_info host1 = {&phy1};
-> EXPORT_SYMBOL(host1);
-> 
-> The board file for SoC B would contain:
-> 
-> struct phy_info phy1 = {&host2);
-> EXPORT_SYMBOL(phy1);
-> struct controller_info host2 = {&phy1};
-> EXPORT_SYMBOL(host2);
-> 
-> And so on.  This explicitly gives the connection between PHYs and
-> controllers.  The PHY providers would use &phy1 or &phy2, and the PHY
-> consumers would use &host1 or &host2.
-
-This could work assuming that only one SoC and one board is supported in 
-single kernel image. However it's not the case.
-
-We've used to support multiple boards since a long time already and now for 
-selected platforms we even support multiplatform, i.e. multiple SoCs in 
-single zImage. Such solution will not work.
-
-Best regards,
-Tomasz
