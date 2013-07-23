@@ -1,40 +1,61 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 23 Jul 2013 14:45:48 -0400 (EDT)
-Subject: [PATCH 5/6] USB: OHCI: make ohci-at91 a separate driver
-In-Reply-To: <1374484770-24531-6-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1307231445230.1304-100000@iolanthe.rowland.org>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Tue, 23 Jul 2013 14:49:08 -0400
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
+ with ARM CPU
+In-Reply-To: <2043662.BcW19XTTMG@lenovo>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+ <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
+Message-ID: <20130723184907.GA6811@ohporter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jul 2013, Manjunath Goudar wrote:
+On Wed, Jul 17, 2013 at 12:08:30AM +0100, Florian Fainelli wrote:
+> Hello,
+> 
+> Le mardi 16 juillet 2013 11:14:36 Matt Porter a ?crit :
+> > > +	compatible = "brcm,bcm5301x";
+> > 
+> > Ok, this was nagging at me before I went on my very long vacation. I see
+> > the "brcm" vendor prefix as a real consistency problem. I noticed on the
+> > bcm281xx/kona family, we have been using "bcm" which is not logged in
+> > vendor-prefixes.txt as a legitimate prefix. I see that bcm2835 had
+> > already established use of "brcm" before any of the bcm281xx support
+> > came in. Ideally, the vendor prefix should change to "bcm" since every
+> > reference in the family names is BCM. However, if others want the least
+> > amount of churn in making this consistent, we might have to go with
+> > "brcm" across the board.
+> 
+> I would like to keep "brcm" here because that is what has been defined as a 
+> vendor prefix, and is used beyond the scope of the ARM Linux kernel support 
+> even within Broadcom. Maybe it was an oversight, or rather a mistake to let 
 
-> Separate the  TI OHCI Atmel host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.12.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> 
-> V2:
->  -Set non-standard fields in ohci_at91_hc_driver manually, rather than
->   relying on an expanded struct ohci_driver_overrides.
->  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
->   relying on ohci_hub_control and hub_status_data being exported.
->  -ohci_setup() has been removed because it is called in .reset member
->   of the ohci_hc_driver structure.
-> 
-> V3:
->  -The ohci_restart() function is not required in  current scenario,
->   only discarding connection state of integrated transceivers is sufficient,
->   for this directly handling ohci->hc_control.
-> 
-> V4:
->  - Removed extra space after "tristate".
->  - Removed extra space between function name  and '(' characters.
->  - MODULE_ALIAS line moved to last statement of ohci-at91 file.
+[Update: I thought some more about this and investigated why Broadcom started
+ using "bcm" and changed my mind]
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Can you provide a cite? I can tell you that within Broadcom they have
+been moving to get rid of it. That is why you see all this Broadcom
+originated code using "bcm" because it actually matches their part
+number prefix. As further evidence of the preference for "bcm", feel free to
+look through the entire public catalog of parts at
+http://www.broadcom.com/products/ and note that they all have BCM as the part
+prefix...this carries over into all driver references to the parts as well
+including everything in the wireless world.
+
+> the bcm281x/kona family support code be merged and use "bcm" there, without 
+> registering it. Besides, a simple rule of number here wins:
+> 
+> git grep "brcm," * | wc -l
+> 63
+> git grep "bcm," * | wc -l
+> 25
+> 
+> (as of Linux 3.11-rc1)
+> 
+> So consistency we should get the bcm281x/kona DT bindings to rename their 
+> vendor prefix as well.
+
+I believe getting this "right" is far more important than the difference
+in churn of a mere 38 instances of use of brcm. "Right" is two things:
+1) it needs to be consistent 2) it should be what makes sense.
+
+-Matt
