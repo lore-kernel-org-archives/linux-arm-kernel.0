@@ -1,30 +1,37 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 23 Jul 2013 12:06:43 +0300
-Subject: [PATCH 0/2] OMAP: Panda DVI fix and a cleanup
-Message-ID: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
+Date: Tue, 23 Jul 2013 12:06:44 +0300
+Subject: [PATCH 1/2] ARM: OMAP: dss-common: fix Panda's DVI DDC channel
+In-Reply-To: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1374570405-8301-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Panda's DVI connector's DDC pins are connected to OMAP's third i2c bus.
+With non-DT, the bus number was 3, and that is what is used in the
+dss-common.c which contains the platform data for Panda's DVI.
 
-Here's a fix for 3.11 that makes EDID read for DVI work again.
+However, with DT, the bus number is 2. As we now only have DT boot for
+Panda, we have to change the bus number to make DVI EDID read
+operational.
 
-I also included a cleanup patch that removes the non-DT support functions that
-are no longer called from anywhere. It's not a fix, but as we're in quite early
-rcs, I thought it would be nice to remove the dead code.
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/dss-common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Up to you if you want to include that one for 3.11 or not. If not, I'll include
-it in a board file series for 3.12 that I'll send soon.
-
- Tomi
-
-Tomi Valkeinen (2):
-  ARM: OMAP: dss-common: fix Panda's DVI DDC channel
-  ARM: OMAP2+: Remove legacy DSS initialization for omap4
-
- arch/arm/mach-omap2/dss-common.c | 49 +---------------------------------------
- arch/arm/mach-omap2/dss-common.h |  2 --
- 2 files changed, 1 insertion(+), 50 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
+index 393aeef..043e570 100644
+--- a/arch/arm/mach-omap2/dss-common.c
++++ b/arch/arm/mach-omap2/dss-common.c
+@@ -42,7 +42,7 @@
+ 
+ /* Using generic display panel */
+ static struct tfp410_platform_data omap4_dvi_panel = {
+-	.i2c_bus_num		= 3,
++	.i2c_bus_num		= 2,
+ 	.power_down_gpio	= PANDA_DVI_TFP410_POWER_DOWN_GPIO,
+ };
+ 
 -- 
 1.8.1.2
