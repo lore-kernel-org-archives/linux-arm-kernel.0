@@ -1,58 +1,34 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Tue, 23 Jul 2013 12:00:30 +0930
-Subject: scatterlist: sg_set_buf() argument must be in linear mapping
- (sha1: ac4e97abce9b80c020e7113325f49e58b7b15e3f)
-In-Reply-To: <51ED2C74.7050502@monstr.eu>
-References: <51E64C6B.3080306@monstr.eu> <87siz7xt4z.fsf@rustcorp.com.au>
- <51ED2C74.7050502@monstr.eu>
-Message-ID: <87ppua9feh.fsf@rustcorp.com.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 23 Jul 2013 13:31:16 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790 SMP prototype v5
+In-Reply-To: <20130719022904.GG4403@verge.net.au>
+References: <20130717204918.30125.40588.sendpatchset@w520>
+ <51E7379A.1080408@renesas.com> <20130719022904.GG4403@verge.net.au>
+Message-ID: <20130723043116.GA26723@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal Simek <monstr@monstr.eu> writes:
-> + Ohad
->
-> On 07/22/2013 03:47 AM, Rusty Russell wrote:
->> Michal Simek <monstr@monstr.eu> writes:
->>> Hi Rusty and Jens,
->>>
->>> I am getting problem with your patch which you have added to the kernel.
->>> The problem is with my arm zynq remoteproc driver where
->>> I use dma_declare_coherent_memory() to specify memory for remoteproc
->>> which is ioremap to the vmalloc area.
->>>
->>> Based on that buf addr is not inside ram even this coherent memory is in ram.
->>> That's why virt_addr_valid(buf) is failing.
->> 
->> But sg_set_buf() calls virt_to_page(buf).  So does that work?
->> 
->> I would think calling sg_set_page() directly would be what you want
->> here...
->
-> Let me take some code from virtio_rpmsg_bus.c to show that problematic part.
->
-> bufs_va = dma_alloc_coherent(vdev->dev.parent->parent,
-> 				RPMSG_TOTAL_BUF_SPACE,
-> 				&vrp->bufs_dma, GFP_KERNEL);
-> vrp->rbufs = bufs_va;
-> for (i = 0; i < RPMSG_NUM_BUFS / 2; i++) {
-> 	struct scatterlist sg;
-> 	void *cpu_addr = vrp->rbufs + i * RPMSG_BUF_SIZE;
->
-> 	sg_init_one(&sg, cpu_addr, RPMSG_BUF_SIZE);
-> }
+On Fri, Jul 19, 2013 at 11:29:04AM +0900, Simon Horman wrote:
+> On Thu, Jul 18, 2013 at 09:32:26AM +0900, Shinya Kuribayashi wrote:
+> > On 7/18/2013 5:49 AM, Magnus Damm wrote:
+> > >  Changes since v4:
+> > >  - Rolled in the following patches from Kuribayashi-san, thanks!
+> > >    ARM: shmobile: smp-r8a7790: remove the obsolete RESCNT register
+> > >    ARM: shmobile: smp-r8a7790: rename s/carescnt/rescnt/g
+> > >    ARM: shmobile: smp-r8a7790: rename s/cabar/bar/g as well
+> > >    ARM: shmobile: smp-r8a7790: power up a CPU core at .smp_boot_secondary stage
+> > > 
+> > >  Written against kernel.org renesas git tag renesas-devel-20130717
+> > 
+> > Thanks for the update, looks good to me.
+> 
+> Thanks.
+> 
+> This seems like it is ready to queue-up.
+> Magnus, are there any outstanding reviews or issues?
 
-Hmm.  Looking at arch/arm/include/asm/memory.h:
+I have placed this in topic/lager-smp-v5 in the renesas tree
+to aid review. It is not yet queued up for mainline.
 
-#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
-#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
-
-pfn_to_page in ARM seems to be the asm-generic one, which depends on
-CONFIG_SPARSEMEM/CONFIG_DISCONTIGMEM/CONFIG_FLATMEM etc.
-
-Perhaps virt_addr_valid() is wrong for your config?  It's pretty clear
-that you shouldn't call virt_to_page() on something for which
-!virt_addr_valid().
-
-Cheers,
-Rusty.
+topic/lager-smp still contains v3 of this patch.
+Let me know if I can delete this branch.
