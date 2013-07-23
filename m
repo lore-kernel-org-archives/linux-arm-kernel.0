@@ -1,30 +1,28 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 23 Jul 2013 08:23:57 +0530
-Subject: [PATCH v2 0/6] clk: exynos: Some fixes and cleanup
-In-Reply-To: <20130722180515.7598.56428@quantum>
-References: <1374141682-29432-1-git-send-email-sachin.kamat@linaro.org>
- <20130722180515.7598.56428@quantum>
-Message-ID: <CAK9yfHziN=_vw-JtMTf_58L-5YrGo1j-A35Lt5TKaQHOj_wv1Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 22 Jul 2013 19:54:11 -0700
+Subject: [GIT PULL] omap fixes against v3.11-rc1
+In-Reply-To: <20130719104538.GE7656@atomide.com>
+References: <20130719104538.GE7656@atomide.com>
+Message-ID: <20130723025411.GD15637@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 July 2013 23:35, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Sachin Kamat (2013-07-18 03:01:16)
->> Resending some of patches (1, 3 and 5) as per discussion in thread [1].
->> Other patches in the series are new.
->>
->> [1] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
->>
->> Changes since v1:
->> * Removed an unnecessary change in Patch 1 as pointed out by Kukjin Kim.
->> * Added Kukjin's ack to patches 3~6.
->
-> Thanks for the fixes! Will take into clk-next unless you need them to go
-> into -rc3, but I don't think there are any regression fixes here.
+On Fri, Jul 19, 2013 at 03:45:38AM -0700, Tony Lindgren wrote:
+> 
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> 
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-against-rc1
+> 
+> for you to fetch changes up to 7956c487e407bdbf7f8c8a570fd5d4d089973692:
+> 
+>   Merge branch 'omap-for-v3.11/dt-fixes' into omap-for-v3.11/fixes (2013-07-19 03:28:35 -0700)
 
-Not at all. They can all go in for 3.12.
-Thanks.
+Pulled, thanks. I've dropped the multi_v7 defconfig update I had applied
+manually since it came in through here too.
 
--- 
-With warm regards,
-Sachin
+
+-Olof
