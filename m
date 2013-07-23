@@ -1,77 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jul 2013 12:09:16 +0100
-Subject: [PATCH v3 04/12] ARM: tlb: don't perform inner-shareable invalidation
- for local BP ops
+Date: Tue, 23 Jul 2013 12:09:22 +0100
+Subject: [PATCH v3 10/12] ARM: mcpm: use -st dsb option prior to sev
+ instructions
 In-Reply-To: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
 References: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374577764-32480-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1374577764-32480-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the ASID allocator doesn't require inner-shareable maintenance,
-we can convert the local_bp_flush_all function to perform only
-non-shareable flushing, in a similar manner to the TLB invalidation
-routines.
+In a similar manner to our spinlock implementation, mcpm uses sev to
+wake up cores waiting on a lock when the lock is unlocked. In order to
+ensure that the final write unlocking the lock is visible, a dsb
+instruction is executed immediately prior to the sev.
 
+This patch changes these dsbs to use the -st option, since we only
+require that the store unlocking the lock is made visible.
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++--
- arch/arm/kernel/smp_tlb.c       |  2 +-
- 2 files changed, 21 insertions(+), 3 deletions(-)
+ arch/arm/common/mcpm_head.S | 2 +-
+ arch/arm/common/vlock.S     | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index f096add..0fc1272 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -531,17 +531,35 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
-  * Branch predictor maintenance is paired with full TLB invalidation, so
-  * there is no need for any barriers here.
-  */
-+static inline void __local_flush_bp_all(void)
-+{
-+	const int zero = 0;
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
-+
-+	if (tlb_flag(TLB_V6_BP))
-+		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
-+}
-+
- static inline void local_flush_bp_all(void)
- {
- 	const int zero = 0;
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
+index 80f033614..39c96df 100644
+--- a/arch/arm/common/mcpm_head.S
++++ b/arch/arm/common/mcpm_head.S
+@@ -151,7 +151,7 @@ mcpm_setup_leave:
  
-+	__local_flush_bp_all();
- 	if (tlb_flag(TLB_V7_UIS_BP))
--		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
--	else if (tlb_flag(TLB_V6_BP))
- 		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
- }
+ 	mov	r0, #INBOUND_NOT_COMING_UP
+ 	strb	r0, [r8, #MCPM_SYNC_CLUSTER_INBOUND]
+-	dsb
++	dsb	st
+ 	sev
  
-+static inline void __flush_bp_all(void)
-+{
-+	const int zero = 0;
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
-+
-+	__local_flush_bp_all();
-+	if (tlb_flag(TLB_V7_UIS_BP))
-+		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
-+}
-+
- #ifdef CONFIG_ARM_ERRATA_798181
- static inline void dummy_flush_tlb_a15_erratum(void)
- {
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index 1c94776..f4bb369 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -190,5 +190,5 @@ void flush_bp_all(void)
- 	if (tlb_ops_need_broadcast())
- 		on_each_cpu(ipi_flush_bp_all, NULL, 1);
- 	else
--		local_flush_bp_all();
-+		__flush_bp_all();
- }
+ 	mov	r0, r11
+diff --git a/arch/arm/common/vlock.S b/arch/arm/common/vlock.S
+index ff19858..8b7df28 100644
+--- a/arch/arm/common/vlock.S
++++ b/arch/arm/common/vlock.S
+@@ -42,7 +42,7 @@
+ 	dmb
+ 	mov	\rscratch, #0
+ 	strb	\rscratch, [\rbase, \rcpu]
+-	dsb
++	dsb	st
+ 	sev
+ .endm
+ 
+@@ -102,7 +102,7 @@ ENTRY(vlock_unlock)
+ 	dmb
+ 	mov	r1, #VLOCK_OWNER_NONE
+ 	strb	r1, [r0, #VLOCK_OWNER_OFFSET]
+-	dsb
++	dsb	st
+ 	sev
+ 	bx	lr
+ ENDPROC(vlock_unlock)
 -- 
 1.8.2.2
