@@ -1,30 +1,49 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 02:44:59 +0200
-Subject: [PATCH v2 6/8] usb: host: ohci-s3c2410 Use
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <CAOMZO5D4X+GT+LdUOjorJ8xgBCwv9iAP4W-RzKrbnE-93kxmUg@mail.gmail.com>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <1374536965-3545-7-git-send-email-tomasz.figa@gmail.com>
- <CAOMZO5D4X+GT+LdUOjorJ8xgBCwv9iAP4W-RzKrbnE-93kxmUg@mail.gmail.com>
-Message-ID: <1749259.aa65CrEVoR@flatron>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Mon, 22 Jul 2013 22:01:05 -0300
+Subject: [PATCH RFC 1/8] clk: sunxi: fix initialization of basic clocks
+In-Reply-To: <1374541272-32173-1-git-send-email-emilio@elopez.com.ar>
+References: <1374541272-32173-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1374541272-32173-2-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 of July 2013 21:15:12 Fabio Estevam wrote:
-> On Mon, Jul 22, 2013 at 8:49 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> >         dev_dbg(&dev->dev, "s3c2410_start_hc:\n");
-> > 
-> > -       clk_enable(usb_clk);
-> > +       clk_prepare_enable(usb_clk);
-> 
->  clk_prepare_enable may fail, so you would better check its return
-> value.
+With the recent move towards CLK_OF_DECLARE(...), the driver stopped
+initializing osc32k, which is compatible "fixed-clock". This is because
+we never called of_clk_init(NULL). Fix this by moving the only other
+simple clock (osc24M) to use CLK_OF_DECLARE(...) and call of_clk_init(NULL)
+to initialize both of them.
 
-Well, ideally yes, but since this driver doesn't have any error path here 
-anyway and on Samsung platforms clk_prepare_enable() simply can't fail, 
-I'd keep it this way until somebody fixes this driver, as it has more 
-issues than just this one.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 412912b..323366b 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -411,10 +411,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ }
+ 
+ /* Matches for of_clk_init */
+-static const __initconst struct of_device_id clk_match[] = {
+-	{.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
+-	{}
+-};
++CLK_OF_DECLARE(sunxi_osc, "allwinner,sun4i-osc-clk", sunxi_osc_clk_setup);
+ 
+ /* Matches for factors clocks */
+ static const __initconst struct of_device_id clk_factors_match[] = {
+@@ -467,8 +464,8 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
+ 
+ void __init sunxi_init_clocks(void)
+ {
+-	/* Register all the simple sunxi clocks on DT */
+-	of_clk_init(clk_match);
++	/* Register all the simple and basic clocks on DT */
++	of_clk_init(NULL);
+ 
+ 	/* Register factor clocks */
+ 	of_sunxi_table_clock_setup(clk_factors_match, sunxi_factors_clk_setup);
+-- 
+1.8.3.3
