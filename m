@@ -1,186 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jul 2013 12:09:18 +0100
-Subject: [PATCH v3 06/12] ARM: tlb: reduce scope of barrier domains for TLB
- invalidation
-In-Reply-To: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
-References: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374577764-32480-7-git-send-email-will.deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Jul 2013 12:12:47 +0100
+Subject: [PATCH v2 1/3] drivers: clocksource: configure event stream for
+ ARM arch timer
+In-Reply-To: <20130723103333.GB30942@mudshark.cambridge.arm.com>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492082-13686-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <20130723102334.GC3748@MacBook-Pro.local>
+ <20130723103333.GB30942@mudshark.cambridge.arm.com>
+Message-ID: <20130723111247.GG3748@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our TLB invalidation routines may require a barrier before the
-maintenance (in order to ensure pending page table writes are visible to
-the hardware walker) and barriers afterwards (in order to ensure
-completion of the maintenance and visibility in the instruction stream).
+On Tue, Jul 23, 2013 at 11:33:33AM +0100, Will Deacon wrote:
+> On Tue, Jul 23, 2013 at 11:23:34AM +0100, Catalin Marinas wrote:
+> > On Mon, Jul 22, 2013 at 12:21:20PM +0100, Sudeep KarkadaNagesha wrote:
+> > > From: Will Deacon <will.deacon@arm.com>
+> > > 
+> > > The ARM architected timer can generate events (used for waking up
+> > > CPUs executing the wfe instruction) at a frequency represented as a
+> > > power-of-2 divisor of the clock rate.
+> > > 
+> > > This patch configures the event stream, aiming for a period of 100us
+> > > between events. This can be used to implement wfe-based timeouts for
+> > > userspace locking implementations.
+> > ...
+> > > --- a/include/clocksource/arm_arch_timer.h
+> > > +++ b/include/clocksource/arm_arch_timer.h
+> > > @@ -29,6 +29,8 @@
+> > >  #define ARCH_TIMER_PHYS_ACCESS		0
+> > >  #define ARCH_TIMER_VIRT_ACCESS		1
+> > >  
+> > > +#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
+> > 
+> > BTW, if user-space starts using this, it will become an ABI. Is this the
+> > right frequency?
+> 
+> It doesn't quite become ABI; not all platforms will use the architected
+> timers and not all timers can support an arbitrary frequency. The best we
+> can do is calculate something as close to the target value as possible.
 
-Whilst this is expensive, the cost can be reduced somewhat by reducing
-the scope of the barrier instructions:
+ABI in the sense that if it is available and advertised by the kernel as
+such, people may use it.
 
-  - The barrier before only needs to apply to stores (pte writes)
-  - Local ops are required only to affect the non-shareable domain
-  - Global ops are required only to affect the inner-shareable domain
+> I spoke to both tools developers and some HSA driver guys about the frequency,
+> and this is what ended up being suggested.
+> 
+> > In addition, do we want to expose this via hwcap? Something like
+> > HWCAP_EVSTR100US?
+> 
+> Hmm, maybe, but we don't want people to try and use this for any accurate
+> time measurements, so I wouldn't include the period.
 
-This patch makes these changes for the TLB flushing code.
+Definitely not for accurate time but some user-space may find the delay
+too small or too large. I'm fine without specifying the period, maybe
+add a comment in the kernel like /* currently 100us */.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/tlbflush.h | 36 ++++++++++++++++++------------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 0fc1272..9297685 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -335,13 +335,13 @@ static inline void local_flush_tlb_all(void)
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(nshst);
- 
- 	__local_flush_tlb_all();
- 	tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
- 
- 	if (tlb_flag(TLB_BARRIER)) {
--		dsb();
-+		dsb(nsh);
- 		isb();
- 	}
- }
-@@ -352,13 +352,13 @@ static inline void __flush_tlb_all(void)
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(ishst);
- 
- 	__local_flush_tlb_all();
- 	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
- 
- 	if (tlb_flag(TLB_BARRIER)) {
--		dsb();
-+		dsb(ish);
- 		isb();
- 	}
- }
-@@ -388,13 +388,13 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(nshst);
- 
- 	__local_flush_tlb_mm(mm);
- 	tlb_op(TLB_V7_UIS_ASID, "c8, c7, 2", asid);
- 
- 	if (tlb_flag(TLB_BARRIER))
--		dsb();
-+		dsb(nsh);
- }
- 
- static inline void __flush_tlb_mm(struct mm_struct *mm)
-@@ -402,7 +402,7 @@ static inline void __flush_tlb_mm(struct mm_struct *mm)
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(ishst);
- 
- 	__local_flush_tlb_mm(mm);
- #ifdef CONFIG_ARM_ERRATA_720789
-@@ -412,7 +412,7 @@ static inline void __flush_tlb_mm(struct mm_struct *mm)
- #endif
- 
- 	if (tlb_flag(TLB_BARRIER))
--		dsb();
-+		dsb(ish);
- }
- 
- static inline void
-@@ -445,13 +445,13 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
- 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(nshst);
- 
- 	__local_flush_tlb_page(vma, uaddr);
- 	tlb_op(TLB_V7_UIS_PAGE, "c8, c7, 1", uaddr);
- 
- 	if (tlb_flag(TLB_BARRIER))
--		dsb();
-+		dsb(nsh);
- }
- 
- static inline void
-@@ -462,7 +462,7 @@ __flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
- 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(ishst);
- 
- 	__local_flush_tlb_page(vma, uaddr);
- #ifdef CONFIG_ARM_ERRATA_720789
-@@ -472,7 +472,7 @@ __flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
- #endif
- 
- 	if (tlb_flag(TLB_BARRIER))
--		dsb();
-+		dsb(ish);
- }
- 
- static inline void __local_flush_tlb_kernel_page(unsigned long kaddr)
-@@ -498,13 +498,13 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
- 	kaddr &= PAGE_MASK;
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(nshst);
- 
- 	__local_flush_tlb_kernel_page(kaddr);
- 	tlb_op(TLB_V7_UIS_PAGE, "c8, c7, 1", kaddr);
- 
- 	if (tlb_flag(TLB_BARRIER)) {
--		dsb();
-+		dsb(nsh);
- 		isb();
- 	}
- }
-@@ -516,13 +516,13 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
- 	kaddr &= PAGE_MASK;
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(ishst);
- 
- 	__local_flush_tlb_kernel_page(kaddr);
- 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", kaddr);
- 
- 	if (tlb_flag(TLB_BARRIER)) {
--		dsb();
-+		dsb(ish);
- 		isb();
- 	}
- }
-@@ -567,7 +567,7 @@ static inline void dummy_flush_tlb_a15_erratum(void)
- 	 * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
- 	 */
- 	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
--	dsb();
-+	dsb(ish);
- }
- #else
- static inline void dummy_flush_tlb_a15_erratum(void)
-@@ -596,7 +596,7 @@ static inline void flush_pmd_entry(void *pmd)
- 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
- 
- 	if (tlb_flag(TLB_WB))
--		dsb();
-+		dsb(ishst);
- }
- 
- static inline void clean_pmd_entry(void *pmd)
 -- 
-1.8.2.2
+Catalin
