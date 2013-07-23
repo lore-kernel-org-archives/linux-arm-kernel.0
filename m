@@ -1,140 +1,102 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 23 Jul 2013 10:20:14 +0300
-Subject: [PATCHv4 19/33] CLK: omap: add am33xx clock init file
+Date: Tue, 23 Jul 2013 10:20:09 +0300
+Subject: [PATCHv4 14/33] CLK: omap: add dra7 clock init file
 In-Reply-To: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1374564028-11352-20-git-send-email-t-kristo@ti.com>
+Message-ID: <1374564028-11352-15-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk-33xx.c now contains the clock init functionality for am33xx, including
+clk-7xx.c now contains the clock init functionality for dra7, including
 DT clock registration and adding of static clkdev entries.
-
-This patch also moves the omap2_clk_enable_init_clocks declaration to
-the driver include, as this is needed by the am33xx clock init code.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clock.h |    1 -
- drivers/clk/omap/clk-33xx.c |   85 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/omap.h    |    1 +
- 3 files changed, 86 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/omap/clk-33xx.c
+ drivers/clk/omap/Makefile  |    2 +-
+ drivers/clk/omap/clk-7xx.c |   67 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/omap/clk-7xx.c
 
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index d1a3125..6273f14 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -267,7 +267,6 @@ void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
- 				void __iomem **idlest_reg,
- 				u8 *idlest_bit, u8 *idlest_val);
- int omap2_clk_enable_autoidle_all(void);
--void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
- int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
- void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
- 			       const char *core_ck_name,
-diff --git a/drivers/clk/omap/clk-33xx.c b/drivers/clk/omap/clk-33xx.c
+diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
+index 74385f2..b8dbfda 100644
+--- a/drivers/clk/omap/Makefile
++++ b/drivers/clk/omap/Makefile
+@@ -1,2 +1,2 @@
+ obj-y					+= clk.o dpll.o autoidle.o gate.o \
+-					   clk-44xx.o clk-54xx.o
++					   clk-44xx.o clk-54xx.o clk-7xx.o
+diff --git a/drivers/clk/omap/clk-7xx.c b/drivers/clk/omap/clk-7xx.c
 new file mode 100644
-index 0000000..3ada30e
+index 0000000..ddb39dd
 --- /dev/null
-+++ b/drivers/clk/omap/clk-33xx.c
-@@ -0,0 +1,85 @@
++++ b/drivers/clk/omap/clk-7xx.c
+@@ -0,0 +1,67 @@
 +/*
-+ * AM33XX Clock init
++ * DRA7 Clock init
 + *
-+ * Copyright (C) 2013 Texas Instruments, Inc
-+ *     Tero Kristo (t-kristo at ti.com)
++ * Copyright (C) 2013 Texas Instruments, Inc.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
++ * Tero Kristo (t-kristo at ti.com)
 + *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
 +#include <linux/kernel.h>
 +#include <linux/list.h>
-+#include <linux/clk-provider.h>
++#include <linux/clk-private.h>
++#include <linux/clkdev.h>
++#include <linux/io.h>
 +#include <linux/clk/omap.h>
 +
++#define DRA7_DPLL_ABE_DEFFREQ				361267200
++#define DRA7_DPLL_GMAC_DEFFREQ				1000000000
 +
-+static struct omap_dt_clk am33xx_clks[] = {
-+	DT_CLK("cpu0", NULL, "dpll_mpu_ck"),
-+	DT_CLK("481cc000.d_can", NULL, "dcan0_fck"),
-+	DT_CLK("481d0000.d_can", NULL, "dcan1_fck"),
-+	DT_CLK(NULL, "timer_32k_ck", "clkdiv32k_ick"),
-+	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
-+	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
-+	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
-+	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
++
++static struct omap_dt_clk dra7xx_clks[] = {
++	DT_CLK(NULL, "timer_32k_ck", "sys_32k_ck"),
++	DT_CLK("4ae18000.timer", "timer_sys_ck", "sys_clkin2"),
++	DT_CLK("48032000.timer", "timer_sys_ck", "sys_clkin2"),
++	DT_CLK("48034000.timer", "timer_sys_ck", "sys_clkin2"),
++	DT_CLK("48036000.timer", "timer_sys_ck", "sys_clkin2"),
++	DT_CLK("4803e000.timer", "timer_sys_ck", "sys_clkin2"),
++	DT_CLK("48086000.timer", "timer_sys_ck", "sys_clkin2"),
++	DT_CLK("48088000.timer", "timer_sys_ck", "sys_clkin2"),
++	DT_CLK("48820000.timer", "timer_sys_ck", "timer_sys_clk_div"),
++	DT_CLK("48822000.timer", "timer_sys_ck", "timer_sys_clk_div"),
++	DT_CLK("48824000.timer", "timer_sys_ck", "timer_sys_clk_div"),
++	DT_CLK("48826000.timer", "timer_sys_ck", "timer_sys_clk_div"),
++	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
 +};
 +
-+static const char *enable_init_clks[] = {
-+	"dpll_ddr_m2_ck",
-+	"dpll_mpu_m2_ck",
-+	"l3_gclk",
-+	"l4hs_gclk",
-+	"l4fw_gclk",
-+	"l4ls_gclk",
-+	/* Required for external peripherals like, Audio codecs */
-+	"clkout2_ck",
-+};
-+
-+int __init am33xx_clk_init(void)
++int __init dra7xx_clk_init(void)
 +{
-+	struct clk *clk1, *clk2;
++	int rc;
++	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
 +
 +	dt_omap_clk_init();
 +
-+	omap_dt_clocks_register(am33xx_clks, ARRAY_SIZE(am33xx_clks));
++	omap_dt_clocks_register(dra7xx_clks, ARRAY_SIZE(dra7xx_clks));
 +
 +	omap2_clk_disable_autoidle_all();
 +
-+	omap2_clk_enable_init_clocks(enable_init_clks,
-+				     ARRAY_SIZE(enable_init_clks));
++	abe_dpll_mux = clk_get_sys(NULL, "abe_dpll_sys_clk_mux");
++	sys_clkin2 = clk_get_sys(NULL, "sys_clkin2");
++	dpll_ck = clk_get_sys(NULL, "dpll_abe_ck");
 +
-+	/* TRM ERRATA: Timer 3 & 6 default parent (TCLKIN) may not be always
-+	 *    physically present, in such a case HWMOD enabling of
-+	 *    clock would be failure with default parent. And timer
-+	 *    probe thinks clock is already enabled, this leads to
-+	 *    crash upon accessing timer 3 & 6 registers in probe.
-+	 *    Fix by setting parent of both these timers to master
-+	 *    oscillator clock.
-+	 */
++	rc = clk_set_parent(abe_dpll_mux, sys_clkin2);
++	if (!rc)
++		rc = clk_set_rate(dpll_ck, DRA7_DPLL_ABE_DEFFREQ);
++	if (rc)
++		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
 +
-+	clk1 = clk_get_sys(NULL, "sys_clkin_ck");
-+	clk2 = clk_get_sys(NULL, "timer3_fck");
-+	clk_set_parent(clk2, clk1);
++	dpll_ck = clk_get_sys(NULL, "dpll_gmac_ck");
++	rc = clk_set_rate(dpll_ck, DRA7_DPLL_GMAC_DEFFREQ);
++	if (rc)
++		pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
 +
-+	clk2 = clk_get_sys(NULL, "timer6_fck");
-+	clk_set_parent(clk2, clk1);
-+	/*
-+	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
-+	 * the design/spec, so as a result, for example, timer which supposed
-+	 * to get expired @60Sec, but will expire somewhere ~@40Sec, which is
-+	 * not expected by any use-case, so change WDT1 clock source to PRCM
-+	 * 32KHz clock.
-+	 */
-+	clk1 = clk_get_sys(NULL, "wdt1_fck");
-+	clk2 = clk_get_sys(NULL, "clkdiv32k_ick");
-+	clk_set_parent(clk1, clk2);
-+
-+	return 0;
++	return rc;
 +}
-diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
-index 58ebb80..c8d9468 100644
---- a/include/linux/clk/omap.h
-+++ b/include/linux/clk/omap.h
-@@ -184,6 +184,7 @@ int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- 
- int omap2_clk_disable_autoidle_all(void);
-+void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
- 
- extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
- extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
 -- 
 1.7.9.5
