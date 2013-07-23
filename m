@@ -1,25 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 23 Jul 2013 21:40:13 +0800
-Subject: [PATCH v2] ARM: dts: mxs: Add spi alias
-In-Reply-To: <1374526621-29874-1-git-send-email-festevam@gmail.com>
-References: <1374526621-29874-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130723134012.GB17327@S2101-09.ap.freescale.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 23 Jul 2013 17:04:48 +0300
+Subject: [PATCH v2] ARM: Do not run dummy_flush_tlb_a15_erratum() on
+ non-Cortex-A15
+In-Reply-To: <1374581199-8277-1-git-send-email-festevam@gmail.com>
+References: <1374581199-8277-1-git-send-email-festevam@gmail.com>
+Message-ID: <51EE8D80.8010409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 05:57:01PM -0300, Fabio Estevam wrote:
+On 07/23/2013 03:06 PM, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> After providing spi alias, we can get the following message during probe:
+> Commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15 erratum 798181 
+> (TLBI/DSB operations)) causes the following undefined instruction error on a
+> mx53 (Cortex-A8):
 > 
-> m25p80 spi1.0: sst25vf016b (2048 Kbytes)
+> Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> CPU: 0 PID: 275 Comm: modprobe Not tainted 3.11.0-rc2-next-20130722-00009-g9b0f371 #881
+> task: df46cc00 ti: df48e000 task.ti: df48e000
+> PC is at check_and_switch_context+0x17c/0x4d0
+> LR is at check_and_switch_context+0xdc/0x4d0
 > 
-> ,which looks better than the original one:
+> This problem happens because check_and_switch_context() calls 
+> dummy_flush_tlb_a15_erratum() without checking if we are really running on a 
+> Cortex-A15 or not. 
 > 
-> m25p80 spi32766.0: sst25vf016b (2048 Kbytes)
-> 
-> While at it, keep the alias entries in alphabetical order.
+> To avoid this issue, only call dummy_flush_tlb_a15_erratum() inside 
+> check_and_switch_context() if erratum_a15_798181() returns true, which means
+> that we are really running on a Cortex-A15.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied, thanks.
+Reviewed-by: Roger Quadros <rogerq@ti.com>
