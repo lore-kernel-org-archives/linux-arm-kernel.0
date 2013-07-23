@@ -1,85 +1,33 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 23 Jul 2013 12:32:41 +0100
-Subject: [PATCH 2/5] ARM: vexpress: remove redundant vexpress_dt_cpus_num to
- get cpu count
+Date: Tue, 23 Jul 2013 12:32:40 +0100
+Subject: [PATCH 1/5] ARM: keystone: remove redundant smp_init_cpus definition
 In-Reply-To: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374579164-30255-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374579164-30255-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-arm_dt_init_cpu_maps parses the device tree, validates and sets the
-cpu_possible_mask appropriately. It is unnecessary to do another DT
-parse to get the number of cpus, use num_possible_cpus instead.
+arm_dt_init_cpu_maps is called before smp_init_cpus. It makes the
+platform/SoC definition of smp_init_cpus unnecessary.
 
-This patch also removes setting cpu_present_mask as platforms should
-only re-initialize it in smp_prepare_cpus() if present != possible.
-
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/mach-vexpress/platsmp.c | 32 +-------------------------------
- 1 file changed, 1 insertion(+), 31 deletions(-)
+ arch/arm/mach-keystone/platsmp.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 993c9ae..4a2d8c4 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -77,39 +77,13 @@ void __init vexpress_dt_smp_map_io(void)
- 		WARN_ON(of_scan_flat_dt(vexpress_dt_find_scu, NULL));
+diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+index 14378e3..c122961 100644
+--- a/arch/arm/mach-keystone/platsmp.c
++++ b/arch/arm/mach-keystone/platsmp.c
+@@ -38,6 +38,5 @@ static int keystone_smp_boot_secondary(unsigned int cpu,
  }
  
--static int __init vexpress_dt_cpus_num(unsigned long node, const char *uname,
--		int depth, void *data)
--{
--	static int prev_depth = -1;
--	static int nr_cpus = -1;
--
--	if (prev_depth > depth && nr_cpus > 0)
--		return nr_cpus;
--
--	if (nr_cpus < 0 && strcmp(uname, "cpus") == 0)
--		nr_cpus = 0;
--
--	if (nr_cpus >= 0) {
--		const char *device_type = of_get_flat_dt_prop(node,
--				"device_type", NULL);
--
--		if (device_type && strcmp(device_type, "cpu") == 0)
--			nr_cpus++;
--	}
--
--	prev_depth = depth;
--
--	return 0;
--}
--
- static void __init vexpress_dt_smp_init_cpus(void)
- {
- 	int ncores = 0, i;
- 
- 	switch (vexpress_dt_scu) {
- 	case GENERIC_SCU:
--		ncores = of_scan_flat_dt(vexpress_dt_cpus_num, NULL);
--		break;
-+		return;
- 	case CORTEX_A9_SCU:
- 		ncores = scu_get_core_count(vexpress_dt_cortex_a9_scu_base);
- 		break;
-@@ -133,12 +107,8 @@ static void __init vexpress_dt_smp_init_cpus(void)
- 
- static void __init vexpress_dt_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
- 	switch (vexpress_dt_scu) {
- 	case GENERIC_SCU:
--		for (i = 0; i < max_cpus; i++)
--			set_cpu_present(i, true);
- 		break;
- 	case CORTEX_A9_SCU:
- 		scu_enable(vexpress_dt_cortex_a9_scu_base);
+ struct smp_operations keystone_smp_ops __initdata = {
+-	.smp_init_cpus		= arm_dt_init_cpu_maps,
+ 	.smp_boot_secondary	= keystone_smp_boot_secondary,
+ };
 -- 
 1.8.1.2
