@@ -1,52 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 23 Jul 2013 20:31:05 +0100
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <20130723180110.GA8688@kroah.com>
-References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
- <51EE9EC0.6060905@ti.com> <20130723161846.GD2486@kroah.com>
- <1446965.6APW5ZgLBW@amdc1227> <20130723173710.GB28284@kroah.com>
- <20130723174456.GM9858@sirena.org.uk>
- <20130723180110.GA8688@kroah.com>
-Message-ID: <20130723193105.GP9858@sirena.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 23 Jul 2013 15:34:25 -0400 (EDT)
+Subject: linux setup
+In-Reply-To: <20130723102554.GD3748@MacBook-Pro.local>
+References: <CANEcUBXMPhTjgVYbRN7NY+EUjh7DDGpKnZ8_LXY-ZLcfbH65Ug@mail.gmail.com>
+ <20130723102554.GD3748@MacBook-Pro.local>
+Message-ID: <alpine.LFD.2.03.1307231530080.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 11:01:10AM -0700, Greg KH wrote:
-> On Tue, Jul 23, 2013 at 06:44:56PM +0100, Mark Brown wrote:
+On Tue, 23 Jul 2013, Catalin Marinas wrote:
 
-> > What are the problems you are seeing with doing things with lookups?
+> On Mon, Jul 22, 2013 at 02:28:50PM +0100, zhaobin xv wrote:
+> > I recently read lernel source .
+> > I have a question:In
+> > folder:linux/arch/arm/boot/compressed/head.S(linux2.6.22.6):
+> > 
+> > 
+> > start:
+> >         .type    start,#function
+> >         .rept    8
+> >         mov    r0, r0
+> >         .endr
+> > 
+> >         b    1f
+> >         .word    0x016f2818        @ Magic numbers to help the loader
+> >         .word    start            @ absolute load/run zImage address
+> >         .word    _edata            @ zImage end address
+> > 1:        mov    r7, r1            @ save architecture ID
+> >         mov    r8, r2            @ save atags pointer
+> > 
+> > 
+> > I don't kown why the ?mov r0 r0 ? repeated  emergence 8 times.
+> 
+> I think some people used that in the past to be able to modify the
+> zImage binary directly and work around wrong register values passed by
+> the boot loader. I've never used it myself but I saw it mentioned once.
 
-> You don't "know" the id of the device you are looking up, due to
-> multiple devices being in the system (dynamic ids, look back earlier in
-> this thread for details about that.)
+The whole reason for this is because in a distant past the kernel image 
+was an a.out binary containing a 32-bytes header.  Those nops are simply 
+padding so to be compatible with those bootloaders expecting the kernel 
+code to start at an offset of 32.
 
-I got copied in very late so don't have most of the thread I'm afraid, 
-I did try looking at web archives but didn't see a clear problem
-statement.  In any case this is why the APIs doing lookups do the
-lookups in the context of the requesting device - devices ask for
-whatever name they use locally.
 
-> > Having to write platform data for everything gets old fast and the code
-> > duplication is pretty tedious...
-
-> Adding a single pointer is "tedious"?  Where is the "name" that you are
-> going to lookup going to come from?  That code doesn't write itself...
-
-It's adding platform data in the first place that gets tedious - and of
-course there's also DT and ACPI to worry about, it's not just a case of
-platform data and then you're done.  Pushing the lookup into library
-code means that drivers don't have to worry about any of this stuff.
-
-For most of the APIs doing this there is a clear and unambiguous name in
-the hardware that can be used (and for hardware process reasons is
-unlikely to get changed).  The major exception to this is the clock API
-since it is relatively rare to have clear, segregated IP level
-information for IPs baked into larger chips.  The other APIs tend to be
-establishing chip to chip links.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/3c3ea43f/attachment-0001.sig>
+Nicolas
