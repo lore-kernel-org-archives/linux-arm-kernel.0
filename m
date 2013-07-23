@@ -1,24 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 22 Jul 2013 19:59:35 -0700
-Subject: [GIT PULL] ARM: imx: fixes for 3.11
-In-Reply-To: <20130715161236.GC23589@S2101-09.ap.freescale.net>
-References: <20130715161236.GC23589@S2101-09.ap.freescale.net>
-Message-ID: <20130723025935.GA16733@quad.lixom.net>
+Date: Mon, 22 Jul 2013 20:02:01 -0700
+Subject: [PATCH] ARM: footbridge: fix overlapping PCI mappings
+In-Reply-To: <CAL_JsqKaha08U0fN1FruEEfsH=jAGzsxeJATJqeDvburd6EDjw@mail.gmail.com>
+References: <1372387356-15341-1-git-send-email-vapier@gentoo.org>
+ <CAL_JsqKaha08U0fN1FruEEfsH=jAGzsxeJATJqeDvburd6EDjw@mail.gmail.com>
+Message-ID: <20130723030201.GB16733@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 12:12:38AM +0800, Shawn Guo wrote:
-> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+On Mon, Jul 15, 2013 at 03:52:12PM -0500, Rob Herring wrote:
+> On Thu, Jun 27, 2013 at 9:42 PM, Mike Frysinger <vapier@gentoo.org> wrote:
+> > Commit 8ef6e6201b26cb9fde79c1baa08145af6aca2815 (ARM: footbridge: use
+> > fixed PCI i/o mapping) broke booting on my netwinder.  Before that,
+> > everything boots fine.  Since then, it crashes on boot.
+> >
+> > With earlyprintk, I see it BUG-ing like so:
+> > kernel BUG at lib/ioremap.c:27!
+> > Internal error: Oops - BUG: 0 [#1] ARM
+> > ...
+> > [<c0139b54>] (ioremap_page_range+0x128/0x154) from [<c02e6a6c>] (dc21285_setup+0xd0/0x114)
+> > [<c02e6a6c>] (dc21285_setup+0xd0/0x114) from [<c02e4874>] (pci_common_init+0xa0/0x298)
+> > [<c02e4874>] (pci_common_init+0xa0/0x298) from [<c02e793c>] (netwinder_pci_init+0xc/0x18)
+> > [<c02e793c>] (netwinder_pci_init+0xc/0x18) from [<c02e27d0>] (do_one_initcall+0xb4/0x180)
+> > ...
+> >
+> > Russell points out it's because of overlapping PCI mappings that was
+> > added with the aforementioned commit.  Rob thought the code would re-use
+> > the static mapping, but that turns out to not be the case and instead
+> > hits the BUG further down.
+> >
+> > After deleting this hunk as suggested by Russel, the system boots up fine
+> > again and all my PCI devices work (IDE, ethernet, the DC21285).
+> >
+> > Signed-off-by: Mike Frysinger <vapier@gentoo.org>
 > 
->   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 > 
-> are available in the git repository at:
+> Olof, Kevin,
 > 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.11
+> Please apply and add stable.
 
-Pulled, thanks. Some of these would have been nice to see a little earlier, but
-I also wasn't very fast at pulling them so I can't complain that loudly. :)
-
+Done (stable v3.5+). Thanks.
 
 
 -Olof
