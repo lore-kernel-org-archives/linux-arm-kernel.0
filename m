@@ -1,105 +1,32 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 23 Jul 2013 11:17:40 +0530
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <Pine.LNX.4.44L0.1307221028440.1495-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1307221028440.1495-100000@iolanthe.rowland.org>
-Message-ID: <51EE18FC.2070505@ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 23 Jul 2013 11:54:36 +0530
+Subject: [PATCH 0/3] OMAP2+: hwmod: Add support to parse clock info from DT
+Message-ID: <1374560679-14666-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With all of OMAP clock data now moving to DT, its possible to pass the
+main or functional clock and all optional clocks information for a
+device from DT instead of having these as part of hwmod static data
+in the kernel.
 
-On Monday 22 July 2013 08:14 PM, Alan Stern wrote:
-> On Mon, 22 Jul 2013, Kishon Vijay Abraham I wrote:
-> 
->>> 	The PHY and the controller it is attached to are both physical
->>> 	devices.
->>>
->>> 	The connection between them is hardwired by the system
->>> 	manufacturer and cannot be changed by software.
->>>
->>> 	PHYs are generally described by fixed system-specific board
->>> 	files or by Device Tree information.  Are they ever discovered
->>> 	dynamically?
->>
->> No. They are created just like any other platform devices are created.
-> 
-> Okay.  Are PHYs _always_ platform devices?
+This patch series is based on 'v3' of omap4 clock movement to DT
+patches [1] and is boot tested on a omap4 panda es.
 
-Not always. It can be any other device also.
-> 
->>> 	Is the same true for the controllers attached to the PHYs?
->>> 	If not -- if both a PHY and a controller are discovered 
->>> 	dynamically -- how does the kernel know whether they are 
->>> 	connected to each other?
->>
->> No differences here. Both PHY and controller will have dt information or hwmod
->> data using which platform devices will be created.
->>>
->>> 	The kernel needs to know which controller is attached to which
->>> 	PHY.  Currently this information is represented by name or ID
->>> 	strings embedded in platform data.
->>
->> right. It's embedded in the platform data of the controller.
-> 
-> It must also be embedded in the PHY's platform data somehow.  
-> Otherwise, how would the kernel know which PHY to use?
-> 
->>> 	The PHY's driver (the supplier) uses the platform data to 
->>> 	construct a platform_device structure that represents the PHY.  
->>
->> Currently the driver assigns static labels (corresponding to the label used in
->> the platform data of the controller).
->>> 	Until this is done, the controller's driver (the client) cannot 
->>> 	use the PHY.
->>
->> right.
->>>
->>> 	Since there is no parent-child relation between the PHY and the 
->>> 	controller, there is no guarantee that the PHY's driver will be
->>> 	ready when the controller's driver wants to use it.  A deferred
->>> 	probe may be needed.
->>
->> right.
->>>
->>> 	The issue (or one of the issues) in this discussion is that 
->>> 	Greg does not like the idea of using names or IDs to associate
->>> 	PHYs with controllers, because they are too prone to
->>> 	duplications or other errors.  Pointers are more reliable.
->>>
->>> 	But pointers to what?  Since the only data known to be 
->>> 	available to both the PHY driver and controller driver is the
->>> 	platform data, the obvious answer is a pointer to platform data
->>> 	(either for the PHY or for the controller, or maybe both).
->>
->> hmm.. it's not going to be simple though as the platform device for the PHY and
->> controller can be created in entirely different places. e.g., in some cases the
->> PHY device is a child of some mfd core device (the device will be created in
->> drivers/mfd) and the controller driver (usually) is created in board file. I
->> guess then we have to come up with something to share a pointer in two
->> different files.
-> 
-> The ability for two different source files to share a pointer to a data 
-> item defined in a third source file has been around since long before 
-> the C language was invented.  :-)
-> 
-> In this case, it doesn't matter where the platform_device structures 
-> are created or where the driver source code is.  Let's take a simple 
-> example.  Suppose the system design includes a PHY named "foo".  Then 
-> the board file could contain:
-> 
-> struct phy_info { ... } phy_foo;
-> EXPORT_SYMBOL_GPL(phy_foo);
-> 
-> and a header file would contain:
-> 
-> extern struct phy_info phy_foo;
-> 
-> The PHY supplier could then call phy_create(&phy_foo), and the PHY 
-> client could call phy_find(&phy_foo).  Or something like that; make up 
-> your own structure tags and function names.
+The series does leave all the interface clocks as part of hwmod (and
+main and optional clocks for devices which are missing DT drivers).
 
-Alright. Thanks for the hint :-)
+[1] http://comments.gmane.org/gmane.linux.ports.arm.omap/100117
 
-Thanks
-Kishon
+Rajendra Nayak (3):
+  ARM: OMAP2+: Add support to parse 'main_clk' info from DT
+  ARM: OMAP2+: Add support to parse optional clk info from DT
+  ARM: OMAP4: dts: Add main and optional clock data into DT
+
+ arch/arm/boot/dts/omap4.dtsi               |  100 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c           |  100 +++++++++++++++++++++----
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  112 ----------------------------
+ 3 files changed, 185 insertions(+), 127 deletions(-)
+
+-- 
+1.7.9.5
