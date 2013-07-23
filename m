@@ -1,51 +1,178 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Tue, 23 Jul 2013 11:52:18 +0100
-Subject: [PATCH v4] xen/arm: enable PV control for ARM
-In-Reply-To: <5228e08a-1cdb-4240-b10f-9ad690c94ac4@email.android.com>
-References: <1374529321-12955-1-git-send-email-julien.grall@linaro.org>
- <5228e08a-1cdb-4240-b10f-9ad690c94ac4@email.android.com>
-Message-ID: <51EE6062.3080304@linaro.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 23 Jul 2013 11:54:10 +0100
+Subject: [PATCH v3 01/16] of: add support for retrieving cpu node for a given
+ logical cpu index
+In-Reply-To: <51ED4A99.3030403@arm.com>
+References: <51ED4A99.3030403@arm.com>
+Message-ID: <1374576850-9667-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 01:32 AM, Konrad Rzeszutek Wilk wrote:
-> Julien Grall <julien.grall@linaro.org> wrote:
->> Enable power management from the toolstack for ARM guest.
->>
->> Signed-off-by: Julien Grall <julien.grall@linaro.org>
->>
->> ---
->>    Changes in v4:
->>        - Divide the patch in 2 distinct parts
->>    Changes in v3:
->>        - Fix condition to compile cpu_hotplug.o
->>    Changes in v2:
->>        - Don't compile xen/cpu_hotplug.o with ARM64
->> ---
->> drivers/xen/Makefile |    3 +--
->> 1 file changed, 1 insertion(+), 2 deletions(-)
->>
->> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
->> index a609353..f185e8d 100644
->> --- a/drivers/xen/Makefile
->> +++ b/drivers/xen/Makefile
->> @@ -1,9 +1,8 @@
->> ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
->> -obj-y	+= manage.o
->> obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
->> endif
->> obj-$(CONFIG_X86)			+= fallback.o
->> -obj-y	+= grant-table.o features.o events.o balloon.o time.o
->> +obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
->> obj-y	+= xenbus/
->>
->> nostackp := $(call cc-option, -fno-stack-protector)
-> 
-> The patch looks Ok but the description is off.  Power management is the term used for cpu freq,  C states and P states. While this patch touches none of that. 
-> 
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-What about : "Enable lifecycle (reboot, shutdown) management from the
-toolstack for ARM guest"?
+Currently different drivers requiring to access cpu device node are
+parsing the device tree themselves. Since the ordering in the DT need
+not match the logical cpu ordering, the parsing logic needs to consider
+that. However, this has resulted in lots of code duplication and in some
+cases even incorrect logic.
 
+It's better to consolidate them by adding support for getting cpu
+device node for a given logical cpu index in DT core library. However
+logical to physical index mapping can be architecture specific.
+
+This patch adds of_get_cpu_node to retrieve a cpu device node for a
+given logical cpu index. The default matching of the physical id to the
+logical cpu index can be overridden by architecture specific code.
+
+It is recommended to use these helper function only in pre-SMP/early
+initialisation stages to retrieve CPU device node pointers in logical
+ordering. Once the cpu devices are registered, it can be retrieved easily
+from cpu device of_node which avoids unnecessary parsing and matching.
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ drivers/of/base.c   | 73 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/cpu.h |  1 +
+ include/linux/of.h  |  6 +++++
+ 3 files changed, 80 insertions(+)
+
+----------------->8--------------------------
+Hi Nico,
+
+I found include/linux/cpu.h is more appropriate for this.
+Is that fine ?
+
+Regards,
+Sudeep
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 5c54279..052b4b2 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -18,6 +18,7 @@
+  *      2 of the License, or (at your option) any later version.
+  */
+ #include <linux/ctype.h>
++#include <linux/cpu.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/spinlock.h>
+@@ -230,6 +231,78 @@ const void *of_get_property(const struct device_node *np, const char *name,
+ }
+ EXPORT_SYMBOL(of_get_property);
+ 
++/*
++ * arch_match_cpu_phys_id - Match the given logical CPU and physical id
++ *
++ * @cpu: logical index of a cpu
++ * @phys_id: physical identifier of a cpu
++ *
++ * CPU logical to physical index mapping is architecture specific.
++ * However this __weak function provides a default match of physical
++ * id to logical cpu index.
++ *
++ * Returns true if the physical identifier and the logical index correspond
++ * to the same cpu, false otherwise.
++ */
++bool __weak arch_match_cpu_phys_id(int cpu, u64 phys_id)
++{
++	return (u32)phys_id == cpu;
++}
++
++/**
++ * of_get_cpu_node - Get device node associated with the given logical CPU
++ *
++ * @cpu: CPU number(logical index) for which device node is required
++ *
++ * The main purpose of this function is to retrieve the device node for the
++ * given logical CPU index. It should be used to initialize the of_node in
++ * cpu device. Once of_node in cpu device is populated, all the further
++ * references can use that instead.
++ *
++ * CPU logical to physical index mapping is architecture specific and is built
++ * before booting secondary cores. This function uses arch_match_cpu_phys_id
++ * which can be overridden by architecture specific implementation.
++ *
++ * Returns a node pointer for the logical cpu if found, else NULL.
++ */
++struct device_node *of_get_cpu_node(int cpu)
++{
++	struct device_node *cpun, *cpus;
++	const __be32 *cell;
++	u64 hwid;
++	int ac, prop_len;
++
++	cpus = of_find_node_by_path("/cpus");
++	if (!cpus) {
++		pr_warn("Missing cpus node, bailing out\n");
++		return NULL;
++	}
++
++	if (of_property_read_u32(cpus, "#address-cells", &ac)) {
++		pr_warn("%s: missing #address-cells\n", cpus->full_name);
++		ac = of_n_addr_cells(cpus);
++	}
++
++	for_each_child_of_node(cpus, cpun) {
++		if (of_node_cmp(cpun->type, "cpu"))
++			continue;
++		cell = of_get_property(cpun, "reg", &prop_len);
++		if (!cell) {
++			pr_warn("%s: missing reg property\n", cpun->full_name);
++			continue;
++		}
++		prop_len /= sizeof(*cell);
++		while (prop_len) {
++			hwid = of_read_number(cell, ac);
++			prop_len -= ac;
++			if (arch_match_cpu_phys_id(cpu, hwid))
++				return cpun;
++		}
++	}
++
++	return NULL;
++}
++
+ /** Checks if the given "compat" string matches one of the strings in
+  * the device's "compatible" property
+  */
+diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+index ab0eade..d0c8204 100644
+--- a/include/linux/cpu.h
++++ b/include/linux/cpu.h
+@@ -34,6 +34,7 @@ extern void cpu_remove_dev_attr(struct device_attribute *attr);
+ 
+ extern int cpu_add_dev_attr_group(struct attribute_group *attrs);
+ extern void cpu_remove_dev_attr_group(struct attribute_group *attrs);
++extern bool arch_match_cpu_phys_id(int cpu, u64 phys_id);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+ extern void unregister_cpu(struct cpu *cpu);
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 1fd08ca..9e82812 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -266,6 +266,7 @@ extern int of_device_is_available(const struct device_node *device);
+ extern const void *of_get_property(const struct device_node *node,
+ 				const char *name,
+ 				int *lenp);
++extern struct device_node *of_get_cpu_node(int cpu);
+ #define for_each_property_of_node(dn, pp) \
+ 	for (pp = dn->properties; pp != NULL; pp = pp->next)
+ 
+@@ -459,6 +460,11 @@ static inline const void *of_get_property(const struct device_node *node,
+ 	return NULL;
+ }
+ 
++static inline struct device_node *of_get_cpu_node(int cpu)
++{
++	return NULL;
++}
++
+ static inline int of_property_read_u64(const struct device_node *np,
+ 				       const char *propname, u64 *out_value)
+ {
 -- 
-Julien
+1.8.1.2
