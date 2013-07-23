@@ -1,72 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 23 Jul 2013 15:38:26 +0800
-Subject: [PATCH] ARM: dts: imx: ocram size is different between imx6q and
- imx6dl
-Message-ID: <1374565107-9658-1-git-send-email-shawn.guo@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Jul 2013 08:52:32 +0100
+Subject: [PATCH 19/22] ARM: shmobile: r8a7779: Remove '0x's from R8A7779
+ DTS file
+In-Reply-To: <20130723013343.GG16481@verge.net.au>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-19-git-send-email-lee.jones@linaro.org>
+ <20130723013343.GG16481@verge.net.au>
+Message-ID: <20130723075232.GD26801@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ocram on imx6q is 256 KiB while on imx6dl it's 128 KiB.  Let's
-have separate node for imx6q and imx6dl.  It also changes imx6q size
-0x3f000 to 0x40000 to match the hardware.
+On Tue, 23 Jul 2013, Simon Horman wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx6dl.dtsi  |    6 ++++++
- arch/arm/boot/dts/imx6q.dtsi   |    6 ++++++
- arch/arm/boot/dts/imx6qdl.dtsi |    6 ------
- 3 files changed, 12 insertions(+), 6 deletions(-)
+> On Mon, Jul 22, 2013 at 11:52:38AM +0100, Lee Jones wrote:
+> > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Let me know if you want me to take this through the renesas tree.
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index e9cb589..9e8ae11 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -32,6 +32,12 @@
- 	};
- 
- 	soc {
-+		ocram: sram at 00900000 {
-+			compatible = "mmio-sram";
-+			reg = <0x00900000 0x20000>;
-+			clocks = <&clks 142>;
-+		};
-+
- 		aips1: aips-bus at 02000000 {
- 			iomuxc: iomuxc at 020e0000 {
- 				compatible = "fsl,imx6dl-iomuxc";
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 76a84e8..f024ef2 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -61,6 +61,12 @@
- 	};
- 
- 	soc {
-+		ocram: sram at 00900000 {
-+			compatible = "mmio-sram";
-+			reg = <0x00900000 0x40000>;
-+			clocks = <&clks 142>;
-+		};
-+
- 		aips-bus at 02000000 { /* AIPS1 */
- 			spba-bus at 02000000 {
- 				ecspi5: ecspi at 02018000 {
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index bc4ca03..ccd55c2 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -99,12 +99,6 @@
- 			status = "disabled";
- 		};
- 
--		ocram: sram at 00900000 {
--			compatible = "mmio-sram";
--			reg = <0x00900000 0x3f000>;
--			clocks = <&clks 142>;
--		};
--
- 		timer at 00a00600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0x00a00600 0x20>;
+Thanks Simon. To save on conflicts, I think that's best.
+
+I will take all orphaned patches or ones without maintainers associated
+with them through ARM SoC, but if you can take it, please do.
+
+> > ---
+> >  arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> > index 7f146c6..86bd487 100644
+> > --- a/arch/arm/boot/dts/r8a7779.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> > @@ -65,7 +65,7 @@
+> >  		sense-bitfield-width = <2>;
+> >  	};
+> >  
+> > -	i2c0: i2c at 0xffc70000 {
+> > +	i2c0: i2c at ffc70000 {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <0>;
+> >  		compatible = "renesas,rmobile-iic";
+> > @@ -74,7 +74,7 @@
+> >  		interrupts = <0 79 0x4>;
+> >  	};
+> >  
+> > -	i2c1: i2c at 0xffc71000 {
+> > +	i2c1: i2c at ffc71000 {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <0>;
+> >  		compatible = "renesas,rmobile-iic";
+> > @@ -83,7 +83,7 @@
+> >  		interrupts = <0 82 0x4>;
+> >  	};
+> >  
+> > -	i2c2: i2c at 0xffc72000 {
+> > +	i2c2: i2c at ffc72000 {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <0>;
+> >  		compatible = "renesas,rmobile-iic";
+> > @@ -92,7 +92,7 @@
+> >  		interrupts = <0 80 0x4>;
+> >  	};
+> >  
+> > -	i2c3: i2c at 0xffc73000 {
+> > +	i2c3: i2c at ffc73000 {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <0>;
+> >  		compatible = "renesas,rmobile-iic";
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
