@@ -1,133 +1,153 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 10:09:06 +0200
-Subject: [PATCH v5] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <20130722092138.GB18731@e106331-lin.cambridge.arm.com>
-References: <1374221278-18204-1-git-send-email-jonas.jensen@gmail.com>
- <1374221837-23773-1-git-send-email-jonas.jensen@gmail.com>
- <20130722092138.GB18731@e106331-lin.cambridge.arm.com>
-Message-ID: <2711657.Br6v071qBc@flatron>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 23 Jul 2013 17:09:26 +0900
+Subject: [PATCH v2] ARM: shmobile: Add lager defconfig
+Message-ID: <1374566966-30345-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 of July 2013 10:21:38 Mark Rutland wrote:
-> On Fri, Jul 19, 2013 at 09:17:17AM +0100, Jonas Jensen wrote:
-> > This patch adds MOXA ART SoCs clock driver support.
-> > 
-> > Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> > ---
-> > 
-> > Notes:
-> >     Changes since v4:
-> >     
-> >     1. remove unnecessary header includes
-> >     
-> >     Applies to next-20130716
-> >  
-> >  .../bindings/clock/moxa,moxart-core-clock.txt      | 23 ++++++++
-> >  drivers/clk/Makefile                               |  1 +
-> >  drivers/clk/clk-moxart.c                           | 69
-> >  ++++++++++++++++++++++ 3 files changed, 93 insertions(+)
-> >  create mode 100644
-> >  Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
-> >  create mode 100644 drivers/clk/clk-moxart.c
-> > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
-> > b/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
-> > new file mode 100644
-> > index 0000000..528c8b0
-> > --- /dev/null
-> > +++
-> > b/Documentation/devicetree/bindings/clock/moxa,moxart-core-clock.txt
-> > @@ -0,0 +1,23 @@
-> > +Device Tree Clock bindings for arch-moxart
-> > +
-> > +This binding uses the common clock binding[1].
-> > +
-> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +
-> > +MOXA ART SoCs allow to determine core clock frequencies by reading
-> > +a register.
-> > +
-> > +Required properties:
-> > +- compatible : Should be "moxa,moxart-core-clock"
-> > +- #clock-cells : Should be 0
-> > +- reg : Should contain registers location and length
-> > +- clock-output-names : Should be "coreclk"
-> > +
-> > +For example:
-> > +
-> > +	coreclk: core-clock at 98100000 {
-> > +		compatible = "moxa,moxart-core-clock";
-> > +		#clock-cells = <0>;
-> > +		reg = <0x98100000 0x34>;
-> > +		clock-output-names = "coreclk";
-> > +	};
-> > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> > index 4038c2b..933622f 100644
-> > --- a/drivers/clk/Makefile
-> > +++ b/drivers/clk/Makefile
-> > @@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
-> > 
-> >  # SoCs specific
-> >  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-> > 
-> > +obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
-> > 
-> >  obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
-> >  obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
-> >  obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
-> > 
-> > diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-> > new file mode 100644
-> > index 0000000..5559371
-> > --- /dev/null
-> > +++ b/drivers/clk/clk-moxart.c
-> > @@ -0,0 +1,69 @@
-> > +/*
-> > + * MOXA ART SoCs clock driver.
-> > + *
-> > + * Copyright (C) 2013 Jonas Jensen
-> > + *
-> > + * Jonas Jensen <jonas.jensen@gmail.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> > +
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/io.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/clkdev.h>
-> > +
-> > +void __init moxart_of_clk_init(struct device_node *node)
-> > +{
-> > +	static void __iomem *base;
-> > +	struct clk *clk;
-> > +	unsigned long rate;
-> > +	unsigned int mul, val, div;
-> > +	const char *name;
-> > +
-> > +	base = of_iomap(node, 0);
-> > +	if (IS_ERR(base))
-> > +		panic("%s: of_iomap failed\n", node->full_name);
-> 
-> As far as I'm aware, of_iomap returns NULL, not an ERR_PTR value.
-> 
-> Also, is it necessary to panic() ? In v1 of the patch you used pr_err...
+This is intended to be used until multi-arch is able to be
+used for the lager board at which time a more generic configuration
+will be used in place of this one.
 
-This is a good question in general, not only for this driver.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-IMHO if you know early that something is really wrong, to the point that 
-the system won't be able to work normally (and failing to initialize 
-clocks looks like it) it is better to let the user/developer know that 
-something is utterly wrong at this point without letting the system run 
-for a bit more and fail anyway with a harder to track down error message.
+---
 
-It's not so obvious, though, what kinds of failure should be considered 
-critical. IMHO any failure in low level initialization code, but this is 
-debatable, I guess.
+v2
+* Place defconfig in correct directory
+* Bump SERIAL_SH_SCI_NR_UARTS up to 10 to reflect the
+  number of devices present
+---
+ arch/arm/configs/lager_defconfig | 121 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 121 insertions(+)
+ create mode 100644 arch/arm/configs/lager_defconfig
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+new file mode 100644
+index 0000000..f9efae1
+--- /dev/null
++++ b/arch/arm/configs/lager_defconfig
+@@ -0,0 +1,121 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_R8A7790=y
++CONFIG_MACH_LAGER=y
++# CONFIG_SH_TIMER_TMU is not set
++# CONFIG_EM_TIMER_STI is not set
++# CONFIG_SWP_EMULATE is not set
++CONFIG_ARM_ERRATA_430973=y
++CONFIG_ARM_ERRATA_458693=y
++CONFIG_ARM_ERRATA_460075=y
++CONFIG_ARM_ERRATA_743622=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++# CONFIG_LOCAL_TIMERS is not set
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_FORCE_MAX_ZONEORDER=13
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_KEXEC=y
++CONFIG_AUTO_ZRELADDR=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_RUNTIME=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CORE is not set
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++CONFIG_SH_ETH=y
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=10
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
++CONFIG_I2C_SH_MOBILE=y
++CONFIG_GPIO_SH_PFC=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_RCAR=y
++# CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
++CONFIG_MMC_SH_MMCIF=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_SH_DMAE=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_ARM_UNWIND is not set
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
+-- 
+1.8.2.1
