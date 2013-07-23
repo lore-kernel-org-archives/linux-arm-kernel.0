@@ -1,115 +1,117 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 23 Jul 2013 11:54:37 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: Add support to parse 'main_clk' info from DT
+Date: Tue, 23 Jul 2013 11:54:38 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: Add support to parse optional clk info from
+ DT
 In-Reply-To: <1374560679-14666-1-git-send-email-rnayak@ti.com>
 References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
-Message-ID: <1374560679-14666-2-git-send-email-rnayak@ti.com>
+Message-ID: <1374560679-14666-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With clocks for OMAP moving to DT, its now possible to pass the 'main_clk'
+With clocks for OMAP moving to DT, its now possible to pass all optional clock
 data for each device from DT instead of having it in hwmod.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   34 +++++++++++++++++++++-------------
- 1 file changed, 21 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   66 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 64 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 5cc5123..12fa589 100644
+index 12fa589..e5c804b 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -728,14 +728,18 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
-  * functional clock pointer) if a main_clk is present.  Returns 0 on
-  * success or -EINVAL on error.
-  */
--static int _init_main_clk(struct omap_hwmod *oh)
-+static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
- {
- 	int ret = 0;
+@@ -805,6 +805,65 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+ 	return ret;
+ }
  
--	if (!oh->main_clk)
-+	if (!oh->main_clk && !of_get_property(np, "clocks", NULL))
- 		return 0;
- 
--	oh->_clk = clk_get(NULL, oh->main_clk);
-+	if (oh->main_clk)
-+		oh->_clk = clk_get(NULL, oh->main_clk);
-+	else
-+		oh->_clk = of_clk_get_by_name(np, "fck");
++static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
++				       struct device_node *np,
++				       int *opt_clks_cnt)
++{
++	int i, clks_cnt;
++	const char *clk_name;
++	const char **opt_clk_names;
 +
- 	if (IS_ERR(oh->_clk)) {
- 		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
- 			   oh->name, oh->main_clk);
-@@ -1561,7 +1565,8 @@ static int _init_clkdm(struct omap_hwmod *oh)
-  * Resolves all clock names embedded in the hwmod.  Returns 0 on
-  * success, or a negative error code on failure.
++	clks_cnt = of_property_count_strings(np, "clock-names");
++	if (!clks_cnt)
++		return NULL;
++
++	opt_clk_names = kzalloc(sizeof(char *)*clks_cnt, GFP_KERNEL);
++	if (!opt_clk_names)
++		return NULL;
++
++	for (i = 0; i < clks_cnt; i++) {
++		of_property_read_string_index(np, "clock-names", i, &clk_name);
++		if (!strcmp(clk_name, "fck"))
++			continue;
++		opt_clks_cnt++;
++		opt_clk_names[i] = clk_name;
++	}
++	return opt_clk_names;
++}
++
++static int _init_opt_clks_dt(struct omap_hwmod *oh, struct device_node *np)
++{
++	struct clk *c;
++	int i, opt_clks_cnt = 0;
++	int ret = 0;
++	const char **opt_clk_names;
++
++	opt_clk_names = _parse_opt_clks_dt(oh, np, &opt_clks_cnt);
++	if (!opt_clk_names)
++		return -EINVAL;
++
++	oh->opt_clks = kzalloc(sizeof(struct omap_hwmod_opt_clk *)
++			       * opt_clks_cnt, GFP_KERNEL);
++	if (!oh->opt_clks)
++		return -ENOMEM;
++
++	oh->opt_clks_cnt = opt_clks_cnt;
++
++	for (i = 0; i < oh->opt_clks_cnt; i++) {
++		c = of_clk_get_by_name(np, opt_clk_names[i]);
++		if (IS_ERR(c)) {
++			pr_warn("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
++				oh->name, opt_clk_names[i]);
++			ret = -EINVAL;
++		}
++		oh->opt_clks[i]._clk = c;
++		oh->opt_clks[i].role = opt_clk_names[i];
++		oh->opt_clks_cnt++;
++		clk_prepare(oh->opt_clks[i]._clk);
++	}
++	return ret;
++}
++
+ /**
+  * _init_opt_clk - get a struct clk * for the the hwmod's optional clocks
+  * @oh: struct omap_hwmod *
+@@ -812,13 +871,16 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+  * Called from _init_clocks().  Populates the @oh omap_hwmod_opt_clk
+  * clock pointers.  Returns 0 on success or -EINVAL on error.
   */
--static int _init_clocks(struct omap_hwmod *oh, void *data)
-+static int _init_clocks(struct omap_hwmod *oh, void *data,
-+			struct device_node *np)
+-static int _init_opt_clks(struct omap_hwmod *oh)
++static int _init_opt_clks(struct omap_hwmod *oh, struct device_node *np)
  {
+ 	struct omap_hwmod_opt_clk *oc;
+ 	struct clk *c;
+ 	int i;
  	int ret = 0;
  
-@@ -1573,7 +1578,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
- 	if (soc_ops.init_clkdm)
- 		ret |= soc_ops.init_clkdm(oh);
++	if (of_get_property(np, "clocks", NULL))
++		return _init_opt_clks_dt(oh, np);
++
+ 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
+ 		c = clk_get(NULL, oc->clk);
+ 		if (IS_ERR(c)) {
+@@ -1580,7 +1642,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data,
  
--	ret |= _init_main_clk(oh);
-+	ret |= _init_main_clk(oh, np);
+ 	ret |= _init_main_clk(oh, np);
  	ret |= _init_interface_clks(oh);
- 	ret |= _init_opt_clks(oh);
+-	ret |= _init_opt_clks(oh);
++	ret |= _init_opt_clks(oh, np);
  
-@@ -2361,11 +2366,11 @@ static struct device_node *of_dev_hwmod_lookup(struct device_node *np,
-  * are part of the device's address space can be ioremapped properly.
-  * No return value.
-  */
--static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
-+static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
-+				     struct device_node *np)
- {
- 	struct omap_hwmod_addr_space *mem;
- 	void __iomem *va_start = NULL;
--	struct device_node *np;
- 
- 	if (!oh)
- 		return;
-@@ -2381,12 +2386,10 @@ static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
- 			 oh->name);
- 
- 		/* Extract the IO space from device tree blob */
--		if (!of_have_populated_dt())
-+		if (!np)
- 			return;
- 
--		np = of_dev_hwmod_lookup(of_find_node_by_name(NULL, "ocp"), oh);
--		if (np)
--			va_start = of_iomap(np, 0);
-+		va_start = of_iomap(np, 0);
- 	} else {
- 		va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
- 	}
-@@ -2418,14 +2421,19 @@ static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
- static int __init _init(struct omap_hwmod *oh, void *data)
- {
- 	int r;
-+	struct device_node *np = NULL;
- 
- 	if (oh->_state != _HWMOD_STATE_REGISTERED)
- 		return 0;
- 
-+	/* If booting with DT, parse the DT node for IO space/clocks etc */
-+	if (of_have_populated_dt())
-+		np = of_dev_hwmod_lookup(of_find_node_by_name(NULL, "ocp"), oh);
-+
- 	if (oh->class->sysc)
--		_init_mpu_rt_base(oh, NULL);
-+		_init_mpu_rt_base(oh, NULL, np);
- 
--	r = _init_clocks(oh, NULL);
-+	r = _init_clocks(oh, NULL, np);
- 	if (r < 0) {
- 		WARN(1, "omap_hwmod: %s: couldn't init clocks\n", oh->name);
- 		return -EINVAL;
+ 	if (!ret)
+ 		oh->_state = _HWMOD_STATE_CLKS_INITED;
 -- 
 1.7.9.5
