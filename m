@@ -1,45 +1,32 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 23 Jul 2013 18:40:18 +0100
-Subject: updates for be8 patch series
-In-Reply-To: <CAA3XUr3h5C0oJVrN5iXsM=NFkLMz_Tssp28CysZfwMNS5KvO-Q@mail.gmail.com>
-References: <CAA3XUr3h5C0oJVrN5iXsM=NFkLMz_Tssp28CysZfwMNS5KvO-Q@mail.gmail.com>
-Message-ID: <51EEC002.9070808@codethink.co.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 23 Jul 2013 18:44:56 +0100
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <20130723173710.GB28284@kroah.com>
+References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
+ <51EE9EC0.6060905@ti.com> <20130723161846.GD2486@kroah.com>
+ <1446965.6APW5ZgLBW@amdc1227> <20130723173710.GB28284@kroah.com>
+Message-ID: <20130723174456.GM9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/07/13 18:24, Victor Kamensky wrote:
-> Hi Ben,
->
-> Wrt BE8 little endian instructions you will need to fix couple more places:
->      ftrace arch/arm/kernel/ftrace.c
->      kprobes arch/arm/kernel/kprobes.c
-> Also in big endian mode atomic64_xxx function will need fixes, otherwise
-> perf
-> counters will be truncated on max of 32bit values
->      atomic64 arch/arm/include/asm/atomic.h
+On Tue, Jul 23, 2013 at 10:37:11AM -0700, Greg KH wrote:
+> On Tue, Jul 23, 2013 at 06:50:29PM +0200, Tomasz Figa wrote:
 
-Hmm, thought ftrace already did the right endian-ness conversions,
-although it is possible it could have missed one.
+> > I fully agree that a simple, single string will not scale even in some, not 
+> > so uncommon cases, but there is already a lot of existing lookup solutions 
+> > over the kernel and so there is no point in introducing another one.
 
-The atomic instructions should work fine for BE8, they're using
-STRD which should be correct.
+> I'm trying to get _rid_ of lookup "solutions" and just use a real
+> pointer, as you should.  I'll go tackle those other ones after this one
+> is taken care of, to show how the others should be handled as well.
 
-> I've attached board independent (core) patch from my work that made
-> Pandaboard ES
-> kernel run in BE mode. You can check my version of fixes for above
-> issues in the
-> patch. Look for corresponding files changes. Please rework them
-> according to style
-> and rules of your patch series. Note the patch itself contains fixes for
-> few other
-> issues that already fixed in your series. I'll cross check and compare
-> individual
-> areas latter. I think you may find attached patch interesting as well,
-> it was developed
-> independent from yours but matches its very well.
-
->
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+What are the problems you are seeing with doing things with lookups?
+Having to write platform data for everything gets old fast and the code
+duplication is pretty tedious...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/5a9806af/attachment.sig>
