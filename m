@@ -1,38 +1,57 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 23 Jul 2013 16:42:18 +0100
-Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
-In-Reply-To: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
-References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 23 Jul 2013 08:44:39 -0700
+Subject: [PATCH V4 2/4] ARM: tegra114: Reprogram GIC CPU interface to
+ bypass IRQ on CPU PM entry
+In-Reply-To: <1374225926-26832-3-git-send-email-josephl@nvidia.com>
+References: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
+ <1374225926-26832-3-git-send-email-josephl@nvidia.com>
+Message-ID: <20130723154438.GA2864@dhcp-172-17-186-34.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The order of arguments in the call to vco_set() for the ICST clocks appears to
-have been switched in error, which results in the VCO not being initialised
-correctly. This in turn stops the integrated LCD on things like Integrator/CP
-from working correctly.
+On Fri, Jul 19, 2013 at 05:25:24PM +0800, Joseph Lo wrote:
+> There is a difference between GICv1 and v2 when CPU in power management
+> mode (aka CPU power down on Tegra). For GICv1, IRQ/FIQ interrupt lines
+> going to CPU are same lines which are also used for wake-interrupt.
+> Therefore, we cannot disable the GIC CPU interface if we need to use same
+> interrupts for CPU wake purpose. This creates a race condition for CPU
+> power off entry. Also, in GICv1, disabling GICv1 CPU interface puts GICv1
+> into bypass mode such that incoming legacy IRQ/FIQ are sent to CPU, which
+> means disabling GIC CPU interface doesn't really disable IRQ/FIQ to CPU.
+> 
+> GICv2 provides a wake IRQ/FIQ (for wake-event purpose), which are not
+> disabled by GIC CPU interface. This is done by adding a bypass override
+> capability when the interrupts are disabled at the CPU interface. To
+> support this, there are four bits about IRQ/FIQ BypassDisable in CPU
+> interface Control Register. When the IRQ/FIQ not being driver by the
+> CPU interface, each interrupt output signal can be deasserted rather
+> than being driven by the legacy interrupt input.
+> 
+> So the wake-event can be used as wakeup signals to SoC (system power
+> controller).
+> 
+> To prevent race conditions and ensure proper interrupt routing on
+> Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
+> call-back to reprogram the GIC CPU interface on PM entry. The
+> GIC CPU interface will be reset back to its normal state by
+> the common GIC CPU PM exit callback when the CPU wakes up.
+> 
+> Based on the work by: Scott Williams <scwilliams@nvidia.com>
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 
-This patch fixes the order and restores the expected functionality.
+Hi Joseph,
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
----
- drivers/clk/versatile/clk-icst.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We've had a rather long-standing issue with PCIe and MSI related to LP2
+on Tegra20. I wonder if that's somehow related to this. Given that this
+is marked as Tegra114 patch explicitly I suppose not, but it certainly
+sounds very similar to the description above.
 
-diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-index 67ccf4a..f5e4c21 100644
---- a/drivers/clk/versatile/clk-icst.c
-+++ b/drivers/clk/versatile/clk-icst.c
-@@ -107,7 +107,7 @@ static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	vco = icst_hz_to_vco(icst->params, rate);
- 	icst->rate = icst_hz(icst->params, vco);
--	vco_set(icst->vcoreg, icst->lockreg, vco);
-+	vco_set(icst->lockreg, icst->vcoreg, vco);
- 	return 0;
- }
- 
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/8bc7f376/attachment.sig>
