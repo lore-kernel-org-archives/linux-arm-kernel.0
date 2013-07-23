@@ -1,40 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 22 Jul 2013 19:50:48 -0700
-Subject: [GIT PULL] DaVinci fixes for v3.11-rc2
-In-Reply-To: <51E572A9.2080201@ti.com>
-References: <51E572A9.2080201@ti.com>
-Message-ID: <20130723025048.GC15637@quad.lixom.net>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 23 Jul 2013 08:23:57 +0530
+Subject: [PATCH v2 0/6] clk: exynos: Some fixes and cleanup
+In-Reply-To: <20130722180515.7598.56428@quantum>
+References: <1374141682-29432-1-git-send-email-sachin.kamat@linaro.org>
+ <20130722180515.7598.56428@quantum>
+Message-ID: <CAK9yfHziN=_vw-JtMTf_58L-5YrGo1j-A35Lt5TKaQHOj_wv1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 09:49:53PM +0530, Sekhar Nori wrote:
-> Hi Arnd, Olof,
-> 
-> Can you please pull the following fixes for v3.11-rc2?
-> 
-> Thanks,
-> Sekhar
-> 
-> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
-> 
->   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.11-rc2
-> 
-> for you to fetch changes up to cf690331642010a837c026088588761f61528ddf:
-> 
->   ARM: davinci: defconfig: enable EDMA driver (2013-07-16 20:39:39 +0530)
-> 
-> ----------------------------------------------------------------
-> DaVinci fixes for v3.11-rc2
-> 
-> The pull request includes fixes for sparse
-> warnings, defconfig changes to enable DMA
-> usage on peripherals and removal of a duplicated
-> include file.
+On 22 July 2013 23:35, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Sachin Kamat (2013-07-18 03:01:16)
+>> Resending some of patches (1, 3 and 5) as per discussion in thread [1].
+>> Other patches in the series are new.
+>>
+>> [1] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
+>>
+>> Changes since v1:
+>> * Removed an unnecessary change in Patch 1 as pointed out by Kukjin Kim.
+>> * Added Kukjin's ack to patches 3~6.
+>
+> Thanks for the fixes! Will take into clk-next unless you need them to go
+> into -rc3, but I don't think there are any regression fixes here.
 
-Pulled, thanks.
+Not at all. They can all go in for 3.12.
+Thanks.
 
--Olof
+-- 
+With warm regards,
+Sachin
