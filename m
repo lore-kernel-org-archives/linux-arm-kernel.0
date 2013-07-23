@@ -1,82 +1,171 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 23 Jul 2013 14:12:09 +0200
-Subject: scatterlist: sg_set_buf() argument must be in linear mapping
- (sha1: ac4e97abce9b80c020e7113325f49e58b7b15e3f)
-In-Reply-To: <20130723103704.GS24642@n2100.arm.linux.org.uk>
-References: <51E64C6B.3080306@monstr.eu> <87siz7xt4z.fsf@rustcorp.com.au>
- <51ED2C74.7050502@monstr.eu> <87ppua9feh.fsf@rustcorp.com.au>
- <20130723103704.GS24642@n2100.arm.linux.org.uk>
-Message-ID: <51EE7319.408@monstr.eu>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Tue, 23 Jul 2013 21:13:04 +0900
+Subject: [PATCH] iommu/exynos: add devices attached to the System MMU to an
+ IOMMU group
+In-Reply-To: <00e601ce8796$bdca50c0$395ef240$%dae@samsung.com>
+References: <1374573694-30595-1-git-send-email-a.motakis@virtualopensystems.com>
+ <00d701ce878f$da099fe0$8e1cdfa0$%dae@samsung.com>
+ <CAG8rG2wNG9wVjKxtaDzLRybvh3wPVR08j9G9OPcK=a2Gwbtg-g@mail.gmail.com>
+ <00e601ce8796$bdca50c0$395ef240$%dae@samsung.com>
+Message-ID: <002901ce879d$fbec5db0$f3c51910$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 12:37 PM, Russell King - ARM Linux wrote:
-> On Tue, Jul 23, 2013 at 12:00:30PM +0930, Rusty Russell wrote:
->> Michal Simek <monstr@monstr.eu> writes:
->>> Let me take some code from virtio_rpmsg_bus.c to show that problematic part.
->>>
->>> bufs_va = dma_alloc_coherent(vdev->dev.parent->parent,
->>> 				RPMSG_TOTAL_BUF_SPACE,
->>> 				&vrp->bufs_dma, GFP_KERNEL);
->>> vrp->rbufs = bufs_va;
->>> for (i = 0; i < RPMSG_NUM_BUFS / 2; i++) {
->>> 	struct scatterlist sg;
->>> 	void *cpu_addr = vrp->rbufs + i * RPMSG_BUF_SIZE;
->>>
->>> 	sg_init_one(&sg, cpu_addr, RPMSG_BUF_SIZE);
->>> }
->>
->> Hmm.  Looking at arch/arm/include/asm/memory.h:
->>
->> #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
->> #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
->>
->> pfn_to_page in ARM seems to be the asm-generic one, which depends on
->> CONFIG_SPARSEMEM/CONFIG_DISCONTIGMEM/CONFIG_FLATMEM etc.
->>
->> Perhaps virt_addr_valid() is wrong for your config?  It's pretty clear
->> that you shouldn't call virt_to_page() on something for which
->> !virt_addr_valid().
+> -----Original Message-----
+> From: Inki Dae [mailto:inki.dae at samsung.com]
+> Sent: Tuesday, July 23, 2013 8:21 PM
 > 
-> The above code fragment is just wrong.  You can't make any assumptions about
-> the memory returned from dma_alloc_coherent(), because:
+> > -----Original Message-----
+> > From: Antonios Motakis [mailto:a.motakis at virtualopensystems.com]
+> > Sent: Tuesday, July 23, 2013 8:00 PM
+> > To: Inki Dae
+> > Cc: Linux ARM Kernel; Linux IOMMU; Linux Samsung SOC; kvm-arm; Cho
+> KyongHo;
+> > Joerg Roedel; Sachin Kamat; Jiri Kosina; Wei Yongjun; open list
+> > Subject: Re: [PATCH] iommu/exynos: add devices attached to the System MMU
+> > to an IOMMU group
+> >
+> > On Tue, Jul 23, 2013 at 12:31 PM, Inki Dae <inki.dae@samsung.com> wrote:
+> > >
+> > >
+> > >
+> > > > -----Original Message-----
+> > > > From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-
+> > soc-
+> > > > owner at vger.kernel.org] On Behalf Of Antonios Motakis
+> > > > Sent: Tuesday, July 23, 2013 7:02 PM
+> > > > To: linux-arm-kernel at lists.infradead.org;
+> > > iommu at lists.linux-foundation.org;
+> > > > linux-samsung-soc at vger.kernel.org
+> > > > Cc: kvmarm at lists.cs.columbia.edu; Antonios Motakis; Cho KyongHo; Joerg
+> > > > Roedel; Sachin Kamat; Jiri Kosina; Wei Yongjun; open list
+> > > > Subject: [PATCH] iommu/exynos: add devices attached to the System MMU
+> > to
+> > > > an IOMMU group
+> > > >
+> > > > IOMMU groups are expected by certain users of the IOMMU API,
+> > > > e.g. VFIO. Since each device is behind its own System MMU, we
+> > > > can allocate a new IOMMU group for each device.
+> > > >
+> > > > This patch depends on Cho KyongHo's patch series titled "[PATCH v7
+> > 00/12]
+> > > > iommu/exynos: Fixes and Enhancements of System MMU driver with DT",
+> > > > applied on a Linux 3.10.1 kernel. It has been tested on the Arndale
+> > board.
+> > > >
+> > > > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> > > > ---
+> > > >  drivers/iommu/exynos-iommu.c | 24 ++++++++++++++++++++++++
+> > > >  1 file changed, 24 insertions(+)
+> > > >
+> > > > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-
+> > iommu.c
+> > > > index 51d43bb..9f39eaa 100644
+> > > > --- a/drivers/iommu/exynos-iommu.c
+> > > > +++ b/drivers/iommu/exynos-iommu.c
+> > > > @@ -1134,6 +1134,28 @@ static phys_addr_t
+> > exynos_iommu_iova_to_phys(struct
+> > > > iommu_domain *domain,
+> > > >       return phys;
+> > > >  }
+> > > >
+> > > > +static int exynos_iommu_add_device(struct device *dev)
+> > > > +{
+> > > > +     struct iommu_group *group;
+> > > > +     int ret;
+> > > > +
+> > > > +     group = iommu_group_alloc();
+> > >
+> > > Is that correct? I don't see why you allocate a group object every time
+> > > add_device callback is called. That doesn't have any meaning we have to
+> > use
+> > > iommu group feature. I think the implementation should be one more
+> > devices
+> > > per a group. So I guess a given device object should be wrapped by
+> > higher
+> > > device object than the given device object. For a good example, you can
+> > > refer to intel-iommu.c file.
+> >
+> > With an Intel IOMMU it can be the case that 2 devices have to share
+> > the same IOMMU mappings (i.e. you can't program them separately). With
+> > the Exynos System MMU, there is always one System MMU per device, so
+> > there is nothing stopping you from programming any 2 devices' mappings
+> > differently. So yes, the right thing to do here is to have a one to
+> > one relationship between devices and IOMMU groups.
 > 
-> - On x86, it is kernel direct mapped memory, where things like
->   virt_to_phys(cpuaddr) will work fine with it.
+> In case of Exynos drm driver, a unified iommu mapping table is used for all
+> devices (fimd, g2d, hdmi, fimc, gsc, rotator) based on drm so they use the
+> same iommu mapping table even though they have each iommu hardware unit. And
+> the iommu mapping table is just logical data structure for hardware
+> translation process by each DMA. Actually, I am considering using iommu
+> group feature for more generic implementation.
 > 
-> - On any architecture which needs to remap memory to make it coherent
->   with the DMA device, the key word there is "remap" - it's not kernel
->   direct mapped memory, and virt_to_phys(cpuaddr) on it is illegal.
+> And one question. Why do you allocate a iommu group object if we should have
+> one to one relationship between devices and iommu groups? In this case, is
+> there any reason you have to use the iommu group object?
 > 
-> The only valid operation with scatterlists and such memory returned from
-> dma_alloc_coherent() is:
+> Thanks,
+> Inki Dae
 > 
-> 	sg_dma_address(sg) = dma_address;
-> 	sg_dma_len(sg) = dma_length;
-> 
-> and not to use the virtual address(es) at all in the scatterlist.  And
-> it is very very important to realise that you must not mix the streaming
-> and coherent DMA APIs - you must never pass coherent memory into the
-> dma_map_* functions.
+Antonios,
 
-Ohad: This code is probably yours and you know the whole history of it.
-Can you please comment it?
+Your patch always creates new iommu group whenever .add_device() is called,
+which results in memory leak. You need to check if the given device is already
+involved in an iommu group.
 
-Thanks,
-Michal
+BTW, I will post new patchset in a few days.
+It will not be such different from previous one and your patch
+will be rebased on that in a trivial manner.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Regards,
+Cho KyongHo
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/e40ca146/attachment.sig>
+> >
+> > (resending because of html mail)
+> >
+> > Cheers,
+> > Antonios
+> >
+> > >
+> > >
+> > > Thanks,
+> > > Inki Dae
+> > >
+> > > > +     if (IS_ERR(group)) {
+> > > > +             dev_err(dev, "Failed to allocate IOMMU group\n");
+> > > > +             return PTR_ERR(group);
+> > > > +     }
+> > > > +
+> > > > +     ret = iommu_group_add_device(group, dev);
+> > > > +     iommu_group_put(group);
+> > > > +
+> > > > +     return ret;
+> > > > +}
+> > > > +
+> > > > +static void exynos_iommu_remove_device(struct device *dev)
+> > > > +{
+> > > > +     iommu_group_remove_device(dev);
+> > > > +}
+> > > > +
+> > > >  static struct iommu_ops exynos_iommu_ops = {
+> > > >       .domain_init = &exynos_iommu_domain_init,
+> > > >       .domain_destroy = &exynos_iommu_domain_destroy,
+> > > > @@ -1142,6 +1164,8 @@ static struct iommu_ops exynos_iommu_ops = {
+> > > >       .map = &exynos_iommu_map,
+> > > >       .unmap = &exynos_iommu_unmap,
+> > > >       .iova_to_phys = &exynos_iommu_iova_to_phys,
+> > > > +     .add_device     = exynos_iommu_add_device,
+> > > > +     .remove_device  = exynos_iommu_remove_device,
+> > > >       .pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+> > > >  };
+> > > >
+> > > > --
+> > > > 1.8.1.2
+> > > >
+> > > > --
+> > > > To unsubscribe from this list: send the line "unsubscribe linux-
+> > samsung-
+> > > > soc" in
+> > > > the body of a message to majordomo at vger.kernel.org
+> > > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > >
