@@ -1,35 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Jul 2013 11:01:24 +0100
-Subject: [PATCH 0/3] arm/arm64: a trio of boot mode detection fixes
-In-Reply-To: <20130718162501.GA20870@e106331-lin.cambridge.arm.com>
-References: <1373379366-15689-1-git-send-email-mark.rutland@arm.com>
- <51E8091A.5040302@arm.com>
- <20130718162501.GA20870@e106331-lin.cambridge.arm.com>
-Message-ID: <20130723100122.GA3748@MacBook-Pro.local>
+From: a.motakis@virtualopensystems.com (Antonios Motakis)
+Date: Tue, 23 Jul 2013 12:01:32 +0200
+Subject: [PATCH] iommu/exynos: add devices attached to the System MMU to an
+ IOMMU group
+Message-ID: <1374573694-30595-1-git-send-email-a.motakis@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 05:25:01PM +0100, Mark Rutland wrote:
-> On Thu, Jul 18, 2013 at 04:26:18PM +0100, Marc Zyngier wrote:
-> > On 09/07/13 15:16, Mark Rutland wrote:
-> > > The following patches fix a couple of issues in the boot mode detection
-> > > code where in the case of mismatched boot modes we can corrupt a small
-> > > portion of memory or fail to detect the fact we've booted CPUs with
-> > > mismatched modes due to the boot mode being logged incoherently.
-> > 
-> > Sorry for the delay in replying to this. The whole series looks good to
-> > me, so: Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Cheers.
-> 
-> Russell,
-> I've dropped the first two patches into the patch system as 7786/1 and
-> 7787/1.
-> 
-> Catalin,
-> Are you happy to pick up the third patch?
+IOMMU groups are expected by certain users of the IOMMU API,
+e.g. VFIO. Since each device is behind its own System MMU, we
+can allocate a new IOMMU group for each device.
 
-Yes. Thanks.
+This patch depends on Cho KyongHo's patch series titled "[PATCH v7 00/12]
+iommu/exynos: Fixes and Enhancements of System MMU driver with DT",
+applied on a Linux 3.10.1 kernel. It has been tested on the Arndale board.
 
+Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+---
+ drivers/iommu/exynos-iommu.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 51d43bb..9f39eaa 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -1134,6 +1134,28 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	return phys;
+ }
+ 
++static int exynos_iommu_add_device(struct device *dev)
++{
++	struct iommu_group *group;
++	int ret;
++
++	group = iommu_group_alloc();
++	if (IS_ERR(group)) {
++		dev_err(dev, "Failed to allocate IOMMU group\n");
++		return PTR_ERR(group);
++	}
++
++	ret = iommu_group_add_device(group, dev);
++	iommu_group_put(group);
++
++	return ret;
++}
++
++static void exynos_iommu_remove_device(struct device *dev)
++{
++	iommu_group_remove_device(dev);
++}
++
+ static struct iommu_ops exynos_iommu_ops = {
+ 	.domain_init = &exynos_iommu_domain_init,
+ 	.domain_destroy = &exynos_iommu_domain_destroy,
+@@ -1142,6 +1164,8 @@ static struct iommu_ops exynos_iommu_ops = {
+ 	.map = &exynos_iommu_map,
+ 	.unmap = &exynos_iommu_unmap,
+ 	.iova_to_phys = &exynos_iommu_iova_to_phys,
++	.add_device	= exynos_iommu_add_device,
++	.remove_device	= exynos_iommu_remove_device,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+ };
+ 
 -- 
-Catalin
+1.8.1.2
