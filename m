@@ -1,74 +1,18 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 Jul 2013 08:52:32 +0100
-Subject: [PATCH 19/22] ARM: shmobile: r8a7779: Remove '0x's from R8A7779
- DTS file
-In-Reply-To: <20130723013343.GG16481@verge.net.au>
+Date: Tue, 23 Jul 2013 08:53:09 +0100
+Subject: [PATCH 06/22] ARM: dts: bcm281xx: Remove '0x's from BCM11351 DTS
+ file
+In-Reply-To: <51EDAC90.6010108@broadcom.com>
 References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-19-git-send-email-lee.jones@linaro.org>
- <20130723013343.GG16481@verge.net.au>
-Message-ID: <20130723075232.GD26801@laptop>
+ <1374490361-25769-6-git-send-email-lee.jones@linaro.org>
+ <51EDAC90.6010108@broadcom.com>
+Message-ID: <20130723075309.GE26801@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jul 2013, Simon Horman wrote:
+> Acked-by: Christian Daudt <csd@broadcom.com>
 
-> On Mon, Jul 22, 2013 at 11:52:38AM +0100, Lee Jones wrote:
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Let me know if you want me to take this through the renesas tree.
-
-Thanks Simon. To save on conflicts, I think that's best.
-
-I will take all orphaned patches or ones without maintainers associated
-with them through ARM SoC, but if you can take it, please do.
-
-> > ---
-> >  arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> > index 7f146c6..86bd487 100644
-> > --- a/arch/arm/boot/dts/r8a7779.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> > @@ -65,7 +65,7 @@
-> >  		sense-bitfield-width = <2>;
-> >  	};
-> >  
-> > -	i2c0: i2c at 0xffc70000 {
-> > +	i2c0: i2c at ffc70000 {
-> >  		#address-cells = <1>;
-> >  		#size-cells = <0>;
-> >  		compatible = "renesas,rmobile-iic";
-> > @@ -74,7 +74,7 @@
-> >  		interrupts = <0 79 0x4>;
-> >  	};
-> >  
-> > -	i2c1: i2c at 0xffc71000 {
-> > +	i2c1: i2c at ffc71000 {
-> >  		#address-cells = <1>;
-> >  		#size-cells = <0>;
-> >  		compatible = "renesas,rmobile-iic";
-> > @@ -83,7 +83,7 @@
-> >  		interrupts = <0 82 0x4>;
-> >  	};
-> >  
-> > -	i2c2: i2c at 0xffc72000 {
-> > +	i2c2: i2c at ffc72000 {
-> >  		#address-cells = <1>;
-> >  		#size-cells = <0>;
-> >  		compatible = "renesas,rmobile-iic";
-> > @@ -92,7 +92,7 @@
-> >  		interrupts = <0 80 0x4>;
-> >  	};
-> >  
-> > -	i2c3: i2c at 0xffc73000 {
-> > +	i2c3: i2c at ffc73000 {
-> >  		#address-cells = <1>;
-> >  		#size-cells = <0>;
-> >  		compatible = "renesas,rmobile-iic";
+Thanks Christian, for both.
 
 -- 
 Lee Jones
