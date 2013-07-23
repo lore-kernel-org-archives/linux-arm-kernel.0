@@ -1,37 +1,64 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Tue, 23 Jul 2013 09:57:17 +0200
-Subject: [PATCH] ARM: S3C24XX: Add missing clkdev entries for s3c2440 UART
-In-Reply-To: <1374435765-6747-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1374435765-6747-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <201307230957.17329.jbe@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 23 Jul 2013 15:58:24 +0800
+Subject: [PATCH] ARM: imx: add ocram clock for imx53
+Message-ID: <1374566304-13488-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 21 July 2013 21:42:45 Sylwester Nawrocki wrote:
-> This patch restores serial port operation which has been broken since
-> commit 60e93575476f90a72146b51283f514da655410a7
-> serial: samsung: enable clock before clearing pending interrupts during
-> init
->
-> That commit only uncovered the real issue which was missing clkdev
-> entries for the "uart" clocks on S3C2440. It went unnoticed so far
-> because return value of clk API calls were not being checked at all
-> in the samsung serial port driver.
->
-> This patch should be backported to at least 3.10 stable kernel, since
-> the serial port has not been working on s3c2440 since 3.10-rc5.
->
-> Cc: Chander Kashyap <chander.kashyap@linaro.org>
-> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-> [on S3C2440 SoC based Mini2440 board]
-> Tested-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
->
-> [...]
+Add missing ocram gate clock for imx53 and also represent it in device
+tree ocram node.
 
-Tested-by: Juergen Beisert <jbe@pengutronix.de>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ .../devicetree/bindings/clock/imx5-clock.txt       |    1 +
+ arch/arm/boot/dts/imx53.dtsi                       |    1 +
+ arch/arm/mach-imx/clk-imx51-imx53.c                |    3 ++-
+ 3 files changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
+index f46f562..4c029a8 100644
+--- a/Documentation/devicetree/bindings/clock/imx5-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
+@@ -197,6 +197,7 @@ clocks and IDs.
+ 	spdif0_gate		183
+ 	spdif1_gate		184
+ 	spdif_ipg_gate		185
++	ocram			186
+ 
+ Examples (for mx53):
+ 
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 44a0170..4307e80 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -1121,6 +1121,7 @@
+ 		ocram: sram at f8000000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0xf8000000 0x20000>;
++			clocks = <&clks 186>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 9afac26..1a56a33 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -119,7 +119,7 @@ enum imx5_clks {
+ 	srtc_gate, pata_gate, sata_gate, spdif_xtal_sel, spdif0_sel,
+ 	spdif1_sel, spdif0_pred, spdif0_podf, spdif1_pred, spdif1_podf,
+ 	spdif0_com_s, spdif1_com_sel, spdif0_gate, spdif1_gate, spdif_ipg_gate,
+-	clk_max
++	ocram, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -506,6 +506,7 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 				mx53_can_sel, ARRAY_SIZE(mx53_can_sel));
+ 	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR6, 22);
+ 	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR6, 20);
++	clk[ocram] = imx_clk_gate2("ocram", "ahb", MXC_CCM_CCGR6, 2);
+ 	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 8);
+ 	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 6);
+ 	clk[i2c3_gate] = imx_clk_gate2("i2c3_gate", "per_root", MXC_CCM_CCGR1, 22);
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| Phone: +49-5121-206917-5128 |
-Peiner Str. 6-8, 31137 Hildesheim, Germany ? ?| Fax: ? +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? ? ?| http://www.pengutronix.de/ ?|
+1.7.9.5
