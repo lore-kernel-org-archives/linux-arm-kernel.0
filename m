@@ -1,216 +1,92 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 23 Jul 2013 10:05:39 +0800
-Subject: [PATCH V2] USB: EHCI: make ehci-w90X900 a separate driver
-In-Reply-To: <1374488380-26428-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
- <1374488380-26428-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <CAKT61h_fdTHH=K2-6oHM4L+Ec6h2zRjS19gDKOZVyv2BCrpJhA@mail.gmail.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Tue, 23 Jul 2013 11:15:00 +0900
+Subject: [PATCH] decompressors: fix "no limit" output buffer length
+In-Reply-To: <1374516481.14712.3.camel@linaro1.home>
+References: <1374476169-32194-1-git-send-email-acourbot@nvidia.com>
+ <1374516481.14712.3.camel@linaro1.home>
+Message-ID: <51EDE724.5020507@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/22 Manjunath Goudar <manjunath.goudar@linaro.org>:
-> Separate the W90X900(W90P910) on-chip host controller driver from
-> ehci-hcd host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> however, note that other changes are still needed before W90X900(W90P910)
-> can be booted with a multi-platform kernel
+On 07/23/2013 03:08 AM, Jon Medhurst (Tixy) wrote:
+> On Mon, 2013-07-22 at 15:56 +0900, Alexandre Courbot wrote:
+>> When decompressing into memory, the output buffer length is set to some
+>> arbitrarily high value (0x7fffffff) to indicate the output is,
+>> virtually, unlimited in size.
+>>
+>> The problem with this is that some platforms have their physical memory
+>> at high physical addresses (0x80000000 or more), and that the output
+>> buffer address and its "unlimited" length cannot be added without
+>> overflowing. An example of this can be found in inflate_fast():
+>>
+>> /* next_out is the output buffer address */
+>> out = strm->next_out - OFF;
+>> /* avail_out is the output buffer size. end will overflow if the output
+>>   * address is >= 0x80000104 */
+>> end = out + (strm->avail_out - 257);
+>>
+>> This has huge consequences on the performance of kernel decompression,
+>> since the following exit condition of inflate_fast() will be always
+>> true:
+>>
+>> } while (in < last && out < end);
+>>
+>> Indeed, "end" has overflowed and is now always lower than "out". As a
+>> result, inflate_fast() will return after processing one single byte of
+>> input data, and will thus need to be called an unreasonably high number
+>> of times. This probably went unnoticed because kernel decompression is
+>> fast enough even with this issue.
+>>
+>> Nonetheless, adjusting the output buffer length in such a way that the
+>> above pointer arithmetic never overflows results in a kernel
+>> decompression that is about 3 times faster on affected machines.
+>>
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 >
-> and an ehci driver that only works on one of them.
+> This speeds up booting of my Versatile Express TC2 by 15 seconds when
+> starting on the A7 cluster :-)
 >
-> With the infrastructure added by Alan Stern in patch 3e0232039
-> "USB: EHCI: prepare to make ehci-hcd a library module", we can
-> avoid this problem by turning a bus glue into a separate
-> module, as we do here for the w90X900 bus glue.
->
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
->
+> Tested-by: Jon Medhurst <tixy@linaro.org>
 
-Manjunath,
+Good to hear! Thanks for taking the time to test this.
 
-Thanks for your patch, it is good to me.
+Although the patch seems ok to me in its current form, there are two 
+points for which I still have small doubts:
 
-Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+1) Whether size_t and pointers will have the same size on all platforms. 
+It not we might end up with some funny behaviors. My limited research on 
+the topic did not end up with evidence that their size may differ, but I 
+don't have a definite case that they do neither.
+2) Whether all platforms have their address space ending at (~0). I do 
+not have a concrete example in mind, but can imagine, say, a platform 
+which represents its addresses as 32-bit pointers but has a smaller 
+physical bus. In this case the current calculation could cause overflows 
+again.
 
-> V2:
->  -Arranged  #include's in alphabetical order.
->  -Replaced "w90p910" by "w90x900" because it is supports
->   all series of w90x900.
-> ---
->  drivers/usb/host/Kconfig        |    2 +-
->  drivers/usb/host/Makefile       |    1 +
->  drivers/usb/host/ehci-hcd.c     |    5 ---
->  drivers/usb/host/ehci-w90x900.c |   85 ++++++++++++++++-----------------------
->  4 files changed, 37 insertions(+), 56 deletions(-)
->
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index ba52912..7bc598b 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -244,7 +244,7 @@ config USB_EHCI_MV
->           SoCs, see USB_EHCI_HCD_ORION for those.
->
->  config USB_W90X900_EHCI
-> -       bool "W90X900(W90P910) EHCI support"
-> +       tristate "W90X900(W90P910) EHCI support"
->         depends on ARCH_W90X900
->         ---help---
->                 Enables support for the W90X900 USB controller
-> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-> index 7664db8..28adb3f 100644
-> --- a/drivers/usb/host/Makefile
-> +++ b/drivers/usb/host/Makefile
-> @@ -35,6 +35,7 @@ obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
->  obj-$(CONFIG_USB_EHCI_MSM)     += ehci-msm.o
->  obj-$(CONFIG_USB_EHCI_TEGRA)   += ehci-tegra.o
->  obj-$(CONFIG_USB_EHCI_MV)       += ehci-mv.o
-> +obj-$(CONFIG_USB_W90X900_EHCI) += ehci-w90x900.o
->
->  obj-$(CONFIG_USB_OXU210HP_HCD) += oxu210hp-hcd.o
->  obj-$(CONFIG_USB_ISP116X_HCD)  += isp116x-hcd.o
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index 5717dcd..4a5644e 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -1249,11 +1249,6 @@ MODULE_LICENSE ("GPL");
->  #define XILINX_OF_PLATFORM_DRIVER      ehci_hcd_xilinx_of_driver
->  #endif
->
-> -#ifdef CONFIG_USB_W90X900_EHCI
-> -#include "ehci-w90x900.c"
-> -#define        PLATFORM_DRIVER         ehci_hcd_w90x900_driver
-> -#endif
-> -
->  #ifdef CONFIG_USB_OCTEON_EHCI
->  #include "ehci-octeon.c"
->  #define PLATFORM_DRIVER                ehci_octeon_driver
-> diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
-> index 59e0e24..4d6631d 100644
-> --- a/drivers/usb/host/ehci-w90x900.c
-> +++ b/drivers/usb/host/ehci-w90x900.c
-> @@ -11,13 +11,28 @@
->   *
->   */
->
-> +#include <linux/dma-mapping.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +
-> +#include "ehci.h"
->
->  /* enable phy0 and phy1 for w90p910 */
->  #define        ENPHY           (0x01<<8)
->  #define PHY0_CTR       (0xA4)
->  #define PHY1_CTR       (0xA8)
->
-> +#define DRIVER_DESC "EHCI w90x900 driver"
-> +
-> +static const char hcd_name[] = "ehci-w90x900 ";
-> +
-> +static struct hc_driver __read_mostly ehci_w90x900_hc_driver;
-> +
->  static int usb_w90x900_probe(const struct hc_driver *driver,
->                       struct platform_device *pdev)
->  {
-> @@ -99,54 +114,6 @@ void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
->         usb_put_hcd(hcd);
->  }
->
-> -static const struct hc_driver ehci_w90x900_hc_driver = {
-> -       .description = hcd_name,
-> -       .product_desc = "Nuvoton w90x900 EHCI Host Controller",
-> -       .hcd_priv_size = sizeof(struct ehci_hcd),
-> -
-> -       /*
-> -        * generic hardware linkage
-> -        */
-> -       .irq = ehci_irq,
-> -       .flags = HCD_USB2|HCD_MEMORY,
-> -
-> -       /*
-> -        * basic lifecycle operations
-> -        */
-> -       .reset = ehci_setup,
-> -       .start = ehci_run,
-> -
-> -       .stop = ehci_stop,
-> -       .shutdown = ehci_shutdown,
-> -
-> -       /*
-> -        * managing i/o requests and associated device resources
-> -        */
-> -       .urb_enqueue = ehci_urb_enqueue,
-> -       .urb_dequeue = ehci_urb_dequeue,
-> -       .endpoint_disable = ehci_endpoint_disable,
-> -       .endpoint_reset = ehci_endpoint_reset,
-> -
-> -       /*
-> -        * scheduling support
-> -        */
-> -       .get_frame_number = ehci_get_frame,
-> -
-> -       /*
-> -        * root hub support
-> -        */
-> -       .hub_status_data = ehci_hub_status_data,
-> -       .hub_control = ehci_hub_control,
-> -#ifdef CONFIG_PM
-> -       .bus_suspend = ehci_bus_suspend,
-> -       .bus_resume = ehci_bus_resume,
-> -#endif
-> -       .relinquish_port        = ehci_relinquish_port,
-> -       .port_handed_over       = ehci_port_handed_over,
-> -
-> -       .clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
-> -};
-> -
->  static int ehci_w90x900_probe(struct platform_device *pdev)
->  {
->         if (usb_disabled())
-> @@ -173,7 +140,25 @@ static struct platform_driver ehci_hcd_w90x900_driver = {
->         },
->  };
->
-> +static int __init ehci_w90X900_init(void)
-> +{
-> +       if (usb_disabled())
-> +               return -ENODEV;
-> +
-> +       pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-> +
-> +       ehci_init_driver(&ehci_w90x900_hc_driver, NULL);
-> +       return platform_driver_register(&ehci_hcd_w90x900_driver);
-> +}
-> +module_init(ehci_w90X900_init);
-> +
-> +static void __exit ehci_w90X900_cleanup(void)
-> +{
-> +       platform_driver_unregister(&ehci_hcd_w90x900_driver);
-> +}
-> +module_exit(ehci_w90X900_cleanup);
-> +
-> +MODULE_DESCRIPTION(DRIVER_DESC);
->  MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
-> -MODULE_DESCRIPTION("w90p910 usb ehci driver!");
-> -MODULE_LICENSE("GPL");
->  MODULE_ALIAS("platform:w90p910-ehci");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.7.9.5
->
+If one (or both) of these points are to be concerned about, there may 
+exist macros I am not aware of that better represent the actual limits 
+of pointers in the kernel.
 
+Thanks,
+Alex.
 
-
---
-Wan ZongShun.
-www.mcuos.com
+>
+>> ---
+>>   lib/decompress_inflate.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/lib/decompress_inflate.c b/lib/decompress_inflate.c
+>> index 19ff89e..d619b28 100644
+>> --- a/lib/decompress_inflate.c
+>> +++ b/lib/decompress_inflate.c
+>> @@ -48,7 +48,7 @@ STATIC int INIT gunzip(unsigned char *buf, int len,
+>>   		out_len = 0x8000; /* 32 K */
+>>   		out_buf = malloc(out_len);
+>>   	} else {
+>> -		out_len = 0x7fffffff; /* no limit */
+>> +		out_len = ((size_t)~0) - (size_t)out_buf; /* no limit */
+>>   	}
+>>   	if (!out_buf) {
+>>   		error("Out of memory while allocating output buffer");
+>
+>
