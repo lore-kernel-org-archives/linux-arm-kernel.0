@@ -1,74 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 23 Jul 2013 12:44:23 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <20130723193105.GP9858@sirena.org.uk>
-References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
- <51EE9EC0.6060905@ti.com> <20130723161846.GD2486@kroah.com>
- <1446965.6APW5ZgLBW@amdc1227> <20130723173710.GB28284@kroah.com>
- <20130723174456.GM9858@sirena.org.uk>
- <20130723180110.GA8688@kroah.com>
- <20130723193105.GP9858@sirena.org.uk>
-Message-ID: <20130723194423.GA22984@kroah.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 23 Jul 2013 20:44:47 +0100
+Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
+ Exynos5420
+In-Reply-To: <CAAgF-BfdfuhoFDH+SeZogXh1wju34hGp-T9N7_+mnapHfc2yww@mail.gmail.com>
+References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
+ <29860116.IF545KsGYb@thinkpad>
+ <20130711112023.GM24508@sirena.org.uk>
+ <2214161.FSfscAvpna@thinkpad>
+ <20130711130139.GQ24508@sirena.org.uk>
+ <CAAgF-BdM4jw0o4+ELVo_N029tbgMJBBqJxU91e=TgBNiiREyaA@mail.gmail.com>
+ <20130712084932.GY24508@sirena.org.uk>
+ <CAAgF-BfdfuhoFDH+SeZogXh1wju34hGp-T9N7_+mnapHfc2yww@mail.gmail.com>
+Message-ID: <20130723194447.GT9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 08:31:05PM +0100, Mark Brown wrote:
-> > You don't "know" the id of the device you are looking up, due to
-> > multiple devices being in the system (dynamic ids, look back earlier in
-> > this thread for details about that.)
-> 
-> I got copied in very late so don't have most of the thread I'm afraid, 
-> I did try looking at web archives but didn't see a clear problem
-> statement.  In any case this is why the APIs doing lookups do the
-> lookups in the context of the requesting device - devices ask for
-> whatever name they use locally.
+On Tue, Jul 23, 2013 at 09:38:00AM +0530, Padma Venkat wrote:
+> On Fri, Jul 12, 2013 at 2:19 PM, Mark Brown <broonie@kernel.org> wrote:
 
-What do you mean by "locally"?
+> > Yes, this is good but the quirk should just be found by software based
+> > on the compatible string rather than in the DT.
 
-The problem with the api was that the phy core wanted a id and a name to
-create a phy, and then later other code was doing a "lookup" based on
-the name and id (mushed together), because it "knew" that this device
-was the one it wanted.
+> You mean I just need to initialize the quirks in the driver based on
+> the compatible string?
 
-Just like the clock api, which, for multiple devices, has proven to
-cause problems.  I don't want to see us accept an api that we know has
-issues in it now, I'd rather us fix it up properly.
+That's the gold standard.
 
-Subsystems should be able to create ids how ever they want to, and not
-rely on the code calling them to specify the names of the devices that
-way, otherwise the api is just too fragile.
+> So what about the quirks that I added previously on 5250? Should I
+> also follow the same thing for other quirks?
 
-I think, that if you create a device, then just carry around the pointer
-to that device (in this case a phy) and pass it to whatever other code
-needs it.  No need to do lookups on "known names" or anything else, just
-normal pointers, with no problems for multiple devices, busses, or
-naming issues.
+Yes, ideally.
 
-> > > Having to write platform data for everything gets old fast and the code
-> > > duplication is pretty tedious...
-> 
-> > Adding a single pointer is "tedious"?  Where is the "name" that you are
-> > going to lookup going to come from?  That code doesn't write itself...
-> 
-> It's adding platform data in the first place that gets tedious - and of
-> course there's also DT and ACPI to worry about, it's not just a case of
-> platform data and then you're done.  Pushing the lookup into library
-> code means that drivers don't have to worry about any of this stuff.
+> Or it need to be passed via driver data as it is done in spi driver?
+> Please clarify me.
 
-I agree, so just pass around the pointer to the phy and all is good.  No
-need to worry about DT or ACPI or anything else.
-
-> For most of the APIs doing this there is a clear and unambiguous name in
-> the hardware that can be used (and for hardware process reasons is
-> unlikely to get changed).  The major exception to this is the clock API
-> since it is relatively rare to have clear, segregated IP level
-> information for IPs baked into larger chips.  The other APIs tend to be
-> establishing chip to chip links.
-
-The clock api is having problems with multiple "names" due to dynamic
-devices from what I was told.  I want to prevent the PHY interface from
-having that same issue.
-
-thanks,
-
-greg k-h
+This is a good way to initialise things based on the name - the core
+will do the lookups for you.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/09c53da6/attachment.sig>
