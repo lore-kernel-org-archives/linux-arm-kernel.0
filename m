@@ -1,61 +1,54 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 23 Jul 2013 20:05:28 +0100
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC with
- ARM CPU
-In-Reply-To: <20130723185733.GB6811@ohporter.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Tue, 23 Jul 2013 21:14:49 +0200
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X
+ SoC with ARM CPU
+In-Reply-To: <CAGVrzcbA72AYu6J3JXBirQQeTiDH9cJThdBdH=Q=gJtOnqz-AA@mail.gmail.com>
 References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
  <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
- <20130719020611.GA4941@glitch> <20130723185733.GB6811@ohporter.com>
-Message-ID: <CAGVrzcYnoN9NnJGvubS7=bVJDk37xSt4BimtvDWghe7OHEWALQ@mail.gmail.com>
+ <20130723184907.GA6811@ohporter.com>
+ <CAGVrzcbA72AYu6J3JXBirQQeTiDH9cJThdBdH=Q=gJtOnqz-AA@mail.gmail.com>
+Message-ID: <51EED629.1000404@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/23 Matt Porter <matt.porter@linaro.org>:
-> On Fri, Jul 19, 2013 at 04:06:11AM +0200, Domenico Andreoli wrote:
->> On Wed, Jul 17, 2013 at 12:08:30AM +0100, Florian Fainelli wrote:
->> > Hello,
+On 07/23/2013 08:56 PM, Florian Fainelli wrote:
+> If you want to add more confusion, because there is,
+> drivers/staging/bcm which stands for Beceem has been later acquired by
+> Broadcom, eventually turning this 3 letter word into something
+> "consistent" from a Broadcom point of view. As far as I am concerned,
+> I would just stick with the allocated vendor prefix and replace "bcm"
+> with "brcm" because the allocated one is the authoritative one.
+
+Nice, huh. In device-tree notation it identifies the vendor and I agree 
+that brcm is a better/preferred vendor id. The confusion here is that 
+the device identifiers are all prefixed with "bcm", which is something 
+different than the vendor id. I do not think consistency was the goal in 
+the acquisition of Beceem ;-)
+
 >> >
->> > Le mardi 16 juillet 2013 11:14:36 Matt Porter a ?crit :
->> > > > +       compatible = "brcm,bcm5301x";
->> > >
->> > > Ok, this was nagging at me before I went on my very long vacation. I see
->> > > the "brcm" vendor prefix as a real consistency problem. I noticed on the
->> > > bcm281xx/kona family, we have been using "bcm" which is not logged in
->> > > vendor-prefixes.txt as a legitimate prefix. I see that bcm2835 had
->> > > already established use of "brcm" before any of the bcm281xx support
->> > > came in. Ideally, the vendor prefix should change to "bcm" since every
->> > > reference in the family names is BCM. However, if others want the least
->> > > amount of churn in making this consistent, we might have to go with
->> > > "brcm" across the board.
+>>> >>the bcm281x/kona family support code be merged and use "bcm" there, without
+>>> >>registering it. Besides, a simple rule of number here wins:
+>>> >>
+>>> >>git grep "brcm," * | wc -l
+>>> >>63
+>>> >>git grep "bcm," * | wc -l
+>>> >>25
+>>> >>
+>>> >>(as of Linux 3.11-rc1)
+>>> >>
+>>> >>So consistency we should get the bcm281x/kona DT bindings to rename their
+>>> >>vendor prefix as well.
 >> >
->> > I would like to keep "brcm" here because that is what has been defined as a
->> > vendor prefix, and is used beyond the scope of the ARM Linux kernel support
->> > even within Broadcom. Maybe it was an oversight, or rather a mistake to let
->>
->> brcm is the stock ticker. As far as I can search, this is the convention
->> for the vendor prefixes.
->
-> No, correlation does not equal causation. The fact that some vendor
-> prefixes in DT match the stock symbol is by chance of 3-4 character name
-> being the same...nothing more.
+>> >I believe getting this "right" is far more important than the difference
+>> >in churn of a mere 38 instances of use of brcm. "Right" is two things:
+>> >1) it needs to be consistent 2) it should be what makes sense.
+> I agree, which is the reason why I would stick with the vendor prefix
+> and end the story there.
 
-That was a bad argument as was later explained to me, I won't use that
-reason again.
+Agree.
 
->
-> It's pretty easy to see that the "ti" vendor prefix has no relation at
-> all to their TXN symbol so that blows that convention out of the water.
-> Rather, the prefix is based on somebody's notion of how that vendor's
-> part are normally referred to. In TI-land, it's TI AM335x or TI OMAP,
-> never TXN OMAP. :)
->
-> For Broadcom, every part is BCMxxxxx so "bcm" is appropriate.
+> --
+> Florian
 
-It was appropriate before being the "wrong" vendor prefix was
-allocated, now that "brcm" has been allocated we should stick to it
-because otherwise we will break existing and on-going DT work.
-
-At the very least, all possible confusion would be avoided by using
-"broadcom" instead of any other abreviation.
---
-Florian
+Regards,
+Arend
