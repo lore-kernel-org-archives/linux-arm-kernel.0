@@ -1,55 +1,63 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 24 Jul 2013 01:32:31 +0200
-Subject: [PATCH v6 02/20] clocksource: samsung_pwm_timer: Correct definition
- of AUTORELOAD bit
-In-Reply-To: <51EDA3EA.9020502@linaro.org>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1658534.7nG6RFjcTc@flatron> <51EDA3EA.9020502@linaro.org>
-Message-ID: <2416336.ny4L9Sf7Ts@flatron>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 23 Jul 2013 16:40:40 -0700
+Subject: [GIT PULL] Remove ARM local timer API
+In-Reply-To: <CAOesGMj5AZcB7-kcS8_JqfKAg_RUKqTdDZf7bdwkebn3pwADAw@mail.gmail.com>
+References: <20130625200211.GA11625@codeaurora.org>
+ <CAOesGMj5AZcB7-kcS8_JqfKAg_RUKqTdDZf7bdwkebn3pwADAw@mail.gmail.com>
+Message-ID: <20130723234040.GB27761@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWM channel 4 has its autoreload bit located at different position. This
-patch fixes the driver to account for that.
+On 07/23, Olof Johansson wrote:
+> On Tue, Jun 25, 2013 at 1:02 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > Olof/Arnd,
+> >
+> > These patches remove the ARM local timer API. The ARM architected
+> > timers have already moved away from this API so this series
+> > migrates the rest of the users allowing us to remove the API
+> > entirely. Thomas has been kind enough to take the first two
+> > patches into timers/core in the tip tree (thanks Thomas!) so I've
+> > merged that into v3.10-rc1 and then applied the rest of the
+> > patches on top. Let me know if this is acceptable.
+> >
+> > These patches have been through multiple rounds and tested by
+> > multiple people since before the 3.10 merge window closed. Only
+> > Barry's ack is missing (Cced).
+> >
+> > Since I don't have a tree on kernel.org, David Brown has been
+> > kind enough to push my tag out to his repo. Please pull.
+> >
+> > The following changes since commit 42cba6e27c4cddc4df701c597dbfa666e1c013c8:
+> >
+> >   Merge branch 'timers/core' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip into remove-local-timers (2013-06-24 17:45:02 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/remove-local-timers
+> >
+> > for you to fetch changes up to 060fd3043e5e3488504b9e70182e188dd9113aea:
+> >
+> >   ARM: smp: Remove local timer API (2013-06-24 17:47:34 -0700)
+> >
+> > ----------------------------------------------------------------
+> > Now that we have a generic arch hook for broadcast we can remove the local
+> > timer API entirely. Doing so will reduce code in ARM core, reduce the
+> > architecture dependencies of our timer drivers, and simplify the code because
+> > we no longer go through an architecture layer that is essentially a hotplug
+> > notifier.
+> 
+> Hi,
+> 
+> Merged in as localtimer/removal into next/cleanup.
+> 
+> I had quite a few merge conflicts due to the __cpuinit removal, so
+> please double-check my resolutions.
+> 
 
-This fixes a problem with the clocksource hanging after it overflows because
-it is not reloaded any more.
+A __cpuinit is leftover in smp_twd.c. Hopefully you can just
+redo the merge?
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- drivers/clocksource/samsung_pwm_timer.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
-Changes since v5:
- - Added more detailed comment about bit layout in TCON register.
-
-diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
-index 3fa5b07..5d0049f 100644
---- a/drivers/clocksource/samsung_pwm_timer.c
-+++ b/drivers/clocksource/samsung_pwm_timer.c
-@@ -44,10 +44,21 @@
- #define TCFG1_SHIFT(x)	  		((x) * 4)
- #define TCFG1_MUX_MASK	  		0xf
- 
-+/*
-+ * Each channel occupies 4 bits in TCON register, but there is a gap of 4
-+ * bits (one channel) after channel 0, so channels have different numbering
-+ * when accessing TCON register.
-+ *
-+ * In addition, the location of autoreload bit for channel 4 (TCON channel 5)
-+ * in its set of bits is 2 as opposed to 3 for other channels.
-+ */
- #define TCON_START(chan)		(1 << (4 * (chan) + 0))
- #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
- #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
--#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
-+#define _TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
-+#define _TCON_AUTORELOAD4(chan)		(1 << (4 * (chan) + 2))
-+#define TCON_AUTORELOAD(chan)		\
-+	((chan < 5) ? _TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
- 
- DEFINE_SPINLOCK(samsung_pwm_lock);
- EXPORT_SYMBOL(samsung_pwm_lock);
 -- 
-1.8.3.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
