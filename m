@@ -1,33 +1,72 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 23 Jul 2013 12:26:23 -0400
-Subject: [v3 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D3441A3@039-SN2MPN1-011.039d.mgd.msft.net>
-References: <1373017942-12583-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373017942-12583-4-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130705174305.GA28088@mtj.dyndns.org>
- <0E83723C55F66F43A6041464FE31119D31432D@039-SN2MPN1-012.039d.mgd.msft.net>
- <20130706020737.GA9029@mtj.dyndns.org>
- <0E83723C55F66F43A6041464FE31119D3441A3@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <20130723162623.GD21100@mtj.dyndns.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 23 Jul 2013 21:58:34 +0530
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <20130723161846.GD2486@kroah.com>
+References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
+ <51EE9EC0.6060905@ti.com> <20130723161846.GD2486@kroah.com>
+Message-ID: <51EEAF32.4040905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Greg,
 
-On Mon, Jul 22, 2013 at 07:02:56AM +0000, Zhu Richard-R65037 wrote:
-> Re-send this email to you and community.
-> I'm afraid that you may be missed or don't receive it.
+On Tuesday 23 July 2013 09:48 PM, Greg KH wrote:
+> On Tue, Jul 23, 2013 at 08:48:24PM +0530, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Tuesday 23 July 2013 08:07 PM, Alan Stern wrote:
+>>> On Tue, 23 Jul 2013, Tomasz Figa wrote:
+>>>
+>>>> On Tuesday 23 of July 2013 09:29:32 Tomasz Figa wrote:
+>>>>> Hi Alan,
+>>>
+>>> Thanks for helping to clarify the issues here.
+>>>
+>>>>>> Okay.  Are PHYs _always_ platform devices?
+>>>>>
+>>>>> They can be i2c, spi or any other device types as well.
+>>>
+>>> In those other cases, presumably there is no platform data associated
+>>> with the PHY since it isn't a platform device.  Then how does the
+>>> kernel know which controller is attached to the PHY?  Is this spelled
+>>> out in platform data associated with the PHY's i2c/spi/whatever parent?
+.
+.
+<snip>
+.
+.
+>>
+>> 	static struct phy *phy_lookup(void *priv) {
+>> 		.
+>> 		.
+>> 		if (phy->priv==priv) //instead of string comparison, we'll use pointer
+>> 			return phy;
+>> 	}
+>>
+>> PHY driver should be like
+>> 	phy_create((dev, ops, pdata->info);
+>>
+>> The controller driver would do
+>> 	phy_get(dev, NULL, pdata->info);
+>>
+>> Now the PHY framework will check for a match of *priv* pointer and return the PHY.
+>>
+>> I think this should be possible?
+> 
+> Ick, no.  Why can't you just pass the pointer to the phy itself?  If you
+> had a "priv" pointer to search from, then you could have just passed the
+> original phy pointer in the first place, right?
+> 
+> The issue is that a string "name" is not going to scale at all, as it
+> requires hard-coded information that will change over time (as the
+> existing clock interface is already showing.)
+> 
+> Please just pass the real "phy" pointer around, that's what it is there
+> for.  Your "board binding" logic/code should be able to handle this, as
+> it somehow was going to do the same thing with a "name".
 
-Sorry about the delay.  I was on the road.
+The problem is the board file won't have the *phy* pointer. *phy* pointer is
+created at a much later time when the phy driver is probed.
 
-> BTW, can you help to pick up the #2 and #3(reviewed and acked by Shawn) of the v7 patch-set of this serial?
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Just one thing, can you please rename the driver to ahci_imx?  I'd
-like to keep all ahci drivers with ahci prefix (yeah, there's already
-an exception, I know).
-
-Thanks.
-
--- 
-tejun
+Thanks
+Kishon
