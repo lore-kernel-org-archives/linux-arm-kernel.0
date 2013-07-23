@@ -1,34 +1,21 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 23 Jul 2013 18:09:51 +0800
-Subject: [PATCH] ARM: dts: tegra114: dalmore: fix the irq trigger type of
- Palmas MFD device
-Message-ID: <1374574191-24396-1-git-send-email-josephl@nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Jul 2013 11:20:07 +0100
+Subject: [PATCH v2] xen/arm and xen/arm64: update xen_restart after
+ ff701306cd49
+In-Reply-To: <1374486464-25243-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <1374486464-25243-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130723102006.GB3748@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ trigger type of Palmas MFD device (tps65913) is low-level
-sensitive. The wrong configuration would cause an interrupt storm
-when booting the system. Fixing it in DT with appropriate interrupt
-type.
+On Mon, Jul 22, 2013 at 10:47:44AM +0100, Stefano Stabellini wrote:
+> Commit ff701306cd49 (arm64: use common reboot infrastructure) changes
+> the prototype of arm_pm_restart.  Update xen_restart accordingly.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Cc: Laxman Dewangan <ldewangan@nvidia.com>
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/boot/dts/tegra114-dalmore.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+You may even want to quote 7b6d864b48d9 (reboot: arm: change reboot_mode
+to use enum reboot_mode) since you are changing a file under arch/arm ;)
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index 76529e4..70b9d0c 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -840,7 +840,7 @@
- 		palmas: tps65913 {
- 			compatible = "ti,palmas";
- 			reg = <0x58>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <0 86 0x8>;
- 
- 			#interrupt-cells = <2>;
- 			interrupt-controller;
 -- 
-1.8.3.2
+Catalin
