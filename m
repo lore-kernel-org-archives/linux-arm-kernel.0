@@ -1,26 +1,35 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 23 Jul 2013 02:54:06 -0700
-Subject: [PATCH, re-send] Always trap on BUG()
-In-Reply-To: <20130723093628.GC19786@gmail.com>
-References: <201307051738.35930.arnd@arndb.de>
- <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
- <20130715222755.GY24642@n2100.arm.linux.org.uk> <51E47924.9030005@zytor.com>
- <20130723093628.GC19786@gmail.com>
-Message-ID: <51EE52BE.5080204@zytor.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Jul 2013 11:01:24 +0100
+Subject: [PATCH 0/3] arm/arm64: a trio of boot mode detection fixes
+In-Reply-To: <20130718162501.GA20870@e106331-lin.cambridge.arm.com>
+References: <1373379366-15689-1-git-send-email-mark.rutland@arm.com>
+ <51E8091A.5040302@arm.com>
+ <20130718162501.GA20870@e106331-lin.cambridge.arm.com>
+Message-ID: <20130723100122.GA3748@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 02:36 AM, Ingo Molnar wrote:
->>
->> Well, there are three alternatives here, right:
->>
->> 1. We can use unreachable(), which means that the compiler can assume it
->> never happens.
+On Thu, Jul 18, 2013 at 05:25:01PM +0100, Mark Rutland wrote:
+> On Thu, Jul 18, 2013 at 04:26:18PM +0100, Marc Zyngier wrote:
+> > On 09/07/13 15:16, Mark Rutland wrote:
+> > > The following patches fix a couple of issues in the boot mode detection
+> > > code where in the case of mismatched boot modes we can corrupt a small
+> > > portion of memory or fail to detect the fact we've booted CPUs with
+> > > mismatched modes due to the boot mode being logged incoherently.
+> > 
+> > Sorry for the delay in replying to this. The whole series looks good to
+> > me, so: Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> AFAICS this is dangerous as it loses warnings and moves execution into 
-> la-la-land without any obvious sign at the C level.
+> Cheers.
 > 
+> Russell,
+> I've dropped the first two patches into the patch system as 7786/1 and
+> 7787/1.
+> 
+> Catalin,
+> Are you happy to pick up the third patch?
 
-Extremely dangerous.
+Yes. Thanks.
 
-	-hpa
+-- 
+Catalin
