@@ -1,89 +1,67 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Jul 2013 23:31:20 -0400
-Subject: [PATCH 04/13] ARM: bL_switcher: add clockevent save/restore support
+Date: Mon, 22 Jul 2013 23:31:22 -0400
+Subject: [PATCH 06/13] ARM: bL_switcher: simplify stack isolation
 In-Reply-To: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1374550289-25305-5-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1374550289-25305-7-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+We now have a dedicated thread for each logical CPU.  That's plenty
+of stack space for our needs.
 
-Per-CPU timers that are shutdown when a CPU is switched over must be disabled
-upon switching and reprogrammed on the inbound CPU by relying on the
-clock events management API. save/restore sequence is executed with irqs
-disabled as mandated by the clock events API.
-
-The next_event is an absolute time, hence, when the inbound CPU resumes,
-if the timer has expired the min delta is forced into the tick device to
-fire after few cycles.
-
-This patch adds switching support for clock events that are per-CPU and
-have to be migrated when a switch takes place; the cpumask of the clock
-event device is checked against the cpumask of the current cpu, and if
-they match, the clockevent device mode is saved and it is put in
-shutdown mode. Resume code reprogrammes the tick device accordingly.
-
-Tested on A15/A7 fast models and architected timers.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/common/bL_switcher.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/common/bL_switcher.c | 23 ++++++++---------------
+ 1 file changed, 8 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-index e63881b430..d6f7e507d9 100644
+index c2355cafc9..3ff7bfe126 100644
 --- a/arch/arm/common/bL_switcher.c
 +++ b/arch/arm/common/bL_switcher.c
-@@ -15,7 +15,11 @@
- #include <linux/sched.h>
- #include <linux/interrupt.h>
- #include <linux/cpu_pm.h>
-+#include <linux/cpumask.h>
- #include <linux/workqueue.h>
-+#include <linux/clockchips.h>
-+#include <linux/hrtimer.h>
-+#include <linux/tick.h>
- #include <linux/mm.h>
- #include <linux/string.h>
- #include <linux/irqchip/arm-gic.h>
-@@ -122,6 +126,8 @@ static int bL_switchpoint(unsigned long _arg)
- static int bL_switch_to(unsigned int new_cluster_id)
+@@ -54,12 +54,6 @@ static void bL_do_switch(void *_unused)
  {
- 	unsigned int mpidr, cpuid, clusterid, ob_cluster, ib_cluster, this_cpu;
-+	struct tick_device *tdev;
-+	enum clock_event_mode tdev_mode;
- 	int ret;
+ 	unsigned mpidr, cpuid, clusterid, ob_cluster, ib_cluster;
+ 
+-	/*
+-	 * We now have a piece of stack borrowed from the init task's.
+-	 * Let's also switch to init_mm right away to match it.
+-	 */
+-	cpu_switch_mm(init_mm.pgd, &init_mm);
+-
+ 	pr_debug("%s\n", __func__);
  
  	mpidr = read_mpidr();
-@@ -167,6 +173,14 @@ static int bL_switch_to(unsigned int new_cluster_id)
- 	 */
- 	arch_send_wakeup_ipi_mask(cpumask_of(this_cpu));
+@@ -94,22 +88,21 @@ static void bL_do_switch(void *_unused)
+ }
  
-+	tdev = tick_get_device(this_cpu);
-+	if (tdev && !cpumask_equal(tdev->evtdev->cpumask, cpumask_of(this_cpu)))
-+		tdev = NULL;
-+	if (tdev) {
-+		tdev_mode = tdev->evtdev->mode;
-+		clockevents_set_mode(tdev->evtdev, CLOCK_EVT_MODE_SHUTDOWN);
-+	}
-+
- 	ret = cpu_pm_enter();
- 
- 	/* we can not tolerate errors at this point */
-@@ -197,6 +211,12 @@ static int bL_switch_to(unsigned int new_cluster_id)
- 
- 	ret = cpu_pm_exit();
- 
-+	if (tdev) {
-+		clockevents_set_mode(tdev->evtdev, tdev_mode);
-+		clockevents_program_event(tdev->evtdev,
-+					  tdev->evtdev->next_event, 1);
-+	}
-+
- 	local_fiq_enable();
- 	local_irq_enable();
- 
+ /*
+- * Stack isolation.  To ensure 'current' remains valid, we just borrow
+- * a slice of the init/idle task which should be fairly lightly used.
+- * The borrowed area starts just above the thread_info structure located
+- * at the very bottom of the stack, aligned to a cache line.
++ * Stack isolation.  To ensure 'current' remains valid, we just use another
++ * piece of our thread's stack space which should be fairly lightly used.
++ * The selected area starts just above the thread_info structure located
++ * at the very bottom of the stack, aligned to a cache line, and indexed
++ * with the cluster number.
+  */
+-#define STACK_SIZE 256
++#define STACK_SIZE 512
+ extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
+ static int bL_switchpoint(unsigned long _arg)
+ {
+ 	unsigned int mpidr = read_mpidr();
+-	unsigned int cpuid = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	unsigned int clusterid = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+-	unsigned int cpu_index = cpuid + clusterid * MAX_CPUS_PER_CLUSTER;
+-	void *stack = &init_thread_info + 1;
++	void *stack = current_thread_info() + 1;
+ 	stack = PTR_ALIGN(stack, L1_CACHE_BYTES);
+-	stack += cpu_index * STACK_SIZE + STACK_SIZE;
++	stack += clusterid * STACK_SIZE + STACK_SIZE;
+ 	call_with_stack(bL_do_switch, (void *)_arg, stack);
+ 	BUG();
+ }
 -- 
 1.8.1.2
