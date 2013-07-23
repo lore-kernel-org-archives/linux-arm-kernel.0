@@ -1,45 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 22 Jul 2013 19:41:12 -0700
-Subject: [PATCH fix for v3.11 (repost)] dmaengine: shdma: fix a build
- failure on platforms with no DMA support
-In-Reply-To: <20130717235058.GA10683@verge.net.au>
-References: <20130717235058.GA10683@verge.net.au>
-Message-ID: <20130723024112.GA15637@quad.lixom.net>
+Date: Mon, 22 Jul 2013 19:47:39 -0700
+Subject: [PATCH] ARM: multi_v7: Enabled omap4430 sdp nfsroot
+In-Reply-To: <20130715132326.GA12025@arwen.pp.htv.fi>
+References: <20130715075816.GN7656@atomide.com>
+ <20130715132326.GA12025@arwen.pp.htv.fi>
+Message-ID: <20130723024739.GB15637@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 08:50:58AM +0900, Simon Horman wrote:
-> From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+On Mon, Jul 15, 2013 at 04:23:26PM +0300, Felipe Balbi wrote:
+> On Mon, Jul 15, 2013 at 12:58:17AM -0700, Tony Lindgren wrote:
+> > Author: Tony Lindgren <tony@atomide.com>
+> > Date:   Mon Jul 15 00:39:41 2013 -0700
+> > 
+> >     ARM: multi_v7: Enabled omap4430 sdp nfsroot
+> >     
+> >     By adding support for OCP2SCP, SPI and KS8851 I can also boot test
+> >     multi_v7_defconfig easily.
+> >     
+> >     Note that if using an older u-boot, CONFIG_ARM_ATAG_DTB_COMPAT=y
+> >     may also be needed for the appended DTB based booting.
+> >     
+> >     Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> On platforms with no support for the shdma dmaengine driver build is
-> currently failing with
+> We will also use OCP2SCP driver to enable USB3 on OMAP5 uEVM, good it's
+> already enabled in multi_v7 after this patch.
 > 
-> drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-> drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
-> 
-> Fix the breakage by defining shdma_chan_filter to NULL in such
-> configurations.
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> [horms+renesas at verge.net.au: Apply change to shdma-base.h instead of sh_dma.h]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  include/linux/shdma-base.h | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> Hi Vinod,
-> 
-> please consider this fix from Guennadi for v3.11 which I have rebased on top of
-> next-20130709. It fixes a build problem on a number of shmobile defconfigs
-> including bockw.
-> 
-> Alternatively, I would be happy to take this through the renesas tree.
-> 
-> I posted this patch last week but I'm wondering if you missed it somehow.
-> This patch resolves a regression in v3.11-rc1.
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-As mentioned on the other thread, I have applied this in the arm-soc fixes
-branch for 3.11 now.
+Applied to fixes for 3.11 since it gives us networking on panda.
 
 
 -Olof
