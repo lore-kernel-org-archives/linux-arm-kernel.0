@@ -1,56 +1,80 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 23 Jul 2013 14:37:29 +0200
-Subject: [PATCH v3 27/31] net: can: mscan: add common clock support for
- mpc512x
-In-Reply-To: <20130723120733.GH19071@book.gsilab.sittig.org>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1374495298-22019-28-git-send-email-gsi@denx.de>
- <51ED2DF4.2090606@pengutronix.de>
- <20130723120733.GH19071@book.gsilab.sittig.org>
-Message-ID: <51EE7909.6080804@pengutronix.de>
+From: B16395@freescale.com (Sethi Varun-B16395)
+Date: Tue, 23 Jul 2013 12:46:27 +0000
+Subject: [PATCH] iommu/exynos: add devices attached to the System MMU to
+ an	IOMMU group
+In-Reply-To: <1374573694-30595-1-git-send-email-a.motakis@virtualopensystems.com>
+References: <1374573694-30595-1-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <C5ECD7A89D1DC44195F34B25E172658D0A3C0DB3@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 02:07 PM, Gerhard Sittig wrote:
-[...]
 
->>> +	return freq_calc;
->>> +
->>> +err_invalid:
->>> +	dev_err(&ofdev->dev, "invalid clock source specification\n");
->>> +	return 0;
->>
->> return 0 in case of error? Please add a comment what this 0 means here.
+
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Antonios Motakis
+> Sent: Tuesday, July 23, 2013 3:32 PM
+> To: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
+> foundation.org; linux-samsung-soc at vger.kernel.org
+> Cc: Sachin Kamat; Jiri Kosina; open list; Wei Yongjun; Antonios Motakis;
+> Cho KyongHo; kvmarm at lists.cs.columbia.edu
+> Subject: [PATCH] iommu/exynos: add devices attached to the System MMU to
+> an IOMMU group
 > 
-> The .get_clock() callback is supposed to return the resulting
-> rate after the clock source was determined and the clock subtree
-> was setup.  It wasn't (explicitly) documented before (in the
-> non-common-clock case), so I did not bother to comment it in the
-> parallel common-clock case.
+> IOMMU groups are expected by certain users of the IOMMU API, e.g. VFIO.
+> Since each device is behind its own System MMU, we can allocate a new
+> IOMMU group for each device.
+> 
+> This patch depends on Cho KyongHo's patch series titled "[PATCH v7 00/12]
+> iommu/exynos: Fixes and Enhancements of System MMU driver with DT",
+> applied on a Linux 3.10.1 kernel. It has been tested on the Arndale
+> board.
+> 
+> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> ---
+>  drivers/iommu/exynos-iommu.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 51d43bb..9f39eaa 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -1134,6 +1134,28 @@ static phys_addr_t
+> exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+>  	return phys;
+>  }
+> 
+> +static int exynos_iommu_add_device(struct device *dev) {
+> +	struct iommu_group *group;
+> +	int ret;
+> +
+> +	group = iommu_group_alloc();
+> +	if (IS_ERR(group)) {
+> +		dev_err(dev, "Failed to allocate IOMMU group\n");
+> +		return PTR_ERR(group);
+> +	}
+> +
+> +	ret = iommu_group_add_device(group, dev);
+> +	iommu_group_put(group);
+> +
+> +	return ret;
+> +}
+> +
+> +static void exynos_iommu_remove_device(struct device *dev) {
+> +	iommu_group_remove_device(dev);
+> +}
+> +
+>  static struct iommu_ops exynos_iommu_ops = {
+>  	.domain_init = &exynos_iommu_domain_init,
+>  	.domain_destroy = &exynos_iommu_domain_destroy, @@ -1142,6 +1164,8
+> @@ static struct iommu_ops exynos_iommu_ops = {
+>  	.map = &exynos_iommu_map,
+>  	.unmap = &exynos_iommu_unmap,
+>  	.iova_to_phys = &exynos_iommu_iova_to_phys,
+> +	.add_device	= exynos_iommu_add_device,
+> +	.remove_device	= exynos_iommu_remove_device,
+>  	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,  };
+> 
+[Sethi Varun-B16395] Do you support PCI devices? This assumption of one iommu group per pci device may not hold true in case of PCI devices.
 
-Yes, but returning 0 in case of error should be documented, as it's very
-uncommon.
-
-> But it's true that returning zero in the error case may be
-> unexpected, and I will add a comment in v4 (in all the
-> .get_clock() implementations).
-
-I think a one liner stating that the return value is the clock rate and
-"0" indicates is an invalid clock rate, this meaning an error here, is
-enough.
-
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/e4b5a260/attachment.sig>
+-Varun
