@@ -1,98 +1,78 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 23 Jul 2013 12:06:45 +0300
-Subject: [PATCH 2/2] ARM: OMAP2+: Remove legacy DSS initialization for omap4
-In-Reply-To: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1374570405-8301-3-git-send-email-tomi.valkeinen@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 23 Jul 2013 12:18:52 +0300
+Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
+In-Reply-To: <Pine.LNX.4.44L0.1307221111410.1495-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1307221111410.1495-100000@iolanthe.rowland.org>
+Message-ID: <51EE4A7C.2020709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no longer needed as omap4 is now booted using device tree.
+On 07/22/2013 06:18 PM, Alan Stern wrote:
+> On Mon, 22 Jul 2013, Roger Quadros wrote:
+> 
+>> Right, I understand it now. How does the below code look?
+>>
+>> +static int omap_ehci_suspend(struct device *dev)
+>> +{
+>> +       struct usb_hcd *hcd = dev_get_drvdata(dev);
+>> +       bool do_wakeup = device_may_wakeup(dev);
+>> +       int ret;
+>> +
+>> +       dev_dbg(dev, "%s may_wakeup %d\n", __func__, do_wakeup);
+>> +
+>> +       if (pm_runtime_status_suspended(dev)) {
+> 
+> You need to do this only when do_wakeup is false.
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/dss-common.c | 47 ----------------------------------------
- arch/arm/mach-omap2/dss-common.h |  2 --
- 2 files changed, 49 deletions(-)
+Right. Missed that.
+> 
+>> +               pm_runtime_get_sync(dev);
+>> +               ehci_resume(hcd, false);
+>> +               ret = ehci_suspend(hcd, do_wakeup);
+>> +               pm_runtime_put_sync(dev);
+> 
+> It would be better to call pm_runtime_resume(dev) at the start instead
+> of pm_runtime_get_sync(), and eliminate the last two lines.  Then the
+> ehci_suspend() below could be moved outside the "if" statement.
 
-diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
-index 043e570..00c0492 100644
---- a/arch/arm/mach-omap2/dss-common.c
-+++ b/arch/arm/mach-omap2/dss-common.c
-@@ -80,24 +80,6 @@ static struct omap_dss_board_info omap4_panda_dss_data = {
- 	.default_device	= &omap4_panda_dvi_device,
- };
- 
--void __init omap4_panda_display_init(void)
--{
--	omap_display_init(&omap4_panda_dss_data);
--
--	/*
--	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
--	 * later have external pull up on the HDMI I2C lines
--	 */
--	if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
--		omap_hdmi_init(OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP);
--	else
--		omap_hdmi_init(0);
--
--	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
--	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
--	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
--}
--
- void __init omap4_panda_display_init_of(void)
- {
- 	omap_display_init(&omap4_panda_dss_data);
-@@ -204,35 +186,6 @@ static struct omap_dss_board_info sdp4430_dss_data = {
-  * used by picodlp on the 4430sdp platform. Keep this gpio disabled as LCD2 is
-  * selected by default
-  */
--void __init omap_4430sdp_display_init(void)
--{
--	int r;
--
--	r = gpio_request_one(DISPLAY_SEL_GPIO, GPIOF_OUT_INIT_HIGH,
--			"display_sel");
--	if (r)
--		pr_err("%s: Could not get display_sel GPIO\n", __func__);
--
--	r = gpio_request_one(DLP_POWER_ON_GPIO, GPIOF_OUT_INIT_LOW,
--		"DLP POWER ON");
--	if (r)
--		pr_err("%s: Could not get DLP POWER ON GPIO\n", __func__);
--
--	omap_display_init(&sdp4430_dss_data);
--	/*
--	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
--	 * later have external pull up on the HDMI I2C lines
--	 */
--	if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
--		omap_hdmi_init(OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP);
--	else
--		omap_hdmi_init(0);
--
--	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
--	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
--	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
--}
--
- void __init omap_4430sdp_display_init_of(void)
- {
- 	int r;
-diff --git a/arch/arm/mach-omap2/dss-common.h b/arch/arm/mach-omap2/dss-common.h
-index 915f6ff..c28fe3c 100644
---- a/arch/arm/mach-omap2/dss-common.h
-+++ b/arch/arm/mach-omap2/dss-common.h
-@@ -6,9 +6,7 @@
-  * This file will be removed when DSS supports DT.
-  */
- 
--void __init omap4_panda_display_init(void);
- void __init omap4_panda_display_init_of(void);
--void __init omap_4430sdp_display_init(void);
- void __init omap_4430sdp_display_init_of(void);
- 
- #endif
--- 
-1.8.1.2
+Why do I find pm_runtime_* so confusing ;)
+
+> 
+> Alternatively, if you are able to turn off the wakeup setting without
+> going through an entire resume/suspend cycle, that would be preferable.
+> 
+
+As we don't rely on the EHCI controller's interrupt any more after we
+power it down, maybe ehci_resume/suspend cycle is not required at all on OMAP,
+even if the wakeup setting is disabled during system suspend.
+
+As the wakeup is controlled entirely by pad wakeup, all we need to do is make sure
+the IO pad wakeup is configured correctly based on do_wakeup. How this is done
+is still in transition but it might be turn out to be as simple as irq_set_irq_wake()
+
+So IMHO, for ehci-omap this should suffice
+
+static int omap_ehci_suspend(struct device *dev)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	bool do_wakeup = device_may_wakeup(dev);
+	int ret = 0;
+
+	if (!pm_runtime_status_suspended(dev))
+		ret = ehci_suspend(hcd, do_wakeup);
+
+	/* Not tested yet */
+	irq_set_irq_wake(hcd->irq, do_wakeup);
+
+	return ret;
+}
+
+What do you think?
+
+As the OMAP IO pad wakeup management code [1] is still in transition, I'll wait till
+that gets settled and then resend this series.
+
+cheers,
+-roger
+
+[1] - http://thread.gmane.org/gmane.linux.ports.arm.omap/99010
