@@ -1,29 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 23 Jul 2013 10:24:45 +0900
-Subject: [PATCH 02/04] ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI
-In-Reply-To: <20130717203109.27542.77708.sendpatchset@w520>
+Date: Tue, 23 Jul 2013 10:24:55 +0900
+Subject: [PATCH 04/04] ARM: shmobile: Allow ARCH_SHMOBILE_MULTI timer
+ configuration
+In-Reply-To: <20130717203127.27542.41663.sendpatchset@w520>
 References: <20130717203049.27542.78385.sendpatchset@w520>
- <20130717203109.27542.77708.sendpatchset@w520>
-Message-ID: <20130723012444.GD16481@verge.net.au>
+ <20130717203127.27542.41663.sendpatchset@w520>
+Message-ID: <20130723012454.GE16481@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 05:31:09AM +0900, Magnus Damm wrote:
+On Thu, Jul 18, 2013 at 05:31:27AM +0900, Magnus Damm wrote:
 > From: Magnus Damm <damm@opensource.se>
 > 
-> Add ARCH_SHMOBILE_MULTI to mach-shmobile that can be used
-> to enable ARCH_MULTIPLATFORM on selected SoCs and boards.
+> Move the timer configuration bits to allow use in
+> case of ARCH_SHMOBILE or ARCH_SHMOBILE_MULTI.
 > 
-> The headers stay under arch/arm/mach-shmobile/include/mach/
-> for now, they can and will be migrated independently over time.
+> The timers all make use of the regular driver model
+> so they are safe to enable for ARCH_MULTIPLATFORM.
 > 
 > Signed-off-by: Magnus Damm <damm@opensource.se>
 > ---
 > 
->  arch/arm/Makefile               |    1 +
->  arch/arm/mach-shmobile/Kconfig  |   21 +++++++++++++++++++++
->  arch/arm/mach-shmobile/Makefile |    2 ++
->  3 files changed, 24 insertions(+)
+>  arch/arm/mach-shmobile/Kconfig |   16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
 
 Thanks, I have queued this up for v3.12 in a new multiarch branch
 of the renesas tree.
