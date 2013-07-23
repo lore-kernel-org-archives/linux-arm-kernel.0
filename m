@@ -1,67 +1,67 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 23 Jul 2013 16:06:14 -0700
-Subject: [PATCH V4 00/11]  USB: OHCI:Properly handle
- ohci_suspend()routine in bus glue
-In-Reply-To: <51ED00A3.8080004@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1374485566-3997-1-git-send-email-manjunath.goudar@linaro.org>
- <51ED00A3.8080004@linaro.org>
-Message-ID: <20130723230614.GA13083@kroah.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 24 Jul 2013 01:21:44 +0200
+Subject: How to create IRQ mappings in a GPIO driver that doesn't control its
+ IRQ domain ?
+Message-ID: <1624911.6TtmtVmU1T@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 03:21:31PM +0530, manjunath wrote:
-> On Monday 22 July 2013 03:02 PM, Manjunath Goudar wrote:
-> >Suspend scenario in case of ohci bus glue was not properly handled as
-> >it was not suspending generic part of ohci controller. Calling
-> >explicitly the ohci_suspend()routine will ensure proper handling
-> >of suspend scenario.
-> >
-> >V2:
-> >  -Incase ohci_suspend() fails, return right away without executing further.
-> >
-> >V3:
-> >  -New patch 1/11 added, for generic ohci-hcd suspend code.
-> >
-> >V4:
-> >  -Properly aligned "do_wakeup" and "ret" variables.
-> >
-> >Manjunath Goudar (11):
-> >   USB: OHCI: Properly handle OHCI controller suspend
-> >   USB: OHCI: Properly handle ohci-at91 suspend
-> >   USB: OHCI: Properly handle ohci-s3c2410 suspend
-> >   USB: OHCI: Properly handle ohci-da8xx suspend
-> >   USB: OHCI: Properly handle ohci-ep93xx suspend
-> >   USB: OHCI: Properly handle ohci-exynos suspend
-> >   USB: OHCI: Properly handle ohci-omap suspend
-> >   USB: OHCI: Properly handle ohci-platform suspend
-> >   USB: OHCI: Properly handle ohci-pxa27x suspend
-> >   USB: OHCI: Properly handle ohci-sm501 suspend
-> >   USB: OHCI: Properly handle ohci-spear suspend
-> >
-> >  drivers/usb/host/ohci-at91.c     |   10 ++++++++--
-> >  drivers/usb/host/ohci-da8xx.c    |   15 +++++++++++----
-> >  drivers/usb/host/ohci-ep93xx.c   |    9 ++++++++-
-> >  drivers/usb/host/ohci-exynos.c   |   20 +++++---------------
-> >  drivers/usb/host/ohci-hcd.c      |    9 ++++++++-
-> >  drivers/usb/host/ohci-omap.c     |   13 ++++++++++---
-> >  drivers/usb/host/ohci-platform.c |    9 ++++++++-
-> >  drivers/usb/host/ohci-pxa27x.c   |    8 +++++++-
-> >  drivers/usb/host/ohci-s3c2410.c  |   19 ++++---------------
-> >  drivers/usb/host/ohci-sm501.c    |   11 +++++++++--
-> >  drivers/usb/host/ohci-spear.c    |   12 +++++++++---
-> >  11 files changed, 87 insertions(+), 48 deletions(-)
-> >
-> I am sorry, not updated patch subject line. This is patch V4 series.
+Hello,
 
-I'm totally confused by all of the different series of patches you've
-sent out, and I don't see Arnd's acks on any of them, so I'll just purge
-them all from my queue and wait for the next round.
+I'm running into an issue on several Renesas SoC with IRQ domains and GPIOs.
 
-Also, after what happened last time, I require Arnd to sign-off on all
-of these types of patches, if for no other reason than I want someone I
-know to be around when they break things :)
+On sh73a0, r8a73a4 and r8a7740, GPIOs and external interrupts are handled by 
+two separate IP cores, namely the PFC (Pin Function Controller) and INTC 
+(Interrupt Controller). The former is handled by the sh-pfc driver 
+(drivers/pinctrl/sh-pfc) and the later by the irq-renesas-intc-irqpin driver 
+(drivers/irqchip), referred to below as the irqpin driver.
 
-thanks,
+The sh73a0, for instance, has 32 external interrupt lines that are multiplexed 
+on pins usable as GPIOs. Both the GPIO and external interrupt functions are 
+usable at the same time, which allows reading the state of the interrupt 
+lines.
 
-greg k-h
+These external interrupts are for MMC/SD support, among other devices. In this 
+specific case the MMC/SD Card Detect signal is wired to one of the external 
+interrupt signals, and the corresponding GPIO is passed to the MMC/SD 
+controller driver. Depending on other configuration parameters the driver can 
+then either poll the Card Detect signal, or register an interrupt handler to 
+detect changes in the signal state. This features is implemented by the MMC/SD 
+core, which call gpio_to_irq() on the GPIO to retrieve the corresponding IRQ 
+number.
+
+On non-DT systems the external IRQs are statically mapped at a known offset. 
+The sh-pfc driver, to implement the gpio_to_irq() function (through its 
+gpiochip .to_irq() handler), simply searches a SoC-specific lookup table for 
+the fixed IRQ number associated with a given GPIO.
+
+However, on DT systems, IRQs are mapped dynamically on demand. The irqpin 
+driver registers a simple IRQ domain, and the irq_create_mapping() function 
+can then be used to map a given IRQ, specified as an offset in the domain. 
+This is where the problem appears, as the irqchip .to_irq() function is 
+implemented in the sh-pfc driver, which doesn't have access to the IRQ domain 
+registered by the irqpin driver.
+
+I could hack around this by exporting a function in the irqpin driver that 
+would map an IRQ, and call that function from the sh-pfc driver. I'd rather 
+avoid that solution as it would add a direct dependency between the two 
+drivers.
+
+Has anyone run into a similar issue ? My gut feeling is that the architecture 
+isn't right somewhere, but I can't really pinpoint where. As the external IRQs 
+are handled by an IP core separate from the PFC one could argue that the 
+corresponding IRQs are not really GPIO IRQs, and that the PFC driver shouldn't 
+implement the .to_irq() operation. However, this would push the problem down 
+to all drivers that need a GPIO they can read and a (possibly optional) IRQ 
+associated with the same signal, and that rely on gpio_to_irq() to retrieve 
+the IRQ associated with the signal. If all those drivers were required to 
+handle the GPIO and the IRQ separately, then we could as well completely 
+remove gpio_to_irq() from the kernel, which doesn't sound like the right thing 
+to do.
+
+Advices and opinions will be welcome.
+
+-- 
+Regards,
+
+Laurent Pinchart
