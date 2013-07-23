@@ -1,287 +1,82 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Tue, 23 Jul 2013 14:07:33 +0200
-Subject: [PATCH v3 27/31] net: can: mscan: add common clock support for
- mpc512x
-In-Reply-To: <51ED2DF4.2090606@pengutronix.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1374495298-22019-28-git-send-email-gsi@denx.de>
- <51ED2DF4.2090606@pengutronix.de>
-Message-ID: <20130723120733.GH19071@book.gsilab.sittig.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 23 Jul 2013 14:12:09 +0200
+Subject: scatterlist: sg_set_buf() argument must be in linear mapping
+ (sha1: ac4e97abce9b80c020e7113325f49e58b7b15e3f)
+In-Reply-To: <20130723103704.GS24642@n2100.arm.linux.org.uk>
+References: <51E64C6B.3080306@monstr.eu> <87siz7xt4z.fsf@rustcorp.com.au>
+ <51ED2C74.7050502@monstr.eu> <87ppua9feh.fsf@rustcorp.com.au>
+ <20130723103704.GS24642@n2100.arm.linux.org.uk>
+Message-ID: <51EE7319.408@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ adjusted devtree to use the vger address ]
-
-On Mon, Jul 22, 2013 at 15:04 +0200, Marc Kleine-Budde wrote:
+On 07/23/2013 12:37 PM, Russell King - ARM Linux wrote:
+> On Tue, Jul 23, 2013 at 12:00:30PM +0930, Rusty Russell wrote:
+>> Michal Simek <monstr@monstr.eu> writes:
+>>> Let me take some code from virtio_rpmsg_bus.c to show that problematic part.
+>>>
+>>> bufs_va = dma_alloc_coherent(vdev->dev.parent->parent,
+>>> 				RPMSG_TOTAL_BUF_SPACE,
+>>> 				&vrp->bufs_dma, GFP_KERNEL);
+>>> vrp->rbufs = bufs_va;
+>>> for (i = 0; i < RPMSG_NUM_BUFS / 2; i++) {
+>>> 	struct scatterlist sg;
+>>> 	void *cpu_addr = vrp->rbufs + i * RPMSG_BUF_SIZE;
+>>>
+>>> 	sg_init_one(&sg, cpu_addr, RPMSG_BUF_SIZE);
+>>> }
+>>
+>> Hmm.  Looking at arch/arm/include/asm/memory.h:
+>>
+>> #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+>> #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+>>
+>> pfn_to_page in ARM seems to be the asm-generic one, which depends on
+>> CONFIG_SPARSEMEM/CONFIG_DISCONTIGMEM/CONFIG_FLATMEM etc.
+>>
+>> Perhaps virt_addr_valid() is wrong for your config?  It's pretty clear
+>> that you shouldn't call virt_to_page() on something for which
+>> !virt_addr_valid().
 > 
-> On 07/22/2013 02:14 PM, Gerhard Sittig wrote:
-> > implement a .get_clock() callback for the MPC512x platform which uses
-> > the common clock infrastructure (eliminating direct access to the clock
-> > control registers from within the CAN network driver), and provide the
-> > corresponding .put_clock() callback to release resources after use
-> > 
-> > keep the previous implementation of MPC512x support in place during
-> > migration, since common clock support is optional
-> > 
-> > this change is neutral to the MPC5200 platform
-> > 
-> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
-> > ---
-> >  drivers/net/can/mscan/mpc5xxx_can.c |  169 +++++++++++++++++++++++++++++++++++
-> >  1 file changed, 169 insertions(+)
-> > 
-> > diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-> > index e59b3a3..4897929 100644
-> > --- a/drivers/net/can/mscan/mpc5xxx_can.c
-> > +++ b/drivers/net/can/mscan/mpc5xxx_can.c
-> > @@ -109,6 +109,167 @@ static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
-> >  #endif /* CONFIG_PPC_MPC52xx */
-> >  
-> >  #ifdef CONFIG_PPC_MPC512x
-> > +
-> > +#if IS_ENABLED(CONFIG_COMMON_CLK)
-> > +
-> > +static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
-> > +				 const char *clock_source, int *mscan_clksrc)
-> > +{
-> > +	struct device_node *np;
-> > +	u32 clockdiv;
-> > +	enum {
-> > +		CLK_FROM_AUTO,
-> > +		CLK_FROM_IPS,
-> > +		CLK_FROM_SYS,
-> > +		CLK_FROM_REF,
-> > +	} clk_from;
-> > +	struct clk *clk_in, *clk_can;
-> > +	unsigned long freq_calc;
-> > +	struct mscan_priv *priv;
-> > +
-> > +	/* the caller passed in the clock source spec that was read from
-> > +	 * the device tree, get the optional clock divider as well
-> > +	 */
-> > +	np = ofdev->dev.of_node;
-> > +	clockdiv = 1;
-> > +	of_property_read_u32(np, "fsl,mscan-clock-divider", &clockdiv);
-> > +	dev_dbg(&ofdev->dev, "device tree specs: clk src[%s] div[%d]\n",
-> > +		clock_source ? clock_source : "<NULL>", clockdiv);
-> > +
-> > +	/* when clock-source is 'ip', the CANCTL1[CLKSRC] bit needs to
-> > +	 * get set, and the 'ips' clock is the input to the MSCAN
-> > +	 * component
-> > +	 *
-> > +	 * for clock-source values of 'ref' or 'sys' the CANCTL1[CLKSRC]
-> > +	 * bit needs to get cleared, an optional clock-divider may have
-> > +	 * been specified (the default value is 1), the appropriate
-> > +	 * MSCAN related MCLK is the input to the MSCAN component
-> > +	 *
-> > +	 * in the absence of a clock-source spec, first an optimal clock
-> > +	 * gets determined based on the 'sys' clock, if that fails the
-> > +	 * 'ref' clock is used
-> > +	 */
-> > +	clk_from = CLK_FROM_AUTO;
-> > +	if (clock_source) {
-> > +		/* interpret the device tree's spec for the clock source */
-> > +		if (!strcmp(clock_source, "ip"))
-> > +			clk_from = CLK_FROM_IPS;
-> > +		else if (!strcmp(clock_source, "sys"))
-> > +			clk_from = CLK_FROM_SYS;
-> > +		else if (!strcmp(clock_source, "ref"))
-> > +			clk_from = CLK_FROM_REF;
-> > +		else
-> > +			goto err_invalid;
-> > +		dev_dbg(&ofdev->dev, "got a clk source spec[%d]\n", clk_from);
-> > +	}
-> > +	if (clk_from == CLK_FROM_AUTO) {
-> > +		/* no spec so far, try the 'sys' clock; round to the
-> > +		 * next MHz and see if we can get a multiple of 16MHz
-> > +		 */
-> > +		dev_dbg(&ofdev->dev, "no clk source spec, trying SYS\n");
-> > +		clk_in = devm_clk_get(&ofdev->dev, "sys");
-> > +		if (IS_ERR(clk_in))
-> > +			goto err_notavail;
-> > +		freq_calc = clk_get_rate(clk_in);
-> > +		freq_calc +=  499999;
-> > +		freq_calc /= 1000000;
-> > +		freq_calc *= 1000000;
-> > +		if ((freq_calc % 16000000) == 0) {
-> > +			clk_from = CLK_FROM_SYS;
-> > +			clockdiv = freq_calc / 16000000;
-> > +			dev_dbg(&ofdev->dev,
-> > +				"clk fit, sys[%lu] div[%d] freq[%lu]\n",
-> > +				freq_calc, clockdiv, freq_calc / clockdiv);
-> > +		}
-> > +	}
-> > +	if (clk_from == CLK_FROM_AUTO) {
-> > +		/* no spec so far, use the 'ref' clock */
-> > +		dev_dbg(&ofdev->dev, "no clk source spec, trying REF\n");
-> > +		clk_in = devm_clk_get(&ofdev->dev, "ref");
-> > +		if (IS_ERR(clk_in))
-> > +			goto err_notavail;
-> > +		clk_from = CLK_FROM_REF;
-> > +		freq_calc = clk_get_rate(clk_in);
-> > +		dev_dbg(&ofdev->dev,
-> > +			"clk fit, ref[%lu] (no div) freq[%lu]\n",
-> > +			freq_calc, freq_calc);
-> > +	}
-> > +
-> > +	/* select IPS or MCLK as the MSCAN input (returned to the caller),
-> > +	 * setup the MCLK mux source and rate if applicable, apply the
-> > +	 * optionally specified or derived above divider, and determine
-> > +	 * the actual resulting clock rate to return to the caller
-> > +	 */
-> > +	switch (clk_from) {
-> > +	case CLK_FROM_IPS:
-> > +		clk_can = devm_clk_get(&ofdev->dev, "ips");
-> > +		if (IS_ERR(clk_can))
-> > +			goto err_notavail;
-> > +		if (clk_prepare(clk_can)) {
+> The above code fragment is just wrong.  You can't make any assumptions about
+> the memory returned from dma_alloc_coherent(), because:
 > 
-> I would just call prepare_enable in the main mscan driver, then we don't
-> need a special "clock is prepared but not enabled" contract.
-
-Yes, I addressed this concern (although differently after
-learning more from a local test setup), see the other reply for
-the CAN driver adjustment for clock API use.
-
+> - On x86, it is kernel direct mapped memory, where things like
+>   virt_to_phys(cpuaddr) will work fine with it.
 > 
-> > +			devm_clk_put(&ofdev->dev, clk_can);
+> - On any architecture which needs to remap memory to make it coherent
+>   with the DMA device, the key word there is "remap" - it's not kernel
+>   direct mapped memory, and virt_to_phys(cpuaddr) on it is illegal.
 > 
-> not needed, as this driver instance will fail, doesn't it?
-
-This is discussed in the other subthread as well.  The only
-remaining question is how many of them to remove, before I'll
-update the series.
-
-> > +			goto err_notavail;
-> > +		}
-> > +		priv = netdev_priv(dev_get_drvdata(&ofdev->dev));
-> > +		priv->clk_can = clk_can;
-> > +		freq_calc = clk_get_rate(clk_can);
-> > +		*mscan_clksrc = MSCAN_CLKSRC_IPS;
-> > +		dev_dbg(&ofdev->dev, "clk from IPS, clksrc[%d] freq[%lu]\n",
-> > +			*mscan_clksrc, freq_calc);
-> > +		break;
-> > +	case CLK_FROM_SYS:
-> > +	case CLK_FROM_REF:
-> > +		clk_can = devm_clk_get(&ofdev->dev, "mclk");
-> > +		if (IS_ERR(clk_can))
-> > +			goto err_notavail;
-> > +		if (clk_prepare(clk_can)) {
-> > +			devm_clk_put(&ofdev->dev, clk_can);
+> The only valid operation with scatterlists and such memory returned from
+> dma_alloc_coherent() is:
 > 
-> same here
+> 	sg_dma_address(sg) = dma_address;
+> 	sg_dma_len(sg) = dma_length;
 > 
-> > +			goto err_notavail;
-> > +		}
-> > +		priv = netdev_priv(dev_get_drvdata(&ofdev->dev));
-> > +		priv->clk_can = clk_can;
-> > +		if (clk_from == CLK_FROM_SYS)
-> > +			clk_in = devm_clk_get(&ofdev->dev, "sys");
-> > +		if (clk_from == CLK_FROM_REF)
-> > +			clk_in = devm_clk_get(&ofdev->dev, "ref");
-> > +		if (IS_ERR(clk_in))
-> > +			goto err_notavail;
-> > +		clk_set_parent(clk_can, clk_in);
-> > +		freq_calc = clk_get_rate(clk_in);
-> > +		freq_calc /= clockdiv;
-> > +		clk_set_rate(clk_can, freq_calc);
-> > +		freq_calc = clk_get_rate(clk_can);
-> > +		*mscan_clksrc = MSCAN_CLKSRC_BUS;
-> > +		dev_dbg(&ofdev->dev, "clk from MCLK, clksrc[%d] freq[%lu]\n",
-> > +			*mscan_clksrc, freq_calc);
-> > +		break;
-> > +	default:
-> > +		goto err_invalid;
-> > +	}
-> > +
-> > +	return freq_calc;
-> > +
-> > +err_invalid:
-> > +	dev_err(&ofdev->dev, "invalid clock source specification\n");
-> > +	return 0;
-> 
-> return 0 in case of error? Please add a comment what this 0 means here.
+> and not to use the virtual address(es) at all in the scatterlist.  And
+> it is very very important to realise that you must not mix the streaming
+> and coherent DMA APIs - you must never pass coherent memory into the
+> dma_map_* functions.
 
-The .get_clock() callback is supposed to return the resulting
-rate after the clock source was determined and the clock subtree
-was setup.  It wasn't (explicitly) documented before (in the
-non-common-clock case), so I did not bother to comment it in the
-parallel common-clock case.
+Ohad: This code is probably yours and you know the whole history of it.
+Can you please comment it?
 
-But it's true that returning zero in the error case may be
-unexpected, and I will add a comment in v4 (in all the
-.get_clock() implementations).
+Thanks,
+Michal
 
-> > +
-> > +err_notavail:
-> > +	dev_err(&ofdev->dev, "cannot acquire or setup clock source\n");
-> > +	return 0;
-> > +}
-> > +
-> > +static void mpc512x_can_put_clock(struct platform_device *ofdev)
-> > +{
-> > +	struct mscan_priv *priv;
-> > +
-> > +	priv = netdev_priv(dev_get_drvdata(&ofdev->dev));
-> > +	if (priv->clk_can) {
-> > +		clk_unprepare(priv->clk_can);
-> > +		devm_clk_put(&ofdev->dev, priv->clk_can);
-> 
-> devm_clk_put can be removed, it's called automatically.
-> 
-> > +	}
-> > +}
-> > +
-> > +#else	/* COMMON_CLK */
-> > +
-> >  struct mpc512x_clockctl {
-> >  	u32 spmr;		/* System PLL Mode Reg */
-> >  	u32 sccr[2];		/* System Clk Ctrl Reg 1 & 2 */
-> > @@ -239,12 +400,18 @@ exit_put:
-> >  	of_node_put(np_clock);
-> >  	return freq;
-> >  }
-> > +
-> > +#define mpc512x_can_put_clock NULL
-> > +
-> > +#endif	/* COMMON_CLK */
-> > +
-> >  #else /* !CONFIG_PPC_MPC512x */
-> >  static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
-> >  				 const char *clock_name, int *mscan_clksrc)
-> >  {
-> >  	return 0;
-> >  }
-> > +#define mpc512x_can_put_clock NULL
-> >  #endif /* CONFIG_PPC_MPC512x */
-> >  
-> >  static const struct of_device_id mpc5xxx_can_table[];
-> > @@ -386,11 +553,13 @@ static int mpc5xxx_can_resume(struct platform_device *ofdev)
-> >  static const struct mpc5xxx_can_data mpc5200_can_data = {
-> >  	.type = MSCAN_TYPE_MPC5200,
-> >  	.get_clock = mpc52xx_can_get_clock,
-> > +	/* .put_clock not applicable */
-> >  };
-> >  
-> >  static const struct mpc5xxx_can_data mpc5121_can_data = {
-> >  	.type = MSCAN_TYPE_MPC5121,
-> >  	.get_clock = mpc512x_can_get_clock,
-> > +	.put_clock = mpc512x_can_put_clock,
-> >  };
-> >  
-> >  static const struct of_device_id mpc5xxx_can_table[] = {
-> > 
-> 
-> Marc
-
-Thank you for the fast and detailled review.  It's very much
-appreciated.
-
-
-virtually yours
-Gerhard Sittig
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/e40ca146/attachment.sig>
