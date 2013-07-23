@@ -1,120 +1,43 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 23 Jul 2013 11:17:13 -0400
-Subject: [PATCHv2 2/5] arm64: factor out spin-table boot method
-In-Reply-To: <1374507454-4573-3-git-send-email-mark.rutland@arm.com>
-References: <1374507454-4573-1-git-send-email-mark.rutland@arm.com>
- <1374507454-4573-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <51EE9E79.6080005@ti.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 23 Jul 2013 17:18:34 +0200
+Subject: Location for a kind of GPIO bus driver
+Message-ID: <20130723151834.GJ9916@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 July 2013 11:37 AM, Mark Rutland wrote:
-> The arm64 kernel has an internal holding pen, which is necessary for
-> some systems where we can't bring CPUs online individually and must hold
-> multiple CPUs in a safe area until the kernel is able to handle them.
-> The current SMP infrastructure for arm64 is closely coupled to this
-> holding pen, and alternative boot methods must launch CPUs into the pen,
-> from whence they are launched into the kernel proper.
->
-s/whence/where
- 
-> With PSCI (and possibly other future boot methods), we can bring CPUs
-> online individually, and need not perform the secondary_holding_pen
-> dance. Instead, this patch factors the holding pen management code out
-> to the spin-table boot method code, as it is the only boot method
-> requiring the pen.
-> 
-> A new entry point for secondaries, secondary_entry is added for other
-> boot methods to use, which bypasses the holding pen and its associated
-> overhead when bringing CPUs online. The smp.pen.text section is also
-> removed, as the pen can live in head.text without problem.
-> 
-> The smp_operations structure is extended with two new functions,
-> cpu_boot and cpu_postboot, for bringing a cpu into the kernel and
-> performing any post-boot cleanup required by a bootmethod (e.g.
-> resetting the secondary_holding_pen_release to INVALID_HWID).
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/include/asm/smp.h       | 17 ++++++++-
->  arch/arm64/kernel/head.S           | 12 +++++-
->  arch/arm64/kernel/smp.c            | 67 +++-------------------------------
->  arch/arm64/kernel/smp_psci.c       | 16 ++++----
->  arch/arm64/kernel/smp_spin_table.c | 75 ++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/vmlinux.lds.S    |  1 -
->  6 files changed, 115 insertions(+), 73 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> index 90626b6..af39644 100644
-> --- a/arch/arm64/include/asm/smp.h
-> +++ b/arch/arm64/include/asm/smp.h
-> @@ -60,8 +60,7 @@ struct secondary_data {
->  	void *stack;
->  };
->  extern struct secondary_data secondary_data;
-> -extern void secondary_holding_pen(void);
-> -extern volatile unsigned long secondary_holding_pen_release;
-> +extern void secondary_entry(void);
->  
->  extern void arch_send_call_function_single_ipi(int cpu);
->  extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
-> @@ -70,8 +69,22 @@ struct device_node;
->  
->  struct smp_operations {
->  	const char	*name;
-> +	/*
-> +	 * Check devicetree data for cpu
-> +	 */
-All these comments can go above the struct as mentioned
-in kerneldoc.
+Hi,
 
->  	int		(*cpu_init)(struct device_node *, unsigned int);
-> +	/*
-> +	 * Test if cpu is present and bootable
-> +	 */
->  	int		(*cpu_prepare)(unsigned int);
-> +	/*
-> +	 * Boot cpu into the kernel
-> +	 */
-> +	int		(*cpu_boot)(unsigned int);
-> +	/*
-> +	 * Performs post-boot cleanup
-> +	 */
-> +	void		(*cpu_postboot)(void);
->  };
->  
->  extern const struct smp_operations smp_spin_table_ops;
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 53dcae4..3532ca6 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -217,7 +217,6 @@ ENTRY(__boot_cpu_mode)
->  	.quad	PAGE_OFFSET
->  
->  #ifdef CONFIG_SMP
-> -	.pushsection    .smp.pen.text, "ax"
->  	.align	3
->  1:	.quad	.
->  	.quad	secondary_holding_pen_release
-> @@ -242,7 +241,16 @@ pen:	ldr	x4, [x3]
->  	wfe
->  	b	pen
->  ENDPROC(secondary_holding_pen)
-> -	.popsection
-> +
-> +	/*
-> +	 * Secondary entry point that jumps straight into the kernel. Only to
-> +	 * be used where CPUs are brought online dynamically by the kernel.
-> +	 */
-> +ENTRY(secondary_entry)
-> +	bl	__calc_phys_offset		// x2=phys offset
-> +	bl	el2_setup			// Drop to EL1
-> +	b	secondary_startup
-> +ENDPROC(secondary_entry)
->  
->  ENTRY(secondary_startup)
->  	/*
-Other than that, rest of the patch looks fine too me.
+I am currently working on converting the LED driver leds-netxbig to DT.
+Doing so, I am also considering to move the GPIO extension bus functions
+(which are currently parts of leds-netxbig) into a separate driver.
 
-regards,
-Santosh
+On the LaCie "Big Network" board family (netxbig), the LEDs are
+controlled by a CPLD. In turn, the CPLD can be configured (mostly the
+LEDs modes) through a kind of parallel GPIO bus, called GPIO extension
+bus. Two registers (address and data) are exposed. Each of them is made
+up of several GPIOs. An extra GPIO is used to notify the CPLD that the
+registers have been updated. The leds-netxbig driver uses some dedicated
+functions (prefixed by "gpio_ext_") to handle the GPIO bus extension.
+
+On the latest "Big Network" boards, this bus is also used to enable the
+PM wakeup sources: the CPLD can be asked to keep powered some devices
+(as the RTC or the Ethernet PHY) while the board is down. I think it
+could be nice to expose this feature to the userland. That's why I am
+thinking about moving the GPIO extension bus support into a separate
+driver. The problem is that I can't find a proper location for a such
+driver. AFAIK, it doesn't fit with anything existing supported by Linux.
+Maybe I should consider drivers/bus ? Or even drivers/misc ?
+
+Also from a DT point, it not clear to me how the resulting bus and LEDs
+driver are going to work together.
+
+Any advice is welcome. Thanks in advance.
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/14d4cf33/attachment.sig>
