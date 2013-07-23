@@ -1,70 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 23 Jul 2013 10:03:20 -0500
-Subject: [PATCH 4/5] ARM: highbank: remove redundant smp_init_cpus
- definition
-In-Reply-To: <1374579164-30255-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374579164-30255-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <51EE9B38.5030003@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Jul 2013 16:16:38 +0100
+Subject: [PATCH v2] arm: Fix deferred mm switch on VIVT processors
+In-Reply-To: <51EE8E6B.7070801@pengutronix.de>
+References: <1374252329-5345-1-git-send-email-catalin.marinas@arm.com>
+ <51EE8E6B.7070801@pengutronix.de>
+Message-ID: <20130723151637.GC32692@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 06:32 AM, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On Tue, Jul 23, 2013 at 03:08:43PM +0100, Marc Kleine-Budde wrote:
+> On 07/19/2013 06:45 PM, Catalin Marinas wrote:
+> > As of commit b9d4d42ad9 (ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+> > pre-ARMv6 CPUs), the mm switching on VIVT processors is done in the
+> > finish_arch_post_lock_switch() function to avoid whole cache flushing
+> > with interrupts disabled. The need for deferred mm switch is stored as a
+> > thread flag (TIF_SWITCH_MM). However, with preemption enabled, we can
+> > have another thread switch before finish_arch_post_lock_switch(). If the
+> > new thread has the same mm as the previous 'next' thread, the scheduler
+> > will not call switch_mm() and the TIF_SWITCH_MM flag won't be set for
+> > the new thread.
+> > 
+> > This patch moves the switch pending flag to the mm_context_t structure
+> > since this is specific to the mm rather than thread.
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> > Cc: <stable@vger.kernel.org> # 3.5+
 > 
-> arm_dt_init_cpu_maps is called before smp_init_cpus, which sets the
-> cpu_possible_mask appropriately. Since highbank_smp_init_cpus does
-> nothing extra, it can be removed.
+> Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-This is all going to get removed in my PSCI support series. Trying to
-get an updated version out soon.
+Thanks. Submitted as:
 
-Rob
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7790/1
 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> ---
->  arch/arm/mach-highbank/platsmp.c | 22 ----------------------
->  1 file changed, 22 deletions(-)
-> 
-> diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
-> index 32d75cf5..25b0bae 100644
-> --- a/arch/arm/mach-highbank/platsmp.c
-> +++ b/arch/arm/mach-highbank/platsmp.c
-> @@ -31,27 +31,6 @@ static int highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	return 0;
->  }
->  
-> -/*
-> - * Initialise the CPU possible map early - this describes the CPUs
-> - * which may be present or become present in the system.
-> - */
-> -static void __init highbank_smp_init_cpus(void)
-> -{
-> -	unsigned int i, ncores = 4;
-> -
-> -	/* sanity check */
-> -	if (ncores > NR_CPUS) {
-> -		printk(KERN_WARNING
-> -		       "highbank: no. of cores (%d) greater than configured "
-> -		       "maximum of %d - clipping\n",
-> -		       ncores, NR_CPUS);
-> -		ncores = NR_CPUS;
-> -	}
-> -
-> -	for (i = 0; i < ncores; i++)
-> -		set_cpu_possible(i, true);
-> -}
-> -
->  static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
->  {
->  	if (scu_base_addr)
-> @@ -59,7 +38,6 @@ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
->  }
->  
->  struct smp_operations highbank_smp_ops __initdata = {
-> -	.smp_init_cpus		= highbank_smp_init_cpus,
->  	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
->  	.smp_boot_secondary	= highbank_boot_secondary,
->  #ifdef CONFIG_HOTPLUG_CPU
-> 
+-- 
+Catalin
