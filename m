@@ -1,24 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 23 Jul 2013 17:24:06 +0200
-Subject: [PATCH v8 00/28] MBus DT binding for Armada 370/XP and Kirkwood
-In-Reply-To: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130723152406.GH6846@lunn.ch>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 23 Jul 2013 16:28:53 +0100
+Subject: [PATCH v5] xen/arm: enable PV control for ARM
+In-Reply-To: <1374592888-5520-1-git-send-email-julien.grall@linaro.org>
+References: <1374592888-5520-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <alpine.DEB.2.02.1307231628330.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 10:31:04AM -0300, Ezequiel Garcia wrote:
-> After Andrew Lunn reported [1] this work need to take account of Kirkwood
-> to prevent breaking PCIe on such platform, here's a new version adding
-> MBus DT binding for Kirkwood and in particular using it to declare PCIe
-> properly.
+On Tue, 23 Jul 2013, Julien Grall wrote:
+> Enable lifecyle management (reboot, shutdown...) from the toolstack
+> for ARM guest.
+              ^ guests
 
-Hi Ezequiel
+> Signed-off-by: Julien Grall <julien.grall@linaro.org>
 
-I boot tested on my Kirkwood QNAP. Both DT and legacy style. Both boot
-O.K. My device does not actually have any PCI devices on the bus, so
-it is not too good a test. But at least the regression is gone.
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-	   Andrew
+> ---
+>     Changes in v5:
+>         - Rework commit message
+>     Changes in v4:
+>         - Divide the patch in 2 distinct parts
+>     Changes in v3:
+>         - Fix condition to compile cpu_hotplug.o
+>     Changes in v2:
+>         - Don't compile xen/cpu_hotplug.o with ARM64
+> ---
+>  drivers/xen/Makefile |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index a609353..f185e8d 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -1,9 +1,8 @@
+>  ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
+> -obj-y	+= manage.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+>  endif
+>  obj-$(CONFIG_X86)			+= fallback.o
+> -obj-y	+= grant-table.o features.o events.o balloon.o time.o
+> +obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
+>  obj-y	+= xenbus/
+>  
+>  nostackp := $(call cc-option, -fno-stack-protector)
+> -- 
+> 1.7.10.4
+> 
