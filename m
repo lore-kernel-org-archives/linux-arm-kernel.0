@@ -1,122 +1,106 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Jul 2013 23:31:23 -0400
-Subject: [PATCH 07/13] ARM: bL_switcher: hot-unplug half of the available CPUs
+Date: Mon, 22 Jul 2013 23:31:24 -0400
+Subject: [PATCH 08/13] ARM: bL_switcher: do not hardcode GIC IDs in the code
 In-Reply-To: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1374550289-25305-8-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1374550289-25305-9-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a regular kernel configuration, all the CPUs are initially available.
-But the switcher execution model uses half of them at any time.  Instead
-of hacking the DTB to remove half of the CPUs, let's remove them at
-run time and make sure we still have a working switcher configuration.
-This way, the same DTB can be used whether or not the switcher is used.
+Currently, GIC IDs are hardcoded making the code dependent on the 4+4 b.L
+configuration.  Let's allow for GIC IDs to be discovered upon switcher
+initialization to support other b.L configurations such as the 1+1 one,
+or 2+3 as on the VExpress TC2.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/common/bL_switcher.c | 78 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 77 insertions(+), 1 deletion(-)
+ arch/arm/common/bL_switcher.c   | 14 +++++++++++++-
+ drivers/irqchip/irq-gic.c       | 21 +++++++++++++++++++++
+ include/linux/irqchip/arm-gic.h |  1 +
+ 3 files changed, 35 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-index 3ff7bfe126..4273be76ba 100644
+index 4273be76ba..34eff3bc25 100644
 --- a/arch/arm/common/bL_switcher.c
 +++ b/arch/arm/common/bL_switcher.c
-@@ -295,18 +295,94 @@ int bL_switch_request(unsigned int cpu, unsigned int new_cluster_id)
- }
- EXPORT_SYMBOL_GPL(bL_switch_request);
+@@ -111,6 +111,8 @@ static int bL_switchpoint(unsigned long _arg)
+  * Generic switcher interface
+  */
  
-+/*
-+ * Activation and configuration code.
++static unsigned int bL_gic_id[MAX_CPUS_PER_CLUSTER][MAX_NR_CLUSTERS];
++
+ /*
+  * bL_switch_to - Switch to a specific cluster for the current CPU
+  * @new_cluster_id: the ID of the cluster to switch to.
+@@ -160,7 +162,7 @@ static int bL_switch_to(unsigned int new_cluster_id)
+ 	this_cpu = smp_processor_id();
+ 
+ 	/* redirect GIC's SGIs to our counterpart */
+-	gic_migrate_target(cpuid + ib_cluster*4);
++	gic_migrate_target(bL_gic_id[cpuid][ib_cluster]);
+ 
+ 	/*
+ 	 * Raise a SGI on the inbound CPU to make sure it doesn't stall
+@@ -338,6 +340,16 @@ static int __init bL_switcher_halve_cpus(void)
+ 		cluster = (cpu_logical_map(i) >> 8) & 0xff;
+ 
+ 		if (cpumask_test_cpu(cpu, &common_mask)) {
++			/* Let's take note of the GIC ID for this CPU */
++			int gic_id = gic_get_cpu_id(i);
++			if (gic_id < 0) {
++				pr_err("%s: bad GIC ID for CPU %d\n", __func__, i);
++				return -EINVAL;
++			}
++			bL_gic_id[cpu][cluster] = gic_id;
++			pr_info("GIC ID for CPU %u cluster %u is %u\n",
++				cpu, cluster, gic_id);
++
+ 			/*
+ 			 * We keep only those logical CPUs which number
+ 			 * is equal to their physical CPU number. This is
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 6bd5a8c1aa..0b6b8bf5df 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -668,6 +668,27 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 
+ #ifdef CONFIG_BL_SWITCHER
+ /*
++ * gic_get_cpu_id - get the CPU interface ID for the specified CPU
++ *
++ * @cpu: the logical CPU number to get the GIC ID for.
++ *
++ * Return the CPU interface ID for the given logical CPU number,
++ * or -1 if the CPU number is too large or the interface ID is
++ * unknown (more than one bit set).
 + */
-+
-+static cpumask_t bL_switcher_removed_logical_cpus;
-+
-+static void __init bL_switcher_restore_cpus(void)
++int gic_get_cpu_id(unsigned int cpu)
 +{
-+	int i;
++	unsigned int cpu_bit;
 +
-+	for_each_cpu(i, &bL_switcher_removed_logical_cpus)
-+		cpu_up(i);
++	if (cpu >= NR_GIC_CPU_IF)
++		return -1;
++	cpu_bit = gic_cpu_map[cpu];
++	if (cpu_bit & (cpu_bit - 1))
++		return -1;
++	return __ffs(cpu_bit);
 +}
 +
-+static int __init bL_switcher_halve_cpus(void)
-+{
-+	int cpu, cluster, i, ret;
-+	cpumask_t cluster_mask[2], common_mask;
-+
-+	cpumask_clear(&bL_switcher_removed_logical_cpus);
-+	cpumask_clear(&cluster_mask[0]);
-+	cpumask_clear(&cluster_mask[1]);
-+
-+	for_each_online_cpu(i) {
-+		cpu = cpu_logical_map(i) & 0xff;
-+		cluster = (cpu_logical_map(i) >> 8) & 0xff;
-+		if (cluster >= 2) {
-+			pr_err("%s: only dual cluster systems are supported\n", __func__);
-+			return -EINVAL;
-+		}
-+		cpumask_set_cpu(cpu, &cluster_mask[cluster]);
-+	}
-+
-+	if (!cpumask_and(&common_mask, &cluster_mask[0], &cluster_mask[1])) {
-+		pr_err("%s: no common set of CPUs\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	for_each_online_cpu(i) {
-+		cpu = cpu_logical_map(i) & 0xff;
-+		cluster = (cpu_logical_map(i) >> 8) & 0xff;
-+
-+		if (cpumask_test_cpu(cpu, &common_mask)) {
-+			/*
-+			 * We keep only those logical CPUs which number
-+			 * is equal to their physical CPU number. This is
-+			 * not perfect but good enough for now.
-+			 */
-+			if (cpu == i)
-+				continue;
-+		}
-+
-+		ret = cpu_down(i);
-+		if (ret) {
-+			bL_switcher_restore_cpus();
-+			return ret;
-+		}
-+		cpumask_set_cpu(i, &bL_switcher_removed_logical_cpus);
-+	}
-+
-+	return 0;
-+}
-+
- static int __init bL_switcher_init(void)
- {
--	int cpu;
-+	int cpu, ret;
++/*
+  * gic_migrate_target - migrate IRQs to another PU interface
+  *
+  * @new_cpu_id: the CPU target ID to migrate IRQs to
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 40bfcac959..2d7d47e8df 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -75,6 +75,7 @@ static inline void gic_init(unsigned int nr, int start,
+ 	gic_init_bases(nr, start, dist, cpu, 0, NULL);
+ }
  
- 	pr_info("big.LITTLE switcher initializing\n");
++int gic_get_cpu_id(unsigned int cpu);
+ void gic_migrate_target(unsigned int new_cpu_id);
  
-+	if (MAX_NR_CLUSTERS != 2) {
-+		pr_err("%s: only dual cluster systems are supported\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	cpu_hotplug_driver_lock();
-+	ret = bL_switcher_halve_cpus();
-+	if (ret) {
-+		cpu_hotplug_driver_unlock();
-+		return ret;
-+	}
-+
- 	for_each_online_cpu(cpu) {
- 		struct bL_thread *t = &bL_threads[cpu];
- 		init_waitqueue_head(&t->wq);
- 		t->wanted_cluster = -1;
- 		t->task = bL_switcher_thread_create(cpu, t);
- 	}
-+	cpu_hotplug_driver_unlock();
- 
- 	pr_info("big.LITTLE switcher initialized\n");
- 	return 0;
+ #endif /* __ASSEMBLY */
 -- 
 1.8.1.2
