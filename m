@@ -1,23 +1,35 @@
 From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 23 Jul 2013 16:42:16 +0100
-Subject: [PATCH 0/2] Restore Integrator/CP CLCD to fully working state
-Message-ID: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
+Date: Tue, 23 Jul 2013 16:42:17 +0100
+Subject: [PATCH 1/2] ARM: integrator_cp: Set LCD{0,
+ 1} enable lines when turning on CLCD
+In-Reply-To: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
+References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <1374594138-17080-2-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Over time and with refactoring, the use of the Integrator/CP LCD seems to have
-broken.
+This turns on the internal integrator LCD display(s). It seems that the code
+to do this got lost in refactoring of the CLCD driver.
 
-This series restores the ability to use the Integrator's CLCD and an external
-VGA display.
-
-Jonathan Austin (2):
-  ARM: integrator_cp: Set LCD{0,1} enable lines when turning on CLCD
-  clk: fixup argument order when setting VCO parameters
-
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+---
  arch/arm/mach-integrator/integrator_cp.c |    3 ++-
- drivers/clk/versatile/clk-icst.c         |    2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 8c60fcb..2f4c9248 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -199,7 +199,8 @@ static struct mmci_platform_data mmc_data = {
+ static void cp_clcd_enable(struct clcd_fb *fb)
+ {
+ 	struct fb_var_screeninfo *var = &fb->fb.var;
+-	u32 val = CM_CTRL_STATIC1 | CM_CTRL_STATIC2;
++	u32 val = CM_CTRL_STATIC1 | CM_CTRL_STATIC2
++			| CM_CTRL_LCDEN0 | CM_CTRL_LCDEN1;
+ 
+ 	if (var->bits_per_pixel <= 8 ||
+ 	    (var->bits_per_pixel == 16 && var->green.length == 5))
 -- 
 1.7.9.5
