@@ -1,103 +1,186 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jul 2013 12:09:19 +0100
-Subject: [PATCH v3 07/12] ARM: mm: use inner-shareable barriers for TLB and
- user cache operations
+Date: Tue, 23 Jul 2013 12:09:18 +0100
+Subject: [PATCH v3 06/12] ARM: tlb: reduce scope of barrier domains for TLB
+ invalidation
 In-Reply-To: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
 References: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374577764-32480-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1374577764-32480-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-System-wide barriers aren't required for situations where we only need
-to make visibility and ordering guarantees in the inner-shareable domain
-(i.e. we are not dealing with devices or potentially incoherent CPUs).
+Our TLB invalidation routines may require a barrier before the
+maintenance (in order to ensure pending page table writes are visible to
+the hardware walker) and barriers afterwards (in order to ensure
+completion of the maintenance and visibility in the instruction stream).
 
-This patch changes the v7 TLB operations, coherent_user_range and
-dcache_clean_area functions to user inner-shareable barriers. For cache
-maintenance, only the store access type is required to ensure completion.
+Whilst this is expensive, the cost can be reduced somewhat by reducing
+the scope of the barrier instructions:
+
+  - The barrier before only needs to apply to stores (pte writes)
+  - Local ops are required only to affect the non-shareable domain
+  - Global ops are required only to affect the inner-shareable domain
+
+This patch makes these changes for the TLB flushing code.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/cache-v7.S | 4 ++--
- arch/arm/mm/proc-v7.S  | 2 +-
- arch/arm/mm/tlb-v7.S   | 8 ++++----
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/tlbflush.h | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 515b000..b5c467a 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -282,7 +282,7 @@ ENTRY(v7_coherent_user_range)
- 	add	r12, r12, r2
- 	cmp	r12, r1
- 	blo	1b
--	dsb
-+	dsb	ishst
- 	icache_line_size r2, r3
- 	sub	r3, r2, #1
- 	bic	r12, r0, r3
-@@ -294,7 +294,7 @@ ENTRY(v7_coherent_user_range)
- 	mov	r0, #0
- 	ALT_SMP(mcr	p15, 0, r0, c7, c1, 6)	@ invalidate BTB Inner Shareable
- 	ALT_UP(mcr	p15, 0, r0, c7, c5, 6)	@ invalidate BTB
--	dsb
-+	dsb	ishst
- 	isb
- 	mov	pc, lr
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 0fc1272..9297685 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -335,13 +335,13 @@ static inline void local_flush_tlb_all(void)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
  
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 5c6d5a3..6147e04 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -82,7 +82,7 @@ ENTRY(cpu_v7_dcache_clean_area)
- 	add	r0, r0, r2
- 	subs	r1, r1, r2
- 	bhi	1b
--	dsb
-+	dsb	ishst
- 	mov	pc, lr
- ENDPROC(cpu_v7_dcache_clean_area)
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
  
-diff --git a/arch/arm/mm/tlb-v7.S b/arch/arm/mm/tlb-v7.S
-index ea94765..3553087 100644
---- a/arch/arm/mm/tlb-v7.S
-+++ b/arch/arm/mm/tlb-v7.S
-@@ -35,7 +35,7 @@
- ENTRY(v7wbi_flush_user_tlb_range)
- 	vma_vm_mm r3, r2			@ get vma->vm_mm
- 	mmid	r3, r3				@ get vm_mm->context.id
--	dsb
-+	dsb	ish
- 	mov	r0, r0, lsr #PAGE_SHIFT		@ align address
- 	mov	r1, r1, lsr #PAGE_SHIFT
- 	asid	r3, r3				@ mask ASID
-@@ -56,7 +56,7 @@ ENTRY(v7wbi_flush_user_tlb_range)
- 	add	r0, r0, #PAGE_SZ
- 	cmp	r0, r1
- 	blo	1b
--	dsb
-+	dsb	ish
- 	mov	pc, lr
- ENDPROC(v7wbi_flush_user_tlb_range)
+ 	__local_flush_tlb_all();
+ 	tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
  
-@@ -69,7 +69,7 @@ ENDPROC(v7wbi_flush_user_tlb_range)
-  *	- end   - end address (exclusive, may not be aligned)
-  */
- ENTRY(v7wbi_flush_kern_tlb_range)
--	dsb
-+	dsb	ish
- 	mov	r0, r0, lsr #PAGE_SHIFT		@ align address
- 	mov	r1, r1, lsr #PAGE_SHIFT
- 	mov	r0, r0, lsl #PAGE_SHIFT
-@@ -84,7 +84,7 @@ ENTRY(v7wbi_flush_kern_tlb_range)
- 	add	r0, r0, #PAGE_SZ
- 	cmp	r0, r1
- 	blo	1b
--	dsb
-+	dsb	ish
- 	isb
- 	mov	pc, lr
- ENDPROC(v7wbi_flush_kern_tlb_range)
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(nsh);
+ 		isb();
+ 	}
+ }
+@@ -352,13 +352,13 @@ static inline void __flush_tlb_all(void)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ 	__local_flush_tlb_all();
+ 	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(ish);
+ 		isb();
+ 	}
+ }
+@@ -388,13 +388,13 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
+ 
+ 	__local_flush_tlb_mm(mm);
+ 	tlb_op(TLB_V7_UIS_ASID, "c8, c7, 2", asid);
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(nsh);
+ }
+ 
+ static inline void __flush_tlb_mm(struct mm_struct *mm)
+@@ -402,7 +402,7 @@ static inline void __flush_tlb_mm(struct mm_struct *mm)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ 	__local_flush_tlb_mm(mm);
+ #ifdef CONFIG_ARM_ERRATA_720789
+@@ -412,7 +412,7 @@ static inline void __flush_tlb_mm(struct mm_struct *mm)
+ #endif
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(ish);
+ }
+ 
+ static inline void
+@@ -445,13 +445,13 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
+ 
+ 	__local_flush_tlb_page(vma, uaddr);
+ 	tlb_op(TLB_V7_UIS_PAGE, "c8, c7, 1", uaddr);
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(nsh);
+ }
+ 
+ static inline void
+@@ -462,7 +462,7 @@ __flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ 	__local_flush_tlb_page(vma, uaddr);
+ #ifdef CONFIG_ARM_ERRATA_720789
+@@ -472,7 +472,7 @@ __flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ #endif
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(ish);
+ }
+ 
+ static inline void __local_flush_tlb_kernel_page(unsigned long kaddr)
+@@ -498,13 +498,13 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+ 	kaddr &= PAGE_MASK;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
+ 
+ 	__local_flush_tlb_kernel_page(kaddr);
+ 	tlb_op(TLB_V7_UIS_PAGE, "c8, c7, 1", kaddr);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(nsh);
+ 		isb();
+ 	}
+ }
+@@ -516,13 +516,13 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
+ 	kaddr &= PAGE_MASK;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ 	__local_flush_tlb_kernel_page(kaddr);
+ 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", kaddr);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(ish);
+ 		isb();
+ 	}
+ }
+@@ -567,7 +567,7 @@ static inline void dummy_flush_tlb_a15_erratum(void)
+ 	 * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
+ 	 */
+ 	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
+-	dsb();
++	dsb(ish);
+ }
+ #else
+ static inline void dummy_flush_tlb_a15_erratum(void)
+@@ -596,7 +596,7 @@ static inline void flush_pmd_entry(void *pmd)
+ 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ }
+ 
+ static inline void clean_pmd_entry(void *pmd)
 -- 
 1.8.2.2
