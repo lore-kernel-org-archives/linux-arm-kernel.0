@@ -1,55 +1,48 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 23 Jul 2013 15:45:01 -0400 (EDT)
-Subject: [PATCH 0/5] ARM: DT: remove redundant DT related code
-In-Reply-To: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <alpine.LFD.2.03.1307231543480.15022@syhkavp.arg>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 23 Jul 2013 15:48:11 -0400 (EDT)
+Subject: [PATCH 1/6] ARM: prefetch: remove redundant "cc" clobber
+In-Reply-To: <1374579389-32704-2-git-send-email-will.deacon@arm.com>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-2-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.03.1307231547010.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jul 2013, Sudeep KarkadaNagesha wrote:
+On Tue, 23 Jul 2013, Will Deacon wrote:
 
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> The pld instruction does not affect the condition flags, so don't bother
+> clobbering them.
 > 
-> Hi,
-> 
-> As part of my changes to remove duplicate code for parsing cpu nodes
-> in the device tree, I found few unnecessary code mostly around smp_init_cpus.
-> Most of the ARM Cortex A9 based platforms use SCU to get the number of cpus
-> while many others depend on the device tree.
-> 
-> Even on DT based platforms using SCU, they can be made to depend on DT
-> to cpu count simplifying smp_init_cpus. In fact arm_dt_init_cpu_maps called
-> before smp_init_cpus, already does the device tree parsing, validating
-> nr_cpu_ids and setting the cpu_possible_mask appropriately. 
-> 
-> However this series targets only the platforms using DT for cpu count
-> (i.e. not using SCU)
-> 
-> Regards,
-> Sudeep
-For the whole series:
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 
+You know the legacy reason why the cc clobber was there, right?
+It certainly doesn't apply anymore.
 
-> Sudeep KarkadaNagesha (5):
->   ARM: keystone: remove redundant smp_init_cpus definition
->   ARM: vexpress: remove redundant vexpress_dt_cpus_num to get cpu count
->   ARM: mach-mvebu: remove redundant DT parsing and validation
->   ARM: highbank: remove redundant smp_init_cpus definition
->   ARM: zynq: remove unnecessary setting of cpu_present_mask
+
+
+> ---
+>  arch/arm/include/asm/processor.h | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 > 
->  arch/arm/mach-highbank/platsmp.c | 22 ----------------------
->  arch/arm/mach-keystone/platsmp.c |  1 -
->  arch/arm/mach-mvebu/platsmp.c    | 19 +------------------
->  arch/arm/mach-vexpress/platsmp.c | 32 +-------------------------------
->  arch/arm/mach-zynq/platsmp.c     |  9 ---------
->  5 files changed, 2 insertions(+), 81 deletions(-)
-> 
+> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+> index 06e7d50..91cfe08 100644
+> --- a/arch/arm/include/asm/processor.h
+> +++ b/arch/arm/include/asm/processor.h
+> @@ -101,9 +101,7 @@ static inline void prefetch(const void *ptr)
+>  {
+>  	__asm__ __volatile__(
+>  		"pld\t%a0"
+> -		:
+> -		: "p" (ptr)
+> -		: "cc");
+> +		:: "p" (ptr));
+>  }
+>  
+>  #define ARCH_HAS_PREFETCHW
 > -- 
-> 1.8.1.2
-> 
+> 1.8.2.2
 > 
 > 
 > _______________________________________________
