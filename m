@@ -1,37 +1,30 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 23 Jul 2013 14:02:06 -0300
-Subject: [PATCH] ARM: multi_v7_defconfig: Select USB chipidea driver
-Message-ID: <1374598926-23761-1-git-send-email-fabio.estevam@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 23 Jul 2013 10:10:31 -0700
+Subject: [PATCH v8 00/28] MBus DT binding for Armada 370/XP and Kirkwood
+In-Reply-To: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CAOesGMh5GjCkaGX1O1VdkQUKdM8z0XPEc08OFPjJcGgP6s9nRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_USB_EHCI_MXC selects the old i.mx USB driver, which does not support 
-device tree.
+On Tue, Jul 23, 2013 at 6:31 AM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> After Andrew Lunn reported [1] this work need to take account of Kirkwood
+> to prevent breaking PCIe on such platform, here's a new version adding
+> MBus DT binding for Kirkwood and in particular using it to declare PCIe
+> properly.
 
-Select the USB chipidea driver instead, so that USB can be functional on i.mx.
+Ezequiel,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/multi_v7_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This is a prime example of someone sending a whole patch series to the
+devicetree mailing list, when only the bindings updates should go
+there. There are a lot of readers of the devicetree lists that can't
+keep up with the volume of email due to this reason.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index fe0bdc3..ade8328 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -111,11 +111,12 @@ CONFIG_FB_SIMPLE=y
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_EHCI_HCD=y
--CONFIG_USB_EHCI_MXC=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_AB8500_USB=y
- CONFIG_NOP_USB_XCEIV=y
- CONFIG_OMAP_USB2=y
--- 
-1.8.1.2
+So, while I'm commenting on your email, this goes for everybody
+mailing to this list (and I expect to repeat myself a few times in the
+weeks and months ahead): Do not post the driver updates to the
+devicetree list, only the bindings updates.
+
+
+-Olof
