@@ -1,46 +1,71 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 23 Jul 2013 16:08:43 +0200
-Subject: [PATCH v2] arm: Fix deferred mm switch on VIVT processors
-In-Reply-To: <1374252329-5345-1-git-send-email-catalin.marinas@arm.com>
-References: <1374252329-5345-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <51EE8E6B.7070801@pengutronix.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 23 Jul 2013 10:14:01 -0400 (EDT)
+Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
+In-Reply-To: <51EE4A7C.2020709@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1307231009120.1304-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2013 06:45 PM, Catalin Marinas wrote:
-> As of commit b9d4d42ad9 (ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
-> pre-ARMv6 CPUs), the mm switching on VIVT processors is done in the
-> finish_arch_post_lock_switch() function to avoid whole cache flushing
-> with interrupts disabled. The need for deferred mm switch is stored as a
-> thread flag (TIF_SWITCH_MM). However, with preemption enabled, we can
-> have another thread switch before finish_arch_post_lock_switch(). If the
-> new thread has the same mm as the previous 'next' thread, the scheduler
-> will not call switch_mm() and the TIF_SWITCH_MM flag won't be set for
-> the new thread.
+On Tue, 23 Jul 2013, Roger Quadros wrote:
+
+> >> +               pm_runtime_get_sync(dev);
+> >> +               ehci_resume(hcd, false);
+> >> +               ret = ehci_suspend(hcd, do_wakeup);
+> >> +               pm_runtime_put_sync(dev);
+> > 
+> > It would be better to call pm_runtime_resume(dev) at the start instead
+> > of pm_runtime_get_sync(), and eliminate the last two lines.  Then the
+> > ehci_suspend() below could be moved outside the "if" statement.
 > 
-> This patch moves the switch pending flag to the mm_context_t structure
-> since this is specific to the mm rather than thread.
+> Why do I find pm_runtime_* so confusing ;)
+
+It tries to provide every service anyone might want, and ends up being 
+confusingly large.
+
+In this case, though, the reasoning is simple.  We know that after the 
+system resumes, the device will be back in the active state.  Hence 
+there's no point in calling pm_runtime_put_sync here, other than to 
+balance the _get_sync above.  Since there's no danger of another thread 
+trying to do a runtime suspend at this point, you don't need to 
+increment the usage counter.  Therefore pm_runtime_resume is good 
+enough.
+
+> > Alternatively, if you are able to turn off the wakeup setting without
+> > going through an entire resume/suspend cycle, that would be preferable.
+> > 
 > 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> Cc: <stable@vger.kernel.org> # 3.5+
+> As we don't rely on the EHCI controller's interrupt any more after we
+> power it down, maybe ehci_resume/suspend cycle is not required at all on OMAP,
+> even if the wakeup setting is disabled during system suspend.
+> 
+> As the wakeup is controlled entirely by pad wakeup, all we need to do is make sure
+> the IO pad wakeup is configured correctly based on do_wakeup. How this is done
+> is still in transition but it might be turn out to be as simple as irq_set_irq_wake()
+> 
+> So IMHO, for ehci-omap this should suffice
+> 
+> static int omap_ehci_suspend(struct device *dev)
+> {
+> 	struct usb_hcd *hcd = dev_get_drvdata(dev);
+> 	bool do_wakeup = device_may_wakeup(dev);
+> 	int ret = 0;
+> 
+> 	if (!pm_runtime_status_suspended(dev))
+> 		ret = ehci_suspend(hcd, do_wakeup);
+> 
+> 	/* Not tested yet */
+> 	irq_set_irq_wake(hcd->irq, do_wakeup);
+> 
+> 	return ret;
+> }
+> 
+> What do you think?
 
-Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Nice and simple.  It looks good.
 
-regards,
-Marc
+> As the OMAP IO pad wakeup management code [1] is still in transition, I'll wait till
+> that gets settled and then resend this series.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Okay.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/ab545a0c/attachment.sig>
+Alan Stern
