@@ -1,45 +1,63 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 13:25:25 +0200
-Subject: [PATCH v2 1/8] clk: mux: Add support for read-only muxes.
-In-Reply-To: <51EE6784.2090808@cogentembedded.com>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
- <51EE6784.2090808@cogentembedded.com>
-Message-ID: <3464612.aV7xx5H2mf@amdc1227>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 23 Jul 2013 12:32:43 +0100
+Subject: [PATCH 4/5] ARM: highbank: remove redundant smp_init_cpus definition
+In-Reply-To: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374579164-30255-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-On Tuesday 23 of July 2013 15:22:44 Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 23-07-2013 3:49, Tomasz Figa wrote:
-> > Some platforms have read-only clock muxes that are preconfigured at
-> > reset and cannot be changed at runtime. This patch extends mux clock
-> > driver to allow handling such read-only muxes by adding new
-> > CLK_MUX_READ_ONLY mux flag.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> 
-> [...]
-> 
-> > diff --git a/include/linux/clk-provider.h
-> > b/include/linux/clk-provider.h
-> > index 1ec14a7..9487b96 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -327,8 +327,10 @@ struct clk_mux {
-> > #define CLK_MUX_INDEX_ONE		BIT(0)
-> > #define CLK_MUX_INDEX_BIT		BIT(1)
-> > #define CLK_MUX_HIWORD_MASK		BIT(2)
-> > +#define CLK_MUX_READ_ONLY	BIT(3) /* mux setting cannot be changed */
-> 
->     Please align BIT(3) with the above BIT() invocations.
+arm_dt_init_cpu_maps is called before smp_init_cpus, which sets the
+cpu_possible_mask appropriately. Since highbank_smp_init_cpus does
+nothing extra, it can be removed.
 
-Different indentation was intended here to fit the comment, like in case of 
-generic flags. IMHO remaining flags should be changed to this way as well, 
-but this is probably material for another patch.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ arch/arm/mach-highbank/platsmp.c | 22 ----------------------
+ 1 file changed, 22 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+index 32d75cf5..25b0bae 100644
+--- a/arch/arm/mach-highbank/platsmp.c
++++ b/arch/arm/mach-highbank/platsmp.c
+@@ -31,27 +31,6 @@ static int highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return 0;
+ }
+ 
+-/*
+- * Initialise the CPU possible map early - this describes the CPUs
+- * which may be present or become present in the system.
+- */
+-static void __init highbank_smp_init_cpus(void)
+-{
+-	unsigned int i, ncores = 4;
+-
+-	/* sanity check */
+-	if (ncores > NR_CPUS) {
+-		printk(KERN_WARNING
+-		       "highbank: no. of cores (%d) greater than configured "
+-		       "maximum of %d - clipping\n",
+-		       ncores, NR_CPUS);
+-		ncores = NR_CPUS;
+-	}
+-
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-}
+-
+ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	if (scu_base_addr)
+@@ -59,7 +38,6 @@ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+ }
+ 
+ struct smp_operations highbank_smp_ops __initdata = {
+-	.smp_init_cpus		= highbank_smp_init_cpus,
+ 	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
+ 	.smp_boot_secondary	= highbank_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+-- 
+1.8.1.2
