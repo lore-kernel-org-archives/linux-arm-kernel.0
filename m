@@ -1,342 +1,100 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 10:23:17 +0200
-Subject: [PATCH 6/6] USB: OHCI: make ohci-s3c2410 a separate driver
-In-Reply-To: <1374484770-24531-7-git-send-email-manjunath.goudar@linaro.org>
-References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
- <1374484770-24531-1-git-send-email-manjunath.goudar@linaro.org>
- <1374484770-24531-7-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <3454167.krWglU43Yy@flatron>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 23 Jul 2013 11:24:31 +0300
+Subject: [PATCHv4 00/33] ARM: OMAP: clock conversion to DT
+In-Reply-To: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+Message-ID: <51EE3DBF.9060101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
+Hrmph,
 
-Please see some comments inline.
+Seems like the old devicetree list was terminated yesterday, so if you 
+reply to this you will get some bounces. Sorry about that.
 
-On Monday 22 of July 2013 14:49:30 Manjunath Goudar wrote:
-> Separate the Samsung OHCI S3CXXXX host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.12.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> 
-> V2:
->  -Set non-standard fields in ohci_s3c2410_hc_driver manually, rather
-> than relying on an expanded struct ohci_driver_overrides.
->  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
->   relying on ohci_hub_control and hub_status_data being exported.
-> 
-> V3:
->  -Kconfig wrong parentheses discription fixed.
->  -ohci_setup() has been removed because it is called in .reset member
->   of the ohci_hc_driver structure.
-> 
-> V4:
->  - Removed extra space before the '='.
->  - Moved  /* forward definitions */ line before the declarations of
-> functions. ---
->  drivers/usb/host/Kconfig        |    8 +++
->  drivers/usb/host/Makefile       |    1 +
->  drivers/usb/host/ohci-hcd.c     |   18 ------
->  drivers/usb/host/ohci-s3c2410.c |  128
-> +++++++++++++++++---------------------- 4 files changed, 66
-> insertions(+), 89 deletions(-)
-> 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 693560a..795d14d 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -390,6 +390,14 @@ config USB_OHCI_HCD_SPEAR
->            Enables support for the on-chip OHCI controller on
->            ST SPEAr chips.
-> 
-> +config USB_OHCI_HCD_S3CXXXX
-> +        tristate "Support for S3CXXXX on-chip OHCI USB controller"
-> +        depends on USB_OHCI_HCD && (ARCH_S3C24XX || ARCH_S3C64XX)
-> +        default y
-> +        ---help---
-> +          Enables support for the on-chip OHCI controller on
-> +          S3CXXXX chips.
-> +
+-Tero
 
-Please keep the name s3c2410 for consistency. Having all the names come 
-from the first SoC with this hardware is somewhat deterministic as opposed 
-to some other naming methods, e.g. ohci-exynos2, while later on a 
-different SoC from Exynos 2 shows up that needs a different driver.
-
->  config USB_OHCI_HCD_AT91
->          tristate "Support for Atmel on-chip OHCI USB controller"
->          depends on USB_OHCI_HCD && ARCH_AT91
-> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-> index a70b044..9dffe81 100644
-> --- a/drivers/usb/host/Makefile
-> +++ b/drivers/usb/host/Makefile
-> @@ -51,6 +51,7 @@ obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
->  obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
->  obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
->  obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
-> +obj-$(CONFIG_USB_OHCI_HCD_S3CXXXX)	+= ohci-s3c2410.o
-> 
->  obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
->  obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
-> diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-> index b48c892..b69a49e 100644
-> --- a/drivers/usb/host/ohci-hcd.c
-> +++ b/drivers/usb/host/ohci-hcd.c
-> @@ -1177,11 +1177,6 @@ MODULE_LICENSE ("GPL");
->  #define SA1111_DRIVER		ohci_hcd_sa1111_driver
->  #endif
-> 
-> -#if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S3C64XX)
-> -#include "ohci-s3c2410.c"
-> -#define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
-> -#endif
-> -
->  #if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
->  #include "ohci-pxa27x.c"
->  #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
-> @@ -1293,12 +1288,6 @@ static int __init ohci_hcd_mod_init(void)
->  		goto error_tmio;
->  #endif
-> 
-> -#ifdef S3C2410_PLATFORM_DRIVER
-> -	retval = platform_driver_register(&S3C2410_PLATFORM_DRIVER);
-> -	if (retval < 0)
-> -		goto error_s3c2410;
-> -#endif
-> -
->  #ifdef EP93XX_PLATFORM_DRIVER
->  	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
->  	if (retval < 0)
-> @@ -1332,10 +1321,6 @@ static int __init ohci_hcd_mod_init(void)
->  	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
->   error_ep93xx:
->  #endif
-> -#ifdef S3C2410_PLATFORM_DRIVER
-> -	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
-> - error_s3c2410:
-> -#endif
->  #ifdef TMIO_OHCI_DRIVER
->  	platform_driver_unregister(&TMIO_OHCI_DRIVER);
->   error_tmio:
-> @@ -1382,9 +1367,6 @@ static void __exit ohci_hcd_mod_exit(void)
->  #ifdef EP93XX_PLATFORM_DRIVER
->  	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
->  #endif
-> -#ifdef S3C2410_PLATFORM_DRIVER
-> -	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
-> -#endif
->  #ifdef TMIO_OHCI_DRIVER
->  	platform_driver_unregister(&TMIO_OHCI_DRIVER);
->  #endif
-> diff --git a/drivers/usb/host/ohci-s3c2410.c
-> b/drivers/usb/host/ohci-s3c2410.c index e125770..48b5948 100644
-> --- a/drivers/usb/host/ohci-s3c2410.c
-> +++ b/drivers/usb/host/ohci-s3c2410.c
-> @@ -19,19 +19,36 @@
->   * This file is licenced under the GPL.
->  */
-> 
-> -#include <linux/platform_device.h>
->  #include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
->  #include <linux/platform_data/usb-ohci-s3c2410.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +
-> +#include "ohci.h"
-> +
-> 
->  #define valid_port(idx) ((idx) == 1 || (idx) == 2)
-> 
->  /* clock device associated with the hcd */
-> 
-> +
-> +#define DRIVER_DESC "OHCI S3CXXXX driver"
-> +
-> +static const char hcd_name[] = "ohci-s3cxxxx";
-> +
-
-Ditto.
-
->  static struct clk *clk;
->  static struct clk *usb_clk;
-> 
->  /* forward definitions */
-> 
-> +static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
-> +			u16 wValue, u16 wIndex, char *buf, u16 wLength);
-> +static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char
-> *buf); +
->  static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
-> 
->  /* conversion functions */
-> @@ -93,7 +110,7 @@ ohci_s3c2410_hub_status_data(struct usb_hcd *hcd,
-> char *buf) int orig;
->  	int portno;
-> 
-> -	orig  = ohci_hub_status_data(hcd, buf);
-> +	orig = orig_ohci_hub_status_data(hcd, buf);
-> 
->  	if (info == NULL)
->  		return orig;
-> @@ -164,7 +181,7 @@ static int ohci_s3c2410_hub_control(
->  	 * process the request straight away and exit */
-> 
->  	if (info == NULL) {
-> -		ret = ohci_hub_control(hcd, typeReq, wValue,
-> +		ret = orig_ohci_hub_control(hcd, typeReq, wValue,
->  				       wIndex, buf, wLength);
->  		goto out;
->  	}
-> @@ -214,7 +231,7 @@ static int ohci_s3c2410_hub_control(
->  		break;
->  	}
-> 
-> -	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, 
-wLength);
-> +	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex, buf,
-> wLength); if (ret)
->  		goto out;
-> 
-> @@ -373,8 +390,6 @@ static int usb_hcd_s3c2410_probe(const struct
-> hc_driver *driver,
-> 
->  	s3c2410_start_hc(dev, hcd);
-> 
-> -	ohci_hcd_init(hcd_to_ohci(hcd));
-> -
->  	retval = usb_add_hcd(hcd, dev->resource[1].start, 0);
->  	if (retval != 0)
->  		goto err_ioremap;
-> @@ -391,71 +406,7 @@ static int usb_hcd_s3c2410_probe(const struct
-> hc_driver *driver,
-> 
->  /*---------------------------------------------------------------------
-> ----*/
-> 
-> -static int
-> -ohci_s3c2410_start(struct usb_hcd *hcd)
-> -{
-> -	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-> -	int ret;
-> -
-> -	ret = ohci_init(ohci);
-> -	if (ret < 0)
-> -		return ret;
-> -
-> -	ret = ohci_run(ohci);
-> -	if (ret < 0) {
-> -		dev_err(hcd->self.controller, "can't start %s\n",
-> -			hcd->self.bus_name);
-> -		ohci_stop(hcd);
-> -		return ret;
-> -	}
-> -
-> -	return 0;
-> -}
-> -
-> -
-> -static const struct hc_driver ohci_s3c2410_hc_driver = {
-> -	.description =		hcd_name,
-> -	.product_desc =		"S3C24XX OHCI",
-> -	.hcd_priv_size =	sizeof(struct ohci_hcd),
-> -
-> -	/*
-> -	 * generic hardware linkage
-> -	 */
-> -	.irq =			ohci_irq,
-> -	.flags =		HCD_USB11 | HCD_MEMORY,
-> -
-> -	/*
-> -	 * basic lifecycle operations
-> -	 */
-> -	.start =		ohci_s3c2410_start,
-> -	.stop =			ohci_stop,
-> -	.shutdown =		ohci_shutdown,
-> -
-> -	/*
-> -	 * managing i/o requests and associated device resources
-> -	 */
-> -	.urb_enqueue =		ohci_urb_enqueue,
-> -	.urb_dequeue =		ohci_urb_dequeue,
-> -	.endpoint_disable =	ohci_endpoint_disable,
-> -
-> -	/*
-> -	 * scheduling support
-> -	 */
-> -	.get_frame_number =	ohci_get_frame,
-> -
-> -	/*
-> -	 * root hub support
-> -	 */
-> -	.hub_status_data =	ohci_s3c2410_hub_status_data,
-> -	.hub_control =		ohci_s3c2410_hub_control,
-> -#ifdef	CONFIG_PM
-> -	.bus_suspend =		ohci_bus_suspend,
-> -	.bus_resume =		ohci_bus_resume,
-> -#endif
-> -	.start_port_reset =	ohci_start_port_reset,
-> -};
-> -
-> -/* device driver */
-> +static struct hc_driver __read_mostly ohci_s3c2410_hc_driver;
-> 
->  static int ohci_hcd_s3c2410_drv_probe(struct platform_device *pdev)
->  {
-> @@ -532,4 +483,39 @@ static struct platform_driver
-> ohci_hcd_s3c2410_driver = { },
->  };
-> 
-> +static int __init ohci_s3cxxxx_init(void)
-> +{
-> +	if (usb_disabled())
-> +		return -ENODEV;
-> +
-> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-> +	ohci_init_driver(&ohci_s3c2410_hc_driver, NULL);
-> +
-> +	/*
-> +	 * The Samsung HW has some unusual quirks, which require
-> +	 * Sumsung-specific workarounds. We override certain hc_driver
-> +	 * functions here to achieve that. We explicitly do not enhance
-> +	 * ohci_driver_overrides to allow this more easily, since this
-> +	 * is an unusual case, and we don't want to encourage others to
-> +	 * override these functions by making it too easy.
-> +	 */
-> +
-> +	orig_ohci_hub_control = ohci_s3c2410_hc_driver.hub_control;
-> +	orig_ohci_hub_status_data = 
-ohci_s3c2410_hc_driver.hub_status_data;
-> +
-> +	ohci_s3c2410_hc_driver.hub_status_data	= 
-ohci_s3c2410_hub_status_data;
-> +	ohci_s3c2410_hc_driver.hub_control	= 
-ohci_s3c2410_hub_control; +
-> +	return platform_driver_register(&ohci_hcd_s3c2410_driver);
-> +}
-> +module_init(ohci_s3cxxxx_init);
-> +
-> +static void __exit ohci_s3cxxxx_cleanup(void)
-> +{
-> +	platform_driver_unregister(&ohci_hcd_s3c2410_driver);
-> +}
-> +module_exit(ohci_s3cxxxx_cleanup);
-> +
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> +MODULE_LICENSE("GPL");
->  MODULE_ALIAS("platform:s3c2410-ohci");
-
-Otherwise looks good to me. I will try to test this on S3C6410 in next 
-days.
-
-Best regards,
-Tomasz
+On 07/23/2013 10:19 AM, Tero Kristo wrote:
+> Hi,
+>
+> Changes compared to previous version:
+>
+> - Clock init files moved from mach-omap2/ to drivers/clk/omap/
+> - AM33xx support added [patches 15-20]
+> - OMAP3 support added [patches 21-29]
+> - DRA7 APLL support added (thanks Keerthy) [patches 30-33]
+>
+> Test branch on top of 3.11-rc1 available here:
+>
+> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+> branch: mainline-3.11-rc1-omap-dt-clks
+>
+> Testing done:
+>
+> - boot + suspend tested on OMAP3 beagle C4 (omap3530)
+> - boot + suspend tested on OMAP4 panda ES (omap4460)
+> - boot tested on beagle bone (am335x)
+>
+> A boot test was also executed for DRA7 and OMAP5 on a separate branch
+> (mainline does not have OMAP5 / DRA7 support so far.)
+>
+> TODO:
+> - Add AM35xx support (OMAP3 derivative, AM35xx only clock nodes missing)
+>
+> Overall diffstat added just for fun:
+>
+>   arch/arm/boot/dts/am33xx-clocks.dtsi               |  663 ++++
+>   arch/arm/boot/dts/am33xx.dtsi                      |    7 +
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi               | 2113 ++++++++++++
+>   arch/arm/boot/dts/omap3.dtsi                       |    7 +
+>   arch/arm/boot/dts/omap3430es1-clocks.dtsi          |  166 +
+>   arch/arm/boot/dts/omap34xx-omap36xx-clocks.dtsi    |  240 ++
+>   arch/arm/boot/dts/omap34xx.dtsi                    |    9 +
+>   .../omap36xx-am35xx-omap3430es2plus-clocks.dtsi    |  214 ++
+>   arch/arm/boot/dts/omap36xx-clocks.dtsi             |   97 +
+>   .../boot/dts/omap36xx-omap3430es2plus-clocks.dtsi  |  185 +
+>   arch/arm/boot/dts/omap36xx.dtsi                    |   10 +
+>   arch/arm/boot/dts/omap3xxx-clocks.dtsi             | 1594 +++++++++
+>   arch/arm/boot/dts/omap443x-clocks.dtsi             |   17 +
+>   arch/arm/boot/dts/omap443x.dtsi                    |    8 +
+>   arch/arm/boot/dts/omap4460.dtsi                    |    8 +
+>   arch/arm/boot/dts/omap446x-clocks.dtsi             |   27 +
+>   arch/arm/boot/dts/omap44xx-clocks.dtsi             | 1654 +++++++++
+>   arch/arm/boot/dts/omap54xx-clocks.dtsi             | 1416 ++++++++
+>   arch/arm/mach-omap2/Makefile                       |    5 +-
+>   arch/arm/mach-omap2/cclock33xx_data.c              | 1059 ------
+>   arch/arm/mach-omap2/cclock3xxx_data.c              | 3641 --------------------
+>   arch/arm/mach-omap2/cclock44xx_data.c              | 1730 ----------
+>   arch/arm/mach-omap2/clock.c                        |    6 +
+>   arch/arm/mach-omap2/clock.h                        |  163 +-
+>   arch/arm/mach-omap2/clock3xxx.h                    |    7 +-
+>   arch/arm/mach-omap2/io.c                           |    7 +-
+>   arch/arm/mach-omap2/omap_hwmod.c                   |    5 +-
+>   drivers/clk/Makefile                               |    1 +
+>   drivers/clk/clk-divider.c                          |    6 +-
+>   drivers/clk/clk-fixed-factor.c                     |    6 +-
+>   drivers/clk/clk-gate.c                             |    8 +-
+>   drivers/clk/clk-mux.c                              |    6 +-
+>   drivers/clk/clkdev.c                               |   32 +
+>   drivers/clk/omap/Makefile                          |    4 +
+>   drivers/clk/omap/apll.c                            |  213 ++
+>   drivers/clk/omap/autoidle.c                        |  130 +
+>   drivers/clk/omap/clk-33xx.c                        |   85 +
+>   drivers/clk/omap/clk-3xxx.c                        |  171 +
+>   drivers/clk/omap/clk-44xx.c                        |  118 +
+>   drivers/clk/omap/clk-54xx.c                        |   58 +
+>   drivers/clk/omap/clk-7xx.c                         |   67 +
+>   drivers/clk/omap/clk.c                             |   84 +
+>   drivers/clk/omap/dpll.c                            |  387 +++
+>   drivers/clk/omap/gate.c                            |  166 +
+>   drivers/clk/omap/interface.c                       |  110 +
+>   include/linux/clk/omap.h                           |  223 ++
+>   46 files changed, 10327 insertions(+), 6606 deletions(-)
+>
+> -Tero
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
