@@ -1,64 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 23 Jul 2013 15:58:24 +0800
-Subject: [PATCH] ARM: imx: add ocram clock for imx53
-Message-ID: <1374566304-13488-1-git-send-email-shawn.guo@linaro.org>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Tue, 23 Jul 2013 16:04:03 +0800
+Subject: [PATCH] ARM: dts: imx: ocram size is different between imx6q
+ and imx6dl
+In-Reply-To: <1374565107-9658-1-git-send-email-shawn.guo@linaro.org>
+References: <1374565107-9658-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <51EE38F3.7020503@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing ocram gate clock for imx53 and also represent it in device
-tree ocram node.
+On 07/23/2013 03:38 PM, Shawn Guo wrote:
+> The ocram on imx6q is 256 KiB while on imx6dl it's 128 KiB.  Let's
+> have separate node for imx6q and imx6dl.  It also changes imx6q size
+> 0x3f000 to 0x40000 to match the hardware.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../devicetree/bindings/clock/imx5-clock.txt       |    1 +
- arch/arm/boot/dts/imx53.dtsi                       |    1 +
- arch/arm/mach-imx/clk-imx51-imx53.c                |    3 ++-
- 3 files changed, 4 insertions(+), 1 deletion(-)
+Acked-by: Liu Ying <Ying.Liu@freescale.com>
 
-diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-index f46f562..4c029a8 100644
---- a/Documentation/devicetree/bindings/clock/imx5-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-@@ -197,6 +197,7 @@ clocks and IDs.
- 	spdif0_gate		183
- 	spdif1_gate		184
- 	spdif_ipg_gate		185
-+	ocram			186
- 
- Examples (for mx53):
- 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 44a0170..4307e80 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -1121,6 +1121,7 @@
- 		ocram: sram at f8000000 {
- 			compatible = "mmio-sram";
- 			reg = <0xf8000000 0x20000>;
-+			clocks = <&clks 186>;
- 		};
- 	};
- };
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 9afac26..1a56a33 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -119,7 +119,7 @@ enum imx5_clks {
- 	srtc_gate, pata_gate, sata_gate, spdif_xtal_sel, spdif0_sel,
- 	spdif1_sel, spdif0_pred, spdif0_podf, spdif1_pred, spdif1_podf,
- 	spdif0_com_s, spdif1_com_sel, spdif0_gate, spdif1_gate, spdif_ipg_gate,
--	clk_max
-+	ocram, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -506,6 +506,7 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 				mx53_can_sel, ARRAY_SIZE(mx53_can_sel));
- 	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR6, 22);
- 	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR6, 20);
-+	clk[ocram] = imx_clk_gate2("ocram", "ahb", MXC_CCM_CCGR6, 2);
- 	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 8);
- 	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 6);
- 	clk[i2c3_gate] = imx_clk_gate2("i2c3_gate", "per_root", MXC_CCM_CCGR1, 22);
--- 
-1.7.9.5
+> ---
+>  arch/arm/boot/dts/imx6dl.dtsi  |    6 ++++++
+>  arch/arm/boot/dts/imx6q.dtsi   |    6 ++++++
+>  arch/arm/boot/dts/imx6qdl.dtsi |    6 ------
+>  3 files changed, 12 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index e9cb589..9e8ae11 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -32,6 +32,12 @@
+>  	};
+>  
+>  	soc {
+> +		ocram: sram at 00900000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0x00900000 0x20000>;
+> +			clocks = <&clks 142>;
+> +		};
+> +
+>  		aips1: aips-bus at 02000000 {
+>  			iomuxc: iomuxc at 020e0000 {
+>  				compatible = "fsl,imx6dl-iomuxc";
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 76a84e8..f024ef2 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -61,6 +61,12 @@
+>  	};
+>  
+>  	soc {
+> +		ocram: sram at 00900000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0x00900000 0x40000>;
+> +			clocks = <&clks 142>;
+> +		};
+> +
+>  		aips-bus at 02000000 { /* AIPS1 */
+>  			spba-bus at 02000000 {
+>  				ecspi5: ecspi at 02018000 {
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index bc4ca03..ccd55c2 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -99,12 +99,6 @@
+>  			status = "disabled";
+>  		};
+>  
+> -		ocram: sram at 00900000 {
+> -			compatible = "mmio-sram";
+> -			reg = <0x00900000 0x3f000>;
+> -			clocks = <&clks 142>;
+> -		};
+> -
+>  		timer at 00a00600 {
+>  			compatible = "arm,cortex-a9-twd-timer";
+>  			reg = <0x00a00600 0x20>;
+> 
