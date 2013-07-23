@@ -1,59 +1,57 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 23 Jul 2013 11:32:43 +0200
-Subject: [PATCH 07/22] ARM: exynos: Remove '0x's from Exynos4110 DTSI file
-In-Reply-To: <20130723085552.GF26801@laptop>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <2350088.9z671SCjFz@flatron> <20130723085552.GF26801@laptop>
-Message-ID: <1610492.3P9vcH2Wcz@amdc1227>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 Jul 2013 11:33:13 +0200
+Subject: [PATCH RFC 1/8] clk: sunxi: fix initialization of basic clocks
+In-Reply-To: <1374541272-32173-2-git-send-email-emilio@elopez.com.ar>
+References: <1374541272-32173-1-git-send-email-emilio@elopez.com.ar>
+ <1374541272-32173-2-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20130723093313.GB10389@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 of July 2013 09:55:52 Lee Jones wrote:
-> On Mon, 22 Jul 2013, Tomasz Figa wrote:
-> > Hi Lee,
-> > 
-> > On Monday 22 of July 2013 11:52:26 Lee Jones wrote:
-> > > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> > > Cc: linux-samsung-soc at vger.kernel.org
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/exynos4210.dtsi | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/exynos4210.dtsi
-> > > b/arch/arm/boot/dts/exynos4210.dtsi index b7f358a..53e2527 100644
-> > > --- a/arch/arm/boot/dts/exynos4210.dtsi
-> > > +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> > > @@ -72,7 +72,7 @@
-> > > 
-> > >  		};
-> > >  	
-> > >  	};
-> > > 
-> > > -	clock: clock-controller at 0x10030000 {
-> > > +	clock: clock-controller at 10030000 {
-> > > 
-> > >  		compatible = "samsung,exynos4210-clock";
-> > >  		reg = <0x10030000 0x20000>;
-> > >  		#clock-cells = <1>;
-> > 
-> > This looks fine, but please fix commit message - it should be
-> > Exynos4210. Also some explanation why this change is needed would be
-> > good, even if it's obvious.
+Hi Emilio,
+
+On Mon, Jul 22, 2013 at 10:01:05PM -0300, Emilio L?pez wrote:
+> With the recent move towards CLK_OF_DECLARE(...), the driver stopped
+> initializing osc32k, which is compatible "fixed-clock". This is because
+> we never called of_clk_init(NULL). Fix this by moving the only other
+> simple clock (osc24M) to use CLK_OF_DECLARE(...) and call of_clk_init(NULL)
+> to initialize both of them.
 > 
-> Hi Tomasz,
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 > 
-> I'm happy to fixup the $SUBJECT line, but do we really have to enter
-> an explanation if it's obvious? Seems a little belt and braces.
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 412912b..323366b 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -411,10 +411,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+>  }
+>  
+>  /* Matches for of_clk_init */
+> -static const __initconst struct of_device_id clk_match[] = {
+> -	{.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
+> -	{}
+> -};
+> +CLK_OF_DECLARE(sunxi_osc, "allwinner,sun4i-osc-clk", sunxi_osc_clk_setup);
 
-It's obvious for us, people working with device tree, but for people that 
-usually don't it might not be.
+Maybe we can drop the comment and the newline above?
 
-Something among following lines would be fine:
+Apart from this nitpick,
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-This patch removes "0x" prefix from addresses in DT nodes for the sake of 
-consistency with other nodes and assumed convention.
+Thanks,
+Maxime
 
-Best regards,
-Tomasz
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/2c6476d6/attachment.sig>
