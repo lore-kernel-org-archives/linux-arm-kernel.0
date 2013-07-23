@@ -1,87 +1,91 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 23 Jul 2013 10:31:11 -0300
-Subject: [PATCH v8 07/28] bus: mvebu-mbus: Factor out initialization details
+Date: Tue, 23 Jul 2013 10:31:12 -0300
+Subject: [PATCH v8 08/28] bus: mvebu-mbus: Introduce device tree binding
 In-Reply-To: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374586292-4941-8-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374586292-4941-9-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We introduce a common initialization function mvebu_mbus_common_init()
-that will be used by both legacy and device-tree initialization code.
-This patch is an intermediate step, which will allow to introduce the
-DT binding for this driver in a less intrusive way.
+This patch adds the most fundamental device-tree initialization.
+We only introduce what's required to be able to probe the mvebu-mbus
+driver from the DT. Follow-up patches will extend the device tree binding,
+allowing to describe static address decoding windows.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 47 ++++++++++++++++++++++++++++++-----------------
- 1 file changed, 30 insertions(+), 17 deletions(-)
+ drivers/bus/mvebu-mbus.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mbus.h     |  1 +
+ 2 files changed, 50 insertions(+)
 
 diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 827468a..1b17954 100644
+index 1b17954..44a07c4 100644
 --- a/drivers/bus/mvebu-mbus.c
 +++ b/drivers/bus/mvebu-mbus.c
-@@ -847,26 +847,14 @@ static __init int mvebu_mbus_debugfs_init(void)
- }
- fs_initcall(mvebu_mbus_debugfs_init);
- 
--int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
--			   size_t mbuswins_size,
--			   phys_addr_t sdramwins_phys_base,
--			   size_t sdramwins_size)
-+static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
-+					 phys_addr_t mbuswins_phys_base,
-+					 size_t mbuswins_size,
-+					 phys_addr_t sdramwins_phys_base,
-+					 size_t sdramwins_size)
- {
--	struct mvebu_mbus_state *mbus = &mbus_state;
--	const struct of_device_id *of_id;
- 	int win;
- 
--	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
--		if (!strcmp(of_id->compatible, soc))
--			break;
--
--	if (!of_id->compatible) {
--		pr_err("could not find a matching SoC family\n");
--		return -ENODEV;
--	}
--
--	mbus->soc = of_id->data;
--
- 	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
- 	if (!mbus->mbuswins_base)
- 		return -ENOMEM;
-@@ -887,3 +875,28 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
- 
- 	return 0;
+@@ -900,3 +900,52 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 			sdramwins_phys_base,
+ 			sdramwins_size);
  }
 +
-+int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
-+			   size_t mbuswins_size,
-+			   phys_addr_t sdramwins_phys_base,
-+			   size_t sdramwins_size)
++#ifdef CONFIG_OF
++int __init mvebu_mbus_dt_init(void)
 +{
++	struct resource mbuswins_res, sdramwins_res;
++	struct device_node *np, *controller;
 +	const struct of_device_id *of_id;
++	const __be32 *prop;
++	int ret;
 +
-+	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
-+		if (!strcmp(of_id->compatible, soc))
-+			break;
-+
-+	if (!of_id->compatible) {
++	np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
++	if (!np) {
 +		pr_err("could not find a matching SoC family\n");
 +		return -ENODEV;
 +	}
 +
++	of_id = of_match_node(of_mvebu_mbus_ids, np);
 +	mbus_state.soc = of_id->data;
 +
-+	return mvebu_mbus_common_init(&mbus_state,
-+			mbuswins_phys_base,
-+			mbuswins_size,
-+			sdramwins_phys_base,
-+			sdramwins_size);
++	prop = of_get_property(np, "controller", NULL);
++	if (!prop) {
++		pr_err("required 'controller' property missing\n");
++		return -EINVAL;
++	}
++
++	controller = of_find_node_by_phandle(be32_to_cpup(prop));
++	if (!controller) {
++		pr_err("could not find an 'mbus-controller' node\n");
++		return -ENODEV;
++	}
++
++	if (of_address_to_resource(controller, 0, &mbuswins_res)) {
++		pr_err("cannot get MBUS register address\n");
++		return -EINVAL;
++	}
++
++	if (of_address_to_resource(controller, 1, &sdramwins_res)) {
++		pr_err("cannot get SDRAM register address\n");
++		return -EINVAL;
++	}
++
++	ret = mvebu_mbus_common_init(&mbus_state,
++				     mbuswins_res.start,
++				     resource_size(&mbuswins_res),
++				     sdramwins_res.start,
++				     resource_size(&sdramwins_res));
++	return ret;
 +}
++#endif
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index 9245b66..eadefd6 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -74,5 +74,6 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
+ int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
+ 		    size_t mbus_size, phys_addr_t sdram_phys_base,
+ 		    size_t sdram_size);
++int mvebu_mbus_dt_init(void);
+ 
+ #endif /* __LINUX_MBUS_H */
 -- 
 1.8.1.5
