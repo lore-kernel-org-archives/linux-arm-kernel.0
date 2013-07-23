@@ -1,43 +1,60 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 23 Jul 2013 12:32:39 +0100
-Subject: [PATCH 0/5] ARM: DT: remove redundant DT related code
-Message-ID: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Tue, 23 Jul 2013 12:32:42 +0100
+Subject: [PATCH 3/5] ARM: mach-mvebu: remove redundant DT parsing and
+ validation
+In-Reply-To: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374579164-30255-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Hi,
+arm_dt_init_cpu_maps parses the device tree, validates and sets the
+cpu_possible_mask appropriately. It is unnecessary to do another DT
+parse to get the number of cpus, use num_possible_cpus instead.
 
-As part of my changes to remove duplicate code for parsing cpu nodes
-in the device tree, I found few unnecessary code mostly around smp_init_cpus.
-Most of the ARM Cortex A9 based platforms use SCU to get the number of cpus
-while many others depend on the device tree.
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ arch/arm/mach-mvebu/platsmp.c | 19 +------------------
+ 1 file changed, 1 insertion(+), 18 deletions(-)
 
-Even on DT based platforms using SCU, they can be made to depend on DT
-to cpu count simplifying smp_init_cpus. In fact arm_dt_init_cpu_maps called
-before smp_init_cpus, already does the device tree parsing, validating
-nr_cpu_ids and setting the cpu_possible_mask appropriately. 
-
-However this series targets only the platforms using DT for cpu count
-(i.e. not using SCU)
-
-Regards,
-Sudeep
-
-Sudeep KarkadaNagesha (5):
-  ARM: keystone: remove redundant smp_init_cpus definition
-  ARM: vexpress: remove redundant vexpress_dt_cpus_num to get cpu count
-  ARM: mach-mvebu: remove redundant DT parsing and validation
-  ARM: highbank: remove redundant smp_init_cpus definition
-  ARM: zynq: remove unnecessary setting of cpu_present_mask
-
- arch/arm/mach-highbank/platsmp.c | 22 ----------------------
- arch/arm/mach-keystone/platsmp.c |  1 -
- arch/arm/mach-mvebu/platsmp.c    | 19 +------------------
- arch/arm/mach-vexpress/platsmp.c | 32 +-------------------------------
- arch/arm/mach-zynq/platsmp.c     |  9 ---------
- 5 files changed, 2 insertions(+), 81 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index ce81d30..2e4508a 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -87,28 +87,11 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ static void __init armada_xp_smp_init_cpus(void)
+ {
+-	struct device_node *np;
+-	unsigned int i, ncores;
++	unsigned int ncores = num_possible_cpus();
+ 
+-	np = of_find_node_by_name(NULL, "cpus");
+-	if (!np)
+-		panic("No 'cpus' node found\n");
+-
+-	ncores = of_get_child_count(np);
+ 	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
+ 		panic("Invalid number of CPUs in DT\n");
+ 
+-	/* Limit possible CPUs to defconfig */
+-	if (ncores > nr_cpu_ids) {
+-		pr_warn("SMP: %d CPUs physically present. Only %d configured.",
+-			ncores, nr_cpu_ids);
+-		pr_warn("Clipping CPU count to %d\n", nr_cpu_ids);
+-		ncores = nr_cpu_ids;
+-	}
+-
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-
+ 	set_smp_cross_call(armada_mpic_send_doorbell);
+ }
+ 
 -- 
 1.8.1.2
