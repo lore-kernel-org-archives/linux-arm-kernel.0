@@ -1,44 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 23 Jul 2013 10:29:22 +0530
-Subject: [PATCH 3/4] ARM: OMAP2+: Avoid idling memory controllers with
- no drivers
-In-Reply-To: <alpine.DEB.2.02.1307221746430.10891@utopia.booyaka.com>
-References: <1374487277-26099-1-git-send-email-rnayak@ti.com>
- <1374487277-26099-4-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.02.1307221746430.10891@utopia.booyaka.com>
-Message-ID: <51EE0DAA.9000203@ti.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Tue, 23 Jul 2013 14:01:32 +0900
+Subject: [PATCH] decompressors: fix "no limit" output buffer length
+In-Reply-To: <51EDF93B.1070101@wwwdotorg.org>
+References: <1374476169-32194-1-git-send-email-acourbot@nvidia.com>
+ <1374516481.14712.3.camel@linaro1.home> <51EDE724.5020507@nvidia.com>
+ <51EDF93B.1070101@wwwdotorg.org>
+Message-ID: <51EE0E2C.8090103@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 July 2013 11:18 PM, Paul Walmsley wrote:
-> Hi
-> 
-> On Mon, 22 Jul 2013, Rajendra Nayak wrote:
-> 
->> Memory controllers in OMAP (like GPMC and EMIF) have the hwmods marked with
->> HWMOD_INIT_NO_IDLE and are left in enabled state post initial setup.
+On 07/23/2013 12:32 PM, Stephen Warren wrote:
+> On 07/22/2013 07:15 PM, Alex Courbot wrote:
+> ...
+>> Although the patch seems ok to me in its current form, there are two
+>> points for which I still have small doubts:
 >>
->> Even if they have drivers missing, avoid idling them as part of
->> omap_device_late_idle()
-> 
-> Since this patch is intended for the -rc series, it's best if you explain 
-> here what effects this patch will fix.  i.e., does this fix a crash, a 
-> warning, etc?  Also maybe update your series description message?
+>> 1) Whether size_t and pointers will have the same size on all platforms.
+>
+> ptrsize_t?
+>
 
-This patch infact is needed because of 'PATCH 4/4' in the series which makes
-sure the omap_device and pm_runtime state are in sync with the hwmod state.
+Do you mean ptrdiff_t? (I cannot find ptrsize_t anywhere in the kernel)
 
-Without that we always had gpmc and emif having the hwmod state as enabled but
-omap_device state as disabled and we never hit the issue of omap_device_late_idle()
-trying to disable gpmc and emif.
+Looking further about the uses of size_t and ptrdiff_t, it seems like 
+size_t is designed to store the maximum addressable member of an array, 
+whereas ptrdiff_t is used to store a substraction of two pointers. In 
+effect, they translate to the unsigned (size_t) and signed (ptrdiff_t) 
+variants of the same type.
 
-So in short, this does not fix anything in the existing code, but something that
-was uncovered by syncing the states across hwmod and omap_device.
+But since here we know that the result of the substraction will always 
+be positive and potentially big (for devices with memory in the lower 
+half of the address space) using size_t sounds safer to avoid overflows 
+and sign-conversion issues (strm->avail_out, where the value of out_len 
+eventually ends, is an unsigned int).
 
-regards,
-Rajendra
+So point 1) at least seems to be handled correctly with size_t. Point 2) 
+might still be of concern, but if your uncompressed kernel image ends up 
+overflowing your addressable memory, I guess you have a bigger problem 
+to start with. :)
 
-> 
-> 
-> - Paul
-> 
+Andrew, do you think you can merge this as-is? Sorry if you are not the 
+right person to ask, but there is no clear maintainer for this part of 
+the code and you appear to have handled the latest patches that affect 
+the same file.
+
+Thanks,
+Alex.
