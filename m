@@ -1,65 +1,59 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 23 Jul 2013 11:25:16 +0200
-Subject: [PATCH v3 12/16] cpufreq: kirkwood-cpufreq: remove device tree
- parsing for cpu nodes
-In-Reply-To: <1374492747-13879-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <20130723092516.GC6846@lunn.ch>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 23 Jul 2013 11:32:43 +0200
+Subject: [PATCH 07/22] ARM: exynos: Remove '0x's from Exynos4110 DTSI file
+In-Reply-To: <20130723085552.GF26801@laptop>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <2350088.9z671SCjFz@flatron> <20130723085552.GF26801@laptop>
+Message-ID: <1610492.3P9vcH2Wcz@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 12:32:23PM +0100, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On Tuesday 23 of July 2013 09:55:52 Lee Jones wrote:
+> On Mon, 22 Jul 2013, Tomasz Figa wrote:
+> > Hi Lee,
+> > 
+> > On Monday 22 of July 2013 11:52:26 Lee Jones wrote:
+> > > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > > Cc: linux-samsung-soc at vger.kernel.org
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/exynos4210.dtsi | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+> > > b/arch/arm/boot/dts/exynos4210.dtsi index b7f358a..53e2527 100644
+> > > --- a/arch/arm/boot/dts/exynos4210.dtsi
+> > > +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> > > @@ -72,7 +72,7 @@
+> > > 
+> > >  		};
+> > >  	
+> > >  	};
+> > > 
+> > > -	clock: clock-controller at 0x10030000 {
+> > > +	clock: clock-controller at 10030000 {
+> > > 
+> > >  		compatible = "samsung,exynos4210-clock";
+> > >  		reg = <0x10030000 0x20000>;
+> > >  		#clock-cells = <1>;
+> > 
+> > This looks fine, but please fix commit message - it should be
+> > Exynos4210. Also some explanation why this change is needed would be
+> > good, even if it's obvious.
 > 
-> Now that the cpu device registration initialises the of_node(if available)
-> appropriately for all the cpus, parsing here is redundant.
+> Hi Tomasz,
 > 
-> This patch removes all DT parsing and uses cpu->of_node instead.
-> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> ---
->  drivers/cpufreq/kirkwood-cpufreq.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
-> index c233ea6..25ac2cb 100644
-> --- a/drivers/cpufreq/kirkwood-cpufreq.c
-> +++ b/drivers/cpufreq/kirkwood-cpufreq.c
-> @@ -14,7 +14,7 @@
->  #include <linux/clk.h>
->  #include <linux/clk-provider.h>
->  #include <linux/cpufreq.h>
-> -#include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <asm/proc-fns.h>
-> @@ -175,9 +175,11 @@ static int kirkwood_cpufreq_probe(struct platform_device *pdev)
->  	if (IS_ERR(priv.base))
->  		return PTR_ERR(priv.base);
->  
-> -	np = of_find_node_by_path("/cpus/cpu at 0");
-> -	if (!np)
-> +	np = of_cpu_device_node_get(0);
-> +	if (!np) {
-> +		dev_err(&pdev->dev, "failed to get cpu device node\n");
->  		return -ENODEV;
-> +	}
->  
->  	priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
->  	if (IS_ERR(priv.cpu_clk)) {
-> -- 
-> 1.8.1.2
+> I'm happy to fixup the $SUBJECT line, but do we really have to enter
+> an explanation if it's obvious? Seems a little belt and braces.
 
-Hi Sudeep
+It's obvious for us, people working with device tree, but for people that 
+usually don't it might not be.
 
-I've not had chance to test it, but it looks O.K.
+Something among following lines would be fine:
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+This patch removes "0x" prefix from addresses in DT nodes for the sake of 
+consistency with other nodes and assumed convention.
 
-	  Andrew
+Best regards,
+Tomasz
