@@ -1,45 +1,115 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 23 Jul 2013 20:13:23 +0530
-Subject: [PATCH] ARM: dts: tegra114: dalmore: fix the irq trigger type
- of Palmas MFD device
-In-Reply-To: <1374574191-24396-1-git-send-email-josephl@nvidia.com>
-References: <1374574191-24396-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51EE968B.1050103@nvidia.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 23 Jul 2013 10:37:05 -0400 (EDT)
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <3419798.aorxYv8pdo@flatron>
+Message-ID: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 July 2013 03:39 PM, Joseph Lo wrote:
-> The IRQ trigger type of Palmas MFD device (tps65913) is low-level
-> sensitive. The wrong configuration would cause an interrupt storm
-> when booting the system. Fixing it in DT with appropriate interrupt
-> type.
->
-> Cc: Laxman Dewangan <ldewangan@nvidia.com>
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
->   arch/arm/boot/dts/tegra114-dalmore.dts | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-> index 76529e4..70b9d0c 100644
-> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
-> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-> @@ -840,7 +840,7 @@
->   		palmas: tps65913 {
->   			compatible = "ti,palmas";
->   			reg = <0x58>;
-> -			interrupts = <0 86 0x4>;
-> +			interrupts = <0 86 0x8>;
->   
+On Tue, 23 Jul 2013, Tomasz Figa wrote:
 
-This fails as GIC does not support the interrupt flag of 8.
+> On Tuesday 23 of July 2013 09:29:32 Tomasz Figa wrote:
+> > Hi Alan,
 
-[   13.007755] genirq: Setting trigger mode 8 for irq 118 failed 
-(gic_set_type+0x0/0xf0)
-[   13.009152] palmas 1-0058: Irq flag is 0x00000000
+Thanks for helping to clarify the issues here.
 
+> > > Okay.  Are PHYs _always_ platform devices?
+> > 
+> > They can be i2c, spi or any other device types as well.
 
-I did not get the interrupt storm and even interrupt is not working on tot.
-Two ways to resolve this:
-- Change the interrupt flag to 0 from 4. Or
-- Remove the nvidia,invert-interrupt; for PMC node.
+In those other cases, presumably there is no platform data associated
+with the PHY since it isn't a platform device.  Then how does the
+kernel know which controller is attached to the PHY?  Is this spelled
+out in platform data associated with the PHY's i2c/spi/whatever parent?
+
+> > > > > 	PHY.  Currently this information is represented by name or 
+> ID
+> > > > > 	strings embedded in platform data.
+> > > > 
+> > > > right. It's embedded in the platform data of the controller.
+> > > 
+> > > It must also be embedded in the PHY's platform data somehow.
+> > > Otherwise, how would the kernel know which PHY to use?
+> > 
+> > By using a PHY lookup as Stephen and I suggested in our previous
+> > replies. Without any extra data in platform data. (I have even posted a
+> > code example.)
+
+I don't understand, because I don't know what "a PHY lookup" does.
+
+> > > In this case, it doesn't matter where the platform_device structures
+> > > are created or where the driver source code is.  Let's take a simple
+> > > example.  Suppose the system design includes a PHY named "foo".  Then
+> > > the board file could contain:
+> > > 
+> > > struct phy_info { ... } phy_foo;
+> > > EXPORT_SYMBOL_GPL(phy_foo);
+> > > 
+> > > and a header file would contain:
+> > > 
+> > > extern struct phy_info phy_foo;
+> > > 
+> > > The PHY supplier could then call phy_create(&phy_foo), and the PHY
+> > > client could call phy_find(&phy_foo).  Or something like that; make up
+> > > your own structure tags and function names.
+> > > 
+> > > It's still possible to have conflicts, but now two PHYs with the same
+> > > name (or a misspelled name somewhere) will cause an error at link
+> > > time.
+> > 
+> > This is incorrect, sorry. First of all it's a layering violation - you
+> > export random driver-specific symbols from one driver to another. Then
+
+No, that's not what I said.  Neither the PHY driver nor the controller
+driver exports anything to the other.  Instead, both drivers use data
+exported by the board file.
+
+> > imagine 4 SoCs - A, B, C, D. There are two PHY types PHY1 and PHY2 and
+> > there are two types of consumer drivers (e.g. USB host controllers). Now
+> > consider following mapping:
+> > 
+> > SoC	PHY	consumer
+> > A	PHY1	HOST1
+> > B	PHY1	HOST2
+> > C	PHY2	HOST1
+> > D	PHY2	HOST2
+> > 
+> > So we have to be able to use any of the PHYs with any of the host
+> > drivers. This means you would have to export symbol with the same name
+> > from both PHY drivers, which obviously would not work in this case,
+> > because having both drivers enabled (in a multiplatform aware
+> > configuration) would lead to linking conflict.
+
+You're right; the scheme was too simple.  Instead, the board file must
+export two types of data structures, one for PHYs and one for
+controllers.  Like this:
+
+struct phy_info {
+	/* Info for the controller attached to this PHY */
+	struct controller_info	*hinfo;
+};
+
+struct controller_info {
+	/* Info for the PHY which this controller is attached to */
+	struct phy_info		*pinfo;
+};
+
+The board file for SoC A would contain:
+
+struct phy_info phy1 = {&host1);
+EXPORT_SYMBOL(phy1);
+struct controller_info host1 = {&phy1};
+EXPORT_SYMBOL(host1);
+
+The board file for SoC B would contain:
+
+struct phy_info phy1 = {&host2);
+EXPORT_SYMBOL(phy1);
+struct controller_info host2 = {&phy1};
+EXPORT_SYMBOL(host2);
+
+And so on.  This explicitly gives the connection between PHYs and
+controllers.  The PHY providers would use &phy1 or &phy2, and the PHY
+consumers would use &host1 or &host2.
+
+Alan Stern
