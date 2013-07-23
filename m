@@ -1,51 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 23 Jul 2013 10:01:53 -0700
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if
- UP system
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EEB180B@DBDE04.ent.ti.com>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
- <B5906170F1614E41A8A28DE3B8D121433EEB180B@DBDE04.ent.ti.com>
-Message-ID: <20130723170153.GA27761@codeaurora.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 23 Jul 2013 14:02:06 -0300
+Subject: [PATCH] ARM: multi_v7_defconfig: Select USB chipidea driver
+Message-ID: <1374598926-23761-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20, Bedia, Vaibhav wrote:
-> Hi,
-> 
-> On Sat, Jul 06, 2013 at 05:09:33, Stephen Boyd wrote:
-> > In a uniprocessor implementation the interrupt processor targets
-> > registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-> > gic_get_cpumask() will print a critical message saying
-> > 
-> >  GIC CPU mask not found - kernel will fail to boot.
-> > 
-> > if these registers all read as zero, but there won't actually be
-> > a problem on uniprocessor systems and the kernel will boot just
-> > fine. Skip this check if we're running a UP kernel or if we
-> > detect that the hardware only supports a single processor.
-> > 
-> > Cc: Nicolas Pitre <nico@linaro.org>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> > 
-> > Maybe we should just drop the check entirely? It looks like it may
-> > just be debug code that won't ever trigger in practice, even on the
-> > 11MPCore that caused this code to be introduced.
-> > 
-> 
-> Apologies if I missed v2 of this patch if there was one. I could not
-> locate it in my inbox or the list archives.
-> 
-> We have a yet to be released single-core A9 MPCore system (AM437x) which
-> needs to co-exist in omap2plus_defconfig wherein NR_CPUS is set to 2. 
-> This currently leads to the "GIC CPU mask not found..." being printed
-> twice during bootup. If the check is really some debug code, can it be
-> completely dropped?
+CONFIG_USB_EHCI_MXC selects the old i.mx USB driver, which does not support 
+device tree.
 
-I have sent both versions of the patch in hopes that one or the
-other will be accepted. Either way works for me.
+Select the USB chipidea driver instead, so that USB can be functional on i.mx.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fe0bdc3..ade8328 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -111,11 +111,12 @@ CONFIG_FB_SIMPLE=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
+-CONFIG_USB_EHCI_MXC=y
+ CONFIG_USB_EHCI_TEGRA=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_STORAGE=y
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_AB8500_USB=y
+ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_OMAP_USB2=y
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.2
