@@ -1,124 +1,105 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 23 Jul 2013 12:39:56 +0100
-Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
- property
-In-Reply-To: <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
-References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
-Message-ID: <CAGVrzcaAw4TNLUKw6L52jXY0KTHShZWS7tnP5mHHky9eFVKsYg@mail.gmail.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 23 Jul 2013 13:53:48 +0200
+Subject: [PATCH v3 11/31] net: can: mscan: improve clock API use
+In-Reply-To: <51ED2619.5040107@pengutronix.de>
+References: <1374166855-7280-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-12-git-send-email-gsi@denx.de>
+ <51ED2619.5040107@pengutronix.de>
+Message-ID: <20130723115348.GF19071@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jul 22, 2013 at 14:31 +0200, Marc Kleine-Budde wrote:
+> 
+> On 07/22/2013 02:14 PM, Gerhard Sittig wrote:
+> > the .get_clock() callback is run from probe() and might allocate
+> > resources, introduce a .put_clock() callback that is run from remove()
+> > to undo any allocation activities
+> 
+> looks good
+> 
+> > use devm_get_clk() upon lookup (for SYS and REF) to have the clocks put
+> > upon driver unload
+> 
+> fine
+> 
+> > assume that resources get prepared but not necessarily enabled in the
+> > setup phase, make the open() and close() callbacks of the CAN network
+> > device enable and disable a previously acquired and prepared clock
+> 
+> I think you should call prepare_enable and disable_unprepare in the
+> open/close functions.
 
-2013/7/23 Mark Rutland <mark.rutland@arm.com>:
-[snip]
+After more local research, which totally eliminated the need to
+pre-enable the CAN related clocks, but might need more discussion
+as it touches the common gate support, I've learned something
+more:
 
->> +++ b/Documentation/devicetree/bindings/net/fixed-link.txt
->> @@ -0,0 +1,26 @@
->> +Fixed link Device Tree binding
->> +------------------------------
->> +
->> +Some Ethernet MACs have a "fixed link", and are not connected to a
->> +normal MDIO-managed PHY device. For those situations, a Device Tree
->> +binding allows to describe a "fixed link".
->
-> Are partictular MACs fixed link, or can some either be either fixed link
-> or wired to an MDIO-managed PHY? i.e. can we assume a given MAC is
-> fixed-link from its compatible string?
+The CAN clock needs to get enabled during probe() already, since
+registers get accessed between probe() for the driver and open()
+for the network device -- while access to peripheral registers
+crashes the kernel when clocks still are disabled (other hardware
+may just hang or provide fake data, neither of this is OK).
 
-There are different use-cases out there:
+But I see the point in your suggestion to prepare _and_ enable
+the clock during open() as well -- to have open() cope with
+whatever probe() did, after all the driver is shared among
+platforms, which may differ in what they do during probe().
 
-- you lack or do not want to have a proper switch/PHY library driver
-for an Ethernet switch, but that specific switch may still be
-accessible on the MDIO bus, yet you just want to expose a link UP from
-the CPU port perspective, that specific use case should dissapear in
-favor of a simplified PHY library driver which just eventually makes
-the link appear as UP from the CPU port perspective
+So I will:
+- make open() of the network device prepare _and_ enable the
+  clock for the peripheral (if acquired during probe())
+- adjust open() because ATM it leaves the clock enabled when the
+  network device operation fails (the error path is incomplete in
+  v3)
+- make the MPC512x specific probe() time .get_clock() routine not
+  just prepare but enable the clock as well
+- and of course address all the shutdown counter parts of the
+  above setup paths
 
-- you have absolutely no control over the PHY on the MDIO bus
-        * for switches, it could be SPI, I2C, GPIO whatever, so to
-avoid any dependency, you might just want to let the link appear as UP
-        * or you could have a very different PHY whose data-path is
-Ethernet, but the control-path is something else, e.g: MoCA (which is
-more the kind of use-case I am interested in)
+This results in:
+- specific chip drivers only need to balance their private get
+  and put clock routines which are called from probe and remove,
+  common paths DTRT for all of them
+- correct operation for MPC512x, where common clock is used
+- still everything is neutral for MPC5200 where common clock
+  isn't used, behaviour is identical to before the change
+- no assumptions are made about what occurs or doesn't occur
+  during probe(), when the network device is used then the clock
+  is fully setup and operational
+- when the CAN network device isn't setup (because device tree
+  doesn't describe it, or disables that node), then its clock
+  remains idle (neither gets setup nor enabled)
+- complete preparation for future improvement wrt power
+  consumption, where potential changes remain isolated to the
+  specific chip (probe() time setup, get_clock() routine) while
+  the ndo part need not get touched any more
 
->
->> +
->> +Such a fixed link situation is described within an Ethernet device
->> +Device Tree node using a 'fixed-link' property, composed of 5
->> +elements:
->
-> I'm not sure grouping these values together is the best way of handling
-> this. It's rather opaque, and inflexible for future extension.
+So this is the most appropriate approach I can come up with.
 
-Well, I proposed making them look like a "standard" Ethernet PHY node
-but this somehow got rejected, see at the very bottom.
 
->
->> +
->> + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
->> +    the system.
->
-> Is there any reason this couldn't be allocated dynamically within the
-> kernel as needed? I don't see why an arbitrary unique value should be a
-> dt binding requirement; it seems like a leak of Linux implementation
-> details.
+Removing unnecessary devm_put_clk() calls is orthogonal to that.
+Putting these in isn't totally wrong (they won't harm, and they
+do signal "visual balance" more clearly such that the next person
+won't stop and wonder), but it's true that they are redundant.
+"Trained persons" will wonder as much about their presence as
+untrained persons wonder about their absence. :)  Apparently I'm
+not well trained yet.
 
-Honestly, I do not really think actually letting this be configurable
-is a good idea because it would become some sort of user-space ABI. If
-we want to expose some PHY identification registers, we could use some
-ID2 and ID3 values which are not allocated to any vendor, or allocated
-to the Linux foundation (e.g; like what USB does with Linux HUBs).
+I thought that being explicit and cautious would be good, but the
+feedback I got suggests that encoding unnecessary instructions
+isn't desirable.  So I will remove those devm_put_clk() in v4.
 
->
->> + 2. The duplex (1 for full-duplex, 0 for half-duplex)
->
-> Will this change for a given MAC?
->
-> Could we not have a boolean property for each of these, and require one
-> to be present?
->
-> Possibly fixed-link-full-duplex / fix-link-half-duplex?
->
->> + 3. The speed (10, 100, 1000)
->
-> fixed-link-speed?
->
->> + 4. The pause setting (1 for enabled, 0 for disabled)
->> + 5. The asym pause setting (1 for enabled, 0 for disabled)
->
-> Boolean properties for both of these?
->
-> Thanks,
-> Mark.
->
->> +
->> +Example:
->> +
->> +ethernet at 0 {
->> +     ...
->> +     fixed-link = <1 1 1000 0 0>;
->> +     ...
->> +};
->> +
+To save us one more iteration, shall I remove those calls only
+from error paths during setup?  Or shall I remove them from
+regular shutdown paths as well?  How much pain does the community
+feel with harmless yet unnecessary instructions? :)
 
-The initial proposal that I had suggested was this:
 
-ethernet-phy at 0 {
-     reg = <0>;
-     id = <0xdeadbeef>;
-     speed = <1000>;
-     full-duplex;
-     pause;
-     asym-pause;
-};
-
-which looks more or less what you seem to want as well but this
-somehow makes it look like a real PHY device, so we could argue that
-this has nowhere to be in the Device Tree. Arguably there are a
-gazillions of other bindings which imho should also not be in a Device
-Tree.
---
-Florian
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
