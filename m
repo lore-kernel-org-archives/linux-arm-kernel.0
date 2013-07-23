@@ -1,84 +1,61 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 23 Jul 2013 09:35:51 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <51EEAF32.4040905@ti.com>
-References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
- <51EE9EC0.6060905@ti.com> <20130723161846.GD2486@kroah.com>
- <51EEAF32.4040905@ti.com>
-Message-ID: <20130723163551.GA12990@kroah.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 23 Jul 2013 17:41:51 +0100
+Subject: [PATCH resend] ARM: nommu: remove ARCH_MULTIPLATFORM's dependency on
+ CONFIG_MMU
+Message-ID: <1374597712-18112-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 09:58:34PM +0530, Kishon Vijay Abraham I wrote:
-> Hi Greg,
-> 
-> On Tuesday 23 July 2013 09:48 PM, Greg KH wrote:
-> > On Tue, Jul 23, 2013 at 08:48:24PM +0530, Kishon Vijay Abraham I wrote:
-> >> Hi,
-> >>
-> >> On Tuesday 23 July 2013 08:07 PM, Alan Stern wrote:
-> >>> On Tue, 23 Jul 2013, Tomasz Figa wrote:
-> >>>
-> >>>> On Tuesday 23 of July 2013 09:29:32 Tomasz Figa wrote:
-> >>>>> Hi Alan,
-> >>>
-> >>> Thanks for helping to clarify the issues here.
-> >>>
-> >>>>>> Okay.  Are PHYs _always_ platform devices?
-> >>>>>
-> >>>>> They can be i2c, spi or any other device types as well.
-> >>>
-> >>> In those other cases, presumably there is no platform data associated
-> >>> with the PHY since it isn't a platform device.  Then how does the
-> >>> kernel know which controller is attached to the PHY?  Is this spelled
-> >>> out in platform data associated with the PHY's i2c/spi/whatever parent?
-> .
-> .
-> <snip>
-> .
-> .
-> >>
-> >> 	static struct phy *phy_lookup(void *priv) {
-> >> 		.
-> >> 		.
-> >> 		if (phy->priv==priv) //instead of string comparison, we'll use pointer
-> >> 			return phy;
-> >> 	}
-> >>
-> >> PHY driver should be like
-> >> 	phy_create((dev, ops, pdata->info);
-> >>
-> >> The controller driver would do
-> >> 	phy_get(dev, NULL, pdata->info);
-> >>
-> >> Now the PHY framework will check for a match of *priv* pointer and return the PHY.
-> >>
-> >> I think this should be possible?
-> > 
-> > Ick, no.  Why can't you just pass the pointer to the phy itself?  If you
-> > had a "priv" pointer to search from, then you could have just passed the
-> > original phy pointer in the first place, right?
-> > 
-> > The issue is that a string "name" is not going to scale at all, as it
-> > requires hard-coded information that will change over time (as the
-> > existing clock interface is already showing.)
-> > 
-> > Please just pass the real "phy" pointer around, that's what it is there
-> > for.  Your "board binding" logic/code should be able to handle this, as
-> > it somehow was going to do the same thing with a "name".
-> 
-> The problem is the board file won't have the *phy* pointer. *phy* pointer is
-> created at a much later time when the phy driver is probed.
+From: Arnd Bergmann <arnd@arndb.de>
 
-Ok, then save it then, as no one could have used it before then, right?
+ARCH_MULTIPLATFORM currently requires CONFIG_MMU to be set, however it is
+intended that all future V6/V7 platforms are compatible with
+ARCH_MULTIPLATFORM, and so this requirement precludes that addition of new
+!MMU platforms.
 
-All I don't want to see is any "get by name/void *" functions in the
-api, as that way is fragile and will break, as people have already
-shown.
+Furthermore, this requirement creates unnecessary differences between the MMU
+and !MMU worlds, which is undesirable.
 
-Just pass the real pointer around.  If that is somehow a problem, then
-something larger is a problem with how board devices are tied together :)
+This patch allows ARCH_MULTIPLATFORM to remain selected in a !MMU
+configuration. There is still a need to hardcode CONFIG_DRAM_BASE and other
+parameters relating to the system, so this patch is less about making an
+actual multiplatform kernel for !MMU and more about consistency across the
+kernel.
 
-thanks,
+Along with the nommu-fixes, R7 support and MPU support already sent to this
+list, this patch is sufficient to allow building and booting of kernel for a
+Cortex-R7 core on a Versatile Express platform.
 
-greg k-h
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+---
+
+This patch was written by Arnd and after some discussion/testing at my end he
+asked me to send it to the list with a full description.
+
+I'm resending this after testing it still allows R7 to boot on 3.11.
+
+Assuming no comments, I'll drop this in the patch system shortly. Any calls for
+Cc-ing stable?
+
+Jonny
+
+ arch/arm/Kconfig |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 49d993c..5a61686 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -289,8 +289,7 @@ choice
+ 
+ config ARCH_MULTIPLATFORM
+ 	bool "Allow multiple platforms to be selected"
+-	depends on MMU
+-	select ARM_PATCH_PHYS_VIRT
++	select ARM_PATCH_PHYS_VIRT if MMU
+ 	select AUTO_ZRELADDR
+ 	select COMMON_CLK
+ 	select MULTI_IRQ_HANDLER
+-- 
+1.7.9.5
