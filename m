@@ -1,42 +1,51 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Tue, 23 Jul 2013 09:38:00 +0530
-Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
- Exynos5420
-In-Reply-To: <20130712084932.GY24508@sirena.org.uk>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
- <29860116.IF545KsGYb@thinkpad>
- <20130711112023.GM24508@sirena.org.uk>
- <2214161.FSfscAvpna@thinkpad>
- <20130711130139.GQ24508@sirena.org.uk>
- <CAAgF-BdM4jw0o4+ELVo_N029tbgMJBBqJxU91e=TgBNiiREyaA@mail.gmail.com>
- <20130712084932.GY24508@sirena.org.uk>
-Message-ID: <CAAgF-BfdfuhoFDH+SeZogXh1wju34hGp-T9N7_+mnapHfc2yww@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 23 Jul 2013 13:12:23 +0900
+Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
+ no DMA support
+In-Reply-To: <20130723023907.GC14983@quad.lixom.net>
+References: <1373422152-29976-1-git-send-email-horms+renesas@verge.net.au>
+ <20130716012041.GA942@verge.net.au>
+ <20130723023907.GC14983@quad.lixom.net>
+Message-ID: <20130723041220.GA22253@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, Jul 22, 2013 at 07:39:07PM -0700, Olof Johansson wrote:
+> On Tue, Jul 16, 2013 at 10:20:41AM +0900, Simon Horman wrote:
+> > On Wed, Jul 10, 2013 at 11:09:12AM +0900, Simon Horman wrote:
+> > > From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > > 
+> > > On platforms with no support for the shdma dmaengine driver build is
+> > > currently failing with
+> > > 
+> > > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+> > > drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+> > > 
+> > > Fix the breakage by defining shdma_chan_filter to NULL in such
+> > > configurations.
+> > > 
+> > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > > [horms+renesas at verge.net.au: Apply change to shdma-base.h instead of sh_dma.h]
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > ---
+> > >  include/linux/shdma-base.h | 4 ++++
+> > >  1 file changed, 4 insertions(+)
+> > 
+> > > 
+> > > Hi Vinod,
+> > > 
+> > > please consider this fix from Guennadi for v3.11 which I have rebased on top of
+> > > next-20130709. It fixes a build problem on a number of shmobile defconfigs
+> > > including bockw.
+> > 
+> > Ping.
+> > 
+> > Would it be appropriate for me to take this change through my tree?
+> > It seems to resolve a regression in v3.11-rc1.
+> 
+> I'll take it through arm-soc since there's no response from Vinod. I've
+> applied it in the fixes branch we have.
 
-On Fri, Jul 12, 2013 at 2:19 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jul 12, 2013 at 10:07:22AM +0530, Padma Venkat wrote:
->
->> A new version number is added when a there was some change in the IP
->> like adding a internal mux to the IP, adding multi channel support,
->> adding reset control bit. This was done in the older code with
->> platform device.
->> Same thing is followed here. So as previously done, adding a new
->> compatible name like "samsung,i2s-v6" with new quirk
->> "samsung,supports-tdm" is okey?
->
-> Yes, this is good but the quirk should just be found by software based
-> on the compatible string rather than in the DT.
+Thanks!
 
-You mean I just need to initialize the quirks in the driver based on
-the compatible string?
-So what about the quirks that I added previously on 5250? Should I
-also follow the same thing for other quirks?
-
-Or it need to be passed via driver data as it is done in spi driver?
-Please clarify me.
-
-Thanks
-Padma
+Very much appreciated.
