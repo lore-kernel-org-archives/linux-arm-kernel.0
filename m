@@ -1,68 +1,66 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 22 Jul 2013 18:26:21 -0700
-Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
- PLL36xx for samsung SoCs
-In-Reply-To: <CAGm_ybj31kv=iW2YKsHnBRJ741G2amSNAJf+Mx8Z-JMoVynZ8w@mail.gmail.com>
-References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
- <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
- <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
- <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
- <51C85F8F.9050501@samsung.com> <20130624190227.20448.68120@quantum>
- <007001ce7149$1f683f40$5e38bdc0$%kim@samsung.com>
- <CAKew6eVW6dOzLRN2CG8jT3Oo1uzKrXqi1aRYkAHmUu61dBSDpA@mail.gmail.com>
- <CAGm_ybj31kv=iW2YKsHnBRJ741G2amSNAJf+Mx8Z-JMoVynZ8w@mail.gmail.com>
-Message-ID: <20130723012621.7598.46496@quantum>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 23 Jul 2013 10:33:43 +0900
+Subject: [PATCH 19/22] ARM: shmobile: r8a7779: Remove '0x's from R8A7779
+ DTS file
+In-Reply-To: <1374490361-25769-19-git-send-email-lee.jones@linaro.org>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130723013343.GG16481@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Vikas Sajjan (2013-07-21 23:15:27)
-> Hi Kukjin / Mike,
+On Mon, Jul 22, 2013 at 11:52:38AM +0100, Lee Jones wrote:
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+Let me know if you want me to take this through the renesas tree.
+
+> ---
+>  arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> Can you apply this series
-
-Let me apply this to see if the dependencies are taken care of now. If
-so I'll just take it through the clk tree.
-
-Regards,
-Mike
-
+> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> index 7f146c6..86bd487 100644
+> --- a/arch/arm/boot/dts/r8a7779.dtsi
+> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> @@ -65,7 +65,7 @@
+>  		sense-bitfield-width = <2>;
+>  	};
+>  
+> -	i2c0: i2c at 0xffc70000 {
+> +	i2c0: i2c at ffc70000 {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  		compatible = "renesas,rmobile-iic";
+> @@ -74,7 +74,7 @@
+>  		interrupts = <0 79 0x4>;
+>  	};
+>  
+> -	i2c1: i2c at 0xffc71000 {
+> +	i2c1: i2c at ffc71000 {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  		compatible = "renesas,rmobile-iic";
+> @@ -83,7 +83,7 @@
+>  		interrupts = <0 82 0x4>;
+>  	};
+>  
+> -	i2c2: i2c at 0xffc72000 {
+> +	i2c2: i2c at ffc72000 {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  		compatible = "renesas,rmobile-iic";
+> @@ -92,7 +92,7 @@
+>  		interrupts = <0 80 0x4>;
+>  	};
+>  
+> -	i2c3: i2c at 0xffc73000 {
+> +	i2c3: i2c at ffc73000 {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  		compatible = "renesas,rmobile-iic";
+> -- 
+> 1.8.1.2
 > 
-> On Tue, Jul 16, 2013 at 7:10 PM, Yadwinder Singh Brar
-> <yadi.brar01@gmail.com> wrote:
-> > Hi Kukjin / Mike,
-> >
-> > On Tue, Jun 25, 2013 at 7:40 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> >> Mike Turquette wrote:
-> >>>
-> >>> Quoting Kukjin Kim (2013-06-24 08:02:39)
-> >>> > On 06/22/13 01:31, Mike Turquette wrote:
-> >>> > >
-> >>> > > Acked-by: Mike Turquette<mturquette@linaro.org>
-> >>> > >
-> >>> > > Or I can take this through the clk tree. Either way is fine.
-> >>> > >
-> >>> > Mike, please go ahead taking this series into the clk tree for 3.11.
-> >>>
-> >>> Actually it might be better for you to take it. Patch #5 relies on
-> >>> drivers/clk/samsung/clk-exynos5420.c which only exists in the samsung
-> >>> tree.  It was introduced by commit 1609027f, "clk: exynos5420: register
-> >>> clocks using common clock framework".
-> >>>
-> >> Yes, you're right. It depends on soc-exynos5420 stuff in samsung tree.
-> >>
-> >>> And these patches need to be applied with some fuzz to the clk tree due
-> >>> to other changes which are not in my tree and only present in yours.
-> >>>
-> >>> The best two options are either for you to take this series or it can be
-> >>> rebased on top of clk-next, after which I'll apply it.
-> >>>
-> >> Let me try to send this series via samsung tree for v3.11 but I'm not sure because it's a little bit late for arm-soc tree.
-> >>
-> >> Thanks for your ack, just note I will send to arm-soc tonight in my time.
-> >>
-> >
-> > Can we get this series merge now in any of trees.
-> > Please let me if its required to rebase it.
-> >
-> > Regards,
-> > Yadwinder
