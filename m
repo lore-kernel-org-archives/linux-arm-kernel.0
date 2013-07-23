@@ -1,111 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 23 Jul 2013 10:37:11 -0700
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <1446965.6APW5ZgLBW@amdc1227>
-References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
- <51EE9EC0.6060905@ti.com> <20130723161846.GD2486@kroah.com>
- <1446965.6APW5ZgLBW@amdc1227>
-Message-ID: <20130723173710.GB28284@kroah.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 23 Jul 2013 18:40:18 +0100
+Subject: updates for be8 patch series
+In-Reply-To: <CAA3XUr3h5C0oJVrN5iXsM=NFkLMz_Tssp28CysZfwMNS5KvO-Q@mail.gmail.com>
+References: <CAA3XUr3h5C0oJVrN5iXsM=NFkLMz_Tssp28CysZfwMNS5KvO-Q@mail.gmail.com>
+Message-ID: <51EEC002.9070808@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 06:50:29PM +0200, Tomasz Figa wrote:
-> > Ick, no.  Why can't you just pass the pointer to the phy itself?  If you
-> > had a "priv" pointer to search from, then you could have just passed the
-> > original phy pointer in the first place, right?
-> 
-> IMHO it would be better if you provided some code example, but let's try to 
-> check if I understood you correctly.
+On 23/07/13 18:24, Victor Kamensky wrote:
+> Hi Ben,
+>
+> Wrt BE8 little endian instructions you will need to fix couple more places:
+>      ftrace arch/arm/kernel/ftrace.c
+>      kprobes arch/arm/kernel/kprobes.c
+> Also in big endian mode atomic64_xxx function will need fixes, otherwise
+> perf
+> counters will be truncated on max of 32bit values
+>      atomic64 arch/arm/include/asm/atomic.h
 
-It's not my code that I want to have added, so I don't have to write
-examples, I just get to complain about the existing stuff :)
+Hmm, thought ftrace already did the right endian-ness conversions,
+although it is possible it could have missed one.
 
-> 8><------------------------------------------------------------------------
-> 
-> [Board file]
-> 
-> static struct phy my_phy;
-> 
-> static struct platform_device phy_pdev = {
-> 	/* ... */
-> 	.platform_data = &my_phy;
-> 	/* ... */
-> };
-> 
-> static struct platform_device phy_pdev = {
-> 	/* ... */
-> 	.platform_data = &my_phy;
-> 	/* ... */
-> };
-> 
-> [Provider driver]
-> 
-> struct phy *phy = pdev->dev.platform_data;
-> 
-> ret = phy_create(phy);
-> 
-> [Consumer driver]
-> 
-> struct phy *phy = pdev->dev.platform_data;
-> 
-> ret = phy_get(&pdev->dev, phy);
-> 
-> ------------------------------------------------------------------------><8
-> 
-> Is this what you mean?
+The atomic instructions should work fine for BE8, they're using
+STRD which should be correct.
 
-No.  Well, kind of.  What's wrong with using the platform data structure
-unique to the board to have the pointer?
+> I've attached board independent (core) patch from my work that made
+> Pandaboard ES
+> kernel run in BE mode. You can check my version of fixes for above
+> issues in the
+> patch. Look for corresponding files changes. Please rework them
+> according to style
+> and rules of your patch series. Note the patch itself contains fixes for
+> few other
+> issues that already fixed in your series. I'll cross check and compare
+> individual
+> areas latter. I think you may find attached patch interesting as well,
+> it was developed
+> independent from yours but matches its very well.
 
-For example (just randomly picking one), the ata-pxa driver would change
-include/linux/platform_data/ata-pxa.h to have a phy pointer in it:
+>
 
-struct phy;
-
-struct  pata_pxa_pdata {
-	/* PXA DMA DREQ<0:2> pin */
-	uint32_t	dma_dreq;
-	/* Register shift */
-	uint32_t	reg_shift;
-	/* IRQ flags */
-	uint32_t	irq_flags;
-	/* PHY */
-	struct phy	*phy;
-};
-
-Then, when you create the platform, set the phy* pointer with a call to
-phy_create().  Then you can use that pointer wherever that plaform data
-is available (i.e. whereever platform_data is at).
-
-> > The issue is that a string "name" is not going to scale at all, as it
-> > requires hard-coded information that will change over time (as the
-> > existing clock interface is already showing.)
-> 
-> I fully agree that a simple, single string will not scale even in some, not 
-> so uncommon cases, but there is already a lot of existing lookup solutions 
-> over the kernel and so there is no point in introducing another one.
-
-I'm trying to get _rid_ of lookup "solutions" and just use a real
-pointer, as you should.  I'll go tackle those other ones after this one
-is taken care of, to show how the others should be handled as well.
-
-> > Please just pass the real "phy" pointer around, that's what it is there
-> > for.  Your "board binding" logic/code should be able to handle this, as
-> > it somehow was going to do the same thing with a "name".
-> 
-> It's technically correct, but quality of this solution isn't really nice, 
-> because it's a layering violation (at least if I understood what you mean). 
-> This is because you need to have full definition of struct phy in board file 
-> and a structure that is used as private data in PHY core comes from 
-> platform code.
-
-No, just a pointer, you don't need the "full" structure until you get to
-some .c code that actually manipulates the phy itself, for all other
-places, you are just dealing with a pointer and a structure you never
-reference.
-
-Does that make more sense?
-
-thanks,
-
-greg k-h
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
