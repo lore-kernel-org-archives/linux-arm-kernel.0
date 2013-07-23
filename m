@@ -1,62 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jul 2013 12:09:21 +0100
-Subject: [PATCH v3 09/12] ARM: kvm: use inner-shareable barriers after TLB
- flushing
+Date: Tue, 23 Jul 2013 12:09:15 +0100
+Subject: [PATCH v3 03/12] ARM: tlb: don't bother with barriers for branch
+ predictor maintenance
 In-Reply-To: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
 References: <1374577764-32480-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374577764-32480-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1374577764-32480-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When flushing the TLB at PL2 in response to remapping at stage-2 or VMID
-rollover, we have a dsb instruction to ensure completion of the command
-before continuing.
+Branch predictor maintenance is only required when we are either
+changing the kernel's view of memory (switching tables completely) or
+dealing with ASID rollover.
 
-Since we only care about other processors for TLB invalidation, use the
-inner-shareable variant of the dsb instruction instead.
+Both of these use-cases require subsequent TLB invalidation, which has
+the relevant barrier instructions to ensure completion and visibility
+of the maintenance, so this patch removes the instruction barrier from
+[local_]flush_bp_all.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kvm/init.S       | 2 +-
- arch/arm/kvm/interrupts.S | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/tlbflush.h | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index f048338..1b9844d 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -142,7 +142,7 @@ target:	@ We're now in the trampoline code, switch page tables
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 0f029a6..f096add 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -527,6 +527,10 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
+ 	}
+ }
  
- 	@ Invalidate the old TLBs
- 	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
--	dsb
-+	dsb	ish
++/*
++ * Branch predictor maintenance is paired with full TLB invalidation, so
++ * there is no need for any barriers here.
++ */
+ static inline void local_flush_bp_all(void)
+ {
+ 	const int zero = 0;
+@@ -536,9 +540,6 @@ static inline void local_flush_bp_all(void)
+ 		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
+ 	else if (tlb_flag(TLB_V6_BP))
+ 		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
+-
+-	if (tlb_flag(TLB_BARRIER))
+-		isb();
+ }
  
- 	eret
- 
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 16cd4ba..f85052f 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -55,7 +55,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
- 	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
- 	isb
- 	mcr     p15, 0, r0, c8, c3, 0	@ TLBIALLIS (rt ignored)
--	dsb
-+	dsb	ish
- 	isb
- 	mov	r2, #0
- 	mov	r3, #0
-@@ -79,7 +79,7 @@ ENTRY(__kvm_flush_vm_context)
- 	mcr     p15, 4, r0, c8, c3, 4
- 	/* Invalidate instruction caches Inner Shareable (ICIALLUIS) */
- 	mcr     p15, 0, r0, c7, c1, 0
--	dsb
-+	dsb	ish
- 	isb				@ Not necessary if followed by eret
- 
- 	bx	lr
+ #ifdef CONFIG_ARM_ERRATA_798181
 -- 
 1.8.2.2
