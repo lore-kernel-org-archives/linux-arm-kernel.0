@@ -1,100 +1,35 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 23 Jul 2013 11:24:31 +0300
-Subject: [PATCHv4 00/33] ARM: OMAP: clock conversion to DT
-In-Reply-To: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
-Message-ID: <51EE3DBF.9060101@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 23 Jul 2013 09:31:35 +0100
+Subject: alignment handler instruction endian-ness (Ben Dooks)
+In-Reply-To: <CALicx6tS2B_itZHdFh2YrQ2VZOoacx-MuO5vkNfqypH9v5rEiQ@mail.gmail.com>
+References: <CALicx6tS2B_itZHdFh2YrQ2VZOoacx-MuO5vkNfqypH9v5rEiQ@mail.gmail.com>
+Message-ID: <51EE3F67.4050709@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hrmph,
+On 19/07/13 12:38, Vijay Kilari wrote:
+> On Fri, Jul 19, 2013 at 5:06 PM, Vijay Kilari<vijay.kilari@gmail.com>  wrote:
+>>> Message: 4
+>>> Date: Fri, 19 Jul 2013 11:58:45 +0100
+>>> From: Ben Dooks<ben.dooks@codethink.co.uk>
+>>> To: "linux-arm-kernel at lists.infradead.org"
+>>>          <linux-arm-kernel@lists.infradead.org>
+>>> Subject: alignment handler instruction endian-ness
+>>> Message-ID:<51E91BE5.8070809@codethink.co.uk>
+>>> Content-Type: text/plain; charset=ISO-8859-1; format=flowed
+>>>
 
-Seems like the old devicetree list was terminated yesterday, so if you 
-reply to this you will get some bounces. Sorry about that.
 
--Tero
+[snip]
 
-On 07/23/2013 10:19 AM, Tero Kristo wrote:
-> Hi,
->
-> Changes compared to previous version:
->
-> - Clock init files moved from mach-omap2/ to drivers/clk/omap/
-> - AM33xx support added [patches 15-20]
-> - OMAP3 support added [patches 21-29]
-> - DRA7 APLL support added (thanks Keerthy) [patches 30-33]
->
-> Test branch on top of 3.11-rc1 available here:
->
-> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> branch: mainline-3.11-rc1-omap-dt-clks
->
-> Testing done:
->
-> - boot + suspend tested on OMAP3 beagle C4 (omap3530)
-> - boot + suspend tested on OMAP4 panda ES (omap4460)
-> - boot tested on beagle bone (am335x)
->
-> A boot test was also executed for DRA7 and OMAP5 on a separate branch
-> (mainline does not have OMAP5 / DRA7 support so far.)
->
-> TODO:
-> - Add AM35xx support (OMAP3 derivative, AM35xx only clock nodes missing)
->
-> Overall diffstat added just for fun:
->
->   arch/arm/boot/dts/am33xx-clocks.dtsi               |  663 ++++
->   arch/arm/boot/dts/am33xx.dtsi                      |    7 +
->   arch/arm/boot/dts/dra7xx-clocks.dtsi               | 2113 ++++++++++++
->   arch/arm/boot/dts/omap3.dtsi                       |    7 +
->   arch/arm/boot/dts/omap3430es1-clocks.dtsi          |  166 +
->   arch/arm/boot/dts/omap34xx-omap36xx-clocks.dtsi    |  240 ++
->   arch/arm/boot/dts/omap34xx.dtsi                    |    9 +
->   .../omap36xx-am35xx-omap3430es2plus-clocks.dtsi    |  214 ++
->   arch/arm/boot/dts/omap36xx-clocks.dtsi             |   97 +
->   .../boot/dts/omap36xx-omap3430es2plus-clocks.dtsi  |  185 +
->   arch/arm/boot/dts/omap36xx.dtsi                    |   10 +
->   arch/arm/boot/dts/omap3xxx-clocks.dtsi             | 1594 +++++++++
->   arch/arm/boot/dts/omap443x-clocks.dtsi             |   17 +
->   arch/arm/boot/dts/omap443x.dtsi                    |    8 +
->   arch/arm/boot/dts/omap4460.dtsi                    |    8 +
->   arch/arm/boot/dts/omap446x-clocks.dtsi             |   27 +
->   arch/arm/boot/dts/omap44xx-clocks.dtsi             | 1654 +++++++++
->   arch/arm/boot/dts/omap54xx-clocks.dtsi             | 1416 ++++++++
->   arch/arm/mach-omap2/Makefile                       |    5 +-
->   arch/arm/mach-omap2/cclock33xx_data.c              | 1059 ------
->   arch/arm/mach-omap2/cclock3xxx_data.c              | 3641 --------------------
->   arch/arm/mach-omap2/cclock44xx_data.c              | 1730 ----------
->   arch/arm/mach-omap2/clock.c                        |    6 +
->   arch/arm/mach-omap2/clock.h                        |  163 +-
->   arch/arm/mach-omap2/clock3xxx.h                    |    7 +-
->   arch/arm/mach-omap2/io.c                           |    7 +-
->   arch/arm/mach-omap2/omap_hwmod.c                   |    5 +-
->   drivers/clk/Makefile                               |    1 +
->   drivers/clk/clk-divider.c                          |    6 +-
->   drivers/clk/clk-fixed-factor.c                     |    6 +-
->   drivers/clk/clk-gate.c                             |    8 +-
->   drivers/clk/clk-mux.c                              |    6 +-
->   drivers/clk/clkdev.c                               |   32 +
->   drivers/clk/omap/Makefile                          |    4 +
->   drivers/clk/omap/apll.c                            |  213 ++
->   drivers/clk/omap/autoidle.c                        |  130 +
->   drivers/clk/omap/clk-33xx.c                        |   85 +
->   drivers/clk/omap/clk-3xxx.c                        |  171 +
->   drivers/clk/omap/clk-44xx.c                        |  118 +
->   drivers/clk/omap/clk-54xx.c                        |   58 +
->   drivers/clk/omap/clk-7xx.c                         |   67 +
->   drivers/clk/omap/clk.c                             |   84 +
->   drivers/clk/omap/dpll.c                            |  387 +++
->   drivers/clk/omap/gate.c                            |  166 +
->   drivers/clk/omap/interface.c                       |  110 +
->   include/linux/clk/omap.h                           |  223 ++
->   46 files changed, 10327 insertions(+), 6606 deletions(-)
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+>>>
+>>
+>   I think some changes are required in arch/arm/kernel/traps.c
+>   for handling undefined instruction as well
+
+I've added those now thanks.
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
