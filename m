@@ -1,45 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 23 Jul 2013 20:44:47 +0100
-Subject: [PATCH] ASoC: Samsung: Modify the I2S driver to support I2S on
- Exynos5420
-In-Reply-To: <CAAgF-BfdfuhoFDH+SeZogXh1wju34hGp-T9N7_+mnapHfc2yww@mail.gmail.com>
-References: <1373526505-27115-1-git-send-email-padma.v@samsung.com>
- <29860116.IF545KsGYb@thinkpad>
- <20130711112023.GM24508@sirena.org.uk>
- <2214161.FSfscAvpna@thinkpad>
- <20130711130139.GQ24508@sirena.org.uk>
- <CAAgF-BdM4jw0o4+ELVo_N029tbgMJBBqJxU91e=TgBNiiREyaA@mail.gmail.com>
- <20130712084932.GY24508@sirena.org.uk>
- <CAAgF-BfdfuhoFDH+SeZogXh1wju34hGp-T9N7_+mnapHfc2yww@mail.gmail.com>
-Message-ID: <20130723194447.GT9858@sirena.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 23 Jul 2013 15:45:01 -0400 (EDT)
+Subject: [PATCH 0/5] ARM: DT: remove redundant DT related code
+In-Reply-To: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <alpine.LFD.2.03.1307231543480.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 09:38:00AM +0530, Padma Venkat wrote:
-> On Fri, Jul 12, 2013 at 2:19 PM, Mark Brown <broonie@kernel.org> wrote:
+On Tue, 23 Jul 2013, Sudeep KarkadaNagesha wrote:
 
-> > Yes, this is good but the quirk should just be found by software based
-> > on the compatible string rather than in the DT.
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Hi,
+> 
+> As part of my changes to remove duplicate code for parsing cpu nodes
+> in the device tree, I found few unnecessary code mostly around smp_init_cpus.
+> Most of the ARM Cortex A9 based platforms use SCU to get the number of cpus
+> while many others depend on the device tree.
+> 
+> Even on DT based platforms using SCU, they can be made to depend on DT
+> to cpu count simplifying smp_init_cpus. In fact arm_dt_init_cpu_maps called
+> before smp_init_cpus, already does the device tree parsing, validating
+> nr_cpu_ids and setting the cpu_possible_mask appropriately. 
+> 
+> However this series targets only the platforms using DT for cpu count
+> (i.e. not using SCU)
+> 
+> Regards,
+> Sudeep
+For the whole series:
 
-> You mean I just need to initialize the quirks in the driver based on
-> the compatible string?
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-That's the gold standard.
 
-> So what about the quirks that I added previously on 5250? Should I
-> also follow the same thing for other quirks?
-
-Yes, ideally.
-
-> Or it need to be passed via driver data as it is done in spi driver?
-> Please clarify me.
-
-This is a good way to initialise things based on the name - the core
-will do the lookups for you.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/09c53da6/attachment.sig>
+> Sudeep KarkadaNagesha (5):
+>   ARM: keystone: remove redundant smp_init_cpus definition
+>   ARM: vexpress: remove redundant vexpress_dt_cpus_num to get cpu count
+>   ARM: mach-mvebu: remove redundant DT parsing and validation
+>   ARM: highbank: remove redundant smp_init_cpus definition
+>   ARM: zynq: remove unnecessary setting of cpu_present_mask
+> 
+>  arch/arm/mach-highbank/platsmp.c | 22 ----------------------
+>  arch/arm/mach-keystone/platsmp.c |  1 -
+>  arch/arm/mach-mvebu/platsmp.c    | 19 +------------------
+>  arch/arm/mach-vexpress/platsmp.c | 32 +-------------------------------
+>  arch/arm/mach-zynq/platsmp.c     |  9 ---------
+>  5 files changed, 2 insertions(+), 81 deletions(-)
+> 
+> -- 
+> 1.8.1.2
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
