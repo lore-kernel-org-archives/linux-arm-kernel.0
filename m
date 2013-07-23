@@ -1,30 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Jul 2013 10:10:31 -0700
-Subject: [PATCH v8 00/28] MBus DT binding for Armada 370/XP and Kirkwood
-In-Reply-To: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <CAOesGMh5GjCkaGX1O1VdkQUKdM8z0XPEc08OFPjJcGgP6s9nRw@mail.gmail.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Wed, 24 Jul 2013 02:31:17 +0900
+Subject: [PATCH] ARM: dts: Add USBPHY nodes to Exynos4x12
+Message-ID: <1374600682-19376-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 6:31 AM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> After Andrew Lunn reported [1] this work need to take account of Kirkwood
-> to prevent breaking PCIe on such platform, here's a new version adding
-> MBus DT binding for Kirkwood and in particular using it to declare PCIe
-> properly.
+This patch adds device nodes for USBPHY to Exynos4x12.
 
-Ezequiel,
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+---
+ arch/arm/boot/dts/exynos4x12.dtsi |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-This is a prime example of someone sending a whole patch series to the
-devicetree mailing list, when only the bindings updates should go
-there. There are a lot of readers of the devicetree lists that can't
-keep up with the volume of email due to this reason.
-
-So, while I'm commenting on your email, this goes for everybody
-mailing to this list (and I expect to repeat myself a few times in the
-weeks and months ahead): Do not post the driver updates to the
-devicetree list, only the bindings updates.
-
-
--Olof
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 01da194..9c3335b 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -73,4 +73,22 @@
+ 		clock-names = "sclk_fimg2d", "fimg2d";
+ 		status = "disabled";
+ 	};
++
++	usbphy at 125B00000 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "samsung,exynos4x12-usb2phy";
++		reg = <0x125B0000 0x100>;
++		ranges;
++
++		clocks = <&clock 2>, <&clock 305>;
++		clock-names = "xusbxti", "otg";
++		status = "disabled";
++
++		usbphy-sys {
++			/* USB device and host PHY_CONTROL registers */
++			reg = <0x10020704 0xc>,
++			      <0x1001021c 0x4>;
++		};
++	};
+ };
+-- 
+1.7.9.5
