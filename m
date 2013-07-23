@@ -1,188 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 23 Jul 2013 12:22:59 +0100
-Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
- property
-In-Reply-To: <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 23 Jul 2013 13:25:25 +0200
+Subject: [PATCH v2 1/8] clk: mux: Add support for read-only muxes.
+In-Reply-To: <51EE6784.2090808@cogentembedded.com>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+ <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
+ <51EE6784.2090808@cogentembedded.com>
+Message-ID: <3464612.aV7xx5H2mf@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Sergei,
 
-On Mon, Jul 15, 2013 at 04:34:08PM +0100, Thomas Petazzoni wrote:
-> Some Ethernet MACs have a "fixed link", and are not connected to a
-> normal MDIO-managed PHY device. For those situations, a Device Tree
-> binding allows to describe a "fixed link", as a "fixed-link" property
-> of the Ethernet device Device Tree node.
+On Tuesday 23 of July 2013 15:22:44 Sergei Shtylyov wrote:
+> Hello.
 > 
-> This patch adds:
+> On 23-07-2013 3:49, Tomasz Figa wrote:
+> > Some platforms have read-only clock muxes that are preconfigured at
+> > reset and cannot be changed at runtime. This patch extends mux clock
+> > driver to allow handling such read-only muxes by adding new
+> > CLK_MUX_READ_ONLY mux flag.
+> > 
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 > 
->  * A documentation for the Device Tree property "fixed-link".
+> [...]
 > 
->  * A of_phy_register_fixed_link() OF helper, which provided an OF node
->    that contains a "fixed-link" property, registers the corresponding
->    fixed PHY.
+> > diff --git a/include/linux/clk-provider.h
+> > b/include/linux/clk-provider.h
+> > index 1ec14a7..9487b96 100644
+> > --- a/include/linux/clk-provider.h
+> > +++ b/include/linux/clk-provider.h
+> > @@ -327,8 +327,10 @@ struct clk_mux {
+> > #define CLK_MUX_INDEX_ONE		BIT(0)
+> > #define CLK_MUX_INDEX_BIT		BIT(1)
+> > #define CLK_MUX_HIWORD_MASK		BIT(2)
+> > +#define CLK_MUX_READ_ONLY	BIT(3) /* mux setting cannot be changed */
 > 
->  * Removes the warning on the of_phy_connect_fixed_link() that says
->    new drivers should not use it, since Grant Likely indicated that
->    this "fixed-link" property is indeed the way to go.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../devicetree/bindings/net/fixed-link.txt         | 26 ++++++++++++++++
->  drivers/of/of_mdio.c                               | 36 +++++++++++++++++++---
->  include/linux/of_mdio.h                            | 10 ++++++
->  3 files changed, 68 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/fixed-link.txt b/Documentation/devicetree/bindings/net/fixed-link.txt
-> new file mode 100644
-> index 0000000..25a009a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/fixed-link.txt
-> @@ -0,0 +1,26 @@
-> +Fixed link Device Tree binding
-> +------------------------------
-> +
-> +Some Ethernet MACs have a "fixed link", and are not connected to a
-> +normal MDIO-managed PHY device. For those situations, a Device Tree
-> +binding allows to describe a "fixed link".
+>     Please align BIT(3) with the above BIT() invocations.
 
-Are partictular MACs fixed link, or can some either be either fixed link
-or wired to an MDIO-managed PHY? i.e. can we assume a given MAC is
-fixed-link from its compatible string?
+Different indentation was intended here to fit the comment, like in case of 
+generic flags. IMHO remaining flags should be changed to this way as well, 
+but this is probably material for another patch.
 
-> +
-> +Such a fixed link situation is described within an Ethernet device
-> +Device Tree node using a 'fixed-link' property, composed of 5
-> +elements:
-
-I'm not sure grouping these values together is the best way of handling
-this. It's rather opaque, and inflexible for future extension.
-
-> +
-> + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
-> +    the system.
-
-Is there any reason this couldn't be allocated dynamically within the
-kernel as needed? I don't see why an arbitrary unique value should be a
-dt binding requirement; it seems like a leak of Linux implementation
-details.
-
-> + 2. The duplex (1 for full-duplex, 0 for half-duplex)
-
-Will this change for a given MAC?
-
-Could we not have a boolean property for each of these, and require one
-to be present?
-
-Possibly fixed-link-full-duplex / fix-link-half-duplex?
-
-> + 3. The speed (10, 100, 1000)
-
-fixed-link-speed?
-
-> + 4. The pause setting (1 for enabled, 0 for disabled)
-> + 5. The asym pause setting (1 for enabled, 0 for disabled)
-
-Boolean properties for both of these?
-
-Thanks,
-Mark.
-
-> +
-> +Example:
-> +
-> +ethernet at 0 {
-> +	...
-> +	fixed-link = <1 1 1000 0 0>;
-> +	...
-> +};
-> +
-> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-> index d5a57a9..66d5591 100644
-> --- a/drivers/of/of_mdio.c
-> +++ b/drivers/of/of_mdio.c
-> @@ -14,6 +14,7 @@
->  #include <linux/netdevice.h>
->  #include <linux/err.h>
->  #include <linux/phy.h>
-> +#include <linux/phy_fixed.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_mdio.h>
-> @@ -215,10 +216,6 @@ EXPORT_SYMBOL(of_phy_connect);
->   * @dev: pointer to net_device claiming the phy
->   * @hndlr: Link state callback for the network device
->   * @iface: PHY data interface type
-> - *
-> - * This function is a temporary stop-gap and will be removed soon.  It is
-> - * only to support the fs_enet, ucc_geth and gianfar Ethernet drivers.  Do
-> - * not call this function from new drivers.
->   */
->  struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
->  					     void (*hndlr)(struct net_device *),
-> @@ -247,3 +244,34 @@ struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
->  	return IS_ERR(phy) ? NULL : phy;
->  }
->  EXPORT_SYMBOL(of_phy_connect_fixed_link);
-> +
-> +#if defined(CONFIG_FIXED_PHY)
-> +/**
-> + * of_phy_register_fixed_link - Parse fixed-link property and register a dummy phy
-> + * @np: pointer to the OF device node that contains the "fixed-link"
-> + * property for which a dummy phy should be registered.
-> + */
-> +#define FIXED_LINK_PROPERTIES_COUNT 5
-> +int of_phy_register_fixed_link(struct device_node *np)
-> +{
-> +	struct fixed_phy_status status = {};
-> +	u32 fixed_link_props[FIXED_LINK_PROPERTIES_COUNT];
-> +	int ret;
-> +
-> +	ret = of_property_read_u32_array(np, "fixed-link",
-> +					 fixed_link_props,
-> +					 FIXED_LINK_PROPERTIES_COUNT);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	status.link       = 1;
-> +	status.duplex     = fixed_link_props[1];
-> +	status.speed      = fixed_link_props[2];
-> +	status.pause      = fixed_link_props[3];
-> +	status.asym_pause = fixed_link_props[4];
-> +
-> +	return fixed_phy_add(PHY_POLL, fixed_link_props[0],
-> +			     &status);
-> +}
-> +EXPORT_SYMBOL(of_phy_register_fixed_link);
-> +#endif
-> diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
-> index 8163107..bf6efea 100644
-> --- a/include/linux/of_mdio.h
-> +++ b/include/linux/of_mdio.h
-> @@ -57,4 +57,14 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
->  }
->  #endif /* CONFIG_OF */
->  
-> +#if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
-> +extern int of_phy_register_fixed_link(struct device_node *np);
-> +#else
-> +static inline int of_phy_register_fixed_link(struct device_node *np)
-> +{
-> +	return -ENOSYS;
-> +}
-> +#endif
-> +
-> +
->  #endif /* __LINUX_OF_MDIO_H */
-> -- 
-> 1.8.1.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Best regards,
+Tomasz
