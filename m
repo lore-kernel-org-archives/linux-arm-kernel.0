@@ -1,220 +1,496 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 23 Jul 2013 08:13:39 -0500
-Subject: [PATCH] arm: l2x0: add support for prefetch and pwr control
- register configuration
-In-Reply-To: <20130723102212.GD4833@e106331-lin.cambridge.arm.com>
-References: <1374572345-5763-1-git-send-email-chander.kashyap@linaro.org>
- <20130723102212.GD4833@e106331-lin.cambridge.arm.com>
-Message-ID: <51EE8183.9010703@gmail.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 23 Jul 2013 15:14:06 +0200
+Subject: [PATCH v3 17/31] clk: mpc512x: introduce COMMON_CLK for MPC512x
+In-Reply-To: <1374495298-22019-18-git-send-email-gsi@denx.de>
+References: <1374166855-7280-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-18-git-send-email-gsi@denx.de>
+Message-ID: <20130723131406.GI19071@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 05:22 AM, Mark Rutland wrote:
-> Hi,
-> 
-> [adding Rob Herring to Cc]
+[ summary: "shared gate" support desirable? approach acceptable? ]
 
-Thanks.
+On Mon, Jul 22, 2013 at 14:14 +0200, Gerhard Sittig wrote:
+> 
+> this change implements a clock driver for the MPC512x PowerPC platform
+> which follows the COMMON_CLK approach and uses common clock drivers
+> shared with other platforms
+> 
+> [ ... ]
+> 
+> some of the clock items get pre-enabled in the clock driver to not have
+> them automatically disabled by the underlying clock subsystem because of
+> their being unused -- this approach is desirable because
+> [ ... ]
+> - some help introduce support for and migrate to the common
+>   infrastructure, while more appropriate support for specific hardware
+>   constraints isn't available yet (remaining changes are strictly
+>   internal to the clock driver and won't affect peripheral drivers)
 
-> On Tue, Jul 23, 2013 at 10:39:05AM +0100, Chander Kashyap wrote:
->> This patch adds support to configure prefetch and pwr control registers
->> of pl310 cache controllor.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/arm/l2cc.txt |    6 ++++
->>  arch/arm/include/asm/hardware/cache-l2x0.h     |   23 +++++++++++++
->>  arch/arm/mm/cache-l2x0.c                       |   44 ++++++++++++++++++++++++
->>  3 files changed, 73 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->> index cbef09b..66876b6 100644
->> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->> @@ -34,6 +34,12 @@ Optional properties:
->>  - arm,filter-ranges : <start length> Starting address and length of window to
->>    filter. Addresses in the filter window are directed to the M1 port. Other
->>    addresses will go to the M0 port.
->> +- arm,prefetch-control : Prefetch related configurations. Specifies 8 cells of
->> +  prefetch-offset, not-same-ID-on-exclusive-sequence-en, incr-double-Linefill-en,
->> +  prefetch-drop-en, data-prefetch-en, instruction-prefetch-en and
->> +  double-linefill-en.
-> 
-> This looks like configuration rather than hardware specification. 
+This remark was related to the CAN clocks of the MPC512x SoC.
 
-I think weigh whether this is configuration based on the h/w or just
-user preference. This would be the former, but...
+The clock subtrees which are involved in generating CAN bitrates
+include one path from the XTAL to an internal MCLK (this is part
+of the CCF support for the platform), and another path from the
+MCLK or yet another IP bus clock to the actual bitrate on the
+wire (this is taken care of within the mscan(4) driver).
 
-> Is there any reason we couldn't have Linux configure this itself? I'm
-> not sure having a fixed configuration of these values makes sense - the
-> configuration values could interact badly with future changes to Linux
-> (e.g. performance improvements or errata workarounds), and then we'd
-> have to ignore the described values and/or decide on more suitable ones
-> dynamically anyway.
+The MCLK generation for CAN is documented in the MPC5121e
+Reference Manual, chapter 5, section 5.2.5 "MSCAN Clock
+Generation".  SYS, REF (both internal), PSC_MCLK_IN, and SPDIF_TX
+(both external) are muxed, gated, and divided.  The result is
+muxed with IP.  The result is fed into the MSCAN component and
+gets muxed with IP again (can't tell why, maybe for backwards
+compatibility).
 
-Does having a variable configuration for these make sense either? I mean
-other than an errata work-around, why would you ever turn off prefetch
-or double linefill?
+In parallel to this MCLK block there is SCCR2[25], the "BDLC and
+MSCAN clock enable", documented in section 5.3.1.3 "System Clock
+Control Register 2".  So there is a gate that "somehow needs to
+get setup" yet isn't part of the visible MCLK chain.
 
-None of these fields can be set in NS world. We've already laid down the
-law in regards to setting secure only bits for errata work-arounds. I
-think this is no different and we should move towards the kernel doesn't
-touch aux ctrl at all. There might be an exception with the event bus
-enable, but you would still have the secure vs. non-secure issue and no
-way to detect that.
+The series up to and including v3 approaches the problem by
+- adding a gate after the second MCLK mux, which gets exported
+  for client lookups and is the MCLK input for the mscan(4)
+  driver
+- creating that gate for each of the four MSCAN clocks of the
+  SoC, all of them referencing the single "enable" bit in the
+  SCCR2 register
+- pre-enabling the MSCAN clocks from within the clock driver, and
+  thus avoid having the clock disabled from the common
+  infrastructure, because disabling one of these clocks had
+  closed the shared gate and thus had broken all other clock uses
 
-Rob
+> clkdev registration provides "alias names" for few clock items
+> [ ... ]
+> 
+[ ... ]
+> +
+> +/* setup the MCLK clock subtree of an individual PSC/MSCAN/SPDIF */
+> +static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry)
+> +{
+> +	size_t clks_idx_pub, clks_idx_int;
+> +	u32 __iomem *mccr_reg;	/* MCLK control register (mux, en, div) */
+> +	u32 __iomem *sccr_reg;	/* system clock control register (enable) */
+> +	int sccr_bit;
+> +	int div;
+> +
+> +	/* derive a few parameters from the component type and index */
+> +	switch (entry->type) {
+> +	case MCLK_TYPE_PSC:
+> +		clks_idx_pub = MPC512x_CLK_PSC0_MCLK + entry->comp_idx;
+> +		clks_idx_int = MPC512x_CLK_MCLKS_FIRST
+> +			     + (entry->comp_idx) * MCLK_MAX_IDX;
+> +		mccr_reg = &clkregs->psc_ccr[entry->comp_idx];
+> +		break;
+> +	case MCLK_TYPE_MSCAN:
+> +		clks_idx_pub = MPC512x_CLK_MSCAN0_MCLK + entry->comp_idx;
+> +		clks_idx_int = MPC512x_CLK_MCLKS_FIRST
+> +			     + (NR_PSCS + entry->comp_idx) * MCLK_MAX_IDX;
+> +		mccr_reg = &clkregs->mscan_ccr[entry->comp_idx];
+> +		break;
+> +	case MCLK_TYPE_SPDIF:
+> +		clks_idx_pub = MPC512x_CLK_SPDIF_MCLK;
+> +		clks_idx_int = MPC512x_CLK_MCLKS_FIRST
+> +			     + (NR_PSCS + NR_MSCANS) * MCLK_MAX_IDX;
+> +		mccr_reg = &clkregs->spccr;
+> +		break;
+> +	default:
+> +		return;
+> +	}
+> +	if (entry->bit_sccr1 >= 0) {
+> +		sccr_reg = &clkregs->sccr1;
+> +		sccr_bit = entry->bit_sccr1;
+> +	} else if (entry->bit_sccr2 >= 0) {
+> +		sccr_reg = &clkregs->sccr2;
+> +		sccr_bit = entry->bit_sccr2;
+> +	} else {
+> +		sccr_reg = NULL;
+> +	}
+> +
+> +	/*
+> +	 * this was grabbed from the PPC_CLOCK implementation, which
+> +	 * enforced a specific MCLK divider while the clock was gated
+> +	 * during setup (that's a documented hardware requirement)
+> +	 *
+> +	 * the PPC_CLOCK implementation might even have violated the
+> +	 * "MCLK <= IPS" constraint, the fixed divider value of 1
+> +	 * results in a divider of 2 and thus MCLK = SYS/2 which equals
+> +	 * CSB which is greater than IPS; the serial port setup may have
+> +	 * adjusted the divider which the clock setup might have left in
+> +	 * an undesirable state
+> +	 *
+> +	 * initial setup is:
+> +	 * - MCLK 0 from SYS
+> +	 * - MCLK DIV such to not exceed the IPS clock
+> +	 * - MCLK 0 enabled
+> +	 * - MCLK 1 from MCLK DIV
+> +	 */
+> +	div = clk_get_rate(clks[MPC512x_CLK_SYS]);
+> +	div /= clk_get_rate(clks[MPC512x_CLK_IPS]);
+> +	out_be32(mccr_reg, (0 << 16));
+> +	out_be32(mccr_reg, (0 << 16) | ((div - 1) << 17));
+> +	out_be32(mccr_reg, (1 << 16) | ((div - 1) << 17));
+> +
+> +	/*
+> +	 * create the 'struct clk' items of the MCLK's clock subtree
+> +	 *
+> +	 * note that by design we always create all nodes and won't take
+> +	 * shortcuts here, because
+> +	 * - the "internal" MCLK_DIV and MCLK_OUT signal in turn are
+> +	 *   selectable inputs to the CFM while those who "actually use"
+> +	 *   the PSC/MSCAN/SPDIF (serial drivers et al) need the MCLK
+> +	 *   for their bitrate
+> +	 * - in the absence of "aliases" for clocks we need to create
+> +	 *   individial 'struct clk' items for whatever might get
+> +	 *   referenced or looked up, even if several of those items are
+> +	 *   identical from the logical POV (their rate value)
+> +	 * - for easier future maintenance and for better reflection of
+> +	 *   the SoC's documentation, it appears appropriate to generate
+> +	 *   clock items even for those muxers which actually are NOPs
+> +	 *   (those with two inputs of which one is reserved)
+> +	 */
+> +	clks[clks_idx_int + MCLK_IDX_MUX0] = mpc512x_clk_muxed(
+> +			entry->name_mux0,
+> +			&parent_names_mux0[0], ARRAY_SIZE(parent_names_mux0),
+> +			mccr_reg, 14, 2);
+> +	clks[clks_idx_int + MCLK_IDX_EN0] = mpc512x_clk_gated(
+> +			entry->name_en0, entry->name_mux0,
+> +			mccr_reg, 16);
+> +	clks[clks_idx_int + MCLK_IDX_DIV0] = mpc512x_clk_divider(
+> +			entry->name_div0,
+> +			entry->name_en0, CLK_SET_RATE_GATE,
+> +			mccr_reg, 17, 15, 0);
+> +	if (entry->has_mclk1) {
+> +		clks[clks_idx_int + MCLK_IDX_MUX1] = mpc512x_clk_muxed(
+> +				entry->name_mux1,
+> +				&entry->parent_names_mux1[0],
+> +				ARRAY_SIZE(entry->parent_names_mux1),
+> +				mccr_reg, 7, 1);
+> +	} else {
+> +		clks[clks_idx_int + MCLK_IDX_MUX1] = mpc512x_clk_factor(
+> +				entry->name_mux1, entry->parent_names_mux1[0],
+> +				1, 1);
+> +	}
+> +	if (sccr_reg) {
+> +		clks[clks_idx_pub] = mpc512x_clk_gated(
+> +				entry->name_mclk,
+> +				entry->name_mux1, sccr_reg, sccr_bit);
+> +	} else {
+> +		clks[clks_idx_pub] = mpc512x_clk_factor(
+> +				entry->name_mclk,
+> +				entry->name_mux1, 1, 1);
+> +	}
+> +
+> +	/*
+> +	 * without this "clock device" registration, "simple" lookups in
+> +	 * the SPI master initialization and serial port setup will fail
+> +	 *
+> +	 * those drivers need to get adjusted to lookup their required
+> +	 * clocks from device tree specs, and device tree nodes need to
+> +	 * provide the clock specs, before this clkdev registration
+> +	 * becomes obsolete
+> +	 */
+> +	clk_register_clkdev(clks[clks_idx_pub], entry->name_mclk, NULL);
+> +}
+> [ ... ]
 
-> 
-> I assume that these cells are meant to either be zero or one? If they're
-> necessary, they should be separate boolean properties rather than
-> grouped together by the register they're configured by (see the way
-> arm,tag-latency and arm,data-latency are handled). 
-> 
-> Also, I'd prefer "-enable" to "-en".
-> 
->> +- arm,pwr-control : Operting mode clock and power mode selection. Specifies two
-> 
-> s/Operting/Operating/
-> 
-> I'd prefer "power" to "pwr" (though there's precedent for both in
-> bindings...).
-> 
->> +  cells of standby-mode-en and dynamic_clk_gating_en.
-> 
-> More boolean properties.
-> 
->>  - interrupts : 1 combined interrupt.
->>  - cache-id-part: cache id part number to be used if it is not present
->>    on hardware
-> 
-> No amendments to the example?
-> 
->> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
->> index 3b2c40b..188f4da 100644
->> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
->> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
->> @@ -106,6 +106,29 @@
->>  
->>  #define L2X0_WAY_SIZE_SHIFT		3
->>  
->> +#define L2X0_PREFETCH_CTRL_OFFSET_SHIFT			0
->> +#define L2X0_PREFETCH_CTRL_NOT_SAME_ID_SHIFT		21
->> +#define L2X0_PREFETCH_CTRL_INC_DOUBLE_LINEFILL_SHIFT	23
->> +#define L2X0_PREFETCH_CTRL_PREFETCH_DROP_SHIFT		24
->> +#define L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_WR_SHIFT	27
->> +#define L2X0_PREFETCH_CTRL_DATA_PREFETCH_EN_SHIFT	28
->> +#define L2X0_PREFETCH_CTRL_INSTR_PREFETCH_EN_SHIFT	29
->> +#define L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_EN_SHIFT	30
->> +
->> +#define PREFETCH_R2P0_MASK	(~(1 << L2X0_PREFETCH_CTRL_OFFSET_SHIFT))
->> +#define PREFETCH_R3P0_MASK \
->> +		(~((1 << L2X0_PREFETCH_CTRL_NOT_SAME_ID_SHIFT) | \
->> +		   (1 << L2X0_PREFETCH_CTRL_INC_DOUBLE_LINEFILL_SHIFT) | \
->> +		   (1 << L2X0_PREFETCH_CTRL_PREFETCH_DROP_SHIFT) | \
->> +		   (1 << L2X0_PREFETCH_CTRL_DATA_PREFETCH_EN_SHIFT) | \
->> +		   (1 << L2X0_PREFETCH_CTRL_INSTR_PREFETCH_EN_SHIFT) | \
->> +		   (1 << L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_EN_SHIFT)))
->> +#define PREFETCH_R3P1_MASK \
->> +		(~(1 << L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_WR_SHIFT))
->> +
->> +#define L2X0_PWR_CTRL_STANDBY_MODE_EN_SHIFT	0
->> +#define L2X0_PWR_CTRL_DYNAMIC_CLK_GATE_EN_SHIFT	1
->> +
->>  #ifndef __ASSEMBLY__
->>  extern void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask);
->>  #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
->> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->> index c465fac..490e182 100644
->> --- a/arch/arm/mm/cache-l2x0.c
->> +++ b/arch/arm/mm/cache-l2x0.c
->> @@ -563,6 +563,11 @@ static void __init pl310_of_setup(const struct device_node *np,
->>  	u32 data[3] = { 0, 0, 0 };
->>  	u32 tag[3] = { 0, 0, 0 };
->>  	u32 filter[2] = { 0, 0 };
->> +	u32 prefetch[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
->> +	u32 prefetch_val;
->> +	u32 pwr[2] = { 0, 0 };
->> +	u32 l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
->> +		L2X0_CACHE_ID_RTL_MASK;
->>  
->>  	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
->>  	if (tag[0] && tag[1] && tag[2])
->> @@ -589,6 +594,45 @@ static void __init pl310_of_setup(const struct device_node *np,
->>  		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
->>  			       l2x0_base + L2X0_ADDR_FILTER_START);
->>  	}
->> +
->> +	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R2P0) {
-> 
-> You didn't describe that some properties were dependent on a particular
-> revision.
-> 
->> +		of_property_read_u32_array(np, "arm,prefetch-control",
->> +						prefetch, ARRAY_SIZE(prefetch));
->> +		prefetch_val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
->> +		prefetch_val &= PREFETCH_R2P0_MASK;
->> +		prefetch_val |= prefetch[0] << L2X0_PREFETCH_CTRL_OFFSET_SHIFT;
->> +		if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
->> +			prefetch_val &= PREFETCH_R3P0_MASK;
->> +			prefetch_val |=
->> +			 ((prefetch[1]) <<
->> +			   L2X0_PREFETCH_CTRL_NOT_SAME_ID_SHIFT) |
->> +			 ((prefetch[2]) <<
->> +			   L2X0_PREFETCH_CTRL_INC_DOUBLE_LINEFILL_SHIFT) |
->> +			 ((prefetch[3]) <<
->> +			   L2X0_PREFETCH_CTRL_PREFETCH_DROP_SHIFT) |
->> +			 ((prefetch[5]) <<
->> +			   L2X0_PREFETCH_CTRL_DATA_PREFETCH_EN_SHIFT) |
->> +			 ((prefetch[6]) <<
->> +			   L2X0_PREFETCH_CTRL_INSTR_PREFETCH_EN_SHIFT) |
->> +			 ((prefetch[7]) <<
->> +			   L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_EN_SHIFT);
-> 
-> You've not sanity checked these properties. What If I typo a value as
-> something other than 0 or 1?
-> 
-> Use boolean properties and of_property_read_bool (or even better,
-> configure this dynamically based on revision rather than having a dt
-> description).
-> 
->> +			if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P1) {
->> +				prefetch_val &= PREFETCH_R3P1_MASK;
->> +				prefetch_val |=
->> +				 ((prefetch[4]) <<
->> +				   L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_WR_SHIFT);
->> +			}
-> 
-> Another undocumented revision dependency.
-> 
->> +			writel_relaxed(prefetch_val,
->> +					l2x0_base + L2X0_PREFETCH_CTRL);
->> +
->> +			of_property_read_u32_array(np, "arm,pwr-control",
->> +						pwr, ARRAY_SIZE(pwr));
->> +			writel_relaxed(
->> +			 ((pwr[0]) << L2X0_PWR_CTRL_STANDBY_MODE_EN_SHIFT) |
->> +			 ((pwr[1]) << L2X0_PWR_CTRL_DYNAMIC_CLK_GATE_EN_SHIFT),
->> +			   l2x0_base + L2X0_POWER_CTRL);
-> 
-> Again, use boolean properties or do this dynamically.
-> 
-> Do none of these values need to be saved for the resume callback?
-> 
-> Thanks,
-> Mark.
-> 
->> +		}
->> +	}
->>  }
->>  
->>  static void __init pl310_save(void)
->> -- 
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+This was the routine which sets up _one_ MCLK block, note the
+assignment at the routine's end to the "published" clock item
+that's the gate's output after the second mux stage.
+
+> [ ... ]
+> +	clks[MPC512x_CLK_I2C] = mpc512x_clk_gated("i2c", "ips",
+> +						  &clkregs->sccr2, 26);
+> +	mpc512x_clk_setup_mclks(mclk_mscan_data, ARRAY_SIZE(mclk_mscan_data));
+> +	clks[MPC512x_CLK_SDHC] = mpc512x_clk_gated("sdhc", "sdhc-ug",
+> +						   &clkregs->sccr2, 24);
+> +	mpc512x_clk_setup_mclks(mclk_spdif_data, ARRAY_SIZE(mclk_spdif_data));
+> [ ... ]
+
+This is the invocation of the routine which sets up four MCLK
+blocks for the MSCAN components, while all of them refer to bit
+25 of SCCR2.
+
+> [ ... ]
+> +
+> +	/* enable some of the clocks here unconditionally because ... */
+> +	pr_debug("automatically enabling some clocks\n");
+> +	/* some are essential yet never get claimed by any driver */
+> +	clk_prepare_enable(clks[MPC512x_CLK_DUMMY]);
+> +	clk_prepare_enable(clks[MPC512x_CLK_E300]);	/* PowerPC CPU */
+> +	clk_prepare_enable(clks[MPC512x_CLK_DDR]);	/* DRAM */
+> +	clk_prepare_enable(clks[MPC512x_CLK_MEM]);	/* SRAM */
+> +	clk_prepare_enable(clks[MPC512x_CLK_IPS]);	/* SoC periph */
+> +	clk_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
+> +	/* some are required yet no dependencies were declared */
+> +	clk_prepare_enable(clks[MPC512x_CLK_PSC_FIFO]);
+> +	/* some are not yet acquired by their respective drivers */
+> +	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
+> +	clk_prepare_enable(clks[MPC512x_CLK_FEC]);	/* network, NFS */
+> +	clk_prepare_enable(clks[MPC512x_CLK_DIU]);	/* display */
+> +	clk_prepare_enable(clks[MPC512x_CLK_I2C]);
+> +	/*
+> +	 * some have their individual clock subtree with separate clock
+> +	 * items and their individual enable counters, yet share a
+> +	 * common gate (refer to the same register location) while the
+> +	 * common clock driver code is not aware of the fact and the
+> +	 * platform's code doesn't provide specific support either
+> +	 *
+> +	 * what might happen is that e.g. enabling two MSCAN clock items
+> +	 * and disabling one of them will disable the common gate and
+> +	 * thus break the other MSCAN clock as well
+> +	 */
+> +	clk_prepare_enable(clks[MPC512x_CLK_MSCAN0_MCLK]);
+> +	clk_prepare_enable(clks[MPC512x_CLK_MSCAN1_MCLK]);
+> +	clk_prepare_enable(clks[MPC512x_CLK_MSCAN2_MCLK]);
+> +	clk_prepare_enable(clks[MPC512x_CLK_MSCAN3_MCLK]);
+> +}
+
+This is the pre-enable workaround for the MSCAN0 to MSCAN3 clock
+items.
+
+The above approach does work in that it introduces complete
+support for common clock on the MPC512x platform, with the CAN
+component being operational, and the clock driver using shared
+logic across platforms.
+
+The remaining issue is that regardless of whether CAN is used,
+the (chip internal) clock is enabled.  This may not be a problem
+when bitrates aren't generated and the wire isn't driven.
+
+
+The question now is how to correctly support the situation where
+a gate is shared between subtrees yet isn't really part of any
+path within the subtrees.  I really cannot find a single spot
+where to introduce the gate such that it's not duplicated.
+
+The appropriate solution would not be to pre-enable those clocks,
+but to either introduce another gate clock type which supports a
+shared reference, or to add support for the shared reference to
+the existing gate code.
+
+
+I'd rather not duplicate most or all of the code of clk-gate.c,
+instead I looked into how to add "shared gate" support to the
+existing driver.
+
+My question is whether the approach is acceptable.  It adds
+minimal overhead and shall be OK for the enable/disable path from
+a technical POV.  And it doesn't feel like too much of a stretch.
+But there may be non-technical reasons to reject the approach.
+I'd like to learn whether to follow that path before preparing
+another version of the patch series.
+
+The diffs were taken with the '-w -b' options to demonstrate
+their essence and not drown it in whitespace changes.  The
+implementation assumes that the caller which registers the gate
+(the platform's clock driver) provides both the counter cell and
+the lock.  And that all gates with a "shared use counter" use the
+same lock (which is satisfied as they all get registered from the
+same spot in the platform's clock driver).
+
+The CLK_IGNORE_UNUSED flag addresses a different problem.  The
+SoC has four MSCAN components, while two of them are enabled in
+the device tree (the other two are present but disabled).  So
+during probe two of the clocks get enabled.  After probe all
+unused clocks automatically get disabled (that's another two).
+So the "shared use counter" drops to zero although components are
+in use, because "disable, it's unused" isn't told from "disable
+after enable, regular use".  The flag would become obsolete if
+the common gate logic would implement a separate disable_unused()
+routine, but I guess this isn't necessary and the use of the flag
+is appropriate.
+
+That the example use creates a field for just one counter is to
+better demonstrate the use and potential extension as need
+arises.  Reducing this to a mere integer variable would be a
+micro optimization.
+
+
+The extension of the existing clk_gate implementation:
+
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -46,6 +46,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 	struct clk_gate *gate = to_clk_gate(hw);
+ 	int set = gate->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
+ 	unsigned long flags = 0;
++	int need_reg_access;
+ 	u32 reg;
+ 
+ 	set ^= enable;
+@@ -53,6 +54,20 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 	if (gate->lock)
+ 		spin_lock_irqsave(gate->lock, flags);
+ 
++	/*
++	 * if a "shared use counter" was specified, keep track of enable
++	 * and disable calls and only access hardware registers upon the
++	 * very first enable or very last disable call
++	 */
++	if (!gate->share_count) {
++		need_reg_access = 1;
++	} else if (enable) {
++		need_reg_access = (*gate->share_count)++ == 0;
++	} else {
++		need_reg_access = --(*gate->share_count) == 0;
++	}
++
++	if (need_reg_access) {
+ 		if (gate->flags & CLK_GATE_HIWORD_MASK) {
+ 			reg = BIT(gate->bit_idx + 16);
+ 			if (set)
+@@ -67,6 +82,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 		}
+ 
+ 		clk_writel(reg, gate->reg);
++	}
+ 
+ 	if (gate->lock)
+ 		spin_unlock_irqrestore(gate->lock, flags);
+@@ -118,10 +134,11 @@ EXPORT_SYMBOL_GPL(clk_gate_ops);
+  * @clk_gate_flags: gate-specific flags for this clock
+  * @lock: shared register lock for this clock
+  */
+-struct clk *clk_register_gate(struct device *dev, const char *name,
++struct clk *clk_register_gate_shared(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+-		u8 clk_gate_flags, spinlock_t *lock)
++		u8 clk_gate_flags, spinlock_t *lock,
++		int *share_count)
+ {
+ 	struct clk_gate *gate;
+ 	struct clk *clk;
+@@ -152,6 +169,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 	gate->bit_idx = bit_idx;
+ 	gate->flags = clk_gate_flags;
+ 	gate->lock = lock;
++	gate->share_count = share_count;
+ 	gate->hw.init = &init;
+ 
+ 	clk = clk_register(dev, &gate->hw);
+@@ -161,3 +179,14 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 
+ 	return clk;
+ }
++
++struct clk *clk_register_gate(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 bit_idx,
++		u8 clk_gate_flags, spinlock_t *lock)
++{
++
++	return clk_register_gate_shared(dev, name, parent_name, flags,
++					reg, bit_idx, clk_gate_flags,
++					lock, NULL);
++}
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -222,6 +222,7 @@ struct clk_gate {
+ 	u8		bit_idx;
+ 	u8		flags;
+ 	spinlock_t	*lock;
++	int		*share_count;
+ };
+ 
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+@@ -232,6 +233,11 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate_flags, spinlock_t *lock);
++struct clk *clk_register_gate_shared(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *reg, u8 bit_idx,
++		u8 clk_gate_flags, spinlock_t *lock,
++		int *share_count);
+ 
+ struct clk_div_table {
+ 	unsigned int	val;
+
+
+How to use these shared gates:
+
+--- a/arch/powerpc/platforms/512x/clock-commonclk.c
++++ b/arch/powerpc/platforms/512x/clock-commonclk.c
+@@ -123,6 +123,39 @@ static inline struct clk *mpc512x_clk_gated(
+				 reg, pos, 0, &clklock);
+ }
+ 
++enum mpc512x_clk_shared_gate_id_t {
++	MPC512x_CLK_SHARED_GATE_MSCAN,
++	MPC512x_CLK_SHARED_GATE_MAX,
++};
++
++static int mpc512x_clk_gate_counters[MPC512x_CLK_SHARED_GATE_MAX];
++
++/*
++ * implementor's note:  since clk_gate items don't implement a separate
++ * .disable_unused() callback, their .disable() routine gets called and
++ * "disable the clock as we can't see it's in use" cannot be told from
++ * "regular disable, count these events please"
++ *
++ * passing the CLK_IGNORE_UNUSED flag upon clock creation will suppress
++ * the "disable, unused" call, so use counts won't get unbalanced, the
++ * clock either never got enabled and thus need not get disabled, or
++ * part of the hardware got enabled while disabling the other part isn't
++ * wanted
++ */
++static inline struct clk *mpc512x_clk_gated_shared(
++	const char *name, const char *parent_name,
++	u32 __iomem *reg, u8 pos,
++	enum mpc512x_clk_shared_gate_id_t share_id)
++{
++	int clkflags;
++
++	clkflags = CLK_SET_RATE_PARENT;
++	clkflags |= CLK_IGNORE_UNUSED;
++	return clk_register_gate_shared(NULL, name, parent_name, clkflags,
++					reg, pos, 0, &clklock,
++					&mpc512x_clk_gate_counters[share_id]);
++}
++
+ static inline struct clk *mpc512x_clk_muxed(const char *name,
+	const char **parent_names, int parent_count,
+	u32 __iomem *reg, u8 pos, u8 len)
+@@ -520,9 +553,16 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry)
+				1, 1);
+	}
+	if (sccr_reg) {
++		if (entry->type == MCLK_TYPE_MSCAN) {
++			clks[clks_idx_pub] = mpc512x_clk_gated_shared(
++					entry->name_mclk,
++					entry->name_mux1, sccr_reg, sccr_bit,
++					MPC512x_CLK_SHARED_GATE_MSCAN);
++		} else {
+			clks[clks_idx_pub] = mpc512x_clk_gated(
+					entry->name_mclk,
+					entry->name_mux1, sccr_reg, sccr_bit);
++		}
+	} else {
+		clks[clks_idx_pub] = mpc512x_clk_factor(
+				entry->name_mclk,
+
+Local tests have shown that the extension solves the problem of
+how to satisfy the SoC's constraints on the MPC512x platform.
+The MSCAN clocks no longer need to get pre-enabled, instead they
+get setup and enabled only as the mscan(4) driver probes devices
+according to how it was instructed (device tree nodes).
+
+What do you think?  Is the "shared gate" support in the common
+logic appropriate?  I'd rather not duplicate all of this code
+just to introduce the specific gate I need, while most of the
+logic is identical to the existing gate implementation.  The
+desire isn't to override the gate's operations, but to wrap them
+and to consult a counter in addition, while the register access
+still applies.
+
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
