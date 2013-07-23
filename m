@@ -1,76 +1,177 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 23 Jul 2013 16:05:58 -0400 (EDT)
-Subject: [PATCH 3/6] ARM: prefetch: add support for prefetchw using pldw on
- SMP ARMv7+ CPUs
-In-Reply-To: <1374579389-32704-4-git-send-email-will.deacon@arm.com>
-References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
- <1374579389-32704-4-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.03.1307231559120.15022@syhkavp.arg>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 23 Jul 2013 22:07:52 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <20130723194423.GA22984@kroah.com>
+References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
+ <20130723193105.GP9858@sirena.org.uk> <20130723194423.GA22984@kroah.com>
+Message-ID: <1731726.KENstTPhkb@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jul 2013, Will Deacon wrote:
-
-> SMP ARMv7 CPUs implement the pldw instruction, which allows them to
-> prefetch data cachelines in an exclusive state.
+On Tuesday 23 of July 2013 12:44:23 Greg KH wrote:
+> On Tue, Jul 23, 2013 at 08:31:05PM +0100, Mark Brown wrote:
+> > > You don't "know" the id of the device you are looking up, due to
+> > > multiple devices being in the system (dynamic ids, look back earlier
+> > > in
+> > > this thread for details about that.)
+> > 
+> > I got copied in very late so don't have most of the thread I'm afraid,
+> > I did try looking at web archives but didn't see a clear problem
+> > statement.  In any case this is why the APIs doing lookups do the
+> > lookups in the context of the requesting device - devices ask for
+> > whatever name they use locally.
 > 
-> This patch defines the prefetchw macro using pldw for CPUs that support
-> it.
+> What do you mean by "locally"?
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-Minor nit below.  Otherwise:
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> ---
->  arch/arm/include/asm/processor.h | 17 ++++++++++++-----
->  1 file changed, 12 insertions(+), 5 deletions(-)
+> The problem with the api was that the phy core wanted a id and a name to
+> create a phy, and then later other code was doing a "lookup" based on
+> the name and id (mushed together), because it "knew" that this device
+> was the one it wanted.
 > 
-> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-> index cbdb130..d571697 100644
-> --- a/arch/arm/include/asm/processor.h
-> +++ b/arch/arm/include/asm/processor.h
-> @@ -116,12 +116,19 @@ static inline void prefetch(const void *ptr)
->  		:: "p" (ptr));
->  }
->  
-> +#if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
->  #define ARCH_HAS_PREFETCHW
-> -#define prefetchw(ptr)	prefetch(ptr)
-> -
-> -#define ARCH_HAS_SPINLOCK_PREFETCH
-> -#define spin_lock_prefetch(x) do { } while (0)
-> -
-
-What about keeping the above definitions when __LINUX_ARM_ARCH__ >= 7
-&& defined(CONFIG_SMP) is not true?
-
-> +static inline void prefetchw(const void *ptr)
-> +{
-> +	__asm__ __volatile__(
-> +		".arch_extension	mp\n"
-> +	__ALT_SMP_ASM(
-> +		WASM(pldw)		"\t%a0",
-> +		WASM(pld)		"\t%a0"
-> +	)
-
-The paren indentation looks odd.  If you shift the whole __ALT_SMP_ASM 
-block right then it is also less likely to look like a sequential 
-execution of pldw followed by pld to the casual reader.
-
-> +		:: "p" (ptr));
-> +}
-> +#endif
->  #endif
->  
->  #define HAVE_ARCH_PICK_MMAP_LAYOUT
-> -- 
-> 1.8.2.2
+> Just like the clock api, which, for multiple devices, has proven to
+> cause problems.  I don't want to see us accept an api that we know has
+> issues in it now, I'd rather us fix it up properly.
 > 
+> Subsystems should be able to create ids how ever they want to, and not
+> rely on the code calling them to specify the names of the devices that
+> way, otherwise the api is just too fragile.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I think, that if you create a device, then just carry around the pointer
+> to that device (in this case a phy) and pass it to whatever other code
+> needs it.  No need to do lookups on "known names" or anything else,
+> just normal pointers, with no problems for multiple devices, busses, or
+> naming issues.
+
+PHY object is not a device, it is something that a device driver creates 
+(one or more instances of) when it is being probed. You don't have a clean 
+way to export this PHY object to other driver, other than keeping this PHY 
+on a list inside PHY core with some well-known ID (e.g. device name + 
+consumer port name/index, like in regulator core) and then to use this 
+well-known ID inside consumer driver as a lookup key passed to phy_get();
+
+Actually I think for PHY case, exactly the same way as used for regulators 
+might be completely fine:
+
+1. Each PHY would have some kind of platform, non-unique name, that is 
+just used to print some messages (like the platform/board name of a 
+regulator).
+2. Each PHY would have an array of consumers. Consumer specifier would 
+consist of consumer device name and consumer port name - just like in 
+regulator subsystem.
+3. PHY driver receives an array of, let's say, phy_init_data inside its 
+platform data that it would use to register its PHYs.
+4. Consumer drivers would have constant consumer port names and wouldn't 
+receive any information about PHYs from platform code.
+
+Code example:
+
+[Board file]
+
+static const struct phy_consumer_data usb_20_phy0_consumers[] = {
+	{
+		.devname = "foo-ehci",
+		.port = "usbphy",
+	},
+};
+
+static const struct phy_consumer_data usb_20_phy1_consumers[] = {
+	{
+		.devname = "foo-otg",
+		.port = "otgphy",
+	},
+};
+
+static const struct phy_init_data my_phys[] = {
+	{
+		.name = "USB 2.0 PHY 0",
+		.consumers = usb_20_phy0_consumers,
+		.num_consumers = ARRAY_SIZE(usb_20_phy0_consumers),
+	},
+	{
+		.name = "USB 2.0 PHY 1",
+		.consumers = usb_20_phy1_consumers,
+		.num_consumers = ARRAY_SIZE(usb_20_phy1_consumers),
+	},
+	{ }
+};
+
+static const struct platform_device usb_phy_pdev = {
+	.name = "foo-usbphy",
+	.id = -1,
+	.dev = {
+		.platform_data = my_phys,
+	},
+};
+
+[PHY driver]
+
+static int foo_usbphy_probe(pdev)
+{
+	struct foo_usbphy *foo;
+	struct phy_init_data *init_data = pdev->dev.platform_data;
+	/* ... */
+	// for each PHY in init_data {
+		phy_register(&foo->phy[i], &init_data[i]);
+	// }
+	/* ... */
+}
+
+[EHCI driver]
+
+static int foo_ehci_probe(pdev)
+{
+	struct phy *phy;
+	/* ... */
+	phy = phy_get(&pdev->dev, "usbphy");
+	/* ... */
+}
+
+[OTG driver]
+
+static int foo_otg_probe(pdev)
+{
+	struct phy *phy;
+	/* ... */
+	phy = phy_get(&pdev->dev, "otgphy");
+	/* ... */
+}
+
+> > > > Having to write platform data for everything gets old fast and the
+> > > > code
+> > > > duplication is pretty tedious...
+> > > 
+> > > Adding a single pointer is "tedious"?  Where is the "name" that you
+> > > are
+> > > going to lookup going to come from?  That code doesn't write
+> > > itself...
+> > 
+> > It's adding platform data in the first place that gets tedious - and
+> > of
+> > course there's also DT and ACPI to worry about, it's not just a case
+> > of
+> > platform data and then you're done.  Pushing the lookup into library
+> > code means that drivers don't have to worry about any of this stuff.
 > 
+> I agree, so just pass around the pointer to the phy and all is good.  No
+> need to worry about DT or ACPI or anything else.
+
+With Device Tree we don't have board files anymore. How would you pass any 
+pointers between provider and consumer drivers in this case?
+
+> > For most of the APIs doing this there is a clear and unambiguous name
+> > in the hardware that can be used (and for hardware process reasons is
+> > unlikely to get changed).  The major exception to this is the clock
+> > API since it is relatively rare to have clear, segregated IP level
+> > information for IPs baked into larger chips.  The other APIs tend to
+> > be establishing chip to chip links.
+> 
+> The clock api is having problems with multiple "names" due to dynamic
+> devices from what I was told.  I want to prevent the PHY interface from
+> having that same issue.
+
+Yes, the clock API has a problem related to the clock namespace being 
+global for all registered clock controllers. This is not a problem with 
+lookup in general, but with wrong lookup key chosen.
+
+Best regards,
+Tomasz
