@@ -1,67 +1,55 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 24 Jul 2013 01:21:44 +0200
-Subject: How to create IRQ mappings in a GPIO driver that doesn't control its
- IRQ domain ?
-Message-ID: <1624911.6TtmtVmU1T@avalon>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 24 Jul 2013 01:32:31 +0200
+Subject: [PATCH v6 02/20] clocksource: samsung_pwm_timer: Correct definition
+ of AUTORELOAD bit
+In-Reply-To: <51EDA3EA.9020502@linaro.org>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1658534.7nG6RFjcTc@flatron> <51EDA3EA.9020502@linaro.org>
+Message-ID: <2416336.ny4L9Sf7Ts@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+PWM channel 4 has its autoreload bit located at different position. This
+patch fixes the driver to account for that.
 
-I'm running into an issue on several Renesas SoC with IRQ domains and GPIOs.
+This fixes a problem with the clocksource hanging after it overflows because
+it is not reloaded any more.
 
-On sh73a0, r8a73a4 and r8a7740, GPIOs and external interrupts are handled by 
-two separate IP cores, namely the PFC (Pin Function Controller) and INTC 
-(Interrupt Controller). The former is handled by the sh-pfc driver 
-(drivers/pinctrl/sh-pfc) and the later by the irq-renesas-intc-irqpin driver 
-(drivers/irqchip), referred to below as the irqpin driver.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/clocksource/samsung_pwm_timer.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-The sh73a0, for instance, has 32 external interrupt lines that are multiplexed 
-on pins usable as GPIOs. Both the GPIO and external interrupt functions are 
-usable at the same time, which allows reading the state of the interrupt 
-lines.
+Changes since v5:
+ - Added more detailed comment about bit layout in TCON register.
 
-These external interrupts are for MMC/SD support, among other devices. In this 
-specific case the MMC/SD Card Detect signal is wired to one of the external 
-interrupt signals, and the corresponding GPIO is passed to the MMC/SD 
-controller driver. Depending on other configuration parameters the driver can 
-then either poll the Card Detect signal, or register an interrupt handler to 
-detect changes in the signal state. This features is implemented by the MMC/SD 
-core, which call gpio_to_irq() on the GPIO to retrieve the corresponding IRQ 
-number.
-
-On non-DT systems the external IRQs are statically mapped at a known offset. 
-The sh-pfc driver, to implement the gpio_to_irq() function (through its 
-gpiochip .to_irq() handler), simply searches a SoC-specific lookup table for 
-the fixed IRQ number associated with a given GPIO.
-
-However, on DT systems, IRQs are mapped dynamically on demand. The irqpin 
-driver registers a simple IRQ domain, and the irq_create_mapping() function 
-can then be used to map a given IRQ, specified as an offset in the domain. 
-This is where the problem appears, as the irqchip .to_irq() function is 
-implemented in the sh-pfc driver, which doesn't have access to the IRQ domain 
-registered by the irqpin driver.
-
-I could hack around this by exporting a function in the irqpin driver that 
-would map an IRQ, and call that function from the sh-pfc driver. I'd rather 
-avoid that solution as it would add a direct dependency between the two 
-drivers.
-
-Has anyone run into a similar issue ? My gut feeling is that the architecture 
-isn't right somewhere, but I can't really pinpoint where. As the external IRQs 
-are handled by an IP core separate from the PFC one could argue that the 
-corresponding IRQs are not really GPIO IRQs, and that the PFC driver shouldn't 
-implement the .to_irq() operation. However, this would push the problem down 
-to all drivers that need a GPIO they can read and a (possibly optional) IRQ 
-associated with the same signal, and that rely on gpio_to_irq() to retrieve 
-the IRQ associated with the signal. If all those drivers were required to 
-handle the GPIO and the IRQ separately, then we could as well completely 
-remove gpio_to_irq() from the kernel, which doesn't sound like the right thing 
-to do.
-
-Advices and opinions will be welcome.
-
+diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
+index 3fa5b07..5d0049f 100644
+--- a/drivers/clocksource/samsung_pwm_timer.c
++++ b/drivers/clocksource/samsung_pwm_timer.c
+@@ -44,10 +44,21 @@
+ #define TCFG1_SHIFT(x)	  		((x) * 4)
+ #define TCFG1_MUX_MASK	  		0xf
+ 
++/*
++ * Each channel occupies 4 bits in TCON register, but there is a gap of 4
++ * bits (one channel) after channel 0, so channels have different numbering
++ * when accessing TCON register.
++ *
++ * In addition, the location of autoreload bit for channel 4 (TCON channel 5)
++ * in its set of bits is 2 as opposed to 3 for other channels.
++ */
+ #define TCON_START(chan)		(1 << (4 * (chan) + 0))
+ #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
+ #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
+-#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
++#define _TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
++#define _TCON_AUTORELOAD4(chan)		(1 << (4 * (chan) + 2))
++#define TCON_AUTORELOAD(chan)		\
++	((chan < 5) ? _TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
+ 
+ DEFINE_SPINLOCK(samsung_pwm_lock);
+ EXPORT_SYMBOL(samsung_pwm_lock);
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.3.2
