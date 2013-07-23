@@ -1,36 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 23 Jul 2013 20:01:57 +0200
-Subject: [PATCH 24/27] sound/soc/pxa: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1374602524-3398-1-git-send-email-wsa@the-dreams.de>
-References: <1374602524-3398-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1374602524-3398-25-git-send-email-wsa@the-dreams.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 23 Jul 2013 11:11:45 -0700
+Subject: [PATCH] ARM: tegra: enable ULPI phy on Colibri T20
+Message-ID: <1374603105-21226-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource does sanity checks on the given resource. No need to
-duplicate this in the driver.
+From: Lucas Stach <dev@lynxeye.de>
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+This was missed when splitting out the phy from the controller node in
+commit 9dffe3be3f32 (ARM: tegra: modify ULPI reset GPIO properties).
+
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-Please apply via the subsystem-tree.
+Olof, Arnd, this is a fix for 3.11. Thanks!
 
- sound/soc/pxa/mmp-sspa.c |    3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
-index 62142ce..1605934 100644
---- a/sound/soc/pxa/mmp-sspa.c
-+++ b/sound/soc/pxa/mmp-sspa.c
-@@ -430,9 +430,6 @@ static int asoc_mmp_sspa_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+index 2fcb3f2..5592be6 100644
+--- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
++++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+@@ -457,6 +457,7 @@
+ 	};
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (res == NULL)
--		return -ENOMEM;
--
- 	priv->sspa->mmio_base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(priv->sspa->mmio_base))
- 		return PTR_ERR(priv->sspa->mmio_base);
+ 	usb-phy at c5004000 {
++		status = "okay";
+ 		nvidia,phy-reset-gpio = <&gpio TEGRA_GPIO(V, 1)
+ 			GPIO_ACTIVE_LOW>;
+ 	};
 -- 
 1.7.10.4
