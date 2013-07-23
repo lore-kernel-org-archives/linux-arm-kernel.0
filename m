@@ -1,38 +1,155 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 23 Jul 2013 14:13:54 +0300
-Subject: [PATCH] ARM: Do not run dummy_flush_tlb_a15_erratum() on
- non-Cortex-A15
-In-Reply-To: <CAOMZO5Brgj2CzJXqjUfihi-aNxumvamDUGdvZuU94rHMwutCog@mail.gmail.com>
-References: <1374556774-18795-1-git-send-email-festevam@gmail.com>
- <51EE3B46.7020906@ti.com>
- <CAOMZO5Brgj2CzJXqjUfihi-aNxumvamDUGdvZuU94rHMwutCog@mail.gmail.com>
-Message-ID: <51EE6572.50909@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 23 Jul 2013 20:21:13 +0900
+Subject: [PATCH] iommu/exynos: add devices attached to the System MMU to an
+ IOMMU group
+In-Reply-To: <CAG8rG2wNG9wVjKxtaDzLRybvh3wPVR08j9G9OPcK=a2Gwbtg-g@mail.gmail.com>
+References: <1374573694-30595-1-git-send-email-a.motakis@virtualopensystems.com>
+ <00d701ce878f$da099fe0$8e1cdfa0$%dae@samsung.com>
+ <CAG8rG2wNG9wVjKxtaDzLRybvh3wPVR08j9G9OPcK=a2Gwbtg-g@mail.gmail.com>
+Message-ID: <00e601ce8796$bdca50c0$395ef240$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 02:02 PM, Fabio Estevam wrote:
-> Hi Roger,
-> 
-> On Tue, Jul 23, 2013 at 5:13 AM, Roger Quadros <rogerq@ti.com> wrote:
-> 
->>> -     if (!erratum_a15_798181())
->>> -             return;
->>> -
->>
->> Removing this if statement will cause "ipi_flush_tlb_a15_erratum" to be called
->> on non A15 platforms. So I would just keep it to be safe.
-> 
-> I just moved the if statement into the the beginning of
-> dummy_flush_tlb_a15_erratum(), so ipi_flush_tlb_a15_erratum will not
-> be called on non-A15 systems.
 
-It will be called. Please see the code below after your patch is applied.
 
- static void broadcast_tlb_a15_erratum(void)
- {
- 	dummy_flush_tlb_a15_erratum();
- 	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
- }
+> -----Original Message-----
+> From: Antonios Motakis [mailto:a.motakis at virtualopensystems.com]
+> Sent: Tuesday, July 23, 2013 8:00 PM
+> To: Inki Dae
+> Cc: Linux ARM Kernel; Linux IOMMU; Linux Samsung SOC; kvm-arm; Cho
+KyongHo;
+> Joerg Roedel; Sachin Kamat; Jiri Kosina; Wei Yongjun; open list
+> Subject: Re: [PATCH] iommu/exynos: add devices attached to the System MMU
+> to an IOMMU group
+> 
+> On Tue, Jul 23, 2013 at 12:31 PM, Inki Dae <inki.dae@samsung.com> wrote:
+> >
+> >
+> >
+> > > -----Original Message-----
+> > > From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-
+> soc-
+> > > owner at vger.kernel.org] On Behalf Of Antonios Motakis
+> > > Sent: Tuesday, July 23, 2013 7:02 PM
+> > > To: linux-arm-kernel at lists.infradead.org;
+> > iommu at lists.linux-foundation.org;
+> > > linux-samsung-soc at vger.kernel.org
+> > > Cc: kvmarm at lists.cs.columbia.edu; Antonios Motakis; Cho KyongHo; Joerg
+> > > Roedel; Sachin Kamat; Jiri Kosina; Wei Yongjun; open list
+> > > Subject: [PATCH] iommu/exynos: add devices attached to the System MMU
+> to
+> > > an IOMMU group
+> > >
+> > > IOMMU groups are expected by certain users of the IOMMU API,
+> > > e.g. VFIO. Since each device is behind its own System MMU, we
+> > > can allocate a new IOMMU group for each device.
+> > >
+> > > This patch depends on Cho KyongHo's patch series titled "[PATCH v7
+> 00/12]
+> > > iommu/exynos: Fixes and Enhancements of System MMU driver with DT",
+> > > applied on a Linux 3.10.1 kernel. It has been tested on the Arndale
+> board.
+> > >
+> > > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> > > ---
+> > >  drivers/iommu/exynos-iommu.c | 24 ++++++++++++++++++++++++
+> > >  1 file changed, 24 insertions(+)
+> > >
+> > > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-
+> iommu.c
+> > > index 51d43bb..9f39eaa 100644
+> > > --- a/drivers/iommu/exynos-iommu.c
+> > > +++ b/drivers/iommu/exynos-iommu.c
+> > > @@ -1134,6 +1134,28 @@ static phys_addr_t
+> exynos_iommu_iova_to_phys(struct
+> > > iommu_domain *domain,
+> > >       return phys;
+> > >  }
+> > >
+> > > +static int exynos_iommu_add_device(struct device *dev)
+> > > +{
+> > > +     struct iommu_group *group;
+> > > +     int ret;
+> > > +
+> > > +     group = iommu_group_alloc();
+> >
+> > Is that correct? I don't see why you allocate a group object every time
+> > add_device callback is called. That doesn't have any meaning we have to
+> use
+> > iommu group feature. I think the implementation should be one more
+> devices
+> > per a group. So I guess a given device object should be wrapped by
+> higher
+> > device object than the given device object. For a good example, you can
+> > refer to intel-iommu.c file.
+> 
+> With an Intel IOMMU it can be the case that 2 devices have to share
+> the same IOMMU mappings (i.e. you can't program them separately). With
+> the Exynos System MMU, there is always one System MMU per device, so
+> there is nothing stopping you from programming any 2 devices' mappings
+> differently. So yes, the right thing to do here is to have a one to
+> one relationship between devices and IOMMU groups.
 
-cheers,
--roger
+In case of Exynos drm driver, a unified iommu mapping table is used for all
+devices (fimd, g2d, hdmi, fimc, gsc, rotator) based on drm so they use the
+same iommu mapping table even though they have each iommu hardware unit. And
+the iommu mapping table is just logical data structure for hardware
+translation process by each DMA. Actually, I am considering using iommu
+group feature for more generic implementation.
+
+And one question. Why do you allocate a iommu group object if we should have
+one to one relationship between devices and iommu groups? In this case, is
+there any reason you have to use the iommu group object?
+
+Thanks,
+Inki Dae
+
+> 
+> (resending because of html mail)
+> 
+> Cheers,
+> Antonios
+> 
+> >
+> >
+> > Thanks,
+> > Inki Dae
+> >
+> > > +     if (IS_ERR(group)) {
+> > > +             dev_err(dev, "Failed to allocate IOMMU group\n");
+> > > +             return PTR_ERR(group);
+> > > +     }
+> > > +
+> > > +     ret = iommu_group_add_device(group, dev);
+> > > +     iommu_group_put(group);
+> > > +
+> > > +     return ret;
+> > > +}
+> > > +
+> > > +static void exynos_iommu_remove_device(struct device *dev)
+> > > +{
+> > > +     iommu_group_remove_device(dev);
+> > > +}
+> > > +
+> > >  static struct iommu_ops exynos_iommu_ops = {
+> > >       .domain_init = &exynos_iommu_domain_init,
+> > >       .domain_destroy = &exynos_iommu_domain_destroy,
+> > > @@ -1142,6 +1164,8 @@ static struct iommu_ops exynos_iommu_ops = {
+> > >       .map = &exynos_iommu_map,
+> > >       .unmap = &exynos_iommu_unmap,
+> > >       .iova_to_phys = &exynos_iommu_iova_to_phys,
+> > > +     .add_device     = exynos_iommu_add_device,
+> > > +     .remove_device  = exynos_iommu_remove_device,
+> > >       .pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+> > >  };
+> > >
+> > > --
+> > > 1.8.1.2
+> > >
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-
+> samsung-
+> > > soc" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
