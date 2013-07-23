@@ -1,177 +1,56 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Tue, 23 Jul 2013 23:54:57 +0200
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
- with ARM CPU
-In-Reply-To: <20130719022314.GB4941@glitch>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130719022314.GB4941@glitch>
-Message-ID: <51EEFBB1.6070408@hauke-m.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 23 Jul 2013 15:10:17 -0700
+Subject: [GIT PULL] Remove ARM local timer API
+In-Reply-To: <20130625200211.GA11625@codeaurora.org>
+References: <20130625200211.GA11625@codeaurora.org>
+Message-ID: <CAOesGMj5AZcB7-kcS8_JqfKAg_RUKqTdDZf7bdwkebn3pwADAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2013 04:23 AM, Domenico Andreoli wrote:
-> Hi Hauke,
-> 
-> On Tue, Jul 16, 2013 at 03:52:07PM +0200, Hauke Mehrtens wrote:
->> This patch adds support for the BCM5301/BCM470X SoCs with an ARM CPU.
->> Currently just booting to a shell is working and nothing else, no
->> Ethernet, wifi, flash, ...
->>
->> This SoC uses a Dual core CPU, but this is currently not implemented.
->> More information about this SoC can be found here:
->> http://www.anandtech.com/show/5925/broadcom-announces-bcm4708x-and-bcm5301x-socs-for-80211ac-routers
->>
->> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->> ---
-> 
-> ...
-> 
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index e401a76..74e32f6 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -93,6 +93,10 @@ choice
->>  		bool "Kernel low-level debugging on BCM2835 PL011 UART"
->>  		depends on ARCH_BCM2835
->>  
->> +	config DEBUG_BCM53XX
->> +		bool "Kernel low-level debugging on BCM53XX UART1"
->> +		depends on ARCH_BCM53XX
->> +
->>  	config DEBUG_CLPS711X_UART1
->>  		bool "Kernel low-level debugging messages via UART1"
->>  		depends on ARCH_CLPS711X
->> @@ -762,6 +766,7 @@ endchoice
->>  config DEBUG_LL_INCLUDE
->>  	string
->>  	default "debug/bcm2835.S" if DEBUG_BCM2835
->> +	default "debug/bcm53xx.S" if DEBUG_BCM53XX
->>  	default "debug/cns3xxx.S" if DEBUG_CNS3XXX
->>  	default "debug/exynos.S" if DEBUG_EXYNOS_UART
->>  	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
-> 
-> ...
-> 
->> diff --git a/arch/arm/include/debug/bcm53xx.S b/arch/arm/include/debug/bcm53xx.S
->> new file mode 100644
->> index 0000000..98c836b
->> --- /dev/null
->> +++ b/arch/arm/include/debug/bcm53xx.S
->> @@ -0,0 +1,19 @@
->> +/*
->> + * Macros used for EARLY_PRINTK, in low-level UART debug console
->> + *
->> + * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
->> + *
->> + * Licensed under the GNU/GPL. See COPYING for details.
->> + */
->> +
->> +#define BCM53XX_UART1_PHYS	0x18000300
->> +#define BCM53XX_UART1_VIRT	0xf1000300
->> +#define BCM53XX_UART1_SH	0
->> +
->> +	.macro	addruart, rp, rv, tmp
->> +	ldr	\rp, =BCM53XX_UART1_PHYS 	@ MMU off, Physical
->> +	ldr	\rv, =BCM53XX_UART1_VIRT 	@ MMU on, Virtual
->> +	.endm
->> +
->> +#define UART_SHIFT	BCM53XX_UART1_SH
->> +#include <asm/hardware/debug-8250.S>
-> 
-> don't know if it's worth to add this debug uart support here. there is a
-> series from Russel to consolidate 8250 and pl01x debug uarts. maybe you
-> want to delay this.
+On Tue, Jun 25, 2013 at 1:02 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Olof/Arnd,
+>
+> These patches remove the ARM local timer API. The ARM architected
+> timers have already moved away from this API so this series
+> migrates the rest of the users allowing us to remove the API
+> entirely. Thomas has been kind enough to take the first two
+> patches into timers/core in the tip tree (thanks Thomas!) so I've
+> merged that into v3.10-rc1 and then applied the rest of the
+> patches on top. Let me know if this is acceptable.
+>
+> These patches have been through multiple rounds and tested by
+> multiple people since before the 3.10 merge window closed. Only
+> Barry's ack is missing (Cced).
+>
+> Since I don't have a tree on kernel.org, David Brown has been
+> kind enough to push my tag out to his repo. Please pull.
+>
+> The following changes since commit 42cba6e27c4cddc4df701c597dbfa666e1c013c8:
+>
+>   Merge branch 'timers/core' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip into remove-local-timers (2013-06-24 17:45:02 -0700)
+>
+> are available in the git repository at:
+>
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/remove-local-timers
+>
+> for you to fetch changes up to 060fd3043e5e3488504b9e70182e188dd9113aea:
+>
+>   ARM: smp: Remove local timer API (2013-06-24 17:47:34 -0700)
+>
+> ----------------------------------------------------------------
+> Now that we have a generic arch hook for broadcast we can remove the local
+> timer API entirely. Doing so will reduce code in ARM core, reduce the
+> architecture dependencies of our timer drivers, and simplify the code because
+> we no longer go through an architecture layer that is essentially a hotplug
+> notifier.
 
-Yes, I saw the patch submission and now it is in linux-next. I will add
-debugging into a separate patch.
+Hi,
 
-> 
->> diff --git a/arch/arm/mach-bcm53xx/bcm53xx.c b/arch/arm/mach-bcm53xx/bcm53xx.c
->> new file mode 100644
->> index 0000000..aa5bd397
->> --- /dev/null
->> +++ b/arch/arm/mach-bcm53xx/bcm53xx.c
->> @@ -0,0 +1,68 @@
->> +/*
->> + * Broadcom BCM47XX / BCM53XX ARM platform code.
->> + *
->> + * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
->> + *
->> + * Licensed under the GNU/GPL. See COPYING for details.
->> + */
->> +#include <linux/of_address.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/irqchip.h>
->> +#include <linux/clocksource.h>
->> +#include <linux/clk-provider.h>
->> +
->> +#include <asm/mach/arch.h>
->> +#include <asm/mach/map.h>
->> +#include <asm/signal.h>
->> +
->> +static int bcm53xx_abort_handler(unsigned long addr, unsigned int fsr,
->> +				 struct pt_regs *regs)
->> +{
->> +	/*
->> +	 * These happen for no good reason
->> +	 * possibly left over from CFE
->> +	 */
->> +	pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
->> +		addr, fsr);
->> +
->> +	/* Returning non-zero causes fault display and panic */
->> +	return 0;
->> +}
->> +
->> +static void bcm53xx_aborts_enable(void)
->> +{
->> +	/* Install our hook */
->> +	hook_fault_code(16 + 6, bcm53xx_abort_handler, SIGBUS, 0,
->> +			"imprecise external abort");
->> +}
->> +
->> +static void __init bcm53xx_timer_init(void)
->> +{
->> +	of_clk_init(NULL);
->> +	clocksource_of_init();
->> +}
->> +
->> +void __init bcm53xx_map_io(void)
->> +{
->> +	debug_ll_io_init();
->> +	bcm53xx_aborts_enable();
->> +}
->> +
->> +static void __init bcm53xx_dt_init(void)
->> +{
->> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->> +}
->> +
->> +static const char const *bcm53xx_dt_compat[] = {
->> +	"brcm,bcm5301x",
->> +	"netgear,r6250v1",
->> +	NULL,
->> +};
->> +
->> +DT_MACHINE_START(BCM53XX, "BCM53XX")
->> +	.init_machine = bcm53xx_dt_init,
->> +	.map_io = bcm53xx_map_io,
->> +	.init_irq = irqchip_init,
->> +	.init_time = bcm53xx_timer_init,
->> +	.dt_compat = bcm53xx_dt_compat,
->> +MACHINE_END
-> 
-> the trend is to consolidate machine descriptors.
-> 
-> so .init_irq can go, irqchip_init is picked anyway if .init_irq is NULL.
-Thanks for the info, I will removed it.
-> 
-> also .init_time could be dropped, it can be specified using
-> CLOCKSOURCE_OF_DECLARE(), but I see bcm53xx_timer_init is already quite
-> minimal here and I'm struggling to see the big picture here. So mine is
-> actually a question for others... :)
+Merged in as localtimer/removal into next/cleanup.
 
-I will leave it for now like it is, if someone has a better idea I will
-change it.
+I had quite a few merge conflicts due to the __cpuinit removal, so
+please double-check my resolutions.
 
-Hauke
+
+-Olof
