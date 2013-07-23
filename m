@@ -1,39 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 23 Jul 2013 11:35:00 +0200
-Subject: [PATCH RFC 2/8] clk: sunxi: register factors clocks behind
- composite
-In-Reply-To: <1374541272-32173-3-git-send-email-emilio@elopez.com.ar>
-References: <1374541272-32173-1-git-send-email-emilio@elopez.com.ar>
- <1374541272-32173-3-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20130723093500.GC10389@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 23 Jul 2013 10:35:13 +0100
+Subject: [PATCH] xen/arm64: Don't compile cpu hotplug
+In-Reply-To: <1374529258-12866-1-git-send-email-julien.grall@linaro.org>
+References: <1374529258-12866-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <20130723093513.GC4833@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+On Mon, Jul 22, 2013 at 10:40:58PM +0100, Julien Grall wrote:
+> On ARM64, when CONFIG_XEN=y, the compilation will fail because CPU hotplug is
+> not yet supported with XEN. For now, disable it.
+> 
+> Signed-off-by: Julien Grall <julien.grall@linaro.org>
 
-On Mon, Jul 22, 2013 at 10:01:06PM -0300, Emilio L?pez wrote:
-> This commit reworks factors clock registration to be done behind a
-> composite clock. This allows us to additionally add a gate, mux or
-> divisors, as it will be needed by some future PLLs.
+With this applied I'm able to build an arm64 kernel with both
+CONFIG_HOTPLUG_CPU (from local patches) and CONFIG_XEN.
 
-Thanks for this patch, it looks fine.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-I'm actually wondering if we could do this as well for the mux/gate/div
-that we have?
+Cheers,
+Mark.
 
-This way, we would cover all the cases, and could only have one clock
-defined per actual hardware clock.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/84a933b0/attachment-0001.sig>
+> ---
+>  drivers/xen/Makefile |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index 2bf461a..a609353 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -1,4 +1,4 @@
+> -ifneq ($(CONFIG_ARM),y)
+> +ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
+>  obj-y	+= manage.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+>  endif
+> -- 
+> 1.7.10.4
+> 
+> 
