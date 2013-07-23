@@ -1,45 +1,42 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 22 Jul 2013 18:30:26 -0600
-Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <20130716234307.3d5ed229@skate>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E4167B.4000208@wwwdotorg.org>
- <20130715162709.GA24625@dhcp-172-17-186-34.nvidia.com>
- <20130716103351.15b0fb50@skate>
- <20130716210509.GA29318@dhcp-172-17-186-34.nvidia.com>
- <20130716234307.3d5ed229@skate>
-Message-ID: <CAErSpo5G=d=WsN0MnXrwYa4HgTVFre5QYj+hDeHGVXnz-Aeygg@mail.gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 22 Jul 2013 20:32:06 -0400
+Subject: [PATCH v4] xen/arm: enable PV control for ARM
+In-Reply-To: <1374529321-12955-1-git-send-email-julien.grall@linaro.org>
+References: <1374529321-12955-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <5228e08a-1cdb-4240-b10f-9ad690c94ac4@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 3:43 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Thierry,
+Julien Grall <julien.grall@linaro.org> wrote:
+>Enable power management from the toolstack for ARM guest.
 >
-> On Tue, 16 Jul 2013 14:05:10 -0700, Thierry Reding wrote:
+>Signed-off-by: Julien Grall <julien.grall@linaro.org>
 >
->> > This is from:
->> >
->> > Subject: Re: [PATCH v2 6/8] pci: mvebu: add support for MSI
->> > Date: Tue, 18 Jun 2013 16:57:11 -0600
->>
->> Yes, I'm aware of that discussion. However we currently need to have the
->> custom root bus scan implementation anyway because pci_scan_root_bus()
->> just doesn't work on ARM. So again, since we'll have to rework the
->> driver anyway in order to use pci_scan_root_bus() once the issues have
->> been resolved, it wouldn't hurt to postpone the transition to the new
->> ARM pcibios_add_bus() support until that point.
->>
->> All I was trying to do was reduce the list of common dependencies in an
->> attempt to make merging it easier.
+>---
+>    Changes in v4:
+>        - Divide the patch in 2 distinct parts
+>    Changes in v3:
+>        - Fix condition to compile cpu_hotplug.o
+>    Changes in v2:
+>        - Don't compile xen/cpu_hotplug.o with ARM64
+>---
+> drivers/xen/Makefile |    3 +--
+> 1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> Understood. Bjorn, since you are the one who originally requested
-> the usage of pcibios_add_bus(), would you agree with the idea proposed
-> by Thierry? It would remove one dependency for both the Marvell MSI
-> support and Tegra PCIe support, which would help getting this code
-> merged.
->
-> As Thierry points out, this can easily be resolved at a later point,
-> once the new hooks are merged in the ARM PCI core.
+>diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+>index a609353..f185e8d 100644
+>--- a/drivers/xen/Makefile
+>+++ b/drivers/xen/Makefile
+>@@ -1,9 +1,8 @@
+> ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
+>-obj-y	+= manage.o
+> obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+> endif
+> obj-$(CONFIG_X86)			+= fallback.o
+>-obj-y	+= grant-table.o features.o events.o balloon.o time.o
+>+obj-y	+= grant-table.o features.o events.o balloon.o time.o manage.o
+> obj-y	+= xenbus/
+> 
+> nostackp := $(call cc-option, -fno-stack-protector)
 
-Yep, that's fine with me.
+The patch looks Ok but the description is off.  Power management is the term used for cpu freq,  C states and P states. While this patch touches none of that. 
