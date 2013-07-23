@@ -1,56 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Jul 2013 15:10:17 -0700
-Subject: [GIT PULL] Remove ARM local timer API
-In-Reply-To: <20130625200211.GA11625@codeaurora.org>
-References: <20130625200211.GA11625@codeaurora.org>
-Message-ID: <CAOesGMj5AZcB7-kcS8_JqfKAg_RUKqTdDZf7bdwkebn3pwADAw@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 24 Jul 2013 00:10:57 +0200
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
+ with ARM CPU
+In-Reply-To: <20130719013646.GA16615@glitch>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+ <20130716172023.64337690@skate> <51E56839.8010205@hauke-m.de>
+ <20130719013646.GA16615@glitch>
+Message-ID: <51EEFF71.8090203@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 25, 2013 at 1:02 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Olof/Arnd,
->
-> These patches remove the ARM local timer API. The ARM architected
-> timers have already moved away from this API so this series
-> migrates the rest of the users allowing us to remove the API
-> entirely. Thomas has been kind enough to take the first two
-> patches into timers/core in the tip tree (thanks Thomas!) so I've
-> merged that into v3.10-rc1 and then applied the rest of the
-> patches on top. Let me know if this is acceptable.
->
-> These patches have been through multiple rounds and tested by
-> multiple people since before the 3.10 merge window closed. Only
-> Barry's ack is missing (Cced).
->
-> Since I don't have a tree on kernel.org, David Brown has been
-> kind enough to push my tag out to his repo. Please pull.
->
-> The following changes since commit 42cba6e27c4cddc4df701c597dbfa666e1c013c8:
->
->   Merge branch 'timers/core' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip into remove-local-timers (2013-06-24 17:45:02 -0700)
->
-> are available in the git repository at:
->
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/remove-local-timers
->
-> for you to fetch changes up to 060fd3043e5e3488504b9e70182e188dd9113aea:
->
->   ARM: smp: Remove local timer API (2013-06-24 17:47:34 -0700)
->
-> ----------------------------------------------------------------
-> Now that we have a generic arch hook for broadcast we can remove the local
-> timer API entirely. Doing so will reduce code in ARM core, reduce the
-> architecture dependencies of our timer drivers, and simplify the code because
-> we no longer go through an architecture layer that is essentially a hotplug
-> notifier.
+On 07/19/2013 03:36 AM, Domenico Andreoli wrote:
+> On Tue, Jul 16, 2013 at 05:35:21PM +0200, Hauke Mehrtens wrote:
+>> On 07/16/2013 05:20 PM, Thomas Petazzoni wrote:
+>>>
+>>>> diff --git a/arch/arm/mach-bcm53xx/Kconfig b/arch/arm/mach-bcm53xx/Kconfig
+>>>> new file mode 100644
+>>>> index 0000000..1e16e87
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/mach-bcm53xx/Kconfig
+>>>> @@ -0,0 +1,10 @@
+>>>> +config ARCH_BCM53XX
+>>>> +	bool "Broadcom BCM47XX / BCM53XX ARM SoC"
+>>>
+>>> So the directory is named mach-bcm53xx, but you also handle BCM47xx
+>>> SoCs. This doesn't sound really easy to follow.
+> 
+> At the time of the BCM281XX merge we considered that such directories would
+> mostly contain board files only, being these new entries DT based. Hence
+> the choice of mach-bcm to collect all of them.
+> 
+> I think you should then put this stuff there.
 
-Hi,
+So you think I should move the file from
+arch/arm/mach-bcm53xx/bcm53xx.c to arch/arm/mach-bcm/bcm53xx.c ?
+Most (All?) of the Router SoCs in the BCM53XX and BCM47XX line are from
+the same family and they should be supported by the same code, so there
+is no reason to have a bcm47xx.c and a bcm53xx.c.
 
-Merged in as localtimer/removal into next/cleanup.
+>> Yes the BCM53XX and BCM47XX SoCs are technically from the same line. I
+>> do not know why there are two different names, probably marketing.
+>>
+>> Earlier versions of these SoC lines (also BCM47XX and BCM53XX) used a
+>> MIPS core and they are supported by arch/mips/bcm47xx/. I use BCM53XX to
+>> not conflict with the MIPS part now. I know this could still cause
+>> problems and people will get confused, but I do not know a better name.
+> 
+> I'll throw also BCM476x (bcm4760 and bcm4761) on the table. These are ARM11,
+> single-core SoCs.
+> 
+> Can we agree on a nice naming so that we actually clarify this silliness?
 
-I had quite a few merge conflicts due to the __cpuinit removal, so
-please double-check my resolutions.
+We could name it BCM5301X like it is named the the vendor source code.
+Currently there are the following SoCs of this family available:
+BCM53010, BCM53011, BCM53012, BCM53014, BCM53015, BCM53016, BCM53017,
+BCM53018, BCM4707, BCM4708 and BCM4709. Internal there are two different
+chip IDs available 53010 (BCM4707) and 53018 (BCM53018).
 
-
--Olof
+Hauke
