@@ -1,57 +1,137 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 23 Jul 2013 08:44:39 -0700
-Subject: [PATCH V4 2/4] ARM: tegra114: Reprogram GIC CPU interface to
- bypass IRQ on CPU PM entry
-In-Reply-To: <1374225926-26832-3-git-send-email-josephl@nvidia.com>
-References: <1374225926-26832-1-git-send-email-josephl@nvidia.com>
- <1374225926-26832-3-git-send-email-josephl@nvidia.com>
-Message-ID: <20130723154438.GA2864@dhcp-172-17-186-34.nvidia.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 23 Jul 2013 08:47:22 -0700
+Subject: Issue with gpio and pinmux
+In-Reply-To: <20130722083535.GA19685@ab42.lan>
+References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
+ <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+ <51EB590A.4010600@wwwdotorg.org> <20130722083535.GA19685@ab42.lan>
+Message-ID: <51EEA58A.30206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 05:25:24PM +0800, Joseph Lo wrote:
-> There is a difference between GICv1 and v2 when CPU in power management
-> mode (aka CPU power down on Tegra). For GICv1, IRQ/FIQ interrupt lines
-> going to CPU are same lines which are also used for wake-interrupt.
-> Therefore, we cannot disable the GIC CPU interface if we need to use same
-> interrupts for CPU wake purpose. This creates a race condition for CPU
-> power off entry. Also, in GICv1, disabling GICv1 CPU interface puts GICv1
-> into bypass mode such that incoming legacy IRQ/FIQ are sent to CPU, which
-> means disabling GIC CPU interface doesn't really disable IRQ/FIQ to CPU.
+On 07/22/2013 01:35 AM, Christian Ruppert wrote:
+> On Sat, Jul 20, 2013 at 09:44:10PM -0600, Stephen Warren wrote:
+>> On 07/20/2013 04:44 PM, Linus Walleij wrote:
+>>> On Thu, Jul 18, 2013 at 8:11 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>
+>>>> The issue is that some HW muxes groups of pins at a time, so simply
+>>>> because that group of pins is "claimed" by a mux function, implies
+>>>> nothing about which specific pins in that group are actually used; some
+>>>> may actually still be free for usage as a GPIO.
+>>>
+>>> This we need to get into the documentation.
+>>>
+>>>> The solution here may be one of:
+>>>>
+>>>> a) Modify pinctrl /not/ to allow both a GPIO and a mux function to claim
+>>>> a pin *if* the group that contains the pin only contains a single pin.
+>>>> This is a bit of a hacky special case though; there are other situations
+>>>> where "dual claiming" shouldn't be allowed, and this doesn't solve those.
+>>>>
+>>>> b) Ignore the issue; if the system configuration is correct, the issue
+>>>> won't cause problems in practice, since nothing will be configured to
+>>>> "dual claim" any pin.
+>>>>
+>>>> c) Enhance pinctrl with extra information, so it knows which pins in a
+>>>> group are usable as GPIO even when the group is claimed by a mux
+>>>> function. The list of pins could theoretically vary per mux function, so
+>>>> you'd need a table with lookup key (pin group, mux function) and output
+>>>> data (list of pins that can be "dual claimed"). This would be a complete
+>>>> solution. If a list wasn't provided, the pinctrl core could assume that
+>>>> mean no dual claim was allowed.
+>>>
+>>> I guess (b) is what we have.
+>>>
+>>> But it really feels incomplete does it not? IIRC the system was strict
+>>> not to allow simultaneous use of pins for GPIO and other functions
+>>> at all until the above corner case made it necessary to relax this
+>>> restriction.
+>>>
+>>> A simple way to get (a) would be to just add a flag like ".strict"
+>>> to struct pinmux_ops but it feels cheap.
+>>>
+>>> What do we need for (c)? I think we can refactor this as the Tegra
+>>> and U300 should be the two platforms with such tricky groups so
+>>> the impact should be fairly small right now. I'm just worried it would
+>>> be a complex and memory-consuming thing :-/
+>>
+>> Actually, a better way to do (c) might be to just add an extra "op" to
+>> struct pinmux_ops; something like validate_gpio_mux(), passing in
+>> information such as whether a mux function is in effect on that pin,
+>> whether the pin is already claimed as a GPIO, and whether the function
+>> is being called to check a GPIO-claim or mux-claim operation . If the op
+>> is missing, no "dual claim" is allowed. If the op is present, the code
+>> in the op validates whether the particular GPIO is allowed to be claimed
+>> while the particular mux function is active.
+>>
+>> That way, I think any driver that doesn't want to allow dual-claim
+>> doesn't have to do anything, but the few drivers that do can code up
+>> whatever algorithm they want; for Tegra, I'd just allow everything for
+>> simplicity, but we could always enhance that later if we want.
 > 
-> GICv2 provides a wake IRQ/FIQ (for wake-event purpose), which are not
-> disabled by GIC CPU interface. This is done by adding a bypass override
-> capability when the interrupts are disabled at the CPU interface. To
-> support this, there are four bits about IRQ/FIQ BypassDisable in CPU
-> interface Control Register. When the IRQ/FIQ not being driver by the
-> CPU interface, each interrupt output signal can be deasserted rather
-> than being driven by the legacy interrupt input.
-> 
-> So the wake-event can be used as wakeup signals to SoC (system power
-> controller).
-> 
-> To prevent race conditions and ensure proper interrupt routing on
-> Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
-> call-back to reprogram the GIC CPU interface on PM entry. The
-> GIC CPU interface will be reset back to its normal state by
-> the common GIC CPU PM exit callback when the CPU wakes up.
-> 
-> Based on the work by: Scott Williams <scwilliams@nvidia.com>
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> [ An introductory note on terminology: in the following, "port" refers
+> to a set of pins who's mux is controlled through the same bit field in
+> the same register,
 
-Hi Joseph,
+I believe that's exactly what a "pingroup" is in pinctrl subsystem
+terminology. Where there is already an existing name for something, it'd
+be best to use that so that every person doesn't use a different name
+for everything.
 
-We've had a rather long-standing issue with PCIe and MSI related to LP2
-on Tegra20. I wonder if that's somehow related to this. Given that this
-is marked as Tegra114 patch explicitly I suppose not, but it certainly
-sounds very similar to the description above.
+> "interface" refers to the set of pins comprising a
+> functional unit, e.g. SCL and SDA of an I2C interface or the four pins
+> of an SPI interface ]
+> 
+> In my understanding, the problem stems from the fact that we always
+> claim an entire port instead of just the pins required for a given
+> functionality.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130723/8bc7f376/attachment.sig>
+Yes.
+
+> The pinctrl core is already well equipped to manage
+> claiming interfaces instead of ports and thus a fourth alternative would
+> be to
+
+I would argue that's not the case. pinctrl knows absolutely nothing
+about "interfaces"; there is no data structure defines that describes
+interfaces at all.
+
+That's not saying such a thing could not be added; I'm simply arguing
+that "well equipped" doesn't seem to be true at the moment.
+
+> d) implement gpio/pin conflict management in the already existing
+> callbacks inside the driver: Today, both enable and gpio_request_enable
+> exist (and can refuse a request for a configuration/pin).
+> If we only claim the pins used by a given interface instead of the
+> entire port, conflict management becomes natural (see
+> http://lkml.indiana.edu/hypermail/linux/kernel/1306.2/00749.html and the
+> following).
+
+OK, that's basically the same as my proposal to add a new callback; it's
+simply re-using and existing driver callback rather than creating a new
+one solely for conflict checking.
+
+Re-using the existing callback(s) seems fine, with appropriate prototype
+modification to pass back the list of pins that can-or-can't be
+dual-claimed I suppose.
+
+> IMHO, the pinctrl drivers are the right place for everything but the
+> most basic pin conflict management since constraints on what can be
+> muxed at the same time are highly hardware implementation dependent. One
+> could e.g. imagine an implementation where a GPIO can override and snoop
+> a pin's output value in one mux configuration, just snoop the pin value
+> in another and do neither in a third.
+> 
+> I see two (independent) ways to enhance the pinctrl core in order to
+> support drivers in this task:
+> a) Add two functions pin_is_claimed and gpio_is_claimed which allow the
+> pinctrl driver to query if a given pin/gpio is available for muxing.
+> b) Add four functions lock_gpio/unlock_gpio and lock_pin/unlock_pin
+> which allow the pinctrl driver to prevent the core from granting
+> requests on GPIOs/pins.
+
+Yes, either of those are basically what I proposed in my followup to the
+email you're replying to.
+
+> This solution also has the advantage that it doesn't modify the default
+> behaviour of the core and it thus won't break existing drivers.
