@@ -1,28 +1,68 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 23 Jul 2013 10:24:55 +0900
-Subject: [PATCH 04/04] ARM: shmobile: Allow ARCH_SHMOBILE_MULTI timer
- configuration
-In-Reply-To: <20130717203127.27542.41663.sendpatchset@w520>
-References: <20130717203049.27542.78385.sendpatchset@w520>
- <20130717203127.27542.41663.sendpatchset@w520>
-Message-ID: <20130723012454.GE16481@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 22 Jul 2013 18:26:21 -0700
+Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
+ PLL36xx for samsung SoCs
+In-Reply-To: <CAGm_ybj31kv=iW2YKsHnBRJ741G2amSNAJf+Mx8Z-JMoVynZ8w@mail.gmail.com>
+References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
+ <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
+ <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
+ <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
+ <51C85F8F.9050501@samsung.com> <20130624190227.20448.68120@quantum>
+ <007001ce7149$1f683f40$5e38bdc0$%kim@samsung.com>
+ <CAKew6eVW6dOzLRN2CG8jT3Oo1uzKrXqi1aRYkAHmUu61dBSDpA@mail.gmail.com>
+ <CAGm_ybj31kv=iW2YKsHnBRJ741G2amSNAJf+Mx8Z-JMoVynZ8w@mail.gmail.com>
+Message-ID: <20130723012621.7598.46496@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 05:31:27AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+Quoting Vikas Sajjan (2013-07-21 23:15:27)
+> Hi Kukjin / Mike,
 > 
-> Move the timer configuration bits to allow use in
-> case of ARCH_SHMOBILE or ARCH_SHMOBILE_MULTI.
-> 
-> The timers all make use of the regular driver model
-> so they are safe to enable for ARCH_MULTIPLATFORM.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  arch/arm/mach-shmobile/Kconfig |   16 +++++++++++-----
->  1 file changed, 11 insertions(+), 5 deletions(-)
+> Can you apply this series
 
-Thanks, I have queued this up for v3.12 in a new multiarch branch
-of the renesas tree.
+Let me apply this to see if the dependencies are taken care of now. If
+so I'll just take it through the clk tree.
+
+Regards,
+Mike
+
+> 
+> On Tue, Jul 16, 2013 at 7:10 PM, Yadwinder Singh Brar
+> <yadi.brar01@gmail.com> wrote:
+> > Hi Kukjin / Mike,
+> >
+> > On Tue, Jun 25, 2013 at 7:40 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> >> Mike Turquette wrote:
+> >>>
+> >>> Quoting Kukjin Kim (2013-06-24 08:02:39)
+> >>> > On 06/22/13 01:31, Mike Turquette wrote:
+> >>> > >
+> >>> > > Acked-by: Mike Turquette<mturquette@linaro.org>
+> >>> > >
+> >>> > > Or I can take this through the clk tree. Either way is fine.
+> >>> > >
+> >>> > Mike, please go ahead taking this series into the clk tree for 3.11.
+> >>>
+> >>> Actually it might be better for you to take it. Patch #5 relies on
+> >>> drivers/clk/samsung/clk-exynos5420.c which only exists in the samsung
+> >>> tree.  It was introduced by commit 1609027f, "clk: exynos5420: register
+> >>> clocks using common clock framework".
+> >>>
+> >> Yes, you're right. It depends on soc-exynos5420 stuff in samsung tree.
+> >>
+> >>> And these patches need to be applied with some fuzz to the clk tree due
+> >>> to other changes which are not in my tree and only present in yours.
+> >>>
+> >>> The best two options are either for you to take this series or it can be
+> >>> rebased on top of clk-next, after which I'll apply it.
+> >>>
+> >> Let me try to send this series via samsung tree for v3.11 but I'm not sure because it's a little bit late for arm-soc tree.
+> >>
+> >> Thanks for your ack, just note I will send to arm-soc tonight in my time.
+> >>
+> >
+> > Can we get this series merge now in any of trees.
+> > Please let me if its required to rebase it.
+> >
+> > Regards,
+> > Yadwinder
