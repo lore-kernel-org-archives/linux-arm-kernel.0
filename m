@@ -1,71 +1,23 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 23 Jul 2013 10:14:01 -0400 (EDT)
-Subject: [PATCH 6/6] USB: ehci-omap: Implement suspend/resume
-In-Reply-To: <51EE4A7C.2020709@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1307231009120.1304-100000@iolanthe.rowland.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Jul 2013 16:17:27 +0200
+Subject: [PATCH v5] linux,stdout-path helper
+In-Reply-To: <20121121155312.GX4398@game.jcrosoft.org>
+References: <20121121155312.GX4398@game.jcrosoft.org>
+Message-ID: <20130723141727.GA6807@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jul 2013, Roger Quadros wrote:
+On Wed, Nov 21, 2012 at 04:53:12PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> The following adds a helper for matching the linux,stdout-path property
+> in the chosen node and makes use of it in the i.MX serial and Atmel serial driver.
 
-> >> +               pm_runtime_get_sync(dev);
-> >> +               ehci_resume(hcd, false);
-> >> +               ret = ehci_suspend(hcd, do_wakeup);
-> >> +               pm_runtime_put_sync(dev);
-> > 
-> > It would be better to call pm_runtime_resume(dev) at the start instead
-> > of pm_runtime_get_sync(), and eliminate the last two lines.  Then the
-> > ehci_suspend() below could be moved outside the "if" statement.
-> 
-> Why do I find pm_runtime_* so confusing ;)
+Seems this got stuck. Jean-Christophe, will you update this series? I
+could really make use of this.
 
-It tries to provide every service anyone might want, and ends up being 
-confusingly large.
+Sascha
 
-In this case, though, the reasoning is simple.  We know that after the 
-system resumes, the device will be back in the active state.  Hence 
-there's no point in calling pm_runtime_put_sync here, other than to 
-balance the _get_sync above.  Since there's no danger of another thread 
-trying to do a runtime suspend at this point, you don't need to 
-increment the usage counter.  Therefore pm_runtime_resume is good 
-enough.
-
-> > Alternatively, if you are able to turn off the wakeup setting without
-> > going through an entire resume/suspend cycle, that would be preferable.
-> > 
-> 
-> As we don't rely on the EHCI controller's interrupt any more after we
-> power it down, maybe ehci_resume/suspend cycle is not required at all on OMAP,
-> even if the wakeup setting is disabled during system suspend.
-> 
-> As the wakeup is controlled entirely by pad wakeup, all we need to do is make sure
-> the IO pad wakeup is configured correctly based on do_wakeup. How this is done
-> is still in transition but it might be turn out to be as simple as irq_set_irq_wake()
-> 
-> So IMHO, for ehci-omap this should suffice
-> 
-> static int omap_ehci_suspend(struct device *dev)
-> {
-> 	struct usb_hcd *hcd = dev_get_drvdata(dev);
-> 	bool do_wakeup = device_may_wakeup(dev);
-> 	int ret = 0;
-> 
-> 	if (!pm_runtime_status_suspended(dev))
-> 		ret = ehci_suspend(hcd, do_wakeup);
-> 
-> 	/* Not tested yet */
-> 	irq_set_irq_wake(hcd->irq, do_wakeup);
-> 
-> 	return ret;
-> }
-> 
-> What do you think?
-
-Nice and simple.  It looks good.
-
-> As the OMAP IO pad wakeup management code [1] is still in transition, I'll wait till
-> that gets settled and then resend this series.
-
-Okay.
-
-Alan Stern
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
