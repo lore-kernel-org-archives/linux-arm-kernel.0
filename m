@@ -1,35 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Jul 2013 12:15:54 -0700
-Subject: [PATCH] ARM: pxa: propagate errors from regulator_enable() to
- pxamci
-In-Reply-To: <8638rt3svt.fsf@void.printf.net>
-References: <201307051751.20729.arnd@arndb.de> <8638rt3svt.fsf@void.printf.net>
-Message-ID: <CAOesGMiVzH7qyu_tBpKV5PTHBvvwE9E6Q9f39ENfVOO-6wY3+w@mail.gmail.com>
+Date: Tue, 23 Jul 2013 12:18:33 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Select USB chipidea driver
+In-Reply-To: <1374598926-23761-1-git-send-email-fabio.estevam@freescale.com>
+References: <1374598926-23761-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130723191833.GA16811@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 5, 2013 at 8:53 AM, Chris Ball <cjb@laptop.org> wrote:
-> Hi,
->
-> On Fri, Jul 05 2013, Arnd Bergmann wrote:
->> The em_x270_mci_setpower() and em_x270_usb_hub_init() functions
->> call regulator_enable(), which may return an error that must
->> be checked.
->>
->> This changes the em_x270_usb_hub_init() function to bail out
->> if it fails, and changes the pxamci_platform_data->setpower
->> callback so that the a failed em_x270_mci_setpower call
->> can be propagated by the pxamci driver into the mmc core.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> For pxamci:
->
-> Acked-by: Chris Ball <cjb@laptop.org>
+On Tue, Jul 23, 2013 at 02:02:06PM -0300, Fabio Estevam wrote:
+> CONFIG_USB_EHCI_MXC selects the old i.mx USB driver, which does not support 
+> device tree.
+> 
+> Select the USB chipidea driver instead, so that USB can be functional on i.mx.
 
-Applied with your ack to arm-soc fixes branch for 3.11, after fixing
-the set/test ordering pointed out in the thread.
+Applied to 3.11 fixes branch, but we should probably stop updating defconfigs
+for 3.11 now unless it's because of real problems.
 
-Thanks!
 
 -Olof
