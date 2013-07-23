@@ -1,137 +1,73 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 23 Jul 2013 11:13:58 +0300
-Subject: [PATCH] ARM: Do not run dummy_flush_tlb_a15_erratum() on
- non-Cortex-A15
-In-Reply-To: <1374556774-18795-1-git-send-email-festevam@gmail.com>
-References: <1374556774-18795-1-git-send-email-festevam@gmail.com>
-Message-ID: <51EE3B46.7020906@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 23 Jul 2013 09:16:39 +0100
+Subject: [PATCH 4/4] ARM: set --be8 when linking modules
+In-Reply-To: <51ED8040.2020803@codethink.co.uk>
+References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374510833-25716-5-git-send-email-ben.dooks@codethink.co.uk>
+ <20130722170500.GC19639@codeaurora.org> <51ED69CA.3030501@codethink.co.uk>
+ <alpine.LFD.2.03.1307221452210.15022@syhkavp.arg>
+ <51ED8040.2020803@codethink.co.uk>
+Message-ID: <51EE3BE7.2030706@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On 07/23/2013 08:19 AM, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15 erratum 798181 
-> (TLBI/DSB operations)) causes the following undefined instruction error on a
-> mx53 (Cortex-A8):
-> 
-> Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
-> CPU: 0 PID: 275 Comm: modprobe Not tainted 3.11.0-rc2-next-20130722-00009-g9b0f371 #881
-> task: df46cc00 ti: df48e000 task.ti: df48e000
-> PC is at check_and_switch_context+0x17c/0x4d0
-> LR is at check_and_switch_context+0xdc/0x4d0
-> 
-> This problem happens because check_and_switch_context() calls 
-> dummy_flush_tlb_a15_erratum() without checking if we are really running on a 
-> Cortex-A15 or not. 
-> 
-> To avoid this issue, always check if we are running on a Cortex-A15 or not 
-> (via erratum_a15_798181()) inside dummy_flush_tlb_a15_erratum(), so that we do 
-> not need to keep doing the same check in all occurrences of 
-> dummy_flush_tlb_a15_erratum().
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/include/asm/tlbflush.h | 18 ++++++++++++++++++
->  arch/arm/kernel/smp_tlb.c       | 23 -----------------------
->  2 files changed, 18 insertions(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-> index fdbb9e3..2478b6f 100644
-> --- a/arch/arm/include/asm/tlbflush.h
-> +++ b/arch/arm/include/asm/tlbflush.h
-> @@ -443,9 +443,22 @@ static inline void local_flush_bp_all(void)
->  		isb();
->  }
->  
-> +#include <asm/cputype.h>
->  #ifdef CONFIG_ARM_ERRATA_798181
-> +static inline int erratum_a15_798181(void)
-> +{
-> +	unsigned int midr = read_cpuid_id();
+On 22/07/13 19:56, Ben Dooks wrote:
+> On 22/07/13 19:53, Nicolas Pitre wrote:
+>> On Mon, 22 Jul 2013, Ben Dooks wrote:
+>>
+>>> On 22/07/13 18:05, Stephen Boyd wrote:
+>>>> On 07/22, Ben Dooks wrote:
+>>>>> To avoid having to make every text section swap the instruction order
+>>>>> of all instructions, make sure modules are built also built with --be8
+>>>>> (as is the current kernel final link).
+>>>>>
+>>>>> If we do not do this, we would end up having to swap all instructions
+>>>>> when loading a module, instead of just the instructions that we are
+>>>>> applying ELF relocations to.
+>>>>>
+>>>>
+>>>> If someone tries to load a be8 module on a non-be8 kernel will it
+>>>> still work? Or should we add an extra version magic string in
+>>>> asm/module.h to prevent that?
+>>>
+>>> The ELF header changes the EI_DATA field in the ei_ident from
+>>> ELFDATA2LSB to ELFDATA2MSB when compiling so we should be able
+>>> to detect these when loading.
+>>>
+>>> I have not checked to see if the kernel correctly checks for this.
+>>>
+>>> I do not think it currently checks the ei_flags field for the
+>>> EF_ARM_BE8 in ABI 4 and 5. I am not sure if this is really important?
+>>
+>> If the information is already there and easily accessible, then it
+>> should be used.
+>>
+>>
+>> Nicolas
+>
+> I have something like this, it does not mess things up loading
+> BE8 binaries on my current system. I think we're building stuff
+> for EABI4 but haven't checked.
+>
+> diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
+> index d0d1e83..3b0351c 100644
+> --- a/arch/arm/kernel/elf.c
+> +++ b/arch/arm/kernel/elf.c
+> @@ -34,6 +34,15 @@ int elf_check_arch(const struct elf32_hdr *x)
+> if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & HWCAP_VFP))
+> return 0;
+> }
 > +
-> +	/* Cortex-A15 r0p0..r3p2 affected */
-> +	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
-> +		return 0;
-> +	return 1;
-> +}
-> +
->  static inline void dummy_flush_tlb_a15_erratum(void)
->  {
-> +	if (!erratum_a15_798181())
-> +		return;
->  	/*
->  	 * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
->  	 */
-> @@ -453,6 +466,11 @@ static inline void dummy_flush_tlb_a15_erratum(void)
->  	dsb();
->  }
->  #else
-> +static inline int erratum_a15_798181(void)
-> +{
-> +	return 0;
-> +}
-> +
->  static inline void dummy_flush_tlb_a15_erratum(void)
->  {
->  }
-> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-> index a98b62d..29e9038 100644
-> --- a/arch/arm/kernel/smp_tlb.c
-> +++ b/arch/arm/kernel/smp_tlb.c
-> @@ -70,23 +70,6 @@ static inline void ipi_flush_bp_all(void *ignored)
->  	local_flush_bp_all();
->  }
->  
-> -#ifdef CONFIG_ARM_ERRATA_798181
-> -static int erratum_a15_798181(void)
-> -{
-> -	unsigned int midr = read_cpuid_id();
-> -
-> -	/* Cortex-A15 r0p0..r3p2 affected */
-> -	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
-> -		return 0;
-> -	return 1;
-> -}
-> -#else
-> -static int erratum_a15_798181(void)
-> -{
-> -	return 0;
-> -}
-> -#endif
-> -
->  static void ipi_flush_tlb_a15_erratum(void *arg)
->  {
->  	dmb();
-> @@ -94,9 +77,6 @@ static void ipi_flush_tlb_a15_erratum(void *arg)
->  
->  static void broadcast_tlb_a15_erratum(void)
->  {
-> -	if (!erratum_a15_798181())
-> -		return;
-> -
+> + if ((eflags & EF_ARM_EABI_MASK) >= EF_ARM_EABI_VER4) {
+> + if (eflags & EF_ARM_BE8) {
+> + if (!IS_ENABLED(CONFIG_ARM_CPU_BE8))
+> + return 1;
+> + } else if (IS_ENABLED(CONFIG_ARM_CPU_BE8))
+> + return 1;
+> + }
 
-Removing this if statement will cause "ipi_flush_tlb_a15_erratum" to be called
-on non A15 platforms. So I would just keep it to be safe.
+dis-regard this, it does not work. I blame the heat.
 
->  	dummy_flush_tlb_a15_erratum();
->  	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
->  }
-> @@ -106,9 +86,6 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
->  	int this_cpu;
->  	cpumask_t mask = { CPU_BITS_NONE };
->  
-> -	if (!erratum_a15_798181())
-> -		return;
-> -
-
-same here.
->  	dummy_flush_tlb_a15_erratum();
->  	this_cpu = get_cpu();
->  	a15_erratum_get_cpumask(this_cpu, mm, &mask);
-> 
-
-cheers,
--roger
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
