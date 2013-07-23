@@ -1,63 +1,85 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 23 Jul 2013 12:32:43 +0100
-Subject: [PATCH 4/5] ARM: highbank: remove redundant smp_init_cpus definition
+Date: Tue, 23 Jul 2013 12:32:41 +0100
+Subject: [PATCH 2/5] ARM: vexpress: remove redundant vexpress_dt_cpus_num to
+ get cpu count
 In-Reply-To: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1374579164-30255-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374579164-30255-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-arm_dt_init_cpu_maps is called before smp_init_cpus, which sets the
-cpu_possible_mask appropriately. Since highbank_smp_init_cpus does
-nothing extra, it can be removed.
+arm_dt_init_cpu_maps parses the device tree, validates and sets the
+cpu_possible_mask appropriately. It is unnecessary to do another DT
+parse to get the number of cpus, use num_possible_cpus instead.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
+This patch also removes setting cpu_present_mask as platforms should
+only re-initialize it in smp_prepare_cpus() if present != possible.
+
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/mach-highbank/platsmp.c | 22 ----------------------
- 1 file changed, 22 deletions(-)
+ arch/arm/mach-vexpress/platsmp.c | 32 +-------------------------------
+ 1 file changed, 1 insertion(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
-index 32d75cf5..25b0bae 100644
---- a/arch/arm/mach-highbank/platsmp.c
-+++ b/arch/arm/mach-highbank/platsmp.c
-@@ -31,27 +31,6 @@ static int highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return 0;
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index 993c9ae..4a2d8c4 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -77,39 +77,13 @@ void __init vexpress_dt_smp_map_io(void)
+ 		WARN_ON(of_scan_flat_dt(vexpress_dt_find_scu, NULL));
  }
  
--/*
-- * Initialise the CPU possible map early - this describes the CPUs
-- * which may be present or become present in the system.
-- */
--static void __init highbank_smp_init_cpus(void)
+-static int __init vexpress_dt_cpus_num(unsigned long node, const char *uname,
+-		int depth, void *data)
 -{
--	unsigned int i, ncores = 4;
+-	static int prev_depth = -1;
+-	static int nr_cpus = -1;
 -
--	/* sanity check */
--	if (ncores > NR_CPUS) {
--		printk(KERN_WARNING
--		       "highbank: no. of cores (%d) greater than configured "
--		       "maximum of %d - clipping\n",
--		       ncores, NR_CPUS);
--		ncores = NR_CPUS;
+-	if (prev_depth > depth && nr_cpus > 0)
+-		return nr_cpus;
+-
+-	if (nr_cpus < 0 && strcmp(uname, "cpus") == 0)
+-		nr_cpus = 0;
+-
+-	if (nr_cpus >= 0) {
+-		const char *device_type = of_get_flat_dt_prop(node,
+-				"device_type", NULL);
+-
+-		if (device_type && strcmp(device_type, "cpu") == 0)
+-			nr_cpus++;
 -	}
 -
--	for (i = 0; i < ncores; i++)
--		set_cpu_possible(i, true);
+-	prev_depth = depth;
+-
+-	return 0;
 -}
 -
- static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+ static void __init vexpress_dt_smp_init_cpus(void)
  {
- 	if (scu_base_addr)
-@@ -59,7 +38,6 @@ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
- }
+ 	int ncores = 0, i;
  
- struct smp_operations highbank_smp_ops __initdata = {
--	.smp_init_cpus		= highbank_smp_init_cpus,
- 	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
- 	.smp_boot_secondary	= highbank_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
+ 	switch (vexpress_dt_scu) {
+ 	case GENERIC_SCU:
+-		ncores = of_scan_flat_dt(vexpress_dt_cpus_num, NULL);
+-		break;
++		return;
+ 	case CORTEX_A9_SCU:
+ 		ncores = scu_get_core_count(vexpress_dt_cortex_a9_scu_base);
+ 		break;
+@@ -133,12 +107,8 @@ static void __init vexpress_dt_smp_init_cpus(void)
+ 
+ static void __init vexpress_dt_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	int i;
+-
+ 	switch (vexpress_dt_scu) {
+ 	case GENERIC_SCU:
+-		for (i = 0; i < max_cpus; i++)
+-			set_cpu_present(i, true);
+ 		break;
+ 	case CORTEX_A9_SCU:
+ 		scu_enable(vexpress_dt_cortex_a9_scu_base);
 -- 
 1.8.1.2
