@@ -1,23 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Jul 2013 16:17:27 +0200
-Subject: [PATCH v5] linux,stdout-path helper
-In-Reply-To: <20121121155312.GX4398@game.jcrosoft.org>
-References: <20121121155312.GX4398@game.jcrosoft.org>
-Message-ID: <20130723141727.GA6807@pengutronix.de>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 23 Jul 2013 20:13:23 +0530
+Subject: [PATCH] ARM: dts: tegra114: dalmore: fix the irq trigger type
+ of Palmas MFD device
+In-Reply-To: <1374574191-24396-1-git-send-email-josephl@nvidia.com>
+References: <1374574191-24396-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51EE968B.1050103@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 04:53:12PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> The following adds a helper for matching the linux,stdout-path property
-> in the chosen node and makes use of it in the i.MX serial and Atmel serial driver.
+On Tuesday 23 July 2013 03:39 PM, Joseph Lo wrote:
+> The IRQ trigger type of Palmas MFD device (tps65913) is low-level
+> sensitive. The wrong configuration would cause an interrupt storm
+> when booting the system. Fixing it in DT with appropriate interrupt
+> type.
+>
+> Cc: Laxman Dewangan <ldewangan@nvidia.com>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+>   arch/arm/boot/dts/tegra114-dalmore.dts | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+> index 76529e4..70b9d0c 100644
+> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
+> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+> @@ -840,7 +840,7 @@
+>   		palmas: tps65913 {
+>   			compatible = "ti,palmas";
+>   			reg = <0x58>;
+> -			interrupts = <0 86 0x4>;
+> +			interrupts = <0 86 0x8>;
+>   
 
-Seems this got stuck. Jean-Christophe, will you update this series? I
-could really make use of this.
+This fails as GIC does not support the interrupt flag of 8.
 
-Sascha
+[   13.007755] genirq: Setting trigger mode 8 for irq 118 failed 
+(gic_set_type+0x0/0xf0)
+[   13.009152] palmas 1-0058: Irq flag is 0x00000000
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+I did not get the interrupt storm and even interrupt is not working on tot.
+Two ways to resolve this:
+- Change the interrupt flag to 0 from 4. Or
+- Remove the nvidia,invert-interrupt; for PMC node.
