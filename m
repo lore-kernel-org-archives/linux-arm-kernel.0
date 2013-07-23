@@ -1,55 +1,121 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 23 Jul 2013 16:15:59 -0400 (EDT)
-Subject: [PATCH 6/6] ARM: bitops: prefetch the destination word for write
- prior to strex
-In-Reply-To: <1374579389-32704-7-git-send-email-will.deacon@arm.com>
-References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
- <1374579389-32704-7-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.03.1307231615370.15022@syhkavp.arg>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 23 Jul 2013 22:20:53 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <Pine.LNX.4.44L0.1307231518310.1304-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1307231518310.1304-100000@iolanthe.rowland.org>
+Message-ID: <1387574.Tkg16KearS@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jul 2013, Will Deacon wrote:
+On Tuesday 23 of July 2013 15:36:00 Alan Stern wrote:
+> On Tue, 23 Jul 2013, Tomasz Figa wrote:
+> > IMHO it would be better if you provided some code example, but let's
+> > try to check if I understood you correctly.
+> > 
+> > 8><-------------------------------------------------------------------
+> > -----
+> > 
+> > [Board file]
+> > 
+> > static struct phy my_phy;
+> > 
+> > static struct platform_device phy_pdev = {
+> > 
+> > 	/* ... */
+> > 	.platform_data = &my_phy;
+> > 	/* ... */
+> > 
+> > };
+> > 
+> > static struct platform_device phy_pdev = {
+> 
+> This should be controller_pdev, not phy_pdev, yes?
 
-> The cost of changing a cacheline from shared to exclusive state can be
-> significant, especially when this is triggered by an exclusive store,
-> since it may result in having to retry the transaction.
-> 
-> This patch prefixes our atomic bitops implementation with prefetchw,
-> to try and grab the line in exclusive state from the start. The testop
-> macro is left alone, since the barrier semantics limit the usefulness
-> of prefetching data.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Right. A copy-pasto.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+> > 	/* ... */
+> > 	.platform_data = &my_phy;
+> > 	/* ... */
+> > 
+> > };
+> > 
+> > [Provider driver]
+> > 
+> > struct phy *phy = pdev->dev.platform_data;
+> > 
+> > ret = phy_create(phy);
+> > 
+> > [Consumer driver]
+> > 
+> > struct phy *phy = pdev->dev.platform_data;
+> > 
+> > ret = phy_get(&pdev->dev, phy);
+> 
+> Or even just phy_get(&pdev->dev), because phy_get() could be smart
+> enough to to set phy = dev->platform_data.
 
-> ---
->  arch/arm/lib/bitops.h | 5 +++++
->  1 file changed, 5 insertions(+)
+Unless you need more than one PHY in this driver...
+
 > 
-> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-> index d6408d1..e0c68d5 100644
-> --- a/arch/arm/lib/bitops.h
-> +++ b/arch/arm/lib/bitops.h
-> @@ -10,6 +10,11 @@ UNWIND(	.fnstart	)
->  	and	r3, r0, #31		@ Get bit offset
->  	mov	r0, r0, lsr #5
->  	add	r1, r1, r0, lsl #2	@ Get word offset
-> +#if __LINUX_ARM_ARCH__ >= 7
-> +	.arch_extension	mp
-> +	ALT_SMP(W(pldw)	[r1])
-> +	ALT_UP(W(nop))
-> +#endif
->  	mov	r3, r2, lsl r3
->  1:	ldrex	r2, [r1]
->  	\instr	r2, r2, r3
-> -- 
-> 1.8.2.2
+> > ----------------------------------------------------------------------
+> > --><8
+> > 
+> > Is this what you mean?
 > 
+> That's what I was going to suggest too.  The struct phy is defined in
+> the board file, which already knows about all the PHYs that exist in
+> the system.  (Or perhaps it is allocated dynamically, so that when many
+> board files are present in the same kernel, only the entries listed in
+> the board file for the current system get created.) 
+
+Well, such dynamic allocation is a must. We don't accept non-multiplatform 
+aware code anymore, not even saying about multiboard.
+
+> Then the
+> structure's address is stored in the platform data and made available
+> to both the provider and the consumer.
+
+Yes, technically this can work. You would still have to perform some kind 
+of synchronization to make sure that the PHY bound to this structure is 
+actually present. This is again technically doable (e.g. a list of 
+registered struct phys inside PHY core).
+
+> Even though the struct phy is defined (or allocated) in the board file,
+> its contents don't get filled in until the PHY driver provides the
+> details.
+
+You can't assure this. Board file is free to do whatever it wants with 
+this struct. A clean solution would prevent this.
+
+> > It's technically correct, but quality of this solution isn't really
+> > nice, because it's a layering violation (at least if I understood
+> > what you mean). This is because you need to have full definition of
+> > struct phy in board file and a structure that is used as private data
+> > in PHY core comes from platform code.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> You don't have to have a full definition in the board file.  Just a
+> partial definition -- most of the contents can be filled in later, when
+> the PHY driver is ready to store the private data.
 > 
+> It's not a layering violation for one region of the kernel to store
+> private data in a structure defined by another part of the kernel.
+> This happens all the time (e.g., dev_set_drvdata).
+
+Not really. The phy struct is something that _is_ private data of PHY 
+subsystem, not something that can store private data of PHY subsystem 
+(sure it can store private data of particular PHY driver, but that's 
+another story) and only PHY subsystem should have access to its contents.
+
+By the way, we need to consider other cases here as well, for example it 
+would be nice to have a single phy_get() function that works for both non-
+DT and DT cases to make the consumer driver not have to worry whether it's 
+being probed from DT or not.
+
+I'd suggest simply reusing the lookup method of regulator framework, just 
+as I suggested here:
+
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/252813/focus=101661
+
+Best regards,
+Tomasz
