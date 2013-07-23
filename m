@@ -1,43 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 Jul 2013 00:25:10 +0200
-Subject: [PATCH 08/10] ARM: sunxi: dt: Add PIO controller to A31 DTSI
+Date: Wed, 24 Jul 2013 00:25:08 +0200
+Subject: [PATCH 06/10] ARM: sun6i: Add WITS Colombus A31 evaluation kit support
 In-Reply-To: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1374618312-19001-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1374618312-19001-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has a different set of pins than the one found on the A10 and
-A13, so we will need a different compatible string, even though the IP
-is the same.
+This platform from WITS is the evaluation board for the Allwinner A31.
+It features a quad-Cortex A7, 2048MB of RAM, NAND, USB, MMC, several
+UART, HDMI, a 2048 x 1536 10" screen, powered by a PowerVR, etc.
+
+Of course, most of these peripherals aren't supported yet, but support
+for those will come eventually.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/sun6i-a31-colombus.dts | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-colombus.dts
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index c6c19a9..0443628 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -67,6 +67,18 @@
- 		reg = <0x01c20000 0x300000>;
- 		ranges;
- 
-+		pio: pinctrl at 01c20800 {
-+			compatible = "allwinner,sun6i-a31-pinctrl";
-+			reg = <0x01c20800 0x400>;
-+			interrupts = <0 11 1>, <0 15 1>, <0 16 1>, <0 17 1>;
-+			clocks = <&osc>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#gpio-cells = <3>;
-+		};
+diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+new file mode 100644
+index 0000000..0128754
+--- /dev/null
++++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+@@ -0,0 +1,30 @@
++/*
++ * Copyright 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sun4i-timer";
- 			reg = <0x01c20c00 0xa0>;
++/dts-v1/;
++/include/ "sun6i-a31.dtsi"
++
++/ {
++	model = "WITS A31 Colombus Evaluation Board";
++	compatible = "wits,colombus", "allwinner,sun6i-a31";
++
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	soc at 01c20000 {
++		uart0: serial at 01c28000 {
++			status = "okay";
++		};
++	};
++};
 -- 
 1.8.3.2
