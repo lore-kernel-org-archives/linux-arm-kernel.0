@@ -1,143 +1,134 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 22 Jul 2013 22:01:10 -0300
-Subject: [PATCH RFC 6/8] ARM: sunxi: add PLL5 and PLL6 support
+Date: Mon, 22 Jul 2013 22:01:12 -0300
+Subject: [PATCH RFC 8/8] ARM: sun4i: mod0 clocks
 In-Reply-To: <1374541272-32173-1-git-send-email-emilio@elopez.com.ar>
 References: <1374541272-32173-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1374541272-32173-7-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1374541272-32173-9-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds PLL5 and PLL6 nodes to the sun4i and sun5i device trees.
+This commit adds all the mod0 clocks present on sun4i to its device tree
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi  | 19 +++++++++++++++++--
- arch/arm/boot/dts/sun5i-a10s.dtsi | 19 +++++++++++++++++--
- arch/arm/boot/dts/sun5i-a13.dtsi  | 19 +++++++++++++++++--
- 3 files changed, 51 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 105 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 105 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 6d569fd..620290b 100644
+index 620290b..90493e3 100644
 --- a/arch/arm/boot/dts/sun4i-a10.dtsi
 +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -73,6 +73,22 @@
- 			clocks = <&osc24M>;
+@@ -180,6 +180,111 @@
+ 				"apb1_uart4", "apb1_uart5", "apb1_uart6",
+ 				"apb1_uart7";
  		};
- 
-+		pll5: pll5 at 01c20020 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-pll5-clk";
-+			reg = <0x01c20020 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll5_ddr", "pll5_other";
++
++		nand: nand at 01c20080 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20080 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
 +		};
 +
-+		pll6: pll6 at 01c20028 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-pll6-clk";
-+			reg = <0x01c20028 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll6_sata", "pll6_other";
++		ms: ms at 01c20084 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20084 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
 +		};
 +
- 		/* dummy is 200M */
- 		cpu: cpu at 01c20054 {
- 			#clock-cells = <0>;
-@@ -138,12 +154,11 @@
- 				"apb0_ir1", "apb0_keypad";
- 		};
- 
--		/* dummy is pll62 */
- 		apb1_mux: apb1_mux at 01c20058 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-apb1-mux-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&dummy>, <&osc32k>;
-+			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
- 		};
- 
- 		apb1: apb1 at 01c20058 {
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 9c1a2b9..4d47abc 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -70,6 +70,22 @@
- 			clocks = <&osc24M>;
- 		};
- 
-+		pll5: pll5 at 01c20020 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-pll5-clk";
-+			reg = <0x01c20020 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll5_ddr", "pll5_other";
++		mmc0: mmc0 at 01c20088 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20088 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
 +		};
 +
-+		pll6: pll6 at 01c20028 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-pll6-clk";
-+			reg = <0x01c20028 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll6_sata", "pll6_other";
++		mmc1: mmc1 at 01c2008c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c2008c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
 +		};
 +
- 		/* dummy is 200M */
- 		cpu: cpu at 01c20054 {
- 			#clock-cells = <0>;
-@@ -135,12 +151,11 @@
- 				"apb0_ir1", "apb0_keypad";
- 		};
- 
--		/* dummy is pll62 */
- 		apb1_mux: apb1_mux at 01c20058 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-apb1-mux-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&dummy>, <&osc32k>;
-+			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
- 		};
- 
- 		apb1: apb1 at 01c20058 {
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 67889cf..e652b5f 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -74,6 +74,22 @@
- 			clocks = <&osc24M>;
- 		};
- 
-+		pll5: pll5 at 01c20020 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-pll5-clk";
-+			reg = <0x01c20020 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll5_ddr", "pll5_other";
++		mmc2: mmc2 at 01c20090 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20090 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
 +		};
 +
-+		pll6: pll6 at 01c20028 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-pll6-clk";
-+			reg = <0x01c20028 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll6_sata", "pll6_other";
++		mmc3: mmc3 at 01c20094 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20094 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
 +		};
 +
- 		/* dummy is 200M */
- 		cpu: cpu at 01c20054 {
- 			#clock-cells = <0>;
-@@ -132,12 +148,11 @@
- 			clock-output-names = "apb0_codec", "apb0_pio", "apb0_ir";
- 		};
++		ts: ts at 01c20098 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20098 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		ss: ss at 01c2009c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c2009c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		spi0: spi0 at 01c200a0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a0 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		spi1: spi0 at 01c200a4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a4 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		spi2: spi0 at 01c200a8 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a8 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		pata: pata at 01c200ac {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200ac 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		ir0: ir0 at 01c200b0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200b0 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		ir1: ir1 at 01c200b4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200b4 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
++
++		spi3: spi3 at 01c200d4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200d4 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
+ 	};
  
--		/* dummy is pll6 */
- 		apb1_mux: apb1_mux at 01c20058 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-apb1-mux-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&dummy>, <&osc32k>;
-+			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
- 		};
- 
- 		apb1: apb1 at 01c20058 {
+ 	soc at 01c20000 {
 -- 
 1.8.3.3
