@@ -1,77 +1,50 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Jul 2013 16:04:03 +0800
-Subject: [PATCH] ARM: dts: imx: ocram size is different between imx6q
- and imx6dl
-In-Reply-To: <1374565107-9658-1-git-send-email-shawn.guo@linaro.org>
-References: <1374565107-9658-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <51EE38F3.7020503@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 23 Jul 2013 16:05:43 +0800
+Subject: [PATCH] ARM: imx6q: add vdoa gate clock
+Message-ID: <1374566744-13692-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 03:38 PM, Shawn Guo wrote:
-> The ocram on imx6q is 256 KiB while on imx6dl it's 128 KiB.  Let's
-> have separate node for imx6q and imx6dl.  It also changes imx6q size
-> 0x3f000 to 0x40000 to match the hardware.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Add the missing vdoa gate clock for imx6q.
 
-Acked-by: Liu Ying <Ying.Liu@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    1 +
+ arch/arm/mach-imx/clk-imx6q.c                      |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-> ---
->  arch/arm/boot/dts/imx6dl.dtsi  |    6 ++++++
->  arch/arm/boot/dts/imx6q.dtsi   |    6 ++++++
->  arch/arm/boot/dts/imx6qdl.dtsi |    6 ------
->  3 files changed, 12 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> index e9cb589..9e8ae11 100644
-> --- a/arch/arm/boot/dts/imx6dl.dtsi
-> +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> @@ -32,6 +32,12 @@
->  	};
->  
->  	soc {
-> +		ocram: sram at 00900000 {
-> +			compatible = "mmio-sram";
-> +			reg = <0x00900000 0x20000>;
-> +			clocks = <&clks 142>;
-> +		};
-> +
->  		aips1: aips-bus at 02000000 {
->  			iomuxc: iomuxc at 020e0000 {
->  				compatible = "fsl,imx6dl-iomuxc";
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 76a84e8..f024ef2 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -61,6 +61,12 @@
->  	};
->  
->  	soc {
-> +		ocram: sram at 00900000 {
-> +			compatible = "mmio-sram";
-> +			reg = <0x00900000 0x40000>;
-> +			clocks = <&clks 142>;
-> +		};
-> +
->  		aips-bus at 02000000 { /* AIPS1 */
->  			spba-bus at 02000000 {
->  				ecspi5: ecspi at 02018000 {
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index bc4ca03..ccd55c2 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -99,12 +99,6 @@
->  			status = "disabled";
->  		};
->  
-> -		ocram: sram at 00900000 {
-> -			compatible = "mmio-sram";
-> -			reg = <0x00900000 0x3f000>;
-> -			clocks = <&clks 142>;
-> -		};
-> -
->  		timer at 00a00600 {
->  			compatible = "arm,cortex-a9-twd-timer";
->  			reg = <0x00a00600 0x20>;
-> 
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index 3066f181..5a90a72 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -214,6 +214,7 @@ clocks and IDs.
+ 	cko2_podf      		199
+ 	cko2      		200
+ 	cko      		201
++	vdoa      		202
+ 
+ Examples:
+ 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index ed19b33..bbafa3c 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -251,7 +251,7 @@ enum mx6q_clks {
+ 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+ 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+ 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+-	spdif, cko2_sel, cko2_podf, cko2, cko, clk_max
++	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -501,6 +501,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[i2c3]         = imx_clk_gate2("i2c3",          "ipg_per",           base + 0x70, 10);
+ 	clk[iim]          = imx_clk_gate2("iim",           "ipg",               base + 0x70, 12);
+ 	clk[enfc]         = imx_clk_gate2("enfc",          "enfc_podf",         base + 0x70, 14);
++	clk[vdoa]         = imx_clk_gate2("vdoa",          "vdo_axi",           base + 0x70, 26);
+ 	clk[ipu1]         = imx_clk_gate2("ipu1",          "ipu1_podf",         base + 0x74, 0);
+ 	clk[ipu1_di0]     = imx_clk_gate2("ipu1_di0",      "ipu1_di0_sel",      base + 0x74, 2);
+ 	clk[ipu1_di1]     = imx_clk_gate2("ipu1_di1",      "ipu1_di1_sel",      base + 0x74, 4);
+-- 
+1.7.9.5
