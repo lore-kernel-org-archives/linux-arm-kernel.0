@@ -1,43 +1,34 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 22 Jul 2013 22:19:01 -0300
-Subject: [PATCH] ARM: sunxi: make the leds' names conform to the current
- naming convention
-Message-ID: <1374542341-3429-1-git-send-email-emilio@elopez.com.ar>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 23 Jul 2013 10:24:33 +0900
+Subject: [PATCH v2 03/04] ARM: shmobile: Add EMEV2 and KZM9D to
+ ARCH_SHMOBILE_MULTI
+In-Reply-To: <20130717203118.27542.37940.sendpatchset@w520>
+References: <20130717203049.27542.78385.sendpatchset@w520>
+ <20130717203118.27542.37940.sendpatchset@w520>
+Message-ID: <20130723012432.GA16481@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting from Documentation/leds/leds-class.txt:
+On Thu, Jul 18, 2013 at 05:31:18AM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Enable build of EMEV2 and KZM9D DT Reference in
+> case of ARCH_MULTIPLATFORM and ARCH_SHMOBILE_MULTI.
+> 
+> IS_ENABLED() is leaves the clock-emev2.c file out
+> in case of COMMON_CLK=y.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Changes since V1:
+>  - use IS_ENABLED() instead of weak symbol, thanks Arnd!
+> 
+>  arch/arm/boot/dts/Makefile                     |    1 +
+>  arch/arm/mach-shmobile/Kconfig                 |   15 +++++++++++++++
+>  arch/arm/mach-shmobile/board-kzm9d-reference.c |    3 ++-
+>  arch/arm/mach-shmobile/setup-emev2.c           |    3 ++-
+>  4 files changed, 20 insertions(+), 2 deletions(-)
 
-    LED Device Naming
-    =================
-
-    Is currently of the form:
-
-    "devicename:colour:function"
-
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 757c4cd..4580b62 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -76,12 +76,12 @@
- 		pinctrl-0 = <&led_pins_cubieboard>;
- 
- 		blue {
--			label = "cubieboard::blue";
-+			label = "cubieboard:blue:usr";
- 			gpios = <&pio 7 21 0>; /* LED1 */
- 		};
- 
- 		green {
--			label = "cubieboard::green";
-+			label = "cubieboard:green:usr";
- 			gpios = <&pio 7 20 0>; /* LED2 */
- 			linux,default-trigger = "heartbeat";
- 		};
--- 
-1.8.3.3
+Thanks, I have queued this up for v3.12 in a new multiarch branch
+of the renesas tree.
