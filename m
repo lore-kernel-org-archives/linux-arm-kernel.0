@@ -1,171 +1,129 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Tue, 23 Jul 2013 21:13:04 +0900
-Subject: [PATCH] iommu/exynos: add devices attached to the System MMU to an
- IOMMU group
-In-Reply-To: <00e601ce8796$bdca50c0$395ef240$%dae@samsung.com>
-References: <1374573694-30595-1-git-send-email-a.motakis@virtualopensystems.com>
- <00d701ce878f$da099fe0$8e1cdfa0$%dae@samsung.com>
- <CAG8rG2wNG9wVjKxtaDzLRybvh3wPVR08j9G9OPcK=a2Gwbtg-g@mail.gmail.com>
- <00e601ce8796$bdca50c0$395ef240$%dae@samsung.com>
-Message-ID: <002901ce879d$fbec5db0$f3c51910$@samsung.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 23 Jul 2013 08:28:16 -0400 (EDT)
+Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
+In-Reply-To: <20130723104352.GA3023@localhost.localdomain>
+References: <1374118116-16836-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374118116-16836-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130718150408.GB2655@localhost.localdomain>
+ <alpine.LFD.2.03.1307181231510.14924@syhkavp.arg>
+ <20130718180323.GC2655@localhost.localdomain>
+ <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
+ <20130719102844.GA3746@localhost.localdomain>
+ <20130719105907.GB27389@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307221353360.15022@syhkavp.arg>
+ <20130723104352.GA3023@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1307230821270.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Inki Dae [mailto:inki.dae at samsung.com]
-> Sent: Tuesday, July 23, 2013 8:21 PM
-> 
-> > -----Original Message-----
-> > From: Antonios Motakis [mailto:a.motakis at virtualopensystems.com]
-> > Sent: Tuesday, July 23, 2013 8:00 PM
-> > To: Inki Dae
-> > Cc: Linux ARM Kernel; Linux IOMMU; Linux Samsung SOC; kvm-arm; Cho
-> KyongHo;
-> > Joerg Roedel; Sachin Kamat; Jiri Kosina; Wei Yongjun; open list
-> > Subject: Re: [PATCH] iommu/exynos: add devices attached to the System MMU
-> > to an IOMMU group
-> >
-> > On Tue, Jul 23, 2013 at 12:31 PM, Inki Dae <inki.dae@samsung.com> wrote:
-> > >
-> > >
-> > >
-> > > > -----Original Message-----
-> > > > From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-
-> > soc-
-> > > > owner at vger.kernel.org] On Behalf Of Antonios Motakis
-> > > > Sent: Tuesday, July 23, 2013 7:02 PM
-> > > > To: linux-arm-kernel at lists.infradead.org;
-> > > iommu at lists.linux-foundation.org;
-> > > > linux-samsung-soc at vger.kernel.org
-> > > > Cc: kvmarm at lists.cs.columbia.edu; Antonios Motakis; Cho KyongHo; Joerg
-> > > > Roedel; Sachin Kamat; Jiri Kosina; Wei Yongjun; open list
-> > > > Subject: [PATCH] iommu/exynos: add devices attached to the System MMU
-> > to
-> > > > an IOMMU group
-> > > >
-> > > > IOMMU groups are expected by certain users of the IOMMU API,
-> > > > e.g. VFIO. Since each device is behind its own System MMU, we
-> > > > can allocate a new IOMMU group for each device.
-> > > >
-> > > > This patch depends on Cho KyongHo's patch series titled "[PATCH v7
-> > 00/12]
-> > > > iommu/exynos: Fixes and Enhancements of System MMU driver with DT",
-> > > > applied on a Linux 3.10.1 kernel. It has been tested on the Arndale
-> > board.
-> > > >
-> > > > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-> > > > ---
-> > > >  drivers/iommu/exynos-iommu.c | 24 ++++++++++++++++++++++++
-> > > >  1 file changed, 24 insertions(+)
-> > > >
-> > > > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-
-> > iommu.c
-> > > > index 51d43bb..9f39eaa 100644
-> > > > --- a/drivers/iommu/exynos-iommu.c
-> > > > +++ b/drivers/iommu/exynos-iommu.c
-> > > > @@ -1134,6 +1134,28 @@ static phys_addr_t
-> > exynos_iommu_iova_to_phys(struct
-> > > > iommu_domain *domain,
-> > > >       return phys;
-> > > >  }
-> > > >
-> > > > +static int exynos_iommu_add_device(struct device *dev)
-> > > > +{
-> > > > +     struct iommu_group *group;
-> > > > +     int ret;
-> > > > +
-> > > > +     group = iommu_group_alloc();
-> > >
-> > > Is that correct? I don't see why you allocate a group object every time
-> > > add_device callback is called. That doesn't have any meaning we have to
-> > use
-> > > iommu group feature. I think the implementation should be one more
-> > devices
-> > > per a group. So I guess a given device object should be wrapped by
-> > higher
-> > > device object than the given device object. For a good example, you can
-> > > refer to intel-iommu.c file.
-> >
-> > With an Intel IOMMU it can be the case that 2 devices have to share
-> > the same IOMMU mappings (i.e. you can't program them separately). With
-> > the Exynos System MMU, there is always one System MMU per device, so
-> > there is nothing stopping you from programming any 2 devices' mappings
-> > differently. So yes, the right thing to do here is to have a one to
-> > one relationship between devices and IOMMU groups.
-> 
-> In case of Exynos drm driver, a unified iommu mapping table is used for all
-> devices (fimd, g2d, hdmi, fimc, gsc, rotator) based on drm so they use the
-> same iommu mapping table even though they have each iommu hardware unit. And
-> the iommu mapping table is just logical data structure for hardware
-> translation process by each DMA. Actually, I am considering using iommu
-> group feature for more generic implementation.
-> 
-> And one question. Why do you allocate a iommu group object if we should have
-> one to one relationship between devices and iommu groups? In this case, is
-> there any reason you have to use the iommu group object?
-> 
-> Thanks,
-> Inki Dae
-> 
-Antonios,
+On Tue, 23 Jul 2013, Dave Martin wrote:
 
-Your patch always creates new iommu group whenever .add_device() is called,
-which results in memory leak. You need to check if the given device is already
-involved in an iommu group.
+> On Mon, Jul 22, 2013 at 01:58:12PM -0400, Nicolas Pitre wrote:
+> > On Fri, 19 Jul 2013, Lorenzo Pieralisi wrote:
+> > 
+> > > On Fri, Jul 19, 2013 at 11:28:49AM +0100, Dave Martin wrote:
+> > > > On Thu, Jul 18, 2013 at 02:59:06PM -0400, Nicolas Pitre wrote:
+> > > > > On Thu, 18 Jul 2013, Dave Martin wrote:
+> > > > > 
+> > > > > > I had other names in mind, like "coherency_exit" or "cache_exit".
+> > > > > > Those are not very intelligible, but that might at least make people
+> > > > > > pause and think before blindly using it.
+> > > > > 
+> > > > > Good point.  It should still embody the architecture name for which it 
+> > > > > is valid though.
+> > > > 
+> > > > Sure, I was assuming something would be pasted on the start of the name.
+> > > 
+> > > v7 :-) with a comment describing the assumptions (in particular related
+> > > as Dave mentioned to the SMP bit behaviour) ?
+> > 
+> > OK... What about this then:
+> > 
+> > ----- >8
+> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Date: Thu, 18 Jul 2013 13:12:48 -0400
+> > Subject: [PATCH] ARM: cacheflush: consolidate single-CPU ARMv7 cache disabling
+> >  code
+> > 
+> > This code is becoming duplicated in many places.  So let's consolidate
+> > it into a handy macro that is known to be right and available for reuse.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > 
+> > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+> > index 17d0ae8672..8f4e2297e2 100644
+> > --- a/arch/arm/include/asm/cacheflush.h
+> > +++ b/arch/arm/include/asm/cacheflush.h
+> > @@ -436,4 +436,44 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
+> >  #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
+> >  #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
+> >  
+> > +/*
+> > + * Disabling cache access for one CPU in an ARMv7 SMP system is tricky.
+> > + * To do so we must:
+> > + *
+> > + * - Clear the SCTLR.C bit to prevent further cache allocations
+> > + * - Flush the desired level of cache
+> > + * - Clear the ACTLR "SMP" bit to disable local coherency
+> > + *
+> > + * ... and so without any intervening memory access in between those steps,
+> > + * not even to the stack.
+> > + *
+> > + * WARNING -- After this has been called:
+> > + *
+> > + * - No ldr/str exclusive must be used.
+> 
+> Maybe write ldrex/strex (I misread that the first time around as "no
+> ldr/str ... must be used", which seemed a bit drastic)
 
-BTW, I will post new patchset in a few days.
-It will not be such different from previous one and your patch
-will be rebased on that in a trivial manner.
+OK.
 
-Regards,
-Cho KyongHo
+> > + * - The CPU is obviously no longer coherent with the other CPUs.
+> > + *
+> > + * Further considerations:
+> > + *
+> > + * - This relies on the presence and behavior of the AUXCR.SMP bit as
+> > + *   documented in the ARMv7 TRM.  Vendor implementations that deviate from
+> 
+> Sorry to be pedantic here, but there is no "ARMv7 TRM".  The SMP bit is
+> not part of ARMv7 at all.
 
-> >
-> > (resending because of html mail)
-> >
-> > Cheers,
-> > Antonios
-> >
-> > >
-> > >
-> > > Thanks,
-> > > Inki Dae
-> > >
-> > > > +     if (IS_ERR(group)) {
-> > > > +             dev_err(dev, "Failed to allocate IOMMU group\n");
-> > > > +             return PTR_ERR(group);
-> > > > +     }
-> > > > +
-> > > > +     ret = iommu_group_add_device(group, dev);
-> > > > +     iommu_group_put(group);
-> > > > +
-> > > > +     return ret;
-> > > > +}
-> > > > +
-> > > > +static void exynos_iommu_remove_device(struct device *dev)
-> > > > +{
-> > > > +     iommu_group_remove_device(dev);
-> > > > +}
-> > > > +
-> > > >  static struct iommu_ops exynos_iommu_ops = {
-> > > >       .domain_init = &exynos_iommu_domain_init,
-> > > >       .domain_destroy = &exynos_iommu_domain_destroy,
-> > > > @@ -1142,6 +1164,8 @@ static struct iommu_ops exynos_iommu_ops = {
-> > > >       .map = &exynos_iommu_map,
-> > > >       .unmap = &exynos_iommu_unmap,
-> > > >       .iova_to_phys = &exynos_iommu_iova_to_phys,
-> > > > +     .add_device     = exynos_iommu_add_device,
-> > > > +     .remove_device  = exynos_iommu_remove_device,
-> > > >       .pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
-> > > >  };
-> > > >
-> > > > --
-> > > > 1.8.1.2
-> > > >
-> > > > --
-> > > > To unsubscribe from this list: send the line "unsubscribe linux-
-> > samsung-
-> > > > soc" in
-> > > > the body of a message to majordomo at vger.kernel.org
-> > > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > >
+Well, I just copied Lorenzo's words here, trusting he knew more about it 
+than I do.
+
+> Also, it seems that A9 isn't precisely the
+> same: two ACTLR bits need to be twiddled.  R-class CPUs are generally
+> not the same either.
+> 
+> This is why I preferred to treat the whole sequence as specific to a
+> particular CPU implementation.  The similarity between A7 and A15
+> might be viewed as a happy coincidence (it also makes life easier in
+> big.LITTLE land).
+
+Fair enough.
+
+> (Also, you mix the names "ACTLR" and "AUXCR", but people will generally
+> be able to guess those are the same thing)
+
+We apparently use both in the kernel already.  Which one is the 
+canonical one?
+
+> > + *   that will need their own procedure.
+> > + * - This is unlikely to work if Linux is running non-secure.
+> > + */
+> > +#define v7_exit_coherency_flush(level) \
+> 
+> ... hence:
+> 
+> #define cortex_a15_exit_coherency(level) ...
+> 
+> #define cortex_a7_exit_coherency(level) cortex_a15_exit_coherency(level)
+> 
+> What do you think?
+
+To be pedantic again, we don't really exit coherency at some cache 
+level.  Hence my usage of "flush" indicating that the level argument 
+applies only to that and not to the coherency status.
+
+
+Nicolas
