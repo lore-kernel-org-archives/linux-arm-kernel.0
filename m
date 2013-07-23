@@ -1,50 +1,706 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 23 Jul 2013 10:20:11 +0300
-Subject: [PATCHv4 16/33] CLK: OMAP: DPLL: do not of_iomap NULL autoidle
- register
+Date: Tue, 23 Jul 2013 10:20:13 +0300
+Subject: [PATCHv4 18/33] ARM: dts: am33xx clock data
 In-Reply-To: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1374564028-11352-17-git-send-email-t-kristo@ti.com>
+Message-ID: <1374564028-11352-19-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM33xx series SoCs do not have autoidle support, and for these the
-autoidle register is marked as NULL. Check against a NULL pointer and
-do not attempt to of_iomap in this case, as this just creates a bogus
-pointer and causes a kernel crash during boot.
+This patch creates a unique node for each clock in the AM33xx power,
+reset and clock manager (PRCM).
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/omap/dpll.c |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am33xx-clocks.dtsi |  663 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi        |    7 +
+ 2 files changed, 670 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am33xx-clocks.dtsi
 
-diff --git a/drivers/clk/omap/dpll.c b/drivers/clk/omap/dpll.c
-index 1d24feada..d8a958a 100644
---- a/drivers/clk/omap/dpll.c
-+++ b/drivers/clk/omap/dpll.c
-@@ -162,6 +162,7 @@ static void __init of_omap_dpll_setup(struct device_node *node,
- 	u32 max_multiplier = 2047;
- 	u32 max_divider = 128;
- 	u32 min_divider = 1;
-+	u32 val;
- 	int i;
- 
- 	dd = kzalloc(sizeof(struct dpll_data), GFP_KERNEL);
-@@ -210,7 +211,14 @@ static void __init of_omap_dpll_setup(struct device_node *node,
- 
- 	dd->control_reg = of_iomap(node, 0);
- 	dd->idlest_reg = of_iomap(node, 1);
--	dd->autoidle_reg = of_iomap(node, 2);
-+	/*
-+	 * AM33xx DPLLs have no autoidle support, and the autoidle reg
-+	 * for these is NULL. Do not attempt to of_iomap in this case,
-+	 * as this just creates a bogus pointer and crashes the kernel.
-+	 */
-+	of_property_read_u32_index(node, "reg", 2 * 2, &val);
-+	if (val)
-+		dd->autoidle_reg = of_iomap(node, 2);
- 	dd->mult_div1_reg = of_iomap(node, 3);
- 
- 	dd->idlest_mask = idlest_mask;
+diff --git a/arch/arm/boot/dts/am33xx-clocks.dtsi b/arch/arm/boot/dts/am33xx-clocks.dtsi
+new file mode 100644
+index 0000000..1b19443
+--- /dev/null
++++ b/arch/arm/boot/dts/am33xx-clocks.dtsi
+@@ -0,0 +1,663 @@
++/*
++ * Device Tree Source for AM33xx clock data
++ *
++ * Copyright (C) 2013 Texas Instruments, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++clk_32768_ck: clk_32768_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <32768>;
++};
++
++clk_rc32k_ck: clk_rc32k_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <32000>;
++};
++
++virt_19200000_ck: virt_19200000_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <19200000>;
++};
++
++virt_24000000_ck: virt_24000000_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <24000000>;
++};
++
++virt_25000000_ck: virt_25000000_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <25000000>;
++};
++
++virt_26000000_ck: virt_26000000_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <26000000>;
++};
++
++sys_clkin_ck: sys_clkin_ck at 44e10040 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&virt_19200000_ck>, <&virt_24000000_ck>, <&virt_25000000_ck>, <&virt_26000000_ck>;
++	bit-shift = <22>;
++	reg = <0x44e10040 0x4>;
++	bit-mask = <0x3>;
++};
++
++tclkin_ck: tclkin_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <12000000>;
++};
++
++dpll_core_ck: dpll_core_ck at 44e00490 {
++	#clock-cells = <0>;
++	compatible = "ti,omap4-dpll-clock";
++	clocks = <&sys_clkin_ck>;
++	reg = <0x44e00490 0x4>, <0x44e0045c 0x4>, <0x0 0x4>, <0x44e00468 0x4>;
++	ti,clk-ref = <&sys_clkin_ck>;
++	ti,clk-bypass = <&sys_clkin_ck>;
++	ti,dpll-core;
++};
++
++dpll_core_x2_ck: dpll_core_x2_ck {
++	#clock-cells = <0>;
++	compatible = "ti,omap4-dpll-clock";
++	clocks = <&dpll_core_ck>;
++	ti,dpll-clk-x2;
++};
++
++dpll_core_m4_ck: dpll_core_m4_ck at 44e00480 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&dpll_core_x2_ck>;
++	reg = <0x44e00480 0x4>;
++	bit-mask = <0x1f>;
++	index-starts-at-one;
++};
++
++dpll_core_m5_ck: dpll_core_m5_ck at 44e00484 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&dpll_core_x2_ck>;
++	reg = <0x44e00484 0x4>;
++	bit-mask = <0x1f>;
++	index-starts-at-one;
++};
++
++dpll_core_m6_ck: dpll_core_m6_ck at 44e004d8 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&dpll_core_x2_ck>;
++	reg = <0x44e004d8 0x4>;
++	bit-mask = <0x1f>;
++	index-starts-at-one;
++};
++
++dpll_mpu_ck: dpll_mpu_ck at 44e00488 {
++	#clock-cells = <0>;
++	compatible = "ti,omap4-dpll-clock";
++	clocks = <&sys_clkin_ck>;
++	reg = <0x44e00488 0x4>, <0x44e00420 0x4>, <0x0 0x4>, <0x44e0042c 0x4>;
++	ti,clk-ref = <&sys_clkin_ck>;
++	ti,clk-bypass = <&sys_clkin_ck>;
++};
++
++dpll_mpu_m2_ck: dpll_mpu_m2_ck at 44e004a8 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&dpll_mpu_ck>;
++	reg = <0x44e004a8 0x4>;
++	bit-mask = <0x1f>;
++	index-starts-at-one;
++};
++
++dpll_ddr_ck: dpll_ddr_ck at 44e00494 {
++	#clock-cells = <0>;
++	compatible = "ti,omap4-dpll-clock";
++	clocks = <&sys_clkin_ck>;
++	reg = <0x44e00494 0x4>, <0x44e00434 0x4>, <0x0 0x4>, <0x44e00440 0x4>;
++	ti,clk-ref = <&sys_clkin_ck>;
++	ti,clk-bypass = <&sys_clkin_ck>;
++	ti,dpll-no-gate;
++};
++
++dpll_ddr_m2_ck: dpll_ddr_m2_ck at 44e004a0 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&dpll_ddr_ck>;
++	reg = <0x44e004a0 0x4>;
++	bit-mask = <0x1f>;
++	index-starts-at-one;
++};
++
++dpll_ddr_m2_div2_ck: dpll_ddr_m2_div2_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_ddr_m2_ck>;
++	clock-mult = <1>;
++	clock-div = <2>;
++};
++
++dpll_disp_ck: dpll_disp_ck at 44e00498 {
++	#clock-cells = <0>;
++	compatible = "ti,omap4-dpll-clock";
++	clocks = <&sys_clkin_ck>;
++	reg = <0x44e00498 0x4>, <0x44e00448 0x4>, <0x0 0x4>, <0x44e00454 0x4>;
++	ti,clk-ref = <&sys_clkin_ck>;
++	ti,clk-bypass = <&sys_clkin_ck>;
++	ti,dpll-no-gate;
++};
++
++dpll_disp_m2_ck: dpll_disp_m2_ck at 44e004a4 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&dpll_disp_ck>;
++	reg = <0x44e004a4 0x4>;
++	bit-mask = <0x1f>;
++	index-starts-at-one;
++	set-rate-parent;
++};
++
++dpll_per_ck: dpll_per_ck at 44e0048c {
++	#clock-cells = <0>;
++	compatible = "ti,omap4-dpll-clock";
++	clocks = <&sys_clkin_ck>;
++	reg = <0x44e0048c 0x4>, <0x44e00470 0x4>, <0x0 0x4>, <0x44e0049c 0x4>;
++	ti,clk-ref = <&sys_clkin_ck>;
++	ti,clk-bypass = <&sys_clkin_ck>;
++	ti,dpll-no-gate;
++};
++
++dpll_per_m2_ck: dpll_per_m2_ck at 44e004ac {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&dpll_per_ck>;
++	reg = <0x44e004ac 0x4>;
++	bit-mask = <0x1f>;
++	index-starts-at-one;
++};
++
++dpll_per_m2_div4_wkupdm_ck: dpll_per_m2_div4_wkupdm_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_per_m2_ck>;
++	clock-mult = <1>;
++	clock-div = <4>;
++};
++
++dpll_per_m2_div4_ck: dpll_per_m2_div4_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_per_m2_ck>;
++	clock-mult = <1>;
++	clock-div = <4>;
++};
++
++adc_tsc_fck: adc_tsc_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++cefuse_fck: cefuse_fck at 44e00a20 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&sys_clkin_ck>;
++	bit-shift = <1>;
++	reg = <0x44e00a20 0x4>;
++};
++
++clk_24mhz: clk_24mhz {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_per_m2_ck>;
++	clock-mult = <1>;
++	clock-div = <8>;
++};
++
++clkdiv32k_ck: clkdiv32k_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&clk_24mhz>;
++	clock-mult = <1>;
++	clock-div = <732>;
++};
++
++clkdiv32k_ick: clkdiv32k_ick at 44e0014c {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&clkdiv32k_ck>;
++	reg = <0x44e0014c 0x4>;
++	bit-shift = <1>;
++};
++
++dcan0_fck: dcan0_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++dcan1_fck: dcan1_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++l3_gclk: l3_gclk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++pruss_ocp_gclk: pruss_ocp_gclk at 44e00530 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&l3_gclk>, <&dpll_disp_m2_ck>;
++	reg = <0x44e00530 0x4>;
++	bit-mask = <0x1>;
++};
++
++mcasp0_fck: mcasp0_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++mcasp1_fck: mcasp1_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++mmu_fck: mmu_fck at 44e00914 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&dpll_core_m4_ck>;
++	bit-shift = <1>;
++	reg = <0x44e00914 0x4>;
++};
++
++smartreflex0_fck: smartreflex0_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++smartreflex1_fck: smartreflex1_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++sha0_fck: sha0_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++aes0_fck: aes0_fck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&sys_clkin_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++timer1_fck: timer1_fck at 44e00528 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&sys_clkin_ck>, <&clkdiv32k_ick>, <&tclkin_ck>, <&clk_rc32k_ck>, <&clk_32768_ck>;
++	reg = <0x44e00528 0x4>;
++	bit-mask = <0x7>;
++};
++
++timer2_fck: timer2_fck at 44e00508 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&tclkin_ck>, <&sys_clkin_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e00508 0x4>;
++	bit-mask = <0x3>;
++};
++
++timer3_fck: timer3_fck at 44e0050c {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&tclkin_ck>, <&sys_clkin_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e0050c 0x4>;
++	bit-mask = <0x3>;
++};
++
++timer4_fck: timer4_fck at 44e00510 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&tclkin_ck>, <&sys_clkin_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e00510 0x4>;
++	bit-mask = <0x3>;
++};
++
++timer5_fck: timer5_fck at 44e00518 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&tclkin_ck>, <&sys_clkin_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e00518 0x4>;
++	bit-mask = <0x3>;
++};
++
++timer6_fck: timer6_fck at 44e0051c {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&tclkin_ck>, <&sys_clkin_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e0051c 0x4>;
++	bit-mask = <0x3>;
++};
++
++timer7_fck: timer7_fck at 44e00504 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&tclkin_ck>, <&sys_clkin_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e00504 0x4>;
++	bit-mask = <0x3>;
++};
++
++usbotg_fck: usbotg_fck at 44e0047c {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&dpll_per_ck>;
++	bit-shift = <8>;
++	reg = <0x44e0047c 0x4>;
++};
++
++dpll_core_m4_div2_ck: dpll_core_m4_div2_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_ck>;
++	clock-mult = <1>;
++	clock-div = <2>;
++};
++
++ieee5000_fck: ieee5000_fck at 44e000e4 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&dpll_core_m4_div2_ck>;
++	bit-shift = <1>;
++	reg = <0x44e000e4 0x4>;
++};
++
++wdt1_fck: wdt1_fck at 44e00538 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&clk_rc32k_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e00538 0x4>;
++	bit-mask = <0x3>;
++};
++
++l4_rtc_gclk: l4_rtc_gclk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_ck>;
++	clock-mult = <1>;
++	clock-div = <2>;
++};
++
++l4hs_gclk: l4hs_gclk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++l3s_gclk: l3s_gclk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_div2_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++l4fw_gclk: l4fw_gclk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_div2_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++l4ls_gclk: l4ls_gclk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_div2_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++sysclk_div_ck: sysclk_div_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m4_ck>;
++	clock-mult = <1>;
++	clock-div = <1>;
++};
++
++cpsw_125mhz_gclk: cpsw_125mhz_gclk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_core_m5_ck>;
++	clock-mult = <1>;
++	clock-div = <2>;
++};
++
++cpsw_cpts_rft_clk: cpsw_cpts_rft_clk at 44e00520 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&dpll_core_m5_ck>, <&dpll_core_m4_ck>;
++	reg = <0x44e00520 0x4>;
++	bit-mask = <0x1>;
++};
++
++gpio0_dbclk_mux_ck: gpio0_dbclk_mux_ck at 44e0053c {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&clk_rc32k_ck>, <&clk_32768_ck>, <&clkdiv32k_ick>;
++	reg = <0x44e0053c 0x4>;
++	bit-mask = <0x3>;
++};
++
++gpio0_dbclk: gpio0_dbclk at 44e00408 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&gpio0_dbclk_mux_ck>;
++	bit-shift = <18>;
++	reg = <0x44e00408 0x4>;
++};
++
++gpio1_dbclk: gpio1_dbclk at 44e000ac {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&clkdiv32k_ick>;
++	bit-shift = <18>;
++	reg = <0x44e000ac 0x4>;
++};
++
++gpio2_dbclk: gpio2_dbclk at 44e000b0 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&clkdiv32k_ick>;
++	bit-shift = <18>;
++	reg = <0x44e000b0 0x4>;
++};
++
++gpio3_dbclk: gpio3_dbclk at 44e000b4 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&clkdiv32k_ick>;
++	bit-shift = <18>;
++	reg = <0x44e000b4 0x4>;
++};
++
++lcd_gclk: lcd_gclk at 44e00534 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&dpll_disp_m2_ck>, <&dpll_core_m5_ck>, <&dpll_per_m2_ck>;
++	reg = <0x44e00534 0x4>;
++	bit-mask = <0x3>;
++	set-rate-parent;
++};
++
++mmc_clk: mmc_clk {
++	#clock-cells = <0>;
++	compatible = "fixed-factor-clock";
++	clocks = <&dpll_per_m2_ck>;
++	clock-mult = <1>;
++	clock-div = <2>;
++};
++
++gfx_fclk_clksel_ck: gfx_fclk_clksel_ck at 44e0052c {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&dpll_core_m4_ck>, <&dpll_per_m2_ck>;
++	bit-shift = <1>;
++	reg = <0x44e0052c 0x4>;
++	bit-mask = <0x1>;
++};
++
++gfx_fck_div_ck: gfx_fck_div_ck at 44e0052c {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&gfx_fclk_clksel_ck>;
++	reg = <0x44e0052c 0x4>;
++	table = < 1 0 >, < 2 1 >;
++	bit-mask = <0x1>;
++};
++
++sysclkout_pre_ck: sysclkout_pre_ck at 44e00700 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&clk_32768_ck>, <&l3_gclk>, <&dpll_ddr_m2_ck>, <&dpll_per_m2_ck>, <&lcd_gclk>;
++	reg = <0x44e00700 0x4>;
++	bit-mask = <0x7>;
++};
++
++clkout2_div_ck: clkout2_div_ck at 44e00700 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&sysclkout_pre_ck>;
++	bit-shift = <3>;
++	reg = <0x44e00700 0x4>;
++	table = < 1 0 >, < 2 1 >, < 3 2 >, < 4 3 >, < 5 4 >, < 6 5 >, < 7 6 >, < 8 7 >;
++	bit-mask = <0x7>;
++};
++
++dbg_sysclk_ck: dbg_sysclk_ck at 44e00414 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&sys_clkin_ck>;
++	bit-shift = <19>;
++	reg = <0x44e00414 0x4>;
++};
++
++dbg_clka_ck: dbg_clka_ck at 44e00414 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&dpll_core_m4_ck>;
++	bit-shift = <30>;
++	reg = <0x44e00414 0x4>;
++};
++
++stm_pmd_clock_mux_ck: stm_pmd_clock_mux_ck at 44e00414 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&dbg_sysclk_ck>, <&dbg_clka_ck>;
++	bit-shift = <22>;
++	reg = <0x44e00414 0x4>;
++	bit-mask = <0x3>;
++};
++
++trace_pmd_clk_mux_ck: trace_pmd_clk_mux_ck at 44e00414 {
++	#clock-cells = <0>;
++	compatible = "mux-clock";
++	clocks = <&dbg_sysclk_ck>, <&dbg_clka_ck>;
++	bit-shift = <20>;
++	reg = <0x44e00414 0x4>;
++	bit-mask = <0x3>;
++};
++
++stm_clk_div_ck: stm_clk_div_ck at 44e00414 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&stm_pmd_clock_mux_ck>;
++	bit-shift = <27>;
++	reg = <0x44e00414 0x4>;
++	bit-mask = <0x7>;
++	index-power-of-two;
++};
++
++trace_clk_div_ck: trace_clk_div_ck at 44e00414 {
++	#clock-cells = <0>;
++	compatible = "divider-clock";
++	clocks = <&trace_pmd_clk_mux_ck>;
++	bit-shift = <24>;
++	reg = <0x44e00414 0x4>;
++	bit-mask = <0x7>;
++	index-power-of-two;
++};
++
++clkout2_ck: clkout2_ck at 44e00700 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&clkout2_div_ck>;
++	bit-shift = <7>;
++	reg = <0x44e00700 0x4>;
++};
++
++ehrpwm0_tbclk: ehrpwm0_tbclk at 44e10664 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&dpll_per_m2_ck>;
++	bit-shift = <0>;
++	reg = <0x44e10664 0x4>;
++};
++
++ehrpwm1_tbclk: ehrpwm1_tbclk at 44e10664 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&dpll_per_m2_ck>;
++	bit-shift = <1>;
++	reg = <0x44e10664 0x4>;
++};
++
++ehrpwm2_tbclk: ehrpwm2_tbclk at 44e10664 {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&dpll_per_m2_ck>;
++	bit-shift = <2>;
++	reg = <0x44e10664 0x4>;
++};
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 38b446b..4701e3c 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -531,4 +531,11 @@
+ 			status = "disabled";
+ 		};
+ 	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		/include/ "am33xx-clocks.dtsi"
++	};
+ };
 -- 
 1.7.9.5
