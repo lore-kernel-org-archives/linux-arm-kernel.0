@@ -1,24 +1,28 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 24 Jul 2013 08:00:54 +0800
-Subject: [PATCH, re-send] Always trap on BUG()
-In-Reply-To: <20130723093628.GC19786@gmail.com>
-References: <201307051738.35930.arnd@arndb.de>
- <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
- <20130715222755.GY24642@n2100.arm.linux.org.uk> <51E47924.9030005@zytor.com>
- <20130723093628.GC19786@gmail.com>
-Message-ID: <51EF1936.7090801@asianux.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 23 Jul 2013 16:56:09 -0700
+Subject: [GIT PULL] Remove ARM local timer API
+In-Reply-To: <20130723234040.GB27761@codeaurora.org>
+References: <20130625200211.GA11625@codeaurora.org>
+ <CAOesGMj5AZcB7-kcS8_JqfKAg_RUKqTdDZf7bdwkebn3pwADAw@mail.gmail.com>
+ <20130723234040.GB27761@codeaurora.org>
+Message-ID: <CAOesGMiornt0twdQv=tYMtAX56Lc79MVyNrHaK1nWpOk189dDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 05:36 PM, Ingo Molnar wrote:
-> 
-> (the crazies can keep a separate patch to remove even more of BUG() to win 
-> a K or two.)
-> 
+On Tue, Jul 23, 2013 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/23, Olof Johansson wrote:
 
-Excuse me, my English is not quite well, I do not quite understand your
-meaning, could you please repeat again in details or say more clearly ?
+>> Merged in as localtimer/removal into next/cleanup.
+>>
+>> I had quite a few merge conflicts due to the __cpuinit removal, so
+>> please double-check my resolutions.
+>>
+>
+> A __cpuinit is leftover in smp_twd.c. Hopefully you can just
+> redo the merge?
 
-Thanks.
--- 
-Chen Gang
+Done, thanks for catching it. I thought I grepped for them but I
+somehow missed that one. Fixed now.
+
+
+-Olof
