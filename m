@@ -1,62 +1,84 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 23 Jul 2013 17:33:19 +0100
-Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
-In-Reply-To: <alpine.LFD.2.03.1307230821270.15022@syhkavp.arg>
-References: <1374118116-16836-2-git-send-email-nicolas.pitre@linaro.org>
- <20130718150408.GB2655@localhost.localdomain>
- <alpine.LFD.2.03.1307181231510.14924@syhkavp.arg>
- <20130718180323.GC2655@localhost.localdomain>
- <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
- <20130719102844.GA3746@localhost.localdomain>
- <20130719105907.GB27389@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1307221353360.15022@syhkavp.arg>
- <20130723104352.GA3023@localhost.localdomain>
- <alpine.LFD.2.03.1307230821270.15022@syhkavp.arg>
-Message-ID: <20130723163319.GA781@e102568-lin.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 23 Jul 2013 09:35:51 -0700
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <51EEAF32.4040905@ti.com>
+References: <Pine.LNX.4.44L0.1307231017290.1304-100000@iolanthe.rowland.org>
+ <51EE9EC0.6060905@ti.com> <20130723161846.GD2486@kroah.com>
+ <51EEAF32.4040905@ti.com>
+Message-ID: <20130723163551.GA12990@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 01:28:16PM +0100, Nicolas Pitre wrote:
-
-[...]
-
-> > > + * - The CPU is obviously no longer coherent with the other CPUs.
-> > > + *
-> > > + * Further considerations:
-> > > + *
-> > > + * - This relies on the presence and behavior of the AUXCR.SMP bit as
-> > > + *   documented in the ARMv7 TRM.  Vendor implementations that deviate from
+On Tue, Jul 23, 2013 at 09:58:34PM +0530, Kishon Vijay Abraham I wrote:
+> Hi Greg,
+> 
+> On Tuesday 23 July 2013 09:48 PM, Greg KH wrote:
+> > On Tue, Jul 23, 2013 at 08:48:24PM +0530, Kishon Vijay Abraham I wrote:
+> >> Hi,
+> >>
+> >> On Tuesday 23 July 2013 08:07 PM, Alan Stern wrote:
+> >>> On Tue, 23 Jul 2013, Tomasz Figa wrote:
+> >>>
+> >>>> On Tuesday 23 of July 2013 09:29:32 Tomasz Figa wrote:
+> >>>>> Hi Alan,
+> >>>
+> >>> Thanks for helping to clarify the issues here.
+> >>>
+> >>>>>> Okay.  Are PHYs _always_ platform devices?
+> >>>>>
+> >>>>> They can be i2c, spi or any other device types as well.
+> >>>
+> >>> In those other cases, presumably there is no platform data associated
+> >>> with the PHY since it isn't a platform device.  Then how does the
+> >>> kernel know which controller is attached to the PHY?  Is this spelled
+> >>> out in platform data associated with the PHY's i2c/spi/whatever parent?
+> .
+> .
+> <snip>
+> .
+> .
+> >>
+> >> 	static struct phy *phy_lookup(void *priv) {
+> >> 		.
+> >> 		.
+> >> 		if (phy->priv==priv) //instead of string comparison, we'll use pointer
+> >> 			return phy;
+> >> 	}
+> >>
+> >> PHY driver should be like
+> >> 	phy_create((dev, ops, pdata->info);
+> >>
+> >> The controller driver would do
+> >> 	phy_get(dev, NULL, pdata->info);
+> >>
+> >> Now the PHY framework will check for a match of *priv* pointer and return the PHY.
+> >>
+> >> I think this should be possible?
 > > 
-> > Sorry to be pedantic here, but there is no "ARMv7 TRM".  The SMP bit is
-> > not part of ARMv7 at all.
+> > Ick, no.  Why can't you just pass the pointer to the phy itself?  If you
+> > had a "priv" pointer to search from, then you could have just passed the
+> > original phy pointer in the first place, right?
+> > 
+> > The issue is that a string "name" is not going to scale at all, as it
+> > requires hard-coded information that will change over time (as the
+> > existing clock interface is already showing.)
+> > 
+> > Please just pass the real "phy" pointer around, that's what it is there
+> > for.  Your "board binding" logic/code should be able to handle this, as
+> > it somehow was going to do the same thing with a "name".
 > 
-> Well, I just copied Lorenzo's words here, trusting he knew more about it 
-> than I do.
-> 
-> > Also, it seems that A9 isn't precisely the
-> > same: two ACTLR bits need to be twiddled.  R-class CPUs are generally
-> > not the same either.
+> The problem is the board file won't have the *phy* pointer. *phy* pointer is
+> created at a much later time when the phy driver is probed.
 
-If you mean the ACTLR.FW bit in A9, A5, and R7, then, IIRC, we do not need to
-clear it, clearing the SMP bit is enough.
+Ok, then save it then, as no one could have used it before then, right?
 
-See, Dave has a point, there is no explicit "unified v7 TRM disable
-clean and exit coherency procedure" even though the designers end goal is to
-have one and that's the one you wrote. The code you posted is perfectly ok on
-all v7 implementations in the kernel I am aware of, I stand to be corrected
-but to the best of my knowledge that's the case.
+All I don't want to see is any "get by name/void *" functions in the
+api, as that way is fragile and will break, as people have already
+shown.
 
-> > This is why I preferred to treat the whole sequence as specific to a
-> > particular CPU implementation.  The similarity between A7 and A15
-> > might be viewed as a happy coincidence (it also makes life easier in
-> > big.LITTLE land).
-> 
-> Fair enough.
+Just pass the real pointer around.  If that is somehow a problem, then
+something larger is a problem with how board devices are tied together :)
 
-I disagree on the happy coincidence but the point is taken. I am not
-sure about what we should do, but I reiterate my point, the sequence as
-it stands is OK on all NS v7 implementations I am aware of. We can add
-macros to differentiate processors when we need them, but again that's
-just my opinion, as correct as it can be.
+thanks,
 
-Lorenzo
+greg k-h
