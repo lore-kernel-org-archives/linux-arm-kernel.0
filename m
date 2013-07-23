@@ -1,189 +1,60 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 23 Jul 2013 10:31:24 -0300
-Subject: [PATCH v8 20/28] ARM: mvebu: Add MBus to Armada 370/XP device tree
+Date: Tue, 23 Jul 2013 10:31:28 -0300
+Subject: [PATCH v8 24/28] ARM: kirkwood: Split DT and legacy MBus
+ initialization
 In-Reply-To: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374586292-4941-21-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374586292-4941-25-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370/XP SoC family has a completely configurable address
-space handled by the MBus controller.
-
-This patch introduces the device tree layout of MBus, making the
-'soc' node as mbus-compatible.
-Since every peripheral/controller is a child of this 'soc' node,
-this makes all of them sit behind the mbus, thus describing the
-hardware accurately.
-
-A translation entry has been added for the internal-regs mapping.
-This can't be done in the common armada-370-xp.dtsi because A370
-and AXP have different addressing width.
+This commit replaces the legacy MBus initialization with the new
+DT-based in Kirkwood. For boards that are not yet converted to DT,
+we keep the legacy initialization.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts              |  2 ++
- arch/arm/boot/dts/armada-370-mirabox.dts         |  2 ++
- arch/arm/boot/dts/armada-370-rd.dts              |  2 ++
- arch/arm/boot/dts/armada-370-xp.dtsi             | 15 ++++++++++-----
- arch/arm/boot/dts/armada-370.dtsi                |  4 ++--
- arch/arm/boot/dts/armada-xp-db.dts               |  4 +---
- arch/arm/boot/dts/armada-xp-gp.dts               |  4 +---
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  4 +---
- arch/arm/boot/dts/armada-xp.dtsi                 |  2 ++
- 9 files changed, 23 insertions(+), 16 deletions(-)
+ arch/arm/mach-kirkwood/board-dt.c | 1 +
+ arch/arm/mach-kirkwood/common.c   | 8 ++++----
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 55b986c..5920b4e 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -30,6 +30,8 @@
- 	};
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 6e122ed..682b7ac 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -87,6 +87,7 @@ static void __init kirkwood_dt_init(void)
+ 	 */
+ 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
  
- 	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
++	BUG_ON(mvebu_mbus_dt_init());
+ 	kirkwood_setup_wins();
+ 
+ 	kirkwood_l2_init();
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 165e751..15b7e72 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -534,10 +534,6 @@ void __init kirkwood_cpuidle_init(void)
+ void __init kirkwood_init_early(void)
+ {
+ 	orion_time_set_base(TIMER_VIRT_BASE);
+-
+-	mvebu_mbus_init("marvell,kirkwood-mbus",
+-			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
+-			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ);
+ }
+ 
+ int kirkwood_tclk;
+@@ -713,6 +709,10 @@ void __init kirkwood_init(void)
+ 	 */
+ 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
+ 
++	BUG_ON(mvebu_mbus_init("marvell,kirkwood-mbus",
++			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
++			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ));
 +
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <200000000>;
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 37530af..a4202b6 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -25,6 +25,8 @@
- 	};
+ 	kirkwood_setup_wins();
  
- 	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <200000000>;
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index 7aa2171..dd0ba01 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -28,6 +28,8 @@
- 	};
- 
- 	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000>;
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <200000000>;
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 90b1176..62639b4 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -18,6 +18,8 @@
- 
- /include/ "skeleton64.dtsi"
- 
-+#define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
-+
- / {
- 	model = "Marvell Armada 370 and XP SoC";
- 	compatible = "marvell,armada-370-xp";
-@@ -38,18 +40,21 @@
- 	};
- 
- 	soc {
--		#address-cells = <1>;
-+		#address-cells = <2>;
- 		#size-cells = <1>;
--		compatible = "simple-bus";
-+		controller = <&mbusc>;
- 		interrupt-parent = <&mpic>;
--		ranges = <0          0 0xd0000000 0x0100000 /* internal registers */
--			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
- 
- 		internal-regs {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			ranges;
-+			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
-+
-+			mbusc: mbus-controller at 20000 {
-+				compatible = "marvell,mbus-controller";
-+				reg = <0x20000 0x100>, <0x20180 0x20>;
-+			};
- 
- 			mpic: interrupt-controller at 20000 {
- 				compatible = "marvell,mpic";
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 08ec6e3..4b54e51 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -29,8 +29,8 @@
- 	};
- 
- 	soc {
--		ranges = <0          0xd0000000 0x0100000 /* internal registers */
--			  0xe0000000 0xe0000000 0x8100000 /* PCIe */>;
-+		compatible = "marvell,armada370-mbus", "simple-bus";
-+
- 		internal-regs {
- 			system-controller at 18200 {
- 				compatible = "marvell,armada-370-xp-system-controller";
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index a9bd766..0d4ce54 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -30,9 +30,7 @@
- 	};
- 
- 	soc {
--		ranges = <0          0 0xd0000000 0x100000	/* Internal registers 1MiB */
--			  0xe0000000 0 0xe0000000 0x8100000     /* PCIe */
--			  0xf0000000 0 0xf0000000 0x1000000>;	/* Device Bus, NOR 16MiB   */
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 54843e5..2fa9209 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -39,9 +39,7 @@
- 	};
- 
- 	soc {
--		ranges = <0          0 0xd0000000 0x100000  /* Internal registers 1MiB */
--			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */
--			  0xf0000000 0 0xf0000000 0x1000000 /* Device Bus, NOR 16MiB  */>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index d090264..a3e3a12 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -27,9 +27,7 @@
- 	};
- 
- 	soc {
--		ranges = <0          0 0xd0000000 0x100000	/* Internal registers 1MiB */
--			  0xe0000000 0 0xe0000000 0x8100000     /* PCIe */
--			  0xf0000000 0 0xf0000000 0x8000000     /* Device Bus, NOR 128MiB   */>;
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000>;
- 
- 		internal-regs {
- 			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 8c07bfe..8033824 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -27,6 +27,8 @@
- 	};
- 
- 	soc {
-+		compatible = "marvell,armadaxp-mbus", "simple-bus";
-+
- 		internal-regs {
- 			L2: l2-cache {
- 				compatible = "marvell,aurora-system-cache";
+ 	kirkwood_l2_init();
 -- 
 1.8.1.5
