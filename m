@@ -1,158 +1,59 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 24 Jul 2013 15:15:20 +0200
-Subject: [PATCH 14/14] sh-pfc: r8a7790: Add VIN pin groups and functions
-In-Reply-To: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1374671720-8794-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 24 Jul 2013 15:17:12 +0200
+Subject: [PATCH v4 00/13] ARM: dts: Add camera and magnetometer support for
+ TRATS(2) board
+Message-ID: <1374671845-30373-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+This patch series includes some fixes and extensions to the Exynos dts
+files to add the camera and magnetometer sensor support for the TRATS
+and TRATS2 board. It depends on a patch from Tomasz adding initial
+TRATS2 board dts file [1].
 
-Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 106 +++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
+Changes since v3 include:
+ - removed patch adding MIPI PHY node (although it is unlikely the DT
+   binding will change the PHY driver is still in review phase),
+ - added one more patch for SPI and s5c73m3 camera.
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index fa501ef..846ffcc 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -2893,6 +2893,84 @@ static const unsigned int usb2_pins[] = {
- static const unsigned int usb2_mux[] = {
- 	USB2_PWEN_MARK, USB2_OVC_MARK,
- };
-+/* - VIN0 ------------------------------------------------------------------- */
-+static const unsigned int vin0_data_g_pins[] = {
-+	RCAR_GP_PIN(0, 8), RCAR_GP_PIN(0, 9), RCAR_GP_PIN(0, 10),
-+	RCAR_GP_PIN(0, 11), RCAR_GP_PIN(0, 0), RCAR_GP_PIN(0, 1),
-+	RCAR_GP_PIN(0, 2), RCAR_GP_PIN(0, 3),
-+};
-+static const unsigned int vin0_data_g_mux[] = {
-+	VI0_G0_MARK, VI0_G1_MARK, VI0_G2_MARK,
-+	VI0_G3_MARK, VI0_G4_MARK, VI0_G5_MARK,
-+	VI0_G6_MARK, VI0_G7_MARK,
-+};
-+static const unsigned int vin0_data_r_pins[] = {
-+	RCAR_GP_PIN(0, 4), RCAR_GP_PIN(0, 5), RCAR_GP_PIN(0, 6),
-+	RCAR_GP_PIN(0, 7), RCAR_GP_PIN(0, 24), RCAR_GP_PIN(0, 25),
-+	RCAR_GP_PIN(0, 26), RCAR_GP_PIN(1, 11),
-+};
-+static const unsigned int vin0_data_r_mux[] = {
-+	VI0_R0_MARK, VI0_R1_MARK, VI0_R2_MARK,
-+	VI0_R3_MARK, VI0_R4_MARK, VI0_R5_MARK,
-+	VI0_R6_MARK, VI0_R7_MARK,
-+};
-+static const unsigned int vin0_data_b_pins[] = {
-+	RCAR_GP_PIN(2, 1), RCAR_GP_PIN(2, 2), RCAR_GP_PIN(2, 3),
-+	RCAR_GP_PIN(2, 4), RCAR_GP_PIN(2, 5), RCAR_GP_PIN(2, 6),
-+	RCAR_GP_PIN(2, 7), RCAR_GP_PIN(2, 8),
-+};
-+static const unsigned int vin0_data_b_mux[] = {
-+	VI0_DATA0_VI0_B0_MARK, VI0_DATA1_VI0_B1_MARK, VI0_DATA2_VI0_B2_MARK,
-+	VI0_DATA3_VI0_B3_MARK, VI0_DATA4_VI0_B4_MARK, VI0_DATA5_VI0_B5_MARK,
-+	VI0_DATA6_VI0_B6_MARK, VI0_DATA7_VI0_B7_MARK,
-+};
-+static const unsigned int vin0_hsync_signal_pins[] = {
-+	RCAR_GP_PIN(0, 12),
-+};
-+static const unsigned int vin0_hsync_signal_mux[] = {
-+	VI0_HSYNC_N_MARK,
-+};
-+static const unsigned int vin0_vsync_signal_pins[] = {
-+	RCAR_GP_PIN(0, 13),
-+};
-+static const unsigned int vin0_vsync_signal_mux[] = {
-+	VI0_VSYNC_N_MARK,
-+};
-+static const unsigned int vin0_field_signal_pins[] = {
-+	RCAR_GP_PIN(0, 15),
-+};
-+static const unsigned int vin0_field_signal_mux[] = {
-+	VI0_FIELD_MARK,
-+};
-+static const unsigned int vin0_data_enable_pins[] = {
-+	RCAR_GP_PIN(0, 14),
-+};
-+static const unsigned int vin0_data_enable_mux[] = {
-+	VI0_CLKENB_MARK,
-+};
-+static const unsigned int vin0_clk_pins[] = {
-+	RCAR_GP_PIN(2, 0),
-+};
-+static const unsigned int vin0_clk_mux[] = {
-+	VI0_CLK_MARK,
-+};
-+/* - VIN1 ------------------------------------------------------------------- */
-+static const unsigned int vin1_data_pins[] = {
-+	RCAR_GP_PIN(2, 10), RCAR_GP_PIN(2, 11), RCAR_GP_PIN(2, 12),
-+	RCAR_GP_PIN(2, 13), RCAR_GP_PIN(2, 14), RCAR_GP_PIN(2, 15),
-+	RCAR_GP_PIN(2, 16), RCAR_GP_PIN(2, 17),
-+};
-+static const unsigned int vin1_data_mux[] = {
-+	VI1_DATA0_VI1_B0_MARK, VI1_DATA1_VI1_B1_MARK, VI1_DATA2_VI1_B2_MARK,
-+	VI1_DATA3_VI1_B3_MARK, VI1_DATA4_VI1_B4_MARK, VI1_DATA5_VI1_B5_MARK,
-+	VI1_DATA6_VI1_B6_MARK, VI1_DATA7_VI1_B7_MARK,
-+};
-+static const unsigned int vin1_clk_pins[] = {
-+	RCAR_GP_PIN(2, 9),
-+};
-+static const unsigned int vin1_clk_mux[] = {
-+	VI1_CLK_MARK,
-+};
- 
- static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(eth_link),
-@@ -3048,6 +3126,16 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(usb0),
- 	SH_PFC_PIN_GROUP(usb1),
- 	SH_PFC_PIN_GROUP(usb2),
-+	SH_PFC_PIN_GROUP(vin0_data_g),
-+	SH_PFC_PIN_GROUP(vin0_data_r),
-+	SH_PFC_PIN_GROUP(vin0_data_b),
-+	SH_PFC_PIN_GROUP(vin0_hsync_signal),
-+	SH_PFC_PIN_GROUP(vin0_vsync_signal),
-+	SH_PFC_PIN_GROUP(vin0_field_signal),
-+	SH_PFC_PIN_GROUP(vin0_data_enable),
-+	SH_PFC_PIN_GROUP(vin0_clk),
-+	SH_PFC_PIN_GROUP(vin1_data),
-+	SH_PFC_PIN_GROUP(vin1_clk),
- };
- 
- static const char * const eth_groups[] = {
-@@ -3284,6 +3372,22 @@ static const char * const usb2_groups[] = {
- 	"usb2",
- };
- 
-+static const char * const vin0_groups[] = {
-+	"vin0_data_g",
-+	"vin0_data_r",
-+	"vin0_data_b",
-+	"vin0_hsync_signal",
-+	"vin0_vsync_signal",
-+	"vin0_field_signal",
-+	"vin0_data_enable",
-+	"vin0_clk",
-+};
-+
-+static const char * const vin1_groups[] = {
-+	"vin1_data",
-+	"vin1_clk",
-+};
-+
- static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(eth),
- 	SH_PFC_FUNCTION(hscif0),
-@@ -3312,6 +3416,8 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(usb0),
- 	SH_PFC_FUNCTION(usb1),
- 	SH_PFC_FUNCTION(usb2),
-+	SH_PFC_FUNCTION(vin0),
-+	SH_PFC_FUNCTION(vin1),
- };
- 
- static struct pinmux_cfg_reg pinmux_config_regs[] = {
--- 
-1.8.1.5
+Detailed changes are listed in each patch.
+
+This series has been tested with the S5K6A3/FIMC-IS, S5C73M3 and
+S5K5BAFX cameras on top of v3.11-rc2.
+
+I have a couple more similar patches that actually enable remaining
+devices I intend to submit for v3.12, once corresponding driver
+patches are reviewed and queued.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg253184.html
+
+Andrzej Hajda (3):
+  ARM: dts: Add SPI1 controller and s5c73m3 sensor node for TRATS2
+  ARM: dts: Add Exynos4210 SoC camera port pinctrl nodes
+  ARM: dts: Add S5K5BA sensor regulator definitions for Trats board
+
+Jacek Anaszewski (1):
+  ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
+
+Sylwester Nawrocki (9):
+  ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
+  ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
+  ARM: dts: Add ISP power domain node for Exynos4x12
+  ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
+  ARM: dts: Add camera subsystem device nodes to exynos4.dtsi
+  ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
+  ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
+  ARM: dts: Add camera device nodes for Exynos4210 SoCs
+  ARM: dts: Add FIMC nodes for Exynos4210 Trats board
+
+ arch/arm/boot/dts/exynos4.dtsi            |  100 +++++++++++++++++++++--
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi |   23 ++++++
+ arch/arm/boot/dts/exynos4210-trats.dts    |  100 +++++++++++++++++++----
+ arch/arm/boot/dts/exynos4210.dtsi         |   30 +++++++
+ arch/arm/boot/dts/exynos4412-trats2.dts   |  123 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   61 ++++++++++++--
+ arch/arm/boot/dts/exynos4x12.dtsi         |  103 ++++++++++++++++++++++++
+ 7 files changed, 511 insertions(+), 29 deletions(-)
+
+--
+1.7.9.5
