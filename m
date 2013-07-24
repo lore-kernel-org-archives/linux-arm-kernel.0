@@ -1,129 +1,74 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 24 Jul 2013 18:35:29 +0200
-Subject: [PATCH 2/2] ARM i.MX6Q: dts: Enable I2C1 with EEPROM and PMIC on
- Phytec phyFLEX-i.MX6 Ouad module
-In-Reply-To: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
-References: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1374683729-13438-2-git-send-email-p.zabel@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 24 Jul 2013 12:38:51 -0400
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <51EFFBE1.4090505@ti.com>
+References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
+ <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
+ <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
+Message-ID: <51F0031B.1050307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables I2C1 and adds device tree nodes for the EEPROM and the
-DA9063 PMIC connected to this I2C bus.
+On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote:
+> On 07/22/2013 11:23 AM, Santosh Shilimkar wrote:
+>> To summaries it again, what I understood from Sricharan's proposal,
+>>
+>> - Setup all the routing at cross-bar probe so that kernel continue to
+>> work like normal IRQ controller with cross-bar scope vanishes once
+>> the routing is done. Cross-bar does this before any of the devices
+>> are created.
+>> - Something similar needs to happen for DMA lines as well or for any
+>> other event routing in future.
+>> - Cross-bar callbacks for device drivers for error paths.
+>> (Sricharan, you have to drop these because it doesn't bring any
+>> functionality and rather can create a side effects of drivers
+>> getting polluted.)
+> Ack.
+> 
+>>
+>> The concern raised on above was instead of fixing the routing at DT
+>> statically, doing at the driver probes where the loop-up for IRQ or DMA
+>> lines should happen in background transparently on drivers call of
+>> request_irq/request_dma_channel etc with cross-bar number as
+>> an input to it. Though it will be nice to have
+>> such feature, it doesn't bring anything special and brings the
+>> notion of these APIs which expect that you know what IRQ and DMA
+>> lines you want while calling these.
+> Unfortunately, we do have a constraint without allocating dynamic IRQs - what IP instances should hwmod and dts contain?
+> 
+> If we go with current series of patches[1] [2] for DRA7 dts which assumes default mapping, hence, uart7-10, GPTimers12-16 dont have default irq - hence they dont exist in dts etc.
+> 
+> How would we like to support those with pinctrl approach?
+>
+The whole reason the cross-bar being there because all the peripherals
+IRQs can not me routed to the IRQ controller. So You pick up a configuration
+would like to support and stick to it. It will be good to specify all the
+peripheral devices but tsome of them might not have the IRQ/DMA lines
+associated with them because of limited slots on IRQ/DMA controller.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi | 91 ++++++++++++++++++++++++++++++
- 1 file changed, 91 insertions(+)
+>>
+>> Note that mux inputs are pretty much fixed. Its his connection
+>> to IRQ controller or DMA controller is what needs to be programmed.
+>> So scope is pretty much limited. I felt this requirement is pretty
+>> similar to pin-mux and hence thought of it as a viable option.
+>>
+>> Having said all of above, if there is a better alternative than
+>> enhanced pin-mux we surely can do that.
+> We could look at it as a signal mux problem as this thread suggests OR look at it as interrupt distribution problem (which is how it looks like at the face of it).
+Its not interrupt distribution problem but rather setting up the signal
+routing which otherwise generally hardwired in SOC. Hence the pin-control analogy.
+Pinmux also lets you set many possible combinations but we pick one for a board design.
 
-diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-index 5113d29..8d1a548 100644
---- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-@@ -34,6 +34,96 @@
- 	};
- };
- 
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1>;
-+	status = "okay";
-+
-+	eeprom at 50 {
-+		compatible = "atmel,24c32";
-+		reg = <0x50>;
-+	};
-+
-+	pmic at 58 {
-+		compatible = "dialog,da9063";
-+		reg = <0x58>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <17 0x8>; /* active-low GPIO4_17 */
-+
-+		regulators {
-+			vddcore_reg: bcore1 {
-+				regulator-min-microvolt = <730000>;
-+				regulator-max-microvolt = <1380000>;
-+				regulator-always-on;
-+			};
-+
-+			vddsoc_reg: bcore2 {
-+				regulator-min-microvolt = <730000>;
-+				regulator-max-microvolt = <1380000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_ddr3_reg: bpro {
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_reg: bperi {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_buckmem_reg: bmem {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_eth_reg: bio {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_eth_io_reg: ldo4 {
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_mx6_snvs_reg: ldo5 {
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_pmic_io_reg: ldo6 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_sd0_reg: ldo9 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vdd_sd1_reg: ldo10 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vdd_mx6_high_reg: ldo11 {
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
-@@ -43,6 +133,7 @@
- 			fsl,pins = <
- 				MX6Q_PAD_EIM_D23__GPIO3_IO23    0x80000000
- 				MX6Q_PAD_DISP0_DAT3__GPIO4_IO24	0x80000000 /* SPI NOR chipselect */
-+				MX6Q_PAD_DI0_PIN15__GPIO4_IO17  0x80000000 /* PMIC interrupt */
- 			>;
- 		};
- 	};
--- 
-1.8.3.2
+> That said, maybe a intermediate pinctrl approach might be more pragmatic andless theoretically flexible.
+> an option might be to "statically allocate" default number of interrupts to a domain - example:
+> * GIC IRQ 72->78 allotted to UARTs
+> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
+> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
+> 
+> Does that sound fair trade off?
+This sounds better. That way we can get all the devices in the DT at least.
+
+Regards,
+Santosh
