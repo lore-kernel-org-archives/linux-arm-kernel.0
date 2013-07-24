@@ -1,49 +1,30 @@
-From: xvzhaobin@gmail.com (zhaobin xv)
-Date: Wed, 24 Jul 2013 09:12:30 +0800
-Subject: linux setup
-In-Reply-To: <alpine.LFD.2.03.1307231530080.15022@syhkavp.arg>
-References: <CANEcUBXMPhTjgVYbRN7NY+EUjh7DDGpKnZ8_LXY-ZLcfbH65Ug@mail.gmail.com>
- <20130723102554.GD3748@MacBook-Pro.local>
- <alpine.LFD.2.03.1307231530080.15022@syhkavp.arg>
-Message-ID: <CANEcUBVaVBCfaE1iY-cHzYfxhmOQdN80ttqHrGrwD7esNtn=DA@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 24 Jul 2013 10:50:38 +0900
+Subject: [PATCH 3/3] ARM: dts: Add WM1811A audio CODEC to Arndale bindings
+In-Reply-To: <20130702092507.GV27646@sirena.org.uk>
+References: <1372714599-17588-1-git-send-email-broonie@kernel.org>
+ <1372714599-17588-3-git-send-email-broonie@kernel.org>
+ <51D26360.2080708@linaro.org> <20130702092507.GV27646@sirena.org.uk>
+Message-ID: <0deb01ce8810$3295b790$97c126b0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-thank you for your answer,
+Mark Brown wrote:
+> 
+> On Tue, Jul 02, 2013 at 10:51:36AM +0530, Tushar Behera wrote:
+> 
+> > Arndale board also comes with two other audio codec boards - ALC5631Q
+> > and AK4678. Different audio codec boards came with different shipments.
+> 
+> This is the default though and since they didn't bother providing any
+> way of identifying the modules we just have to put them all in the
+> device tree and hope that the individual CODEC drivers can do runtime
+> identification (the WM1811A can but I don't know about the other two,
+> nobody supported them upstream).
 
-2013/7/24 Nicolas Pitre <nico@fluxnic.net>:
-> On Tue, 23 Jul 2013, Catalin Marinas wrote:
->
->> On Mon, Jul 22, 2013 at 02:28:50PM +0100, zhaobin xv wrote:
->> > I recently read lernel source .
->> > I have a question:In
->> > folder:linux/arch/arm/boot/compressed/head.S(linux2.6.22.6):
->> >
->> >
->> > start:
->> >         .type    start,#function
->> >         .rept    8
->> >         mov    r0, r0
->> >         .endr
->> >
->> >         b    1f
->> >         .word    0x016f2818        @ Magic numbers to help the loader
->> >         .word    start            @ absolute load/run zImage address
->> >         .word    _edata            @ zImage end address
->> > 1:        mov    r7, r1            @ save architecture ID
->> >         mov    r8, r2            @ save atags pointer
->> >
->> >
->> > I don't kown why the ?mov r0 r0 ? repeated  emergence 8 times.
->>
->> I think some people used that in the past to be able to modify the
->> zImage binary directly and work around wrong register values passed by
->> the boot loader. I've never used it myself but I saw it mentioned once.
->
-> The whole reason for this is because in a distant past the kernel image
-> was an a.out binary containing a 32-bytes header.  Those nops are simply
-> padding so to be compatible with those bootloaders expecting the kernel
-> code to start at an offset of 32.
->
->
-> Nicolas
+Basically, I agree with Mark Brown's opinion, at this moment would be better
+if upstreamed WM1811A could be supported on Arndale and if further
+supporting of two codecs is required, we could discuss again next time. And
+they should be identified in the kernel at runtime.
+
+- Kukjin
