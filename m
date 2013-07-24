@@ -1,111 +1,93 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:34:03 +0900
-Subject: [PATCH 09/16] ARM: shmobile: Add r8a7790 CMT00 clock event
+Date: Wed, 24 Jul 2013 09:34:01 +0900
+Subject: [PATCH 07/16] ARM: shmobile: r8a73a4: add clocks for I2C controllers
 In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
 References: <cover.1374624383.git.horms+renesas@verge.net.au>
-Message-ID: <99ade1a0f02e086248874d9908def3e8e4539418.1374624383.git.horms+renesas@verge.net.au>
+Message-ID: <1e453df90047f052cdce2041a572830c8eb32084.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Add clock event support for CMT0 timer channel 0
-to the r8a7790 SoC code. On most ARM mach-shmobile
-the CMT is hooked up to a 32KHz clock but on r8a7790
-a 31.7KHz clock is instead used.
+r8a73a4 SoCs have numerous I2C controllers, of which 9 are compatible with
+the i2c-sh_mobile.c driver. This patch adds clock definitions for them.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
- arch/arm/mach-shmobile/setup-r8a7790.c | 23 ++++++++++++++++++++++-
- 2 files changed, 26 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a73a4.c | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 10d99b3..62d8162 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -47,6 +47,7 @@
- #define CPG_BASE 0xe6150000
- #define CPG_LEN 0x1000
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index 27ff58c..f831b3b 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -30,6 +30,7 @@
  
-+#define SMSTPCR1 0xe6150134
  #define SMSTPCR2 0xe6150138
  #define SMSTPCR3 0xe615013c
++#define SMSTPCR4 0xe6150140
  #define SMSTPCR5 0xe6150144
-@@ -186,6 +187,7 @@ enum {
- 	MSTP522,
- 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP311, MSTP305, MSTP304,
- 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
-+	MSTP124,
+ 
+ #define FRQCRA		0xE6150000
+@@ -504,8 +505,10 @@ static struct clk div6_clks[DIV6_NR] = {
+ /* MSTP */
+ enum {
+ 	MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
+-	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305,
+-	MSTP522,
++	MSTP323, MSTP318, MSTP317, MSTP316,
++	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305, MSTP300,
++	MSTP411, MSTP410, MSTP409,
++	MSTP522, MSTP515,
  	MSTP_NR
  };
  
-@@ -208,6 +210,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
- 	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
- 	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
-+	[MSTP124] = SH_CLK_MSTP32(&rclk_clk, SMSTPCR1, 24, 0), /* CMT0 */
+@@ -516,12 +519,21 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP207] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 7, 0), /* SCIFB1 */
+ 	[MSTP216] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 16, 0), /* SCIFB2 */
+ 	[MSTP217] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 17, 0), /* SCIFB3 */
++	[MSTP300] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 0, 0), /* IIC2 */
+ 	[MSTP305] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC1],SMSTPCR3, 5, 0), /* MMCIF1 */
+ 	[MSTP312] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI2],SMSTPCR3, 12, 0), /* SDHI2 */
+ 	[MSTP313] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI1],SMSTPCR3, 13, 0), /* SDHI1 */
+ 	[MSTP314] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI0],SMSTPCR3, 14, 0), /* SDHI0 */
+ 	[MSTP315] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC0],SMSTPCR3, 15, 0), /* MMCIF0 */
++	[MSTP316] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 16, 0), /* IIC6 */
++	[MSTP317] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 17, 0), /* IIC7 */
++	[MSTP318] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 18, 0), /* IIC0 */
++	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 23, 0), /* IIC1 */
++	[MSTP409] = SH_CLK_MSTP32(&main_div2_clk,	SMSTPCR4, 9, 0), /* IIC5 */
++	[MSTP410] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 10, 0), /* IIC4 */
++	[MSTP411] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 11, 0), /* IIC3 */
+ 	[MSTP522] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR5, 22, 0), /* Thermal */
++	[MSTP515] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR5, 15, 0), /* IIC8 */
  };
  
  static struct clk_lookup lookups[] = {
-@@ -270,6 +273,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP311]),
- 	CLKDEV_DEV_ID("ee220000.mmcif", &mstp_clks[MSTP305]),
+@@ -566,6 +578,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
+ 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP217]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
++	CLKDEV_DEV_ID("e6520000.i2c", &mstp_clks[MSTP300]),
  	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
-+	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- };
+ 	CLKDEV_DEV_ID("ee220000.mmcif", &mstp_clks[MSTP305]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP312]),
+@@ -576,6 +589,14 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("ee100000.sdhi", &mstp_clks[MSTP314]),
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
+ 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
++	CLKDEV_DEV_ID("e6550000.i2c", &mstp_clks[MSTP316]),
++	CLKDEV_DEV_ID("e6560000.i2c", &mstp_clks[MSTP317]),
++	CLKDEV_DEV_ID("e6500000.i2c", &mstp_clks[MSTP318]),
++	CLKDEV_DEV_ID("e6510000.i2c", &mstp_clks[MSTP323]),
++	CLKDEV_DEV_ID("e60b0000.i2c", &mstp_clks[MSTP409]),
++	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP410]),
++	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP411]),
++	CLKDEV_DEV_ID("e6570000.i2c", &mstp_clks[MSTP515]),
  
- #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index bc40a44..ece60c6 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -21,9 +21,10 @@
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
--#include <linux/serial_sci.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_data/irq-renesas-irqc.h>
-+#include <linux/serial_sci.h>
-+#include <linux/sh_timer.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a7790.h>
-@@ -159,6 +160,25 @@ static struct resource thermal_resources[] __initdata = {
- 					thermal_resources,		\
- 					ARRAY_SIZE(thermal_resources))
- 
-+static struct sh_timer_config cmt00_platform_data = {
-+	.name = "CMT00",
-+	.timer_bit = 0,
-+	.clockevent_rating = 80,
-+};
-+
-+static struct resource cmt00_resources[] = {
-+	DEFINE_RES_MEM(0xffca0510, 0x0c),
-+	DEFINE_RES_MEM(0xffca0500, 0x04),
-+	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
-+};
-+
-+#define r8a7790_register_cmt(idx)					\
-+	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
-+					  idx, cmt##idx##_resources,	\
-+					  ARRAY_SIZE(cmt##idx##_resources), \
-+					  &cmt##idx##_platform_data,	\
-+					  sizeof(struct sh_timer_config))
-+
- void __init r8a7790_add_standard_devices(void)
- {
- 	r8a7790_register_scif(SCIFA0);
-@@ -173,6 +193,7 @@ void __init r8a7790_add_standard_devices(void)
- 	r8a7790_register_scif(HSCIF1);
- 	r8a7790_register_irqc(0);
- 	r8a7790_register_thermal();
-+	r8a7790_register_cmt(00);
- }
- 
- void __init r8a7790_timer_init(void)
+ 	/* for DT */
+ 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
 -- 
 1.8.2.1
