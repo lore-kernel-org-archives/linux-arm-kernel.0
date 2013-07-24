@@ -1,34 +1,40 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 25 Jul 2013 00:13:53 +0530
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 24 Jul 2013 13:51:42 -0500
 Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <51F00530.9090703@ti.com>
+In-Reply-To: <51F02069.3050207@ti.com>
 References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
  <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
  <51E83A4F.5080904@ti.com>
  <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
  <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
- <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com>
-Message-ID: <51F02069.3050207@ti.com>
+ <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+Message-ID: <51F0223E.4050008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 July 2013 10:17 PM, Nishanth Menon wrote:
-> On 07/24/2013 11:38 AM, Santosh Shilimkar wrote:
->> On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote: 
->>> That said, maybe a intermediate pinctrl approach might be more pragmatic and less theoretically flexible.
->>> an option might be to "statically allocate" default number of interrupts to a domain - example:
->>> * GIC IRQ 72->78 allotted to UARTs
->>> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
->>> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
->>>
->>> Does that sound fair trade off?
->> This sounds better. That way we can get all the devices in the DT at least.
+On 07/24/2013 01:43 PM, Sricharan R wrote:
+> On Wednesday 24 July 2013 10:17 PM, Nishanth Menon wrote:
+>> On 07/24/2013 11:38 AM, Santosh Shilimkar wrote:
+>>> On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote:
+>>>> That said, maybe a intermediate pinctrl approach might be more pragmatic and less theoretically flexible.
+>>>> an option might be to "statically allocate" default number of interrupts to a domain - example:
+>>>> * GIC IRQ 72->78 allotted to UARTs
+>>>> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
+>>>> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
+>>>>
+>>>> Does that sound fair trade off?
+>>> This sounds better. That way we can get all the devices in the DT at least.
+>>
+>> Fair enough - if Linus and Tony are still ok with this approach to the problem, seeing a patch series with the effect would be beneficial.
+>>
+>   Ok, i will use this idea of certain number interrupts to groups.
+> Yes on DRA7XX, we have about 160 gic lines and 320 irq crossbar device inputs contending for it.
+> 1:2 and fully arbitrary.  But will we be really exhausting them ?
 >
-> Fair enough - if Linus and Tony are still ok with this approach to the problem, seeing a patch series with the effect would be beneficial.
->
- Ok, i will use this idea of certain number interrupts to groups.
-Yes on DRA7XX, we have about 160 gic lines and 320 irq crossbar device inputs contending for it.
-1:2 and fully arbitrary.  But will we be really exhausting them ?
+Depends on how we allocate :). The default arbitary allocation can be 
+made more logical in your series ofcourse :).
 
+
+-- 
 Regards,
- Sricharan
+Nishanth Menon
