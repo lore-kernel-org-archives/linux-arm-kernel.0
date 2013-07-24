@@ -1,65 +1,61 @@
 From: rizhao@nvidia.com (Richard Zhao)
-Date: Wed, 24 Jul 2013 12:09:57 +0800
-Subject: [PATCH 4/9] spi: tegra20-slink: move to generic dma DT binding
+Date: Wed, 24 Jul 2013 12:09:59 +0800
+Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
 In-Reply-To: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
 References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
-Message-ID: <1374639002-16753-5-git-send-email-rizhao@nvidia.com>
+Message-ID: <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 - driver: remove use of nvidia,dma-request-selector
 	  use dma_request_slave_channel to request channel
-- if dmas/dma-names are missing, it still supports cpu based transfer
-- update binding doc and specify dmas/dma-names properties as optional
+- update binding doc
 
 Signed-off-by: Richard Zhao <rizhao@nvidia.com>
 ---
- .../devicetree/bindings/spi/nvidia,tegra20-slink.txt     | 10 +++++++---
- drivers/spi/spi-tegra20-slink.c                          | 16 +++++-----------
- 2 files changed, 12 insertions(+), 14 deletions(-)
+ .../devicetree/bindings/serial/nvidia,tegra20-hsuart.txt |  8 +++++---
+ drivers/tty/serial/serial-tegra.c                        | 16 +---------------
+ 2 files changed, 6 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt
-index eefe15e..ae43bd1 100644
---- a/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt
-+++ b/Documentation/devicetree/bindings/spi/nvidia,tegra20-slink.txt
-@@ -4,8 +4,11 @@ Required properties:
- - compatible : should be "nvidia,tegra20-slink", "nvidia,tegra30-slink".
- - reg: Should contain SLINK registers location and length.
- - interrupts: Should contain SLINK interrupts.
+diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt
+index 392a449..1ed2f48 100644
+--- a/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt
++++ b/Documentation/devicetree/bindings/serial/nvidia,tegra20-hsuart.txt
+@@ -4,8 +4,9 @@ Required properties:
+ - compatible : should be "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
+ - reg: Should contain UART controller registers location and length.
+ - interrupts: Should contain UART controller interrupts.
 -- nvidia,dma-request-selector : The Tegra DMA controller's phandle and
--  request selector for this SLINK controller.
-+
-+Optional properties:
+-  request selector for this UART controller.
 +- dmas : The Tegra DMA controller's phandle and request selector for
-+  this SLINK controller.
-+- dma-names : Should be "rx-tx".
++  this UART controller.
++- dma-names : Should be "rx-tx";
  
- Recommended properties:
- - spi-max-frequency: Definition as per
-@@ -17,7 +20,8 @@ spi at 7000d600 {
- 	compatible = "nvidia,tegra20-slink";
- 	reg = <0x7000d600 0x200>;
- 	interrupts = <0 82 0x04>;
--	nvidia,dma-request-selector = <&apbdma 16>;
-+	dmas = <&apbdma 16>;
+ Optional properties:
+ - nvidia,enable-modem-interrupt: Enable modem interrupts. Should be enable
+@@ -18,7 +19,8 @@ serial at 70006000 {
+ 	reg = <0x70006000 0x40>;
+ 	reg-shift = <2>;
+ 	interrupts = <0 36 0x04>;
+-	nvidia,dma-request-selector = <&apbdma 8>;
++	dmas = <&apbdma 8>;
 +	dma-names = "rx-tx";
- 	spi-max-frequency = <25000000>;
- 	#address-cells = <1>;
- 	#size-cells = <0>;
-diff --git a/drivers/spi/spi-tegra20-slink.c b/drivers/spi/spi-tegra20-slink.c
-index 80490cc..278fb04 100644
---- a/drivers/spi/spi-tegra20-slink.c
-+++ b/drivers/spi/spi-tegra20-slink.c
-@@ -170,7 +170,7 @@ struct tegra_slink_data {
- 	void __iomem				*base;
- 	phys_addr_t				phys;
- 	unsigned				irq;
+ 	nvidia,enable-modem-interrupt;
+ 	status = "disabled";
+ };
+diff --git a/drivers/tty/serial/serial-tegra.c b/drivers/tty/serial/serial-tegra.c
+index ee7c812..c8a7828 100644
+--- a/drivers/tty/serial/serial-tegra.c
++++ b/drivers/tty/serial/serial-tegra.c
+@@ -120,7 +120,6 @@ struct tegra_uart_port {
+ 	bool					rx_timeout;
+ 	int					rx_in_progress;
+ 	int					symb_bit;
 -	int					dma_req_sel;
-+	bool					use_dma;
- 	u32					spi_max_frequency;
- 	u32					cur_speed;
  
-@@ -629,11 +629,8 @@ static int tegra_slink_init_dma_param(struct tegra_slink_data *tspi,
+ 	struct dma_chan				*rx_dma_chan;
+ 	struct dma_chan				*tx_dma_chan;
+@@ -902,11 +901,8 @@ static int tegra_uart_dma_channel_allocate(struct tegra_uart_port *tup,
  	dma_addr_t dma_phys;
  	int ret;
  	struct dma_slave_config dma_sconfig;
@@ -68,40 +64,35 @@ index 80490cc..278fb04 100644
 -	dma_cap_zero(mask);
 -	dma_cap_set(DMA_SLAVE, mask);
 -	dma_chan = dma_request_channel(mask, NULL, NULL);
-+	dma_chan = dma_request_slave_channel(tspi->dev, "rx-tx");
++	dma_chan = dma_request_slave_channel(tup->uport.dev, "rx-tx");
  	if (!dma_chan) {
- 		dev_err(tspi->dev,
+ 		dev_err(tup->uport.dev,
  			"Dma channel is not available, will try later\n");
-@@ -648,7 +645,6 @@ static int tegra_slink_init_dma_param(struct tegra_slink_data *tspi,
- 		return -ENOMEM;
+@@ -930,7 +926,6 @@ static int tegra_uart_dma_channel_allocate(struct tegra_uart_port *tup,
+ 		dma_buf = tup->uport.state->xmit.buf;
  	}
  
--	dma_sconfig.slave_id = tspi->dma_req_sel;
+-	dma_sconfig.slave_id = tup->dma_req_sel;
  	if (dma_to_memory) {
- 		dma_sconfig.src_addr = tspi->phys + SLINK_RX_FIFO;
- 		dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-@@ -1034,11 +1030,9 @@ static irqreturn_t tegra_slink_isr(int irq, void *context_data)
- static void tegra_slink_parse_dt(struct tegra_slink_data *tspi)
+ 		dma_sconfig.src_addr = tup->uport.mapbase;
+ 		dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+@@ -1214,17 +1209,8 @@ static int tegra_uart_parse_dt(struct platform_device *pdev,
+ 	struct tegra_uart_port *tup)
  {
- 	struct device_node *np = tspi->dev->of_node;
+ 	struct device_node *np = pdev->dev.of_node;
 -	u32 of_dma[2];
+ 	int port;
  
 -	if (of_property_read_u32_array(np, "nvidia,dma-request-selector",
--				of_dma, 2) >= 0)
--		tspi->dma_req_sel = of_dma[1];
-+	if (of_find_property(np, "dmas", NULL))
-+		tspi->use_dma = true;
- 
- 	if (of_property_read_u32(np, "spi-max-frequency",
- 					&tspi->spi_max_frequency))
-@@ -1132,7 +1126,7 @@ static int tegra_slink_probe(struct platform_device *pdev)
- 	tspi->max_buf_size = SLINK_FIFO_DEPTH << 2;
- 	tspi->dma_buf_size = DEFAULT_SPI_DMA_BUF_LEN;
- 
--	if (tspi->dma_req_sel) {
-+	if (tspi->use_dma) {
- 		ret = tegra_slink_init_dma_param(tspi, true);
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "RxDma Init failed, err %d\n", ret);
+-				of_dma, 2) >= 0) {
+-		tup->dma_req_sel = of_dma[1];
+-	} else {
+-		dev_err(&pdev->dev, "missing dma requestor in device tree\n");
+-		return -EINVAL;
+-	}
+-
+ 	port = of_alias_get_id(np, "serial");
+ 	if (port < 0) {
+ 		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", port);
 -- 
 1.8.1.5
