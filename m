@@ -1,60 +1,30 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 24 Jul 2013 14:23:39 +0200
-Subject: [PATCH v4 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
-In-Reply-To: <0eb101ce8865$60f1d920$22d58b60$@org>
-References: <1374655405-22998-1-git-send-email-sachin.kamat@linaro.org>
- <51EFB023.6090804@samsung.com>
- <CAK9yfHyMcyWJh6Jv0ZK1t=+hMhD44qE3WccaLnwFM=tK8ab6GQ@mail.gmail.com>
- <0eb101ce8865$60f1d920$22d58b60$@org>
-Message-ID: <51EFC74B.8000403@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Jul 2013 13:39:31 +0100
+Subject: [PATCH v2 07/22] ARM: Exynos4210: Remove '0x's from Exynos4110 DTSI
+ file
+In-Reply-To: <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130724123931.GL26801@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 02:00 PM, Kukjin Kim wrote:
-> Kukjin Kim wrote:
->> Sachin Kamat wrote:
-[...]
->>>>> @@ -1590,8 +1590,7 @@ config ARM_PSCI
->>>>>  config ARCH_NR_GPIO
->>>>>       int
->>>>>       default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
->>>>> -     default 512 if SOC_OMAP5
->>>>> -     default 512 if ARCH_KEYSTONE
->>>>> +     default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5
->>>>
->>>> Sorry, 512 seems a bit too generous to me. Also I would rather
->>>> leave each SOC/ARCH on a separate line.
->>>
->>> Even I had left it that way earlier. However Kukjin suggested the
->>> above (single line).
->>> I feel it is more of individual preference.
->>>
->> I know it is quite big but I think if we want to use the large number, I'd
->> preferred to use enough the large number so that we don't need to update
->> it soon. If so, multiple line is useless...
->>
->> Note, according to git log, for omap5, 256 is the accurately right number.
+... for the sake of consistency and assumed convention.
+    
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-If it's done similarly for other SoCs then I'm fine with change as above.
-256 entries is only about 3 kB anyway, it shouldn't be a big deal for
-systems using those SoCs.
-
->>>> Almost half of those 512 entries would have been unused in most
->>>> cases. How about, e.g. 352 ? If anyone finds this value too low
->>>> they could always submit a patch like this one. IMHO with 352 or
->>>> 392 there would be sufficient margin.
->>>
->> Hmm...
->>
->>> I agree. Again, I do not have any reservations here. I just went with
->>> maintainer's choice which was a superset of your and Tomasz's
->>> suggestions :)
->
-> If you have another opinion on this, please let me know before sending fixes
-> for 3.11 probably tomorrow morning in my time.
-
-I'm OK with that change. Sorry for the trouble.
-
---
-Thanks,
-Sylwester
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index b7f358a..53e2527 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -72,7 +72,7 @@
+                };
+        };
+ 
+-       clock: clock-controller at 0x10030000 {
++       clock: clock-controller at 10030000 {
+                compatible = "samsung,exynos4210-clock";
+                reg = <0x10030000 0x20000>;
+                #clock-cells = <1>;
