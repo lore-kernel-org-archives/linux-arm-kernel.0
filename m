@@ -1,35 +1,73 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 24 Jul 2013 13:31:00 -0500
-Subject: Do we have people interested in device tree janitoring / cleanup?
-In-Reply-To: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
-References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
-Message-ID: <51F01D64.9060609@gmail.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Wed, 24 Jul 2013 19:31:45 +0100
+Subject: Requirements for FDT load address on ARM
+In-Reply-To: <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
+References: <1374677923.6623.194.camel@hastur.hellion.org.uk>
+ <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
+Message-ID: <1374690705.30195.18.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 10:27 AM, Olof Johansson wrote:
-> Every now and then I come across a binding that's just done Wrong(tm),
-> merged through a submaintainer tree and hasn't seen proper review --
-> if it had, it wouldn't look the way it does. It's something we're
-> starting to address now since there's more people stepping up to be
-> maintainers, but there's a backlog of bad bindings already merged.
+On Wed, 2013-07-24 at 11:24 -0400, Nicolas Pitre wrote:
+> On Wed, 24 Jul 2013, Ian Campbell wrote:
 > 
-> Often they are produced by translating the platform_data structures
-> directly over into device-tree properties without consideration to
-> describing the hardware or usual conventions, using key/value pairs
-> instead of boolean properties, etc.
+> > [apologies if this is a repeat, I don't see it in the archives and at
+> > least one CC'd recipient (Julien) didn't receive it either. Beasties in
+> > our email server I expect...]
+> > 
+> > Are there any requirements about where the FDT may be loaded by the
+> > bootloader?
 > 
-> Getting involved in cleaning up these kind of bindings is a great way
-> to learn "the ways of device tree" for someone that has interest in
-> that.
-> 
-> Latest find in this area is the Maxim 8925 bindings, that I came
-> across since they caused a compile warning on some defconfig. I'll
-> post a patch to address the warning but if someone else feels like
-> fixing the bindings on top of it that would be appreciated!
+> It must be located where it is unlikely to be overwritten by the zImage 
+> decompressor relocating itself.  Same goes for the initrd.
 
-Are they documented typically? Can we at a minimum update the
-documentation with a big fat warning to not use or propagate the crap.
-Or move the binding doc file to a fixme directory.
+Right. That's a bit hard to determine programmaticaly from a bootloader
+though :-(
 
-Rob
+> > I'm finding that if I load it "too high" I get a fault (the specifics
+> > aren't that relevant but details are below).
+> 
+> Do you have commit 6f16f4998f98 in your kernel tree?
+
+It doesn't look like I do. The symptoms I'm seeing could well be
+explained by that lack.
+
+> > FWIW with RAM from 0x8000000-0xffffffff and a kernel loaded at 
+> > 0x80008000 "too high" means above somewhere around 0xaf800000.
+> 
+> Sorry, I don't understand the above sentence.
+> 
+> Is RAM actually starting at 0x08000000 ?
+
+Sorry, missed a zero, RAM starts at 0x80000000.
+
+What I was trying to say that in my empirical experience loading the fdt
+"too high" meant above 0xaf800000. Not actually terribly useful data
+TBH.
+
+>   Note that the kernel must be 
+> loaded in the first 128MB of RAM.
+
+> > I expect this is because the kernel doesn't use an explicit mapping of
+> > the fdt but expects it to be within the RAM directly mapped by the
+> > lowmem area (i.e. it uses phys_to_virt, since day one aka 93c02ab40ae6
+> > "arm/dt: probe for platforms via the device tree").
+> 
+> The fdt is expected to be located in lowmem.  So yes, that's actually a 
+> restriction.
+
+OK, that's good to know.
+
+> > This effectively
+> > limits the FDT to being within the first ~700MB (give or take based
+> > on .config etc, I suppose <500MB is a pretty safe rule of thumb). Is
+> > this expected or is it actually not intentional and the kernel should
+> > really be using an explicit mapping here? Should I send a patch against
+> > Documentation/arm/Booting?
+> 
+> Yes please.
+
+OK I'll try and put something together which I hope won't be too
+drastically wrong.
+
+Ian.
