@@ -1,91 +1,70 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 24 Jul 2013 10:40:18 +0200
-Subject: [PATCH] dma: edma: add device_slave_caps() support
-In-Reply-To: <FB20353E-4890-4462-A671-3587A3841B4A@ti.com>
-References: <1374597804-3961-1-git-send-email-joelf@ti.com>
- <51EF8A52.90902@metafoo.de> <51EF8C2B.2030409@ti.com>,
- <51EF8F4E.8080806@metafoo.de> <FB20353E-4890-4462-A671-3587A3841B4A@ti.com>
-Message-ID: <51EF92F2.3030405@metafoo.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 24 Jul 2013 17:46:38 +0900
+Subject: [PATCH] ARM: shmobile: marzen: Switch to DT_MACHINE_START
+In-Reply-To: <20130724073952.GD17045@verge.net.au>
+References: <20130724073042.28351.33041.sendpatchset@w520>
+ <20130724073952.GD17045@verge.net.au>
+Message-ID: <20130724084637.GA5774@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 10:28 AM, Fernandes, Joel wrote:
+On Wed, Jul 24, 2013 at 04:39:53PM +0900, Simon Horman wrote:
+> On Wed, Jul 24, 2013 at 04:30:42PM +0900, Magnus Damm wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > Convert the marzen board to use DT_MACHINE_START. With this in
+> > place all mach-shmobile boards use DT_MACHINE_START. Also, this
+> > makes it possible for the r8a7779 SMP code to use DT for CPUs.
+> > 
+> > So appended DTB is the way forward on this board.
 > 
-> On Jul 24, 2013, at 3:23 AM, "Lars-Peter Clausen" <lars@metafoo.de> wrote:
-> 
->> On 07/24/2013 10:11 AM, Joel Fernandes wrote:
->>> On 07/24/2013 03:03 AM, Lars-Peter Clausen wrote:
->>>> On 07/23/2013 06:43 PM, Joel Fernandes wrote:
->>>>> Implement device_slave_caps(). EDMA has a limited number of slots.
->>>>> Slave drivers such as omap_hsmmc will query the driver to make
->>>>> sure they don't pass in more than these many scatter segments.
->>>>>
->>>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
->>>>> ---
->>>>> Vinod, or Dan- If this patch looks ok, can you please merge in for
->>>>> -rc cycle? This patch is required to fix MMC support on AM33xx. This
->>>>> patch is blocking 3 other patches which fix various MMC things. Thanks!
->>>>>
->>>>> Notes:
->>>>> (1) this approach is temporary and only for -rc cycle to fix MMC on
->>>>> AM335x. It will be replace by the RFC series in future kernels:
->>>>> http://www.spinics.net/lists/arm-kernel/msg260094.html
->>>>>
->>>>> (2) Patch depends Vinod's patch at:
->>>>> http://permalink.gmane.org/gmane.linux.kernel/1525112
->>>>>
->>>>> drivers/dma/edma.c |    9 +++++++++
->>>>> 1 file changed, 9 insertions(+)
->>>>>
->>>>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
->>>>> index 7222cbe..81d5429 100644
->>>>> --- a/drivers/dma/edma.c
->>>>> +++ b/drivers/dma/edma.c
->>>>> @@ -517,6 +517,14 @@ static void edma_issue_pending(struct dma_chan *chan)
->>>>>    spin_unlock_irqrestore(&echan->vchan.lock, flags);
->>>>> }
->>>>>
->>>>> +static inline int edma_slave_caps(struct dma_chan *chan,
->>>>> +    struct dma_slave_caps *caps)
->>>>> +{
->>>>> +    caps->max_sg_nr = MAX_NR_SG;
->>>>
->>>> Hm, what about the other fields?
->>>
->>> Other fields are unused, the max segment size is supposed to be
->>> calculated "given" the address width and burst size. Since these
->>> can't be provided to get_caps, I have left it out for now.
->>> See: https://lkml.org/lkml/2013/3/6/464
->>
->> The PL330 driver is similar in this regard, the maximum segment size also
->> depends on address width and burst width. What I did for the get_slave_caps
->> implementation is to set it to the minimum maximum size. E.g. in you case
->> that should be SZ_64K - 1 (burstsize and addrwidth both set to 1).
-> 
-> So you're setting max to minimum maximum size? Isn't that like telling the driver that its segments can't be bigger than this... Unless I'm missing something..
+> Please supply a patch to update the defconfig accordingly.
 
-Yes. This is a limitation of the current slave_caps API. The maximum needs
-to be the maximum for all possible configurations. A specific configuration
-may allow a larger maximum. So we maybe have to extend the API to be able to
-query the limits for a certain configuration. Not sure what the best way
-would be to do that, either adding a config parameter to get_slave_caps or
-to break it into two functions like you proposed one for the static
-capabilities and one for the sg limits.
+In the course of testing this patch I created
+a patch to update the defconfig. I will post it with
+a patch to use DT for SMP but I have some questions about this patch.
 
-> 
->>
->>>
->>> Even if it did, the "segment size" itself is unused in the MMC driver
->>> that this is supposed to fix, unlike the "number of segments" which I'm
->>> populating above.
->>
->> E.g. for ALSA we'll need to know the max segment size, so I think it doesn't
->> hurt add this in this patch as well.
-> 
-> For alsa it would dma only the minimum max size even if the dma controller could do more?
-> 
+It seems to me that the following is also needed:
 
-Yes, but I think 64k is still plenty enough for the max period size. The
-current davinci PCM driver even claims to only support up to 8k.
+* Select USE_OF in Kconfig
+* Provide dt_compat in DT_MACHINE_START
+* Provide r8a7779-marzen dts
 
-- Lars
+I have a revised version of this patch which does the above.
+But I wanted to check with you that I am on the right track
+before posting it.
+
+
+Also, I think that once sh73a0 and r8a7779 uses DT for SMP we can remove
+shmobile_smp_init_cpus(). As you have posted a patch for sh73a0 I have
+prepated a patch for r8a7779 I have also prepared a patch to remove
+shmobile_smp_init_cpus().
+
+My plan is to post all relevant patches as a series once
+my questions above are resolved.
+
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > ---
+> > 
+> >  Written on top of renesas-devel-20130724
+> > 
+> >  arch/arm/mach-shmobile/board-marzen.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > --- 0001/arch/arm/mach-shmobile/board-marzen.c
+> > +++ work/arch/arm/mach-shmobile/board-marzen.c	2013-07-24 15:45:39.000000000 +0900
+> > @@ -238,7 +238,7 @@ static void __init marzen_init(void)
+> >  	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+> >  }
+> >  
+> > -MACHINE_START(MARZEN, "marzen")
+> > +DT_MACHINE_START(MARZEN, "marzen")
+> >  	.smp		= smp_ops(r8a7779_smp_ops),
+> >  	.map_io		= r8a7779_map_io,
+> >  	.init_early	= r8a7779_add_early_devices,
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
