@@ -1,76 +1,87 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 11:37:28 -0700
-Subject: [PATCH 1/4] msm_serial: Fix NUL byte output on UARTDM
+Date: Wed, 24 Jul 2013 11:37:29 -0700
+Subject: [PATCH 2/4] msm_serial: Fix sparse warnings
 In-Reply-To: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
 References: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1374691051-28544-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374691051-28544-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UARTDM serial devices require us to wait for the entire TX fifo
-to drain before we can change the contents of the NCF_TX
-register. Furthermore, if we write any characters to the TX fifo
-within the same clock cycle of changing the NCF_TX register the
-NCF_TX register won't latch properly.
+drivers/tty/serial/msm_serial.c:302:6: warning: symbol 'msm_set_mctrl' was
+not declared. Should it be static?
+drivers/tty/serial/msm_serial.c:597:17: warning: incorrect type in argument 2
+(different address spaces)
+drivers/tty/serial/msm_serial.c:597:17: expected void volatile [noderef] <asn:2>*addr
+drivers/tty/serial/msm_serial.c:597:17: got unsigned int *
+drivers/tty/serial/msm_serial.c:608:33: warning: incorrect type in argument 1
+(different address spaces)
+drivers/tty/serial/msm_serial.c:608:33: expected void volatile [noderef] <asn:2>*addr
+drivers/tty/serial/msm_serial.c:608:33: got unsigned int *gsbi_base
+drivers/tty/serial/msm_serial.c:648:37: warning: incorrect type in assignment
+(different address spaces)
+drivers/tty/serial/msm_serial.c:648:37: expected unsigned int *gsbi_base
+drivers/tty/serial/msm_serial.c:648:37: got void [noderef] <asn:2>*
 
-To fix these issues we should read back the NCF_TX register to
-delay any TX fifo accesses by a clock cycle and we should wait
-for the TX fifo to drain (instead of just waiting for the fifo to
-be ready to receive more characters). Failure to do so leads to
-random NUL bytes interspersed in the output.
+Mark the ioremapped memory as __iomem and use writel instead of
+iowrite because we're not dealing with PCI devices. Also, mark
+msm_set_mctrl() static because it isn't used outside this file.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/tty/serial/msm_serial.c | 14 +++++++++-----
- drivers/tty/serial/msm_serial.h |  1 +
- 2 files changed, 10 insertions(+), 5 deletions(-)
+ drivers/tty/serial/msm_serial.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index 2c6cfb3..fa3fc67 100644
+index fa3fc67..cab4105 100644
 --- a/drivers/tty/serial/msm_serial.c
 +++ b/drivers/tty/serial/msm_serial.c
-@@ -50,11 +50,14 @@ struct msm_port {
+@@ -45,7 +45,7 @@ struct msm_port {
+ 	struct clk		*clk;
+ 	struct clk		*pclk;
+ 	unsigned int		imr;
+-	unsigned int            *gsbi_base;
++	void __iomem		*gsbi_base;
+ 	int			is_uartdm;
  	unsigned int		old_snap_state;
  };
- 
--static inline void wait_for_xmitr(struct uart_port *port, int bits)
-+static inline void wait_for_xmitr(struct uart_port *port)
- {
--	if (!(msm_read(port, UART_SR) & UART_SR_TX_EMPTY))
--		while ((msm_read(port, UART_ISR) & bits) != bits)
--			cpu_relax();
-+	while (!(msm_read(port, UART_SR) & UART_SR_TX_EMPTY)) {
-+		if (msm_read(port, UART_ISR) & UART_ISR_TX_READY)
-+			break;
-+		udelay(1);
-+	}
-+	msm_write(port, UART_CR_CMD_RESET_TX_READY, UART_CR);
+@@ -299,7 +299,7 @@ static void msm_reset(struct uart_port *port)
+ 	msm_write(port, UART_CR_CMD_SET_RFR, UART_CR);
  }
  
- static void msm_stop_tx(struct uart_port *port)
-@@ -194,8 +197,9 @@ static void handle_rx(struct uart_port *port)
- 
- static void reset_dm_count(struct uart_port *port)
+-void msm_set_mctrl(struct uart_port *port, unsigned int mctrl)
++static void msm_set_mctrl(struct uart_port *port, unsigned int mctrl)
  {
--	wait_for_xmitr(port, UART_ISR_TX_READY);
-+	wait_for_xmitr(port);
- 	msm_write(port, 1, UARTDM_NCF_TX);
-+	msm_read(port, UARTDM_NCF_TX);
+ 	unsigned int mr;
+ 	mr = msm_read(port, UART_MR1);
+@@ -593,12 +593,10 @@ static void msm_release_port(struct uart_port *port)
+ 	port->membase = NULL;
+ 
+ 	if (msm_port->gsbi_base) {
+-		iowrite32(GSBI_PROTOCOL_IDLE, msm_port->gsbi_base +
+-			  GSBI_CONTROL);
+-
+-		gsbi_resource = platform_get_resource(pdev,
+-							IORESOURCE_MEM, 1);
++		writel_relaxed(GSBI_PROTOCOL_IDLE,
++				msm_port->gsbi_base + GSBI_CONTROL);
+ 
++		gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+ 		if (unlikely(!gsbi_resource))
+ 			return;
+ 
+@@ -670,10 +668,9 @@ static void msm_config_port(struct uart_port *port, int flags)
+ 		if (ret)
+ 			return;
+ 	}
+-
+ 	if (msm_port->is_uartdm)
+-		iowrite32(GSBI_PROTOCOL_UART, msm_port->gsbi_base +
+-			  GSBI_CONTROL);
++		writel_relaxed(GSBI_PROTOCOL_UART,
++				msm_port->gsbi_base + GSBI_CONTROL);
  }
  
- static void handle_tx(struct uart_port *port)
-diff --git a/drivers/tty/serial/msm_serial.h b/drivers/tty/serial/msm_serial.h
-index e4acef5..15c186e 100644
---- a/drivers/tty/serial/msm_serial.h
-+++ b/drivers/tty/serial/msm_serial.h
-@@ -71,6 +71,7 @@
- #define UART_CR_CMD_RESET_RFR		(14 << 4)
- #define UART_CR_CMD_PROTECTION_EN	(16 << 4)
- #define UART_CR_CMD_STALE_EVENT_ENABLE	(80 << 4)
-+#define UART_CR_CMD_RESET_TX_READY	(3 << 8)
- #define UART_CR_TX_DISABLE		(1 << 3)
- #define UART_CR_TX_ENABLE		(1 << 2)
- #define UART_CR_RX_DISABLE		(1 << 1)
+ static int msm_verify_port(struct uart_port *port, struct serial_struct *ser)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
