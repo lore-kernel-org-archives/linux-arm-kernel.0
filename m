@@ -1,197 +1,98 @@
-From: gururaja.hebbar@ti.com (Gururaja Hebbar)
-Date: Wed, 24 Jul 2013 18:44:56 +0530
-Subject: [Patch V2 3/4] rtc: omap: add rtc wakeup support to alarm events
-In-Reply-To: <1372841225-18813-4-git-send-email-gururaja.hebbar@ti.com>
-References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
- <1372841225-18813-4-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <51EFD350.4030500@ti.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 24 Jul 2013 15:15:12 +0200
+Subject: [PATCH 06/14] sh-pfc: r8a7790: Swap SCIFA2_RXD_B and HRX0_C
+ configurations
+In-Reply-To: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1374671720-8794-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+From: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 
-On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
-> On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
-> is available to enable Alarm Wakeup feature. This register needs to be
-> properly handled for the rtcwake to work properly.
->
-> Platforms using such IP should set "ti,am3352-rtc" in rtc device dt
-> compatibility node.
+The SCIFA2 RXD_B and HRX0_C pins have their pinmux configuration data
+swapped, fix it.
 
-I just checked that the 1st patch in this series is pulled in and this
-patch [3/4] is not pulled . If you do not have any comments, can you 
-pull this one also. I have already got Acks from Sekhar & Kevin for the 
-same.
+Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-Thanks & regards
-Gururaja
-
->
-> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: rtc-linux at googlegroups.com
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-doc at vger.kernel.org
-> ---
-> Changes in V2:
-> 	- Coding style corrections (use lower case for hex numbers)
-> 	- use "[AM/am]3352" instead of "[AM/am]335x" to keep the all
-> 	  usages in sync.
-> 	- Use index defined for struct members so they remain in sync
->
-> :100644 100644 b47aa41... 5a0f02d... M	Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> :100644 100644 761919d... c2e18fe... M	drivers/rtc/rtc-omap.c
->   Documentation/devicetree/bindings/rtc/rtc-omap.txt |    6 +-
->   drivers/rtc/rtc-omap.c                             |   60 +++++++++++++++++---
->   2 files changed, 57 insertions(+), 9 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> index b47aa41..5a0f02d 100644
-> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> @@ -1,7 +1,11 @@
->   TI Real Time Clock
->
->   Required properties:
-> -- compatible: "ti,da830-rtc"
-> +- compatible:
-> +	- "ti,da830-rtc"  - for RTC IP used similar to that on DA8xx SoC family.
-> +	- "ti,am3352-rtc" - for RTC IP used similar to that on AM335x SoC family.
-> +			    This RTC IP has special WAKE-EN Register to enable
-> +			    Wakeup generation for event Alarm.
->   - reg: Address range of rtc register set
->   - interrupts: rtc timer, alarm interrupts in order
->   - interrupt-parent: phandle for the interrupt controller
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index 761919d..c2e18fe 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -72,6 +72,8 @@
->   #define OMAP_RTC_KICK0_REG		0x6c
->   #define OMAP_RTC_KICK1_REG		0x70
->
-> +#define OMAP_RTC_IRQWAKEEN		0x7c
-> +
->   /* OMAP_RTC_CTRL_REG bit fields: */
->   #define OMAP_RTC_CTRL_SPLIT		(1<<7)
->   #define OMAP_RTC_CTRL_DISABLE		(1<<6)
-> @@ -96,12 +98,21 @@
->   #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
->   #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
->
-> +/* OMAP_RTC_IRQWAKEEN bit fields: */
-> +#define OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN    (1<<1)
-> +
->   /* OMAP_RTC_KICKER values */
->   #define	KICK0_VALUE			0x83e70b13
->   #define	KICK1_VALUE			0x95a4f1e0
->
->   #define	OMAP_RTC_HAS_KICKER		0x1
->
-> +/*
-> + * Few RTC IP revisions has special WAKE-EN Register to enable Wakeup
-> + * generation for event Alarm.
-> + */
-> +#define	OMAP_RTC_HAS_IRQWAKEEN		0x2
-> +
->   static void __iomem	*rtc_base;
->
->   #define rtc_read(addr)		readb(rtc_base + (addr))
-> @@ -301,12 +312,18 @@ static struct rtc_class_ops omap_rtc_ops = {
->   static int omap_rtc_alarm;
->   static int omap_rtc_timer;
->
-> -#define	OMAP_RTC_DATA_DA830_IDX	1
-> +#define	OMAP_RTC_DATA_AM3352_IDX	1
-> +#define	OMAP_RTC_DATA_DA830_IDX		2
->
->   static struct platform_device_id omap_rtc_devtype[] = {
->   	{
->   		.name	= DRIVER_NAME,
-> -	}, {
-> +	},
-> +	[OMAP_RTC_DATA_AM3352_IDX] = {
-> +		.name	= "am3352-rtc",
-> +		.driver_data = OMAP_RTC_HAS_KICKER | OMAP_RTC_HAS_IRQWAKEEN,
-> +	},
-> +	[OMAP_RTC_DATA_DA830_IDX] = {
->   		.name	= "da830-rtc",
->   		.driver_data = OMAP_RTC_HAS_KICKER,
->   	},
-> @@ -318,6 +335,9 @@ static const struct of_device_id omap_rtc_of_match[] = {
->   	{	.compatible	= "ti,da830-rtc",
->   		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
->   	},
-> +	{	.compatible	= "ti,am3352-rtc",
-> +		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_AM3352_IDX],
-> +	},
->   	{},
->   };
->   MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
-> @@ -466,16 +486,28 @@ static u8 irqstat;
->
->   static int omap_rtc_suspend(struct device *dev)
->   {
-> +	u8 irqwake_stat;
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	const struct platform_device_id *id_entry =
-> +					platform_get_device_id(pdev);
-> +
->   	irqstat = rtc_read(OMAP_RTC_INTERRUPTS_REG);
->
->   	/* FIXME the RTC alarm is not currently acting as a wakeup event
-> -	 * source, and in fact this enable() call is just saving a flag
-> -	 * that's never used...
-> +	 * source on some platforms, and in fact this enable() call is just
-> +	 * saving a flag that's never used...
->   	 */
-> -	if (device_may_wakeup(dev))
-> +	if (device_may_wakeup(dev)) {
->   		enable_irq_wake(omap_rtc_alarm);
-> -	else
-> +
-> +		if (id_entry->driver_data & OMAP_RTC_HAS_IRQWAKEEN) {
-> +			irqwake_stat = rtc_read(OMAP_RTC_IRQWAKEEN);
-> +			irqwake_stat |= OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN;
-> +			rtc_write(irqwake_stat, OMAP_RTC_IRQWAKEEN);
-> +		}
-> +	} else {
->   		rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
-> +	}
->
->   	/* Disable the clock/module */
->   	pm_runtime_put_sync(dev);
-> @@ -485,13 +517,25 @@ static int omap_rtc_suspend(struct device *dev)
->
->   static int omap_rtc_resume(struct device *dev)
->   {
-> +	u8 irqwake_stat;
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	const struct platform_device_id *id_entry =
-> +				platform_get_device_id(pdev);
-> +
->   	/* Enable the clock/module so that we can access the registers */
->   	pm_runtime_get_sync(dev);
->
-> -	if (device_may_wakeup(dev))
-> +	if (device_may_wakeup(dev)) {
->   		disable_irq_wake(omap_rtc_alarm);
-> -	else
-> +
-> +		if (id_entry->driver_data & OMAP_RTC_HAS_IRQWAKEEN) {
-> +			irqwake_stat = rtc_read(OMAP_RTC_IRQWAKEEN);
-> +			irqwake_stat &= ~OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN;
-> +			rtc_write(irqwake_stat, OMAP_RTC_IRQWAKEEN);
-> +		}
-> +	} else {
->   		rtc_write(irqstat, OMAP_RTC_INTERRUPTS_REG);
-> +	}
->   	return 0;
->   }
->   #endif
->
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+index 350b076..b06d36c 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+@@ -464,7 +464,7 @@ enum {
+ 	FN_LCDOUT21, FN_MSIOF0_SCK, FN_TS_SDAT0, FN_ADICLK,
+ 	FN_DU2_DB6, FN_LCDOUT22, FN_MSIOF0_SYNC, FN_TS_SCK0,
+ 	FN_SSI_SCK2, FN_ADIDATA, FN_DU2_DB7, FN_LCDOUT23,
+-	FN_SCIFA2_RXD_B, FN_MSIOF0_SS1, FN_ADICHS0,
++	FN_HRX0_C, FN_MSIOF0_SS1, FN_ADICHS0,
+ 	FN_DU2_DG5, FN_LCDOUT13, FN_MSIOF0_TXD, FN_ADICHS1,
+ 	FN_DU2_DG6, FN_LCDOUT14,
+ 
+@@ -472,7 +472,7 @@ enum {
+ 	FN_MSIOF0_SS2, FN_AUDIO_CLKOUT, FN_ADICHS2,
+ 	FN_DU2_DISP, FN_QPOLA, FN_HTX0_C, FN_SCIFA2_TXD_B,
+ 	FN_MSIOF0_RXD, FN_TS_SPSYNC0, FN_SSI_WS2,
+-	FN_ADICS_SAMP, FN_DU2_CDE, FN_QPOLB, FN_HRX0_C,
++	FN_ADICS_SAMP, FN_DU2_CDE, FN_QPOLB, FN_SCIFA2_RXD_B,
+ 	FN_USB1_PWEN, FN_AUDIO_CLKOUT_D, FN_USB1_OVC,
+ 	FN_TCLK1_B,
+ 
+@@ -827,14 +827,14 @@ enum {
+ 	LCDOUT21_MARK, MSIOF0_SCK_MARK, TS_SDAT0_MARK, ADICLK_MARK,
+ 	DU2_DB6_MARK, LCDOUT22_MARK, MSIOF0_SYNC_MARK, TS_SCK0_MARK,
+ 	SSI_SCK2_MARK, ADIDATA_MARK, DU2_DB7_MARK, LCDOUT23_MARK,
+-	SCIFA2_RXD_B_MARK, MSIOF0_SS1_MARK, ADICHS0_MARK,
++	HRX0_C_MARK, MSIOF0_SS1_MARK, ADICHS0_MARK,
+ 	DU2_DG5_MARK, LCDOUT13_MARK, MSIOF0_TXD_MARK, ADICHS1_MARK,
+ 	DU2_DG6_MARK, LCDOUT14_MARK,
+ 
+ 	MSIOF0_SS2_MARK, AUDIO_CLKOUT_MARK, ADICHS2_MARK,
+ 	DU2_DISP_MARK, QPOLA_MARK, HTX0_C_MARK, SCIFA2_TXD_B_MARK,
+ 	MSIOF0_RXD_MARK, TS_SPSYNC0_MARK, SSI_WS2_MARK,
+-	ADICS_SAMP_MARK, DU2_CDE_MARK, QPOLB_MARK, HRX0_C_MARK,
++	ADICS_SAMP_MARK, DU2_CDE_MARK, QPOLB_MARK, SCIFA2_RXD_B_MARK,
+ 	USB1_PWEN_MARK, AUDIO_CLKOUT_D_MARK, USB1_OVC_MARK,
+ 	TCLK1_B_MARK,
+ 	PINMUX_MARK_END,
+@@ -1742,7 +1742,7 @@ static const pinmux_enum_t pinmux_data[] = {
+ 	PINMUX_IPSR_DATA(IP15_25_23, ADIDATA),
+ 	PINMUX_IPSR_DATA(IP15_25_23, DU2_DB7),
+ 	PINMUX_IPSR_DATA(IP15_25_23, LCDOUT23),
+-	PINMUX_IPSR_MODSEL_DATA(IP15_25_23, SCIFA2_RXD_B, SEL_SCIFA2_1),
++	PINMUX_IPSR_MODSEL_DATA(IP15_25_23, HRX0_C, SEL_SCIFA2_1),
+ 	PINMUX_IPSR_MODSEL_DATA(IP15_27_26, MSIOF0_SS1, SEL_SOF0_0),
+ 	PINMUX_IPSR_DATA(IP15_27_26, ADICHS0),
+ 	PINMUX_IPSR_DATA(IP15_27_26, DU2_DG5),
+@@ -1765,7 +1765,7 @@ static const pinmux_enum_t pinmux_data[] = {
+ 	PINMUX_IPSR_DATA(IP16_5_3, ADICS_SAMP),
+ 	PINMUX_IPSR_DATA(IP16_5_3, DU2_CDE),
+ 	PINMUX_IPSR_DATA(IP16_5_3, QPOLB),
+-	PINMUX_IPSR_MODSEL_DATA(IP16_5_3, HRX0_C, SEL_HSCIF0_2),
++	PINMUX_IPSR_MODSEL_DATA(IP16_5_3, SCIFA2_RXD_B, SEL_HSCIF0_2),
+ 	PINMUX_IPSR_DATA(IP16_6, USB1_PWEN),
+ 	PINMUX_IPSR_DATA(IP16_6, AUDIO_CLKOUT_D),
+ 	PINMUX_IPSR_DATA(IP16_7, USB1_OVC),
+@@ -3753,7 +3753,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+ 		FN_MSIOF0_SS1, FN_ADICHS0, FN_DU2_DG5, FN_LCDOUT13,
+ 		/* IP15_25_23 [3] */
+ 		FN_MSIOF0_SYNC, FN_TS_SCK0, FN_SSI_SCK2, FN_ADIDATA,
+-		FN_DU2_DB7, FN_LCDOUT23, FN_SCIFA2_RXD_B, 0,
++		FN_DU2_DB7, FN_LCDOUT23, FN_HRX0_C, 0,
+ 		/* IP15_22_20 [3] */
+ 		FN_MSIOF0_SCK, FN_TS_SDAT0, FN_ADICLK,
+ 		FN_DU2_DB6, FN_LCDOUT22, 0, 0, 0,
+@@ -3804,7 +3804,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+ 		FN_USB1_PWEN, FN_AUDIO_CLKOUT_D,
+ 		/* IP16_5_3 [3] */
+ 		FN_MSIOF0_RXD, FN_TS_SPSYNC0, FN_SSI_WS2,
+-		FN_ADICS_SAMP, FN_DU2_CDE, FN_QPOLB, FN_HRX0_C, 0,
++		FN_ADICS_SAMP, FN_DU2_CDE, FN_QPOLB, FN_SCIFA2_RXD_B, 0,
+ 		/* IP16_2_0 [3] */
+ 		FN_MSIOF0_SS2, FN_AUDIO_CLKOUT, FN_ADICHS2,
+ 		FN_DU2_DISP, FN_QPOLA, FN_HTX0_C, FN_SCIFA2_TXD_B, 0, }
+-- 
+1.8.1.5
