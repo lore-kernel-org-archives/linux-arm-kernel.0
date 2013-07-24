@@ -1,29 +1,87 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 25 Jul 2013 00:15:49 +0900
-Subject: ARM CPU Hotplug breakage on mach-shmobile and KZM9D
-Message-ID: <CANqRtoRx7voEVwJG8UNNy_Jiixo=uRJCvxTD0bZdzVohoryBUA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 24 Jul 2013 17:16:39 +0200
+Subject: [PATCH 1/4] ARM: exynos: cpuidle: Fallback to WFI,
+ when AFTR is selected
+In-Reply-To: <1566146.MINY8cDBRi@flatron>
+References: <1374152070-21008-1-git-send-email-daniel.lezcano@linaro.org>
+ <1566146.MINY8cDBRi@flatron>
+Message-ID: <2640946.7q3KRPlDWo@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
 
-Bad news: CPU Hotplug on KZM9D seems broken on recent kernels.
+On Wednesday, July 24, 2013 10:32:47 AM Tomasz Figa wrote:
+> Hi Daniel,
+> 
+> On Thursday 18 of July 2013 14:54:27 Daniel Lezcano wrote:
+> > When there are several cpus online, the AFTR state does not work.
+> > 
+> > The AFTR must be selected only when there is one cpu online.
+> > 
+> > The previous code was already handling this case.
+> > 
+> > Simplified the code, especially the init routine to have the same init
+> > pattern than the other drivers.
+> > 
+> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > ---
+> >  arch/arm/mach-exynos/cpuidle.c |   13 ++-----------
+> >  1 file changed, 2 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-exynos/cpuidle.c
+> > b/arch/arm/mach-exynos/cpuidle.c index 17a18ff..cc4b097 100644
+> > --- a/arch/arm/mach-exynos/cpuidle.c
+> > +++ b/arch/arm/mach-exynos/cpuidle.c
+> > @@ -147,16 +147,11 @@ static int exynos4_enter_lowpower(struct
+> > cpuidle_device *dev, struct cpuidle_driver *drv,
+> >  				int index)
+> >  {
+> > -	int new_index = index;
+> > -
+> >  	/* This mode only can be entered when other core's are offline */
+> >  	if (num_online_cpus() > 1)
+> > -		new_index = drv->safe_state_index;
+> > +		return drv->states[0].enter(dev, drv, 0);
+> > 
+> > -	if (new_index == 0)
+> > -		return arm_cpuidle_simple_enter(dev, drv, new_index);
+> > -	else
+> > -		return exynos4_enter_core0_aftr(dev, drv, new_index);
+> > +	return exynos4_enter_core0_aftr(dev, drv, index);
+> >  }
+> > 
+> >  static void __init exynos5_core_down_clk(void)
+> > @@ -209,10 +204,6 @@ static int __init exynos4_init_cpuidle(void)
+> >  		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+> >  		device->cpu = cpu_id;
+> > 
+> > -		/* Support IDLE only */
+> > -		if (cpu_id != 0)
+> > -			device->state_count = 1;
+> > -
+> 
+> Are you sure that this is okay? It means, assuming that you have CPU0 
+> hotplug enabled, that you can enter the AFTR state if _any_ single core 
+> remains plugged in, which is technically possible, but then wake-up will 
+> occur on CPU0, which is not what cpuidle and hotplug code expect.
 
-On renesas-next-20130710 or earlier I can perform the following:
+I worry that the current code is already broken in this respect as cpuidle
+core is using driver->state_count for everything except creating/destroying
+sysfs state entries. This is probably something that needs to be fixed in
+the cpuidle core (I suspect that governors should use device->state_count
+instead of driver->state_count but it would need confirmation from someone
+that knows this code better) but in the meantime it could be fixed by adding
+CPU0 check to exynos4_enter_lowpower() (if the last CPU != 0 then don't go
+into AFTR mode).
 
-# echo 0 > /sys/devices/system/cpu/cpu1/online
-CPU1: shutdown
-# echo 1 > /sys/devices/system/cpu/cpu1/online
-CPU1: Booted secondary processor
-#
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-While on more recent kernels the hotplug boot fails. This may be
-related to the move to v3.11-rc. The tag renesas-next-20130710
-surprisingly seems to be the final kernel based on v3.10-rc before
-jumping to v3.11-rc.
-
-I wonder, do other ARM platforms have working CPU Hotplug in v3.11-rc?
-
-Cheers,
-
-/ magnus
+> P.S. Please keep linux-samsung-soc at vger.kernel.org mailing list on Cc for 
+> patches related to Samsung SoCs.
+> 
+> Best regards,
+> Tomasz
