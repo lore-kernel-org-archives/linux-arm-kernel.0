@@ -1,98 +1,95 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 24 Jul 2013 21:15:23 +0200
-Subject: [PATCH] dma: edma: add device_slave_caps() support
-In-Reply-To: <51F0231C.7000401@ti.com>
-References: <1374597804-3961-1-git-send-email-joelf@ti.com>
- <51EF8A52.90902@metafoo.de> <51EF8C2B.2030409@ti.com>,
- <51EF8F4E.8080806@metafoo.de> <FB20353E-4890-4462-A671-3587A3841B4A@ti.com>
- <51EF92F2.3030405@metafoo.de> <51F0231C.7000401@ti.com>
-Message-ID: <51F027CB.2050608@metafoo.de>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 24 Jul 2013 21:21:43 +0200
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
+ with ARM CPU
+In-Reply-To: <CADjby3WGW6f=1Vdm2kx+Re0KrjFRaC3dQOumpnS6_sp2yb5NfQ@mail.gmail.com>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+ <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
+ <20130723184907.GA6811@ohporter.com>
+ <CAGVrzcbA72AYu6J3JXBirQQeTiDH9cJThdBdH=Q=gJtOnqz-AA@mail.gmail.com>
+ <20130723192203.GC6811@ohporter.com> <51EF1B8C.9020304@broadcom.com>
+ <CADjby3WGW6f=1Vdm2kx+Re0KrjFRaC3dQOumpnS6_sp2yb5NfQ@mail.gmail.com>
+Message-ID: <51F02947.7020301@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 08:55 PM, Joel Fernandes wrote:
-> On 07/24/2013 03:40 AM, Lars-Peter Clausen wrote:
->> On 07/24/2013 10:28 AM, Fernandes, Joel wrote:
->>>
->>> On Jul 24, 2013, at 3:23 AM, "Lars-Peter Clausen" <lars@metafoo.de> wrote:
->>>
->>>> On 07/24/2013 10:11 AM, Joel Fernandes wrote:
->>>>> On 07/24/2013 03:03 AM, Lars-Peter Clausen wrote:
->>>>>> On 07/23/2013 06:43 PM, Joel Fernandes wrote:
->>>>>>> Implement device_slave_caps(). EDMA has a limited number of slots.
->>>>>>> Slave drivers such as omap_hsmmc will query the driver to make
->>>>>>> sure they don't pass in more than these many scatter segments.
->>>>>>>
->>>>>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
->>>>>>> ---
->>>>>>> Vinod, or Dan- If this patch looks ok, can you please merge in for
->>>>>>> -rc cycle? This patch is required to fix MMC support on AM33xx. This
->>>>>>> patch is blocking 3 other patches which fix various MMC things. Thanks!
->>>>>>>
->>>>>>> Notes:
->>>>>>> (1) this approach is temporary and only for -rc cycle to fix MMC on
->>>>>>> AM335x. It will be replace by the RFC series in future kernels:
->>>>>>> http://www.spinics.net/lists/arm-kernel/msg260094.html
->>>>>>>
->>>>>>> (2) Patch depends Vinod's patch at:
->>>>>>> http://permalink.gmane.org/gmane.linux.kernel/1525112
->>>>>>>
->>>>>>> drivers/dma/edma.c |    9 +++++++++
->>>>>>> 1 file changed, 9 insertions(+)
->>>>>>>
->>>>>>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
->>>>>>> index 7222cbe..81d5429 100644
->>>>>>> --- a/drivers/dma/edma.c
->>>>>>> +++ b/drivers/dma/edma.c
->>>>>>> @@ -517,6 +517,14 @@ static void edma_issue_pending(struct dma_chan *chan)
->>>>>>>     spin_unlock_irqrestore(&echan->vchan.lock, flags);
->>>>>>> }
->>>>>>>
->>>>>>> +static inline int edma_slave_caps(struct dma_chan *chan,
->>>>>>> +    struct dma_slave_caps *caps)
->>>>>>> +{
->>>>>>> +    caps->max_sg_nr = MAX_NR_SG;
->>>>>>
->>>>>> Hm, what about the other fields?
+On 07/24/2013 02:44 AM, Domenico Andreoli wrote:
+> On Wednesday, July 24, 2013, Hauke Mehrtens <hauke@hauke-m.de
+> <mailto:hauke@hauke-m.de>> wrote:
+>> On 07/19/2013 03:36 AM, Domenico Andreoli wrote:
+>>> On Tue, Jul 16, 2013 at 05:35:21PM +0200, Hauke Mehrtens wrote:
+>>>> On 07/16/2013 05:20 PM, Thomas Petazzoni wrote:
 >>>>>
->>>>> Other fields are unused, the max segment size is supposed to be
->>>>> calculated "given" the address width and burst size. Since these
->>>>> can't be provided to get_caps, I have left it out for now.
->>>>> See: https://lkml.org/lkml/2013/3/6/464
->>>>
->>>> The PL330 driver is similar in this regard, the maximum segment size also
->>>> depends on address width and burst width. What I did for the get_slave_caps
->>>> implementation is to set it to the minimum maximum size. E.g. in you case
->>>> that should be SZ_64K - 1 (burstsize and addrwidth both set to 1).
+>>>>>> diff --git a/arch/arm/mach-bcm53xx/Kconfig
+> b/arch/arm/mach-bcm53xx/Kconfig
+>>>>>> new file mode 100644
+>>>>>> index 0000000..1e16e87
+>>>>>> --- /dev/null
+>>>>>> +++ b/arch/arm/mach-bcm53xx/Kconfig
+>>>>>> @@ -0,0 +1,10 @@
+>>>>>> +config ARCH_BCM53XX
+>>>>>> +  bool "Broadcom BCM47XX / BCM53XX ARM SoC"
+>>>>>
+>>>>> So the directory is named mach-bcm53xx, but you also handle BCM47xx
+>>>>> SoCs. This doesn't sound really easy to follow.
 >>>
->>> So you're setting max to minimum maximum size? Isn't that like telling the driver that its segments can't be bigger than this... Unless I'm missing something..
+>>> At the time of the BCM281XX merge we considered that such directories
+> would
+>>> mostly contain board files only, being these new entries DT based. Hence
+>>> the choice of mach-bcm to collect all of them.
+>>>
+>>> I think you should then put this stuff there.
 >>
->> Yes. This is a limitation of the current slave_caps API. The maximum needs
->> to be the maximum for all possible configurations. A specific configuration
->> may allow a larger maximum. So we maybe have to extend the API to be able to
->> query the limits for a certain configuration. Not sure what the best way
->> would be to do that, either adding a config parameter to get_slave_caps or
->> to break it into two functions like you proposed one for the static
->> capabilities and one for the sg limits.
->
-> I am OK with either approach as long as a decision can be made quickly
-> by maintainers. Right now lot of back and forth has happened and 3
-> different versions of the same thing have been posted since January.
-> Since this is such a trivial change, it doesn't make sense to spend so
-> much time on it IMO.... The sad part is though this change is trivial,
-> other drivers such as MMC are broken and cannot be enabled due to this.
-> We cannot afford to leave them broken.
+>> So you think I should move the file from
+>> arch/arm/mach-bcm53xx/bcm53xx.c to arch/arm/mach-bcm/bcm53xx.c ?
+> 
+> yes
+> 
+> this looks more comsistent with the actual soc name:
+> arch/arm/mach-bcm/bcm530xx.c
+> 
+> but I find also acceptable the complete name of the "parent" soc (as I'm
+> doing with the bcm4760), so: arch/arm/mach-bcm/bcm53010.c
 
-Well this is a new API, so it is kind of expected that there is some back and 
-forth and that there will be a few revisions.
+I do not think these Broadcom ARM SoCs (bcm4760, BCM5301X, bcm11351)
+have more in common than the vendor name, so I do not think it is a good
+idea to place them all at mach-bcm.
 
->
-> If Vinod is not available, can Dan please respond on how to proceed on
-> this? We really need this trivial change to go into this -rc cycle and
-> not delay it by another kernel release. Thank you.
+>> Most (All?) of the Router SoCs in the BCM53XX and BCM47XX line are from
+>> the same family and they should be supported by the same code, so there
+>> is no reason to have a bcm47xx.c and a bcm53xx.c.
+>>
+>>>> Yes the BCM53XX and BCM47XX SoCs are technically from the same line. I
+>>>> do not know why there are two different names, probably marketing.
+>>>>
+>>>> Earlier versions of these SoC lines (also BCM47XX and BCM53XX) used a
+>>>> MIPS core and they are supported by arch/mips/bcm47xx/. I use BCM53XX to
+>>>> not conflict with the MIPS part now. I know this could still cause
+>>>> problems and people will get confused, but I do not know a better name.
+>>>
+>>> I'll throw also BCM476x (bcm4760 and bcm4761) on the table. These are
+> ARM11,
+>>> single-core SoCs.
+>>>
+>>> Can we agree on a nice naming so that we actually clarify this silliness?
+>>
+>> We could name it BCM5301X like it is named the the vendor source code.
+>> Currently there are the following SoCs of this family available:
+>> BCM53010, BCM53011, BCM53012, BCM53014, BCM53015, BCM53016, BCM53017,
+>> BCM53018, BCM4707, BCM4708 and BCM4709.
+> 
+> There is not a clear single pattern here, whatever choice won't be 100%
+> right. Users will need to read some help to pick the right choice.
+> BCM53010? But mine is not a strong opinion.
+> 
+>> Internal there are two different
+>> chip IDs available 53010 (BCM4707) and 53018 (BCM53018).
+> 
+> what do you mean with "internal" here?
 
-This is not something you'd merge for rc3 or even later. If the MMC driver does 
-not work without this I guess it never worked, so strictly speaking there is no 
-regression and it is just a new feature.
+There is some register in the chip where the chipid is stored, according
+to the vendor code these two values are currently possible. This was
+changed for every generation with the MIPS SoCs, while one generation
+had some SoCs.
 
-- Lars
+Hauke
