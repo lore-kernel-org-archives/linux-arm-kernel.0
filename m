@@ -1,125 +1,197 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 24 Jul 2013 17:37:23 +0530
-Subject: [PATCH 6/8] ARM: mm: LPAE: Correct virt_to_phys patching for
- 64 bit physical addresses
-In-Reply-To: <51EFBF8F.4010201@ti.com>
-References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
- <1371858502-10083-7-git-send-email-santosh.shilimkar@ti.com>
- <alpine.LFD.2.03.1307231850350.15022@syhkavp.arg> <51EF356D.2050902@ti.com>
- <alpine.LFD.2.03.1307232222200.15022@syhkavp.arg> <51EFBF8F.4010201@ti.com>
-Message-ID: <51EFC37B.80906@ti.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 24 Jul 2013 21:13:38 +0900
+Subject: [RESEND PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to
+ exynos5250 common clock
+In-Reply-To: <CADGdYn5owUyCMzJSJQgzR6N0inLpm5Te09BvX0rvBZ1bx=bv=Q@mail.gmail.com>
+References: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
+ <1370501833-9196-1-git-send-email-amit.daniel@samsung.com>
+ <CADGdYn5owUyCMzJSJQgzR6N0inLpm5Te09BvX0rvBZ1bx=bv=Q@mail.gmail.com>
+Message-ID: <0eb301ce8867$3b12f430$b138dc90$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 July 2013 05:20 PM, Sricharan R wrote:
-> On Wednesday 24 July 2013 08:19 AM, Nicolas Pitre wrote:
->> On Tue, 23 Jul 2013, Santosh Shilimkar wrote:
->>
->>> On Tuesday 23 July 2013 09:10 PM, Nicolas Pitre wrote:
->>>> On Fri, 21 Jun 2013, Santosh Shilimkar wrote:
->>>>
->>>>> From: Sricharan R <r.sricharan@ti.com>
->>>>>
->>>>> The current phys_to_virt patching mechanism does not work
->>>>> for 64 bit physical addressesp. Note that constant used in add/sub
->>>>> instructions is encoded in to the last 8 bits of the opcode. So shift
->>>>> the _pv_offset constant by 24 to get it in to the correct place.
->>>>>
->>>>> The v2p patching mechanism patches the higher 32bits of physical
->>>>> address with a constant. While this is correct, in those platforms
->>>>> where the lowmem addressable physical memory spawns across 4GB boundary,
->>>>> a carry bit can be produced as a result of addition of lower 32bits.
->>>>> This has to be taken in to account and added in to the upper. The patched
->>>>> __pv_offset and va are added in lower 32bits, where __pv_offset can be
->>>>> in two's complement form when PA_START < VA_START and that can result
->>>>> in a false carry bit.
->>>>>
->>>>> e.g PA = 0x80000000 VA = 0xC0000000
->>>>> __pv_offset = PA - VA = 0xC0000000 (2's complement)
->>>>>
->>>>> So adding __pv_offset + VA should never result in a true overflow. So in
->>>>> order to differentiate between a true carry, a extra flag __pv_sign_flag
->>>>> is introduced.
->>> First of all thanks for the review.
->>>  
->>>> I'm still wondering if this is worth bothering about.
->>>>
->>>> If PA = 0x80000000 and VA = 0xC0000000 there will never be a real carry 
->>>> to propagate to the high word of the physical address as the VA space 
->>>> cannot be larger than 0x40000000.
->>>>
->>> Agreed.
->>>
->>>> So is there really a case where:
->>>>
->>>> 1) physical memory is crossing the 4GB mark, and ...
->>>>
->>>> 2) physical memory start address is higher than virtual memory start 
->>>>    address needing a carry due to the 32-bit add overflow?
->>>>
->>> Consider below two cases of memory layout apart from one mentioned
->>> above where the carry is bit irrelevant as you rightly said.
->>>
->>> 1) PA = 0x8_0000_0000, VA= 0xC000_0000, absolute pv_offset = 0x7_4000_0000
->> This can be patched as:
->>
->> 	mov	phys_hi, #0x8
->> 	add	phys_lo, virt, #0x40000000  @ carry ignored
->>
->>> 2) PA = 0x2_8000_0000, VA= 0xC000_000, absolute pv_offset = 0x1_C000_0000
->> 	mov	phys_hi, #0x2
->> 	add	phys_lo, virt, #0xc0000000  @ carry ignored
->>
->>> In both of these cases there a true carry which needs to be
->>> considered.
->> Well, not really.  However, if you have:
->>
->> 3) PA = 0x2_8000_0000, VA = 0x4000-0000, pv_offset = 0x2-4000-0000
->>
->> ... then you need:
->>
->> 	mov	phys_hi, #0x2
->> 	adds	phys_lo, virt, #0x40000000
->> 	adc	phys_hi, phys_hi, #0
->>
->> My question is: how likely is this?
->>
->> What is your actual physical memory start address?
->  Agreed.  In our case we do not have the Physical address crossing across
->   4GB. So ignoring the carry would have be been OK. But we are
->  also addressing the other case where it would really crossover.
->
->> If we really need to cope with the carry, then the __pv_sign_flag should 
->> instead be represented in pv_offset directly:
->>
->> Taking example #2 above, that would be:
->>
->> 	mov	phys_hi, #0x1
->> 	adds	phys_lo, virt, #0xc0000000
->> 	adc	phys_hi, phys_hi, #0
->>
->> If PA = 0x8000-0000 and VA = 0xc000-0000 then pv_offset is 
->> 0xffff-ffff-c000-0000, meaning:
->>
->> 	mvn	phys_hi, #0
->> 	add	phys_lo, virt, #0xc0000000
->> 	adc	phys_hi, phys_hi, #0
->>
->> So that would require a special case in the patching code where a mvn 
->> with 0 is used if the high part of pv_offset is 0xffffffff.
->>
->>
->> Nicolas
-> Extending pv_offset to 64bit is really neat way. When PA > VA, then pv_offset
-> is going to be actual value and not 2's complement. Fine here.
-> When running from higher physical address space, we will always fall here.
->
-> So for the second case where pv_offset is 0xffffffff .., (PA < VA)
-> is a problem only when we run from lower physical address. So we can safely
-> assume that the higher 32bits of PA are '0' and stub it initially. In this way we
-> can avoid the special case.
-   Sorry, I missed one more point here. In the second case,we should patch it with
-   0x0 when (PA > VA) and with 0xffffffff when (PA < VA).
+amit daniel kachhap wrote:
+> 
+> Hi Mike,
+> 
+> If possible please ack this patch or merge this via your tree.
+> 
+> Thanks,
+> Amit Daniel
+> 
+> On Thu, Jun 6, 2013 at 12:27 PM, Amit Daniel Kachhap
+> <amit.daniel@samsung.com> wrote:
+> > Now with common clock support added for exynos5250 it is necessary to
+> move
+> > this code to exynos5250 common clock driver as clock registers should be
+> > handled there. This change is tested in exynos5250 based arndale
+> platform.
+> >
+> > Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> > Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 
-Regards,
- Sricharan
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Mike, if you have any concerns on this, please let me know.
+
+Thanks,
+Kukjin
+
+> > ---
+> > Re-based against linux for-next branch.
+> >
+> >  arch/arm/mach-exynos/cpuidle.c       |   35
+----------------------------
+> >  drivers/clk/samsung/clk-exynos5250.c |   42
+> ++++++++++++++++++++++++++++++++++
+> >  2 files changed, 42 insertions(+), 35 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
+> exynos/cpuidle.c
+> > index 17a18ff..4667907 100644
+> > --- a/arch/arm/mach-exynos/cpuidle.c
+> > +++ b/arch/arm/mach-exynos/cpuidle.c
+> > @@ -159,46 +159,11 @@ static int exynos4_enter_lowpower(struct
+> cpuidle_device *dev,
+> >                 return exynos4_enter_core0_aftr(dev, drv, new_index);
+> >  }
+> >
+> > -static void __init exynos5_core_down_clk(void)
+> > -{
+> > -       unsigned int tmp;
+> > -
+> > -       /*
+> > -        * Enable arm clock down (in idle) and set arm divider
+> > -        * ratios in WFI/WFE state.
+> > -        */
+> > -       tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
+> > -             PWR_CTRL1_CORE1_DOWN_RATIO | \
+> > -             PWR_CTRL1_DIV2_DOWN_EN     | \
+> > -             PWR_CTRL1_DIV1_DOWN_EN     | \
+> > -             PWR_CTRL1_USE_CORE1_WFE    | \
+> > -             PWR_CTRL1_USE_CORE0_WFE    | \
+> > -             PWR_CTRL1_USE_CORE1_WFI    | \
+> > -             PWR_CTRL1_USE_CORE0_WFI;
+> > -       __raw_writel(tmp, EXYNOS5_PWR_CTRL1);
+> > -
+> > -       /*
+> > -        * Enable arm clock up (on exiting idle). Set arm divider
+> > -        * ratios when not in idle along with the standby duration
+> > -        * ratios.
+> > -        */
+> > -       tmp = PWR_CTRL2_DIV2_UP_EN       | \
+> > -             PWR_CTRL2_DIV1_UP_EN       | \
+> > -             PWR_CTRL2_DUR_STANDBY2_VAL | \
+> > -             PWR_CTRL2_DUR_STANDBY1_VAL | \
+> > -             PWR_CTRL2_CORE2_UP_RATIO   | \
+> > -             PWR_CTRL2_CORE1_UP_RATIO;
+> > -       __raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+> > -}
+> > -
+> >  static int __init exynos4_init_cpuidle(void)
+> >  {
+> >         int cpu_id, ret;
+> >         struct cpuidle_device *device;
+> >
+> > -       if (soc_is_exynos5250())
+> > -               exynos5_core_down_clk();
+> > -
+> >         ret = cpuidle_register_driver(&exynos4_idle_driver);
+> >         if (ret) {
+> >                 printk(KERN_ERR "CPUidle failed to register driver\n");
+> > diff --git a/drivers/clk/samsung/clk-exynos5250.c
+> b/drivers/clk/samsung/clk-exynos5250.c
+> > index 5c97e75..89f51e9 100644
+> > --- a/drivers/clk/samsung/clk-exynos5250.c
+> > +++ b/drivers/clk/samsung/clk-exynos5250.c
+> > @@ -21,6 +21,8 @@
+> >
+> >  #define SRC_CPU                        0x200
+> >  #define DIV_CPU0               0x500
+> > +#define PWR_CTRL1              0x1020
+> > +#define PWR_CTRL2              0x1024
+> >  #define SRC_CORE1              0x4204
+> >  #define SRC_TOP0               0x10210
+> >  #define SRC_TOP2               0x10218
+> > @@ -63,6 +65,23 @@
+> >  #define PLL_DIV2_SEL           0x20a24
+> >  #define GATE_IP_DISP1          0x10928
+> >
+> > +/*Below definitions are used for PWR_CTRL settings*/
+> > +#define PWR_CTRL1_CORE2_DOWN_RATIO             (7 << 28)
+> > +#define PWR_CTRL1_CORE1_DOWN_RATIO             (7 << 16)
+> > +#define PWR_CTRL1_DIV2_DOWN_EN                 (1 << 9)
+> > +#define PWR_CTRL1_DIV1_DOWN_EN                 (1 << 8)
+> > +#define PWR_CTRL1_USE_CORE1_WFE                        (1 << 5)
+> > +#define PWR_CTRL1_USE_CORE0_WFE                        (1 << 4)
+> > +#define PWR_CTRL1_USE_CORE1_WFI                        (1 << 1)
+> > +#define PWR_CTRL1_USE_CORE0_WFI                        (1 << 0)
+> > +
+> > +#define PWR_CTRL2_DIV2_UP_EN                   (1 << 25)
+> > +#define PWR_CTRL2_DIV1_UP_EN                   (1 << 24)
+> > +#define PWR_CTRL2_DUR_STANDBY2_VAL             (1 << 16)
+> > +#define PWR_CTRL2_DUR_STANDBY1_VAL             (1 << 8)
+> > +#define PWR_CTRL2_CORE2_UP_RATIO               (1 << 4)
+> > +#define PWR_CTRL2_CORE1_UP_RATIO               (1 << 0)
+> > +
+> >  /*
+> >   * Let each supported clock get a unique id. This id is used to lookup
+> the clock
+> >   * for device tree based platforms. The clocks are categorized into
+> three
+> > @@ -110,6 +129,8 @@ enum exynos5250_clks {
+> >  static __initdata unsigned long exynos5250_clk_regs[] = {
+> >         SRC_CPU,
+> >         DIV_CPU0,
+> > +       PWR_CTRL1,
+> > +       PWR_CTRL2,
+> >         SRC_CORE1,
+> >         SRC_TOP0,
+> >         SRC_TOP2,
+> > @@ -474,6 +495,7 @@ void __init exynos5250_clk_init(struct device_node
+> *np)
+> >  {
+> >         void __iomem *reg_base;
+> >         struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
+> > +       unsigned int tmp;
+> >
+> >         if (np) {
+> >                 reg_base = of_iomap(np, 0);
+> > @@ -516,6 +538,26 @@ void __init exynos5250_clk_init(struct device_node
+> *np)
+> >         samsung_clk_register_gate(exynos5250_gate_clks,
+> >                         ARRAY_SIZE(exynos5250_gate_clks));
+> >
+> > +       /*
+> > +        * Enable arm clock down (in idle) and set arm divider
+> > +        * ratios in WFI/WFE state.
+> > +        */
+> > +       tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
+> > +               PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
+> > +               PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
+> > +               PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
+> > +       __raw_writel(tmp, reg_base + PWR_CTRL1);
+> > +
+> > +       /*
+> > +        * Enable arm clock up (on exiting idle). Set arm divider
+> > +        * ratios when not in idle along with the standby duration
+> > +        * ratios.
+> > +        */
+> > +       tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
+> > +               PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL
+|
+> > +               PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
+> > +       __raw_writel(tmp, reg_base + PWR_CTRL2);
+> > +
+> >         pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+> >                         _get_rate("armclk"));
+> >  }
+> > --
+> > 1.7.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
