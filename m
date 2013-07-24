@@ -1,70 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 17:46:38 +0900
-Subject: [PATCH] ARM: shmobile: marzen: Switch to DT_MACHINE_START
-In-Reply-To: <20130724073952.GD17045@verge.net.au>
-References: <20130724073042.28351.33041.sendpatchset@w520>
- <20130724073952.GD17045@verge.net.au>
-Message-ID: <20130724084637.GA5774@verge.net.au>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 24 Jul 2013 14:13:25 +0530
+Subject: [PATCH v4 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+Message-ID: <1374655405-22998-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 04:39:53PM +0900, Simon Horman wrote:
-> On Wed, Jul 24, 2013 at 04:30:42PM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Convert the marzen board to use DT_MACHINE_START. With this in
-> > place all mach-shmobile boards use DT_MACHINE_START. Also, this
-> > makes it possible for the r8a7779 SMP code to use DT for CPUs.
-> > 
-> > So appended DTB is the way forward on this board.
-> 
-> Please supply a patch to update the defconfig accordingly.
+With the recent cleanup in Exynos platform code notably commits
+17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
+more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
+of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
+Exynos4412 which have more than the default number of GPIOs. Thus define
+this number in KConfig file which takes care of current SoC requirements
+and provides scope for GPIO expanders. Without this patch we get the
+following errors during boot:
 
-In the course of testing this patch I created
-a patch to update the defconfig. I will post it with
-a patch to use DT for SMP but I have some questions about this patch.
+gpiochip_add: gpios 251..258 (gpv0) failed to register
+samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
+error code: -22
+samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
 
-It seems to me that the following is also needed:
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: Tomasz Figa <t.figa@samsung.com>
+---
+Changes since v3:
+Rearranged different default values in single line.
+---
+ arch/arm/Kconfig |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-* Select USE_OF in Kconfig
-* Provide dt_compat in DT_MACHINE_START
-* Provide r8a7779-marzen dts
-
-I have a revised version of this patch which does the above.
-But I wanted to check with you that I am on the right track
-before posting it.
-
-
-Also, I think that once sh73a0 and r8a7779 uses DT for SMP we can remove
-shmobile_smp_init_cpus(). As you have posted a patch for sh73a0 I have
-prepated a patch for r8a7779 I have also prepared a patch to remove
-shmobile_smp_init_cpus().
-
-My plan is to post all relevant patches as a series once
-my questions above are resolved.
-
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > ---
-> > 
-> >  Written on top of renesas-devel-20130724
-> > 
-> >  arch/arm/mach-shmobile/board-marzen.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > --- 0001/arch/arm/mach-shmobile/board-marzen.c
-> > +++ work/arch/arm/mach-shmobile/board-marzen.c	2013-07-24 15:45:39.000000000 +0900
-> > @@ -238,7 +238,7 @@ static void __init marzen_init(void)
-> >  	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
-> >  }
-> >  
-> > -MACHINE_START(MARZEN, "marzen")
-> > +DT_MACHINE_START(MARZEN, "marzen")
-> >  	.smp		= smp_ops(r8a7779_smp_ops),
-> >  	.map_io		= r8a7779_map_io,
-> >  	.init_early	= r8a7779_add_early_devices,
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f8fb910..ac9fa38 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1590,8 +1590,7 @@ config ARM_PSCI
+ config ARCH_NR_GPIO
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+-	default 512 if SOC_OMAP5
+-	default 512 if ARCH_KEYSTONE
++	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5
+ 	default 392 if ARCH_U8500
+ 	default 352 if ARCH_VT8500
+ 	default 288 if ARCH_SUNXI
+-- 
+1.7.9.5
