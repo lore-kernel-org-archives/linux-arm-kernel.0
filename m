@@ -1,38 +1,70 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 24 Jul 2013 23:44:05 +0900
-Subject: [PATCH 0/3] sh-pfc: Don't include mach/*.h headers were not
- required
-In-Reply-To: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CANqRtoQHD9bk4uyAE9GAPvz_ZTLx1EtohFjaYhnetmwQ1Te1qg@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 24 Jul 2013 10:44:21 -0400
+Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
+In-Reply-To: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51EFE845.6010805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On 07/18/2013 07:21 PM, Stephen Boyd wrote:
+> This patchset adds support for 64 bit counters in the generic
+> sched_clock code and converts drivers over to use it. Based
+> on v3.11-rc1.
+> 
+> Changes since v3:
+>  * Move to use seqcount to fix issues with 64-bit cyc counters
+>  * Move to hrtimer to fix underflow/overflow errors in wraparound
+>    calculation
+>  * Use of 1 hour in clocks_calc_mult_shift
+>  * Converted over drivers in drivers/clocksource
+> 
+> Stephen Boyd (17):
+>   clocksource: Extract max nsec calculation into separate function
+>   sched_clock: Use seqcount instead of rolling our own
+>   sched_clock: Use an hrtimer instead of timer
+>   sched_clock: Add support for >32 bit sched_clock
+>   arch_timer: Move to generic sched_clock framework
+>   sched_clock: Remove sched_clock_func() hook
+>   clocksource: bcm2835: Switch to sched_clock_register()
+>   ocksource: dbx500-prcmu: Switch to sched_clock_register()
+>   clocksource: dw_apb_timer_of: Switch to sched_clock_register()
+>   clocksource: mxs_timer: Switch to sched_clock_register()
+>   clocksource: nomadik: Switch to sched_clock_register()
+>   clocksource: samsung_pwm_timer: Switch to sched_clock_register()
+>   clocksource: tegra: Switch to sched_clock_register()
+>   clocksource: time-armada-370-xp: Switch to sched_clock_register()
+>   clocksource: sirf: Switch to sched_clock_register() and use 64 bits
+>   clocksource: vf_pit_timer: Switch to sched_clock_register()
+>   sched_clock: Deprecate setup_sched_clock()
+> 
+>  arch/arm/kernel/arch_timer.c              |  14 ----
+>  arch/arm64/Kconfig                        |   1 +
+>  arch/arm64/kernel/time.c                  |  10 ---
+>  drivers/clocksource/arm_arch_timer.c      |   4 ++
+>  drivers/clocksource/bcm2835_timer.c       |   4 +-
+>  drivers/clocksource/clksrc-dbx500-prcmu.c |   5 +-
+>  drivers/clocksource/dw_apb_timer_of.c     |   4 +-
+>  drivers/clocksource/mxs_timer.c           |   4 +-
+>  drivers/clocksource/nomadik-mtu.c         |   4 +-
+>  drivers/clocksource/samsung_pwm_timer.c   |   4 +-
+>  drivers/clocksource/tegra20_timer.c       |   4 +-
+>  drivers/clocksource/time-armada-370-xp.c  |   4 +-
+>  drivers/clocksource/timer-prima2.c        |   6 +-
+>  drivers/clocksource/vf_pit_timer.c        |   4 +-
+>  include/linux/clocksource.h               |   2 +
+>  include/linux/sched_clock.h               |   7 +-
+>  kernel/time/clocksource.c                 |  45 ++++++++-----
+>  kernel/time/sched_clock.c                 | 105 +++++++++++++++---------------
+>  18 files changed, 116 insertions(+), 115 deletions(-)
+> 
 
-On Wed, Jul 24, 2013 at 10:09 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-> Hello,
->
-> The (long) road to multiplatform kernels requires getting rid of mach/*.h
-> headers in device drivers. This patch set removes some of the included mach
-> headers from the sh-pfc driver. The only remaining one is mach/irqs.h, to get
-> the irq_pin() macro. This will require more work, see [1] for a discussion of
-> the issue.
+I ran 32-bit and 64-bit kernels with these patches on the Versatile Express
+software model and things looked fine, so for the applicable patches,
 
-That's a blocker for some of the SoCs, right? I suppose the ones using
-a separate GPIO controller are OK as-is?
+Tested-by: Christopher Covington <cov@codeaurora.org>
 
-> The patches are based on v3.11-rc2. Linus, do you usually pick pinctrl patches
-> from the list, or should I send you a pull request ?
->
-> [1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg473450.html
->
-> Laurent Pinchart (3):
->   sh-pfc: Remove unneeded mach/<soc>.h includes
->   sh-pfc: sh7372: Replace <mach/irqs.h> with <linux/sh_intc.h>
->   sh-pfc: sh73a0: Remove EXT_IRQ16L and EXT_IRQ16H macros
-
-These are fine with me. Thanks for your help!
-
-Acked-by: Magnus Damm <damm@opensource.se>
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
