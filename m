@@ -1,57 +1,35 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 24 Jul 2013 15:09:26 +0200
-Subject: [PATCH 1/3] sh-pfc: Remove unneeded mach/<soc>.h includes
-In-Reply-To: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1374671368-4681-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Wed, 24 Jul 2013 15:09:25 +0200
+Subject: [PATCH 0/3] sh-pfc: Don't include mach/*.h headers were not required
+Message-ID: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC-specific mach/<soc>.h headers are included needlesly. Don't
-include them.
+Hello,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/pinctrl/sh-pfc/pfc-r8a73a4.c | 1 -
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 1 -
- drivers/pinctrl/sh-pfc/pfc-sh7372.c  | 1 -
- 3 files changed, 3 deletions(-)
+The (long) road to multiplatform kernels requires getting rid of mach/*.h
+headers in device drivers. This patch set removes some of the included mach
+headers from the sh-pfc driver. The only remaining one is mach/irqs.h, to get
+the irq_pin() macro. This will require more work, see [1] for a discussion of
+the issue.
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-index 82bf6ab..2b9c0b3 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-@@ -21,7 +21,6 @@
- #include <linux/kernel.h>
- #include <linux/pinctrl/pinconf-generic.h>
- #include <mach/irqs.h>
--#include <mach/r8a73a4.h>
- 
- #include "core.h"
- #include "sh_pfc.h"
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index f6ea47c..6a7d382 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -22,7 +22,6 @@
- #include <linux/kernel.h>
- #include <linux/pinctrl/pinconf-generic.h>
- 
--#include <mach/r8a7740.h>
- #include <mach/irqs.h>
- 
- #include "core.h"
-diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-index 6dfb187..1528693 100644
---- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-@@ -25,7 +25,6 @@
- #include <linux/pinctrl/pinconf-generic.h>
- 
- #include <mach/irqs.h>
--#include <mach/sh7372.h>
- 
- #include "core.h"
- #include "sh_pfc.h"
+The patches are based on v3.11-rc2. Linus, do you usually pick pinctrl patches
+from the list, or should I send you a pull request ?
+
+[1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg473450.html
+
+Laurent Pinchart (3):
+  sh-pfc: Remove unneeded mach/<soc>.h includes
+  sh-pfc: sh7372: Replace <mach/irqs.h> with <linux/sh_intc.h>
+  sh-pfc: sh73a0: Remove EXT_IRQ16L and EXT_IRQ16H macros
+
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c |  1 -
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c |  1 -
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c  |  4 +--
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c  | 68 +++++++++++++++++-------------------
+ 4 files changed, 33 insertions(+), 41 deletions(-)
+
 -- 
-1.8.1.5
+Regards,
+
+Laurent Pinchart
