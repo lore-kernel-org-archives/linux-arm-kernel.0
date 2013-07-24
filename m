@@ -1,31 +1,20 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 24 Jul 2013 13:20:33 +0200
-Subject: [PATCH v8 06/28] ARM: dove: Move to ID based window creation
-In-Reply-To: <1374586292-4941-7-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1374586292-4941-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1374586292-4941-7-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <51EFB881.4030901@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 24 Jul 2013 12:41:15 +0100
+Subject: [PATCH] arm64: Change kernel stack size to 16K.
+In-Reply-To: <1374601951-4091-1-git-send-email-fkan@apm.com>
+References: <1374601951-4091-1-git-send-email-fkan@apm.com>
+Message-ID: <20130724114114.GD6238@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/13 15:31, Ezequiel Garcia wrote:
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->
-> With the introduction of the ID based MBus API, it's better
-> to switch to use it instead of the current name based scheme.
->
-> This will allow to deprecate the name based API, once every
-> user is removed.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->   arch/arm/mach-dove/common.c | 68 ++++++++++++++++++++++++++++++---------------
->   1 file changed, 45 insertions(+), 23 deletions(-)
+On Tue, Jul 23, 2013 at 06:52:31PM +0100, Feng Kan wrote:
+> Written by Catalin Marinas, tested by APM on storm platform. This is needed 
+> because of the failures encountered when running SpecWeb benchmark test.
+> 
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Acked-by: Kumar Sankaran <ksankaran@apm.com>
 
-Ezequiel,
+Thanks.
 
-for the whole patch series on Dove DT:
-
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-Sebastian
+-- 
+Catalin
