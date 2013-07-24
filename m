@@ -1,35 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:32:34 +0900
-Subject: [PATCH 07/19] ARM: shmobile: r8a7790: Add pin control device to
- device tree
+Date: Wed, 24 Jul 2013 09:32:36 +0900
+Subject: [PATCH 09/19] ARM: shmobile: sh7372: Add pin control device to device
+ tree
 In-Reply-To: <cover.1374625203.git.horms+renesas@verge.net.au>
 References: <cover.1374625203.git.horms+renesas@verge.net.au>
-Message-ID: <9694c778048e006604c3fbade6b0aefa5dd0b516.1374625203.git.horms+renesas@verge.net.au>
+Message-ID: <871e4b3e9e437b48287c635c5e66ba80b5cd365a.1374625203.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Add a pfc node to the r8a7790 device tree.
+Add a pfc node to the sh7372 device tree.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sh7372.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 339d9b1..13caf12 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -54,4 +54,9 @@
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 0 4>, <0 1 4>, <0 2 4>,	<0 3 4>;
+diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
+index 7bf020e..249f65be2 100644
+--- a/arch/arm/boot/dts/sh7372.dtsi
++++ b/arch/arm/boot/dts/sh7372.dtsi
+@@ -23,4 +23,12 @@
+ 			reg = <0x0>;
+ 		};
  	};
 +
-+	pfc: pfc at e6060000 {
-+		compatible = "renesas,pfc-r8a7790";
-+		reg = <0 0xe6060000 0 0x250>;
++	pfc: pfc at e6050000 {
++		compatible = "renesas,pfc-sh7372";
++		reg = <0xe6050000 0x8000>,
++		      <0xe605801c 0x1c>;
++		gpio-controller;
++		#gpio-cells = <2>;
 +	};
  };
 -- 
