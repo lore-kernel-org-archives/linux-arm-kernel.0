@@ -1,61 +1,47 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 24 Jul 2013 16:55:16 +0900
-Subject: [PATCH v3 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
-In-Reply-To: <CAK9yfHz-UcA0--Md0YfrTkPvqzZncTcu-6a-AaHbiWx2tJZczw@mail.gmail.com>
-References: <1374636693-32336-1-git-send-email-sachin.kamat@linaro.org>
- <0e4301ce8835$f5bef5e0$e13ce1a0$@org>
- <CAK9yfHz-UcA0--Md0YfrTkPvqzZncTcu-6a-AaHbiWx2tJZczw@mail.gmail.com>
-Message-ID: <0e8401ce8843$22817960$67846c20$@org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 24 Jul 2013 10:03:30 +0200
+Subject: [PATCH] dma: edma: add device_slave_caps() support
+In-Reply-To: <1374597804-3961-1-git-send-email-joelf@ti.com>
+References: <1374597804-3961-1-git-send-email-joelf@ti.com>
+Message-ID: <51EF8A52.90902@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
+On 07/23/2013 06:43 PM, Joel Fernandes wrote:
+> Implement device_slave_caps(). EDMA has a limited number of slots.
+> Slave drivers such as omap_hsmmc will query the driver to make
+> sure they don't pass in more than these many scatter segments.
 > 
-> On 24 July 2013 11:50, Kukjin Kim <kgene@kernel.org> wrote:
-> > Sachin Kamat wrote:
-> >>
-> >> With the recent cleanup in Exynos platform code notably commits
-> >> 17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
-> >> more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
-> >> of ARCH_NR_GPIOS got removed. This started causing problems on SoCs
-> like
-> >> Exynos4412 which have more than the default number of GPIOs. Thus
-> define
-> >> this number in KConfig file which takes care of current SoC
-> requirements
-> >> and provides scope for GPIO expanders. Without this patch we get the
-> >> following
-> >> errors during boot:
-> >>
-> >> gpiochip_add: gpios 251..258 (gpv0) failed to register
-> >> samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
-> >> error code: -22
-> >> samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
-> >>
-> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> >> Cc: Tomasz Figa <t.figa@samsung.com>
-> >> ---
-> >> Changes since v2:
-> >> Changed the default number to 512 to accomodate GPIO exapnders.
-> >> ---
-> >>  arch/arm/Kconfig |    1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >> index ccc388d..b3c4fa4 100644
-> >> --- a/arch/arm/Kconfig
-> >> +++ b/arch/arm/Kconfig
-> >> @@ -1601,6 +1601,7 @@ config ARCH_NR_GPIO
-> >>       int
-> >>       default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
-> >>       default 512 if SOC_OMAP5
-> >> +     default 512 if ARCH_EXYNOS
-> >>       default 512 if ARCH_KEYSTONE
-> >
-> > +       default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 ?
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+> Vinod, or Dan- If this patch looks ok, can you please merge in for
+> -rc cycle? This patch is required to fix MMC support on AM33xx. This
+> patch is blocking 3 other patches which fix various MMC things. Thanks!
 > 
-> Looks good. Do you want me to re-send this?
+> Notes:
+> (1) this approach is temporary and only for -rc cycle to fix MMC on
+> AM335x. It will be replace by the RFC series in future kernels:
+> http://www.spinics.net/lists/arm-kernel/msg260094.html
 > 
-Yes, please.
+> (2) Patch depends Vinod's patch at:
+> http://permalink.gmane.org/gmane.linux.kernel/1525112
+> 
+>  drivers/dma/edma.c |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 7222cbe..81d5429 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -517,6 +517,14 @@ static void edma_issue_pending(struct dma_chan *chan)
+>  	spin_unlock_irqrestore(&echan->vchan.lock, flags);
+>  }
+>  
+> +static inline int edma_slave_caps(struct dma_chan *chan,
+> +	struct dma_slave_caps *caps)
+> +{
+> +	caps->max_sg_nr = MAX_NR_SG;
 
-- Kukjin
+Hm, what about the other fields?
+
+- Lars
