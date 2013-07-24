@@ -1,48 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 24 Jul 2013 14:19:24 -0400
-Subject: Location for a kind of GPIO bus driver
-In-Reply-To: <20130723151834.GJ9916@kw.sim.vm.gnt>
-References: <20130723151834.GJ9916@kw.sim.vm.gnt>
-Message-ID: <20130724181924.GI19736@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 24 Jul 2013 13:31:00 -0500
+Subject: Do we have people interested in device tree janitoring / cleanup?
+In-Reply-To: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
+References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
+Message-ID: <51F01D64.9060609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 05:18:34PM +0200, Simon Guinot wrote:
-> Hi,
+On 07/24/2013 10:27 AM, Olof Johansson wrote:
+> Every now and then I come across a binding that's just done Wrong(tm),
+> merged through a submaintainer tree and hasn't seen proper review --
+> if it had, it wouldn't look the way it does. It's something we're
+> starting to address now since there's more people stepping up to be
+> maintainers, but there's a backlog of bad bindings already merged.
 > 
-> I am currently working on converting the LED driver leds-netxbig to DT.
-> Doing so, I am also considering to move the GPIO extension bus functions
-> (which are currently parts of leds-netxbig) into a separate driver.
+> Often they are produced by translating the platform_data structures
+> directly over into device-tree properties without consideration to
+> describing the hardware or usual conventions, using key/value pairs
+> instead of boolean properties, etc.
 > 
-> On the LaCie "Big Network" board family (netxbig), the LEDs are
-> controlled by a CPLD. In turn, the CPLD can be configured (mostly the
-> LEDs modes) through a kind of parallel GPIO bus, called GPIO extension
-> bus. Two registers (address and data) are exposed. Each of them is made
-> up of several GPIOs. An extra GPIO is used to notify the CPLD that the
-> registers have been updated. The leds-netxbig driver uses some dedicated
-> functions (prefixed by "gpio_ext_") to handle the GPIO bus extension.
+> Getting involved in cleaning up these kind of bindings is a great way
+> to learn "the ways of device tree" for someone that has interest in
+> that.
 > 
-> On the latest "Big Network" boards, this bus is also used to enable the
-> PM wakeup sources: the CPLD can be asked to keep powered some devices
-> (as the RTC or the Ethernet PHY) while the board is down. I think it
-> could be nice to expose this feature to the userland. That's why I am
-> thinking about moving the GPIO extension bus support into a separate
-> driver. The problem is that I can't find a proper location for a such
-> driver. AFAIK, it doesn't fit with anything existing supported by Linux.
-> Maybe I should consider drivers/bus ? Or even drivers/misc ?
+> Latest find in this area is the Maxim 8925 bindings, that I came
+> across since they caused a compile warning on some defconfig. I'll
+> post a patch to address the warning but if someone else feels like
+> fixing the bindings on top of it that would be appreciated!
 
-iiuc, the CPLD is more of gpio multiplexer/expander.  Have you seen
+Are they documented typically? Can we at a minimum update the
+documentation with a big fat warning to not use or propagate the crap.
+Or move the binding doc file to a fixme directory.
 
-  66bcb58 arm: mvebu: enable gpio expander over i2c on Mirabox platform
-
-?  And the corresponding driver, drivers/gpio/gpio-pca953x.c?
-
-I would try drivers/gpio.  If there are complaints, it should be trivial
-to move it in a new version of the series.
-
-Is there any reason why the new capabilities in the "Big Network" boards
-couldn't be covered by gpio-regulator?
-
-thx,
-
-Jason.
+Rob
