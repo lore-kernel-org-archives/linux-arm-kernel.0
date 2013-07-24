@@ -1,59 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:34:00 +0900
-Subject: [PATCH 06/16] ARM: shmobile: r8a73a4: add Z2 clock support
+Date: Wed, 24 Jul 2013 09:34:05 +0900
+Subject: [PATCH 12/16] ARM: shmobile: Make r8a73a4 Arch timer optional
 In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
 References: <cover.1374624383.git.horms+renesas@verge.net.au>
-Message-ID: <a040f22d2c2e82347f978b52e7402a7387e5dee5.1374624383.git.horms+renesas@verge.net.au>
+Message-ID: <b9a30ef1d354c0bc0cc6d973bbe7ede9f00716ee.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Magnus Damm <damm@opensource.se>
 
-The Z2 clock on r8a73a4 is used to clock the 4 Cortex A7 cores on the SoC.
-Add a definition for this clock to later use it from the arm_big_little
-CPUFreq driver.
+Update the r8a73a4 code to allow using other
+timers than Arch timer for clock event
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/mach-shmobile/Kconfig                | 1 -
+ arch/arm/mach-shmobile/board-ape6evm.c        | 1 +
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h | 1 +
+ arch/arm/mach-shmobile/setup-r8a73a4.c        | 8 ++++++++
+ 4 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 22f10ff..27ff58c 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -323,6 +323,21 @@ static struct clk z_clk = {
- 	.ops = &zclk_ops,
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 406077c..dd80f21 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -23,7 +23,6 @@ config ARCH_R8A73A4
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
+-	select HAVE_ARM_ARCH_TIMER
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
+ 	select ARCH_HAS_CPUFREQ
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index 1fbc39a..af6dd39 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -101,6 +101,7 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
  };
  
-+/*
-+ * It seems only 1/2 divider is usable in manual mode. 1/2 / 2/3
-+ * switching is only available in auto-DVFS mode
-+ */
-+SH_FIXED_RATIO_CLK(pll0_div2_clk,	pll0_clk,		div2);
+ DT_MACHINE_START(APE6EVM_DT, "ape6evm")
++	.init_early	= r8a73a4_init_delay,
+ 	.init_time	= shmobile_timer_init,
+ 	.init_machine	= ape6evm_add_standard_devices,
+ 	.dt_compat	= ape6evm_boards_compat_dt,
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+index f043103..144a85e 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+@@ -4,5 +4,6 @@
+ void r8a73a4_add_standard_devices(void);
+ void r8a73a4_clock_init(void);
+ void r8a73a4_pinmux_init(void);
++void r8a73a4_init_delay(void);
+ 
+ #endif /* __ASM_R8A73A4_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index b8dddf4..d533bd2 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -202,6 +202,13 @@ void __init r8a73a4_add_standard_devices(void)
+ 	r8a7790_register_cmt(10);
+ }
+ 
++void __init r8a73a4_init_delay(void)
++{
++#ifndef CONFIG_ARM_ARCH_TIMER
++	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
++#endif
++}
 +
-+static struct clk z2_clk = {
-+	.parent = &pll0_div2_clk,
-+	.div_mask = 0x1f,
-+	.enable_bit = 0,
-+	/* We'll need to access FRQCRB and FRQCRC */
-+	.enable_reg = (void __iomem *)FRQCRB,
-+	.ops = &zclk_ops,
-+};
-+
- static struct clk *main_clks[] = {
- 	&extalr_clk,
- 	&extal1_clk,
-@@ -341,6 +356,8 @@ static struct clk *main_clks[] = {
- 	&pll2s_clk,
- 	&pll2h_clk,
- 	&z_clk,
-+	&pll0_div2_clk,
-+	&z2_clk,
+ #ifdef CONFIG_USE_OF
+ void __init r8a73a4_add_standard_devices_dt(void)
+ {
+@@ -215,6 +222,7 @@ static const char *r8a73a4_boards_compat_dt[] __initdata = {
  };
  
- /* DIV4 */
+ DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
++	.init_early	= r8a73a4_init_delay,
+ 	.init_machine	= r8a73a4_add_standard_devices_dt,
+ 	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= r8a73a4_boards_compat_dt,
 -- 
 1.8.2.1
