@@ -1,33 +1,40 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 24 Jul 2013 16:36:29 +0900
-Subject: [PATCH V2 2/2] ARM: EXYNOS: cpuidle: Allow C1 state only in
- supported SOC's.
-In-Reply-To: <CADGdYn5uY7A9OB=xGi_oKS3DX6+wRhbKBnTfxjkFY5OtUX3hXg@mail.gmail.com>
-References: <1371036526-16589-1-git-send-email-amit.daniel@samsung.com>
- <1371036526-16589-3-git-send-email-amit.daniel@samsung.com>
- <0e2301ce882c$d39021a0$7ab064e0$@org>
- <CADGdYn5uY7A9OB=xGi_oKS3DX6+wRhbKBnTfxjkFY5OtUX3hXg@mail.gmail.com>
-Message-ID: <0e7d01ce8840$82f79070$88e6b150$@org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 24 Jul 2013 16:39:53 +0900
+Subject: [PATCH] ARM: shmobile: marzen: Switch to DT_MACHINE_START
+In-Reply-To: <20130724073042.28351.33041.sendpatchset@w520>
+References: <20130724073042.28351.33041.sendpatchset@w520>
+Message-ID: <20130724073952.GD17045@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-amit daniel kachhap wrote:
-
-[...]
-
-> >>               /* Support IDLE only */
-> >> -             if (cpu_id != 0)
-> >> +             if (!(soc_is_exynos4210() || soc_is_exynos4212() ||
-> >> +                     soc_is_exynos4412() || soc_is_exynos5250()) ||
-> >> +                     cpu_id != 0)
-> >
-> > How about exynos5420?
-> >
-> > So...
-> >
-> > +               if (soc_is_exynos5440() || cpu_id !=0) ?
-> This is fine.
+On Wed, Jul 24, 2013 at 04:30:42PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-So, you will re-send?
+> Convert the marzen board to use DT_MACHINE_START. With this in
+> place all mach-shmobile boards use DT_MACHINE_START. Also, this
+> makes it possible for the r8a7779 SMP code to use DT for CPUs.
+> 
+> So appended DTB is the way forward on this board.
 
-- Kukjin
+Please supply a patch to update the defconfig accordingly.
+
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written on top of renesas-devel-20130724
+> 
+>  arch/arm/mach-shmobile/board-marzen.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- 0001/arch/arm/mach-shmobile/board-marzen.c
+> +++ work/arch/arm/mach-shmobile/board-marzen.c	2013-07-24 15:45:39.000000000 +0900
+> @@ -238,7 +238,7 @@ static void __init marzen_init(void)
+>  	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+>  }
+>  
+> -MACHINE_START(MARZEN, "marzen")
+> +DT_MACHINE_START(MARZEN, "marzen")
+>  	.smp		= smp_ops(r8a7779_smp_ops),
+>  	.map_io		= r8a7779_map_io,
+>  	.init_early	= r8a7779_add_early_devices,
+> 
