@@ -1,58 +1,89 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 24 Jul 2013 14:55:00 -0400 (EDT)
-Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value
- to index into save array
-In-Reply-To: <20130724164717.GA4610@localhost.localdomain>
-References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
- <1374550289-25305-2-git-send-email-nicolas.pitre@linaro.org>
- <20130724164717.GA4610@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1307241437460.15022@syhkavp.arg>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 24 Jul 2013 13:55:24 -0500
+Subject: [PATCH] dma: edma: add device_slave_caps() support
+In-Reply-To: <51EF92F2.3030405@metafoo.de>
+References: <1374597804-3961-1-git-send-email-joelf@ti.com>
+ <51EF8A52.90902@metafoo.de> <51EF8C2B.2030409@ti.com>,
+ <51EF8F4E.8080806@metafoo.de> <FB20353E-4890-4462-A671-3587A3841B4A@ti.com>
+ <51EF92F2.3030405@metafoo.de>
+Message-ID: <51F0231C.7000401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Jul 2013, Dave Martin wrote:
-
-> On Mon, Jul 22, 2013 at 11:31:17PM -0400, Nicolas Pitre wrote:
-> > Currently we hash the MPIDR of the CPU being suspended to determine which
-> > entry in the sleep_save_sp array to use. In some situations, such as when
-> > we want to resume on another physical CPU, the MPIDR of another CPU should
-> > be used instead.
-> > 
-> > So let's use the value of cpu_logical_map(smp_processor_id()) in place
-> > of the MPIDR in the suspend path.  This will result in the same index
-> > being used as with the previous code unless the caller has modified
-> > cpu_logical_map() beforehand.
+On 07/24/2013 03:40 AM, Lars-Peter Clausen wrote:
+> On 07/24/2013 10:28 AM, Fernandes, Joel wrote:
+>>
+>> On Jul 24, 2013, at 3:23 AM, "Lars-Peter Clausen" <lars@metafoo.de> wrote:
+>>
+>>> On 07/24/2013 10:11 AM, Joel Fernandes wrote:
+>>>> On 07/24/2013 03:03 AM, Lars-Peter Clausen wrote:
+>>>>> On 07/23/2013 06:43 PM, Joel Fernandes wrote:
+>>>>>> Implement device_slave_caps(). EDMA has a limited number of slots.
+>>>>>> Slave drivers such as omap_hsmmc will query the driver to make
+>>>>>> sure they don't pass in more than these many scatter segments.
+>>>>>>
+>>>>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>>>>> ---
+>>>>>> Vinod, or Dan- If this patch looks ok, can you please merge in for
+>>>>>> -rc cycle? This patch is required to fix MMC support on AM33xx. This
+>>>>>> patch is blocking 3 other patches which fix various MMC things. Thanks!
+>>>>>>
+>>>>>> Notes:
+>>>>>> (1) this approach is temporary and only for -rc cycle to fix MMC on
+>>>>>> AM335x. It will be replace by the RFC series in future kernels:
+>>>>>> http://www.spinics.net/lists/arm-kernel/msg260094.html
+>>>>>>
+>>>>>> (2) Patch depends Vinod's patch at:
+>>>>>> http://permalink.gmane.org/gmane.linux.kernel/1525112
+>>>>>>
+>>>>>> drivers/dma/edma.c |    9 +++++++++
+>>>>>> 1 file changed, 9 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+>>>>>> index 7222cbe..81d5429 100644
+>>>>>> --- a/drivers/dma/edma.c
+>>>>>> +++ b/drivers/dma/edma.c
+>>>>>> @@ -517,6 +517,14 @@ static void edma_issue_pending(struct dma_chan *chan)
+>>>>>>    spin_unlock_irqrestore(&echan->vchan.lock, flags);
+>>>>>> }
+>>>>>>
+>>>>>> +static inline int edma_slave_caps(struct dma_chan *chan,
+>>>>>> +    struct dma_slave_caps *caps)
+>>>>>> +{
+>>>>>> +    caps->max_sg_nr = MAX_NR_SG;
+>>>>>
+>>>>> Hm, what about the other fields?
+>>>>
+>>>> Other fields are unused, the max segment size is supposed to be
+>>>> calculated "given" the address width and burst size. Since these
+>>>> can't be provided to get_caps, I have left it out for now.
+>>>> See: https://lkml.org/lkml/2013/3/6/464
+>>>
+>>> The PL330 driver is similar in this regard, the maximum segment size also
+>>> depends on address width and burst width. What I did for the get_slave_caps
+>>> implementation is to set it to the minimum maximum size. E.g. in you case
+>>> that should be SZ_64K - 1 (burstsize and addrwidth both set to 1).
+>>
+>> So you're setting max to minimum maximum size? Isn't that like telling the driver that its segments can't be bigger than this... Unless I'm missing something..
 > 
-> This only works because we happen to swap MPIDRs in cpu_logical_map
-> before we get here, so that cpu_logical_map(smp_processor_id())
-> described the post-resume situation for this logical CPU, not the
-> current situation.
+> Yes. This is a limitation of the current slave_caps API. The maximum needs
+> to be the maximum for all possible configurations. A specific configuration
+> may allow a larger maximum. So we maybe have to extend the API to be able to
+> query the limits for a certain configuration. Not sure what the best way
+> would be to do that, either adding a config parameter to get_slave_caps or
+> to break it into two functions like you proposed one for the static
+> capabilities and one for the sg limits.
 
-Yes, that's more or less what I said above.  Maybe that should be 
-clarified further?
+I am OK with either approach as long as a decision can be made quickly
+by maintainers. Right now lot of back and forth has happened and 3
+different versions of the same thing have been posted since January.
+Since this is such a trivial change, it doesn't make sense to spend so
+much time on it IMO.... The sad part is though this change is trivial,
+other drivers such as MMC are broken and cannot be enabled due to this.
+We cannot afford to leave them broken.
 
-> We have to swizzle cpu_logical_map() somewhere, and the suspend path is
-> just as good as the resume path for that.
+If Vinod is not available, can Dan please respond on how to proceed on
+this? We really need this trivial change to go into this -rc cycle and
+not delay it by another kernel release. Thank you.
 
-Not quite.  On the resume path, we have to get to the context save array 
-while having no mmu active and no stack.  There is no way we could take 
-over another CPU's context in those conditions without making it 
-extremely painful on ourselves.  It is therefore way easier to swizzle 
-cpu_logical_map() on the suspend path and keep the suspend/resume logic 
-unmodified.
-
-> But this patch commits us to requiring that on the suspend path 
-> specifically -- I think that ought to be mentioned somewhere. A 
-> comment in the preamble for __cpu_suspend would be enough, I think.
-
-What comment would you suggest?  I want to make sure the possible 
-confusion you see is properly addressed.
-
-> Looks like the patch should work though, and it does remove the need to
-> read the MPIDR, which is slightly nicer for the non-switcher case.
-
-This patch works fine here, and I'd expect rather catastrophic results 
-if it didn't.  ;-)
-
-
-Nicolas
+-Joel
