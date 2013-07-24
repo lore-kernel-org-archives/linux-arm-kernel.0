@@ -1,36 +1,67 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 24 Jul 2013 17:18:51 +0100
-Subject: [PATCH 1/3] PSCI: add missing dependency on CONFIG_OF for PSCI.
-In-Reply-To: <1374682733-7416-1-git-send-email-jonathan.austin@arm.com>
-References: <1374682733-7416-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1374682733-7416-2-git-send-email-jonathan.austin@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Jul 2013 17:20:37 +0100
+Subject: [PATCH 12/14] ARM: traps: use <asm/opcodes.h> to get correct
+ instruction order
+In-Reply-To: <1374661682-9349-13-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374661682-9349-13-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130724162036.GS11072@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PSCI initialisation depends on data found in the DT. Without this the
-including PSCI support makes little sense, and furthermore the of_* stub
-functions aren't broad enough to ensure that this builds without CONFIG_OF.
+On Wed, Jul 24, 2013 at 11:28:00AM +0100, Ben Dooks wrote:
+> The trap handler needs to take into account the endian configuration of
+> the system when loading instructions. Use <asm/opcodes.h> to provide the
+> necessary conversion functions.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/kernel/traps.c |   10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 18b32e8..c300e51 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -34,6 +34,7 @@
+>  #include <asm/unwind.h>
+>  #include <asm/tls.h>
+>  #include <asm/system_misc.h>
+> +#include <asm/opcodes.h>
+>  
+>  #include "signal.h"
+>  
+> @@ -404,23 +405,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>  	if (processor_mode(regs) == SVC_MODE) {
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  		if (thumb_mode(regs)) {
+> -			instr = ((u16 *)pc)[0];
+> +			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
+>  			if (is_wide_instruction(instr)) {
+>  				instr <<= 16;
+> -				instr |= ((u16 *)pc)[1];
+> +				instr |= __mem_to_opcode_thumb16(((u16 *)pc)[1]);
+>  			}
+>  		} else
+>  #endif
+> -			instr = *(u32 *) pc;
+> +			instr = __mem_to_opcode_arm(*(u32 *) pc);
+>  	} else if (thumb_mode(regs)) {
+>  		if (get_user(instr, (u16 __user *)pc))
+>  			goto die_sig;
+> +		instr = __mem_to_opcode_thumb16(instr);
+>  		if (is_wide_instruction(instr)) {
+>  			unsigned int instr2;
+>  			if (get_user(instr2, (u16 __user *)pc+1))
+>  				goto die_sig;
+>  			instr <<= 16;
+> -			instr |= instr2;
+> +			instr |= __mem_to_opcode_thumb16(instr2);
+>  		}
+>  	} else if (get_user(instr, (u32 __user *)pc)) {
+>  		goto die_sig;
 
-As there is little enthusiasm for extending these stubs without useful use-cases
-(of which this is *not* an example) this patch prevents building of PSCI
-without CONFIG_OF.
+Maybe it's also worth updating dump_instr, so that we don't confuse people
+by printing the faulting instruction in the wrong endianness.
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
----
- arch/arm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..972ec25 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1577,6 +1577,7 @@ config HOTPLUG_CPU
- config ARM_PSCI
- 	bool "Support for the ARM Power State Coordination Interface (PSCI)"
- 	depends on CPU_V7
-+	depends on CONFIG_OF
- 	help
- 	  Say Y here if you want Linux to communicate with system firmware
- 	  implementing the PSCI specification for CPU-centric power
--- 
-1.7.9.5
+Will
