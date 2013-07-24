@@ -1,116 +1,99 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:34:06 +0900
-Subject: [PATCH 13/16] ARM: shmobile: Disconnect EMEV2 SMP code from clocks
+Date: Wed, 24 Jul 2013 09:34:04 +0900
+Subject: [PATCH 11/16] ARM: shmobile: Add r8a73a4 CMT10 clock event
 In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
 References: <cover.1374624383.git.horms+renesas@verge.net.au>
-Message-ID: <8d7217e5d74966e1016dad1f48fdaebb85deb685.1374624383.git.horms+renesas@verge.net.au>
+Message-ID: <a7b99f27a260a25f856ea37090cea997d50fe112.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Update the EMEV2 SMP code to access the SMU directly
-instead of relying on help from the legacy clock code.
-
-This change moves us one step closer to common clocks.
+Add clock event support for CMT1 timer channel 0
+to the r8a73a4 SoC code. The CMT is used together
+with a 32KHz clock in this case.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-emev2.c        | 18 ------------------
- arch/arm/mach-shmobile/include/mach/emev2.h |  1 -
- arch/arm/mach-shmobile/smp-emev2.c          | 11 +++++++++--
- 3 files changed, 9 insertions(+), 21 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a73a4.c |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a73a4.c | 21 +++++++++++++++++++++
+ 2 files changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-emev2.c b/arch/arm/mach-shmobile/clock-emev2.c
-index 56dd0cf..5ac13ba 100644
---- a/arch/arm/mach-shmobile/clock-emev2.c
-+++ b/arch/arm/mach-shmobile/clock-emev2.c
-@@ -40,7 +40,6 @@
- #define USIB2SCLKDIV 0x65c
- #define USIB3SCLKDIV 0x660
- #define STI_CLKSEL 0x688
--#define SMU_GENERAL_REG0 0x7c0
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index f831b3b..8ea5ef6 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -505,7 +505,7 @@ static struct clk div6_clks[DIV6_NR] = {
+ /* MSTP */
+ enum {
+ 	MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
+-	MSTP323, MSTP318, MSTP317, MSTP316,
++	MSTP329, MSTP323, MSTP318, MSTP317, MSTP316,
+ 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305, MSTP300,
+ 	MSTP411, MSTP410, MSTP409,
+ 	MSTP522, MSTP515,
+@@ -529,6 +529,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP317] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 17, 0), /* IIC7 */
+ 	[MSTP318] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 18, 0), /* IIC0 */
+ 	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 23, 0), /* IIC1 */
++	[MSTP329] = SH_CLK_MSTP32(&extalr_clk, SMSTPCR3, 29, 0), /* CMT10 */
+ 	[MSTP409] = SH_CLK_MSTP32(&main_div2_clk,	SMSTPCR4, 9, 0), /* IIC5 */
+ 	[MSTP410] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 10, 0), /* IIC4 */
+ 	[MSTP411] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 11, 0), /* IIC3 */
+@@ -593,6 +594,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("e6560000.i2c", &mstp_clks[MSTP317]),
+ 	CLKDEV_DEV_ID("e6500000.i2c", &mstp_clks[MSTP318]),
+ 	CLKDEV_DEV_ID("e6510000.i2c", &mstp_clks[MSTP323]),
++	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[MSTP329]),
+ 	CLKDEV_DEV_ID("e60b0000.i2c", &mstp_clks[MSTP409]),
+ 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP410]),
+ 	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP411]),
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index 9c52096..b8dddf4 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_data/irq-renesas-irqc.h>
+ #include <linux/serial_sci.h>
++#include <linux/sh_timer.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a73a4.h>
+@@ -168,6 +169,25 @@ static const struct resource thermal0_resources[] = {
+ 					thermal0_resources,		\
+ 					ARRAY_SIZE(thermal0_resources))
  
- /* not pretty, but hey */
- static void __iomem *smu_base;
-@@ -51,11 +50,6 @@ static void emev2_smu_write(unsigned long value, int offs)
- 	iowrite32(value, smu_base + offs);
++static struct sh_timer_config cmt10_platform_data = {
++	.name = "CMT10",
++	.timer_bit = 0,
++	.clockevent_rating = 80,
++};
++
++static struct resource cmt10_resources[] = {
++	DEFINE_RES_MEM(0xe6130010, 0x0c),
++	DEFINE_RES_MEM(0xe6130000, 0x04),
++	DEFINE_RES_IRQ(gic_spi(120)), /* CMT1_0 */
++};
++
++#define r8a7790_register_cmt(idx)					\
++	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
++					  idx, cmt##idx##_resources,	\
++					  ARRAY_SIZE(cmt##idx##_resources), \
++					  &cmt##idx##_platform_data,	\
++					  sizeof(struct sh_timer_config))
++
+ void __init r8a73a4_add_standard_devices(void)
+ {
+ 	r8a73a4_register_scif(SCIFA0);
+@@ -179,6 +199,7 @@ void __init r8a73a4_add_standard_devices(void)
+ 	r8a73a4_register_irqc(0);
+ 	r8a73a4_register_irqc(1);
+ 	r8a73a4_register_thermal();
++	r8a7790_register_cmt(10);
  }
  
--void emev2_set_boot_vector(unsigned long value)
--{
--	emev2_smu_write(value, SMU_GENERAL_REG0);
--}
--
- static struct clk_mapping smu_mapping = {
- 	.phys	= EMEV2_SMU_BASE,
- 	.len	= PAGE_SIZE,
-@@ -205,18 +199,6 @@ static struct clk_lookup lookups[] = {
- void __init emev2_clock_init(void)
- {
- 	int k, ret = 0;
--	static int is_setup;
--
--	/* yuck, this is ugly as hell, but the non-smp case of clocks
--	 * code is now designed to rely on ioremap() instead of static
--	 * entity maps. in the case of smp we need access to the SMU
--	 * register earlier than ioremap() is actually working without
--	 * any static maps. to enable SMP in ugly but with dynamic
--	 * mappings we have to call emev2_clock_init() from different
--	 * places depending on UP and SMP...
--	 */
--	if (is_setup++)
--		return;
- 
- 	smu_base = ioremap(EMEV2_SMU_BASE, PAGE_SIZE);
- 	BUG_ON(!smu_base);
-diff --git a/arch/arm/mach-shmobile/include/mach/emev2.h b/arch/arm/mach-shmobile/include/mach/emev2.h
-index b0ab4b7..c2eb756 100644
---- a/arch/arm/mach-shmobile/include/mach/emev2.h
-+++ b/arch/arm/mach-shmobile/include/mach/emev2.h
-@@ -5,7 +5,6 @@ extern void emev2_map_io(void);
- extern void emev2_init_delay(void);
- extern void emev2_add_standard_devices(void);
- extern void emev2_clock_init(void);
--extern void emev2_set_boot_vector(unsigned long value);
- 
- #define EMEV2_GPIO_BASE 200
- #define EMEV2_GPIO_IRQ(n) (EMEV2_GPIO_BASE + (n))
-diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
-index 9787165..1bf8bc7 100644
---- a/arch/arm/mach-shmobile/smp-emev2.c
-+++ b/arch/arm/mach-shmobile/smp-emev2.c
-@@ -29,6 +29,8 @@
- #include <asm/smp_scu.h>
- 
- #define EMEV2_SCU_BASE 0x1e000000
-+#define EMEV2_SMU_BASE 0xe0110000
-+#define SMU_GENERAL_REG0 0x7c0
- 
- static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-@@ -38,13 +40,18 @@ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *
- 
- static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	void __iomem *smu;
-+
- 	/* setup EMEV2 specific SCU base, enable */
- 	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
- 	scu_enable(shmobile_scu_base);
- 
- 	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
--	emev2_clock_init(); /* need ioremapped SMU */
--	emev2_set_boot_vector(__pa(shmobile_boot_vector));
-+	smu = ioremap(EMEV2_SMU_BASE, PAGE_SIZE);
-+	if (smu) {
-+		iowrite32(__pa(shmobile_boot_vector), smu + SMU_GENERAL_REG0);
-+		iounmap(smu);
-+	}
- 	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
- 	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
- 
+ #ifdef CONFIG_USE_OF
 -- 
 1.8.2.1
