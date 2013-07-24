@@ -1,50 +1,183 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 23 Jul 2013 17:10:52 -0700
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X
- SoC with ARM CPU
-In-Reply-To: <20130723192203.GC6811@ohporter.com>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
- <20130723184907.GA6811@ohporter.com>
- <CAGVrzcbA72AYu6J3JXBirQQeTiDH9cJThdBdH=Q=gJtOnqz-AA@mail.gmail.com>
- <20130723192203.GC6811@ohporter.com>
-Message-ID: <51EF1B8C.9020304@broadcom.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 24 Jul 2013 09:26:55 +0900
+Subject: [PATCH] clocksource: sh_cmt: 32-bit control register support
+In-Reply-To: <51ECAF43.80200@linaro.org>
+References: <cover.1374207810.git.horms+renesas@verge.net.au>
+ <2792cc6f22031110f6959c02d42d7b6116105a71.1374207810.git.horms+renesas@verge.net.au>
+ <51ECAF43.80200@linaro.org>
+Message-ID: <20130724002655.GA532@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-07-23 12:22 PM, Matt Porter wrote:
->>>> the bcm281x/kona family support code be merged and use "bcm" there, without
->>>> registering it. Besides, a simple rule of number here wins:
->>>>
->>>> git grep "brcm," * | wc -l
->>>> 63
->>>> git grep "bcm," * | wc -l
->>>> 25
->>>>
->>>> (as of Linux 3.11-rc1)
->>>>
->>>> So consistency we should get the bcm281x/kona DT bindings to rename their
->>>> vendor prefix as well.
->>> I believe getting this "right" is far more important than the difference
->>> in churn of a mere 38 instances of use of brcm. "Right" is two things:
->>> 1) it needs to be consistent 2) it should be what makes sense.
->> I agree, which is the reason why I would stick with the vendor prefix
->> and end the story there.
-> It doesn't end there. An update to all the in process stuff has to
-> happen, plus the upstream stuff. So in both cases there are changes to
-> be made both upstream and with work-in-progress. The only difference is
-> that I was suggesting an update to correct the prefix in
-> vendor-prefixes.txt.
->
-> However, if I'm the only one that cares enough to speak up for "bcm"
-> I'll abandon that and submit the patch to adjust bcm281xx to be
-> compliant with the current state of vendor-prefixes.txt. :)
->
-bcm has been used internally but not consistently - about as 
-consistently as brcm has been used in upstream :) Given that I've 
-submitted most/all of the non-compliant code, I'll send a patch 
-rectifying it and request internal team to switch to using brcm, for 
-devicetree bindings, as atonement. If Matt doesn't beat me to it...
+On Mon, Jul 22, 2013 at 06:04:19AM +0200, Daniel Lezcano wrote:
+> On 07/19/2013 06:36 AM, Simon Horman wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > Add support for CMT hardware with 32-bit control and counter
+> > registers, as found on r8a73a4 and r8a7790. To use the CMT
+> > with 32-bit hardware a second I/O memory resource needs to
+> > point out the CMSTR register and it needs to be 32 bit wide.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> 
+> In the future, can you Cc drivers/clocksource maintainers please ?
 
-  Thanks,
-    csd
+Yes of course, sorry for that oversight.
+
+> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+Olof, Arnd, please let me know if you wish me to re-send the pull
+request with Daniel's Reviewed-by added to this patch.
+
+> 
+> >  drivers/clocksource/sh_cmt.c |   50 ++++++++++++++++++++++++++++++------------
+> >  1 file changed, 36 insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+> > index 08d0c41..0965e98 100644
+> > --- a/drivers/clocksource/sh_cmt.c
+> > +++ b/drivers/clocksource/sh_cmt.c
+> > @@ -37,6 +37,7 @@
+> >  
+> >  struct sh_cmt_priv {
+> >  	void __iomem *mapbase;
+> > +	void __iomem *mapbase_str;
+> >  	struct clk *clk;
+> >  	unsigned long width; /* 16 or 32 bit version of hardware block */
+> >  	unsigned long overflow_bit;
+> > @@ -79,6 +80,12 @@ struct sh_cmt_priv {
+> >   * CMCSR 0xffca0060 16-bit
+> >   * CMCNT 0xffca0064 32-bit
+> >   * CMCOR 0xffca0068 32-bit
+> > + *
+> > + * "32-bit counter and 32-bit control" as found on r8a73a4 and r8a7790:
+> > + * CMSTR 0xffca0500 32-bit
+> > + * CMCSR 0xffca0510 32-bit
+> > + * CMCNT 0xffca0514 32-bit
+> > + * CMCOR 0xffca0518 32-bit
+> >   */
+> >  
+> >  static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
+> > @@ -109,9 +116,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
+> >  
+> >  static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
+> >  {
+> > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> > -
+> > -	return p->read_control(p->mapbase - cfg->channel_offset, 0);
+> > +	return p->read_control(p->mapbase_str, 0);
+> >  }
+> >  
+> >  static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
+> > @@ -127,9 +132,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
+> >  static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
+> >  				      unsigned long value)
+> >  {
+> > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> > -
+> > -	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
+> > +	p->write_control(p->mapbase_str, 0, value);
+> >  }
+> >  
+> >  static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
+> > @@ -676,7 +679,7 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
+> >  static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> >  {
+> >  	struct sh_timer_config *cfg = pdev->dev.platform_data;
+> > -	struct resource *res;
+> > +	struct resource *res, *res2;
+> >  	int irq, ret;
+> >  	ret = -ENXIO;
+> >  
+> > @@ -694,6 +697,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> >  		goto err0;
+> >  	}
+> >  
+> > +	/* optional resource for the shared timer start/stop register */
+> > +	res2 = platform_get_resource(p->pdev, IORESOURCE_MEM, 1);
+> > +
+> >  	irq = platform_get_irq(p->pdev, 0);
+> >  	if (irq < 0) {
+> >  		dev_err(&p->pdev->dev, "failed to get irq\n");
+> > @@ -707,6 +713,15 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> >  		goto err0;
+> >  	}
+> >  
+> > +	/* map second resource for CMSTR */
+> > +	p->mapbase_str = ioremap_nocache(res2 ? res2->start :
+> > +					 res->start - cfg->channel_offset,
+> > +					 res2 ? resource_size(res2) : 2);
+> > +	if (p->mapbase_str == NULL) {
+> > +		dev_err(&p->pdev->dev, "failed to remap I/O second memory\n");
+> > +		goto err1;
+> > +	}
+> > +
+> >  	/* request irq using setup_irq() (too early for request_irq()) */
+> >  	p->irqaction.name = dev_name(&p->pdev->dev);
+> >  	p->irqaction.handler = sh_cmt_interrupt;
+> > @@ -719,11 +734,17 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> >  	if (IS_ERR(p->clk)) {
+> >  		dev_err(&p->pdev->dev, "cannot get clock\n");
+> >  		ret = PTR_ERR(p->clk);
+> > -		goto err1;
+> > +		goto err2;
+> >  	}
+> >  
+> > -	p->read_control = sh_cmt_read16;
+> > -	p->write_control = sh_cmt_write16;
+> > +	if (res2 && (resource_size(res2) == 4)) {
+> > +		/* assume both CMSTR and CMCSR to be 32-bit */
+> > +		p->read_control = sh_cmt_read32;
+> > +		p->write_control = sh_cmt_write32;
+> > +	} else {
+> > +		p->read_control = sh_cmt_read16;
+> > +		p->write_control = sh_cmt_write16;
+> > +	}
+> >  
+> >  	if (resource_size(res) == 6) {
+> >  		p->width = 16;
+> > @@ -752,22 +773,23 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> >  			      cfg->clocksource_rating);
+> >  	if (ret) {
+> >  		dev_err(&p->pdev->dev, "registration failed\n");
+> > -		goto err2;
+> > +		goto err3;
+> >  	}
+> >  	p->cs_enabled = false;
+> >  
+> >  	ret = setup_irq(irq, &p->irqaction);
+> >  	if (ret) {
+> >  		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+> > -		goto err2;
+> > +		goto err3;
+> >  	}
+> >  
+> >  	platform_set_drvdata(pdev, p);
+> >  
+> >  	return 0;
+> > -err2:
+> > +err3:
+> >  	clk_put(p->clk);
+> > -
+> > +err2:
+> > +	iounmap(p->mapbase_str);
+> >  err1:
+> >  	iounmap(p->mapbase);
+> >  err0:
+> > 
+> 
+> 
+> -- 
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
