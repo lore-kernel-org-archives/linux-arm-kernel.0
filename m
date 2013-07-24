@@ -1,36 +1,46 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 24 Jul 2013 13:31:51 -0700
-Subject: [PATCH 0/4] msm_serial fixes and improvements
-In-Reply-To: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
-References: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130724203151.GF10926@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 24 Jul 2013 13:32:53 -0700
+Subject: [PATCH v4 0/5] Memory mapped architected timers
+In-Reply-To: <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
+References: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
+ <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
+Message-ID: <20130724203253.GE27761@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 11:37:27AM -0700, Stephen Boyd wrote:
->Here are a couple fixes and improvements to the msm_serial
->driver. The first two patches fix a bug on UARTDM devices and
->silence sparse warnings. The last two patches improve the baud
->code detection and increase the throughput on UARTDM devices.
->
->After this it is rather trivial to add support for newer UARTDM
->devices via new compatible fields.
->
->Stephen Boyd (4):
->  msm_serial: Fix NUL byte output on UARTDM
->  msm_serial: Fix sparse warnings
->  msm_serial: Make baud_code detection more dynamic
->  msm_serial: Send more than 1 character at a time on UARTDM
->
-> drivers/tty/serial/msm_serial.c | 180 ++++++++++++++++++++--------------------
-> drivers/tty/serial/msm_serial.h |  19 ++---
-> 2 files changed, 97 insertions(+), 102 deletions(-)
+On 07/22, Mark Rutland wrote:
+> Hi Stephen,
+> 
+> On Fri, Jul 19, 2013 at 12:59:27AM +0100, Stephen Boyd wrote:
+> > This patchset adds support for memory mapped architected timers. We
+> > don't have any other global broadcast timer in our system, so we use the
+> > mmio timer during low power modes. The first patch changes the register
+> > accessor to an enum per Thomas' request. The second patch is the binding.
+> > The next two patches lay some groundwork so that the last patch is simpler.
+> > The final patch adds support for mmio timers.
+> > 
+> > Patches are based on v3.11-rc1.
+> 
+> Be aware that as of v3.11-rc2 this doesn't cleanly apply, as the
+> __cpuinit removal broke the final patch's context in a couple of places.
+> It would be nice to get rid of the new cpuinit additions too...
+> 
+> With that cleaned up locally, I've gave this a spin on tc2 and a
+> Foundation model to test the cp15/system timers, hotplugging CPUs and
+> running a basic test (`time sleep 5`). That all seems to work.
+> 
+> Unfortunately I have no way of testing the memory-mapped timer support,
+> but I trust you've tested that locally.
+> 
+> For the series:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
 
-Thanks for these patches.  I'm glad to finally see these issues fixed.
+Thanks Mark.
 
-David
+Daniel, can you pick up these patches please?
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
