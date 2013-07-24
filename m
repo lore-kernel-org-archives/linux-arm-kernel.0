@@ -1,48 +1,23 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Jul 2013 17:34:15 +0300
-Subject: [PATCHv4 00/33] ARM: OMAP: clock conversion to DT
-In-Reply-To: <51EFE4D7.10800@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <51EFE1D4.8090307@ti.com> <51EFE4D7.10800@ti.com>
-Message-ID: <51EFE5E7.4090506@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 Jul 2013 15:35:11 +0100
+Subject: [PATCH 24/27] sound/soc/pxa: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <1374602524-3398-25-git-send-email-wsa@the-dreams.de>
+References: <1374602524-3398-1-git-send-email-wsa@the-dreams.de>
+ <1374602524-3398-25-git-send-email-wsa@the-dreams.de>
+Message-ID: <20130724143511.GG9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 05:29 PM, Tero Kristo wrote:
-> On 07/24/2013 05:16 PM, Roger Quadros wrote:
->> On 07/23/2013 10:19 AM, Tero Kristo wrote:
->>> Hi,
->>>
->>> Changes compared to previous version:
->>>
->>> - Clock init files moved from mach-omap2/ to drivers/clk/omap/
->>> - AM33xx support added [patches 15-20]
->>> - OMAP3 support added [patches 21-29]
->>> - DRA7 APLL support added (thanks Keerthy) [patches 30-33]
->>>
->>> Test branch on top of 3.11-rc1 available here:
->>>
->>> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
->>> branch: mainline-3.11-rc1-omap-dt-clks
->>>
->>> Testing done:
->>>
->>> - boot + suspend tested on OMAP3 beagle C4 (omap3530)
->>> - boot + suspend tested on OMAP4 panda ES (omap4460)
->>> - boot tested on beagle bone (am335x)
->>>
->>> A boot test was also executed for DRA7 and OMAP5 on a separate branch
->>> (mainline does not have OMAP5 / DRA7 support so far.)
->>
->> Thanks to your hints, I was able to get this to work with 3.11-rc1 on omap5 uevm
->> using the following 3 patches. Please include them in your series. Thanks.
-> 
-> Your patches don't apply cleanly to mainline currently, as the omap5 base support is still not merged. I deliberately left out the full omap5 integration because of that. Lets see how and when the integration proceeds, but I can track your patches meanwhile.
->
+On Tue, Jul 23, 2013 at 08:01:57PM +0200, Wolfram Sang wrote:
+> devm_ioremap_resource does sanity checks on the given resource. No need to
+> duplicate this in the driver.
 
-Strange, I didn't use any out of tree patch. Just 3.11-rc1 with your 33 patches on top.
-
-Are you on 3.11-rc2?
-
-cheers,
--roger
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130724/721b0383/attachment-0001.sig>
