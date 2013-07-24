@@ -1,46 +1,127 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 24 Jul 2013 18:35:28 +0200
-Subject: [PATCH 1/2] ARM i.MX6Q: dts: Enable SPI NOR flash on Phytec
- phyFLEX-i.MX6 Ouad module
-Message-ID: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
+Date: Wed, 24 Jul 2013 18:35:29 +0200
+Subject: [PATCH 2/2] ARM i.MX6Q: dts: Enable I2C1 with EEPROM and PMIC on
+ Phytec phyFLEX-i.MX6 Ouad module
+In-Reply-To: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
+References: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1374683729-13438-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch enables I2C1 and adds device tree nodes for the EEPROM and the
+DA9063 PMIC connected to this I2C bus.
+
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi | 91 ++++++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-index f5e1981..5113d29 100644
+index 5113d29..8d1a548 100644
 --- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
 +++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-@@ -20,6 +20,20 @@
+@@ -34,6 +34,96 @@
  	};
  };
  
-+&ecspi3 {
++&i2c1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi3_1>;
++	pinctrl-0 = <&pinctrl_i2c1_1>;
 +	status = "okay";
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio4 24 0>;
 +
-+	flash: m25p80 at 0 {
-+		compatible = "m25p80";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
++	eeprom at 50 {
++		compatible = "atmel,24c32";
++		reg = <0x50>;
++	};
++
++	pmic at 58 {
++		compatible = "dialog,da9063";
++		reg = <0x58>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <17 0x8>; /* active-low GPIO4_17 */
++
++		regulators {
++			vddcore_reg: bcore1 {
++				regulator-min-microvolt = <730000>;
++				regulator-max-microvolt = <1380000>;
++				regulator-always-on;
++			};
++
++			vddsoc_reg: bcore2 {
++				regulator-min-microvolt = <730000>;
++				regulator-max-microvolt = <1380000>;
++				regulator-always-on;
++			};
++
++			vdd_ddr3_reg: bpro {
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++			};
++
++			vdd_3v3_reg: bperi {
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd_buckmem_reg: bmem {
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd_eth_reg: bio {
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++			};
++
++			vdd_eth_io_reg: ldo4 {
++				regulator-min-microvolt = <2500000>;
++				regulator-max-microvolt = <2500000>;
++				regulator-always-on;
++			};
++
++			vdd_mx6_snvs_reg: ldo5 {
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++			};
++
++			vdd_3v3_pmic_io_reg: ldo6 {
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd_sd0_reg: ldo9 {
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vdd_sd1_reg: ldo10 {
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vdd_mx6_high_reg: ldo11 {
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++			};
++		};
 +	};
 +};
 +
  &iomuxc {
  	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_hog>;
-@@ -28,6 +42,7 @@
- 		pinctrl_hog: hoggrp {
+@@ -43,6 +133,7 @@
  			fsl,pins = <
  				MX6Q_PAD_EIM_D23__GPIO3_IO23    0x80000000
-+				MX6Q_PAD_DISP0_DAT3__GPIO4_IO24	0x80000000 /* SPI NOR chipselect */
+ 				MX6Q_PAD_DISP0_DAT3__GPIO4_IO24	0x80000000 /* SPI NOR chipselect */
++				MX6Q_PAD_DI0_PIN15__GPIO4_IO17  0x80000000 /* PMIC interrupt */
  			>;
  		};
  	};
