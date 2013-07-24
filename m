@@ -1,87 +1,111 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Wed, 24 Jul 2013 09:34:03 +0900
-Subject: [PATCH 10/16] ARM: shmobile: Make r8a7790 Arch timer optional
+Subject: [PATCH 09/16] ARM: shmobile: Add r8a7790 CMT00 clock event
 In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
 References: <cover.1374624383.git.horms+renesas@verge.net.au>
-Message-ID: <8333d8c995169e489a81241bd632a4b9370ed7c3.1374624383.git.horms+renesas@verge.net.au>
+Message-ID: <99ade1a0f02e086248874d9908def3e8e4539418.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Update the r8a7790 code to allow using other
-timers than Arch timer for clock events.
+Add clock event support for CMT0 timer channel 0
+to the r8a7790 SoC code. On most ARM mach-shmobile
+the CMT is hooked up to a 32KHz clock but on r8a7790
+a 31.7KHz clock is instead used.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig                | 1 -
- arch/arm/mach-shmobile/board-lager.c          | 1 +
- arch/arm/mach-shmobile/include/mach/r8a7790.h | 1 +
- arch/arm/mach-shmobile/setup-r8a7790.c        | 8 ++++++++
- 4 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+ arch/arm/mach-shmobile/setup-r8a7790.c | 23 ++++++++++++++++++++++-
+ 2 files changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 734b3ee..406077c 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -61,7 +61,6 @@ config ARCH_R8A7790
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select CPU_V7
--	select HAVE_ARM_ARCH_TIMER
- 	select SH_CLK_CPG
- 	select RENESAS_IRQC
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 10d99b3..62d8162 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -47,6 +47,7 @@
+ #define CPG_BASE 0xe6150000
+ #define CPG_LEN 0x1000
  
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 1e99b17..d0da052 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -102,6 +102,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
++#define SMSTPCR1 0xe6150134
+ #define SMSTPCR2 0xe6150138
+ #define SMSTPCR3 0xe615013c
+ #define SMSTPCR5 0xe6150144
+@@ -186,6 +187,7 @@ enum {
+ 	MSTP522,
+ 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP311, MSTP305, MSTP304,
+ 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
++	MSTP124,
+ 	MSTP_NR
  };
  
- DT_MACHINE_START(LAGER_DT, "lager")
-+	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
- 	.dt_compat	= lager_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-index 2e919e6..7851cc1 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -4,6 +4,7 @@
- void r8a7790_add_standard_devices(void);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
-+void r8a7790_init_delay(void);
- void r8a7790_timer_init(void);
+@@ -208,6 +210,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
+ 	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
+ 	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
++	[MSTP124] = SH_CLK_MSTP32(&rclk_clk, SMSTPCR1, 24, 0), /* CMT0 */
+ };
  
- #endif /* __ASM_R8A7790_H__ */
+ static struct clk_lookup lookups[] = {
+@@ -270,6 +273,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP311]),
+ 	CLKDEV_DEV_ID("ee220000.mmcif", &mstp_clks[MSTP305]),
+ 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
++	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
+ };
+ 
+ #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
 diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index ece60c6..f01542e 100644
+index bc40a44..ece60c6 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7790.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -208,6 +208,13 @@ void __init r8a7790_timer_init(void)
- 	shmobile_timer_init();
+@@ -21,9 +21,10 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+-#include <linux/serial_sci.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_data/irq-renesas-irqc.h>
++#include <linux/serial_sci.h>
++#include <linux/sh_timer.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7790.h>
+@@ -159,6 +160,25 @@ static struct resource thermal_resources[] __initdata = {
+ 					thermal_resources,		\
+ 					ARRAY_SIZE(thermal_resources))
+ 
++static struct sh_timer_config cmt00_platform_data = {
++	.name = "CMT00",
++	.timer_bit = 0,
++	.clockevent_rating = 80,
++};
++
++static struct resource cmt00_resources[] = {
++	DEFINE_RES_MEM(0xffca0510, 0x0c),
++	DEFINE_RES_MEM(0xffca0500, 0x04),
++	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
++};
++
++#define r8a7790_register_cmt(idx)					\
++	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
++					  idx, cmt##idx##_resources,	\
++					  ARRAY_SIZE(cmt##idx##_resources), \
++					  &cmt##idx##_platform_data,	\
++					  sizeof(struct sh_timer_config))
++
+ void __init r8a7790_add_standard_devices(void)
+ {
+ 	r8a7790_register_scif(SCIFA0);
+@@ -173,6 +193,7 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(HSCIF1);
+ 	r8a7790_register_irqc(0);
+ 	r8a7790_register_thermal();
++	r8a7790_register_cmt(00);
  }
  
-+void __init r8a7790_init_delay(void)
-+{
-+#ifndef CONFIG_ARM_ARCH_TIMER
-+	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
-+#endif
-+}
-+
- #ifdef CONFIG_USE_OF
- 
- static const char *r8a7790_boards_compat_dt[] __initdata = {
-@@ -216,6 +223,7 @@ static const char *r8a7790_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
-+	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
- MACHINE_END
+ void __init r8a7790_timer_init(void)
 -- 
 1.8.2.1
