@@ -1,51 +1,36 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 24 Jul 2013 11:27:58 +0100
-Subject: [PATCH 10/14] vexpress: add big endian support
+Date: Wed, 24 Jul 2013 11:28:02 +0100
+Subject: [PATCH 14/14] ARM: set --be8 when linking modules
 In-Reply-To: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374661682-9349-11-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374661682-9349-15-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the versatile express systems to boot big-endian.
+To avoid having to make every text section swap the instruction order
+of all instructions, make sure modules are built also built with --be8
+(as is the current kernel final link).
+
+If we do not do this, we would end up having to swap all instructions
+when loading a module, instead of just the instructions that we are
+applying ELF relocations to.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-vexpress/Kconfig    |    1 +
- arch/arm/plat-versatile/headsmp.S |    2 ++
- 2 files changed, 3 insertions(+)
+ arch/arm/Makefile |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 5907e10..fa69d4e 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -1,6 +1,7 @@
- config ARCH_VEXPRESS
- 	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select ARM_TIMER_SP804
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-index b178d44..4c5c8ca 100644
---- a/arch/arm/plat-versatile/headsmp.S
-+++ b/arch/arm/plat-versatile/headsmp.S
-@@ -10,6 +10,7 @@
-  */
- #include <linux/linkage.h>
- #include <linux/init.h>
-+#include <asm/assembler.h>
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 1ba358b..70bc19e 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -16,6 +16,7 @@ LDFLAGS		:=
+ LDFLAGS_vmlinux	:=-p --no-undefined -X
+ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux	+= --be8
++LDFLAGS_MODULE	+= --be8
+ endif
  
- 	__INIT
- 
-@@ -19,6 +20,7 @@
-  * until we're ready for them to initialise.
-  */
- ENTRY(versatile_secondary_startup)
-+ ARM_BE8(setend	be)
- 	mrc	p15, 0, r0, c0, c0, 5
- 	bic	r0, #0xff000000
- 	adr	r4, 1f
+ OBJCOPYFLAGS	:=-O binary -R .comment -S
 -- 
 1.7.10.4
