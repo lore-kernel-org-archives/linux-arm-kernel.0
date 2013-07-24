@@ -1,73 +1,68 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 24 Jul 2013 11:27:52 +0100
-Subject: [PATCH 04/14] ARM: set BE8 if LE in head code
+Date: Wed, 24 Jul 2013 11:27:55 +0100
+Subject: [PATCH 07/14] ARM: smp_scu: data endian fixes
 In-Reply-To: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374661682-9349-5-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374661682-9349-8-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are booting in LE and compiled for BE8, then add code to
-set the state to bE8. Since the instruction stream is always LE,
-we do not need to do anything special to the instruction.
-
-Also ensure that the secondary processors are started in the same mode.
-
-Note, we do add about 20 bytes to the kernel image, but it seems easier
-to do this than adding another configuration to change.
+The smp_scu driver needs to use the relaxed readl/write accessors
+to avoid any issues with the endian mode the processor core is in.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/boot/compressed/head.S |    1 +
- arch/arm/kernel/head.S          |    4 ++++
- arch/arm/kernel/sleep.S         |    1 +
- 3 files changed, 6 insertions(+)
+ arch/arm/kernel/smp_scu.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 4eb8364..4d83bfd 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -135,6 +135,7 @@ start:
- 		.word	_edata			@ zImage end address
-  THUMB(		.thumb			)
- 1:
-+ ARM_BE8(	setend	be )			@ go BE8 if LE, no-op if BE8
- 		mrs	r9, cpsr
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index e40c0b3b..706c441 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -77,6 +77,7 @@
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 5bc1a63..1aafa0d 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -28,7 +28,7 @@
+  */
+ unsigned int __init scu_get_core_count(void __iomem *scu_base)
+ {
+-	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
++	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
+ 	return (ncores & 0x03) + 1;
+ }
  
- 	__HEAD
- ENTRY(stext)
-+ ARM_BE8(setend	be )			@ ensure we are in BE8 mode
- 
-  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-@@ -351,6 +352,9 @@ ENTRY(secondary_startup)
- 	 * the processor type - there is no need to check the machine type
- 	 * as it has already been validated by the primary processor.
- 	 */
-+
-+ ARM_BE8(setend	be)				@ if system starts LE, go BE8
-+
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install_secondary
+@@ -42,19 +42,19 @@ void scu_enable(void __iomem *scu_base)
+ #ifdef CONFIG_ARM_ERRATA_764369
+ 	/* Cortex-A9 only */
+ 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
+-		scu_ctrl = __raw_readl(scu_base + 0x30);
++		scu_ctrl = readl_relaxed(scu_base + 0x30);
+ 		if (!(scu_ctrl & 1))
+-			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
++			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
+ 	}
  #endif
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 987dcf3..954c28a 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -81,6 +81,7 @@ ENDPROC(cpu_resume_after_mmu)
- 	.data
- 	.align
- ENTRY(cpu_resume)
-+ARM_BE8(setend be)			@ ensure we are in BE mode
- #ifdef CONFIG_SMP
- 	adr	r0, sleep_save_sp
- 	ALT_SMP(mrc p15, 0, r1, c0, c0, 5)
+ 
+-	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
++	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
+ 	/* already enabled? */
+ 	if (scu_ctrl & 1)
+ 		return;
+ 
+ 	scu_ctrl |= 1;
+-	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
++	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 
+ 	/*
+ 	 * Ensure that the data accessed by CPU0 before the SCU was
+@@ -80,9 +80,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ 	if (mode > 3 || mode == 1 || cpu > 3)
+ 		return -EINVAL;
+ 
+-	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
++	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
+ 	val |= mode;
+-	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
++	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
+ 
+ 	return 0;
+ }
 -- 
 1.7.10.4
