@@ -1,99 +1,106 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:34:04 +0900
-Subject: [PATCH 11/16] ARM: shmobile: Add r8a73a4 CMT10 clock event
+Date: Wed, 24 Jul 2013 09:34:08 +0900
+Subject: [PATCH 15/16] ARM: shmobile: Introduce r8a7790_read_mode_pins()
 In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
 References: <cover.1374624383.git.horms+renesas@verge.net.au>
-Message-ID: <a7b99f27a260a25f856ea37090cea997d50fe112.1374624383.git.horms+renesas@verge.net.au>
+Message-ID: <512e53bc7f0088e3adfd89b3fea3447495fc8423.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add clock event support for CMT1 timer channel 0
-to the r8a73a4 SoC code. The CMT is used together
-with a 32KHz clock in this case.
+Break out the r8a7790 boot mode code into a separate
+function so it can be shared by multiple users.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c |  4 +++-
- arch/arm/mach-shmobile/setup-r8a73a4.c | 21 +++++++++++++++++++++
- 2 files changed, 24 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c        | 11 ++---------
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
+ arch/arm/mach-shmobile/setup-r8a7790.c        | 14 ++++++++++++++
+ 3 files changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index f831b3b..8ea5ef6 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -505,7 +505,7 @@ static struct clk div6_clks[DIV6_NR] = {
- /* MSTP */
- enum {
- 	MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
--	MSTP323, MSTP318, MSTP317, MSTP316,
-+	MSTP329, MSTP323, MSTP318, MSTP317, MSTP316,
- 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305, MSTP300,
- 	MSTP411, MSTP410, MSTP409,
- 	MSTP522, MSTP515,
-@@ -529,6 +529,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP317] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 17, 0), /* IIC7 */
- 	[MSTP318] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 18, 0), /* IIC0 */
- 	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 23, 0), /* IIC1 */
-+	[MSTP329] = SH_CLK_MSTP32(&extalr_clk, SMSTPCR3, 29, 0), /* CMT10 */
- 	[MSTP409] = SH_CLK_MSTP32(&main_div2_clk,	SMSTPCR4, 9, 0), /* IIC5 */
- 	[MSTP410] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 10, 0), /* IIC4 */
- 	[MSTP411] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 11, 0), /* IIC3 */
-@@ -593,6 +594,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e6560000.i2c", &mstp_clks[MSTP317]),
- 	CLKDEV_DEV_ID("e6500000.i2c", &mstp_clks[MSTP318]),
- 	CLKDEV_DEV_ID("e6510000.i2c", &mstp_clks[MSTP323]),
-+	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[MSTP329]),
- 	CLKDEV_DEV_ID("e60b0000.i2c", &mstp_clks[MSTP409]),
- 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP410]),
- 	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP411]),
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 9c52096..b8dddf4 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -22,6 +22,7 @@
- #include <linux/of_platform.h>
- #include <linux/platform_data/irq-renesas-irqc.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_timer.h>
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 62d8162..50d96f9 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -24,6 +24,7 @@
+ #include <linux/clkdev.h>
+ #include <mach/clock.h>
  #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a73a4.h>
-@@ -168,6 +169,25 @@ static const struct resource thermal0_resources[] = {
- 					thermal0_resources,		\
- 					ARRAY_SIZE(thermal0_resources))
++#include <mach/r8a7790.h>
  
-+static struct sh_timer_config cmt10_platform_data = {
-+	.name = "CMT10",
-+	.timer_bit = 0,
-+	.clockevent_rating = 80,
-+};
-+
-+static struct resource cmt10_resources[] = {
-+	DEFINE_RES_MEM(0xe6130010, 0x0c),
-+	DEFINE_RES_MEM(0xe6130000, 0x04),
-+	DEFINE_RES_IRQ(gic_spi(120)), /* CMT1_0 */
-+};
-+
-+#define r8a7790_register_cmt(idx)					\
-+	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
-+					  idx, cmt##idx##_resources,	\
-+					  ARRAY_SIZE(cmt##idx##_resources), \
-+					  &cmt##idx##_platform_data,	\
-+					  sizeof(struct sh_timer_config))
-+
- void __init r8a73a4_add_standard_devices(void)
+ /*
+  *   MD		EXTAL		PLL0	PLL1	PLL3
+@@ -42,8 +43,6 @@
+  *	see "p1 / 2" on R8A7790_CLOCK_ROOT() below
+  */
+ 
+-#define MD(nr)	(1 << nr)
+-
+ #define CPG_BASE 0xe6150000
+ #define CPG_LEN 0x1000
+ 
+@@ -53,7 +52,6 @@
+ #define SMSTPCR5 0xe6150144
+ #define SMSTPCR7 0xe615014c
+ 
+-#define MODEMR		0xE6160060
+ #define SDCKCR		0xE6150074
+ #define SD2CKCR		0xE6150078
+ #define SD3CKCR		0xE615007C
+@@ -288,14 +286,9 @@ static struct clk_lookup lookups[] = {
+ 
+ void __init r8a7790_clock_init(void)
  {
- 	r8a73a4_register_scif(SCIFA0);
-@@ -179,6 +199,7 @@ void __init r8a73a4_add_standard_devices(void)
- 	r8a73a4_register_irqc(0);
- 	r8a73a4_register_irqc(1);
- 	r8a73a4_register_thermal();
-+	r8a7790_register_cmt(10);
+-	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+-	u32 mode;
++	u32 mode = r8a7790_read_mode_pins();
+ 	int k, ret = 0;
+ 
+-	BUG_ON(!modemr);
+-	mode = ioread32(modemr);
+-	iounmap(modemr);
+-
+ 	switch (mode & (MD(14) | MD(13))) {
+ 	case 0:
+ 		R8A7790_CLOCK_ROOT(15, &extal_clk, 172, 208, 106, 88);
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+index 7851cc1..7aaef40 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+@@ -7,4 +7,7 @@ void r8a7790_pinmux_init(void);
+ void r8a7790_init_delay(void);
+ void r8a7790_timer_init(void);
+ 
++#define MD(nr) BIT(nr)
++u32 r8a7790_read_mode_pins(void);
++
+ #endif /* __ASM_R8A7790_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index f01542e..6acddc1 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -196,6 +196,20 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_cmt(00);
  }
  
- #ifdef CONFIG_USE_OF
++#define MODEMR 0xe6160060
++
++u32 __init r8a7790_read_mode_pins(void)
++{
++	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
++	u32 mode;
++
++	BUG_ON(!modemr);
++	mode = ioread32(modemr);
++	iounmap(modemr);
++
++	return mode;
++}
++
+ void __init r8a7790_timer_init(void)
+ {
+ 	void __iomem *cntcr;
 -- 
 1.8.2.1
