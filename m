@@ -1,68 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 13:36:10 -0700
-Subject: [PATCH v2] ARM: Fix deadlock scenario with smp_send_stop()
-In-Reply-To: <20130724202148.GA24642@n2100.arm.linux.org.uk>
-Message-ID: <1374698170-26605-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 24 Jul 2013 13:54:27 -0700
+Subject: [PATCH v2 2/9] ARM: msm: Don't compile __msm_ioremap_caller() unless
+ used
+In-Reply-To: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
+References: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374699274-18388-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If one process calls sys_reboot and that process then stops other
-CPUs while those CPUs are within a spin_lock() region we can
-potentially encounter a deadlock scenario like below.
+This function is only used on MSM7x00A so only compile the
+function if the build includes support for that platform.
 
-CPU 0                   CPU 1
------                   -----
-                        spin_lock(my_lock)
-smp_send_stop()
- <send IPI>             handle_IPI()
-                         disable_preemption/irqs
-                          while(1);
- <PREEMPT>
-spin_lock(my_lock) <--- Waits forever
-
-We shouldn't attempt to run any other tasks after we send a stop
-IPI to a CPU so disable preemption so that this task runs to
-completion. We use local_irq_disable() here for cross-arch
-consistency with x86.
-
-Reported-by: Sundarajan Srinivasan <sundaraj@codeaurora.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ arch/arm/mach-msm/io.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Changes since v1:
- - Use local_irq_disable() instead of preempt_disable()
-
- arch/arm/kernel/process.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index d3ca4f6..08b47eb 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -197,6 +197,7 @@ void machine_shutdown(void)
-  */
- void machine_halt(void)
- {
-+	local_irq_disable();
- 	smp_send_stop();
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 3dc04cc..4a1a222 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -168,6 +168,7 @@ void __init msm_map_msm7x30_io(void)
+ }
+ #endif /* CONFIG_ARCH_MSM7X30 */
  
- 	local_irq_disable();
-@@ -211,6 +212,7 @@ void machine_halt(void)
-  */
- void machine_power_off(void)
++#ifdef CONFIG_ARCH_MSM7X00A
+ void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 				   unsigned int mtype, void *caller)
  {
-+	local_irq_disable();
- 	smp_send_stop();
+@@ -182,3 +183,4 @@ void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
  
- 	if (pm_power_off)
-@@ -230,6 +232,7 @@ void machine_power_off(void)
-  */
- void machine_restart(char *cmd)
- {
-+	local_irq_disable();
- 	smp_send_stop();
- 
- 	arm_pm_restart(reboot_mode, cmd);
+ 	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+ }
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
