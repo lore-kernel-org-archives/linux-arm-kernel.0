@@ -1,34 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Jul 2013 11:19:51 +0100
-Subject: [PATCH 1/6] ARM: prefetch: remove redundant "cc" clobber
-In-Reply-To: <alpine.LFD.2.03.1307231547010.15022@syhkavp.arg>
-References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
- <1374579389-32704-2-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1307231547010.15022@syhkavp.arg>
-Message-ID: <20130724101950.GG9629@mudshark.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 Jul 2013 11:20:34 +0100
+Subject: [PATCH v2 3/4] Documentation: DT: Add DSPI driver
+In-Reply-To: <1374643943-3324-4-git-send-email-b44548@freescale.com>
+References: <1374643943-3324-1-git-send-email-b44548@freescale.com>
+ <1374643943-3324-4-git-send-email-b44548@freescale.com>
+Message-ID: <20130724102034.GA9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Wed, Jul 24, 2013 at 01:32:22PM +0800, Chao Fu wrote:
 
-On Tue, Jul 23, 2013 at 08:48:11PM +0100, Nicolas Pitre wrote:
-> On Tue, 23 Jul 2013, Will Deacon wrote:
-> 
-> > The pld instruction does not affect the condition flags, so don't bother
-> > clobbering them.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+Please make sure this document is word wrapped to less than 80 columns.
 
-Thanks for reviewing the series, much appreciated.
+> +-dspi,ctar-dbr : Double baud rate
+> +Doubles the effective baud rate of the Serial Communications Clock (SCK). This field is used only in
 
-> You know the legacy reason why the cc clobber was there, right?
-> It certainly doesn't apply anymore.
+> +-dspi,ctar-pbr : Baud Rate Prescaler
+> +	0: Baud Rate Prescaler value is 2.
+> +	1: Baud Rate Prescaler value is 3.
+> +	2: Baud Rate Prescaler value is 5.
+> +	3: Baud Rate Prescaler value is 7.
 
-I was under the impression that it was due to ancient GCC behaviour and the "cc"
-was there to prevent re-ordering. For interest, what are the specifics?
-
-Cheers,
-
-Will
+Why do these properties need to be set in DT?  They appears to be just
+setting the clock rate for the bus so I'd expect them to be configured
+based on that rather than manually specified.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130724/6eda3df5/attachment.sig>
