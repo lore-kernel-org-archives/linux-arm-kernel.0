@@ -1,51 +1,38 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 24 Jul 2013 17:43:24 +0300
-Subject: [PATCHv4 00/33] ARM: OMAP: clock conversion to DT
-In-Reply-To: <51EFE5E7.4090506@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <51EFE1D4.8090307@ti.com> <51EFE4D7.10800@ti.com> <51EFE5E7.4090506@ti.com>
-Message-ID: <51EFE80C.7020805@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 24 Jul 2013 23:44:05 +0900
+Subject: [PATCH 0/3] sh-pfc: Don't include mach/*.h headers were not
+ required
+In-Reply-To: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CANqRtoQHD9bk4uyAE9GAPvz_ZTLx1EtohFjaYhnetmwQ1Te1qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 05:34 PM, Roger Quadros wrote:
-> On 07/24/2013 05:29 PM, Tero Kristo wrote:
->> On 07/24/2013 05:16 PM, Roger Quadros wrote:
->>> On 07/23/2013 10:19 AM, Tero Kristo wrote:
->>>> Hi,
->>>>
->>>> Changes compared to previous version:
->>>>
->>>> - Clock init files moved from mach-omap2/ to drivers/clk/omap/
->>>> - AM33xx support added [patches 15-20]
->>>> - OMAP3 support added [patches 21-29]
->>>> - DRA7 APLL support added (thanks Keerthy) [patches 30-33]
->>>>
->>>> Test branch on top of 3.11-rc1 available here:
->>>>
->>>> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
->>>> branch: mainline-3.11-rc1-omap-dt-clks
->>>>
->>>> Testing done:
->>>>
->>>> - boot + suspend tested on OMAP3 beagle C4 (omap3530)
->>>> - boot + suspend tested on OMAP4 panda ES (omap4460)
->>>> - boot tested on beagle bone (am335x)
->>>>
->>>> A boot test was also executed for DRA7 and OMAP5 on a separate branch
->>>> (mainline does not have OMAP5 / DRA7 support so far.)
->>>
->>> Thanks to your hints, I was able to get this to work with 3.11-rc1 on omap5 uevm
->>> using the following 3 patches. Please include them in your series. Thanks.
->>
->> Your patches don't apply cleanly to mainline currently, as the omap5 base support is still not merged. I deliberately left out the full omap5 integration because of that. Lets see how and when the integration proceeds, but I can track your patches meanwhile.
->>
->
-> Strange, I didn't use any out of tree patch. Just 3.11-rc1 with your 33 patches on top.
->
-> Are you on 3.11-rc2?
+Hi Laurent,
 
-Oh, so OMAP5 hwmod data was actually merged now, cool. Sorry about the 
-fuss. I can include your patches to the next rev if one is made.
+On Wed, Jul 24, 2013 at 10:09 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> Hello,
+>
+> The (long) road to multiplatform kernels requires getting rid of mach/*.h
+> headers in device drivers. This patch set removes some of the included mach
+> headers from the sh-pfc driver. The only remaining one is mach/irqs.h, to get
+> the irq_pin() macro. This will require more work, see [1] for a discussion of
+> the issue.
 
--Tero
+That's a blocker for some of the SoCs, right? I suppose the ones using
+a separate GPIO controller are OK as-is?
+
+> The patches are based on v3.11-rc2. Linus, do you usually pick pinctrl patches
+> from the list, or should I send you a pull request ?
+>
+> [1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg473450.html
+>
+> Laurent Pinchart (3):
+>   sh-pfc: Remove unneeded mach/<soc>.h includes
+>   sh-pfc: sh7372: Replace <mach/irqs.h> with <linux/sh_intc.h>
+>   sh-pfc: sh73a0: Remove EXT_IRQ16L and EXT_IRQ16H macros
+
+These are fine with me. Thanks for your help!
+
+Acked-by: Magnus Damm <damm@opensource.se>
