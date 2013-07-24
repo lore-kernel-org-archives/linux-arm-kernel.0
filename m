@@ -1,45 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:32:51 +0900
-Subject: [PATCH 12/19] ARM: shmobile: armadillo-reference: Add st1232 pin
- mappings
+Date: Wed, 24 Jul 2013 09:32:34 +0900
+Subject: [PATCH 07/19] ARM: shmobile: r8a7790: Add pin control device to
+ device tree
 In-Reply-To: <cover.1374625203.git.horms+renesas@verge.net.au>
 References: <cover.1374625203.git.horms+renesas@verge.net.au>
-Message-ID: <f46a6b0f6a54e80ebf1003134f2e6f4258e53688.1374625203.git.horms+renesas@verge.net.au>
+Message-ID: <9694c778048e006604c3fbade6b0aefa5dd0b516.1374625203.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Add pin mappings for the st1232 device to the device tree and reference
-them as the default state for the device.
+Add a pfc node to the r8a7790 device tree.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 4a7ae32..a6c6606 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -41,6 +41,8 @@
- 		reg = <0x55>;
- 		interrupt-parent = <&irqpin1>;
- 		interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
-+		pinctrl-0 = <&st1232_pins>;
-+		pinctrl-names = "default";
- 	};
- };
- 
-@@ -52,4 +54,9 @@
- 		renesas,groups = "scifa1_data";
- 		renesas,function = "scifa1";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 339d9b1..13caf12 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -54,4 +54,9 @@
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 0 4>, <0 1 4>, <0 2 4>,	<0 3 4>;
  	};
 +
-+	st1232_pins: st1232 {
-+		renesas,groups = "intc_irq10";
-+		renesas,function = "intc";
++	pfc: pfc at e6060000 {
++		compatible = "renesas,pfc-r8a7790";
++		reg = <0 0xe6060000 0 0x250>;
 +	};
  };
 -- 
