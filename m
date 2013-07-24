@@ -1,36 +1,24 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 23 Jul 2013 16:57:10 -0700
-Subject: [PATCH] MAINTAINERS: Add mach-bcm and drivers
-Message-ID: <1374623830-32105-1-git-send-email-csd@broadcom.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 24 Jul 2013 08:00:54 +0800
+Subject: [PATCH, re-send] Always trap on BUG()
+In-Reply-To: <20130723093628.GC19786@gmail.com>
+References: <201307051738.35930.arnd@arndb.de>
+ <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
+ <20130715222755.GY24642@n2100.arm.linux.org.uk> <51E47924.9030005@zytor.com>
+ <20130723093628.GC19786@gmail.com>
+Message-ID: <51EF1936.7090801@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding ownership to maintainers file for the mach-bcm related files,
-including drivers that are used for the SoCs defined in mach-bcm.
+On 07/23/2013 05:36 PM, Ingo Molnar wrote:
+> 
+> (the crazies can keep a separate patch to remove even more of BUG() to win 
+> a K or two.)
+> 
 
-Signed-off-by: Christian Daudt <csd@broadcom.com>
+Excuse me, my English is not quite well, I do not quite understand your
+meaning, could you please repeat again in details or say more clearly ?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index bf61e04..49480494 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1785,6 +1785,17 @@ L:	netdev at vger.kernel.org
- S:	Supported
- F:	drivers/net/ethernet/broadcom/bnx2x/
- 
-+BROADCOM BCM281XX/BCM11XXX ARM ARCHITECTURE
-+M:	Christian Daudt <csd@broadcom.com>
-+T:	git git://git.github.com/broadcom/bcm11351
-+S:	Maintained
-+F:	arch/arm/mach-bcm/
-+F:	arch/arm/boot/dts/bcm113*
-+F:	arch/arm/boot/dts/bcm281*
-+F:	arch/arm/configs/bcm_defconfig
-+F:	drivers/mmc/host/sdhci_bcm_kona.c
-+F:	drivers/clocksource/bcm_kona_timer.c
-+
- BROADCOM BCM2835 ARM ARCHICTURE
- M:	Stephen Warren <swarren@wwwdotorg.org>
- L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
+Thanks.
 -- 
-1.7.10.4
+Chen Gang
