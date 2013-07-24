@@ -1,80 +1,94 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 24 Jul 2013 15:15:18 +0200
-Subject: [PATCH 12/14] sh-pfc: r8a7790: Add SCIF2 pin groups and functions
+Date: Wed, 24 Jul 2013 15:15:19 +0200
+Subject: [PATCH 13/14] sh-pfc: r8a7790: Add USB pin groups and functions
 In-Reply-To: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1374671720-8794-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1374671720-8794-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+
+Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 42 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index 9acb0e5..2fd904f 100644
+index 2fd904f..fa501ef 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -2311,6 +2311,28 @@ static const unsigned int scif1_clk_e_pins[] = {
- static const unsigned int scif1_clk_e_mux[] = {
- 	SCK1_E_MARK,
+@@ -2869,6 +2869,30 @@ static const unsigned int tpu0_to3_pins[] = {
+ static const unsigned int tpu0_to3_mux[] = {
+ 	TPU0TO3_MARK,
  };
-+/* - SCIF2 ------------------------------------------------------------------ */
-+static const unsigned int scif2_data_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(5, 6), RCAR_GP_PIN(5, 5),
++/* - USB0 ------------------------------------------------------------------- */
++static const unsigned int usb0_pins[] = {
++	/* PWEN, OVC/VBUS */
++	RCAR_GP_PIN(5, 18), RCAR_GP_PIN(5, 19),
 +};
-+static const unsigned int scif2_data_mux[] = {
-+	RX2_MARK, TX2_MARK,
++static const unsigned int usb0_mux[] = {
++	USB0_PWEN_MARK, USB0_OVC_VBUS_MARK,
 +};
-+static const unsigned int scif2_clk_pins[] = {
-+	/* SCK */
-+	RCAR_GP_PIN(5, 4),
++/* - USB1 ------------------------------------------------------------------- */
++static const unsigned int usb1_pins[] = {
++	/* PWEN, OVC */
++	RCAR_GP_PIN(5, 20), RCAR_GP_PIN(5, 21),
 +};
-+static const unsigned int scif2_clk_mux[] = {
-+	SCK2_MARK,
++static const unsigned int usb1_mux[] = {
++	USB1_PWEN_MARK, USB1_OVC_MARK,
 +};
-+static const unsigned int scif2_data_b_pins[] = {
-+	/* RX, TX */
-+	RCAR_GP_PIN(0, 24), RCAR_GP_PIN(0, 25),
++/* - USB2 ------------------------------------------------------------------- */
++static const unsigned int usb2_pins[] = {
++	/* PWEN, OVC */
++	RCAR_GP_PIN(5, 22), RCAR_GP_PIN(5, 23),
 +};
-+static const unsigned int scif2_data_b_mux[] = {
-+	RX2_B_MARK, TX2_B_MARK,
++static const unsigned int usb2_mux[] = {
++	USB2_PWEN_MARK, USB2_OVC_MARK,
 +};
- /* - SCIFA0 ----------------------------------------------------------------- */
- static const unsigned int scifa0_data_pins[] = {
- 	/* RXD, TXD */
-@@ -2921,6 +2943,9 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(scif1_clk_d),
- 	SH_PFC_PIN_GROUP(scif1_data_e),
- 	SH_PFC_PIN_GROUP(scif1_clk_e),
-+	SH_PFC_PIN_GROUP(scif2_data),
-+	SH_PFC_PIN_GROUP(scif2_clk),
-+	SH_PFC_PIN_GROUP(scif2_data_b),
- 	SH_PFC_PIN_GROUP(scifa0_data),
- 	SH_PFC_PIN_GROUP(scifa0_clk),
- 	SH_PFC_PIN_GROUP(scifa0_ctrl),
-@@ -3106,6 +3131,12 @@ static const char * const scif1_groups[] = {
- 	"scif1_clk_e",
+ 
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(eth_link),
+@@ -3021,6 +3045,9 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(tpu0_to1),
+ 	SH_PFC_PIN_GROUP(tpu0_to2),
+ 	SH_PFC_PIN_GROUP(tpu0_to3),
++	SH_PFC_PIN_GROUP(usb0),
++	SH_PFC_PIN_GROUP(usb1),
++	SH_PFC_PIN_GROUP(usb2),
  };
  
-+static const char * const scif2_groups[] = {
-+	"scif2_data",
-+	"scif2_clk",
-+	"scif2_data_b",
+ static const char * const eth_groups[] = {
+@@ -3245,6 +3272,18 @@ static const char * const tpu0_groups[] = {
+ 	"tpu0_to3",
+ };
+ 
++static const char * const usb0_groups[] = {
++	"usb0",
 +};
 +
- static const char * const scifa0_groups[] = {
- 	"scifa0_data",
- 	"scifa0_clk",
-@@ -3227,6 +3258,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(msiof3),
- 	SH_PFC_FUNCTION(scif0),
- 	SH_PFC_FUNCTION(scif1),
-+	SH_PFC_FUNCTION(scif2),
- 	SH_PFC_FUNCTION(scifa0),
- 	SH_PFC_FUNCTION(scifa1),
- 	SH_PFC_FUNCTION(scifa2),
++static const char * const usb1_groups[] = {
++	"usb1",
++};
++
++static const char * const usb2_groups[] = {
++	"usb2",
++};
++
+ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(eth),
+ 	SH_PFC_FUNCTION(hscif0),
+@@ -3270,6 +3309,9 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(sdhi2),
+ 	SH_PFC_FUNCTION(sdhi3),
+ 	SH_PFC_FUNCTION(tpu0),
++	SH_PFC_FUNCTION(usb0),
++	SH_PFC_FUNCTION(usb1),
++	SH_PFC_FUNCTION(usb2),
+ };
+ 
+ static struct pinmux_cfg_reg pinmux_config_regs[] = {
 -- 
 1.8.1.5
