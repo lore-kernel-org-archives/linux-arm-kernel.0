@@ -1,54 +1,29 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 24 Jul 2013 11:24:48 -0400 (EDT)
-Subject: Requirements for FDT load address on ARM
-In-Reply-To: <1374677923.6623.194.camel@hastur.hellion.org.uk>
-References: <1374677923.6623.194.camel@hastur.hellion.org.uk>
-Message-ID: <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Jul 2013 08:27:13 -0700
+Subject: Do we have people interested in device tree janitoring / cleanup?
+Message-ID: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Jul 2013, Ian Campbell wrote:
+Every now and then I come across a binding that's just done Wrong(tm),
+merged through a submaintainer tree and hasn't seen proper review --
+if it had, it wouldn't look the way it does. It's something we're
+starting to address now since there's more people stepping up to be
+maintainers, but there's a backlog of bad bindings already merged.
 
-> [apologies if this is a repeat, I don't see it in the archives and at
-> least one CC'd recipient (Julien) didn't receive it either. Beasties in
-> our email server I expect...]
-> 
-> Are there any requirements about where the FDT may be loaded by the
-> bootloader?
+Often they are produced by translating the platform_data structures
+directly over into device-tree properties without consideration to
+describing the hardware or usual conventions, using key/value pairs
+instead of boolean properties, etc.
 
-It must be located where it is unlikely to be overwritten by the zImage 
-decompressor relocating itself.  Same goes for the initrd.
+Getting involved in cleaning up these kind of bindings is a great way
+to learn "the ways of device tree" for someone that has interest in
+that.
 
-> I'm finding that if I load it "too high" I get a fault (the specifics
-> aren't that relevant but details are below).
-
-Do you have commit 6f16f4998f98 in your kernel tree?
-
-> FWIW with RAM from 0x8000000-0xffffffff and a kernel loaded at 
-> 0x80008000 "too high" means above somewhere around 0xaf800000.
-
-Sorry, I don't understand the above sentence.
-
-Is RAM actually starting at 0x08000000 ?  Note that the kernel must be 
-loaded in the first 128MB of RAM.
-
-> I expect this is because the kernel doesn't use an explicit mapping of
-> the fdt but expects it to be within the RAM directly mapped by the
-> lowmem area (i.e. it uses phys_to_virt, since day one aka 93c02ab40ae6
-> "arm/dt: probe for platforms via the device tree").
-
-The fdt is expected to be located in lowmem.  So yes, that's actually a 
-restriction.
+Latest find in this area is the Maxim 8925 bindings, that I came
+across since they caused a compile warning on some defconfig. I'll
+post a patch to address the warning but if someone else feels like
+fixing the bindings on top of it that would be appreciated!
 
 
-> This effectively
-> limits the FDT to being within the first ~700MB (give or take based
-> on .config etc, I suppose <500MB is a pretty safe rule of thumb). Is
-> this expected or is it actually not intentional and the kernel should
-> really be using an explicit mapping here? Should I send a patch against
-> Documentation/arm/Booting?
-
-Yes please.
-
-
-Nicolas
+-Olof
