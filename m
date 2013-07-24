@@ -1,41 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 24 Jul 2013 15:23:09 +0300
-Subject: [PATCH 1/7] usb: phy: msm: Move mach dependent code to platform
- data
-In-Reply-To: <1372087664-26396-2-git-send-email-iivanov@mm-sol.com>
-References: <1372087664-26396-1-git-send-email-iivanov@mm-sol.com>
- <1372087664-26396-2-git-send-email-iivanov@mm-sol.com>
-Message-ID: <20130724122309.GD17962@radagast>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 24 Jul 2013 14:23:39 +0200
+Subject: [PATCH v4 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+In-Reply-To: <0eb101ce8865$60f1d920$22d58b60$@org>
+References: <1374655405-22998-1-git-send-email-sachin.kamat@linaro.org>
+ <51EFB023.6090804@samsung.com>
+ <CAK9yfHyMcyWJh6Jv0ZK1t=+hMhD44qE3WccaLnwFM=tK8ab6GQ@mail.gmail.com>
+ <0eb101ce8865$60f1d920$22d58b60$@org>
+Message-ID: <51EFC74B.8000403@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 06:27:38PM +0300, Ivan T. Ivanov wrote:
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> 
-> This patch fix compilation error and is an intermediate step
-> before the addition of DeviceTree support for newer targets.
-> Fix suggested here: https://lkml.org/lkml/2013/6/19/381
-> 
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> 
-> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+On 07/24/2013 02:00 PM, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+>> Sachin Kamat wrote:
+[...]
+>>>>> @@ -1590,8 +1590,7 @@ config ARM_PSCI
+>>>>>  config ARCH_NR_GPIO
+>>>>>       int
+>>>>>       default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+>>>>> -     default 512 if SOC_OMAP5
+>>>>> -     default 512 if ARCH_KEYSTONE
+>>>>> +     default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5
+>>>>
+>>>> Sorry, 512 seems a bit too generous to me. Also I would rather
+>>>> leave each SOC/ARCH on a separate line.
+>>>
+>>> Even I had left it that way earlier. However Kukjin suggested the
+>>> above (single line).
+>>> I feel it is more of individual preference.
+>>>
+>> I know it is quite big but I think if we want to use the large number, I'd
+>> preferred to use enough the large number so that we don't need to update
+>> it soon. If so, multiple line is useless...
+>>
+>> Note, according to git log, for omap5, 256 is the accurately right number.
 
-I need Acks
+If it's done similarly for other SoCs then I'm fine with change as above.
+256 entries is only about 3 kB anyway, it shouldn't be a big deal for
+systems using those SoCs.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130724/e731fbea/attachment.sig>
+>>>> Almost half of those 512 entries would have been unused in most
+>>>> cases. How about, e.g. 352 ? If anyone finds this value too low
+>>>> they could always submit a patch like this one. IMHO with 352 or
+>>>> 392 there would be sufficient margin.
+>>>
+>> Hmm...
+>>
+>>> I agree. Again, I do not have any reservations here. I just went with
+>>> maintainer's choice which was a superset of your and Tomasz's
+>>> suggestions :)
+>
+> If you have another opinion on this, please let me know before sending fixes
+> for 3.11 probably tomorrow morning in my time.
+
+I'm OK with that change. Sorry for the trouble.
+
+--
+Thanks,
+Sylwester
