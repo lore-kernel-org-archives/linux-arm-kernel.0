@@ -1,33 +1,40 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 24 Jul 2013 16:01:18 +0200
-Subject: [PATCH v2 6/6] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
- clock framework
-In-Reply-To: <0ee601ce886d$abb6a690$0323f3b0$@org>
-References: <201307100057.06061.heiko@sntech.de> <2236509.stVfXyPhpt@amdc1227>
- <0ee601ce886d$abb6a690$0323f3b0$@org>
-Message-ID: <2889437.fCIi7koiPh@amdc1227>
+Date: Wed, 24 Jul 2013 16:03:55 +0200
+Subject: [PATCH v2 07/22] ARM: Exynos4210: Remove '0x's from Exynos4110
+ DTSI file
+In-Reply-To: <20130724123931.GL26801@laptop>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
+ <20130724123931.GL26801@laptop>
+Message-ID: <6156493.tCYrm4xD5A@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 of July 2013 21:59:45 Kukjin Kim wrote:
-> Tomasz Figa wrote:
+On Wednesday 24 of July 2013 13:39:31 Lee Jones wrote:
+> ... for the sake of consistency and assumed convention.
 > 
-> [...]
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> > > > +	timer at 51000000 {
-> > > > +		clocks = <&clocks PCLK_PWM>;
-> > > 
-> > > +		clocks = <&clock PCLK_PWM>;
-> > > 
-> > > And I'm not sure using definition PCLK_PWM is better here...
-> > 
-> > Care to explain your doubts about it? I think this is fine.
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+> b/arch/arm/boot/dts/exynos4210.dtsi index b7f358a..53e2527 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -72,7 +72,7 @@
+>                 };
+>         };
 > 
-> I mean I don't know why someone use a hard value(number) and someone use
-> the definition...
+> -       clock: clock-controller at 0x10030000 {
+> +       clock: clock-controller at 10030000 {
+>                 compatible = "samsung,exynos4210-clock";
+>                 reg = <0x10030000 0x20000>;
+>                 #clock-cells = <1>;
 
-Since preprocessor support for dts files was introduced, definitions are 
-preferred, wherever possible to specify constants.
+Looks good to me, except the subject which is still wrong - 
+s/Exynos4110/Exynos4210/.
+
+I guess it might be fixed when applying, though.
 
 Best regards,
 Tomasz
