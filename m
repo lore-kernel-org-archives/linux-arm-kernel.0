@@ -1,67 +1,24 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Jul 2013 17:20:37 +0100
-Subject: [PATCH 12/14] ARM: traps: use <asm/opcodes.h> to get correct
- instruction order
-In-Reply-To: <1374661682-9349-13-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed, 24 Jul 2013 17:25:30 +0100
+Subject: [PATCH 14/14] ARM: set --be8 when linking modules
+In-Reply-To: <1374661682-9349-15-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-13-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130724162036.GS11072@mudshark.cambridge.arm.com>
+ <1374661682-9349-15-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130724162530.GT11072@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 11:28:00AM +0100, Ben Dooks wrote:
-> The trap handler needs to take into account the endian configuration of
-> the system when loading instructions. Use <asm/opcodes.h> to provide the
-> necessary conversion functions.
+On Wed, Jul 24, 2013 at 11:28:02AM +0100, Ben Dooks wrote:
+> To avoid having to make every text section swap the instruction order
+> of all instructions, make sure modules are built also built with --be8
+> (as is the current kernel final link).
+> 
+> If we do not do this, we would end up having to swap all instructions
+> when loading a module, instead of just the instructions that we are
+> applying ELF relocations to.
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/kernel/traps.c |   10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 18b32e8..c300e51 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -34,6 +34,7 @@
->  #include <asm/unwind.h>
->  #include <asm/tls.h>
->  #include <asm/system_misc.h>
-> +#include <asm/opcodes.h>
->  
->  #include "signal.h"
->  
-> @@ -404,23 +405,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->  	if (processor_mode(regs) == SVC_MODE) {
->  #ifdef CONFIG_THUMB2_KERNEL
->  		if (thumb_mode(regs)) {
-> -			instr = ((u16 *)pc)[0];
-> +			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
->  			if (is_wide_instruction(instr)) {
->  				instr <<= 16;
-> -				instr |= ((u16 *)pc)[1];
-> +				instr |= __mem_to_opcode_thumb16(((u16 *)pc)[1]);
->  			}
->  		} else
->  #endif
-> -			instr = *(u32 *) pc;
-> +			instr = __mem_to_opcode_arm(*(u32 *) pc);
->  	} else if (thumb_mode(regs)) {
->  		if (get_user(instr, (u16 __user *)pc))
->  			goto die_sig;
-> +		instr = __mem_to_opcode_thumb16(instr);
->  		if (is_wide_instruction(instr)) {
->  			unsigned int instr2;
->  			if (get_user(instr2, (u16 __user *)pc+1))
->  				goto die_sig;
->  			instr <<= 16;
-> -			instr |= instr2;
-> +			instr |= __mem_to_opcode_thumb16(instr2);
->  		}
->  	} else if (get_user(instr, (u32 __user *)pc)) {
->  		goto die_sig;
 
-Maybe it's also worth updating dump_instr, so that we don't confuse people
-by printing the faulting instruction in the wrong endianness.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
 Will
