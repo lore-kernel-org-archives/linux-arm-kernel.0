@@ -1,29 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Jul 2013 08:27:13 -0700
-Subject: Do we have people interested in device tree janitoring / cleanup?
-Message-ID: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Jul 2013 16:28:37 +0100
+Subject: [PATCH 11/14] ARM: alignment: correctly decode instructions in
+ BE8 mode.
+In-Reply-To: <1374661682-9349-12-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374661682-9349-12-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130724152837.GQ11072@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Every now and then I come across a binding that's just done Wrong(tm),
-merged through a submaintainer tree and hasn't seen proper review --
-if it had, it wouldn't look the way it does. It's something we're
-starting to address now since there's more people stepping up to be
-maintainers, but there's a backlog of bad bindings already merged.
+On Wed, Jul 24, 2013 at 11:27:59AM +0100, Ben Dooks wrote:
+> If we are in BE8 mode, we must deal with the instruction stream being
+> in LE order when data is being loaded in BE order. Ensure the data is
+> swapped before processing to avoid thre following:
+> 
+> Change to using <asm/opcodes.h> to provide the necessary conversion
+> functions to change the byte ordering.
+> 
+> Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
+> Unhandled fault: alignment exception (0x001) at 0xbfa09567
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/mm/alignment.c |    8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index 6f4585b..f38145a 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -25,6 +25,7 @@
+>  #include <asm/cp15.h>
+>  #include <asm/system_info.h>
+>  #include <asm/unaligned.h>
+> +#include <asm/opcodes.h>
+>  
+>  #include "fault.h"
+>  
+> @@ -762,21 +763,24 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	if (thumb_mode(regs)) {
+>  		u16 *ptr = (u16 *)(instrptr & ~1);
+>  		fault = probe_kernel_address(ptr, tinstr);
+> +		tinstr = __mem_to_opcode_thumb16(tinstr);
+>  		if (!fault) {
+>  			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+>  			    IS_T32(tinstr)) {
+>  				/* Thumb-2 32-bit */
+>  				u16 tinst2 = 0;
+>  				fault = probe_kernel_address(ptr + 1, tinst2);
+> +				tinst2 = __mem_to_opcode_thumb16(tinst2);
+>  				instr = (tinstr << 16) | tinst2;
 
-Often they are produced by translating the platform_data structures
-directly over into device-tree properties without consideration to
-describing the hardware or usual conventions, using key/value pairs
-instead of boolean properties, etc.
+Took me a while to convince myself, but looks right to me:
 
-Getting involved in cleaning up these kind of bindings is a great way
-to learn "the ways of device tree" for someone that has interest in
-that.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Latest find in this area is the Maxim 8925 bindings, that I came
-across since they caused a compile warning on some defconfig. I'll
-post a patch to address the warning but if someone else feels like
-fixing the bindings on top of it that would be appreciated!
-
-
--Olof
+Will
