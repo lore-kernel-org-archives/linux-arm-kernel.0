@@ -1,106 +1,122 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:34:08 +0900
-Subject: [PATCH 15/16] ARM: shmobile: Introduce r8a7790_read_mode_pins()
-In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
-References: <cover.1374624383.git.horms+renesas@verge.net.au>
-Message-ID: <512e53bc7f0088e3adfd89b3fea3447495fc8423.1374624383.git.horms+renesas@verge.net.au>
+Date: Wed, 24 Jul 2013 09:34:31 +0900
+Subject: [PATCH 1/4] ARM: shmobile: armadillo800eva: Add backlight support
+In-Reply-To: <cover.1374624997.git.horms+renesas@verge.net.au>
+References: <cover.1374624997.git.horms+renesas@verge.net.au>
+Message-ID: <d58226a21a7b84a3f82265821f24ce2aad267f1c.1374624997.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Break out the r8a7790 boot mode code into a separate
-function so it can be shared by multiple users.
+The flat panel backlight on the Armadillo 800 EVA board is driven by the
+TPU PWM output.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Simon Horman <horms@verge.net.au>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c        | 11 ++---------
- arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
- arch/arm/mach-shmobile/setup-r8a7790.c        | 14 ++++++++++++++
- 3 files changed, 19 insertions(+), 9 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 54 +++++++++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 62d8162..50d96f9 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -24,6 +24,7 @@
- #include <linux/clkdev.h>
- #include <mach/clock.h>
- #include <mach/common.h>
-+#include <mach/r8a7790.h>
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index e115f67..9457c76 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -31,6 +31,8 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/regulator/driver.h>
+ #include <linux/pinctrl/machine.h>
++#include <linux/platform_data/pwm-renesas-tpu.h>
++#include <linux/pwm_backlight.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/gpio-regulator.h>
+ #include <linux/regulator/machine.h>
+@@ -387,7 +389,50 @@ static struct platform_device sh_eth_device = {
+ 	.num_resources = ARRAY_SIZE(sh_eth_resources),
+ };
  
- /*
-  *   MD		EXTAL		PLL0	PLL1	PLL3
-@@ -42,8 +43,6 @@
-  *	see "p1 / 2" on R8A7790_CLOCK_ROOT() below
+-/* LCDC */
++/* PWM */
++static struct resource pwm_resources[] = {
++	[0] = {
++		.start = 0xe6600000,
++		.end = 0xe66000ff,
++		.flags = IORESOURCE_MEM,
++	},
++};
++
++static struct tpu_pwm_platform_data pwm_device_data = {
++	.channels[2] = {
++		.polarity = PWM_POLARITY_INVERSED,
++	}
++};
++
++static struct platform_device pwm_device = {
++	.name = "renesas-tpu-pwm",
++	.id = -1,
++	.dev = {
++		.platform_data = &pwm_device_data,
++	},
++	.num_resources = ARRAY_SIZE(pwm_resources),
++	.resource = pwm_resources,
++};
++
++static struct pwm_lookup pwm_lookup[] = {
++	PWM_LOOKUP("renesas-tpu-pwm", 2, "pwm-backlight.0", NULL),
++};
++
++/* LCDC and backlight */
++static struct platform_pwm_backlight_data pwm_backlight_data = {
++	.lth_brightness = 50,
++	.max_brightness = 255,
++	.dft_brightness = 255,
++	.pwm_period_ns = 33333, /* 30kHz */
++};
++
++static struct platform_device pwm_backlight_device = {
++	.name = "pwm-backlight",
++	.dev = {
++		.platform_data = &pwm_backlight_data,
++	},
++};
++
+ static struct fb_videomode lcdc0_mode = {
+ 	.name		= "AMPIER/AM-800480",
+ 	.xres		= 800,
+@@ -1030,6 +1075,8 @@ static struct i2c_board_info i2c2_devices[] = {
   */
+ static struct platform_device *eva_devices[] __initdata = {
+ 	&lcdc0_device,
++	&pwm_device,
++	&pwm_backlight_device,
+ 	&gpio_keys_device,
+ 	&sh_eth_device,
+ 	&vcc_sdhi0,
+@@ -1101,6 +1148,9 @@ static const struct pinctrl_map eva_pinctrl_map[] = {
+ 	/* ST1232 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("0-0055", "pfc-r8a7740",
+ 				  "intc_irq10", "intc"),
++	/* TPU0 */
++	PIN_MAP_MUX_GROUP_DEFAULT("renesas-tpu-pwm", "pfc-r8a7740",
++				  "tpu0_to2_1", "tpu0"),
+ 	/* USBHS */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7740",
+ 				  "intc_irq7_1", "intc"),
+@@ -1154,13 +1204,13 @@ static void __init eva_init(void)
+ 				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
  
--#define MD(nr)	(1 << nr)
--
- #define CPG_BASE 0xe6150000
- #define CPG_LEN 0x1000
+ 	pinctrl_register_mappings(eva_pinctrl_map, ARRAY_SIZE(eva_pinctrl_map));
++	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
  
-@@ -53,7 +52,6 @@
- #define SMSTPCR5 0xe6150144
- #define SMSTPCR7 0xe615014c
+ 	r8a7740_pinmux_init();
+ 	r8a7740_meram_workaround();
  
--#define MODEMR		0xE6160060
- #define SDCKCR		0xE6150074
- #define SD2CKCR		0xE6150078
- #define SD3CKCR		0xE615007C
-@@ -288,14 +286,9 @@ static struct clk_lookup lookups[] = {
+ 	/* LCDC0 */
+ 	gpio_request_one(61, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
+-	gpio_request_one(202, GPIOF_OUT_INIT_LOW, NULL); /* LCD0_LED_CONT */
  
- void __init r8a7790_clock_init(void)
- {
--	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
--	u32 mode;
-+	u32 mode = r8a7790_read_mode_pins();
- 	int k, ret = 0;
- 
--	BUG_ON(!modemr);
--	mode = ioread32(modemr);
--	iounmap(modemr);
--
- 	switch (mode & (MD(14) | MD(13))) {
- 	case 0:
- 		R8A7790_CLOCK_ROOT(15, &extal_clk, 172, 208, 106, 88);
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-index 7851cc1..7aaef40 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -7,4 +7,7 @@ void r8a7790_pinmux_init(void);
- void r8a7790_init_delay(void);
- void r8a7790_timer_init(void);
- 
-+#define MD(nr) BIT(nr)
-+u32 r8a7790_read_mode_pins(void);
-+
- #endif /* __ASM_R8A7790_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index f01542e..6acddc1 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -196,6 +196,20 @@ void __init r8a7790_add_standard_devices(void)
- 	r8a7790_register_cmt(00);
- }
- 
-+#define MODEMR 0xe6160060
-+
-+u32 __init r8a7790_read_mode_pins(void)
-+{
-+	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
-+	u32 mode;
-+
-+	BUG_ON(!modemr);
-+	mode = ioread32(modemr);
-+	iounmap(modemr);
-+
-+	return mode;
-+}
-+
- void __init r8a7790_timer_init(void)
- {
- 	void __iomem *cntcr;
+ 	/* Touchscreen */
+ 	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
 -- 
 1.8.2.1
