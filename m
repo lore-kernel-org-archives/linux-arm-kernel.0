@@ -1,92 +1,156 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 24 Jul 2013 15:15:19 +0200
-Subject: [PATCH 13/14] sh-pfc: r8a7790: Add USB pin groups and functions
+Date: Wed, 24 Jul 2013 15:15:20 +0200
+Subject: [PATCH 14/14] sh-pfc: r8a7790: Add VIN pin groups and functions
 In-Reply-To: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1374671720-8794-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1374671720-8794-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
 
 Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 42 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 106 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 106 insertions(+)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index 2fd904f..fa501ef 100644
+index fa501ef..846ffcc 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -2869,6 +2869,30 @@ static const unsigned int tpu0_to3_pins[] = {
- static const unsigned int tpu0_to3_mux[] = {
- 	TPU0TO3_MARK,
+@@ -2893,6 +2893,84 @@ static const unsigned int usb2_pins[] = {
+ static const unsigned int usb2_mux[] = {
+ 	USB2_PWEN_MARK, USB2_OVC_MARK,
  };
-+/* - USB0 ------------------------------------------------------------------- */
-+static const unsigned int usb0_pins[] = {
-+	/* PWEN, OVC/VBUS */
-+	RCAR_GP_PIN(5, 18), RCAR_GP_PIN(5, 19),
++/* - VIN0 ------------------------------------------------------------------- */
++static const unsigned int vin0_data_g_pins[] = {
++	RCAR_GP_PIN(0, 8), RCAR_GP_PIN(0, 9), RCAR_GP_PIN(0, 10),
++	RCAR_GP_PIN(0, 11), RCAR_GP_PIN(0, 0), RCAR_GP_PIN(0, 1),
++	RCAR_GP_PIN(0, 2), RCAR_GP_PIN(0, 3),
 +};
-+static const unsigned int usb0_mux[] = {
-+	USB0_PWEN_MARK, USB0_OVC_VBUS_MARK,
++static const unsigned int vin0_data_g_mux[] = {
++	VI0_G0_MARK, VI0_G1_MARK, VI0_G2_MARK,
++	VI0_G3_MARK, VI0_G4_MARK, VI0_G5_MARK,
++	VI0_G6_MARK, VI0_G7_MARK,
 +};
-+/* - USB1 ------------------------------------------------------------------- */
-+static const unsigned int usb1_pins[] = {
-+	/* PWEN, OVC */
-+	RCAR_GP_PIN(5, 20), RCAR_GP_PIN(5, 21),
++static const unsigned int vin0_data_r_pins[] = {
++	RCAR_GP_PIN(0, 4), RCAR_GP_PIN(0, 5), RCAR_GP_PIN(0, 6),
++	RCAR_GP_PIN(0, 7), RCAR_GP_PIN(0, 24), RCAR_GP_PIN(0, 25),
++	RCAR_GP_PIN(0, 26), RCAR_GP_PIN(1, 11),
 +};
-+static const unsigned int usb1_mux[] = {
-+	USB1_PWEN_MARK, USB1_OVC_MARK,
++static const unsigned int vin0_data_r_mux[] = {
++	VI0_R0_MARK, VI0_R1_MARK, VI0_R2_MARK,
++	VI0_R3_MARK, VI0_R4_MARK, VI0_R5_MARK,
++	VI0_R6_MARK, VI0_R7_MARK,
 +};
-+/* - USB2 ------------------------------------------------------------------- */
-+static const unsigned int usb2_pins[] = {
-+	/* PWEN, OVC */
-+	RCAR_GP_PIN(5, 22), RCAR_GP_PIN(5, 23),
++static const unsigned int vin0_data_b_pins[] = {
++	RCAR_GP_PIN(2, 1), RCAR_GP_PIN(2, 2), RCAR_GP_PIN(2, 3),
++	RCAR_GP_PIN(2, 4), RCAR_GP_PIN(2, 5), RCAR_GP_PIN(2, 6),
++	RCAR_GP_PIN(2, 7), RCAR_GP_PIN(2, 8),
 +};
-+static const unsigned int usb2_mux[] = {
-+	USB2_PWEN_MARK, USB2_OVC_MARK,
++static const unsigned int vin0_data_b_mux[] = {
++	VI0_DATA0_VI0_B0_MARK, VI0_DATA1_VI0_B1_MARK, VI0_DATA2_VI0_B2_MARK,
++	VI0_DATA3_VI0_B3_MARK, VI0_DATA4_VI0_B4_MARK, VI0_DATA5_VI0_B5_MARK,
++	VI0_DATA6_VI0_B6_MARK, VI0_DATA7_VI0_B7_MARK,
++};
++static const unsigned int vin0_hsync_signal_pins[] = {
++	RCAR_GP_PIN(0, 12),
++};
++static const unsigned int vin0_hsync_signal_mux[] = {
++	VI0_HSYNC_N_MARK,
++};
++static const unsigned int vin0_vsync_signal_pins[] = {
++	RCAR_GP_PIN(0, 13),
++};
++static const unsigned int vin0_vsync_signal_mux[] = {
++	VI0_VSYNC_N_MARK,
++};
++static const unsigned int vin0_field_signal_pins[] = {
++	RCAR_GP_PIN(0, 15),
++};
++static const unsigned int vin0_field_signal_mux[] = {
++	VI0_FIELD_MARK,
++};
++static const unsigned int vin0_data_enable_pins[] = {
++	RCAR_GP_PIN(0, 14),
++};
++static const unsigned int vin0_data_enable_mux[] = {
++	VI0_CLKENB_MARK,
++};
++static const unsigned int vin0_clk_pins[] = {
++	RCAR_GP_PIN(2, 0),
++};
++static const unsigned int vin0_clk_mux[] = {
++	VI0_CLK_MARK,
++};
++/* - VIN1 ------------------------------------------------------------------- */
++static const unsigned int vin1_data_pins[] = {
++	RCAR_GP_PIN(2, 10), RCAR_GP_PIN(2, 11), RCAR_GP_PIN(2, 12),
++	RCAR_GP_PIN(2, 13), RCAR_GP_PIN(2, 14), RCAR_GP_PIN(2, 15),
++	RCAR_GP_PIN(2, 16), RCAR_GP_PIN(2, 17),
++};
++static const unsigned int vin1_data_mux[] = {
++	VI1_DATA0_VI1_B0_MARK, VI1_DATA1_VI1_B1_MARK, VI1_DATA2_VI1_B2_MARK,
++	VI1_DATA3_VI1_B3_MARK, VI1_DATA4_VI1_B4_MARK, VI1_DATA5_VI1_B5_MARK,
++	VI1_DATA6_VI1_B6_MARK, VI1_DATA7_VI1_B7_MARK,
++};
++static const unsigned int vin1_clk_pins[] = {
++	RCAR_GP_PIN(2, 9),
++};
++static const unsigned int vin1_clk_mux[] = {
++	VI1_CLK_MARK,
 +};
  
  static const struct sh_pfc_pin_group pinmux_groups[] = {
  	SH_PFC_PIN_GROUP(eth_link),
-@@ -3021,6 +3045,9 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(tpu0_to1),
- 	SH_PFC_PIN_GROUP(tpu0_to2),
- 	SH_PFC_PIN_GROUP(tpu0_to3),
-+	SH_PFC_PIN_GROUP(usb0),
-+	SH_PFC_PIN_GROUP(usb1),
-+	SH_PFC_PIN_GROUP(usb2),
+@@ -3048,6 +3126,16 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(usb0),
+ 	SH_PFC_PIN_GROUP(usb1),
+ 	SH_PFC_PIN_GROUP(usb2),
++	SH_PFC_PIN_GROUP(vin0_data_g),
++	SH_PFC_PIN_GROUP(vin0_data_r),
++	SH_PFC_PIN_GROUP(vin0_data_b),
++	SH_PFC_PIN_GROUP(vin0_hsync_signal),
++	SH_PFC_PIN_GROUP(vin0_vsync_signal),
++	SH_PFC_PIN_GROUP(vin0_field_signal),
++	SH_PFC_PIN_GROUP(vin0_data_enable),
++	SH_PFC_PIN_GROUP(vin0_clk),
++	SH_PFC_PIN_GROUP(vin1_data),
++	SH_PFC_PIN_GROUP(vin1_clk),
  };
  
  static const char * const eth_groups[] = {
-@@ -3245,6 +3272,18 @@ static const char * const tpu0_groups[] = {
- 	"tpu0_to3",
+@@ -3284,6 +3372,22 @@ static const char * const usb2_groups[] = {
+ 	"usb2",
  };
  
-+static const char * const usb0_groups[] = {
-+	"usb0",
++static const char * const vin0_groups[] = {
++	"vin0_data_g",
++	"vin0_data_r",
++	"vin0_data_b",
++	"vin0_hsync_signal",
++	"vin0_vsync_signal",
++	"vin0_field_signal",
++	"vin0_data_enable",
++	"vin0_clk",
 +};
 +
-+static const char * const usb1_groups[] = {
-+	"usb1",
-+};
-+
-+static const char * const usb2_groups[] = {
-+	"usb2",
++static const char * const vin1_groups[] = {
++	"vin1_data",
++	"vin1_clk",
 +};
 +
  static const struct sh_pfc_function pinmux_functions[] = {
  	SH_PFC_FUNCTION(eth),
  	SH_PFC_FUNCTION(hscif0),
-@@ -3270,6 +3309,9 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(sdhi2),
- 	SH_PFC_FUNCTION(sdhi3),
- 	SH_PFC_FUNCTION(tpu0),
-+	SH_PFC_FUNCTION(usb0),
-+	SH_PFC_FUNCTION(usb1),
-+	SH_PFC_FUNCTION(usb2),
+@@ -3312,6 +3416,8 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(usb0),
+ 	SH_PFC_FUNCTION(usb1),
+ 	SH_PFC_FUNCTION(usb2),
++	SH_PFC_FUNCTION(vin0),
++	SH_PFC_FUNCTION(vin1),
  };
  
  static struct pinmux_cfg_reg pinmux_config_regs[] = {
