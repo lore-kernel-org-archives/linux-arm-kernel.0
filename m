@@ -1,77 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:32:50 +0900
-Subject: [PATCH 11/19] ARM: shmobile: armadillo-reference: Move pinctrl
- mappings to device tree
+Date: Wed, 24 Jul 2013 09:32:35 +0900
+Subject: [PATCH 08/19] ARM: shmobile: r8a7790: Add GPIO controller devices to
+ device tree
 In-Reply-To: <cover.1374625203.git.horms+renesas@verge.net.au>
 References: <cover.1374625203.git.horms+renesas@verge.net.au>
-Message-ID: <5d244563da5326d66ca839b06dbc6f632d2f24df.1374625203.git.horms+renesas@verge.net.au>
+Message-ID: <f98e10c88aa95bf7d37cce6dbacec0820dd6ecc2.1374625203.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the pinctrl mappings in board code by device tree mappings.
-For devices that are still instantiated from board code reference the
-mappings as the default pin controller state to apply them at boot time.
+Add GPIO controller nodes to the r8a7790 core device tree.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts  | 10 ++++++++++
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c |  9 ---------
- 2 files changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 73 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 09ea22c..4a7ae32 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -43,3 +43,13 @@
- 		interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 13caf12..9465cfc 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -38,6 +38,78 @@
+ 		interrupts = <1 9 0xf04>;
+ 	};
+ 
++	gpio0: gpio at ffc40000 {
++		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		reg = <0 0xffc40000 0 0x2c>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 4 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 0 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio1: gpio at ffc41000 {
++		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		reg = <0 0xffc41000 0 0x2c>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 5 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 32 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio2: gpio at ffc42000 {
++		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		reg = <0 0xffc42000 0 0x2c>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 6 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 64 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio3: gpio at ffc43000 {
++		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		reg = <0 0xffc43000 0 0x2c>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 7 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 96 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio4: gpio at ffc44000 {
++		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		reg = <0 0xffc44000 0 0x2c>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 8 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 128 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio5: gpio at ffc45000 {
++		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		reg = <0 0xffc45000 0 0x2c>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 9 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 160 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <1 13 0xf08>,
+@@ -58,5 +130,6 @@
+ 	pfc: pfc at e6060000 {
+ 		compatible = "renesas,pfc-r8a7790";
+ 		reg = <0 0xe6060000 0 0x250>;
++		#gpio-range-cells = <3>;
  	};
  };
-+
-+&pfc {
-+	pinctrl-0 = <&scifa1_pins>;
-+	pinctrl-names = "default";
-+
-+	scifa1_pins: scifa1 {
-+		renesas,groups = "scifa1_data";
-+		renesas,function = "scifa1";
-+	};
-+};
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-index f25b6aa..4ddd299 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-@@ -24,7 +24,6 @@
- #include <linux/kernel.h>
- #include <linux/gpio.h>
- #include <linux/io.h>
--#include <linux/pinctrl/machine.h>
- #include <mach/common.h>
- #include <mach/r8a7740.h>
- #include <asm/mach/arch.h>
-@@ -119,12 +118,6 @@
-  *	usbhsf_power_ctrl()
-  */
- 
--static const struct pinctrl_map eva_pinctrl_map[] = {
--	/* SCIFA1 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.1", "e6050000.pfc",
--				  "scifa1_data", "scifa1"),
--};
--
- static void __init eva_clock_init(void)
- {
- 	struct clk *system	= clk_get(NULL, "system_clk");
-@@ -169,8 +162,6 @@ static void __init eva_init(void)
- 	r8a7740_clock_init(MD_CK0 | MD_CK2);
- 	eva_clock_init();
- 
--	pinctrl_register_mappings(eva_pinctrl_map, ARRAY_SIZE(eva_pinctrl_map));
--
- 	r8a7740_meram_workaround();
- 
- #ifdef CONFIG_CACHE_L2X0
 -- 
 1.8.2.1
