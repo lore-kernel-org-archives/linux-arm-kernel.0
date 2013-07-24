@@ -1,79 +1,60 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 24 Jul 2013 15:49:41 +0900
-Subject: [PATCH] ARM: dts: Add USB host node for Exynos4
-In-Reply-To: <CADoNuNdqF0Y=3pdBCE26AQgkv6uqZQ4uE+BfPSSNxAvuuR+kvg@mail.gmail.com>
-References: <1374600763-19466-1-git-send-email-tobetter@gmail.com>
- <CAK9yfHz10ao32Y4VRsvjNLe+zaq+hYk4KVgtwFgSLDsN-9Pfpw@mail.gmail.com>
- <CADoNuNdqF0Y=3pdBCE26AQgkv6uqZQ4uE+BfPSSNxAvuuR+kvg@mail.gmail.com>
-Message-ID: <000001ce8839$f97faa90$ec7effb0$@samsung.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 24 Jul 2013 14:56:38 +0800
+Subject: [PATCH] ARM: dts: tegra114: dalmore: fix the irq trigger type
+ of Palmas MFD device
+In-Reply-To: <51EE968B.1050103@nvidia.com>
+References: <1374574191-24396-1-git-send-email-josephl@nvidia.com>
+ <51EE968B.1050103@nvidia.com>
+Message-ID: <1374648998.23756.13.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 24, 2013 3:29 PM, Dongjin Kim wrote:
-> 
-> +Jingoo Han
-> 
-> Sorry, its my bad. Typo problem.
-> 
-> I found another patch same with mine,
-> https://patchwork.kernel.org/patch/2628451, submitted by Jingoo Han
-> and tested on Exynos4210. Mine is tested on Exynos4412. Both SoC have
-> same USB host address space, so I think USB host device nodes can be
-> placed in exynos4.dtsi.
-
-OK, USB host device nodes can be placed in exynos4.dtsi.
-
-However, next time, please leave comment on earlier patch.
-The patch for Exynos4210 USB was already submitted 2 months ago.
-
-
-> 
-> Regards,
-> Dongjin.
-> 
-> On Wed, Jul 24, 2013 at 12:38 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> > On 23 July 2013 23:02, Dongjin Kim <tobetter@gmail.com> wrote:
-> >> This patch adds EHCI and OHCI host device nodes for Exynos4.
-> >>
-> >> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
-> >> ---
-> >>  arch/arm/boot/dts/exynos4.dtsi |   20 ++++++++++++++++++++
-> >>  1 file changed, 20 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> >> index 3f94fe8..1cdbf89 100644
-> >> --- a/arch/arm/boot/dts/exynos4.dtsi
-> >> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> >> @@ -155,6 +155,26 @@
-> >>                 status = "disabled";
-> >>         };
-> >>
-> >> +       ehci at 12580000 {
-> >> +               compatible = "samsung,exynos4210-ehci";
-> >> +               reg = <0x12580000 0x100>;
-> >> +               interrupts = <0 70 0>;
-> >> +               status = "disabled";
-> >> +
-> >> +               clocks = <&clock 304>;
-> >> +               clock-names = "usbhost";
-> >> +       };
-> >> +
-> >> +       ohci at 12590000 {
-> >> +               compatible = "samsung,exynos4210-ohci";
-> >> +               reg = <0x12580000 0x100>;
+On Tue, 2013-07-23 at 22:43 +0800, Laxman Dewangan wrote:
+> On Tuesday 23 July 2013 03:39 PM, Joseph Lo wrote:
+> > The IRQ trigger type of Palmas MFD device (tps65913) is low-level
+> > sensitive. The wrong configuration would cause an interrupt storm
+> > when booting the system. Fixing it in DT with appropriate interrupt
+> > type.
 > >
-> > Register value and node name do not match. Typo?
+> > Cc: Laxman Dewangan <ldewangan@nvidia.com>
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > ---
+> >   arch/arm/boot/dts/tegra114-dalmore.dts | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
 > >
-> >
-> >> +               interrupts = <0 70 0>;
-> >> +               status = "disabled";
-> >> +
-> >> +               clocks = <&clock 304>;
-> >> +               clock-names = "usbhost";
-> >> +       };
-> >> +
-> >>         mfc: codec at 13400000 {
-> >>                 compatible = "samsung,mfc-v5";
-> >>                 reg = <0x13400000 0x10000>;
-> >> --
-> >> 1.7.9.5
+> > diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+> > index 76529e4..70b9d0c 100644
+> > --- a/arch/arm/boot/dts/tegra114-dalmore.dts
+> > +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+> > @@ -840,7 +840,7 @@
+> >   		palmas: tps65913 {
+> >   			compatible = "ti,palmas";
+> >   			reg = <0x58>;
+> > -			interrupts = <0 86 0x4>;
+> > +			interrupts = <0 86 0x8>;
+> >   
+> 
+> This fails as GIC does not support the interrupt flag of 8.
+> 
+Yes, I knew this. But everything works as expected, the IRQ storm
+disappears and the IRQ of Palmas RTC is working and can be used as a
+wake up signal.
+
+> [   13.007755] genirq: Setting trigger mode 8 for irq 118 failed 
+> (gic_set_type+0x0/0xf0)
+> [   13.009152] palmas 1-0058: Irq flag is 0x00000000
+> 
+> I did not get the interrupt storm and even interrupt is not working on tot.
+> Two ways to resolve this:
+> - Change the interrupt flag to 0 from 4. Or
+Actually I fixed this issue two months ago, I had tried to use 0x0 as
+the IRQ flag before. It's not working. But I still tried it today, it's
+OK now(!!!). The function is what I expect. Maybe something wrong in my
+test two months ago. Will fix this in V2.
+
+> - Remove the nvidia,invert-interrupt; for PMC node.
+This can avoid IRQ storm but introduce a new issue. The system suspend
+would be woken up automatically by Palmas RTC all the time.
+
+Thanks,
+Joseph
