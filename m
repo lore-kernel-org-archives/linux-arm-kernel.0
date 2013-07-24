@@ -1,63 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Jul 2013 18:23:22 +0100
-Subject: OMAP4430 SDP boot issues.. (Was Re: OMAP2430 SDP boot broken
- after Linus' rmk merge)
-In-Reply-To: <51EFF571.3070106@ti.com>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com> <20130724145237.GB21614@n2100.arm.linux.org.uk>
- <51EFF571.3070106@ti.com>
-Message-ID: <20130724172321.GC21614@n2100.arm.linux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 24 Jul 2013 18:34:35 +0100
+Subject: [PATCH 2/4] ARM: traps: use <asm/opcodes.h> to get correct
+ instruction order
+In-Reply-To: <1374510833-25716-3-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374510833-25716-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130724173435.GC4610@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 11:40:33AM -0400, Santosh Shilimkar wrote:
-> On Wednesday 24 July 2013 10:52 AM, Russell King - ARM Linux wrote:
-> > I also continue to be disappointed by the lack of things working on the
-> > 4430 - it's been a number of years now and _still_ the on-board LCDs do
-> > not work.  People have tried to blame that on hardware faults and the
-> > like, but they're just being idiotic when they say stuff like that.  It
-> > can't be hardware faults when the kernel supplied with the board is able
-> > to make them work to the extent that userspace can play back video on all
-> > three output devices simultaneously, without hiccup or any imperfection.
-> > I don't know whether it's just that the backlight support isn't working
-> > or what - because any information on the 4430 seems to be a tightly
-> > controlled secret that only a few select people are permitted to know
-> > about.  As far as I'm concerned, much of the hardware is a black box to
-> > me.
-> > 
-> On the display related issues, Tomi and Archit have been sorting out
-> issue but am not sure about the current state. If the pre-built binaries
-> video playback works means your hardware seems to be fine.
+On Mon, Jul 22, 2013 at 05:33:51PM +0100, Ben Dooks wrote:
+> The trap handler needs to take into account the endian configuration of
+> the system when loading instructions. Use <asm/opcodes.h> to provide the
+> necessary conversion functions.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/kernel/traps.c |   10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 1c08911..0a56e13 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -34,6 +34,7 @@
+>  #include <asm/unwind.h>
+>  #include <asm/tls.h>
+>  #include <asm/system_misc.h>
+> +#include <asm/opcodes.h>
+>  
+>  #include "signal.h"
 
-Just let me be absolutely crystal clear about this: the on-board LCDs
-have _never_ worked with a mainline kernel, but they did work with the
-kernel which originally came with the board with the original 4430 SoC.
-I can right now put the original 4430 SoC back on the board and boot
-using the kernel which is still on the SD card and they will work.
+Looks like is_valid_bugaddr() might need fixing too?
 
-Even with the original 4430 SoC and mainline kernels, they have never
-worked.
+That will need __mem_to_opcode_thumb16() or __mem_to_opcode_arm()
+depending on CONFIG_THUMB2_KERNEL.
 
-I tried it back and forth several times, but even with this, the
-explanation was always "your hardware must be faulty".  And then the wrong
-voltage levels was found which was preventing the LCD modules from even
-being recognised... but still, no sign of life on the LCD panels.
+>  
+> @@ -411,23 +412,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>  	if (processor_mode(regs) == SVC_MODE) {
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  		if (thumb_mode(regs)) {
+> -			instr = ((u16 *)pc)[0];
+> +			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
+>  			if (is_wide_instruction(instr)) {
+>  				instr <<= 16;
+> -				instr |= ((u16 *)pc)[1];
+> +				instr |= __mem_to_opcode_thumb16(((u16 *)pc)[1]);
 
-It may be that there's some error in the kernel configuration I'm building.
-I don't know, because I have _no_ idea what hardware is involved in
-bringing the LCDs online.  Like I said above, the 4430SDP board is just
-a black box.  I am totally reliant on others telling me what the right
-config options are supposed to be and fixing problems when things don't
-work.
+Could use __opcode_thumb32_compose(), in which case it might look like
 
-With the lack of information on this board, all I can do when things don't
-work is whinge and moan at people.  I am powerless to debug the problems
-myself, even if they're a simple misconfiguration.
+			if (is_wide_instruction(instr)) {
+				unsigned int instr2 = __mem_to_opcode_thumb16(
+					((u16 *)pc)[1]);
+				instr = __opcode_thumb32_compose(instr, instr2);
 
-Is there information available on the 4430SDP?  Is there any reason I
-can't have access to it?
+(Hmmm, I just noticed that is_wide_instruction and __opcode_is_thumb16()
+kinda duplicate each other.  Could change that too, but it would look
+more like pointless churn...  is_wide_instruction() is used in a fair
+few places already.)
+
+>  			}
+>  		} else
+>  #endif
+> -			instr = *(u32 *) pc;
+> +			instr = __mem_to_opcode_arm(*(u32 *) pc);
+>  	} else if (thumb_mode(regs)) {
+>  		if (get_user(instr, (u16 __user *)pc))
+>  			goto die_sig;
+> +		instr = __mem_to_opcode_thumb16(instr);
+>  		if (is_wide_instruction(instr)) {
+>  			unsigned int instr2;
+>  			if (get_user(instr2, (u16 __user *)pc+1))
+>  				goto die_sig;
+>  			instr <<= 16;
+> -			instr |= instr2;
+> +			instr |= __mem_to_opcode_thumb16(instr2);
+>  		}
+>  	} else if (get_user(instr, (u32 __user *)pc)) {
+
+This also needs mem-to-opcode'ing.
+
+Cheers
+---Dave
