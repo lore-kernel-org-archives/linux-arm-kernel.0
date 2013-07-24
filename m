@@ -1,122 +1,100 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:34:31 +0900
-Subject: [PATCH 1/4] ARM: shmobile: armadillo800eva: Add backlight support
-In-Reply-To: <cover.1374624997.git.horms+renesas@verge.net.au>
-References: <cover.1374624997.git.horms+renesas@verge.net.au>
-Message-ID: <d58226a21a7b84a3f82265821f24ce2aad267f1c.1374624997.git.horms+renesas@verge.net.au>
+Date: Wed, 24 Jul 2013 09:34:09 +0900
+Subject: [PATCH 16/16] ARM: shmobile: Setup r8a7790 arch timer based on MD pins
+In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
+References: <cover.1374624383.git.horms+renesas@verge.net.au>
+Message-ID: <81b9d5351fa96caad4accc6711bc1b9342927d4a.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-The flat panel backlight on the Armadillo 800 EVA board is driven by the
-TPU PWM output.
+Update the r8a7790 arch timer setup code to configure the
+frequency dynamically at boot time. This means that the arch
+timer driver will be able to detect a timer frequency that
+has been calculated based on the MD pins instead of a fixed
+and potentially incorrect 13 MHz.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Simon Horman <horms@verge.net.au>
+With this patch applied the Linux kernel will correctly
+support the r8a7790 Lager board that uses a 20 Mhz EXTAL.
+The arch timer will operate on 10 MHz and the Linux arch
+timer driver will be correctly configured to use 10 MHz.
+
+Without this patch the 20 MHz EXTAL will be used to drive
+the arch timer at 10 MHz, but the Linux arch timer driver
+will believe it is counting at 13 Mhz.
+
+Reported-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Tested-by: Ulrich Hecht <ulrich.hecht@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 54 +++++++++++++++++++++++++-
- 1 file changed, 52 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7790.c | 51 ++++++++++++++++++++++++++++++----
+ 1 file changed, 45 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index e115f67..9457c76 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -31,6 +31,8 @@
- #include <linux/gpio_keys.h>
- #include <linux/regulator/driver.h>
- #include <linux/pinctrl/machine.h>
-+#include <linux/platform_data/pwm-renesas-tpu.h>
-+#include <linux/pwm_backlight.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/gpio-regulator.h>
- #include <linux/regulator/machine.h>
-@@ -387,7 +389,50 @@ static struct platform_device sh_eth_device = {
- 	.num_resources = ARRAY_SIZE(sh_eth_resources),
- };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 6acddc1..4c96dad 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -210,14 +210,53 @@ u32 __init r8a7790_read_mode_pins(void)
+ 	return mode;
+ }
  
--/* LCDC */
-+/* PWM */
-+static struct resource pwm_resources[] = {
-+	[0] = {
-+		.start = 0xe6600000,
-+		.end = 0xe66000ff,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
++#define CNTCR 0
++#define CNTFID0 0x20
 +
-+static struct tpu_pwm_platform_data pwm_device_data = {
-+	.channels[2] = {
-+		.polarity = PWM_POLARITY_INVERSED,
+ void __init r8a7790_timer_init(void)
+ {
+-	void __iomem *cntcr;
+-
+-	/* make sure arch timer is started by setting bit 0 of CNTCT */
+-	cntcr = ioremap(0xe6080000, PAGE_SIZE);
+-	iowrite32(1, cntcr);
+-	iounmap(cntcr);
++#ifdef CONFIG_ARM_ARCH_TIMER
++	u32 mode = r8a7790_read_mode_pins();
++	void __iomem *base;
++	int extal_mhz = 0;
++	u32 freq;
++
++	/* At Linux boot time the r8a7790 arch timer comes up
++	 * with the counter disabled. Moreover, it may also report
++	 * a potentially incorrect fixed 13 MHz frequency. To be
++	 * correct these registers need to be updated to use the
++	 * frequency EXTAL / 2 which can be determined by the MD pins.
++	 */
++
++	switch (mode & (MD(14) | MD(13))) {
++	case 0:
++		extal_mhz = 15;
++		break;
++	case MD(13):
++		extal_mhz = 20;
++		break;
++	case MD(14):
++		extal_mhz = 26;
++		break;
++	case MD(13) | MD(14):
++		extal_mhz = 30;
++		break;
 +	}
-+};
 +
-+static struct platform_device pwm_device = {
-+	.name = "renesas-tpu-pwm",
-+	.id = -1,
-+	.dev = {
-+		.platform_data = &pwm_device_data,
-+	},
-+	.num_resources = ARRAY_SIZE(pwm_resources),
-+	.resource = pwm_resources,
-+};
++	/* The arch timer frequency equals EXTAL / 2 */
++	freq = extal_mhz * (1000000 / 2);
 +
-+static struct pwm_lookup pwm_lookup[] = {
-+	PWM_LOOKUP("renesas-tpu-pwm", 2, "pwm-backlight.0", NULL),
-+};
++	/* Remap "armgcnt address map" space */
++	base = ioremap(0xe6080000, PAGE_SIZE);
 +
-+/* LCDC and backlight */
-+static struct platform_pwm_backlight_data pwm_backlight_data = {
-+	.lth_brightness = 50,
-+	.max_brightness = 255,
-+	.dft_brightness = 255,
-+	.pwm_period_ns = 33333, /* 30kHz */
-+};
++	/* Update registers with correct frequency */
++	iowrite32(freq, base + CNTFID0);
++	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
 +
-+static struct platform_device pwm_backlight_device = {
-+	.name = "pwm-backlight",
-+	.dev = {
-+		.platform_data = &pwm_backlight_data,
-+	},
-+};
-+
- static struct fb_videomode lcdc0_mode = {
- 	.name		= "AMPIER/AM-800480",
- 	.xres		= 800,
-@@ -1030,6 +1075,8 @@ static struct i2c_board_info i2c2_devices[] = {
-  */
- static struct platform_device *eva_devices[] __initdata = {
- 	&lcdc0_device,
-+	&pwm_device,
-+	&pwm_backlight_device,
- 	&gpio_keys_device,
- 	&sh_eth_device,
- 	&vcc_sdhi0,
-@@ -1101,6 +1148,9 @@ static const struct pinctrl_map eva_pinctrl_map[] = {
- 	/* ST1232 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("0-0055", "pfc-r8a7740",
- 				  "intc_irq10", "intc"),
-+	/* TPU0 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("renesas-tpu-pwm", "pfc-r8a7740",
-+				  "tpu0_to2_1", "tpu0"),
- 	/* USBHS */
- 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7740",
- 				  "intc_irq7_1", "intc"),
-@@ -1154,13 +1204,13 @@ static void __init eva_init(void)
- 				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
++	/* make sure arch timer is started by setting bit 0 of CNTCR */
++	iowrite32(1, base + CNTCR);
++	iounmap(base);
++#endif /* CONFIG_ARM_ARCH_TIMER */
  
- 	pinctrl_register_mappings(eva_pinctrl_map, ARRAY_SIZE(eva_pinctrl_map));
-+	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
- 
- 	r8a7740_pinmux_init();
- 	r8a7740_meram_workaround();
- 
- 	/* LCDC0 */
- 	gpio_request_one(61, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
--	gpio_request_one(202, GPIOF_OUT_INIT_LOW, NULL); /* LCD0_LED_CONT */
- 
- 	/* Touchscreen */
- 	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
+ 	shmobile_timer_init();
+ }
 -- 
 1.8.2.1
