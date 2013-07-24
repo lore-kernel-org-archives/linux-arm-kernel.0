@@ -1,46 +1,68 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 13:32:53 -0700
-Subject: [PATCH v4 0/5] Memory mapped architected timers
-In-Reply-To: <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
-References: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
- <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
-Message-ID: <20130724203253.GE27761@codeaurora.org>
+Date: Wed, 24 Jul 2013 13:36:10 -0700
+Subject: [PATCH v2] ARM: Fix deadlock scenario with smp_send_stop()
+In-Reply-To: <20130724202148.GA24642@n2100.arm.linux.org.uk>
+Message-ID: <1374698170-26605-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22, Mark Rutland wrote:
-> Hi Stephen,
-> 
-> On Fri, Jul 19, 2013 at 12:59:27AM +0100, Stephen Boyd wrote:
-> > This patchset adds support for memory mapped architected timers. We
-> > don't have any other global broadcast timer in our system, so we use the
-> > mmio timer during low power modes. The first patch changes the register
-> > accessor to an enum per Thomas' request. The second patch is the binding.
-> > The next two patches lay some groundwork so that the last patch is simpler.
-> > The final patch adds support for mmio timers.
-> > 
-> > Patches are based on v3.11-rc1.
-> 
-> Be aware that as of v3.11-rc2 this doesn't cleanly apply, as the
-> __cpuinit removal broke the final patch's context in a couple of places.
-> It would be nice to get rid of the new cpuinit additions too...
-> 
-> With that cleaned up locally, I've gave this a spin on tc2 and a
-> Foundation model to test the cp15/system timers, hotplugging CPUs and
-> running a basic test (`time sleep 5`). That all seems to work.
-> 
-> Unfortunately I have no way of testing the memory-mapped timer support,
-> but I trust you've tested that locally.
-> 
-> For the series:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
+If one process calls sys_reboot and that process then stops other
+CPUs while those CPUs are within a spin_lock() region we can
+potentially encounter a deadlock scenario like below.
 
-Thanks Mark.
+CPU 0                   CPU 1
+-----                   -----
+                        spin_lock(my_lock)
+smp_send_stop()
+ <send IPI>             handle_IPI()
+                         disable_preemption/irqs
+                          while(1);
+ <PREEMPT>
+spin_lock(my_lock) <--- Waits forever
 
-Daniel, can you pick up these patches please?
+We shouldn't attempt to run any other tasks after we send a stop
+IPI to a CPU so disable preemption so that this task runs to
+completion. We use local_irq_disable() here for cross-arch
+consistency with x86.
 
+Reported-by: Sundarajan Srinivasan <sundaraj@codeaurora.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+Changes since v1:
+ - Use local_irq_disable() instead of preempt_disable()
+
+ arch/arm/kernel/process.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index d3ca4f6..08b47eb 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -197,6 +197,7 @@ void machine_shutdown(void)
+  */
+ void machine_halt(void)
+ {
++	local_irq_disable();
+ 	smp_send_stop();
+ 
+ 	local_irq_disable();
+@@ -211,6 +212,7 @@ void machine_halt(void)
+  */
+ void machine_power_off(void)
+ {
++	local_irq_disable();
+ 	smp_send_stop();
+ 
+ 	if (pm_power_off)
+@@ -230,6 +232,7 @@ void machine_power_off(void)
+  */
+ void machine_restart(char *cmd)
+ {
++	local_irq_disable();
+ 	smp_send_stop();
+ 
+ 	arm_pm_restart(reboot_mode, cmd);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
