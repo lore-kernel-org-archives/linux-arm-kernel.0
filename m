@@ -1,37 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Jul 2013 17:29:58 +0100
-Subject: [PATCH 06/14] ARM: twd: data endian fix
-In-Reply-To: <51EFED92.2050408@codethink.co.uk>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-7-git-send-email-ben.dooks@codethink.co.uk>
- <20130724144923.GO11072@mudshark.cambridge.arm.com>
- <51EFED92.2050408@codethink.co.uk>
-Message-ID: <20130724162958.GU11072@mudshark.cambridge.arm.com>
+From: shuahkhan@gmail.com (Shuah Khan)
+Date: Wed, 24 Jul 2013 10:30:33 -0600
+Subject: Linux Plumbers ACPI/PM, PCI Microconference
+In-Reply-To: <CAErSpo7TexM5-7Z=8H+B5=49-GzoKd_prn=LbMFZWV9rpdn__A@mail.gmail.com>
+References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
+ <CAErSpo7TexM5-7Z=8H+B5=49-GzoKd_prn=LbMFZWV9rpdn__A@mail.gmail.com>
+Message-ID: <CAKocOOOW6+eqb6GTsWLgonQQ7uy5R10t6L_T3jaTN9qSbetVeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 04:06:58PM +0100, Ben Dooks wrote:
-> On 24/07/13 15:49, Will Deacon wrote:
-> > On Wed, Jul 24, 2013 at 11:27:54AM +0100, Ben Dooks wrote:
-> >> Ensure the twd driver uses the correct calls to access the hardware
-> >> to ensure that we do not end up with data in the wrong endian format.
-> >>
-> >> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
-> >
-> > Reviewed-by: Will Deacon<will.deacon@arm.com>
-> >
-> > There are a bunch of other __raw_* users under arch/arm/, but I suppose we
-> > can let other people move those over as they see fit. It wouldn't hurt to
-> > fix arch/arm/include/asm/{cti,hardware/coresight.h} though.
-> 
-> I didn't think to look for things under there.
-> 
-> Do people think it would be worth just changing __raw_read/__raw_write
-> functions to also take into account endian-ness?
+On Tue, Jul 23, 2013 at 10:06 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Tue, Jul 16, 2013 at 8:21 PM, Myron Stowe <myron.stowe@gmail.com> wrote:
+>> Linux Plumbers has approved an ACPI/PM, PCI microconference. The
+>> overview page is here:
+>>
+>> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+>>
+>> We would like to start receiving volunteers for presenting topics of
+>> interest.  There is a lot of activity in these subsystems so please
+>> respond by submitting presentation or discussion proposals that you
+>> would be willing to cover for consideration.  You should also feel
+>> free to submit ideas as proposals that others could cover.
+>
+> Somebody else privately suggested these ARM/PCI topics:
+>
+>> -> how it's been cleaned up to be more common across arm-32 machines
+>> -> dependencies on dtb
+>> -> future use/dependency(s) on ACPI
+>> -> hotplug support issues (if any; acpi (host-bridge) vs <whatever ARM uses> ?)
+>
+> and I'm interested in those as well.  There seems to be a lot of
+> activity in that area.  In addition, I'm interested in ARM IOMMU
+> support.  I see drivers/iommu/arm-smmu.c, but it's brand-new and I
+> haven't looked at it at all.
+>
 
-That's probably a bit too far and will likely break some of the many drivers
-which use these accessors. It also puts us at odds with other architectures
-offering these accessors, so we're better off just fixing the callsites as
-appropriate.
+I second this topic. I am interested in ARM/iommu space also.
 
-Will
+thanks,
+-- Shuah
