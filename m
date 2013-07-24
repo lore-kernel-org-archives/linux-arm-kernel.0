@@ -1,121 +1,75 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:32:54 +0900
-Subject: [PATCH 15/19] ARM: shmobile: marzen-reference: Move pinctrl mappings
- to device tree
-In-Reply-To: <cover.1374625203.git.horms+renesas@verge.net.au>
-References: <cover.1374625203.git.horms+renesas@verge.net.au>
-Message-ID: <c4a003f6075c8e3e4e5a0d8958518882d779ef74.1374625203.git.horms+renesas@verge.net.au>
+Date: Wed, 24 Jul 2013 09:33:45 +0900
+Subject: [GIT 00/16] Renesas ARM based SoC updates for v3.12
+Message-ID: <cover.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Arnd,
 
-Replace the pinctrl mappings in board code by device tree mappings.
-For devices that are still instantiated from board code reference the
-mappings as the default pin controller state to apply them at boot time.
+please consider the following Renesas ARM based SoC updates for v3.12.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7779-marzen-reference.dts  | 35 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-marzen-reference.c | 27 -------------------
- 2 files changed, 35 insertions(+), 27 deletions(-)
+This pull request is based on renesas-dt-for-v3.12 which I have
+previously sent a pull request for.
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-index 72be4c8..6d20247 100644
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-@@ -37,6 +37,9 @@
- 	lan0 at 18000000 {
- 		compatible = "smsc,lan9220", "smsc,lan9115";
- 		reg = <0x18000000 0x100>;
-+		pinctrl-0 = <&lan0_pins>;
-+		pinctrl-names = "default";
-+
- 		phy-mode = "mii";
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 28 0x4>;
-@@ -45,3 +48,35 @@
- 		vdd33a-supply = <&fixedregulator3v3>;
- 	};
- };
-+
-+&pfc {
-+	pinctrl-0 = <&scif2_pins &scif4_pins &sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	lan0_pins: lan0 {
-+		intc {
-+			renesas,groups = "intc_irq1_b";
-+			renesas,function = "intc";
-+		};
-+		lbsc {
-+			renesas,groups = "lbsc_ex_cs0";
-+			renesas,function = "lbsc";
-+		};
-+	};
-+
-+	scif2_pins: scif2 {
-+		renesas,groups = "scif2_data_c";
-+		renesas,function = "scif2";
-+	};
-+
-+	scif4_pins: scif4 {
-+		renesas,groups = "scif4_data";
-+		renesas,function = "scif4";
-+	};
-+
-+	sdhi0_pins: sdhi0 {
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd",
-+				 "sdhi0_wp";
-+		renesas,function = "sdhi0";
-+	};
-+};
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index 94804f3..3d1c439 100644
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -19,41 +19,14 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
--#include <linux/pinctrl/machine.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
- 
--static const struct pinctrl_map marzen_pinctrl_map[] = {
--	/* SCIF2 (CN18: DEBUG0) */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "fffc0000.pfc",
--				  "scif2_data_c", "scif2"),
--	/* SCIF4 (CN19: DEBUG1) */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "fffc0000.pfc",
--				  "scif4_data", "scif4"),
--	/* SDHI0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
--				  "sdhi0_data4", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
--				  "sdhi0_ctrl", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
--				  "sdhi0_cd", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
--				  "sdhi0_wp", "sdhi0"),
--	/* SMSC */
--	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "fffc0000.pfc",
--				  "intc_irq1_b", "intc"),
--	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "fffc0000.pfc",
--				  "lbsc_ex_cs0", "lbsc"),
--};
--
- static void __init marzen_init(void)
- {
--	pinctrl_register_mappings(marzen_pinctrl_map,
--				  ARRAY_SIZE(marzen_pinctrl_map));
--
- 	r8a7779_add_standard_devices_dt();
- }
- 
--- 
-1.8.2.1
+The following changes since commit 66a5cab04d339d02b93a4671eadf8e251dbfdc2c:
+
+  ARM: shmobile: Add SMSC ethernet chip to KZM9D DT reference (2013-07-17 10:06:47 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.12
+
+for you to fetch changes up to 81b9d5351fa96caad4accc6711bc1b9342927d4a:
+
+  ARM: shmobile: Setup r8a7790 arch timer based on MD pins (2013-07-17 14:26:56 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC updates for v3.12
+
+* Setup arch timer based on MD pins on r8a7790 SoC
+* Thermal driver support for r8a7790 SoC
+* Make arch timer optional for r8a7790 and r8a73a4 SoCs
+* CMT10 clock event for r8a7790 and r8a73a4 SoCs
+* Increased clock coverage for r8a73a4 SoC
+* MMCIF DMA definitions for r8a7740 SoC
+* Disconnect SMP code from clocks on emev2 SoC
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (6):
+      ARM: shmobile: r8a73a4: wait for completion when kicking the clock
+      ARM: shmobile: r8a73a4: implement CPU clock scaling for CPUFreq
+      ARM: shmobile: r8a73a4: safeguard against wrong clk_set_rate() uses
+      ARM: shmobile: r8a73a4: add Z2 clock support
+      ARM: shmobile: r8a73a4: add clocks for I2C controllers
+      ARM: shmobile: r8a7740: add MMCIF DMA definitions
+
+Magnus Damm (8):
+      ARM: shmobile: Sort r8a7790 MSTP entries
+      ARM: shmobile: Add r8a7790 CMT00 clock event
+      ARM: shmobile: Make r8a7790 Arch timer optional
+      ARM: shmobile: Add r8a73a4 CMT10 clock event
+      ARM: shmobile: Make r8a73a4 Arch timer optional
+      ARM: shmobile: Disconnect EMEV2 SMP code from clocks
+      ARM: shmobile: Introduce r8a7790_read_mode_pins()
+      ARM: shmobile: Setup r8a7790 arch timer based on MD pins
+
+Simon Horman (2):
+      ARM: shmobile: r8a7790: add clocks for thermal
+      ARM: shmobile: r8a7790: add thermal driver support
+
+ arch/arm/mach-shmobile/Kconfig                |   4 +-
+ arch/arm/mach-shmobile/board-ape6evm.c        |   1 +
+ arch/arm/mach-shmobile/board-lager.c          |   1 +
+ arch/arm/mach-shmobile/clock-emev2.c          |  18 ---
+ arch/arm/mach-shmobile/clock-r8a73a4.c        | 199 ++++++++++++++++++++++++--
+ arch/arm/mach-shmobile/clock-r8a7790.c        |  23 +--
+ arch/arm/mach-shmobile/include/mach/emev2.h   |   1 -
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h |   1 +
+ arch/arm/mach-shmobile/include/mach/r8a7740.h |   2 +
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |   4 +
+ arch/arm/mach-shmobile/setup-r8a73a4.c        |  30 ++++
+ arch/arm/mach-shmobile/setup-r8a7740.c        |  10 ++
+ arch/arm/mach-shmobile/setup-r8a7790.c        | 106 +++++++++++++-
+ arch/arm/mach-shmobile/smp-emev2.c            |  11 +-
+ 14 files changed, 363 insertions(+), 48 deletions(-)
