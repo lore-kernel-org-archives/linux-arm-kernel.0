@@ -1,26 +1,34 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Wed, 24 Jul 2013 13:31:07 -0700
-Subject: [PATCH 4/4] msm_serial: Send more than 1 character at a time on
- UARTDM
-In-Reply-To: <1374691051-28544-5-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 24 Jul 2013 13:31:51 -0700
+Subject: [PATCH 0/4] msm_serial fixes and improvements
+In-Reply-To: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
 References: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
- <1374691051-28544-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130724203106.GE10926@codeaurora.org>
+Message-ID: <20130724203151.GF10926@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 11:37:31AM -0700, Stephen Boyd wrote:
->UARTDM cores have a TX fifo that can accept more than one
->character per register write, but the msm_serial driver currently
->only supports 1 character mode. Add support for this mode of operation
->to speed up the transmit path on DM devices.
+On Wed, Jul 24, 2013 at 11:37:27AM -0700, Stephen Boyd wrote:
+>Here are a couple fixes and improvements to the msm_serial
+>driver. The first two patches fix a bug on UARTDM devices and
+>silence sparse warnings. The last two patches improve the baud
+>code detection and increase the throughput on UARTDM devices.
 >
->Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->---
-> drivers/tty/serial/msm_serial.c | 51 ++++++++++++++++++++++++++---------------
-> 1 file changed, 32 insertions(+), 19 deletions(-)
+>After this it is rather trivial to add support for newer UARTDM
+>devices via new compatible fields.
+>
+>Stephen Boyd (4):
+>  msm_serial: Fix NUL byte output on UARTDM
+>  msm_serial: Fix sparse warnings
+>  msm_serial: Make baud_code detection more dynamic
+>  msm_serial: Send more than 1 character at a time on UARTDM
+>
+> drivers/tty/serial/msm_serial.c | 180 ++++++++++++++++++++--------------------
+> drivers/tty/serial/msm_serial.h |  19 ++---
+> 2 files changed, 97 insertions(+), 102 deletions(-)
 
-Acked-by: David Brown <davidb@codeaurora.org>
+Thanks for these patches.  I'm glad to finally see these issues fixed.
+
+David
 
 -- 
 sent by an employee of the Qualcomm Innovation Center, Inc.
