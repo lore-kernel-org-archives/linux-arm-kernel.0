@@ -1,83 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Jul 2013 15:41:19 +0100
-Subject: [PATCH 04/14] ARM: set BE8 if LE in head code
-In-Reply-To: <1374661682-9349-5-git-send-email-ben.dooks@codethink.co.uk>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-5-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130724144118.GM11072@mudshark.cambridge.arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 24 Jul 2013 17:43:24 +0300
+Subject: [PATCHv4 00/33] ARM: OMAP: clock conversion to DT
+In-Reply-To: <51EFE5E7.4090506@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <51EFE1D4.8090307@ti.com> <51EFE4D7.10800@ti.com> <51EFE5E7.4090506@ti.com>
+Message-ID: <51EFE80C.7020805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 11:27:52AM +0100, Ben Dooks wrote:
-> If we are booting in LE and compiled for BE8, then add code to
-> set the state to bE8. Since the instruction stream is always LE,
-> we do not need to do anything special to the instruction.
-> 
-> Also ensure that the secondary processors are started in the same mode.
-> 
-> Note, we do add about 20 bytes to the kernel image, but it seems easier
-> to do this than adding another configuration to change.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/boot/compressed/head.S |    1 +
->  arch/arm/kernel/head.S          |    4 ++++
->  arch/arm/kernel/sleep.S         |    1 +
->  3 files changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 4eb8364..4d83bfd 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -135,6 +135,7 @@ start:
->  		.word	_edata			@ zImage end address
->   THUMB(		.thumb			)
->  1:
-> + ARM_BE8(	setend	be )			@ go BE8 if LE, no-op if BE8
+On 07/24/2013 05:34 PM, Roger Quadros wrote:
+> On 07/24/2013 05:29 PM, Tero Kristo wrote:
+>> On 07/24/2013 05:16 PM, Roger Quadros wrote:
+>>> On 07/23/2013 10:19 AM, Tero Kristo wrote:
+>>>> Hi,
+>>>>
+>>>> Changes compared to previous version:
+>>>>
+>>>> - Clock init files moved from mach-omap2/ to drivers/clk/omap/
+>>>> - AM33xx support added [patches 15-20]
+>>>> - OMAP3 support added [patches 21-29]
+>>>> - DRA7 APLL support added (thanks Keerthy) [patches 30-33]
+>>>>
+>>>> Test branch on top of 3.11-rc1 available here:
+>>>>
+>>>> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+>>>> branch: mainline-3.11-rc1-omap-dt-clks
+>>>>
+>>>> Testing done:
+>>>>
+>>>> - boot + suspend tested on OMAP3 beagle C4 (omap3530)
+>>>> - boot + suspend tested on OMAP4 panda ES (omap4460)
+>>>> - boot tested on beagle bone (am335x)
+>>>>
+>>>> A boot test was also executed for DRA7 and OMAP5 on a separate branch
+>>>> (mainline does not have OMAP5 / DRA7 support so far.)
+>>>
+>>> Thanks to your hints, I was able to get this to work with 3.11-rc1 on omap5 uevm
+>>> using the following 3 patches. Please include them in your series. Thanks.
+>>
+>> Your patches don't apply cleanly to mainline currently, as the omap5 base support is still not merged. I deliberately left out the full omap5 integration because of that. Lets see how and when the integration proceeds, but I can track your patches meanwhile.
+>>
+>
+> Strange, I didn't use any out of tree patch. Just 3.11-rc1 with your 33 patches on top.
+>
+> Are you on 3.11-rc2?
 
-I find the comment here slightly confusing as it makes it sound like the
-macro expands to nothing if we're BE8 (which is clearly not the case).
+Oh, so OMAP5 hwmod data was actually merged now, cool. Sorry about the 
+fuss. I can include your patches to the next rev if one is made.
 
->  		mrs	r9, cpsr
->  #ifdef CONFIG_ARM_VIRT_EXT
->  		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index e40c0b3b..706c441 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -77,6 +77,7 @@
->  
->  	__HEAD
->  ENTRY(stext)
-> + ARM_BE8(setend	be )			@ ensure we are in BE8 mode
-
-Alignment issue here -- please try to align the instruction with the
-instructions below (it's awkward to read with all the brackets).
-
->  
->   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-> @@ -351,6 +352,9 @@ ENTRY(secondary_startup)
->  	 * the processor type - there is no need to check the machine type
->  	 * as it has already been validated by the primary processor.
->  	 */
-> +
-> + ARM_BE8(setend	be)				@ if system starts LE, go BE8
-> +
->  #ifdef CONFIG_ARM_VIRT_EXT
->  	bl	__hyp_stub_install_secondary
->  #endif
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index 987dcf3..954c28a 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -81,6 +81,7 @@ ENDPROC(cpu_resume_after_mmu)
->  	.data
->  	.align
->  ENTRY(cpu_resume)
-> +ARM_BE8(setend be)			@ ensure we are in BE mode
-
-Any reason to have three different comments for the same thing? I think you
-probably just need to comment the one in head.S.
-
-Will
+-Tero
