@@ -1,30 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Jul 2013 13:39:31 +0100
-Subject: [PATCH v2 07/22] ARM: Exynos4210: Remove '0x's from Exynos4110 DTSI
- file
-In-Reply-To: <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130724123931.GL26801@laptop>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 24 Jul 2013 21:59:45 +0900
+Subject: [PATCH v2 6/6] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
+ clock framework
+In-Reply-To: <2236509.stVfXyPhpt@amdc1227>
+References: <201307100057.06061.heiko@sntech.de>
+ <201307100100.28992.heiko@sntech.de>
+ <02cf01ce81f3$6777e5f0$3667b1d0$%kim@samsung.com>
+ <2236509.stVfXyPhpt@amdc1227>
+Message-ID: <0ee601ce886d$abb6a690$0323f3b0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... for the sake of consistency and assumed convention.
-    
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Tomasz Figa wrote:
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index b7f358a..53e2527 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -72,7 +72,7 @@
-                };
-        };
- 
--       clock: clock-controller at 0x10030000 {
-+       clock: clock-controller at 10030000 {
-                compatible = "samsung,exynos4210-clock";
-                reg = <0x10030000 0x20000>;
-                #clock-cells = <1>;
+[...]
+
+> > > +	timer at 51000000 {
+> > > +		clocks = <&clocks PCLK_PWM>;
+> >
+> > +		clocks = <&clock PCLK_PWM>;
+> >
+> > And I'm not sure using definition PCLK_PWM is better here...
+> 
+> Care to explain your doubts about it? I think this is fine.
+> 
+I mean I don't know why someone use a hard value(number) and someone use the
+definition...
+
+- Kukjin
