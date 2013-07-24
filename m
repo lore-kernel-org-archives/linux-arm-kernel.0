@@ -1,70 +1,24 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 24 Jul 2013 10:44:21 -0400
-Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
-In-Reply-To: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51EFE845.6010805@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Jul 2013 15:44:20 +0100
+Subject: [PATCH 05/14] ARM: pl01x debug code endian fix
+In-Reply-To: <1374661682-9349-6-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374661682-9349-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130724144420.GN11072@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2013 07:21 PM, Stephen Boyd wrote:
-> This patchset adds support for 64 bit counters in the generic
-> sched_clock code and converts drivers over to use it. Based
-> on v3.11-rc1.
+On Wed, Jul 24, 2013 at 11:27:53AM +0100, Ben Dooks wrote:
+> The PL01X debug code needs to take into account which endian mode the
+> processor is running in. If it is big-endian, ensure the data is swapped
+> appropriately.
 > 
-> Changes since v3:
->  * Move to use seqcount to fix issues with 64-bit cyc counters
->  * Move to hrtimer to fix underflow/overflow errors in wraparound
->    calculation
->  * Use of 1 hour in clocks_calc_mult_shift
->  * Converted over drivers in drivers/clocksource
+> Note, we could do this slightly more efficiently if we have an macro to
+> do the necessary swap for the bits used by test.
 > 
-> Stephen Boyd (17):
->   clocksource: Extract max nsec calculation into separate function
->   sched_clock: Use seqcount instead of rolling our own
->   sched_clock: Use an hrtimer instead of timer
->   sched_clock: Add support for >32 bit sched_clock
->   arch_timer: Move to generic sched_clock framework
->   sched_clock: Remove sched_clock_func() hook
->   clocksource: bcm2835: Switch to sched_clock_register()
->   ocksource: dbx500-prcmu: Switch to sched_clock_register()
->   clocksource: dw_apb_timer_of: Switch to sched_clock_register()
->   clocksource: mxs_timer: Switch to sched_clock_register()
->   clocksource: nomadik: Switch to sched_clock_register()
->   clocksource: samsung_pwm_timer: Switch to sched_clock_register()
->   clocksource: tegra: Switch to sched_clock_register()
->   clocksource: time-armada-370-xp: Switch to sched_clock_register()
->   clocksource: sirf: Switch to sched_clock_register() and use 64 bits
->   clocksource: vf_pit_timer: Switch to sched_clock_register()
->   sched_clock: Deprecate setup_sched_clock()
-> 
->  arch/arm/kernel/arch_timer.c              |  14 ----
->  arch/arm64/Kconfig                        |   1 +
->  arch/arm64/kernel/time.c                  |  10 ---
->  drivers/clocksource/arm_arch_timer.c      |   4 ++
->  drivers/clocksource/bcm2835_timer.c       |   4 +-
->  drivers/clocksource/clksrc-dbx500-prcmu.c |   5 +-
->  drivers/clocksource/dw_apb_timer_of.c     |   4 +-
->  drivers/clocksource/mxs_timer.c           |   4 +-
->  drivers/clocksource/nomadik-mtu.c         |   4 +-
->  drivers/clocksource/samsung_pwm_timer.c   |   4 +-
->  drivers/clocksource/tegra20_timer.c       |   4 +-
->  drivers/clocksource/time-armada-370-xp.c  |   4 +-
->  drivers/clocksource/timer-prima2.c        |   6 +-
->  drivers/clocksource/vf_pit_timer.c        |   4 +-
->  include/linux/clocksource.h               |   2 +
->  include/linux/sched_clock.h               |   7 +-
->  kernel/time/clocksource.c                 |  45 ++++++++-----
->  kernel/time/sched_clock.c                 | 105 +++++++++++++++---------------
->  18 files changed, 116 insertions(+), 115 deletions(-)
-> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
 
-I ran 32-bit and 64-bit kernels with these patches on the Versatile Express
-software model and things looked fine, so for the applicable patches,
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Tested-by: Christopher Covington <cov@codeaurora.org>
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Will
