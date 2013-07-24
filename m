@@ -1,76 +1,66 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 24 Jul 2013 11:27:57 +0100
-Subject: [PATCH 09/14] mvebu: support running big-endian
+Date: Wed, 24 Jul 2013 11:27:59 +0100
+Subject: [PATCH 11/14] ARM: alignment: correctly decode instructions in BE8
+ mode.
 In-Reply-To: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374661682-9349-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374661682-9349-12-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add indication we can run these cores in BE mode, and ensure that the
-secondary CPU is set to big-endian mode in the initialisation code as
-the initial code runs little-endian.
+If we are in BE8 mode, we must deal with the instruction stream being
+in LE order when data is being loaded in BE order. Ensure the data is
+swapped before processing to avoid thre following:
+
+Change to using <asm/opcodes.h> to provide the necessary conversion
+functions to change the byte ordering.
+
+Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
+Unhandled fault: alignment exception (0x001) at 0xbfa09567
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-mvebu/Kconfig        |    1 +
- arch/arm/mach-mvebu/coherency_ll.S |    3 +++
- arch/arm/mach-mvebu/headsmp.S      |    4 ++++
- 3 files changed, 8 insertions(+)
+ arch/arm/mm/alignment.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 80a8bca..317cdb8 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_MVEBU
- 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select CLKSRC_MMIO
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index 5476669..ee7598f 100644
---- a/arch/arm/mach-mvebu/coherency_ll.S
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -20,6 +20,8 @@
- #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
- #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 6f4585b..f38145a 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -25,6 +25,7 @@
+ #include <asm/cp15.h>
+ #include <asm/system_info.h>
+ #include <asm/unaligned.h>
++#include <asm/opcodes.h>
  
-+#include <asm/assembler.h>
-+
- 	.text
- /*
-  * r0: Coherency fabric base register address
-@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
- 	/* Create bit by cpu index */
- 	mov	r3, #(1 << 24)
- 	lsl	r1, r3, r1
-+ARM_BE8(rev	r1, r1)
+ #include "fault.h"
  
- 	/* Add CPU to SMP group - Atomic */
- 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index a06e0ed..a4f995d 100644
---- a/arch/arm/mach-mvebu/headsmp.S
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -21,6 +21,8 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
+@@ -762,21 +763,24 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	if (thumb_mode(regs)) {
+ 		u16 *ptr = (u16 *)(instrptr & ~1);
+ 		fault = probe_kernel_address(ptr, tinstr);
++		tinstr = __mem_to_opcode_thumb16(tinstr);
+ 		if (!fault) {
+ 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+ 			    IS_T32(tinstr)) {
+ 				/* Thumb-2 32-bit */
+ 				u16 tinst2 = 0;
+ 				fault = probe_kernel_address(ptr + 1, tinst2);
++				tinst2 = __mem_to_opcode_thumb16(tinst2);
+ 				instr = (tinstr << 16) | tinst2;
+ 				thumb2_32b = 1;
+ 			} else {
+ 				isize = 2;
+-				instr = thumb2arm(tinstr);
+ 			}
+ 		}
+-	} else
++	} else {
+ 		fault = probe_kernel_address(instrptr, instr);
++		instr = __mem_to_opcode_arm(instr);
++	}
  
-+#include <asm/assembler.h>
-+
- /*
-  * At this stage the secondary CPUs don't have acces yet to the MMU, so
-  * we have to provide physical addresses
-@@ -36,6 +38,8 @@
-  */
- ENTRY(armada_xp_secondary_startup)
- 
-+ ARM_BE8(setend	be )			@ go BE8 if booted LE
-+
- 	/* Read CPU id */
- 	mrc     p15, 0, r1, c0, c0, 5
- 	and     r1, r1, #0xF
+ 	if (fault) {
+ 		type = TYPE_FAULT;
 -- 
 1.7.10.4
