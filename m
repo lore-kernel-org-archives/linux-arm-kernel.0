@@ -1,166 +1,655 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 24 Jul 2013 15:15:14 +0200
-Subject: [PATCH 08/14] sh-pfc: r8a7790: Add SCIF2 pins configuration support
+Date: Wed, 24 Jul 2013 15:15:16 +0200
+Subject: [PATCH 10/14] sh-pfc: r8a7790: Sort pin groups and functions
+ alphabetically
 In-Reply-To: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1374671720-8794-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1374671720-8794-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1374671720-8794-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+Navigating through the source code is hard enough without having to
+manually search for groups and functions.
 
-Update the pinmux configuration tables to support the SCIF2 pins
-(TX2/TX2_B, RX2/RX2_B, SCK2).
-
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 40 +++++++++++++++++++++---------------
- 1 file changed, 23 insertions(+), 17 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 560 +++++++++++++++++------------------
+ 1 file changed, 280 insertions(+), 280 deletions(-)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index 51e590b..9a63063 100644
+index 62ac0d2..7f7b2bd 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -198,9 +198,9 @@ enum {
- 	FN_A6, FN_SCIFA1_RTS_N_B, FN_TPU0TO2, FN_A7,
- 	FN_SCIFA1_SCK_B, FN_AUDIO_CLKOUT_B, FN_TPU0TO3,
- 	FN_A8, FN_SCIFA1_RXD_B, FN_SSI_SCK5_B, FN_VI0_R4,
--	FN_VI0_R4_B, FN_SCIFB2_RXD_C, FN_VI2_DATA0_VI2_B0_B,
-+	FN_VI0_R4_B, FN_SCIFB2_RXD_C, FN_RX2_B, FN_VI2_DATA0_VI2_B0_B,
- 	FN_A9, FN_SCIFA1_CTS_N_B, FN_SSI_WS5_B, FN_VI0_R5,
--	FN_VI0_R5_B, FN_SCIFB2_TXD_C, FN_VI2_DATA1_VI2_B1_B,
-+	FN_VI0_R5_B, FN_SCIFB2_TXD_C, FN_TX2_B, FN_VI2_DATA1_VI2_B1_B,
- 	FN_A10, FN_SSI_SDATA5_B, FN_MSIOF2_SYNC, FN_VI0_R6,
- 	FN_VI0_R6_B, FN_VI2_DATA2_VI2_B2_B,
+@@ -1814,128 +1814,6 @@ static const unsigned int eth_rmii_mux[] = {
+ 	ETH_RXD0_MARK, ETH_RXD1_MARK, ETH_RX_ER_MARK, ETH_CRS_DV_MARK,
+ 	ETH_TXD0_MARK, ETH_TXD1_MARK, ETH_TX_EN_MARK, ETH_REF_CLK_MARK,
+ };
+-/* - INTC ------------------------------------------------------------------- */
+-static const unsigned int intc_irq0_pins[] = {
+-	/* IRQ */
+-	RCAR_GP_PIN(1, 25),
+-};
+-static const unsigned int intc_irq0_mux[] = {
+-	IRQ0_MARK,
+-};
+-static const unsigned int intc_irq1_pins[] = {
+-	/* IRQ */
+-	RCAR_GP_PIN(1, 27),
+-};
+-static const unsigned int intc_irq1_mux[] = {
+-	IRQ1_MARK,
+-};
+-static const unsigned int intc_irq2_pins[] = {
+-	/* IRQ */
+-	RCAR_GP_PIN(1, 29),
+-};
+-static const unsigned int intc_irq2_mux[] = {
+-	IRQ2_MARK,
+-};
+-static const unsigned int intc_irq3_pins[] = {
+-	/* IRQ */
+-	RCAR_GP_PIN(1, 23),
+-};
+-static const unsigned int intc_irq3_mux[] = {
+-	IRQ3_MARK,
+-};
+-/* - SCIF0 ----------------------------------------------------------------- */
+-static const unsigned int scif0_data_pins[] = {
+-	/* RX, TX */
+-	RCAR_GP_PIN(4, 28), RCAR_GP_PIN(4, 29),
+-};
+-static const unsigned int scif0_data_mux[] = {
+-	RX0_MARK, TX0_MARK,
+-};
+-static const unsigned int scif0_clk_pins[] = {
+-	/* SCK */
+-	RCAR_GP_PIN(4, 27),
+-};
+-static const unsigned int scif0_clk_mux[] = {
+-	SCK0_MARK,
+-};
+-static const unsigned int scif0_ctrl_pins[] = {
+-	/* RTS, CTS */
+-	RCAR_GP_PIN(4, 31), RCAR_GP_PIN(4, 30),
+-};
+-static const unsigned int scif0_ctrl_mux[] = {
+-	RTS0_N_MARK, CTS0_N_MARK,
+-};
+-static const unsigned int scif0_data_b_pins[] = {
+-	/* RX, TX */
+-	RCAR_GP_PIN(0, 4), RCAR_GP_PIN(0, 5),
+-};
+-static const unsigned int scif0_data_b_mux[] = {
+-	RX0_B_MARK, TX0_B_MARK,
+-};
+-/* - SCIF1 ----------------------------------------------------------------- */
+-static const unsigned int scif1_data_pins[] = {
+-	/* RX, TX */
+-	RCAR_GP_PIN(5, 0), RCAR_GP_PIN(5, 1),
+-};
+-static const unsigned int scif1_data_mux[] = {
+-	RX1_MARK, TX1_MARK,
+-};
+-static const unsigned int scif1_clk_pins[] = {
+-	/* SCK */
+-	RCAR_GP_PIN(4, 20),
+-};
+-static const unsigned int scif1_clk_mux[] = {
+-	SCK1_MARK,
+-};
+-static const unsigned int scif1_ctrl_pins[] = {
+-	/* RTS, CTS */
+-	RCAR_GP_PIN(5, 3), RCAR_GP_PIN(5, 2),
+-};
+-static const unsigned int scif1_ctrl_mux[] = {
+-	RTS1_N_MARK, CTS1_N_MARK,
+-};
+-static const unsigned int scif1_data_b_pins[] = {
+-	/* RX, TX */
+-	RCAR_GP_PIN(0, 14), RCAR_GP_PIN(0, 15),
+-};
+-static const unsigned int scif1_data_b_mux[] = {
+-	RX1_B_MARK, TX1_B_MARK,
+-};
+-static const unsigned int scif1_data_c_pins[] = {
+-	/* RX, TX */
+-	RCAR_GP_PIN(4, 1), RCAR_GP_PIN(4, 2),
+-};
+-static const unsigned int scif1_data_c_mux[] = {
+-	RX1_C_MARK, TX1_C_MARK,
+-};
+-static const unsigned int scif1_data_d_pins[] = {
+-	/* RX, TX */
+-	RCAR_GP_PIN(3, 18), RCAR_GP_PIN(3, 19),
+-};
+-static const unsigned int scif1_data_d_mux[] = {
+-	RX1_D_MARK, TX1_D_MARK,
+-};
+-static const unsigned int scif1_clk_d_pins[] = {
+-	/* SCK */
+-	RCAR_GP_PIN(3, 17),
+-};
+-static const unsigned int scif1_clk_d_mux[] = {
+-	SCK1_D_MARK,
+-};
+-static const unsigned int scif1_data_e_pins[] = {
+-	/* RX, TX */
+-	RCAR_GP_PIN(2, 21), RCAR_GP_PIN(2, 22),
+-};
+-static const unsigned int scif1_data_e_mux[] = {
+-	RX1_E_MARK, TX1_E_MARK,
+-};
+-static const unsigned int scif1_clk_e_pins[] = {
+-	/* SCK */
+-	RCAR_GP_PIN(2, 20),
+-};
+-static const unsigned int scif1_clk_e_mux[] = {
+-	SCK1_E_MARK,
+-};
+ /* - HSCIF0 ----------------------------------------------------------------- */
+ static const unsigned int hscif0_data_pins[] = {
+ 	/* RX, TX */
+@@ -2047,29 +1925,219 @@ static const unsigned int hscif1_ctrl_pins[] = {
+ 	/* RTS, CTS */
+ 	RCAR_GP_PIN(4, 31), RCAR_GP_PIN(4, 30),
+ };
+-static const unsigned int hscif1_ctrl_mux[] = {
+-	HRTS1_N_MARK, HCTS1_N_MARK,
++static const unsigned int hscif1_ctrl_mux[] = {
++	HRTS1_N_MARK, HCTS1_N_MARK,
++};
++static const unsigned int hscif1_data_b_pins[] = {
++	/* RX, TX */
++	RCAR_GP_PIN(1, 12), RCAR_GP_PIN(1, 18),
++};
++static const unsigned int hscif1_data_b_mux[] = {
++	HRX1_B_MARK, HTX1_B_MARK,
++};
++static const unsigned int hscif1_clk_b_pins[] = {
++	/* SCK */
++	RCAR_GP_PIN(1, 28),
++};
++static const unsigned int hscif1_clk_b_mux[] = {
++	HSCK1_B_MARK,
++};
++static const unsigned int hscif1_ctrl_b_pins[] = {
++	/* RTS, CTS */
++	RCAR_GP_PIN(1, 14), RCAR_GP_PIN(1, 13),
++};
++static const unsigned int hscif1_ctrl_b_mux[] = {
++	HRTS1_N_B_MARK, HCTS1_N_B_MARK,
++};
++/* - INTC ------------------------------------------------------------------- */
++static const unsigned int intc_irq0_pins[] = {
++	/* IRQ */
++	RCAR_GP_PIN(1, 25),
++};
++static const unsigned int intc_irq0_mux[] = {
++	IRQ0_MARK,
++};
++static const unsigned int intc_irq1_pins[] = {
++	/* IRQ */
++	RCAR_GP_PIN(1, 27),
++};
++static const unsigned int intc_irq1_mux[] = {
++	IRQ1_MARK,
++};
++static const unsigned int intc_irq2_pins[] = {
++	/* IRQ */
++	RCAR_GP_PIN(1, 29),
++};
++static const unsigned int intc_irq2_mux[] = {
++	IRQ2_MARK,
++};
++static const unsigned int intc_irq3_pins[] = {
++	/* IRQ */
++	RCAR_GP_PIN(1, 23),
++};
++static const unsigned int intc_irq3_mux[] = {
++	IRQ3_MARK,
++};
++/* - MMCIF0 ----------------------------------------------------------------- */
++static const unsigned int mmc0_data1_pins[] = {
++	/* D[0] */
++	RCAR_GP_PIN(3, 18),
++};
++static const unsigned int mmc0_data1_mux[] = {
++	MMC0_D0_MARK,
++};
++static const unsigned int mmc0_data4_pins[] = {
++	/* D[0:3] */
++	RCAR_GP_PIN(3, 18), RCAR_GP_PIN(3, 19),
++	RCAR_GP_PIN(3, 20), RCAR_GP_PIN(3, 21),
++};
++static const unsigned int mmc0_data4_mux[] = {
++	MMC0_D0_MARK, MMC0_D1_MARK, MMC0_D2_MARK, MMC0_D3_MARK,
++};
++static const unsigned int mmc0_data8_pins[] = {
++	/* D[0:7] */
++	RCAR_GP_PIN(3, 18), RCAR_GP_PIN(3, 19),
++	RCAR_GP_PIN(3, 20), RCAR_GP_PIN(3, 21),
++	RCAR_GP_PIN(3, 22), RCAR_GP_PIN(3, 23),
++	RCAR_GP_PIN(3, 6), RCAR_GP_PIN(3, 7),
++};
++static const unsigned int mmc0_data8_mux[] = {
++	MMC0_D0_MARK, MMC0_D1_MARK, MMC0_D2_MARK, MMC0_D3_MARK,
++	MMC0_D4_MARK, MMC0_D5_MARK, MMC0_D6_MARK, MMC0_D7_MARK,
++};
++static const unsigned int mmc0_ctrl_pins[] = {
++	/* CLK, CMD */
++	RCAR_GP_PIN(3, 16), RCAR_GP_PIN(3, 17),
++};
++static const unsigned int mmc0_ctrl_mux[] = {
++	MMC0_CLK_MARK, MMC0_CMD_MARK,
++};
++/* - MMCIF1 ----------------------------------------------------------------- */
++static const unsigned int mmc1_data1_pins[] = {
++	/* D[0] */
++	RCAR_GP_PIN(3, 26),
++};
++static const unsigned int mmc1_data1_mux[] = {
++	MMC1_D0_MARK,
++};
++static const unsigned int mmc1_data4_pins[] = {
++	/* D[0:3] */
++	RCAR_GP_PIN(3, 26), RCAR_GP_PIN(3, 27),
++	RCAR_GP_PIN(3, 28), RCAR_GP_PIN(3, 29),
++};
++static const unsigned int mmc1_data4_mux[] = {
++	MMC1_D0_MARK, MMC1_D1_MARK, MMC1_D2_MARK, MMC1_D3_MARK,
++};
++static const unsigned int mmc1_data8_pins[] = {
++	/* D[0:7] */
++	RCAR_GP_PIN(3, 26), RCAR_GP_PIN(3, 27),
++	RCAR_GP_PIN(3, 28), RCAR_GP_PIN(3, 29),
++	RCAR_GP_PIN(3, 30), RCAR_GP_PIN(3, 31),
++	RCAR_GP_PIN(3, 14), RCAR_GP_PIN(3, 15),
++};
++static const unsigned int mmc1_data8_mux[] = {
++	MMC1_D0_MARK, MMC1_D1_MARK, MMC1_D2_MARK, MMC1_D3_MARK,
++	MMC1_D4_MARK, MMC1_D5_MARK, MMC1_D6_MARK, MMC1_D7_MARK,
++};
++static const unsigned int mmc1_ctrl_pins[] = {
++	/* CLK, CMD */
++	RCAR_GP_PIN(3, 24), RCAR_GP_PIN(3, 25),
++};
++static const unsigned int mmc1_ctrl_mux[] = {
++	MMC1_CLK_MARK, MMC1_CMD_MARK,
++};
++/* - SCIF0 ------------------------------------------------------------------ */
++static const unsigned int scif0_data_pins[] = {
++	/* RX, TX */
++	RCAR_GP_PIN(4, 28), RCAR_GP_PIN(4, 29),
++};
++static const unsigned int scif0_data_mux[] = {
++	RX0_MARK, TX0_MARK,
++};
++static const unsigned int scif0_clk_pins[] = {
++	/* SCK */
++	RCAR_GP_PIN(4, 27),
++};
++static const unsigned int scif0_clk_mux[] = {
++	SCK0_MARK,
++};
++static const unsigned int scif0_ctrl_pins[] = {
++	/* RTS, CTS */
++	RCAR_GP_PIN(4, 31), RCAR_GP_PIN(4, 30),
++};
++static const unsigned int scif0_ctrl_mux[] = {
++	RTS0_N_MARK, CTS0_N_MARK,
++};
++static const unsigned int scif0_data_b_pins[] = {
++	/* RX, TX */
++	RCAR_GP_PIN(0, 4), RCAR_GP_PIN(0, 5),
++};
++static const unsigned int scif0_data_b_mux[] = {
++	RX0_B_MARK, TX0_B_MARK,
++};
++/* - SCIF1 ------------------------------------------------------------------ */
++static const unsigned int scif1_data_pins[] = {
++	/* RX, TX */
++	RCAR_GP_PIN(5, 0), RCAR_GP_PIN(5, 1),
++};
++static const unsigned int scif1_data_mux[] = {
++	RX1_MARK, TX1_MARK,
++};
++static const unsigned int scif1_clk_pins[] = {
++	/* SCK */
++	RCAR_GP_PIN(4, 20),
++};
++static const unsigned int scif1_clk_mux[] = {
++	SCK1_MARK,
++};
++static const unsigned int scif1_ctrl_pins[] = {
++	/* RTS, CTS */
++	RCAR_GP_PIN(5, 3), RCAR_GP_PIN(5, 2),
++};
++static const unsigned int scif1_ctrl_mux[] = {
++	RTS1_N_MARK, CTS1_N_MARK,
++};
++static const unsigned int scif1_data_b_pins[] = {
++	/* RX, TX */
++	RCAR_GP_PIN(0, 14), RCAR_GP_PIN(0, 15),
++};
++static const unsigned int scif1_data_b_mux[] = {
++	RX1_B_MARK, TX1_B_MARK,
++};
++static const unsigned int scif1_data_c_pins[] = {
++	/* RX, TX */
++	RCAR_GP_PIN(4, 1), RCAR_GP_PIN(4, 2),
++};
++static const unsigned int scif1_data_c_mux[] = {
++	RX1_C_MARK, TX1_C_MARK,
+ };
+-static const unsigned int hscif1_data_b_pins[] = {
++static const unsigned int scif1_data_d_pins[] = {
+ 	/* RX, TX */
+-	RCAR_GP_PIN(1, 12), RCAR_GP_PIN(1, 18),
++	RCAR_GP_PIN(3, 18), RCAR_GP_PIN(3, 19),
+ };
+-static const unsigned int hscif1_data_b_mux[] = {
+-	HRX1_B_MARK, HTX1_B_MARK,
++static const unsigned int scif1_data_d_mux[] = {
++	RX1_D_MARK, TX1_D_MARK,
+ };
+-static const unsigned int hscif1_clk_b_pins[] = {
++static const unsigned int scif1_clk_d_pins[] = {
+ 	/* SCK */
+-	RCAR_GP_PIN(1, 28),
++	RCAR_GP_PIN(3, 17),
+ };
+-static const unsigned int hscif1_clk_b_mux[] = {
+-	HSCK1_B_MARK,
++static const unsigned int scif1_clk_d_mux[] = {
++	SCK1_D_MARK,
+ };
+-static const unsigned int hscif1_ctrl_b_pins[] = {
+-	/* RTS, CTS */
+-	RCAR_GP_PIN(1, 14), RCAR_GP_PIN(1, 13),
++static const unsigned int scif1_data_e_pins[] = {
++	/* RX, TX */
++	RCAR_GP_PIN(2, 21), RCAR_GP_PIN(2, 22),
+ };
+-static const unsigned int hscif1_ctrl_b_mux[] = {
+-	HRTS1_N_B_MARK, HCTS1_N_B_MARK,
++static const unsigned int scif1_data_e_mux[] = {
++	RX1_E_MARK, TX1_E_MARK,
++};
++static const unsigned int scif1_clk_e_pins[] = {
++	/* SCK */
++	RCAR_GP_PIN(2, 20),
++};
++static const unsigned int scif1_clk_e_mux[] = {
++	SCK1_E_MARK,
+ };
+ /* - SCIFA0 ----------------------------------------------------------------- */
+ static const unsigned int scifa0_data_pins[] = {
+@@ -2434,103 +2502,6 @@ static const unsigned int scifb2_data_c_pins[] = {
+ static const unsigned int scifb2_data_c_mux[] = {
+ 	SCIFB2_RXD_C_MARK, SCIFB2_TXD_C_MARK,
+ };
+-/* - TPU0 ------------------------------------------------------------------- */
+-static const unsigned int tpu0_to0_pins[] = {
+-	/* TO */
+-	RCAR_GP_PIN(0, 20),
+-};
+-static const unsigned int tpu0_to0_mux[] = {
+-	TPU0TO0_MARK,
+-};
+-static const unsigned int tpu0_to1_pins[] = {
+-	/* TO */
+-	RCAR_GP_PIN(0, 21),
+-};
+-static const unsigned int tpu0_to1_mux[] = {
+-	TPU0TO1_MARK,
+-};
+-static const unsigned int tpu0_to2_pins[] = {
+-	/* TO */
+-	RCAR_GP_PIN(0, 22),
+-};
+-static const unsigned int tpu0_to2_mux[] = {
+-	TPU0TO2_MARK,
+-};
+-static const unsigned int tpu0_to3_pins[] = {
+-	/* TO */
+-	RCAR_GP_PIN(0, 23),
+-};
+-static const unsigned int tpu0_to3_mux[] = {
+-	TPU0TO3_MARK,
+-};
+-/* - MMCIF0 ----------------------------------------------------------------- */
+-static const unsigned int mmc0_data1_pins[] = {
+-	/* D[0] */
+-	RCAR_GP_PIN(3, 18),
+-};
+-static const unsigned int mmc0_data1_mux[] = {
+-	MMC0_D0_MARK,
+-};
+-static const unsigned int mmc0_data4_pins[] = {
+-	/* D[0:3] */
+-	RCAR_GP_PIN(3, 18), RCAR_GP_PIN(3, 19),
+-	RCAR_GP_PIN(3, 20), RCAR_GP_PIN(3, 21),
+-};
+-static const unsigned int mmc0_data4_mux[] = {
+-	MMC0_D0_MARK, MMC0_D1_MARK, MMC0_D2_MARK, MMC0_D3_MARK,
+-};
+-static const unsigned int mmc0_data8_pins[] = {
+-	/* D[0:7] */
+-	RCAR_GP_PIN(3, 18), RCAR_GP_PIN(3, 19),
+-	RCAR_GP_PIN(3, 20), RCAR_GP_PIN(3, 21),
+-	RCAR_GP_PIN(3, 22), RCAR_GP_PIN(3, 23),
+-	RCAR_GP_PIN(3, 6), RCAR_GP_PIN(3, 7),
+-};
+-static const unsigned int mmc0_data8_mux[] = {
+-	MMC0_D0_MARK, MMC0_D1_MARK, MMC0_D2_MARK, MMC0_D3_MARK,
+-	MMC0_D4_MARK, MMC0_D5_MARK, MMC0_D6_MARK, MMC0_D7_MARK,
+-};
+-static const unsigned int mmc0_ctrl_pins[] = {
+-	/* CLK, CMD */
+-	RCAR_GP_PIN(3, 16), RCAR_GP_PIN(3, 17),
+-};
+-static const unsigned int mmc0_ctrl_mux[] = {
+-	MMC0_CLK_MARK, MMC0_CMD_MARK,
+-};
+-/* - MMCIF1 ----------------------------------------------------------------- */
+-static const unsigned int mmc1_data1_pins[] = {
+-	/* D[0] */
+-	RCAR_GP_PIN(3, 26),
+-};
+-static const unsigned int mmc1_data1_mux[] = {
+-	MMC1_D0_MARK,
+-};
+-static const unsigned int mmc1_data4_pins[] = {
+-	/* D[0:3] */
+-	RCAR_GP_PIN(3, 26), RCAR_GP_PIN(3, 27),
+-	RCAR_GP_PIN(3, 28), RCAR_GP_PIN(3, 29),
+-};
+-static const unsigned int mmc1_data4_mux[] = {
+-	MMC1_D0_MARK, MMC1_D1_MARK, MMC1_D2_MARK, MMC1_D3_MARK,
+-};
+-static const unsigned int mmc1_data8_pins[] = {
+-	/* D[0:7] */
+-	RCAR_GP_PIN(3, 26), RCAR_GP_PIN(3, 27),
+-	RCAR_GP_PIN(3, 28), RCAR_GP_PIN(3, 29),
+-	RCAR_GP_PIN(3, 30), RCAR_GP_PIN(3, 31),
+-	RCAR_GP_PIN(3, 14), RCAR_GP_PIN(3, 15),
+-};
+-static const unsigned int mmc1_data8_mux[] = {
+-	MMC1_D0_MARK, MMC1_D1_MARK, MMC1_D2_MARK, MMC1_D3_MARK,
+-	MMC1_D4_MARK, MMC1_D5_MARK, MMC1_D6_MARK, MMC1_D7_MARK,
+-};
+-static const unsigned int mmc1_ctrl_pins[] = {
+-	/* CLK, CMD */
+-	RCAR_GP_PIN(3, 24), RCAR_GP_PIN(3, 25),
+-};
+-static const unsigned int mmc1_ctrl_mux[] = {
+-	MMC1_CLK_MARK, MMC1_CMD_MARK,
+-};
+ /* - SDHI0 ------------------------------------------------------------------ */
+ static const unsigned int sdhi0_data1_pins[] = {
+ 	/* D0 */
+@@ -2675,6 +2646,35 @@ static const unsigned int sdhi3_wp_pins[] = {
+ static const unsigned int sdhi3_wp_mux[] = {
+ 	SD3_WP_MARK,
+ };
++/* - TPU0 ------------------------------------------------------------------- */
++static const unsigned int tpu0_to0_pins[] = {
++	/* TO */
++	RCAR_GP_PIN(0, 20),
++};
++static const unsigned int tpu0_to0_mux[] = {
++	TPU0TO0_MARK,
++};
++static const unsigned int tpu0_to1_pins[] = {
++	/* TO */
++	RCAR_GP_PIN(0, 21),
++};
++static const unsigned int tpu0_to1_mux[] = {
++	TPU0TO1_MARK,
++};
++static const unsigned int tpu0_to2_pins[] = {
++	/* TO */
++	RCAR_GP_PIN(0, 22),
++};
++static const unsigned int tpu0_to2_mux[] = {
++	TPU0TO2_MARK,
++};
++static const unsigned int tpu0_to3_pins[] = {
++	/* TO */
++	RCAR_GP_PIN(0, 23),
++};
++static const unsigned int tpu0_to3_mux[] = {
++	TPU0TO3_MARK,
++};
  
-@@ -452,10 +452,10 @@ enum {
- 	FN_HRTS0_N_C,
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(eth_link),
+@@ -2809,6 +2809,31 @@ static const char * const eth_groups[] = {
+ 	"eth_rmii",
+ };
  
- 	/* IPSR15 */
--	FN_SCIFA2_SCK, FN_FMCLK, FN_MSIOF3_SCK, FN_DU2_DG7,
-+	FN_SCIFA2_SCK, FN_FMCLK, FN_SCK2, FN_MSIOF3_SCK, FN_DU2_DG7,
- 	FN_LCDOUT15, FN_SCIF_CLK_B, FN_SCIFA2_RXD, FN_FMIN,
--	FN_DU2_DB0, FN_LCDOUT16, FN_IIC2_SCL, FN_I2C2_SCL,
--	FN_SCIFA2_TXD, FN_BPFCLK, FN_DU2_DB1, FN_LCDOUT17,
-+	FN_TX2, FN_DU2_DB0, FN_LCDOUT16, FN_IIC2_SCL, FN_I2C2_SCL,
-+	FN_SCIFA2_TXD, FN_BPFCLK, FN_RX2, FN_DU2_DB1, FN_LCDOUT17,
- 	FN_IIC2_SDA, FN_I2C2_SDA, FN_HSCK0, FN_TS_SDEN0,
- 	FN_DU2_DG4, FN_LCDOUT12, FN_HCTS0_N_C, FN_HRX0,
- 	FN_DU2_DB2, FN_LCDOUT18, FN_HTX0, FN_DU2_DB3,
-@@ -507,6 +507,7 @@ enum {
- 	FN_SEL_CANCLK_0, FN_SEL_CANCLK_1,
- 	FN_SEL_SCIFA2_0, FN_SEL_SCIFA2_1, FN_SEL_SCIFA2_2,
- 	FN_SEL_CAN1_0, FN_SEL_CAN1_1,
-+	FN_SEL_SCIF2_0, FN_SEL_SCIF2_1,
- 	FN_SEL_ADI_0, FN_SEL_ADI_1,
- 	FN_SEL_SSP_0, FN_SEL_SSP_1,
- 	FN_SEL_FM_0, FN_SEL_FM_1, FN_SEL_FM_2, FN_SEL_FM_3,
-@@ -573,9 +574,9 @@ enum {
- 	A6_MARK, SCIFA1_RTS_N_B_MARK, TPU0TO2_MARK, A7_MARK,
- 	SCIFA1_SCK_B_MARK, AUDIO_CLKOUT_B_MARK, TPU0TO3_MARK,
- 	A8_MARK, SCIFA1_RXD_B_MARK, SSI_SCK5_B_MARK, VI0_R4_MARK,
--	VI0_R4_B_MARK, SCIFB2_RXD_C_MARK, VI2_DATA0_VI2_B0_B_MARK,
-+	VI0_R4_B_MARK, SCIFB2_RXD_C_MARK, RX2_B_MARK, VI2_DATA0_VI2_B0_B_MARK,
- 	A9_MARK, SCIFA1_CTS_N_B_MARK, SSI_WS5_B_MARK, VI0_R5_MARK,
--	VI0_R5_B_MARK, SCIFB2_TXD_C_MARK, VI2_DATA1_VI2_B1_B_MARK,
-+	VI0_R5_B_MARK, SCIFB2_TXD_C_MARK, TX2_B_MARK, VI2_DATA1_VI2_B1_B_MARK,
- 	A10_MARK, SSI_SDATA5_B_MARK, MSIOF2_SYNC_MARK, VI0_R6_MARK,
- 	VI0_R6_B_MARK, VI2_DATA2_VI2_B2_B_MARK,
++static const char * const hscif0_groups[] = {
++	"hscif0_data",
++	"hscif0_clk",
++	"hscif0_ctrl",
++	"hscif0_data_b",
++	"hscif0_ctrl_b",
++	"hscif0_data_c",
++	"hscif0_ctrl_c",
++	"hscif0_data_d",
++	"hscif0_ctrl_d",
++	"hscif0_data_e",
++	"hscif0_ctrl_e",
++	"hscif0_data_f",
++	"hscif0_ctrl_f",
++};
++
++static const char * const hscif1_groups[] = {
++	"hscif1_data",
++	"hscif1_clk",
++	"hscif1_ctrl",
++	"hscif1_data_b",
++	"hscif1_clk_b",
++	"hscif1_ctrl_b",
++};
++
+ static const char * const intc_groups[] = {
+ 	"intc_irq0",
+ 	"intc_irq1",
+@@ -2816,6 +2841,20 @@ static const char * const intc_groups[] = {
+ 	"intc_irq3",
+ };
  
-@@ -815,10 +816,10 @@ enum {
- 	MSIOF3_TXD_MARK, DU1_DOTCLKOUT_MARK, QSTVB_QVE_MARK,
- 	HRTS0_N_C_MARK,
++static const char * const mmc0_groups[] = {
++	"mmc0_data1",
++	"mmc0_data4",
++	"mmc0_data8",
++	"mmc0_ctrl",
++};
++
++static const char * const mmc1_groups[] = {
++	"mmc1_data1",
++	"mmc1_data4",
++	"mmc1_data8",
++	"mmc1_ctrl",
++};
++
+ static const char * const scif0_groups[] = {
+ 	"scif0_data",
+ 	"scif0_clk",
+@@ -2835,31 +2874,6 @@ static const char * const scif1_groups[] = {
+ 	"scif1_clk_e",
+ };
  
--	SCIFA2_SCK_MARK, FMCLK_MARK, MSIOF3_SCK_MARK, DU2_DG7_MARK,
-+	SCIFA2_SCK_MARK, FMCLK_MARK, SCK2_MARK, MSIOF3_SCK_MARK, DU2_DG7_MARK,
- 	LCDOUT15_MARK, SCIF_CLK_B_MARK, SCIFA2_RXD_MARK, FMIN_MARK,
--	DU2_DB0_MARK, LCDOUT16_MARK, IIC2_SCL_MARK, I2C2_SCL_MARK,
--	SCIFA2_TXD_MARK, BPFCLK_MARK, DU2_DB1_MARK, LCDOUT17_MARK,
-+	TX2_MARK, DU2_DB0_MARK, LCDOUT16_MARK, IIC2_SCL_MARK, I2C2_SCL_MARK,
-+	SCIFA2_TXD_MARK, BPFCLK_MARK, RX2_MARK, DU2_DB1_MARK, LCDOUT17_MARK,
- 	IIC2_SDA_MARK, I2C2_SDA_MARK, HSCK0_MARK, TS_SDEN0_MARK,
- 	DU2_DG4_MARK, LCDOUT12_MARK, HCTS0_N_C_MARK, HRX0_MARK,
- 	DU2_DB2_MARK, LCDOUT18_MARK, HTX0_MARK, DU2_DB3_MARK,
-@@ -981,6 +982,7 @@ static const pinmux_enum_t pinmux_data[] = {
- 	PINMUX_IPSR_MODSEL_DATA(IP2_21_18, VI0_R4, SEL_VI0_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_21_18, VI0_R4_B, SEL_VI0_1),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_21_18, SCIFB2_RXD_C, SEL_SCIFB2_2),
-+	PINMUX_IPSR_MODSEL_DATA(IP2_21_18, RX2_B, SEL_SCIF2_1),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_21_18, VI2_DATA0_VI2_B0_B, SEL_VI2_1),
- 	PINMUX_IPSR_DATA(IP2_25_22, A9),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_25_22, SCIFA1_CTS_N_B, SEL_SCIFA1_1),
-@@ -988,6 +990,7 @@ static const pinmux_enum_t pinmux_data[] = {
- 	PINMUX_IPSR_MODSEL_DATA(IP2_25_22, VI0_R5, SEL_VI0_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_25_22, VI0_R5_B, SEL_VI0_1),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_25_22, SCIFB2_TXD_C, SEL_SCIFB2_2),
-+	PINMUX_IPSR_MODSEL_DATA(IP2_25_22, TX2_B, SEL_SCIF2_1),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_25_22, VI2_DATA1_VI2_B1_B, SEL_VI2_1),
- 	PINMUX_IPSR_DATA(IP2_28_26, A10),
- 	PINMUX_IPSR_MODSEL_DATA(IP2_28_26, SSI_SDATA5_B, SEL_SSI5_1),
-@@ -1696,18 +1699,21 @@ static const pinmux_enum_t pinmux_data[] = {
+-static const char * const hscif0_groups[] = {
+-	"hscif0_data",
+-	"hscif0_clk",
+-	"hscif0_ctrl",
+-	"hscif0_data_b",
+-	"hscif0_ctrl_b",
+-	"hscif0_data_c",
+-	"hscif0_ctrl_c",
+-	"hscif0_data_d",
+-	"hscif0_ctrl_d",
+-	"hscif0_data_e",
+-	"hscif0_ctrl_e",
+-	"hscif0_data_f",
+-	"hscif0_ctrl_f",
+-};
+-
+-static const char * const hscif1_groups[] = {
+-	"hscif1_data",
+-	"hscif1_clk",
+-	"hscif1_ctrl",
+-	"hscif1_data_b",
+-	"hscif1_clk_b",
+-	"hscif1_ctrl_b",
+-};
+-
+ static const char * const scifa0_groups[] = {
+ 	"scifa0_data",
+ 	"scifa0_clk",
+@@ -2929,27 +2943,6 @@ static const char * const scifb2_groups[] = {
+ 	"scifb2_data_c",
+ };
  
- 	PINMUX_IPSR_MODSEL_DATA(IP15_2_0, SCIFA2_SCK, SEL_SCIFA2_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_2_0, FMCLK, SEL_FM_0),
-+	PINMUX_IPSR_DATA(IP15_2_0, SCK2),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_2_0, MSIOF3_SCK, SEL_SOF3_0),
- 	PINMUX_IPSR_DATA(IP15_2_0, DU2_DG7),
- 	PINMUX_IPSR_DATA(IP15_2_0, LCDOUT15),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_2_0, SCIF_CLK_B, SEL_SCIFCLK_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_5_3, SCIFA2_RXD, SEL_SCIFA2_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_5_3, FMIN, SEL_FM_0),
-+	PINMUX_IPSR_MODSEL_DATA(IP15_5_3, TX2, SEL_SCIF2_0),
- 	PINMUX_IPSR_DATA(IP15_5_3, DU2_DB0),
- 	PINMUX_IPSR_DATA(IP15_5_3, LCDOUT16),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_5_3, IIC2_SCL, SEL_IIC2_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_5_3, I2C2_SCL, SEL_I2C2_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_8_6, SCIFA2_TXD, SEL_SCIFA2_0),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_8_6, BPFCLK, SEL_FM_0),
-+	PINMUX_IPSR_MODSEL_DATA(IP15_8_6, RX2, SEL_SCIF2_0),
- 	PINMUX_IPSR_DATA(IP15_8_6, DU2_DB1),
- 	PINMUX_IPSR_DATA(IP15_8_6, LCDOUT17),
- 	PINMUX_IPSR_MODSEL_DATA(IP15_8_6, IIC2_SDA, SEL_IIC2_0),
-@@ -3286,11 +3292,11 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
- 		FN_VI0_R6_B, FN_VI2_DATA2_VI2_B2_B, 0, 0,
- 		/* IP2_25_22 [4] */
- 		FN_A9, FN_SCIFA1_CTS_N_B, FN_SSI_WS5_B, FN_VI0_R5,
--		FN_VI0_R5_B, FN_SCIFB2_TXD_C, 0, FN_VI2_DATA1_VI2_B1_B,
-+		FN_VI0_R5_B, FN_SCIFB2_TXD_C, FN_TX2_B, FN_VI2_DATA1_VI2_B1_B,
- 		0, 0, 0, 0, 0, 0, 0, 0,
- 		/* IP2_21_18 [4] */
- 		FN_A8, FN_SCIFA1_RXD_B, FN_SSI_SCK5_B, FN_VI0_R4,
--		FN_VI0_R4_B, FN_SCIFB2_RXD_C, 0, FN_VI2_DATA0_VI2_B0_B,
-+		FN_VI0_R4_B, FN_SCIFB2_RXD_C, FN_RX2_B, FN_VI2_DATA0_VI2_B0_B,
- 		0, 0, 0, 0, 0, 0, 0, 0,
- 		/* IP2_17_15 [3] */
- 		FN_A7, FN_SCIFA1_SCK_B, FN_AUDIO_CLKOUT_B, FN_TPU0TO3,
-@@ -3770,13 +3776,13 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
- 		FN_HSCK0, FN_TS_SDEN0, FN_DU2_DG4, FN_LCDOUT12, FN_HCTS0_N_C,
- 		0, 0, 0,
- 		/* IP15_8_6 [3] */
--		FN_SCIFA2_TXD, FN_BPFCLK, 0, FN_DU2_DB1, FN_LCDOUT17,
-+		FN_SCIFA2_TXD, FN_BPFCLK, FN_RX2, FN_DU2_DB1, FN_LCDOUT17,
- 		FN_IIC2_SDA, FN_I2C2_SDA, 0,
- 		/* IP15_5_3 [3] */
--		FN_SCIFA2_RXD, FN_FMIN, 0, FN_DU2_DB0, FN_LCDOUT16,
-+		FN_SCIFA2_RXD, FN_FMIN, FN_TX2, FN_DU2_DB0, FN_LCDOUT16,
- 		FN_IIC2_SCL, FN_I2C2_SCL, 0,
- 		/* IP15_2_0 [3] */
--		FN_SCIFA2_SCK, FN_FMCLK, 0, FN_MSIOF3_SCK, FN_DU2_DG7,
-+		FN_SCIFA2_SCK, FN_FMCLK, FN_SCK2, FN_MSIOF3_SCK, FN_DU2_DG7,
- 		FN_LCDOUT15, FN_SCIF_CLK_B, 0, }
- 	},
- 	{ PINMUX_CFG_REG_VAR("IPSR16", 0xE6060160, 32,
-@@ -3881,8 +3887,8 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
- 		FN_SEL_CAN1_0, FN_SEL_CAN1_1,
- 		/* RESERVED [2] */
- 		0, 0, 0, 0,
--		/* RESERVED [1] (actually TX2, RX2 vs. TX2_B, RX2_B of SCIF2) */
--		0, 0,
-+		/* SEL_SCIF2 [1] */
-+		FN_SEL_SCIF2_0, FN_SEL_SCIF2_1,
- 		/* SEL_ADI [1] */
- 		FN_SEL_ADI_0, FN_SEL_ADI_1,
- 		/* SEL_SSP [1] */
+-static const char * const tpu0_groups[] = {
+-	"tpu0_to0",
+-	"tpu0_to1",
+-	"tpu0_to2",
+-	"tpu0_to3",
+-};
+-
+-static const char * const mmc0_groups[] = {
+-	"mmc0_data1",
+-	"mmc0_data4",
+-	"mmc0_data8",
+-	"mmc0_ctrl",
+-};
+-
+-static const char * const mmc1_groups[] = {
+-	"mmc1_data1",
+-	"mmc1_data4",
+-	"mmc1_data8",
+-	"mmc1_ctrl",
+-};
+-
+ static const char * const sdhi0_groups[] = {
+ 	"sdhi0_data1",
+ 	"sdhi0_data4",
+@@ -2982,6 +2975,13 @@ static const char * const sdhi3_groups[] = {
+ 	"sdhi3_wp",
+ };
+ 
++static const char * const tpu0_groups[] = {
++	"tpu0_to0",
++	"tpu0_to1",
++	"tpu0_to2",
++	"tpu0_to3",
++};
++
+ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(eth),
+ 	SH_PFC_FUNCTION(hscif0),
 -- 
 1.8.1.5
