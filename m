@@ -1,38 +1,73 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 11:39:12 -0700
-Subject: [PATCH v5 0/5] clk: implement remuxing during set_rate
-In-Reply-To: <CAAG0J9-F0P67=oaE5UHhmgd3Wz4k4XjsRjWShxmKOqicAyrhfw@mail.gmail.com>
-References: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>
- <20130621170407.20448.35605@quantum>
- <CAAG0J9-F0P67=oaE5UHhmgd3Wz4k4XjsRjWShxmKOqicAyrhfw@mail.gmail.com>
-Message-ID: <20130724183912.GC27761@codeaurora.org>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Wed, 24 Jul 2013 19:42:44 +0100
+Subject: Requirements for FDT load address on ARM
+In-Reply-To: <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
+References: <1374677923.6623.194.camel@hastur.hellion.org.uk>
+ <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
+Message-ID: <1374691364.32286.13.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21, James Hogan wrote:
-> On 21 June 2013 18:04, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting James Hogan (2013-06-13 09:05:57)
-> >> This patchset adds support for automatic selection of the best parent
-> >> for a clock mux, i.e. the one which can provide the closest clock rate
-> >> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
-> >> flag (which is set for all uses of clk_register_mux().
-> >>
-> >> This works by way of adding a new op, determine_rate, similar to
-> >> round_rate but with an extra parameter to allow the clock driver to
-> >> optionally select a different parent clock. This is used in
-> >> clk_calc_new_rates to decide whether to initiate a set_parent operation.
-> >
-> > Hi James,
-> >
-> > I'm going to hold off on this one for 3.11. I'll revisit it after the
-> > next merge window.
+On Wed, 2013-07-24 at 11:24 -0400, Nicolas Pitre wrote:
+> On Wed, 24 Jul 2013, Ian Campbell wrote:
 > 
-> Okay, no worries.
+> > [apologies if this is a repeat, I don't see it in the archives and at
+> > least one CC'd recipient (Julien) didn't receive it either. Beasties in
+> > our email server I expect...]
+> > 
+> > Are there any requirements about where the FDT may be loaded by the
+> > bootloader?
 > 
+> It must be located where it is unlikely to be overwritten by the zImage 
+> decompressor relocating itself.  Same goes for the initrd.
 
-Has a new patchset been sent out? I'd like to see this merge in
-3.12.
+Right. That's a bit hard to determine programmaticaly from a bootloader
+though :-(
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> > I'm finding that if I load it "too high" I get a fault (the specifics
+> > aren't that relevant but details are below).
+> 
+> Do you have commit 6f16f4998f98 in your kernel tree?
+
+It doesn't look like I do. The symptoms I'm seeing could well be
+explained by that lack.
+
+> > FWIW with RAM from 0x8000000-0xffffffff and a kernel loaded at 
+> > 0x80008000 "too high" means above somewhere around 0xaf800000.
+> 
+> Sorry, I don't understand the above sentence.
+> 
+> Is RAM actually starting at 0x08000000 ?
+
+Sorry, missed a zero, RAM starts at 0x80000000.
+
+What I was trying to say that in my empirical experience loading the fdt
+"too high" meant above 0xaf800000. Not actually terribly useful data
+TBH.
+
+>   Note that the kernel must be 
+> loaded in the first 128MB of RAM.
+
+> > I expect this is because the kernel doesn't use an explicit mapping of
+> > the fdt but expects it to be within the RAM directly mapped by the
+> > lowmem area (i.e. it uses phys_to_virt, since day one aka 93c02ab40ae6
+> > "arm/dt: probe for platforms via the device tree").
+> 
+> The fdt is expected to be located in lowmem.  So yes, that's actually a 
+> restriction.
+
+OK, that's good to know, although the fuzziness about what is "lowmem"
+for a given kernel config makes it a bit trickier.
+
+> > This effectively
+> > limits the FDT to being within the first ~700MB (give or take based
+> > on .config etc, I suppose <500MB is a pretty safe rule of thumb). Is
+> > this expected or is it actually not intentional and the kernel should
+> > really be using an explicit mapping here? Should I send a patch against
+> > Documentation/arm/Booting?
+> 
+> Yes please.
+
+OK I'll try and put something together which I hope isn't too wildly wrong...
+
+Ian
