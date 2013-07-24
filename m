@@ -1,56 +1,34 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 24 Jul 2013 16:27:39 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0: Rely on DT for SMP CPU info
-Message-ID: <20130724072739.28333.44251.sendpatchset@w520>
+Date: Wed, 24 Jul 2013 16:30:42 +0900
+Subject: [PATCH] ARM: shmobile: marzen: Switch to DT_MACHINE_START
+Message-ID: <20130724073042.28351.33041.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove sh73a0 specific ->smp_init_cpus() callback and
-instead of relying on shmobile_smp_init_cpus() simply
-use DT for CPU core information.
+Convert the marzen board to use DT_MACHINE_START. With this in
+place all mach-shmobile boards use DT_MACHINE_START. Also, this
+makes it possible for the r8a7779 SMP code to use DT for CPUs.
 
-This assumes that DT_MACHINE_START is used which is
-the case when AG5EVM and Kota2 are removed.
+So appended DTB is the way forward on this board.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/smp-sh73a0.c |   11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+ Written on top of renesas-devel-20130724
 
---- 0001/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ work/arch/arm/mach-shmobile/smp-sh73a0.c	2013-07-24 15:59:16.000000000 +0900
-@@ -62,6 +62,8 @@ static int sh73a0_boot_secondary(unsigne
- 
- static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	/* setup sh73a0 specific SCU base */
-+	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
- 	scu_enable(shmobile_scu_base);
- 
- 	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
-@@ -74,14 +76,6 @@ static void __init sh73a0_smp_prepare_cp
- 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+ arch/arm/mach-shmobile/board-marzen.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- 0001/arch/arm/mach-shmobile/board-marzen.c
++++ work/arch/arm/mach-shmobile/board-marzen.c	2013-07-24 15:45:39.000000000 +0900
+@@ -238,7 +238,7 @@ static void __init marzen_init(void)
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
  }
  
--static void __init sh73a0_smp_init_cpus(void)
--{
--	/* setup sh73a0 specific SCU base */
--	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
--
--	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
--}
--
- #ifdef CONFIG_HOTPLUG_CPU
- static int sh73a0_cpu_kill(unsigned int cpu)
- {
-@@ -120,7 +114,6 @@ static int sh73a0_cpu_disable(unsigned i
- #endif /* CONFIG_HOTPLUG_CPU */
- 
- struct smp_operations sh73a0_smp_ops __initdata = {
--	.smp_init_cpus		= sh73a0_smp_init_cpus,
- 	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
- 	.smp_boot_secondary	= sh73a0_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
+-MACHINE_START(MARZEN, "marzen")
++DT_MACHINE_START(MARZEN, "marzen")
+ 	.smp		= smp_ops(r8a7779_smp_ops),
+ 	.map_io		= r8a7779_map_io,
+ 	.init_early	= r8a7779_add_early_devices,
