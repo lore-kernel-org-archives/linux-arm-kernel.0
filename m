@@ -1,45 +1,37 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Wed, 24 Jul 2013 12:10:02 +0800
-Subject: [PATCH 9/9] dma: tegra20-apbdma: remove legacy nvidia,
- dma-request-selector support
-In-Reply-To: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
-References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
-Message-ID: <1374639002-16753-10-git-send-email-rizhao@nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 24 Jul 2013 13:36:47 +0900
+Subject: [PATCH] ARM: dts: re-ordering exynos dtbs in Makefile
+Message-ID: <0e0c01ce8827$6850a220$38f1e660$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All tegra dma client drivers have moved to generic dma binding.
 
-Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+Re-ordering in alphabetical.
+
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/dma/tegra20-apb-dma.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/boot/dts/Makefile |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
-index 0e12f78..a67d159 100644
---- a/drivers/dma/tegra20-apb-dma.c
-+++ b/drivers/dma/tegra20-apb-dma.c
-@@ -344,13 +344,6 @@ static int tegra_dma_slave_config(struct dma_chan *dc,
- 
- 	memcpy(&tdc->dma_sconfig, sconfig, sizeof(*sconfig));
- 
--	/* If we didn't get slave_id from DT when request channel, use the one
--	 * passed here.
--	 * It makes compatible with legacy nvidia,dma-request-selector.
--	 */
--	if (tdc->slave_id == -EINVAL)
--		tdc->slave_id = sconfig->slave_id;
--
- 	tdc->config_init = true;
- 	return 0;
- }
-@@ -1374,7 +1367,6 @@ static int tegra_dma_probe(struct platform_device *pdev)
- 				&tdma->dma_dev.channels);
- 		tdc->tdma = tdma;
- 		tdc->id = i;
--		tdc->slave_id = -EINVAL;
- 
- 		tasklet_init(&tdc->tasklet, tegra_dma_tasklet,
- 				(unsigned long)tdc);
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 641b3c9..ad340e4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -53,13 +53,13 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos4210-trats.dtb \
+ 	exynos4210-universal_c210.dtb \
+ 	exynos4412-odroidx.dtb \
+-	exynos4412-smdk4412.dtb \
+ 	exynos4412-origen.dtb \
++	exynos4412-smdk4412.dtb \
+ 	exynos5250-arndale.dtb \
+-	exynos5440-sd5v1.dtb \
+ 	exynos5250-smdk5250.dtb \
+ 	exynos5250-snow.dtb \
+ 	exynos5420-smdk5420.dtb \
++	exynos5440-sd5v1.dtb \
+ 	exynos5440-ssdk5440.dtb
+ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+ 	ecx-2000.dtb
 -- 
-1.8.1.5
+1.7.10.4
