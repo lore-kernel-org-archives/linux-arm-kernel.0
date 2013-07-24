@@ -1,60 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:33:59 +0900
-Subject: [PATCH 05/16] ARM: shmobile: r8a73a4: safeguard against wrong
- clk_set_rate() uses
+Date: Wed, 24 Jul 2013 09:33:57 +0900
+Subject: [PATCH 03/16] ARM: shmobile: r8a73a4: wait for completion when
+ kicking the clock
 In-Reply-To: <cover.1374624383.git.horms+renesas@verge.net.au>
 References: <cover.1374624383.git.horms+renesas@verge.net.au>
-Message-ID: <d1c3c959f2206dad0582876af2510aded4f9eac5.1374624383.git.horms+renesas@verge.net.au>
+Message-ID: <8d27657286a1e9e6ee7adaf4d0638cefd708a6fa.1374624383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-clk_set_rate() should only be called with exact rates, returned by
-clk_round_rate(). However, it is still good to verify, that the value,
-passed to clock's .set_rate() method is at least valid. This patch adds
-such a check for the Z-clock on r8a73a4.
+To reconfigure clocks, controlled by FRQCRA and FRQCRB, a kick bit has to
+be set and to make sure the setting has taken effect, it has to be read
+back repeatedly until it is cleared by the hardware. This patch adds the
+waiting part, that was missing until now.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a73a4.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 824789c..22f10ff 100644
+index 5f7fe62..d5176d0 100644
 --- a/arch/arm/mach-shmobile/clock-r8a73a4.c
 +++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -225,16 +225,28 @@ static int zclk_set_rate(struct clk *clk, unsigned long rate)
- 		goto done;
- 	}
+@@ -184,6 +184,21 @@ PLL_CLOCK(pll2h_clk, &main_div2_clk, pll_parent_main_extal, 3, 5, PLL2HCR, 5);
  
--	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
-+	/*
-+	 * Users are supposed to first call clk_set_rate() only with
-+	 * clk_round_rate() results. So, we don't fix wrong rates here, but
-+	 * guard against them anyway
-+	 */
+ SH_FIXED_RATIO_CLK(pll1_div2_clk,	pll1_clk,	div2);
  
- 	p_rate = clk_get_rate(clk->parent);
- 	if (rate == p_rate) {
- 		val = 0;
- 	} else {
- 		step = DIV_ROUND_CLOSEST(p_rate, 32);
++static int frqcr_kick_do(struct clk *clk)
++{
++	int i;
 +
-+		if (rate > p_rate || rate < step) {
-+			ret = -EINVAL;
-+			goto done;
-+		}
++	/* set KICK bit in FRQCRB to update hardware setting, check success */
++	iowrite32(ioread32(CPG_MAP(FRQCRB)) | BIT(31), CPG_MAP(FRQCRB));
++	for (i = 1000; i; i--)
++		if (ioread32(CPG_MAP(FRQCRB)) & BIT(31))
++			cpu_relax();
++		else
++			return 0;
 +
- 		val = 32 - rate / step;
- 	}
- 
-+	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
++	return -ETIMEDOUT;
++}
 +
- 	iowrite32((ioread32(frqcrc) & ~(clk->div_mask << clk->enable_bit)) |
- 		  (val << clk->enable_bit), frqcrc);
+ static struct clk *main_clks[] = {
+ 	&extalr_clk,
+ 	&extal1_clk,
+@@ -205,12 +220,7 @@ static struct clk *main_clks[] = {
+ /* DIV4 */
+ static void div4_kick(struct clk *clk)
+ {
+-	unsigned long value;
+-
+-	/* set KICK bit in FRQCRB to update hardware setting */
+-	value = ioread32(CPG_MAP(FRQCRB));
+-	value |= (1 << 31);
+-	iowrite32(value, CPG_MAP(FRQCRB));
++	frqcr_kick_do(clk);
+ }
  
+ static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18, 24, 0, 36, 48, 10};
 -- 
 1.8.2.1
