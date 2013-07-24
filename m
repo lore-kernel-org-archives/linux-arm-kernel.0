@@ -1,46 +1,48 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 24 Jul 2013 14:13:25 +0530
-Subject: [PATCH v4 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
-Message-ID: <1374655405-22998-1-git-send-email-sachin.kamat@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Jul 2013 10:36:22 +0100
+Subject: updates for be8 patch series
+In-Reply-To: <CAA3XUr31LAJ3+iWq5gXb+JZO-1G96waOFy-RBVZQEW-djj3dYA@mail.gmail.com>
+References: <CAA3XUr3h5C0oJVrN5iXsM=NFkLMz_Tssp28CysZfwMNS5KvO-Q@mail.gmail.com>
+ <51EEC002.9070808@codethink.co.uk>
+ <CAA3XUr2oDEDD6LFjnZ_N0JGTFUMDZG6O9b3JoeJ8AELrK2KDiw@mail.gmail.com>
+ <CAA3XUr1BJD-ypfJiEsp079qHDERjGp-xFxc_ke_Ep9z3N=UPaA@mail.gmail.com>
+ <51EECBBD.20000@codethink.co.uk>
+ <CAA3XUr31LAJ3+iWq5gXb+JZO-1G96waOFy-RBVZQEW-djj3dYA@mail.gmail.com>
+Message-ID: <20130724093622.GC9629@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the recent cleanup in Exynos platform code notably commits
-17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
-more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
-of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
-Exynos4412 which have more than the default number of GPIOs. Thus define
-this number in KConfig file which takes care of current SoC requirements
-and provides scope for GPIO expanders. Without this patch we get the
-following errors during boot:
+On Wed, Jul 24, 2013 at 02:06:05AM +0100, Victor Kamensky wrote:
+> Hi Ben,
+> 
+> Let me split off atomic64 from other issues, so we have focused topic here.
+> 
+> Please see atomic64 issue test case below. Please try it in your setup. I've
+> run on Pandaboard ES with my set of patches, but I believe it should be the
+> same in your case.
 
-gpiochip_add: gpios 251..258 (gpv0) failed to register
-samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
-error code: -22
-samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
+[...]
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Tomasz Figa <t.figa@samsung.com>
----
-Changes since v3:
-Rearranged different default values in single line.
----
- arch/arm/Kconfig |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f8fb910..ac9fa38 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1590,8 +1590,7 @@ config ARM_PSCI
- config ARCH_NR_GPIO
- 	int
- 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
--	default 512 if SOC_OMAP5
--	default 512 if ARCH_KEYSTONE
-+	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5
- 	default 392 if ARCH_U8500
- 	default 352 if ARCH_VT8500
- 	default 288 if ARCH_SUNXI
--- 
-1.7.9.5
+> <snip>
+> 
+> >> Index: linux-linaro-tracking/arch/arm/include/asm/atomic.h
+> >> ===================================================================
+> >> --- linux-linaro-tracking.orig/arch/arm/include/asm/atomic.h
+> >> +++ linux-linaro-tracking/arch/arm/include/asm/atomic.h
+> >> @@ -301,8 +301,13 @@ static inline void atomic64_add(u64 i, a
+> >>
+> >>       __asm__ __volatile__("@ atomic64_add\n"
+> >>   "1:    ldrexd    %0, %H0, [%3]\n"
+> >> +#ifndef CONFIG_CPU_BIG_ENDIAN /* little endian */
+> >>   "    adds    %0, %0, %4\n"
+> >>   "    adc    %H0, %H0, %H4\n"
+> >> +#else
+> >> +"    adds    %H0, %H0, %H4\n"
+> >> +"    adc    %0, %0, %4\n"
+> >> +#endif
+
+I thought you could just use the %Q and %R output modifiers to get the
+appropriate halves of the 64-bit operand, then you can avoid the #ifdef.
+
+Will
