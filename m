@@ -1,42 +1,95 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 24 Jul 2013 08:55:05 -0700
-Subject: [PATCH 1/7] usb: phy: msm: Move mach dependent code to platform
- data
-In-Reply-To: <1372087664-26396-2-git-send-email-iivanov@mm-sol.com>
-References: <1372087664-26396-1-git-send-email-iivanov@mm-sol.com>
- <1372087664-26396-2-git-send-email-iivanov@mm-sol.com>
-Message-ID: <20130724155505.GA26371@codeaurora.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 24 Jul 2013 16:55:05 +0100
+Subject: [PATCH 04/14] ARM: set BE8 if LE in head code
+In-Reply-To: <20130724144118.GM11072@mudshark.cambridge.arm.com>
+References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374661682-9349-5-git-send-email-ben.dooks@codethink.co.uk>
+ <20130724144118.GM11072@mudshark.cambridge.arm.com>
+Message-ID: <51EFF8D9.6010802@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 24, 2013 at 06:27:38PM +0300, Ivan T. Ivanov wrote:
->From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
->
->This patch fix compilation error and is an intermediate step
->before the addition of DeviceTree support for newer targets.
->Fix suggested here: https://lkml.org/lkml/2013/6/19/381
->
->Cc: David Brown <davidb@codeaurora.org>
->Cc: Daniel Walker <dwalker@fifo99.com>
->Cc: Bryan Huntsman <bryanh@codeaurora.org>
->Cc: Russell King <linux@arm.linux.org.uk>
->Cc: Felipe Balbi <balbi@ti.com>
->Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->Cc: Stephen Boyd <sboyd@codeaurora.org>
->Cc: linux-arm-kernel at lists.infradead.org
->Cc: linux-kernel at vger.kernel.org
->
->Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
->---
-> arch/arm/mach-msm/board-msm7x30.c |   35 +++++++++++++++++++++++
-> arch/arm/mach-msm/board-qsd8x50.c |   34 +++++++++++++++++++++++
-> drivers/usb/phy/phy-msm-usb.c     |   55 ++++++++++---------------------------
-> include/linux/usb/msm_hsusb.h     |    2 ++
-> 4 files changed, 85 insertions(+), 41 deletions(-)
+On 24/07/13 15:41, Will Deacon wrote:
+> On Wed, Jul 24, 2013 at 11:27:52AM +0100, Ben Dooks wrote:
+>> If we are booting in LE and compiled for BE8, then add code to
+>> set the state to bE8. Since the instruction stream is always LE,
+>> we do not need to do anything special to the instruction.
+>>
+>> Also ensure that the secondary processors are started in the same mode.
+>>
+>> Note, we do add about 20 bytes to the kernel image, but it seems easier
+>> to do this than adding another configuration to change.
+>>
+>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+>> ---
+>>   arch/arm/boot/compressed/head.S |    1 +
+>>   arch/arm/kernel/head.S          |    4 ++++
+>>   arch/arm/kernel/sleep.S         |    1 +
+>>   3 files changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index 4eb8364..4d83bfd 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -135,6 +135,7 @@ start:
+>>   		.word	_edata			@ zImage end address
+>>    THUMB(		.thumb			)
+>>   1:
+>> + ARM_BE8(	setend	be )			@ go BE8 if LE, no-op if BE8
+ >
+> I find the comment here slightly confusing as it makes it sound like the
+> macro expands to nothing if we're BE8 (which is clearly not the case).
 
-Acked-by: David Brown <davidb@codeaurora.org>
+I've changed it to "go BE8 if compiled for BE8"
+
+>>   		mrs	r9, cpsr
+>>   #ifdef CONFIG_ARM_VIRT_EXT
+>>   		bl	__hyp_stub_install	@ get into SVC mode, reversibly
+>> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+>> index e40c0b3b..706c441 100644
+>> --- a/arch/arm/kernel/head.S
+>> +++ b/arch/arm/kernel/head.S
+>> @@ -77,6 +77,7 @@
+>>
+>>   	__HEAD
+>>   ENTRY(stext)
+>> + ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+>
+> Alignment issue here -- please try to align the instruction with the
+> instructions below (it's awkward to read with all the brackets).
+
+If I move it one to the left, then it gets coloured blue by
+my editor, as it is the first thing on the line like the
+ENTRY() macro.
+
+>>
+>>    THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
+>>    THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
+>> @@ -351,6 +352,9 @@ ENTRY(secondary_startup)
+>>   	 * the processor type - there is no need to check the machine type
+>>   	 * as it has already been validated by the primary processor.
+>>   	 */
+>> +
+>> + ARM_BE8(setend	be)				@ if system starts LE, go BE8
+>> +
+>>   #ifdef CONFIG_ARM_VIRT_EXT
+>>   	bl	__hyp_stub_install_secondary
+>>   #endif
+>> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+>> index 987dcf3..954c28a 100644
+>> --- a/arch/arm/kernel/sleep.S
+>> +++ b/arch/arm/kernel/sleep.S
+>> @@ -81,6 +81,7 @@ ENDPROC(cpu_resume_after_mmu)
+>>   	.data
+>>   	.align
+>>   ENTRY(cpu_resume)
+>> +ARM_BE8(setend be)			@ ensure we are in BE mode
+>
+> Any reason to have three different comments for the same thing? I think you
+> probably just need to comment the one in head.S.
+
+I've changed the comments to match in.
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
