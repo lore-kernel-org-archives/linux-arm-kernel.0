@@ -1,26 +1,65 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 24 Jul 2013 12:38:29 +0900
-Subject: [PATCH 08/08] ARM: shmobile: Remove include <mach/hardware.h>
-In-Reply-To: <20130724033715.30567.82782.sendpatchset@w520>
-References: <20130724033715.30567.82782.sendpatchset@w520>
-Message-ID: <20130724033829.30567.27355.sendpatchset@w520>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 24 Jul 2013 09:08:41 +0530
+Subject: [PATCH] ARM: dts: Add USB host node for Exynos4
+In-Reply-To: <1374600763-19466-1-git-send-email-tobetter@gmail.com>
+References: <1374600763-19466-1-git-send-email-tobetter@gmail.com>
+Message-ID: <CAK9yfHz10ao32Y4VRsvjNLe+zaq+hYk4KVgtwFgSLDsN-9Pfpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 23 July 2013 23:02, Dongjin Kim <tobetter@gmail.com> wrote:
+> This patch adds EHCI and OHCI host device nodes for Exynos4.
+>
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi |   20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 3f94fe8..1cdbf89 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -155,6 +155,26 @@
+>                 status = "disabled";
+>         };
+>
+> +       ehci at 12580000 {
+> +               compatible = "samsung,exynos4210-ehci";
+> +               reg = <0x12580000 0x100>;
+> +               interrupts = <0 70 0>;
+> +               status = "disabled";
+> +
+> +               clocks = <&clock 304>;
+> +               clock-names = "usbhost";
+> +       };
+> +
+> +       ohci at 12590000 {
+> +               compatible = "samsung,exynos4210-ohci";
+> +               reg = <0x12580000 0x100>;
 
-Now when no one is using this file, remove <mach/hardware.h>.
+Register value and node name do not match. Typo?
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
 
- arch/arm/mach-shmobile/include/mach/hardware.h |    4 ----
- 1 file changed, 4 deletions(-)
+> +               interrupts = <0 70 0>;
+> +               status = "disabled";
+> +
+> +               clocks = <&clock 304>;
+> +               clock-names = "usbhost";
+> +       };
+> +
+>         mfc: codec at 13400000 {
+>                 compatible = "samsung,mfc-v5";
+>                 reg = <0x13400000 0x10000>;
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
---- 0001/arch/arm/mach-shmobile/include/mach/hardware.h
-+++ /dev/null	2013-06-03 21:41:10.638032047 +0900
-@@ -1,4 +0,0 @@
--#ifndef __ASM_MACH_HARDWARE_H
--#define __ASM_MACH_HARDWARE_H
--
--#endif /* __ASM_MACH_HARDWARE_H */
+
+
+-- 
+With warm regards,
+Sachin
