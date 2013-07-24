@@ -1,160 +1,426 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:32:56 +0900
-Subject: [PATCH 17/19] ARM: shmobile: kzm9g-reference: Move pinctrl mappings
- to device tree
-In-Reply-To: <cover.1374625203.git.horms+renesas@verge.net.au>
-References: <cover.1374625203.git.horms+renesas@verge.net.au>
-Message-ID: <ec028600f4a4bd1b272465caea3e2ff066e40377.1374625203.git.horms+renesas@verge.net.au>
+Date: Wed, 24 Jul 2013 09:34:34 +0900
+Subject: [PATCH 4/4] leds: Remove leds-renesas-tpu driver
+In-Reply-To: <cover.1374624997.git.horms+renesas@verge.net.au>
+References: <cover.1374624997.git.horms+renesas@verge.net.au>
+Message-ID: <ae3e4c277669e16093f0e71ca927cf33e7dde053.1374624997.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the pinctrl mappings in board code by device tree mappings.
-For devices that are still instantiated from board code reference the
-mappings as the default pin controller state to apply them at boot time.
+The driver is superseded by the generic pwm-renesas-tpu driver used with
+leds-pwm.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Bryan Wu <cooloney@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   | 51 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-kzm9g-reference.c | 40 --------------------
- 2 files changed, 51 insertions(+), 40 deletions(-)
+ drivers/leds/Kconfig                           |  12 -
+ drivers/leds/Makefile                          |   1 -
+ drivers/leds/leds-renesas-tpu.c                | 337 -------------------------
+ include/linux/platform_data/leds-renesas-tpu.h |  14 -
+ 4 files changed, 364 deletions(-)
+ delete mode 100644 drivers/leds/leds-renesas-tpu.c
+ delete mode 100644 include/linux/platform_data/leds-renesas-tpu.h
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index b6f759e..11ae9ad 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -145,19 +145,70 @@
- 	};
- };
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index e43402d..074bcb3 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -429,18 +429,6 @@ config LEDS_ASIC3
+ 	  cannot be used. This driver supports hardware blinking with an on+off
+ 	  period from 62ms to 125s. Say Y to enable LEDs on the HP iPAQ hx4700.
  
-+&i2c3 {
-+	pinctrl-0 = <&i2c3_pins>;
-+	pinctrl-names = "default";
-+};
-+
- &mmcif {
-+	pinctrl-0 = <&mmcif_pins>;
-+	pinctrl-names = "default";
-+
- 	bus-width = <8>;
- 	vmmc-supply = <&reg_1p8v>;
- 	status = "okay";
- };
- 
-+&pfc {
-+	pinctrl-0 = <&scifa4_pins>;
-+	pinctrl-names = "default";
-+
-+	i2c3_pins: i2c3 {
-+		renesas,groups = "i2c3_1";
-+		renesas,function = "i2c3";
-+	};
-+
-+	mmcif_pins: mmcif {
-+		mux {
-+			renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
-+			renesas,function = "mmc0";
-+		};
-+		cfg {
-+			renesas,groups = "mmc0_data8_0";
-+			renesas,pins = "PORT279";
-+			bias-pull-up;
-+		};
-+	};
-+
-+	scifa4_pins: scifa4 {
-+		renesas,groups = "scifa4_data", "scifa4_ctrl";
-+		renesas,function = "scifa4";
-+	};
-+
-+	sdhi0_pins: sdhi0 {
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd", "sdhi0_wp";
-+		renesas,function = "sdhi0";
-+	};
-+
-+	sdhi2_pins: sdhi2 {
-+		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
-+		renesas,function = "sdhi2";
-+	};
-+};
-+
- &sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
- 	vmmc-supply = <&reg_3p3v>;
- 	bus-width = <4>;
- 	status = "okay";
- };
- 
- &sdhi2 {
-+	pinctrl-0 = <&sdhi2_pins>;
-+	pinctrl-names = "default";
-+
- 	vmmc-supply = <&reg_3p3v>;
- 	bus-width = <4>;
- 	broken-cd;
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index 6ff6ca2..fc2bb37 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -27,55 +27,15 @@
- #include <linux/irqchip.h>
- #include <linux/input.h>
- #include <linux/of_platform.h>
--#include <linux/pinctrl/machine.h>
--#include <linux/pinctrl/pinconf-generic.h>
- #include <mach/sh73a0.h>
- #include <mach/common.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--static unsigned long pin_pullup_conf[] = {
--	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
+-config LEDS_RENESAS_TPU
+-	bool "LED support for Renesas TPU"
+-	depends on LEDS_CLASS=y && HAVE_CLK && GPIOLIB
+-	help
+-	  This option enables build of the LED TPU platform driver,
+-	  suitable to drive any TPU channel on newer Renesas SoCs.
+-	  The driver controls the GPIO pin connected to the LED via
+-	  the GPIO framework and expects the LED to be connected to
+-	  a pin that can be driven in both GPIO mode and using TPU
+-	  pin function. The latter to support brightness control.
+-	  Brightness control is supported but hardware blinking is not.
+-
+ config LEDS_TCA6507
+ 	tristate "LED Support for TCA6507 I2C chip"
+ 	depends on LEDS_CLASS && I2C
+diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+index ac28977..ae4b613 100644
+--- a/drivers/leds/Makefile
++++ b/drivers/leds/Makefile
+@@ -49,7 +49,6 @@ obj-$(CONFIG_LEDS_MC13783)		+= leds-mc13783.o
+ obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
+ obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
+ obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
+-obj-$(CONFIG_LEDS_RENESAS_TPU)		+= leds-renesas-tpu.o
+ obj-$(CONFIG_LEDS_MAX8997)		+= leds-max8997.o
+ obj-$(CONFIG_LEDS_LM355x)		+= leds-lm355x.o
+ obj-$(CONFIG_LEDS_BLINKM)		+= leds-blinkm.o
+diff --git a/drivers/leds/leds-renesas-tpu.c b/drivers/leds/leds-renesas-tpu.c
+deleted file mode 100644
+index adebf49..0000000
+--- a/drivers/leds/leds-renesas-tpu.c
++++ /dev/null
+@@ -1,337 +0,0 @@
+-/*
+- * LED control using Renesas TPU
+- *
+- *  Copyright (C) 2011 Magnus Damm
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/module.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/spinlock.h>
+-#include <linux/printk.h>
+-#include <linux/ioport.h>
+-#include <linux/io.h>
+-#include <linux/clk.h>
+-#include <linux/leds.h>
+-#include <linux/platform_data/leds-renesas-tpu.h>
+-#include <linux/gpio.h>
+-#include <linux/err.h>
+-#include <linux/slab.h>
+-#include <linux/pm_runtime.h>
+-#include <linux/workqueue.h>
+-
+-enum r_tpu_pin { R_TPU_PIN_UNUSED, R_TPU_PIN_GPIO, R_TPU_PIN_GPIO_FN };
+-enum r_tpu_timer { R_TPU_TIMER_UNUSED, R_TPU_TIMER_ON };
+-
+-struct r_tpu_priv {
+-	struct led_classdev ldev;
+-	void __iomem *mapbase;
+-	struct clk *clk;
+-	struct platform_device *pdev;
+-	enum r_tpu_pin pin_state;
+-	enum r_tpu_timer timer_state;
+-	unsigned long min_rate;
+-	unsigned int refresh_rate;
+-	struct work_struct work;
+-	enum led_brightness new_brightness;
 -};
 -
--static const struct pinctrl_map kzm_pinctrl_map[] = {
--	PIN_MAP_MUX_GROUP_DEFAULT("e6826000.i2c", "e6050000.pfc",
--				  "i2c3_1", "i2c3"),
--	/* MMCIF */
--	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				  "mmc0_data8_0", "mmc0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				  "mmc0_ctrl_0", "mmc0"),
--	PIN_MAP_CONFIGS_PIN_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				    "PORT279", pin_pullup_conf),
--	PIN_MAP_CONFIGS_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				      "mmc0_data8_0", pin_pullup_conf),
--	/* SCIFA4 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
--				  "scifa4_data", "scifa4"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
--				  "scifa4_ctrl", "scifa4"),
--	/* SDHI0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_data4", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_ctrl", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_cd", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_wp", "sdhi0"),
--	/* SDHI2 */
--	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "e6050000.pfc",
--				  "sdhi2_data4", "sdhi2"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "e6050000.pfc",
--				  "sdhi2_ctrl", "sdhi2"),
+-static DEFINE_SPINLOCK(r_tpu_lock);
+-
+-#define TSTR -1 /* Timer start register (shared register) */
+-#define TCR  0 /* Timer control register (+0x00) */
+-#define TMDR 1 /* Timer mode register (+0x04) */
+-#define TIOR 2 /* Timer I/O control register (+0x08) */
+-#define TIER 3 /* Timer interrupt enable register (+0x0c) */
+-#define TSR  4 /* Timer status register (+0x10) */
+-#define TCNT 5 /* Timer counter (+0x14) */
+-#define TGRA 6 /* Timer general register A (+0x18) */
+-#define TGRB 7 /* Timer general register B (+0x1c) */
+-#define TGRC 8 /* Timer general register C (+0x20) */
+-#define TGRD 9 /* Timer general register D (+0x24) */
+-
+-static inline u16 r_tpu_read(struct r_tpu_priv *p, int reg_nr)
+-{
+-	struct led_renesas_tpu_config *cfg = p->pdev->dev.platform_data;
+-	void __iomem *base = p->mapbase;
+-	unsigned long offs = reg_nr << 2;
+-
+-	if (reg_nr == TSTR)
+-		return ioread16(base - cfg->channel_offset);
+-
+-	return ioread16(base + offs);
+-}
+-
+-static inline void r_tpu_write(struct r_tpu_priv *p, int reg_nr, u16 value)
+-{
+-	struct led_renesas_tpu_config *cfg = p->pdev->dev.platform_data;
+-	void __iomem *base = p->mapbase;
+-	unsigned long offs = reg_nr << 2;
+-
+-	if (reg_nr == TSTR) {
+-		iowrite16(value, base - cfg->channel_offset);
+-		return;
+-	}
+-
+-	iowrite16(value, base + offs);
+-}
+-
+-static void r_tpu_start_stop_ch(struct r_tpu_priv *p, int start)
+-{
+-	struct led_renesas_tpu_config *cfg = p->pdev->dev.platform_data;
+-	unsigned long flags;
+-	u16 value;
+-
+-	/* start stop register shared by multiple timer channels */
+-	spin_lock_irqsave(&r_tpu_lock, flags);
+-	value = r_tpu_read(p, TSTR);
+-
+-	if (start)
+-		value |= 1 << cfg->timer_bit;
+-	else
+-		value &= ~(1 << cfg->timer_bit);
+-
+-	r_tpu_write(p, TSTR, value);
+-	spin_unlock_irqrestore(&r_tpu_lock, flags);
+-}
+-
+-static int r_tpu_enable(struct r_tpu_priv *p, enum led_brightness brightness)
+-{
+-	struct led_renesas_tpu_config *cfg = p->pdev->dev.platform_data;
+-	int prescaler[] = { 1, 4, 16, 64 };
+-	int k, ret;
+-	unsigned long rate, tmp;
+-
+-	if (p->timer_state == R_TPU_TIMER_ON)
+-		return 0;
+-
+-	/* wake up device and enable clock */
+-	pm_runtime_get_sync(&p->pdev->dev);
+-	ret = clk_enable(p->clk);
+-	if (ret) {
+-		dev_err(&p->pdev->dev, "cannot enable clock\n");
+-		return ret;
+-	}
+-
+-	/* make sure channel is disabled */
+-	r_tpu_start_stop_ch(p, 0);
+-
+-	/* get clock rate after enabling it */
+-	rate = clk_get_rate(p->clk);
+-
+-	/* pick the lowest acceptable rate */
+-	for (k = ARRAY_SIZE(prescaler) - 1; k >= 0; k--)
+-		if ((rate / prescaler[k]) >= p->min_rate)
+-			break;
+-
+-	if (k < 0) {
+-		dev_err(&p->pdev->dev, "clock rate mismatch\n");
+-		goto err0;
+-	}
+-	dev_dbg(&p->pdev->dev, "rate = %lu, prescaler %u\n",
+-		rate, prescaler[k]);
+-
+-	/* clear TCNT on TGRB match, count on rising edge, set prescaler */
+-	r_tpu_write(p, TCR, 0x0040 | k);
+-
+-	/* output 0 until TGRA, output 1 until TGRB */
+-	r_tpu_write(p, TIOR, 0x0002);
+-
+-	rate /= prescaler[k] * p->refresh_rate;
+-	r_tpu_write(p, TGRB, rate);
+-	dev_dbg(&p->pdev->dev, "TRGB = 0x%04lx\n", rate);
+-
+-	tmp = (cfg->max_brightness - brightness) * rate;
+-	r_tpu_write(p, TGRA, tmp / cfg->max_brightness);
+-	dev_dbg(&p->pdev->dev, "TRGA = 0x%04lx\n", tmp / cfg->max_brightness);
+-
+-	/* PWM mode */
+-	r_tpu_write(p, TMDR, 0x0002);
+-
+-	/* enable channel */
+-	r_tpu_start_stop_ch(p, 1);
+-
+-	p->timer_state = R_TPU_TIMER_ON;
+-	return 0;
+- err0:
+-	clk_disable(p->clk);
+-	pm_runtime_put_sync(&p->pdev->dev);
+-	return -ENOTSUPP;
+-}
+-
+-static void r_tpu_disable(struct r_tpu_priv *p)
+-{
+-	if (p->timer_state == R_TPU_TIMER_UNUSED)
+-		return;
+-
+-	/* disable channel */
+-	r_tpu_start_stop_ch(p, 0);
+-
+-	/* stop clock and mark device as idle */
+-	clk_disable(p->clk);
+-	pm_runtime_put_sync(&p->pdev->dev);
+-
+-	p->timer_state = R_TPU_TIMER_UNUSED;
+-}
+-
+-static void r_tpu_set_pin(struct r_tpu_priv *p, enum r_tpu_pin new_state,
+-			  enum led_brightness brightness)
+-{
+-	struct led_renesas_tpu_config *cfg = p->pdev->dev.platform_data;
+-
+-	if (p->pin_state == new_state) {
+-		if (p->pin_state == R_TPU_PIN_GPIO)
+-			gpio_set_value(cfg->pin_gpio, brightness);
+-		return;
+-	}
+-
+-	if (p->pin_state == R_TPU_PIN_GPIO)
+-		gpio_free(cfg->pin_gpio);
+-
+-	if (p->pin_state == R_TPU_PIN_GPIO_FN)
+-		gpio_free(cfg->pin_gpio_fn);
+-
+-	if (new_state == R_TPU_PIN_GPIO)
+-		gpio_request_one(cfg->pin_gpio, !!brightness ?
+-				GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
+-				cfg->name);
+-
+-	if (new_state == R_TPU_PIN_GPIO_FN)
+-		gpio_request(cfg->pin_gpio_fn, cfg->name);
+-
+-	p->pin_state = new_state;
+-}
+-
+-static void r_tpu_work(struct work_struct *work)
+-{
+-	struct r_tpu_priv *p = container_of(work, struct r_tpu_priv, work);
+-	enum led_brightness brightness = p->new_brightness;
+-
+-	r_tpu_disable(p);
+-
+-	/* off and maximum are handled as GPIO pins, in between PWM */
+-	if ((brightness == 0) || (brightness == p->ldev.max_brightness))
+-		r_tpu_set_pin(p, R_TPU_PIN_GPIO, brightness);
+-	else {
+-		r_tpu_set_pin(p, R_TPU_PIN_GPIO_FN, 0);
+-		r_tpu_enable(p, brightness);
+-	}
+-}
+-
+-static void r_tpu_set_brightness(struct led_classdev *ldev,
+-				 enum led_brightness brightness)
+-{
+-	struct r_tpu_priv *p = container_of(ldev, struct r_tpu_priv, ldev);
+-	p->new_brightness = brightness;
+-	schedule_work(&p->work);
+-}
+-
+-static int r_tpu_probe(struct platform_device *pdev)
+-{
+-	struct led_renesas_tpu_config *cfg = pdev->dev.platform_data;
+-	struct r_tpu_priv *p;
+-	struct resource *res;
+-	int ret;
+-
+-	if (!cfg) {
+-		dev_err(&pdev->dev, "missing platform data\n");
+-		return -ENODEV;
+-	}
+-
+-	p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
+-	if (p == NULL) {
+-		dev_err(&pdev->dev, "failed to allocate driver data\n");
+-		return -ENOMEM;
+-	}
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		dev_err(&pdev->dev, "failed to get I/O memory\n");
+-		return -ENXIO;
+-	}
+-
+-	/* map memory, let mapbase point to our channel */
+-	p->mapbase = devm_ioremap_nocache(&pdev->dev, res->start,
+-					resource_size(res));
+-	if (p->mapbase == NULL) {
+-		dev_err(&pdev->dev, "failed to remap I/O memory\n");
+-		return -ENXIO;
+-	}
+-
+-	/* get hold of clock */
+-	p->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(p->clk)) {
+-		dev_err(&pdev->dev, "cannot get clock\n");
+-		return PTR_ERR(p->clk);
+-	}
+-
+-	p->pdev = pdev;
+-	p->pin_state = R_TPU_PIN_UNUSED;
+-	p->timer_state = R_TPU_TIMER_UNUSED;
+-	p->refresh_rate = cfg->refresh_rate ? cfg->refresh_rate : 100;
+-	r_tpu_set_pin(p, R_TPU_PIN_GPIO, LED_OFF);
+-	platform_set_drvdata(pdev, p);
+-
+-	INIT_WORK(&p->work, r_tpu_work);
+-
+-	p->ldev.name = cfg->name;
+-	p->ldev.brightness = LED_OFF;
+-	p->ldev.max_brightness = cfg->max_brightness;
+-	p->ldev.brightness_set = r_tpu_set_brightness;
+-	p->ldev.flags |= LED_CORE_SUSPENDRESUME;
+-	ret = led_classdev_register(&pdev->dev, &p->ldev);
+-	if (ret < 0)
+-		goto err0;
+-
+-	/* max_brightness may be updated by the LED core code */
+-	p->min_rate = p->ldev.max_brightness * p->refresh_rate;
+-
+-	pm_runtime_enable(&pdev->dev);
+-	return 0;
+-
+- err0:
+-	r_tpu_set_pin(p, R_TPU_PIN_UNUSED, LED_OFF);
+-	return ret;
+-}
+-
+-static int r_tpu_remove(struct platform_device *pdev)
+-{
+-	struct r_tpu_priv *p = platform_get_drvdata(pdev);
+-
+-	r_tpu_set_brightness(&p->ldev, LED_OFF);
+-	led_classdev_unregister(&p->ldev);
+-	cancel_work_sync(&p->work);
+-	r_tpu_disable(p);
+-	r_tpu_set_pin(p, R_TPU_PIN_UNUSED, LED_OFF);
+-
+-	pm_runtime_disable(&pdev->dev);
+-
+-	return 0;
+-}
+-
+-static struct platform_driver r_tpu_device_driver = {
+-	.probe		= r_tpu_probe,
+-	.remove		= r_tpu_remove,
+-	.driver		= {
+-		.name	= "leds-renesas-tpu",
+-	}
 -};
 -
- static void __init kzm_init(void)
- {
- 	sh73a0_add_standard_devices_dt();
--	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
- 
- 	/* enable SD */
- 	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+-module_platform_driver(r_tpu_device_driver);
+-
+-MODULE_AUTHOR("Magnus Damm");
+-MODULE_DESCRIPTION("Renesas TPU LED Driver");
+-MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/platform_data/leds-renesas-tpu.h b/include/linux/platform_data/leds-renesas-tpu.h
+deleted file mode 100644
+index 0553870..0000000
+--- a/include/linux/platform_data/leds-renesas-tpu.h
++++ /dev/null
+@@ -1,14 +0,0 @@
+-#ifndef __LEDS_RENESAS_TPU_H__
+-#define __LEDS_RENESAS_TPU_H__
+-
+-struct led_renesas_tpu_config {
+-	char *name;
+-	unsigned pin_gpio_fn;
+-	unsigned pin_gpio;
+-	unsigned int channel_offset;
+-	unsigned int timer_bit;
+-	unsigned int max_brightness;
+-	unsigned int refresh_rate;
+-};
+-
+-#endif /* __LEDS_RENESAS_TPU_H__ */
 -- 
 1.8.2.1
