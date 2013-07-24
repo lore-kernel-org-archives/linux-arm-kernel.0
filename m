@@ -1,52 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Jul 2013 18:18:26 +0100
-Subject: Requirements for FDT load address on ARM
-In-Reply-To: <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
-References: <1374677923.6623.194.camel@hastur.hellion.org.uk>
- <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
-Message-ID: <20130724171826.GX11072@mudshark.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 24 Jul 2013 13:22:46 -0400 (EDT)
+Subject: [PATCH 1/6] ARM: prefetch: remove redundant "cc" clobber
+In-Reply-To: <20130724165820.GZ24642@n2100.arm.linux.org.uk>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-2-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307231547010.15022@syhkavp.arg>
+ <20130724101950.GG9629@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307241205050.15022@syhkavp.arg>
+ <20130724163530.GV11072@mudshark.cambridge.arm.com>
+ <20130724165820.GZ24642@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1307241319410.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 04:24:48PM +0100, Nicolas Pitre wrote:
-> On Wed, 24 Jul 2013, Ian Campbell wrote:
-> 
-> > [apologies if this is a repeat, I don't see it in the archives and at
-> > least one CC'd recipient (Julien) didn't receive it either. Beasties in
-> > our email server I expect...]
+On Wed, 24 Jul 2013, Russell King - ARM Linux wrote:
+
+> On Wed, Jul 24, 2013 at 05:35:31PM +0100, Will Deacon wrote:
+> > On Wed, Jul 24, 2013 at 05:16:59PM +0100, Nicolas Pitre wrote:
+> > > On Wed, 24 Jul 2013, Will Deacon wrote:
+> > > > On Tue, Jul 23, 2013 at 08:48:11PM +0100, Nicolas Pitre wrote:
+> > > > > You know the legacy reason why the cc clobber was there, right?
+> > > > > It certainly doesn't apply anymore.
+> > > > 
+> > > > I was under the impression that it was due to ancient GCC behaviour and the "cc"
+> > > > was there to prevent re-ordering. For interest, what are the specifics?
+> > > 
+> > > In the old days, you had to take care of the predicate for conditional 
+> > > instructions in your inline asm code.  So for example, if you had:
+> > > 
+> > > 	if (foo)
+> > > 		inline asm ("mov %0, #1" : "=r" (bar));
+> > > 
+> > > That wouldn't work most of the time because even if the if condition was 
+> > > false, gcc would not branch over the inline asm code but expect you to 
+> > > take care of the condition code.  That means the above needed to be 
+> > > written as:
+> > > 
+> > > 	if (foo)
+> > > 		inline asm ("mov%? %0, #1" : "=r" (bar));
+> > > 
+> > > Because having %? added all over the place was cumbersome, the 
+> > > alternative was to add "cc" to the clobber list so gcc would then branch 
+> > > across the inline asm when the condition is false.
+> > > 
+> > > But of course many people forgot about those subtle details quite often, 
+> > > and then gcc was changed so inline asm was made non predicated.
 > > 
-> > Are there any requirements about where the FDT may be loaded by the
-> > bootloader?
+> > Holy sh*t....
+> > 
+> > Next time I complain to the tools guys about inline asm, I'll count my
+> > blessings so they don't try and resurrect anything as horrendous as what
+> > you've just described.
 > 
-> It must be located where it is unlikely to be overwritten by the zImage 
-> decompressor relocating itself.  Same goes for the initrd.
+> And the result of its removal is all the horrid macro crap in asm/tlbflush.h
+> to work around the lack of this feature - otherwise we end up with seven
+> instances of:
 > 
-> > I'm finding that if I load it "too high" I get a fault (the specifics
-> > aren't that relevant but details are below).
+> 	tst
+> 	bne	1f
+> 	mcr
+> 1:
 > 
-> Do you have commit 6f16f4998f98 in your kernel tree?
-> 
-> > FWIW with RAM from 0x8000000-0xffffffff and a kernel loaded at 
-> > 0x80008000 "too high" means above somewhere around 0xaf800000.
-> 
-> Sorry, I don't understand the above sentence.
-> 
-> Is RAM actually starting at 0x08000000 ?  Note that the kernel must be 
-> loaded in the first 128MB of RAM.
-> 
-> > I expect this is because the kernel doesn't use an explicit mapping of
-> > the fdt but expects it to be within the RAM directly mapped by the
-> > lowmem area (i.e. it uses phys_to_virt, since day one aka 93c02ab40ae6
-> > "arm/dt: probe for platforms via the device tree").
-> 
-> The fdt is expected to be located in lowmem.  So yes, that's actually a 
-> restriction.
+> for every call to a TLB function.  GCC _could_ have detected the lack of
+> %? and the lack of "cc" clobber and either warned or implicitly branched
+> around the block.  There was no need to completely remove the facility.
 
-FWIW, you could have a look at what I do in kvmtool. It's not perfect, but
-I couldn't come up with anything better:
+I agree.  gcc could have considered an inline asm block predicate safe 
+whenever it contains a %?.  I even suggested this at the time.
 
-https://git.kernel.org/cgit/linux/kernel/git/will/kvmtool.git/tree/tools/kvm/arm/fdt.c?h=kvmtool/master
 
-(see the load_flat_binary function)
-
-Will
+Nicolas
