@@ -1,36 +1,60 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 24 Jul 2013 19:43:35 +0530
-Subject: [PATCH v3 5/5] clk/exynos5250: change parent to aclk200_disp1 for hdmi
- subsystem
-In-Reply-To: <1374675215-27862-1-git-send-email-rahul.sharma@samsung.com>
-References: <1374675215-27862-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1374675215-27862-6-git-send-email-rahul.sharma@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Jul 2013 14:56:17 +0100
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <51EE474D.5070804@ti.com>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+ <20130722184325.GA21614@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+ <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com>
+Message-ID: <20130724135617.GI11072@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-parent of hdmi and mixer block is mentioned as aclk200 which is
-not correct. It is clocked by the ouput of aclk200_disp1. Hence
-parent for mixer and hdmi clocks is changed to aclk200_disp1.
+On Tue, Jul 23, 2013 at 10:05:17AM +0100, Rajendra Nayak wrote:
+> On Tuesday 23 July 2013 12:37 PM, Paul Walmsley wrote:
+> > Hi Rajendra,
+> > 
+> > On Tue, 23 Jul 2013, Rajendra Nayak wrote:
+> > 
+> >> On Tuesday 23 July 2013 01:37 AM, Paul Walmsley wrote:
+> >>> On Mon, 22 Jul 2013, Russell King - ARM Linux wrote:
+> >>>
+> >>>> Bear in mind that I'm almost at the point of not boot-testing anything
+> >>>> I sent to Linus because of the uselessness of the SDP4430 board now
+> >>>> that it's DT only - the only platform which boot-tests anything I send
+> >>>> is the 3430LDP board now.  If people care about that, maybe they can
+> >>>> assist with sorting out the issues I've raised on these lists about
+> >>>> the SDP4430 - and why the SDP4430 build remains disabled in my build
+> >>>> and boot system.
+> >>>
+> >>> I understand completely...
+> >>>
+> >>>> Looking at the boot log, it just stops after uboot hands over control.
+> >>>> With the lack of output from the decompressor, it's not possible to
+> >>>> tell whether it's a decompressor problem or a kernel problem.
+> >>>>
+> >>>> I think you need to turn on the LL_DEBUG option, select the appropriate
+> >>>> output option, and also get the decompressor to use the kernel's debug
+> >>>> io functions to output it's stuff (I think the option is DEBUG_UNCOMPRESS).
+> >>>
+> >>> OK, will dig deeper here at the next opportunity.
+> >>
+> >> Paul, I can take a look at the 4430sdp issue. Are you also seeing this also on
+> >> 2430sdp as the subject says, or was that a typo?
+> > 
+> > Thanks for the offer.  The issue that I'm seeing is on the 2430SDP in my 
+> > testbed.
+> > 
+> > I don't have a 4430SDP, so you might consider touching base with rmk for 
+> > that one.
+> 
+> So I tried commit 'fb2af00' on the 4430SDP and it did boot fine, though I see
+> the below errors. (I am using the mainline bootloaders which do not lock any
+> additional DPLLs like USB)
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
----
- drivers/clk/samsung/clk-exynos5250.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Any update on this? If it's an issue introduced by architectural changes,
+I'd really like to bisect it down but I don't have a board.
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index c727d9e..24a66b3 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -469,8 +469,8 @@ struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 	GATE(mie1, "mie1", "aclk200", GATE_IP_DISP1, 1, 0, 0),
- 	GATE(dsim0, "dsim0", "aclk200", GATE_IP_DISP1, 3, 0, 0),
- 	GATE(dp, "dp", "aclk200", GATE_IP_DISP1, 4, 0, 0),
--	GATE(mixer, "mixer", "aclk200", GATE_IP_DISP1, 5, 0, 0),
--	GATE(hdmi, "hdmi", "aclk200", GATE_IP_DISP1, 6, 0, 0),
-+	GATE(mixer, "mixer", "mout_aclk200_disp1", GATE_IP_DISP1, 5, 0, 0),
-+	GATE(hdmi, "hdmi", "mout_aclk200_disp1", GATE_IP_DISP1, 6, 0, 0),
- };
- 
- static __initdata struct of_device_id ext_clk_match[] = {
--- 
-1.7.10.4
+Will
