@@ -1,48 +1,110 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Wed, 24 Jul 2013 02:21:18 +0000
-Subject: [v3 3/3] sata: imx: add ahci sata support on imx platforms
-In-Reply-To: <20130723162623.GD21100@mtj.dyndns.org>
-References: <1373017942-12583-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1373017942-12583-4-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130705174305.GA28088@mtj.dyndns.org>
- <0E83723C55F66F43A6041464FE31119D31432D@039-SN2MPN1-012.039d.mgd.msft.net>
- <20130706020737.GA9029@mtj.dyndns.org>
- <0E83723C55F66F43A6041464FE31119D3441A3@039-SN2MPN1-011.039d.mgd.msft.net>
- <20130723162623.GD21100@mtj.dyndns.org>
-Message-ID: <0E83723C55F66F43A6041464FE31119D34517C@039-SN2MPN1-011.039d.mgd.msft.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 23 Jul 2013 22:49:03 -0400 (EDT)
+Subject: [PATCH 6/8] ARM: mm: LPAE: Correct virt_to_phys patching for 64
+ bit physical addresses
+In-Reply-To: <51EF356D.2050902@ti.com>
+References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
+ <1371858502-10083-7-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.LFD.2.03.1307231850350.15022@syhkavp.arg> <51EF356D.2050902@ti.com>
+Message-ID: <alpine.LFD.2.03.1307232222200.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun:
-Thanks a lot.
+On Tue, 23 Jul 2013, Santosh Shilimkar wrote:
 
-No problem, I can rename the driver from sata_imx to ahci_imx.
+> On Tuesday 23 July 2013 09:10 PM, Nicolas Pitre wrote:
+> > On Fri, 21 Jun 2013, Santosh Shilimkar wrote:
+> > 
+> >> From: Sricharan R <r.sricharan@ti.com>
+> >>
+> >> The current phys_to_virt patching mechanism does not work
+> >> for 64 bit physical addressesp. Note that constant used in add/sub
+> >> instructions is encoded in to the last 8 bits of the opcode. So shift
+> >> the _pv_offset constant by 24 to get it in to the correct place.
+> >>
+> >> The v2p patching mechanism patches the higher 32bits of physical
+> >> address with a constant. While this is correct, in those platforms
+> >> where the lowmem addressable physical memory spawns across 4GB boundary,
+> >> a carry bit can be produced as a result of addition of lower 32bits.
+> >> This has to be taken in to account and added in to the upper. The patched
+> >> __pv_offset and va are added in lower 32bits, where __pv_offset can be
+> >> in two's complement form when PA_START < VA_START and that can result
+> >> in a false carry bit.
+> >>
+> >> e.g PA = 0x80000000 VA = 0xC0000000
+> >> __pv_offset = PA - VA = 0xC0000000 (2's complement)
+> >>
+> >> So adding __pv_offset + VA should never result in a true overflow. So in
+> >> order to differentiate between a true carry, a extra flag __pv_sign_flag
+> >> is introduced.
+> >
+> First of all thanks for the review.
+>  
+> > I'm still wondering if this is worth bothering about.
+> > 
+> > If PA = 0x80000000 and VA = 0xC0000000 there will never be a real carry 
+> > to propagate to the high word of the physical address as the VA space 
+> > cannot be larger than 0x40000000.
+> > 
+> Agreed.
+> 
+> > So is there really a case where:
+> > 
+> > 1) physical memory is crossing the 4GB mark, and ...
+> > 
+> > 2) physical memory start address is higher than virtual memory start 
+> >    address needing a carry due to the 32-bit add overflow?
+> > 
+> Consider below two cases of memory layout apart from one mentioned
+> above where the carry is bit irrelevant as you rightly said.
+> 
+> 1) PA = 0x8_0000_0000, VA= 0xC000_0000, absolute pv_offset = 0x7_4000_0000
 
-Best Regards
-Richard Zhu
+This can be patched as:
+
+	mov	phys_hi, #0x8
+	add	phys_lo, virt, #0x40000000  @ carry ignored
+
+> 2) PA = 0x2_8000_0000, VA= 0xC000_000, absolute pv_offset = 0x1_C000_0000
+
+	mov	phys_hi, #0x2
+	add	phys_lo, virt, #0xc0000000  @ carry ignored
+
+> In both of these cases there a true carry which needs to be
+> considered.
+
+Well, not really.  However, if you have:
+
+3) PA = 0x2_8000_0000, VA = 0x4000-0000, pv_offset = 0x2-4000-0000
+
+... then you need:
+
+	mov	phys_hi, #0x2
+	adds	phys_lo, virt, #0x40000000
+	adc	phys_hi, phys_hi, #0
+
+My question is: how likely is this?
+
+What is your actual physical memory start address?
+
+If we really need to cope with the carry, then the __pv_sign_flag should 
+instead be represented in pv_offset directly:
+
+Taking example #2 above, that would be:
+
+	mov	phys_hi, #0x1
+	adds	phys_lo, virt, #0xc0000000
+	adc	phys_hi, phys_hi, #0
+
+If PA = 0x8000-0000 and VA = 0xc000-0000 then pv_offset is 
+0xffff-ffff-c000-0000, meaning:
+
+	mvn	phys_hi, #0
+	add	phys_lo, virt, #0xc0000000
+	adc	phys_hi, phys_hi, #0
+
+So that would require a special case in the patching code where a mvn 
+with 0 is used if the high part of pv_offset is 0xffffffff.
 
 
------Original Message-----
-From: Tejun Heo [mailto:htejun at gmail.com] On Behalf Of Tejun Heo
-Sent: Wednesday, July 24, 2013 12:26 AM
-To: Zhu Richard-R65037
-Cc: Richard Zhu; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; avorontsov at ru.mvista.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org
-Subject: Re: [v3 3/3] sata: imx: add ahci sata support on imx platforms
-
-Hello,
-
-On Mon, Jul 22, 2013 at 07:02:56AM +0000, Zhu Richard-R65037 wrote:
-> Re-send this email to you and community.
-> I'm afraid that you may be missed or don't receive it.
-
-Sorry about the delay.  I was on the road.
-
-> BTW, can you help to pick up the #2 and #3(reviewed and acked by Shawn) of the v7 patch-set of this serial?
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Just one thing, can you please rename the driver to ahci_imx?  I'd like to keep all ahci drivers with ahci prefix (yeah, there's already an exception, I know).
-
-Thanks.
-
---
-tejun
+Nicolas
