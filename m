@@ -1,234 +1,72 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu, 25 Jul 2013 09:41:53 +0530
-Subject: [PATCH] arm: l2x0: add support for prefetch and pwr control
- register configuration
-In-Reply-To: <51EE8183.9010703@gmail.com>
-References: <1374572345-5763-1-git-send-email-chander.kashyap@linaro.org>
- <20130723102212.GD4833@e106331-lin.cambridge.arm.com>
- <51EE8183.9010703@gmail.com>
-Message-ID: <CANuQgHE2rEDCwP8tHhUFF442Nqa9Gyqa6gii-jQDTEUVdEYwcA@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 24 Jul 2013 21:24:46 +0100
+Subject: How to create IRQ mappings in a GPIO driver that doesn't control
+ its IRQ domain ?
+In-Reply-To: <1624911.6TtmtVmU1T@avalon>
+References: <1624911.6TtmtVmU1T@avalon>
+Message-ID: <20130724202446.6CAF23E1313@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2013 18:43, Rob Herring <robherring2@gmail.com> wrote:
-> On 07/23/2013 05:22 AM, Mark Rutland wrote:
->> Hi,
->>
->> [adding Rob Herring to Cc]
->
-> Thanks.
->
->> On Tue, Jul 23, 2013 at 10:39:05AM +0100, Chander Kashyap wrote:
->>> This patch adds support to configure prefetch and pwr control registers
->>> of pl310 cache controllor.
->>>
->>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/arm/l2cc.txt |    6 ++++
->>>  arch/arm/include/asm/hardware/cache-l2x0.h     |   23 +++++++++++++
->>>  arch/arm/mm/cache-l2x0.c                       |   44 ++++++++++++++++++++++++
->>>  3 files changed, 73 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->>> index cbef09b..66876b6 100644
->>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->>> @@ -34,6 +34,12 @@ Optional properties:
->>>  - arm,filter-ranges : <start length> Starting address and length of window to
->>>    filter. Addresses in the filter window are directed to the M1 port. Other
->>>    addresses will go to the M0 port.
->>> +- arm,prefetch-control : Prefetch related configurations. Specifies 8 cells of
->>> +  prefetch-offset, not-same-ID-on-exclusive-sequence-en, incr-double-Linefill-en,
->>> +  prefetch-drop-en, data-prefetch-en, instruction-prefetch-en and
->>> +  double-linefill-en.
->>
->> This looks like configuration rather than hardware specification.
->
-> I think weigh whether this is configuration based on the h/w or just
-> user preference. This would be the former, but...
->
->> Is there any reason we couldn't have Linux configure this itself? I'm
->> not sure having a fixed configuration of these values makes sense - the
->> configuration values could interact badly with future changes to Linux
->> (e.g. performance improvements or errata workarounds), and then we'd
->> have to ignore the described values and/or decide on more suitable ones
->> dynamically anyway.
->
-> Does having a variable configuration for these make sense either? I mean
-> other than an errata work-around, why would you ever turn off prefetch
-> or double linefill?
->
-> None of these fields can be set in NS world. We've already laid down the
-> law in regards to setting secure only bits for errata work-arounds. I
-> think this is no different and we should move towards the kernel doesn't
-> touch aux ctrl at all. There might be an exception with the event bus
-> enable, but you would still have the secure vs. non-secure issue and no
-> way to detect that.
+On Wed, 24 Jul 2013 01:21:44 +0200, Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+> Hello,
+> 
+> I'm running into an issue on several Renesas SoC with IRQ domains and GPIOs.
+> 
+> On sh73a0, r8a73a4 and r8a7740, GPIOs and external interrupts are handled by 
+> two separate IP cores, namely the PFC (Pin Function Controller) and INTC 
+> (Interrupt Controller). The former is handled by the sh-pfc driver 
+> (drivers/pinctrl/sh-pfc) and the later by the irq-renesas-intc-irqpin driver 
+> (drivers/irqchip), referred to below as the irqpin driver.
+> 
+> The sh73a0, for instance, has 32 external interrupt lines that are multiplexed 
+> on pins usable as GPIOs. Both the GPIO and external interrupt functions are 
+> usable at the same time, which allows reading the state of the interrupt 
+> lines.
+> 
+> These external interrupts are for MMC/SD support, among other devices. In this 
+> specific case the MMC/SD Card Detect signal is wired to one of the external 
+> interrupt signals, and the corresponding GPIO is passed to the MMC/SD 
+> controller driver. Depending on other configuration parameters the driver can 
+> then either poll the Card Detect signal, or register an interrupt handler to 
+> detect changes in the signal state. This features is implemented by the MMC/SD 
+> core, which call gpio_to_irq() on the GPIO to retrieve the corresponding IRQ 
+> number.
+> 
+> On non-DT systems the external IRQs are statically mapped at a known offset. 
+> The sh-pfc driver, to implement the gpio_to_irq() function (through its 
+> gpiochip .to_irq() handler), simply searches a SoC-specific lookup table for 
+> the fixed IRQ number associated with a given GPIO.
+> 
+> However, on DT systems, IRQs are mapped dynamically on demand. The irqpin 
+> driver registers a simple IRQ domain, and the irq_create_mapping() function 
+> can then be used to map a given IRQ, specified as an offset in the domain. 
+> This is where the problem appears, as the irqchip .to_irq() function is 
+> implemented in the sh-pfc driver, which doesn't have access to the IRQ domain 
+> registered by the irqpin driver.
+> 
+> I could hack around this by exporting a function in the irqpin driver that 
+> would map an IRQ, and call that function from the sh-pfc driver. I'd rather 
+> avoid that solution as it would add a direct dependency between the two 
+> drivers.
 
-So what is the suggestion here. Not to touch the prefetch register at all.
-But prefetch register values are saved and resumed in existing code,
-how to take care for that.
+Well, the gpio controller really does need to know what irq is
+associated with a GPIO line. If the gpio controller driver doesn't have
+direct access to that information, then it needs to have a hook to set
+it up.
 
->
-> Rob
->
->>
->> I assume that these cells are meant to either be zero or one? If they're
->> necessary, they should be separate boolean properties rather than
->> grouped together by the register they're configured by (see the way
->> arm,tag-latency and arm,data-latency are handled).
->>
->> Also, I'd prefer "-enable" to "-en".
->>
->>> +- arm,pwr-control : Operting mode clock and power mode selection. Specifies two
->>
->> s/Operting/Operating/
->>
->> I'd prefer "power" to "pwr" (though there's precedent for both in
->> bindings...).
->>
->>> +  cells of standby-mode-en and dynamic_clk_gating_en.
->>
->> More boolean properties.
->>
->>>  - interrupts : 1 combined interrupt.
->>>  - cache-id-part: cache id part number to be used if it is not present
->>>    on hardware
->>
->> No amendments to the example?
->>
->>> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
->>> index 3b2c40b..188f4da 100644
->>> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
->>> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
->>> @@ -106,6 +106,29 @@
->>>
->>>  #define L2X0_WAY_SIZE_SHIFT         3
->>>
->>> +#define L2X0_PREFETCH_CTRL_OFFSET_SHIFT                     0
->>> +#define L2X0_PREFETCH_CTRL_NOT_SAME_ID_SHIFT                21
->>> +#define L2X0_PREFETCH_CTRL_INC_DOUBLE_LINEFILL_SHIFT        23
->>> +#define L2X0_PREFETCH_CTRL_PREFETCH_DROP_SHIFT              24
->>> +#define L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_WR_SHIFT 27
->>> +#define L2X0_PREFETCH_CTRL_DATA_PREFETCH_EN_SHIFT   28
->>> +#define L2X0_PREFETCH_CTRL_INSTR_PREFETCH_EN_SHIFT  29
->>> +#define L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_EN_SHIFT 30
->>> +
->>> +#define PREFETCH_R2P0_MASK  (~(1 << L2X0_PREFETCH_CTRL_OFFSET_SHIFT))
->>> +#define PREFETCH_R3P0_MASK \
->>> +            (~((1 << L2X0_PREFETCH_CTRL_NOT_SAME_ID_SHIFT) | \
->>> +               (1 << L2X0_PREFETCH_CTRL_INC_DOUBLE_LINEFILL_SHIFT) | \
->>> +               (1 << L2X0_PREFETCH_CTRL_PREFETCH_DROP_SHIFT) | \
->>> +               (1 << L2X0_PREFETCH_CTRL_DATA_PREFETCH_EN_SHIFT) | \
->>> +               (1 << L2X0_PREFETCH_CTRL_INSTR_PREFETCH_EN_SHIFT) | \
->>> +               (1 << L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_EN_SHIFT)))
->>> +#define PREFETCH_R3P1_MASK \
->>> +            (~(1 << L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_WR_SHIFT))
->>> +
->>> +#define L2X0_PWR_CTRL_STANDBY_MODE_EN_SHIFT 0
->>> +#define L2X0_PWR_CTRL_DYNAMIC_CLK_GATE_EN_SHIFT     1
->>> +
->>>  #ifndef __ASSEMBLY__
->>>  extern void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask);
->>>  #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
->>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->>> index c465fac..490e182 100644
->>> --- a/arch/arm/mm/cache-l2x0.c
->>> +++ b/arch/arm/mm/cache-l2x0.c
->>> @@ -563,6 +563,11 @@ static void __init pl310_of_setup(const struct device_node *np,
->>>      u32 data[3] = { 0, 0, 0 };
->>>      u32 tag[3] = { 0, 0, 0 };
->>>      u32 filter[2] = { 0, 0 };
->>> +    u32 prefetch[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
->>> +    u32 prefetch_val;
->>> +    u32 pwr[2] = { 0, 0 };
->>> +    u32 l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
->>> +            L2X0_CACHE_ID_RTL_MASK;
->>>
->>>      of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
->>>      if (tag[0] && tag[1] && tag[2])
->>> @@ -589,6 +594,45 @@ static void __init pl310_of_setup(const struct device_node *np,
->>>              writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
->>>                             l2x0_base + L2X0_ADDR_FILTER_START);
->>>      }
->>> +
->>> +    if (l2x0_revision >= L2X0_CACHE_ID_RTL_R2P0) {
->>
->> You didn't describe that some properties were dependent on a particular
->> revision.
->>
->>> +            of_property_read_u32_array(np, "arm,prefetch-control",
->>> +                                            prefetch, ARRAY_SIZE(prefetch));
->>> +            prefetch_val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
->>> +            prefetch_val &= PREFETCH_R2P0_MASK;
->>> +            prefetch_val |= prefetch[0] << L2X0_PREFETCH_CTRL_OFFSET_SHIFT;
->>> +            if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
->>> +                    prefetch_val &= PREFETCH_R3P0_MASK;
->>> +                    prefetch_val |=
->>> +                     ((prefetch[1]) <<
->>> +                       L2X0_PREFETCH_CTRL_NOT_SAME_ID_SHIFT) |
->>> +                     ((prefetch[2]) <<
->>> +                       L2X0_PREFETCH_CTRL_INC_DOUBLE_LINEFILL_SHIFT) |
->>> +                     ((prefetch[3]) <<
->>> +                       L2X0_PREFETCH_CTRL_PREFETCH_DROP_SHIFT) |
->>> +                     ((prefetch[5]) <<
->>> +                       L2X0_PREFETCH_CTRL_DATA_PREFETCH_EN_SHIFT) |
->>> +                     ((prefetch[6]) <<
->>> +                       L2X0_PREFETCH_CTRL_INSTR_PREFETCH_EN_SHIFT) |
->>> +                     ((prefetch[7]) <<
->>> +                       L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_EN_SHIFT);
->>
->> You've not sanity checked these properties. What If I typo a value as
->> something other than 0 or 1?
->>
->> Use boolean properties and of_property_read_bool (or even better,
->> configure this dynamically based on revision rather than having a dt
->> description).
->>
->>> +                    if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P1) {
->>> +                            prefetch_val &= PREFETCH_R3P1_MASK;
->>> +                            prefetch_val |=
->>> +                             ((prefetch[4]) <<
->>> +                               L2X0_PREFETCH_CTRL_DOUBLE_LINEFILL_WR_SHIFT);
->>> +                    }
->>
->> Another undocumented revision dependency.
->>
->>> +                    writel_relaxed(prefetch_val,
->>> +                                    l2x0_base + L2X0_PREFETCH_CTRL);
->>> +
->>> +                    of_property_read_u32_array(np, "arm,pwr-control",
->>> +                                            pwr, ARRAY_SIZE(pwr));
->>> +                    writel_relaxed(
->>> +                     ((pwr[0]) << L2X0_PWR_CTRL_STANDBY_MODE_EN_SHIFT) |
->>> +                     ((pwr[1]) << L2X0_PWR_CTRL_DYNAMIC_CLK_GATE_EN_SHIFT),
->>> +                       l2x0_base + L2X0_POWER_CTRL);
->>
->> Again, use boolean properties or do this dynamically.
->>
->> Do none of these values need to be saved for the resume callback?
->>
->> Thanks,
->> Mark.
->>
->>> +            }
->>> +    }
->>>  }
->>>
->>>  static void __init pl310_save(void)
->>> --
->>> 1.7.9.5
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->
+In the past, I've seen gpio controllers have an interrupts property
+specifying which interrupts it is connected to and can use for GPIO
+events. That seems like a resonable scenario in this regard, but if
+GPIOS are 1:1 mapped to irqs, then it means a lot of interrupt entries
+need to appear in the GPIO node. The other option is to add a hook
+directly to the gpio driver so that it knows to use a specific irq
+controller; but that feels wrong. Thought it may be a bit verbose, the
+addition of an interrupts property to the GPIO controller node is
+probably what is wanted.
 
-thanks for reviewing.
+There has also been a trend to make gpio controllers also interrupt
+controllers if they support being used directly as irq inputs, but that
+doesn't really help your problem.  :-)
 
--- 
-with warm regards,
-Chander Kashyap
+g.
