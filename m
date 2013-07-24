@@ -1,35 +1,37 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Wed, 24 Jul 2013 19:08:13 +0530
-Subject: [PATCH 1/2] ARM: OMAP2+: hwmod: rt address space index for DT
-In-Reply-To: <4bb04ee7bcb8ca73d5fc43049ba029471b9cdda3.1373036932.git.afzal@ti.com>
-References: <4bb04ee7bcb8ca73d5fc43049ba029471b9cdda3.1373036932.git.afzal@ti.com>
-Message-ID: <51EFD8C5.8030505@ti.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Wed, 24 Jul 2013 19:43:30 +0530
+Subject: [PATCH v3 0/5] clk/exynos5250: add clocks for hdmi subsystem
+Message-ID: <1374675215-27862-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul, Benoit,
+Add clock changes for hdmi subsystem for exynos5250 SoC. These
+include addition of new clocks like mout_hdmi and smmu_tv, associating
+ID to clk_hdmiphy and some essential corrections.
 
-On 7/5/2013 8:43 PM, Afzal Mohammed wrote:
+This set is based on kukjin's for-next branch at
+http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git.
 
-> Address space is being removed from hwmod database and DT information
-> in <reg> property is being used. Currently the 0th index of device
-> address space is used to map for register target address. This is not
-> always true, eg. cpgmac has it's sysconfig in second address space.
->
-> Handle it by specifying index of device address space to be used for
-> register target. As default value of this field would be zero with
-> static initialization, existing behaviour of using first address space
-> for register target while using DT would be kept as such.
+V3:
+1) Rebase to kgene for-next based on 3.11-rc1.
+2) Added Tushar's patch in the series.
 
-This series is required to fix the wrong register target address being 
-picked up by hwmod for cpgmac on am335x.
+V2:
+1) Dropped "clk/exynos5250: Fix HDMI clock number in documentation" as
+it already get merged.
 
-Issue happened during last merge window cleanup, where address space was 
-removed from hwmod, and in turn DTS was relied upon for address 
-space(Earlier having the address space in hwmod did not cause any issue 
-as 'ADDR_TYPE_RT' was used to specify proper address space index).
+Rahul Sharma (4):
+  clk/exynos5250: add mout_hdmi mux clock for hdmi
+  clk/exynos5250: add sclk_hdmiphy in the list of special clocks
+  clk/exynos5250: add clock for mixer sysmmu
+  clk/exynos5250: change parent to aclk200_disp1 for hdmi subsystem
 
-Please help this series reach mainline for v3.11
+Tushar Behera (1):
+  Documentation: exynos5250-clock: Add div_i2s1 and div_i2s2
 
-Regards
-Afzal
+ .../devicetree/bindings/clock/exynos5250-clock.txt |   12 ++++++++++++
+ drivers/clk/samsung/clk-exynos5250.c               |   20 ++++++++++++++------
+ 2 files changed, 26 insertions(+), 6 deletions(-)
+
+-- 
+1.7.10.4
