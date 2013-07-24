@@ -1,183 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 09:26:55 +0900
-Subject: [PATCH] clocksource: sh_cmt: 32-bit control register support
-In-Reply-To: <51ECAF43.80200@linaro.org>
-References: <cover.1374207810.git.horms+renesas@verge.net.au>
- <2792cc6f22031110f6959c02d42d7b6116105a71.1374207810.git.horms+renesas@verge.net.au>
- <51ECAF43.80200@linaro.org>
-Message-ID: <20130724002655.GA532@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 24 Jul 2013 09:32:14 +0900
+Subject: [GIT 00/19 v2] Renesas ARM based SoC pinmux updates for v3.12
+Message-ID: <cover.1374625203.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 06:04:19AM +0200, Daniel Lezcano wrote:
-> On 07/19/2013 06:36 AM, Simon Horman wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Add support for CMT hardware with 32-bit control and counter
-> > registers, as found on r8a73a4 and r8a7790. To use the CMT
-> > with 32-bit hardware a second I/O memory resource needs to
-> > point out the CMSTR register and it needs to be 32 bit wide.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> 
-> In the future, can you Cc drivers/clocksource maintainers please ?
+Hi Olof, Hi Arnd,
 
-Yes of course, sorry for that oversight.
+please consider the following pinmux updates for v3.12.
 
-> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Difference with v1 of this pull-request:
+* Remove bogus i2c portions of the first patch of the series.
+* Correct addressing mode used in dts of the first patch of the series.
+* Removal of egg from face: wip
 
-Olof, Arnd, please let me know if you wish me to re-send the pull
-request with Daniel's Reviewed-by added to this patch.
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-> 
-> >  drivers/clocksource/sh_cmt.c |   50 ++++++++++++++++++++++++++++++------------
-> >  1 file changed, 36 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-> > index 08d0c41..0965e98 100644
-> > --- a/drivers/clocksource/sh_cmt.c
-> > +++ b/drivers/clocksource/sh_cmt.c
-> > @@ -37,6 +37,7 @@
-> >  
-> >  struct sh_cmt_priv {
-> >  	void __iomem *mapbase;
-> > +	void __iomem *mapbase_str;
-> >  	struct clk *clk;
-> >  	unsigned long width; /* 16 or 32 bit version of hardware block */
-> >  	unsigned long overflow_bit;
-> > @@ -79,6 +80,12 @@ struct sh_cmt_priv {
-> >   * CMCSR 0xffca0060 16-bit
-> >   * CMCNT 0xffca0064 32-bit
-> >   * CMCOR 0xffca0068 32-bit
-> > + *
-> > + * "32-bit counter and 32-bit control" as found on r8a73a4 and r8a7790:
-> > + * CMSTR 0xffca0500 32-bit
-> > + * CMCSR 0xffca0510 32-bit
-> > + * CMCNT 0xffca0514 32-bit
-> > + * CMCOR 0xffca0518 32-bit
-> >   */
-> >  
-> >  static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
-> > @@ -109,9 +116,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
-> >  
-> >  static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
-> >  {
-> > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
-> > -
-> > -	return p->read_control(p->mapbase - cfg->channel_offset, 0);
-> > +	return p->read_control(p->mapbase_str, 0);
-> >  }
-> >  
-> >  static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
-> > @@ -127,9 +132,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
-> >  static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
-> >  				      unsigned long value)
-> >  {
-> > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
-> > -
-> > -	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
-> > +	p->write_control(p->mapbase_str, 0, value);
-> >  }
-> >  
-> >  static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
-> > @@ -676,7 +679,7 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
-> >  static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
-> >  {
-> >  	struct sh_timer_config *cfg = pdev->dev.platform_data;
-> > -	struct resource *res;
-> > +	struct resource *res, *res2;
-> >  	int irq, ret;
-> >  	ret = -ENXIO;
-> >  
-> > @@ -694,6 +697,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
-> >  		goto err0;
-> >  	}
-> >  
-> > +	/* optional resource for the shared timer start/stop register */
-> > +	res2 = platform_get_resource(p->pdev, IORESOURCE_MEM, 1);
-> > +
-> >  	irq = platform_get_irq(p->pdev, 0);
-> >  	if (irq < 0) {
-> >  		dev_err(&p->pdev->dev, "failed to get irq\n");
-> > @@ -707,6 +713,15 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
-> >  		goto err0;
-> >  	}
-> >  
-> > +	/* map second resource for CMSTR */
-> > +	p->mapbase_str = ioremap_nocache(res2 ? res2->start :
-> > +					 res->start - cfg->channel_offset,
-> > +					 res2 ? resource_size(res2) : 2);
-> > +	if (p->mapbase_str == NULL) {
-> > +		dev_err(&p->pdev->dev, "failed to remap I/O second memory\n");
-> > +		goto err1;
-> > +	}
-> > +
-> >  	/* request irq using setup_irq() (too early for request_irq()) */
-> >  	p->irqaction.name = dev_name(&p->pdev->dev);
-> >  	p->irqaction.handler = sh_cmt_interrupt;
-> > @@ -719,11 +734,17 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
-> >  	if (IS_ERR(p->clk)) {
-> >  		dev_err(&p->pdev->dev, "cannot get clock\n");
-> >  		ret = PTR_ERR(p->clk);
-> > -		goto err1;
-> > +		goto err2;
-> >  	}
-> >  
-> > -	p->read_control = sh_cmt_read16;
-> > -	p->write_control = sh_cmt_write16;
-> > +	if (res2 && (resource_size(res2) == 4)) {
-> > +		/* assume both CMSTR and CMCSR to be 32-bit */
-> > +		p->read_control = sh_cmt_read32;
-> > +		p->write_control = sh_cmt_write32;
-> > +	} else {
-> > +		p->read_control = sh_cmt_read16;
-> > +		p->write_control = sh_cmt_write16;
-> > +	}
-> >  
-> >  	if (resource_size(res) == 6) {
-> >  		p->width = 16;
-> > @@ -752,22 +773,23 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
-> >  			      cfg->clocksource_rating);
-> >  	if (ret) {
-> >  		dev_err(&p->pdev->dev, "registration failed\n");
-> > -		goto err2;
-> > +		goto err3;
-> >  	}
-> >  	p->cs_enabled = false;
-> >  
-> >  	ret = setup_irq(irq, &p->irqaction);
-> >  	if (ret) {
-> >  		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
-> > -		goto err2;
-> > +		goto err3;
-> >  	}
-> >  
-> >  	platform_set_drvdata(pdev, p);
-> >  
-> >  	return 0;
-> > -err2:
-> > +err3:
-> >  	clk_put(p->clk);
-> > -
-> > +err2:
-> > +	iounmap(p->mapbase_str);
-> >  err1:
-> >  	iounmap(p->mapbase);
-> >  err0:
-> > 
-> 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux-for-v3.12
+
+for you to fetch changes up to 1469273960de45275f33276c7254456edcba9da2:
+
+  ARM: shmobile: kzm9g-reference: Add LED1-LED4 to the device tree (2013-07-22 10:12:41 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC pinmux updates for v3.12
+
+SH Mobile pinctrl DT support
+
+----------------------------------------------------------------
+Laurent Pinchart (19):
+      ARM: shmobile: r8a73a4: Add pin control device to device tree
+      ARM: shmobile: r8a7740: Add pin control device to device tree
+      ARM: shmobile: r8a7778: Add pin control device to device tree
+      ARM: shmobile: r8a7778: Add GPIO controller devices to device tree
+      ARM: shmobile: r8a7779: Add pin control device to device tree
+      ARM: shmobile: r8a7779: Add GPIO controller devices to device tree
+      ARM: shmobile: r8a7790: Add pin control device to device tree
+      ARM: shmobile: r8a7790: Add GPIO controller devices to device tree
+      ARM: shmobile: sh7372: Add pin control device to device tree
+      ARM: shmobile: sh73a0: Add pin control device to device tree
+      ARM: shmobile: armadillo-reference: Move pinctrl mappings to device tree
+      ARM: shmobile: armadillo-reference: Add st1232 pin mappings
+      ARM: shmobile: armadillo-reference: Move st1232 reset GPIO to DT
+      ARM: shmobile: armadillo-reference: Add LED1-LED4 to the device tree
+      ARM: shmobile: marzen-reference: Move pinctrl mappings to device tree
+      ARM: shmobile: marzen-reference: Add LED2-LED4 to the device tree
+      ARM: shmobile: kzm9g-reference: Move pinctrl mappings to device tree
+      ARM: shmobile: kzm9g-reference: Move SDHI regulators to DT
+      ARM: shmobile: kzm9g-reference: Add LED1-LED4 to the device tree
+
+ arch/arm/boot/dts/r8a73a4.dtsi                     |  7 ++
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts | 34 ++++++++
+ arch/arm/boot/dts/r8a7740.dtsi                     |  8 ++
+ arch/arm/boot/dts/r8a7778.dtsi                     | 66 ++++++++++++++++
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts     | 49 ++++++++++++
+ arch/arm/boot/dts/r8a7779.dtsi                     | 90 ++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7790.dtsi                     | 78 +++++++++++++++++++
+ arch/arm/boot/dts/sh7372.dtsi                      |  8 ++
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       | 90 +++++++++++++++++++++-
+ arch/arm/boot/dts/sh73a0.dtsi                      |  8 ++
+ .../board-armadillo800eva-reference.c              | 18 +----
+ arch/arm/mach-shmobile/board-kzm9g-reference.c     | 47 -----------
+ arch/arm/mach-shmobile/board-marzen-reference.c    | 28 -------
+ 13 files changed, 437 insertions(+), 94 deletions(-)
