@@ -1,78 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Jul 2013 22:00:05 +0900
-Subject: [PATCH v3 00/13] ARM: dts: Add camera and magnetometer support for
- TRATS(2) board
-In-Reply-To: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-References: <1372692155-17653-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <0ee701ce886d$b7bc5930$27350b90$%kim@samsung.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 24 Jul 2013 15:09:26 +0200
+Subject: [PATCH 1/3] sh-pfc: Remove unneeded mach/<soc>.h includes
+In-Reply-To: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374671368-4681-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1374671368-4681-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> This patch series includes some fixes and extensions to the Exynos dts
-> files to add the camera and magnetometer sensor support for the TRATS
-> and TRATS2 board. It depends on a patch from Tomasz adding initial
-> TRATS2 board dts file [1].
-> 
-Already it is in my tree :)
+The SoC-specific mach/<soc>.h headers are included needlesly. Don't
+include them.
 
-> Comparing to the previous version of this patch set I've added a few
-> more patches, for the Exynos4210 based TRATS board and a patch adding
-> MIPI CSIS/DSIM PHY provider nodes and related properties to the PHY
-> consumer nodes.
-> 
-> This series has been tested with the S5K6A3/FIMC-IS and S5K5BAFX
-> (front facing) cameras on top of next-20130627 tag. It can be found
-> also at:
-> http://git.linuxtv.org/snawrocki/samsung.git/next-20130627-dts-trats-v3
-> 
-> Detailed changes since v2 are listed in each patch.
-> 
-> Changes since v1:
->  - enabled pull down in cam-port-{a, b}-clk-idle nodes (1/8)
->  - added node alias for i2c-gpio at 0 I2C controller node (7/8).
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg253184.html
-> 
-> Andrzej Hajda (2):
->   ARM: dts: Add Exynos4210 SoC camera port pinctrl nodes
->   ARM: dts: Add S5K5BA sensor regulator definitions for Trats board
-> 
-> Jacek Anaszewski (1):
->   ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
-> 
-> Sylwester Nawrocki (10):
->   ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
->   ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
->   ARM: dts: Add ISP power domain node for Exynos4x12
->   ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
->   ARM: dts: Add camera subsystem device nodes to exynos4.dtsi
->   ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
->   ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
->   ARM: dts: Add camera device nodes for Exynos4210 SoCs
->   ARM: dts: Add FIMC nodes for Exynos4210 Trats board
->   ARM: dts: Add MIPI PHY node to exynos4.dtsi
-> 
->  arch/arm/boot/dts/exynos4.dtsi            |  102
-++++++++++++++++++++++++--
->  arch/arm/boot/dts/exynos4210-pinctrl.dtsi |   23 ++++++
->  arch/arm/boot/dts/exynos4210-trats.dts    |  103
-++++++++++++++++++++++---
-> --
->  arch/arm/boot/dts/exynos4210.dtsi         |   30 ++++++++
->  arch/arm/boot/dts/exynos4412-trats2.dts   |  110
-> +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   61 ++++++++++++++--
->  arch/arm/boot/dts/exynos4x12.dtsi         |  103
-+++++++++++++++++++++++++++
->  7 files changed, 503 insertions(+), 29 deletions(-)
-> 
-> --
-> 1.7.9.5
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c | 1 -
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 1 -
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c  | 1 -
+ 3 files changed, 3 deletions(-)
 
-Basically, I'm fine on this series but you said, you will address comments
-on some patches :)
-
-Thanks,
-Kukjin
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+index 82bf6ab..2b9c0b3 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+@@ -21,7 +21,6 @@
+ #include <linux/kernel.h>
+ #include <linux/pinctrl/pinconf-generic.h>
+ #include <mach/irqs.h>
+-#include <mach/r8a73a4.h>
+ 
+ #include "core.h"
+ #include "sh_pfc.h"
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index f6ea47c..6a7d382 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -22,7 +22,6 @@
+ #include <linux/kernel.h>
+ #include <linux/pinctrl/pinconf-generic.h>
+ 
+-#include <mach/r8a7740.h>
+ #include <mach/irqs.h>
+ 
+ #include "core.h"
+diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+index 6dfb187..1528693 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
++++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+@@ -25,7 +25,6 @@
+ #include <linux/pinctrl/pinconf-generic.h>
+ 
+ #include <mach/irqs.h>
+-#include <mach/sh7372.h>
+ 
+ #include "core.h"
+ #include "sh_pfc.h"
+-- 
+1.8.1.5
