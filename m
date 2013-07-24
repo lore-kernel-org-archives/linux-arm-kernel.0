@@ -1,46 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 13:29:00 -0700
-Subject: [PATCH] ARM: Fix deadlock scenario with smp_send_stop()
-In-Reply-To: <20130724202148.GA24642@n2100.arm.linux.org.uk>
-References: <1373384217-26307-1-git-send-email-sboyd@codeaurora.org>
- <20130724185618.GD27761@codeaurora.org>
- <20130724202148.GA24642@n2100.arm.linux.org.uk>
-Message-ID: <51F0390C.7090501@codeaurora.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 24 Jul 2013 13:29:44 -0700
+Subject: [PATCH 1/4] msm_serial: Fix NUL byte output on UARTDM
+In-Reply-To: <1374691051-28544-2-git-send-email-sboyd@codeaurora.org>
+References: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
+ <1374691051-28544-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130724202944.GB10926@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/13 13:21, Russell King - ARM Linux wrote:
-> On Wed, Jul 24, 2013 at 11:56:18AM -0700, Stephen Boyd wrote:
->> On 07/09, Stephen Boyd wrote:
->>> If one process calls sys_reboot and that process then stops other
->>> CPUs while those CPUs are within a spin_lock() region we can
->>> potentially encounter a deadlock scenario like below.
->>>
->>> CPU 0                   CPU 1
->>> -----                   -----
->>>                         spin_lock(my_lock)
->>> smp_send_stop()
->>>  <send IPI>             handle_IPI()
->>>                          disable_preemption/irqs
->>>                           while(1);
->>>  <PREEMPT>
->>> spin_lock(my_lock) <--- Waits forever
->>>
->>> We shouldn't attempt to run any other tasks after we send a stop
->>> IPI to a CPU so disable preemption so that this task runs to
->>> completion.
->>>
->>> Reported-by: Sundarajan Srinivasan <sundaraj@codeaurora.com>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> ---
->>>
->>> Resending this patch now that the context has changed.
->> Ping? Shall I put this in the patch tracker?
-> Well, looking at x86, they use local_irq_disable() before sending the
-> stop, so I think we should do the same for cross-arch consistency.
+On Wed, Jul 24, 2013 at 11:37:28AM -0700, Stephen Boyd wrote:
+>UARTDM serial devices require us to wait for the entire TX fifo
+>to drain before we can change the contents of the NCF_TX
+>register. Furthermore, if we write any characters to the TX fifo
+>within the same clock cycle of changing the NCF_TX register the
+>NCF_TX register won't latch properly.
+>
+>To fix these issues we should read back the NCF_TX register to
+>delay any TX fifo accesses by a clock cycle and we should wait
+>for the TX fifo to drain (instead of just waiting for the fifo to
+>be ready to receive more characters). Failure to do so leads to
+>random NUL bytes interspersed in the output.
+>
+>Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>---
+> drivers/tty/serial/msm_serial.c | 14 +++++++++-----
+> drivers/tty/serial/msm_serial.h |  1 +
+> 2 files changed, 10 insertions(+), 5 deletions(-)
 
-Fair enough. I'll send v2 with that.
+Acked-by: David Brown <davidb@codeaurora.org>
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
