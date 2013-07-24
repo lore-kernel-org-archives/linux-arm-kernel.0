@@ -1,44 +1,56 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 24 Jul 2013 09:01:33 +0530
-Subject: [PATCH v3 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
-Message-ID: <1374636693-32336-1-git-send-email-sachin.kamat@linaro.org>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Wed, 24 Jul 2013 12:09:53 +0800
+Subject: [PATCH 0/9] ARM: tegra: move to generic DMA DT binding
+Message-ID: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the recent cleanup in Exynos platform code notably commits
-17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
-more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
-of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
-Exynos4412 which have more than the default number of GPIOs. Thus define
-this number in KConfig file which takes care of current SoC requirements
-and provides scope for GPIO expanders. Without this patch we get the following
-errors during boot:
+The patch series aim to move apbdma to generic DT binding.
 
-gpiochip_add: gpios 251..258 (gpv0) failed to register
-samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
-error code: -22
-samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
+Changes:
+- It add dmas/dma-names properties while leave
+  nvidia,dma-request-selector to be compatible.
+- update apbdma driver and dma client drivers
+- ASoC tegra adds a new struct to pass device and dma-name.
+- at last, remove legacy nvidia,dma-request-selector
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Tomasz Figa <t.figa@samsung.com>
----
-Changes since v2:
-Changed the default number to 512 to accomodate GPIO exapnders.
----
- arch/arm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+Richard Zhao (9):
+  ARM: dts: add generic DMA DT binding for tegra apbdma
+  dma: tegra20-apbdma: move to generic device tree bindings
+  spi: tegra114: move to generic dma DT binding
+  spi: tegra20-slink: move to generic dma DT binding
+  spi: tegra20-sflash: move to generic dma DT binding
+  serial: tegra: move to generic dma DT binding
+  ASoC: tegra: move to generic DMA DT binding
+  ARM: dts: tegra: remove legacy nvidia,dma-request-selector properties
+  dma: tegra20-apbdma: remove legacy nvidia,dma-request-selector support
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ccc388d..b3c4fa4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1601,6 +1601,7 @@ config ARCH_NR_GPIO
- 	int
- 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
- 	default 512 if SOC_OMAP5
-+	default 512 if ARCH_EXYNOS
- 	default 512 if ARCH_KEYSTONE
- 	default 392 if ARCH_U8500
- 	default 352 if ARCH_VT8500
+ .../devicetree/bindings/dma/tegra20-apbdma.txt     |  1 +
+ .../bindings/serial/nvidia,tegra20-hsuart.txt      |  8 ++--
+ .../bindings/sound/nvidia,tegra20-ac97.txt         |  8 ++--
+ .../bindings/sound/nvidia,tegra20-i2s.txt          |  8 ++--
+ .../bindings/sound/nvidia,tegra30-ahub.txt         | 12 +++---
+ .../bindings/spi/nvidia,tegra114-spi.txt           | 10 +++--
+ .../bindings/spi/nvidia,tegra20-sflash.txt         | 10 +++--
+ .../bindings/spi/nvidia,tegra20-slink.txt          | 10 +++--
+ arch/arm/boot/dts/tegra114.dtsi                    | 41 +++++++++++++-------
+ arch/arm/boot/dts/tegra20.dtsi                     | 40 +++++++++++++-------
+ arch/arm/boot/dts/tegra30.dtsi                     | 37 ++++++++++++------
+ drivers/dma/tegra20-apb-dma.c                      | 38 ++++++++++++++++++-
+ drivers/spi/spi-tegra114.c                         | 16 +++-----
+ drivers/spi/spi-tegra20-slink.c                    | 16 +++-----
+ drivers/tty/serial/serial-tegra.c                  | 16 +-------
+ sound/soc/tegra/tegra20_ac97.c                     | 17 +++------
+ sound/soc/tegra/tegra20_ac97.h                     |  2 +
+ sound/soc/tegra/tegra20_i2s.c                      | 26 ++++---------
+ sound/soc/tegra/tegra20_i2s.h                      |  2 +
+ sound/soc/tegra/tegra30_ahub.c                     | 25 +++++-------
+ sound/soc/tegra/tegra30_ahub.h                     | 11 +++---
+ sound/soc/tegra/tegra30_i2s.c                      | 44 +++++++++++++++-------
+ sound/soc/tegra/tegra30_i2s.h                      |  2 +
+ sound/soc/tegra/tegra_pcm.c                        | 14 +++++++
+ sound/soc/tegra/tegra_pcm.h                        | 13 +++++++
+ 25 files changed, 260 insertions(+), 167 deletions(-)
+
 -- 
-1.7.9.5
+1.8.1.5
