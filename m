@@ -1,83 +1,69 @@
-From: richard.zhuhongxing@gmail.com (Richard Zhu)
-Date: Wed, 24 Jul 2013 14:15:26 +0800
-Subject: [PATCH v8 0/3] ahci: enable ahci sata support on imx6q
-Message-ID: <1374646529-24432-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 24 Jul 2013 11:46:39 +0530
+Subject: [PATCH] ARM: dts: Add USBPHY nodes to Exynos4x12
+In-Reply-To: <CADoNuNe1t8KENvdwZXzg8tZAVNuqobV7gXAaVVuSVZX8LEc2xg@mail.gmail.com>
+References: <1374600682-19376-1-git-send-email-tobetter@gmail.com>
+ <CAK9yfHw98L-FUtX7v32FyE4UN308uYpJXx8oxDuYgYZk1uUp_A@mail.gmail.com>
+ <CADoNuNe1t8KENvdwZXzg8tZAVNuqobV7gXAaVVuSVZX8LEc2xg@mail.gmail.com>
+Message-ID: <CAK9yfHzXg_U=dgkJ=vqmme+VxXCw=WcRdCU-7V1_hPzRrgTyPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v8: add imx6q specific ahci sata support
-  - Regarding to Tejun's comments, rename the sata_imx driver
-  to be ahci_imx
-  - Add Shawn's ack and review signoff.
-  - 
+On 24 July 2013 11:29, Dongjin Kim <tobetter@gmail.com> wrote:
+> Thanks Sachin,
+>
+> On Wed, Jul 24, 2013 at 2:12 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+>> Hi Dongjin,
+>>
+>> On 23 July 2013 23:01, Dongjin Kim <tobetter@gmail.com> wrote:
+>>> This patch adds device nodes for USBPHY to Exynos4x12.
+>>>
+>>> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos4x12.dtsi |   18 ++++++++++++++++++
+>>>  1 file changed, 18 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+>>> index 01da194..9c3335b 100644
+>>> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+>>> @@ -73,4 +73,22 @@
+>>>                 clock-names = "sclk_fimg2d", "fimg2d";
+>>>                 status = "disabled";
+>>>         };
+>>> +
+>>> +       usbphy at 125B00000 {
+>>
+>> Extra 0 above.
+>>
+> This is my bad, I will fix.
+>
+>>> +               #address-cells = <1>;
+>>> +               #size-cells = <1>;
+>>> +               compatible = "samsung,exynos4x12-usb2phy";
+>>> +               reg = <0x125B0000 0x100>;
+>>> +               ranges;
+>>> +
+>>> +               clocks = <&clock 2>, <&clock 305>;
+>>> +               clock-names = "xusbxti", "otg";
+>>> +               status = "disabled";
+>>> +
+>>> +               usbphy-sys {
+>>> +                       /* USB device and host PHY_CONTROL registers */
+>>> +                       reg = <0x10020704 0xc>,
+>>> +                             <0x1001021c 0x4>;
+>>> +               };
+>>> +       };
+>>>  };
+>>
+>> Please add this node after tmu node (satisfies alphabetical order as
+>> well as increasing address value)
+> No tmu node in exynos4x12.dtsi in mainline v3.11-rc2 yet, even in
+> Kukjin's branch.
 
-v7: http://www.spinics.net/lists/linux-ide/msg45738.html
-  Thanks to Sergei Shtylyow and Shawn.
-  - According to ePAPR [1] section 2.2.2, re-name
-  the node from 'ahci' to 'sata'
-  - Move the initialization of the ahb clock of the private
-  data to the probe function.
-  - Remove the platform_set_drvdata(..., NULL), and devm_clk_put
-  (..., ...).
-  - 
+Sorry, that patch is not yet applied to for-next. I will re-send
+again. You may ignore this comment for now.
 
-v6: http://www.spinics.net/lists/linux-ide/msg45719.html
-  Thanks for Shawn's comments.
-  - Speicify the ahb clock in the sata related dts changes.
-  - Move the initialization of the sata PHY clock of the private
-  data to the probe function.
-  - Remove the empty device release function.
-  - In order to be more readable, rename the imx_dev/imx_ahci_pdev
-  to be ahci_dev/ahci_pdev, and do some other changes, such as typo
-  error, more readable name of the variable.
-  - 
-
-v5: http://www.spinics.net/lists/linux-ide/msg45712.html
-  - Fix the wrong referrence usage of the private data.
-  - Use the private data to contain the poninter of the PHY
-  signals adjustment window(gpr)
-  - Tested on imx6q sd board.
-  - 
-
-v4: http://www.spinics.net/lists/linux-ide/msg45699.html
-  Thanks for the review comments provided by Sascha, and Alexander.
-  - Use the private data and keep a pointer to the PHY clock.
-  - Don't use the global platform device variable, because that
-  it would make the driver broken for mutiple instances.
-  - Don't do the "writel" with assignment.
-  - Other minor changes, such as print the error code when printing
-  error message, use a u32 type to store readl results, and so on.
-
-v3: http://www.spinics.net/lists/linux-ide/msg45688.html
-  - Keep arch/arm and ahci_platform driver clean.
-  - Add the sata_imx standalone driver contained all the
-  specific setup
-  - Add the release function, support the loadable module
-  driver.
-  - Tested on imx6q sd board.
-
-v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
- - Setup standalone imx ahci sata driver, because of
- the misalignments of the bits definition of the HBA register.
- - Replace the node by the label in the board dts.
- - 
-
-v1: http://www.spinics.net/lists/linux-ide/msg45581.html
- - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
-
-These patches is based on imx/dt branch of
-"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
-
-[v8 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
-[v8 2/3] ARM: imx6q: update the sata bits definitions of gpr13
-[v8 3/3] ahci_imx: add ahci sata support on imx platforms
-
-arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
-arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
-arch/arm/boot/dts/imx6q.dtsi                |    9 +
-drivers/ata/Kconfig                         |    9 +
-drivers/ata/Makefile                        |    1 +
-drivers/ata/ahci_imx.c                      |  236 +++++++++++++++++++++++++++
-include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++----
-8 files changed, 351 insertions(+), 37 deletions(-)
+-- 
+With warm regards,
+Sachin
