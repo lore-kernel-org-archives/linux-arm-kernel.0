@@ -1,72 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 11:56:18 -0700
-Subject: [PATCH] ARM: Fix deadlock scenario with smp_send_stop()
-In-Reply-To: <1373384217-26307-1-git-send-email-sboyd@codeaurora.org>
-References: <1373384217-26307-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130724185618.GD27761@codeaurora.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 24 Jul 2013 14:59:27 -0400
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <51F0223E.4050008@ti.com>
+References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
+ <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
+ <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
+ <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com>
+Message-ID: <51F0240F.3050507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09, Stephen Boyd wrote:
-> If one process calls sys_reboot and that process then stops other
-> CPUs while those CPUs are within a spin_lock() region we can
-> potentially encounter a deadlock scenario like below.
+On Wednesday 24 July 2013 02:51 PM, Nishanth Menon wrote:
+> On 07/24/2013 01:43 PM, Sricharan R wrote:
+>> On Wednesday 24 July 2013 10:17 PM, Nishanth Menon wrote:
+>>> On 07/24/2013 11:38 AM, Santosh Shilimkar wrote:
+>>>> On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote:
+>>>>> That said, maybe a intermediate pinctrl approach might be more pragmatic and less theoretically flexible.
+>>>>> an option might be to "statically allocate" default number of interrupts to a domain - example:
+>>>>> * GIC IRQ 72->78 allotted to UARTs
+>>>>> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
+>>>>> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
+>>>>>
+>>>>> Does that sound fair trade off?
+>>>> This sounds better. That way we can get all the devices in the DT at least.
+>>>
+>>> Fair enough - if Linus and Tony are still ok with this approach to the problem, seeing a patch series with the effect would be beneficial.
+>>>
+>>   Ok, i will use this idea of certain number interrupts to groups.
+>> Yes on DRA7XX, we have about 160 gic lines and 320 irq crossbar device inputs contending for it.
+>> 1:2 and fully arbitrary.  But will we be really exhausting them ?
+>>
+> Depends on how we allocate :). The default arbitary allocation can be made more logical in your series ofcourse :).
 > 
-> CPU 0                   CPU 1
-> -----                   -----
->                         spin_lock(my_lock)
-> smp_send_stop()
->  <send IPI>             handle_IPI()
->                          disable_preemption/irqs
->                           while(1);
->  <PREEMPT>
-> spin_lock(my_lock) <--- Waits forever
-> 
-> We shouldn't attempt to run any other tasks after we send a stop
-> IPI to a CPU so disable preemption so that this task runs to
-> completion.
-> 
-> Reported-by: Sundarajan Srinivasan <sundaraj@codeaurora.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Resending this patch now that the context has changed.
-
-Ping? Shall I put this in the patch tracker?
-
-> 
->  arch/arm/kernel/process.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 7f1efcd..8bc12d7 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -206,6 +206,7 @@ void machine_shutdown(void)
->   */
->  void machine_halt(void)
->  {
-> +	preempt_disable();
->  	smp_send_stop();
->  
->  	local_irq_disable();
-> @@ -220,6 +221,7 @@ void machine_halt(void)
->   */
->  void machine_power_off(void)
->  {
-> +	preempt_disable();
->  	smp_send_stop();
->  
->  	if (pm_power_off)
-> @@ -239,6 +241,7 @@ void machine_power_off(void)
->   */
->  void machine_restart(char *cmd)
->  {
-> +	preempt_disable();
->  	smp_send_stop();
->  
->  	arm_pm_restart(reboot_mode, cmd);
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I would just most logical peripherals rather than providing every single
+IP connected to cross bar. Otherwise we will end up wth hwmod like
+scenario where now started removing the unused stuff because of
+maintenance and loc issues ;-)
