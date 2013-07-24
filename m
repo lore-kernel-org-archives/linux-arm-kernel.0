@@ -1,40 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 24 Jul 2013 16:39:53 +0900
-Subject: [PATCH] ARM: shmobile: marzen: Switch to DT_MACHINE_START
-In-Reply-To: <20130724073042.28351.33041.sendpatchset@w520>
-References: <20130724073042.28351.33041.sendpatchset@w520>
-Message-ID: <20130724073952.GD17045@verge.net.au>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 24 Jul 2013 16:55:16 +0900
+Subject: [PATCH v3 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+In-Reply-To: <CAK9yfHz-UcA0--Md0YfrTkPvqzZncTcu-6a-AaHbiWx2tJZczw@mail.gmail.com>
+References: <1374636693-32336-1-git-send-email-sachin.kamat@linaro.org>
+ <0e4301ce8835$f5bef5e0$e13ce1a0$@org>
+ <CAK9yfHz-UcA0--Md0YfrTkPvqzZncTcu-6a-AaHbiWx2tJZczw@mail.gmail.com>
+Message-ID: <0e8401ce8843$22817960$67846c20$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 04:30:42PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+Sachin Kamat wrote:
 > 
-> Convert the marzen board to use DT_MACHINE_START. With this in
-> place all mach-shmobile boards use DT_MACHINE_START. Also, this
-> makes it possible for the r8a7779 SMP code to use DT for CPUs.
+> On 24 July 2013 11:50, Kukjin Kim <kgene@kernel.org> wrote:
+> > Sachin Kamat wrote:
+> >>
+> >> With the recent cleanup in Exynos platform code notably commits
+> >> 17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
+> >> more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
+> >> of ARCH_NR_GPIOS got removed. This started causing problems on SoCs
+> like
+> >> Exynos4412 which have more than the default number of GPIOs. Thus
+> define
+> >> this number in KConfig file which takes care of current SoC
+> requirements
+> >> and provides scope for GPIO expanders. Without this patch we get the
+> >> following
+> >> errors during boot:
+> >>
+> >> gpiochip_add: gpios 251..258 (gpv0) failed to register
+> >> samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
+> >> error code: -22
+> >> samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
+> >>
+> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> >> Cc: Tomasz Figa <t.figa@samsung.com>
+> >> ---
+> >> Changes since v2:
+> >> Changed the default number to 512 to accomodate GPIO exapnders.
+> >> ---
+> >>  arch/arm/Kconfig |    1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index ccc388d..b3c4fa4 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -1601,6 +1601,7 @@ config ARCH_NR_GPIO
+> >>       int
+> >>       default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+> >>       default 512 if SOC_OMAP5
+> >> +     default 512 if ARCH_EXYNOS
+> >>       default 512 if ARCH_KEYSTONE
+> >
+> > +       default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 ?
 > 
-> So appended DTB is the way forward on this board.
+> Looks good. Do you want me to re-send this?
+> 
+Yes, please.
 
-Please supply a patch to update the defconfig accordingly.
-
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written on top of renesas-devel-20130724
-> 
->  arch/arm/mach-shmobile/board-marzen.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- 0001/arch/arm/mach-shmobile/board-marzen.c
-> +++ work/arch/arm/mach-shmobile/board-marzen.c	2013-07-24 15:45:39.000000000 +0900
-> @@ -238,7 +238,7 @@ static void __init marzen_init(void)
->  	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
->  }
->  
-> -MACHINE_START(MARZEN, "marzen")
-> +DT_MACHINE_START(MARZEN, "marzen")
->  	.smp		= smp_ops(r8a7779_smp_ops),
->  	.map_io		= r8a7779_map_io,
->  	.init_early	= r8a7779_add_early_devices,
-> 
+- Kukjin
