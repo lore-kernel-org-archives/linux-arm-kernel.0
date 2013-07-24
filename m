@@ -1,69 +1,55 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 24 Jul 2013 11:46:39 +0530
-Subject: [PATCH] ARM: dts: Add USBPHY nodes to Exynos4x12
-In-Reply-To: <CADoNuNe1t8KENvdwZXzg8tZAVNuqobV7gXAaVVuSVZX8LEc2xg@mail.gmail.com>
-References: <1374600682-19376-1-git-send-email-tobetter@gmail.com>
- <CAK9yfHw98L-FUtX7v32FyE4UN308uYpJXx8oxDuYgYZk1uUp_A@mail.gmail.com>
- <CADoNuNe1t8KENvdwZXzg8tZAVNuqobV7gXAaVVuSVZX8LEc2xg@mail.gmail.com>
-Message-ID: <CAK9yfHzXg_U=dgkJ=vqmme+VxXCw=WcRdCU-7V1_hPzRrgTyPQ@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 24 Jul 2013 15:20:57 +0900
+Subject: [PATCH v3 1/1] ARM: EXYNOS: Update CONFIG_ARCH_NR_GPIO for Exynos
+In-Reply-To: <1374636693-32336-1-git-send-email-sachin.kamat@linaro.org>
+References: <1374636693-32336-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <0e4301ce8835$f5bef5e0$e13ce1a0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2013 11:29, Dongjin Kim <tobetter@gmail.com> wrote:
-> Thanks Sachin,
->
-> On Wed, Jul 24, 2013 at 2:12 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
->> Hi Dongjin,
->>
->> On 23 July 2013 23:01, Dongjin Kim <tobetter@gmail.com> wrote:
->>> This patch adds device nodes for USBPHY to Exynos4x12.
->>>
->>> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/exynos4x12.dtsi |   18 ++++++++++++++++++
->>>  1 file changed, 18 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
->>> index 01da194..9c3335b 100644
->>> --- a/arch/arm/boot/dts/exynos4x12.dtsi
->>> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
->>> @@ -73,4 +73,22 @@
->>>                 clock-names = "sclk_fimg2d", "fimg2d";
->>>                 status = "disabled";
->>>         };
->>> +
->>> +       usbphy at 125B00000 {
->>
->> Extra 0 above.
->>
-> This is my bad, I will fix.
->
->>> +               #address-cells = <1>;
->>> +               #size-cells = <1>;
->>> +               compatible = "samsung,exynos4x12-usb2phy";
->>> +               reg = <0x125B0000 0x100>;
->>> +               ranges;
->>> +
->>> +               clocks = <&clock 2>, <&clock 305>;
->>> +               clock-names = "xusbxti", "otg";
->>> +               status = "disabled";
->>> +
->>> +               usbphy-sys {
->>> +                       /* USB device and host PHY_CONTROL registers */
->>> +                       reg = <0x10020704 0xc>,
->>> +                             <0x1001021c 0x4>;
->>> +               };
->>> +       };
->>>  };
->>
->> Please add this node after tmu node (satisfies alphabetical order as
->> well as increasing address value)
-> No tmu node in exynos4x12.dtsi in mainline v3.11-rc2 yet, even in
-> Kukjin's branch.
+Sachin Kamat wrote:
+> 
+> With the recent cleanup in Exynos platform code notably commits
+> 17859bec ("ARM: EXYNOS: Do not select legacy Kconfig symbols any
+> more") and b9222210 ("ARM: EXYNOS: Remove mach/gpio.h"), the definition
+> of ARCH_NR_GPIOS got removed. This started causing problems on SoCs like
+> Exynos4412 which have more than the default number of GPIOs. Thus define
+> this number in KConfig file which takes care of current SoC requirements
+> and provides scope for GPIO expanders. Without this patch we get the
+> following
+> errors during boot:
+> 
+> gpiochip_add: gpios 251..258 (gpv0) failed to register
+> samsung-pinctrl 106e0000.pinctrl: failed to register gpio_chip gpv0,
+> error code: -22
+> samsung-pinctrl: probe of 106e0000.pinctrl failed with error -22
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> ---
+> Changes since v2:
+> Changed the default number to 512 to accomodate GPIO exapnders.
+> ---
+>  arch/arm/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ccc388d..b3c4fa4 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1601,6 +1601,7 @@ config ARCH_NR_GPIO
+>  	int
+>  	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+>  	default 512 if SOC_OMAP5
+> +	default 512 if ARCH_EXYNOS
+>  	default 512 if ARCH_KEYSTONE
 
-Sorry, that patch is not yet applied to for-next. I will re-send
-again. You may ignore this comment for now.
++	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 ?
 
--- 
-With warm regards,
-Sachin
+Thanks,
+Kukjin
+
+>  	default 392 if ARCH_U8500
+>  	default 352 if ARCH_VT8500
+> --
+> 1.7.9.5
