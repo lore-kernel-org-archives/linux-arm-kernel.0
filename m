@@ -1,117 +1,70 @@
 From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 25 Jul 2013 00:54:43 +0200
+Date: Thu, 25 Jul 2013 01:11:06 +0200
 Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
  with ARM CPU
-In-Reply-To: <51F02947.7020301@hauke-m.de>
+In-Reply-To: <CAGVrzcYnoN9NnJGvubS7=bVJDk37xSt4BimtvDWghe7OHEWALQ@mail.gmail.com>
 References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
  <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
- <20130723184907.GA6811@ohporter.com>
- <CAGVrzcbA72AYu6J3JXBirQQeTiDH9cJThdBdH=Q=gJtOnqz-AA@mail.gmail.com>
- <20130723192203.GC6811@ohporter.com>
- <51EF1B8C.9020304@broadcom.com>
- <CADjby3WGW6f=1Vdm2kx+Re0KrjFRaC3dQOumpnS6_sp2yb5NfQ@mail.gmail.com>
- <51F02947.7020301@hauke-m.de>
-Message-ID: <20130724225443.GA29801@glitch>
+ <20130719020611.GA4941@glitch> <20130723185733.GB6811@ohporter.com>
+ <CAGVrzcYnoN9NnJGvubS7=bVJDk37xSt4BimtvDWghe7OHEWALQ@mail.gmail.com>
+Message-ID: <20130724231106.GB29801@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 09:21:43PM +0200, Hauke Mehrtens wrote:
-> On 07/24/2013 02:44 AM, Domenico Andreoli wrote:
-> > On Wednesday, July 24, 2013, Hauke Mehrtens <hauke@hauke-m.de
-> > <mailto:hauke@hauke-m.de>> wrote:
-> >> On 07/19/2013 03:36 AM, Domenico Andreoli wrote:
-> >>> On Tue, Jul 16, 2013 at 05:35:21PM +0200, Hauke Mehrtens wrote:
-> >>>> On 07/16/2013 05:20 PM, Thomas Petazzoni wrote:
-> >>>>>
-> >>>>>> diff --git a/arch/arm/mach-bcm53xx/Kconfig
-> > b/arch/arm/mach-bcm53xx/Kconfig
-> >>>>>> new file mode 100644
-> >>>>>> index 0000000..1e16e87
-> >>>>>> --- /dev/null
-> >>>>>> +++ b/arch/arm/mach-bcm53xx/Kconfig
-> >>>>>> @@ -0,0 +1,10 @@
-> >>>>>> +config ARCH_BCM53XX
-> >>>>>> +  bool "Broadcom BCM47XX / BCM53XX ARM SoC"
-> >>>>>
-> >>>>> So the directory is named mach-bcm53xx, but you also handle BCM47xx
-> >>>>> SoCs. This doesn't sound really easy to follow.
-> >>>
-> >>> At the time of the BCM281XX merge we considered that such directories
-> > would
-> >>> mostly contain board files only, being these new entries DT based. Hence
-> >>> the choice of mach-bcm to collect all of them.
-> >>>
-> >>> I think you should then put this stuff there.
+On Tue, Jul 23, 2013 at 08:05:28PM +0100, Florian Fainelli wrote:
+> 2013/7/23 Matt Porter <matt.porter@linaro.org>:
+> > On Fri, Jul 19, 2013 at 04:06:11AM +0200, Domenico Andreoli wrote:
+> >> On Wed, Jul 17, 2013 at 12:08:30AM +0100, Florian Fainelli wrote:
+> >> > Hello,
+> >> >
+> >> > Le mardi 16 juillet 2013 11:14:36 Matt Porter a ?crit :
+> >> > > > +       compatible = "brcm,bcm5301x";
+> >> > >
+> >> > > Ok, this was nagging at me before I went on my very long vacation. I see
+> >> > > the "brcm" vendor prefix as a real consistency problem. I noticed on the
+> >> > > bcm281xx/kona family, we have been using "bcm" which is not logged in
+> >> > > vendor-prefixes.txt as a legitimate prefix. I see that bcm2835 had
+> >> > > already established use of "brcm" before any of the bcm281xx support
+> >> > > came in. Ideally, the vendor prefix should change to "bcm" since every
+> >> > > reference in the family names is BCM. However, if others want the least
+> >> > > amount of churn in making this consistent, we might have to go with
+> >> > > "brcm" across the board.
+> >> >
+> >> > I would like to keep "brcm" here because that is what has been defined as a
+> >> > vendor prefix, and is used beyond the scope of the ARM Linux kernel support
+> >> > even within Broadcom. Maybe it was an oversight, or rather a mistake to let
 > >>
-> >> So you think I should move the file from
-> >> arch/arm/mach-bcm53xx/bcm53xx.c to arch/arm/mach-bcm/bcm53xx.c ?
-> > 
-> > yes
-> > 
-> > this looks more comsistent with the actual soc name:
-> > arch/arm/mach-bcm/bcm530xx.c
-> > 
-> > but I find also acceptable the complete name of the "parent" soc (as I'm
-> > doing with the bcm4760), so: arch/arm/mach-bcm/bcm53010.c
+> >> brcm is the stock ticker. As far as I can search, this is the convention
+> >> for the vendor prefixes.
+> >
+> > No, correlation does not equal causation. The fact that some vendor
+> > prefixes in DT match the stock symbol is by chance of 3-4 character name
+> > being the same...nothing more.
 > 
-> I do not think these Broadcom ARM SoCs (bcm4760, BCM5301X, bcm11351)
-> have more in common than the vendor name, so I do not think it is a good
-> idea to place them all at mach-bcm.
+> That was a bad argument as was later explained to me, I won't use that
+> reason again.
 
-In an ideal DT-only world (as basically is for Broadcom ARM SoCs), whatever
-two or more SoCs share can hopefully modelled in a driver and as such
-would go in the drivers/ subtree. What's left is really SoC specific and,
-again hopefully, very minimal.
+I cited the stock ticker only because IIRC it's the reason my initial
+proposal for bcm has been ditched in favour of brcm when bcm2835 was
+initially proposed.
 
-There should not be any SoC so weird to require a whole subdirectory full
-of that SoC specific stuff. So grouping everything by vendor name looks
-quite appealing to me.
-
-Sharing the same subdir requires people working in it to talk and find
-agreements some more than the sparsely populated subdir did (because there
-is not a single maintainer who owns it). I think this is a big advantage
-Broadcomers can start with right now.
-
+> > It's pretty easy to see that the "ti" vendor prefix has no relation at
+> > all to their TXN symbol so that blows that convention out of the water.
+> > Rather, the prefix is based on somebody's notion of how that vendor's
+> > part are normally referred to. In TI-land, it's TI AM335x or TI OMAP,
+> > never TXN OMAP. :)
+> >
+> > For Broadcom, every part is BCMxxxxx so "bcm" is appropriate.
 > 
-> >> Most (All?) of the Router SoCs in the BCM53XX and BCM47XX line are from
-> >> the same family and they should be supported by the same code, so there
-> >> is no reason to have a bcm47xx.c and a bcm53xx.c.
-> >>
-> >>>> Yes the BCM53XX and BCM47XX SoCs are technically from the same line. I
-> >>>> do not know why there are two different names, probably marketing.
-> >>>>
-> >>>> Earlier versions of these SoC lines (also BCM47XX and BCM53XX) used a
-> >>>> MIPS core and they are supported by arch/mips/bcm47xx/. I use BCM53XX to
-> >>>> not conflict with the MIPS part now. I know this could still cause
-> >>>> problems and people will get confused, but I do not know a better name.
-> >>>
-> >>> I'll throw also BCM476x (bcm4760 and bcm4761) on the table. These are
-> > ARM11,
-> >>> single-core SoCs.
-> >>>
-> >>> Can we agree on a nice naming so that we actually clarify this silliness?
-> >>
-> >> We could name it BCM5301X like it is named the the vendor source code.
-> >> Currently there are the following SoCs of this family available:
-> >> BCM53010, BCM53011, BCM53012, BCM53014, BCM53015, BCM53016, BCM53017,
-> >> BCM53018, BCM4707, BCM4708 and BCM4709.
-> > 
-> > There is not a clear single pattern here, whatever choice won't be 100%
-> > right. Users will need to read some help to pick the right choice.
-> > BCM53010? But mine is not a strong opinion.
-> > 
-> >> Internal there are two different
-> >> chip IDs available 53010 (BCM4707) and 53018 (BCM53018).
-> > 
-> > what do you mean with "internal" here?
-> 
-> There is some register in the chip where the chipid is stored, according
-> to the vendor code these two values are currently possible. This was
-> changed for every generation with the MIPS SoCs, while one generation
-> had some SoCs.
+> It was appropriate before being the "wrong" vendor prefix was
+> allocated, now that "brcm" has been allocated we should stick to it
+> because otherwise we will break existing and on-going DT work.
 
-Only two chipids for all these SoCs? Not that changes anything to me,
-I'm only trying to understand the beast.
+I still prefer bcm to brcm and I find enough evidence that bcm would be
+better in the long term.
 
-> 
-> Hauke
+So if Broadcomers can agree on bcm, now it's still the cheapest time to
+fix in that direction, later will not be better.
+
+my 2c
+dom
