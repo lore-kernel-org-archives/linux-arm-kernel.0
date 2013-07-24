@@ -1,36 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Jul 2013 20:32:03 +0200
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <5977067.8rykRgjgre@flatron>
-References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
- <5977067.8rykRgjgre@flatron>
-Message-ID: <201307242032.03597.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 24 Jul 2013 22:33:20 +0400
+Subject: [PATCH 1/2] ARM i.MX6Q: dts: Enable SPI NOR flash on Phytec
+ phyFLEX-i.MX6 Ouad module
+In-Reply-To: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
+References: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <51F01DF0.3030207@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 July 2013, Tomasz Figa wrote:
-> On Tuesday 23 of July 2013 17:14:20 Alan Stern wrote:
-> > On Tue, 23 Jul 2013, Tomasz Figa wrote:
-> > > Where would you want to have those phy_address arrays stored? There
-> > > are no board files when booting with DT. Not even saying that you
-> > > don't need to use any hacky schemes like this when you have DT that
-> > > nicely specifies relations between devices.
-> > 
-> > If everybody agrees DT has a nice scheme for specifying relations
-> > between devices, why not use that same scheme in the PHY core?
-> 
-> It is already used, for cases when consumer device has a DT node attached. 
-> In non-DT case this kind lookup translates loosely to something that is 
-> being done in regulator framework - you can't bind devices by pointers, 
-> because you don't have those pointers, so you need to use device names.
-> 
+Hello.
 
-Sorry for jumping in to the middle of the discussion, but why does a *new*
-framework even bother defining an interface for board files?
+On 07/24/2013 08:35 PM, Philipp Zabel wrote:
 
-Can't we just drop any interfaces for platform data passing in the phy
-framework and put the burden of adding those to anyone who actually needs
-them? All the platforms we are concerned with here (exynos and omap,
-plus new platforms) can be booted using DT anyway.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>   arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi | 15 +++++++++++++++
+>   1 file changed, 15 insertions(+)
 
-	Arnd
+> diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+> index f5e1981..5113d29 100644
+> --- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+> +++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+> @@ -20,6 +20,20 @@
+>   	};
+>   };
+>
+> +&ecspi3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi3_1>;
+> +	status = "okay";
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio4 24 0>;
+> +
+> +	flash: m25p80 at 0 {
+
+    Quoting the EPAPR spec [1]: "The name of a node should be somewhat 
+generic, reflecting the function of the device and not its precise programming 
+model. If appropriate, the name should be one of the following choices:
+[...]
+    - flash
+[...]
+"
+
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+WBR, Sergei
