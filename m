@@ -1,40 +1,44 @@
-From: shuahkhan@gmail.com (Shuah Khan)
-Date: Wed, 24 Jul 2013 10:30:33 -0600
-Subject: Linux Plumbers ACPI/PM, PCI Microconference
-In-Reply-To: <CAErSpo7TexM5-7Z=8H+B5=49-GzoKd_prn=LbMFZWV9rpdn__A@mail.gmail.com>
-References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
- <CAErSpo7TexM5-7Z=8H+B5=49-GzoKd_prn=LbMFZWV9rpdn__A@mail.gmail.com>
-Message-ID: <CAKocOOOW6+eqb6GTsWLgonQQ7uy5R10t6L_T3jaTN9qSbetVeQ@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 24 Jul 2013 12:30:38 -0400
+Subject: [v8 3/3] ahci_imx: add ahci sata support on imx platforms
+In-Reply-To: <1374646529-24432-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1374646529-24432-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1374646529-24432-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20130724163038.GF20377@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 10:06 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Tue, Jul 16, 2013 at 8:21 PM, Myron Stowe <myron.stowe@gmail.com> wrote:
->> Linux Plumbers has approved an ACPI/PM, PCI microconference. The
->> overview page is here:
->>
->> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
->>
->> We would like to start receiving volunteers for presenting topics of
->> interest.  There is a lot of activity in these subsystems so please
->> respond by submitting presentation or discussion proposals that you
->> would be willing to cover for consideration.  You should also feel
->> free to submit ideas as proposals that others could cover.
->
-> Somebody else privately suggested these ARM/PCI topics:
->
->> -> how it's been cleaned up to be more common across arm-32 machines
->> -> dependencies on dtb
->> -> future use/dependency(s) on ACPI
->> -> hotplug support issues (if any; acpi (host-bridge) vs <whatever ARM uses> ?)
->
-> and I'm interested in those as well.  There seems to be a lot of
-> activity in that area.  In addition, I'm interested in ARM IOMMU
-> support.  I see drivers/iommu/arm-smmu.c, but it's brand-new and I
-> haven't looked at it at all.
->
+On Wed, Jul 24, 2013 at 02:15:29PM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
+> 
+> imx6q contains one Synopsys AHCI SATA controller,
+> But it can't share ahci_platform driver with other
+> controllers.
+> Because there are some misalignments of the generic
+> AHCI controller.
+> The bits definitions of the HBA registers, the Vendor
+> Specific registers, the AHCI PHY clock and the AHCI
+> signals adjustment window(GPR13 register).
+>  - CAP_SSS(bit20) of the HOST_CAP is writable, default
+>  value is '0', should be configured to be '1'
+>  - bit0 (only one AHCI SATA port on imx6q) of the
+>  HOST_PORTS_IMPL should be set to be '1'.(default 0)
+>  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)
+>  should be configured regarding to the frequency of AHB
+>  bus clock.
+>  - Configurations of the AHCI PHY clock, and the signal
+>  parameters of the GPR13
+> 
+> Setup its own ahci sata driver, contained the imx6q specific
+> initialized codes, re-use the generic ahci_platform driver, and
+> keep the generic ahci_platform driver clean as much as possible.
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 
-I second this topic. I am interested in ARM/iommu space also.
+Applied 2-3 to libata/for-3.11-fixes with minor adjustments.
 
-thanks,
--- Shuah
+Thanks.
+
+-- 
+tejun
