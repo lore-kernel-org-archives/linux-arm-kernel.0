@@ -1,74 +1,138 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 24 Jul 2013 12:38:51 -0400
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <51EFFBE1.4090505@ti.com>
-References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
- <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
- <51E83A4F.5080904@ti.com>
- <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
- <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
-Message-ID: <51F0031B.1050307@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 24 Jul 2013 17:47:22 +0100
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value to
+ index into save array
+In-Reply-To: <1374550289-25305-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130724164717.GA4610@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote:
-> On 07/22/2013 11:23 AM, Santosh Shilimkar wrote:
->> To summaries it again, what I understood from Sricharan's proposal,
->>
->> - Setup all the routing at cross-bar probe so that kernel continue to
->> work like normal IRQ controller with cross-bar scope vanishes once
->> the routing is done. Cross-bar does this before any of the devices
->> are created.
->> - Something similar needs to happen for DMA lines as well or for any
->> other event routing in future.
->> - Cross-bar callbacks for device drivers for error paths.
->> (Sricharan, you have to drop these because it doesn't bring any
->> functionality and rather can create a side effects of drivers
->> getting polluted.)
-> Ack.
+On Mon, Jul 22, 2013 at 11:31:17PM -0400, Nicolas Pitre wrote:
+> Currently we hash the MPIDR of the CPU being suspended to determine which
+> entry in the sleep_save_sp array to use. In some situations, such as when
+> we want to resume on another physical CPU, the MPIDR of another CPU should
+> be used instead.
 > 
->>
->> The concern raised on above was instead of fixing the routing at DT
->> statically, doing at the driver probes where the loop-up for IRQ or DMA
->> lines should happen in background transparently on drivers call of
->> request_irq/request_dma_channel etc with cross-bar number as
->> an input to it. Though it will be nice to have
->> such feature, it doesn't bring anything special and brings the
->> notion of these APIs which expect that you know what IRQ and DMA
->> lines you want while calling these.
-> Unfortunately, we do have a constraint without allocating dynamic IRQs - what IP instances should hwmod and dts contain?
-> 
-> If we go with current series of patches[1] [2] for DRA7 dts which assumes default mapping, hence, uart7-10, GPTimers12-16 dont have default irq - hence they dont exist in dts etc.
-> 
-> How would we like to support those with pinctrl approach?
->
-The whole reason the cross-bar being there because all the peripherals
-IRQs can not me routed to the IRQ controller. So You pick up a configuration
-would like to support and stick to it. It will be good to specify all the
-peripheral devices but tsome of them might not have the IRQ/DMA lines
-associated with them because of limited slots on IRQ/DMA controller.
+> So let's use the value of cpu_logical_map(smp_processor_id()) in place
+> of the MPIDR in the suspend path.  This will result in the same index
+> being used as with the previous code unless the caller has modified
+> cpu_logical_map() beforehand.
 
->>
->> Note that mux inputs are pretty much fixed. Its his connection
->> to IRQ controller or DMA controller is what needs to be programmed.
->> So scope is pretty much limited. I felt this requirement is pretty
->> similar to pin-mux and hence thought of it as a viable option.
->>
->> Having said all of above, if there is a better alternative than
->> enhanced pin-mux we surely can do that.
-> We could look at it as a signal mux problem as this thread suggests OR look at it as interrupt distribution problem (which is how it looks like at the face of it).
-Its not interrupt distribution problem but rather setting up the signal
-routing which otherwise generally hardwired in SOC. Hence the pin-control analogy.
-Pinmux also lets you set many possible combinations but we pick one for a board design.
+This only works because we happen to swap MPIDRs in cpu_logical_map
+before we get here, so that cpu_logical_map(smp_processor_id())
+described the post-resume situation for this logical CPU, not the
+current situation.
 
-> That said, maybe a intermediate pinctrl approach might be more pragmatic andless theoretically flexible.
-> an option might be to "statically allocate" default number of interrupts to a domain - example:
-> * GIC IRQ 72->78 allotted to UARTs
-> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
-> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
+We have to swizzle cpu_logical_map() somewhere, and the suspend path is
+just as good as the resume path for that.  But this patch commits us to
+requiring that on the suspend path specifically -- I think that ought to
+be mentioned somewhere.  A comment in the preamble for __cpu_suspend
+would be enough, I think.
+
+Looks like the patch should work though, and it does remove the need to
+read the MPIDR, which is slightly nicer for the non-switcher case.
+
+Cheers
+---Dave
+
 > 
-> Does that sound fair trade off?
-This sounds better. That way we can get all the devices in the DT at least.
-
-Regards,
-Santosh
+> The register allocation in __cpu_suspend is reworked in order to better
+> accommodate the additional argument.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/kernel/sleep.S   | 25 +++++++++++--------------
+>  arch/arm/kernel/suspend.c |  8 +++++---
+>  2 files changed, 16 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> index db1536b8b3..836d10e698 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -55,6 +55,7 @@
+>   * specific registers and some other data for resume.
+>   *  r0 = suspend function arg0
+>   *  r1 = suspend function
+> + *  r2 = MPIDR value used to index into sleep_save_sp
+>   */
+>  ENTRY(__cpu_suspend)
+>  	stmfd	sp!, {r4 - r11, lr}
+> @@ -67,23 +68,19 @@ ENTRY(__cpu_suspend)
+>  	mov	r5, sp			@ current virtual SP
+>  	add	r4, r4, #12		@ Space for pgd, virt sp, phys resume fn
+>  	sub	sp, sp, r4		@ allocate CPU state on stack
+> -	stmfd	sp!, {r0, r1}		@ save suspend func arg and pointer
+> -	add	r0, sp, #8		@ save pointer to save block
+> -	mov	r1, r4			@ size of save block
+> -	mov	r2, r5			@ virtual SP
+>  	ldr	r3, =sleep_save_sp
+> +	stmfd	sp!, {r0, r1}		@ save suspend func arg and pointer
+>  	ldr	r3, [r3, #SLEEP_SAVE_SP_VIRT]
+> -	ALT_SMP(mrc p15, 0, r9, c0, c0, 5)
+> -        ALT_UP_B(1f)
+> -	ldr	r8, =mpidr_hash
+> -	/*
+> -	 * This ldmia relies on the memory layout of the mpidr_hash
+> -	 * struct mpidr_hash.
+> -	 */
+> -	ldmia	r8, {r4-r7}	@ r4 = mpidr mask (r5,r6,r7) = l[0,1,2] shifts
+> -	compute_mpidr_hash	lr, r5, r6, r7, r9, r4
+> -	add	r3, r3, lr, lsl #2
+> +	ALT_SMP(ldr r0, =mpidr_hash)
+> +       ALT_UP_B(1f)
+> +	/* This ldmia relies on the memory layout of the mpidr_hash struct */
+> +	ldmia	r0, {r1, r6-r8}	@ r1 = mpidr mask (r6,r7,r8) = l[0,1,2] shifts
+> +	compute_mpidr_hash	r0, r6, r7, r8, r2, r1
+> +	add	r3, r3, r0, lsl #2
+>  1:
+> +	mov	r2, r5			@ virtual SP
+> +	mov	r1, r4			@ size of save block
+> +	add	r0, sp, #8		@ pointer to save block
+>  	bl	__cpu_suspend_save
+>  	adr	lr, BSYM(cpu_suspend_abort)
+>  	ldmfd	sp!, {r0, pc}		@ call suspend fn
+> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> index 41cf3cbf75..2835d35234 100644
+> --- a/arch/arm/kernel/suspend.c
+> +++ b/arch/arm/kernel/suspend.c
+> @@ -10,7 +10,7 @@
+>  #include <asm/suspend.h>
+>  #include <asm/tlbflush.h>
+>  
+> -extern int __cpu_suspend(unsigned long, int (*)(unsigned long));
+> +extern int __cpu_suspend(unsigned long, int (*)(unsigned long), u32 cpuid);
+>  extern void cpu_resume_mmu(void);
+>  
+>  #ifdef CONFIG_MMU
+> @@ -21,6 +21,7 @@ extern void cpu_resume_mmu(void);
+>  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  {
+>  	struct mm_struct *mm = current->active_mm;
+> +	u32 __mpidr = cpu_logical_map(smp_processor_id());
+>  	int ret;
+>  
+>  	if (!idmap_pgd)
+> @@ -32,7 +33,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  	 * resume (indicated by a zero return code), we need to switch
+>  	 * back to the correct page tables.
+>  	 */
+> -	ret = __cpu_suspend(arg, fn);
+> +	ret = __cpu_suspend(arg, fn, __mpidr);
+>  	if (ret == 0) {
+>  		cpu_switch_mm(mm->pgd, mm);
+>  		local_flush_bp_all();
+> @@ -44,7 +45,8 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  #else
+>  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  {
+> -	return __cpu_suspend(arg, fn);
+> +	u32 __mpidr = cpu_logical_map(smp_processor_id());
+> +	return __cpu_suspend(arg, fn, __mpidr);
+>  }
+>  #define	idmap_pgd	NULL
+>  #endif
+> -- 
+> 1.8.1.2
+> 
