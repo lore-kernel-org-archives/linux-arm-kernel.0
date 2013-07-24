@@ -1,57 +1,46 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 25 Jul 2013 01:22:44 +0200
-Subject: Do we have people interested in device tree janitoring / cleanup?
-In-Reply-To: <CAOesGMj5eyRdE++hJgFV3AJKUGWZEoE7P9_pr_5QBHpJWFCzmQ@mail.gmail.com>
-References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
- <1619688.mith7vb7oh@flatron>
- <CAOesGMj5eyRdE++hJgFV3AJKUGWZEoE7P9_pr_5QBHpJWFCzmQ@mail.gmail.com>
-Message-ID: <2077078.hRKZxaEG2D@flatron>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 24 Jul 2013 16:26:00 -0700
+Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
+In-Reply-To: <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
+References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
+ <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20130724232600.7598.95231@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 of July 2013 16:20:02 Olof Johansson wrote:
-> Hi,
+Quoting Jonathan Austin (2013-07-23 08:42:18)
+> The order of arguments in the call to vco_set() for the ICST clocks appears to
+> have been switched in error, which results in the VCO not being initialised
+> correctly. This in turn stops the integrated LCD on things like Integrator/CP
+> from working correctly.
 > 
-> On Wed, Jul 24, 2013 at 4:15 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > Hi Olof,
-> > 
-> > On Wednesday 24 of July 2013 08:27:13 Olof Johansson wrote:
-> >> Every now and then I come across a binding that's just done
-> >> Wrong(tm),
-> >> merged through a submaintainer tree and hasn't seen proper review --
-> >> if it had, it wouldn't look the way it does. It's something we're
-> >> starting to address now since there's more people stepping up to be
-> >> maintainers, but there's a backlog of bad bindings already merged.
-> >> 
-> >> Often they are produced by translating the platform_data structures
-> >> directly over into device-tree properties without consideration to
-> >> describing the hardware or usual conventions, using key/value pairs
-> >> instead of boolean properties, etc.
-> >> 
-> >> Getting involved in cleaning up these kind of bindings is a great way
-> >> to learn "the ways of device tree" for someone that has interest in
-> >> that.
-> >> 
-> >> Latest find in this area is the Maxim 8925 bindings, that I came
-> >> across since they caused a compile warning on some defconfig. I'll
-> >> post a patch to address the warning but if someone else feels like
-> >> fixing the bindings on top of it that would be appreciated!
-> > 
-> > Care to explain your doubts about max8952 bindings? As far as I
-> > remember it's just a standard single voltage regulator (= generic
-> > regulator bindings) + some device specific properties.
-> > 
-> > Looking at Documentation/devicetree/bindings/regulator/max8952.txt I
-> > don't really see anything worrying...
+> This patch fixes the order and restores the expected functionality.
 > 
-> Documentation/devicetree/bindings/video/backlight/max8925-backlight.txt
-> 
-> But yes, the regulator one looks normal.
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 
-Oh gosh, it's time to sleep. I confused 8925 with 8952... Sorry for the 
-noise and thanks for quick reply. (I'm writing separate reply about 
-janitoring/cleanup itself.)
+Thanks for the fix. Will send out with the next batch.
 
-Best regards,
-Tomasz
+Regards,
+Mike
+
+> ---
+>  drivers/clk/versatile/clk-icst.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
+> index 67ccf4a..f5e4c21 100644
+> --- a/drivers/clk/versatile/clk-icst.c
+> +++ b/drivers/clk/versatile/clk-icst.c
+> @@ -107,7 +107,7 @@ static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
+>  
+>         vco = icst_hz_to_vco(icst->params, rate);
+>         icst->rate = icst_hz(icst->params, vco);
+> -       vco_set(icst->vcoreg, icst->lockreg, vco);
+> +       vco_set(icst->lockreg, icst->vcoreg, vco);
+>         return 0;
+>  }
+>  
+> -- 
+> 1.7.9.5
