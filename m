@@ -1,66 +1,234 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 13:54:25 -0700
-Subject: [PATCH v2 0/9] Move MSM closer to multi-platform
-Message-ID: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 24 Jul 2013 13:54:29 -0700
+Subject: [PATCH v2 4/9] ARM: msm: Remove TMR and TMR0 static mappings
+In-Reply-To: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
+References: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374699274-18388-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are a set of patches that move MSM closer to multi-platform
-but still keep everything compiling. We still have to tackle
-reset and dma, but these patches shouldn't be controversial.
+Nobody is using these mappings so just drop them. of_iomap() in
+the timer driver will take care of it for us. Doing this allows
+us to remove the 8x60 and 8960 iomap files completely.
 
-Rohit Vaswani (1):
-  ARM: msm: Remove unused and unmapped MSM_TLMM_BASE for 8x60
-
-Stephen Boyd (8):
-  ARM: msm: Don't compile __msm_ioremap_caller() unless used
-  ARM: msm: Move debug-macro.S to include/debug
-  ARM: msm: Remove TMR and TMR0 static mappings
-  ARM: msm: Migrate msm_timer to CLOCKSOURCE_OF_DECLARE
-  ARM: msm: Move mach/board.h contents to common.h
-  ARM: msm: Remove devices-iommu.c
-  iommu/msm: Move mach includes to iommu directory
-  ARM: msm: Only compile io.c on platforms that use it
-
- arch/arm/Kconfig                                   |   1 +
- arch/arm/Kconfig.debug                             |   9 +-
- .../mach/debug-macro.S => include/debug/msm.S}     |  32 +-
- arch/arm/mach-msm/Makefile                         |   9 +-
- arch/arm/mach-msm/board-dt-8660.c                  |   4 +-
- arch/arm/mach-msm/board-dt-8960.c                  |   3 +-
- arch/arm/mach-msm/board-halibut.c                  |   1 -
- arch/arm/mach-msm/board-mahimahi.c                 |   2 +-
- arch/arm/mach-msm/board-msm7x30.c                  |   1 -
- arch/arm/mach-msm/board-qsd8x50.c                  |   1 -
- arch/arm/mach-msm/board-sapphire.c                 |   2 +-
- arch/arm/mach-msm/board-trout.c                    |   1 -
- arch/arm/mach-msm/board-trout.h                    |   2 +-
- arch/arm/mach-msm/common.h                         |  18 +-
- arch/arm/mach-msm/devices-iommu.c                  | 912 ---------------------
- arch/arm/mach-msm/devices-msm7x30.c                |   2 +-
- arch/arm/mach-msm/devices-qsd8x50.c                |   2 +-
- arch/arm/mach-msm/include/mach/board.h             |  38 -
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h    |  46 --
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |  53 --
- arch/arm/mach-msm/include/mach/msm_iomap.h         |  17 -
- arch/arm/mach-msm/include/mach/uncompress.h        |  63 --
- arch/arm/mach-msm/io.c                             |  67 +-
- arch/arm/mach-msm/timer.c                          |  17 +-
- drivers/iommu/msm_iommu.c                          |   4 +-
- .../mach/iommu.h => drivers/iommu/msm_iommu.h      |   0
- drivers/iommu/msm_iommu_dev.c                      |   4 +-
- .../iommu/msm_iommu_hw-8xxx.h                      |   0
- drivers/video/msm/msm_fb.c                         |   1 -
- 29 files changed, 93 insertions(+), 1219 deletions(-)
- rename arch/arm/{mach-msm/include/mach/debug-macro.S => include/debug/msm.S} (61%)
- delete mode 100644 arch/arm/mach-msm/devices-iommu.c
- delete mode 100644 arch/arm/mach-msm/include/mach/board.h
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/board-dt-8660.c               |  2 +-
+ arch/arm/mach-msm/board-dt-8960.c               |  2 +-
+ arch/arm/mach-msm/common.h                      |  2 --
+ arch/arm/mach-msm/include/mach/msm_iomap-8960.h | 41 -----------------------
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h | 44 -------------------------
+ arch/arm/mach-msm/include/mach/msm_iomap.h      |  5 ---
+ arch/arm/mach-msm/io.c                          | 26 ---------------
+ 7 files changed, 2 insertions(+), 120 deletions(-)
  delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8960.h
  delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
- delete mode 100644 arch/arm/mach-msm/include/mach/uncompress.h
- rename arch/arm/mach-msm/include/mach/iommu.h => drivers/iommu/msm_iommu.h (100%)
- rename arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h => drivers/iommu/msm_iommu_hw-8xxx.h (100%)
 
+diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
+index 492f5cd..f1d9c82 100644
+--- a/arch/arm/mach-msm/board-dt-8660.c
++++ b/arch/arm/mach-msm/board-dt-8660.c
+@@ -15,6 +15,7 @@
+ #include <linux/of_platform.h>
+ 
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ 
+ #include <mach/board.h>
+ #include "common.h"
+@@ -42,7 +43,6 @@ static const char *msm8x60_fluid_match[] __initdata = {
+ 
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+-	.map_io = msm_map_msm8x60_io,
+ 	.init_machine = msm8x60_dt_init,
+ 	.init_late = msm8x60_init_late,
+ 	.init_time	= msm_dt_timer_init,
+diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
+index bb55309..f930eaf 100644
+--- a/arch/arm/mach-msm/board-dt-8960.c
++++ b/arch/arm/mach-msm/board-dt-8960.c
+@@ -14,6 +14,7 @@
+ #include <linux/of_platform.h>
+ 
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ 
+ #include "common.h"
+ 
+@@ -29,7 +30,6 @@ static const char * const msm8960_dt_match[] __initconst = {
+ 
+ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+-	.map_io = msm_map_msm8960_io,
+ 	.init_time	= msm_dt_timer_init,
+ 	.init_machine = msm_dt_init,
+ 	.dt_compat = msm8960_dt_match,
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index 421cf77..569bd16 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -19,8 +19,6 @@ extern void qsd8x50_timer_init(void);
+ 
+ extern void msm_map_common_io(void);
+ extern void msm_map_msm7x30_io(void);
+-extern void msm_map_msm8x60_io(void);
+-extern void msm_map_msm8960_io(void);
+ extern void msm_map_qsd8x50_io(void);
+ 
+ extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h b/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
+deleted file mode 100644
+index 396958b..0000000
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
++++ /dev/null
+@@ -1,41 +0,0 @@
+-/*
+- * Copyright (C) 2007 Google, Inc.
+- * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+- * Author: Brian Swetland <swetland@google.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- *
+- * The MSM peripherals are spread all over across 768MB of physical
+- * space, which makes just having a simple IO_ADDRESS macro to slide
+- * them into the right virtual location rough.  Instead, we will
+- * provide a master phys->virt mapping for peripherals here.
+- *
+- */
+-
+-#ifndef __ASM_ARCH_MSM_IOMAP_8960_H
+-#define __ASM_ARCH_MSM_IOMAP_8960_H
+-
+-/* Physical base address and size of peripherals.
+- * Ordered by the virtual base addresses they will be mapped at.
+- *
+- * If you add or remove entries here, you'll want to edit the
+- * msm_io_desc array in arch/arm/mach-msm/io.c to reflect your
+- * changes.
+- *
+- */
+-
+-#define MSM8960_TMR_PHYS	0x0200A000
+-#define MSM8960_TMR_SIZE	SZ_4K
+-
+-#define MSM8960_TMR0_PHYS	0x0208A000
+-#define MSM8960_TMR0_SIZE	SZ_4K
+-
+-#endif
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+deleted file mode 100644
+index dede6aa..0000000
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/*
+- * Copyright (C) 2007 Google, Inc.
+- * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+- * Author: Brian Swetland <swetland@google.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- *
+- * The MSM peripherals are spread all over across 768MB of physical
+- * space, which makes just having a simple IO_ADDRESS macro to slide
+- * them into the right virtual location rough.  Instead, we will
+- * provide a master phys->virt mapping for peripherals here.
+- *
+- */
+-
+-#ifndef __ASM_ARCH_MSM_IOMAP_8X60_H
+-#define __ASM_ARCH_MSM_IOMAP_8X60_H
+-
+-/* Physical base address and size of peripherals.
+- * Ordered by the virtual base addresses they will be mapped at.
+- *
+- * MSM_VIC_BASE must be an value that can be loaded via a "mov"
+- * instruction, otherwise entry-macro.S will not compile.
+- *
+- * If you add or remove entries here, you'll want to edit the
+- * msm_io_desc array in arch/arm/mach-msm/io.c to reflect your
+- * changes.
+- *
+- */
+-
+-#define MSM8X60_TMR_PHYS	0x02000000
+-#define MSM8X60_TMR_SIZE	SZ_4K
+-
+-#define MSM8X60_TMR0_PHYS	0x02040000
+-#define MSM8X60_TMR0_SIZE	SZ_4K
+-
+-#endif
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap.h b/arch/arm/mach-msm/include/mach/msm_iomap.h
+index 0b36c42..0e4f491 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap.h
+@@ -45,13 +45,8 @@
+ #include "msm_iomap-7x00.h"
+ #endif
+ 
+-#include "msm_iomap-8x60.h"
+-#include "msm_iomap-8960.h"
+-
+ /* Virtual addresses shared across all MSM targets. */
+ #define MSM_CSR_BASE		IOMEM(0xE0001000)
+-#define MSM_TMR_BASE		IOMEM(0xF0200000)
+-#define MSM_TMR0_BASE		IOMEM(0xF0201000)
+ #define MSM_GPIO1_BASE		IOMEM(0xE0003000)
+ #define MSM_GPIO2_BASE		IOMEM(0xE0004000)
+ 
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 66acb98..c632c87 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -114,32 +114,6 @@ void __init msm_map_qsd8x50_io(void)
+ }
+ #endif /* CONFIG_ARCH_QSD8X50 */
+ 
+-#ifdef CONFIG_ARCH_MSM8X60
+-static struct map_desc msm8x60_io_desc[] __initdata = {
+-	MSM_CHIP_DEVICE(TMR, MSM8X60),
+-	MSM_CHIP_DEVICE(TMR0, MSM8X60),
+-};
+-
+-void __init msm_map_msm8x60_io(void)
+-{
+-	debug_ll_io_init();
+-	iotable_init(msm8x60_io_desc, ARRAY_SIZE(msm8x60_io_desc));
+-}
+-#endif /* CONFIG_ARCH_MSM8X60 */
+-
+-#ifdef CONFIG_ARCH_MSM8960
+-static struct map_desc msm8960_io_desc[] __initdata = {
+-	MSM_CHIP_DEVICE(TMR, MSM8960),
+-	MSM_CHIP_DEVICE(TMR0, MSM8960),
+-};
+-
+-void __init msm_map_msm8960_io(void)
+-{
+-	debug_ll_io_init();
+-	iotable_init(msm8960_io_desc, ARRAY_SIZE(msm8960_io_desc));
+-}
+-#endif /* CONFIG_ARCH_MSM8960 */
+-
+ #ifdef CONFIG_ARCH_MSM7X30
+ static struct map_desc msm7x30_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
