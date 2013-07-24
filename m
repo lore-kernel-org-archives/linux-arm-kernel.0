@@ -1,44 +1,40 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 24 Jul 2013 17:29:43 +0300
-Subject: [PATCHv4 00/33] ARM: OMAP: clock conversion to DT
-In-Reply-To: <51EFE1D4.8090307@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <51EFE1D4.8090307@ti.com>
-Message-ID: <51EFE4D7.10800@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 24 Jul 2013 17:32:32 +0300
+Subject: [PATCH 0/4] Add USB Host support for OMAP5 uevm
+Message-ID: <1374676356-31286-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 05:16 PM, Roger Quadros wrote:
-> On 07/23/2013 10:19 AM, Tero Kristo wrote:
->> Hi,
->>
->> Changes compared to previous version:
->>
->> - Clock init files moved from mach-omap2/ to drivers/clk/omap/
->> - AM33xx support added [patches 15-20]
->> - OMAP3 support added [patches 21-29]
->> - DRA7 APLL support added (thanks Keerthy) [patches 30-33]
->>
->> Test branch on top of 3.11-rc1 available here:
->>
->> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
->> branch: mainline-3.11-rc1-omap-dt-clks
->>
->> Testing done:
->>
->> - boot + suspend tested on OMAP3 beagle C4 (omap3530)
->> - boot + suspend tested on OMAP4 panda ES (omap4460)
->> - boot tested on beagle bone (am335x)
->>
->> A boot test was also executed for DRA7 and OMAP5 on a separate branch
->> (mainline does not have OMAP5 / DRA7 support so far.)
->
-> Thanks to your hints, I was able to get this to work with 3.11-rc1 on omap5 uevm
-> using the following 3 patches. Please include them in your series. Thanks.
+Hi,
 
-Your patches don't apply cleanly to mainline currently, as the omap5 
-base support is still not merged. I deliberately left out the full omap5 
-integration because of that. Lets see how and when the integration 
-proceeds, but I can track your patches meanwhile.
+These patches provide USB host support for the OMAP5 uEVM board.
 
--Tero
+They depend on the OMAP clock tree DT data series by Tero Kristo [1]
+
+In patch 3 we also provide USB PHY clock for Panda. This should make
+the clock alias patch [2] redundant and it should be reverted when
+this series gets in.
+
+[1] - http://thread.gmane.org/gmane.linux.ports.arm.omap/101582
+
+[2] - ARM: OMAP2+: Provide alias to USB PHY clock
+http://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/commit/?h=omap-for-v3.11/fixes&id=741532c4a995be11815cb72d4d7a48f442a22fea
+
+cheers,
+-roger
+
+---
+Roger Quadros (4):
+  ARM: OMAP5: hwmod data: Add USB Host and TLL modules
+  ARM: dts: OMAP5: Add 60MHz clock reference to USB Host module
+  ARM: dts: omap4-panda: Provide USB PHY clock
+  ARM: dts: omap5-uevm: Provide USB PHY clock
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi  |    8 +-
+ arch/arm/boot/dts/omap5-uevm.dts           |    8 +-
+ arch/arm/boot/dts/omap5.dtsi               |    2 +
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  157 ++++++++++++++++++++++++++++
+ 4 files changed, 163 insertions(+), 12 deletions(-)
+
+-- 
+1.7.4.1
