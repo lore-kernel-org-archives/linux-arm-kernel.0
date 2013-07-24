@@ -1,41 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 24 Jul 2013 17:27:38 -0400 (EDT)
-Subject: Requirements for FDT load address on ARM
-In-Reply-To: <1374690705.30195.18.camel@hastur.hellion.org.uk>
-References: <1374677923.6623.194.camel@hastur.hellion.org.uk>
- <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
- <1374690705.30195.18.camel@hastur.hellion.org.uk>
-Message-ID: <alpine.LFD.2.03.1307241625190.15022@syhkavp.arg>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 24 Jul 2013 15:41:26 -0700
+Subject: [PATCH 0/3] MSM gpio fixes
+In-Reply-To: <CACRpkdbOO8fFEx+PxsdJ9F1dqD6V4_RPZThvTufo9+XhhyuHOg@mail.gmail.com>
+References: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
+ <CACRpkdbOO8fFEx+PxsdJ9F1dqD6V4_RPZThvTufo9+XhhyuHOg@mail.gmail.com>
+Message-ID: <20130724224126.GA27678@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Jul 2013, Ian Campbell wrote:
+On Sat, Jul 20, 2013 at 10:54:42PM +0200, Linus Walleij wrote:
+>On Thu, Jul 18, 2013 at 10:07 PM, David Brown <davidb@codeaurora.org> wrote:
+>
+>> Rohit sent these three fixes out on June 18.  I still need a
+>> devicetree ack for the first patch, and would like these to get pulled
+>> in for v3.11
+>>
+>> Rohit Vaswani (3):
+>>   ARM: msm: dts: Fix the gpio register address for msm8960
+>>   drivers: gpio: msm: Fix the error condition for reading ngpio
+>
+>OK for these two...
+>
+>>   ARM: msm: Consolidate gpiomux for older architectures
+>
+>This does not look like a fix? Surely this can wait for v3.12?
 
-> On Wed, 2013-07-24 at 11:24 -0400, Nicolas Pitre wrote:
-> > On Wed, 24 Jul 2013, Ian Campbell wrote:
-> > 
-> > > [apologies if this is a repeat, I don't see it in the archives and at
-> > > least one CC'd recipient (Julien) didn't receive it either. Beasties in
-> > > our email server I expect...]
-> > > 
-> > > Are there any requirements about where the FDT may be loaded by the
-> > > bootloader?
-> > 
-> > It must be located where it is unlikely to be overwritten by the zImage 
-> > decompressor relocating itself.  Same goes for the initrd.
-> 
-> Right. That's a bit hard to determine programmaticaly from a bootloader
-> though :-(
+It fixes compilation.  But, it could also wait for v3.12.
 
-Well... The kernel has to be loaded in the first 128MB of RAM for the 
-automatic RAM location to work.  So you simply have to load the ftd and 
-initrd sequentially above the 128MB mark.  The kernel cannot grow above 
-16MB in size or we lose the ability to link modules without far calls, 
-or 32MB for the kernel itself after wich the kernel itself doesn't link.  
-This means the decompressor will never relocate anything above the 128MB 
-mark in any case.
+David
 
-In practice this limit can even be lowered to 64MB.
-
-
-Nicolas
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
