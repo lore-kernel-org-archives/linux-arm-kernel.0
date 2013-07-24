@@ -1,75 +1,57 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 24 Jul 2013 11:08:01 -0500
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <51ED5C66.1010407@ti.com>
-References: <1374165830-6367-1-git-send-email-r.sricharan@ti.com>
- <1374165830-6367-2-git-send-email-r.sricharan@ti.com>
- <51E83A4F.5080904@ti.com>
- <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
- <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com>
-Message-ID: <51EFFBE1.4090505@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 24 Jul 2013 12:16:59 -0400 (EDT)
+Subject: [PATCH 1/6] ARM: prefetch: remove redundant "cc" clobber
+In-Reply-To: <20130724101950.GG9629@mudshark.cambridge.arm.com>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-2-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307231547010.15022@syhkavp.arg>
+ <20130724101950.GG9629@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1307241205050.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2013 11:23 AM, Santosh Shilimkar wrote:
-> To summaries it again, what I understood from Sricharan's proposal,
->
-> - Setup all the routing at cross-bar probe so that kernel continue to
-> work like normal IRQ controller with cross-bar scope vanishes once
-> the routing is done. Cross-bar does this before any of the devices
-> are created.
-> - Something similar needs to happen for DMA lines as well or for any
-> other event routing in future.
-> - Cross-bar callbacks for device drivers for error paths.
-> (Sricharan, you have to drop these because it doesn't bring any
-> functionality and rather can create a side effects of drivers
-> getting polluted.)
-Ack.
+On Wed, 24 Jul 2013, Will Deacon wrote:
 
->
-> The concern raised on above was instead of fixing the routing at DT
-> statically, doing at the driver probes where the loop-up for IRQ or DMA
-> lines should happen in background transparently on drivers call of
-> request_irq/request_dma_channel etc with cross-bar number as
-> an input to it. Though it will be nice to have
-> such feature, it doesn't bring anything special and brings the
-> notion of these APIs which expect that you know what IRQ and DMA
-> lines you want while calling these.
-Unfortunately, we do have a constraint without allocating dynamic IRQs - 
-what IP instances should hwmod and dts contain?
+> Hi Nicolas,
+> 
+> On Tue, Jul 23, 2013 at 08:48:11PM +0100, Nicolas Pitre wrote:
+> > On Tue, 23 Jul 2013, Will Deacon wrote:
+> > 
+> > > The pld instruction does not affect the condition flags, so don't bother
+> > > clobbering them.
+> > > 
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+> Thanks for reviewing the series, much appreciated.
+> 
+> > You know the legacy reason why the cc clobber was there, right?
+> > It certainly doesn't apply anymore.
+> 
+> I was under the impression that it was due to ancient GCC behaviour and the "cc"
+> was there to prevent re-ordering. For interest, what are the specifics?
 
-If we go with current series of patches[1] [2] for DRA7 dts which 
-assumes default mapping, hence, uart7-10, GPTimers12-16 dont have 
-default irq - hence they dont exist in dts etc.
+In the old days, you had to take care of the predicate for conditional 
+instructions in your inline asm code.  So for example, if you had:
 
-How would we like to support those with pinctrl approach?
+	if (foo)
+		inline asm ("mov %0, #1" : "=r" (bar));
 
->
-> Note that mux inputs are pretty much fixed. Its his connection
-> to IRQ controller or DMA controller is what needs to be programmed.
-> So scope is pretty much limited. I felt this requirement is pretty
-> similar to pin-mux and hence thought of it as a viable option.
->
-> Having said all of above, if there is a better alternative than
-> enhanced pin-mux we surely can do that.
-We could look at it as a signal mux problem as this thread suggests OR 
-look at it as interrupt distribution problem (which is how it looks like 
-at the face of it). That said, maybe a intermediate pinctrl approach 
-might be more pragmatic and less theoretically flexible.
-an option might be to "statically allocate" default number of interrupts 
-to a domain - example:
-* GIC IRQ 72->78 allotted to UARTs
-* pinctrl mapping provided for those but only 6 can be used (rest are 
-marked status="disabled" as default) at any given time (choice of 
-pinctrl option determines GIC interrupt line to use)
-* All modules will have a pinctrl definition to have a mapping - to 
-avoid bootloader overriding default cross bar setting in ways 
-un-expected by kernel.
+That wouldn't work most of the time because even if the if condition was 
+false, gcc would not branch over the inline asm code but expect you to 
+take care of the condition code.  That means the above needed to be 
+written as:
 
-Does that sound fair trade off?
+	if (foo)
+		inline asm ("mov%? %0, #1" : "=r" (bar));
 
-[1] http://marc.info/?l=linux-omap&m=137335524702155&w=2
-[2] http://marc.info/?l=linux-omap&m=137335522802144&w=2
--- 
-Regards,
-Nishanth Menon
+Because having %? added all over the place was cumbersome, the 
+alternative was to add "cc" to the clobber list so gcc would then branch 
+across the inline asm when the condition is false.
+
+But of course many people forgot about those subtle details quite often, 
+and then gcc was changed so inline asm was made non predicated.
+
+
+Nicolas
