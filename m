@@ -1,40 +1,33 @@
 From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 24 Jul 2013 17:18:52 +0100
-Subject: [PATCH 2/3] clocksource: Add missing dependency on CONFIG_OF for
- ARM_ARCH_TIMER
+Date: Wed, 24 Jul 2013 17:18:53 +0100
+Subject: [PATCH 3/3] ARM: arch_timer: Add missing include for of_* functions
 In-Reply-To: <1374682733-7416-1-git-send-email-jonathan.austin@arm.com>
 References: <1374682733-7416-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1374682733-7416-3-git-send-email-jonathan.austin@arm.com>
+Message-ID: <1374682733-7416-4-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialisation of the ARM Arch timer requires data from the DT. There is no
-fallback initialisation method and hence selecting ARM_ARCH_TIMER without OF
-makes little sense.
-
-Furthermore, doing so causes a build error because the of_* stubs for
-!CONFIG_OF do not extend to all of the functions being used by this driver,
-and will not be extended unless there are valid use-cases for them to be
-(this is not a valid case).
+The arch timer code uses a bunch of of_* functions that are defined in
+linux/of.h. Currently this header is not included but the functions are
+available elsewise.
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/clocksource/Kconfig |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/clocksource/arm_arch_timer.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index b7b9b04..4348902 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -72,7 +72,8 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index ffadd83..857a196 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -15,6 +15,7 @@
+ #include <linux/cpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
++#include <linux/of.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
  
- config ARM_ARCH_TIMER
- 	bool
--	select CLKSRC_OF if OF
-+	depends on OF
-+	select CLKSRC_OF
- 
- config ARM_GLOBAL_TIMER
- 	bool
 -- 
 1.7.9.5
