@@ -1,71 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 24 Jul 2013 14:17:07 -0400
-Subject: OMAP4430 SDP boot issues.. (Was Re: OMAP2430 SDP boot broken
- after Linus' rmk merge)
-In-Reply-To: <20130724172321.GC21614@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com> <20130724145237.GB21614@n2100.arm.linux.org.uk>
- <51EFF571.3070106@ti.com> <20130724172321.GC21614@n2100.arm.linux.org.uk>
-Message-ID: <51F01A23.2060502@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 24 Jul 2013 14:19:24 -0400
+Subject: Location for a kind of GPIO bus driver
+In-Reply-To: <20130723151834.GJ9916@kw.sim.vm.gnt>
+References: <20130723151834.GJ9916@kw.sim.vm.gnt>
+Message-ID: <20130724181924.GI19736@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 July 2013 01:23 PM, Russell King - ARM Linux wrote:
-> On Wed, Jul 24, 2013 at 11:40:33AM -0400, Santosh Shilimkar wrote:
->> On Wednesday 24 July 2013 10:52 AM, Russell King - ARM Linux wrote:
->>> I also continue to be disappointed by the lack of things working on the
->>> 4430 - it's been a number of years now and _still_ the on-board LCDs do
->>> not work.  People have tried to blame that on hardware faults and the
->>> like, but they're just being idiotic when they say stuff like that.  It
->>> can't be hardware faults when the kernel supplied with the board is able
->>> to make them work to the extent that userspace can play back video on all
->>> three output devices simultaneously, without hiccup or any imperfection.
->>> I don't know whether it's just that the backlight support isn't working
->>> or what - because any information on the 4430 seems to be a tightly
->>> controlled secret that only a few select people are permitted to know
->>> about.  As far as I'm concerned, much of the hardware is a black box to
->>> me.
->>>
->> On the display related issues, Tomi and Archit have been sorting out
->> issue but am not sure about the current state. If the pre-built binaries
->> video playback works means your hardware seems to be fine.
+On Tue, Jul 23, 2013 at 05:18:34PM +0200, Simon Guinot wrote:
+> Hi,
 > 
-> Just let me be absolutely crystal clear about this: the on-board LCDs
-> have _never_ worked with a mainline kernel, but they did work with the
-> kernel which originally came with the board with the original 4430 SoC.
-> I can right now put the original 4430 SoC back on the board and boot
-> using the kernel which is still on the SD card and they will work.
+> I am currently working on converting the LED driver leds-netxbig to DT.
+> Doing so, I am also considering to move the GPIO extension bus functions
+> (which are currently parts of leds-netxbig) into a separate driver.
 > 
-> Even with the original 4430 SoC and mainline kernels, they have never
-> worked.
+> On the LaCie "Big Network" board family (netxbig), the LEDs are
+> controlled by a CPLD. In turn, the CPLD can be configured (mostly the
+> LEDs modes) through a kind of parallel GPIO bus, called GPIO extension
+> bus. Two registers (address and data) are exposed. Each of them is made
+> up of several GPIOs. An extra GPIO is used to notify the CPLD that the
+> registers have been updated. The leds-netxbig driver uses some dedicated
+> functions (prefixed by "gpio_ext_") to handle the GPIO bus extension.
 > 
-> I tried it back and forth several times, but even with this, the
-> explanation was always "your hardware must be faulty".  And then the wrong
-> voltage levels was found which was preventing the LCD modules from even
-> being recognised... but still, no sign of life on the LCD panels.
-> 
-> It may be that there's some error in the kernel configuration I'm building.
-> I don't know, because I have _no_ idea what hardware is involved in
-> bringing the LCDs online.  Like I said above, the 4430SDP board is just
-> a black box.  I am totally reliant on others telling me what the right
-> config options are supposed to be and fixing problems when things don't
-> work.
-> 
-> With the lack of information on this board, all I can do when things don't
-> work is whinge and moan at people.  I am powerless to debug the problems
-> myself, even if they're a simple misconfiguration.
-> 
-> Is there information available on the 4430SDP?  Is there any reason I
-> can't have access to it?
-> 
-I haven't come across the information which is available on the web.
-Let me check if there are schematics which i can send across to
-you.
+> On the latest "Big Network" boards, this bus is also used to enable the
+> PM wakeup sources: the CPLD can be asked to keep powered some devices
+> (as the RTC or the Ethernet PHY) while the board is down. I think it
+> could be nice to expose this feature to the userland. That's why I am
+> thinking about moving the GPIO extension bus support into a separate
+> driver. The problem is that I can't find a proper location for a such
+> driver. AFAIK, it doesn't fit with anything existing supported by Linux.
+> Maybe I should consider drivers/bus ? Or even drivers/misc ?
 
-Regards,
-Santosh
+iiuc, the CPLD is more of gpio multiplexer/expander.  Have you seen
+
+  66bcb58 arm: mvebu: enable gpio expander over i2c on Mirabox platform
+
+?  And the corresponding driver, drivers/gpio/gpio-pca953x.c?
+
+I would try drivers/gpio.  If there are complaints, it should be trivial
+to move it in a new version of the series.
+
+Is there any reason why the new capabilities in the "Big Network" boards
+couldn't be covered by gpio-regulator?
+
+thx,
+
+Jason.
