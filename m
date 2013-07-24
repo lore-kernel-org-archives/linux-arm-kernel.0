@@ -1,33 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Jul 2013 11:20:34 +0100
-Subject: [PATCH v2 3/4] Documentation: DT: Add DSPI driver
-In-Reply-To: <1374643943-3324-4-git-send-email-b44548@freescale.com>
-References: <1374643943-3324-1-git-send-email-b44548@freescale.com>
- <1374643943-3324-4-git-send-email-b44548@freescale.com>
-Message-ID: <20130724102034.GA9858@sirena.org.uk>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 24 Jul 2013 15:39:15 +0530
+Subject: [PATCH Resend 1/1] clk: exynos4: Add clock entries for TMU
+Message-ID: <1374660555-17429-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 01:32:22PM +0800, Chao Fu wrote:
+Added clock entries for thermal management unit (TMU) for
+Exynos4 SoCs.
 
-Please make sure this document is word wrapped to less than 80 columns.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+Resending this (after rebasing) based on the below discussion:
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
 
-> +-dspi,ctar-dbr : Double baud rate
-> +Doubles the effective baud rate of the Serial Communications Clock (SCK). This field is used only in
+Previous version:
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/18081
+---
+ .../devicetree/bindings/clock/exynos4-clock.txt    |    1 +
+ drivers/clk/samsung/clk-exynos4.c                  |    4 +++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-> +-dspi,ctar-pbr : Baud Rate Prescaler
-> +	0: Baud Rate Prescaler value is 2.
-> +	1: Baud Rate Prescaler value is 3.
-> +	2: Baud Rate Prescaler value is 5.
-> +	3: Baud Rate Prescaler value is 7.
-
-Why do these properties need to be set in DT?  They appears to be just
-setting the clock rate for the bus so I'd expect them to be configured
-based on that rather than manually specified.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130724/6eda3df5/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+index 14d5c2a..c6bf8a6 100644
+--- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
++++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+@@ -236,6 +236,7 @@ Exynos4 SoC and this is specified where applicable.
+   spi0_isp_sclk       380     Exynos4x12
+   spi1_isp_sclk       381     Exynos4x12
+   uart_isp_sclk       382     Exynos4x12
++  tmu_apbif           383
+ 
+ 		[Mux Clocks]
+ 
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 75635eb..cee297d 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -169,7 +169,7 @@ enum exynos4_clks {
+ 	gicisp, smmu_isp, smmu_drc, smmu_fd, smmu_lite0, smmu_lite1, mcuctl_isp,
+ 	mpwm_isp, i2c0_isp, i2c1_isp, mtcadc_isp, pwm_isp, wdt_isp, uart_isp,
+ 	asyncaxim, smmu_ispcx, spi0_isp, spi1_isp, pwm_isp_sclk, spi0_isp_sclk,
+-	spi1_isp_sclk, uart_isp_sclk,
++	spi1_isp_sclk, uart_isp_sclk, tmu_apbif,
+ 
+ 	/* mux clocks */
+ 	mout_fimc0 = 384, mout_fimc1, mout_fimc2, mout_fimc3, mout_cam0,
+@@ -814,6 +814,7 @@ static struct samsung_gate_clock exynos4210_gate_clks[] __initdata = {
+ 	GATE_A(keyif, "keyif", "aclk100", E4210_GATE_IP_PERIR, 16, 0, 0, "keypad"),
+ 	GATE_DA(sclk_fimd1, "exynos4-fb.1", "sclk_fimd1", "div_fimd1",
+ 			E4210_SRC_MASK_LCD1, 0, CLK_SET_RATE_PARENT, 0, "sclk_fimd"),
++	GATE(tmu_apbif, "tmu_apbif", "aclk100", E4210_GATE_IP_PERIR, 17, 0, 0),
+ };
+ 
+ /* list of gate clocks supported in exynos4x12 soc */
+@@ -915,6 +916,7 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+ 	GATE(spi1_isp, "spi1_isp", "aclk200", E4X12_GATE_ISP1, 13,
+ 			CLK_IGNORE_UNUSED, 0),
+ 	GATE(g2d, "g2d", "aclk200", GATE_IP_DMC, 23, 0, 0),
++	GATE(tmu_apbif, "tmu_apbif", "aclk100", E4X12_GATE_IP_PERIR, 17, 0, 0),
+ };
+ 
+ /*
+-- 
+1.7.9.5
