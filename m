@@ -1,22 +1,36 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Wed, 24 Jul 2013 19:32:09 +0100
-Subject: Requirements for FDT load address on ARM
-In-Reply-To: <20130724171826.GX11072@mudshark.cambridge.arm.com>
-References: <1374677923.6623.194.camel@hastur.hellion.org.uk>
- <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
- <20130724171826.GX11072@mudshark.cambridge.arm.com>
-Message-ID: <1374690729.30195.21.camel@hastur.hellion.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Jul 2013 20:32:03 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <5977067.8rykRgjgre@flatron>
+References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
+ <5977067.8rykRgjgre@flatron>
+Message-ID: <201307242032.03597.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-07-24 at 18:18 +0100, Will Deacon wrote:
-> FWIW, you could have a look at what I do in kvmtool. It's not perfect, but
-> I couldn't come up with anything better:
+On Tuesday 23 July 2013, Tomasz Figa wrote:
+> On Tuesday 23 of July 2013 17:14:20 Alan Stern wrote:
+> > On Tue, 23 Jul 2013, Tomasz Figa wrote:
+> > > Where would you want to have those phy_address arrays stored? There
+> > > are no board files when booting with DT. Not even saying that you
+> > > don't need to use any hacky schemes like this when you have DT that
+> > > nicely specifies relations between devices.
+> > 
+> > If everybody agrees DT has a nice scheme for specifying relations
+> > between devices, why not use that same scheme in the PHY core?
 > 
-> https://git.kernel.org/cgit/linux/kernel/git/will/kvmtool.git/tree/tools/kvm/arm/fdt.c?h=kvmtool/master
+> It is already used, for cases when consumer device has a DT node attached. 
+> In non-DT case this kind lookup translates loosely to something that is 
+> being done in regulator framework - you can't bind devices by pointers, 
+> because you don't have those pointers, so you need to use device names.
 > 
-> (see the load_flat_binary function)
 
-Thanks, it's most probably a good idea for us to do the same thing.
+Sorry for jumping in to the middle of the discussion, but why does a *new*
+framework even bother defining an interface for board files?
 
-Ian.
+Can't we just drop any interfaces for platform data passing in the phy
+framework and put the burden of adding those to anyone who actually needs
+them? All the platforms we are concerned with here (exynos and omap,
+plus new platforms) can be booted using DT anyway.
+
+	Arnd
