@@ -1,41 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 25 Jul 2013 19:14:16 +0400
-Subject: [PATCH v2 1/3] ARM: shmobile: marzen: Switch to DT_MACHINE_START
-In-Reply-To: <1374718423-24230-2-git-send-email-horms+renesas@verge.net.au>
-References: <1374718423-24230-1-git-send-email-horms+renesas@verge.net.au>
- <1374718423-24230-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <51F140C8.8070802@cogentembedded.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 25 Jul 2013 12:14:25 +0100
+Subject: [RFC PATCH 2/3] ARM: vexpress: tc2: disable GIC CPU IF in
+ tc2_pm_suspend
+In-Reply-To: <1374750866-750-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1374750866-750-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1374750866-750-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+To prevent cores from exiting wfi when they are about to be shut down
+the GIC CPU IF must be disabled so that the GIC CPU IF IRQ output line
+is not asserted to the cores. wfi completion must be prevented since,
+in absence of coordinating HW logic, if the power controller receives
+a standbywfi signal but in the meantime the processor restarts executing
+owing to a pending IRQ, the core might be reset when running in a
+non-quiescent state (eg with pending load/store transactions)
 
-On 25-07-2013 6:13, Simon Horman wrote:
+Raw GIC distributor IRQ signals are routed to the power controller, that
+is capable of taking core out of reset on pending IRQs even if their GIC
+CPU IF is disabled, thus keeping the normal wfi behaviour.
 
-> From: Magnus Damm <damm@opensource.se>
+GIC CPU IF is restored upon CPU wake-up by the respective MCPM API
+consumers (ie CPU idle driver and suspend to RAM thread).
 
-    Don't think it makes sense to keep Magnus as an author with so many of 
-your added changes. But well, it's your decision...
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/mach-vexpress/tc2_pm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> Convert the marzen board to use DT_MACHINE_START. With this in
-> place all mach-shmobile boards use DT_MACHINE_START. Also, this
-> makes it possible for the r8a7779 SMP code to use DT for CPUs.
-
-> So appended DTB is the way forward on this board.
-
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-> v2 [Simon Horman]
-> * Select USE_OF in Kconfig
-> * Provide dt_compat in DT_MACHINE_START
-> * Provide r8a7779-marzen dts
-
-> v1 [Magnus Damm]
-> ---
->   arch/arm/boot/dts/Makefile            |  1 +
->   arch/arm/boot/dts/r8a7779-marzen.dts  | 27 +++++++++++++++++++++++++++
-
-    Perhaps arch/arm/boot/dts/ changes should be put into a separate patch?
-
-WBR, Sergei
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index dfb55d4..3303ac6 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -16,6 +16,7 @@
+ #include <linux/kernel.h>
+ #include <linux/spinlock.h>
+ #include <linux/errno.h>
++#include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/mcpm.h>
+ #include <asm/proc-fns.h>
+@@ -211,6 +212,7 @@ static void tc2_pm_suspend(u64 residency)
+ 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+ 	ve_spc_set_resume_addr(cluster, cpu, virt_to_phys(mcpm_entry_point));
++	gic_cpu_if_down();
+ 	tc2_pm_down(residency);
+ }
+ 
+-- 
+1.8.2.2
