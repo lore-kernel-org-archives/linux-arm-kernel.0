@@ -1,131 +1,74 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 17:43:38 -0700
-Subject: [PATCH v1 10/14] clk: msm: Add support for MSM8960's multimedia clock
- controller (MMCC)
+Date: Wed, 24 Jul 2013 17:43:35 -0700
+Subject: [PATCH v1 07/14] clk: msm: Add support for branches/gate clocks
 In-Reply-To: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
 References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1374713022-6049-11-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374713022-6049-8-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Fill in the data and wire up the multimedia clock controller to
-the MSM clock driver. This should allow multimedia device drivers
-to control their clocks on 8960 based platforms.
 
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/clock/qcom,mmcc.txt        |  38 ++++++
- drivers/clk/msm/Kconfig                            |   8 ++
- drivers/clk/msm/Makefile                           |   1 +
- drivers/clk/msm/core.c                             |   3 +
- drivers/clk/msm/internal.h                         |   1 +
- drivers/clk/msm/mmcc-8960.c                        | 142 +++++++++++++++++++++
- 6 files changed, 193 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,mmcc.txt
- create mode 100644 drivers/clk/msm/mmcc-8960.c
+ Documentation/devicetree/bindings/clock/msm.txt |  28 ++++
+ drivers/clk/msm/Makefile                        |   1 +
+ drivers/clk/msm/clk-branch.c                    | 190 ++++++++++++++++++++++++
+ drivers/clk/msm/clk-branch.h                    |  48 ++++++
+ 4 files changed, 267 insertions(+)
+ create mode 100644 drivers/clk/msm/clk-branch.c
+ create mode 100644 drivers/clk/msm/clk-branch.h
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,mmcc.txt b/Documentation/devicetree/bindings/clock/qcom,mmcc.txt
-new file mode 100644
-index 0000000..e06577e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/qcom,mmcc.txt
-@@ -0,0 +1,38 @@
-+MSM Multimedia Clock Controller Binding
-+-----------------------------------------
+diff --git a/Documentation/devicetree/bindings/clock/msm.txt b/Documentation/devicetree/bindings/clock/msm.txt
+index f4595fa..6840398 100644
+--- a/Documentation/devicetree/bindings/clock/msm.txt
++++ b/Documentation/devicetree/bindings/clock/msm.txt
+@@ -69,3 +69,31 @@ Example:
+ 		clocks = <&pxo>, <&pll2>, <&pll8>;
+ 	};
+ 
++CXC Binding
++-----------
 +
-+Required properties :
-+- compatible : shall contain at least "qcom,mmcc" and only one of the
-+	       following:
-+
-+			"qcom,mmcc-8660"
-+			"qcom,mmcc-8960"
-+
-+- reg : shall contain base register location and length
-+- clocks : shall contain clocks supplied by the clock controller
++Required properties:
++- compatible : shall be "qcom,cxc-clock".
++- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : from common clock binding; shall be set to the source being gated
 +
 +Example:
-+	clock-controller at 4000000 {
-+		compatible = "qcom,mmcc-8960", "qcom,mmcc";
-+		reg = <0x4000000 0x1000>;
-+
-+		clocks {
-+			pll2: pll2 {
-+				#clock-cells = <0>;
-+				compatible = "qcom,pll";
-+				clocks = <&pxo>;
-+			};
-+
-+			mdp_rcg: mdp_rcg {
-+				#clock-cells = <0>;
-+				compatible = "qcom,mn8-dyn-clock";
-+				clocks = <&pxo>, <&pll2>, <&vpll8>;
-+			};
-+
-+			mdp_cxc: mdp_cxc {
-+				#clock-cells = <0>;
-+				compatible = "qcom,cxc-clock";
-+				clocks = <&mdp_rcg>;
-+			};
-+		};
++	gsbi5_uart_clk: gsbi5_uart_cxc {
++		#clock-cells = <0>;
++		compatible = "qcom,cxc-clock";
++		clocks = <&gsbi5_uart_rcg>;
 +	};
-diff --git a/drivers/clk/msm/Kconfig b/drivers/clk/msm/Kconfig
-index 3eaffb6..6147380 100644
---- a/drivers/clk/msm/Kconfig
-+++ b/drivers/clk/msm/Kconfig
-@@ -11,4 +11,12 @@ config MSM_GCC_8960
- 	  Say Y if you want to use peripheral devices such as UART, SPI,
- 	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
- 
-+config MSM_MMCC_8960
-+	bool "MSM8960 Multimedia Clock Controller"
-+	select MSM_GCC_8960
-+	help
-+	  Support for the multimedia clock controller on msm8960 devices.
-+	  Say Y if you want to support multimedia devices such as display,
-+	  graphics, video encode/decode, camera, etc.
 +
- endif
++CXC With Hardware Gating Binding
++--------------------------------
++
++Required properties:
++- compatible : shall be "qcom,cxc-hg-clock".
++- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : from common clock binding; shall be set to the source being gated
++
++	gsbi5_uart_ahb: gsbi5_uart_ahb {
++		#clock-cells = <0>;
++		compatible = "qcom,cxc-hg-clock";
++		clocks = <&cfpb_clk>;
++	};
 diff --git a/drivers/clk/msm/Makefile b/drivers/clk/msm/Makefile
-index c785943..ae199f5 100644
+index fb78ac9..e1cee29 100644
 --- a/drivers/clk/msm/Makefile
 +++ b/drivers/clk/msm/Makefile
-@@ -8,3 +8,4 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
- clk-msm-$(CONFIG_COMMON_CLK_MSM) += core.o
- 
- clk-msm-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
-+clk-msm-$(CONFIG_MSM_MMCC_8960) += mmcc-8960.o
-diff --git a/drivers/clk/msm/core.c b/drivers/clk/msm/core.c
-index b8e702b..4e8b8d0 100644
---- a/drivers/clk/msm/core.c
-+++ b/drivers/clk/msm/core.c
-@@ -176,6 +176,9 @@ static const struct of_device_id msm_cc_match_table[] = {
- #ifdef CONFIG_MSM_GCC_8960
- 	{ .compatible = "qcom,gcc-8960", .data = &msm_gcc_8960_matches },
- #endif
-+#ifdef CONFIG_MSM_MMCC_8960
-+	{ .compatible = "qcom,mmcc-8960", .data = &msm_mmcc_8960_matches },
-+#endif
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, msm_cc_match_table);
-diff --git a/drivers/clk/msm/internal.h b/drivers/clk/msm/internal.h
-index b0ffda7..45435a8 100644
---- a/drivers/clk/msm/internal.h
-+++ b/drivers/clk/msm/internal.h
-@@ -22,5 +22,6 @@ struct msm_clk_match {
- };
- 
- extern const struct msm_clk_match msm_gcc_8960_matches;
-+extern const struct msm_clk_match msm_mmcc_8960_matches;
- 
- #endif
-diff --git a/drivers/clk/msm/mmcc-8960.c b/drivers/clk/msm/mmcc-8960.c
+@@ -3,3 +3,4 @@ obj-$(CONFIG_COMMON_CLK_MSM) += clk-msm.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
++clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
+diff --git a/drivers/clk/msm/clk-branch.c b/drivers/clk/msm/clk-branch.c
 new file mode 100644
-index 0000000..e7b7867
+index 0000000..ff2e599
 --- /dev/null
-+++ b/drivers/clk/msm/mmcc-8960.c
-@@ -0,0 +1,142 @@
++++ b/drivers/clk/msm/clk-branch.c
+@@ -0,0 +1,190 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -139,135 +82,237 @@ index 0000000..e7b7867
 + * GNU General Public License for more details.
 + */
 +
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
 +#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/device.h>
 +
-+#include "internal.h"
-+#include "clk-pll.h"
-+#include "clk-rcg.h"
 +#include "clk-branch.h"
 +
-+static struct pll_desc pll2_desc = {
-+	.l_reg = 0x320,
-+	.m_reg = 0x324,
-+	.n_reg = 0x328,
-+	.config_reg = 0x32c,
-+	.mode_reg = 0x31c,
-+	.status_reg = 0x334,
-+	.status_bit = 16,
++/**
++ * struct clk_branch - gating clock with status bit and dynamic hardware gating
++ *
++ * @ctl_reg: clock control register
++ * @ctl_bit: ORed with @ctl_reg to enable the clock
++ * @hwcg_reg: dynamic hardware clock gating register
++ * @hwcg_bit: ORed with @hwcg_reg to enable dynamic hardware clock gating
++ * @halt_reg: halt register
++ * @halt_bit: ANDed with @halt_reg to test for clock halted
++ * @halt_check: type of halt checking to perform
++ * @hw: handle between common and hardware-specific interfaces
++ * @lock: register lock
++ *
++ * Clock which can gate its output.
++ */
++struct clk_branch {
++	void __iomem	*ctl_reg;
++	void __iomem	*hwcg_reg;
++	void __iomem	*halt_reg;
++
++	u8		ctl_bit;
++	u8		hwcg_bit;
++	u8		halt_bit;
++	u8		halt_check;
++
++	struct clk_hw	hw;
++	spinlock_t	*lock;
 +};
 +
-+#define PXO	0
-+#define PLL2	1
-+#define PLL8	2
++#define to_clk_branch(_hw) container_of(_hw, struct clk_branch, hw)
 +
-+static u8 mmcc_pxo_pll2_pll8_map[] = {
-+	[PXO]	= 0,
-+	[PLL2]	= 1,
-+	[PLL8]	= 2,
++static bool clk_branch_is_halted(const struct clk_branch *br)
++{
++	bool invert = (br->halt_check == BRANCH_HALT_ENABLE);
++	u32 status_bit = readl_relaxed(br->halt_reg) & BIT(br->halt_bit);
++	return invert ? !status_bit : status_bit;
++}
++
++static bool clk_branch_in_hwcg_mode(const struct clk_branch *br)
++{
++	if (!br->hwcg_reg)
++		return 0;
++
++	return !!(readl_relaxed(br->hwcg_reg) & BIT(br->hwcg_bit));
++}
++
++static int clk_branch_wait(const struct clk_branch *br, bool enabling)
++{
++	bool voted = br->halt_check & BRANCH_VOTED;
++	const char *name = __clk_get_name(br->hw.clk);
++
++	/* Skip checking halt bit if the clock is in hardware gated mode */
++	if (clk_branch_in_hwcg_mode(br))
++		return 0;
++
++	if (br->halt_check == BRANCH_HALT_DELAY || (!enabling && voted)) {
++		udelay(10);
++	} else if (br->halt_check == BRANCH_HALT_ENABLE ||
++		   br->halt_check == BRANCH_HALT ||
++		   (enabling && voted)) {
++		int count = 200;
++
++		while (count-- > 0) {
++			if (clk_branch_is_halted(br) == !enabling)
++				return 0;
++			udelay(1);
++		}
++		WARN("%s status stuck at 'o%s'", name, enabling ? "ff" : "n");
++		return -EBUSY;
++	}
++	return 0;
++}
++
++static int clk_branch_toggle(const struct clk_hw *hw, bool en)
++{
++	struct clk_branch *br = to_clk_branch(hw);
++	unsigned long flags;
++	u32 val;
++
++	spin_lock_irqsave(br->lock, flags);
++
++	val = readl_relaxed(br->ctl_reg);
++	if (en)
++		val |= BIT(br->ctl_bit);
++	else
++		val &= ~BIT(br->ctl_bit);
++	writel(val, br->ctl_reg);
++
++	spin_unlock_irqrestore(br->lock, flags);
++
++	return clk_branch_wait(br, en);
++}
++
++static int clk_branch_enable(struct clk_hw *hw)
++{
++	return clk_branch_toggle(hw, true);
++}
++
++static void clk_branch_disable(struct clk_hw *hw)
++{
++	clk_branch_toggle(hw, false);
++}
++
++static int clk_branch_is_enabled(struct clk_hw *hw)
++{
++	struct clk_branch *br = to_clk_branch(hw);
++	u32 val;
++
++	val = readl_relaxed(br->ctl_reg);
++	val &= BIT(br->ctl_bit);
++
++	return val ? 1 : 0;
++}
++
++static const struct clk_ops clk_branch_ops = {
++	.enable = clk_branch_enable,
++	.is_enabled = clk_branch_is_enabled,
++	.disable = clk_branch_disable,
 +};
 +
-+static struct freq_tbl clk_tbl_mdp[] = {
-+	{   9600000, PLL8, 0, 1, 40 },
-+	{  13710000, PLL8, 0, 1, 28 },
-+	{  27000000, PXO,  0, 0,  0 },
-+	{  29540000, PLL8, 0, 1, 13 },
-+	{  34910000, PLL8, 0, 1, 11 },
-+	{  38400000, PLL8, 0, 1, 10 },
-+	{  59080000, PLL8, 0, 2, 13 },
-+	{  76800000, PLL8, 0, 1,  5 },
-+	{  85330000, PLL8, 0, 2,  9 },
-+	{  96000000, PLL8, 0, 1,  4 },
-+	{ 128000000, PLL8, 0, 1,  3 },
-+	{ 160000000, PLL2, 0, 1,  5 },
-+	{ 177780000, PLL2, 0, 2,  9 },
-+	{ 200000000, PLL2, 0, 1,  4 },
-+	{ 228571000, PLL2, 0, 2,  7 },
-+	{ 266667000, PLL2, 0, 1,  3 },
-+	{ }
++struct clk *branch_clk_register(struct device *dev, struct branch_desc *desc,
++		spinlock_t *lock, struct clk_init_data *init)
++{
++	struct clk_branch *b;
++
++	b = devm_kzalloc(dev, sizeof(*b), GFP_KERNEL);
++	if (!b)
++		return ERR_PTR(-ENOMEM);
++
++	b->ctl_reg = desc->base + desc->ctl_reg;
++	b->halt_reg = desc->base + desc->halt_reg;
++	b->ctl_bit = desc->ctl_bit;
++	b->halt_bit = desc->halt_bit;
++	b->halt_check = desc->halt_check;
++	b->lock = lock;
++
++	init->ops = &clk_branch_ops;
++	init->flags |= CLK_SET_RATE_PARENT;
++	b->hw.init = init;
++
++	return devm_clk_register(dev, &b->hw);
++}
++
++struct clk *branch_hg_clk_register(struct device *dev, struct branch_desc *desc,
++		spinlock_t *lock, struct clk_init_data *init)
++{
++	struct clk_branch *b;
++
++	b = devm_kzalloc(dev, sizeof(*b), GFP_KERNEL);
++	if (!b)
++		return ERR_PTR(-ENOMEM);
++
++	b->ctl_reg = desc->base + desc->ctl_reg;
++	b->halt_reg = desc->base + desc->halt_reg;
++	b->hwcg_reg = desc->base + desc->hwcg_reg;
++	b->ctl_bit = desc->ctl_bit;
++	b->halt_bit = desc->halt_bit;
++	b->halt_check = desc->halt_check;
++	b->lock = lock;
++
++	init->ops = &clk_branch_ops;
++	init->flags |= CLK_SET_RATE_PARENT;
++	b->hw.init = init;
++
++	return devm_clk_register(dev, &b->hw);
++}
+diff --git a/drivers/clk/msm/clk-branch.h b/drivers/clk/msm/clk-branch.h
+new file mode 100644
+index 0000000..bcb7345
+--- /dev/null
++++ b/drivers/clk/msm/clk-branch.h
+@@ -0,0 +1,48 @@
++/*
++ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MSM_CLK_BRANCH_H__
++#define __MSM_CLK_BRANCH_H__
++
++#include <linux/spinlock.h>
++
++struct device;
++struct clk;
++struct clk_init_data;
++
++struct branch_desc {
++	void __iomem *base;
++	u32 ctl_reg;
++	u32 hwcg_reg;
++	u32 halt_reg;
++
++	u8 ctl_bit;
++	u8 hwcg_bit;
++	u8 halt_bit;
++	u8 halt_check;
++#define BRANCH_VOTED			BIT(7) /* Delay on disable */
++#define BRANCH_HALT			0 /* pol: 1 = halt */
++#define BRANCH_HALT_VOTED		(BRANCH_HALT | BRANCH_VOTED)
++#define BRANCH_HALT_ENABLE		1 /* pol: 0 = halt */
++#define BRANCH_HALT_ENABLE_VOTED	(BRANCH_HALT_ENABLE | BRANCH_VOTED)
++#define BRANCH_HALT_DELAY		2 /* No bit to check; just delay */
 +};
 +
-+static struct rcg_dyn_desc mdp_rcg = {
-+	.ctl_reg = 0xc0,
-+	.ns_reg = 0xd0,
-+	.md0_reg = 0xc4,
-+	.md1_reg = 0xc8,
-+	.ctl_bit = 2,
-+	.mnctr0_en_bit = 8,
-+	.mnctr1_en_bit = 5,
-+	.mnctr0_reset_bit = 31,
-+	.mnctr1_reset_bit = 30,
-+	.mnctr0_mode_shift = 9,
-+	.mnctr1_mode_shift = 6,
-+	.src0_sel_shift = 3,
-+	.src1_sel_shift = 0,
-+	.n0_val_shift = 22,
-+	.n1_val_shift = 14,
-+	.m0_val_shift = 8,
-+	.m1_val_shift = 8,
-+	.mux_sel_bit = 11,
-+	.parent_map = mmcc_pxo_pll2_pll8_map,
-+	.freq_tbl = clk_tbl_mdp,
-+};
++extern struct clk *branch_clk_register(struct device *dev,
++		struct branch_desc *desc, spinlock_t *lock,
++		struct clk_init_data *init);
++extern struct clk *branch_hg_clk_register(struct device *dev,
++		struct branch_desc *desc, spinlock_t *lock,
++		struct clk_init_data *init);
 +
-+static struct branch_desc mdp_cxc = {
-+	.ctl_reg = 0xc0,
-+	.halt_reg = 0x1d0,
-+	.ctl_bit = 0,
-+	.halt_bit = 10,
-+	.halt_check = BRANCH_HALT,
-+};
-+
-+static struct freq_tbl clk_tbl_rot[] = {
-+	{  27000000, PXO,   1 },
-+	{  29540000, PLL8, 13 },
-+	{  32000000, PLL8, 12 },
-+	{  38400000, PLL8, 10 },
-+	{  48000000, PLL8,  8 },
-+	{  54860000, PLL8,  7 },
-+	{  64000000, PLL8,  6 },
-+	{  76800000, PLL8,  5 },
-+	{  96000000, PLL8,  4 },
-+	{ 100000000, PLL2,  8 },
-+	{ 114290000, PLL2,  7 },
-+	{ 133330000, PLL2,  6 },
-+	{ 160000000, PLL2,  5 },
-+	{ 200000000, PLL2,  4 },
-+	{ }
-+};
-+
-+static struct rcg_dyn_desc rot_rcg = {
-+	.ctl_reg = 0xe0,
-+	.ns_reg = 0xe8,
-+	.ctl_bit = 2,
-+	.pre_div0_shift = 22,
-+	.pre_div1_shift = 26,
-+	.src0_sel_shift = 16,
-+	.src1_sel_shift = 19,
-+	.mux_sel_bit = 30,
-+	.parent_map = mmcc_pxo_pll2_pll8_map,
-+	.freq_tbl = clk_tbl_rot,
-+};
-+
-+static struct branch_desc rot_cxc = {
-+	.ctl_reg = 0xe0,
-+	.halt_reg = 0x1d0,
-+	.ctl_bit = 0,
-+	.halt_bit = 15,
-+	.halt_check = BRANCH_HALT,
-+};
-+
-+static struct of_clk_match msm_mmcc_clk_match[] = {
-+	{ .name = "pll2", .driver_data = &pll2_desc },
-+	{ .name = "mdp_rcg", .driver_data = &mdp_rcg },
-+	{ .name = "mdp_cxc", .driver_data = &mdp_cxc },
-+	{ .name = "rot_rcg", .driver_data = &rot_rcg },
-+	{ .name = "rot_cxc", .driver_data = &rot_cxc },
-+};
-+
-+const struct msm_clk_match msm_mmcc_8960_matches = {
-+	.matches = msm_mmcc_clk_match,
-+	.size = ARRAY_SIZE(msm_mmcc_clk_match)
-+};
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
