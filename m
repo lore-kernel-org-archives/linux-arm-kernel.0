@@ -1,162 +1,73 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 11:31:04 -0400
-Subject: [PATCH 1/2] ARM: remove dmacap,memset from Device tree binding
-In-Reply-To: <1372762453-12018-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1372762453-12018-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1372762453-12018-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130725153104.GH23879@titan.lakedaemon.net>
+From: a.motakis@virtualopensystems.com (Antonios Motakis)
+Date: Thu, 25 Jul 2013 17:34:59 +0200
+Subject: [PATCHv2 1/2] iommu/exynos: add devices attached to the System MMU to
+ an IOMMU group
+Message-ID: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 12:54:12PM +0200, Sebastian Hesselbarth wrote:
-> DMA_MEMSET support has been removed, so update the device tree files
-> and corresponding binding documentation for Marvell SoCs.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk> 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com> 
-> Cc: devicetree-discuss at lists.ozlabs.org 
-> Cc: linux-kernel at vger.kernel.org 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> ---
->  Documentation/devicetree/bindings/dma/mv-xor.txt |    2 --
->  arch/arm/boot/dts/armada-370.dtsi                |    2 --
->  arch/arm/boot/dts/armada-xp.dtsi                 |    2 --
->  arch/arm/boot/dts/dove.dtsi                      |    2 --
->  arch/arm/boot/dts/kirkwood.dtsi                  |    2 --
->  arch/arm/boot/dts/orion5x.dtsi                   |    1 -
->  6 files changed, 0 insertions(+), 11 deletions(-)
+IOMMU groups are expected by certain users of the IOMMU API,
+e.g. VFIO. Since each device is behind its own System MMU, we
+can allocate a new IOMMU group for each device.
 
-Adding the new devicetree ml to the Cc:
+This patch depends on Cho KyongHo's patch series titled "[PATCH v7 00/12]
+iommu/exynos: Fixes and Enhancements of System MMU driver with DT",
+applied on a Linux 3.10.1 kernel. It has been tested on the Arndale board.
 
-I'm fine with the changes to the dts{i} files, but I think the binding
-document should be handled differently.
+Changes since in v2:
+- Removed possibility for minor memory leak in case of
+  misbehaving platform drivers
 
-thx,
+Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+---
+ drivers/iommu/exynos-iommu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Jason.
-
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
-> index 7c6cb7f..68f7004 100644
-> --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
-> +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
-> @@ -14,7 +14,6 @@ properties:
->  
->  And the following optional properties:
->  - dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
-> -- dmacap,memset to indicate that the XOR channel is capable of memset operations
->  - dmacap,xor to indicate that the XOR channel is capable of xor operations
->  
->  Example:
-> @@ -35,6 +34,5 @@ xor at d0060900 {
->  	      interrupts = <52>;
->  	      dmacap,memcpy;
->  	      dmacap,xor;
-> -	      dmacap,memset;
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index fa3dfc6..a315ad1 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -132,7 +132,6 @@
->  					interrupts = <52>;
->  					dmacap,memcpy;
->  					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> @@ -151,7 +150,6 @@
->  					interrupts = <95>;
->  					dmacap,memcpy;
->  					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 416eb94..4b3dd56 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -114,7 +114,6 @@
->  					interrupts = <52>;
->  					dmacap,memcpy;
->  					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> @@ -134,7 +133,6 @@
->  					interrupts = <95>;
->  					dmacap,memcpy;
->  					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 6cab468..2cef34f 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -232,7 +232,6 @@
->  
->  			channel1 {
->  				interrupts = <40>;
-> -				dmacap,memset;
->  				dmacap,memcpy;
->  				dmacap,xor;
->  			};
-> @@ -253,7 +252,6 @@
->  
->  			channel1 {
->  				interrupts = <43>;
-> -				dmacap,memset;
->  				dmacap,memcpy;
->  				dmacap,xor;
->  			};
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 9809fc1..078637c 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -126,7 +126,6 @@
->  			      interrupts = <6>;
->  			      dmacap,memcpy;
->  			      dmacap,xor;
-> -			      dmacap,memset;
->  			};
->  		};
->  
-> @@ -146,7 +145,6 @@
->  			      interrupts = <8>;
->  			      dmacap,memcpy;
->  			      dmacap,xor;
-> -			      dmacap,memset;
->  			};
->  		};
->  
-> diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-> index 892c64e..f82ece7 100644
-> --- a/arch/arm/boot/dts/orion5x.dtsi
-> +++ b/arch/arm/boot/dts/orion5x.dtsi
-> @@ -120,7 +120,6 @@
->  			      interrupts = <31>;
->  			      dmacap,memcpy;
->  			      dmacap,xor;
-> -			      dmacap,memset;
->  			};
->  		};
->  
-> -- 
-> 1.7.2.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 51d43bb..c7dd4b5 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -1134,6 +1134,32 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	return phys;
+ }
+ 
++static int exynos_iommu_add_device(struct device *dev)
++{
++	struct iommu_group *group;
++	int ret;
++
++	group = iommu_group_get(dev);
++
++	if (!group) {
++		group = iommu_group_alloc();
++		if (IS_ERR(group)) {
++			dev_err(dev, "Failed to allocate IOMMU group\n");
++			return PTR_ERR(group);
++		}
++	}
++
++	ret = iommu_group_add_device(group, dev);
++	iommu_group_put(group);
++
++	return ret;
++}
++
++static void exynos_iommu_remove_device(struct device *dev)
++{
++	iommu_group_remove_device(dev);
++}
++
+ static struct iommu_ops exynos_iommu_ops = {
+ 	.domain_init = &exynos_iommu_domain_init,
+ 	.domain_destroy = &exynos_iommu_domain_destroy,
+@@ -1142,6 +1168,8 @@ static struct iommu_ops exynos_iommu_ops = {
+ 	.map = &exynos_iommu_map,
+ 	.unmap = &exynos_iommu_unmap,
+ 	.iova_to_phys = &exynos_iommu_iova_to_phys,
++	.add_device	= exynos_iommu_add_device,
++	.remove_device	= exynos_iommu_remove_device,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+ };
+ 
+-- 
+1.8.1.2
