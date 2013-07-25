@@ -1,30 +1,112 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Thu, 25 Jul 2013 18:36:02 +0200
-Subject: [PATCH 05/22] ARM: dts: bcm281xx: Remove '0x's from
- BCM11351 BRT DTS file
-In-Reply-To: <CAAYSxhrf+WNz1+ojA1r_pOLWg4xf9Ko8OyUc4GfVEMUN776pfA@mail.gmail.com>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
- <51ED2D90.4020209@broadcom.com> <20130722133852.GA26801@laptop>
- <51ED3971.905@broadcom.com> <51ED6486.3080700@broadcom.com>
- <CAAYSxhrf+WNz1+ojA1r_pOLWg4xf9Ko8OyUc4GfVEMUN776pfA@mail.gmail.com>
-Message-ID: <51F153F2.4080107@broadcom.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Jul 2013 09:36:56 -0700
+Subject: [PATCH v1 02/14] clk: Add of_init_clk_data() to parse common
+ clock bindings
+In-Reply-To: <1714620.Z8J8zTxIRB@flatron>
+References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+ <1374713022-6049-3-git-send-email-sboyd@codeaurora.org>
+ <1714620.Z8J8zTxIRB@flatron>
+Message-ID: <20130725163656.GC29694@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2013 05:43 PM, Tim Kryger wrote:
-> On Mon, Jul 22, 2013 at 9:57 AM, Christian Daudt <csd@broadcom.com> wrote:
->
->> it'd be nice to have something to point
->> people to as this being the best practice for kernel dev.
->
-> Power.org's ePAPR exclusively omits the 0x in the unit-address of node names.
->
-> https://www.power.org/wp-content/uploads/2012/06/Power_ePAPR_APPROVED_v1.1.pdf
->
+On 07/25, Tomasz Figa wrote:
+> On Wednesday 24 of July 2013 17:43:30 Stephen Boyd wrote:
+> > Consolidate DT parsing for the common bits of a clock binding in
+> > one place to simplify clock drivers. This also has the added
+> > benefit of standardizing how the clock names used by the common
+> > clock framework are generated from the DT bindings. We always use
+> > the first clock-output-names string if it exists, otherwise we
+> > fall back to the node name.
+> > 
+> > To be slightly more efficient and make the caller's life easier,
+> > we introduce a shallow copy flag so that the clock core knows to
+> > just copy the pointers to the strings and not the string
+> > contents. Otherwise the callers of this function would have to
+> > free the strings allocated here which could be cumbersome.
+> > 
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  drivers/clk/clk.c            | 59
+> > +++++++++++++++++++++++++++++++++++++++++++-
+> > include/linux/clk-provider.h |  7 ++++++
+> >  2 files changed, 65 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 1ed9bdd..ea8e951b 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1809,6 +1809,10 @@ static int _clk_register(struct device *dev,
+> > struct clk_hw *hw, struct clk *clk) {
+> >  	int i, ret;
+> > 
+> > +	hw->clk = clk;
+> > +	if (hw->init->flags & CLK_SHALLOW_COPY)
+> > +		return PTR_RET(__clk_register(dev, hw));
+> > +
+> >  	clk->name = kstrdup(hw->init->name, GFP_KERNEL);
+> >  	if (!clk->name) {
+> >  		pr_err("%s: could not allocate clk->name\n", __func__);
+> > @@ -1819,7 +1823,6 @@ static int _clk_register(struct device *dev,
+> > struct clk_hw *hw, struct clk *clk) clk->hw = hw;
+> >  	clk->flags = hw->init->flags;
+> >  	clk->num_parents = hw->init->num_parents;
+> > -	hw->clk = clk;
+> > 
+> >  	/* allocate local copy in case parent_names is __initdata */
+> >  	clk->parent_names = kzalloc((sizeof(char*) * clk->num_parents),
+> > @@ -2232,4 +2235,58 @@ void __init of_clk_init(const struct of_device_id
+> > *matches) clk_init_cb(np);
+> >  	}
+> >  }
+> > +
+> > +/**
+> > + * of_init_clk_data() - Initialize a clk_init_data struct from a DT
+> > node + * @np: node to initialize struct from
+> > + * @init: struct to initialize
+> > + *
+> > + * Populates the clk_init_data struct by parsing the device node for
+> > + * properties matching the common clock binding. Returns 0 on success
+> > + * and a negative error code on failure.
+> > + */
+> > +int of_init_clk_data(struct device_node *np, struct clk_init_data
+> > *init) +{
+> > +	struct of_phandle_args s;
+> > +	const char **names = NULL, **p;
+> > +	const char *name;
+> > +	int i;
+> > +
+> > +	if (of_property_read_string(np, "clock-output-names", &name) < 0)
+> > +		name = np->name;
+> > +	init->name = kstrdup(name, GFP_KERNEL);
+> > +	if (!init->name)
+> > +		return -ENOMEM;
+> > +
+> > +	for (i = 0; of_parse_phandle_with_args(np, "clocks", "#clock-
+> cells",
+> > +				i, &s) == 0; i++) {
+> > +		p = krealloc(names, sizeof(*names) * (i + 1), GFP_KERNEL);
+> > +		if (!p)
+> > +			goto err;
+> 
+> What about using of_count_phandle_with_args() first to get the parent 
+> count?
 
-Thanks for the link. While browsing on power.org I got the impression 
-that I needed to have a membership to get it.
+Sure that simplifies things.
 
-Regards,
-Arend
+> 
+> > +		names = p;
+> > +
+> > +		if (of_property_read_string(s.np, "clock-output-names",
+> > +					&name) < 0)
+> > +			name = s.np->name;
+> 
+> You should be able to use of_clk_get_parent_name() here, instead of 
+> parsing the properties directly.
+
+This must be new too. Will do in v2.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
