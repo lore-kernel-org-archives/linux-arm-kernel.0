@@ -1,57 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Jul 2013 18:01:47 +0100
-Subject: [PATCH v3 4/4] ARM: cacheflush: don't bother rounding to nearest vma
-In-Reply-To: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
-References: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374771707-2619-5-git-send-email-will.deacon@arm.com>
+Date: Thu, 25 Jul 2013 18:01:43 +0100
+Subject: [PATCH v3 0/4] Optimise cache-flushing system call
+Message-ID: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-do_cache_op finds the lowest VMA contained in the specified address
-range and rounds the range to cover only the mapped addresses.
+Hi guys,
 
-Since commit 4542b6a0fa6b ("ARM: 7365/1: drop unused parameter from
-flush_cache_user_range") the VMA is not used for anything else in this
-code and seeing as the low-level cache flushing routines return -EFAULT
-if the address is not valid, there is no need for this range truncation.
+This is a refresh of the patches I originally posted here:
 
-This patch removes the VMA handling code from the cacheflushing syscall.
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/157810.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170601.html
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/traps.c | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+This is just a rebase onto 3.11-rc2, there are no functional changes to
+the series.
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4fd8ef5..9e60563 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -548,24 +548,11 @@ static long do_cache_op_restart(struct restart_block *unused)
- static inline int
- do_cache_op(unsigned long start, unsigned long end, int flags)
- {
--	struct mm_struct *mm = current->active_mm;
--	struct vm_area_struct *vma;
--
- 	if (end < start || flags)
- 		return -EINVAL;
- 
--	down_read(&mm->mmap_sem);
--	vma = find_vma(mm, start);
--	if (!vma || vma->vm_start >= end) {
--		up_read(&mm->mmap_sem);
--		return -EINVAL;
--	}
--
--	if (start < vma->vm_start)
--		start = vma->vm_start;
--	if (end > vma->vm_end)
--		end = vma->vm_end;
--	up_read(&mm->mmap_sem);
-+	if (!access_ok(VERIFY_READ, start, end - start))
-+		return -EFAULT;
- 
- 	return __do_cache_op(start, end);
- }
+Cheers,
+
+Will
+
+
+Will Deacon (4):
+  ARM: entry: allow ARM-private syscalls to be restarted
+  ARM: cacheflush: split user cache-flushing into interruptible chunks
+  ARM: cacheflush: don't round address range up to nearest page
+  ARM: cacheflush: don't bother rounding to nearest vma
+
+ arch/arm/include/asm/cacheflush.h  |  3 +-
+ arch/arm/include/asm/thread_info.h | 11 +++++++
+ arch/arm/kernel/entry-common.S     |  4 +--
+ arch/arm/kernel/traps.c            | 64 +++++++++++++++++++++++++++++---------
+ 4 files changed, 63 insertions(+), 19 deletions(-)
+
 -- 
 1.8.2.2
