@@ -1,126 +1,110 @@
-From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
-Date: Thu, 25 Jul 2013 09:08:48 +0300
-Subject: [PATCH v6 2/2] iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
-In-Reply-To: <51EA69DE.4080908@kernel.org>
-References: <1374226039-16943-1-git-send-email-oleksandr.kozaruk@ti.com>
- <1374226039-16943-3-git-send-email-oleksandr.kozaruk@ti.com>
- <51EA69DE.4080908@kernel.org>
-Message-ID: <20130725060848.GA16521@uglx0158319>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 25 Jul 2013 09:40:01 +0300
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <20130724145237.GB21614@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+ <20130722184325.GA21614@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+ <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com> <20130724145237.GB21614@n2100.arm.linux.org.uk>
+Message-ID: <51F0C841.8000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 20, 2013 at 11:43:42AM +0100, Jonathan Cameron wrote:
-> On 07/19/2013 10:27 AM, Oleksandr Kozaruk wrote:
-> > The GPADC is general purpose ADC found on TWL6030, and TWL6032 PMIC,
-> > known also as Phoenix and PhoenixLite.
-> >
-> > The TWL6030 and TWL6032 have GPADC with 17 and 19 channels
-> > respectively. Some channels have current source and are used for
-> > measuring voltage drop on resistive load for detecting battery ID
-> > resistance, or measuring voltage drop on NTC resistors for external
-> > temperature measurements. Some channels measure voltage, (i.e. battery
-> > voltage), and have voltage dividers, thus, capable to scale voltage.
-> > Some channels are dedicated for measuring die temperature.
-> >
-> > Some channels are calibrated in 2 points, having offsets from ideal
-> > values kept in trim registers. This is used to correct measurements.
-> >
-> > The differences between GPADC in TWL6030 and TWL6032:
-> > - 10 bit vs 12 bit ADC;
-> > - 17 vs 19 channels;
-> > - channels have different purpose(i.e. battery voltage
-> >   channel 8 vs channel 18);
-> > - trim values are interpreted differently.
-> >
-> > Based on the driver patched from Balaji TK, Graeme Gregory, Ambresh K,
-> > Girish S Ghongdemath.
-> >
-> > Signed-off-by: Balaji T K <balajitk@ti.com>
-> > Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
-> > Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
-> A few little bits and bobs inline.
-> 
-> My only major query is about the lack of info for the temperature
-> channels.  How do you convert these to useful real world units?
+On 24/07/13 17:52, Russell King - ARM Linux wrote:
 
-On blaze tablet platform(OMAP 4) temperature channels were used by
-thermal framework and battery driver.
-Thermal was using channel 4 [1]
+> I also continue to be disappointed by the lack of things working on the
+> 4430 - it's been a number of years now and _still_ the on-board LCDs do
+> not work.  People have tried to blame that on hardware faults and the
+> like, but they're just being idiotic when they say stuff like that.  It
+> can't be hardware faults when the kernel supplied with the board is able
+> to make them work to the extent that userspace can play back video on all
+> three output devices simultaneously, without hiccup or any imperfection.
+> I don't know whether it's just that the backlight support isn't working
+> or what - because any information on the 4430 seems to be a tightly
+> controlled secret that only a few select people are permitted to know
+> about.  As far as I'm concerned, much of the hardware is a black box to
+> me.
 
-Here is the comment from the driver:
+The 4430SDP's backlight hasn't been working in the mainline due to
+missing support from the TWL driver. But we finally did get that in for
+3.10 (or maybe 3.9), and booting 3.10 non-DT kernel brings up the
+backlights. However, the BL doesn't work yet with DT boot, so again with
+3.11, with no board files, the BL is out... Sigh.
 
-* NTC termistor (NCP15WB473F) schematic connection for OMAP4460 board:
-*
-*          [Vref]
-*            |
-*            $ (Rpu)
-*            |
-*            +----+-----------[Vin]
-*            |    |
-*           [Rt]  $ (Rpd)
-*            |    |
-*           -------- (ground)
-*
-* NTC termistor resistanse (Rt, k) calculated from following formula:
-*
-* Rt = Rpd * Rpu * Vin / (Rpd * (Vref - Vin) - Rpu * Vin)
-*
-* where       Vref (GPADC_VREF4) - reference voltage, Vref = 1250 mV;
-*                     Vin (GPADC_IN4) - measuring voltage, Vin = 0...1250 mV;
-*                     Rpu (R1041) - pullup resistor, Rpu = 10 k;
-*                     Rpd (R1043) - pulldown resistor, Rpd = 220 k;
-*
-* Pcb temp sensor temperature (t, C) calculated from following formula:
-*
-* t = 1 / (ln(Rt / Rt0) / B + 1 / T0) - 273
-*
-* where       Rt0 - NTC termistor resistance at 25 C, Rt0 = 47 k;
-*                     B - specific constant, B = 4131 K;
-*                     T0 - temperature, T0 = 298 K
-[..]
+The panel driver itself have been working as long as it has been in the
+mainline kernel (for me). I think there was a mixup at some point with
+pinmuxing due to TRM having wrong information, but for some reason my
+board works fine with both right and wrong muxing. If I recall right,
+your board did not. But that's also solved some kernel versions ago.
 
-And then there is a table for conversion:
-/*
- * Temperature values in degrees celsius,
- * voltage values from 156 to 1191 milli volts
-*/
-static s8 mvolt_to_temp[] = {
-               125, 125, 125, 124, 124, 124, 124, 123, 123, 123, 122, 122,
-               122, 122, 121, 121, 121, 121, 120, 120, 120, 120, 119, 119,
-[..]
+But even with the above fixed, you could observe that your panel doesn't
+work. The reason is that the panels in the 4430SDP board were chosen a
+bit oddly: they are so called manual update panels, meant to be
+explicitly updated by the software only when required. The phones that
+have such panels (which, I guess, is what 4430SDP is designed to
+resemble) have software doing that, but obviously the standard linux
+software does not.
 
-The battery driver was using channel 1, dedicated for measuring battery
-temperature.
-static void twl6030_bci_battery_work(struct work_struct *work)
-{
-[..]
-	for (temp = 0; temp < di->platform_data->tblsize; temp++) {
-		if (adc_code >= di->platform_data->
-				battery_tmp_tbl[temp])
-			break;
-	}
+There's a hack to enable a non-optimal automatic update for testing
+purposes:
 
-	/* first 2 values are for negative temperature */
-	di->temp_C = (temp - 2) * 10; * /* in tenths of degree Celsius */
-	[..]
-}
-static int omap4_batt_table[] = {
-/* adc code for temperature in degree C */
-	929, 925, /* -2 ,-1 */
-	920, 917, 912, 908, 904, 899, 895, 890, 885, 880, /* 00 - 09 */
-	875, 869, 864, 858, 853, 847, 841, 835, 829, 823, /* 10 - 19 */
-[..]
-	591, 583, 575, 567, 559, 551, 543, 535, 527, 519, /* 50 - 59 */
-	511, 504, 496 /* 60 - 62 */
-};
+echo 1 > /sys/class/graphics/fb0/update_mode
 
-So, one driver was using millivolts and the other ADC code,
-Though converting to millivolts and the to temperature, seems,
-to be redundant, as code can be converted to temperature.
-If I recollect correctly the previous driver version was using just
-ADC code.
+This makes omapfb update the display 20 times per second. Or via a
+module parameter: omapfb.auto_update=y
 
-Regards,
-Sasha.
+We could implement a better auto-update system for manual-update panels,
+but I have opted not to:
 
-[1] http://git.omapzoom.org/?p=kernel/omap.git;a=blob;f=drivers/staging/thermal_framework/sensor/thermistor_sensor.c;h=828d8010579b55ec4a122c49a2e5b547b1e41e63;hb=decb3fd22223ddf207e0118d0d558459acc7094e
+- It's not easy to implement efficiently and reliably (in fact, we did
+have auto-update support at some point in the kernel, but it was removed
+as it was rather troublesome to keep working).
+
+- Manual-update panels are meant to be updated manually, only when
+needed. That's the whole point of the manual-update feature. Doing
+auto-update with a manual-update panel is inefficient. So such a feature
+would only be useful for testing purposes.
+
+- Manual-update panels are quite rare, and the trend to use them seems
+to be coming even rarer.
+
+> And yes, my 4430 has the projector module on it.  Never ever seen that
+> work, and no idea how to make it work because there's no information
+> available on the hardware.
+
+I don't have that one. PicoDLP shares resources (DSS pins, at least, if
+I recall right, and some power line) with the second LCD, and we don't
+have support to manage sharing those resources. So the PicoDLP is left
+disabled in the board file.
+
+I don't have any clear idea how to implement management of those
+resources, and no one has ever asked about PicoDLP from me, so it's
+never been a very high priority.
+
+So 4430SDP is a bit difficult on the display side: non-standard panels
+and a pico projector that is mutually exclusive with the LCD2.
+
+> And no, I don't want another Beagle board or Panda board or whatever, I
+> have those (I think I have one of each), and they've never been powered up
+> because they have no ethernet on them, and I have no USB to ethernet still,
+> partly because I don't really do USB here *at* *all*, so I don't know what
+> works well and what doesn't with Linux.  Even if I did provide them with a
+> USB ethernet, I doubt they'd be able to boot a kernel via the network.
+
+Beagle xM and Panda have ethernet. I boot Panda via the network (load
+kernel and use nfsroot). But they don't have panels, so you need an
+external display for those.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/b7d54168/attachment.sig>
