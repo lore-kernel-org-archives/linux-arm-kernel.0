@@ -1,75 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 Jul 2013 09:09:19 -0700
-Subject: DT bindings as ABI [was: Do we have people interested in device tree
- janitoring / cleanup?]
-Message-ID: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Jul 2013 09:13:37 -0700
+Subject: [GIT PULL] Remove ARM local timer API
+In-Reply-To: <CAOesGMiornt0twdQv=tYMtAX56Lc79MVyNrHaK1nWpOk189dDA@mail.gmail.com>
+References: <20130625200211.GA11625@codeaurora.org>
+ <CAOesGMj5AZcB7-kcS8_JqfKAg_RUKqTdDZf7bdwkebn3pwADAw@mail.gmail.com>
+ <20130723234040.GB27761@codeaurora.org>
+ <CAOesGMiornt0twdQv=tYMtAX56Lc79MVyNrHaK1nWpOk189dDA@mail.gmail.com>
+Message-ID: <20130725161337.GA29694@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[I'm adding LKML and ksummit-discuss to this thread, since the ACPI/DT
-discussions have been covered there and this overlaps some with that]
+On 07/23, Olof Johansson wrote:
+> On Tue, Jul 23, 2013 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 07/23, Olof Johansson wrote:
+> 
+> >> Merged in as localtimer/removal into next/cleanup.
+> >>
+> >> I had quite a few merge conflicts due to the __cpuinit removal, so
+> >> please double-check my resolutions.
+> >>
+> >
+> > A __cpuinit is leftover in smp_twd.c. Hopefully you can just
+> > redo the merge?
+> 
+> Done, thanks for catching it. I thought I grepped for them but I
+> somehow missed that one. Fixed now.
+> 
 
-On Thu, Jul 25, 2013 at 7:38 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Jul 25, 2013 at 03:27:02PM +0100, Russell King - ARM Linux wrote:
->> Remember the stated assertion when DT was first added to the kernel: the
->> DT descriptions _will_ become a separately maintained project which is
->> independent of the kernel.  They will _not_ be kernel version specific.
->
-> I'm looking forward to this.
->
-> Question for the DT guys: what are the plans here? Are we going to get
-> rid of the .dts files inside the kernel tree?
+Also I think a HAVE_CAN_FLEXCAN if CAN was dragged in to
+arch/arm/mach-imx/Kconfig. Here's a patch.
 
-In the discussions we had in Dublin, a couple of options on how to
-lock in bindings were discussed. I'm a little surprised that Grant
-didn't cover them in his initial emails on the new maintainership
-model, but maybe he wanted the new group to handle it. And they didn't
-bring it up yet either. So I am. :-)
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 21fa9fa..1303e33 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -794,7 +794,6 @@ config SOC_IMX6Q
+ 	select CPU_V7
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_IMX_ANATOP
+ 	select HAVE_IMX_GPC
+ 	select HAVE_IMX_MMDC
 
-Until now, we have been working under the assumption that the bindings
-are _NOT LOCKED_. I.e. they can change as needed, and we _ARE_
-assuming that the device tree has to match the kernel. That has been a
-good choice as people get up to speed on what is a good binding and
-not, and has given us much-needed room to adjust things as needed.
-That obviously has to change, but doing so needs to be done carefully.
-
-It's likely that we still want to have a period in which a binding is
-tentative and can be changed. Sometimes we don't know what we really
-want until after we've used it a while, and sometimes we, like
-everybody else, make mistakes on what is a good idea and not. The
-alternative is to grind most new binding proposals to a halt while we
-spend mind-numbing hours and hours on polishing every single aspect of
-the binding to a perfect shine, since we can't go back and fix it.
-
-So, there really seems to be a need for a layered approach, one in
-which a binding "graduates" from being tentative to being locked in.
-I'm refraining from using the terms "staging" and "stable" here, since
-they have overloaded meaning in the kernel world that doesn't apply
-here.
-
-One problem that needs to be solved is obviously how a binding
-graduates from tentative to locked. This work isn't going to be very
-interesting to most people, I suspect. Think standards committee type
-work.
-
-A possible way to handle this is to have exactly that: A group of
-people that essentially constitute the "standards committee" that meet
-on a regular basis to review and approve new bindings. They should be
-people not just doing ARM Linux work, but other stakeholders in these
-bindings too. One of the things they should probably do is sift
-through our current in-kernel bindings and select those who seem ready
-to be locked in, review/discuss/decide upon that and once the decision
-is made, that specific binding does become part of the static,
-never-ever-change ABI of firmware-to-kernel interfaces.   That might
-also be the time that the binding is moved from the kernel to a
-separate repo, but that's a technicality that we'll let the DT
-maintainers decide among themselves, IMHO.
-
-I think that captures most of what we discussed in person. Others
-might have changed their opinions since then, so I'm definitely not
-claiming that any of this was an official decision made by anybody.
-It's just one proposal on how to handle these things moving forward.
-
-
--Olof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
