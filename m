@@ -1,138 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 25 Jul 2013 11:40:44 -0700
-Subject: [PATCHv5 04/11] PCI: Introduce new MSI chip infrastructure
-In-Reply-To: <1373889167-27878-5-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130725184043.GB18584@dhcp-172-17-186-34.nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Jul 2013 14:41:00 -0400
+Subject: [PATCHv1] arm: armada: Add .dts file for Netgear ReadyNAS 102
+In-Reply-To: <878v1mgh4x.fsf@natisbad.org>
+References: <878v1mgh4x.fsf@natisbad.org>
+Message-ID: <20130725184100.GQ23879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 01:52:40PM +0200, Thomas Petazzoni wrote:
-> From: Thierry Reding <thierry.reding@avionic-design.de>
+On Thu, Jul 04, 2013 at 11:16:46PM +0200, Arnaud Ebalard wrote:
 > 
-> The new struct msi_chip is used to associated an MSI controller with a
-> PCI bus. It is automatically handed down from the root to its children
-> during bus enumeration.
+> All hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 102 are
+> supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
+> Gigabit controller and PHY, serial port, leds, buttons, SATA ports,
+> G762 fan controller) except for:
 > 
-> This patch provides default (weak) implementations for the architecture-
-> specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
-> and arch_msi_check_device()) which check if a PCI device's bus has an
-> attached MSI chip and forward the call appropriately.
+>  - the Intersil ISL12057 I2C RTC Chip,
+>  - the Armada NAND controller.
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Support for both of those is currently work in progress and does not
+> prevent boot.
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
->  drivers/pci/msi.c   | 27 +++++++++++++++++++++++++--
->  drivers/pci/probe.c |  1 +
->  include/linux/msi.h | 11 +++++++++++
->  include/linux/pci.h |  1 +
->  4 files changed, 38 insertions(+), 2 deletions(-)
-
-Bjorn,
-
-We'll need this as part of a stable branch as well, so any chance you
-could ack it?
-
-Thierry
-
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index aa2f697..d5b6378 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -32,16 +32,39 @@ static int pci_msi_enable = 1;
->  
->  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->  {
-> -	return -EINVAL;
-> +	struct msi_chip *chip = dev->bus->msi;
-> +	int err;
-> +
-> +	if (!chip || !chip->setup_irq)
-> +		return -EINVAL;
-> +
-> +	err = chip->setup_irq(chip, dev, desc);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	irq_set_chip_data(desc->irq, chip);
-> +
-> +	return 0;
->  }
->  
->  void __weak arch_teardown_msi_irq(unsigned int irq)
->  {
-> +	struct msi_chip *chip = irq_get_chip_data(irq);
-> +
-> +	if (!chip || !chip->teardown_irq)
-> +		return;
-> +
-> +	chip->teardown_irq(chip, irq);
->  }
->  
->  int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
->  {
-> -	return 0;
-> +	struct msi_chip *chip = dev->bus->msi;
-> +
-> +	if (!chip || !chip->check_device)
-> +		return 0;
-> +
-> +	return chip->check_device(chip, dev, nvec, type);
->  }
->  
->  int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 46ada5c..b8eaa81 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -666,6 +666,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->  
->  	child->parent = parent;
->  	child->ops = parent->ops;
-> +	child->msi = parent->msi;
->  	child->sysdata = parent->sysdata;
->  	child->bus_flags = parent->bus_flags;
->  
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 18870b0..cbf5d05 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -64,4 +64,15 @@ void arch_restore_msi_irqs(struct pci_dev *dev, int irq);
->  
->  void default_teardown_msi_irqs(struct pci_dev *dev);
->  
-> +struct msi_chip {
-> +	struct module *owner;
-> +	struct device *dev;
-> +
-> +	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
-> +			 struct msi_desc *desc);
-> +	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
-> +	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
-> +			    int nvec, int type);
-> +};
-> +
->  #endif /* LINUX_MSI_H */
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 0fd1f15..4044e3c 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -433,6 +433,7 @@ struct pci_bus {
->  	struct resource busn_res;	/* bus numbers routed to this bus */
->  
->  	struct pci_ops	*ops;		/* configuration access functions */
-> +	struct msi_chip	*msi;		/* MSI controller */
->  	void		*sysdata;	/* hook for sys-specific extension */
->  	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
->  
-> -- 
-> 1.8.1.2
+> Hi Jason and Andrew,
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/6ec029e2/attachment.sig>
+> As requested
+> 
+>  - this version is tested against current head of linus tree (+ I2C
+>    fixes for a race condition; for details, see message #94 of
+>    http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622325).
+>  - nand layout entry and ISL12057 entry have been removed until support
+>    is available in mainline kernel for eahc of those
+>  - clock, gpio led and keys have been made siblings of soc, memory and
+>    chosen (reported by Sebastian).
+> 
+> Is it still acceptable for current merge window or am I too late?
+
+Well, for v3.12... ;-)
+
+> Cheers,
+> 
+> a+
+> 
+>  arch/arm/boot/dts/Makefile                     |   1 +
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 176 +++++++++++++++++++++++++
+>  2 files changed, 177 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn102.dts
+
+Applied to mvebu/dt
+
+thx,
+
+Jason.
