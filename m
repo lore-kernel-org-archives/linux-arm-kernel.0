@@ -1,27 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Jul 2013 11:30:28 +0200
-Subject: [PATCH 1/5] gpio: pxa: remove dead code
-In-Reply-To: <51F0E92E.6060900@gmail.com>
-References: <1373555877-29887-1-git-send-email-zonque@gmail.com>
- <1373555877-29887-2-git-send-email-zonque@gmail.com>
- <CACRpkdaB7JnWzoLKpQ1eLWAi7yFz9CanhbhwtiCnEtcNWzX3RQ@mail.gmail.com>
- <CAD6h2NS0p-kMUGyhbr93vd_oLSNyaB572riFB8mHt1cu5f-bGw@mail.gmail.com>
- <51F0E92E.6060900@gmail.com>
-Message-ID: <CACRpkdZT51uwW6z-BzmU2tv9-fX=UQN2ywCQwb-SDVHovo4BxA@mail.gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Thu, 25 Jul 2013 10:30:29 +0100
+Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
+In-Reply-To: <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
+References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
+ <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
+ <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
+Message-ID: <51F0F035.8010705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:00 AM, Daniel Mack <zonque@gmail.com> wrote:
+On 24/07/13 20:32, Linus Walleij wrote:
+> On Tue, Jul 23, 2013 at 5:42 PM, Jonathan Austin
+> <jonathan.austin@arm.com> wrote:
+>
+>> The order of arguments in the call to vco_set() for the ICST clocks appears to
+>> have been switched in error, which results in the VCO not being initialised
+>> correctly. This in turn stops the integrated LCD on things like Integrator/CP
+>> from working correctly.
+>>
+>> This patch fixes the order and restores the expected functionality.
+>>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+>
+> Good catch! Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> You should probably mark this for stable as well.
+>
 
-> And what about the others? I think the first 3 patches of this series
-> can go through Linus W, and the other 2 should end up in the pxa tree,
-> right?
+Mike, will you add Cc: stable when you take the fix or shall I resubmit 
+the patch somehow else?
 
-Yes. They might need to build on top of the pinctrl tree.
+> What I don't understand is why my CLCD VGA output has
+> been working all the time :-(
+>
 
-Or, if there are no other things happening in the PXA tree for the
-next merge window, I can take it into my tree, with the ACKs of
-e.g. Eric and Olof Johansson.
+No, this confuses me too - perhaps the display you've got it plugged in 
+to is really lenient about modes and just made the best of it?
 
-Yours,
-Linus Walleij
+> I thought this VCO was necessary for that as well,  but apparently
+> it works with the defaults.
+
+Certainly I can't get anything out of the display on my integrator or 
+via the VGA port without this fix and the other one in the series.
+
+Jonny
+>
+> Yours,
+> Linus Walleij
+>
