@@ -1,76 +1,49 @@
-From: jett.zhou@gmail.com (jett zhou)
-Date: Thu, 25 Jul 2013 19:02:45 +0800
-Subject: [V3 0/7] Enhance mmp display driver
-In-Reply-To: <CACDDiy8OwYHbmYGwc0FV2NLVfu1BiUL9GYCmA2QEVVB5isFJGQ@mail.gmail.com>
-References: <1372332473-6584-1-git-send-email-jtzhou@marvell.com>
- <20130709133918.GC18477@ns203013.ovh.net>
- <CACDDiy8OwYHbmYGwc0FV2NLVfu1BiUL9GYCmA2QEVVB5isFJGQ@mail.gmail.com>
-Message-ID: <CACDDiy8wkW95zHCrzEP5u09DYbC2=PQGmb-6bjMsZCs8OmqNsw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Jul 2013 13:00:49 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <2174304.5JlzJ583hP@avalon>
+References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
+ <201307242032.03597.arnd@arndb.de> <2174304.5JlzJ583hP@avalon>
+Message-ID: <201307251300.49282.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean
-      Does apply patch1~patch3 and patch6~patch7 have issue on your side? :)
-Thanks
+On Thursday 25 July 2013, Laurent Pinchart wrote:
+> On Wednesday 24 July 2013 20:32:03 Arnd Bergmann wrote:
+> > On Tuesday 23 July 2013, Tomasz Figa wrote:
+> > > On Tuesday 23 of July 2013 17:14:20 Alan Stern wrote:
+> > > > On Tue, 23 Jul 2013, Tomasz Figa wrote:
+> > > > > Where would you want to have those phy_address arrays stored? There
+> > > > > are no board files when booting with DT. Not even saying that you
+> > > > > don't need to use any hacky schemes like this when you have DT that
+> > > > > nicely specifies relations between devices.
+> > > > 
+> > > > If everybody agrees DT has a nice scheme for specifying relations
+> > > > between devices, why not use that same scheme in the PHY core?
+> > > 
+> > > It is already used, for cases when consumer device has a DT node attached.
+> > > In non-DT case this kind lookup translates loosely to something that is
+> > > being done in regulator framework - you can't bind devices by pointers,
+> > > because you don't have those pointers, so you need to use device names.
+> > 
+> > Sorry for jumping in to the middle of the discussion, but why does a new
+> > framework even bother defining an interface for board files?
+> > 
+> > Can't we just drop any interfaces for platform data passing in the phy
+> > framework and put the burden of adding those to anyone who actually needs
+> > them? All the platforms we are concerned with here (exynos and omap, plus
+> > new platforms) can be booted using DT anyway.
+> 
+> What about non-DT architectures such as MIPS (still widely used in consumer 
+> networking equipments from what I've heard) ?
 
-2013/7/14 jett zhou <jett.zhou@gmail.com>:
-> Hi Jean
->      As I checked the for-next branch, found patch4 and patch5 are
-> already applied.
->      As checked on my side,  only apply patch1~patch3 and
-> patch6~patch7 is ok, so think you can apply them except for patch4/5.
->      If there is still problem, please let me know, I will check it then.
-> Thanks
->
-> 2013/7/9 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> HI,
->>
->>         please rebase on the for-next branch as it does not apply
->>
->> Best Regards,
->> J.
->> On 19:27 Thu 27 Jun     , Jett.Zhou wrote:
->>> Changelog:
->>> 1 Add more comments for the mmp_display rbswap usage
->>> according to Daniel's comments;
->>> 2 Add fix patch for ttc_dkb on rbswap;
->>> 3 Add more comments on the pitch usage and definition;
->>> 4 Combine the modification on pitch of graphic and video layer
->>> in one patch.
->>>
->>> Guoqing Li (2):
->>>   video: mmp: rb swap setting update for mmp display
->>>   video: mmp: optimize some register setting code
->>>
->>> Jett.Zhou (1):
->>>   ARM: mmp: remove the legacy rbswap setting for ttc_dkb platform
->>>
->>> Jing Xiang (4):
->>>   video: mmp: fix graphics/video layer enable/mask issue
->>>   video: mmp: fix memcpy wrong size for mmp_addr issue
->>>   video: mmp: calculate pitch value when fb set win
->>>   video: mmp: add pitch info in mmp_win structure
->>>
->>>  arch/arm/mach-mmp/ttc_dkb.c     |    4 +-
->>>  drivers/video/mmp/fb/mmpfb.c    |   34 +++++++++++------
->>>  drivers/video/mmp/hw/mmp_ctrl.c |   79 ++++++++++++++++++++++-----------------
->>>  drivers/video/mmp/hw/mmp_ctrl.h |    5 ++
->>>  include/video/mmp_disp.h        |    6 +++
->>>  5 files changed, 79 insertions(+), 49 deletions(-)
->>>
->
->
->
-> --
->
-> ----------------------------------
-> Best Regards
-> Jett Zhou
+* Vendors of such equipment have started moving on to ARM (e.g. Broadcom bcm47xx)
+* Some of the modern MIPS platforms are now using DT
+* Legacy platforms probably won't migrate to either DT or the generic PHY framework
 
+I'm not saying that we can't support legacy board files with the common
+PHY framework, but I'd expect things to be much easier if we focus on those
+platforms that are actively being worked on for now, to bring an end to the
+pointless API discussion.
 
-
--- 
-
-----------------------------------
-Best Regards
-Jett Zhou
+	Arnd
