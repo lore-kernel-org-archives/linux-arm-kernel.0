@@ -1,46 +1,41 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 15:42:37 +0100
-Subject: [PATCH 2/2] ARM: fix BUG() detection
+Date: Thu, 25 Jul 2013 15:42:36 +0100
+Subject: [PATCH 1/2] ARM: Correct BUG() assembly to ensure it is
+ endian-agnostic
 In-Reply-To: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374763357-4893-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374763357-4893-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The detection of the instruction used by BUG() did not take into account
-the differences in endian-ness between instruction and data. Change the
-code to use the relevant helpers in <asm/opcodes.h> to translate the
-endian-ness of the instructions.
+Currently BUG() uses .word or .hword to create the necessary illegal
+instructions. However if we are building BE8 then these get swapped
+by the linker into different illegal instructions in the text.
+
+Change to using .inst and .inst.w to create the instructions and mark
+them as instructions so that the linker acts correctly.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/traps.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/bug.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index cb67b04..ae2d828 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -344,15 +344,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
- int is_valid_bugaddr(unsigned long pc)
- {
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 7af5c6c..b95da52 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -12,10 +12,10 @@
+  */
  #ifdef CONFIG_THUMB2_KERNEL
--	unsigned short bkpt;
-+	u16 bkpt;
-+	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
+ #define BUG_INSTR_VALUE 0xde02
+-#define BUG_INSTR_TYPE ".hword "
++#define BUG_INSTR_TYPE ".inst.w "
  #else
--	unsigned long bkpt;
-+	u32 bkpt;
-+	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
+ #define BUG_INSTR_VALUE 0xe7f001f2
+-#define BUG_INSTR_TYPE ".word "
++#define BUG_INSTR_TYPE ".inst "
  #endif
  
- 	if (probe_kernel_address((unsigned *)pc, bkpt))
- 		return 0;
  
--	return bkpt == BUG_INSTR_VALUE;
-+	return bkpt == insn;
- }
- 
- #endif
 -- 
 1.7.10.4
