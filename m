@@ -1,48 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Jul 2013 11:40:44 +0100
-Subject: [PATCH 03/14] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-In-Reply-To: <20130725102541.GC24642@n2100.arm.linux.org.uk>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-4-git-send-email-ben.dooks@codethink.co.uk>
- <20130724143335.GL11072@mudshark.cambridge.arm.com>
- <51EFF1B2.4050609@codethink.co.uk>
- <20130725101442.GA5609@mudshark.cambridge.arm.com>
- <20130725102541.GC24642@n2100.arm.linux.org.uk>
-Message-ID: <20130725104044.GD5609@mudshark.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Jul 2013 12:41:16 +0200
+Subject: [PATCH] pinctrl: sunxi: Fix gpio_set behaviour
+Message-ID: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:25:41AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 25, 2013 at 11:14:42AM +0100, Will Deacon wrote:
-> > What's wrong with the following?
-> 
-> Is this like a challenge to find the silly mistake?
+The current gpio_set function is ignoring the previous value set in the
+GPIO value register, which leads in erasing the values already set for
+the other GPIOs in the same bank when setting the value of a given GPIO.
 
-Unfortunately, yes. I'm half asleep this morning...
+Add the usual read/mask/write pattern to fix this brown paper bag bug.
 
-> > @@ -581,8 +581,13 @@ __fixup_a_pv_table:
-> >         b       2f
-> >  1:     add     r7, r3
-> >         ldrh    ip, [r7, #2]
-> > +#ifdef CONFIG_CPU_ENDIAN_BE8
-> > +       and     ip, 0x008f
-> > +       orr     ip, ip, r6, lsl #24
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-sunxi.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-That was supposed to be lsl #8 (I blindly copied from Ben's correct ARM
-hunk), but I think that it's still broken with that change.
-
-> > +#else
-> >         and     ip, 0x8f00
-> >         orr     ip, r6  @ mask in offset bits 31-24
-> > +#endif
-> >         strh    ip, [r7, #2]
-> 
-> Well, ip is being loaded/stored as 16bit, but you're putting r6 in to
-> ip's bits 31-24, which are going to be ignored by the following strh.
-> 
-> The comment "@ mask in offset bits 31-24" refers to the physical address
-> bits here, which are already pre-shifted to bits 7-0 in r6.
-
-Yup. It's bits 15-8 that make life slightly fiddly.
-
-Will
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index fc058b6..4f8bb18 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -464,8 +464,14 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
+ 	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
+ 	u32 reg = sunxi_data_reg(offset);
+ 	u8 index = sunxi_data_offset(offset);
++	u32 regval = readl(pctl->membase + reg);
+ 
+-	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
++	if (value)
++		regval |= BIT(index);
++	else
++		regval &= ~(BIT(index));
++
++	writel(regval, pctl->membase + reg);
+ }
+ 
+ static int sunxi_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
+-- 
+1.8.3.2
