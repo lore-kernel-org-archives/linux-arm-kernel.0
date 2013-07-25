@@ -1,33 +1,81 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Jul 2013 16:01:22 +0200
-Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
-In-Reply-To: <51F0F199.3040501@arm.com>
-References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
- <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
- <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
- <51F0F035.8010705@arm.com>
- <CACRpkdb7UGS8ysPv=LakbWouUdL9MpKvrgYKh_v9NqSYV3TStg@mail.gmail.com>
- <51F0F199.3040501@arm.com>
-Message-ID: <CACRpkdbMxdzpjQrEkSxX-NZKVRNFVT44NDhuZ4pdua5Prvjmug@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 25 Jul 2013 16:03:10 +0200
+Subject: Enabling USBH1 on mx53qsb
+In-Reply-To: <CAOMZO5CAdxzn-3Xc2DZDYEXwsEznRrcqPbCbTDc5ieBkQkA8=g@mail.gmail.com>
+ (Fabio Estevam's message of "Wed, 24 Jul 2013 23:59:35 -0300")
+References: <CAOMZO5CAdxzn-3Xc2DZDYEXwsEznRrcqPbCbTDc5ieBkQkA8=g@mail.gmail.com>
+Message-ID: <8738r2wxcx.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:36 AM, Jonathan Austin
-<jonathan.austin@arm.com> wrote:
-> On 25/07/13 10:33, Linus Walleij wrote:
+Fabio Estevam <festevam@gmail.com> writes:
 
->> Then as the VCO params get written, it is never really unlocked
->> so the registers are untouched.
->>
->> You may have a different boot monitor?
->>
+> Hi,
+
+Hi,
 >
-> Ahh, that seems highly likely. I don't ever see boot-monitor (boot straight
-> in to uboot) but I don't see anything on the display until the kernel boots,
-> so I don't think BM is setting up the VCO for me.
+> I am trying to get USBH1 port to work on mx53qsb (with Dialog pmic)
+> with the following patch against linux-next-20130724:
 
-True, if you boot directly into U-boot the boot monitor is
-never executed and the mode is never set up.
+I've been trying to reach the same goal for quite some time without
+success (on the same version of the mx53qsb).
+>
+> --- a/arch/arm/boot/dts/imx53-qsb.dts
+> +++ b/arch/arm/boot/dts/imx53-qsb.dts
+> @@ -93,6 +93,15 @@
+>                         regulator-max-microvolt = <3200000>;
+>                         regulator-always-on;
+>                 };
+> +
+> +               reg_usb_vbus: usb_vbus {
+> +                       compatible = "regulator-fixed";
+> +                       regulator-name = "usb_vbus";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       gpio = <&gpio7 8 0>;
+> +                       enable-active-high;
+> +               };
+>         };
+>
+>         sound {
+> @@ -145,6 +154,7 @@
+>                                 MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
+>                                 MX53_PAD_EIM_DA13__GPIO3_13       0x80000000
+>                                 MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
+> +                               MX53_PAD_PATA_DA_2__GPIO7_8       0x80000000
+>                                 MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+>                         >;
+>                 };
+> @@ -302,7 +312,8 @@
+>  };
+>
+>  &usbh1 {
+> -       status = "okay";
+> +       vbus-supply = <&reg_usb_vbus>;
+> +       status = "okay";
 
-Yours,
-Linus Walleij
+I tried also with:
++       phy_type = "utmi_wide";
++       dr_mode = "host";
+
+but nothing.
+
+>  };
+>
+>  &usbotg {
+>
+>
+> mx53qsb board has two USB host ports:
+>
+> - The top port is USBH1
+> - The bottom port is OTG (also shared with J3 connector)
+>
+> After applying the above patch the OTG port does work, but the USBH1
+> does not.
+
+Given that the same gpio controls vbus for both ports, my current guess
+is something on port configuration side (I guess the board would freeze
+hard if a clock is not enabled).
+
+
+Arnaud
