@@ -1,96 +1,107 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Jul 2013 11:22:47 -0700
-Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
- prior to strex
-In-Reply-To: <20130725180518.GM12827@mudshark.cambridge.arm.com>
-References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
- <1374579389-32704-5-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
- <20130724111841.GD11072@mudshark.cambridge.arm.com>
- <51F160EA.6030800@codeaurora.org> <51F1626C.3050008@codeaurora.org>
- <20130725174555.GK12827@mudshark.cambridge.arm.com>
- <51F166A0.7030203@codeaurora.org>
- <20130725180518.GM12827@mudshark.cambridge.arm.com>
-Message-ID: <51F16CF7.5080604@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 25 Jul 2013 11:25:30 -0700
+Subject: DT bindings as ABI [was: Do we have people interested in device
+ tree janitoring / cleanup?]
+In-Reply-To: <51F168FC.9070906@wwwdotorg.org>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+Message-ID: <CAOesGMiLKysW2JG1jbef76Ves=-DAYEiE9d+s8YXWRXUJ+XhaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/13 11:05, Will Deacon wrote:
-> On Thu, Jul 25, 2013 at 06:55:44PM +0100, Stephen Boyd wrote:
->> On 07/25/13 10:45, Will Deacon wrote:
->>> On Thu, Jul 25, 2013 at 06:37:48PM +0100, Stephen Boyd wrote:
->>>> On 07/25/13 10:31, Stephen Boyd wrote:
->>>>> Maybe I'm wrong, but can't you just remove the casts and leave the
->>>>> function as static inline? const void * is pretty much telling the
->>>>> compiler to turn off type checking.
->>>>>
->>>> Oh joy. Why is rwlock's lock member marked volatile?
->>> Yeah, that was the problematic guy. However, I had to fix that anyway in
->>> this patch because otherwise the definition for prefetchw when
->>> !ARCH_HAS_PREFETCHW (which expands to __builtin_prefetch(x,1)) will explode.
+On Thu, Jul 25, 2013 at 11:05 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/25/2013 10:57 AM, Mark Rutland wrote:
+>> On Thu, Jul 25, 2013 at 05:09:19PM +0100, Olof Johansson wrote:
+> ...
+>>> So, there really seems to be a need for a layered approach, one in
+>>> which a binding "graduates" from being tentative to being locked in.
+>>> I'm refraining from using the terms "staging" and "stable" here, since
+>>> they have overloaded meaning in the kernel world that doesn't apply
+>>> here.
+>>
+>> I'm not sure how realistic it is to have drivers in the kernel using
+>> unstable bindings, and expect people to not rely on them, but I don't
+>> have a better option to give. We need a big fat warning that an unstable
+>> binding is in use.
+>
+> I don't think having people "rely" on the bindings is the issue so much
+> as the awareness that if they do, there will be compatibility issues for
+> unstable bindings.
+
+If we continue doing what we do today, where we have (at least part
+of) the device trees hosted with the kernel sources, then we can
+introduce tentative changes to the device trees at the same time as
+the code, so having the drivers rely on that seems appropriate.
+
+Of course, things should not be static in that state, and have to move
+out of it reasonably quickly.
+
+>>> One problem that needs to be solved is obviously how a binding
+>>> graduates from tentative to locked. This work isn't going to be very
+>>> interesting to most people, I suspect. Think standards committee type
+>>> work.
 >>>
->>> So, given that I've fixed the rwlocks, I think I could put prefetch and
->>> prefetchw back to static inline functions. What do you reckon?
->> It would be good to match the builtin function's signature so that we
->> don't explode in the future on ARCH_HAS_PREFETCHW configs.
-> Ok, so that's basically just undoing the macroisation on top of v2 (fixup
-> below).
+>>> A possible way to handle this is to have exactly that: A group of
+>>> people that essentially constitute the "standards committee" that meet
+>>> on a regular basis to review and approve new bindings. They should be
+>>> people not just doing ARM Linux work, but other stakeholders in these
+>>> bindings too. One of the things they should probably do is sift
+>>> through our current in-kernel bindings and select those who seem ready
+>>> to be locked in, review/discuss/decide upon that and once the decision
+>>> is made, that specific binding does become part of the static,
+>>> never-ever-change ABI of firmware-to-kernel interfaces.   That might
+>>> also be the time that the binding is moved from the kernel to a
+>>> separate repo, but that's a technicality that we'll let the DT
+>>> maintainers decide among themselves, IMHO.
+>>
+>> We're going to need input from other OSs too, or the bindings will
+>> remain Linux-specific regardless of how far away the bindings and dts
+>> repo(s) is/are.
 >
-> Will
+> And bootloaders too. Some U-Boot platforms are starting to use DT for
+> exactly the same reason that the kernel does; to allow a single
+> bootloader binary to run on a variety of different boards, with all
+> configuration coming from DT.
 
-Looks good to me. Thanks.
+Not only that, but in some cases u-boot might want to reach into the
+device-tree of the launching kernel and tweak settings based on board
+information. It already does this for things like memory and command
+line, but there could be other cases where it wants to do so as well.
+If things move around, or bindings change, this will obviously cause
+problems. (I've already seen this with the Chrome OS u-boot vs
+upstream kernels, partly due to a bug in the local fork of u-boot, but
+still).
 
->
-> --->8
->
-> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-> index dde7ecc..dac9429 100644
-> --- a/arch/arm/include/asm/processor.h
-> +++ b/arch/arm/include/asm/processor.h
-> @@ -109,25 +109,25 @@ unsigned long get_wchan(struct task_struct *p);
->  #if __LINUX_ARM_ARCH__ >= 5
->  
->  #define ARCH_HAS_PREFETCH
-> -#define prefetch(p)                                                    \
-> -({                                                                     \
-> -       __asm__ __volatile__(                                           \
-> -               "pld\t%a0"                                              \
-> -               :: "p" (p));                                            \
-> -})
-> +static inline void prefetch(const void *ptr)
-> +{
-> +       __asm__ __volatile__(
-> +               "pld\t%a0"
-> +               :: "p" (ptr));
-> +}
->  
->  #if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
->  #define ARCH_HAS_PREFETCHW
-> -#define prefetchw(p)                                                   \
-> -({                                                                     \
-> -       __asm__ __volatile__(                                           \
-> -               ".arch_extension        mp\n"                           \
-> -               __ALT_SMP_ASM(                                          \
-> -                       WASM(pldw)              "\t%a0",                \
-> -                       WASM(pld)               "\t%a0"                 \
-> -               )                                                       \
-> -               :: "p" (p));                                            \
-> -})
-> +static inline void prefetchw(const void *ptr)
-> +{
-> +       __asm__ __volatile__(
-> +               ".arch_extension        mp\n"
-> +               __ALT_SMP_ASM(
-> +                       WASM(pldw)              "\t%a0",
-> +                       WASM(pld)               "\t%a0"
-> +               )
-> +               :: "p" (ptr));
-> +}
->  #endif
->  #endif
->
+> On another related topic, something that may be useful for the DT
+> bindings reviewer team is a basic checklist for new DT bindings.
+> Something similar to Fedora's package review checklist. Perhaps also
+> (yet another?) document on a bit of DT philosophy. If this sounds
+> useful, I could try and take a stab at some basic initial version.
+
+Sounds reasonable. Starting with one of the existing ones instead of
+from scratch is a reasonable approach. A checklist and a best
+practices doc would come a long way.
+
+> We also need to decide (or just document) exactly what "describes the
+> HW" means; see the thread on thermal limits, and consider the extension
+> of describing hard/absolute thermal limits to describing use-cased base
+> thermal profiles using the same schema, or not allowing that.
+
+Yes indeed. A basic binding need just specify what the specific
+hardware IP is, if the rest of the configuration of the IP can be
+determined at runtime through other means (i.e. by autoprobing). It's
+stuff beyond that that gets very complicated.
+
+To talk semi-specifics: What about USB PHY tunings for a specific
+board, where each of the three USB ports and their registers have
+slightly different layout? Sure, we can take 10 properties to describe
+each tunable field in each register, but at the end it will just be
+used to craft the contents blindly, so we might just stuff the 32-bit
+register value as a property instead. And in other cases we might
+indeed want to describe each property independently. Determining what
+is appropriate when is one of the most difficult parts of the review
+workflow.
 
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+-Olof
