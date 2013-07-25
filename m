@@ -1,32 +1,57 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 25 Jul 2013 09:53:03 -0700
+Date: Thu, 25 Jul 2013 09:57:00 -0700
 Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
  hooks to hw_pci
 In-Reply-To: <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130725165302.GA27802@dhcp-172-17-186-34.nvidia.com>
+Message-ID: <20130725165659.GB27802@dhcp-172-17-186-34.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jul 15, 2013 at 01:52:44PM +0200, Thomas Petazzoni wrote:
-[...]
+> Some PCI drivers may need to adjust the pci_bus structure after it has
+> been allocated by the Linux PCI core. The PCI core allows
+> architectures to implement the pcibios_add_bus() and
+> pcibios_remove_bus() for this purpose. This commit therefore extends
+> the hw_pci and pci_sys_data structures of the ARM PCI core to allow
+> PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
+> which will get called when a bus is added or removed from the system.
+> 
+> This will be used for example by the Marvell PCIe driver to connect a
+> particular PCI bus with its corresponding MSI chip to handle Message
+> Signaled Interrupts.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+> ---
+>  arch/arm/include/asm/mach/pci.h |  4 ++++
+>  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
+>  2 files changed, 20 insertions(+)
 
-Hi Thomas,
+Hi Russell,
 
-I just noticed two minor issues, see below.
+Can we have your Acked-by on this patch so that it can be moved to a
+stable branch along with some of the other patches in this branch that
+both Marvell and Tegra PCIe drivers need?
 
+Thanks,
+Thierry
+
+> 
 > diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-[...]
+> index a1c90d7..487155c 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
 > @@ -36,6 +36,8 @@ struct hw_pci {
 >  					  resource_size_t start,
 >  					  resource_size_t size,
 >  					  resource_size_t align);
 > +	void            (*add_bus)(struct pci_bus *bus);
 > +	void            (*remove_bus)(struct pci_bus *bus);
-
-This hunk...
-
+>  };
+>  
+>  /*
 > @@ -63,6 +65,8 @@ struct pci_sys_data {
 >  					  resource_size_t start,
 >  					  resource_size_t size,
@@ -35,29 +60,48 @@ This hunk...
 > +	void            (*remove_bus)(struct pci_bus *bus);
 >  	void		*private_data;	/* platform controller private data	*/
 >  };
-
-and this one use inconsistent indentation (spaces instead of tabs).
-
+>  
 > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-[...]
+> index 261fcc8..530e59d 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -363,6 +363,20 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+>  }
+>  EXPORT_SYMBOL(pcibios_fixup_bus);
+>  
+> +void pcibios_add_bus(struct pci_bus *bus)
+> +{
+> +	struct pci_sys_data *sys = bus->sysdata;
+> +	if (sys->add_bus)
+> +		sys->add_bus(bus);
+> +}
+> +
+> +void pcibios_remove_bus(struct pci_bus *bus)
+> +{
+> +	struct pci_sys_data *sys = bus->sysdata;
+> +	if (sys->remove_bus)
+> +		sys->remove_bus(bus);
+> +}
+> +
+>  /*
+>   * Swizzle the device pin each time we cross a bridge.  If a platform does
+>   * not provide a swizzle function, we perform the standard PCI swizzling.
 > @@ -464,6 +478,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 >  		sys->swizzle = hw->swizzle;
 >  		sys->map_irq = hw->map_irq;
 >  		sys->align_resource = hw->align_resource;
 > +		sys->add_bus        = hw->add_bus;
 > +		sys->remove_bus     = hw->remove_bus;
-
-And this one aligns the '=' sign, whereas none of the other assignments
-do.
-
-Might be nice to fix those up before sending them to Russell's patch
-tracker.
-
-Thierry
+>  		INIT_LIST_HEAD(&sys->resources);
+>  
+>  		if (hw->private_data)
+> -- 
+> 1.8.1.2
+> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/6f6205d2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/28eff599/attachment.sig>
