@@ -1,36 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Jul 2013 11:25:41 +0100
-Subject: [PATCH 03/14] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-In-Reply-To: <20130725101442.GA5609@mudshark.cambridge.arm.com>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-4-git-send-email-ben.dooks@codethink.co.uk>
- <20130724143335.GL11072@mudshark.cambridge.arm.com>
- <51EFF1B2.4050609@codethink.co.uk>
- <20130725101442.GA5609@mudshark.cambridge.arm.com>
-Message-ID: <20130725102541.GC24642@n2100.arm.linux.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 25 Jul 2013 11:26:41 +0100
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <2174304.5JlzJ583hP@avalon>
+References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
+ <5977067.8rykRgjgre@flatron> <201307242032.03597.arnd@arndb.de>
+ <2174304.5JlzJ583hP@avalon>
+Message-ID: <CAGVrzcZqTNcu4Dxnr9p6JNBVzEBSBPuFSZLpiogDVX4zfw6kWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:14:42AM +0100, Will Deacon wrote:
-> What's wrong with the following?
+2013/7/25 Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
+> Hi Arnd,
+>
+> On Wednesday 24 July 2013 20:32:03 Arnd Bergmann wrote:
+>> On Tuesday 23 July 2013, Tomasz Figa wrote:
+>> > On Tuesday 23 of July 2013 17:14:20 Alan Stern wrote:
+>> > > On Tue, 23 Jul 2013, Tomasz Figa wrote:
+>> > > > Where would you want to have those phy_address arrays stored? There
+>> > > > are no board files when booting with DT. Not even saying that you
+>> > > > don't need to use any hacky schemes like this when you have DT that
+>> > > > nicely specifies relations between devices.
+>> > >
+>> > > If everybody agrees DT has a nice scheme for specifying relations
+>> > > between devices, why not use that same scheme in the PHY core?
+>> >
+>> > It is already used, for cases when consumer device has a DT node attached.
+>> > In non-DT case this kind lookup translates loosely to something that is
+>> > being done in regulator framework - you can't bind devices by pointers,
+>> > because you don't have those pointers, so you need to use device names.
+>>
+>> Sorry for jumping in to the middle of the discussion, but why does a *new*
+>> framework even bother defining an interface for board files?
+>>
+>> Can't we just drop any interfaces for platform data passing in the phy
+>> framework and put the burden of adding those to anyone who actually needs
+>> them? All the platforms we are concerned with here (exynos and omap, plus
+>> new platforms) can be booted using DT anyway.
+>
+> What about non-DT architectures such as MIPS (still widely used in consumer
+> networking equipments from what I've heard) ?
 
-Is this like a challenge to find the silly mistake?
+Is there any specific MIPS platform you are thinking about which could
+benefit from this generic PHY framework? MIPS is also trying to make
+DT the standard for passing such information now.
 
-> @@ -581,8 +581,13 @@ __fixup_a_pv_table:
->         b       2f
->  1:     add     r7, r3
->         ldrh    ip, [r7, #2]
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +       and     ip, 0x008f
-> +       orr     ip, ip, r6, lsl #24
-> +#else
->         and     ip, 0x8f00
->         orr     ip, r6  @ mask in offset bits 31-24
-> +#endif
->         strh    ip, [r7, #2]
-
-Well, ip is being loaded/stored as 16bit, but you're putting r6 in to
-ip's bits 31-24, which are going to be ignored by the following strh.
-
-The comment "@ mask in offset bits 31-24" refers to the physical address
-bits here, which are already pre-shifted to bits 7-0 in r6.
+-- 
+Florian
