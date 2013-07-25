@@ -1,82 +1,44 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 25 Jul 2013 22:33:46 +0200
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
- with ARM CPU
-In-Reply-To: <20130724225443.GA29801@glitch>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
- <20130723184907.GA6811@ohporter.com>
- <CAGVrzcbA72AYu6J3JXBirQQeTiDH9cJThdBdH=Q=gJtOnqz-AA@mail.gmail.com>
- <20130723192203.GC6811@ohporter.com> <51EF1B8C.9020304@broadcom.com>
- <CADjby3WGW6f=1Vdm2kx+Re0KrjFRaC3dQOumpnS6_sp2yb5NfQ@mail.gmail.com>
- <51F02947.7020301@hauke-m.de> <20130724225443.GA29801@glitch>
-Message-ID: <51F18BAA.1050806@hauke-m.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Jul 2013 16:51:33 -0400
+Subject: [GIT PULL] ARM: mvebu: stable fix for v3.10
+In-Reply-To: <CAOesGMjNh3u=GmckBHfTZtJSEzbwPHtkJkhC7kCwFQ+TeKtHAA@mail.gmail.com>
+References: <20130725173357.GN23879@titan.lakedaemon.net>
+ <CAOesGMjNh3u=GmckBHfTZtJSEzbwPHtkJkhC7kCwFQ+TeKtHAA@mail.gmail.com>
+Message-ID: <20130725205133.GY23879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2013 12:54 AM, Domenico Andreoli wrote:
-> On Wed, Jul 24, 2013 at 09:21:43PM +0200, Hauke Mehrtens wrote:
->> On 07/24/2013 02:44 AM, Domenico Andreoli wrote:
->>> On Wednesday, July 24, 2013, Hauke Mehrtens <hauke@hauke-m.de
->>> <mailto:hauke@hauke-m.de>> wrote:
->>>> On 07/19/2013 03:36 AM, Domenico Andreoli wrote:
->>>>> On Tue, Jul 16, 2013 at 05:35:21PM +0200, Hauke Mehrtens wrote:
->>>>>> On 07/16/2013 05:20 PM, Thomas Petazzoni wrote:
->>>>>>>
->>>>>>>> diff --git a/arch/arm/mach-bcm53xx/Kconfig
->>> b/arch/arm/mach-bcm53xx/Kconfig
->>>>>>>> new file mode 100644
->>>>>>>> index 0000000..1e16e87
->>>>>>>> --- /dev/null
->>>>>>>> +++ b/arch/arm/mach-bcm53xx/Kconfig
->>>>>>>> @@ -0,0 +1,10 @@
->>>>>>>> +config ARCH_BCM53XX
->>>>>>>> +  bool "Broadcom BCM47XX / BCM53XX ARM SoC"
->>>>>>>
->>>>>>> So the directory is named mach-bcm53xx, but you also handle BCM47xx
->>>>>>> SoCs. This doesn't sound really easy to follow.
->>>>>
->>>>> At the time of the BCM281XX merge we considered that such directories
->>> would
->>>>> mostly contain board files only, being these new entries DT based. Hence
->>>>> the choice of mach-bcm to collect all of them.
->>>>>
->>>>> I think you should then put this stuff there.
->>>>
->>>> So you think I should move the file from
->>>> arch/arm/mach-bcm53xx/bcm53xx.c to arch/arm/mach-bcm/bcm53xx.c ?
->>>
->>> yes
->>>
->>> this looks more comsistent with the actual soc name:
->>> arch/arm/mach-bcm/bcm530xx.c
->>>
->>> but I find also acceptable the complete name of the "parent" soc (as I'm
->>> doing with the bcm4760), so: arch/arm/mach-bcm/bcm53010.c
->>
->> I do not think these Broadcom ARM SoCs (bcm4760, BCM5301X, bcm11351)
->> have more in common than the vendor name, so I do not think it is a good
->> idea to place them all at mach-bcm.
+On Thu, Jul 25, 2013 at 01:33:08PM -0700, Olof Johansson wrote:
+> Hi,
 > 
-> In an ideal DT-only world (as basically is for Broadcom ARM SoCs), whatever
-> two or more SoCs share can hopefully modelled in a driver and as such
-> would go in the drivers/ subtree. What's left is really SoC specific and,
-> again hopefully, very minimal.
+> On Thu, Jul 25, 2013 at 10:33 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Arnd, Olof,
+> >
+> > I'm trying something new.  I've based this branch off of the common
+> > ancestor to the v3.10.x tree (v3.10).  If you could handle it just like
+> > a normal mvebu/fixes branch (ie merge it in for v3.11-rcX), once it hits
+> > mainline, I'll send a PR to the stable folks for the branch.
+> >
+> > The advantage of this is that you get the same commit id in both trees
+> > and it's less work for the stable maintainers.
+> >
+> > Also, please note the URL change.  I'll post an announcement about that
+> > shortly.
+> >
+> > As usual, please tell me if I'm all fouled up. :)
 > 
-> There should not be any SoC so weird to require a whole subdirectory full
-> of that SoC specific stuff. So grouping everything by vendor name looks
-> quite appealing to me.
-> 
-> Sharing the same subdir requires people working in it to talk and find
-> agreements some more than the sparsely populated subdir did (because there
-> is not a single maintainer who owns it). I think this is a big advantage
-> Broadcomers can start with right now.
+> I'm confused. Just to double-check, I just checked out v3.10 and built
+> orion5x_defconfig, without any kind of problem.
 
-I want to be able to build the BCM5301X SoC without building the current
-CONFIG_ARCH_BCM, so what name do you suggest for board_bcm.o ?
+gah! you're right.  I did a git blame on the mbus call to see how far
+back to go, but didn't look deep enough.  mv643xx_eth.h includes mbus.h.
 
-My plan would be to make CONFIG_ARCH_BCM just activate the Broadcom
-submenu, but not build any code. Then the list of Broadcom SoCs is
-opened like CONFIG_ARCH_BCM5301X and the "old" CONFIG_ARCH_BCM.
+The error occurs once mv643xx_eth.h is removed (in Sebastian's patch
+series to convert mv643xx_eth init to DT).  I'll append this patch to
+the series causing the build failure.  Please ignore this PR.
 
-Hauke
+Sorry for the noise.
+
+thx,
+
+Jason.
