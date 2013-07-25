@@ -1,61 +1,162 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Jul 2013 10:44:48 +0100
-Subject: [PATCH 11/14] ARM: alignment: correctly decode instructions in
- BE8 mode.
-In-Reply-To: <1374661682-9349-12-git-send-email-ben.dooks@codethink.co.uk>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-12-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130725094447.GE27613@mudshark.cambridge.arm.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 25 Jul 2013 10:45:37 +0100
+Subject: [PATCH v3 1/3] drivers: clocksource: configure event stream for ARM
+ arch timer
+In-Reply-To: <1374492082-13686-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492082-13686-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1374745537-30389-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 11:27:59AM +0100, Ben Dooks wrote:
-> If we are in BE8 mode, we must deal with the instruction stream being
-> in LE order when data is being loaded in BE order. Ensure the data is
-> swapped before processing to avoid thre following:
-> 
-> Change to using <asm/opcodes.h> to provide the necessary conversion
-> functions to change the byte ordering.
-> 
-> Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
-> Unhandled fault: alignment exception (0x001) at 0xbfa09567
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/mm/alignment.c |    8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index 6f4585b..f38145a 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -25,6 +25,7 @@
->  #include <asm/cp15.h>
->  #include <asm/system_info.h>
->  #include <asm/unaligned.h>
-> +#include <asm/opcodes.h>
->  
->  #include "fault.h"
->  
-> @@ -762,21 +763,24 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  	if (thumb_mode(regs)) {
->  		u16 *ptr = (u16 *)(instrptr & ~1);
->  		fault = probe_kernel_address(ptr, tinstr);
-> +		tinstr = __mem_to_opcode_thumb16(tinstr);
->  		if (!fault) {
->  			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
->  			    IS_T32(tinstr)) {
->  				/* Thumb-2 32-bit */
->  				u16 tinst2 = 0;
->  				fault = probe_kernel_address(ptr + 1, tinst2);
-> +				tinst2 = __mem_to_opcode_thumb16(tinst2);
->  				instr = (tinstr << 16) | tinst2;
->  				thumb2_32b = 1;
->  			} else {
->  				isize = 2;
-> -				instr = thumb2arm(tinstr);
+From: Will Deacon <will.deacon@arm.com>
 
-As Dave pointed out in the other thread, this looks like an erroneous
-deletion.
+The ARM architected timer can generate events (used for waking up
+CPUs executing the wfe instruction) at a frequency represented as a
+power-of-2 divisor of the clock rate.
 
-Will
+This patch configures the event stream, aiming for a period of 100us
+between events. This can be used to implement wfe-based timeouts for
+userspace locking implementations.
+
+This patch also adds the hwcaps for the same, so that userspace can
+detect this feature.
+
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/arch_timer.h    | 6 ++++--
+ arch/arm/include/uapi/asm/hwcap.h    | 1 +
+ arch/arm/kernel/setup.c              | 1 +
+ arch/arm64/include/asm/arch_timer.h  | 6 +++---
+ drivers/clocksource/arm_arch_timer.c | 9 ++++++++-
+ include/clocksource/arm_arch_timer.h | 2 ++
+ 6 files changed, 19 insertions(+), 6 deletions(-)
+
+------------>8---------------------
+
+Hi,
+
+This version adds the hwcaps for publishing the event stream feature to the
+userspace.
+
+This patch is now rebased on rmk's fixes branch as it conflicts with ab8d46c0 
+"ARM: 7788/1: elf: fix lpae hwcap feature reporting in proc/cpuinfo"
+
+Regards,
+Sudeep
+
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index e406d57..8963877 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -89,16 +89,18 @@ static inline u64 arch_counter_get_cntvct(void)
+ 	return cval;
+ }
+ 
+-static inline void arch_counter_set_user_access(void)
++static inline void arch_counter_set_user_access(int divider)
+ {
+ 	u32 cntkctl;
+ 
+ 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+ 
+ 	/* disable user access to everything */
+-	cntkctl &= ~((3 << 8) | (7 << 0));
++	cntkctl &= ~((3 << 8) | (0xf << 4) | (3 << 0));
++	cntkctl |= (divider << 4) | (1 << 2);
+ 
+ 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
++	elf_hwcap |= HWCAP_EVTSTRM;
+ }
+ #endif
+ 
+diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+index 6d34d08..7dcc10d 100644
+--- a/arch/arm/include/uapi/asm/hwcap.h
++++ b/arch/arm/include/uapi/asm/hwcap.h
+@@ -26,5 +26,6 @@
+ #define HWCAP_VFPD32	(1 << 19)	/* set if VFP has 32 regs (not 16) */
+ #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
+ #define HWCAP_LPAE	(1 << 20)
++#define HWCAP_EVTSTRM	(1 << 21)
+ 
+ #endif /* _UAPI__ASMARM_HWCAP_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 96286cb..5191956 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -973,6 +973,7 @@ static const char *hwcap_str[] = {
+ 	"idivt",
+ 	"vfpd32",
+ 	"lpae",
++	"evtstrm",
+ 	NULL
+ };
+ 
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 98abd47..8c1e42f 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -97,16 +97,16 @@ static inline u32 arch_timer_get_cntfrq(void)
+ 	return val;
+ }
+ 
+-static inline void arch_counter_set_user_access(void)
++static inline void arch_counter_set_user_access(int divider)
+ {
+ 	u32 cntkctl;
+ 
+ 	/* Disable user access to the timers and the physical counter. */
+ 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
+-	cntkctl &= ~((3 << 8) | (1 << 0));
++	cntkctl &= ~((3 << 8) | (0xf << 4) | (1 << 0));
+ 
+ 	/* Enable user access to the virtual counter and frequency. */
+-	cntkctl |= (1 << 1);
++	cntkctl |= (divider << 4) | (1 << 2) | (1 << 1);
+ 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+ }
+ 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index ffadd83..6301ee5 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -125,6 +125,8 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
+ 
+ static int arch_timer_setup(struct clock_event_device *clk)
+ {
++	int evt_stream_div, pos;
++
+ 	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
+ 	clk->name = "arch_sys_timer";
+ 	clk->rating = 450;
+@@ -153,7 +155,12 @@ static int arch_timer_setup(struct clock_event_device *clk)
+ 			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+ 	}
+ 
+-	arch_counter_set_user_access();
++	/* Find the closest power of two to the divisor */
++	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
++	pos = fls(evt_stream_div);
++	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
++		pos--;
++	arch_counter_set_user_access(min(pos, 15));
+ 
+ 	return 0;
+ }
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index c463ce9..24dc140 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -29,6 +29,8 @@
+ #define ARCH_TIMER_PHYS_ACCESS		0
+ #define ARCH_TIMER_VIRT_ACCESS		1
+ 
++#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
++
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ 
+ extern u32 arch_timer_get_rate(void);
+-- 
+1.8.1.2
