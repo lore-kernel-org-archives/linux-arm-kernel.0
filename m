@@ -1,40 +1,63 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Jul 2013 09:45:42 -0700
-Subject: [PATCH v1 04/14] clk: Add set_rate_and_parent() op
-In-Reply-To: <4582949.WCP5JfKYES@flatron>
-References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-5-git-send-email-sboyd@codeaurora.org>
- <4582949.WCP5JfKYES@flatron>
-Message-ID: <20130725164542.GF29694@codeaurora.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 25 Jul 2013 09:53:03 -0700
+Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
+ hooks to hw_pci
+In-Reply-To: <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130725165302.GA27802@dhcp-172-17-186-34.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25, Tomasz Figa wrote:
-> On Wednesday 24 of July 2013 17:43:32 Stephen Boyd wrote:
-> > Some of Qualcomm's clocks can change their parent and rate at the
-> > same time with a single register write. Add support for this
-> > hardware to the common clock framework by adding a new
-> > set_rate_and_parent() op. When the clock framework determines
-> > that both the parent and the rate are going to change during
-> > clk_set_rate() it will call the .set_rate_and_parent() op if
-> > available and fall back to calling .set_parent() followed by
-> > .set_rate() otherwise.
-> 
-> This is strange. Does you hardware support switching parent and rate 
-> separately or you always need to set both and so all the fuss here?
+On Mon, Jul 15, 2013 at 01:52:44PM +0200, Thomas Petazzoni wrote:
+[...]
 
-It supports setting the parent or setting the rate, or setting
-both at the same time.
+Hi Thomas,
 
-> 
-> If the latter is the case, then maybe you can simply keep parent index and 
-> rate cached inside driver data of your clock driver and use them on any 
-> .set_rate() or .set_parent() calls?
+I just noticed two minor issues, see below.
 
-This will not work. In fact, doing that would cause us to
-overclock hardware for a short time between switching the parent
-and the rate.
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+[...]
+> @@ -36,6 +36,8 @@ struct hw_pci {
+>  					  resource_size_t start,
+>  					  resource_size_t size,
+>  					  resource_size_t align);
+> +	void            (*add_bus)(struct pci_bus *bus);
+> +	void            (*remove_bus)(struct pci_bus *bus);
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+This hunk...
+
+> @@ -63,6 +65,8 @@ struct pci_sys_data {
+>  					  resource_size_t start,
+>  					  resource_size_t size,
+>  					  resource_size_t align);
+> +	void            (*add_bus)(struct pci_bus *bus);
+> +	void            (*remove_bus)(struct pci_bus *bus);
+>  	void		*private_data;	/* platform controller private data	*/
+>  };
+
+and this one use inconsistent indentation (spaces instead of tabs).
+
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+[...]
+> @@ -464,6 +478,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+>  		sys->align_resource = hw->align_resource;
+> +		sys->add_bus        = hw->add_bus;
+> +		sys->remove_bus     = hw->remove_bus;
+
+And this one aligns the '=' sign, whereas none of the other assignments
+do.
+
+Might be nice to fix those up before sending them to Russell's patch
+tracker.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/6f6205d2/attachment.sig>
