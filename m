@@ -1,84 +1,72 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Thu, 25 Jul 2013 14:37:07 -0700
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X
- SoC with ARM CPU
-In-Reply-To: <51F18BAA.1050806@hauke-m.de>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
- <20130723184907.GA6811@ohporter.com>
- <CAGVrzcbA72AYu6J3JXBirQQeTiDH9cJThdBdH=Q=gJtOnqz-AA@mail.gmail.com>
- <20130723192203.GC6811@ohporter.com> <51EF1B8C.9020304@broadcom.com>
- <CADjby3WGW6f=1Vdm2kx+Re0KrjFRaC3dQOumpnS6_sp2yb5NfQ@mail.gmail.com>
- <51F02947.7020301@hauke-m.de> <20130724225443.GA29801@glitch>
- <51F18BAA.1050806@hauke-m.de>
-Message-ID: <51F19A83.2090000@broadcom.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 25 Jul 2013 15:37:53 -0600
+Subject: DT bindings as ABI [was: Do we have people interested in device
+ tree janitoring / cleanup?]
+In-Reply-To: <20130725184834.GA8296@netboy>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+Message-ID: <20130725213753.GC17616@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-07-25 01:33 PM, Hauke Mehrtens wrote:
-> On 07/25/2013 12:54 AM, Domenico Andreoli wrote:
->> On Wed, Jul 24, 2013 at 09:21:43PM +0200, Hauke Mehrtens wrote:
->>> On 07/24/2013 02:44 AM, Domenico Andreoli wrote:
->>>> On Wednesday, July 24, 2013, Hauke Mehrtens <hauke@hauke-m.de
->>>> <mailto:hauke@hauke-m.de>> wrote:
->>>>> On 07/19/2013 03:36 AM, Domenico Andreoli wrote:
->>>>>> On Tue, Jul 16, 2013 at 05:35:21PM +0200, Hauke Mehrtens wrote:
->>>>>>> On 07/16/2013 05:20 PM, Thomas Petazzoni wrote:
->>>>>>>>> diff --git a/arch/arm/mach-bcm53xx/Kconfig
->>>> b/arch/arm/mach-bcm53xx/Kconfig
->>>>>>>>> new file mode 100644
->>>>>>>>> index 0000000..1e16e87
->>>>>>>>> --- /dev/null
->>>>>>>>> +++ b/arch/arm/mach-bcm53xx/Kconfig
->>>>>>>>> @@ -0,0 +1,10 @@
->>>>>>>>> +config ARCH_BCM53XX
->>>>>>>>> +  bool "Broadcom BCM47XX / BCM53XX ARM SoC"
->>>>>>>> So the directory is named mach-bcm53xx, but you also handle BCM47xx
->>>>>>>> SoCs. This doesn't sound really easy to follow.
->>>>>> At the time of the BCM281XX merge we considered that such directories
->>>> would
->>>>>> mostly contain board files only, being these new entries DT based. Hence
->>>>>> the choice of mach-bcm to collect all of them.
->>>>>>
->>>>>> I think you should then put this stuff there.
->>>>> So you think I should move the file from
->>>>> arch/arm/mach-bcm53xx/bcm53xx.c to arch/arm/mach-bcm/bcm53xx.c ?
->>>> yes
->>>>
->>>> this looks more comsistent with the actual soc name:
->>>> arch/arm/mach-bcm/bcm530xx.c
->>>>
->>>> but I find also acceptable the complete name of the "parent" soc (as I'm
->>>> doing with the bcm4760), so: arch/arm/mach-bcm/bcm53010.c
->>> I do not think these Broadcom ARM SoCs (bcm4760, BCM5301X, bcm11351)
->>> have more in common than the vendor name, so I do not think it is a good
->>> idea to place them all at mach-bcm.
->> In an ideal DT-only world (as basically is for Broadcom ARM SoCs), whatever
->> two or more SoCs share can hopefully modelled in a driver and as such
->> would go in the drivers/ subtree. What's left is really SoC specific and,
->> again hopefully, very minimal.
->>
->> There should not be any SoC so weird to require a whole subdirectory full
->> of that SoC specific stuff. So grouping everything by vendor name looks
->> quite appealing to me.
->>
->> Sharing the same subdir requires people working in it to talk and find
->> agreements some more than the sparsely populated subdir did (because there
->> is not a single maintainer who owns it). I think this is a big advantage
->> Broadcomers can start with right now.
-> I want to be able to build the BCM5301X SoC without building the current
-> CONFIG_ARCH_BCM, so what name do you suggest for board_bcm.o ?
-> My plan would be to make CONFIG_ARCH_BCM just activate the Broadcom
-> submenu, but not build any code. Then the list of Broadcom SoCs is
-> opened like CONFIG_ARCH_BCM5301X and the "old" CONFIG_ARCH_BCM.
->
->
-CONFIG_ARCH_BCM wasn't the best name, but it is there now. We intend to 
-upstream the (mobile-team) ARM SoCs going forward, and have them be 
-multiplatform and all buildable into a single zImage with the ARCH_BCM 
-config option. Which is why this option does not have a chip name on it.
-Take ARCH_BCM == Broadcom Mobile team SoCs (I think that's what the help 
-on it says).
+On Thu, Jul 25, 2013 at 08:48:34PM +0200, Richard Cochran wrote:
+> On Thu, Jul 25, 2013 at 07:29:20PM +0100, Mark Rutland wrote:
+> > On Thu, Jul 25, 2013 at 07:05:48PM +0100, Stephen Warren wrote:
+> > > 
+> > > I don't think having people "rely" on the bindings is the issue so much
+> > > as the awareness that if they do, there will be compatibility issues for
+> > > unstable bindings.
+> > 
+> > As long as we can make sufficiently clear that trying to use an unstable
+> > binding is going to be *very* painful, and not necessarily supported.
+> 
+> Oh, man.
+> 
+> The introduction of DT into ARM Linux was supposed to make everyone's
+> life sooo much easier. Of course, based on experience with powerpc, I
+> never believed it*, but still I would expect to hear that the DT
+> bindings are, well, a *binding* contract between the board developer,
+> boot loader, and the kernel.
 
-  thanks,
-    csd
+To restate a perspective I've shared before (as someone shipping
+embedded products with DT on PPC and ARM).
+
+We use DT has a kernel configuration input. Our environment is
+designed to guarantee 100% that the kernel and DT match exactly. DT
+very deliberately isn't an ABI boundary in our systems.
+
+We've been doing this for years and have a proven in the field track
+record of upgrades from pre-2.6.16 to 3.7 and beyond with multiple
+SOCs. The same bootloader that was shipped to support non-DT 2.6.16
+boots DT 3.7 just fine.
+
+For closed system embedded DT has proven *WONDERFUL*. It is a huge,
+gigantic improvement over what we had before. The introduction of DT
+carried with it an increase in generality and configurability that has
+gone far beyond what was possible using just board.c files (back in
+the 2.6.teens days).
+
+This is where I see the value in DT. ABI stability is not something I
+want/need from DT. As an ODM we have dramatically less board specific
+code than ever before, and new code we need is upstreamable as DT
+elements.
+
+IMHO, this is a fine and very reasonable way to use DT in embedded.
+
+To me, it is general purpose stuff (Chromebooks, ARM servers, etc)
+where the main problem is. I think those cases need a different
+solution: A subset of DT that is guarenteed ABI stable, firmware that
+substantially sets up the entire machine, and the proper callback
+hooks (eg through UEFI and AHCI) to let the firmware do low level
+hardware specific work at runtime.
+
+This is how x86 gets the kind of compatability it has. Trying to
+describe and control every tiny detail (pin mux, regulator, clk) is
+great for embedded, but fundamentally not future-proof enough for
+general purpose.
+
+Regards,
+Jason
