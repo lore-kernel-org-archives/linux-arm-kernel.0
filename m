@@ -1,30 +1,132 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 25 Jul 2013 10:06:08 +0900
-Subject: ARM CPU Hotplug breakage on mach-shmobile and KZM9D
-In-Reply-To: <CANqRtoRx7voEVwJG8UNNy_Jiixo=uRJCvxTD0bZdzVohoryBUA@mail.gmail.com>
-References: <CANqRtoRx7voEVwJG8UNNy_Jiixo=uRJCvxTD0bZdzVohoryBUA@mail.gmail.com>
-Message-ID: <20130725010607.GB31464@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 25 Jul 2013 10:13:41 +0900
+Subject: [PATCH] mfd: max8925: fix dt code for backlight
+In-Reply-To: <1374680547-5336-1-git-send-email-olof@lixom.net>
+References: <1374680547-5336-1-git-send-email-olof@lixom.net>
+Message-ID: <000401ce88d4$33773de0$9a65b9a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 12:15:49AM +0900, Magnus Damm wrote:
-> Hi everyone,
+On Thursday, July 25, 2013 12:42 AM, Olof Johansson wrote:
 > 
-> Bad news: CPU Hotplug on KZM9D seems broken on recent kernels.
+> The device-tree enablement for max8925 has several problems, but besides
+> the bindings being wrong (and not having seen review) there's also some
+> bad coding practices on how to fill in the platform_data from device tree.
 > 
-> On renesas-next-20130710 or earlier I can perform the following:
+> I came across this since it causes a warning when compiling
+> mmp2_defconfig, and instead of doing the minimal fix to silence the
+> warning, I restructured the code a bit.
 > 
-> # echo 0 > /sys/devices/system/cpu/cpu1/online
-> CPU1: shutdown
-> # echo 1 > /sys/devices/system/cpu/cpu1/online
-> CPU1: Booted secondary processor
-> #
+> This silences the warning:
+> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
+> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
 > 
-> While on more recent kernels the hotplug boot fails. This may be
-> related to the move to v3.11-rc. The tag renesas-next-20130710
-> surprisingly seems to be the final kernel based on v3.10-rc before
-> jumping to v3.11-rc.
+> Note that the bindings themselves need to be revisited too, but that will
+> affect more than just the backlight driver and is best done separately;
+> this just fixes the bad code for the backlight driver.
 > 
-> I wonder, do other ARM platforms have working CPU Hotplug in v3.11-rc?
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+> 
+> Richard, Jingoo, this would be good to see go into 3.11 if you're
+> comfortable with it.
 
-I have a snowball that I could test if you think it would be useful.
+CC'ed Andrew Morton
+
+
+Hi Olof Johansson,
+
+Currently, there is not git tree for Backlight subsystem.
+I hope that this would go into 3.11 through one of other trees
+with my Ack.
+
+If not, it will go into 3.12-rc1 through mm-tree.
+
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+
+Best regards,
+Jingoo Han
+
+> 
+> 
+> -Olof
+> 
+>  drivers/video/backlight/max8925_bl.c |   41 +++++++++++++++++-----------------
+>  1 file changed, 21 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/video/backlight/max8925_bl.c b/drivers/video/backlight/max8925_bl.c
+> index 5ca11b0..886e797 100644
+> --- a/drivers/video/backlight/max8925_bl.c
+> +++ b/drivers/video/backlight/max8925_bl.c
+> @@ -101,33 +101,37 @@ static const struct backlight_ops max8925_backlight_ops = {
+>  	.get_brightness	= max8925_backlight_get_brightness,
+>  };
+> 
+> -#ifdef CONFIG_OF
+> -static int max8925_backlight_dt_init(struct platform_device *pdev,
+> -			      struct max8925_backlight_pdata *pdata)
+> +static void max8925_backlight_dt_init(struct platform_device *pdev)
+>  {
+>  	struct device_node *nproot = pdev->dev.parent->of_node, *np;
+> -	int dual_string;
+> +	struct max8925_backlight_pdata *pdata;
+> +	u32 val;
+> +
+> +	if (!nproot || !IS_ENABLED(CONFIG_OF))
+> +		return;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev,
+> +			     sizeof(struct max8925_backlight_pdata),
+> +			     GFP_KERNEL);
+> +	if (!pdata)
+> +		return;
+> 
+> -	if (!nproot)
+> -		return -ENODEV;
+>  	np = of_find_node_by_name(nproot, "backlight");
+>  	if (!np) {
+>  		dev_err(&pdev->dev, "failed to find backlight node\n");
+> -		return -ENODEV;
+> +		return;
+>  	}
+> 
+> -	of_property_read_u32(np, "maxim,max8925-dual-string", &dual_string);
+> -	pdata->dual_string = dual_string;
+> -	return 0;
+> +	if (!of_property_read_u32(np, "maxim,max8925-dual-string", &val))
+> +		pdata->dual_string = val;
+> +
+> +	pdev->dev.platform_data = pdata;
+>  }
+> -#else
+> -#define max8925_backlight_dt_init(x, y)	(-1)
+> -#endif
+> 
+>  static int max8925_backlight_probe(struct platform_device *pdev)
+>  {
+>  	struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
+> -	struct max8925_backlight_pdata *pdata = pdev->dev.platform_data;
+> +	struct max8925_backlight_pdata *pdata;
+>  	struct max8925_backlight_data *data;
+>  	struct backlight_device *bl;
+>  	struct backlight_properties props;
+> @@ -170,13 +174,10 @@ static int max8925_backlight_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, bl);
+> 
+>  	value = 0;
+> -	if (pdev->dev.parent->of_node && !pdata) {
+> -		pdata = devm_kzalloc(&pdev->dev,
+> -				     sizeof(struct max8925_backlight_pdata),
+> -				     GFP_KERNEL);
+> -		max8925_backlight_dt_init(pdev, pdata);
+> -	}
+> +	if (!pdev->dev.platform_data)
+> +		max8925_backlight_dt_init(pdev);
+> 
+> +	pdata = pdev->dev.platform_data;
+>  	if (pdata) {
+>  		if (pdata->lxw_scl)
+>  			value |= (1 << 7);
+> --
+> 1.7.10.4
