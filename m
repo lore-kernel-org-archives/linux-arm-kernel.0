@@ -1,75 +1,189 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Jul 2013 12:25:58 +0100
-Subject: Do we have people interested in device tree janitoring / cleanup?
-In-Reply-To: <20130725110634.GB2546@localhost.localdomain>
-References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
- <20130725110634.GB2546@localhost.localdomain>
-Message-ID: <20130725112558.GD24642@n2100.arm.linux.org.uk>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Thu, 25 Jul 2013 12:44:05 +0100
+Subject: [PATCH 02/13] ARM: gic: add CPU migration support
+In-Reply-To: <1374550289-25305-3-git-send-email-nicolas.pitre@linaro.org>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <51F10F85.7090508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 12:06:34PM +0100, Dave Martin wrote:
-> On Wed, Jul 24, 2013 at 08:27:13AM -0700, Olof Johansson wrote:
-> > Every now and then I come across a binding that's just done Wrong(tm),
-> > merged through a submaintainer tree and hasn't seen proper review --
-> > if it had, it wouldn't look the way it does. It's something we're
-> > starting to address now since there's more people stepping up to be
-> > maintainers, but there's a backlog of bad bindings already merged.
-> > 
-> > Often they are produced by translating the platform_data structures
-> > directly over into device-tree properties without consideration to
-> > describing the hardware or usual conventions, using key/value pairs
-> > instead of boolean properties, etc.
-> > 
-> > Getting involved in cleaning up these kind of bindings is a great way
-> > to learn "the ways of device tree" for someone that has interest in
-> > that.
-> > 
-> > Latest find in this area is the Maxim 8925 bindings, that I came
-> > across since they caused a compile warning on some defconfig. I'll
-> > post a patch to address the warning but if someone else feels like
-> > fixing the bindings on top of it that would be appreciated!
-> 
-> DT bindings (even poorly conceived, ad-hoc and/or undocumented ones)
-> are ABI.
-> 
-> A review/merge process which _allows_ junk into an ABI is the real
-> problem we need to solve here, but once it's there we can't just magic
-> it away.
-> 
-> Do we plan on having a proper deprecation path for the junk, so that
-> the old, superseded bindings continue to work for a limited time,
-> preferably with a big fat warning somewhere?
+Hi Nico,
 
-This is the exact problem, and if you've seen how Linus rants about
-the ARM ecosystem breaking ABI stuff all the time, you will start to
-appreciate why ARM is not highly valued in the Linux communities.
+I've got a couple of minor questions/comments about this one...
 
-We need to stop this crap getting in.
+On 23/07/13 04:31, Nicolas Pitre wrote:
+> This is required by the big.LITTLE switcher code.
+>
+> The gic_migrate_target() changes the CPU interface mapping for the
+> current CPU to redirect SGIs to the specified interface, and it also
+> updates the target CPU for each interrupts to that CPU interface
+> if they were targeting the current interface.  Finally, pending
+> SGIs for the current CPU are forwarded to the new interface.
+>
+> Because Linux does not use it, the SGI source information for the
+> forwarded SGIs is not preserved.  Neither is the source information
+> for the SGIs sent by the current CPU to other CPUs adjusted to match
+> the new CPU interface mapping.  The required registers are banked so
+> only the target CPU could do it.
+>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>   drivers/irqchip/irq-gic.c       | 81 +++++++++++++++++++++++++++++++++++++++--
+>   include/linux/irqchip/arm-gic.h |  4 ++
+>   2 files changed, 82 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index ee7c503120..6bd5a8c1aa 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -253,10 +253,9 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>   	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+>   		return -EINVAL;
+>
+> +	raw_spin_lock(&irq_controller_lock);
+>   	mask = 0xff << shift;
+>   	bit = gic_cpu_map[cpu] << shift;
+> -
+> -	raw_spin_lock(&irq_controller_lock);
+>   	val = readl_relaxed(reg) & ~mask;
+>   	writel_relaxed(val | bit, reg);
+>   	raw_spin_unlock(&irq_controller_lock);
+> @@ -646,7 +645,9 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
+>   void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>   {
+>   	int cpu;
+> -	unsigned long map = 0;
+> +	unsigned long flags, map = 0;
+> +
+> +	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>
+>   	/* Convert our logical CPU mask into a physical one. */
+>   	for_each_cpu(cpu, mask)
+> @@ -660,6 +661,80 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>
+>   	/* this always happens on GIC0 */
+>   	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> +
+> +	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> +}
+> +#endif
+> +
+> +#ifdef CONFIG_BL_SWITCHER
+> +/*
+> + * gic_migrate_target - migrate IRQs to another PU interface
 
-We need subsystem people to refuse to merge DT stuff if it hasn't been
-reviewed by DT people - subsystem people are _not_ qualified to accept
-those patches, even if they're responsible for the files which they're
-being applied to. Yes, they can review them, but they should _not_
-accept them without them having the bindings reviewed by folk who (a)
-know the hardware and (b) know the implications of creating a DT binding.
+(nit) Should that be _C_PU?
 
-That means whoever is doing the review of DT bindings probably needs to
-have access to documentation on the hardware - or they need to be educated
-by the submitter.  Or, we need submitters to individually justify why
-each and every property is required in the description.
+> + *
+> + * @new_cpu_id: the CPU target ID to migrate IRQs to
+> + *
+> + * Migrate all peripheral interrupts with a target matching the current CPU
+> + * to the interface corresponding to @new_cpu_id.  The CPU interface mapping
+> + * is also updated.  Targets to other CPU interfaces are unchanged.
+> + * This must be called with IRQs locally disabled.
+> + */
+> +void gic_migrate_target(unsigned int new_cpu_id)
+> +{
+> +	unsigned int old_cpu_id, gic_irqs, gic_nr = 0;
+> +	void __iomem *dist_base;
+> +	int i, ror_val, cpu = smp_processor_id();
+> +	u32 val, old_mask, active_mask;
+> +
+> +	if (gic_nr >= MAX_GIC_NR)
+> +		BUG();
+> +
+> +	dist_base = gic_data_dist_base(&gic_data[gic_nr]);
+> +	if (!dist_base)
+> +		return;
+> +	gic_irqs = gic_data[gic_nr].gic_irqs;
+> +
+> +	old_cpu_id = __ffs(gic_cpu_map[cpu]);
+> +	old_mask = 0x01010101 << old_cpu_id;
 
-As for those already there, I don't think there's anything which can be
-done about them in the short term (short = quite a few years) - we can't
-go removing any properties that are already there, because that will
-break the ABI.  We're basically stuck with that crap for ever now.
+I don't think this is very clear, though section 4.3.12 of the GIC spec 
+helps a lot! A little pointer or some more self-evident name for the 
+mask might be nice...
 
-That's the point that people have to understand: if they accept a DT
-description into the kernel, it's basically saying at that point that
-the DT description is the official and definitive description for that
-hardware.  It's just the same as adding a new syscall or something like
-that which the entire world starts to use immediately.  You can't go
-removing or changing it after the fact.
+old_mask = GIC_ITARGETSR_MASK << old_cpu_id
 
-And this is also why a _hell_ of a lot of thought should go into each
-and every property _before_ it is even proposed by the patch submitter.
+or similar? This@least points one to the right bit of documentation?
+
+> +	ror_val = (old_cpu_id - new_cpu_id) & 31;
+> +
+> +	raw_spin_lock(&irq_controller_lock);
+> +
+> +	gic_cpu_map[cpu] = 1 << new_cpu_id;
+> +
+> +	for (i = 8; i < DIV_ROUND_UP(gic_irqs, 4); i++) {
+
+Does this '8' here warrant a #define? GIC_RO_INTR_REGS?
+
+Perhaps everyone looking@the code will be familiar enough with the 
+GIC to see immediately why the first 8 entries are being skipped...?
+
+> +		val = readl_relaxed(dist_base + GIC_DIST_TARGET + i * 4);
+> +		active_mask = val & old_mask;
+> +		if (active_mask) {
+> +			val &= ~active_mask;
+> +			val |= ror32(active_mask, ror_val);
+> +			writel_relaxed(val, dist_base + GIC_DIST_TARGET + i*4);
+> +		}
+> +	}
+> +
+> +	raw_spin_unlock(&irq_controller_lock);
+> +
+> +	/*
+> +	 * Now let's migrate and clear any potential SGIs that might be
+> +	 * pending for us (old_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
+> +	 * is a banked register, we can only forward the SGI using
+> +	 * GIC_DIST_SOFTINT.  The original SGI source is lost but Linux
+> +	 * doesn't use that information anyway.
+> +	 *
+> +	 * For the same reason we do not adjust SGI source information
+> +	 * for previously sent SGIs by us to other CPUs either.
+> +	 */
+> +	for (i = 0; i < 16; i += 4) {
+> +		int j;
+> +		val = readl_relaxed(dist_base + GIC_DIST_SGI_PENDING_SET + i);
+> +		if (!val)
+> +			continue;
+> +		writel_relaxed(val, dist_base + GIC_DIST_SGI_PENDING_CLEAR + i);
+> +		for (j = i; j < i + 4; j++) {
+> +			if (val & 0xff)
+> +				writel_relaxed((1 << (new_cpu_id + 16)) | j,
+> +						dist_base + GIC_DIST_SOFTINT);
+> +			val >>= 8;
+> +		}
+> +	}
+
+I'm curious as to why we don't need to do anything for PPIs here - could 
+there be any pending PPIs that don't get handled (I guess retargetting 
+doesn't make sense for these?)
+
+>   }
+>   #endif
+>
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index 3e203eb23c..40bfcac959 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -31,6 +31,8 @@
+>   #define GIC_DIST_TARGET			0x800
+>   #define GIC_DIST_CONFIG			0xc00
+>   #define GIC_DIST_SOFTINT		0xf00
+> +#define GIC_DIST_SGI_PENDING_CLEAR	0xf10
+> +#define GIC_DIST_SGI_PENDING_SET	0xf20
+>
+>   #define GICH_HCR			0x0
+>   #define GICH_VTR			0x4
+> @@ -73,6 +75,8 @@ static inline void gic_init(unsigned int nr, int start,
+>   	gic_init_bases(nr, start, dist, cpu, 0, NULL);
+>   }
+>
+> +void gic_migrate_target(unsigned int new_cpu_id);
+> +
+>   #endif /* __ASSEMBLY */
+>
+>   #endif
+>
