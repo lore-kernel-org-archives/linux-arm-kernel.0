@@ -1,45 +1,19 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 25 Jul 2013 15:22:29 +0200
-Subject: How to create IRQ mappings in a GPIO driver that doesn't control
- its IRQ domain ?
-In-Reply-To: <20130725131556.GD9858@sirena.org.uk>
-References: <1624911.6TtmtVmU1T@avalon> <1408178.cxAUTUGJc5@avalon>
- <20130725131556.GD9858@sirena.org.uk>
-Message-ID: <1681089.qGWOhLKTTo@avalon>
+From: damien.riegel.ext@parrot.com (Damien Riegel)
+Date: Thu, 25 Jul 2013 15:20:41 +0200
+Subject: Issue with gpio and pinmux
+In-Reply-To: <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+References: <51E667BC.3070804@parrot.com>	<51E82FBB.1080905@wwwdotorg.org>
+ <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+ <51EB590A.4010600@wwwdotorg.org>
+ <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+Message-ID: <51F12629.7090909@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+I don't know about pinctrl background but I don't really get why there
+is such a distinction between gpio and other functions in most cases.
 
-On Thursday 25 July 2013 14:15:56 Mark Brown wrote:
-> On Thu, Jul 25, 2013 at 11:45:33AM +0200, Laurent Pinchart wrote:
-> > The two devices are independent, so there's no real parent/child
-> > relationship. However, as Grant proposed, I could list all the interrupts
-> > associated with GPIOs in the GPIO controller DT node. I would then just
-> > call irq_of_parse_and_map() in the .to_irq() handler to magically
-> > translate the GPIO number to a mapped IRQ number.
-> > 
-> > The number of interrupts can be pretty high (up to 58 in the worst case so
-> > far), so an alternative would be to specify the interrupt-parent only, and
-> > call irq_create_of_mapping() directly. What solution would you prefer ?
-> 
-> Are the interrupts in a contiguous block in the controller so you can just
-> pass around the controller and a base number?
-
-In two of the three SoCs I need to fix they are. I've just realized that in 
-the last one the interrupts are in two contiguous blocks in two different 
-parents. I will thus need at least a list of <parent-phandle base count>. Our 
-standard interrupt bindings don't seem to support multiple parents, is that 
-something that we want to fix or should I go for custom bindings ?
-
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/be41a24f/attachment.sig>
+I understand that on some arch a pin can be muxed and used as a gpio at
+the same time. But on most arch, isn't gpio just another function that
+can be muxed on a pin, and therefore we should check that a pin can be
+requested as a gpio just by checking desc->mux_owner ?
