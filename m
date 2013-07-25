@@ -1,44 +1,36 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 25 Jul 2013 10:37:31 +0530
-Subject: [PATCH v4 0/6] clk/exynos5250: add clocks for hdmi subsystem
-Message-ID: <1374728857-4208-1-git-send-email-rahul.sharma@samsung.com>
+Date: Thu, 25 Jul 2013 10:37:33 +0530
+Subject: [PATCH v4 2/6] Documentation: exynos5250-clock: Add div_i2s1 and
+ div_i2s2
+In-Reply-To: <1374728857-4208-1-git-send-email-rahul.sharma@samsung.com>
+References: <1374728857-4208-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1374728857-4208-3-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock changes for hdmi subsystem for exynos5250 SoC. These
-include addition of new clocks like mout_hdmi and smmu_tv, associating
-ID to clk_hdmiphy and some essential corrections.
+From: Tushar Behera <tushar.behera@linaro.org>
 
-This set is based on kukjin's for-next branch at
-http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git.
+commit 79d743c177f9 ("clk: exynos5250: Add enum entries for divider
+clock of i2s1 and i2s2") added two new clock entries. Add the clock
+entry enum numbers to documentation.
 
-V4:
-1) Added Arun's patch hdmi clock number correction in this series.
-2) Corrected clock number for smmu_mixer
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+---
+ Documentation/devicetree/bindings/clock/exynos5250-clock.txt |    2 ++
+ 1 file changed, 2 insertions(+)
 
-V3:
-1) Rebase to kgene for-next based on 3.11-rc1.
-2) Added Tushar's patch in the series.
-
-V2:
-1) Dropped "clk/exynos5250: Fix HDMI clock number in documentation" as
-it already get merged.
-
-Arun Kumar K (1):
-  clk/exynos5250: Fix HDMI clock number in documentation
-
-Rahul Sharma (4):
-  clk/exynos5250: add mout_hdmi mux clock for hdmi
-  clk/exynos5250: add sclk_hdmiphy in the list of special clocks
-  clk/exynos5250: add clock for mixer sysmmu
-  clk/exynos5250: change parent to aclk200_disp1 for hdmi subsystem
-
-Tushar Behera (1):
-  Documentation: exynos5250-clock: Add div_i2s1 and div_i2s2
-
- .../devicetree/bindings/clock/exynos5250-clock.txt |   14 +++++++++++++-
- drivers/clk/samsung/clk-exynos5250.c               |   20 ++++++++++++++------
- 2 files changed, 27 insertions(+), 7 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+index 1a05761..bea503f 100644
+--- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
++++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+@@ -59,6 +59,8 @@ clock which they consume.
+   sclk_spi0		154
+   sclk_spi1		155
+   sclk_spi2		156
++  div_i2s1		157
++  div_i2s2		158
+ 
+ 
+    [Peripheral Clock Gates]
 -- 
 1.7.10.4
