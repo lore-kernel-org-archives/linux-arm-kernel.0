@@ -1,66 +1,84 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 25 Jul 2013 11:05:48 -0700
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
-Message-ID: <51F168FC.9070906@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 25 Jul 2013 11:05:57 -0700
+Subject: [PATCH v5 4/5] clk: add CLK_SET_RATE_NO_REPARENT flag
+In-Reply-To: <51F1202D.9060403@imgtec.com>
+References: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>
+ <1371139562-305-5-git-send-email-james.hogan@imgtec.com>
+ <51F11B46.7010900@samsung.com> <51F1202D.9060403@imgtec.com>
+Message-ID: <20130725180557.7598.20285@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2013 10:57 AM, Mark Rutland wrote:
-> On Thu, Jul 25, 2013 at 05:09:19PM +0100, Olof Johansson wrote:
-...
->> So, there really seems to be a need for a layered approach, one in
->> which a binding "graduates" from being tentative to being locked in.
->> I'm refraining from using the terms "staging" and "stable" here, since
->> they have overloaded meaning in the kernel world that doesn't apply
->> here.
+Quoting James Hogan (2013-07-25 05:55:09)
+> Hi Sylwester
 > 
-> I'm not sure how realistic it is to have drivers in the kernel using
-> unstable bindings, and expect people to not rely on them, but I don't
-> have a better option to give. We need a big fat warning that an unstable
-> binding is in use.
-
-I don't think having people "rely" on the bindings is the issue so much
-as the awareness that if they do, there will be compatibility issues for
-unstable bindings.
-
->> One problem that needs to be solved is obviously how a binding
->> graduates from tentative to locked. This work isn't going to be very
->> interesting to most people, I suspect. Think standards committee type
->> work.
->>
->> A possible way to handle this is to have exactly that: A group of
->> people that essentially constitute the "standards committee" that meet
->> on a regular basis to review and approve new bindings. They should be
->> people not just doing ARM Linux work, but other stakeholders in these
->> bindings too. One of the things they should probably do is sift
->> through our current in-kernel bindings and select those who seem ready
->> to be locked in, review/discuss/decide upon that and once the decision
->> is made, that specific binding does become part of the static,
->> never-ever-change ABI of firmware-to-kernel interfaces.   That might
->> also be the time that the binding is moved from the kernel to a
->> separate repo, but that's a technicality that we'll let the DT
->> maintainers decide among themselves, IMHO.
+> On 25/07/13 13:34, Sylwester Nawrocki wrote:
+> > On 06/13/2013 06:06 PM, James Hogan wrote:
+> >> Add a CLK_SET_RATE_NO_REPARENT clock flag, which will prevent muxes
+> >> being reparented during clk_set_rate.
+> >>
+> >> To avoid breaking existing platforms, all callers of clk_register_mux()
+> >> are adjusted to pass the new flag. Platform maintainers are encouraged
+> >> to remove the flag if they wish to allow mux reparenting on set_rate.
+> > [..]
+> >> Changes in v3:
+> >>
+> >> * rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
+> >>   to this new patch.
+> >> * patch 3: add CLK_SET_RATE_NO_REPARENT flag to all callers of
+> >>   clk_register_mux. If you don't mind your clocks being reparented in
+> >>   response to set_rate please let me know and I'll drop the relevant
+> >>   portion of the patch.
+> > 
+> > Why is this better to change current behaviour of the clock core
+> > and modify all drivers instead of having, e.g. CLK_SET_RATE_REPARENT
+> > set in drivers of hardware that supports clock re-parenting while
+> > setting clock rate ?
 > 
-> We're going to need input from other OSs too, or the bindings will
-> remain Linux-specific regardless of how far away the bindings and dts
-> repo(s) is/are.
+> See this message from Mike Turquette which first suggested it:
+> 
+> http://marc.info/?l=linux-kernel&m=136847508109344&w=2
+> 
+> > Is there intention to just have the automatic clock re-parenting
+> > as a default feature in the common clock API ?
+> 
+> Yes, that would be the result (except where explicitly disallowed).
+> Unfortunately where such policy should ideally be defined is still up in
+> the air.
+> 
+> It's not a property of the hardware, but then it is arguably a property
+> of the environment the bootloader has configured (like the stuff in the
+> /chosen device tree node).
 
-And bootloaders too. Some U-Boot platforms are starting to use DT for
-exactly the same reason that the kernel does; to allow a single
-bootloader binary to run on a variety of different boards, with all
-configuration coming from DT.
+I'm happy to get feedback on this decision. Looking back on
+CLK_SET_RATE_PARENT flag I wish I had made that behavior the default.
+Instead there would only be a flag for the case where you explicitly do
+not wish to propagate the rate change request up the tree.
 
-On another related topic, something that may be useful for the DT
-bindings reviewer team is a basic checklist for new DT bindings.
-Something similar to Fedora's package review checklist. Perhaps also
-(yet another?) document on a bit of DT philosophy. If this sounds
-useful, I could try and take a stab at some basic initial version.
+Another thing to consider here is that only users of .determine_rate are
+affected. If your mux clock implements .set_parent and .round_rate, but
+not .determine_rate then you are not affected by this change.
 
-We also need to decide (or just document) exactly what "describes the
-HW" means; see the thread on thermal limits, and consider the extension
-of describing hard/absolute thermal limits to describing use-cased base
-thermal profiles using the same schema, or not allowing that.
+The whole thing gets messy because we're pushing policy into the clock
+framework, but there is no way to avoid that if we're going to achieve
+the goal of having drivers know only about the leaf clocks they consume
+and not requiring those drivers to understand the greater clock tree
+topology.
+
+Regards,
+Mike
+
+> 
+> Presuming that the usual reason not to reparent a mux is because other
+> important clocks depend on it, the kernel might know enough to work out
+> whether it's safe (unless of course there are other cores/threads in the
+> SoC using the clock that Linux isn't aware of, which brings us back to
+> it being a bootloader environment thing).
+> 
+> > My apologies if this has already been answered, I haven't been
+> > following this thread.
+> 
+> No problem :)
+> 
+> Cheers
+> James
