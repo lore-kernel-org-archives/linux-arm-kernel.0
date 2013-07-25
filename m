@@ -1,132 +1,55 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 25 Jul 2013 10:13:41 +0900
-Subject: [PATCH] mfd: max8925: fix dt code for backlight
-In-Reply-To: <1374680547-5336-1-git-send-email-olof@lixom.net>
-References: <1374680547-5336-1-git-send-email-olof@lixom.net>
-Message-ID: <000401ce88d4$33773de0$9a65b9a0$@samsung.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Thu, 25 Jul 2013 01:32:29 +0000
+Subject: [v8 3/3] ahci_imx: add ahci sata support on imx platforms
+In-Reply-To: <20130724163038.GF20377@mtj.dyndns.org>
+References: <1374646529-24432-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1374646529-24432-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20130724163038.GF20377@mtj.dyndns.org>
+Message-ID: <0E83723C55F66F43A6041464FE31119D346BC3@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 25, 2013 12:42 AM, Olof Johansson wrote:
-> 
-> The device-tree enablement for max8925 has several problems, but besides
-> the bindings being wrong (and not having seen review) there's also some
-> bad coding practices on how to fill in the platform_data from device tree.
-> 
-> I came across this since it causes a warning when compiling
-> mmp2_defconfig, and instead of doing the minimal fix to silence the
-> warning, I restructured the code a bit.
-> 
-> This silences the warning:
-> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
-> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
-> 
-> Note that the bindings themselves need to be revisited too, but that will
-> affect more than just the backlight driver and is best done separately;
-> this just fixes the bad code for the backlight driver.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-> 
-> Richard, Jingoo, this would be good to see go into 3.11 if you're
-> comfortable with it.
+Thanks a lot. :).
 
-CC'ed Andrew Morton
+Best Regards
+Richard Zhu
 
 
-Hi Olof Johansson,
+-----Original Message-----
+From: Tejun Heo [mailto:htejun at gmail.com] On Behalf Of Tejun Heo
+Sent: Thursday, July 25, 2013 12:31 AM
+To: Richard Zhu
+Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org; Zhu Richard-R65037
+Subject: Re: [v8 3/3] ahci_imx: add ahci sata support on imx platforms
 
-Currently, there is not git tree for Backlight subsystem.
-I hope that this would go into 3.11 through one of other trees
-with my Ack.
+On Wed, Jul 24, 2013 at 02:15:29PM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
+> 
+> imx6q contains one Synopsys AHCI SATA controller, But it can't share 
+> ahci_platform driver with other controllers.
+> Because there are some misalignments of the generic AHCI controller.
+> The bits definitions of the HBA registers, the Vendor Specific 
+> registers, the AHCI PHY clock and the AHCI signals adjustment 
+> window(GPR13 register).
+>  - CAP_SSS(bit20) of the HOST_CAP is writable, default  value is '0', 
+> should be configured to be '1'
+>  - bit0 (only one AHCI SATA port on imx6q) of the  HOST_PORTS_IMPL 
+> should be set to be '1'.(default 0)
+>  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)  should be 
+> configured regarding to the frequency of AHB  bus clock.
+>  - Configurations of the AHCI PHY clock, and the signal  parameters of 
+> the GPR13
+> 
+> Setup its own ahci sata driver, contained the imx6q specific 
+> initialized codes, re-use the generic ahci_platform driver, and keep 
+> the generic ahci_platform driver clean as much as possible.
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 
-If not, it will go into 3.12-rc1 through mm-tree.
+Applied 2-3 to libata/for-3.11-fixes with minor adjustments.
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+Thanks.
 
-
-Best regards,
-Jingoo Han
-
-> 
-> 
-> -Olof
-> 
->  drivers/video/backlight/max8925_bl.c |   41 +++++++++++++++++-----------------
->  1 file changed, 21 insertions(+), 20 deletions(-)
-> 
-> diff --git a/drivers/video/backlight/max8925_bl.c b/drivers/video/backlight/max8925_bl.c
-> index 5ca11b0..886e797 100644
-> --- a/drivers/video/backlight/max8925_bl.c
-> +++ b/drivers/video/backlight/max8925_bl.c
-> @@ -101,33 +101,37 @@ static const struct backlight_ops max8925_backlight_ops = {
->  	.get_brightness	= max8925_backlight_get_brightness,
->  };
-> 
-> -#ifdef CONFIG_OF
-> -static int max8925_backlight_dt_init(struct platform_device *pdev,
-> -			      struct max8925_backlight_pdata *pdata)
-> +static void max8925_backlight_dt_init(struct platform_device *pdev)
->  {
->  	struct device_node *nproot = pdev->dev.parent->of_node, *np;
-> -	int dual_string;
-> +	struct max8925_backlight_pdata *pdata;
-> +	u32 val;
-> +
-> +	if (!nproot || !IS_ENABLED(CONFIG_OF))
-> +		return;
-> +
-> +	pdata = devm_kzalloc(&pdev->dev,
-> +			     sizeof(struct max8925_backlight_pdata),
-> +			     GFP_KERNEL);
-> +	if (!pdata)
-> +		return;
-> 
-> -	if (!nproot)
-> -		return -ENODEV;
->  	np = of_find_node_by_name(nproot, "backlight");
->  	if (!np) {
->  		dev_err(&pdev->dev, "failed to find backlight node\n");
-> -		return -ENODEV;
-> +		return;
->  	}
-> 
-> -	of_property_read_u32(np, "maxim,max8925-dual-string", &dual_string);
-> -	pdata->dual_string = dual_string;
-> -	return 0;
-> +	if (!of_property_read_u32(np, "maxim,max8925-dual-string", &val))
-> +		pdata->dual_string = val;
-> +
-> +	pdev->dev.platform_data = pdata;
->  }
-> -#else
-> -#define max8925_backlight_dt_init(x, y)	(-1)
-> -#endif
-> 
->  static int max8925_backlight_probe(struct platform_device *pdev)
->  {
->  	struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
-> -	struct max8925_backlight_pdata *pdata = pdev->dev.platform_data;
-> +	struct max8925_backlight_pdata *pdata;
->  	struct max8925_backlight_data *data;
->  	struct backlight_device *bl;
->  	struct backlight_properties props;
-> @@ -170,13 +174,10 @@ static int max8925_backlight_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, bl);
-> 
->  	value = 0;
-> -	if (pdev->dev.parent->of_node && !pdata) {
-> -		pdata = devm_kzalloc(&pdev->dev,
-> -				     sizeof(struct max8925_backlight_pdata),
-> -				     GFP_KERNEL);
-> -		max8925_backlight_dt_init(pdev, pdata);
-> -	}
-> +	if (!pdev->dev.platform_data)
-> +		max8925_backlight_dt_init(pdev);
-> 
-> +	pdata = pdev->dev.platform_data;
->  	if (pdata) {
->  		if (pdata->lxw_scl)
->  			value |= (1 << 7);
-> --
-> 1.7.10.4
+--
+tejun
