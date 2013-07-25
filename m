@@ -1,41 +1,29 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 15:42:36 +0100
-Subject: [PATCH 1/2] ARM: Correct BUG() assembly to ensure it is
- endian-agnostic
-In-Reply-To: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374763357-4893-2-git-send-email-ben.dooks@codethink.co.uk>
+From: damien.riegel.ext@parrot.com (Damien Riegel)
+Date: Thu, 25 Jul 2013 16:42:59 +0200
+Subject: Issue with gpio and pinmux
+In-Reply-To: <CACRpkdb-hVE1Jj69ttrn+zf5cEuMHhxNh2OyhfTtrG+yUiO+jg@mail.gmail.com>
+References: <51E667BC.3070804@parrot.com>	<51E82FBB.1080905@wwwdotorg.org>
+ <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+ <51EB590A.4010600@wwwdotorg.org>
+ <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+ <51F12629.7090909@parrot.com>
+ <CACRpkdb-hVE1Jj69ttrn+zf5cEuMHhxNh2OyhfTtrG+yUiO+jg@mail.gmail.com>
+Message-ID: <51F13973.70806@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently BUG() uses .word or .hword to create the necessary illegal
-instructions. However if we are building BE8 then these get swapped
-by the linker into different illegal instructions in the text.
 
-Change to using .inst and .inst.w to create the instructions and mark
-them as instructions so that the linker acts correctly.
+> Does this recently submitted documentation patch help in explaining
+> some of your questions?
+> http://marc.info/?l=linux-kernel&m=137442899829271&w=2
+This is a very helpful addition to the existing documentation.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/include/asm/bug.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+My reflection rather was: when gpio is not orthogonal, we could just
+check mux_owner to see if pin is available; and when it is, use the
+current implementation.
 
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 7af5c6c..b95da52 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -12,10 +12,10 @@
-  */
- #ifdef CONFIG_THUMB2_KERNEL
- #define BUG_INSTR_VALUE 0xde02
--#define BUG_INSTR_TYPE ".hword "
-+#define BUG_INSTR_TYPE ".inst.w "
- #else
- #define BUG_INSTR_VALUE 0xe7f001f2
--#define BUG_INSTR_TYPE ".word "
-+#define BUG_INSTR_TYPE ".inst "
- #endif
- 
- 
--- 
-1.7.10.4
+But well, we obviously need to way to tell if gpios are orthogonal or
+not, and adding a function to struct pinmux_ops is an elegant solution
+to do so since it even allows a pin granularity.
+
+I guess I sent my previous mail a bit too quickly.
