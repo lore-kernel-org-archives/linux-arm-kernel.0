@@ -1,109 +1,136 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Jul 2013 14:11:31 -0500
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
-Message-ID: <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 25 Jul 2013 15:22:16 -0400 (EDT)
+Subject: [PATCH v2 4/6] ARM: locks: prefetch the destination word for
+ write prior to strex
+In-Reply-To: <1374767740-2068-5-git-send-email-will.deacon@arm.com>
+References: <1374767740-2068-1-git-send-email-will.deacon@arm.com>
+ <1374767740-2068-5-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.03.1307251521490.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:09 AM, Olof Johansson <olof@lixom.net> wrote:
-> [I'm adding LKML and ksummit-discuss to this thread, since the ACPI/DT
-> discussions have been covered there and this overlaps some with that]
->
-> On Thu, Jul 25, 2013 at 7:38 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> On Thu, Jul 25, 2013 at 03:27:02PM +0100, Russell King - ARM Linux wrote:
->>> Remember the stated assertion when DT was first added to the kernel: the
->>> DT descriptions _will_ become a separately maintained project which is
->>> independent of the kernel.  They will _not_ be kernel version specific.
->>
->> I'm looking forward to this.
->>
->> Question for the DT guys: what are the plans here? Are we going to get
->> rid of the .dts files inside the kernel tree?
->
-> In the discussions we had in Dublin, a couple of options on how to
-> lock in bindings were discussed. I'm a little surprised that Grant
-> didn't cover them in his initial emails on the new maintainership
-> model, but maybe he wanted the new group to handle it. And they didn't
-> bring it up yet either. So I am. :-)
->
-> Until now, we have been working under the assumption that the bindings
-> are _NOT LOCKED_. I.e. they can change as needed, and we _ARE_
-> assuming that the device tree has to match the kernel. That has been a
-> good choice as people get up to speed on what is a good binding and
-> not, and has given us much-needed room to adjust things as needed.
-> That obviously has to change, but doing so needs to be done carefully.
+On Thu, 25 Jul 2013, Will Deacon wrote:
 
-I would argue that little has gone in (if reviewed) with the
-expectation that the binding will change. Many of the common bindings
-have had many rounds of review and they have not changed. My position
-any time I see an incompatible change has been that it require anyone
-affected to be okay with the change. This has pretty much been limited
-to specific platforms from what I've seen.
+> The cost of changing a cacheline from shared to exclusive state can be
+> significant, especially when this is triggered by an exclusive store,
+> since it may result in having to retry the transaction.
+> 
+> This patch prefixes our {spin,read,write}_[try]lock implementations with
+> pldw instructions (on CPUs which support them) to try and grab the line
+> in exclusive state from the start. arch_rwlock_t is changed to avoid
+> using a volatile member, since this generates compiler warnings when
+> falling back on the __builtin_prefetch intrinsic which expects a const
+> void * argument.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-One area we've gotten into trouble is using ePAPR based bindings and
-then deciding those aren't sufficient. For cpu bindings, we've gone
-from the cores are describable we don't need them in DT to following
-ePAPR to some level to more fully describing cpu info including
-topology.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> It's likely that we still want to have a period in which a binding is
-> tentative and can be changed. Sometimes we don't know what we really
-> want until after we've used it a while, and sometimes we, like
-> everybody else, make mistakes on what is a good idea and not. The
-> alternative is to grind most new binding proposals to a halt while we
-> spend mind-numbing hours and hours on polishing every single aspect of
-> the binding to a perfect shine, since we can't go back and fix it.
->
-> So, there really seems to be a need for a layered approach, one in
-> which a binding "graduates" from being tentative to being locked in.
-> I'm refraining from using the terms "staging" and "stable" here, since
-> they have overloaded meaning in the kernel world that doesn't apply
-> here.
-
-+1
-
-Tentative must still be reviewed to the same level bindings which have
-been reviewed up to now were.
-
-> One problem that needs to be solved is obviously how a binding
-> graduates from tentative to locked. This work isn't going to be very
-> interesting to most people, I suspect. Think standards committee type
-> work.
-
-I think a time based stabilization period would be better than a
-separate directory to apply bindings too. Or time plus periodic review
-perhaps.
-
-> A possible way to handle this is to have exactly that: A group of
-> people that essentially constitute the "standards committee" that meet
-> on a regular basis to review and approve new bindings. They should be
-> people not just doing ARM Linux work, but other stakeholders in these
-> bindings too. One of the things they should probably do is sift
-> through our current in-kernel bindings and select those who seem ready
-> to be locked in, review/discuss/decide upon that and once the decision
-> is made, that specific binding does become part of the static,
-> never-ever-change ABI of firmware-to-kernel interfaces.   That might
-> also be the time that the binding is moved from the kernel to a
-> separate repo, but that's a technicality that we'll let the DT
-> maintainers decide among themselves, IMHO.
-
-Seems like a good plan.
-
-Rob
-
->
-> I think that captures most of what we discussed in person. Others
-> might have changed their opinions since then, so I'm definitely not
-> claiming that any of this was an official decision made by anybody.
-> It's just one proposal on how to handle these things moving forward.
->
->
-> -Olof
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ---
+>  arch/arm/include/asm/spinlock.h       | 13 ++++++++++---
+>  arch/arm/include/asm/spinlock_types.h |  2 +-
+>  2 files changed, 11 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+> index 0de7bec..3c8c532 100644
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -5,7 +5,7 @@
+>  #error SMP not supported on pre-ARMv6 CPUs
+>  #endif
+>  
+> -#include <asm/processor.h>
+> +#include <linux/prefetch.h>
+>  
+>  /*
+>   * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
+> @@ -70,6 +70,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+>  	u32 newval;
+>  	arch_spinlock_t lockval;
+>  
+> +	prefetchw(&lock->slock);
+>  	__asm__ __volatile__(
+>  "1:	ldrex	%0, [%3]\n"
+>  "	add	%1, %0, %4\n"
+> @@ -93,6 +94,7 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+>  	unsigned long contended, res;
+>  	u32 slock;
+>  
+> +	prefetchw(&lock->slock);
+>  	do {
+>  		__asm__ __volatile__(
+>  		"	ldrex	%0, [%3]\n"
+> @@ -145,6 +147,7 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
+>  {
+>  	unsigned long tmp;
+>  
+> +	prefetchw(&rw->lock);
+>  	__asm__ __volatile__(
+>  "1:	ldrex	%0, [%1]\n"
+>  "	teq	%0, #0\n"
+> @@ -163,6 +166,7 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
+>  {
+>  	unsigned long tmp;
+>  
+> +	prefetchw(&rw->lock);
+>  	__asm__ __volatile__(
+>  "	ldrex	%0, [%1]\n"
+>  "	teq	%0, #0\n"
+> @@ -193,7 +197,7 @@ static inline void arch_write_unlock(arch_rwlock_t *rw)
+>  }
+>  
+>  /* write_can_lock - would write_trylock() succeed? */
+> -#define arch_write_can_lock(x)		((x)->lock == 0)
+> +#define arch_write_can_lock(x)		(ACCESS_ONCE((x)->lock) == 0)
+>  
+>  /*
+>   * Read locks are a bit more hairy:
+> @@ -211,6 +215,7 @@ static inline void arch_read_lock(arch_rwlock_t *rw)
+>  {
+>  	unsigned long tmp, tmp2;
+>  
+> +	prefetchw(&rw->lock);
+>  	__asm__ __volatile__(
+>  "1:	ldrex	%0, [%2]\n"
+>  "	adds	%0, %0, #1\n"
+> @@ -231,6 +236,7 @@ static inline void arch_read_unlock(arch_rwlock_t *rw)
+>  
+>  	smp_mb();
+>  
+> +	prefetchw(&rw->lock);
+>  	__asm__ __volatile__(
+>  "1:	ldrex	%0, [%2]\n"
+>  "	sub	%0, %0, #1\n"
+> @@ -249,6 +255,7 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
+>  {
+>  	unsigned long tmp, tmp2 = 1;
+>  
+> +	prefetchw(&rw->lock);
+>  	__asm__ __volatile__(
+>  "	ldrex	%0, [%2]\n"
+>  "	adds	%0, %0, #1\n"
+> @@ -262,7 +269,7 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
+>  }
+>  
+>  /* read_can_lock - would read_trylock() succeed? */
+> -#define arch_read_can_lock(x)		((x)->lock < 0x80000000)
+> +#define arch_read_can_lock(x)		(ACCESS_ONCE((x)->lock) < 0x80000000)
+>  
+>  #define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
+>  #define arch_write_lock_flags(lock, flags) arch_write_lock(lock)
+> diff --git a/arch/arm/include/asm/spinlock_types.h b/arch/arm/include/asm/spinlock_types.h
+> index b262d2f..47663fc 100644
+> --- a/arch/arm/include/asm/spinlock_types.h
+> +++ b/arch/arm/include/asm/spinlock_types.h
+> @@ -25,7 +25,7 @@ typedef struct {
+>  #define __ARCH_SPIN_LOCK_UNLOCKED	{ { 0 } }
+>  
+>  typedef struct {
+> -	volatile unsigned int lock;
+> +	u32 lock;
+>  } arch_rwlock_t;
+>  
+>  #define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
+> -- 
+> 1.8.2.2
+> 
