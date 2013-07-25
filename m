@@ -1,72 +1,67 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 25 Jul 2013 10:53:16 -0700
-Subject: [PATCH v5 02/16] ARM: tegra: Move pmc.h to include/linux/tegra-pmc.h
+Date: Thu, 25 Jul 2013 10:53:18 -0700
+Subject: [PATCH v5 04/16] ARM: tegra: tamonten: Add PCIe support
 In-Reply-To: <1374774810-18459-1-git-send-email-thierry.reding@gmail.com>
 References: <1374774810-18459-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1374774810-18459-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1374774810-18459-5-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <thierry.reding@avionic-design.de>
 
-In preparation for moving the PCIe driver into the drivers/pci/host
-directory, this header, which contains prototypes that are required by
-the PCIe driver, needs to be moved to a globally visible location.
+Add properties common to all Tamonten-derived boards to the Tamonten
+DTSI and add the fixed 1.05 V regulator.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
 Changes in v2:
-- keep tegra_pmc_init() prototype in arch/arm/mach-tegra/pmc.h
-- move pmc.h to includex/linux/tegra-pmc.h
+- add properties common to all Tamonten boards
+- add fixed 1.05 V regulator
 
-Changes in v3:
-- update subject to match new location
+ arch/arm/boot/dts/tegra20-tamonten.dtsi | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
- arch/arm/mach-tegra/pmc.h |  1 -
- include/linux/tegra-pmc.h | 23 +++++++++++++++++++++++
- 2 files changed, 23 insertions(+), 1 deletion(-)
- create mode 100644 include/linux/tegra-pmc.h
-
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-index cdb08a1..e1c2df2 100644
---- a/arch/arm/mach-tegra/pmc.h
-+++ b/arch/arm/mach-tegra/pmc.h
-@@ -37,6 +37,5 @@ int tegra_pmc_cpu_power_on(int cpuid);
- int tegra_pmc_cpu_remove_clamping(int cpuid);
+diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+index c54faae..5ee674b 100644
+--- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
++++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+@@ -366,7 +366,7 @@
+ 					regulator-always-on;
+ 				};
  
- void tegra_pmc_init(void);
--void tegra_pmc_pcie_xclk_clamp(bool clamp);
+-				ldo0 {
++				pci_clk_reg: ldo0 {
+ 					regulator-name = "vdd_ldo0,vddio_pex_clk";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+@@ -467,6 +467,11 @@
+ 		nvidia,sys-clock-req-active-high;
+ 	};
  
- #endif
-diff --git a/include/linux/tegra-pmc.h b/include/linux/tegra-pmc.h
-new file mode 100644
-index 0000000..b6296bf
---- /dev/null
-+++ b/include/linux/tegra-pmc.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2012 NVIDIA CORPORATION. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
++	pcie-controller {
++		pex-clk-supply = <&pci_clk_reg>;
++		vdd-supply = <&pci_vdd_reg>;
++	};
 +
-+#ifndef __LINUX_TEGRA_PMC_H
-+#define __LINUX_TEGRA_PMC_H
+ 	usb at c5008000 {
+ 		status = "okay";
+ 	};
+@@ -509,5 +514,15 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			regulator-always-on;
+ 		};
 +
-+void tegra_pmc_pcie_xclk_clamp(bool clamp);
-+
-+#endif
++		pci_vdd_reg: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "vdd_1v05";
++			regulator-min-microvolt = <1050000>;
++			regulator-max-microvolt = <1050000>;
++			gpio = <&pmic 2 0>;
++			enable-active-high;
++		};
+ 	};
+ };
 -- 
 1.8.1.5
