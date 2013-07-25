@@ -1,33 +1,21 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 11:38:56 -0400
-Subject: [PATCH 2/2] ARM: orion5x: add missing mbus include
-In-Reply-To: <1372762453-12018-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1372762453-12018-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1372762453-12018-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130725153856.GI23879@titan.lakedaemon.net>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Thu, 25 Jul 2013 08:43:38 -0700
+Subject: [PATCH 05/22] ARM: dts: bcm281xx: Remove '0x's from BCM11351 BRT
+ DTS file
+In-Reply-To: <51ED6486.3080700@broadcom.com>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
+ <51ED2D90.4020209@broadcom.com> <20130722133852.GA26801@laptop>
+ <51ED3971.905@broadcom.com> <51ED6486.3080700@broadcom.com>
+Message-ID: <CAAYSxhrf+WNz1+ojA1r_pOLWg4xf9Ko8OyUc4GfVEMUN776pfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 12:54:13PM +0200, Sebastian Hesselbarth wrote:
-> edmini_v2-setup is missing an include of linux/mbus.h which causes
-> compiler error because of missing reference to mvebu_mbus_add_window.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk> 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com> 
-> Cc: devicetree-discuss at lists.ozlabs.org 
-> Cc: linux-kernel at vger.kernel.org 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> ---
->  arch/arm/mach-orion5x/edmini_v2-setup.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+On Mon, Jul 22, 2013 at 9:57 AM, Christian Daudt <csd@broadcom.com> wrote:
 
-Applied to mvebu/stable-3.10
+> it'd be nice to have something to point
+> people to as this being the best practice for kernel dev.
 
-thx,
+Power.org's ePAPR exclusively omits the 0x in the unit-address of node names.
 
-Jason.
+https://www.power.org/wp-content/uploads/2012/06/Power_ePAPR_APPROVED_v1.1.pdf
