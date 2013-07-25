@@ -1,44 +1,52 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 25 Jul 2013 10:36:18 +0200
-Subject: Mainline kernel on snowball
-In-Reply-To: <20130725082639.GA25311@verge.net.au>
-References: <20130725052317.GA25854@verge.net.au>
- <20130725054036.GD31954@1wt.eu> <20130725072525.GC7654@verge.net.au>
- <20130725075203.GE31954@1wt.eu> <20130725082639.GA25311@verge.net.au>
-Message-ID: <20130725083618.GA2346@1wt.eu>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 25 Jul 2013 16:57:22 +0800
+Subject: [PATCH 5/6] ASoC: sirf-inner: add mach driver for SiRFSoC
+ internal codec
+In-Reply-To: <20130719185101.GV9858@sirena.org.uk>
+References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
+ <1374232042-26088-6-git-send-email-Baohua.Song@csr.com>
+ <20130719185101.GV9858@sirena.org.uk>
+Message-ID: <CAGsJ_4w5G3ppgWdFYJ0-cMLbuvDMdy+dJneMshkeYz5MR6RW+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 05:26:39PM +0900, Simon Horman wrote:
-> On Thu, Jul 25, 2013 at 09:52:03AM +0200, Willy Tarreau wrote:
-> > On Thu, Jul 25, 2013 at 04:25:25PM +0900, Simon Horman wrote:
-> > > > # cat /proc/cmdline 
-> > > > console=tty0 console=ttyAMA2,115200n8  root=UUID=018e1580-e7e9-460b-95c5-236f6b87b13d rootwait ro fixrtc nocompcache vmalloc=300M mem=128M at 0 mali.mali_mem=64M at 128M hwmem=168M at 192M mem=22M at 360M mem_issw=1M at 383M mem=640M at 384M
-> > > 
-> > > Thanks. Rummaging around in the environment present in uboot I came up with
-> > > the following:
-> > > 
-> > > bootargs=cachepolicy=writealloc noinitrd init=init board_id=1 crashkernel=crashkernel=1M at 0x5600000 logo.nologo startup_graphics=1 mpcore_wdt.mpcore_margin=359 loglevel=8 console=ttyAMA2,115200n8 mem=128M at 0 mali.mali_mem=64M at 128M
-> > > mem=24M at 192M hwmem=167M at 216M mem_issw=1M at 383M mem=640M at 384M vmalloc=256M
-> > > 
-> > > Unfortunately neither this, nor the boot args you are using seem
-> > > to get me any further.
-> > 
-> > OK, I'm attaching the config that works for me on 3.10-rc5 (not
-> > tested a new one yet). It boots with the cmdline above and with
-> > the DTB from the kernel.
-> > 
-> > Hoping this helps,
-> > Willy
-> > 
-> 
-> Thanks! I have something working now.
-> 
-> It seems that part of my problem may have been the compiler that
-> I was using. But that is just speculation at this time.
+2013/7/20 Mark Brown <broonie@kernel.org>:
+> On Fri, Jul 19, 2013 at 07:07:21PM +0800, Barry Song wrote:
+>
+>> +#ifndef CONFIG_ANDROID
+>> +     unsigned int            gpio_hp_detect;
+>> +     struct snd_soc_jack     hp_jack;
+>> +#endif
+>
+> Not for mainline.  I'd suggest setting it up for extcon anyway
+> especially if it's just a simple accessory, that should work for both
+> Android and mainline.
 
-I have some vague memories about failures that I attributed to some
-flavor of 4.5 but I don't remember if it was the real cause in the end
-or not.
+sounds good as if CONFIG_ANDROID is enabled without
+CONFIG_ANDROID_SWITCH, /sys/class/switch/* will be symbolically linked
+to /sys/class/extcon/, so that they are still compatible with legacy
+userspace processes.
 
-Willy
+>
+>> +static int sirf_inner_speaker_out_put(struct snd_kcontrol *kcontrol,
+>> +             struct snd_ctl_elem_value *ucontrol)
+>> +{
+>> +     int is_spk_out = ucontrol->value.integer.value[0];
+>> +     struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+>> +     struct snd_soc_card *card = codec->card;
+>> +     struct sirf_inner_card *sinner_card = snd_soc_card_get_drvdata(card);
+>> +
+>> +     if (gpio_is_valid(sinner_card->gpio_spk_pa))
+>> +             gpio_direction_output(sinner_card->gpio_spk_pa, is_spk_out);
+>> +     return 0;
+>> +}
+>
+> Oh, right.  If this is doing what I think this is doing you want to use
+> DAPM within the CODEC then this can just become a pin switch or you can
+> hook in directly if you continue to use soc-jack - it has DAPM
+> integration.
+
+ok. here it is more of machine stuff than codec stuff, so i think we
+move to snd_soc_jack_gpio.
+
+-barry
