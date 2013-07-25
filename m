@@ -1,28 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Jul 2013 11:27:41 +0200
-Subject: Mainline kernel on snowball
-In-Reply-To: <20130725052317.GA25854@verge.net.au>
-References: <20130725052317.GA25854@verge.net.au>
-Message-ID: <CACRpkdagoo965=8QMR-TwiD3GEwE4FjgdJv2ET1E4R0OWq+efw@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 25 Jul 2013 11:29:46 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <201307242032.03597.arnd@arndb.de>
+References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
+ <5977067.8rykRgjgre@flatron> <201307242032.03597.arnd@arndb.de>
+Message-ID: <51F0F00A.1040907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 7:23 AM, Simon Horman <horms@verge.net.au> wrote:
+On 07/24/2013 08:32 PM, Arnd Bergmann wrote:
+> On Tuesday 23 July 2013, Tomasz Figa wrote:
+>> On Tuesday 23 of July 2013 17:14:20 Alan Stern wrote:
+>>> On Tue, 23 Jul 2013, Tomasz Figa wrote:
+>>>> Where would you want to have those phy_address arrays stored? There
+>>>> are no board files when booting with DT. Not even saying that you
+>>>> don't need to use any hacky schemes like this when you have DT that
+>>>> nicely specifies relations between devices.
+>>>
+>>> If everybody agrees DT has a nice scheme for specifying relations
+>>> between devices, why not use that same scheme in the PHY core?
+>>
+>> It is already used, for cases when consumer device has a DT node attached. 
+>> In non-DT case this kind lookup translates loosely to something that is 
+>> being done in regulator framework - you can't bind devices by pointers, 
+>> because you don't have those pointers, so you need to use device names.
+>>
+> 
+> Sorry for jumping in to the middle of the discussion, but why does a *new*
+> framework even bother defining an interface for board files?
+> 
+> Can't we just drop any interfaces for platform data passing in the phy
+> framework and put the burden of adding those to anyone who actually needs
+> them? All the platforms we are concerned with here (exynos and omap,
+> plus new platforms) can be booted using DT anyway.
 
-> I would like to boot the mainline kernel - ideally v3.10 and v3.11-rcX -
-> on snowball. The reason being to verify CPU hotplug which
-> seems to be broken on shmobile, though that is tangential to this post.
+Indeed, I was also a bit surprised we still need non-dt support, since
+migration to this generic PHY framework in case of exynos was solely
+part of migration of the whole platform to DT.
 
-I usually compile my kernel with this makefile:
-http://www.df.lth.se/~triad/krad/makefiles/u8500.mak
+Two of the drivers that are being converted are also used on s5pv210,
+but there is currently no boards in mainline that would use devices
+covered by those drivers and s5pv210 will very likely get DT support
+in v3.13 anyway.
 
-It appends an initramfs and it appends a DTB (if you compile it
-with config-dt and build-dt) and need nothing from any FS or
-similar.
+But it seems omap still needs non-dt support in the PHY framework.
 
-But the way it looks up compilers and initramfs etc is a bit
-custom I gues ... you have a copy of my initramfs here:
-http://www.df.lth.se/~triad/krad/ux00/rootfs-u8500.cpio
-
-Yours,
-Linus Walleij
+---
+Thanks,
+Sylwester
