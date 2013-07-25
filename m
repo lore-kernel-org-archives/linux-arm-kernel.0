@@ -1,51 +1,76 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 25 Jul 2013 13:00:34 +0200
-Subject: [PATCH 1/2] ARM i.MX6Q: dts: Enable SPI NOR flash on Phytec
- phyFLEX-i.MX6 Ouad module
-In-Reply-To: <20130725023605.GA7492@S2101-09.ap.freescale.net>
-References: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
- <51F01DF0.3030207@cogentembedded.com>
- <20130725023605.GA7492@S2101-09.ap.freescale.net>
-Message-ID: <1374750034.4297.29.camel@pizza.hi.pengutronix.de>
+From: jett.zhou@gmail.com (jett zhou)
+Date: Thu, 25 Jul 2013 19:02:45 +0800
+Subject: [V3 0/7] Enhance mmp display driver
+In-Reply-To: <CACDDiy8OwYHbmYGwc0FV2NLVfu1BiUL9GYCmA2QEVVB5isFJGQ@mail.gmail.com>
+References: <1372332473-6584-1-git-send-email-jtzhou@marvell.com>
+ <20130709133918.GC18477@ns203013.ovh.net>
+ <CACDDiy8OwYHbmYGwc0FV2NLVfu1BiUL9GYCmA2QEVVB5isFJGQ@mail.gmail.com>
+Message-ID: <CACDDiy8wkW95zHCrzEP5u09DYbC2=PQGmb-6bjMsZCs8OmqNsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 25.07.2013, 10:36 +0800 schrieb Shawn Guo:
-> On Wed, Jul 24, 2013 at 10:33:20PM +0400, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> > On 07/24/2013 08:35 PM, Philipp Zabel wrote:
-> > 
-> > >Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > >---
-> > >  arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi | 15 +++++++++++++++
-> > >  1 file changed, 15 insertions(+)
-> > 
-> > >diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> > >index f5e1981..5113d29 100644
-> > >--- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> > >+++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> > >@@ -20,6 +20,20 @@
-> > >  	};
-> > >  };
-> > >
-> > >+&ecspi3 {
-> > >+	pinctrl-names = "default";
-> > >+	pinctrl-0 = <&pinctrl_ecspi3_1>;
-> > >+	status = "okay";
-> > >+	fsl,spi-num-chipselects = <1>;
-> > >+	cs-gpios = <&gpio4 24 0>;
-> > >+
-> > >+	flash: m25p80 at 0 {
-> > 
-> >    Quoting the EPAPR spec [1]: "The name of a node should be
-> > somewhat generic, reflecting the function of the device and not its
-> > precise programming model. If appropriate, the name should be one of
-> > the following choices:
-> > [...]
-> >    - flash
-> 
-> I fixed it up and applied the series.
+Hi Jean
+      Does apply patch1~patch3 and patch6~patch7 have issue on your side? :)
+Thanks
 
-thanks
-Philipp
+2013/7/14 jett zhou <jett.zhou@gmail.com>:
+> Hi Jean
+>      As I checked the for-next branch, found patch4 and patch5 are
+> already applied.
+>      As checked on my side,  only apply patch1~patch3 and
+> patch6~patch7 is ok, so think you can apply them except for patch4/5.
+>      If there is still problem, please let me know, I will check it then.
+> Thanks
+>
+> 2013/7/9 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> HI,
+>>
+>>         please rebase on the for-next branch as it does not apply
+>>
+>> Best Regards,
+>> J.
+>> On 19:27 Thu 27 Jun     , Jett.Zhou wrote:
+>>> Changelog:
+>>> 1 Add more comments for the mmp_display rbswap usage
+>>> according to Daniel's comments;
+>>> 2 Add fix patch for ttc_dkb on rbswap;
+>>> 3 Add more comments on the pitch usage and definition;
+>>> 4 Combine the modification on pitch of graphic and video layer
+>>> in one patch.
+>>>
+>>> Guoqing Li (2):
+>>>   video: mmp: rb swap setting update for mmp display
+>>>   video: mmp: optimize some register setting code
+>>>
+>>> Jett.Zhou (1):
+>>>   ARM: mmp: remove the legacy rbswap setting for ttc_dkb platform
+>>>
+>>> Jing Xiang (4):
+>>>   video: mmp: fix graphics/video layer enable/mask issue
+>>>   video: mmp: fix memcpy wrong size for mmp_addr issue
+>>>   video: mmp: calculate pitch value when fb set win
+>>>   video: mmp: add pitch info in mmp_win structure
+>>>
+>>>  arch/arm/mach-mmp/ttc_dkb.c     |    4 +-
+>>>  drivers/video/mmp/fb/mmpfb.c    |   34 +++++++++++------
+>>>  drivers/video/mmp/hw/mmp_ctrl.c |   79 ++++++++++++++++++++++-----------------
+>>>  drivers/video/mmp/hw/mmp_ctrl.h |    5 ++
+>>>  include/video/mmp_disp.h        |    6 +++
+>>>  5 files changed, 79 insertions(+), 49 deletions(-)
+>>>
+>
+>
+>
+> --
+>
+> ----------------------------------
+> Best Regards
+> Jett Zhou
+
+
+
+-- 
+
+----------------------------------
+Best Regards
+Jett Zhou
