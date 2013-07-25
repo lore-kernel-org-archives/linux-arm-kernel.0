@@ -1,90 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Jul 2013 15:27:02 +0100
-Subject: Do we have people interested in device tree janitoring / cleanup?
-In-Reply-To: <20130725135645.GA17304@glitch>
-References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
- <20130725110634.GB2546@localhost.localdomain>
- <20130725112558.GD24642@n2100.arm.linux.org.uk>
- <20130725135645.GA17304@glitch>
-Message-ID: <20130725142702.GE24642@n2100.arm.linux.org.uk>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 25 Jul 2013 09:29:28 -0500
+Subject: [PATCH 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <201307251102.23446.heiko@sntech.de>
+References: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
+ <1374723797-22169-2-git-send-email-dinguyen@altera.com>
+ <201307251102.23446.heiko@sntech.de>
+Message-ID: <1374762568.3139.7.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 03:56:45PM +0200, Domenico Andreoli wrote:
-> On Thu, Jul 25, 2013 at 12:25:58PM +0100, Russell King - ARM Linux wrote:
-> > This is the exact problem, and if you've seen how Linus rants about
-> > the ARM ecosystem breaking ABI stuff all the time, you will start to
-> > appreciate why ARM is not highly valued in the Linux communities.
+Hi Heiko,
+
+On Thu, 2013-07-25 at 11:02 +0200, Heiko St?bner wrote:
+> Am Donnerstag, 25. Juli 2013, 05:43:17 schrieb dinguyen at altera.com:
+> > From: Dinh Nguyen <dinguyen@altera.com>
 > > 
-> > We need to stop this crap getting in.
+> > The read_sched_clock should return the ~value because the clock is a
+> > countdown implementation. read_sched_clock() should be the same as
+> > __apbt_read_clocksource().
 > > 
-> > We need subsystem people to refuse to merge DT stuff if it hasn't been
-> > reviewed by DT people - subsystem people are _not_ qualified to accept
-> > those patches, even if they're responsible for the files which they're
-> > being applied to. Yes, they can review them, but they should _not_
-> > accept them without them having the bindings reviewed by folk who (a)
-> > know the hardware and (b) know the implications of creating a DT binding.
+> > If a separate timer for the sched_clock exist, then read_sched_clock()
+> > will return an incorrect value. The (sched_io_base + 0x4) needs to be in
+> > the function for both cases.
 > > 
-> > That means whoever is doing the review of DT bindings probably needs to
-> > have access to documentation on the hardware - or they need to be educated
-> > by the submitter.  Or, we need submitters to individually justify why
-> > each and every property is required in the description.
+> > Also, remove the use of "dw-apb-timer-sp" and "dw-apb-timer-osc" since
+> > they are the same DW clock.
 > > 
-> > As for those already there, I don't think there's anything which can be
-> > done about them in the short term (short = quite a few years) - we can't
-> > go removing any properties that are already there, because that will
-> > break the ABI.  We're basically stuck with that crap for ever now.
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Acked-by: Jamie Iles <jamie@jamieiles.com>
+> > CC: Rob Herring <rob.herring@calxeda.com>
+> > CC: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > CC: Jamie Iles <jamie@jamieiles.com>
+> > Cc: John Stultz <john.stultz@linaro.org>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Pavel Machek <pavel@denx.de>
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > ---
+> >  drivers/clocksource/dw_apb_timer_of.c |    7 +++----
+> >  1 file changed, 3 insertions(+), 4 deletions(-)
 > > 
-> > That's the point that people have to understand: if they accept a DT
-> > description into the kernel, it's basically saying at that point that
-> > the DT description is the official and definitive description for that
-> > hardware.  It's just the same as adding a new syscall or something like
-> > that which the entire world starts to use immediately.  You can't go
-> > removing or changing it after the fact.
+> > diff --git a/drivers/clocksource/dw_apb_timer_of.c
+> > b/drivers/clocksource/dw_apb_timer_of.c index 4cbae4f..8e00929 100644
+> > --- a/drivers/clocksource/dw_apb_timer_of.c
+> > +++ b/drivers/clocksource/dw_apb_timer_of.c
+> > @@ -102,18 +102,17 @@ static void add_clocksource(struct device_node
+> > *source_timer) * timer is found. sched_io_base then points to the
+> > current_value * register of the clocksource timer.
+> >  	 */
+> > -	sched_io_base = iobase + 0x04;
+> > +	sched_io_base = iobase;
+> >  	sched_rate = rate;
+> >  }
 > > 
-> > And this is also why a _hell_ of a lot of thought should go into each
-> > and every property _before_ it is even proposed by the patch submitter.
+> >  static u32 read_sched_clock(void)
+> >  {
+> > -	return __raw_readl(sched_io_base);
+> > +	return ~__raw_readl(sched_io_base + 0x4);
+> >  }
+> > 
 > 
-> So this is the true price for having a nice HW agnostic kernel.
+> 
+> 
+> >  static const struct of_device_id sptimer_ids[] __initconst = {
+> >  	{ .compatible = "picochip,pc3x2-rtc" },
+> > -	{ .compatible = "snps,dw-apb-timer-sp" },
+> >  	{ /* Sentinel */ },
+> >  };
+> 
+> I'm not 100% sure, but maybe the same explaination as below applies to this - 
+> with it better being part of the first patch.
+> 
+> 
+> > @@ -153,4 +152,4 @@ static void __init dw_apb_timer_init(struct device_node
+> > *timer) num_called++;
+> >  }
+> >  CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer",
+> > dw_apb_timer_init); -CLOCKSOURCE_OF_DECLARE(apb_timer,
+> > "snps,dw-apb-timer-osc", dw_apb_timer_init);
+> > +CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer",
+> > dw_apb_timer_init);
+> 
+> I think this hunk would better be part of the first patch, as you rename the 
+> devices in the dtsi files there and it has nothing to do with the sched_clock 
+> fix.
+> 
+> Changing the clocksource name here also breaks bisectability on the affected 
+> platforms because they wouldn't be able to add the clocksources when only the 
+> first patch is applied.
 
-Of course it is, and if you thought otherwise, then you haven't thought
-about the problem enough.
+I agree with you, but I was under the impression that Arnd wanted to
+keep DTS changes in a separate commit.
 
-If anyone went walking into DT thinking that the DT bindings can be hacked
-around any old way, then they went into DT with a blindfold on, and did
-not *think*/have not thought about the consequences.
-
-Don't go thinking that ACPI would be any different, because it isn't.
-It's no different from any _other_ interface that the kernel may ever
-use to the outside world, be that the boot loader interface or the user
-interfaces.  All those interfaces are all part of "the ABI" to code
-outside of the kernel, and those are all interfaces which must be
-thought out REAL carefully, and any changes to them must be backed up
-with a way for the existing interfaces to _continue_ working.
-
-What that means is that any DT representation created for any device which
-has ever appeared in a mainline kernel is part of the kernel ABI and must
-remain working in that state.  You can supplement it with new ways of doing
-things, but the original bindings must continue to work.
-
-Remember the stated assertion when DT was first added to the kernel: the
-DT descriptions _will_ become a separately maintained project which is
-independent of the kernel.  They will _not_ be kernel version specific.
-
-Linus wants the platform specific crap like clocks and the like _out_ of
-the kernel tree.  He doesn't want the stuff merely transformed into a
-different representation - he wants it out of the kernel tree and
-entirely separate.
-
-Think about that for a moment with regard to churn in DT descriptions
-and you will soon realise that if you change the DT descriptions and
-then have to update the kernel inline with those updates, you're on to
-creating one hell of a mess.
-
-DT done correctly with care and thought works fine.  DT done without that
-is a disaster, one which I had hoped people had learnt from with the
-problems that PPC has had with bad bindings.
-
-ABI compatibility is VERY important.  If you disagree with that, send
-Linus an email justifying why you think you can change the ABI with no
-compatibility.
+Dinh
+> 
+> 
+> Heiko
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
