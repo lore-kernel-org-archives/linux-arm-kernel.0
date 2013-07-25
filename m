@@ -1,33 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Jul 2013 11:37:52 +0200
-Subject: Issue with gpio and pinmux
-In-Reply-To: <51EB590A.4010600@wwwdotorg.org>
-References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
- <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
- <51EB590A.4010600@wwwdotorg.org>
-Message-ID: <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 25 Jul 2013 15:10:19 +0530
+Subject: [PATCH 1/2] i2c: davinci: remove useless mach/hardware include
+In-Reply-To: <1374712099-32095-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
+ <1374712099-32095-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <51F0F283.5080900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 21, 2013 at 5:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Thursday 25 July 2013 05:58 AM, Santosh Shilimkar wrote:
+> This driver no longer uses definitions from mach/hardware.h.
+> On the other hand, including this header breaks this driver
+> on non-davinci platforms which don't have such a header.
+> 
+> Fix it.
+> 
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-> Actually, a better way to do (c) might be to just add an extra "op" to
-> struct pinmux_ops; something like validate_gpio_mux(), passing in
-> information such as whether a mux function is in effect on that pin,
-> whether the pin is already claimed as a GPIO, and whether the function
-> is being called to check a GPIO-claim or mux-claim operation . If the op
-> is missing, no "dual claim" is allowed. If the op is present, the code
-> in the op validates whether the particular GPIO is allowed to be claimed
-> while the particular mux function is active.
->
-> That way, I think any driver that doesn't want to allow dual-claim
-> doesn't have to do anything, but the few drivers that do can code up
-> whatever algorithm they want; for Tegra, I'd just allow everything for
-> simplicity, but we could always enhance that later if we want.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-You are right, this would be an elegant solution.
+One minor nit:
 
-Christian, are you interested in coding this up?
+> ---
+>  drivers/i2c/busses/i2c-davinci.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+> index fa55605..ddaa2a3 100644
+> --- a/drivers/i2c/busses/i2c-davinci.c
+> +++ b/drivers/i2c/busses/i2c-davinci.c
+> @@ -41,7 +41,6 @@
+>  #include <linux/of_i2c.h>
+>  #include <linux/of_device.h>
+>  
 
-Yours,
-Linus Walleij
+You can now remove this empty line too.
+
+Thanks,
+Sekhar
+
+> -#include <mach/hardware.h>
+>  #include <linux/platform_data/i2c-davinci.h>
+>  
+>  /* ----- global defines ----------------------------------------------- */
+> 
