@@ -1,48 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Jul 2013 09:13:37 -0700
-Subject: [GIT PULL] Remove ARM local timer API
-In-Reply-To: <CAOesGMiornt0twdQv=tYMtAX56Lc79MVyNrHaK1nWpOk189dDA@mail.gmail.com>
-References: <20130625200211.GA11625@codeaurora.org>
- <CAOesGMj5AZcB7-kcS8_JqfKAg_RUKqTdDZf7bdwkebn3pwADAw@mail.gmail.com>
- <20130723234040.GB27761@codeaurora.org>
- <CAOesGMiornt0twdQv=tYMtAX56Lc79MVyNrHaK1nWpOk189dDA@mail.gmail.com>
-Message-ID: <20130725161337.GA29694@codeaurora.org>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 25 Jul 2013 17:20:47 +0100
+Subject: [RFC 0/2] ARM: mm: HugeTLB + THP support for non-LPAE
+Message-ID: <1374769249-15908-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23, Olof Johansson wrote:
-> On Tue, Jul 23, 2013 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 07/23, Olof Johansson wrote:
-> 
-> >> Merged in as localtimer/removal into next/cleanup.
-> >>
-> >> I had quite a few merge conflicts due to the __cpuinit removal, so
-> >> please double-check my resolutions.
-> >>
-> >
-> > A __cpuinit is leftover in smp_twd.c. Hopefully you can just
-> > redo the merge?
-> 
-> Done, thanks for catching it. I thought I grepped for them but I
-> somehow missed that one. Fixed now.
-> 
+Hello,
 
-Also I think a HAVE_CAN_FLEXCAN if CAN was dragged in to
-arch/arm/mach-imx/Kconfig. Here's a patch.
+The following patches bring both HugeTLB support and Transparent
+HugePage (THP) support to ARM for 2 levels of paging (i.e. without
+LPAE).
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 21fa9fa..1303e33 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -794,7 +794,6 @@ config SOC_IMX6Q
- 	select CPU_V7
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select HAVE_CAN_FLEXCAN if CAN
- 	select HAVE_IMX_ANATOP
- 	select HAVE_IMX_GPC
- 	select HAVE_IMX_MMDC
+This code has been tested on an Arndale board (Exynos 5250), and
+is based on 3.11-rc1, with the hugepage simplification patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184117.html
+
+HugeTLB and THP support for LPAE has already been merged in 3.11-rc1.
+
+Hugepages can give nice performance boosts to workloads that put
+pressure on the TLBs. I've observed uplifts of ~5% to some tasks
+just by enabling hugepages via the libhugetlbfs tools. Other
+people have observed decent performance boosts when huge pages
+are enabled:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148835.html
+
+I would appreciate any discussion on these patches, as there are
+people who have an interest in having huge page support in
+non-LPAE kernels.
+
+Cheers,
+-- 
+Steve
+
+Steve Capper (2):
+  ARM: mm: HugeTLB support for non-LPAE systems.
+  ARM: mm: Transparent huge page support for non-LPAE systems.
+
+ arch/arm/Kconfig                      |   4 +-
+ arch/arm/include/asm/hugetlb-2level.h | 126 +++++++++++++++++++++++++
+ arch/arm/include/asm/hugetlb.h        |   4 +
+ arch/arm/include/asm/pgtable-2level.h | 170 ++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level.h |   6 ++
+ arch/arm/include/asm/pgtable.h        |   7 +-
+ arch/arm/include/asm/tlb.h            |  10 +-
+ arch/arm/kernel/head.S                |  10 +-
+ arch/arm/mm/fault.c                   |  13 ---
+ arch/arm/mm/fsr-2level.c              |   4 +-
+ arch/arm/mm/hugetlbpage.c             |   2 +-
+ arch/arm/mm/mmu.c                     |  27 ++++++
+ 12 files changed, 360 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb-2level.h
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.4
