@@ -1,31 +1,28 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 25 Jul 2013 13:58:56 +0800
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 25 Jul 2013 08:05:41 +0200
 Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
  support for Chipidea
-In-Reply-To: <201307250755.23403.marex@denx.de>
+In-Reply-To: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
 References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <201307220340.32263.marex@denx.de>
- <20130722015305.GB25817@nchen-desktop>
- <201307250755.23403.marex@denx.de>
-Message-ID: <20130725055855.GA4924@nchen-desktop>
+Message-ID: <201307250805.41238.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 07:55:23AM +0200, Marek Vasut wrote:
-> Hi Peter,
-> 
-> > 
-> > I have not tried the manual switching, but first, you need to close your
-> > vbus supply.
-> 
-> I think we can close this issue, I will now be also getting MX28EVK. Thanks for 
-> all your help!
-> 
-> 
+Dear Peter Chen,
 
-Great. What's the problem? Any changes for this patchset?
+> This patchset adds tested otg id switch function and
+> vbus connect and disconnect detection for chipidea driver.
+> And fix kinds of bugs found at chipidea drivers after enabling
+> id and vbus detection.
+> 
+> This patch is fully tested at imx6 sabresd platform.
+> My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
 
--- 
+Patchset:
 
-Best Regards,
-Peter Chen
+Tested-by: Marek Vasut <marex@denx.de>
+
+on two STMP3780-based boards (not yet mainline) and two MX28-based boards.
+
+Best regards,
+Marek Vasut
