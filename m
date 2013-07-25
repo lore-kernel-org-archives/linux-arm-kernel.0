@@ -1,41 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Jul 2013 18:01:44 +0100
-Subject: [PATCH v3 1/4] ARM: entry: allow ARM-private syscalls to be restarted
+Date: Thu, 25 Jul 2013 18:01:46 +0100
+Subject: [PATCH v3 3/4] ARM: cacheflush: don't round address range up to
+ nearest page
 In-Reply-To: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
 References: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374771707-2619-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1374771707-2619-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-System calls will only be restarted after signal handling if they (a)
-return an error code indicating that a restart is required and (b) have
-`why' set to a non-zero value, to indicate that the signal interrupted
-them.
+The flush_cache_user_range macro takes a pair of addresses describing
+the start and end of the virtual address range to flush. Due to an
+accidental oversight when flush_cache_range_user was introduced, the
+address range was rounded up so that the start and end addresses were
+page-aligned.
 
-This patch leaves `why' set to a non-zero value for ARM-private syscalls
-, and only zeroes it for syscalls that are not implemented.
+For historical reference, the interesting commits in history.git are:
 
+10eacf1775e1 ("[ARM] Clean up ARM cache handling interfaces (part 1)")
+71432e79b76b ("[ARM] Add flush_cache_user_page() for sys_cacheflush()")
+
+This patch removes the alignment code, reducing the amount of flushing
+required for ranges that are not an exact multiple of PAGE_SIZE.
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/entry-common.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/cacheflush.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 94104bf..74ad15d1 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -442,10 +442,10 @@ local_restart:
- 	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 17d0ae8..bfd37e5 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -268,8 +268,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
+  * Harvard caches are synchronised for the user space address range.
+  * This is used for the ARM private sys_cacheflush system call.
+  */
+-#define flush_cache_user_range(start,end) \
+-	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
++#define flush_cache_user_range(s,e)	__cpuc_coherent_user_range(s,e)
  
- 	add	r1, sp, #S_OFF
--2:	mov	why, #0				@ no longer a real syscall
- 	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
- 	eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
--	bcs	arm_syscall	
-+	bcs	arm_syscall
-+2:	mov	why, #0				@ no longer a real syscall
- 	b	sys_ni_syscall			@ not private func
- 
- #if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
+ /*
+  * Perform necessary cache operations to ensure that data previously
 -- 
 1.8.2.2
