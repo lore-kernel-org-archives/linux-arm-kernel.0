@@ -1,33 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Jul 2013 11:33:27 +0200
-Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
-In-Reply-To: <51F0F035.8010705@arm.com>
-References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
- <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
- <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
- <51F0F035.8010705@arm.com>
-Message-ID: <CACRpkdb7UGS8ysPv=LakbWouUdL9MpKvrgYKh_v9NqSYV3TStg@mail.gmail.com>
+Date: Thu, 25 Jul 2013 11:35:10 +0200
+Subject: [PATCH 0/3] MSM gpio fixes
+In-Reply-To: <20130724224126.GA27678@codeaurora.org>
+References: <1374178035-19943-1-git-send-email-davidb@codeaurora.org>
+ <CACRpkdbOO8fFEx+PxsdJ9F1dqD6V4_RPZThvTufo9+XhhyuHOg@mail.gmail.com>
+ <20130724224126.GA27678@codeaurora.org>
+Message-ID: <CACRpkdb6N-i5cSTSmaB9XCLT6hoYwVRRTxZvuzPw6erCD5P4SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:30 AM, Jonathan Austin
-<jonathan.austin@arm.com> wrote:
+On Thu, Jul 25, 2013 at 12:41 AM, David Brown <davidb@codeaurora.org> wrote:
+> On Sat, Jul 20, 2013 at 10:54:42PM +0200, Linus Walleij wrote:
 
->> What I don't understand is why my CLCD VGA output has
->> been working all the time :-(
+>>>   ARM: msm: Consolidate gpiomux for older architectures
 >>
+>> This does not look like a fix? Surely this can wait for v3.12?
 >
-> No, this confuses me too - perhaps the display you've got it plugged in to
-> is really lenient about modes and just made the best of it?
+> It fixes compilation.  But, it could also wait for v3.12.
 
-I think it's because it is set up into some mode by the boot
-monitor, as I get the boot monitor prompt on the VGA
-display.
-
-Then as the VCO params get written, it is never really unlocked
-so the registers are untouched.
-
-You may have a different boot monitor?
+Well it's up to you. The GPIO patch is in Torvalds tree now, so the
+rest goes through ARM SoC I guess...
 
 Yours,
 Linus Walleij
