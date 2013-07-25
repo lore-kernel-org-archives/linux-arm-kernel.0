@@ -1,64 +1,71 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 25 Jul 2013 11:37:17 +0800
-Subject: Enabling USBH1 on mx53qsb
-In-Reply-To: <CAOMZO5DB5Pxv50Yp2xUtp+yoJq6O+r=ZrGfJvsFNf1gcVOQUEA@mail.gmail.com>
-References: <CAOMZO5CAdxzn-3Xc2DZDYEXwsEznRrcqPbCbTDc5ieBkQkA8=g@mail.gmail.com>
- <20130725031315.GA4489@nchen-desktop>
- <CAOMZO5DB5Pxv50Yp2xUtp+yoJq6O+r=ZrGfJvsFNf1gcVOQUEA@mail.gmail.com>
-Message-ID: <20130725033716.GB4489@nchen-desktop>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 24 Jul 2013 22:43:17 -0500
+Subject: [PATCH 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
+References: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1374723797-22169-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 12:28:15AM -0300, Fabio Estevam wrote:
-> Hi Peter,
-> 
-> On Thu, Jul 25, 2013 at 12:13 AM, Peter Chen <peter.chen@freescale.com> wrote:
-> 
-> > Would you enable CONFIG_USB_DEBUG to see where is the problem?
-> 
-> This is what I get:
-> 
-> ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap: f5780100 op: f5780140
-> ci_hdrc ci_hdrc.0: doesn't support gadget
-> ci_hdrc ci_hdrc.0: EHCI Host Controller
-> ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
-> ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
-> hub 1-0:1.0: USB hub found
-> hub 1-0:1.0: 1 port detected
-> ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap: f5780300 op: f5780340
-> ci_hdrc ci_hdrc.1: doesn't support gadget
-> ci_hdrc ci_hdrc.1: EHCI Host Controller
-> ci_hdrc ci_hdrc.1: new USB bus registered, assigned bus number 2
-> ci_hdrc ci_hdrc.1: USB 2.0 started, EHCI 1.00
-> hub 2-0:1.0: USB hub found
-> hub 2-0:1.0: 1 port detected
-> 
-> >
-> >>
-> >> However, if I access USBH1 within U-boot prior to launching the
-> >> kernel, then I am able to use USBH1 in the kernel succesfully.
-> >
-> > access host 1 at u-boot, what do you mean, only register access
-> > or let host 1 work?
-> 
-> This is what I do in U-boot:
-> 
-> MX53LOCO U-Boot > usb reset
-> (Re)start USB...
-> USB0:   USB EHCI 1.00
-> scanning bus 0 for devices... 2 USB Device(s) found
->        scanning usb for storage devices... 1 Storage Device(s) found
->        scanning usb for ethernet devices... 0 Ethernet Device(s) found
-> MX53LOCO U-Boot > run bootcmd
-> 
-> Then kernel is launched and I can use USBH1 succesfully.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-seems u-boot already support mx53.
+The read_sched_clock should return the ~value because the clock is a
+countdown implementation. read_sched_clock() should be the same as
+__apbt_read_clocksource().
 
-Can you measure the host 1 vbus pin? The vbus should be 5v to let
-the host works normal.
+If a separate timer for the sched_clock exist, then read_sched_clock()
+will return an incorrect value. The (sched_io_base + 0x4) needs to be in
+the function for both cases.
 
+Also, remove the use of "dw-apb-timer-sp" and "dw-apb-timer-osc" since
+they are the same DW clock.
+
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+CC: Rob Herring <rob.herring@calxeda.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+CC: Jamie Iles <jamie@jamieiles.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Pavel Machek <pavel@denx.de>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/clocksource/dw_apb_timer_of.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index 4cbae4f..8e00929 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -102,18 +102,17 @@ static void add_clocksource(struct device_node *source_timer)
+ 	 * timer is found. sched_io_base then points to the current_value
+ 	 * register of the clocksource timer.
+ 	 */
+-	sched_io_base = iobase + 0x04;
++	sched_io_base = iobase;
+ 	sched_rate = rate;
+ }
+ 
+ static u32 read_sched_clock(void)
+ {
+-	return __raw_readl(sched_io_base);
++	return ~__raw_readl(sched_io_base + 0x4);
+ }
+ 
+ static const struct of_device_id sptimer_ids[] __initconst = {
+ 	{ .compatible = "picochip,pc3x2-rtc" },
+-	{ .compatible = "snps,dw-apb-timer-sp" },
+ 	{ /* Sentinel */ },
+ };
+ 
+@@ -153,4 +152,4 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 	num_called++;
+ }
+ CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
+-CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
 -- 
-
-Best Regards,
-Peter Chen
+1.7.9.5
