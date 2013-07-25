@@ -1,38 +1,89 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 25 Jul 2013 17:26:39 +0900
-Subject: Mainline kernel on snowball
-In-Reply-To: <20130725075203.GE31954@1wt.eu>
-References: <20130725052317.GA25854@verge.net.au>
- <20130725054036.GD31954@1wt.eu>
- <20130725072525.GC7654@verge.net.au>
- <20130725075203.GE31954@1wt.eu>
-Message-ID: <20130725082639.GA25311@verge.net.au>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 25 Jul 2013 10:29:13 +0200
+Subject: [PATCH v1 05/14] clk: msm: Add support for phase locked loops
+ (PLLs)
+In-Reply-To: <1374713022-6049-6-git-send-email-sboyd@codeaurora.org>
+References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+ <1374713022-6049-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <6003715.TMZ71jDUbL@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 09:52:03AM +0200, Willy Tarreau wrote:
-> On Thu, Jul 25, 2013 at 04:25:25PM +0900, Simon Horman wrote:
-> > > # cat /proc/cmdline 
-> > > console=tty0 console=ttyAMA2,115200n8  root=UUID=018e1580-e7e9-460b-95c5-236f6b87b13d rootwait ro fixrtc nocompcache vmalloc=300M mem=128M at 0 mali.mali_mem=64M at 128M hwmem=168M at 192M mem=22M at 360M mem_issw=1M at 383M mem=640M at 384M
-> > 
-> > Thanks. Rummaging around in the environment present in uboot I came up with
-> > the following:
-> > 
-> > bootargs=cachepolicy=writealloc noinitrd init=init board_id=1 crashkernel=crashkernel=1M at 0x5600000 logo.nologo startup_graphics=1 mpcore_wdt.mpcore_margin=359 loglevel=8 console=ttyAMA2,115200n8 mem=128M at 0 mali.mali_mem=64M at 128M
-> > mem=24M at 192M hwmem=167M at 216M mem_issw=1M at 383M mem=640M at 384M vmalloc=256M
-> > 
-> > Unfortunately neither this, nor the boot args you are using seem
-> > to get me any further.
-> 
-> OK, I'm attaching the config that works for me on 3.10-rc5 (not
-> tested a new one yet). It boots with the cmdline above and with
-> the DTB from the kernel.
-> 
-> Hoping this helps,
-> Willy
-> 
+Hi Stephen,
 
-Thanks! I have something working now.
+On Wednesday 24 of July 2013 17:43:33 Stephen Boyd wrote:
+> Add support for MSM's PLLs (phase locked loops). This is
+> sufficient enough to be able to determine the rate the PLL is
+> running at. We can add rate setting support later when it's
+> needed.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/clock/msm.txt |  40 ++++
+>  drivers/clk/Kconfig                             |   2 +
+>  drivers/clk/Makefile                            |   1 +
+>  drivers/clk/msm/Kconfig                         |   4 +
+>  drivers/clk/msm/Makefile                        |   3 +
+>  drivers/clk/msm/clk-pll.c                       | 233
+> ++++++++++++++++++++++++ drivers/clk/msm/clk-pll.h                     
+>  |  43 +++++
+>  7 files changed, 326 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/msm.txt
+>  create mode 100644 drivers/clk/msm/Kconfig
+>  create mode 100644 drivers/clk/msm/Makefile
+>  create mode 100644 drivers/clk/msm/clk-pll.c
+>  create mode 100644 drivers/clk/msm/clk-pll.h
+[snip]
+> diff --git a/drivers/clk/msm/clk-pll.h b/drivers/clk/msm/clk-pll.h
+> new file mode 100644
+> index 0000000..4e63a5e
+> --- /dev/null
+> +++ b/drivers/clk/msm/clk-pll.h
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms. + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __MSM_CLK_PLL_H__
+> +#define __MSM_CLK_PLL_H__
+> +
+> +struct device;
+> +struct clk;
+> +struct clk_init_data;
+> +
+> +struct pll_desc {
+> +	void __iomem *base;
+> +	u16 l_reg;
+> +	u16 m_reg;
+> +	u16 n_reg;
+> +	u16 config_reg;
+> +	u16 mode_reg;
+> +	u16 status_reg;
+> +	u8 status_bit;
+> +};
+> +
+> +struct pll_vote_desc {
+> +	void __iomem *base;
+> +	u16 vote_reg;
+> +	u8 vote_bit;
+> +};
+> +
+> +extern struct clk *pll_clk_register(struct device *dev, struct pll_desc
+> *desc, +		struct clk_init_data *init);
+> +extern struct clk *pll_vote_clk_register(struct device *dev,
+> +		struct pll_vote_desc *desc, struct clk_init_data *init);
 
-It seems that part of my problem may have been the compiler that
-I was using. But that is just speculation at this time.
+I don't think such generic name is good here. What about prefixing them 
+with msm_ or qcom_ string?
+
+Best regards,
+Tomasz
