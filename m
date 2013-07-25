@@ -1,123 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Jul 2013 16:55:36 +0100
-Subject: [PATCH v2 2/6] ARM: smp_on_up: move inline asm ALT_SMP patching macro
- out of spinlock.h
+Date: Thu, 25 Jul 2013 16:55:37 +0100
+Subject: [PATCH v2 3/6] ARM: prefetch: add support for prefetchw using pldw on
+ SMP ARMv7+ CPUs
 In-Reply-To: <1374767740-2068-1-git-send-email-will.deacon@arm.com>
 References: <1374767740-2068-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1374767740-2068-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1374767740-2068-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patching UP/SMP alternatives inside inline assembly blocks is useful
-outside of the spinlock implementation, where it is used for sev and wfe.
+SMP ARMv7 CPUs implement the pldw instruction, which allows them to
+prefetch data cachelines in an exclusive state.
 
-This patch lifts the macro into processor.h and gives it a scarier name
-to (a) avoid conflicts in the global namespace and (b) to try and deter
-its usage unless you "know what you're doing". The W macro for generating
-wide instructions when targetting Thumb-2 is also made available under
-the name WASM, to reduce the potential for conflicts with other headers.
+This patch defines the prefetchw macro using pldw for CPUs that support
+it.
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/processor.h | 12 ++++++++++++
- arch/arm/include/asm/spinlock.h  | 15 ++++-----------
- arch/arm/include/asm/unified.h   |  4 ++++
- 3 files changed, 20 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/processor.h | 29 ++++++++++++++++++-----------
+ 1 file changed, 18 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-index 91cfe08..cbdb130 100644
+index cbdb130..dde7ecc 100644
 --- a/arch/arm/include/asm/processor.h
 +++ b/arch/arm/include/asm/processor.h
-@@ -22,6 +22,7 @@
- #include <asm/hw_breakpoint.h>
- #include <asm/ptrace.h>
- #include <asm/types.h>
-+#include <asm/unified.h>
+@@ -109,19 +109,26 @@ unsigned long get_wchan(struct task_struct *p);
+ #if __LINUX_ARM_ARCH__ >= 5
  
- #ifdef __KERNEL__
- #define STACK_TOP	((current->personality & ADDR_LIMIT_32BIT) ? \
-@@ -91,6 +92,17 @@ unsigned long get_wchan(struct task_struct *p);
- #define KSTK_EIP(tsk)	task_pt_regs(tsk)->ARM_pc
- #define KSTK_ESP(tsk)	task_pt_regs(tsk)->ARM_sp
+ #define ARCH_HAS_PREFETCH
+-static inline void prefetch(const void *ptr)
+-{
+-	__asm__ __volatile__(
+-		"pld\t%a0"
+-		:: "p" (ptr));
+-}
++#define prefetch(p)							\
++({									\
++	__asm__ __volatile__(						\
++		"pld\t%a0"						\
++		:: "p" (p));						\
++})
  
-+#ifdef CONFIG_SMP
-+#define __ALT_SMP_ASM(smp, up)						\
-+	"9998:	" smp "\n"						\
-+	"	.pushsection \".alt.smp.init\", \"a\"\n"		\
-+	"	.long	9998b\n"					\
-+	"	" up "\n"						\
-+	"	.popsection\n"
-+#else
-+#define __ALT_SMP_ASM(smp, up)	up
-+#endif
-+
- /*
-  * Prefetching support - only ARMv5.
-  */
-diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-index f8b8965..0de7bec 100644
---- a/arch/arm/include/asm/spinlock.h
-+++ b/arch/arm/include/asm/spinlock.h
-@@ -11,15 +11,7 @@
-  * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
-  * extensions, so when running on UP, we have to patch these instructions away.
-  */
--#define ALT_SMP(smp, up)					\
--	"9998:	" smp "\n"					\
--	"	.pushsection \".alt.smp.init\", \"a\"\n"	\
--	"	.long	9998b\n"				\
--	"	" up "\n"					\
--	"	.popsection\n"
++#if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
+ #define ARCH_HAS_PREFETCHW
+-#define prefetchw(ptr)	prefetch(ptr)
 -
- #ifdef CONFIG_THUMB2_KERNEL
--#define SEV		ALT_SMP("sev.w", "nop.w")
- /*
-  * For Thumb-2, special care is needed to ensure that the conditional WFE
-  * instruction really does assemble to exactly 4 bytes (as required by
-@@ -31,17 +23,18 @@
-  * the assembler won't change IT instructions which are explicitly present
-  * in the input.
-  */
--#define WFE(cond)	ALT_SMP(		\
-+#define WFE(cond)	__ALT_SMP_ASM(		\
- 	"it " cond "\n\t"			\
- 	"wfe" cond ".n",			\
- 						\
- 	"nop.w"					\
- )
- #else
--#define SEV		ALT_SMP("sev", "nop")
--#define WFE(cond)	ALT_SMP("wfe" cond, "nop")
-+#define WFE(cond)	__ALT_SMP_ASM("wfe" cond, "nop")
+-#define ARCH_HAS_SPINLOCK_PREFETCH
+-#define spin_lock_prefetch(x) do { } while (0)
+-
++#define prefetchw(p)							\
++({									\
++	__asm__ __volatile__(						\
++		".arch_extension	mp\n"				\
++		__ALT_SMP_ASM(						\
++			WASM(pldw)		"\t%a0",		\
++			WASM(pld)		"\t%a0"			\
++		)							\
++		:: "p" (p));						\
++})
++#endif
  #endif
  
-+#define SEV		__ALT_SMP_ASM(WASM(sev), WASM(nop))
-+
- static inline void dsb_sev(void)
- {
- #if __LINUX_ARM_ARCH__ >= 7
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index f5989f4..b88beab 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -38,6 +38,8 @@
- #ifdef __ASSEMBLY__
- #define W(instr)	instr.w
- #define BSYM(sym)	sym + 1
-+#else
-+#define WASM(instr)	#instr ".w"
- #endif
- 
- #else	/* !CONFIG_THUMB2_KERNEL */
-@@ -50,6 +52,8 @@
- #ifdef __ASSEMBLY__
- #define W(instr)	instr
- #define BSYM(sym)	sym
-+#else
-+#define WASM(instr)	#instr
- #endif
- 
- #endif	/* CONFIG_THUMB2_KERNEL */
+ #define HAVE_ARCH_PICK_MMAP_LAYOUT
 -- 
 1.8.2.2
