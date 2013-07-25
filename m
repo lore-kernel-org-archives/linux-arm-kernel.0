@@ -1,64 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Jul 2013 10:37:48 -0700
-Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
- prior to strex
-In-Reply-To: <51F160EA.6030800@codeaurora.org>
-References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
- <1374579389-32704-5-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
- <20130724111841.GD11072@mudshark.cambridge.arm.com>
- <51F160EA.6030800@codeaurora.org>
-Message-ID: <51F1626C.3050008@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Jul 2013 13:41:32 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.12
+Message-ID: <20130725174132.GO23879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/13 10:31, Stephen Boyd wrote:
-> On 07/24/13 04:18, Will Deacon wrote:
->> On Tue, Jul 23, 2013 at 09:10:33PM +0100, Nicolas Pitre wrote:
->>> On Tue, 23 Jul 2013, Will Deacon wrote:
->>>
->>>> The cost of changing a cacheline from shared to exclusive state can be
->>>> significant, especially when this is triggered by an exclusive store,
->>>> since it may result in having to retry the transaction.
->>>>
->>>> This patch prefixes our {spin,read,write}_[try]lock implementations with
->>>> pldw instructions (on CPUs which support them) to try and grab the line
->>>> in exclusive state from the start.
->>>>
->>>> Signed-off-by: Will Deacon <will.deacon@arm.com>
->>>> ---
->>>>  arch/arm/include/asm/spinlock.h | 9 ++++++++-
->>>>  1 file changed, 8 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
->>>> index 0de7bec..3e1cc9d 100644
->>>> --- a/arch/arm/include/asm/spinlock.h
->>>> +++ b/arch/arm/include/asm/spinlock.h
->>>> @@ -5,7 +5,7 @@
->>>>  #error SMP not supported on pre-ARMv6 CPUs
->>>>  #endif
->>>>  
->>>> -#include <asm/processor.h>
->>>> +#include <linux/prefetch.h>
->>>>  
->>>>  /*
->>>>   * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
->>>> @@ -70,6 +70,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
->>>>  	u32 newval;
->>>>  	arch_spinlock_t lockval;
->>>>  
->>>> +	prefetchw((const void *)&lock->slock);
->>> Couldn't that cast be carried in the definition of prefetchw() instead?
->> I think that would mean implementing prefetchw as a macro rather than an
->> inline function, since the core code expects to pass a const pointer and GCC
->> gets angry if the type signatures don't match.
-> Maybe I'm wrong, but can't you just remove the casts and leave the
-> function as static inline? const void * is pretty much telling the
-> compiler to turn off type checking.
->
 
-Oh joy. Why is rwlock's lock member marked volatile?
+The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/fixes-non-3.12
+
+for you to fetch changes up to 2746a7c272a3242f919fa2fd5a5f2d9f8a41173a:
+
+  ARM: dove: fix missing __init section of dove_mpp_gpio_mode (2013-07-25 15:22:17 +0000)
+
+----------------------------------------------------------------
+mvebu fixes-non-critical for v3.12
+
+ - dove
+    - fix section mismatch (all callers are already _init, so it's just a space
+      issue)
+
+----------------------------------------------------------------
+Sebastian Hesselbarth (1):
+      ARM: dove: fix missing __init section of dove_mpp_gpio_mode
+
+ arch/arm/mach-dove/mpp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
