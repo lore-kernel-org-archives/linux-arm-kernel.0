@@ -1,59 +1,76 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Fri, 26 Jul 2013 09:45:26 +1000
-Subject: [PATCH 01/12] mmc: mmc_spi: Support CD/RO GPIOs
-In-Reply-To: <1374794808-21890-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1374794808-21890-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1374794808-21890-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <51F1B896.8020005@gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 26 Jul 2013 08:47:36 +0900
+Subject: [PATCHv2 2/3] video: hx8357: Make IM pins optional
+In-Reply-To: <1374757513-2253-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1374757513-2253-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1374757513-2253-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <002201ce8991$5785e8e0$0691baa0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/13 09:26, Laurent Pinchart wrote:
-> Add support for passing CD/RO GPIO numbers directly to the mmc_spi
-> driver instead of relying solely on board code callbacks to retrieve the
-> CD/RO signals values.
+On Thursday, July 25, 2013 10:05 PM, Maxime Ripard wrote:
 > 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> The IM pins of the HX8357 controller are used to define the interface
+> used to feed pixel stream to the LCD panel.
+> 
+> Most of the time, these pins are directly routed to either the ground or
+> the VCC to set their values.
+> 
+> Remove the need to assign GPIOs to these pins when we are in such a case.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/mmc/host/mmc_spi.c    | 32 +++++++++++++++++++++---------
->  drivers/mmc/host/of_mmc_spi.c | 46 +++++++++++--------------------------------
->  include/linux/spi/mmc_spi.h   | 11 +++++++++++
->  3 files changed, 46 insertions(+), 43 deletions(-)
+>  drivers/video/backlight/hx8357.c | 53 +++++++++++++++++++++++-----------------
+>  1 file changed, 31 insertions(+), 22 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/mmc_spi.c b/drivers/mmc/host/mmc_spi.c
-> index 74145d1..4e83908 100644
-> --- a/drivers/mmc/host/mmc_spi.c
-> +++ b/drivers/mmc/host/mmc_spi.c
-> @@ -36,6 +36,7 @@
->  
->  #include <linux/mmc/host.h>
->  #include <linux/mmc/mmc.h>		/* for R1_SPI_* bit values */
-> +#include <linux/mmc/slot-gpio.h>
->  
->  #include <linux/spi/spi.h>
->  #include <linux/spi/mmc_spi.h>
-> @@ -1278,11 +1279,8 @@ static int mmc_spi_get_ro(struct mmc_host *mmc)
->  
->  	if (host->pdata && host->pdata->get_ro)
->  		return !!host->pdata->get_ro(mmc->parent);
-> -	/*
-> -	 * Board doesn't support read only detection; let the mmc core
-> -	 * decide what to do.
-> -	 */
-> -	return -ENOSYS;
-> +	else
-> +		return mmc_gpio_get_ro(mmc);
 
-Why not just have the board file assign mmc_gpio_get_ro as
-host->pdata->get_ro? This would eliminate the need for the
-MMC_SPI_USE_RO_GPIO flag.
+[.....]
 
-Also, if host->pdata->get_ro is not set then this will assume
-mmc_gpio_get_ro is valid, even if MMC_SPI_USE_RO_GPIO is not set. I'm
-guessing it will end up returning -ENOSYS, but they way the code reads
-is that if the host doesn't have get_ro function set, then it is must be
-a gpio.
+> +	if (of_find_property(spi->dev.of_node, "im-gpios", NULL)) {
+> +		lcd->use_im_pins = 1;
+> +
+> +		for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
+> +			lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
+> +							    "im-gpios", i);
+> +			if (lcd->im_pins[i] == -EPROBE_DEFER) {
+> +				dev_info(&spi->dev, "GPIO requested is not here yet, deferring the
+> probe\n");
+> +				return -EPROBE_DEFER;
+> +			}
+> +			if (!gpio_is_valid(lcd->im_pins[i])) {
+> +				dev_err(&spi->dev, "Missing dt property: im-gpios\n");
+> +				return -EINVAL;
+> +			}
+> +
+> +			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
+> +						    GPIOF_OUT_INIT_LOW,
+> +						    "im_pins");
+> +			if (ret) {
+> +				dev_err(&spi->dev, "failed to request gpio %d: %d\n",
+> +					lcd->im_pins[i], ret);
+> +				return -EINVAL;
+> +			}
+>  		}
+> -
+> -		ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
+> -					GPIOF_OUT_INIT_LOW, "im_pins");
+> -		if (ret) {
+> -			dev_err(&spi->dev, "failed to request gpio %d: %d\n",
+> -				lcd->im_pins[i], ret);
+> -			return -EINVAL;
+> -		}
+> -	}
+> +	} else
+> +		lcd->use_im_pins = 0;
 
-Same applies for the other callbacks.
+According to the 'Documentation/CodingStyle', braces are necessary as below.
 
-~Ryan
+	} else {
+		lcd->use_im_pins = 0;
+	}
+
+Others look good.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+Best regards,
+Jingoo Han
