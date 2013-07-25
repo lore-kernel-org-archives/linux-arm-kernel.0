@@ -1,49 +1,107 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 22:08:56 +0100
-Subject: [PATCH 3/4] ARM: kprobes-test: use <asm/opcodes.h>
+Date: Thu, 25 Jul 2013 22:08:54 +0100
+Subject: [PATCH 1/4] ARM: kprobes: fix instruction fetch order with
+ <asm/opcodes.h>
 In-Reply-To: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374786537-10726-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374786537-10726-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure we read instructions in the correct endian-ness by using
-the <asm/opcodes.h> helper to transform them as necessary.
+If we are running BE8, the data and instruction endian-ness do not
+match, so use <asm/opcodes.h> to correctly translate memory accesses
+into ARM instructions.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>y
 ---
- arch/arm/kernel/kprobes-test.c |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ arch/arm/kernel/kprobes-common.c |   14 ++++++++------
+ arch/arm/kernel/kprobes.c        |    9 +++++----
+ 2 files changed, 13 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 0cd63d0..6cfa04d 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -1374,13 +1374,13 @@ static uintptr_t __used kprobes_test_case_start(const char *title, void *stack)
+diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
+index 18a7628..c0b202e 100644
+--- a/arch/arm/kernel/kprobes-common.c
++++ b/arch/arm/kernel/kprobes-common.c
+@@ -14,6 +14,7 @@
+ #include <linux/kernel.h>
+ #include <linux/kprobes.h>
+ #include <asm/system_info.h>
++#include <asm/opcodes.h>
  
- 	if (test_case_is_thumb) {
- 		u16 *p = (u16 *)(test_code & ~1);
--		current_instruction = p[0];
-+		current_instruction = __mem_to_opcode_thumb16(p[0]);
- 		if (is_wide_instruction(current_instruction)) {
--			current_instruction <<= 16;
--			current_instruction |= p[1];
-+			u16 instr2 = __mem_to_opcode_thumb16(p[1]);
-+			current_instruction = ___asm_opcode_thumb32_compose(current_instruction, instr2);
- 		}
- 	} else {
--		current_instruction = *(u32 *)test_code;
-+		current_instruction = __mem_to_opcode_arm(*(u32 *)test_code);
+ #include "kprobes.h"
+ 
+@@ -305,7 +306,8 @@ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 
+ 	if (handler) {
+ 		/* We can emulate the instruction in (possibly) modified form */
+-		asi->insn[0] = (insn & 0xfff00000) | (rn << 16) | reglist;
++		asi->insn[0] = __opcode_to_mem_arm((insn & 0xfff00000) |
++						   (rn << 16) | reglist);
+ 		asi->insn_handler = handler;
+ 		return INSN_GOOD;
  	}
- 
- 	if (current_title[0] == '.')
-@@ -1593,7 +1593,6 @@ static int run_test_cases(void (*tests)(void), const union decode_item *table)
- 	return 0;
+@@ -338,9 +340,9 @@ prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+ 		thumb_insn[2] = 0x4770; /* Thumb bx lr */
+ 		return insn;
+ 	}
+-	asi->insn[1] = 0xe12fff1e; /* ARM bx lr */
++	asi->insn[1] = __opcode_to_mem_arm(0xe12fff1e); /* ARM bx lr */
+ #else
+-	asi->insn[1] = 0xe1a0f00e; /* mov pc, lr */
++	asi->insn[1] = __opcode_to_mem_arm(0xe1a0f00e); /* mov pc, lr */
+ #endif
+ 	/* Make an ARM instruction unconditional */
+ 	if (insn < 0xe0000000)
+@@ -360,12 +362,12 @@ set_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+ 	if (thumb) {
+ 		u16 *ip = (u16 *)asi->insn;
+ 		if (is_wide_instruction(insn))
+-			*ip++ = insn >> 16;
+-		*ip++ = insn;
++			*ip++ = ___asm_opcode_to_mem_thumb16(insn >> 16);
++		*ip++ = ___asm_opcode_to_mem_thumb16(insn);
+ 		return;
+ 	}
+ #endif
+-	asi->insn[0] = insn;
++	asi->insn[0] = __opcode_to_mem_arm(insn);
  }
  
--
- static int __init run_all_tests(void)
- {
- 	int ret = 0;
+ /*
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index 170e9f3..3775af1 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -26,6 +26,7 @@
+ #include <linux/stop_machine.h>
+ #include <linux/stringify.h>
+ #include <asm/traps.h>
++#include <asm/opcodes.h>
+ #include <asm/cacheflush.h>
+ 
+ #include "kprobes.h"
+@@ -62,10 +63,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ #ifdef CONFIG_THUMB2_KERNEL
+ 	thumb = true;
+ 	addr &= ~1; /* Bit 0 would normally be set to indicate Thumb code */
+-	insn = ((u16 *)addr)[0];
++	insn = __mem_to_opcode_thumb16(((u16 *)addr)[0]);
+ 	if (is_wide_instruction(insn)) {
+-		insn <<= 16;
+-		insn |= ((u16 *)addr)[1];
++		u16 inst2 = __mem_to_opcode_thumb16(((u16 *)addr)[1]);
++		insn = ___asm_opcode_thumb32_compose(insn, inst2);
+ 		decode_insn = thumb32_kprobe_decode_insn;
+ 	} else
+ 		decode_insn = thumb16_kprobe_decode_insn;
+@@ -73,7 +74,7 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ 	thumb = false;
+ 	if (addr & 0x3)
+ 		return -EINVAL;
+-	insn = *p->addr;
++	insn = __mem_to_opcode_arm(*p->addr);
+ 	decode_insn = arm_kprobe_decode_insn;
+ #endif
+ 
 -- 
 1.7.10.4
