@@ -1,22 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 25 Jul 2013 15:51:58 +0100
-Subject: XCLKOUT in exynos5250 clock driver
-Message-ID: <20130725145158.GI9858@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Jul 2013 17:06:05 +0200
+Subject: Issue with gpio and pinmux
+In-Reply-To: <51F13973.70806@parrot.com>
+References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
+ <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+ <51EB590A.4010600@wwwdotorg.org>
+ <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+ <51F12629.7090909@parrot.com>
+ <CACRpkdb-hVE1Jj69ttrn+zf5cEuMHhxNh2OyhfTtrG+yUiO+jg@mail.gmail.com>
+ <51F13973.70806@parrot.com>
+Message-ID: <CACRpkdaxD9ShfciD2CJY-1X9hmRPFj+mnFxJXp7ddA0PAZh4wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I appear to be missing something in the clock driver for the exynos5250.
-I'm looking at the Arndale schematic and I see that the audio master
-clock is connected to XCLKOUT on the SoC.  However I can't see any
-reference to XCLKOUT or anything similar in the clock driver or any of
-the DTS files - where is this clock exposed by the clock driver?
+On Thu, Jul 25, 2013 at 4:42 PM, Damien Riegel
+<damien.riegel.ext@parrot.com> wrote:
 
-Unfortunately I haven't been able to get access to the datasheet for the
-part so I can't check this myself.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/040fd358/attachment.sig>
+> My reflection rather was: when gpio is not orthogonal, we could just
+> check mux_owner to see if pin is available; and when it is, use the
+> current implementation.
+>
+> But well, we obviously need to way to tell if gpios are orthogonal or
+> not, and adding a function to struct pinmux_ops is an elegant solution
+> to do so since it even allows a pin granularity.
+
+Yep, I'm just waiting for the patches now :-)
+
+Yours,
+Linus Walleij
