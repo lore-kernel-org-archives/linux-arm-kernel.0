@@ -1,69 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 25 Jul 2013 11:03:18 +0900
-Subject: [PATCH] ARM: shmobile: marzen: Switch to DT_MACHINE_START
-In-Reply-To: <CANqRtoT46LimTXt4mihFJS-DDpXOu5wONVX3yWwt=sr9SDvnsg@mail.gmail.com>
-References: <20130724073042.28351.33041.sendpatchset@w520>
- <20130724073952.GD17045@verge.net.au>
- <20130724084637.GA5774@verge.net.au>
- <CANqRtoT46LimTXt4mihFJS-DDpXOu5wONVX3yWwt=sr9SDvnsg@mail.gmail.com>
-Message-ID: <20130725020317.GA21110@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 25 Jul 2013 11:13:40 +0900
+Subject: [PATCH v2 0/3] ARM: shmobile: marzen: Switch to DT_MACHINE_START
+Message-ID: <1374718423-24230-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 07:00:05PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Wed, Jul 24, 2013 at 5:46 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Jul 24, 2013 at 04:39:53PM +0900, Simon Horman wrote:
-> >> On Wed, Jul 24, 2013 at 04:30:42PM +0900, Magnus Damm wrote:
-> >> > From: Magnus Damm <damm@opensource.se>
-> >> >
-> >> > Convert the marzen board to use DT_MACHINE_START. With this in
-> >> > place all mach-shmobile boards use DT_MACHINE_START. Also, this
-> >> > makes it possible for the r8a7779 SMP code to use DT for CPUs.
-> >> >
-> >> > So appended DTB is the way forward on this board.
-> >>
-> >> Please supply a patch to update the defconfig accordingly.
-> >
-> > In the course of testing this patch I created
-> > a patch to update the defconfig. I will post it with
-> > a patch to use DT for SMP but I have some questions about this patch.
-> >
-> > It seems to me that the following is also needed:
-> >
-> > * Select USE_OF in Kconfig
-> > * Provide dt_compat in DT_MACHINE_START
-> > * Provide r8a7779-marzen dts
-> >
-> > I have a revised version of this patch which does the above.
-> > But I wanted to check with you that I am on the right track
-> > before posting it.
-> 
-> Yes, you are correct. It seems that I was (am) too trigger happy.
-> Thanks for fixing these.
+A short series to use DT_MACHINE_START on the marzen board.
 
-No problem, I'll post the patches.
+Changes since v1
 
-> > Also, I think that once sh73a0 and r8a7779 uses DT for SMP we can remove
-> > shmobile_smp_init_cpus(). As you have posted a patch for sh73a0 I have
-> > prepated a patch for r8a7779 I have also prepared a patch to remove
-> > shmobile_smp_init_cpus().
-> 
-> I think we should remove that function, but I'd like to put some
-> shared code in the same file. So I don't want to remove the file.
-> Perhaps the easiest is to leave it as-is for now and let me deal with
-> that in an upcoming series.
+* Add "ARM: shmobile: marzen: Enable ARM_APPENDED_DTB in defconfig" patch
+* Add "ARM: shmobile: r8a7779: Rely on DT for SMP CPU info" patch
+* Enhance "ARM: shmobile: marzen: Switch to DT_MACHINE_START" to:
+  - Select USE_OF in Kconfig
+  - Provide dt_compat in DT_MACHINE_START
+  - Provide r8a7779-marzen dts
 
-Sure, if that is how you would like to roll.
-Another option is to remove the file and then add it back again later.
+Magnus Damm (1):
+  ARM: shmobile: marzen: Switch to DT_MACHINE_START
 
-> > My plan is to post all relevant patches as a series once
-> > my questions above are resolved.
-> 
-> Sounds good, thanks for your help!
-> 
-> Thanks,
-> 
-> / magnus
-> 
+Simon Horman (2):
+  ARM: shmobile: r8a7779: Rely on DT for SMP CPU info
+  ARM: shmobile: marzen: Enable ARM_APPENDED_DTB in defconfig
+
+ arch/arm/boot/dts/Makefile            |  1 +
+ arch/arm/boot/dts/r8a7779-marzen.dts  | 27 +++++++++++++++++++++++++++
+ arch/arm/configs/marzen_defconfig     |  1 +
+ arch/arm/mach-shmobile/Kconfig        |  1 +
+ arch/arm/mach-shmobile/board-marzen.c |  8 +++++++-
+ arch/arm/mach-shmobile/smp-r8a7779.c  | 12 +++---------
+ 6 files changed, 40 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7779-marzen.dts
+
+-- 
+1.8.2.1
