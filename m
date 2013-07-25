@@ -1,36 +1,143 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Jul 2013 18:01:43 +0100
-Subject: [PATCH v3 0/4] Optimise cache-flushing system call
-Message-ID: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 25 Jul 2013 18:01:45 +0100
+Subject: [PATCH v3 2/4] ARM: cacheflush: split user cache-flushing into
+ interruptible chunks
+In-Reply-To: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
+References: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1374771707-2619-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Flushing a large, non-faulting VMA from userspace can potentially result
+in a long time spent flushing the cache line-by-line without preemption
+occurring (in the case of CONFIG_PREEMPT=n).
 
-This is a refresh of the patches I originally posted here:
+Whilst this doesn't affect the stability of the system, it can certainly
+affect the responsiveness and CPU availability for other tasks.
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/157810.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170601.html
+This patch splits up the user cacheflush code so that it flushes in
+chunks of a page. After each chunk has been flushed, we may reschedule
+if appropriate and, before processing the next chunk, we allow any
+pending signals to be handled before resuming from where we left off.
 
-This is just a rebase onto 3.11-rc2, there are no functional changes to
-the series.
-
-Cheers,
-
-Will
-
-
-Will Deacon (4):
-  ARM: entry: allow ARM-private syscalls to be restarted
-  ARM: cacheflush: split user cache-flushing into interruptible chunks
-  ARM: cacheflush: don't round address range up to nearest page
-  ARM: cacheflush: don't bother rounding to nearest vma
-
- arch/arm/include/asm/cacheflush.h  |  3 +-
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
  arch/arm/include/asm/thread_info.h | 11 +++++++
- arch/arm/kernel/entry-common.S     |  4 +--
- arch/arm/kernel/traps.c            | 64 +++++++++++++++++++++++++++++---------
- 4 files changed, 63 insertions(+), 19 deletions(-)
+ arch/arm/kernel/traps.c            | 63 +++++++++++++++++++++++++++++++++-----
+ 2 files changed, 66 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index 214d415..7d77645 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -43,6 +43,16 @@ struct cpu_context_save {
+ 	__u32	extra[2];		/* Xscale 'acc' register, etc */
+ };
+ 
++struct arm_restart_block {
++	union {
++		/* For user cache flushing */
++		struct {
++			unsigned long start;
++			unsigned long end;
++		} cache;
++	};
++};
++
+ /*
+  * low level task data that entry.S needs immediate access to.
+  * __switch_to() assumes cpu_context follows immediately after cpu_domain.
+@@ -68,6 +78,7 @@ struct thread_info {
+ 	unsigned long		thumbee_state;	/* ThumbEE Handler Base register */
+ #endif
+ 	struct restart_block	restart_block;
++	struct arm_restart_block	arm_restart_block;
+ };
+ 
+ #define INIT_THREAD_INFO(tsk)						\
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index cab094c..4fd8ef5 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -499,6 +499,52 @@ static int bad_syscall(int n, struct pt_regs *regs)
+ 	return regs->ARM_r0;
+ }
+ 
++static long do_cache_op_restart(struct restart_block *);
++
++static inline int
++__do_cache_op(unsigned long start, unsigned long end)
++{
++	int ret;
++	unsigned long chunk = PAGE_SIZE;
++
++	do {
++		if (signal_pending(current)) {
++			struct thread_info *ti = current_thread_info();
++
++			ti->restart_block = (struct restart_block) {
++				.fn	= do_cache_op_restart,
++			};
++
++			ti->arm_restart_block = (struct arm_restart_block) {
++				.cache = {
++					.start	= start,
++					.end	= end,
++				},
++			};
++
++			return -ERESTART_RESTARTBLOCK;
++		}
++
++		ret = flush_cache_user_range(start, start + chunk);
++		if (ret)
++			return ret;
++
++		cond_resched();
++		start += chunk;
++	} while (start < end);
++
++	return 0;
++}
++
++static long do_cache_op_restart(struct restart_block *unused)
++{
++	struct arm_restart_block *restart_block;
++
++	restart_block = &current_thread_info()->arm_restart_block;
++	return __do_cache_op(restart_block->cache.start,
++			     restart_block->cache.end);
++}
++
+ static inline int
+ do_cache_op(unsigned long start, unsigned long end, int flags)
+ {
+@@ -510,17 +556,18 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
+ 
+ 	down_read(&mm->mmap_sem);
+ 	vma = find_vma(mm, start);
+-	if (vma && vma->vm_start < end) {
+-		if (start < vma->vm_start)
+-			start = vma->vm_start;
+-		if (end > vma->vm_end)
+-			end = vma->vm_end;
+-
++	if (!vma || vma->vm_start >= end) {
+ 		up_read(&mm->mmap_sem);
+-		return flush_cache_user_range(start, end);
++		return -EINVAL;
+ 	}
++
++	if (start < vma->vm_start)
++		start = vma->vm_start;
++	if (end > vma->vm_end)
++		end = vma->vm_end;
+ 	up_read(&mm->mmap_sem);
+-	return -EINVAL;
++
++	return __do_cache_op(start, end);
+ }
+ 
+ /*
 -- 
 1.8.2.2
