@@ -1,95 +1,153 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 12:03:24 -0400
-Subject: Location for a kind of GPIO bus driver
-In-Reply-To: <20130725154932.GL9916@kw.sim.vm.gnt>
-References: <20130723151834.GJ9916@kw.sim.vm.gnt>
- <20130724181924.GI19736@titan.lakedaemon.net>
- <20130725154932.GL9916@kw.sim.vm.gnt>
-Message-ID: <20130725160324.GJ23879@titan.lakedaemon.net>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 25 Jul 2013 17:05:03 +0100
+Subject: [PATCH 1/2] ARM: Correct BUG() assembly to ensure it is
+ endian-agnostic
+In-Reply-To: <20130725155700.GD2546@localhost.localdomain>
+References: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374763357-4893-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20130725155700.GD2546@localhost.localdomain>
+Message-ID: <51F14CAF.5010602@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 05:49:32PM +0200, Simon Guinot wrote:
-> On Wed, Jul 24, 2013 at 02:19:24PM -0400, Jason Cooper wrote:
-> > On Tue, Jul 23, 2013 at 05:18:34PM +0200, Simon Guinot wrote:
-> > > Hi,
-> > > 
-> > > I am currently working on converting the LED driver leds-netxbig to DT.
-> > > Doing so, I am also considering to move the GPIO extension bus functions
-> > > (which are currently parts of leds-netxbig) into a separate driver.
-> > > 
-> > > On the LaCie "Big Network" board family (netxbig), the LEDs are
-> > > controlled by a CPLD. In turn, the CPLD can be configured (mostly the
-> > > LEDs modes) through a kind of parallel GPIO bus, called GPIO extension
-> > > bus. Two registers (address and data) are exposed. Each of them is made
-> > > up of several GPIOs. An extra GPIO is used to notify the CPLD that the
-> > > registers have been updated. The leds-netxbig driver uses some dedicated
-> > > functions (prefixed by "gpio_ext_") to handle the GPIO bus extension.
-> > > 
-> > > On the latest "Big Network" boards, this bus is also used to enable the
-> > > PM wakeup sources: the CPLD can be asked to keep powered some devices
-> > > (as the RTC or the Ethernet PHY) while the board is down. I think it
-> > > could be nice to expose this feature to the userland. That's why I am
-> > > thinking about moving the GPIO extension bus support into a separate
-> > > driver. The problem is that I can't find a proper location for a such
-> > > driver. AFAIK, it doesn't fit with anything existing supported by Linux.
-> > > Maybe I should consider drivers/bus ? Or even drivers/misc ?
-> 
-> Hi Jason,
-> 
-> Thanks for your answer.
-> 
-> > 
-> > iiuc, the CPLD is more of gpio multiplexer/expander.  Have you seen
-> > 
-> >   66bcb58 arm: mvebu: enable gpio expander over i2c on Mirabox platform
-> > 
-> > ?  And the corresponding driver, drivers/gpio/gpio-pca953x.c?
-> 
-> All the drivers under drivers/gpio are registering some GPIO chips.
-> It is a big difference with the LaCie "GPIO extension bus". This last
-> is more an extension mechanism on the top of GPIOs already existing
-> (eventually provided by a SoC or a Super-I/O on x86 boards). No new
-> GPIOs are added. I think that the name "extension" is quite confusing.
+On 25/07/13 16:57, Dave Martin wrote:
+> On Thu, Jul 25, 2013 at 03:42:36PM +0100, Ben Dooks wrote:
+>> Currently BUG() uses .word or .hword to create the necessary illegal
+>> instructions. However if we are building BE8 then these get swapped
+>> by the linker into different illegal instructions in the text.
+>
+> In the case of Thumb, the resulting instruction is actually not illegal,
+> which is even worse...
+>
+>> Change to using .inst and .inst.w to create the instructions and mark
+>> them as instructions so that the linker acts correctly.
+>>
+>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+>> ---
+>>   arch/arm/include/asm/bug.h |    4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+>> index 7af5c6c..b95da52 100644
+>> --- a/arch/arm/include/asm/bug.h
+>> +++ b/arch/arm/include/asm/bug.h
+>> @@ -12,10 +12,10 @@
+>>    */
+>>   #ifdef CONFIG_THUMB2_KERNEL
+>>   #define BUG_INSTR_VALUE 0xde02
+>> -#define BUG_INSTR_TYPE ".hword "
+>> +#define BUG_INSTR_TYPE ".inst.w "
+>>   #else
+>>   #define BUG_INSTR_VALUE 0xe7f001f2
+>> -#define BUG_INSTR_TYPE ".word "
+>> +#define BUG_INSTR_TYPE ".inst "
+>>   #endif
+>
+> There was some uncertainty a while ago about precisely which versions of
+> gas support .inst.
+>
+> <asm/opcodes.h>  implements an abstracted workaround for this issue,
+> whereby you can emit instructions using the __inst*() macros, and
+> the swabbing and assembler directives should be generated for you.
+>
+> The patch below ought to do this for BUG(), but I've only briefly
+> build-tested it.
+>
+>
+> Note that the disassembly of the injected instructions in .o files
+> can be a bit confusing, because they are marked as data, do ld --be8
+> doesn't swab them (unlike the instructions, which do get swabbed).
+> objdump may also do extra swabbing during disassembly.
+>
+> You can sanity-check what is really in the image by dumping the text
+> section of vmlinux with objdump -s.
+>
+>
+> The change to<asm/opcodes.h>  is due to a missing include which is
+> really required for correctness, but which didn't show up without
+> the<asm/bug.h>  change (this causes opcodes.h to get included way
+> more often than is otherwise the case).
+>
+> Cheers
+> ---Dave
 
-Agreed.
+Given it was added ~2006 according the mailing lists I have seen, then
+it should be ok to use for building modern kernels with. I think the
+use of .inst and .inst.w is a better solution than having the code
+having bits of it marked as data.
 
-> The idea behind this "bus" is to allow to configure a lot of LEDs (in
-> various modes) using only few GPIOs and a CPLD (which is already
-> available on the board for other purposes). This cheap solution allows
-> precisely to save the cost of a GPIO expander :)
-> 
-> As an example, you can see the "GPIO extension bus" configuration for
-> the Kirkwood "Big Network" boards in:
-> arch/arm/mach-kirkwood/netxbig_v2-setup.c:132.
-> 
-> > 
-> > I would try drivers/gpio.  If there are complaints, it should be trivial
-> > to move it in a new version of the series.
-> 
-> Why not, as long it is clear that the resulting driver will not provide
-> a GPIO chip but rather functions as a library.
+>
+> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+> index 7af5c6c..e36fe85 100644
+> --- a/arch/arm/include/asm/bug.h
+> +++ b/arch/arm/include/asm/bug.h
+> @@ -2,6 +2,7 @@
+>   #define _ASMARM_BUG_H
+>
+>   #include<linux/linkage.h>
+> +#include<asm/opcodes.h>
+>
+>   #ifdef CONFIG_BUG
+>
+> @@ -12,15 +13,15 @@
+>    */
+>   #ifdef CONFIG_THUMB2_KERNEL
+>   #define BUG_INSTR_VALUE 0xde02
+> -#define BUG_INSTR_TYPE ".hword "
+> +#define __BUG_INSTR __inst_thumb16(BUG_INSTR_VALUE)
+>   #else
+>   #define BUG_INSTR_VALUE 0xe7f001f2
+> -#define BUG_INSTR_TYPE ".word "
+> +#define __BUG_INSTR __inst_arm(BUG_INSTR_VALUE)
+>   #endif
+>
+>
+> -#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
+> -#define _BUG(file, line, value) __BUG(file, line, value)
+> +#define BUG() _BUG(__FILE__, __LINE__)
+> +#define _BUG(file, line) __BUG(file, line)
+>
+>   #ifdef CONFIG_DEBUG_BUGVERBOSE
+>
+> @@ -31,9 +32,9 @@
+>    * avoid multiple copies of the string appearing in the kernel image.
+>    */
+>
+> -#define __BUG(__file, __line, __value)				\
+> +#define __BUG(__file, __line)					\
+>   do {								\
+> -	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
+> +	asm volatile("1:\t" __BUG_INSTR "\n"			\
+>   		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
+>   		"2:\t.asciz " #__file "\n" 			\
+>   		".popsection\n" 				\
+> @@ -46,9 +47,9 @@ do {								\
+>
+>   #else  /* not CONFIG_DEBUG_BUGVERBOSE */
+>
+> -#define __BUG(__file, __line, __value)				\
+> +#define __BUG(__file, __line)					\
+>   do {								\
+> -	asm volatile(BUG_INSTR_TYPE #__value);			\
+> +	asm volatile(__BUG_INSTR)				\
+>   	unreachable();						\
+>   } while (0)
+>   #endif  /* CONFIG_DEBUG_BUGVERBOSE */
+> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+> index e796c59..e94ebfd 100644
+> --- a/arch/arm/include/asm/opcodes.h
+> +++ b/arch/arm/include/asm/opcodes.h
+> @@ -11,6 +11,8 @@
+>
+>   #ifndef __ASSEMBLY__
+>   #include<linux/linkage.h>
+> +#include<linux/types.h>
+> +
+>   extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+>   #endif
+>
 
-right, but the end result of what the library would do is expose a
-series of LEDs and PM 'virtual gpios'.  So, even though it's not a gpio
-expander per-se, it's still filling that role.  Or am I still missing
-something?
 
-> > Is there any reason why the new capabilities in the "Big Network" boards
-> > couldn't be covered by gpio-regulator?
-> 
-> I don't have looked at the details but I think that gpio-regulator
-> could be able to configure the PM modes through the GPIO extension bus.
-> 
-> But a problem remains. The same GPIOs would be used by two different
-> drivers: leds-netxbig and gpio-regulator. This would lead to some
-> conflicts. That's why I think that at some level a driver is needed to
-> handle the GPIO extension bus.
-
-It may be simpler to combine it into one driver and place it under
-drivers/mfd as it's certainly a multi-function device.  I don't think
-anyone outside of Lacie is going to be adopting this 'bus'...
-
-thx,
-
-Jason.
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
