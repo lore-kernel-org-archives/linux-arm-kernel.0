@@ -1,89 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 25 Jul 2013 18:54:56 +0100
-Subject: [PATCH 1/2] ARM: Correct BUG() assembly to ensure it is
- endian-agnostic
-In-Reply-To: <51F14CAF.5010602@codethink.co.uk>
-References: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374763357-4893-2-git-send-email-ben.dooks@codethink.co.uk>
- <20130725155700.GD2546@localhost.localdomain>
- <51F14CAF.5010602@codethink.co.uk>
-Message-ID: <20130725175456.GF2546@localhost.localdomain>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 25 Jul 2013 10:53:29 -0700
+Subject: [PATCH v5 15/16] ARM: dts: tegra: Increase prefetchable PCI memory
+ space
+In-Reply-To: <1374774810-18459-1-git-send-email-thierry.reding@gmail.com>
+References: <1374774810-18459-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1374774810-18459-16-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 05:05:03PM +0100, Ben Dooks wrote:
-> On 25/07/13 16:57, Dave Martin wrote:
-> >On Thu, Jul 25, 2013 at 03:42:36PM +0100, Ben Dooks wrote:
-> >>Currently BUG() uses .word or .hword to create the necessary illegal
-> >>instructions. However if we are building BE8 then these get swapped
-> >>by the linker into different illegal instructions in the text.
-> >
-> >In the case of Thumb, the resulting instruction is actually not illegal,
-> >which is even worse...
-> >
-> >>Change to using .inst and .inst.w to create the instructions and mark
-> >>them as instructions so that the linker acts correctly.
-> >>
-> >>Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
-> >>---
-> >>  arch/arm/include/asm/bug.h |    4 ++--
-> >>  1 file changed, 2 insertions(+), 2 deletions(-)
-> >>
-> >>diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-> >>index 7af5c6c..b95da52 100644
-> >>--- a/arch/arm/include/asm/bug.h
-> >>+++ b/arch/arm/include/asm/bug.h
-> >>@@ -12,10 +12,10 @@
-> >>   */
-> >>  #ifdef CONFIG_THUMB2_KERNEL
-> >>  #define BUG_INSTR_VALUE 0xde02
-> >>-#define BUG_INSTR_TYPE ".hword "
-> >>+#define BUG_INSTR_TYPE ".inst.w "
-> >>  #else
-> >>  #define BUG_INSTR_VALUE 0xe7f001f2
-> >>-#define BUG_INSTR_TYPE ".word "
-> >>+#define BUG_INSTR_TYPE ".inst "
-> >>  #endif
-> >
-> >There was some uncertainty a while ago about precisely which versions of
-> >gas support .inst.
-> >
-> ><asm/opcodes.h>  implements an abstracted workaround for this issue,
-> >whereby you can emit instructions using the __inst*() macros, and
-> >the swabbing and assembler directives should be generated for you.
-> >
-> >The patch below ought to do this for BUG(), but I've only briefly
-> >build-tested it.
-> >
-> >
-> >Note that the disassembly of the injected instructions in .o files
-> >can be a bit confusing, because they are marked as data, do ld --be8
-> >doesn't swab them (unlike the instructions, which do get swabbed).
-> >objdump may also do extra swabbing during disassembly.
-> >
-> >You can sanity-check what is really in the image by dumping the text
-> >section of vmlinux with objdump -s.
-> >
-> >
-> >The change to<asm/opcodes.h>  is due to a missing include which is
-> >really required for correctness, but which didn't show up without
-> >the<asm/bug.h>  change (this causes opcodes.h to get included way
-> >more often than is otherwise the case).
-> >
-> >Cheers
-> >---Dave
-> 
-> Given it was added ~2006 according the mailing lists I have seen, then
-> it should be ok to use for building modern kernels with. I think the
-> use of .inst and .inst.w is a better solution than having the code
-> having bits of it marked as data.
+From: Jay Agarwal <jagarwal@nvidia.com>
 
-Of course it is.  But this discussion can be decoupled from bug.h:
-if we decide to migrate to .inst, we can do that in one place in
-opcodes.h, no?
+Instead of evenly splitting the 512 MiB area between prefetchable and
+non-prefetchable memory spaces, increase the prefetchable memory space
+to 384 MiB while at the same time decreasing the non-prefetchable memory
+space to 128 MiB. This is a more useful default as most PCIe devices
+require more prefetchable than non-prefetchable memory.
 
-Otherwise, we have multiple fixes to apply when we decide to make
-that change.
+Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20.dtsi | 4 ++--
+ arch/arm/boot/dts/tegra30.dtsi | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Cheers
----Dave
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index ecd016a..3add9ac2 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -473,8 +473,8 @@
+ 		ranges = <0x82000000 0 0x80000000 0x80000000 0 0x00001000   /* port 0 registers */
+ 			  0x82000000 0 0x80001000 0x80001000 0 0x00001000   /* port 1 registers */
+ 			  0x81000000 0 0          0x82000000 0 0x00010000   /* downstream I/O */
+-			  0x82000000 0 0xa0000000 0xa0000000 0 0x10000000   /* non-prefetchable memory */
+-			  0xc2000000 0 0xb0000000 0xb0000000 0 0x10000000>; /* prefetchable memory */
++			  0x82000000 0 0xa0000000 0xa0000000 0 0x08000000   /* non-prefetchable memory */
++			  0xc2000000 0 0xa8000000 0xa8000000 0 0x18000000>; /* prefetchable memory */
+ 
+ 		clocks = <&tegra_car TEGRA20_CLK_PEX>,
+ 			 <&tegra_car TEGRA20_CLK_AFI>,
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index c8facca..d81c52e 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -35,8 +35,8 @@
+ 			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
+ 			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
+ 			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
+-			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
+-			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
++			  0x82000000 0 0x20000000 0x20000000 0 0x08000000   /* non-prefetchable memory */
++			  0xc2000000 0 0x28000000 0x28000000 0 0x18000000>; /* prefetchable memory */
+ 
+ 		clocks = <&tegra_car TEGRA30_CLK_PCIE>,
+ 			 <&tegra_car TEGRA30_CLK_AFI>,
+-- 
+1.8.1.5
