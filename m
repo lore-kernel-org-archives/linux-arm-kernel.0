@@ -1,35 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Jul 2013 20:28:55 +0300
-Subject: [PATCH 1/6] usb: phy-nop: Use RESET Controller for managing the
- reset line
-In-Reply-To: <1374137590-17865-2-git-send-email-rogerq@ti.com>
-References: <1374137590-17865-1-git-send-email-rogerq@ti.com>
- <1374137590-17865-2-git-send-email-rogerq@ti.com>
-Message-ID: <20130725172855.GJ25415@radagast>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Jul 2013 10:31:22 -0700
+Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
+ prior to strex
+In-Reply-To: <20130724111841.GD11072@mudshark.cambridge.arm.com>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-5-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
+ <20130724111841.GD11072@mudshark.cambridge.arm.com>
+Message-ID: <51F160EA.6030800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 11:53:05AM +0300, Roger Quadros wrote:
-> Till now we were modelling the RESET line as a voltage regulator and
-> using the regulator framework to manage it.
-> 
-> [1] introduces a GPIO based reset controller driver. We use that
-> to manage the PHY reset line, at least for DT boots. For legacy boots,
-> will still need to use the regulator framework for reset lines.
-> 
-> [1] - http://thread.gmane.org/gmane.linux.drivers.devicetree/41348
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+On 07/24/13 04:18, Will Deacon wrote:
+> On Tue, Jul 23, 2013 at 09:10:33PM +0100, Nicolas Pitre wrote:
+>> On Tue, 23 Jul 2013, Will Deacon wrote:
+>>
+>>> The cost of changing a cacheline from shared to exclusive state can be
+>>> significant, especially when this is triggered by an exclusive store,
+>>> since it may result in having to retry the transaction.
+>>>
+>>> This patch prefixes our {spin,read,write}_[try]lock implementations with
+>>> pldw instructions (on CPUs which support them) to try and grab the line
+>>> in exclusive state from the start.
+>>>
+>>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>>  arch/arm/include/asm/spinlock.h | 9 ++++++++-
+>>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+>>> index 0de7bec..3e1cc9d 100644
+>>> --- a/arch/arm/include/asm/spinlock.h
+>>> +++ b/arch/arm/include/asm/spinlock.h
+>>> @@ -5,7 +5,7 @@
+>>>  #error SMP not supported on pre-ARMv6 CPUs
+>>>  #endif
+>>>  
+>>> -#include <asm/processor.h>
+>>> +#include <linux/prefetch.h>
+>>>  
+>>>  /*
+>>>   * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
+>>> @@ -70,6 +70,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+>>>  	u32 newval;
+>>>  	arch_spinlock_t lockval;
+>>>  
+>>> +	prefetchw((const void *)&lock->slock);
+>> Couldn't that cast be carried in the definition of prefetchw() instead?
+> I think that would mean implementing prefetchw as a macro rather than an
+> inline function, since the core code expects to pass a const pointer and GCC
+> gets angry if the type signatures don't match.
 
-that's not in mainline yet, right ? Is it guaranteed that it will hit
-v3.12 merge window ?
+Maybe I'm wrong, but can't you just remove the casts and leave the
+function as static inline? const void * is pretty much telling the
+compiler to turn off type checking.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/fa2fd658/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
