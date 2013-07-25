@@ -1,96 +1,91 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 25 Jul 2013 14:01:25 +0200
-Subject: [PATCH 4/5] iio: at91: add an optional dt property for for adc
- clock hz.
-In-Reply-To: <1373789069-11604-5-git-send-email-josh.wu@atmel.com>
-References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
- <1373789069-11604-5-git-send-email-josh.wu@atmel.com>
-Message-ID: <51F11395.9040406@overkiz.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 25 Jul 2013 13:04:24 +0100
+Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
+In-Reply-To: <20130723163319.GA781@e102568-lin.cambridge.arm.com>
+References: <20130718150408.GB2655@localhost.localdomain>
+ <alpine.LFD.2.03.1307181231510.14924@syhkavp.arg>
+ <20130718180323.GC2655@localhost.localdomain>
+ <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
+ <20130719102844.GA3746@localhost.localdomain>
+ <20130719105907.GB27389@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307221353360.15022@syhkavp.arg>
+ <20130723104352.GA3023@localhost.localdomain>
+ <alpine.LFD.2.03.1307230821270.15022@syhkavp.arg>
+ <20130723163319.GA781@e102568-lin.cambridge.arm.com>
+Message-ID: <20130725120424.GC2546@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On Tue, Jul 23, 2013 at 05:33:19PM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Jul 23, 2013 at 01:28:16PM +0100, Nicolas Pitre wrote:
+> 
+> [...]
+> 
+> > > > + * - The CPU is obviously no longer coherent with the other CPUs.
+> > > > + *
+> > > > + * Further considerations:
+> > > > + *
+> > > > + * - This relies on the presence and behavior of the AUXCR.SMP bit as
+> > > > + *   documented in the ARMv7 TRM.  Vendor implementations that deviate from
+> > > 
+> > > Sorry to be pedantic here, but there is no "ARMv7 TRM".  The SMP bit is
+> > > not part of ARMv7 at all.
+> > 
+> > Well, I just copied Lorenzo's words here, trusting he knew more about it 
+> > than I do.
+> > 
+> > > Also, it seems that A9 isn't precisely the
+> > > same: two ACTLR bits need to be twiddled.  R-class CPUs are generally
+> > > not the same either.
+> 
+> If you mean the ACTLR.FW bit in A9, A5, and R7, then, IIRC, we do not need to
+> clear it, clearing the SMP bit is enough.
+> 
+> See, Dave has a point, there is no explicit "unified v7 TRM disable
+> clean and exit coherency procedure" even though the designers end goal is to
+> have one and that's the one you wrote. The code you posted is perfectly ok on
+> all v7 implementations in the kernel I am aware of, I stand to be corrected
+> but to the best of my knowledge that's the case.
 
-On 14/07/2013 10:04, Josh Wu wrote:
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->   Documentation/devicetree/bindings/arm/atmel-adc.txt |    2 ++
->   drivers/iio/adc/at91_adc.c                          |    8 +++++++-
->   2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> index 16769d9..0db2945 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> @@ -27,6 +27,8 @@ Optional properties:
->   		       resolution will be used.
->     - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
->     - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
-> +  - atmel,adc-clock-rate: ADC clock rate. If not specified, use the default
-> +			  adc_op_clk.
->
->   Optional trigger Nodes:
->     - Required properties:
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index e93a075..8f1386f 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -47,6 +47,7 @@ struct at91_adc_caps {
->
->   struct at91_adc_state {
->   	struct clk		*adc_clk;
-> +	u32			adc_clk_rate;
->   	u16			*buffer;
->   	unsigned long		channels_mask;
->   	struct clk		*clk;
-> @@ -448,6 +449,10 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
->   	if (!node)
->   		return -EINVAL;
->
-> +	prop = 0;
-> +	of_property_read_u32(node, "atmel,adc-clock-rate", &prop);
-> +	st->adc_clk_rate = prop;
-> +
->   	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
->
->   	if (of_property_read_u32(node, "atmel,adc-channels-used", &prop)) {
-> @@ -723,7 +728,8 @@ static int at91_adc_probe(struct platform_device *pdev)
->   	 * specified by the electrical characteristics of the board.
->   	 */
->   	mstrclk = clk_get_rate(st->clk);
-> -	adc_clk = clk_get_rate(st->adc_clk);
-> +	adc_clk = st->adc_clk_rate ?
-> +		st->adc_clk_rate : clk_get_rate(st->adc_clk);
->   	adc_clk_khz = adc_clk / 1000;
->   	prsc = (mstrclk / (2 * adc_clk)) - 1;
->
->
+What I'm really concerned about here is not Cortex-*, but the vendors
+who have their own CPU implementations.  I don't think I've ever seen
+a TRM for one of those.
 
-As said by Maxime and Lars-Peter, I think this should be handled by a 
-proper clock implementation (adc_clock ?) using common clock framework.
+> 
+> > > This is why I preferred to treat the whole sequence as specific to a
+> > > particular CPU implementation.  The similarity between A7 and A15
+> > > might be viewed as a happy coincidence (it also makes life easier in
+> > > big.LITTLE land).
+> > 
+> > Fair enough.
+> 
+> I disagree on the happy coincidence but the point is taken. I am not
 
-IMO the fake adc_op_clk should not exist. Instead the adc clock binding 
-should define properties describing the adc clock characteristics (see 
-pll implementation in at91 common clk series).
-These characteristics can be found in 'ADC characteristics' chapter in 
-atmel's datasheets.
+I confess to exaggeration!  There was obviously an effort to align A15
+and A7, but we know there are differences at the system level, and there
+is always the possibility of b.L pairings which differ on things like
+the SMP bit, or b.L pairings of CPUs not originally designed to pair but
+which are "similar enough" to be pairable.
 
-The adc clock binding would look like this (based on sama5 datasheet):
+> sure about what we should do, but I reiterate my point, the sequence as
+> it stands is OK on all NS v7 implementations I am aware of. We can add
+> macros to differentiate processors when we need them, but again that's
+> just my opinion, as correct as it can be.
 
-adc_clk {
-	compatible = "sama5d3-adc-clk";
-	output = <1000000 20000000>; /* output clock frequency range */
-};
+I still vote for naming them a15_* a7_* or similar.
 
-It is up to the clk user (adc driver) to choose the appropriate 
-frequency to use (maximum rate ?) and configure it with clk_set_rate 
-function.
-The adc clk implem will take care of PRESCAL field config in ADC_MR 
-according to parent rate (mck rate) and requested rate. It will also 
-check if the requested rate is in the output clk range.
+For big.LITTLE pairings, I think we should assume that the big CPU's
+macro is usable on the LITTLE CPU too.  Assuming sane CPU designs, that
+will be true, and we know it works for A15+A7.
 
-These are just thought, feel free to comment it.
+So we would use the a15 macro on TC2, but the a7 macro on an a7-only
+platform.
 
-Best Regards,
 
-Boris
+The other way to abstract this stuff would be to add a new per-CPU
+proc_fn, but that may be overkill, particularly since we know the whole
+mcpm backend may tend to be platform-specific, not just the CPU coherency
+exit part.
+
+Cheers
+---Dave
