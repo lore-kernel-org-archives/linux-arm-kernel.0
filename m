@@ -1,33 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 13:41:32 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.12
-Message-ID: <20130725174132.GO23879@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 25 Jul 2013 10:44:16 -0700
+Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
+In-Reply-To: <51F0F035.8010705@arm.com>
+References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
+ <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
+ <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
+ <51F0F035.8010705@arm.com>
+Message-ID: <20130725174416.7598.73819@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Jonathan Austin (2013-07-25 02:30:29)
+> On 24/07/13 20:32, Linus Walleij wrote:
+> > On Tue, Jul 23, 2013 at 5:42 PM, Jonathan Austin
+> > <jonathan.austin@arm.com> wrote:
+> >
+> >> The order of arguments in the call to vco_set() for the ICST clocks appears to
+> >> have been switched in error, which results in the VCO not being initialised
+> >> correctly. This in turn stops the integrated LCD on things like Integrator/CP
+> >> from working correctly.
+> >>
+> >> This patch fixes the order and restores the expected functionality.
+> >>
+> >> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >> Cc: Mike Turquette <mturquette@linaro.org>
+> >> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> >
+> > Good catch! Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> > You should probably mark this for stable as well.
+> >
+> 
+> Mike, will you add Cc: stable when you take the fix or shall I resubmit 
+> the patch somehow else?
 
-The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+I'll add it.
 
-  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/fixes-non-3.12
-
-for you to fetch changes up to 2746a7c272a3242f919fa2fd5a5f2d9f8a41173a:
-
-  ARM: dove: fix missing __init section of dove_mpp_gpio_mode (2013-07-25 15:22:17 +0000)
-
-----------------------------------------------------------------
-mvebu fixes-non-critical for v3.12
-
- - dove
-    - fix section mismatch (all callers are already _init, so it's just a space
-      issue)
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (1):
-      ARM: dove: fix missing __init section of dove_mpp_gpio_mode
-
- arch/arm/mach-dove/mpp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Regards,
+Mike
