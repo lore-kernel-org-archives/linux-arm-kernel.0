@@ -1,88 +1,201 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 17:43:28 -0700
-Subject: [PATCH v1 00/14] Add support for MSM's mmio clocks
-Message-ID: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 24 Jul 2013 17:43:32 -0700
+Subject: [PATCH v1 04/14] clk: Add set_rate_and_parent() op
+In-Reply-To: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374713022-6049-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reposting this RFC due to conflicts with v3.11-rc1 and because I haven't
-gone through and generated all the data needed yet. This is just a few
-clocks for now to give a general idea until I get some comments from DT
-reviewers.
+Some of Qualcomm's clocks can change their parent and rate at the
+same time with a single register write. Add support for this
+hardware to the common clock framework by adding a new
+set_rate_and_parent() op. When the clock framework determines
+that both the parent and the rate are going to change during
+clk_set_rate() it will call the .set_rate_and_parent() op if
+available and fall back to calling .set_parent() followed by
+.set_rate() otherwise.
 
-The first 4 patches are generic clock framework patches. They add support
-for finding clocks in DT and parsing them generically. They also add support
-for setting the rate and the parent at the same time based on patches from
-James Hogan's remuxing set_rate series [1].
+Cc: James Hogan <james.hogan@imgtec.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ Documentation/clk.txt        |  3 ++
+ drivers/clk/clk.c            | 78 +++++++++++++++++++++++++++++++++-----------
+ include/linux/clk-provider.h | 15 +++++++++
+ 3 files changed, 77 insertions(+), 19 deletions(-)
 
-After that we add MSM clock hardware support and then fill in the DT and
-data to actually register clocks. This is sufficient enough to get the UART
-going on my msm8960 device.
-
-If DT reviewers are ok I'll go ahead and generate the rest of the data
-and post v2.
-
-Stephen Boyd (14):
-  clk: fixed-rate: Export clk_fixed_rate_register()
-  clk: Add of_init_clk_data() to parse common clock bindings
-  clk: Add of_clk_match() for device drivers
-  clk: Add set_rate_and_parent() op
-  clk: msm: Add support for phase locked loops (PLLs)
-  clk: msm: Add support for root clock generators (RCGs)
-  clk: msm: Add support for branches/gate clocks
-  clk: msm: Add MSM clock driver
-  clk: msm: Add support for MSM8960's global clock controller (GCC)
-  clk: msm: Add support for MSM8960's multimedia clock controller (MMCC)
-  ARM: dts: msm: Add MSM8960 GCC DT nodes
-  ARM: dts: msm: Add MSM8960 MMCC DT nodes
-  clk: msm: Add MSM8974 GCC data
-  ARM: dts: msm: Add clock entries for MSM8960 uart device
-
- Documentation/clk.txt                              |   3 +
- Documentation/devicetree/bindings/clock/msm.txt    |  99 +++
- .../devicetree/bindings/clock/qcom,gcc.txt         |  56 ++
- .../devicetree/bindings/clock/qcom,mmcc.txt        |  38 ++
- arch/arm/boot/dts/msm8960-cdp.dts                  | 111 +++
- drivers/clk/Kconfig                                |   2 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-fixed-rate.c                       |   1 +
- drivers/clk/clk.c                                  | 201 +++++-
- drivers/clk/msm/Kconfig                            |  29 +
- drivers/clk/msm/Makefile                           |  12 +
- drivers/clk/msm/clk-branch.c                       | 190 ++++++
- drivers/clk/msm/clk-branch.h                       |  48 ++
- drivers/clk/msm/clk-pll.c                          | 233 +++++++
- drivers/clk/msm/clk-pll.h                          |  43 ++
- drivers/clk/msm/clk-rcg.c                          | 754 +++++++++++++++++++++
- drivers/clk/msm/clk-rcg.h                          | 114 ++++
- drivers/clk/msm/clk-rcg2.c                         | 320 +++++++++
- drivers/clk/msm/core.c                             | 274 ++++++++
- drivers/clk/msm/gcc-8960.c                         | 174 +++++
- drivers/clk/msm/gcc-8974.c                         | 107 +++
- drivers/clk/msm/internal.h                         |  28 +
- drivers/clk/msm/mmcc-8960.c                        | 142 ++++
- include/linux/clk-provider.h                       |  38 ++
- 24 files changed, 2998 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/msm.txt
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,gcc.txt
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,mmcc.txt
- create mode 100644 drivers/clk/msm/Kconfig
- create mode 100644 drivers/clk/msm/Makefile
- create mode 100644 drivers/clk/msm/clk-branch.c
- create mode 100644 drivers/clk/msm/clk-branch.h
- create mode 100644 drivers/clk/msm/clk-pll.c
- create mode 100644 drivers/clk/msm/clk-pll.h
- create mode 100644 drivers/clk/msm/clk-rcg.c
- create mode 100644 drivers/clk/msm/clk-rcg.h
- create mode 100644 drivers/clk/msm/clk-rcg2.c
- create mode 100644 drivers/clk/msm/core.c
- create mode 100644 drivers/clk/msm/gcc-8960.c
- create mode 100644 drivers/clk/msm/gcc-8974.c
- create mode 100644 drivers/clk/msm/internal.h
- create mode 100644 drivers/clk/msm/mmcc-8960.c
-
-[1] Subject: [PATCH v5 0/5] clk: implement remuxing during set_rate                 Message-ID: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>  
-
+diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+index 3aeb5c4..79700ea 100644
+--- a/Documentation/clk.txt
++++ b/Documentation/clk.txt
+@@ -77,6 +77,9 @@ the operations defined in clk.h:
+ 		int		(*set_parent)(struct clk_hw *hw, u8 index);
+ 		u8		(*get_parent)(struct clk_hw *hw);
+ 		int		(*set_rate)(struct clk_hw *hw, unsigned long);
++		int		(*set_rate_and_parent)(struct clk_hw *hw,
++					    unsigned long rate,
++					    unsigned long parent_rate, u8 index);
+ 		void		(*init)(struct clk_hw *hw);
+ 	};
+ 
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 1e3e0db..73de07c 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1121,10 +1121,9 @@ static void clk_reparent(struct clk *clk, struct clk *new_parent)
+ 	clk->parent = new_parent;
+ }
+ 
+-static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
++static struct clk *__clk_set_parent_before(struct clk *clk, struct clk *parent)
+ {
+ 	unsigned long flags;
+-	int ret = 0;
+ 	struct clk *old_parent = clk->parent;
+ 
+ 	/*
+@@ -1155,6 +1154,34 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+ 	clk_reparent(clk, parent);
+ 	clk_enable_unlock(flags);
+ 
++	return old_parent;
++}
++
++static void __clk_set_parent_after(struct clk *clk, struct clk *parent,
++		struct clk *old_parent)
++{
++	/*
++	 * Finish the migration of prepare state and undo the changes done
++	 * for preventing a race with clk_enable().
++	 */
++	if (clk->prepare_count) {
++		clk_disable(clk);
++		clk_disable(old_parent);
++		__clk_unprepare(old_parent);
++	}
++
++	/* update debugfs with new clk tree topology */
++	clk_debug_reparent(clk, parent);
++}
++
++static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
++{
++	unsigned long flags;
++	int ret = 0;
++	struct clk *old_parent;
++
++	old_parent = __clk_set_parent_before(clk, parent);
++
+ 	/* change clock input source */
+ 	if (parent && clk->ops->set_parent)
+ 		ret = clk->ops->set_parent(clk->hw, p_index);
+@@ -1172,18 +1199,8 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+ 		return ret;
+ 	}
+ 
+-	/*
+-	 * Finish the migration of prepare state and undo the changes done
+-	 * for preventing a race with clk_enable().
+-	 */
+-	if (clk->prepare_count) {
+-		clk_disable(clk);
+-		clk_disable(old_parent);
+-		__clk_unprepare(old_parent);
+-	}
++	__clk_set_parent_after(clk, parent, old_parent);
+ 
+-	/* update debugfs with new clk tree topology */
+-	clk_debug_reparent(clk, parent);
+ 	return 0;
+ }
+ 
+@@ -1368,17 +1385,32 @@ static void clk_change_rate(struct clk *clk)
+ 	struct clk *child;
+ 	unsigned long old_rate;
+ 	unsigned long best_parent_rate = 0;
++	bool skip_set_rate = false;
++	struct clk *old_parent;
+ 
+ 	old_rate = clk->rate;
+ 
+-	/* set parent */
+-	if (clk->new_parent && clk->new_parent != clk->parent)
+-		__clk_set_parent(clk, clk->new_parent, clk->new_parent_index);
+-
+-	if (clk->parent)
++	if (clk->new_parent)
++		best_parent_rate = clk->new_parent->rate;
++	else if (clk->parent)
+ 		best_parent_rate = clk->parent->rate;
+ 
+-	if (clk->ops->set_rate)
++	if (clk->new_parent && clk->new_parent != clk->parent) {
++		old_parent = __clk_set_parent_before(clk, clk->new_parent);
++
++		if (clk->ops->set_rate_and_parent) {
++			skip_set_rate = true;
++			clk->ops->set_rate_and_parent(clk->hw, clk->new_rate,
++					best_parent_rate,
++					clk->new_parent_index);
++		} else if (clk->ops->set_parent) {
++			clk->ops->set_parent(clk->hw, clk->new_parent_index);
++		}
++
++		__clk_set_parent_after(clk, clk->new_parent, old_parent);
++	}
++
++	if (!skip_set_rate && clk->ops->set_rate)
+ 		clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
+ 
+ 	if (clk->ops->recalc_rate)
+@@ -1664,6 +1696,14 @@ int __clk_init(struct device *dev, struct clk *clk)
+ 		goto out;
+ 	}
+ 
++	if (clk->ops->set_rate_and_parent &&
++			!(clk->ops->set_parent && clk->ops->set_rate)) {
++		pr_warning("%s: %s must implement .set_parent & .set_rate\n",
++				__func__, clk->name);
++		ret = -EINVAL;
++		goto out;
++	}
++
+ 	/* throw a WARN if any entries in parent_names are NULL */
+ 	for (i = 0; i < clk->num_parents; i++)
+ 		WARN(!clk->parent_names[i],
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 484f8ad..1f7eabb 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -108,6 +108,18 @@ struct clk_hw;
+  *		which is likely helpful for most .set_rate implementation.
+  *		Returns 0 on success, -EERROR otherwise.
+  *
++ * @set_rate_and_parent: Change the rate and the parent of this clock. The
++ *		requested rate is specified by the second argument, which
++ *		should typically be the return of .round_rate call.  The
++ *		third argument gives the parent rate which is likely helpful
++ *		for most .set_rate_and_parent implementation. The fourth
++ *		argument gives the parent index. It is optional (and
++ *		unnecessary) for clocks with 0 or 1 parents as well as
++ *		for clocks that can tolerate switching the rate and the parent
++ *		separately via calls to .set_parent and .set_rate.
++ *		Returns 0 on success, -EERROR otherwise.
++ *
++ *
+  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
+  * implementations to split any work between atomic (enable) and sleepable
+  * (prepare) contexts.  If enabling a clock requires code that might sleep,
+@@ -139,6 +151,9 @@ struct clk_ops {
+ 	u8		(*get_parent)(struct clk_hw *hw);
+ 	int		(*set_rate)(struct clk_hw *hw, unsigned long,
+ 				    unsigned long);
++	int		(*set_rate_and_parent)(struct clk_hw *hw,
++				    unsigned long rate,
++				    unsigned long parent_rate, u8 index);
+ 	void		(*init)(struct clk_hw *hw);
+ };
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
