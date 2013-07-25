@@ -1,36 +1,153 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 25 Jul 2013 12:53:51 +0530
-Subject: [PATCH] dma: edma: add device_slave_caps() support
-In-Reply-To: <51F02CBA.5060704@ti.com>
-References: <1374597804-3961-1-git-send-email-joelf@ti.com>
- <51EF8A52.90902@metafoo.de> <51EF8C2B.2030409@ti.com>
- <51EF8F4E.8080806@metafoo.de>
- <FB20353E-4890-4462-A671-3587A3841B4A@ti.com>
- <51EF92F2.3030405@metafoo.de> <51F0231C.7000401@ti.com>
- <20130724183329.GH18642@intel.com> <51F02CBA.5060704@ti.com>
-Message-ID: <20130725072351.GJ18642@intel.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 25 Jul 2013 10:12:12 +0200
+Subject: [PATCH v1 03/14] clk: Add of_clk_match() for device drivers
+In-Reply-To: <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
+References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+ <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <52875092.tEWeSbEJZC@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 02:36:26PM -0500, Joel Fernandes wrote:
-> > Also another point worth considering is the approach Russell suggested, I havent
-> > gotten a chance to dig deeper but if I understood it correctly then programming
-> > the device_dma_parameters should be the right thing to do. Again I need to look
-> > deeper and esp wrt edma
-> 
-> OK. I have some patches sitting in my tree too that I'm working on. With
-> that I don't need to know about maximum number of allowed segments and
-> can send along any number of segment. I will rework them and post them.
-> fwiw, I will also implement caps API incase like Lars did populating the
-> other fields though these will not be unused.
-> 
-> For segment size, at this time I don't know any driver that uses it
-> other than davinci-pcm. For this reason the calculations can be done as
-> Lars suggested (for minimum of maximum). Do you know in advance if
-> you're going to amend to drop segment size if we go with what Russell
-> suggested, or are you going to leave the seg-size in the caps API anyway.
-I am just back and havent really done my work on this. Let me check and as I
-said if my understanding is right I would be inclined to remove these fields...
+Hi Stephen,
 
-~Vinod
--- 
+On Wednesday 24 of July 2013 17:43:31 Stephen Boyd wrote:
+> In similar fashion as of_regulator_match() add an of_clk_match()
+> function that finds an initializes clock init_data structs from
+> devicetree. Drivers should use this API to find clocks that their
+> device is providing and then iterate over their match table
+> registering the clocks with the init data parsed.
+
+I think all you need here is declaring all your clock drivers using 
+CLK_OF_DECLARE() macro. Then they will be automatically probed by 
+of_clk_init(). See last lines of drivers/clk/clk-fixed-rate.c for an 
+example.
+
+Best regards,
+Tomasz
+
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/clk.c            | 64
+> ++++++++++++++++++++++++++++++++++++++++++++
+> include/linux/clk-provider.h | 16 +++++++++++
+>  2 files changed, 80 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index ea8e951b..1e3e0db 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2289,4 +2289,68 @@ err:
+>  	return -ENOMEM;
+>  }
+>  EXPORT_SYMBOL_GPL(of_init_clk_data);
+> +
+> +/**
+> + * of_clk_match() - Scan and match clock providers from the DT node of
+> a device + * @dev: device initializing clock providers
+> + * @matches: match table of clocks
+> + * @num_matches: number of entries in @matches
+> + *
+> + * This function uses a match table specified by the clock driver to
+> parse + * clock init data from the device tree. @dev is expected to be
+> a device with + * a 'clocks' child node containing a set of child
+> nodes, each providing the + * init data for one clock. The data parsed
+> from a child node will be matched + * to a clock based on the child
+> node's name. Note that the match table is + * modified in place.
+> + *
+> + * Returns the number of matches found or a negative error code on
+> failure. + */
+> +int of_clk_match(struct device *dev, struct of_clk_match *matches,
+> +		 int num_matches)
+> +{
+> +	int count = 0;
+> +	int err, i;
+> +	struct device_node *np, *clocks;
+> +	struct clk_init_data *init;
+> +
+> +	clocks = of_find_node_by_name(dev->of_node, "clocks");
+> +	if (!clocks)
+> +		return -EINVAL;
+> +
+> +	for (i = 0; i < num_matches; i++) {
+> +		struct of_clk_match *match = &matches[i];
+> +		match->init_data = NULL;
+> +		match->of_node = NULL;
+> +	}
+> +
+> +	for_each_available_child_of_node(clocks, np) {
+> +		for (i = 0; i < num_matches; i++) {
+> +			struct of_clk_match *match = &matches[i];
+> +			if (match->of_node)
+> +				continue;
+> +
+> +			if (strcmp(match->name, np->name))
+> +				continue;
+> +
+> +			init = devm_kzalloc(dev, sizeof(*init), 
+GFP_KERNEL);
+> +			if (!init)
+> +				return -ENOMEM;
+> +
+> +			err = of_init_clk_data(np, init);
+> +			if (err) {
+> +				dev_err(dev,
+> +					"failed to parse DT for clock 
+%s\n",
+> +					np->name);
+> +				return err;
+> +			}
+> +			match->of_node = np;
+> +			match->init_data = init;
+> +			count++;
+> +			break;
+> +		}
+> +	}
+> +
+> +	return count;
+> +}
+> +EXPORT_SYMBOL_GPL(of_clk_match);
+>  #endif
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 18d6362..484f8ad 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -461,6 +461,13 @@ struct clk_onecell_data {
+>  		__used __section(__clk_of_table)		\
+>  		= { .compatible = compat, .data = fn };
+> 
+> +struct of_clk_match {
+> +	const char *name;
+> +	void *driver_data;
+> +	struct clk_init_data *init_data;
+> +	struct device_node *of_node;
+> +};
+> +
+>  #ifdef CONFIG_OF
+>  int of_clk_add_provider(struct device_node *np,
+>  			struct clk *(*clk_src_get)(struct of_phandle_args 
+*args,
+> @@ -475,6 +482,9 @@ const char *of_clk_get_parent_name(struct
+> device_node *np, int index); void of_clk_init(const struct of_device_id
+> *matches);
+>  int of_init_clk_data(struct device_node *np, struct clk_init_data
+> *init);
+> 
+> +int of_clk_match(struct device *dev, struct of_clk_match *matches,
+> +		 int num_matches);
+> +
+>  #else /* !CONFIG_OF */
+> 
+>  static inline int of_clk_add_provider(struct device_node *np,
+> @@ -508,6 +518,12 @@ of_init_clk_data(struct device_node *np, struct
+> clk_init_data *init) {
+>  	return 0;
+>  }
+> +static inline int
+> +of_clk_match(struct device *dev, struct of_clk_match *matches, int
+> num_matches) +{
+> +
+> +	return 0;
+> +}
+>  #endif /* CONFIG_OF */
+>  #endif /* CONFIG_COMMON_CLK */
+>  #endif /* CLK_PROVIDER_H */
