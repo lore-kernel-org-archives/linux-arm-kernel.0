@@ -1,58 +1,75 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 25 Jul 2013 12:06:51 -0400 (EDT)
-Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value
- to index into save array
-In-Reply-To: <20130725105528.GA2546@localhost.localdomain>
-References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
- <1374550289-25305-2-git-send-email-nicolas.pitre@linaro.org>
- <20130724164717.GA4610@localhost.localdomain>
- <alpine.LFD.2.03.1307241437460.15022@syhkavp.arg>
- <20130725105528.GA2546@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 25 Jul 2013 09:09:19 -0700
+Subject: DT bindings as ABI [was: Do we have people interested in device tree
+ janitoring / cleanup?]
+Message-ID: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Jul 2013, Dave Martin wrote:
+[I'm adding LKML and ksummit-discuss to this thread, since the ACPI/DT
+discussions have been covered there and this overlaps some with that]
 
-> On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
-> > On Wed, 24 Jul 2013, Dave Martin wrote:
-> > 
-> > > But this patch commits us to requiring that on the suspend path 
-> > > specifically -- I think that ought to be mentioned somewhere. A 
-> > > comment in the preamble for __cpu_suspend would be enough, I think.
-> > 
-> > What comment would you suggest?  I want to make sure the possible 
-> > confusion you see is properly addressed.
-> 
-> I think we just need to state that the value of
-> cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
-> CPU the suspending logical CPU will resume on.  Consequently, if doing a
-> migration, cpu_logical_map() must be updated appropriately somewhere
-> between cpu_pm_enter() and cpu_suspend().
+On Thu, Jul 25, 2013 at 7:38 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Jul 25, 2013 at 03:27:02PM +0100, Russell King - ARM Linux wrote:
+>> Remember the stated assertion when DT was first added to the kernel: the
+>> DT descriptions _will_ become a separately maintained project which is
+>> independent of the kernel.  They will _not_ be kernel version specific.
+>
+> I'm looking forward to this.
+>
+> Question for the DT guys: what are the plans here? Are we going to get
+> rid of the .dts files inside the kernel tree?
 
-Excellent.  I've amended the patch with this:
+In the discussions we had in Dublin, a couple of options on how to
+lock in bindings were discussed. I'm a little surprised that Grant
+didn't cover them in his initial emails on the new maintainership
+model, but maybe he wanted the new group to handle it. And they didn't
+bring it up yet either. So I am. :-)
 
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index 2835d35234..caf938db62 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
- /*
-  * Hide the first two arguments to __cpu_suspend - these are an implementation
-  * detail which platform code shouldn't have to know about.
-+ *
-+ * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
-+ * the MPIDR of the physical CPU the suspending logical CPU will resume on.
-+ * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
-+ * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
-  */
- int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- {
+Until now, we have been working under the assumption that the bindings
+are _NOT LOCKED_. I.e. they can change as needed, and we _ARE_
+assuming that the device tree has to match the kernel. That has been a
+good choice as people get up to speed on what is a good binding and
+not, and has given us much-needed room to adjust things as needed.
+That obviously has to change, but doing so needs to be done carefully.
 
-I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
-is what users should care about.
+It's likely that we still want to have a period in which a binding is
+tentative and can be changed. Sometimes we don't know what we really
+want until after we've used it a while, and sometimes we, like
+everybody else, make mistakes on what is a good idea and not. The
+alternative is to grind most new binding proposals to a halt while we
+spend mind-numbing hours and hours on polishing every single aspect of
+the binding to a perfect shine, since we can't go back and fix it.
 
-ACK?
+So, there really seems to be a need for a layered approach, one in
+which a binding "graduates" from being tentative to being locked in.
+I'm refraining from using the terms "staging" and "stable" here, since
+they have overloaded meaning in the kernel world that doesn't apply
+here.
+
+One problem that needs to be solved is obviously how a binding
+graduates from tentative to locked. This work isn't going to be very
+interesting to most people, I suspect. Think standards committee type
+work.
+
+A possible way to handle this is to have exactly that: A group of
+people that essentially constitute the "standards committee" that meet
+on a regular basis to review and approve new bindings. They should be
+people not just doing ARM Linux work, but other stakeholders in these
+bindings too. One of the things they should probably do is sift
+through our current in-kernel bindings and select those who seem ready
+to be locked in, review/discuss/decide upon that and once the decision
+is made, that specific binding does become part of the static,
+never-ever-change ABI of firmware-to-kernel interfaces.   That might
+also be the time that the binding is moved from the kernel to a
+separate repo, but that's a technicality that we'll let the DT
+maintainers decide among themselves, IMHO.
+
+I think that captures most of what we discussed in person. Others
+might have changed their opinions since then, so I'm definitely not
+claiming that any of this was an official decision made by anybody.
+It's just one proposal on how to handle these things moving forward.
 
 
-Nicolas
+-Olof
