@@ -1,67 +1,35 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 25 Jul 2013 15:38:56 +0200
-Subject: [PATCH 2/2] video: imxfb: Add feature to setup PWM Contrast
- Control Register
-In-Reply-To: <1374395709-20898-2-git-send-email-shc_work@mail.ru>
-References: <1374395709-20898-1-git-send-email-shc_work@mail.ru>
- <1374395709-20898-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20130725133824.GD16871@s25.your-server.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 25 Jul 2013 14:53:19 +0100
+Subject: How to create IRQ mappings in a GPIO driver that doesn't control
+ its IRQ domain ?
+In-Reply-To: <CACRpkdY-mdLbMY16aMqR9Jwu8qs9q4KNyxOxnwhXiGrAAxpKjg@mail.gmail.com>
+References: <1624911.6TtmtVmU1T@avalon>
+ <CACRpkdazPX3EbVbLvXQZh0oRBpHoWPK+EkFO75v9zfAXSPCkHA@mail.gmail.com>
+ <1408178.cxAUTUGJc5@avalon> <20130725131556.GD9858@sirena.org.uk>
+ <CACRpkdY-mdLbMY16aMqR9Jwu8qs9q4KNyxOxnwhXiGrAAxpKjg@mail.gmail.com>
+Message-ID: <20130725135319.GF9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jul 25, 2013 at 03:21:35PM +0200, Linus Walleij wrote:
+> On Thu, Jul 25, 2013 at 3:15 PM, Mark Brown <broonie@kernel.org> wrote:
 
-On Sun, Jul 21, 2013 at 12:35:09PM +0400, Alexander Shiyan wrote:
-> This patch adds feature to setup PWM Contrast Control Register.
-> This register is used to control the signal output at the contrast pin,
-> which controls contrast of the LCD panel.
+> > Are the interrupts in a contiguous block in the controller so you can
+> > just pass around the controller and a base number?
 
-http://www.spinics.net/lists/linux-fbdev/msg10002.html
+> That works with platform data and in-kernel structures, but AFAICT
+> device tree has no such "bulk" concept but expects you to list
+> each and every line individually in cases like this.
 
-Regards,
-
-Markus
-
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  Documentation/devicetree/bindings/video/fsl,imx-fb.txt | 1 +
->  drivers/video/imxfb.c                                  | 2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> index 46da08d..be10c65 100644
-> --- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> @@ -18,6 +18,7 @@ Optional properties:
->  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
->  	register is not modified as recommended by the datasheet.
->  - fsl,lscr1: LCDC Sharp Configuration Register value.
-> +- fsl,pwmr: LCDC PWM Contrast Control Register value.
->  
->  Example:
->  
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index 8e104c4..d98299a 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -806,8 +806,8 @@ static int imxfb_init_fbinfo(struct platform_device *pdev,
->  
->  		fbi->lscr1 = IMXFB_LSCR1_DEFAULT;
->  		of_property_read_u32(np, "fsl,lscr1", &fbi->lscr1);
-> -
->  		of_property_read_u32(np, "fsl,dmacr", &fbi->dmacr);
-> +		of_property_read_u32(np, "fsl,pwmr", &fbi->pwmr);
->  
->  		/* These two function pointers could be used by some specific
->  		 * platforms. */
-> -- 
-> 1.8.1.5
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+It works fine with domains as well - the domains all have a hwirq number
+which is local to the domain context and doesn't correspond to a Linux
+interrupt number.  If you can say "the X interrupts in this domain
+starting at Y correspond to these X GPIOs" then you should be able to
+cope.  Hopefully.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/4d30ee7c/attachment.sig>
