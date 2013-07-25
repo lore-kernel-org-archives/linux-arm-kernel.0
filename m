@@ -1,41 +1,48 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Thu, 25 Jul 2013 10:07:52 +0100
-Subject: [PATCH v5 0/5] clk: implement remuxing during set_rate
-In-Reply-To: <20130724183912.GC27761@codeaurora.org>
-References: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>
- <20130621170407.20448.35605@quantum>
- <CAAG0J9-F0P67=oaE5UHhmgd3Wz4k4XjsRjWShxmKOqicAyrhfw@mail.gmail.com>
- <20130724183912.GC27761@codeaurora.org>
-Message-ID: <51F0EAE8.90303@imgtec.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Jul 2013 11:40:44 +0100
+Subject: [PATCH 03/14] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+In-Reply-To: <20130725102541.GC24642@n2100.arm.linux.org.uk>
+References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374661682-9349-4-git-send-email-ben.dooks@codethink.co.uk>
+ <20130724143335.GL11072@mudshark.cambridge.arm.com>
+ <51EFF1B2.4050609@codethink.co.uk>
+ <20130725101442.GA5609@mudshark.cambridge.arm.com>
+ <20130725102541.GC24642@n2100.arm.linux.org.uk>
+Message-ID: <20130725104044.GD5609@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/13 19:39, Stephen Boyd wrote:
-> On 06/21, James Hogan wrote:
->> On 21 June 2013 18:04, Mike Turquette <mturquette@linaro.org> wrote:
->>> Quoting James Hogan (2013-06-13 09:05:57)
->>>> This patchset adds support for automatic selection of the best parent
->>>> for a clock mux, i.e. the one which can provide the closest clock rate
->>>> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
->>>> flag (which is set for all uses of clk_register_mux().
->>>>
->>>> This works by way of adding a new op, determine_rate, similar to
->>>> round_rate but with an extra parameter to allow the clock driver to
->>>> optionally select a different parent clock. This is used in
->>>> clk_calc_new_rates to decide whether to initiate a set_parent operation.
->>>
->>> Hi James,
->>>
->>> I'm going to hold off on this one for 3.11. I'll revisit it after the
->>> next merge window.
->>
->> Okay, no worries.
->>
+On Thu, Jul 25, 2013 at 11:25:41AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 25, 2013 at 11:14:42AM +0100, Will Deacon wrote:
+> > What's wrong with the following?
 > 
-> Has a new patchset been sent out? I'd like to see this merge in
-> 3.12.
+> Is this like a challenge to find the silly mistake?
 
-Not yet, but I'll try and get it updated and resent early next week.
+Unfortunately, yes. I'm half asleep this morning...
 
-Cheers
-James
+> > @@ -581,8 +581,13 @@ __fixup_a_pv_table:
+> >         b       2f
+> >  1:     add     r7, r3
+> >         ldrh    ip, [r7, #2]
+> > +#ifdef CONFIG_CPU_ENDIAN_BE8
+> > +       and     ip, 0x008f
+> > +       orr     ip, ip, r6, lsl #24
+
+That was supposed to be lsl #8 (I blindly copied from Ben's correct ARM
+hunk), but I think that it's still broken with that change.
+
+> > +#else
+> >         and     ip, 0x8f00
+> >         orr     ip, r6  @ mask in offset bits 31-24
+> > +#endif
+> >         strh    ip, [r7, #2]
+> 
+> Well, ip is being loaded/stored as 16bit, but you're putting r6 in to
+> ip's bits 31-24, which are going to be ignored by the following strh.
+> 
+> The comment "@ mask in offset bits 31-24" refers to the physical address
+> bits here, which are already pre-shifted to bits 7-0 in r6.
+
+Yup. It's bits 15-8 that make life slightly fiddly.
+
+Will
