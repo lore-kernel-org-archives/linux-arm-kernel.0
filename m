@@ -1,51 +1,86 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Thu, 25 Jul 2013 10:30:29 +0100
-Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
-In-Reply-To: <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
-References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
- <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
- <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
-Message-ID: <51F0F035.8010705@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 25 Jul 2013 17:32:12 +0800
+Subject: [PATCH 3/6] ASoC: usp-pcm: add CPU DAI driver for PCM simulated
+ from USP
+In-Reply-To: <20130719181313.GT9858@sirena.org.uk>
+References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
+ <1374232042-26088-4-git-send-email-Baohua.Song@csr.com>
+ <20130719181313.GT9858@sirena.org.uk>
+Message-ID: <CAGsJ_4xNdxFWyN6NUEL36W9n+4Cj=01+QGi+xaeODm9u8pdP9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/13 20:32, Linus Walleij wrote:
-> On Tue, Jul 23, 2013 at 5:42 PM, Jonathan Austin
-> <jonathan.austin@arm.com> wrote:
+2013/7/20 Mark Brown <broonie@kernel.org>:
+> On Fri, Jul 19, 2013 at 07:07:19PM +0800, Barry Song wrote:
 >
->> The order of arguments in the call to vco_set() for the ICST clocks appears to
->> have been switched in error, which results in the VCO not being initialised
->> correctly. This in turn stops the integrated LCD on things like Integrator/CP
->> from working correctly.
->>
->> This patch fixes the order and restores the expected functionality.
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Mike Turquette <mturquette@linaro.org>
->> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+>> +static int sirf_usp_pcm_divider(struct snd_soc_dai *dai, int div_id, int rate)
+>> +{
+>> +     struct sirf_usp *susp = snd_soc_dai_get_drvdata(dai);
+>> +
+>> +     u32 clk_rate = clk_get_rate(susp->clk);
+>> +     u32 clk_div = (clk_rate/(2*rate)) - 1;
+>> +     u32 clk_div_hi = (clk_div & 0xC00)>>10;
+>> +     u32 clk_div_lo = (clk_div & 0x3FF);
+>> +
+>> +     writel((clk_div_lo<<21) | readl(susp->base + USP_MODE2),
+>> +             susp->base + USP_MODE2);
+>> +     writel((clk_div_hi<<30) | readl(susp->base + USP_TX_FRAME_CTRL),
+>> +             susp->base + USP_TX_FRAME_CTRL);
+>> +
+>> +     return 0;
+>> +}
 >
-> Good catch! Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> You should probably mark this for stable as well.
+> I'd be happier if this did some validation on the supplied rate (for
+> example, checking that it's less than the master rate) and had arguments
+> specifying which clock was being affected (in case there's more in
+> future revisions).
+
+sounds good.
+
 >
+> Also what exactly is the rate being set - can the driver just figure
+> this out automatically from the sample rate?
 
-Mike, will you add Cc: stable when you take the fix or shall I resubmit 
-the patch somehow else?
+here it is generating the right pcm clock by an internal DIVISOR in USP module.
 
-> What I don't understand is why my CLCD VGA output has
-> been working all the time :-(
+For USP_MODE2:
+30:21 (R/W) USP_CLK_DIVISOR 10?h0 USP serial clock divider
+
+For USP_TX_FRAME_CTRL:
+31:30 (R/W) USP_CLK_DIVISOR 2?h0 This is the two bit [11:10] of
+USP_CLK_DIVISOR in USP_MODE2
+
+for figuring this out automatically from the sample rate, do you mean
+a lookup table for common sample rate?
+
 >
-
-No, this confuses me too - perhaps the display you've got it plugged in 
-to is really lenient about modes and just made the best of it?
-
-> I thought this VCO was necessary for that as well,  but apparently
-> it works with the defaults.
-
-Certainly I can't get anything out of the display on my integrator or 
-via the VGA port without this fix and the other one in the series.
-
-Jonny
+>> +#ifdef CONFIG_PM
+>> +static int sirf_usp_pcm_suspend(struct platform_device *pdev,
+>> +     pm_message_t state)
+>> +{
+>> +     struct sirf_usp *susp = platform_get_drvdata(pdev);
+>> +
+>> +     susp->mode1_reg = readl(susp->base + USP_MODE1);
+>> +     susp->mode2_reg = readl(susp->base + USP_MODE2);
+>> +     sirf_usp_controller_uninit(susp);
+>> +     clk_disable_unprepare(susp->clk);
+>> +
+>> +     return 0;
+>> +}
 >
-> Yours,
-> Linus Walleij
+> Can this be done as runtime PM as well?  Seems like it'd save power.
+
+agree.
+
 >
+>> +     susp->clk = clk_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(susp->clk)) {
+>> +             dev_err(&pdev->dev, "Get clock failed.\n");
+>> +             return PTR_ERR(susp->clk);
+>> +     }
+>
+> devm_clk_get().
+
+agree. missed this one.
+
+-barry
