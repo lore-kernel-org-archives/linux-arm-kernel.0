@@ -1,100 +1,52 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 12:17:59 +0100
-Subject: [PATCH 2/4] ARM: traps: use <asm/opcodes.h> to get correct
- instruction order
-In-Reply-To: <20130724173435.GC4610@localhost.localdomain>
-References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374510833-25716-3-git-send-email-ben.dooks@codethink.co.uk>
- <20130724173435.GC4610@localhost.localdomain>
-Message-ID: <51F10967.1090302@codethink.co.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 25 Jul 2013 13:19:06 +0200
+Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
+In-Reply-To: <1374659615-29447-1-git-send-email-amit.daniel@samsung.com>
+References: <0e7d01ce8840$82f79070$88e6b150$@org>
+ <1374659615-29447-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <9315698.l6JrEAGWLQ@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/13 18:34, Dave Martin wrote:
-> On Mon, Jul 22, 2013 at 05:33:51PM +0100, Ben Dooks wrote:
->> The trap handler needs to take into account the endian configuration of
->> the system when loading instructions. Use<asm/opcodes.h>  to provide the
->> necessary conversion functions.
->>
->> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
->> ---
->>   arch/arm/kernel/traps.c |   10 ++++++----
->>   1 file changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index 1c08911..0a56e13 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -34,6 +34,7 @@
->>   #include<asm/unwind.h>
->>   #include<asm/tls.h>
->>   #include<asm/system_misc.h>
->> +#include<asm/opcodes.h>
->>
->>   #include "signal.h"
->
-> Looks like is_valid_bugaddr() might need fixing too?
->
-> That will need __mem_to_opcode_thumb16() or __mem_to_opcode_arm()
-> depending on CONFIG_THUMB2_KERNEL.
 
-I was looking at that, and was considering if this is the right
-thing to do or to change the value of BUG_INSTR_VALUE depending
-on this.
+[ added Daniel and linux-pm to cc: ]
 
-It is possible the linker may try and change the ordering of the
-BUG() instruction as it is being placed in the output with either
-a .hword or .word value. I will go and check this as soon as possible.
+Hi,
 
->> @@ -411,23 +412,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->>   	if (processor_mode(regs) == SVC_MODE) {
->>   #ifdef CONFIG_THUMB2_KERNEL
->>   		if (thumb_mode(regs)) {
->> -			instr = ((u16 *)pc)[0];
->> +			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
->>   			if (is_wide_instruction(instr)) {
->>   				instr<<= 16;
->> -				instr |= ((u16 *)pc)[1];
->> +				instr |= __mem_to_opcode_thumb16(((u16 *)pc)[1]);
->
-> Could use __opcode_thumb32_compose(), in which case it might look like
->
-> 			if (is_wide_instruction(instr)) {
-> 				unsigned int instr2 = __mem_to_opcode_thumb16(
-> 					((u16 *)pc)[1]);
-> 				instr = __opcode_thumb32_compose(instr, instr2);
->
-> (Hmmm, I just noticed that is_wide_instruction and __opcode_is_thumb16()
-> kinda duplicate each other.  Could change that too, but it would look
-> more like pointless churn...  is_wide_instruction() is used in a fair
-> few places already.)
+On Wednesday, July 24, 2013 03:23:35 PM Amit Daniel Kachhap wrote:
+> This patch skips the deep C1(AFTR -Arm off top running) state for exynos5440
+> soc as this soc does not support this state. All the cpu's only allows the basic
+> C0 state.
+> 
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  arch/arm/mach-exynos/cpuidle.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index 17a18ff..9a776a1 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
+>  		device->cpu = cpu_id;
+>  
+>  		/* Support IDLE only */
+> -		if (cpu_id != 0)
+> +		if (soc_is_exynos5440() || cpu_id != 0)
+>  			device->state_count = 1;
+>  
+>  		ret = cpuidle_register_device(device);
 
-It is possible that it could be changed, but I will avoid that for this
-particular patch
+This may not achieve what you are intending to do and conflicts with
+Daniel's patch (which removes code that you're modifying). Please see:
 
->>   			}
->>   		} else
->>   #endif
->> -			instr = *(u32 *) pc;
->> +			instr = __mem_to_opcode_arm(*(u32 *) pc);
->>   	} else if (thumb_mode(regs)) {
->>   		if (get_user(instr, (u16 __user *)pc))
->>   			goto die_sig;
->> +		instr = __mem_to_opcode_thumb16(instr);
->>   		if (is_wide_instruction(instr)) {
->>   			unsigned int instr2;
->>   			if (get_user(instr2, (u16 __user *)pc+1))
->>   				goto die_sig;
->>   			instr<<= 16;
->> -			instr |= instr2;
->> +			instr |= __mem_to_opcode_thumb16(instr2);
->>   		}
->>   	} else if (get_user(instr, (u32 __user *)pc)) {
->
-> This also needs mem-to-opcode'ing.
+	http://marc.info/?l=linux-arm-kernel&m=137467935712513&w=2
 
-Thanks, will check.
+How's about changing exynos4_idle_driver.state_count for EXYNOS5540
+at the beginning of exynos4_init_cpuidle() instead?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
