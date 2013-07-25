@@ -1,43 +1,139 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 17:43:36 -0700
-Subject: [PATCH v1 08/14] clk: msm: Add MSM clock driver
+Date: Wed, 24 Jul 2013 17:43:37 -0700
+Subject: [PATCH v1 09/14] clk: msm: Add support for MSM8960's global clock
+ controller (GCC)
 In-Reply-To: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
 References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1374713022-6049-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374713022-6049-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a clock driver that registers clocks from a DT node's
-'clocks' child. Each new SoC will add a file describing the
-software interface and frequency plan to drivers/clk/msm/ and
-then hook that into the msm_cc_match_table by means of a
-compatible string and an msm_clk_match table.
+Fill in the data and wire up the global clock controller to the
+MSM clock driver. This should allow most non-multimedia device
+drivers to control their clocks on 8960 based platforms.
 
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/msm/Makefile   |   2 +
- drivers/clk/msm/core.c     | 265 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/msm/internal.h |  24 ++++
- 3 files changed, 291 insertions(+)
- create mode 100644 drivers/clk/msm/core.c
- create mode 100644 drivers/clk/msm/internal.h
+ .../devicetree/bindings/clock/qcom,gcc.txt         |  55 +++++++
+ drivers/clk/msm/Kconfig                            |  10 ++
+ drivers/clk/msm/Makefile                           |   2 +
+ drivers/clk/msm/core.c                             |   3 +
+ drivers/clk/msm/gcc-8960.c                         | 174 +++++++++++++++++++++
+ drivers/clk/msm/internal.h                         |   2 +
+ 6 files changed, 246 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,gcc.txt
+ create mode 100644 drivers/clk/msm/gcc-8960.c
 
+diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
+new file mode 100644
+index 0000000..2311e1a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
+@@ -0,0 +1,55 @@
++MSM Global Clock Controller Binding
++-----------------------------------
++
++Required properties :
++- compatible : shall contain at least "qcom,gcc" and only one of the
++	       following:
++
++			"qcom,gcc-8660"
++			"qcom,gcc-8960"
++
++- reg : shall contain base register location and length
++- clocks : shall contain clocks supplied by the clock controller
++
++Example:
++	clock-controller at 900000 {
++		compatible = "qcom,gcc-8960", "qcom,gcc";
++		reg = <0x900000 0x4000>;
++
++		clocks {
++			pxo: pxo {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++				clock-frequency = <27000000>;
++			};
++
++			pll8: pll8 {
++				#clock-cells = <0>;
++				compatible = "qcom,pll";
++				clocks = <&pxo>;
++			};
++
++			vpll8: vpll8 {
++				#clock-cells = <0>;
++				compatible = "qcom,pll-vote";
++				clocks = <&pll8>;
++			};
++
++			gsbi5_uart_rcg: gsbi5_uart_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn16-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
++
++			gsbi5_uart_clk: gsbi5_uart_cxc {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-clock";
++				clocks = <&gsbi5_uart_rcg>;
++			};
++
++			gsbi5_uart_ahb: gsbi5_uart_ahb {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-hg-clock";
++			};
++		};
++	};
+diff --git a/drivers/clk/msm/Kconfig b/drivers/clk/msm/Kconfig
+index bf7e3d2..3eaffb6 100644
+--- a/drivers/clk/msm/Kconfig
++++ b/drivers/clk/msm/Kconfig
+@@ -2,3 +2,13 @@ menuconfig COMMON_CLK_MSM
+ 	tristate "Support for Qualcomm's MSM designs"
+ 	depends on OF
+ 
++if COMMON_CLK_MSM
++
++config MSM_GCC_8960
++	bool "MSM8960 Global Clock Controller"
++	help
++	  Support for the global clock controller on msm8960 devices.
++	  Say Y if you want to use peripheral devices such as UART, SPI,
++	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
++
++endif
 diff --git a/drivers/clk/msm/Makefile b/drivers/clk/msm/Makefile
-index e1cee29..9cfd0d7 100644
+index 9cfd0d7..c785943 100644
 --- a/drivers/clk/msm/Makefile
 +++ b/drivers/clk/msm/Makefile
-@@ -4,3 +4,5 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
- clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg.o
- clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
+@@ -6,3 +6,5 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
  clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
+ 
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += core.o
 +
-+clk-msm-$(CONFIG_COMMON_CLK_MSM) += core.o
++clk-msm-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
 diff --git a/drivers/clk/msm/core.c b/drivers/clk/msm/core.c
-new file mode 100644
-index 0000000..b1904c0
---- /dev/null
+index b1904c0..b8e702b 100644
+--- a/drivers/clk/msm/core.c
 +++ b/drivers/clk/msm/core.c
-@@ -0,0 +1,265 @@
+@@ -173,6 +173,9 @@ typedef struct clk *
+ 		struct cc_data *cc);
+ 
+ static const struct of_device_id msm_cc_match_table[] = {
++#ifdef CONFIG_MSM_GCC_8960
++	{ .compatible = "qcom,gcc-8960", .data = &msm_gcc_8960_matches },
++#endif
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, msm_cc_match_table);
+diff --git a/drivers/clk/msm/gcc-8960.c b/drivers/clk/msm/gcc-8960.c
+new file mode 100644
+index 0000000..b57d2dd
+--- /dev/null
++++ b/drivers/clk/msm/gcc-8960.c
+@@ -0,0 +1,174 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -51,288 +147,178 @@ index 0000000..b1904c0
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
 +#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/spinlock.h>
 +
 +#include "internal.h"
 +#include "clk-pll.h"
 +#include "clk-rcg.h"
 +#include "clk-branch.h"
 +
-+struct cc_data {
-+	void __iomem *base;
-+	spinlock_t lock;
++static struct pll_desc pll8_desc = {
++	.l_reg = 0x3144,
++	.m_reg = 0x3148,
++	.n_reg = 0x314c,
++	.config_reg = 0x3154,
++	.mode_reg = 0x3140,
++	.status_reg = 0x3158,
++	.status_bit = 16,
 +};
 +
-+static struct clk *
-+dispatch_fixed_clk(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	u32 rate;
-+	const char *name = m->init_data->name;
-+
-+	if (of_property_read_u32(m->of_node, "clock-frequency", &rate))
-+		return ERR_PTR(-EINVAL);
-+
-+	return clk_register_fixed_rate(dev, name, NULL, CLK_IS_ROOT, rate);
-+}
-+
-+static struct clk *
-+dispatch_pll_clk(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct pll_desc *desc = m->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return pll_clk_register(dev, desc, m->init_data);
-+}
-+
-+static struct clk *
-+dispatch_pll_vote_clk(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct pll_vote_desc *desc = m->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return pll_vote_clk_register(dev, desc, m->init_data);
-+}
-+
-+static struct clk *
-+dispatch_rcg_p2mn16_clk(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct rcg_desc *desc = m->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return rcg_p2mn16_clk_register(dev, desc, &cc->lock, m->init_data);
-+}
-+
-+static struct clk *
-+dispatch_rcg_p2mn8_clk(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct rcg_desc *desc = m->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return rcg_p2mn8_clk_register(dev, desc, &cc->lock, m->init_data);
-+}
-+
-+static struct clk *
-+dispatch_rcg_mn8_dyn_clk(struct of_clk_match *match, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct rcg_dyn_desc *desc = match->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return rcg_mn8_dyn_clk_register(dev, desc, &cc->lock,
-+			match->init_data);
-+}
-+
-+static struct clk *
-+dispatch_rcg_p4_dyn_clk(struct of_clk_match *match, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct rcg_dyn_desc *desc = match->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return rcg_p4_dyn_clk_register(dev, desc, &cc->lock,
-+			match->init_data);
-+}
-+
-+static struct clk *
-+dispatch_rcg_h5mn8_clk(struct of_clk_match *match, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct rcg2_desc *desc = match->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return rcg_h5mn8_clk_register(dev, desc, &cc->lock, match->init_data);
-+}
-+
-+static struct clk *
-+dispatch_rcg_h5mn16_clk(struct of_clk_match *match, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct rcg2_desc *desc = match->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return rcg_h5mn16_clk_register(dev, desc, &cc->lock, match->init_data);
-+}
-+
-+static struct clk *
-+dispatch_branch_clk(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct branch_desc *desc = m->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return branch_clk_register(dev, desc, &cc->lock, m->init_data);
-+}
-+
-+static struct clk *
-+dispatch_branch_hg_clk(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc)
-+{
-+	struct branch_desc *desc = m->driver_data;
-+
-+	desc->base = cc->base;
-+
-+	return branch_hg_clk_register(dev, desc, &cc->lock, m->init_data);
-+}
-+
-+static const struct of_device_id dispatch_table[] = {
-+	{ .compatible = "fixed-clock", .data = dispatch_fixed_clk },
-+	{ .compatible = "qcom,pll", .data = dispatch_pll_clk },
-+	{ .compatible = "qcom,pll-vote", .data = dispatch_pll_vote_clk },
-+	{ .compatible = "qcom,p2-mn8-clock", .data = dispatch_rcg_p2mn8_clk },
-+	{ .compatible = "qcom,p2-mn16-clock", .data = dispatch_rcg_p2mn16_clk },
-+	{ .compatible = "qcom,mn8-dyn-clock", .data = dispatch_rcg_mn8_dyn_clk },
-+	{ .compatible = "qcom,p4-dyn-clock", .data = dispatch_rcg_p4_dyn_clk },
-+	{ .compatible = "qcom,h5-mn8-clock", .data = dispatch_rcg_h5mn8_clk },
-+	{ .compatible = "qcom,h5-mn16-clock", .data = dispatch_rcg_h5mn16_clk },
-+	{ .compatible = "qcom,cxc-clock", .data = dispatch_branch_clk },
-+	{ .compatible = "qcom,cxc-hg-clock", .data = dispatch_branch_hg_clk },
++static struct pll_vote_desc pll8_vote_desc = {
++	.vote_reg = 0x34c0,
++	.vote_bit = 8,
 +};
 +
-+typedef struct clk *
-+(*clk_dispatch_fn)(struct of_clk_match *m, struct device *dev,
-+		struct cc_data *cc);
++#define PXO	0
++#define PLL8	1
 +
-+static const struct of_device_id msm_cc_match_table[] = {
++static u8 gcc_pxo_pll8_map[] = {
++	[PXO]	= 0,
++	[PLL8]	= 3,
++};
++
++static struct freq_tbl clk_tbl_gsbi_uart[] = {
++	{  1843200, PLL8, 2,  6, 625 },
++	{  3686400, PLL8, 2, 12, 625 },
++	{  7372800, PLL8, 2, 24, 625 },
++	{ 14745600, PLL8, 2, 48, 625 },
++	{ 16000000, PLL8, 4,  1,   6 },
++	{ 24000000, PLL8, 4,  1,   4 },
++	{ 32000000, PLL8, 4,  1,   3 },
++	{ 40000000, PLL8, 1,  5,  48 },
++	{ 46400000, PLL8, 1, 29, 240 },
++	{ 48000000, PLL8, 4,  1,   2 },
++	{ 51200000, PLL8, 1,  2,  15 },
++	{ 56000000, PLL8, 1,  7,  48 },
++	{ 58982400, PLL8, 1, 96, 625 },
++	{ 64000000, PLL8, 2,  1,   3 },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, msm_cc_match_table);
 +
-+static int msm_cc_probe(struct platform_device *pdev)
-+{
-+	struct cc_data *cc;
-+	void __iomem *base;
-+	struct resource *res;
-+	int count, i;
-+	const struct of_device_id *id_entry;
-+	const struct msm_clk_match *m;
-+	struct of_clk_match *matches;
-+	size_t size;
-+
-+	id_entry = of_match_device(msm_cc_match_table, &pdev->dev);
-+	m = id_entry->data;
-+	matches = m->matches;
-+	size = m->size;
-+
-+	cc = devm_kzalloc(&pdev->dev, sizeof(*cc), GFP_KERNEL);
-+	if (!cc)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	cc->base = base;
-+	spin_lock_init(&cc->lock);
-+
-+	count = of_clk_match(&pdev->dev, matches, size);
-+	if (count < 0)
-+		return count;
-+
-+	for (i = 0; i < size; i++) {
-+		struct of_clk_match *match;
-+		const struct of_device_id *id;
-+		struct device_node *np;
-+		clk_dispatch_fn fn;
-+		struct clk *clk;
-+		int err;
-+
-+		match = &matches[i];
-+		np = match->of_node;
-+		if (!np)
-+			continue;
-+
-+		id = of_match_node(dispatch_table, match->of_node);
-+		if (!id)
-+			continue;
-+
-+		fn = id->data;
-+		clk = fn(match, &pdev->dev, cc);
-+		if (IS_ERR(clk))
-+			return PTR_ERR(clk);
-+
-+		err = of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+		if (err)
-+			return err;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct platform_driver msm_cc_driver = {
-+	.probe		= msm_cc_probe,
-+	.driver		= {
-+		.name	= "msm-clock",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = msm_cc_match_table,
-+	},
++static struct rcg_desc gsbi5_uart_rcg = {
++	.ctl_reg = 0x2a54,
++	.ns_reg = 0x2a54,
++	.md_reg = 0x2a50,
++	.ctl_bit = 11,
++	.mnctr_en_bit = 8,
++	.mnctr_reset_bit = 7,
++	.mnctr_mode_shift = 5,
++	.pre_div_shift = 3,
++	.src_sel_shift = 0,
++	.n_val_shift = 16,
++	.m_val_shift = 16,
++	.parent_map = gcc_pxo_pll8_map,
++	.freq_tbl = clk_tbl_gsbi_uart,
 +};
 +
-+static int __init msm_cc_init(void)
-+{
-+	return platform_driver_register(&msm_cc_driver);
-+}
-+core_initcall(msm_cc_init);
++static struct branch_desc gsbi5_uart_cxc = {
++	.ctl_reg = 0x2a54,
++	.halt_reg = 0x2fd0,
++	.ctl_bit = 9,
++	.halt_bit = 22,
++	.halt_check = BRANCH_HALT,
++};
 +
-+static void __exit msm_cc_exit(void)
-+{
-+	platform_driver_unregister(&msm_cc_driver);
-+}
-+module_exit(msm_cc_exit);
++static struct rcg_desc gsbi6_uart_rcg = {
++	.ctl_reg = 0x2a74,
++	.ns_reg = 0x2a74,
++	.md_reg = 0x2a70,
++	.ctl_bit = 11,
++	.mnctr_en_bit = 8,
++	.mnctr_reset_bit = 7,
++	.mnctr_mode_shift = 5,
++	.pre_div_shift = 3,
++	.src_sel_shift = 0,
++	.n_val_shift = 16,
++	.m_val_shift = 16,
++	.parent_map = gcc_pxo_pll8_map,
++	.freq_tbl = clk_tbl_gsbi_uart,
++};
 +
-+MODULE_DESCRIPTION("MSM Clock Driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:msm-cc");
++static struct branch_desc gsbi6_uart_cxc = {
++	.ctl_reg = 0x2a74,
++	.halt_reg = 0x2fd0,
++	.ctl_bit = 9,
++	.halt_bit = 18,
++	.halt_check = BRANCH_HALT,
++};
++
++static struct branch_desc gsbi5_uart_ahb = {
++	.ctl_reg = 0x2a40,
++	.halt_reg = 0x2fd0,
++	.hwcg_reg = 0x2a40,
++	.ctl_bit = 4,
++	.hwcg_bit = 6,
++	.halt_bit = 23,
++	.halt_check = BRANCH_HALT,
++};
++
++static struct freq_tbl clk_tbl_gsbi_qup[] = {
++	{  1100000, PXO,  1, 2, 49 },
++	{  5400000, PXO,  1, 1,  5 },
++	{ 10800000, PXO,  1, 2,  5 },
++	{ 15060000, PLL8, 1, 2, 51 },
++	{ 24000000, PLL8, 4, 1,  4 },
++	{ 25600000, PLL8, 1, 1, 15 },
++	{ 27000000, PXO,  1, 0,  0 },
++	{ 48000000, PLL8, 4, 1,  2 },
++	{ 51200000, PLL8, 1, 2, 15 },
++	{ }
++};
++
++static struct rcg_desc gsbi5_qup_rcg = {
++	.ctl_reg = 0x2a4c,
++	.ns_reg = 0x2a4c,
++	.md_reg = 0x2a48,
++	.ctl_bit = 11,
++	.mnctr_en_bit = 8,
++	.mnctr_reset_bit = 7,
++	.mnctr_mode_shift = 5,
++	.pre_div_shift = 3,
++	.src_sel_shift = 0,
++	.n_val_shift = 16,
++	.m_val_shift = 16,
++	.parent_map = gcc_pxo_pll8_map,
++	.freq_tbl = clk_tbl_gsbi_qup,
++};
++
++static struct branch_desc gsbi5_qup_cxc = {
++	.ctl_reg = 0x2a4c,
++	.halt_reg = 0x2fd0,
++	.ctl_bit = 9,
++	.halt_bit = 20,
++	.halt_check = BRANCH_HALT,
++};
++
++static struct of_clk_match msm_gcc_clk_match[] = {
++	{ .name = "cxo" },
++	{ .name = "pxo" },
++	{ .name = "pll8", .driver_data = &pll8_desc },
++	{ .name = "vpll8", .driver_data = &pll8_vote_desc },
++	{ .name = "gsbi5_uart_rcg", .driver_data = &gsbi5_uart_rcg },
++	{ .name = "gsbi5_uart_cxc", .driver_data = &gsbi5_uart_cxc },
++	{ .name = "gsbi6_uart_rcg", .driver_data = &gsbi6_uart_rcg },
++	{ .name = "gsbi6_uart_cxc", .driver_data = &gsbi6_uart_cxc },
++	{ .name = "gsbi5_uart_ahb", .driver_data = &gsbi5_uart_ahb },
++	{ .name = "gsbi5_qup_rcg", .driver_data = &gsbi5_qup_rcg },
++	{ .name = "gsbi5_qup_cxc", .driver_data = &gsbi5_qup_cxc },
++};
++
++const struct msm_clk_match msm_gcc_8960_matches = {
++	.matches = msm_gcc_clk_match,
++	.size = ARRAY_SIZE(msm_gcc_clk_match)
++};
 diff --git a/drivers/clk/msm/internal.h b/drivers/clk/msm/internal.h
-new file mode 100644
-index 0000000..177bd3b
---- /dev/null
+index 177bd3b..b0ffda7 100644
+--- a/drivers/clk/msm/internal.h
 +++ b/drivers/clk/msm/internal.h
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+@@ -21,4 +21,6 @@ struct msm_clk_match {
+ 	size_t size;
+ };
+ 
++extern const struct msm_clk_match msm_gcc_8960_matches;
 +
-+#ifndef __MSM_CLK_INTERNAL_H__
-+#define __MSM_CLK_INTERNAL_H__
-+
-+struct of_clk_match;
-+
-+struct msm_clk_match {
-+	struct of_clk_match *matches;
-+	size_t size;
-+};
-+
-+#endif
+ #endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
