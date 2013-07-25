@@ -1,29 +1,15 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 25 Jul 2013 14:36:26 +0200
-Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
- support for Chipidea
-In-Reply-To: <20130725055855.GA4924@nchen-desktop>
-References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
- <201307250755.23403.marex@denx.de> <20130725055855.GA4924@nchen-desktop>
-Message-ID: <201307251436.27161.marex@denx.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 25 Jul 2013 09:42:21 -0300
+Subject: [patch 1/1] imx53-qsb: enable usb power
+In-Reply-To: <20130620212939.018670789@rtp-net.org>
+References: <20130620212939.018670789@rtp-net.org>
+Message-ID: <CAOMZO5Bb7eUk9u0yhwo0+ektW6oj-WGVhE2pRYK6U4j=_G7Lag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Peter Chen,
+On Thu, Jun 20, 2013 at 6:29 PM, Arnaud Patard
+<arnaud.patard@rtp-net.org> wrote:
+> Enable usb power pin by using a fixed regulator. With this and the usb clock
+> patch is making usb working on my loco.
 
-> On Thu, Jul 25, 2013 at 07:55:23AM +0200, Marek Vasut wrote:
-> > Hi Peter,
-> > 
-> > > I have not tried the manual switching, but first, you need to close
-> > > your vbus supply.
-> > 
-> > I think we can close this issue, I will now be also getting MX28EVK.
-> > Thanks for all your help!
-> 
-> Great. What's the problem? Any changes for this patchset?
-
-No changes needed, I had VDD5V constantly tied to 5V so I didn't get the VBUS 
-interrupt.
-
-Best regards,
-Marek Vasut
+Which "usb clock patch" are you referring to?
