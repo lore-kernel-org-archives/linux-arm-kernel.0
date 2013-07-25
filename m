@@ -1,45 +1,110 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 25 Jul 2013 11:53:49 -0700
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <20130725184834.GA8296@netboy>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
-Message-ID: <51F1743D.7050007@wwwdotorg.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 25 Jul 2013 14:53:53 -0400
+Subject: [PATCH 6/8] ARM: mm: LPAE: Correct virt_to_phys patching for
+ 64 bit physical addresses
+In-Reply-To: <51F0A051.20203@ti.com>
+References: <1371858502-10083-1-git-send-email-santosh.shilimkar@ti.com>
+ <1371858502-10083-7-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.LFD.2.03.1307231850350.15022@syhkavp.arg> <51EF356D.2050902@ti.com>
+ <alpine.LFD.2.03.1307232222200.15022@syhkavp.arg> <51EFBF8F.4010201@ti.com>
+ <51EFC37B.80906@ti.com> <alpine.LFD.2.03.1307241456260.15022@syhkavp.arg>
+ <51F0A051.20203@ti.com>
+Message-ID: <51F17441.3000503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2013 11:48 AM, Richard Cochran wrote:
-> On Thu, Jul 25, 2013 at 07:29:20PM +0100, Mark Rutland wrote:
->> On Thu, Jul 25, 2013 at 07:05:48PM +0100, Stephen Warren wrote:
->>>
->>> I don't think having people "rely" on the bindings is the issue so much
->>> as the awareness that if they do, there will be compatibility issues for
->>> unstable bindings.
->>
->> As long as we can make sufficiently clear that trying to use an unstable
->> binding is going to be *very* painful, and not necessarily supported.
+On Wednesday 24 July 2013 11:49 PM, Sricharan R wrote:
+> Hi Nicolas,
 > 
-> Oh, man.
-> 
-> The introduction of DT into ARM Linux was supposed to make everyone's
-> life sooo much easier. Of course, based on experience with powerpc, I
-> never believed it*, but still I would expect to hear that the DT
-> bindings are, well, a *binding* contract between the board developer,
-> boot loader, and the kernel.
-> 
-> Once it is working with a particular kernel, a DT board description
-> file should continue to work indefinitely with newer kernels. Anything
-> less is a regression, pure and simple.
-> 
-> If you go around changing the bindings willy nilly, then what is point
-> of having DT at all?
+> On Thursday 25 July 2013 01:51 AM, Nicolas Pitre wrote:
 
-That's exactly why we're starting to think about which bindings should
-be considered stable and immutable, and when that should happen. As Olof
-pointed out, we haven't fully enforced that yet. Preferably bindings
-will be marked stable very fast, but mistakes are always going to happen
-in early development. ABIs are very hard.
+[..]
+
+>> I don't think I follow you here.
+>>
+>> Let's assume:
+>>
+>> phys_addr_t __pv_offset = PHYS_START - VIRT_START;
+>>
+>> If PA = 0x0-8000-0000 and VA = 0xc000-0000 then
+>> __pv_offset = 0xffff-ffff-c000-0000.
+>>
+>> If PA = 0x2-8000-0000 and VA = 0xc000-0000 then
+>> __pv_offset = 0x1-c000-0000.
+>>
+>> So the __virt_to_phys() assembly stub could look like:
+>>
+>> static inline phys_addr_t __virt_to_phys(unsigned long x)
+>> {
+>> 	phys_addr_t t;
+>>
+>> 	if if (sizeof(phys_addr_t) == 4) {
+>> 		__pv_stub(x, t, "add", __PV_BITS_31_24);
+>> 	} else {
+>> 		__pv_movhi_stub(t);
+>> 		__pv_add_carry_stub(x, t);
+>> 	}
+>>
+>> 	return t;
+>> }
+>>
+>> And...
+>>
+>> #define __pv_movhi_stub(y) \
+>> 	__asm__("@ __pv_movhi_stub\n" \
+>> 	"1:	mov	%R0, %1\n" \
+>> 	"	.pushsection .pv_table,\"a\"\n" \
+>> 	"	.long	1b\n" \
+>> 	"	.popsection\n" \
+>> 	: "=r" (y) \
+>> 	: "I" (__PV_BITS_8_0))
+>>
+>> #define __pv_add_carry_stub(x, y) \
+>> 	__asm__("@ __pv_add_carry_stub\n" \
+>> 	"1:	adds	%Q0, %1, %2\n" \
+>> 	"	adc	%R0, %R0, #0\n" \
+>> 	"	.pushsection .pv_table,\"a\"\n" \
+>> 	"	.long	1b\n" \
+>> 	"	.popsection\n" \
+>> 	: "+r" (y) \
+>> 	: "r" (x), "I" (__PV_BITS_31_24) \
+>> 	: "cc")
+>>
+>> The stub bits such as __PV_BITS_8_0 can be augmented with more bits in 
+>> the middle to determine the type of fixup needed.  The fixup code would 
+>> determine the shift needed on the value, and whether or not the low or 
+>> high word of __pv_offset should be used according to those bits.
+>>
+>> Then, in the case where a mov is patched, you need to check if the high 
+>> word of __pv_offset is 0xffffffff and if so the mov should be turned 
+>> into a "mvn rn, #0".
+>>
+>> And there you are with all possible cases handled.
+>>
+Brilliant !!
+We knew you will have some tricks and better way. We were
+not convinced with the extra stub for 'mov' but also didn't
+have idea to avoid it.
+
+>   Thanks and you have given the full details here.
+> 
+>   Sorry if i was not clear on my previous response.
+> 
+>  1)  When i said special case can be avoided, i meant that
+>       we need not differentiate the 0xfffffff case inside the
+>       __virt_to_phy macro, but can handle it at the time of patching.
+>       Your above code makes that clear.
+>  
+>  2) I would have ended creating separate tables for 'mov' and 'add'
+>       case. But again thanks to your above idea of augumenting the
+>       __PV_BITS, with which we can find out run time. And 'mvn' would
+>       be needed for moving '0xffffffff' . Now I can get rid
+>      of the separate section that i created for 'mov' in my previous
+>      version.
+> 
+We also get rid of calling separate patching for modules as well
+as late patching. Overall the patch-set becomes smaller and
+simpler. Thanks for help.
+
+Regards,
+Santosh
