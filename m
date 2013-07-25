@@ -1,40 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 12:33:20 -0400
-Subject: [PATCH, RESEND] arm: kirkwood: readynas duo v2: Add GMT G762
- Fan Controller
-In-Reply-To: <874nceui0h.fsf@natisbad.org>
-References: <874nceui0h.fsf@natisbad.org>
-Message-ID: <20130725163320.GL23879@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Jul 2013 09:36:02 -0700
+Subject: [PATCH v1 03/14] clk: Add of_clk_match() for device drivers
+In-Reply-To: <52875092.tEWeSbEJZC@flatron>
+References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+ <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
+ <52875092.tEWeSbEJZC@flatron>
+Message-ID: <20130725163602.GB29694@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 10:45:02PM +0200, Arnaud Ebalard wrote:
+On 07/25, Tomasz Figa wrote:
+> Hi Stephen,
 > 
-> Now that GMT G762 PWM Fan Controller is available upstream, let's add
-> missing bindings in Netgear ReadyNAS Duo v2 .dts file.
+> On Wednesday 24 of July 2013 17:43:31 Stephen Boyd wrote:
+> > In similar fashion as of_regulator_match() add an of_clk_match()
+> > function that finds an initializes clock init_data structs from
+> > devicetree. Drivers should use this API to find clocks that their
+> > device is providing and then iterate over their match table
+> > registering the clocks with the init data parsed.
 > 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
-> Hi Jason and Andrew,
+> I think all you need here is declaring all your clock drivers using 
+> CLK_OF_DECLARE() macro. Then they will be automatically probed by 
+> of_clk_init(). See last lines of drivers/clk/clk-fixed-rate.c for an 
+> example.
 > 
-> This one applies and has been tested against Stephen Rothwell tree.
-> Can you make it flow to Linus tree during the merge window?
-> 
-> Following Thomas feedback, this is a resend of previous version, this
-> time w/o fixes for bad spaces at the end of the file. Just tell me if
-> I should send a separate one for that purpose.
-> 
-> Thanks in advance.
-> 
-> Cheers,
-> 
-> a+
-> 
->  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts    | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
 
-Applied to mvebu/dt
+CLK_OF_DECLARE() will not work because it doesn't give the
+caller a struct device. I want that struct device to use managed
+allocations and clk registrations.
 
-thx,
-
-Jason.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
