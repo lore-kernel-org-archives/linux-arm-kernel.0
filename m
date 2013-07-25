@@ -1,228 +1,126 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 25 Jul 2013 14:06:56 +0800
-Subject: [PATCH] dmaengine: sirf: add PM entries for sleep and runtime
-Message-ID: <1374732416-3870-1-git-send-email-Baohua.Song@csr.com>
+From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
+Date: Thu, 25 Jul 2013 09:08:48 +0300
+Subject: [PATCH v6 2/2] iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
+In-Reply-To: <51EA69DE.4080908@kernel.org>
+References: <1374226039-16943-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <1374226039-16943-3-git-send-email-oleksandr.kozaruk@ti.com>
+ <51EA69DE.4080908@kernel.org>
+Message-ID: <20130725060848.GA16521@uglx0158319>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch adds PM ops entries in sirf-dma drivers, so that this
-driver can support suspend/resume, hibernation and runtime PM.
+On Sat, Jul 20, 2013 at 11:43:42AM +0100, Jonathan Cameron wrote:
+> On 07/19/2013 10:27 AM, Oleksandr Kozaruk wrote:
+> > The GPADC is general purpose ADC found on TWL6030, and TWL6032 PMIC,
+> > known also as Phoenix and PhoenixLite.
+> >
+> > The TWL6030 and TWL6032 have GPADC with 17 and 19 channels
+> > respectively. Some channels have current source and are used for
+> > measuring voltage drop on resistive load for detecting battery ID
+> > resistance, or measuring voltage drop on NTC resistors for external
+> > temperature measurements. Some channels measure voltage, (i.e. battery
+> > voltage), and have voltage dividers, thus, capable to scale voltage.
+> > Some channels are dedicated for measuring die temperature.
+> >
+> > Some channels are calibrated in 2 points, having offsets from ideal
+> > values kept in trim registers. This is used to correct measurements.
+> >
+> > The differences between GPADC in TWL6030 and TWL6032:
+> > - 10 bit vs 12 bit ADC;
+> > - 17 vs 19 channels;
+> > - channels have different purpose(i.e. battery voltage
+> >   channel 8 vs channel 18);
+> > - trim values are interpreted differently.
+> >
+> > Based on the driver patched from Balaji TK, Graeme Gregory, Ambresh K,
+> > Girish S Ghongdemath.
+> >
+> > Signed-off-by: Balaji T K <balajitk@ti.com>
+> > Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
+> > Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
+> A few little bits and bobs inline.
+> 
+> My only major query is about the lack of info for the temperature
+> channels.  How do you convert these to useful real world units?
 
-while suspending, sirf-dma will lose all registers, so we save
-them at suspend and restore in resume for active channels.
+On blaze tablet platform(OMAP 4) temperature channels were used by
+thermal framework and battery driver.
+Thermal was using channel 4 [1]
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
----
- drivers/dma/sirf-dma.c | 124 +++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 121 insertions(+), 3 deletions(-)
+Here is the comment from the driver:
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 716b23e..b6cf509 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -9,6 +9,7 @@
- #include <linux/module.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
-+#include <linux/pm_runtime.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-@@ -73,6 +74,11 @@ struct sirfsoc_dma_chan {
- 	int				mode;
- };
- 
-+struct sirfsoc_dma_regs {
-+	u32				ctrl[SIRFSOC_DMA_CHANNELS];
-+	u32				interrupt_en;
-+};
-+
- struct sirfsoc_dma {
- 	struct dma_device		dma;
- 	struct tasklet_struct		tasklet;
-@@ -81,10 +87,13 @@ struct sirfsoc_dma {
- 	int				irq;
- 	struct clk			*clk;
- 	bool				is_marco;
-+	struct sirfsoc_dma_regs		regs_save;
- };
- 
- #define DRV_NAME	"sirfsoc_dma"
- 
-+static int sirfsoc_dma_runtime_suspend(struct device *dev);
-+
- /* Convert struct dma_chan to struct sirfsoc_dma_chan */
- static inline
- struct sirfsoc_dma_chan *dma_chan_to_sirfsoc_dma_chan(struct dma_chan *c)
-@@ -393,6 +402,8 @@ static int sirfsoc_dma_alloc_chan_resources(struct dma_chan *chan)
- 	LIST_HEAD(descs);
- 	int i;
- 
-+	pm_runtime_get_sync(sdma->dma.dev);
-+
- 	/* Alloc descriptors for this channel */
- 	for (i = 0; i < SIRFSOC_DMA_DESCRIPTORS; i++) {
- 		sdesc = kzalloc(sizeof(*sdesc), GFP_KERNEL);
-@@ -425,6 +436,7 @@ static int sirfsoc_dma_alloc_chan_resources(struct dma_chan *chan)
- static void sirfsoc_dma_free_chan_resources(struct dma_chan *chan)
- {
- 	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
- 	struct sirfsoc_dma_desc *sdesc, *tmp;
- 	unsigned long flags;
- 	LIST_HEAD(descs);
-@@ -445,6 +457,8 @@ static void sirfsoc_dma_free_chan_resources(struct dma_chan *chan)
- 	/* Free descriptors */
- 	list_for_each_entry_safe(sdesc, tmp, &descs, node)
- 		kfree(sdesc);
-+
-+	pm_runtime_put(sdma->dma.dev);
- }
- 
- /* Send pending descriptor to hardware */
-@@ -723,14 +737,14 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 
- 	tasklet_init(&sdma->tasklet, sirfsoc_dma_tasklet, (unsigned long)sdma);
- 
--	clk_prepare_enable(sdma->clk);
--
- 	/* Register DMA engine */
- 	dev_set_drvdata(dev, sdma);
-+
- 	ret = dma_async_device_register(dma);
- 	if (ret)
- 		goto free_irq;
- 
-+	pm_runtime_enable(&op->dev);
- 	dev_info(dev, "initialized SIRFSOC DMAC driver\n");
- 
- 	return 0;
-@@ -747,13 +761,116 @@ static int sirfsoc_dma_remove(struct platform_device *op)
- 	struct device *dev = &op->dev;
- 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
- 
--	clk_disable_unprepare(sdma->clk);
- 	dma_async_device_unregister(&sdma->dma);
- 	free_irq(sdma->irq, sdma);
- 	irq_dispose_mapping(sdma->irq);
-+	pm_runtime_disable(&op->dev);
-+	if (!pm_runtime_status_suspended(&op->dev))
-+		sirfsoc_dma_runtime_suspend(&op->dev);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_runtime_suspend(struct device *dev)
-+{
-+	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
-+
-+	clk_disable_unprepare(sdma->clk);
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_runtime_resume(struct device *dev)
-+{
-+	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(sdma->clk);
-+	if (ret < 0) {
-+		dev_err(dev, "clk_enable failed: %d\n", ret);
-+		return ret;
-+	}
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_pm_suspend(struct device *dev)
-+{
-+	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
-+	struct sirfsoc_dma_regs *save = &sdma->regs_save;
-+	struct sirfsoc_dma_desc *sdesc;
-+	struct sirfsoc_dma_chan *schan;
-+	int ch;
-+	int ret;
-+
-+	/* Enable clock before accessing register */
-+	if (pm_runtime_status_suspended(dev)) {
-+		ret = sirfsoc_dma_runtime_resume(dev);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	for (ch = 0; ch < SIRFSOC_DMA_CHANNELS; ch++) {
-+		schan = &sdma->channels[ch];
-+		if (list_empty(&schan->active))
-+			continue;
-+		sdesc = list_first_entry(&schan->active,
-+			struct sirfsoc_dma_desc,
-+			node);
-+		save->ctrl[ch] = readl_relaxed(sdma->base +
-+			ch * 0x10 + SIRFSOC_DMA_CH_CTRL);
-+	}
-+	save->interrupt_en = readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN);
-+
-+	/* Disable clock */
-+	sirfsoc_dma_runtime_suspend(dev);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_pm_resume(struct device *dev)
-+{
-+	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
-+	struct sirfsoc_dma_regs *save = &sdma->regs_save;
-+	struct sirfsoc_dma_desc *sdesc;
-+	struct sirfsoc_dma_chan *schan;
-+	int ch;
-+	int ret;
-+
-+	/* Enable clock before accessing register */
-+	ret = sirfsoc_dma_runtime_resume(dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	writel_relaxed(save->interrupt_en, sdma->base + SIRFSOC_DMA_INT_EN);
-+	for (ch = 0; ch < SIRFSOC_DMA_CHANNELS; ch++) {
-+		schan = &sdma->channels[ch];
-+		if (list_empty(&schan->active))
-+			continue;
-+		sdesc = list_first_entry(&schan->active,
-+			struct sirfsoc_dma_desc,
-+			node);
-+		writel_relaxed(sdesc->width,
-+			sdma->base + SIRFSOC_DMA_WIDTH_0 + ch * 4);
-+		writel_relaxed(sdesc->xlen,
-+			sdma->base + ch * 0x10 + SIRFSOC_DMA_CH_XLEN);
-+		writel_relaxed(sdesc->ylen,
-+			sdma->base + ch * 0x10 + SIRFSOC_DMA_CH_YLEN);
-+		writel_relaxed(save->ctrl[ch],
-+			sdma->base + ch * 0x10 + SIRFSOC_DMA_CH_CTRL);
-+		writel_relaxed(sdesc->addr >> 2,
-+			sdma->base + ch * 0x10 + SIRFSOC_DMA_CH_ADDR);
-+	}
-+
-+	/* Disable clock */
-+	sirfsoc_dma_runtime_suspend(dev);
-+
- 	return 0;
- }
- 
-+static const struct dev_pm_ops sirfsoc_dma_pm_ops = {
-+	SET_RUNTIME_PM_OPS(sirfsoc_dma_runtime_suspend, sirfsoc_dma_runtime_resume, NULL)
-+	SET_SYSTEM_SLEEP_PM_OPS(sirfsoc_dma_pm_suspend, sirfsoc_dma_pm_resume)
-+};
-+
- static struct of_device_id sirfsoc_dma_match[] = {
- 	{ .compatible = "sirf,prima2-dmac", },
- 	{ .compatible = "sirf,marco-dmac", },
-@@ -766,6 +883,7 @@ static struct platform_driver sirfsoc_dma_driver = {
- 	.driver = {
- 		.name = DRV_NAME,
- 		.owner = THIS_MODULE,
-+		.pm = &sirfsoc_dma_pm_ops,
- 		.of_match_table	= sirfsoc_dma_match,
- 	},
- };
--- 
-1.8.2.3
+* NTC termistor (NCP15WB473F) schematic connection for OMAP4460 board:
+*
+*          [Vref]
+*            |
+*            $ (Rpu)
+*            |
+*            +----+-----------[Vin]
+*            |    |
+*           [Rt]  $ (Rpd)
+*            |    |
+*           -------- (ground)
+*
+* NTC termistor resistanse (Rt, k) calculated from following formula:
+*
+* Rt = Rpd * Rpu * Vin / (Rpd * (Vref - Vin) - Rpu * Vin)
+*
+* where       Vref (GPADC_VREF4) - reference voltage, Vref = 1250 mV;
+*                     Vin (GPADC_IN4) - measuring voltage, Vin = 0...1250 mV;
+*                     Rpu (R1041) - pullup resistor, Rpu = 10 k;
+*                     Rpd (R1043) - pulldown resistor, Rpd = 220 k;
+*
+* Pcb temp sensor temperature (t, C) calculated from following formula:
+*
+* t = 1 / (ln(Rt / Rt0) / B + 1 / T0) - 273
+*
+* where       Rt0 - NTC termistor resistance at 25 C, Rt0 = 47 k;
+*                     B - specific constant, B = 4131 K;
+*                     T0 - temperature, T0 = 298 K
+[..]
+
+And then there is a table for conversion:
+/*
+ * Temperature values in degrees celsius,
+ * voltage values from 156 to 1191 milli volts
+*/
+static s8 mvolt_to_temp[] = {
+               125, 125, 125, 124, 124, 124, 124, 123, 123, 123, 122, 122,
+               122, 122, 121, 121, 121, 121, 120, 120, 120, 120, 119, 119,
+[..]
+
+The battery driver was using channel 1, dedicated for measuring battery
+temperature.
+static void twl6030_bci_battery_work(struct work_struct *work)
+{
+[..]
+	for (temp = 0; temp < di->platform_data->tblsize; temp++) {
+		if (adc_code >= di->platform_data->
+				battery_tmp_tbl[temp])
+			break;
+	}
+
+	/* first 2 values are for negative temperature */
+	di->temp_C = (temp - 2) * 10; * /* in tenths of degree Celsius */
+	[..]
+}
+static int omap4_batt_table[] = {
+/* adc code for temperature in degree C */
+	929, 925, /* -2 ,-1 */
+	920, 917, 912, 908, 904, 899, 895, 890, 885, 880, /* 00 - 09 */
+	875, 869, 864, 858, 853, 847, 841, 835, 829, 823, /* 10 - 19 */
+[..]
+	591, 583, 575, 567, 559, 551, 543, 535, 527, 519, /* 50 - 59 */
+	511, 504, 496 /* 60 - 62 */
+};
+
+So, one driver was using millivolts and the other ADC code,
+Though converting to millivolts and the to temperature, seems,
+to be redundant, as code can be converted to temperature.
+If I recollect correctly the previous driver version was using just
+ADC code.
+
+Regards,
+Sasha.
+
+[1] http://git.omapzoom.org/?p=kernel/omap.git;a=blob;f=drivers/staging/thermal_framework/sensor/thermistor_sensor.c;h=828d8010579b55ec4a122c49a2e5b547b1e41e63;hb=decb3fd22223ddf207e0118d0d558459acc7094e
