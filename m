@@ -1,19 +1,45 @@
-From: damien.riegel.ext@parrot.com (Damien Riegel)
-Date: Thu, 25 Jul 2013 15:20:41 +0200
-Subject: Issue with gpio and pinmux
-In-Reply-To: <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
-References: <51E667BC.3070804@parrot.com>	<51E82FBB.1080905@wwwdotorg.org>
- <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
- <51EB590A.4010600@wwwdotorg.org>
- <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
-Message-ID: <51F12629.7090909@parrot.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 25 Jul 2013 22:23:19 +0900
+Subject: [PATCH v2 1/3] ARM: shmobile: marzen: Switch to DT_MACHINE_START
+In-Reply-To: <51F140C8.8070802@cogentembedded.com>
+References: <1374718423-24230-1-git-send-email-horms+renesas@verge.net.au>
+ <1374718423-24230-2-git-send-email-horms+renesas@verge.net.au>
+ <51F140C8.8070802@cogentembedded.com>
+Message-ID: <20130725132319.GC30895@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't know about pinctrl background but I don't really get why there
-is such a distinction between gpio and other functions in most cases.
+On Thu, Jul 25, 2013 at 07:14:16PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 25-07-2013 6:13, Simon Horman wrote:
+> 
+> >From: Magnus Damm <damm@opensource.se>
+> 
+>    Don't think it makes sense to keep Magnus as an author with so
+> many of your added changes. But well, it's your decision...
 
-I understand that on some arch a pin can be muxed and used as a gpio at
-the same time. But on most arch, isn't gpio just another function that
-can be muxed on a pin, and therefore we should check that a pin can be
-requested as a gpio just by checking desc->mux_owner ?
+I am comfortable with things the way they are so long as Magnus is too.
+
+> >Convert the marzen board to use DT_MACHINE_START. With this in
+> >place all mach-shmobile boards use DT_MACHINE_START. Also, this
+> >makes it possible for the r8a7779 SMP code to use DT for CPUs.
+> 
+> >So appended DTB is the way forward on this board.
+> 
+> >Signed-off-by: Magnus Damm <damm@opensource.se>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> >v2 [Simon Horman]
+> >* Select USE_OF in Kconfig
+> >* Provide dt_compat in DT_MACHINE_START
+> >* Provide r8a7779-marzen dts
+> 
+> >v1 [Magnus Damm]
+> >---
+> >  arch/arm/boot/dts/Makefile            |  1 +
+> >  arch/arm/boot/dts/r8a7779-marzen.dts  | 27 +++++++++++++++++++++++++++
+> 
+>    Perhaps arch/arm/boot/dts/ changes should be put into a separate patch?
+
+That sounds reasonable.
