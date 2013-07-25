@@ -1,97 +1,216 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 15:02:46 -0400
-Subject: [PATCHv5 00/11] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <20130725184920.GC18584@dhcp-172-17-186-34.nvidia.com>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E4167B.4000208@wwwdotorg.org> <20130716104347.045a612a@skate>
- <20130716131547.GC12062@titan.lakedaemon.net>
- <20130716153911.423cc408@skate>
- <20130725184920.GC18584@dhcp-172-17-186-34.nvidia.com>
-Message-ID: <20130725190246.GR23879@titan.lakedaemon.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 25 Jul 2013 15:11:06 -0400 (EDT)
+Subject: [PATCH 02/13] ARM: gic: add CPU migration support
+In-Reply-To: <51F10F85.7090508@arm.com>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-3-git-send-email-nicolas.pitre@linaro.org>
+ <51F10F85.7090508@arm.com>
+Message-ID: <alpine.LFD.2.03.1307251207110.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas (tglx), Russell (rmk),
+On Thu, 25 Jul 2013, Jonathan Austin wrote:
 
-Please see my request below.
-
-On Thu, Jul 25, 2013 at 11:49:21AM -0700, Thierry Reding wrote:
-> On Tue, Jul 16, 2013 at 03:39:11PM +0200, Thomas Petazzoni wrote:
-> > Dear Jason Cooper,
-> > 
-> > On Tue, 16 Jul 2013 09:15:47 -0400, Jason Cooper wrote:
-> > 
-> > > > A quick diagram of the dependencies, best viewed with a fixed-size font
-> > > > mailer.
-> > > > 
-> > > > kernel/irq/irqdomain    drivers/pci        arch/arm/kernel
-> > > >      patch 1           patch 2, 3, 4           patch 8
-> > > >         ||                  ||                   ||
-> > > >         ||                  \/                   \/
-> > > >         ||               drivers/of   ==> drivers/pci/host
-> > > >         ||                patch 5           patch 10
-> > > >         ||                  ||
-> > > >         \\__________________//
-> > > >                   ||
-> > > >                   \/
-> > > >             drivers/irqchip
-> > > >               patch 6, 7
-> > > 
-> > > Well, that got more complicated.  :(  No cookie for you.
-> > 
-> > Yeah, sorry about this. I'm not sure how to handle that differently.
-> > 
-> > > > Patches 9 and 11 are DT patches, so they are not mentioned in this
-> > > > diagram.
-> > > > 
-> > > > Normally tegra would require 1, 2, 3, 4, 5 and 8, so ideally, with
-> > > > the respective maintainers ACKs, Jason Cooper could take them in a
-> > > > specific topic stable branch that would not be rebased, on top of which
-> > > > both the Marvell work and Tegra work could be done.
-> > > 
-> > > After my recent discussions with tglx, here's my proposal:
-> > > 
-> > > - rmk creates a dedicated topic branch with patch 8
-> > > 
-> > > - Bjorn creates a dedicated topic branch based on rmk's with 2, 3, 4, 5,
-> > >   and 10
-> > > 
-> > > - tglx creates a dedicated topic branch based on Bjorn's with 1, 6, 7
-> > 
-> > I am wondering if this merge strategy isn't too complicated to work
-> > nicely. Would it be easier if one person took all of those patches in a
-> > stable topic branch, with the ACKs from the proper maintainers?
-> > 
-> > But anyway, as long as things get merged, I don't really mind what
-> > merge strategy is used, so I'll trust on what will be the best option
-> > on this.
-> > 
-> > Thanks a lot for taking care of this!
+> Hi Nico,
 > 
-> Hi Thomas, Jason,
+> I've got a couple of minor questions/comments about this one...
 > 
-> I've talked this over with Stephen and he'd be willing to create the
-> stable branch with patches 2, 4 and 8. That could serve as the basis
-> for both Tegra and Marvell.
+> On 23/07/13 04:31, Nicolas Pitre wrote:
+> > This is required by the big.LITTLE switcher code.
+> > 
+> > The gic_migrate_target() changes the CPU interface mapping for the
+> > current CPU to redirect SGIs to the specified interface, and it also
+> > updates the target CPU for each interrupts to that CPU interface
+> > if they were targeting the current interface.  Finally, pending
+> > SGIs for the current CPU are forwarded to the new interface.
+> > 
+> > Because Linux does not use it, the SGI source information for the
+> > forwarded SGIs is not preserved.  Neither is the source information
+> > for the SGIs sent by the current CPU to other CPUs adjusted to match
+> > the new CPU interface mapping.  The required registers are banked so
+> > only the target CPU could do it.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> >   drivers/irqchip/irq-gic.c       | 81
+> > +++++++++++++++++++++++++++++++++++++++--
+> >   include/linux/irqchip/arm-gic.h |  4 ++
+> >   2 files changed, 82 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> > index ee7c503120..6bd5a8c1aa 100644
+> > --- a/drivers/irqchip/irq-gic.c
+> > +++ b/drivers/irqchip/irq-gic.c
+> > @@ -253,10 +253,9 @@ static int gic_set_affinity(struct irq_data *d, const
+> > struct cpumask *mask_val,
+> >   	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+> >   		return -EINVAL;
+> > 
+> > +	raw_spin_lock(&irq_controller_lock);
+> >   	mask = 0xff << shift;
+> >   	bit = gic_cpu_map[cpu] << shift;
+> > -
+> > -	raw_spin_lock(&irq_controller_lock);
+> >   	val = readl_relaxed(reg) & ~mask;
+> >   	writel_relaxed(val | bit, reg);
+> >   	raw_spin_unlock(&irq_controller_lock);
+> > @@ -646,7 +645,9 @@ static void __init gic_pm_init(struct gic_chip_data
+> > *gic)
+> >   void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> >   {
+> >   	int cpu;
+> > -	unsigned long map = 0;
+> > +	unsigned long flags, map = 0;
+> > +
+> > +	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> > 
+> >   	/* Convert our logical CPU mask into a physical one. */
+> >   	for_each_cpu(cpu, mask)
+> > @@ -660,6 +661,80 @@ void gic_raise_softirq(const struct cpumask *mask,
+> > unsigned int irq)
+> > 
+> >   	/* this always happens on GIC0 */
+> >   	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) +
+> > GIC_DIST_SOFTINT);
+> > +
+> > +	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> > +}
+> > +#endif
+> > +
+> > +#ifdef CONFIG_BL_SWITCHER
+> > +/*
+> > + * gic_migrate_target - migrate IRQs to another PU interface
 > 
-> Given that there are no cross-dependencies for any of the other patches
-> (that I'm aware of) it would probably be easier to take them through the
-> Marvell tree if Bjorn and Thomas (tglx) agree to Ack the patches.
+> (nit) Should that be _C_PU?
 
-Ok, this is getting complicated again. :(  I'm all for adhering to
-Thomas' (tglx) request that all clocksource and irqchip patches go
-through his tree.  However, this series is just a hot-dependency mess.
+Obviously.
 
-Thomas, Russell, can you please cut me a little slack on this series and
-Ack your respective patches (tglx: #1, #6, #7; rmk: #8) for going
-through arm-soc?
+> > + *
+> > + * @new_cpu_id: the CPU target ID to migrate IRQs to
+> > + *
+> > + * Migrate all peripheral interrupts with a target matching the current CPU
+> > + * to the interface corresponding to @new_cpu_id.  The CPU interface
+> > mapping
+> > + * is also updated.  Targets to other CPU interfaces are unchanged.
+> > + * This must be called with IRQs locally disabled.
+> > + */
+> > +void gic_migrate_target(unsigned int new_cpu_id)
+> > +{
+> > +	unsigned int old_cpu_id, gic_irqs, gic_nr = 0;
+> > +	void __iomem *dist_base;
+> > +	int i, ror_val, cpu = smp_processor_id();
+> > +	u32 val, old_mask, active_mask;
+> > +
+> > +	if (gic_nr >= MAX_GIC_NR)
+> > +		BUG();
+> > +
+> > +	dist_base = gic_data_dist_base(&gic_data[gic_nr]);
+> > +	if (!dist_base)
+> > +		return;
+> > +	gic_irqs = gic_data[gic_nr].gic_irqs;
+> > +
+> > +	old_cpu_id = __ffs(gic_cpu_map[cpu]);
+> > +	old_mask = 0x01010101 << old_cpu_id;
+> 
+> I don't think this is very clear, though section 4.3.12 of the GIC spec helps
+> a lot! A little pointer or some more self-evident name for the mask might be
+> nice...
+> 
+> old_mask = GIC_ITARGETSR_MASK << old_cpu_id
+> 
+> or similar? This at least points one to the right bit of documentation?
 
-I know it's not the proper way, but I could have this series in -next
-tomorrow with a public branch for Thierry.  The alternative is turning
-into a Rube Goldberg machine [1].
+I've renamed old_cpu_id to cur_cpu_id and old_mask to cur_target_mask.
+Also added a comment later on.
 
-thx,
+> > +	ror_val = (old_cpu_id - new_cpu_id) & 31;
+> > +
+> > +	raw_spin_lock(&irq_controller_lock);
+> > +
+> > +	gic_cpu_map[cpu] = 1 << new_cpu_id;
+> > +
+> > +	for (i = 8; i < DIV_ROUND_UP(gic_irqs, 4); i++) {
+> 
+> Does this '8' here warrant a #define? GIC_RO_INTR_REGS?
+> 
+> Perhaps everyone looking at the code will be familiar enough with the GIC to
+> see immediately why the first 8 entries are being skipped...?
 
-Jason.
+I've added a comment right before this loop explaining what is being 
+done, mentioning why it starts at 8.
 
-[1] https://en.wikipedia.org/wiki/Rube_Goldberg_machine
+> I'm curious as to why we don't need to do anything for PPIs here - could there
+> be any pending PPIs that don't get handled (I guess retargetting doesn't make
+> sense for these?)
+
+PPIs are strictly processor private and I don't think there is any way 
+for one processor to set them on another processor.  So the only way to 
+cope with those is for the outbound CPU to save and disable its PPI 
+state, and let the inbound CPU enable them.  That should be up to each 
+PPI-using driver to do via the cpu_pm_enter()/cpu_pm_exit() notifiers.
+
+I've amended the patch with the following:
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 6bd5a8c1aa..268874ac75 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -668,7 +668,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 
+ #ifdef CONFIG_BL_SWITCHER
+ /*
+- * gic_migrate_target - migrate IRQs to another PU interface
++ * gic_migrate_target - migrate IRQs to another CPU interface
+  *
+  * @new_cpu_id: the CPU target ID to migrate IRQs to
+  *
+@@ -679,10 +679,10 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+  */
+ void gic_migrate_target(unsigned int new_cpu_id)
+ {
+-	unsigned int old_cpu_id, gic_irqs, gic_nr = 0;
++	unsigned int cur_cpu_id, gic_irqs, gic_nr = 0;
+ 	void __iomem *dist_base;
+ 	int i, ror_val, cpu = smp_processor_id();
+-	u32 val, old_mask, active_mask;
++	u32 val, cur_target_mask, active_mask;
+ 
+ 	if (gic_nr >= MAX_GIC_NR)
+ 		BUG();
+@@ -692,17 +692,23 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 		return;
+ 	gic_irqs = gic_data[gic_nr].gic_irqs;
+ 
+-	old_cpu_id = __ffs(gic_cpu_map[cpu]);
+-	old_mask = 0x01010101 << old_cpu_id;
+-	ror_val = (old_cpu_id - new_cpu_id) & 31;
++	cur_cpu_id = __ffs(gic_cpu_map[cpu]);
++	cur_target_mask = 0x01010101 << cur_cpu_id;
++	ror_val = (cur_cpu_id - new_cpu_id) & 31;
+ 
+ 	raw_spin_lock(&irq_controller_lock);
+ 
++	/* Update the target interface for this logical CPU */
+ 	gic_cpu_map[cpu] = 1 << new_cpu_id;
+ 
++	/*
++	 * Find all the peripheral interrupts targetting the current
++	 * CPU interface and migrate them to the new CPU interface.
++	 * We skip DIST_TARGET 0 to 7 as they are read-only.
++	 */
+ 	for (i = 8; i < DIV_ROUND_UP(gic_irqs, 4); i++) {
+ 		val = readl_relaxed(dist_base + GIC_DIST_TARGET + i * 4);
+-		active_mask = val & old_mask;
++		active_mask = val & cur_target_mask;
+ 		if (active_mask) {
+ 			val &= ~active_mask;
+ 			val |= ror32(active_mask, ror_val);
+@@ -714,7 +720,7 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 
+ 	/*
+ 	 * Now let's migrate and clear any potential SGIs that might be
+-	 * pending for us (old_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
++	 * pending for us (cur_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
+ 	 * is a banked register, we can only forward the SGI using
+ 	 * GIC_DIST_SOFTINT.  The original SGI source is lost but Linux
+ 	 * doesn't use that information anyway.
