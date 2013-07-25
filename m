@@ -1,48 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 25 Jul 2013 10:36:08 +0800
-Subject: [PATCH 1/2] ARM i.MX6Q: dts: Enable SPI NOR flash on Phytec
- phyFLEX-i.MX6 Ouad module
-In-Reply-To: <51F01DF0.3030207@cogentembedded.com>
-References: <1374683729-13438-1-git-send-email-p.zabel@pengutronix.de>
- <51F01DF0.3030207@cogentembedded.com>
-Message-ID: <20130725023605.GA7492@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 24 Jul 2013 23:59:35 -0300
+Subject: Enabling USBH1 on mx53qsb
+Message-ID: <CAOMZO5CAdxzn-3Xc2DZDYEXwsEznRrcqPbCbTDc5ieBkQkA8=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 10:33:20PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 07/24/2013 08:35 PM, Philipp Zabel wrote:
-> 
-> >Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >---
-> >  arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> 
-> >diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> >index f5e1981..5113d29 100644
-> >--- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> >+++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> >@@ -20,6 +20,20 @@
-> >  	};
-> >  };
-> >
-> >+&ecspi3 {
-> >+	pinctrl-names = "default";
-> >+	pinctrl-0 = <&pinctrl_ecspi3_1>;
-> >+	status = "okay";
-> >+	fsl,spi-num-chipselects = <1>;
-> >+	cs-gpios = <&gpio4 24 0>;
-> >+
-> >+	flash: m25p80 at 0 {
-> 
->    Quoting the EPAPR spec [1]: "The name of a node should be
-> somewhat generic, reflecting the function of the device and not its
-> precise programming model. If appropriate, the name should be one of
-> the following choices:
-> [...]
->    - flash
+Hi,
 
-I fixed it up and applied the series.
+I am trying to get USBH1 port to work on mx53qsb (with Dialog pmic)
+with the following patch against linux-next-20130724:
 
-Shawn
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -93,6 +93,15 @@
+                        regulator-max-microvolt = <3200000>;
+                        regulator-always-on;
+                };
++
++               reg_usb_vbus: usb_vbus {
++                       compatible = "regulator-fixed";
++                       regulator-name = "usb_vbus";
++                       regulator-min-microvolt = <5000000>;
++                       regulator-max-microvolt = <5000000>;
++                       gpio = <&gpio7 8 0>;
++                       enable-active-high;
++               };
+        };
+
+        sound {
+@@ -145,6 +154,7 @@
+                                MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
+                                MX53_PAD_EIM_DA13__GPIO3_13       0x80000000
+                                MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
++                               MX53_PAD_PATA_DA_2__GPIO7_8       0x80000000
+                                MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+                        >;
+                };
+@@ -302,7 +312,8 @@
+ };
+
+ &usbh1 {
+-       status = "okay";
++       vbus-supply = <&reg_usb_vbus>;
++       status = "okay";
+ };
+
+ &usbotg {
+
+
+mx53qsb board has two USB host ports:
+
+- The top port is USBH1
+- The bottom port is OTG (also shared with J3 connector)
+
+After applying the above patch the OTG port does work, but the USBH1 does not.
+
+However, if I access USBH1 within U-boot prior to launching the
+kernel, then I am able to use USBH1 in the kernel succesfully.
+
+Any idea of something I am missing?
+
+Thanks,
+
+Fabio Estevam
