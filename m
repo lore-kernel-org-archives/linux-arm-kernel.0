@@ -1,73 +1,42 @@
 From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Thu, 25 Jul 2013 17:34:59 +0200
-Subject: [PATCHv2 1/2] iommu/exynos: add devices attached to the System MMU to
- an IOMMU group
-Message-ID: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
+Date: Thu, 25 Jul 2013 17:35:00 +0200
+Subject: [PATCH 2/2] iommu/exynos: Follow kernel coding style for
+ __sysmmu_enable return type
+In-Reply-To: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
+References: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <1374766502-14823-2-git-send-email-a.motakis@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU groups are expected by certain users of the IOMMU API,
-e.g. VFIO. Since each device is behind its own System MMU, we
-can allocate a new IOMMU group for each device.
+On success, the __sysmmu_enable returns 1 instead of 0, which does not
+respect the convention described in Chapter 16 of the Linux kernel coding
+style.
 
-This patch depends on Cho KyongHo's patch series titled "[PATCH v7 00/12]
-iommu/exynos: Fixes and Enhancements of System MMU driver with DT",
-applied on a Linux 3.10.1 kernel. It has been tested on the Arndale board.
+In fact, this return value is propagated all the way up to
+iommu_attach_device() and iommu_attach_device() in drivers/iommu.c,
+which results into inconsistent behavior of the IOMMU API with Exynos
+systems, compared to other IOMMUs.
 
-Changes since in v2:
-- Removed possibility for minor memory leak in case of
-  misbehaving platform drivers
+This patch replaces the return value with 0, which makes the Exynos'
+IOMMU driver behavior consistent with that of other IOMMUs.
 
 Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
 ---
- drivers/iommu/exynos-iommu.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/iommu/exynos-iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 51d43bb..c7dd4b5 100644
+index c7dd4b5..4ea3abb 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -1134,6 +1134,32 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
- 	return phys;
- }
+@@ -504,7 +504,7 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
  
-+static int exynos_iommu_add_device(struct device *dev)
-+{
-+	struct iommu_group *group;
-+	int ret;
-+
-+	group = iommu_group_get(dev);
-+
-+	if (!group) {
-+		group = iommu_group_alloc();
-+		if (IS_ERR(group)) {
-+			dev_err(dev, "Failed to allocate IOMMU group\n");
-+			return PTR_ERR(group);
-+		}
-+	}
-+
-+	ret = iommu_group_add_device(group, dev);
-+	iommu_group_put(group);
-+
-+	return ret;
-+}
-+
-+static void exynos_iommu_remove_device(struct device *dev)
-+{
-+	iommu_group_remove_device(dev);
-+}
-+
- static struct iommu_ops exynos_iommu_ops = {
- 	.domain_init = &exynos_iommu_domain_init,
- 	.domain_destroy = &exynos_iommu_domain_destroy,
-@@ -1142,6 +1168,8 @@ static struct iommu_ops exynos_iommu_ops = {
- 	.map = &exynos_iommu_map,
- 	.unmap = &exynos_iommu_unmap,
- 	.iova_to_phys = &exynos_iommu_iova_to_phys,
-+	.add_device	= exynos_iommu_add_device,
-+	.remove_device	= exynos_iommu_remove_device,
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
- };
+ 		dev_dbg(data->sysmmu, "Enabled\n");
+ 	} else {
+-		ret = (pgtable == data->pgtable) ? 1 : -EBUSY;
++		ret = (pgtable == data->pgtable) ? 0 : -EBUSY;
  
+ 		dev_dbg(data->sysmmu, "already enabled\n");
+ 	}
 -- 
 1.8.1.2
