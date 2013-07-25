@@ -1,107 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 25 Jul 2013 09:57:00 -0700
-Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
- hooks to hw_pci
-In-Reply-To: <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130725165659.GB27802@dhcp-172-17-186-34.nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Jul 2013 18:01:47 +0100
+Subject: [PATCH v3 4/4] ARM: cacheflush: don't bother rounding to nearest vma
+In-Reply-To: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
+References: <1374771707-2619-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1374771707-2619-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 01:52:44PM +0200, Thomas Petazzoni wrote:
-> Some PCI drivers may need to adjust the pci_bus structure after it has
-> been allocated by the Linux PCI core. The PCI core allows
-> architectures to implement the pcibios_add_bus() and
-> pcibios_remove_bus() for this purpose. This commit therefore extends
-> the hw_pci and pci_sys_data structures of the ARM PCI core to allow
-> PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
-> which will get called when a bus is added or removed from the system.
-> 
-> This will be used for example by the Marvell PCIe driver to connect a
-> particular PCI bus with its corresponding MSI chip to handle Message
-> Signaled Interrupts.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
-> ---
->  arch/arm/include/asm/mach/pci.h |  4 ++++
->  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
->  2 files changed, 20 insertions(+)
+do_cache_op finds the lowest VMA contained in the specified address
+range and rounds the range to cover only the mapped addresses.
 
-Hi Russell,
+Since commit 4542b6a0fa6b ("ARM: 7365/1: drop unused parameter from
+flush_cache_user_range") the VMA is not used for anything else in this
+code and seeing as the low-level cache flushing routines return -EFAULT
+if the address is not valid, there is no need for this range truncation.
 
-Can we have your Acked-by on this patch so that it can be moved to a
-stable branch along with some of the other patches in this branch that
-both Marvell and Tegra PCIe drivers need?
+This patch removes the VMA handling code from the cacheflushing syscall.
 
-Thanks,
-Thierry
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/traps.c | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-> 
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index a1c90d7..487155c 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -36,6 +36,8 @@ struct hw_pci {
->  					  resource_size_t start,
->  					  resource_size_t size,
->  					  resource_size_t align);
-> +	void            (*add_bus)(struct pci_bus *bus);
-> +	void            (*remove_bus)(struct pci_bus *bus);
->  };
->  
->  /*
-> @@ -63,6 +65,8 @@ struct pci_sys_data {
->  					  resource_size_t start,
->  					  resource_size_t size,
->  					  resource_size_t align);
-> +	void            (*add_bus)(struct pci_bus *bus);
-> +	void            (*remove_bus)(struct pci_bus *bus);
->  	void		*private_data;	/* platform controller private data	*/
->  };
->  
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 261fcc8..530e59d 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -363,6 +363,20 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->  }
->  EXPORT_SYMBOL(pcibios_fixup_bus);
->  
-> +void pcibios_add_bus(struct pci_bus *bus)
-> +{
-> +	struct pci_sys_data *sys = bus->sysdata;
-> +	if (sys->add_bus)
-> +		sys->add_bus(bus);
-> +}
-> +
-> +void pcibios_remove_bus(struct pci_bus *bus)
-> +{
-> +	struct pci_sys_data *sys = bus->sysdata;
-> +	if (sys->remove_bus)
-> +		sys->remove_bus(bus);
-> +}
-> +
->  /*
->   * Swizzle the device pin each time we cross a bridge.  If a platform does
->   * not provide a swizzle function, we perform the standard PCI swizzling.
-> @@ -464,6 +478,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->  		sys->swizzle = hw->swizzle;
->  		sys->map_irq = hw->map_irq;
->  		sys->align_resource = hw->align_resource;
-> +		sys->add_bus        = hw->add_bus;
-> +		sys->remove_bus     = hw->remove_bus;
->  		INIT_LIST_HEAD(&sys->resources);
->  
->  		if (hw->private_data)
-> -- 
-> 1.8.1.2
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/28eff599/attachment.sig>
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 4fd8ef5..9e60563 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -548,24 +548,11 @@ static long do_cache_op_restart(struct restart_block *unused)
+ static inline int
+ do_cache_op(unsigned long start, unsigned long end, int flags)
+ {
+-	struct mm_struct *mm = current->active_mm;
+-	struct vm_area_struct *vma;
+-
+ 	if (end < start || flags)
+ 		return -EINVAL;
+ 
+-	down_read(&mm->mmap_sem);
+-	vma = find_vma(mm, start);
+-	if (!vma || vma->vm_start >= end) {
+-		up_read(&mm->mmap_sem);
+-		return -EINVAL;
+-	}
+-
+-	if (start < vma->vm_start)
+-		start = vma->vm_start;
+-	if (end > vma->vm_end)
+-		end = vma->vm_end;
+-	up_read(&mm->mmap_sem);
++	if (!access_ok(VERIFY_READ, start, end - start))
++		return -EFAULT;
+ 
+ 	return __do_cache_op(start, end);
+ }
+-- 
+1.8.2.2
