@@ -1,31 +1,103 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jul 2013 17:43:42 -0700
-Subject: [PATCH v1 14/14] ARM: dts: msm: Add clock entries for MSM8960 uart
- device
+Date: Wed, 24 Jul 2013 17:43:39 -0700
+Subject: [PATCH v1 11/14] ARM: dts: msm: Add MSM8960 GCC DT nodes
 In-Reply-To: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
 References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1374713022-6049-15-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1374713022-6049-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the necessary DT data to probe the global clock controller
+on MSM8960 devices.
+
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/msm8960-cdp.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/msm8960-cdp.dts | 72 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
 diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
-index be8d947..e10fba6 100644
+index db2060c..76a1817 100644
 --- a/arch/arm/boot/dts/msm8960-cdp.dts
 +++ b/arch/arm/boot/dts/msm8960-cdp.dts
-@@ -151,6 +151,8 @@
- 		reg = <0x16440000 0x1000>,
- 		      <0x16400000 0x1000>;
- 		interrupts = <0 154 0x0>;
-+		clocks = <&gsbi5_uart_clk>, <&gsbi5_uart_ahb>;
-+		clock-names = "gsbi_uart_clk", "gsbi_pclk";
+@@ -37,6 +37,78 @@
+ 		reg = <0xfd510000 0x4000>;
  	};
  
- 	qcom,ssbi at 500000 {
++	clock-controller at 900000 {
++		compatible = "qcom,gcc-8960", "qcom,gcc";
++		reg = <0x900000 0x4000>;
++
++		clocks {
++			cxo: cxo {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++				clock-frequency = <19200000>;
++			};
++
++			pxo: pxo {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++				clock-frequency = <27000000>;
++			};
++
++			pll8: pll8 {
++				#clock-cells = <0>;
++				compatible = "qcom,pll";
++				clocks = <&pxo>;
++			};
++
++			vpll8: vpll8 {
++				#clock-cells = <0>;
++				compatible = "qcom,pll-vote";
++				clocks = <&pll8>;
++			};
++
++			gsbi5_uart_rcg: gsbi5_uart_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn16-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
++
++			gsbi5_uart_clk: gsbi5_uart_cxc {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-clock";
++				clocks = <&gsbi5_uart_rcg>;
++			};
++
++			gsbi6_uart_rcg: gsbi6_uart_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn16-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
++
++			gsbi6_uart_clk: gsbi6_uart_cxc {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-clock";
++				clocks = <&gsbi6_uart_rcg>;
++			};
++
++			gsbi5_uart_ahb: gsbi5_uart_ahb {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-hg-clock";
++			};
++
++			gsbi5_qup_rcg: gsbi5_qup_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn8-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
++
++			gsbi5_qup_clk: gsbi5_qup_cxc {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-clock";
++				clocks = <&gsbi5_qup_rcg>;
++			};
++		};
++	};
++
+ 	serial at 16440000 {
+ 		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
+ 		reg = <0x16440000 0x1000>,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
