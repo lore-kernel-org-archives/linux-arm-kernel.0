@@ -1,153 +1,108 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 25 Jul 2013 10:12:12 +0200
-Subject: [PATCH v1 03/14] clk: Add of_clk_match() for device drivers
-In-Reply-To: <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 25 Jul 2013 10:21:02 +0200
+Subject: [PATCH v1 02/14] clk: Add of_init_clk_data() to parse common
+ clock bindings
+In-Reply-To: <1374713022-6049-3-git-send-email-sboyd@codeaurora.org>
 References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <52875092.tEWeSbEJZC@flatron>
+ <1374713022-6049-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1714620.Z8J8zTxIRB@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Stephen,
 
-On Wednesday 24 of July 2013 17:43:31 Stephen Boyd wrote:
-> In similar fashion as of_regulator_match() add an of_clk_match()
-> function that finds an initializes clock init_data structs from
-> devicetree. Drivers should use this API to find clocks that their
-> device is providing and then iterate over their match table
-> registering the clocks with the init data parsed.
+Pretty good idea, but I have some comments inline.
 
-I think all you need here is declaring all your clock drivers using 
-CLK_OF_DECLARE() macro. Then they will be automatically probed by 
-of_clk_init(). See last lines of drivers/clk/clk-fixed-rate.c for an 
-example.
+On Wednesday 24 of July 2013 17:43:30 Stephen Boyd wrote:
+> Consolidate DT parsing for the common bits of a clock binding in
+> one place to simplify clock drivers. This also has the added
+> benefit of standardizing how the clock names used by the common
+> clock framework are generated from the DT bindings. We always use
+> the first clock-output-names string if it exists, otherwise we
+> fall back to the node name.
+> 
+> To be slightly more efficient and make the caller's life easier,
+> we introduce a shallow copy flag so that the clock core knows to
+> just copy the pointers to the strings and not the string
+> contents. Otherwise the callers of this function would have to
+> free the strings allocated here which could be cumbersome.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/clk.c            | 59
+> +++++++++++++++++++++++++++++++++++++++++++-
+> include/linux/clk-provider.h |  7 ++++++
+>  2 files changed, 65 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 1ed9bdd..ea8e951b 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1809,6 +1809,10 @@ static int _clk_register(struct device *dev,
+> struct clk_hw *hw, struct clk *clk) {
+>  	int i, ret;
+> 
+> +	hw->clk = clk;
+> +	if (hw->init->flags & CLK_SHALLOW_COPY)
+> +		return PTR_RET(__clk_register(dev, hw));
+> +
+>  	clk->name = kstrdup(hw->init->name, GFP_KERNEL);
+>  	if (!clk->name) {
+>  		pr_err("%s: could not allocate clk->name\n", __func__);
+> @@ -1819,7 +1823,6 @@ static int _clk_register(struct device *dev,
+> struct clk_hw *hw, struct clk *clk) clk->hw = hw;
+>  	clk->flags = hw->init->flags;
+>  	clk->num_parents = hw->init->num_parents;
+> -	hw->clk = clk;
+> 
+>  	/* allocate local copy in case parent_names is __initdata */
+>  	clk->parent_names = kzalloc((sizeof(char*) * clk->num_parents),
+> @@ -2232,4 +2235,58 @@ void __init of_clk_init(const struct of_device_id
+> *matches) clk_init_cb(np);
+>  	}
+>  }
+> +
+> +/**
+> + * of_init_clk_data() - Initialize a clk_init_data struct from a DT
+> node + * @np: node to initialize struct from
+> + * @init: struct to initialize
+> + *
+> + * Populates the clk_init_data struct by parsing the device node for
+> + * properties matching the common clock binding. Returns 0 on success
+> + * and a negative error code on failure.
+> + */
+> +int of_init_clk_data(struct device_node *np, struct clk_init_data
+> *init) +{
+> +	struct of_phandle_args s;
+> +	const char **names = NULL, **p;
+> +	const char *name;
+> +	int i;
+> +
+> +	if (of_property_read_string(np, "clock-output-names", &name) < 0)
+> +		name = np->name;
+> +	init->name = kstrdup(name, GFP_KERNEL);
+> +	if (!init->name)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; of_parse_phandle_with_args(np, "clocks", "#clock-
+cells",
+> +				i, &s) == 0; i++) {
+> +		p = krealloc(names, sizeof(*names) * (i + 1), GFP_KERNEL);
+> +		if (!p)
+> +			goto err;
+
+What about using of_count_phandle_with_args() first to get the parent 
+count?
+
+> +		names = p;
+> +
+> +		if (of_property_read_string(s.np, "clock-output-names",
+> +					&name) < 0)
+> +			name = s.np->name;
+
+You should be able to use of_clk_get_parent_name() here, instead of 
+parsing the properties directly.
 
 Best regards,
 Tomasz
-
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/clk.c            | 64
-> ++++++++++++++++++++++++++++++++++++++++++++
-> include/linux/clk-provider.h | 16 +++++++++++
->  2 files changed, 80 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index ea8e951b..1e3e0db 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2289,4 +2289,68 @@ err:
->  	return -ENOMEM;
->  }
->  EXPORT_SYMBOL_GPL(of_init_clk_data);
-> +
-> +/**
-> + * of_clk_match() - Scan and match clock providers from the DT node of
-> a device + * @dev: device initializing clock providers
-> + * @matches: match table of clocks
-> + * @num_matches: number of entries in @matches
-> + *
-> + * This function uses a match table specified by the clock driver to
-> parse + * clock init data from the device tree. @dev is expected to be
-> a device with + * a 'clocks' child node containing a set of child
-> nodes, each providing the + * init data for one clock. The data parsed
-> from a child node will be matched + * to a clock based on the child
-> node's name. Note that the match table is + * modified in place.
-> + *
-> + * Returns the number of matches found or a negative error code on
-> failure. + */
-> +int of_clk_match(struct device *dev, struct of_clk_match *matches,
-> +		 int num_matches)
-> +{
-> +	int count = 0;
-> +	int err, i;
-> +	struct device_node *np, *clocks;
-> +	struct clk_init_data *init;
-> +
-> +	clocks = of_find_node_by_name(dev->of_node, "clocks");
-> +	if (!clocks)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; i < num_matches; i++) {
-> +		struct of_clk_match *match = &matches[i];
-> +		match->init_data = NULL;
-> +		match->of_node = NULL;
-> +	}
-> +
-> +	for_each_available_child_of_node(clocks, np) {
-> +		for (i = 0; i < num_matches; i++) {
-> +			struct of_clk_match *match = &matches[i];
-> +			if (match->of_node)
-> +				continue;
-> +
-> +			if (strcmp(match->name, np->name))
-> +				continue;
-> +
-> +			init = devm_kzalloc(dev, sizeof(*init), 
-GFP_KERNEL);
-> +			if (!init)
-> +				return -ENOMEM;
-> +
-> +			err = of_init_clk_data(np, init);
-> +			if (err) {
-> +				dev_err(dev,
-> +					"failed to parse DT for clock 
-%s\n",
-> +					np->name);
-> +				return err;
-> +			}
-> +			match->of_node = np;
-> +			match->init_data = init;
-> +			count++;
-> +			break;
-> +		}
-> +	}
-> +
-> +	return count;
-> +}
-> +EXPORT_SYMBOL_GPL(of_clk_match);
->  #endif
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 18d6362..484f8ad 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -461,6 +461,13 @@ struct clk_onecell_data {
->  		__used __section(__clk_of_table)		\
->  		= { .compatible = compat, .data = fn };
-> 
-> +struct of_clk_match {
-> +	const char *name;
-> +	void *driver_data;
-> +	struct clk_init_data *init_data;
-> +	struct device_node *of_node;
-> +};
-> +
->  #ifdef CONFIG_OF
->  int of_clk_add_provider(struct device_node *np,
->  			struct clk *(*clk_src_get)(struct of_phandle_args 
-*args,
-> @@ -475,6 +482,9 @@ const char *of_clk_get_parent_name(struct
-> device_node *np, int index); void of_clk_init(const struct of_device_id
-> *matches);
->  int of_init_clk_data(struct device_node *np, struct clk_init_data
-> *init);
-> 
-> +int of_clk_match(struct device *dev, struct of_clk_match *matches,
-> +		 int num_matches);
-> +
->  #else /* !CONFIG_OF */
-> 
->  static inline int of_clk_add_provider(struct device_node *np,
-> @@ -508,6 +518,12 @@ of_init_clk_data(struct device_node *np, struct
-> clk_init_data *init) {
->  	return 0;
->  }
-> +static inline int
-> +of_clk_match(struct device *dev, struct of_clk_match *matches, int
-> num_matches) +{
-> +
-> +	return 0;
-> +}
->  #endif /* CONFIG_OF */
->  #endif /* CONFIG_COMMON_CLK */
->  #endif /* CLK_PROVIDER_H */
