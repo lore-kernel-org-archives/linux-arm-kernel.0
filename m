@@ -1,80 +1,87 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 25 Jul 2013 12:01:05 -0600
-Subject: [PATCH v5 09/16] PCI: tegra: set up PADS_REFCLK_CFG1
-In-Reply-To: <1374774810-18459-10-git-send-email-thierry.reding@gmail.com>
-References: <1374774810-18459-1-git-send-email-thierry.reding@gmail.com>
- <1374774810-18459-10-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CAErSpo5v0ajACxAZnUQtL5LbY=JW1Xdw+cRf=wtqvJuQDxfAow@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Jul 2013 19:05:18 +0100
+Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
+ prior to strex
+In-Reply-To: <51F166A0.7030203@codeaurora.org>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-5-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
+ <20130724111841.GD11072@mudshark.cambridge.arm.com>
+ <51F160EA.6030800@codeaurora.org> <51F1626C.3050008@codeaurora.org>
+ <20130725174555.GK12827@mudshark.cambridge.arm.com>
+ <51F166A0.7030203@codeaurora.org>
+Message-ID: <20130725180518.GM12827@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:53 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> The registers PADS_REFCLK_CFG are an array of 16-bit data, one entry per
-> PCIe root port. For Tegra30, we therefore need to write a 3rd entry in
-> this array. Doing so mays the mini-PCIe slot on Beaver operate correctly.
->
-> While we're at it, add some #defines to partially document the fields
-> within these 16-bit values.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+On Thu, Jul 25, 2013 at 06:55:44PM +0100, Stephen Boyd wrote:
+> On 07/25/13 10:45, Will Deacon wrote:
+> > On Thu, Jul 25, 2013 at 06:37:48PM +0100, Stephen Boyd wrote:
+> >> On 07/25/13 10:31, Stephen Boyd wrote:
+> >>> Maybe I'm wrong, but can't you just remove the casts and leave the
+> >>> function as static inline? const void * is pretty much telling the
+> >>> compiler to turn off type checking.
+> >>>
+> >> Oh joy. Why is rwlock's lock member marked volatile?
+> > Yeah, that was the problematic guy. However, I had to fix that anyway in
+> > this patch because otherwise the definition for prefetchw when
+> > !ARCH_HAS_PREFETCHW (which expands to __builtin_prefetch(x,1)) will explode.
+> >
+> > So, given that I've fixed the rwlocks, I think I could put prefetch and
+> > prefetchw back to static inline functions. What do you reckon?
+> 
+> It would be good to match the builtin function's signature so that we
+> don't explode in the future on ARCH_HAS_PREFETCHW configs.
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Ok, so that's basically just undoing the macroisation on top of v2 (fixup
+below).
 
-> ---
->  drivers/pci/host/pci-tegra.c | 29 ++++++++++++++++++++++++-----
->  1 file changed, 24 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-> index 5347d7d..0c84c67 100644
-> --- a/drivers/pci/host/pci-tegra.c
-> +++ b/drivers/pci/host/pci-tegra.c
-> @@ -196,6 +196,25 @@
->  #define PADS_REFCLK_CFG0                       0x000000C8
->  #define PADS_REFCLK_CFG1                       0x000000CC
->
-> +/*
-> + * Fields in PADS_REFCLK_CFG*. Those registers form an array of 16-bit
-> + * entries, one entry per PCIe port. These field definitions and desired
-> + * values aren't in the TRM, but do come from NVIDIA.
-> + */
-> +#define PADS_REFCLK_CFG_TERM_SHIFT             2  /* 6:2 */
-> +#define PADS_REFCLK_CFG_E_TERM_SHIFT           7
-> +#define PADS_REFCLK_CFG_PREDI_SHIFT            8  /* 11:8 */
-> +#define PADS_REFCLK_CFG_DRVI_SHIFT             12 /* 15:12 */
-> +
-> +/* Default value provided by HW engineering is 0xfa5c */
-> +#define PADS_REFCLK_CFG_VALUE \
-> +       ( \
-> +               (0x17 << PADS_REFCLK_CFG_TERM_SHIFT)   | \
-> +               (0    << PADS_REFCLK_CFG_E_TERM_SHIFT) | \
-> +               (0xa  << PADS_REFCLK_CFG_PREDI_SHIFT)  | \
-> +               (0xf  << PADS_REFCLK_CFG_DRVI_SHIFT)     \
-> +       )
-> +
->  struct tegra_msi {
->         struct msi_chip chip;
->         DECLARE_BITMAP(used, INT_PCI_MSI_NR);
-> @@ -809,11 +828,11 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
->         value |= PADS_PLL_CTL_RST_B4SM;
->         pads_writel(pcie, value, soc->pads_pll_ctl);
->
-> -       /*
-> -        * Hack, set the clock voltage to the DEFAULT provided by hw folks.
-> -        * This doesn't exist in the documentation.
-> -        */
-> -       pads_writel(pcie, 0xfa5cfa5c, PADS_REFCLK_CFG0);
-> +       /* Configure the reference clock driver */
-> +       value = PADS_REFCLK_CFG_VALUE | (PADS_REFCLK_CFG_VALUE << 16);
-> +       pads_writel(pcie, value, PADS_REFCLK_CFG0);
-> +       if (soc->num_ports > 2)
-> +               pads_writel(pcie, PADS_REFCLK_CFG_VALUE, PADS_REFCLK_CFG1);
->
->         /* wait for the PLL to lock */
->         timeout = 300;
-> --
-> 1.8.1.5
->
+Will
+
+--->8
+
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index dde7ecc..dac9429 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -109,25 +109,25 @@ unsigned long get_wchan(struct task_struct *p);
+ #if __LINUX_ARM_ARCH__ >= 5
+ 
+ #define ARCH_HAS_PREFETCH
+-#define prefetch(p)                                                    \
+-({                                                                     \
+-       __asm__ __volatile__(                                           \
+-               "pld\t%a0"                                              \
+-               :: "p" (p));                                            \
+-})
++static inline void prefetch(const void *ptr)
++{
++       __asm__ __volatile__(
++               "pld\t%a0"
++               :: "p" (ptr));
++}
+ 
+ #if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
+ #define ARCH_HAS_PREFETCHW
+-#define prefetchw(p)                                                   \
+-({                                                                     \
+-       __asm__ __volatile__(                                           \
+-               ".arch_extension        mp\n"                           \
+-               __ALT_SMP_ASM(                                          \
+-                       WASM(pldw)              "\t%a0",                \
+-                       WASM(pld)               "\t%a0"                 \
+-               )                                                       \
+-               :: "p" (p));                                            \
+-})
++static inline void prefetchw(const void *ptr)
++{
++       __asm__ __volatile__(
++               ".arch_extension        mp\n"
++               __ALT_SMP_ASM(
++                       WASM(pldw)              "\t%a0",
++                       WASM(pld)               "\t%a0"
++               )
++               :: "p" (ptr));
++}
+ #endif
+ #endif
