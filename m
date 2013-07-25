@@ -1,42 +1,72 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 25 Jul 2013 10:41:15 +0530
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <201307242032.03597.arnd@arndb.de>
-References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
- <5977067.8rykRgjgre@flatron> <201307242032.03597.arnd@arndb.de>
-Message-ID: <51F0B373.5050907@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 25 Jul 2013 14:23:17 +0900
+Subject: Mainline kernel on snowball
+Message-ID: <20130725052317.GA25854@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thursday 25 July 2013 12:02 AM, Arnd Bergmann wrote:
-> On Tuesday 23 July 2013, Tomasz Figa wrote:
->> On Tuesday 23 of July 2013 17:14:20 Alan Stern wrote:
->>> On Tue, 23 Jul 2013, Tomasz Figa wrote:
->>>> Where would you want to have those phy_address arrays stored? There
->>>> are no board files when booting with DT. Not even saying that you
->>>> don't need to use any hacky schemes like this when you have DT that
->>>> nicely specifies relations between devices.
->>>
->>> If everybody agrees DT has a nice scheme for specifying relations
->>> between devices, why not use that same scheme in the PHY core?
->>
->> It is already used, for cases when consumer device has a DT node attached. 
->> In non-DT case this kind lookup translates loosely to something that is 
->> being done in regulator framework - you can't bind devices by pointers, 
->> because you don't have those pointers, so you need to use device names.
->>
-> 
-> Sorry for jumping in to the middle of the discussion, but why does a *new*
-> framework even bother defining an interface for board files?
-> 
-> Can't we just drop any interfaces for platform data passing in the phy
-> framework and put the burden of adding those to anyone who actually needs
-> them? All the platforms we are concerned with here (exynos and omap,
-> plus new platforms) can be booted using DT anyway.
+I apologise for the na?ve nature of this question,
+but I do not seem to be able to make any progress of my own accord.
 
-The OMAP3 platforms still needs to be supported for non-dt :-s
+I would like to boot the mainline kernel - ideally v3.10 and v3.11-rcX -
+on snowball. The reason being to verify CPU hotplug which
+seems to be broken on shmobile, though that is tangential to this post.
 
-Thanks
-Kishon
+My procedure, which does not work, is as follows.
+I have tried a number of different versions all with roughly
+the same result.
+
+1. Build kernel
+# git checkout v3.10.2 # I have tried several over versions too.
+# make u8500_defconfig
+Edit .config to enable CONFIG_ARM_APPENDED_DTB
+# LOADADDR=0x100000 make uImage dtbs
+
+2. Append dtb to zImage and recreate uImage
+mv arch/arm/boot/zImage arch/arm/boot/zImage.tmp
+cat arch/arm/boot/zImage.tmp arch/arm/boot/dts/snowball.dtb
+/bin/sh scripts/mkuboot.sh \
+	-A arm -O linux -C none  -T kernel \
+	-a 0x100000 -e 0x100000 -n 'Linux-3.10.2' \
+	-d arch/arm/boot/zImage arch/arm/boot/uImage
+
+3. Boot uImage from u-boot
+Snowball $ setenv ethaddr 3e:c4:73:05:d1:a1
+Snowball $ bootp;bootm
+smc911x: detected LAN9221 controller
+smc911x: phy initialized
+smc911x: MAC 3e:c4:73:05:d1:a1
+BOOTP broadcast 1
+*** Unhandled DHCP Option in OFFER/ACK: 28
+*** Unhandled DHCP Option in OFFER/ACK: 44
+*** Unhandled DHCP Option in OFFER/ACK: 28
+*** Unhandled DHCP Option in OFFER/ACK: 44
+DHCP client bound to address 10.3.3.146
+Using smc911x-0 device
+TFTP from server 10.3.3.135; our IP address is 10.3.3.146
+Filename 'snowball/uImage'.
+Load address: 0x100000
+Loading: #################################################################
+         #################################################################
+         #################################################################
+         #################################################################
+         ##########################################################
+done
+Bytes transferred = 2540191 (26c29f hex)
+## Booting kernel from Legacy Image at 00100000 ...
+   Image Name:   'Linux-3.10.2'
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    2540127 Bytes =  2.4 MB
+   Load Address: 00100000
+   Entry Point:  00100000
+   XIP Kernel Image ... OK
+OK
+
+Starting kernel ...
+
+
+
+
+This is as far as it gets.
