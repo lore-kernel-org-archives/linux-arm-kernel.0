@@ -1,108 +1,225 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 25 Jul 2013 10:21:02 +0200
-Subject: [PATCH v1 02/14] clk: Add of_init_clk_data() to parse common
- clock bindings
-In-Reply-To: <1374713022-6049-3-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 25 Jul 2013 10:26:18 +0200
+Subject: [PATCH v1 04/14] clk: Add set_rate_and_parent() op
+In-Reply-To: <1374713022-6049-5-git-send-email-sboyd@codeaurora.org>
 References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1714620.Z8J8zTxIRB@flatron>
+ <1374713022-6049-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <4582949.WCP5JfKYES@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wednesday 24 of July 2013 17:43:32 Stephen Boyd wrote:
+> Some of Qualcomm's clocks can change their parent and rate at the
+> same time with a single register write. Add support for this
+> hardware to the common clock framework by adding a new
+> set_rate_and_parent() op. When the clock framework determines
+> that both the parent and the rate are going to change during
+> clk_set_rate() it will call the .set_rate_and_parent() op if
+> available and fall back to calling .set_parent() followed by
+> .set_rate() otherwise.
 
-Pretty good idea, but I have some comments inline.
+This is strange. Does you hardware support switching parent and rate 
+separately or you always need to set both and so all the fuss here?
 
-On Wednesday 24 of July 2013 17:43:30 Stephen Boyd wrote:
-> Consolidate DT parsing for the common bits of a clock binding in
-> one place to simplify clock drivers. This also has the added
-> benefit of standardizing how the clock names used by the common
-> clock framework are generated from the DT bindings. We always use
-> the first clock-output-names string if it exists, otherwise we
-> fall back to the node name.
-> 
-> To be slightly more efficient and make the caller's life easier,
-> we introduce a shallow copy flag so that the clock core knows to
-> just copy the pointers to the strings and not the string
-> contents. Otherwise the callers of this function would have to
-> free the strings allocated here which could be cumbersome.
-> 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/clk.c            | 59
-> +++++++++++++++++++++++++++++++++++++++++++-
-> include/linux/clk-provider.h |  7 ++++++
->  2 files changed, 65 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 1ed9bdd..ea8e951b 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1809,6 +1809,10 @@ static int _clk_register(struct device *dev,
-> struct clk_hw *hw, struct clk *clk) {
->  	int i, ret;
-> 
-> +	hw->clk = clk;
-> +	if (hw->init->flags & CLK_SHALLOW_COPY)
-> +		return PTR_RET(__clk_register(dev, hw));
-> +
->  	clk->name = kstrdup(hw->init->name, GFP_KERNEL);
->  	if (!clk->name) {
->  		pr_err("%s: could not allocate clk->name\n", __func__);
-> @@ -1819,7 +1823,6 @@ static int _clk_register(struct device *dev,
-> struct clk_hw *hw, struct clk *clk) clk->hw = hw;
->  	clk->flags = hw->init->flags;
->  	clk->num_parents = hw->init->num_parents;
-> -	hw->clk = clk;
-> 
->  	/* allocate local copy in case parent_names is __initdata */
->  	clk->parent_names = kzalloc((sizeof(char*) * clk->num_parents),
-> @@ -2232,4 +2235,58 @@ void __init of_clk_init(const struct of_device_id
-> *matches) clk_init_cb(np);
->  	}
->  }
-> +
-> +/**
-> + * of_init_clk_data() - Initialize a clk_init_data struct from a DT
-> node + * @np: node to initialize struct from
-> + * @init: struct to initialize
-> + *
-> + * Populates the clk_init_data struct by parsing the device node for
-> + * properties matching the common clock binding. Returns 0 on success
-> + * and a negative error code on failure.
-> + */
-> +int of_init_clk_data(struct device_node *np, struct clk_init_data
-> *init) +{
-> +	struct of_phandle_args s;
-> +	const char **names = NULL, **p;
-> +	const char *name;
-> +	int i;
-> +
-> +	if (of_property_read_string(np, "clock-output-names", &name) < 0)
-> +		name = np->name;
-> +	init->name = kstrdup(name, GFP_KERNEL);
-> +	if (!init->name)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; of_parse_phandle_with_args(np, "clocks", "#clock-
-cells",
-> +				i, &s) == 0; i++) {
-> +		p = krealloc(names, sizeof(*names) * (i + 1), GFP_KERNEL);
-> +		if (!p)
-> +			goto err;
+If the latter is the case, then maybe you can simply keep parent index and 
+rate cached inside driver data of your clock driver and use them on any 
+.set_rate() or .set_parent() calls?
 
-What about using of_count_phandle_with_args() first to get the parent 
-count?
-
-> +		names = p;
-> +
-> +		if (of_property_read_string(s.np, "clock-output-names",
-> +					&name) < 0)
-> +			name = s.np->name;
-
-You should be able to use of_clk_get_parent_name() here, instead of 
-parsing the properties directly.
+I'm not really sure if we want such oddities to be handled inside of 
+common clock framework. Mike, what do you think?
 
 Best regards,
 Tomasz
+
+> Cc: James Hogan <james.hogan@imgtec.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  Documentation/clk.txt        |  3 ++
+>  drivers/clk/clk.c            | 78
+> +++++++++++++++++++++++++++++++++-----------
+> include/linux/clk-provider.h | 15 +++++++++
+>  3 files changed, 77 insertions(+), 19 deletions(-)
+> 
+> diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+> index 3aeb5c4..79700ea 100644
+> --- a/Documentation/clk.txt
+> +++ b/Documentation/clk.txt
+> @@ -77,6 +77,9 @@ the operations defined in clk.h:
+>  		int		(*set_parent)(struct clk_hw *hw, u8 
+index);
+>  		u8		(*get_parent)(struct clk_hw *hw);
+>  		int		(*set_rate)(struct clk_hw *hw, unsigned 
+long);
+> +		int		(*set_rate_and_parent)(struct clk_hw *hw,
+> +					    unsigned long rate,
+> +					    unsigned long parent_rate, u8 
+index);
+>  		void		(*init)(struct clk_hw *hw);
+>  	};
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 1e3e0db..73de07c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1121,10 +1121,9 @@ static void clk_reparent(struct clk *clk, struct
+> clk *new_parent) clk->parent = new_parent;
+>  }
+> 
+> -static int __clk_set_parent(struct clk *clk, struct clk *parent, u8
+> p_index) +static struct clk *__clk_set_parent_before(struct clk *clk,
+> struct clk *parent) {
+>  	unsigned long flags;
+> -	int ret = 0;
+>  	struct clk *old_parent = clk->parent;
+> 
+>  	/*
+> @@ -1155,6 +1154,34 @@ static int __clk_set_parent(struct clk *clk,
+> struct clk *parent, u8 p_index) clk_reparent(clk, parent);
+>  	clk_enable_unlock(flags);
+> 
+> +	return old_parent;
+> +}
+> +
+> +static void __clk_set_parent_after(struct clk *clk, struct clk *parent,
+> +		struct clk *old_parent)
+> +{
+> +	/*
+> +	 * Finish the migration of prepare state and undo the changes done
+> +	 * for preventing a race with clk_enable().
+> +	 */
+> +	if (clk->prepare_count) {
+> +		clk_disable(clk);
+> +		clk_disable(old_parent);
+> +		__clk_unprepare(old_parent);
+> +	}
+> +
+> +	/* update debugfs with new clk tree topology */
+> +	clk_debug_reparent(clk, parent);
+> +}
+> +
+> +static int __clk_set_parent(struct clk *clk, struct clk *parent, u8
+> p_index) +{
+> +	unsigned long flags;
+> +	int ret = 0;
+> +	struct clk *old_parent;
+> +
+> +	old_parent = __clk_set_parent_before(clk, parent);
+> +
+>  	/* change clock input source */
+>  	if (parent && clk->ops->set_parent)
+>  		ret = clk->ops->set_parent(clk->hw, p_index);
+> @@ -1172,18 +1199,8 @@ static int __clk_set_parent(struct clk *clk,
+> struct clk *parent, u8 p_index) return ret;
+>  	}
+> 
+> -	/*
+> -	 * Finish the migration of prepare state and undo the changes done
+> -	 * for preventing a race with clk_enable().
+> -	 */
+> -	if (clk->prepare_count) {
+> -		clk_disable(clk);
+> -		clk_disable(old_parent);
+> -		__clk_unprepare(old_parent);
+> -	}
+> +	__clk_set_parent_after(clk, parent, old_parent);
+> 
+> -	/* update debugfs with new clk tree topology */
+> -	clk_debug_reparent(clk, parent);
+>  	return 0;
+>  }
+> 
+> @@ -1368,17 +1385,32 @@ static void clk_change_rate(struct clk *clk)
+>  	struct clk *child;
+>  	unsigned long old_rate;
+>  	unsigned long best_parent_rate = 0;
+> +	bool skip_set_rate = false;
+> +	struct clk *old_parent;
+> 
+>  	old_rate = clk->rate;
+> 
+> -	/* set parent */
+> -	if (clk->new_parent && clk->new_parent != clk->parent)
+> -		__clk_set_parent(clk, clk->new_parent, clk-
+>new_parent_index);
+> -
+> -	if (clk->parent)
+> +	if (clk->new_parent)
+> +		best_parent_rate = clk->new_parent->rate;
+> +	else if (clk->parent)
+>  		best_parent_rate = clk->parent->rate;
+> 
+> -	if (clk->ops->set_rate)
+> +	if (clk->new_parent && clk->new_parent != clk->parent) {
+> +		old_parent = __clk_set_parent_before(clk, clk-
+>new_parent);
+> +
+> +		if (clk->ops->set_rate_and_parent) {
+> +			skip_set_rate = true;
+> +			clk->ops->set_rate_and_parent(clk->hw, clk-
+>new_rate,
+> +					best_parent_rate,
+> +					clk->new_parent_index);
+> +		} else if (clk->ops->set_parent) {
+> +			clk->ops->set_parent(clk->hw, clk-
+>new_parent_index);
+> +		}
+> +
+> +		__clk_set_parent_after(clk, clk->new_parent, old_parent);
+> +	}
+> +
+> +	if (!skip_set_rate && clk->ops->set_rate)
+>  		clk->ops->set_rate(clk->hw, clk->new_rate, 
+best_parent_rate);
+> 
+>  	if (clk->ops->recalc_rate)
+> @@ -1664,6 +1696,14 @@ int __clk_init(struct device *dev, struct clk
+> *clk) goto out;
+>  	}
+> 
+> +	if (clk->ops->set_rate_and_parent &&
+> +			!(clk->ops->set_parent && clk->ops->set_rate)) {
+> +		pr_warning("%s: %s must implement .set_parent & 
+.set_rate\n",
+> +				__func__, clk->name);
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+>  	/* throw a WARN if any entries in parent_names are NULL */
+>  	for (i = 0; i < clk->num_parents; i++)
+>  		WARN(!clk->parent_names[i],
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 484f8ad..1f7eabb 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -108,6 +108,18 @@ struct clk_hw;
+>   *		which is likely helpful for most .set_rate implementation.
+>   *		Returns 0 on success, -EERROR otherwise.
+>   *
+> + * @set_rate_and_parent: Change the rate and the parent of this clock.
+> The + *		requested rate is specified by the second 
+argument, which +
+> *		should typically be the return of .round_rate call.  The
+> + *		third argument gives the parent rate which is likely 
+helpful
+> + *		for most .set_rate_and_parent implementation. The fourth
+> + *		argument gives the parent index. It is optional (and
+> + *		unnecessary) for clocks with 0 or 1 parents as well as
+> + *		for clocks that can tolerate switching the rate and the 
+parent
+> + *		separately via calls to .set_parent and .set_rate.
+> + *		Returns 0 on success, -EERROR otherwise.
+> + *
+> + *
+>   * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
+> * implementations to split any work between atomic (enable) and
+> sleepable * (prepare) contexts.  If enabling a clock requires code that
+> might sleep, @@ -139,6 +151,9 @@ struct clk_ops {
+>  	u8		(*get_parent)(struct clk_hw *hw);
+>  	int		(*set_rate)(struct clk_hw *hw, unsigned long,
+>  				    unsigned long);
+> +	int		(*set_rate_and_parent)(struct clk_hw *hw,
+> +				    unsigned long rate,
+> +				    unsigned long parent_rate, u8 index);
+>  	void		(*init)(struct clk_hw *hw);
+>  };
