@@ -1,83 +1,157 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 25 Jul 2013 16:59:25 -0400
-Subject: [PATCH 1/2] i2c: davinci: remove useless mach/hardware include
-In-Reply-To: <51F0F283.5080900@ti.com>
-References: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
- <1374712099-32095-2-git-send-email-santosh.shilimkar@ti.com>
- <51F0F283.5080900@ti.com>
-Message-ID: <51F191AD.9020108@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 25 Jul 2013 13:59:53 -0700
+Subject: [PATCH v5 3/3] Documentation: Add documentation for APM X-Gene
+ clock binding
+In-Reply-To: <1372269371-22992-4-git-send-email-lho@apm.com>
+References: <1372269371-22992-1-git-send-email-lho@apm.com>
+ <1372269371-22992-2-git-send-email-lho@apm.com>
+ <1372269371-22992-3-git-send-email-lho@apm.com>
+ <1372269371-22992-4-git-send-email-lho@apm.com>
+Message-ID: <20130725205953.7598.15913@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 July 2013 05:40 AM, Sekhar Nori wrote:
-> On Thursday 25 July 2013 05:58 AM, Santosh Shilimkar wrote:
->> This driver no longer uses definitions from mach/hardware.h.
->> On the other hand, including this header breaks this driver
->> on non-davinci platforms which don't have such a header.
->>
->> Fix it.
->>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Quoting Loc Ho (2013-06-26 10:56:11)
+> Documentation: Add documentation for APM X-Gene clock binding with PLL and
+> device clocks.
 > 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  Documentation/devicetree/bindings/clock/xgene.txt |  111 +++++++++++++++++++++
+>  1 files changed, 111 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/xgene.txt
 > 
-> One minor nit:
-> 
->> ---
->>  drivers/i2c/busses/i2c-davinci.c |    1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
->> index fa55605..ddaa2a3 100644
->> --- a/drivers/i2c/busses/i2c-davinci.c
->> +++ b/drivers/i2c/busses/i2c-davinci.c
->> @@ -41,7 +41,6 @@
->>  #include <linux/of_i2c.h>
->>  #include <linux/of_device.h>
->>  
-> 
-> You can now remove this empty line too.
-> 
-Yes. Updated patch below with your ack added.
+> diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
+> new file mode 100644
+> index 0000000..1c4ef77
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/xgene.txt
+> @@ -0,0 +1,111 @@
+> +Device Tree Clock bindings for APM X-Gene
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be one of the following:
+> +       "apm,xgene-socpll-clock" - for a X-Gene SoC PLL clock
+> +       "apm,xgene-pcppll-clock" - for a X-Gene PCP PLL clock
+> +       "apm,xgene-device-clock" - for a X-Gene device clock
+> +
+> +Required properties for SoC or PCP PLL clocks:
+> +- reg : shall be the physical PLL register address for the pll clock.
+> +- clocks : shall be the input parent clock phandle for the clock. This should
+> +       be the reference clock.
+> +- #clock-cells : shall be set to 1.
+> +- clock-output-names : shall be the name of the PLL referenced by derive
+> +  clock.
+> +Optional properties for PLL clocks:
+> +- clock-names : shall be the name of the PLL. If missing, use the device name.
+> +
+> +Required properties for device clocks:
+> +- reg : shall be a list of address and length pairs describing the CSR
+> +         reset and/or the divider. Either may be omitted, but at least
+> +         one must be present.
+> + - reg-names : shall be a string list describing the reg resource. This
+> +               may include "csr-reg" and/or "div-reg". If this property
+> +               is not present, the reg property is assumed to describe
+> +               only "csr-reg".
+
+Where is reg-names used? I see it used in your DTS but I don't see
+clk-xgene.c doing anything with it.
+
+> +- clocks : shall be the input parent clock phandle for the clock.
+> +- #clock-cells : shall be set to 1.
+> +- clock-output-names : shall be the name of the device referenced.
+> +Optional properties for device clocks:
+> +- clock-names : shall be the name of the device clock. If missing, use the
+> +                device name.
+> +- csr-offset : Offset to the CSR reset register from the reset address base.
+> +               Default is 0.
+> +- csr-mask : CSR reset mask bit. Default is 0xF.
+> +- enable-offset : Offset to the enable register from the reset address base.
+> +                  Default is 0x8.
+> +- enable-mask : CSR enable mask bit. Default is 0xF.
+> +- divider-offset : Offset to the divider CSR register from the divider base.
+> +                   Default is 0x0.
+> +- divider-width : Width of the divider register. Default is 0.
+> +- divider-shift : Bit shift of the divider register. Default is 0.
+
+There is a general push to not have register-level details in DT. How
+many clocks do you think you'll end up defining in the future? If you
+have a lot then this binding could grow fairly large.
 
 Regards,
-Santosh
+Mike
 
->From d7ae1c488ebae19028f33abff76c4d684271a7fb Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Tue, 23 Jul 2013 15:40:46 -0400
-Subject: [PATCH 1/2] i2c: davinci: remove useless mach/hardware include
-
-This driver no longer uses definitions from mach/hardware.h.
-On the other hand, including this header breaks this driver
-on non-davinci platforms which don't have such a header.
-
-Fix it.
-
-
-Cc: Wolfram Sang <wsa@the-dreams.de>
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/i2c/busses/i2c-davinci.c |    2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index fa55605..5898df3 100644
---- a/drivers/i2c/busses/i2c-davinci.c
-+++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -40,8 +40,6 @@
- #include <linux/gpio.h>
- #include <linux/of_i2c.h>
- #include <linux/of_device.h>
--
--#include <mach/hardware.h>
- #include <linux/platform_data/i2c-davinci.h>
- 
- /* ----- global defines ----------------------------------------------- */
--- 
-1.7.9.5
+> +
+> +For example:
+> +
+> +       pcppll: pcppll at 17000100 {
+> +               compatible = "apm,xgene-pcppll-clock";
+> +               #clock-cells = <1>;
+> +               clocks = <&refclk 0>;
+> +               clock-names = "pcppll";
+> +               reg = <0x0 0x17000100 0x0 0x1000>;
+> +               clock-output-names = "pcppll";
+> +               type = <0>;
+> +       };
+> +
+> +       socpll: socpll at 17000120 {
+> +               compatible = "apm,xgene-socpll-clock";
+> +               #clock-cells = <1>;
+> +               clocks = <&refclk 0>;
+> +               clock-names = "socpll";
+> +               reg = <0x0 0x17000120 0x0 0x1000>;
+> +               clock-output-names = "socpll";
+> +               type = <1>;
+> +       };
+> +
+> +       qmlclk: qmlclk {
+> +               compatible = "apm,xgene-device-clock";
+> +               #clock-cells = <1>;
+> +               clocks = <&socplldiv2 0>;
+> +               clock-names = "qmlclk";
+> +               reg = <0x0 0x1703C000 0x0 0x1000>;
+> +               reg-name = "csr-reg";
+> +               clock-output-names = "qmlclk";
+> +       };
+> +
+> +       ethclk: ethclk {
+> +               compatible = "apm,xgene-device-clock";
+> +               #clock-cells = <1>;
+> +               clocks = <&socplldiv2 0>;
+> +               clock-names = "ethclk";
+> +               reg = <0x0 0x17000000 0x0 0x1000>;
+> +               reg-names = "div-reg";
+> +               divider-offset = <0x238>;
+> +               divider-width = <0x9>;
+> +               divider-shift = <0x0>;
+> +               clock-output-names = "ethclk";
+> +       };
+> +
+> +       apbclk: apbclk {
+> +               compatible = "apm,xgene-device-clock";
+> +               #clock-cells = <1>;
+> +               clocks = <&ahbclk 0>;
+> +               clock-names = "apbclk";
+> +               reg = <0x0 0x1F2AC000 0x0 0x1000
+> +                       0x0 0x1F2AC000 0x0 0x1000>;
+> +               reg-names = "csr-reg", "div-reg";
+> +               csr-offset = <0x0>;
+> +               csr-mask = <0x200>;
+> +               enable-offset = <0x8>;
+> +               enable-mask = <0x200>;
+> +               divider-offset = <0x10>;
+> +               divider-width = <0x2>;
+> +               divider-shift = <0x0>;
+> +               flags = <0x8>;
+> +               clock-output-names = "apbclk";
+> +       };
+> +
+> -- 
+> 1.5.5
