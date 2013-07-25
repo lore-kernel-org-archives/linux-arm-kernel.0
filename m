@@ -1,55 +1,38 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Thu, 25 Jul 2013 01:32:29 +0000
-Subject: [v8 3/3] ahci_imx: add ahci sata support on imx platforms
-In-Reply-To: <20130724163038.GF20377@mtj.dyndns.org>
-References: <1374646529-24432-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1374646529-24432-4-git-send-email-Hong-Xing.Zhu@freescale.com>
- <20130724163038.GF20377@mtj.dyndns.org>
-Message-ID: <0E83723C55F66F43A6041464FE31119D346BC3@039-SN2MPN1-011.039d.mgd.msft.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 25 Jul 2013 10:49:05 +0900
+Subject: ARM CPU Hotplug breakage on mach-shmobile and KZM9D
+In-Reply-To: <20130725010607.GB31464@verge.net.au>
+References: <CANqRtoRx7voEVwJG8UNNy_Jiixo=uRJCvxTD0bZdzVohoryBUA@mail.gmail.com>
+ <20130725010607.GB31464@verge.net.au>
+Message-ID: <CANqRtoR3XoTVpTTOG8OS_Am+qB35ACD_PtV3O8v2J+1zqTBtfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks a lot. :).
+Hi Simon,
 
-Best Regards
-Richard Zhu
+On Thu, Jul 25, 2013 at 10:06 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Jul 25, 2013 at 12:15:49AM +0900, Magnus Damm wrote:
+>> Hi everyone,
+>>
+>> Bad news: CPU Hotplug on KZM9D seems broken on recent kernels.
+>>
+>> On renesas-next-20130710 or earlier I can perform the following:
+>>
+>> # echo 0 > /sys/devices/system/cpu/cpu1/online
+>> CPU1: shutdown
+>> # echo 1 > /sys/devices/system/cpu/cpu1/online
+>> CPU1: Booted secondary processor
+>> #
+>>
+>> While on more recent kernels the hotplug boot fails. This may be
+>> related to the move to v3.11-rc. The tag renesas-next-20130710
+>> surprisingly seems to be the final kernel based on v3.10-rc before
+>> jumping to v3.11-rc.
+>>
+>> I wonder, do other ARM platforms have working CPU Hotplug in v3.11-rc?
+>
+> I have a snowball that I could test if you think it would be useful.
 
+That would be excellent, thanks!
 
------Original Message-----
-From: Tejun Heo [mailto:htejun at gmail.com] On Behalf Of Tejun Heo
-Sent: Thursday, July 25, 2013 12:31 AM
-To: Richard Zhu
-Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; rob.herring at calxeda.com; s.hauer at pengutronix.de; linux-ide at vger.kernel.org; Zhu Richard-R65037
-Subject: Re: [v8 3/3] ahci_imx: add ahci sata support on imx platforms
-
-On Wed, Jul 24, 2013 at 02:15:29PM +0800, Richard Zhu wrote:
-> From: Richard Zhu <r65037@freescale.com>
-> 
-> imx6q contains one Synopsys AHCI SATA controller, But it can't share 
-> ahci_platform driver with other controllers.
-> Because there are some misalignments of the generic AHCI controller.
-> The bits definitions of the HBA registers, the Vendor Specific 
-> registers, the AHCI PHY clock and the AHCI signals adjustment 
-> window(GPR13 register).
->  - CAP_SSS(bit20) of the HOST_CAP is writable, default  value is '0', 
-> should be configured to be '1'
->  - bit0 (only one AHCI SATA port on imx6q) of the  HOST_PORTS_IMPL 
-> should be set to be '1'.(default 0)
->  - One Vendor Specific register HOST_TIMER1MS(offset:0xe0)  should be 
-> configured regarding to the frequency of AHB  bus clock.
->  - Configurations of the AHCI PHY clock, and the signal  parameters of 
-> the GPR13
-> 
-> Setup its own ahci sata driver, contained the imx6q specific 
-> initialized codes, re-use the generic ahci_platform driver, and keep 
-> the generic ahci_platform driver clean as much as possible.
-> 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
-> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
-
-Applied 2-3 to libata/for-3.11-fixes with minor adjustments.
-
-Thanks.
-
---
-tejun
+/ magnus
