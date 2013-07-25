@@ -1,89 +1,41 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 11:34:38 +0100
-Subject: [PATCH 03/14] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-In-Reply-To: <20130725102541.GC24642@n2100.arm.linux.org.uk>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-4-git-send-email-ben.dooks@codethink.co.uk>
- <20130724143335.GL11072@mudshark.cambridge.arm.com>
- <51EFF1B2.4050609@codethink.co.uk>
- <20130725101442.GA5609@mudshark.cambridge.arm.com>
- <20130725102541.GC24642@n2100.arm.linux.org.uk>
-Message-ID: <51F0FF3E.3050206@codethink.co.uk>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Thu, 25 Jul 2013 10:07:52 +0100
+Subject: [PATCH v5 0/5] clk: implement remuxing during set_rate
+In-Reply-To: <20130724183912.GC27761@codeaurora.org>
+References: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>
+ <20130621170407.20448.35605@quantum>
+ <CAAG0J9-F0P67=oaE5UHhmgd3Wz4k4XjsRjWShxmKOqicAyrhfw@mail.gmail.com>
+ <20130724183912.GC27761@codeaurora.org>
+Message-ID: <51F0EAE8.90303@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/13 11:25, Russell King - ARM Linux wrote:
-> On Thu, Jul 25, 2013 at 11:14:42AM +0100, Will Deacon wrote:
->> What's wrong with the following?
->
-> Is this like a challenge to find the silly mistake?
->
->> @@ -581,8 +581,13 @@ __fixup_a_pv_table:
->>          b       2f
->>   1:     add     r7, r3
->>          ldrh    ip, [r7, #2]
->> +#ifdef CONFIG_CPU_ENDIAN_BE8
->> +       and     ip, 0x008f
->> +       orr     ip, ip, r6, lsl #24
->> +#else
->>          and     ip, 0x8f00
->>          orr     ip, r6  @ mask in offset bits 31-24
->> +#endif
->>          strh    ip, [r7, #2]
->
-> Well, ip is being loaded/stored as 16bit, but you're putting r6 in to
-> ip's bits 31-24, which are going to be ignored by the following strh.
->
-> The comment "@ mask in offset bits 31-24" refers to the physical address
-> bits here, which are already pre-shifted to bits 7-0 in r6.
+On 24/07/13 19:39, Stephen Boyd wrote:
+> On 06/21, James Hogan wrote:
+>> On 21 June 2013 18:04, Mike Turquette <mturquette@linaro.org> wrote:
+>>> Quoting James Hogan (2013-06-13 09:05:57)
+>>>> This patchset adds support for automatic selection of the best parent
+>>>> for a clock mux, i.e. the one which can provide the closest clock rate
+>>>> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
+>>>> flag (which is set for all uses of clk_register_mux().
+>>>>
+>>>> This works by way of adding a new op, determine_rate, similar to
+>>>> round_rate but with an extra parameter to allow the clock driver to
+>>>> optionally select a different parent clock. This is used in
+>>>> clk_calc_new_rates to decide whether to initiate a set_parent operation.
+>>>
+>>> Hi James,
+>>>
+>>> I'm going to hold off on this one for 3.11. I'll revisit it after the
+>>> next merge window.
+>>
+>> Okay, no worries.
+>>
+> 
+> Has a new patchset been sent out? I'd like to see this merge in
+> 3.12.
 
-I looked into this, and the code before this loop does:
+Not yet, but I'll try and get it updated and resent early next week.
 
-	clz	r7, r6
-	lsr	r6, #24
-	lsl	r6, r7
-	bic	r6, #0x0080
-	lsrs	r7, #1
-	orrcs	r6, #0x0080
-	orr	r6, r6, r7, lsl #12
-	orr	r6, #0x4000
-	b	2f
-
-Note that r6 has bits that are not in the 0..7 range, which makes life
-difficult when dealing with the loop. If we are going to change the
-loop then we will have to pre rev16 r6 before going in to it.
-
-IE:
-
-	lsls	r6, #24
-	beq	2f
-	clz	r7, r6
-	lsr	r6, #24
-	lsl	r6, r7
-	bic	r6, #0x0080
-	lsrs	r7, #1
-	orrcs	r6, #0x0080
-	orr	r6, r6, r7, lsl #12
-	orr	r6, #0x4000
-  ARM_BE8(rev16	r6, r6)
-	b	2f
-1:	add     r7, r3
-	ldrh	ip, [r7, #2]
-#ifdef CONFIG_CPU_ENDIAN_BE8
-	and	ip, 0x008f
-#else
-	and	ip, 0x8f00
-#endif
-	orr	ip, r6	@ mask in offset bits 31-24
-	strh	ip, [r7, #2]
-2:	cmp	r4, r5
-	ldrcc	r7, [r4], #4	@ use branch for delay slot
-	bcc	1b
-	bx	lr
-
-
-
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Cheers
+James
