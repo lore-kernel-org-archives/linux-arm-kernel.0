@@ -1,106 +1,25 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 25 Jul 2013 09:29:28 -0500
-Subject: [PATCH 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <201307251102.23446.heiko@sntech.de>
-References: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
- <1374723797-22169-2-git-send-email-dinguyen@altera.com>
- <201307251102.23446.heiko@sntech.de>
-Message-ID: <1374762568.3139.7.camel@linux-builds1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Jul 2013 15:38:15 +0100
+Subject: Do we have people interested in device tree janitoring / cleanup?
+In-Reply-To: <20130725142702.GE24642@n2100.arm.linux.org.uk>
+References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
+ <20130725110634.GB2546@localhost.localdomain>
+ <20130725112558.GD24642@n2100.arm.linux.org.uk>
+ <20130725135645.GA17304@glitch>
+ <20130725142702.GE24642@n2100.arm.linux.org.uk>
+Message-ID: <20130725143815.GA5812@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Thu, Jul 25, 2013 at 03:27:02PM +0100, Russell King - ARM Linux wrote:
+> Remember the stated assertion when DT was first added to the kernel: the
+> DT descriptions _will_ become a separately maintained project which is
+> independent of the kernel.  They will _not_ be kernel version specific.
 
-On Thu, 2013-07-25 at 11:02 +0200, Heiko St?bner wrote:
-> Am Donnerstag, 25. Juli 2013, 05:43:17 schrieb dinguyen at altera.com:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > The read_sched_clock should return the ~value because the clock is a
-> > countdown implementation. read_sched_clock() should be the same as
-> > __apbt_read_clocksource().
-> > 
-> > If a separate timer for the sched_clock exist, then read_sched_clock()
-> > will return an incorrect value. The (sched_io_base + 0x4) needs to be in
-> > the function for both cases.
-> > 
-> > Also, remove the use of "dw-apb-timer-sp" and "dw-apb-timer-osc" since
-> > they are the same DW clock.
-> > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > Acked-by: Jamie Iles <jamie@jamieiles.com>
-> > CC: Rob Herring <rob.herring@calxeda.com>
-> > CC: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > CC: Jamie Iles <jamie@jamieiles.com>
-> > Cc: John Stultz <john.stultz@linaro.org>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Pavel Machek <pavel@denx.de>
-> > Cc: Heiko Stuebner <heiko@sntech.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  drivers/clocksource/dw_apb_timer_of.c |    7 +++----
-> >  1 file changed, 3 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/dw_apb_timer_of.c
-> > b/drivers/clocksource/dw_apb_timer_of.c index 4cbae4f..8e00929 100644
-> > --- a/drivers/clocksource/dw_apb_timer_of.c
-> > +++ b/drivers/clocksource/dw_apb_timer_of.c
-> > @@ -102,18 +102,17 @@ static void add_clocksource(struct device_node
-> > *source_timer) * timer is found. sched_io_base then points to the
-> > current_value * register of the clocksource timer.
-> >  	 */
-> > -	sched_io_base = iobase + 0x04;
-> > +	sched_io_base = iobase;
-> >  	sched_rate = rate;
-> >  }
-> > 
-> >  static u32 read_sched_clock(void)
-> >  {
-> > -	return __raw_readl(sched_io_base);
-> > +	return ~__raw_readl(sched_io_base + 0x4);
-> >  }
-> > 
-> 
-> 
-> 
-> >  static const struct of_device_id sptimer_ids[] __initconst = {
-> >  	{ .compatible = "picochip,pc3x2-rtc" },
-> > -	{ .compatible = "snps,dw-apb-timer-sp" },
-> >  	{ /* Sentinel */ },
-> >  };
-> 
-> I'm not 100% sure, but maybe the same explaination as below applies to this - 
-> with it better being part of the first patch.
-> 
-> 
-> > @@ -153,4 +152,4 @@ static void __init dw_apb_timer_init(struct device_node
-> > *timer) num_called++;
-> >  }
-> >  CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer",
-> > dw_apb_timer_init); -CLOCKSOURCE_OF_DECLARE(apb_timer,
-> > "snps,dw-apb-timer-osc", dw_apb_timer_init);
-> > +CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer",
-> > dw_apb_timer_init);
-> 
-> I think this hunk would better be part of the first patch, as you rename the 
-> devices in the dtsi files there and it has nothing to do with the sched_clock 
-> fix.
-> 
-> Changing the clocksource name here also breaks bisectability on the affected 
-> platforms because they wouldn't be able to add the clocksources when only the 
-> first patch is applied.
+I'm looking forward to this.
 
-I agree with you, but I was under the impression that Arnd wanted to
-keep DTS changes in a separate commit.
+Question for the DT guys: what are the plans here? Are we going to get
+rid of the .dts files inside the kernel tree?
 
-Dinh
-> 
-> 
-> Heiko
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Catalin
