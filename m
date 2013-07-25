@@ -1,34 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 25 Jul 2013 10:29:57 +0100
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <201307242032.03597.arnd@arndb.de>
-References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
- <5977067.8rykRgjgre@flatron> <201307242032.03597.arnd@arndb.de>
-Message-ID: <20130725092957.GV9858@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Jul 2013 11:30:28 +0200
+Subject: [PATCH 1/5] gpio: pxa: remove dead code
+In-Reply-To: <51F0E92E.6060900@gmail.com>
+References: <1373555877-29887-1-git-send-email-zonque@gmail.com>
+ <1373555877-29887-2-git-send-email-zonque@gmail.com>
+ <CACRpkdaB7JnWzoLKpQ1eLWAi7yFz9CanhbhwtiCnEtcNWzX3RQ@mail.gmail.com>
+ <CAD6h2NS0p-kMUGyhbr93vd_oLSNyaB572riFB8mHt1cu5f-bGw@mail.gmail.com>
+ <51F0E92E.6060900@gmail.com>
+Message-ID: <CACRpkdZT51uwW6z-BzmU2tv9-fX=UQN2ywCQwb-SDVHovo4BxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 08:32:03PM +0200, Arnd Bergmann wrote:
+On Thu, Jul 25, 2013 at 11:00 AM, Daniel Mack <zonque@gmail.com> wrote:
 
-> Sorry for jumping in to the middle of the discussion, but why does a *new*
-> framework even bother defining an interface for board files?
+> And what about the others? I think the first 3 patches of this series
+> can go through Linus W, and the other 2 should end up in the pxa tree,
+> right?
 
-> Can't we just drop any interfaces for platform data passing in the phy
-> framework and put the burden of adding those to anyone who actually needs
-> them? All the platforms we are concerned with here (exynos and omap,
-> plus new platforms) can be booted using DT anyway.
+Yes. They might need to build on top of the pinctrl tree.
 
-There's a bunch of non-DT architectures that are in active use (blackfin
-for example) and I'd really hope that this is useful for some of them.
+Or, if there are no other things happening in the PXA tree for the
+next merge window, I can take it into my tree, with the ACKs of
+e.g. Eric and Olof Johansson.
 
-The pushback here was about the fact that the subsystem was doing odd
-things with selecting device names which is odd in itself, I don't know
-if that had bled over into the DT bindings but it sounded like it
-might've done so.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/51a7cbff/attachment.sig>
+Yours,
+Linus Walleij
