@@ -1,25 +1,33 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 24 Jul 2013 20:28:17 -0400
-Subject: [PATCH 0/2] i2c: davinci: Couple of patches to make i2c usable on
- Keystone SOCs
-Message-ID: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Wed, 24 Jul 2013 20:31:37 -0400
+Subject: [PATCH] spi: davinci: Update configs to make it selectable on Keystone
+Message-ID: <1374712297-32187-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone SOCs uses the same I2C IP as available on DaVinci SOCs. These
-couple of patches makes it possible to select the I2C_DAVINCI on
-Keystone SOCs.
+Keystone2 SOCs share the SPI IP block with DaVinci based SOCs. Update
+the config bits so that its usable on Keystone2 based SOCs.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Grant Likely <grant.likely@linaro.org>
 
-Santosh Shilimkar (2):
-  i2c: davinci: remove useless mach/hardware include
-  i2c: davinci: Allow i2c driver available for keystone platforms
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/spi/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/i2c/busses/Kconfig       |    2 +-
- drivers/i2c/busses/i2c-davinci.c |    1 -
- 2 files changed, 1 insertion(+), 2 deletions(-)
-
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 89cbbab..3858d66 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -151,7 +151,7 @@ config SPI_COLDFIRE_QSPI
+ 
+ config SPI_DAVINCI
+ 	tristate "Texas Instruments DaVinci/DA8x/OMAP-L/AM1x SoC SPI controller"
+-	depends on ARCH_DAVINCI
++	depends on ARCH_DAVINCI || ARCH_KEYSTONE
+ 	select SPI_BITBANG
+ 	select TI_EDMA
+ 	help
 -- 
 1.7.9.5
