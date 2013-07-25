@@ -1,30 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Jul 2013 15:24:08 +0200
-Subject: Issue with gpio and pinmux
-In-Reply-To: <51F12629.7090909@parrot.com>
-References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
- <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
- <51EB590A.4010600@wwwdotorg.org>
- <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
- <51F12629.7090909@parrot.com>
-Message-ID: <CACRpkdb-hVE1Jj69ttrn+zf5cEuMHhxNh2OyhfTtrG+yUiO+jg@mail.gmail.com>
+From: oleksandr.kozaruk@ti.com (Oleksandr Kozaruk)
+Date: Thu, 25 Jul 2013 16:26:51 +0300
+Subject: [PATCH v8 0/2] TWL6030, TWL6032 GPADC driver
+Message-ID: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 3:20 PM, Damien Riegel
-<damien.riegel.ext@parrot.com> wrote:
+Hello,
 
-> I don't know about pinctrl background but I don't really get why there
-> is such a distinction between gpio and other functions in most cases.
->
-> I understand that on some arch a pin can be muxed and used as a gpio at
-> the same time. But on most arch, isn't gpio just another function that
-> can be muxed on a pin, and therefore we should check that a pin can be
-> requested as a gpio just by checking desc->mux_owner ?
+v8 - removed unused test channels completely, removed die
+     temperature channels, as it is not known how to convert ADC code
+     to temperature. There if formula for twl6030, but no formula
+     for twl6032.
+v7 - addressed clean up comments, removed test channels
+v6 - addressed comments about trim bits, checkpatch clean up
+v5 - gpadc DT node renamed from "gpadc" to generic "adc", added
+     temperature channels; raw code is corracted with calibration
+     data.
+v4 - addressed comments: fixed style violation, bug in freeing memory,
+     added comments explaining calibration method, removed test network
+     channels from exposing to userspace, error handling for 
+     wait_for_complition
+v3 - fixed compiler warning
+v2 - the driver put in drivers/iio, and
+converted using iio facilities as suggested by Graeme.
 
-Does this recently submitted documentation patch help in explaining
-some of your questions?
-http://marc.info/?l=linux-kernel&m=137442899829271&w=2
+TWL603[02] GPADC is used to measure battery voltage,
+battery temperature, battery presence ID, and could
+be used to measure twl603[02] die temperature.
+This is used on TI blaze, blaze tablet platforms.
 
-Yours,
-Linus Walleij
+The TWL6030/TWL6032 is a PMIC that has a GPADC with 17/19
+channels respectively. Some channels have current
+source and are used for measuring voltage drop
+on resistive load for detecting battery ID resistance,
+or measuring voltage drop on NTC resistors for external
+temperature measurements, other channels measure voltage,
+(i.e. battery voltage), and have inbuilt voltage dividers,
+thus, capable to scale voltage. Some channels are dedicated
+for measuring die temperature.
+
+Some channels could be calibrated in 2 points, having
+offsets from ideal values in trim registers.
+
+The difference between GPADC in TWL6030 and TWL6032:
+- 10 bit vs 12 bit ADC;
+- 17 vs 19 channels;
+- channels have different purpose(i. e. battery voltage
+  channel 8 vs channel 18);
+- trim values are interpreted differently.
+
+The driver is derived from git://git.omapzoom.org/kernel/omap.git
+The original driver's authors and contributors are Balaji T K,
+Graeme Gregory, Ambresh K, Girish S Ghongdemath.
+
+The changes to the original driver:
+- device tree adaptation;
+- drop ioctl support - never been used;
+- unified measurement method for both devices;
+- get rid of "if (device == X)" code style to data driven;
+- drop polling end of conversion and use interrupt instead;
+- iio framework is used
+
+Tested with on blaze tablet 2 with OMAP4430(twl6030), and
+OMAP4470(twl6032) SOMs.
+
+The patches were tested against 3.11-rc2
+
+
+Oleksandr Kozaruk (2):
+  ARM: dts: twl: Add GPADC data to device tree
+  iio: twl6030-gpadc: TWL6030, TWL6032 GPADC driver
+
+ arch/arm/boot/dts/twl6030.dtsi  |    6 +
+ drivers/iio/adc/Kconfig         |   14 +
+ drivers/iio/adc/Makefile        |    1 +
+ drivers/iio/adc/twl6030-gpadc.c | 1027 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 1048 insertions(+)
+ create mode 100644 drivers/iio/adc/twl6030-gpadc.c
+
+-- 
+1.8.1.2
