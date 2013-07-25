@@ -1,153 +1,58 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 17:05:03 +0100
-Subject: [PATCH 1/2] ARM: Correct BUG() assembly to ensure it is
- endian-agnostic
-In-Reply-To: <20130725155700.GD2546@localhost.localdomain>
-References: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374763357-4893-2-git-send-email-ben.dooks@codethink.co.uk>
- <20130725155700.GD2546@localhost.localdomain>
-Message-ID: <51F14CAF.5010602@codethink.co.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 25 Jul 2013 12:06:51 -0400 (EDT)
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value
+ to index into save array
+In-Reply-To: <20130725105528.GA2546@localhost.localdomain>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130724164717.GA4610@localhost.localdomain>
+ <alpine.LFD.2.03.1307241437460.15022@syhkavp.arg>
+ <20130725105528.GA2546@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/13 16:57, Dave Martin wrote:
-> On Thu, Jul 25, 2013 at 03:42:36PM +0100, Ben Dooks wrote:
->> Currently BUG() uses .word or .hword to create the necessary illegal
->> instructions. However if we are building BE8 then these get swapped
->> by the linker into different illegal instructions in the text.
->
-> In the case of Thumb, the resulting instruction is actually not illegal,
-> which is even worse...
->
->> Change to using .inst and .inst.w to create the instructions and mark
->> them as instructions so that the linker acts correctly.
->>
->> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
->> ---
->>   arch/arm/include/asm/bug.h |    4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
->> index 7af5c6c..b95da52 100644
->> --- a/arch/arm/include/asm/bug.h
->> +++ b/arch/arm/include/asm/bug.h
->> @@ -12,10 +12,10 @@
->>    */
->>   #ifdef CONFIG_THUMB2_KERNEL
->>   #define BUG_INSTR_VALUE 0xde02
->> -#define BUG_INSTR_TYPE ".hword "
->> +#define BUG_INSTR_TYPE ".inst.w "
->>   #else
->>   #define BUG_INSTR_VALUE 0xe7f001f2
->> -#define BUG_INSTR_TYPE ".word "
->> +#define BUG_INSTR_TYPE ".inst "
->>   #endif
->
-> There was some uncertainty a while ago about precisely which versions of
-> gas support .inst.
->
-> <asm/opcodes.h>  implements an abstracted workaround for this issue,
-> whereby you can emit instructions using the __inst*() macros, and
-> the swabbing and assembler directives should be generated for you.
->
-> The patch below ought to do this for BUG(), but I've only briefly
-> build-tested it.
->
->
-> Note that the disassembly of the injected instructions in .o files
-> can be a bit confusing, because they are marked as data, do ld --be8
-> doesn't swab them (unlike the instructions, which do get swabbed).
-> objdump may also do extra swabbing during disassembly.
->
-> You can sanity-check what is really in the image by dumping the text
-> section of vmlinux with objdump -s.
->
->
-> The change to<asm/opcodes.h>  is due to a missing include which is
-> really required for correctness, but which didn't show up without
-> the<asm/bug.h>  change (this causes opcodes.h to get included way
-> more often than is otherwise the case).
->
-> Cheers
-> ---Dave
+On Thu, 25 Jul 2013, Dave Martin wrote:
 
-Given it was added ~2006 according the mailing lists I have seen, then
-it should be ok to use for building modern kernels with. I think the
-use of .inst and .inst.w is a better solution than having the code
-having bits of it marked as data.
+> On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
+> > On Wed, 24 Jul 2013, Dave Martin wrote:
+> > 
+> > > But this patch commits us to requiring that on the suspend path 
+> > > specifically -- I think that ought to be mentioned somewhere. A 
+> > > comment in the preamble for __cpu_suspend would be enough, I think.
+> > 
+> > What comment would you suggest?  I want to make sure the possible 
+> > confusion you see is properly addressed.
+> 
+> I think we just need to state that the value of
+> cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
+> CPU the suspending logical CPU will resume on.  Consequently, if doing a
+> migration, cpu_logical_map() must be updated appropriately somewhere
+> between cpu_pm_enter() and cpu_suspend().
 
->
-> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-> index 7af5c6c..e36fe85 100644
-> --- a/arch/arm/include/asm/bug.h
-> +++ b/arch/arm/include/asm/bug.h
-> @@ -2,6 +2,7 @@
->   #define _ASMARM_BUG_H
->
->   #include<linux/linkage.h>
-> +#include<asm/opcodes.h>
->
->   #ifdef CONFIG_BUG
->
-> @@ -12,15 +13,15 @@
->    */
->   #ifdef CONFIG_THUMB2_KERNEL
->   #define BUG_INSTR_VALUE 0xde02
-> -#define BUG_INSTR_TYPE ".hword "
-> +#define __BUG_INSTR __inst_thumb16(BUG_INSTR_VALUE)
->   #else
->   #define BUG_INSTR_VALUE 0xe7f001f2
-> -#define BUG_INSTR_TYPE ".word "
-> +#define __BUG_INSTR __inst_arm(BUG_INSTR_VALUE)
->   #endif
->
->
-> -#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
-> -#define _BUG(file, line, value) __BUG(file, line, value)
-> +#define BUG() _BUG(__FILE__, __LINE__)
-> +#define _BUG(file, line) __BUG(file, line)
->
->   #ifdef CONFIG_DEBUG_BUGVERBOSE
->
-> @@ -31,9 +32,9 @@
->    * avoid multiple copies of the string appearing in the kernel image.
->    */
->
-> -#define __BUG(__file, __line, __value)				\
-> +#define __BUG(__file, __line)					\
->   do {								\
-> -	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
-> +	asm volatile("1:\t" __BUG_INSTR "\n"			\
->   		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
->   		"2:\t.asciz " #__file "\n" 			\
->   		".popsection\n" 				\
-> @@ -46,9 +47,9 @@ do {								\
->
->   #else  /* not CONFIG_DEBUG_BUGVERBOSE */
->
-> -#define __BUG(__file, __line, __value)				\
-> +#define __BUG(__file, __line)					\
->   do {								\
-> -	asm volatile(BUG_INSTR_TYPE #__value);			\
-> +	asm volatile(__BUG_INSTR)				\
->   	unreachable();						\
->   } while (0)
->   #endif  /* CONFIG_DEBUG_BUGVERBOSE */
-> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-> index e796c59..e94ebfd 100644
-> --- a/arch/arm/include/asm/opcodes.h
-> +++ b/arch/arm/include/asm/opcodes.h
-> @@ -11,6 +11,8 @@
->
->   #ifndef __ASSEMBLY__
->   #include<linux/linkage.h>
-> +#include<linux/types.h>
-> +
->   extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->   #endif
->
+Excellent.  I've amended the patch with this:
+
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index 2835d35234..caf938db62 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
+ /*
+  * Hide the first two arguments to __cpu_suspend - these are an implementation
+  * detail which platform code shouldn't have to know about.
++ *
++ * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
++ * the MPIDR of the physical CPU the suspending logical CPU will resume on.
++ * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
++ * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
+  */
+ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ {
+
+I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
+is what users should care about.
+
+ACK?
 
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Nicolas
