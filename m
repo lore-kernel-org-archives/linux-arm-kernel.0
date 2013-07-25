@@ -1,38 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Jul 2013 11:20:54 +0200
-Subject: How to create IRQ mappings in a GPIO driver that doesn't control
- its IRQ domain ?
-In-Reply-To: <1624911.6TtmtVmU1T@avalon>
-References: <1624911.6TtmtVmU1T@avalon>
-Message-ID: <CACRpkdazPX3EbVbLvXQZh0oRBpHoWPK+EkFO75v9zfAXSPCkHA@mail.gmail.com>
+Date: Thu, 25 Jul 2013 11:27:41 +0200
+Subject: Mainline kernel on snowball
+In-Reply-To: <20130725052317.GA25854@verge.net.au>
+References: <20130725052317.GA25854@verge.net.au>
+Message-ID: <CACRpkdagoo965=8QMR-TwiD3GEwE4FjgdJv2ET1E4R0OWq+efw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 1:21 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
+On Thu, Jul 25, 2013 at 7:23 AM, Simon Horman <horms@verge.net.au> wrote:
 
-> Has anyone run into a similar issue ? My gut feeling is that the architecture
-> isn't right somewhere, but I can't really pinpoint where.
+> I would like to boot the mainline kernel - ideally v3.10 and v3.11-rcX -
+> on snowball. The reason being to verify CPU hotplug which
+> seems to be broken on shmobile, though that is tangential to this post.
 
-We had a similar situation with the MFDs, where Mark, Lee and Sam
-came up with the solution to include an irqdomain in the MFD cell
-spawn function:
+I usually compile my kernel with this makefile:
+http://www.df.lth.se/~triad/krad/makefiles/u8500.mak
 
-extern int mfd_add_devices(struct device *parent, int id,
-                           struct mfd_cell *cells, int n_devs,
-                           struct resource *mem_base,
-                           int irq_base, struct irq_domain *irq_domain);
+It appends an initramfs and it appends a DTB (if you compile it
+with config-dt and build-dt) and need nothing from any FS or
+similar.
 
-When each cell (i.e. a platform device) is created, the irq for that
-cell will be translated with irq_create_mapping() so the cell/platform
-device just get a Linux IRQ it can use and do not need to worry
-about translating it.
-
-Prior to this we had all sorts of exported translator functions
-for the IRQs exported from each hub driver ---what a mess.
-
-Can you think about a parent/child relationship making it possible
-to pass the irqs readily translated in this case?
+But the way it looks up compilers and initramfs etc is a bit
+custom I gues ... you have a copy of my initramfs here:
+http://www.df.lth.se/~triad/krad/ux00/rootfs-u8500.cpio
 
 Yours,
 Linus Walleij
