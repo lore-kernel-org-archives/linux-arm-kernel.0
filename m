@@ -1,90 +1,41 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 11:21:21 +0100
-Subject: [PATCH 03/14] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-In-Reply-To: <20130725101442.GA5609@mudshark.cambridge.arm.com>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374661682-9349-4-git-send-email-ben.dooks@codethink.co.uk>
- <20130724143335.GL11072@mudshark.cambridge.arm.com>
- <51EFF1B2.4050609@codethink.co.uk>
- <20130725101442.GA5609@mudshark.cambridge.arm.com>
-Message-ID: <51F0FC21.8050108@codethink.co.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 25 Jul 2013 11:24:53 +0100
+Subject: [PATCH 3/6] ASoC: usp-pcm: add CPU DAI driver for PCM simulated
+ from USP
+In-Reply-To: <CAGsJ_4xNdxFWyN6NUEL36W9n+4Cj=01+QGi+xaeODm9u8pdP9A@mail.gmail.com>
+References: <1374232042-26088-1-git-send-email-Baohua.Song@csr.com>
+ <1374232042-26088-4-git-send-email-Baohua.Song@csr.com>
+ <20130719181313.GT9858@sirena.org.uk>
+ <CAGsJ_4xNdxFWyN6NUEL36W9n+4Cj=01+QGi+xaeODm9u8pdP9A@mail.gmail.com>
+Message-ID: <20130725102453.GZ9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/13 11:14, Will Deacon wrote:
-> On Wed, Jul 24, 2013 at 04:24:34PM +0100, Ben Dooks wrote:
->> On 24/07/13 15:33, Will Deacon wrote:
->>> On Wed, Jul 24, 2013 at 11:27:51AM +0100, Ben Dooks wrote:
->>>> The fixup_pv_table assumes that the instructions are in the same
->>>> endian configuration as the data, but when the CPU is running in
->>>> BE8 the instructions stay in little-endian format.
->>>>
->>>> Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
->>>> alterations to the instructions taking in to account the LDR/STR
->>>> will be swapping the data endian-ness.
->>>>
->>>> Since the code is only modifying a byte, we avoid dual-swapping
->>>> the data, and just change the bits we clear and ORR in (in the
->>>> case where the code is not thumb2).
->>>>
->>>> For thumb2, we add the necessary rev16 instructions to ensure that
->>>> the instructions are processed in the correct format, as it was
->>>> easier than re-writing the code to contain a mask and shift.
->>>>
->>>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
->>>> ---
->>>>    arch/arm/kernel/head.S |    8 ++++++++
->>>>    1 file changed, 8 insertions(+)
->>>>
->>>> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
->>>> index 8bac553..e40c0b3b 100644
->>>> --- a/arch/arm/kernel/head.S
->>>> +++ b/arch/arm/kernel/head.S
->>>> @@ -584,8 +584,10 @@ __fixup_a_pv_table:
->>>>    	b	2f
->>>>    1:	add     r7, r3
->>>>    	ldrh	ip, [r7, #2]
->>>> +ARM_BE8(rev16	ip, ip)
->>>>    	and	ip, 0x8f00
->>>>    	orr	ip, r6	@ mask in offset bits 31-24
->>>> +ARM_BE8(rev16	ip, ip)
->>>
->>> I'm not sure I follow you when you say this is easier than a mask and a
->>> shift? As far as I can tell, it's two extra instructions and makes the LE
->>> and BE cases look different.
->>
->> I am not as familiar with THUMB2 as the ARM, so it was easier
->> to do this than see if there where any spare registers to hold the
->> mask and shift values, and use them.
->
-> What's wrong with the following?
->
-> Will
->
-> --->8
->
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 9cf6063..ee660c2 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -581,8 +581,13 @@ __fixup_a_pv_table:
->          b       2f
->   1:     add     r7, r3
->          ldrh    ip, [r7, #2]
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +       and     ip, 0x008f
-> +       orr     ip, ip, r6, lsl #24
-> +#else
->          and     ip, 0x8f00
->          orr     ip, r6  @ mask in offset bits 31-24
-> +#endif
->          strh    ip, [r7, #2]
->   2:     cmp     r4, r5
->          ldrcc   r7, [r4], #4    @ use branch for delay slot
+On Thu, Jul 25, 2013 at 05:32:12PM +0800, Barry Song wrote:
+> 2013/7/20 Mark Brown <broonie@kernel.org>:
 
-If the offset bits are 8bits, then that would
-be fine (apart from the lsl #8).
+> > Also what exactly is the rate being set - can the driver just figure
+> > this out automatically from the sample rate?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> here it is generating the right pcm clock by an internal DIVISOR in USP module.
+
+> For USP_MODE2:
+> 30:21 (R/W) USP_CLK_DIVISOR 10?h0 USP serial clock divider
+
+> For USP_TX_FRAME_CTRL:
+> 31:30 (R/W) USP_CLK_DIVISOR 2?h0 This is the two bit [11:10] of
+> USP_CLK_DIVISOR in USP_MODE2
+
+> for figuring this out automatically from the sample rate, do you mean
+> a lookup table for common sample rate?
+
+That or just calculating it - if you know the input rate and know the
+output rate you need then for a simple divisor it should be possible to
+calculate the required value.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130725/9d324ca6/attachment.sig>
