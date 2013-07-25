@@ -1,107 +1,92 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 25 Jul 2013 22:08:54 +0100
-Subject: [PATCH 1/4] ARM: kprobes: fix instruction fetch order with
- <asm/opcodes.h>
+Date: Thu, 25 Jul 2013 22:08:57 +0100
+Subject: [PATCH 4/4] ARM: kprobes-test: move to using a pointer to the title
+ text
 In-Reply-To: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1374786537-10726-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374786537-10726-5-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are running BE8, the data and instruction endian-ness do not
-match, so use <asm/opcodes.h> to correctly translate memory accesses
-into ARM instructions.
+When testing the kprobes test code with BE8, there is either an
+issue with the linker or how the code is being built. The issue
+is with embedding the title text as the first part of the test.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>y
+Change to placing a pointer to .rodata with the text title in it
+for the test which seems to stop the issue of the alignment of
+the data following it being changed arbitrarily by the linker.
+
+The proper thing to do here is to fix the linker, however this
+patch also makes the output much easier to read as there are no
+variable length data items here any more.
+
+CC: Jon Medhurst <tixy@yxit.co.uk>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/kprobes-common.c |   14 ++++++++------
- arch/arm/kernel/kprobes.c        |    9 +++++----
- 2 files changed, 13 insertions(+), 10 deletions(-)
+ arch/arm/kernel/kprobes-test.c |   12 +++++-------
+ arch/arm/kernel/kprobes-test.h |    6 ++++--
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
-index 18a7628..c0b202e 100644
---- a/arch/arm/kernel/kprobes-common.c
-+++ b/arch/arm/kernel/kprobes-common.c
-@@ -14,6 +14,7 @@
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
- #include <asm/system_info.h>
-+#include <asm/opcodes.h>
- 
- #include "kprobes.h"
- 
-@@ -305,7 +306,8 @@ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 
- 	if (handler) {
- 		/* We can emulate the instruction in (possibly) modified form */
--		asi->insn[0] = (insn & 0xfff00000) | (rn << 16) | reglist;
-+		asi->insn[0] = __opcode_to_mem_arm((insn & 0xfff00000) |
-+						   (rn << 16) | reglist);
- 		asi->insn_handler = handler;
- 		return INSN_GOOD;
- 	}
-@@ -338,9 +340,9 @@ prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
- 		thumb_insn[2] = 0x4770; /* Thumb bx lr */
- 		return insn;
- 	}
--	asi->insn[1] = 0xe12fff1e; /* ARM bx lr */
-+	asi->insn[1] = __opcode_to_mem_arm(0xe12fff1e); /* ARM bx lr */
- #else
--	asi->insn[1] = 0xe1a0f00e; /* mov pc, lr */
-+	asi->insn[1] = __opcode_to_mem_arm(0xe1a0f00e); /* mov pc, lr */
- #endif
- 	/* Make an ARM instruction unconditional */
- 	if (insn < 0xe0000000)
-@@ -360,12 +362,12 @@ set_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
- 	if (thumb) {
- 		u16 *ip = (u16 *)asi->insn;
- 		if (is_wide_instruction(insn))
--			*ip++ = insn >> 16;
--		*ip++ = insn;
-+			*ip++ = ___asm_opcode_to_mem_thumb16(insn >> 16);
-+		*ip++ = ___asm_opcode_to_mem_thumb16(insn);
- 		return;
- 	}
- #endif
--	asi->insn[0] = insn;
-+	asi->insn[0] = __opcode_to_mem_arm(insn);
+diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+index 6cfa04d..a915ac3 100644
+--- a/arch/arm/kernel/kprobes-test.c
++++ b/arch/arm/kernel/kprobes-test.c
+@@ -111,9 +111,7 @@
+  *	@ TESTCASE_START
+  *	bl	__kprobes_test_case_start
+  *	@ start of inline data...
+- *	.ascii "mov r0, r7"	@ text title for test case
+- *	.byte	0
+- *	.align	2
++ *	.word	title_addr	 @ text title for test case
+  *
+  *	@ TEST_ARG_REG
+  *	.byte	ARG_TYPE_REG
+@@ -959,7 +957,7 @@ void __naked __kprobes_test_case_start(void)
+ 	__asm__ __volatile__ (
+ 		"stmdb	sp!, {r4-r11}				\n\t"
+ 		"sub	sp, sp, #"__stringify(TEST_MEMORY_SIZE)"\n\t"
+-		"bic	r0, lr, #1  @ r0 = inline title string	\n\t"
++		"bic	r0, lr, #3  @ r0 = inline title block	\n\t"
+ 		"mov	r1, sp					\n\t"
+ 		"bl	kprobes_test_case_start			\n\t"
+ 		"bx	r0					\n\t"
+@@ -1336,15 +1334,15 @@ static unsigned long next_instruction(unsigned long pc)
+ 	return pc + 4;
  }
  
- /*
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 170e9f3..3775af1 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -26,6 +26,7 @@
- #include <linux/stop_machine.h>
- #include <linux/stringify.h>
- #include <asm/traps.h>
-+#include <asm/opcodes.h>
- #include <asm/cacheflush.h>
+-static uintptr_t __used kprobes_test_case_start(const char *title, void *stack)
++static uintptr_t __used kprobes_test_case_start(const char **title, void *stack)
+ {
+ 	struct test_arg *args;
+ 	struct test_arg_end *end_arg;
+ 	unsigned long test_code;
  
- #include "kprobes.h"
-@@ -62,10 +63,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- #ifdef CONFIG_THUMB2_KERNEL
- 	thumb = true;
- 	addr &= ~1; /* Bit 0 would normally be set to indicate Thumb code */
--	insn = ((u16 *)addr)[0];
-+	insn = __mem_to_opcode_thumb16(((u16 *)addr)[0]);
- 	if (is_wide_instruction(insn)) {
--		insn <<= 16;
--		insn |= ((u16 *)addr)[1];
-+		u16 inst2 = __mem_to_opcode_thumb16(((u16 *)addr)[1]);
-+		insn = ___asm_opcode_thumb32_compose(insn, inst2);
- 		decode_insn = thumb32_kprobe_decode_insn;
- 	} else
- 		decode_insn = thumb16_kprobe_decode_insn;
-@@ -73,7 +74,7 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	thumb = false;
- 	if (addr & 0x3)
- 		return -EINVAL;
--	insn = *p->addr;
-+	insn = __mem_to_opcode_arm(*p->addr);
- 	decode_insn = arm_kprobe_decode_insn;
- #endif
+-	args = (struct test_arg *)PTR_ALIGN(title + strlen(title) + 1, 4);
++	args = (struct test_arg *)(title + 1);
  
+-	current_title = title;
++	current_title = *title;
+ 	current_args = args;
+ 	current_stack = stack;
+ 
+diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/kernel/kprobes-test.h
+index e28a869..a71db09 100644
+--- a/arch/arm/kernel/kprobes-test.h
++++ b/arch/arm/kernel/kprobes-test.h
+@@ -113,9 +113,11 @@ struct test_arg_end {
+ 	"bl	__kprobes_test_case_start		\n\t"	\
+ 	/* don't use .asciz here as 'title' may be */		\
+ 	/* multiple strings to be concatenated.  */		\
+-	".ascii "#title"				\n\t"	\
++	".pushsection .rodata				\n\t"	\
++	"9999: .ascii "#title"				\n\t"	\
+ 	".byte	0					\n\t"	\
+-	".align	2					\n\t"
++	".popsection					\n\t"	\
++	".word	9999b					\n\t"
+ 
+ #define	TEST_ARG_REG(reg, val)					\
+ 	".byte	"__stringify(ARG_TYPE_REG)"		\n\t"	\
 -- 
 1.7.10.4
