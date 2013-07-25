@@ -1,50 +1,64 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 13:33:57 -0400
-Subject: [GIT PULL] ARM: mvebu: stable fix for v3.10
-Message-ID: <20130725173357.GN23879@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Jul 2013 10:37:48 -0700
+Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
+ prior to strex
+In-Reply-To: <51F160EA.6030800@codeaurora.org>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-5-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
+ <20130724111841.GD11072@mudshark.cambridge.arm.com>
+ <51F160EA.6030800@codeaurora.org>
+Message-ID: <51F1626C.3050008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 07/25/13 10:31, Stephen Boyd wrote:
+> On 07/24/13 04:18, Will Deacon wrote:
+>> On Tue, Jul 23, 2013 at 09:10:33PM +0100, Nicolas Pitre wrote:
+>>> On Tue, 23 Jul 2013, Will Deacon wrote:
+>>>
+>>>> The cost of changing a cacheline from shared to exclusive state can be
+>>>> significant, especially when this is triggered by an exclusive store,
+>>>> since it may result in having to retry the transaction.
+>>>>
+>>>> This patch prefixes our {spin,read,write}_[try]lock implementations with
+>>>> pldw instructions (on CPUs which support them) to try and grab the line
+>>>> in exclusive state from the start.
+>>>>
+>>>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>>> ---
+>>>>  arch/arm/include/asm/spinlock.h | 9 ++++++++-
+>>>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+>>>> index 0de7bec..3e1cc9d 100644
+>>>> --- a/arch/arm/include/asm/spinlock.h
+>>>> +++ b/arch/arm/include/asm/spinlock.h
+>>>> @@ -5,7 +5,7 @@
+>>>>  #error SMP not supported on pre-ARMv6 CPUs
+>>>>  #endif
+>>>>  
+>>>> -#include <asm/processor.h>
+>>>> +#include <linux/prefetch.h>
+>>>>  
+>>>>  /*
+>>>>   * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
+>>>> @@ -70,6 +70,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+>>>>  	u32 newval;
+>>>>  	arch_spinlock_t lockval;
+>>>>  
+>>>> +	prefetchw((const void *)&lock->slock);
+>>> Couldn't that cast be carried in the definition of prefetchw() instead?
+>> I think that would mean implementing prefetchw as a macro rather than an
+>> inline function, since the core code expects to pass a const pointer and GCC
+>> gets angry if the type signatures don't match.
+> Maybe I'm wrong, but can't you just remove the casts and leave the
+> function as static inline? const void * is pretty much telling the
+> compiler to turn off type checking.
+>
 
-I'm trying something new.  I've based this branch off of the common
-ancestor to the v3.10.x tree (v3.10).  If you could handle it just like
-a normal mvebu/fixes branch (ie merge it in for v3.11-rcX), once it hits
-mainline, I'll send a PR to the stable folks for the branch.
+Oh joy. Why is rwlock's lock member marked volatile?
 
-The advantage of this is that you get the same commit id in both trees
-and it's less work for the stable maintainers.
-
-Also, please note the URL change.  I'll post an announcement about that
-shortly.
-
-As usual, please tell me if I'm all fouled up. :)
-
-thx,
-
-Jason.
-
-
-The following changes since commit 8bb495e3f02401ee6f76d1b1d77f3ac9f079e376:
-
-  Linux 3.10 (2013-06-30 15:13:29 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/stable-3.10
-
-for you to fetch changes up to 449a7d428f46f8bfab68cd15afe7e2eca4c71edb:
-
-  ARM: orion5x: add missing mbus include (2013-07-25 17:01:24 +0000)
-
-----------------------------------------------------------------
-mvebu stable changes for v3.10
-
- - fix build failure for orion5x_defconfig
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (1):
-      ARM: orion5x: add missing mbus include
-
- arch/arm/mach-orion5x/edmini_v2-setup.c | 1 +
- 1 file changed, 1 insertion(+)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
