@@ -1,92 +1,150 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 25 Jul 2013 07:40:36 +0200
-Subject: Mainline kernel on snowball
-In-Reply-To: <20130725052317.GA25854@verge.net.au>
-References: <20130725052317.GA25854@verge.net.au>
-Message-ID: <20130725054036.GD31954@1wt.eu>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 25 Jul 2013 07:55:23 +0200
+Subject: [PATCH v12 00/13] Add tested id switch and vbus connect detect
+ support for Chipidea
+In-Reply-To: <20130722015305.GB25817@nchen-desktop>
+References: <1373524041-10482-1-git-send-email-peter.chen@freescale.com>
+ <201307220340.32263.marex@denx.de> <20130722015305.GB25817@nchen-desktop>
+Message-ID: <201307250755.23403.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Peter,
 
-On Thu, Jul 25, 2013 at 02:23:17PM +0900, Simon Horman wrote:
-> Hi,
+> On Mon, Jul 22, 2013 at 03:40:32AM +0200, Marek Vasut wrote:
+> > Dear Peter Chen,
+> > 
+> > > On Mon, Jul 22, 2013 at 03:15:28AM +0200, Marek Vasut wrote:
+> > > > Hi Peter,
+> > > > 
+> > > > > On Fri, Jul 12, 2013 at 03:18:31PM +0200, Marek Vasut wrote:
+> > > > > > Hi Peter,
+> > > > > > 
+> > > > > > > On Fri, Jul 12, 2013 at 06:04:43AM +0200, Marek Vasut wrote:
+> > > > > > > > Hi Peter,
+> > > > > > > > 
+> > > > > > > > > On Thu, Jul 11, 2013 at 07:57:19PM +0200, Marek Vasut wrote:
+> > > > > > > > > > Hi Peter,
+> > > > > > > > > > 
+> > > > > > > > > > > This patchset adds tested otg id switch function and
+> > > > > > > > > > > vbus connect and disconnect detection for chipidea
+> > > > > > > > > > > driver. And fix kinds of bugs found at chipidea
+> > > > > > > > > > > drivers after enabling id and vbus detection.
+> > > > > > > > > > > 
+> > > > > > > > > > > This patch is fully tested at imx6 sabresd platform.
+> > > > > > > > > > > My chipidea repo:
+> > > > > > > > > > > https://github.com/hzpeterchen/linux-usb.git
+> > > > > > > > > > > 
+> > > > > > > > > > > Changes for v12:
+> > > > > > > > > > > - Rebased greg's usb-next tree (3.10.0-rc7+)
+> > > > > > > > > > > - Split more small patches for single function and fix.
+> > > > > > > > > > 
+> > > > > > > > > > I tested the patchset. Here are the results:
+> > > > > > > > > > 
+> > > > > > > > > > - VBUS switching
+> > > > > > > > > > 
+> > > > > > > > > > I'm no longer getting any ID interrupts at all when I
+> > > > > > > > > > apply the patch below. The board stays in HOST mode all
+> > > > > > > > > > the time. If I configure it as peripheral, it works as
+> > > > > > > > > > peripheral. Note with [1], I was able to switch from
+> > > > > > > > > > Peripheral->Host , not the other way around.
+> > > > > > > > > 
+> > > > > > > > > Thanks for your testing. But first, can you have me check
+> > > > > > > > > if your ID wakeup is enabled?
+> > > > > > > > 
+> > > > > > > > ID wakeup? How do I check?
+> > > > > > > 
+> > > > > > > See otgsc at controller register, the ID wakeup enable is bit
+> > > > > > > 24.
+> > > > > > 
+> > > > > > Yes, ID interrupt (IDIE) is set.
+> > > > > > 
+> > > > > > I noticed this backtrace in the kernel bootlog, but this only
+> > > > > > happens if the dr_mode="otg" , it comes from the host-mode irq
+> > > > > > handler :
+> > > > > > 
+> > > > > > [    2.757563] irq 238: nobody cared (try booting with the
+> > > > > > "irqpoll" option) [    2.764398] CPU: 0 PID: 1 Comm: swapper Not
+> > > > > > tainted 3.10.0- next-20130711-00013-g011c4b3-dirty #703
+> > > > > > [    2.773445] [<80013878>] (unwind_backtrace+0x0/0xe8) from
+> > > > > > [<80011644>] (show_stack+0x10/0x14)
+> > > > > > [    2.782027] [<80011644>] (show_stack+0x10/0x14) from
+> > > > > > [<800659f4>] (__report_bad_irq.isra.6+0x20/0xe0)
+> > > > > > [    2.791286] [<800659f4>] (__report_bad_irq.isra.6+0x20/0xe0)
+> > > > > > from [<80065c98>] (note_interrupt+0x16c/0x230)
+> > > > > > [    2.801063] [<80065c98>] (note_interrupt+0x16c/0x230) from
+> > > > > > [<80064000>] (handle_irq_event_percpu+0x10c/0x1a4)
+> > > > > > [    2.811010] [<80064000>] (handle_irq_event_percpu+0x10c/0x1a4)
+> > > > > > from [<800640e8>] (handle_irq_event+0x50/0x78)
+> > > > > > [    2.820958] [<800640e8>] (handle_irq_event+0x50/0x78) from
+> > > > > > [<8006652c>] (handle_level_irq+0x88/0x10c)
+> > > > > > [    2.830210] [<8006652c>] (handle_level_irq+0x88/0x10c) from
+> > > > > > [<800638d0>] (generic_handle_irq+0x28/0x3c)
+> > > > > > [    2.839637] [<800638d0>] (generic_handle_irq+0x28/0x3c) from
+> > > > > > [<8000f84c>] (handle_IRQ+0x30/0x84)
+> > > > > > [    2.848461] [<8000f84c>] (handle_IRQ+0x30/0x84) from
+> > > > > > [<80012160>] (__irq_svc+0x40/0x6c)
+> > > > > > [    2.856510] [<80012160>] (__irq_svc+0x40/0x6c) from
+> > > > > > [<80022a44>] (__do_softirq+0x90/0x1d8)
+> > > > > > [    2.864812] [<80022a44>] (__do_softirq+0x90/0x1d8) from
+> > > > > > [<80022edc>] (irq_exit+0x98/0xd4)
+> > > > > > [    2.873025] [<80022edc>] (irq_exit+0x98/0xd4) from
+> > > > > > [<8000f850>] (handle_IRQ+0x34/0x84)
+> > > > > > [    2.880980] [<8000f850>] (handle_IRQ+0x34/0x84) from
+> > > > > > [<80012160>] (__irq_svc+0x40/0x6c)
+> > > > > > [    2.889020] [<80012160>] (__irq_svc+0x40/0x6c) from
+> > > > > > [<8001d724>] (vprintk_emit+0x1bc/0x524)
+> > > > > > [    2.897411] [<8001d724>] (vprintk_emit+0x1bc/0x524) from
+> > > > > > [<804da5a4>] (printk+0x30/0x40)
+> > > > > > [    2.905551] [<804da5a4>] (printk+0x30/0x40) from [<80630138>]
+> > > > > > (mousedev_init+0x4c/0x60)
+> > > > > > [    2.913617] [<80630138>] (mousedev_init+0x4c/0x60) from
+> > > > > > [<806178fc>] (do_one_initcall+0x94/0x14c)
+> > > > > > [    2.922537] [<806178fc>] (do_one_initcall+0x94/0x14c) from
+> > > > > > [<80617b20>] (kernel_init_freeable+0x16c/0x22c)
+> > > > > > [    2.932230] [<80617b20>] (kernel_init_freeable+0x16c/0x22c)
+> > > > > > from [<804d8cbc>] (kernel_init+0x8/0x150)
+> > > > > > [    2.941486] [<804d8cbc>] (kernel_init+0x8/0x150) from
+> > > > > > [<8000ea70>] (ret_from_fork+0x14/0x24)
+> > > > > > [    2.949932] handlers:
+> > > > > > [    2.952227] [<8033fc58>] ci_irq
+> > > > > > [    2.955388] Disabling IRQ #238
+> > > > > 
+> > > > > Marek, I have a test at imx28evk (Freescale imx28evk) for this
+> > > > > patchset, it works well for dual-role switch after adding below dts
+> > > > > change. There is a kernel dump when works at udc mode(due to enable
+> > > > > CONFIG_LOCKUP_DETECTOR), at the first connect, but it does not
+> > > > > affect function, it should be a common chipidea problem, I will
+> > > > > check later.
+> > > > 
+> > > > Sorry for the long delay. I finally got further with this, at least
+> > > > now I can switch Periph->Host again, but if I do so the other way
+> > > > around (unplug host adapter and plug computer cable) and dump the
+> > > > controller registers, I still see the controller in "host"
+> > > > (according to USBMODE register) mode. The controller stays in HOST
+> > > > mode even if I force it to gadget mode by writing "gadget" into
+> > > > debugfs "role" entry. I will keep poking.
+> > > > 
+> > > > In the meantime, I guess if it works on the EVK, it might be a
+> > > > hardware error so I better stop stalling you. I'll drop you an email
+> > > > if I find what this problem is.
+> > > 
+> > > No, the problem is you did not config the USB OTG ID pin.
+> > > Do the same thing I have done at imx28evk, you probably will work
+> > > if the ID pin is the same at your board.
+> > 
+> > That one I have configured, exactly the same way you did (except that
+> > mine is MX28_PAD_PWM2__USB0_ID).
+> > 
+> > If it was the OTG ID pin issue, would the manual switching not work ?
 > 
-> I apologise for the na?ve nature of this question,
-> but I do not seem to be able to make any progress of my own accord.
+> I can't see at your imx28-m28evk.dts, besides, make sure this pin can be
+> configed as USB OTG ID pin, and fsl,pull-up = <1>. Since you are still
+> at host mode, I suspect it is the ID problem.
+> You can check if there is ID INT when unplug out B-to-A cable.
 > 
-> I would like to boot the mainline kernel - ideally v3.10 and v3.11-rcX -
-> on snowball. The reason being to verify CPU hotplug which
-> seems to be broken on shmobile, though that is tangential to this post.
-> 
-> My procedure, which does not work, is as follows.
-> I have tried a number of different versions all with roughly
-> the same result.
-> 
-> 1. Build kernel
-> # git checkout v3.10.2 # I have tried several over versions too.
-> # make u8500_defconfig
-> Edit .config to enable CONFIG_ARM_APPENDED_DTB
-> # LOADADDR=0x100000 make uImage dtbs
-> 
-> 2. Append dtb to zImage and recreate uImage
-> mv arch/arm/boot/zImage arch/arm/boot/zImage.tmp
-> cat arch/arm/boot/zImage.tmp arch/arm/boot/dts/snowball.dtb
-> /bin/sh scripts/mkuboot.sh \
-> 	-A arm -O linux -C none  -T kernel \
-> 	-a 0x100000 -e 0x100000 -n 'Linux-3.10.2' \
-> 	-d arch/arm/boot/zImage arch/arm/boot/uImage
-> 
-> 3. Boot uImage from u-boot
-> Snowball $ setenv ethaddr 3e:c4:73:05:d1:a1
-> Snowball $ bootp;bootm
-> smc911x: detected LAN9221 controller
-> smc911x: phy initialized
-> smc911x: MAC 3e:c4:73:05:d1:a1
-> BOOTP broadcast 1
-> *** Unhandled DHCP Option in OFFER/ACK: 28
-> *** Unhandled DHCP Option in OFFER/ACK: 44
-> *** Unhandled DHCP Option in OFFER/ACK: 28
-> *** Unhandled DHCP Option in OFFER/ACK: 44
-> DHCP client bound to address 10.3.3.146
-> Using smc911x-0 device
-> TFTP from server 10.3.3.135; our IP address is 10.3.3.146
-> Filename 'snowball/uImage'.
-> Load address: 0x100000
-> Loading: #################################################################
->          #################################################################
->          #################################################################
->          #################################################################
->          ##########################################################
-> done
-> Bytes transferred = 2540191 (26c29f hex)
-> ## Booting kernel from Legacy Image at 00100000 ...
->    Image Name:   'Linux-3.10.2'
->    Image Type:   ARM Linux Kernel Image (uncompressed)
->    Data Size:    2540127 Bytes =  2.4 MB
->    Load Address: 00100000
->    Entry Point:  00100000
->    XIP Kernel Image ... OK
-> OK
-> 
-> Starting kernel ...
-> 
-> 
-> This is as far as it gets.
+> I have not tried the manual switching, but first, you need to close your
+> vbus supply.
 
-Are you sure you have the correct bootargs by default ? It was a
-pain for me to figure the correct ones, and I finally found them
-in the boot scripts. Mine is booted with this :
-
-# cat /proc/cmdline 
-console=tty0 console=ttyAMA2,115200n8  root=UUID=018e1580-e7e9-460b-95c5-236f6b87b13d rootwait ro fixrtc nocompcache vmalloc=300M mem=128M at 0 mali.mali_mem=64M at 128M hwmem=168M at 192M mem=22M at 360M mem_issw=1M at 383M mem=640M at 384M
-
-# uname -a
-Linux snowball 3.10.0-rc5-snowball #2 SMP Fri Jun 14 09:19:28 CEST 2013 armv7l GNU/Linux
-
-I don't have the CONFIG_ARM_APPENDED_DTB set, instead I have copied
-the dtb on the flash since u-boot supports it (I find this boot
-procedure quite annoying btw).
-
-Hoping this helps,
-Willy
+I think we can close this issue, I will now be also getting MX28EVK. Thanks for 
+all your help!
