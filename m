@@ -1,49 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Jul 2013 13:00:49 +0200
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <2174304.5JlzJ583hP@avalon>
-References: <Pine.LNX.4.44L0.1307231708020.1304-100000@iolanthe.rowland.org>
- <201307242032.03597.arnd@arndb.de> <2174304.5JlzJ583hP@avalon>
-Message-ID: <201307251300.49282.arnd@arndb.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 25 Jul 2013 12:06:34 +0100
+Subject: Do we have people interested in device tree janitoring / cleanup?
+In-Reply-To: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
+References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
+Message-ID: <20130725110634.GB2546@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 July 2013, Laurent Pinchart wrote:
-> On Wednesday 24 July 2013 20:32:03 Arnd Bergmann wrote:
-> > On Tuesday 23 July 2013, Tomasz Figa wrote:
-> > > On Tuesday 23 of July 2013 17:14:20 Alan Stern wrote:
-> > > > On Tue, 23 Jul 2013, Tomasz Figa wrote:
-> > > > > Where would you want to have those phy_address arrays stored? There
-> > > > > are no board files when booting with DT. Not even saying that you
-> > > > > don't need to use any hacky schemes like this when you have DT that
-> > > > > nicely specifies relations between devices.
-> > > > 
-> > > > If everybody agrees DT has a nice scheme for specifying relations
-> > > > between devices, why not use that same scheme in the PHY core?
-> > > 
-> > > It is already used, for cases when consumer device has a DT node attached.
-> > > In non-DT case this kind lookup translates loosely to something that is
-> > > being done in regulator framework - you can't bind devices by pointers,
-> > > because you don't have those pointers, so you need to use device names.
-> > 
-> > Sorry for jumping in to the middle of the discussion, but why does a new
-> > framework even bother defining an interface for board files?
-> > 
-> > Can't we just drop any interfaces for platform data passing in the phy
-> > framework and put the burden of adding those to anyone who actually needs
-> > them? All the platforms we are concerned with here (exynos and omap, plus
-> > new platforms) can be booted using DT anyway.
+On Wed, Jul 24, 2013 at 08:27:13AM -0700, Olof Johansson wrote:
+> Every now and then I come across a binding that's just done Wrong(tm),
+> merged through a submaintainer tree and hasn't seen proper review --
+> if it had, it wouldn't look the way it does. It's something we're
+> starting to address now since there's more people stepping up to be
+> maintainers, but there's a backlog of bad bindings already merged.
 > 
-> What about non-DT architectures such as MIPS (still widely used in consumer 
-> networking equipments from what I've heard) ?
+> Often they are produced by translating the platform_data structures
+> directly over into device-tree properties without consideration to
+> describing the hardware or usual conventions, using key/value pairs
+> instead of boolean properties, etc.
+> 
+> Getting involved in cleaning up these kind of bindings is a great way
+> to learn "the ways of device tree" for someone that has interest in
+> that.
+> 
+> Latest find in this area is the Maxim 8925 bindings, that I came
+> across since they caused a compile warning on some defconfig. I'll
+> post a patch to address the warning but if someone else feels like
+> fixing the bindings on top of it that would be appreciated!
 
-* Vendors of such equipment have started moving on to ARM (e.g. Broadcom bcm47xx)
-* Some of the modern MIPS platforms are now using DT
-* Legacy platforms probably won't migrate to either DT or the generic PHY framework
+DT bindings (even poorly conceived, ad-hoc and/or undocumented ones)
+are ABI.
 
-I'm not saying that we can't support legacy board files with the common
-PHY framework, but I'd expect things to be much easier if we focus on those
-platforms that are actively being worked on for now, to bring an end to the
-pointless API discussion.
+A review/merge process which _allows_ junk into an ABI is the real
+problem we need to solve here, but once it's there we can't just magic
+it away.
 
-	Arnd
+Do we plan on having a proper deprecation path for the junk, so that
+the old, superseded bindings continue to work for a limited time,
+preferably with a big fat warning somewhere?
+
+Cheers
+---Dave
