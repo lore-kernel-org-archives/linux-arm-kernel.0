@@ -1,25 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Jul 2013 15:38:15 +0100
-Subject: Do we have people interested in device tree janitoring / cleanup?
-In-Reply-To: <20130725142702.GE24642@n2100.arm.linux.org.uk>
-References: <CAOesGMge5hCDCeXYHXanaF1vR8mngBwdjhNbzD+Tc2EDUPRgCQ@mail.gmail.com>
- <20130725110634.GB2546@localhost.localdomain>
- <20130725112558.GD24642@n2100.arm.linux.org.uk>
- <20130725135645.GA17304@glitch>
- <20130725142702.GE24642@n2100.arm.linux.org.uk>
-Message-ID: <20130725143815.GA5812@darko.cambridge.arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 25 Jul 2013 15:42:37 +0100
+Subject: [PATCH 2/2] ARM: fix BUG() detection
+In-Reply-To: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1374763357-4893-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 03:27:02PM +0100, Russell King - ARM Linux wrote:
-> Remember the stated assertion when DT was first added to the kernel: the
-> DT descriptions _will_ become a separately maintained project which is
-> independent of the kernel.  They will _not_ be kernel version specific.
+The detection of the instruction used by BUG() did not take into account
+the differences in endian-ness between instruction and data. Change the
+code to use the relevant helpers in <asm/opcodes.h> to translate the
+endian-ness of the instructions.
 
-I'm looking forward to this.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+ arch/arm/kernel/traps.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Question for the DT guys: what are the plans here? Are we going to get
-rid of the .dts files inside the kernel tree?
-
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index cb67b04..ae2d828 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -344,15 +344,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
+ int is_valid_bugaddr(unsigned long pc)
+ {
+ #ifdef CONFIG_THUMB2_KERNEL
+-	unsigned short bkpt;
++	u16 bkpt;
++	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
+ #else
+-	unsigned long bkpt;
++	u32 bkpt;
++	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
+ #endif
+ 
+ 	if (probe_kernel_address((unsigned *)pc, bkpt))
+ 		return 0;
+ 
+-	return bkpt == BUG_INSTR_VALUE;
++	return bkpt == insn;
+ }
+ 
+ #endif
 -- 
-Catalin
+1.7.10.4
