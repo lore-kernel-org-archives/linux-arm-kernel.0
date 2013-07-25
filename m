@@ -1,121 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 13:11:06 -0400
-Subject: [PATCH v6 0/7] ARM: mvebu: switch to DT probed mv643xx_eth
-In-Reply-To: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1372762824-12202-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130725171106.GM23879@titan.lakedaemon.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 25 Jul 2013 18:11:30 +0100
+Subject: [PATCH] ARM: kdgb: use .inst for data to be assembled as
+ intruction
+In-Reply-To: <1374763778-5305-2-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374763778-5305-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374763778-5305-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130725171130.GE2546@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 01:00:17PM +0200, Sebastian Hesselbarth wrote:
-> This patch set converts Marvell Dove, Kirkwood, and Orion5x DT enabled
-> boards to probe mv643xx_eth by DT. The corresponding DT support patches
-> for mv643xx_eth driver have already been taked by David Miller and are
-> available in next-20130701. This only contains the ARM part of
-> mv643xx_eth DT support patches and therefore patch counting is
-> continued as v6 with respect to the combined patch set.
+On Thu, Jul 25, 2013 at 03:49:38PM +0100, Ben Dooks wrote:
+> The arch_kgdb_breakpoint() function uses an inline assembly directive
+> to assemble a specific instruction using .word. This means the linker
+> will not treat is as an instruction, and therefore incorrectly swap
+> the endian-ness if running BE8.
 > 
-> The first three patches add nodes for ethernet-controller, mdio-bus,
-> and ethernet PHYs found on the three SoCs and their boards.
+> Note, not tested, please comment if this is wrong.
 > 
-> The last four patches convert DT boards for each SoC from platform_device
-> registration to DT based probing by removing the corresponding calls.
-> For Kirkwood this makes almost all DT board setup (except board-dnskw)
-> obsolete. Therefore, patch 5 removes board setup files, Kconfig, Makefile,
-> and defconfig entries for those boards.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/include/asm/kgdb.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> This patch set has been tested on Marvell Dove, and compile-tested for
-> Kirkwood and Orion5x defconfig on top of next-20130701 with some fixes
-> sent earlier applied (DMA_MEMSET fixes and missing include on edmini_v2).
-> 
-> netdev is added on Cc for completeness, this is all Marvell related and
-> should go through Jason Cooper's branch if there are no objections.
-> 
-> Sebastian Hesselbarth (7):
->   ARM: dove: add gigabit ethernet and mvmdio device tree nodes
->   ARM: kirkwood: add gigabit ethernet and mvmdio device tree nodes
->   ARM: orion5x: add gigabit ethernet and mvmdio device tree nodes
->   ARM: dove: remove legacy mv643xx_eth setup
->   ARM: kirkwood: remove redundant DT board files
->   ARM: kirkwood: remove legacy clk alias for mv643xx_eth
->   ARM: orion5x: remove legacy mv643xx_eth board setup
-> 
->  arch/arm/boot/dts/dove-cubox.dts                   |    7 +
->  arch/arm/boot/dts/dove.dtsi                        |   35 +++++
->  arch/arm/boot/dts/kirkwood-cloudbox.dts            |   16 ++
->  arch/arm/boot/dts/kirkwood-db.dtsi                 |   16 ++
->  arch/arm/boot/dts/kirkwood-dnskw.dtsi              |   16 ++
->  arch/arm/boot/dts/kirkwood-dockstar.dts            |   17 ++
->  arch/arm/boot/dts/kirkwood-dreamplug.dts           |   28 ++++
->  arch/arm/boot/dts/kirkwood-goflexnet.dts           |   16 ++
->  .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |   30 ++++
->  arch/arm/boot/dts/kirkwood-ib62x0.dts              |   16 ++
->  arch/arm/boot/dts/kirkwood-iconnect.dts            |   16 ++
->  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |   24 +++
->  arch/arm/boot/dts/kirkwood-is2.dts                 |    2 +
->  arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |   16 ++
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi               |   28 ++++
->  arch/arm/boot/dts/kirkwood-mplcec4.dts             |   27 ++++
->  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |   16 ++
->  arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   16 ++
->  arch/arm/boot/dts/kirkwood-ns2.dts                 |    2 +
->  arch/arm/boot/dts/kirkwood-ns2lite.dts             |    2 +
->  arch/arm/boot/dts/kirkwood-ns2max.dts              |    2 +
->  arch/arm/boot/dts/kirkwood-ns2mini.dts             |    2 +
->  arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |   16 ++
->  arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |   16 ++
->  arch/arm/boot/dts/kirkwood-topkick.dts             |   16 ++
->  arch/arm/boot/dts/kirkwood-ts219-6281.dts          |    4 +-
->  arch/arm/boot/dts/kirkwood-ts219-6282.dts          |    4 +-
->  arch/arm/boot/dts/kirkwood-ts219.dtsi              |   16 ++
->  arch/arm/boot/dts/kirkwood.dtsi                    |   52 +++++++
->  .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |   17 ++
->  arch/arm/boot/dts/orion5x.dtsi                     |   29 ++++
->  arch/arm/configs/kirkwood_defconfig                |   22 ---
->  arch/arm/mach-dove/board-dt.c                      |    9 -
->  arch/arm/mach-kirkwood/Kconfig                     |  156 --------------------
->  arch/arm/mach-kirkwood/Makefile                    |   23 +---
->  arch/arm/mach-kirkwood/board-db88f628x-bp.c        |   24 ---
->  arch/arm/mach-kirkwood/board-dnskw.c               |    7 -
->  arch/arm/mach-kirkwood/board-dockstar.c            |   32 ----
->  arch/arm/mach-kirkwood/board-dreamplug.c           |   35 -----
->  arch/arm/mach-kirkwood/board-dt.c                  |   86 +-----------
->  arch/arm/mach-kirkwood/board-goflexnet.c           |   34 -----
->  arch/arm/mach-kirkwood/board-guruplug.c            |   33 ----
->  arch/arm/mach-kirkwood/board-ib62x0.c              |   29 ----
->  arch/arm/mach-kirkwood/board-iconnect.c            |   24 ---
->  arch/arm/mach-kirkwood/board-iomega_ix2_200.c      |   34 -----
->  arch/arm/mach-kirkwood/board-km_kirkwood.c         |   44 ------
->  arch/arm/mach-kirkwood/board-lsxl.c                |   36 -----
->  arch/arm/mach-kirkwood/board-mplcec4.c             |   35 -----
->  arch/arm/mach-kirkwood/board-ns2.c                 |   35 -----
->  arch/arm/mach-kirkwood/board-openblocks_a6.c       |   26 ----
->  arch/arm/mach-kirkwood/board-readynas.c            |   27 ----
->  arch/arm/mach-kirkwood/board-sheevaplug.c          |   27 ----
->  arch/arm/mach-kirkwood/board-ts219.c               |   40 -----
->  arch/arm/mach-kirkwood/board-usi_topkick.c         |   29 ----
->  arch/arm/mach-orion5x/edmini_v2-setup.c            |   10 --
->  55 files changed, 520 insertions(+), 857 deletions(-)
->  delete mode 100644 arch/arm/mach-kirkwood/board-db88f628x-bp.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-dockstar.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-dreamplug.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-guruplug.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-ib62x0.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-iconnect.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-iomega_ix2_200.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-km_kirkwood.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-mplcec4.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-ns2.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-openblocks_a6.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-readynas.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-ts219.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-usi_topkick.c
+> diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+> index 48066ce..76227c8 100644
+> --- a/arch/arm/include/asm/kgdb.h
+> +++ b/arch/arm/include/asm/kgdb.h
+> @@ -41,7 +41,7 @@
+>  
+>  static inline void arch_kgdb_breakpoint(void)
+>  {
+> -	asm(".word 0xe7ffdeff");
+> +	asm(".inst 0xe7ffdeff");
 
-Applied whole series to mvebu/boards (v7 of #2 and #5)
+Yikes, this isn't going to work in a Thumb kernel.
 
-thx,
+We should make HAVE_ARCH_KGDB depend on !THUMB2_KERNEL until/unless that
+gets fixed...  It looks like the incompatibilities may be more extensive
+than just this one instruction.
 
-Jason.
+
+For the ARM case, similarly to the other patches, please use the __inst
+macros from <asm/opcodes.h> instead of emitting the opcode explicitly.
+
+Cheers
+---Dave
