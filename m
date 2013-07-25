@@ -1,76 +1,39 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 26 Jul 2013 08:47:36 +0900
-Subject: [PATCHv2 2/3] video: hx8357: Make IM pins optional
-In-Reply-To: <1374757513-2253-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 26 Jul 2013 08:52:09 +0900
+Subject: [PATCHv2 3/3] fb: backlight: HX8357: Add HX8369 support
+In-Reply-To: <1374757513-2253-4-git-send-email-maxime.ripard@free-electrons.com>
 References: <1374757513-2253-1-git-send-email-maxime.ripard@free-electrons.com>
- <1374757513-2253-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <002201ce8991$5785e8e0$0691baa0$@samsung.com>
+ <1374757513-2253-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <002301ce8991$f9b82060$ed286120$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday, July 25, 2013 10:05 PM, Maxime Ripard wrote:
 > 
-> The IM pins of the HX8357 controller are used to define the interface
-> used to feed pixel stream to the LCD panel.
+> From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > 
-> Most of the time, these pins are directly routed to either the ground or
-> the VCC to set their values.
+> Add support for the Himax HX8369 controller as it is quite similar to the
+> hx8357.
 > 
-> Remove the need to assign GPIOs to these pins when we are in such a case.
-> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
 > ---
->  drivers/video/backlight/hx8357.c | 53 +++++++++++++++++++++++-----------------
->  1 file changed, 31 insertions(+), 22 deletions(-)
+>  drivers/video/backlight/hx8357.c | 221 ++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 206 insertions(+), 15 deletions(-)
 > 
 
-[.....]
+[....]
 
-> +	if (of_find_property(spi->dev.of_node, "im-gpios", NULL)) {
-> +		lcd->use_im_pins = 1;
+> +	ret = hx8357_spi_write_byte(lcdev, HX8357_SET_DISPLAY_ON);
+> +	if (ret < 0)
+> +		return ret;
 > +
-> +		for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
-> +			lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
-> +							    "im-gpios", i);
-> +			if (lcd->im_pins[i] == -EPROBE_DEFER) {
-> +				dev_info(&spi->dev, "GPIO requested is not here yet, deferring the
-> probe\n");
-> +				return -EPROBE_DEFER;
-> +			}
-> +			if (!gpio_is_valid(lcd->im_pins[i])) {
-> +				dev_err(&spi->dev, "Missing dt property: im-gpios\n");
-> +				return -EINVAL;
-> +			}
-> +
-> +			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
-> +						    GPIOF_OUT_INIT_LOW,
-> +						    "im_pins");
-> +			if (ret) {
-> +				dev_err(&spi->dev, "failed to request gpio %d: %d\n",
-> +					lcd->im_pins[i], ret);
-> +				return -EINVAL;
-> +			}
->  		}
-> -
-> -		ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
-> -					GPIOF_OUT_INIT_LOW, "im_pins");
-> -		if (ret) {
-> -			dev_err(&spi->dev, "failed to request gpio %d: %d\n",
-> -				lcd->im_pins[i], ret);
-> -			return -EINVAL;
-> -		}
-> -	}
-> +	} else
-> +		lcd->use_im_pins = 0;
+> +	msleep(100);
 
-According to the 'Documentation/CodingStyle', braces are necessary as below.
+Hi Maxime Ripard,
 
-	} else {
-		lcd->use_im_pins = 0;
-	}
-
-Others look good.
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+Could you add comment on this huge delay, too?
 
 Best regards,
 Jingoo Han
