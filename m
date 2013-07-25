@@ -1,35 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jul 2013 15:31:35 -0400
-Subject: DT bindings as ABI [was: Do we have people interested in
- device tree janitoring / cleanup?]
-In-Reply-To: <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
-Message-ID: <20130725193135.GT23879@titan.lakedaemon.net>
+Date: Thu, 25 Jul 2013 16:04:16 -0400
+Subject: [PATCH 1/2] ARM: Kirkwood: Add support for another ZyXEL
+ NSA310 variant
+In-Reply-To: <1374079910-24345-2-git-send-email-andrew@lunn.ch>
+References: <1374079910-24345-1-git-send-email-andrew@lunn.ch>
+ <1374079910-24345-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20130725200416.GU23879@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 02:11:31PM -0500, Rob Herring wrote:
-> On Thu, Jul 25, 2013 at 11:09 AM, Olof Johansson <olof@lixom.net> wrote:
-
-> > One problem that needs to be solved is obviously how a binding
-> > graduates from tentative to locked. This work isn't going to be very
-> > interesting to most people, I suspect. Think standards committee type
-> > work.
+On Wed, Jul 17, 2013 at 06:51:49PM +0200, Andrew Lunn wrote:
+> There are a number of variants of the ZyXEL NSA310, with slightly
+> different LEDs, buttons and i2c devices. Add a DTS file to support one
+> more of these variants.
 > 
-> I think a time based stabilization period would be better than a
-> separate directory to apply bindings too. Or time plus periodic review
-> perhaps.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/Makefile                    |    1 +
+>  arch/arm/boot/dts/kirkwood-nsa310-common.dtsi |  107 ++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-nsa310.dts         |  100 +--------------
+>  arch/arm/boot/dts/kirkwood-nsa310a.dts        |  165 +++++++++++++++++++++++++
+>  4 files changed, 274 insertions(+), 99 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
+>  create mode 100644 arch/arm/boot/dts/kirkwood-nsa310a.dts
 
-The only problem with a time-based versus separate directory is how do
-users who've downloaded the tree determine which bindings are stable?
-If they pull a tarball, or receive an SDK, there is most likely no git
-history attached.
-
-I think the idea of a 'tentative' directory (or 'locked') is churnish,
-but necessary.  If I DL'd a tarball and had to type 'tentative' to get
-to the binding doc I wanted, that would be a pretty clear clue to be
-delicate about how I trust/use/plan with that binding.
+Applied to mvebu/dt
 
 thx,
 
