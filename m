@@ -1,34 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Jul 2013 09:36:02 -0700
-Subject: [PATCH v1 03/14] clk: Add of_clk_match() for device drivers
-In-Reply-To: <52875092.tEWeSbEJZC@flatron>
-References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
- <52875092.tEWeSbEJZC@flatron>
-Message-ID: <20130725163602.GB29694@codeaurora.org>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Thu, 25 Jul 2013 18:36:02 +0200
+Subject: [PATCH 05/22] ARM: dts: bcm281xx: Remove '0x's from
+ BCM11351 BRT DTS file
+In-Reply-To: <CAAYSxhrf+WNz1+ojA1r_pOLWg4xf9Ko8OyUc4GfVEMUN776pfA@mail.gmail.com>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-5-git-send-email-lee.jones@linaro.org>
+ <51ED2D90.4020209@broadcom.com> <20130722133852.GA26801@laptop>
+ <51ED3971.905@broadcom.com> <51ED6486.3080700@broadcom.com>
+ <CAAYSxhrf+WNz1+ojA1r_pOLWg4xf9Ko8OyUc4GfVEMUN776pfA@mail.gmail.com>
+Message-ID: <51F153F2.4080107@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25, Tomasz Figa wrote:
-> Hi Stephen,
-> 
-> On Wednesday 24 of July 2013 17:43:31 Stephen Boyd wrote:
-> > In similar fashion as of_regulator_match() add an of_clk_match()
-> > function that finds an initializes clock init_data structs from
-> > devicetree. Drivers should use this API to find clocks that their
-> > device is providing and then iterate over their match table
-> > registering the clocks with the init data parsed.
-> 
-> I think all you need here is declaring all your clock drivers using 
-> CLK_OF_DECLARE() macro. Then they will be automatically probed by 
-> of_clk_init(). See last lines of drivers/clk/clk-fixed-rate.c for an 
-> example.
-> 
+On 07/25/2013 05:43 PM, Tim Kryger wrote:
+> On Mon, Jul 22, 2013 at 9:57 AM, Christian Daudt <csd@broadcom.com> wrote:
+>
+>> it'd be nice to have something to point
+>> people to as this being the best practice for kernel dev.
+>
+> Power.org's ePAPR exclusively omits the 0x in the unit-address of node names.
+>
+> https://www.power.org/wp-content/uploads/2012/06/Power_ePAPR_APPROVED_v1.1.pdf
+>
 
-CLK_OF_DECLARE() will not work because it doesn't give the
-caller a struct device. I want that struct device to use managed
-allocations and clk registrations.
+Thanks for the link. While browsing on power.org I got the impression 
+that I needed to have a membership to get it.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Arend
