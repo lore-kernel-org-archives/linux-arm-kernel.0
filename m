@@ -1,36 +1,37 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 24 Jul 2013 20:28:19 -0400
-Subject: [PATCH 2/2] i2c: davinci: Allow i2c driver available for keystone
- platforms
+Date: Wed, 24 Jul 2013 20:28:18 -0400
+Subject: [PATCH 1/2] i2c: davinci: remove useless mach/hardware include
 In-Reply-To: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1374712099-32095-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1374712099-32095-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone SOCs uses the same I2C IP as available on DaVinci SOCs.
-Update the config so that ARCH_KEYSTONE can use it.
+This driver no longer uses definitions from mach/hardware.h.
+On the other hand, including this header breaks this driver
+on non-davinci platforms which don't have such a header.
+
+Fix it.
 
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Wolfram Sang <wsa@the-dreams.de>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/i2c/busses/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-davinci.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index dc6dea6..fcdd321 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -385,7 +385,7 @@ config I2C_CPM
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index fa55605..ddaa2a3 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -41,7 +41,6 @@
+ #include <linux/of_i2c.h>
+ #include <linux/of_device.h>
  
- config I2C_DAVINCI
- 	tristate "DaVinci I2C driver"
--	depends on ARCH_DAVINCI
-+	depends on ARCH_DAVINCI || ARCH_KEYSTONE
- 	help
- 	  Support for TI DaVinci I2C controller driver.
+-#include <mach/hardware.h>
+ #include <linux/platform_data/i2c-davinci.h>
  
+ /* ----- global defines ----------------------------------------------- */
 -- 
 1.7.9.5
