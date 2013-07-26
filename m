@@ -1,94 +1,75 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 26 Jul 2013 10:17:50 -0300
-Subject: [PATCH v9 13/30] bus: mvebu-mbus: Remove the no longer used
- name-based API
+Date: Fri, 26 Jul 2013 10:17:54 -0300
+Subject: [PATCH v9 17/30] ARM: mvebu: Remove the harcoded BootROM window
+ allocation
 In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374844687-19981-14-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374844687-19981-18-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+The address decoding window to access the BootROM should not be
+allocated programatically, but instead declared in the device tree.
 
-Now that every user of the deprecated name-based API has been
-converted to using the ID-based API, let's remove the former one.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- drivers/bus/mvebu-mbus.c | 38 --------------------------------------
- include/linux/mbus.h     |  5 -----
- 2 files changed, 43 deletions(-)
+ arch/arm/mach-mvebu/platsmp.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 929fed1..b4a7382 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -766,44 +766,6 @@ int mvebu_mbus_add_window_remap_by_id(unsigned int target,
- 	return mvebu_mbus_alloc_window(s, base, size, remap, target, attribute);
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index ce81d30..c6b00fc 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -21,6 +21,7 @@
+ #include <linux/smp.h>
+ #include <linux/clk.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/mbus.h>
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -29,6 +30,9 @@
+ #include "pmsu.h"
+ #include "coherency.h"
+ 
++#define AXP_BOOTROM_BASE 0xfff00000
++#define AXP_BOOTROM_SIZE 0x100000
++
+ void __init set_secondary_cpus_clock(void)
+ {
+ 	int thiscpu;
+@@ -114,10 +118,29 @@ static void __init armada_xp_smp_init_cpus(void)
+ 
+ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	struct device_node *node;
++	struct resource res;
++	int err;
++
+ 	set_secondary_cpus_clock();
+ 	flush_cache_all();
+ 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+-	mvebu_mbus_add_window("bootrom", 0xfff00000, SZ_1M);
++
++	/*
++	 * In order to boot the secondary CPUs we need to ensure
++	 * the bootROM is mapped at the correct address.
++	 */
++	node = of_find_compatible_node(NULL, NULL, "marvell,bootrom");
++	if (!node)
++		panic("Cannot find 'marvell,bootrom' compatible node");
++
++	err = of_address_to_resource(node, 0, &res);
++	if (err < 0)
++		panic("Cannot get 'bootrom' node address");
++
++	if (res.start != AXP_BOOTROM_BASE ||
++	    resource_size(&res) != AXP_BOOTROM_SIZE)
++		panic("The address for the BootROM is incorrect");
  }
  
--int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
--				      size_t size, phys_addr_t remap,
--				      unsigned int flags)
--{
--	struct mvebu_mbus_state *s = &mbus_state;
--	u8 target, attr;
--	int i;
--
--	if (!s->soc->map)
--		return -ENODEV;
--
--	for (i = 0; s->soc->map[i].name; i++)
--		if (!strcmp(s->soc->map[i].name, devname))
--			break;
--
--	if (!s->soc->map[i].name) {
--		pr_err("unknown device '%s'\n", devname);
--		return -ENODEV;
--	}
--
--	target = s->soc->map[i].target;
--	attr   = s->soc->map[i].attr;
--
--	if (flags == MVEBU_MBUS_PCI_MEM)
--		attr |= 0x8;
--	else if (flags == MVEBU_MBUS_PCI_WA)
--		attr |= 0x28;
--
--	return mvebu_mbus_add_window_remap_by_id(target, attr, base,
--						 size, remap);
--}
--
--int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
--{
--	return mvebu_mbus_add_window_remap_flags(devname, base, size,
--						 MVEBU_MBUS_NO_REMAP, 0);
--}
--
- int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
- 				phys_addr_t base, size_t size)
- {
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index 650bc15..345b8c5 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -63,15 +63,10 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- 
- void mvebu_mbus_get_pcie_mem_aperture(struct resource *res);
- void mvebu_mbus_get_pcie_io_aperture(struct resource *res);
--int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
--				      size_t size, phys_addr_t remap,
--				      unsigned int flags);
- int mvebu_mbus_add_window_remap_by_id(unsigned int target,
- 				      unsigned int attribute,
- 				      phys_addr_t base, size_t size,
- 				      phys_addr_t remap);
--int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
--			  size_t size);
- int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
- 				phys_addr_t base, size_t size);
- int mvebu_mbus_del_window(phys_addr_t base, size_t size);
+ struct smp_operations armada_xp_smp_ops __initdata = {
 -- 
 1.8.1.5
