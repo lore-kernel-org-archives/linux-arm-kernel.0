@@ -1,208 +1,50 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:22 +0800
-Subject: [PATCH v13 06/14] usb: chipidea: Add role init and destory APIs
+Date: Fri, 26 Jul 2013 17:18:19 +0800
+Subject: [PATCH v13 03/14] usb: chipidea: imx: add return value check for
+ devm_regulator_get
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-4-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- The role's init will be called at probe procedure.
-- The role's destory will be called at fail patch
-at probe and driver's removal.
-- The role's start/stop will be called when specific
-role has started.
+- If devm_regulator_get returns -EPROBE_DEFER, we also return
+-EPROBE_DEFER to wait regulator being ready later.
+- If devm_regulator_get returns -ENODEV, we think there is
+no "vbus-supply" node at DT, it means this board doesn't need
+vbus control.
+- If devm_regulator_get returns other error values, it means
+there are something wrong for getting this regulator.
 
-Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/core.c |   10 ++++++++--
- drivers/usb/chipidea/host.c |    7 +++++++
- drivers/usb/chipidea/host.h |    6 ++++++
- drivers/usb/chipidea/udc.c  |   36 +++++++++++++++++++++++++++---------
- drivers/usb/chipidea/udc.h  |    6 ++++++
- 5 files changed, 54 insertions(+), 11 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c |   14 ++++++++++++--
+ 1 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 761f7e8..93961ff 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -399,6 +399,12 @@ void ci_hdrc_remove_device(struct platform_device *pdev)
- }
- EXPORT_SYMBOL_GPL(ci_hdrc_remove_device);
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index d06355e..0ced8c1 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -144,8 +144,18 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
  
-+static inline void ci_role_destroy(struct ci_hdrc *ci)
-+{
-+	ci_hdrc_gadget_destroy(ci);
-+	ci_hdrc_host_destroy(ci);
-+}
-+
- static int ci_hdrc_probe(struct platform_device *pdev)
- {
- 	struct device	*dev = &pdev->dev;
-@@ -517,7 +523,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 
- 	free_irq(ci->irq, ci);
- stop:
--	ci_role_stop(ci);
-+	ci_role_destroy(ci);
- rm_wq:
- 	flush_workqueue(ci->wq);
- 	destroy_workqueue(ci->wq);
-@@ -533,7 +539,7 @@ static int ci_hdrc_remove(struct platform_device *pdev)
- 	flush_workqueue(ci->wq);
- 	destroy_workqueue(ci->wq);
- 	free_irq(ci->irq, ci);
--	ci_role_stop(ci);
-+	ci_role_destroy(ci);
- 
- 	return 0;
- }
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index e94e52b..382be5b 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -105,6 +105,13 @@ static void host_stop(struct ci_hdrc *ci)
- 		regulator_disable(ci->platdata->reg_vbus);
- }
- 
-+
-+void ci_hdrc_host_destroy(struct ci_hdrc *ci)
-+{
-+	if (ci->role == CI_ROLE_HOST)
-+		host_stop(ci);
-+}
-+
- int ci_hdrc_host_init(struct ci_hdrc *ci)
- {
- 	struct ci_role_driver *rdrv;
-diff --git a/drivers/usb/chipidea/host.h b/drivers/usb/chipidea/host.h
-index 058875c..5707bf3 100644
---- a/drivers/usb/chipidea/host.h
-+++ b/drivers/usb/chipidea/host.h
-@@ -4,6 +4,7 @@
- #ifdef CONFIG_USB_CHIPIDEA_HOST
- 
- int ci_hdrc_host_init(struct ci_hdrc *ci);
-+void ci_hdrc_host_destroy(struct ci_hdrc *ci);
- 
- #else
- 
-@@ -12,6 +13,11 @@ static inline int ci_hdrc_host_init(struct ci_hdrc *ci)
- 	return -ENXIO;
- }
- 
-+static inline void ci_hdrc_host_destroy(struct ci_hdrc *ci)
-+{
-+
-+}
-+
- #endif
- 
- #endif /* __DRIVERS_USB_CHIPIDEA_HOST_H */
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 116c762..24a100d 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -27,6 +27,7 @@
- #include "udc.h"
- #include "bits.h"
- #include "debug.h"
-+#include "otg.h"
- 
- /* control endpoint description */
- static const struct usb_endpoint_descriptor
-@@ -1844,13 +1845,13 @@ free_qh_pool:
- }
- 
- /**
-- * udc_remove: parent remove must call this to remove UDC
-+ * ci_hdrc_gadget_destroy: parent remove must call this to remove UDC
-  *
-  * No interrupts active, the IRQ has been released
-  */
--static void udc_stop(struct ci_hdrc *ci)
-+void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
- {
--	if (ci == NULL)
-+	if (!ci->roles[CI_ROLE_GADGET])
- 		return;
- 
- 	usb_del_gadget_udc(&ci->gadget);
-@@ -1865,15 +1866,32 @@ static void udc_stop(struct ci_hdrc *ci)
- 		if (ci->global_phy)
- 			usb_put_phy(ci->transceiver);
- 	}
--	/* my kobject is dynamic, I swear! */
--	memset(&ci->gadget, 0, sizeof(ci->gadget));
-+}
-+
-+static int udc_id_switch_for_device(struct ci_hdrc *ci)
-+{
-+	if (ci->is_otg) {
-+		ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
-+		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
+ 	/* Get the vbus regulator */
+ 	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+-	if (IS_ERR(pdata.reg_vbus))
+-		pdata.reg_vbus = NULL;
++	if (PTR_ERR(pdata.reg_vbus) == -EPROBE_DEFER) {
++		ret = -EPROBE_DEFER;
++		goto err_clk;
++	} else if (PTR_ERR(pdata.reg_vbus) == -ENODEV) {
++		pdata.reg_vbus = NULL; /* no vbus regualator is needed */
++	} else if (IS_ERR(pdata.reg_vbus)) {
++		dev_err(&pdev->dev,
++				"Getting regulator error: %ld\n",
++					PTR_ERR(pdata.reg_vbus));
++		ret = PTR_ERR(pdata.reg_vbus);
++		goto err_clk;
 +	}
-+
-+	return 0;
-+}
-+
-+static void udc_id_switch_for_host(struct ci_hdrc *ci)
-+{
-+	if (ci->is_otg) {
-+		/* host doesn't care B_SESSION_VALID event */
-+		ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
-+		ci_disable_otg_interrupt(ci, OTGSC_BSVIE);
-+	}
- }
  
- /**
-  * ci_hdrc_gadget_init - initialize device related bits
-  * ci: the controller
-  *
-- * This function enables the gadget role, if the device is "device capable".
-+ * This function initializes the gadget, if the device is "device capable".
-  */
- int ci_hdrc_gadget_init(struct ci_hdrc *ci)
- {
-@@ -1886,11 +1904,11 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
- 	if (!rdrv)
- 		return -ENOMEM;
- 
--	rdrv->start	= udc_start;
--	rdrv->stop	= udc_stop;
-+	rdrv->start	= udc_id_switch_for_device;
-+	rdrv->stop	= udc_id_switch_for_host;
- 	rdrv->irq	= udc_irq;
- 	rdrv->name	= "gadget";
- 	ci->roles[CI_ROLE_GADGET] = rdrv;
- 
--	return 0;
-+	return udc_start(ci);
- }
-diff --git a/drivers/usb/chipidea/udc.h b/drivers/usb/chipidea/udc.h
-index 455ac21..e66df00 100644
---- a/drivers/usb/chipidea/udc.h
-+++ b/drivers/usb/chipidea/udc.h
-@@ -84,6 +84,7 @@ struct ci_hw_req {
- #ifdef CONFIG_USB_CHIPIDEA_UDC
- 
- int ci_hdrc_gadget_init(struct ci_hdrc *ci);
-+void ci_hdrc_gadget_destroy(struct ci_hdrc *ci);
- 
- #else
- 
-@@ -92,6 +93,11 @@ static inline int ci_hdrc_gadget_init(struct ci_hdrc *ci)
- 	return -ENXIO;
- }
- 
-+static inline void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
-+{
-+
-+}
-+
- #endif
- 
- #endif /* __DRIVERS_USB_CHIPIDEA_UDC_H */
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
 -- 
 1.7.0.4
