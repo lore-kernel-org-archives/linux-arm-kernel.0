@@ -1,52 +1,65 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 26 Jul 2013 15:09:29 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <1374831744.2923.42.camel@shinybook.infradead.org>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
-Message-ID: <20130726130927.GC4219@netboy>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 26 Jul 2013 15:12:01 +0200
+Subject: [PATCH] net: Add MOXA ART SoCs ethernet driver
+In-Reply-To: <CAGVrzcYdisg5AXMBa5q74GPz7ckWeoXJ9H5di2CGN41VyZ_4vw@mail.gmail.com>
+References: <1374140806-12485-1-git-send-email-jonas.jensen@gmail.com>
+ <CAGVrzcYdisg5AXMBa5q74GPz7ckWeoXJ9H5di2CGN41VyZ_4vw@mail.gmail.com>
+Message-ID: <CACmBeS0Q_WNc17VSALyMPPKzN1wyLUccBLDJpbapVwxq4gdytQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 10:42:24AM +0100, David Woodhouse wrote:
-> On Fri, 2013-07-26 at 10:01 +0200, Richard Cochran wrote:
-> > On Thu, Jul 25, 2013 at 03:37:53PM -0600, Jason Gunthorpe wrote:
-> > > 
-> > > We use DT has a kernel configuration input. Our environment is
-> > > designed to guarantee 100% that the kernel and DT match exactly. DT
-> > > very deliberately isn't an ABI boundary in our systems.
-> > 
-> > Think about what you just said.
-> > 
-> > The DT describes the *hardware* not the kernel. Why should you ever
-> > need to update your DT at all?
-> 
-> Well, the nodes which describe hardware devices, according to the
-> bindings which form an ABI contract between DT and drivers, should not
-> normally change. Although they *can* change, if for example you change
-> the MAC address and that's stored there. Or you change the PHY you want
-> it to use. Or something like that. The *ABI* doesn't change, but the
-> data you express *using* that ABI can change. That's kind of the point.
+Hi Florian,
 
-Unless I totally misunderstood, the thread is talking about letting
-established bindings change with each new kernel version.  I am
-opposed to that.
+Thanks for your help on IRC with this. I think most of the issues you
+pointed out should be fixed. Comments on still unresolved below:
 
-Of course, a user may want to change the values of his MAC addresses,
-if he needs to. But he should never have to change *how* he specifies
-those addresses.
+On 22 July 2013 13:09, Florian Fainelli <florian@openwrt.org> wrote:
+>> +++ b/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt
+>> @@ -0,0 +1,25 @@
+>> +MOXA ART Ethernet Controller
+>> +
+>> +Required properties:
+>> +
+>> +- compatible : Should be "moxa,moxart-mac"
+>> +- reg : Should contain registers location and length
+>> +  index 0 : main register
+>> +  index 1 : mac address (stored on flash)
+>
+> That is kind of unusual, since the MAC register is within the range of
+> the MAC base register, just read the MAC from the base register and
+> use that to fill in dev->dev_addr in your ndo_open() callback.
 
-So, as long as everyone can agree to the principle that a working DT
-should remain working after a kernel upgrade, then I'll shut up. In
-actual fact, this is not the case today, nor was it ever so in the
-past, AFAICT, but it never hurts to set goals.
+It is, but MAC is zeroed out in controller register after boot. That's why it
+has to be read from flash memory (bootloader section), and the reason
+it needs to map flash memory at all.
 
-Thanks,
-Richard
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>> +
+>> +       /* the flash driver (physmap_of) requests the same region
+>> +        * so use ioremap instead of devm_ioremap_resource
+>> +        */
+>> +       priv->flash_base = ioremap(res->start, resource_size(res));
+>> +       if (IS_ERR(priv->flash_base)) {
+>> +               dev_err(p_dev, "%s: devm_ioremap_resource res_flash failed\n",
+>> +                       __func__);
+>> +               goto init_fail;
+>> +       }
+>
+> As stated above from the Device Tree binding documentation, this is
+> unnecessary, since you have a get_mac() function.
+
+This is what the node looks like right now:
+
+mac0: mac at 90900000 {
+compatible = "moxa,moxart-mac";
+reg = <0x90900000 0x100>,
+        <0x80000050 0x6>;
+interrupts = <25 0>;
+};
+
+Bootloader starts at 0x80000000, looks like MAC is stored in code. I
+currently see no way around mapping both registers.
+
+Best regards,
+Jonas
