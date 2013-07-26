@@ -1,142 +1,142 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 26 Jul 2013 18:05:26 +0800
-Subject: [PATCH v6 04/11] ARM: mmp: avoid to include head file in mach-mmp
+Date: Fri, 26 Jul 2013 18:05:27 +0800
+Subject: [PATCH v6 05/11] irqchip: mmp: avoid to include irqs head file
 In-Reply-To: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1374833133-21119-5-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1374833133-21119-6-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxa910_set_wake() & mmp2_set_wake() are both declared in head files
-of arch/arm/mach-mmp/include/mach directory. If we include these
-head files in irq-mmp driver, it blocks the multiplatform build.
-So adjust the code.
+Since <mach/irqs.h> in irq-mmp.c blocks the multiplatform build,
+remove it instead.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/mach-mmp/mmp2.c    |  4 ++++
- arch/arm/mach-mmp/pxa910.c  |  4 ++++
- drivers/irqchip/irq-mmp.c   | 15 +--------------
- include/linux/irqchip/mmp.h |  6 ++++++
- 4 files changed, 15 insertions(+), 14 deletions(-)
- create mode 100644 include/linux/irqchip/mmp.h
+ drivers/irqchip/irq-mmp.c | 45 +++++++++++++++++++++------------------------
+ 1 file changed, 21 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index c7592f1..09fbe7d 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -13,6 +13,8 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/mmp.h>
- #include <linux/platform_device.h>
- 
- #include <asm/hardware/cache-tauros2.h>
-@@ -26,6 +28,7 @@
- #include <mach/mfp.h>
- #include <mach/devices.h>
- #include <mach/mmp2.h>
-+#include <mach/pm-mmp2.h>
- 
- #include "common.h"
- 
-@@ -94,6 +97,7 @@ void mmp2_clear_pmic_int(void)
- void __init mmp2_init_irq(void)
- {
- 	mmp2_init_icu();
-+	icu_irq_chip.irq_set_wake = mmp2_set_wake;
- }
- 
- static int __init mmp2_init(void)
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index a586742..96e125b 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -12,6 +12,8 @@
- #include <linux/init.h>
- #include <linux/list.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/mmp.h>
- #include <linux/platform_device.h>
- 
- #include <asm/hardware/cache-tauros2.h>
-@@ -23,6 +25,7 @@
- #include <mach/dma.h>
- #include <mach/mfp.h>
- #include <mach/devices.h>
-+#include <mach/pm-pxa910.h>
- #include <mach/pxa910.h>
- 
- #include "common.h"
-@@ -80,6 +83,7 @@ static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
- void __init pxa910_init_irq(void)
- {
- 	icu_init_irq();
-+	icu_irq_chip.irq_set_wake = pxa910_set_wake;
- }
- 
- static int __init pxa910_init(void)
 diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
-index 84d51ff..1f81432 100644
+index 1f81432..2cb7cd0 100644
 --- a/drivers/irqchip/irq-mmp.c
 +++ b/drivers/irqchip/irq-mmp.c
-@@ -26,13 +26,6 @@
+@@ -24,8 +24,6 @@
+ #include <asm/exception.h>
+ #include <asm/mach/irq.h>
  
- #include <mach/irqs.h>
- 
--#ifdef CONFIG_CPU_MMP2
--#include <mach/pm-mmp2.h>
--#endif
--#ifdef CONFIG_CPU_PXA910
--#include <mach/pm-pxa910.h>
--#endif
+-#include <mach/irqs.h>
 -
  #include "irqchip.h"
  
  #define MAX_ICU_NR		16
-@@ -132,7 +125,7 @@ static void icu_unmask_irq(struct irq_data *d)
- 	}
- }
- 
--static struct irq_chip icu_irq_chip = {
-+struct irq_chip icu_irq_chip = {
- 	.name		= "icu_irq",
- 	.irq_mask	= icu_mask_irq,
- 	.irq_mask_ack	= icu_mask_ack_irq,
-@@ -251,9 +244,6 @@ void __init icu_init_irq(void)
- 	}
- 	irq_set_default_host(icu_data[0].domain);
- 	set_handle_irq(mmp_handle_irq);
--#ifdef CONFIG_CPU_PXA910
--	icu_irq_chip.irq_set_wake = pxa910_set_wake;
--#endif
- }
- 
+@@ -249,7 +247,7 @@ void __init icu_init_irq(void)
  /* MMP2 (ARMv7) */
-@@ -358,9 +348,6 @@ void __init mmp2_init_icu(void)
- 	}
- 	irq_set_default_host(icu_data[0].domain);
- 	set_handle_irq(mmp2_handle_irq);
--#ifdef CONFIG_CPU_MMP2
--	icu_irq_chip.irq_set_wake = mmp2_set_wake;
--#endif
- }
+ void __init mmp2_init_icu(void)
+ {
+-	int irq;
++	int irq, end;
  
- #ifdef CONFIG_OF
-diff --git a/include/linux/irqchip/mmp.h b/include/linux/irqchip/mmp.h
-new file mode 100644
-index 0000000..c78a892
---- /dev/null
-+++ b/include/linux/irqchip/mmp.h
-@@ -0,0 +1,6 @@
-+#ifndef	__IRQCHIP_MMP_H
-+#define	__IRQCHIP_MMP_H
-+
-+extern struct irq_chip icu_irq_chip;
-+
-+#endif	/* __IRQCHIP_MMP_H */
+ 	max_icu_nr = 8;
+ 	mmp_icu_base = ioremap(0xd4282000, 0x1000);
+@@ -263,11 +261,12 @@ void __init mmp2_init_icu(void)
+ 						   &icu_data[0]);
+ 	icu_data[1].reg_status = mmp_icu_base + 0x150;
+ 	icu_data[1].reg_mask = mmp_icu_base + 0x168;
+-	icu_data[1].clr_mfp_irq_base = IRQ_MMP2_PMIC_BASE;
+-	icu_data[1].clr_mfp_hwirq = IRQ_MMP2_PMIC - IRQ_MMP2_PMIC_BASE;
++	icu_data[1].clr_mfp_irq_base = icu_data[0].virq_base +
++				icu_data[0].nr_irqs;
++	icu_data[1].clr_mfp_hwirq = 1;		/* offset to IRQ_MMP2_PMIC_BASE */
+ 	icu_data[1].nr_irqs = 2;
+ 	icu_data[1].cascade_irq = 4;
+-	icu_data[1].virq_base = IRQ_MMP2_PMIC_BASE;
++	icu_data[1].virq_base = icu_data[0].virq_base + icu_data[0].nr_irqs;
+ 	icu_data[1].domain = irq_domain_add_legacy(NULL, icu_data[1].nr_irqs,
+ 						   icu_data[1].virq_base, 0,
+ 						   &irq_domain_simple_ops,
+@@ -276,7 +275,7 @@ void __init mmp2_init_icu(void)
+ 	icu_data[2].reg_mask = mmp_icu_base + 0x16c;
+ 	icu_data[2].nr_irqs = 2;
+ 	icu_data[2].cascade_irq = 5;
+-	icu_data[2].virq_base = IRQ_MMP2_RTC_BASE;
++	icu_data[2].virq_base = icu_data[1].virq_base + icu_data[1].nr_irqs;
+ 	icu_data[2].domain = irq_domain_add_legacy(NULL, icu_data[2].nr_irqs,
+ 						   icu_data[2].virq_base, 0,
+ 						   &irq_domain_simple_ops,
+@@ -285,7 +284,7 @@ void __init mmp2_init_icu(void)
+ 	icu_data[3].reg_mask = mmp_icu_base + 0x17c;
+ 	icu_data[3].nr_irqs = 3;
+ 	icu_data[3].cascade_irq = 9;
+-	icu_data[3].virq_base = IRQ_MMP2_KEYPAD_BASE;
++	icu_data[3].virq_base = icu_data[2].virq_base + icu_data[2].nr_irqs;
+ 	icu_data[3].domain = irq_domain_add_legacy(NULL, icu_data[3].nr_irqs,
+ 						   icu_data[3].virq_base, 0,
+ 						   &irq_domain_simple_ops,
+@@ -294,7 +293,7 @@ void __init mmp2_init_icu(void)
+ 	icu_data[4].reg_mask = mmp_icu_base + 0x170;
+ 	icu_data[4].nr_irqs = 5;
+ 	icu_data[4].cascade_irq = 17;
+-	icu_data[4].virq_base = IRQ_MMP2_TWSI_BASE;
++	icu_data[4].virq_base = icu_data[3].virq_base + icu_data[3].nr_irqs;
+ 	icu_data[4].domain = irq_domain_add_legacy(NULL, icu_data[4].nr_irqs,
+ 						   icu_data[4].virq_base, 0,
+ 						   &irq_domain_simple_ops,
+@@ -303,7 +302,7 @@ void __init mmp2_init_icu(void)
+ 	icu_data[5].reg_mask = mmp_icu_base + 0x174;
+ 	icu_data[5].nr_irqs = 15;
+ 	icu_data[5].cascade_irq = 35;
+-	icu_data[5].virq_base = IRQ_MMP2_MISC_BASE;
++	icu_data[5].virq_base = icu_data[4].virq_base + icu_data[4].nr_irqs;
+ 	icu_data[5].domain = irq_domain_add_legacy(NULL, icu_data[5].nr_irqs,
+ 						   icu_data[5].virq_base, 0,
+ 						   &irq_domain_simple_ops,
+@@ -312,7 +311,7 @@ void __init mmp2_init_icu(void)
+ 	icu_data[6].reg_mask = mmp_icu_base + 0x178;
+ 	icu_data[6].nr_irqs = 2;
+ 	icu_data[6].cascade_irq = 51;
+-	icu_data[6].virq_base = IRQ_MMP2_MIPI_HSI1_BASE;
++	icu_data[6].virq_base = icu_data[5].virq_base + icu_data[5].nr_irqs;
+ 	icu_data[6].domain = irq_domain_add_legacy(NULL, icu_data[6].nr_irqs,
+ 						   icu_data[6].virq_base, 0,
+ 						   &irq_domain_simple_ops,
+@@ -321,28 +320,26 @@ void __init mmp2_init_icu(void)
+ 	icu_data[7].reg_mask = mmp_icu_base + 0x184;
+ 	icu_data[7].nr_irqs = 2;
+ 	icu_data[7].cascade_irq = 55;
+-	icu_data[7].virq_base = IRQ_MMP2_MIPI_HSI0_BASE;
++	icu_data[7].virq_base = icu_data[6].virq_base + icu_data[6].nr_irqs;
+ 	icu_data[7].domain = irq_domain_add_legacy(NULL, icu_data[7].nr_irqs,
+ 						   icu_data[7].virq_base, 0,
+ 						   &irq_domain_simple_ops,
+ 						   &icu_data[7]);
+-	for (irq = 0; irq < IRQ_MMP2_MUX_END; irq++) {
++	end = icu_data[7].virq_base + icu_data[7].nr_irqs;
++	for (irq = 0; irq < end; irq++) {
+ 		icu_mask_irq(irq_get_irq_data(irq));
+-		switch (irq) {
+-		case IRQ_MMP2_PMIC_MUX:
+-		case IRQ_MMP2_RTC_MUX:
+-		case IRQ_MMP2_KEYPAD_MUX:
+-		case IRQ_MMP2_TWSI_MUX:
+-		case IRQ_MMP2_MISC_MUX:
+-		case IRQ_MMP2_MIPI_HSI1_MUX:
+-		case IRQ_MMP2_MIPI_HSI0_MUX:
++		if (irq == icu_data[1].cascade_irq ||
++		    irq == icu_data[2].cascade_irq ||
++		    irq == icu_data[3].cascade_irq ||
++		    irq == icu_data[4].cascade_irq ||
++		    irq == icu_data[5].cascade_irq ||
++		    irq == icu_data[6].cascade_irq ||
++		    irq == icu_data[7].cascade_irq) {
+ 			irq_set_chip(irq, &icu_irq_chip);
+ 			irq_set_chained_handler(irq, icu_mux_irq_demux);
+-			break;
+-		default:
++		} else {
+ 			irq_set_chip_and_handler(irq, &icu_irq_chip,
+ 						 handle_level_irq);
+-			break;
+ 		}
+ 		set_irq_flags(irq, IRQF_VALID);
+ 	}
 -- 
 1.8.1.2
