@@ -1,54 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 26 Jul 2013 10:46:45 -0400 (EDT)
-Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
- prior to strex
-In-Reply-To: <20130726103404.GB17886@mudshark.cambridge.arm.com>
-References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
- <1374579389-32704-5-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
- <20130724111841.GD11072@mudshark.cambridge.arm.com>
- <51F160EA.6030800@codeaurora.org> <51F1626C.3050008@codeaurora.org>
- <20130725174555.GK12827@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1307251622320.15022@syhkavp.arg>
- <20130726103404.GB17886@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1307261042170.15022@syhkavp.arg>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Fri, 26 Jul 2013 20:19:15 +0530
+Subject: [PATCH V3 0/2] USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1372958187-4039-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1372958187-4039-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1374850157-5854-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Jul 2013, Will Deacon wrote:
+These patches are for separating the SOC On-Chip ohci host controller
+from ohci-hcd host code into its own driver module.
+This work is part of enabling multi-platform kernels on ARM.
 
-> Hi Nicolas,
-> 
-> On Thu, Jul 25, 2013 at 09:24:48PM +0100, Nicolas Pitre wrote:
-> > On Thu, 25 Jul 2013, Will Deacon wrote:
-> > > > 
-> > > > Oh joy. Why is rwlock's lock member marked volatile?
-> > > 
-> > > Yeah, that was the problematic guy. However, I had to fix that anyway in
-> > > this patch because otherwise the definition for prefetchw when
-> > > !ARCH_HAS_PREFETCHW (which expands to __builtin_prefetch(x,1)) will explode.
-> > 
-> > Why not always keep ARCH_HAS_PREFETCHW defined then, and have 
-> > __builtin_prefetch([const volatile void *)x,1)) when we can't do better?
-> > 
-> > Or why not adding this cast to the generic definition?
-> 
-> Yes, I'd prefer to fix the generic definition as a separate patch. However,
-> I think the only case that this generates warnings is when a volatile * is
-> passed. If volatile is actually required, I question whether prefetching
-> from that location even makes sense in the first place since, in the kernel,
-> the keyword seems to be generally associated with IO rather than CPUs accessing
-> shared memory via caches.
-> 
-> What do you think?
+In V2:
 
-The only thing volatile is good for is to tell the compiler not to 
-attempt any kind of optimization on the access.  Obviously this is 
-needed for IO accessors, but we don't want the compiler to think it can 
-cache a previous reading of the lock value either.  So as long as all 
-accesses are done through some accessors (you did add ACCESS_ONCE() in 
-your patch removing the volatile for that reason) then we don't need 
-that keyword in the lock definition.
+patch 1/2:
+     -ohci_hcd_init() statements are removed,
+      because by default it is called in ohci_setup().
 
+Patch 2/2:
+     -Changed ohci_hcd and pxa27x_ohci struct variable names.
+        1 ohci_hcd struct variable name is ohci.
+        2 pxa27x_ohci struct variable name is pxa_ohci.
+ 
+In V3:
 
-Nicolas
+Patch 1/2:
+     -Unused *ohci variable has been removed.
+
+patch 2/2:
+     -Rewrite the macro definition of to_pxa27x_ohci.
+     -clk_put() function has been called before usb_put_hcd().
+
+Manjunath Goudar (2):
+  USB: OHCI: make ohci-ep93xx a separate driver
+  USB: OHCI: make ohci-pxa27x a separate driver
+
+ drivers/usb/host/Kconfig       |   16 +++
+ drivers/usb/host/Makefile      |    2 +
+ drivers/usb/host/ohci-ep93xx.c |   80 ++++++-------
+ drivers/usb/host/ohci-hcd.c    |   24 ----
+ drivers/usb/host/ohci-pxa27x.c |  242 ++++++++++++++++++----------------------
+ 5 files changed, 158 insertions(+), 206 deletions(-)
+
+-- 
+1.7.9.5
