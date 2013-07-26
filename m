@@ -1,78 +1,63 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 26 Jul 2013 17:15:03 +0800
-Subject: [PATCH 1/8] ARM: tegra: add common resume handling code for LP1
- resuming
-In-Reply-To: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1374830110-30685-2-git-send-email-josephl@nvidia.com>
+Date: Fri, 26 Jul 2013 17:15:02 +0800
+Subject: [PATCH 0/8] ARM: tegra: support LP1 suspend mode
+Message-ID: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common LP1 resuming procedures of LP1 on Tegra was checking the LP1
-mask first. The LP1 mask indicated that the Tegra device was in LP1 then
-we need to resume the Tegra from the LP1 reset handler.
+This series adds the support of LP1 suspend mode for Tegra.
 
-And the LP1 was putting the SDRAM to self-refresh mode, the SDRAM wasn't
-accessible when resuming from LP1. We need to copy the LP1 reset handler
-to IRAM before suspending. That's why you can see the address of LP1
-reset handler was located in IRAM.
+Verified on Seaboard, Cardhu and Dalmore.
+And tested with THUMB2_KERNEL as well.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/reset-handler.S | 13 +++++++++++++
- arch/arm/mach-tegra/reset.c         |  2 ++
- arch/arm/mach-tegra/sleep.h         |  2 ++
- 3 files changed, 17 insertions(+)
+P.S.
+A known issue on Dalmore, the LP1 resume may take 10 ~ 15 seconds due to
+the 792MHz BCT. It can't be reproduced on Seaboard or Cardhu. And the
+root cause of this is about the default settings of EMC registers that
+cause the DRAM can't leave self-refresh mode immediately. If you want
+to test with quick LP1 resume on Dalmore, I can provide another HACK for
+this.
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 34614bd..492b10f 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -182,6 +182,19 @@ after_errata:
- 1:
- #endif
- 
-+	/* Waking up from LP1? */
-+	ldr	r8, [r12, #RESET_DATA(MASK_LP1)]
-+	tst	r8, r11				@ if in_lp1
-+	beq	__is_not_lp1
-+	cmp	r10, #0
-+	bne	__die				@ only CPU0 can be here
-+	ldr	lr, [r12, #RESET_DATA(STARTUP_LP1)]
-+ THUMB(	add	lr, lr, #1 )			@ switch to Thumb mode
-+	cmp	lr, #0
-+	bleq	__die				@ no LP1 startup handler
-+	bx	lr
-+__is_not_lp1:
-+
- 	/* Waking up from LP2? */
- 	ldr	r9, [r12, #RESET_DATA(MASK_LP2)]
- 	tst	r9, r11				@ if in_lp2
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 1ac434e..fd0bbf8 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -81,6 +81,8 @@ void __init tegra_cpu_reset_handler_init(void)
- #endif
- 
- #ifdef CONFIG_PM_SLEEP
-+	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP1] =
-+		TEGRA_IRAM_CODE_AREA;
- 	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP2] =
- 		virt_to_phys((void *)tegra_resume);
- #endif
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index e907e40..e7f8b6f 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -29,6 +29,8 @@
- 					+ IO_APB_VIRT)
- #define TEGRA_PMC_VIRT	(TEGRA_PMC_BASE - IO_APB_PHYS + IO_APB_VIRT)
- 
-+#define TEGRA_IRAM_CODE_AREA	(TEGRA_IRAM_BASE + SZ_4K)
-+
- /* PMC_SCRATCH37-39 and 41 are used for tegra_pen_lock and idle */
- #define PMC_SCRATCH37	0x130
- #define PMC_SCRATCH38	0x134
+Joseph Lo (8):
+  ARM: tegra: add common resume handling code for LP1 resuming
+  ARM: tegra: config the polarity of the request of sys clock
+  clk: tegra114: add LP1 suspend/resume support
+  ARM: tegra: add common LP1 suspend support
+  ARM: tegra30: add LP1 suspend support
+  ARM: tegra20: add LP1 suspend support
+  ARM: tegra114: add LP1 suspend support
+  ARM: dts: tegra: enable LP1 suspend mode
+
+ arch/arm/boot/dts/tegra114-dalmore.dts     |   2 +-
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi |   2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts      |   2 +-
+ arch/arm/boot/dts/tegra20-paz00.dts        |   2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts     |   2 +-
+ arch/arm/boot/dts/tegra20-tamonten.dtsi    |   2 +-
+ arch/arm/boot/dts/tegra20-trimslice.dts    |   2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts      |   2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts     |   2 +-
+ arch/arm/boot/dts/tegra30-beaver.dts       |   2 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi      |   2 +-
+ arch/arm/mach-tegra/Makefile               |   3 +
+ arch/arm/mach-tegra/iomap.h                |   6 +
+ arch/arm/mach-tegra/pm-tegra20.c           |  37 ++
+ arch/arm/mach-tegra/pm-tegra30.c           |  37 ++
+ arch/arm/mach-tegra/pm.c                   | 121 +++++-
+ arch/arm/mach-tegra/pm.h                   |  23 ++
+ arch/arm/mach-tegra/pmc.c                  |  36 +-
+ arch/arm/mach-tegra/pmc.h                  |   3 +
+ arch/arm/mach-tegra/reset-handler.S        |  13 +
+ arch/arm/mach-tegra/reset.c                |   2 +
+ arch/arm/mach-tegra/reset.h                |   4 +
+ arch/arm/mach-tegra/sleep-tegra20.S        | 300 ++++++++++++++
+ arch/arm/mach-tegra/sleep-tegra30.S        | 615 +++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/sleep.S                |   8 +-
+ arch/arm/mach-tegra/sleep.h                |  18 +
+ drivers/clk/tegra/clk-tegra114.c           |  32 ++
+ 27 files changed, 1259 insertions(+), 21 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/pm-tegra20.c
+ create mode 100644 arch/arm/mach-tegra/pm-tegra30.c
+
 -- 
 1.8.3.4
