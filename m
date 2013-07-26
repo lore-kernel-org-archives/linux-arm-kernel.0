@@ -1,131 +1,89 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 26 Jul 2013 10:17:47 -0300
-Subject: [PATCH v9 10/30] bus: mvebu-mbus: Add new API for the PCIe memory and
- IO aperture
+Date: Fri, 26 Jul 2013 10:17:44 -0300
+Subject: [PATCH v9 07/30] bus: mvebu-mbus: Factor out initialization details
 In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374844687-19981-11-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374844687-19981-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We add two optional properties to the MBus DT binding, to encode
-the PCIe memory and IO aperture. This allows such information to
-be retrieved by -for instance- the pci driver to allocate the
-MBus decoding windows.
+We introduce a common initialization function mvebu_mbus_common_init()
+that will be used by both legacy and device-tree initialization code.
+This patch is an intermediate step, which will allow to introduce the
+DT binding for this driver in a less intrusive way.
 
-Correspondingly, and in order to retrieve this information,
-we add two new APIs.
-
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- drivers/bus/mvebu-mbus.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mbus.h     |  4 ++++
- 2 files changed, 53 insertions(+)
+ drivers/bus/mvebu-mbus.c | 47 ++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 78b8c04..929fed1 100644
+index 827468a..1b17954 100644
 --- a/drivers/bus/mvebu-mbus.c
 +++ b/drivers/bus/mvebu-mbus.c
-@@ -142,6 +142,8 @@ struct mvebu_mbus_state {
- 	struct dentry *debugfs_root;
- 	struct dentry *debugfs_sdram;
- 	struct dentry *debugfs_devs;
-+	struct resource pcie_mem_aperture;
-+	struct resource pcie_io_aperture;
- 	const struct mvebu_mbus_soc_data *soc;
- 	int hw_io_coherency;
- };
-@@ -821,6 +823,20 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size)
+@@ -847,26 +847,14 @@ static __init int mvebu_mbus_debugfs_init(void)
+ }
+ fs_initcall(mvebu_mbus_debugfs_init);
+ 
+-int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+-			   size_t mbuswins_size,
+-			   phys_addr_t sdramwins_phys_base,
+-			   size_t sdramwins_size)
++static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
++					 phys_addr_t mbuswins_phys_base,
++					 size_t mbuswins_size,
++					 phys_addr_t sdramwins_phys_base,
++					 size_t sdramwins_size)
+ {
+-	struct mvebu_mbus_state *mbus = &mbus_state;
+-	const struct of_device_id *of_id;
+ 	int win;
+ 
+-	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
+-		if (!strcmp(of_id->compatible, soc))
+-			break;
+-
+-	if (!of_id->compatible) {
+-		pr_err("could not find a matching SoC family\n");
+-		return -ENODEV;
+-	}
+-
+-	mbus->soc = of_id->data;
+-
+ 	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
+ 	if (!mbus->mbuswins_base)
+ 		return -ENOMEM;
+@@ -887,3 +875,28 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 
  	return 0;
  }
- 
-+void mvebu_mbus_get_pcie_mem_aperture(struct resource *res)
++
++int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
++			   size_t mbuswins_size,
++			   phys_addr_t sdramwins_phys_base,
++			   size_t sdramwins_size)
 +{
-+	if (!res)
-+		return;
-+	*res = mbus_state.pcie_mem_aperture;
-+}
++	const struct of_device_id *of_id;
 +
-+void mvebu_mbus_get_pcie_io_aperture(struct resource *res)
-+{
-+	if (!res)
-+		return;
-+	*res = mbus_state.pcie_io_aperture;
-+}
++	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
++		if (!strcmp(of_id->compatible, soc))
++			break;
 +
- static __init int mvebu_mbus_debugfs_init(void)
- {
- 	struct mvebu_mbus_state *s = &mbus_state;
-@@ -1023,6 +1039,35 @@ static int __init mbus_dt_setup(struct mvebu_mbus_state *mbus,
- 	return 0;
- }
- 
-+static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
-+						 struct resource *mem,
-+						 struct resource *io)
-+{
-+	u32 reg[2];
-+	int ret;
-+
-+	/*
-+	 * These are optional, so we clear them and they'll
-+	 * be zero if they are missing from the DT.
-+	 */
-+	memset(mem, 0, sizeof(struct resource));
-+	memset(io, 0, sizeof(struct resource));
-+
-+	ret = of_property_read_u32_array(np, "pcie-mem-aperture", reg, ARRAY_SIZE(reg));
-+	if (!ret) {
-+		mem->start = reg[0];
-+		mem->end = mem->start + reg[1];
-+		mem->flags = IORESOURCE_MEM;
++	if (!of_id->compatible) {
++		pr_err("could not find a matching SoC family\n");
++		return -ENODEV;
 +	}
 +
-+	ret = of_property_read_u32_array(np, "pcie-io-aperture", reg, ARRAY_SIZE(reg));
-+	if (!ret) {
-+		io->start = reg[0];
-+		io->end = io->start + reg[1];
-+		io->flags = IORESOURCE_IO;
-+	}
++	mbus_state.soc = of_id->data;
++
++	return mvebu_mbus_common_init(&mbus_state,
++			mbuswins_phys_base,
++			mbuswins_size,
++			sdramwins_phys_base,
++			sdramwins_size);
 +}
-+
- int __init mvebu_mbus_dt_init(void)
- {
- 	struct resource mbuswins_res, sdramwins_res;
-@@ -1062,6 +1107,10 @@ int __init mvebu_mbus_dt_init(void)
- 		return -EINVAL;
- 	}
- 
-+	/* Get optional pcie-{mem,io}-aperture properties */
-+	mvebu_mbus_get_pcie_resources(np, &mbus_state.pcie_mem_aperture,
-+					  &mbus_state.pcie_io_aperture);
-+
- 	ret = mvebu_mbus_common_init(&mbus_state,
- 				     mbuswins_res.start,
- 				     resource_size(&mbuswins_res),
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index eadefd6..650bc15 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -11,6 +11,8 @@
- #ifndef __LINUX_MBUS_H
- #define __LINUX_MBUS_H
- 
-+struct resource;
-+
- struct mbus_dram_target_info
- {
- 	/*
-@@ -59,6 +61,8 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- }
- #endif
- 
-+void mvebu_mbus_get_pcie_mem_aperture(struct resource *res);
-+void mvebu_mbus_get_pcie_io_aperture(struct resource *res);
- int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
- 				      size_t size, phys_addr_t remap,
- 				      unsigned int flags);
 -- 
 1.8.1.5
