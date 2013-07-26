@@ -1,68 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 26 Jul 2013 11:38:39 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0: Rely on DT for SMP CPU info
-In-Reply-To: <20130724072739.28333.44251.sendpatchset@w520>
-References: <20130724072739.28333.44251.sendpatchset@w520>
-Message-ID: <20130726023838.GC32490@verge.net.au>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 26 Jul 2013 10:42:45 +0800
+Subject: [PATCH RESEND 1/2] clk: mmp: use global clock lock
+In-Reply-To: <20130716181029.C08D8FAAF3@dev.laptop.org>
+References: <20130716181029.C08D8FAAF3@dev.laptop.org>
+Message-ID: <CAN1soZw7_3X5pdvp2M-Wp69=7Cr9bp4DDD0qMps4XT6u1s_9mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 04:27:39PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Remove sh73a0 specific ->smp_init_cpus() callback and
-> instead of relying on shmobile_smp_init_cpus() simply
-> use DT for CPU core information.
-> 
-> This assumes that DT_MACHINE_START is used which is
-> the case when AG5EVM and Kota2 are removed.
-
-And indeed they are queued-up for removal.
-
-I have queued-up this patch for v3.12 in the dt2 branch.
-
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+On Wed, Jul 17, 2013 at 2:10 AM, Daniel Drake <dsd@laptop.org> wrote:
+> The mmp platform shares a lock between different clock types, and all
+> clocks are currently initialized by static bindings.
+>
+> Move this static/private lock into global context so that it can
+> easily be shared by clocks that will be defined by the device tree in
+> followup patches.
+>
+> Signed-off-by: Daniel Drake <dsd@laptop.org>
 > ---
-> 
->  arch/arm/mach-shmobile/smp-sh73a0.c |   11 ++---------
->  1 file changed, 2 insertions(+), 9 deletions(-)
-> 
-> --- 0001/arch/arm/mach-shmobile/smp-sh73a0.c
-> +++ work/arch/arm/mach-shmobile/smp-sh73a0.c	2013-07-24 15:59:16.000000000 +0900
-> @@ -62,6 +62,8 @@ static int sh73a0_boot_secondary(unsigne
->  
->  static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
->  {
-> +	/* setup sh73a0 specific SCU base */
-> +	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
->  	scu_enable(shmobile_scu_base);
->  
->  	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
-> @@ -74,14 +76,6 @@ static void __init sh73a0_smp_prepare_cp
->  	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
->  }
->  
-> -static void __init sh73a0_smp_init_cpus(void)
-> -{
-> -	/* setup sh73a0 specific SCU base */
-> -	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
-> -
-> -	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
-> -}
-> -
->  #ifdef CONFIG_HOTPLUG_CPU
->  static int sh73a0_cpu_kill(unsigned int cpu)
->  {
-> @@ -120,7 +114,6 @@ static int sh73a0_cpu_disable(unsigned i
->  #endif /* CONFIG_HOTPLUG_CPU */
->  
->  struct smp_operations sh73a0_smp_ops __initdata = {
-> -	.smp_init_cpus		= sh73a0_smp_init_cpus,
->  	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
->  	.smp_boot_secondary	= sh73a0_boot_secondary,
->  #ifdef CONFIG_HOTPLUG_CPU
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>  drivers/clk/mmp/Makefile   |   2 +-
+>  drivers/clk/mmp/clk-apbc.c |  38 +++++----------
+>  drivers/clk/mmp/clk-apmu.c |  20 ++------
+>  drivers/clk/mmp/clk-mmp2.c | 116 ++++++++++++++++++++++-----------------------
+>  drivers/clk/mmp/clk.h      |   8 ++--
+>  drivers/clk/mmp/common.c   |  13 +++++
+>  6 files changed, 92 insertions(+), 105 deletions(-)
+>  create mode 100644 drivers/clk/mmp/common.c
+>
+> Resending after a month without review.
+>
+
+Currently lock is defined in pxa910, pxa168 & mmp2 clock driver. Only
+one of these driver
+could be active in real system. So I can't see any benefit to use the
+shared clock lock among
+these three drivers.
+
+Regards
+Haojian
