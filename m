@@ -1,37 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Jul 2013 16:25:51 +0100
-Subject: [PATCH V2 2/8] ASoC: Samsung: I2S: Add quirks as driver data in
- I2S
-In-Reply-To: <1417636.4d7IlsSAyI@amdc1227>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
- <1374845812-7803-3-git-send-email-padma.v@samsung.com>
- <20130726145319.GI9858@sirena.org.uk> <1417636.4d7IlsSAyI@amdc1227>
-Message-ID: <20130726152551.GM9858@sirena.org.uk>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 26 Jul 2013 10:27:25 -0500
+Subject: [PATCH] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1374850802.3213.87.camel@hornet>
+References: <1374789881-20611-1-git-send-email-dinguyen@altera.com>
+ <1374846562.3213.56.camel@hornet> <1374850185.20685.12.camel@linux-builds1>
+ <1374850802.3213.87.camel@hornet>
+Message-ID: <1374852445.20685.18.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 05:02:46PM +0200, Tomasz Figa wrote:
+On Fri, 2013-07-26 at 16:00 +0100, Pawel Moll wrote:
+> On Fri, 2013-07-26 at 15:49 +0100, Dinh Nguyen wrote:
+> > Dinh please...
+> 
+> Uh, accept my apologies. I know exactly how it feels ;-)
+> 
+> > > I've also noticed that Exynos defines almost identical bindings:
+> > > 
+> > > > samsung,dw-mshc-ciu-div
+> > > > samsung,dw-mshc-sdr-timing
+> > > > samsung,dw-mshc-ddr-timing
+> > 
+> > Yes, I agree.
+> > > 
+> > > Aren't you both using the same "Synopsis Designware Mobile Storage Host
+> > > Controller" by any chance? Are you sharing a driver? And if not,
+> > > why? ;-) If the timings really must be parametrised, would it be
+> > > possible to come up with a common set of "synopsis" properties, instead
+> > > of "samsung" and "altr" ones? 
+> > 
+> > We are using the same driver. This is just a platform specifc entries
+> > for how the IP can be implemented. I also agree that we can come up with
+> > a shared set of properties for these.
+> > 
+> > But since the platform-driver part has already been picked into the
+> > master tree, can I work on a common set after this patch? That way it
+> > enables SD/MMC to work on SocFPGA for the time being.
+> 
+> Ah, I see. You should have included the binding documentation in the
+> driver using the bindings, not in the patch adding the required nodes to
+> DTS files... Than no one would have any comments on this patch ;-)
+> 
+> So yes, if the driver part got merged I will shut up now, providing you
+> promise to work on "consolidating" the bindings for the next cycle. The
+> sooner, the better. Does it sound like a deal?
 
-> IMHO this SoC-based identification looks much better, especially considering 
-> the fact that IP version isn't something easily determinable, as even the 
-> documentation can sometimes be not really clear about that.
+Yes, you have my promise on the consolidating work! I was also thinking
+the same thing when I enabled this for SOCFPGA, but since I don't have
+any Exynos HW, I didn't have a way to test. But I will work on a patch
+soon and send to the Exynos people to test.
 
-Yeah, it's not terribly clever either way.  We've been using the version
-numbers in audio for a long time partly because it is documented
-sometimes and partly because most of the SoCs tend to have one fully
-featured controller and a bunch of secondary controllers on older IP
-revisions.
-
-> However the s3c6410-i2sv4 string looks a bit unfortunate. AFAIK there were 
-> two types of I2S IPs on S3C6410 - normal I2S and I2S multichannel. What 
-> about having a compatible like s3c6410-i2s-multi?
-
-It was explicitly identified as I2Sv4 in the S3C6410 datasheet so no
-real issue there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/0034ce34/attachment.sig>
+Thanks,
+Dinh
+> 
+> Pawel
+> 
+> 
+> 
