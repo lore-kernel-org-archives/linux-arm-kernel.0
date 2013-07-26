@@ -1,59 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Jul 2013 14:02:50 -0600
-Subject: [PATCH] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1374867220.20685.44.camel@linux-builds1>
-References: <1374789881-20611-1-git-send-email-dinguyen@altera.com>
- <51F2B0C4.8000301@wwwdotorg.org> <1374867220.20685.44.camel@linux-builds1>
-Message-ID: <51F2D5EA.7050108@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Jul 2013 13:07:03 -0700
+Subject: Zynq clk fixes
+In-Reply-To: <51F26716.6030701@monstr.eu>
+References: <51F26716.6030701@monstr.eu>
+Message-ID: <20130726200703.7598.86150@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 01:33 PM, Dinh Nguyen wrote:
-> On Fri, 2013-07-26 at 11:24 -0600, Stephen Warren wrote:
->> On 07/25/2013 04:04 PM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> Add bindings for SD/MMC for SOCFPGA.
->>> Add "syscon" to the "altr,sys-mgr" binding.
-
->>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-
->>> +Example:
->>> +
->>> +  The MSHC controller node can be split into two portions, SoC specific and
->>> +  board specific portions, as listed below.
->>
->> That doesn't sound like a good idea. There should be one DT node for
->> each logical block. The internal construction of the Linux drivers
->> (presumably you have entirely separate code to handle the two nodes in
->> Linux so far?) should not influence the DT construction at all.
+Quoting Michal Simek (2013-07-26 05:09:58)
+> Hi Mike, [cc: Arnd and Olof]
 > 
-> In the end, there is only 1 DT node for each logical block:
+> Soren has found two bug fixes in zynq clk code.
+> Can you please add these two patches to your tree?
+> Will be great if you can add them to v3.11.
+> 
+> Arnd, Olof: I expect that all these clock changes should go through Mike.
+> If I am wrong please let me know.
 
-Oh right, I see you were intending to show the distinction between the
-SoC .dtsi and board .dts file. I hadn't realized that. I don't think
-it's common to do that in the examples, so I would recommend just
-merging the whole example together myself.
+Looks right to me. Do these fix regressions in the current -rc cycle?
 
-> dwmmc0 at ff704000 {
-> 	compatible = "altr,socfpga-dw-mshc";
+Regards,
+Mike
 
-That should include the baseline synopsis compatible value too.
-
-> 	reg = <0xff704000 0x00001000>;
-> 	interrupts = <0x00000000 0x0000008b 0x00000004>;
-> 	fifo-depth = <0x00000400>;
-> 	#address-cells = <0x00000001>;
-> 	#size-cells = <0x00000000>;
-> 	clocks = <0x00000016 0x00000017>;
-> 	clock-names = "biu", "ciu";
-> 	num-slots = <0x00000001>;
-> 	supports-highspeed;
-> 	broken-cd;
->  	altr,dw-mshc-ciu-div = <0x00000003>;
->   	altr,dw-mshc-sdr-timing = <0x00000000 0x00000003>;
-> 	slot at 0 {
-> 		reg = <0x00000000>;
-> 		bus-width = <0x00000004>;
-> 		};
-> 	};
+> 
+> Thanks,
+> Michal
+> 
+> 
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> 
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-fixes-for-3.11
+> 
+> for you to fetch changes up to 97d58aef394831f6f0583653de29e03886a0e09e:
+> 
+>   clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes (2013-07-17 08:36:53 +0200)
+> 
+> ----------------------------------------------------------------
+> arm: Xilinx Zynq clock fixes for v3.11
+> 
+> - Fix watchdog clock registration
+> - Fix gem clock propagation
+> 
+> ----------------------------------------------------------------
+> Soren Brinkmann (2):
+>       clk/zynq/clkc: Add dedicated spinlock for the SWDT
+>       clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes
+> 
+>  drivers/clk/zynq/clkc.c | 13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+> 
+> -- 
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
