@@ -1,56 +1,99 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:28 +0800
-Subject: [PATCH v13 12/14] usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED
- and CI_HDRC_PULLUP_ON_VBUS
+Date: Fri, 26 Jul 2013 17:18:18 +0800
+Subject: [PATCH v13 02/14] usb: chipidea: imx: remove vbus regulator operation
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-13-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CI_HDRC_REGS_SHARED stands for the controller registers is shared
-with other USB drivers, if all USB drivers are at chipidea/, it doesn't
-needed to set.
-CI_HDRC_PULLUP_ON_VBUS stands for pullup dp when the vbus is on. This
-flag doesn't need to set if the vbus is always on for gadget
-since dp has always pulled up after the gadget has initialized.
-
-So, the current code seems to misuse this two flags.
-- When the gadget initializes, the controller doesn't need to run if
-it depends on vbus (CI_HDRC_PULLUP_ON_VBUS), it does not
-relate to shared register.
-- When the gadget starts (load one gadget module), the controller
-can run if vbus is on (CI_HDRC_PULLUP_ON_VBUS), it also does not
-relate to shared register.
+Since we have added vbus reguatlor operation at common
+host file (chipidea/host.c), the glue layer vbus operation
+isn't needed any more.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/udc.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c |   30 +++++++-----------------------
+ 1 files changed, 7 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index c70ce38..45abf4d 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1637,8 +1637,7 @@ static int ci_udc_start(struct usb_gadget *gadget,
- 	pm_runtime_get_sync(&ci->gadget.dev);
- 	if (ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) {
- 		if (ci->vbus_active) {
--			if (ci->platdata->flags & CI_HDRC_REGS_SHARED)
--				hw_device_reset(ci, USBMODE_CM_DC);
-+			hw_device_reset(ci, USBMODE_CM_DC);
- 		} else {
- 			pm_runtime_put_sync(&ci->gadget.dev);
- 			goto done;
-@@ -1801,7 +1800,7 @@ static int udc_start(struct ci_hdrc *ci)
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index 14362c0..d06355e 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -31,7 +31,6 @@ struct ci_hdrc_imx_data {
+ 	struct usb_phy *phy;
+ 	struct platform_device *ci_pdev;
+ 	struct clk *clk;
+-	struct regulator *reg_vbus;
+ };
+ 
+ static const struct usbmisc_ops *usbmisc_ops;
+@@ -141,22 +140,13 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		goto err_clk;
+ 	}
+ 
+-	/* we only support host now, so enable vbus here */
+-	data->reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+-	if (!IS_ERR(data->reg_vbus)) {
+-		ret = regulator_enable(data->reg_vbus);
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"Failed to enable vbus regulator, err=%d\n",
+-				ret);
+-			goto err_clk;
+-		}
+-	} else {
+-		data->reg_vbus = NULL;
+-	}
+-
+ 	pdata.phy = data->phy;
+ 
++	/* Get the vbus regulator */
++	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
++	if (IS_ERR(pdata.reg_vbus))
++		pdata.reg_vbus = NULL;
++
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+ 	if (!pdev->dev.coherent_dma_mask)
+@@ -167,7 +157,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		if (ret) {
+ 			dev_err(&pdev->dev,
+ 				"usbmisc init failed, ret=%d\n", ret);
+-			goto err;
++			goto err_clk;
  		}
  	}
  
--	if (!(ci->platdata->flags & CI_HDRC_REGS_SHARED)) {
-+	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)) {
- 		retval = hw_device_reset(ci, USBMODE_CM_DC);
- 		if (retval)
- 			goto put_transceiver;
+@@ -179,7 +169,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev,
+ 			"Can't register ci_hdrc platform device, err=%d\n",
+ 			ret);
+-		goto err;
++		goto err_clk;
+ 	}
+ 
+ 	if (usbmisc_ops && usbmisc_ops->post) {
+@@ -200,9 +190,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 
+ disable_device:
+ 	ci_hdrc_remove_device(data->ci_pdev);
+-err:
+-	if (data->reg_vbus)
+-		regulator_disable(data->reg_vbus);
+ err_clk:
+ 	clk_disable_unprepare(data->clk);
+ 	return ret;
+@@ -215,9 +202,6 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
+ 	pm_runtime_disable(&pdev->dev);
+ 	ci_hdrc_remove_device(data->ci_pdev);
+ 
+-	if (data->reg_vbus)
+-		regulator_disable(data->reg_vbus);
+-
+ 	if (data->phy) {
+ 		usb_phy_shutdown(data->phy);
+ 		module_put(data->phy->dev->driver->owner);
 -- 
 1.7.0.4
