@@ -1,55 +1,121 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 26 Jul 2013 19:46:01 +0900
-Subject: [PATCH 2/2] iommu/exynos: Follow kernel coding style for
- __sysmmu_enable return type
-In-Reply-To: <1374766502-14823-2-git-send-email-a.motakis@virtualopensystems.com>
-References: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
- <1374766502-14823-2-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <003101ce89ed$52317330$f6945990$@samsung.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jul 2013 11:48:40 +0100
+Subject: [PATCH 1/2] ARM: Correct BUG() assembly to ensure it is
+ endian-agnostic
+In-Reply-To: <20130725175456.GF2546@localhost.localdomain>
+References: <1374763357-4893-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374763357-4893-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20130725155700.GD2546@localhost.localdomain>
+ <51F14CAF.5010602@codethink.co.uk>
+ <20130725175456.GF2546@localhost.localdomain>
+Message-ID: <20130726104835.GA2282@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Antonios Motakis [mailto:a.motakis at virtualopensystems.com]
-> Sent: Friday, July 26, 2013 12:35 AM
+On Thu, Jul 25, 2013 at 06:54:56PM +0100, Dave Martin wrote:
+> On Thu, Jul 25, 2013 at 05:05:03PM +0100, Ben Dooks wrote:
+> > On 25/07/13 16:57, Dave Martin wrote:
+> > >On Thu, Jul 25, 2013 at 03:42:36PM +0100, Ben Dooks wrote:
+> > >>Currently BUG() uses .word or .hword to create the necessary illegal
+> > >>instructions. However if we are building BE8 then these get swapped
+> > >>by the linker into different illegal instructions in the text.
+> > >
+> > >In the case of Thumb, the resulting instruction is actually not illegal,
+> > >which is even worse...
+> > >
+> > >>Change to using .inst and .inst.w to create the instructions and mark
+> > >>them as instructions so that the linker acts correctly.
+> > >>
+> > >>Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+> > >>---
+> > >>  arch/arm/include/asm/bug.h |    4 ++--
+> > >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> > >>
+> > >>diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+> > >>index 7af5c6c..b95da52 100644
+> > >>--- a/arch/arm/include/asm/bug.h
+> > >>+++ b/arch/arm/include/asm/bug.h
+> > >>@@ -12,10 +12,10 @@
+> > >>   */
+> > >>  #ifdef CONFIG_THUMB2_KERNEL
+> > >>  #define BUG_INSTR_VALUE 0xde02
+> > >>-#define BUG_INSTR_TYPE ".hword "
+> > >>+#define BUG_INSTR_TYPE ".inst.w "
+> > >>  #else
+> > >>  #define BUG_INSTR_VALUE 0xe7f001f2
+> > >>-#define BUG_INSTR_TYPE ".word "
+> > >>+#define BUG_INSTR_TYPE ".inst "
+> > >>  #endif
+> > >
+> > >There was some uncertainty a while ago about precisely which versions of
+> > >gas support .inst.
+> > >
+> > ><asm/opcodes.h>  implements an abstracted workaround for this issue,
+> > >whereby you can emit instructions using the __inst*() macros, and
+> > >the swabbing and assembler directives should be generated for you.
+> > >
+> > >The patch below ought to do this for BUG(), but I've only briefly
+> > >build-tested it.
+> > >
+> > >
+> > >Note that the disassembly of the injected instructions in .o files
+> > >can be a bit confusing, because they are marked as data, do ld --be8
+> > >doesn't swab them (unlike the instructions, which do get swabbed).
+> > >objdump may also do extra swabbing during disassembly.
+> > >
+> > >You can sanity-check what is really in the image by dumping the text
+> > >section of vmlinux with objdump -s.
+> > >
+> > >
+> > >The change to<asm/opcodes.h>  is due to a missing include which is
+> > >really required for correctness, but which didn't show up without
+> > >the<asm/bug.h>  change (this causes opcodes.h to get included way
+> > >more often than is otherwise the case).
+> > >
+> > >Cheers
+> > >---Dave
+> > 
+> > Given it was added ~2006 according the mailing lists I have seen, then
+> > it should be ok to use for building modern kernels with. I think the
+> > use of .inst and .inst.w is a better solution than having the code
+> > having bits of it marked as data.
 > 
-> On success, the __sysmmu_enable returns 1 instead of 0, which does not
-> respect the convention described in Chapter 16 of the Linux kernel coding
-> style.
+> Of course it is.  But this discussion can be decoupled from bug.h:
+> if we decide to migrate to .inst, we can do that in one place in
+> opcodes.h, no?
 > 
-> In fact, this return value is propagated all the way up to
-> iommu_attach_device() and iommu_attach_device() in drivers/iommu.c,
-> which results into inconsistent behavior of the IOMMU API with Exynos
-> systems, compared to other IOMMUs.
-> 
-> This patch replaces the return value with 0, which makes the Exynos'
-> IOMMU driver behavior consistent with that of other IOMMUs.
-> 
-> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-> ---
->  drivers/iommu/exynos-iommu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index c7dd4b5..4ea3abb 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -504,7 +504,7 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
-> 
->  		dev_dbg(data->sysmmu, "Enabled\n");
->  	} else {
-> -		ret = (pgtable == data->pgtable) ? 1 : -EBUSY;
-> +		ret = (pgtable == data->pgtable) ? 0 : -EBUSY;
-> 
-Ok.
+> Otherwise, we have multiple fixes to apply when we decide to make
+> that change.
 
-__sysmmu_enable() must return 1 if it is called with the same page table.
-I have fixed it exynos_iommu_attach_device() to always return zero on success
-in the next patchset which I will post today.
+A quick follow-up on that: I found I have a random old binutils
+knocking around which is post-2006 and lacks .inst:
 
-Thank you.
 
->  		dev_dbg(data->sysmmu, "already enabled\n");
->  	}
-> --
-> 1.8.1.2
+$ arm-elf-eabi-as --version
+GNU assembler (GNU Binutils) 2.19.1
+Copyright 2007 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or later.
+This program has absolutely no warranty.
+This assembler was configured for a target of `arm-elf-eabi'.
+
+$ echo .inst 0 | arm-elf-eabi-as
+{standard input}: Assembler messages:
+{standard input}:1: Error: unknown pseudo-op: `.inst'
+
+
+Maybe .inst never made it onto that release branch.
+
+This goes a small way to explaining why my disk is so full, anyway.
+
+
+I won't comment on whether it's wise to carry on using tools that old,
+but I note that it can build current mainline, except for some newer,
+v7-specific configurations.  bug.h is hardly v7-specific.
+
+Because a workaround for the lack of .inst already exists, I think
+it would be execessive to cut off backward tool compaitiblity for
+all configurations just for this minor, solved issue.
+
+Cheers
+---Dave
