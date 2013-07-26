@@ -1,158 +1,95 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 26 Jul 2013 20:27:54 +0900
-Subject: [PATCH v8 05/12] clk: exynos5250: add gate clock descriptions of
- System MMU
-Message-ID: <003b01ce89f3$2be4db80$83ae9280$@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 26 Jul 2013 07:27:57 -0400
+Subject: Location for a kind of GPIO bus driver
+In-Reply-To: <20130726085623.GM9916@kw.sim.vm.gnt>
+References: <20130723151834.GJ9916@kw.sim.vm.gnt>
+ <20130724181924.GI19736@titan.lakedaemon.net>
+ <20130725154932.GL9916@kw.sim.vm.gnt>
+ <20130725160324.GJ23879@titan.lakedaemon.net>
+ <20130726085623.GM9916@kw.sim.vm.gnt>
+Message-ID: <20130726112757.GA29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds gate clocks of all System MMUs and their master IPs
-that are not apeared in clk-exynos5250.c
+On Fri, Jul 26, 2013 at 10:56:23AM +0200, Simon Guinot wrote:
+> On Thu, Jul 25, 2013 at 12:03:24PM -0400, Jason Cooper wrote:
+> > On Thu, Jul 25, 2013 at 05:49:32PM +0200, Simon Guinot wrote:
+> > > On Wed, Jul 24, 2013 at 02:19:24PM -0400, Jason Cooper wrote:
+> > > > On Tue, Jul 23, 2013 at 05:18:34PM +0200, Simon Guinot wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > I am currently working on converting the LED driver leds-netxbig to DT.
+> > > > > Doing so, I am also considering to move the GPIO extension bus functions
+> > > > > (which are currently parts of leds-netxbig) into a separate driver.
+> > > > > 
+> > > > > On the LaCie "Big Network" board family (netxbig), the LEDs are
+> > > > > controlled by a CPLD. In turn, the CPLD can be configured (mostly the
+> > > > > LEDs modes) through a kind of parallel GPIO bus, called GPIO extension
+> > > > > bus. Two registers (address and data) are exposed. Each of them is made
+> > > > > up of several GPIOs. An extra GPIO is used to notify the CPLD that the
+> > > > > registers have been updated. The leds-netxbig driver uses some dedicated
+> > > > > functions (prefixed by "gpio_ext_") to handle the GPIO bus extension.
+> > > > > 
+> > > > > On the latest "Big Network" boards, this bus is also used to enable the
+> > > > > PM wakeup sources: the CPLD can be asked to keep powered some devices
+> > > > > (as the RTC or the Ethernet PHY) while the board is down. I think it
+> > > > > could be nice to expose this feature to the userland. That's why I am
+> > > > > thinking about moving the GPIO extension bus support into a separate
+> > > > > driver. The problem is that I can't find a proper location for a such
+> > > > > driver. AFAIK, it doesn't fit with anything existing supported by Linux.
+> > > > > Maybe I should consider drivers/bus ? Or even drivers/misc ?
+> > > 
+> > > Hi Jason,
+> > > 
+> > > Thanks for your answer.
+> > > 
+> > > > 
+> > > > iiuc, the CPLD is more of gpio multiplexer/expander.  Have you seen
+> > > > 
+> > > >   66bcb58 arm: mvebu: enable gpio expander over i2c on Mirabox platform
+> > > > 
+> > > > ?  And the corresponding driver, drivers/gpio/gpio-pca953x.c?
+> > > 
+> > > All the drivers under drivers/gpio are registering some GPIO chips.
+> > > It is a big difference with the LaCie "GPIO extension bus". This last
+> > > is more an extension mechanism on the top of GPIOs already existing
+> > > (eventually provided by a SoC or a Super-I/O on x86 boards). No new
+> > > GPIOs are added. I think that the name "extension" is quite confusing.
+> > 
+> > Agreed.
+> > 
+> > > The idea behind this "bus" is to allow to configure a lot of LEDs (in
+> > > various modes) using only few GPIOs and a CPLD (which is already
+> > > available on the board for other purposes). This cheap solution allows
+> > > precisely to save the cost of a GPIO expander :)
+> > > 
+> > > As an example, you can see the "GPIO extension bus" configuration for
+> > > the Kirkwood "Big Network" boards in:
+> > > arch/arm/mach-kirkwood/netxbig_v2-setup.c:132.
+> > > 
+> > > > 
+> > > > I would try drivers/gpio.  If there are complaints, it should be trivial
+> > > > to move it in a new version of the series.
+> > > 
+> > > Why not, as long it is clear that the resulting driver will not provide
+> > > a GPIO chip but rather functions as a library.
+> > 
+> > right, but the end result of what the library would do is expose a
+> > series of LEDs and PM 'virtual gpios'.  So, even though it's not a gpio
+> > expander per-se, it's still filling that role.  Or am I still missing
+> > something?
+> 
+> The library could expose a function allowing to set the address and data
+> registers: gpio_ext_set_value(int addr, int value).
+> 
+> Actually, it is how it works inside leds-netxbig. Simply this function
+> would be also accessible by other drivers.
 
-Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
----
- .../devicetree/bindings/clock/exynos5250-clock.txt |   28 +++++++++-
- drivers/clk/samsung/clk-exynos5250.c               |   57 ++++++++++++++++---
- 2 files changed, 75 insertions(+), 10 deletions(-)
+hmmm, at this point I'm inclined to say "post the code RFC" :-)  We can
+bikeshed it all day long, and not get any further.  And to answer your
+original question, put the library under drivers/bus.  Maybe something
+like lacie_gpio?
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-index 781a627..df49694 100644
---- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-@@ -154,7 +154,33 @@ clock which they consume.
-   dsim0			341
-   dp			342
-   mixer			343
--  hdmi			345
-+  hdmi			344
-+  camif_top		345
-+  smmu_fimc_lite0	346
-+  smmu_fimc_lite1	347
-+  smmu_fimc_lite2	348
-+  smmu_tv		349
-+  smmu_fimd1		350
-+  smmu_2d		351
-+  fimc_isp		352
-+  fimc_drc		353
-+  fimc_fd		354
-+  fimc_scc		355
-+  fimc_scp		356
-+  fimc_mcuctl		357
-+  fimc_odc		358
-+  fimc_dis		359
-+  fimc_3dnr		360
-+  smmu_fimc_isp		361
-+  smmu_fimc_drc		362
-+  smmu_fimc_fd		363
-+  smmu_fimc_scc		364
-+  smmu_fimc_scp		365
-+  smmu_fimc_mcuctl	366
-+  smmu_fimc_odc		367
-+  smmu_fimc_dis0	368
-+  smmu_fimc_dis1	369
-+  smmu_fimc_3dnr	370
- 
- Example 1: An example of a clock controller node is listed below.
- 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 22d7699..e242bde 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -53,12 +53,15 @@
- #define DIV_PERIC3		0x10564
- #define DIV_PERIC4		0x10568
- #define DIV_PERIC5		0x1056c
-+#define GATE_IP_ISP0		0x0C800
-+#define GATE_IP_ISP1		0x0C800
- #define GATE_IP_GSCL		0x10920
- #define GATE_IP_MFC		0x1092c
- #define GATE_IP_GEN		0x10934
- #define GATE_IP_FSYS		0x10944
- #define GATE_IP_PERIC		0x10950
- #define GATE_IP_PERIS		0x10960
-+#define GATE_IP_ACP		0x18800
- #define SRC_CDREX		0x20200
- #define PLL_DIV2_SEL		0x20a24
- #define GATE_IP_DISP1		0x10928
-@@ -100,6 +103,14 @@ enum exynos5250_clks {
- 	tzpc2, tzpc3, tzpc4, tzpc5, tzpc6, tzpc7, tzpc8, tzpc9, hdmi_cec, mct,
- 	wdt, rtc, tmu, fimd1, mie1, dsim0, dp, mixer, hdmi,
- 
-+	camif_top, smmu_fimc_lite0, smmu_fimc_lite1, smmu_fimc_lite2,
-+	smmu_tv, smmu_fimd1, smmu_2d,
-+	fimc_isp, fimc_drc, fimc_fd, fimc_scc, fimc_scp, fimc_mcuctl, fimc_odc,
-+	fimc_dis, fimc_3dnr,
-+	smmu_fimc_isp, smmu_fimc_drc, smmu_fimc_fd, smmu_fimc_scc,
-+	smmu_fimc_scp, smmu_fimc_mcuctl, smmu_fimc_odc, smmu_fimc_dis0,
-+	smmu_fimc_dis1, smmu_fimc_3dnr,
-+
- 	nr_clks,
- };
- 
-@@ -320,19 +331,26 @@ struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 	GATE(gscl3, "gscl3", "aclk266", GATE_IP_GSCL, 3, 0, 0),
- 	GATE(gscl_wa, "gscl_wa", "div_gscl_wa", GATE_IP_GSCL, 5, 0, 0),
- 	GATE(gscl_wb, "gscl_wb", "div_gscl_wb", GATE_IP_GSCL, 6, 0, 0),
--	GATE(smmu_gscl0, "smmu_gscl0", "aclk266", GATE_IP_GSCL, 7, 0, 0),
--	GATE(smmu_gscl1, "smmu_gscl1", "aclk266", GATE_IP_GSCL, 8, 0, 0),
--	GATE(smmu_gscl2, "smmu_gscl2", "aclk266", GATE_IP_GSCL, 9, 0, 0),
--	GATE(smmu_gscl3, "smmu_gscl3", "aclk266", GATE_IP_GSCL, 10, 0, 0),
-+	GATE(smmu_gscl0, "smmu_gscl0", "none", GATE_IP_GSCL, 7, 0, 0),
-+	GATE(smmu_gscl1, "smmu_gscl1", "none", GATE_IP_GSCL, 8, 0, 0),
-+	GATE(smmu_gscl2, "smmu_gscl2", "none", GATE_IP_GSCL, 9, 0, 0),
-+	GATE(smmu_gscl3, "smmu_gscl3", "none", GATE_IP_GSCL, 10, 0, 0),
-+	GATE(camif_top, "camif_top", "aclk266", GATE_IP_GSCL, 4, 0, 0),
-+	GATE(smmu_fimc_lite0, "smmu_fimc_lite0", "none",
-+						GATE_IP_GSCL, 12, 0, 0),
-+	GATE(smmu_fimc_lite1, "smmu_fimc_lite1", "none",
-+						GATE_IP_GSCL, 13, 0, 0),
-+	GATE(smmu_fimc_lite2, "smmu_fimc_lite2", "none",
-+						GATE_IP_GSCL, 14, 0, 0),
- 	GATE(mfc, "mfc", "aclk333", GATE_IP_MFC, 0, 0, 0),
--	GATE(smmu_mfcl, "smmu_mfcl", "aclk333", GATE_IP_MFC, 1, 0, 0),
--	GATE(smmu_mfcr, "smmu_mfcr", "aclk333", GATE_IP_MFC, 2, 0, 0),
-+	GATE(smmu_mfcr, "smmu_mfcr", "none", GATE_IP_MFC, 1, 0, 0),
-+	GATE(smmu_mfcl, "smmu_mfcl", "none", GATE_IP_MFC, 2, 0, 0),
- 	GATE(rotator, "rotator", "aclk266", GATE_IP_GEN, 1, 0, 0),
- 	GATE(jpeg, "jpeg", "aclk166", GATE_IP_GEN, 2, 0, 0),
- 	GATE(mdma1, "mdma1", "aclk266", GATE_IP_GEN, 4, 0, 0),
--	GATE(smmu_rotator, "smmu_rotator", "aclk266", GATE_IP_GEN, 6, 0, 0),
--	GATE(smmu_jpeg, "smmu_jpeg", "aclk166", GATE_IP_GEN, 7, 0, 0),
--	GATE(smmu_mdma1, "smmu_mdma1", "aclk266", GATE_IP_GEN, 9, 0, 0),
-+	GATE(smmu_rotator, "smmu_rotator", "none", GATE_IP_GEN, 6, 0, 0),
-+	GATE(smmu_jpeg, "smmu_jpeg", "none", GATE_IP_GEN, 7, 0, 0),
-+	GATE(smmu_mdma1, "smmu_mdma1", "none", GATE_IP_GEN, 9, 0, 0),
- 	GATE(pdma0, "pdma0", "aclk200", GATE_IP_FSYS, 1, 0, 0),
- 	GATE(pdma1, "pdma1", "aclk200", GATE_IP_FSYS, 2, 0, 0),
- 	GATE(sata, "sata", "aclk200", GATE_IP_FSYS, 6, 0, 0),
-@@ -462,6 +480,27 @@ struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 	GATE(dp, "dp", "aclk200", GATE_IP_DISP1, 4, 0, 0),
- 	GATE(mixer, "mixer", "aclk200", GATE_IP_DISP1, 5, 0, 0),
- 	GATE(hdmi, "hdmi", "aclk200", GATE_IP_DISP1, 6, 0, 0),
-+	GATE(smmu_tv, "smmu_tv", "none", GATE_IP_DISP1, 2, 0, 0),
-+	GATE(smmu_fimd1, "smmu_fimd1", "none", GATE_IP_DISP1, 8, 0, 0),
-+
-+	GATE(smmu_fimc_isp, "smmu_fimc_isp", "none", GATE_IP_ISP0, 8, 0, 0),
-+	GATE(smmu_fimc_drc, "smmu_fimc_drc", "none", GATE_IP_ISP0, 9, 0, 0),
-+	GATE(smmu_fimc_fd, "smmu_fimc_fd", "none", GATE_IP_ISP0, 10, 0, 0),
-+	GATE(smmu_fimc_scc, "smmu_fimc_scc", "none",
-+							GATE_IP_ISP0, 11, 0, 0),
-+	GATE(smmu_fimc_scp, "smmu_fimc_scp", "none",
-+							GATE_IP_ISP0, 12, 0, 0),
-+	GATE(smmu_fimc_mcuctl, "smmu_fimc_mcuctl", "none",
-+							GATE_IP_ISP0, 13, 0, 0),
-+	GATE(smmu_fimc_odc, "smmu_fimc_odc", "none", GATE_IP_ISP1, 4, 0, 0),
-+	GATE(smmu_fimc_dis0, "smmu_fimc_dis0", "none",
-+							GATE_IP_ISP1, 5, 0, 0),
-+	GATE(smmu_fimc_dis1, "smmu_fimc_dis1", "none",
-+							GATE_IP_ISP1, 6, 0, 0),
-+	GATE(smmu_fimc_3dnr, "smmu_fimc_3dnr", "none",
-+							GATE_IP_ISP1, 7, 0, 0),
-+
-+	GATE(smmu_2d, "smmu_2d", "none", GATE_IP_ACP, 7, 0, 0),
- };
- 
- static __initdata struct of_device_id ext_clk_match[] = {
--- 
-1.7.2.5
+thx,
+
+Jason.
