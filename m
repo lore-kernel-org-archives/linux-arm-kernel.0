@@ -1,52 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Jul 2013 13:27:58 -0600
-Subject: [PATCH 2/9] dma: tegra20-apbdma: move to generic device tree
- bindings
-In-Reply-To: <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
-References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
- <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
-Message-ID: <51F2CDBE.40802@wwwdotorg.org>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 26 Jul 2013 21:32:34 +0200
+Subject: [PATCH] ARM: dts: imx53-qsb: Make USBH1 functional
+In-Reply-To: <1374787113-6628-1-git-send-email-fabio.estevam@freescale.com>
+ (Fabio Estevam's message of "Thu, 25 Jul 2013 18:18:33 -0300")
+References: <1374787113-6628-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <87ehalunfx.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Stripping the Cc list a lot)
+Fabio Estevam <fabio.estevam@freescale.com> writes:
+Hi,
 
-On 07/23/2013 10:09 PM, Richard Zhao wrote:
-> Update tegra20-apbdma driver to adopt generic DMA device tree bindings.
-> It calls of_dma_controller_register() with of_dma_simple_xlate to get
-> the generic DMA device tree helper support. The #dma-cells for apbdma
-> must be 1, which is slave ID.
-> 
-> The existing nvidia,dma-request-selector still works there, and the
-> support will be removed after all clients get converted to generic DMA
-> device tree helper.
+[...]
 
-(BTW, I would like to take this series through the Tegra tree to
-simplify dependencies. So, I'm looking for ack's on the drivers rather
-than for them to be applied. I had hoped Richard would point this out
-when posting the patches)
+> @@ -302,7 +312,9 @@
+>  };
+>  
+>  &usbh1 {
+> -       status = "okay";
+> +	vbus-supply = <&reg_usb_vbus>;
+> +	phy_type = "utmi";
+> +	status = "okay";
+>  };
+>  
+>  &usbotg {
 
-> diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+why not putting the vbus supply on the otg node too ?
 
-> +static bool tegra_dma_filter_fn(struct dma_chan *dc, void *param)
-> +{
-> +	if (dc->device->dev->driver == &tegra_dmac_driver.driver) {
-> +		struct tegra_dma_channel *tdc = to_tegra_dma_chan(dc);
-> +		unsigned req = *(unsigned *)param;
-> +
-> +		tdc->slave_id = req;
-> +
-> +		return true;
-> +	}
-> +	return false;
-> +}
-> +
-> +static struct of_dma_filter_info tegra_dma_info = {
-> +	.filter_fn = tegra_dma_filter_fn,
-> +};
+Other than this point, works for me.
 
-Why does this driver need to define a filter function? I thought the
-dmaengine's DT support would already match DMA clients/engines based on
-the phandle in DT? Isn't the need to pass the slave channel ID into
-drivers something pretty fundamental to dmaengine, and hence something
-it already supports?
+Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
