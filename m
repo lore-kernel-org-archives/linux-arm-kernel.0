@@ -1,44 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Jul 2013 09:38:48 +0200
-Subject: [PATCH 2/2] video: imxfb: Add feature to setup PWM Contrast
- Control Register
-In-Reply-To: <20130725212053.b39198a8610efc157a91b7be@mail.ru>
-References: <1374395709-20898-1-git-send-email-shc_work@mail.ru>
- <1374395709-20898-2-git-send-email-shc_work@mail.ru>
- <20130725133824.GD16871@s25.your-server.de>
- <20130725212053.b39198a8610efc157a91b7be@mail.ru>
-Message-ID: <20130726073848.GF2737@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 26 Jul 2013 10:50:08 +0300
+Subject: [PATCH 1/6] usb: phy-nop: Use RESET Controller for managing the
+ reset line
+In-Reply-To: <20130725172855.GJ25415@radagast>
+References: <1374137590-17865-1-git-send-email-rogerq@ti.com>
+ <1374137590-17865-2-git-send-email-rogerq@ti.com>
+ <20130725172855.GJ25415@radagast>
+Message-ID: <51F22A30.80507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 09:20:53PM +0400, Alexander Shiyan wrote:
-> On Thu, 25 Jul 2013 15:38:56 +0200
-> Markus Pargmann <mpa@pengutronix.de> wrote:
+On 07/25/2013 08:28 PM, Felipe Balbi wrote:
+> On Thu, Jul 18, 2013 at 11:53:05AM +0300, Roger Quadros wrote:
+>> Till now we were modelling the RESET line as a voltage regulator and
+>> using the regulator framework to manage it.
+>>
+>> [1] introduces a GPIO based reset controller driver. We use that
+>> to manage the PHY reset line, at least for DT boots. For legacy boots,
+>> will still need to use the regulator framework for reset lines.
+>>
+>> [1] - http://thread.gmane.org/gmane.linux.drivers.devicetree/41348
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
 > 
-> > Hi,
-> > 
-> > On Sun, Jul 21, 2013 at 12:35:09PM +0400, Alexander Shiyan wrote:
-> > > This patch adds feature to setup PWM Contrast Control Register.
-> > > This register is used to control the signal output at the contrast pin,
-> > > which controls contrast of the LCD panel.
-> > 
-> > http://www.spinics.net/lists/linux-fbdev/msg10002.html
+> that's not in mainline yet, right ? Is it guaranteed that it will hit
+> v3.12 merge window ?
 > 
-> PWM? I can not understand how the PWM driver will be connected to the
-> framebuffer driver. It is not backlight, this is contrast.
-> Even if we imagine that the driver will be connected through phandle,
-> then we will need to have at least 4! additional parameters in the framebuffer
-> driver: freq source, frequency and active pulse period + phandle to PWM.
-> Is it worth it, given that these parameters should not be adjustable?
-> On my opinion, the only one additional parameter in framebuffer is enough.
-> Thanks.
+Right. It isn't yet. I'm not sure about 3.12. Let's ask Philipp.
 
-Why should the contrast of a display not be adjustable?
+Philipp, is your GPIO Reset driver scheduled for 3.12?
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+cheers,
+-roger
