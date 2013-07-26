@@ -1,31 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jul 2013 15:14:30 +0100
-Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
-In-Reply-To: <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
-References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
- <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
-Message-ID: <20130726141430.GQ24642@n2100.arm.linux.org.uk>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 26 Jul 2013 15:16:39 +0100
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+ <20130726132709.GH29916@titan.lakedaemon.net>
+ <1374846070.14574.92.camel@i7.infradead.org>
+ <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+Message-ID: <1374848199.14574.103.camel@i7.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 02:21:59PM -0400, Rob Clark wrote:
-> On Thu, Jul 25, 2013 at 1:17 PM,  <tom.cooksey@arm.com> wrote:
-> > Known issues:
-> >  * It uses KDS. We intend to switch to whatever implicit per-buffer
-> >    synchronisation mechanism gets merged, once something is merged.
-> >  * It abuses flags parameter of DRM_IOCTL_MODE_CREATE_DUMB to also
-> >    allocate buffers for the GPU. Still not sure how to resolve this
-> >    as we don't use DRM for our GPU driver.
+On Fri, 2013-07-26 at 10:14 -0400, jonsmirl at gmail.com wrote:
 > 
-> any thoughts/plans about a DRM GPU driver?  Ideally long term (esp.
-> once the dma-fence stuff is in place), we'd have gpu-specific drm
-> (gpu-only, no kms) driver, and SoC/display specific drm/kms driver,
-> using prime/dmabuf to share between the two.
+> Yes, yes - that's why the schema should be written down and used as a
+> validation input to dtc. Then dtc can spit out errors for non-standard
+> items. There would be two versions - the standard one and a legacy one
+> that includes the standard one plus the hacks that can't be undone.
+> 
+> But more importantly it provides a framework for people creating new
+> node definitions. Now they can't work in a vacuum and come up with
+> random names and structure for everything.
+> 
+> Most of the problems express in the thread would go away if the schema
+> was written down and discussed. The rule going forward would be no new
+> nodes that aren't part of the standard schema.
 
-The PL111 primecell is just a scanout device.  It has no GPU embedded
-in it.  It's just like the Armada/Dove DRM stuff - if a GPU is provided
-it's an entirely separate piece of IP, and will likely remain a separate
-non-DRM driver.
+Yes, that seems eminently sensible.
 
-In the case of PL111, PL111 is not manufacturer specific so the GPU can
-be any standalone GPU.
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/27cb750a/attachment.bin>
