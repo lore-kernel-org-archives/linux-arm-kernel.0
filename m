@@ -1,83 +1,84 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 26 Jul 2013 12:29:17 +0530
-Subject: [PATCH 4/4] crypto: omap-sham: Convert to devm_kzalloc()
-In-Reply-To: <1374821957-30141-1-git-send-email-lokeshvutla@ti.com>
-References: <1374821957-30141-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1374821957-30141-5-git-send-email-lokeshvutla@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 26 Jul 2013 09:01:23 +0200 (CEST)
+Subject: [PATCH 00/12] Remove platform callbacks from mmc_spi, sh_mmcif
+ and sh_mobile_sdhi drivers
+In-Reply-To: <1374794808-21890-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374794808-21890-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <Pine.LNX.4.64.1307260859410.20450@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_kzalloc() to make cleanup paths simpler.
+Hi Laurent
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+On Fri, 26 Jul 2013, Laurent Pinchart wrote:
+
+> Hello,
+> 
+> This patch set replaces callbacks to board code with regulators and GPIOs in
+> the mmc_spi, sh_mmcif and sh_mobile_sdhi MMC drivers.
+> 
+> Most of the required infrastructure is in place already on the drivers side,
+> except for CD/RO GPIOs support in the mmc_spi driver. The series thus starts
+> with patch 01/12 that adds this feature to the mmc_spi driver.
+> 
+> Patches 02/12 to 05/12 remove the board callbacks from the ecovec24 and
+> vision_ep9307 boards. The code has been compile-tested only as I don't have
+> access to those boards.
+> 
+> Patches 06/12 to 07/12 then proceed to remove the callbacks from the drivers
+> themselves and from the platform data structures.
+> 
+> This will be a bit messy to merge, as the series interleaves patches for
+> drivers and board files. Given that the mmc_spi driver is marked as orphan in
+> MAINTAINERS and that the vision_ep9307 hasn't seen any board-specific
+> modification in the last couple of kernel versions one option would be to
+> merge all patches (or at least patches 01/12 to 06/12) through Simon's tree if
+> all involved maintainers agree.
+> 
+> The series is based on tag renesas-devel-20130725 from
+> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+> 
+> Laurent Pinchart (12):
+>   mmc: mmc_spi: Support CD/RO GPIOs
+>   ARM: ep93xx: vision_ep9307: Use MMC CD and RO GPIO
+>   sh: ecovec24: Use MMC/SDHI CD and RO GPIO
+>   sh: ecovec24: Remove mmcif .down_pwr() callback
+>   sh: ecovec24: Remove MMCIF and SDHI .set_pwr() callbacks
+>   mmc: mmc_spi: Remove platform data .get_cd() and .get_ro() callbacks
+>   mmc: sh_mmcif: Remove .down_pwr() callback from platform data
+>   mmc: sh_mmcif: Remove .set_pwr() callback from platform data
+>   mmc: sh_mobile_sdhi: Remove .get_cd() callback from platform data
+>   mmc: sh_mobile_sdhi: Remove .set_pwr() callback from platform data
+>   mmc: tmio-mmc: Remove .get_cd() callback from platform data
+>   mmc: tmio-mmc: Remove .set_pwr() callback from platform data
+
+For #3-5, 7-12
+
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+Thanks
+Guennadi
+
+>  arch/arm/mach-ep93xx/vision_ep9307.c | 56 ++---------------------
+>  arch/sh/boards/mach-ecovec24/setup.c | 89 ++++--------------------------------
+>  drivers/mmc/host/mmc_spi.c           | 48 +++++++++----------
+>  drivers/mmc/host/of_mmc_spi.c        | 46 +++++--------------
+>  drivers/mmc/host/sh_mmcif.c          |  3 --
+>  drivers/mmc/host/sh_mobile_sdhi.c    | 18 --------
+>  drivers/mmc/host/tmio_mmc.h          |  1 -
+>  drivers/mmc/host/tmio_mmc_pio.c      | 23 +---------
+>  include/linux/mfd/tmio.h             |  2 -
+>  include/linux/mmc/sh_mmcif.h         |  2 -
+>  include/linux/mmc/sh_mobile_sdhi.h   |  2 -
+>  include/linux/spi/mmc_spi.h          | 18 ++++----
+>  12 files changed, 56 insertions(+), 252 deletions(-)
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+
 ---
- drivers/crypto/omap-sham.c |   15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index b82b140..ae1ca8b2 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1870,7 +1870,7 @@ static int omap_sham_probe(struct platform_device *pdev)
- 	int err, i, j;
- 	u32 rev;
- 
--	dd = kzalloc(sizeof(struct omap_sham_dev), GFP_KERNEL);
-+	dd = devm_kzalloc(dev, sizeof(struct omap_sham_dev), GFP_KERNEL);
- 	if (dd == NULL) {
- 		dev_err(dev, "unable to alloc data struct.\n");
- 		err = -ENOMEM;
-@@ -1887,12 +1887,12 @@ static int omap_sham_probe(struct platform_device *pdev)
- 	err = (dev->of_node) ? omap_sham_get_res_of(dd, dev, &res) :
- 			       omap_sham_get_res_pdev(dd, pdev, &res);
- 	if (err)
--		goto res_err;
-+		goto data_err;
- 
- 	dd->io_base = devm_ioremap_resource(dev, &res);
- 	if (IS_ERR(dd->io_base)) {
- 		err = PTR_ERR(dd->io_base);
--		goto res_err;
-+		goto data_err;
- 	}
- 	dd->phys_base = res.start;
- 
-@@ -1901,7 +1901,7 @@ static int omap_sham_probe(struct platform_device *pdev)
- 	if (err) {
- 		dev_err(dev, "unable to request irq %d, err = %d\n",
- 			dd->irq, err);
--		goto res_err;
-+		goto data_err;
- 	}
- 
- 	dma_cap_zero(mask);
-@@ -1913,7 +1913,7 @@ static int omap_sham_probe(struct platform_device *pdev)
- 		dev_err(dev, "unable to obtain RX DMA engine channel %u\n",
- 			dd->dma);
- 		err = -ENXIO;
--		goto res_err;
-+		goto data_err;
- 	}
- 
- 	dd->flags |= dd->pdata->flags;
-@@ -1951,9 +1951,6 @@ err_algs:
- 					&dd->pdata->algs_info[i].algs_list[j]);
- 	pm_runtime_disable(dev);
- 	dma_release_channel(dd->dma_lch);
--res_err:
--	kfree(dd);
--	dd = NULL;
- data_err:
- 	dev_err(dev, "initialization failed.\n");
- 
-@@ -1978,8 +1975,6 @@ static int omap_sham_remove(struct platform_device *pdev)
- 	tasklet_kill(&dd->done_task);
- 	pm_runtime_disable(&pdev->dev);
- 	dma_release_channel(dd->dma_lch);
--	kfree(dd);
--	dd = NULL;
- 
- 	return 0;
- }
--- 
-1.7.9.5
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
