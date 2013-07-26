@@ -1,186 +1,104 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Fri, 26 Jul 2013 10:16:48 -0700
-Subject: [PATCH v8 11/12] iommu/exynos: change rwlock to spinlock
-In-Reply-To: <004101ce89f3$90200980$b0601c80$@samsung.com>
-References: <004101ce89f3$90200980$b0601c80$@samsung.com>
-Message-ID: <CANEJEGv0Bj=iMD=O2jPUc4u918mNQ_CuLvjc2P9ztRrKVKP0iQ@mail.gmail.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Fri, 26 Jul 2013 10:17:33 -0700
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <20130726171153.GN29916@titan.lakedaemon.net>
+References: <20130726145639.116237136@gmail.com>
+ <20130726151223.045835540@gmail.com>
+ <20130726152918.GL29916@titan.lakedaemon.net>
+ <51F29BFE.8000202@broadcom.com>
+ <20130726171153.GN29916@titan.lakedaemon.net>
+Message-ID: <51F2AF2D.1000300@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 4:30 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> Since acquiring read_lock is not more frequent than write_lock, it is
-> not beneficial to use rwlock, this commit changes rwlock to spinlock.
+On 13-07-26 10:11 AM, Jason Cooper wrote:
+> Christian,
 >
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> On Fri, Jul 26, 2013 at 08:55:42AM -0700, Christian Daudt wrote:
+>> [resend in plain text]
+>> On 13-07-26 08:29 AM, Jason Cooper wrote:
+>>> On Fri, Jul 26, 2013 at 04:56:40PM +0200, Domenico Andreoli wrote:
+>>>> From: Domenico Andreoli<domenico.andreoli@linux.com>
+>>>>
+>>>> arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
+>>>> separately. As a matter of flexibility and maintenance, it needs to be
+>>>> always included in the build.
+>>> So if I'm building mach-kirkwood, I _have_ to build Broadcom?  What is
+>>> the *specific* problem you're encountering that this solves?
+>>   No it won't, as the Makefile inside mach-bcm will only pull in
+>> files based on ARCH_ settings. This move is so that a number
+>> different Broadcom SoCs can co-exist inside the mach-bcm directory.
+>
+> Why wouldn't this work?
+>
+> ---->8-------
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ba412e0..97b6aff 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -366,6 +366,12 @@ config ARCH_AT91
+>   	  This enables support for systems based on Atmel
+>   	  AT91RM9200 and AT91SAM9* processors.
+>   
+> +config ARCH_BCM
+> +	bool "Broadcom family SoCs"
+> +	help
+> +	  This enables support for systems based on the Broadcom
+> +	  bcm4760 and bcm281XX series SoCs.
+> +
+>   config ARCH_CLPS711X
+>   	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+>   	select ARCH_REQUIRE_GPIOLIB
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index f112895..4b1f9db 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -1,5 +1,9 @@
+> -config ARCH_BCM
+> -	bool "Broadcom SoC" if ARCH_MULTI_V7
+> +if ARCH_BCM
+> +
+> +menu "Broadcom SoC Implementations"
+> +
+> +config MACH_BCM281XX
+> +	bool "BCM281XX SoCs" if ARCH_MULTI_V7
+>   	depends on MMU
+>   	select ARCH_REQUIRE_GPIOLIB
+>   	select ARM_ERRATA_754322
+> @@ -17,3 +21,7 @@ config ARCH_BCM
+>   	  It currently supports the 'BCM281XX' family, which includes
+>   	  BCM11130, BCM11140, BCM11351, BCM28145 and
+>   	  BCM28155 variants.
+> +
+> +endmenu
+> +
+> +endif
+> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+> index 6adb6aec..e3f8f27 100644
+> --- a/arch/arm/mach-bcm/Makefile
+> +++ b/arch/arm/mach-bcm/Makefile
+> @@ -10,6 +10,6 @@
+>   # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   # GNU General Public License for more details.
+>   
+> -obj-$(CONFIG_ARCH_BCM)		:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
+> +obj-$(CONFIG_MACH_BCM281XX)	:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
+>   plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>   AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
+>
+Because ARCH_BCM is meant to be used for a number of SoC families. We've 
+started upstreaming one (the BCM281XX) but have 2 more internally that 
+we're working towards upstreaming. And in the future our plan is to keep 
+the Broadcom Mobile SoCs all building under this single ARCH_BCM 
+configuration as multiplatform code building a single zImage for them.
+The intent of mach-bcm on the other hand is to aggregate future SoC 
+chips beyond ARCH_BCM (which is mobile SoC focused) to include other 
+Broadcom ARM based SoCs. And there are 2 in the wings at the moment 
+making their way into mainline as patches. The idea here being that with 
+the new multiplatform code, the mach- dirs contain so little code that 
+it makes sense to aggregate a bunch of SoCs from the same company in 
+there (and we are the guinea pig on this one).
 
-Reviewed-by: Grant Grundler <grundler@chromium.org>
-
-cheers,
-grant
-
-> ---
->  drivers/iommu/exynos-iommu.c |   36 ++++++++++++++++++------------------
->  1 files changed, 18 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index c62c244..51e5b35 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -187,7 +187,7 @@ struct sysmmu_drvdata {
->         struct clk *clk;
->         struct clk *clk_master;
->         int activations;
-> -       rwlock_t lock;
-> +       spinlock_t lock;
->         struct iommu_domain *domain;
->         bool runtime_active;
->         unsigned long pgtable;
-> @@ -287,7 +287,7 @@ void exynos_sysmmu_set_prefbuf(struct device *dev,
->         BUG_ON((base0 + size0) <= base0);
->         BUG_ON((size1 > 0) && ((base1 + size1) <= base1));
->
-> -       read_lock_irqsave(&data->lock, flags);
-> +       spin_lock_irqsave(&data->lock, flags);
->         if (!is_sysmmu_active(data))
->                 goto finish;
->
-> @@ -319,7 +319,7 @@ void exynos_sysmmu_set_prefbuf(struct device *dev,
->         }
->         clk_disable(data->clk_master);
->  finish:
-> -       read_unlock_irqrestore(&data->lock, flags);
-> +       spin_unlock_irqrestore(&data->lock, flags);
->  }
->
->  static void show_fault_information(const char *name,
-> @@ -371,7 +371,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
->
->         if (client)
->                 spin_lock(&client->lock);
-> -       read_lock(&data->lock);
-> +       spin_lock(&data->lock);
->
->         if (i == data->nsfrs) {
->                 itype = SYSMMU_FAULT_UNKNOWN;
-> @@ -402,7 +402,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
->         if (itype != SYSMMU_FAULT_UNKNOWN)
->                 sysmmu_unblock(data->sfrbases[i]);
->
-> -       read_unlock(&data->lock);
-> +       spin_unlock(&data->lock);
->         if (client)
->                 spin_unlock(&client->lock);
->
-> @@ -429,7 +429,7 @@ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
->         bool disabled;
->         unsigned long flags;
->
-> -       write_lock_irqsave(&data->lock, flags);
-> +       spin_lock_irqsave(&data->lock, flags);
->
->         disabled = set_sysmmu_inactive(data);
->
-> @@ -446,7 +446,7 @@ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
->                                         data->activations);
->         }
->
-> -       write_unlock_irqrestore(&data->lock, flags);
-> +       spin_unlock_irqrestore(&data->lock, flags);
->
->         return disabled;
->  }
-> @@ -493,7 +493,7 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
->         int ret = 0;
->         unsigned long flags;
->
-> -       write_lock_irqsave(&data->lock, flags);
-> +       spin_lock_irqsave(&data->lock, flags);
->         if (set_sysmmu_active(data)) {
->                 data->pgtable = pgtable;
->                 data->domain = domain;
-> @@ -511,7 +511,7 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
->         if (WARN_ON(ret < 0))
->                 set_sysmmu_inactive(data); /* decrement count */
->
-> -       write_unlock_irqrestore(&data->lock, flags);
-> +       spin_unlock_irqrestore(&data->lock, flags);
->
->         return ret;
->  }
-> @@ -602,7 +602,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
->
->                 data = dev_get_drvdata(client->sysmmu[i]);
->
-> -               read_lock_irqsave(&data->lock, flags);
-> +               spin_lock_irqsave(&data->lock, flags);
->                 if (is_sysmmu_active(data) && data->runtime_active) {
->                         int i;
->                         clk_enable(data->clk_master);
-> @@ -615,7 +615,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
->                                 "disabled. Skipping TLB invalidation @ %#lx\n",
->                                 iova);
->                 }
-> -               read_unlock_irqrestore(&data->lock, flags);
-> +               spin_unlock_irqrestore(&data->lock, flags);
->         }
->  }
->
-> @@ -630,7 +630,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
->
->                 data = dev_get_drvdata(client->sysmmu[i]);
->
-> -               read_lock_irqsave(&data->lock, flags);
-> +               spin_lock_irqsave(&data->lock, flags);
->                 if (is_sysmmu_active(data) &&
->                                 data->runtime_active) {
->                         int i;
-> @@ -646,7 +646,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
->                 } else {
->                         dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
->                 }
-> -               read_unlock_irqrestore(&data->lock, flags);
-> +               spin_unlock_irqrestore(&data->lock, flags);
->         }
->  }
->
-> @@ -735,7 +735,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->
->         data->runtime_active = !pm_runtime_enabled(dev);
->
-> -       rwlock_init(&data->lock);
-> +       spin_lock_init(&data->lock);
->         INIT_LIST_HEAD(&data->node);
->
->         platform_set_drvdata(pdev, data);
-> @@ -749,11 +749,11 @@ static int sysmmu_suspend(struct device *dev)
->  {
->         struct sysmmu_drvdata *data = dev_get_drvdata(dev);
->         unsigned long flags;
-> -       read_lock_irqsave(&data->lock, flags);
-> +       spin_lock_irqsave(&data->lock, flags);
->         if (is_sysmmu_active(data) &&
->                 (!pm_runtime_enabled(dev) || data->runtime_active))
->                 __sysmmu_disable_nocount(data);
-> -       read_unlock_irqrestore(&data->lock, flags);
-> +       spin_unlock_irqrestore(&data->lock, flags);
->         return 0;
->  }
->
-> @@ -761,11 +761,11 @@ static int sysmmu_resume(struct device *dev)
->  {
->         struct sysmmu_drvdata *data = dev_get_drvdata(dev);
->         unsigned long flags;
-> -       read_lock_irqsave(&data->lock, flags);
-> +       spin_lock_irqsave(&data->lock, flags);
->         if (is_sysmmu_active(data) &&
->                 (!pm_runtime_enabled(dev) || data->runtime_active))
->                 __sysmmu_enable_nocount(data);
-> -       read_unlock_irqrestore(&data->lock, flags);
-> +       spin_unlock_irqrestore(&data->lock, flags);
->         return 0;
->  }
->  #endif
-> --
-> 1.7.2.5
->
->
+  Thanks,
+    csd
