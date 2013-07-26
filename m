@@ -1,94 +1,106 @@
-From: tom.cooksey@arm.com (Tom Cooksey)
-Date: Fri, 26 Jul 2013 16:58:55 +0100
-Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
-In-Reply-To: <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
-References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
- <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
-Message-ID: <000001ce8a19$08b1f960$1a15ec20$@cooksey@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jul 2013 17:00:15 +0100
+Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
+In-Reply-To: <alpine.LFD.2.03.1307261047380.15022@syhkavp.arg>
+References: <20130718180323.GC2655@localhost.localdomain>
+ <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
+ <20130719102844.GA3746@localhost.localdomain>
+ <20130719105907.GB27389@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307221353360.15022@syhkavp.arg>
+ <20130723104352.GA3023@localhost.localdomain>
+ <alpine.LFD.2.03.1307230821270.15022@syhkavp.arg>
+ <20130723163319.GA781@e102568-lin.cambridge.arm.com>
+ <20130725120424.GC2546@localhost.localdomain>
+ <alpine.LFD.2.03.1307261047380.15022@syhkavp.arg>
+Message-ID: <20130726160015.GF2282@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-> >  * It abuses flags parameter of DRM_IOCTL_MODE_CREATE_DUMB to also
-> >    allocate buffers for the GPU. Still not sure how to resolve this
-> >    as we don't use DRM for our GPU driver.
+On Fri, Jul 26, 2013 at 10:58:27AM -0400, Nicolas Pitre wrote:
+> On Thu, 25 Jul 2013, Dave Martin wrote:
 > 
-> any thoughts/plans about a DRM GPU driver?  Ideally long term (esp.
-> once the dma-fence stuff is in place), we'd have gpu-specific drm
-> (gpu-only, no kms) driver, and SoC/display specific drm/kms driver,
-> using prime/dmabuf to share between the two.
+> > On Tue, Jul 23, 2013 at 05:33:19PM +0100, Lorenzo Pieralisi wrote:
+> > > On Tue, Jul 23, 2013 at 01:28:16PM +0100, Nicolas Pitre wrote:
+> > > 
+> > > [...]
+> > > 
+> > > > > > + * - The CPU is obviously no longer coherent with the other CPUs.
+> > > > > > + *
+> > > > > > + * Further considerations:
+> > > > > > + *
+> > > > > > + * - This relies on the presence and behavior of the AUXCR.SMP bit as
+> > > > > > + *   documented in the ARMv7 TRM.  Vendor implementations that deviate from
+> > > > > 
+> > > > > Sorry to be pedantic here, but there is no "ARMv7 TRM".  The SMP bit is
+> > > > > not part of ARMv7 at all.
+> > > > 
+> > > > Well, I just copied Lorenzo's words here, trusting he knew more about it 
+> > > > than I do.
+> > > > 
+> > > > > Also, it seems that A9 isn't precisely the
+> > > > > same: two ACTLR bits need to be twiddled.  R-class CPUs are generally
+> > > > > not the same either.
+> > > 
+> > > If you mean the ACTLR.FW bit in A9, A5, and R7, then, IIRC, we do not need to
+> > > clear it, clearing the SMP bit is enough.
+> > > 
+> > > See, Dave has a point, there is no explicit "unified v7 TRM disable
+> > > clean and exit coherency procedure" even though the designers end goal is to
+> > > have one and that's the one you wrote. The code you posted is perfectly ok on
+> > > all v7 implementations in the kernel I am aware of, I stand to be corrected
+> > > but to the best of my knowledge that's the case.
+> > 
+> > What I'm really concerned about here is not Cortex-*, but the vendors
+> > who have their own CPU implementations.  I don't think I've ever seen
+> > a TRM for one of those.
+> 
+> Could we wait until they materialize before worrying about possible 
+> incompatibility issues?  After all this is not a user space ABI that 
+> cannot be changed afterwards.  Remember this is Linux internal code we 
+> have the ability to change when needed, hence we should resist the 
+> temptation to over-engineer.
 
-The "extra" buffers we were allocating from armsoc DDX were really
-being allocated through DRM/GEM so we could get an flink name
-for them and pass a reference to them back to our GPU driver on
-the client side. If it weren't for our need to access those
-extra off-screen buffers with the GPU we wouldn't need to
-allocate them with DRM at all. So, given they are really "GPU"
-buffers, it does absolutely make sense to allocate them in a
-different driver to the display driver.
+If I could think of a better name, I would suggest it ... but unless we call
+it "cortexa" or something, I don't know what it should be.  I'm not sure
+how much I like that either.  Strictly speaking, that's still not correct.
 
-However, to avoid unnecessary memcpys & related cache
-maintenance ops, we'd also like the GPU to render into buffers
-which are scanned out by the display controller. So let's say
-we continue using DRM_IOCTL_MODE_CREATE_DUMB to allocate scan
-out buffers with the display's DRM driver but a custom ioctl
-on the GPU's DRM driver to allocate non scanout, off-screen
-buffers. Sounds great, but I don't think that really works
-with DRI2. If we used two drivers to allocate buffers, which
-of those drivers do we return in DRI2ConnectReply? Even if we
-solve that somehow, GEM flink names are name-spaced to a
-single device node (AFAIK). So when we do a DRI2GetBuffers,
-how does the EGL in the client know which DRM device owns GEM
-flink name "1234"? We'd need some pretty dirty hacks.
+So I guess this comes down to being clear about which CPUs we expect it to
+work for.
 
-So then we looked at allocating _all_ buffers with the GPU's
-DRM driver. That solves the DRI2 single-device-name and single
-name-space issue. It also means the GPU would _never_ render
-into buffers allocated through DRM_IOCTL_MODE_CREATE_DUMB.
-One thing I wasn't sure about is if there was an objection
-to using PRIME to export scanout buffers allocated with
-DRM_IOCTL_MODE_CREATE_DUMB and then importing them into a GPU
-driver to be rendered into? Is that a concern?
+Right now, we know it works for A7 and A15.
 
-Anyway, that latter case also gets quite difficult. The "GPU"
-DRM driver would need to know the constraints of the display
-controller when allocating buffers intended to be scanned out.
-For example, pl111 typically isn't behind an IOMMU and so
-requires physically contiguous memory. We'd have to teach the
-GPU's DRM driver about the constraints of the display HW. Not
-exactly a clean driver model. :-(
+It sounds like we believe it might work for A9.  Lorenzo might know about
+A5, A7 etc.  But I'm not sure this exact sequence has been tested on any
+of those CPUs(?)
 
-I'm still a little stuck on how to proceed, so any ideas
-would greatly appreciated! My current train of thought is
-having a kind of SoC-specific DRM driver which allocates
-buffers for both display and GPU within a single GEM
-namespace. That SoC-specific DRM driver could then know the
-constraints of both the GPU and the display HW. We could then
-use PRIME to export buffers allocated with the SoC DRM driver
-and import them into the GPU and/or display DRM driver.
+We shouldn't expect it to work for any non ARM Ltd CPU, but on platforms
+where firmware does the power control it's not Linux's responsibility
+anyhow.  (Probably the case for most of those vendors).
 
-Note: While it doesn't use the DRM framework, the Mali T6xx
-kernel driver has supported importing buffers through dma_buf
-for some time. I've even written an EGL extension :-):
+> > I confess to exaggeration!  There was obviously an effort to align A15
+> > and A7, but we know there are differences at the system level, and there
+> > is always the possibility of b.L pairings which differ on things like
+> > the SMP bit, or b.L pairings of CPUs not originally designed to pair but
+> > which are "similar enough" to be pairable.
+> > 
+> > > sure about what we should do, but I reiterate my point, the sequence as
+> > > it stands is OK on all NS v7 implementations I am aware of. We can add
+> > > macros to differentiate processors when we need them, but again that's
+> > > just my opinion, as correct as it can be.
+> > 
+> > I still vote for naming them a15_* a7_* or similar.
+> > 
+> > For big.LITTLE pairings, I think we should assume that the big CPU's
+> > macro is usable on the LITTLE CPU too.  Assuming sane CPU designs, that
+> > will be true, and we know it works for A15+A7.
+> 
+> The MCPM backend don't have to assume any kind of pairing.  The TC2 
+> backend already has to test whether or not it is running on an A15 in 
+> order to turn off L2 prefetching which is an A15-only feature.  This is 
+> done outside of this macro exactly to keep the macro generic to all 
+> known (so far) v7 implementations.
 
-<http://www.khronos.org/registry/egl/extensions/EXT/EGL_EXT_image_dma_buf_im
-port.txt>
+That's true.
 
-
-> I'm not entirely sure that the directions that the current CDF
-> proposals are headed is necessarily the right way forward.  I'd prefer
-> to see small/incremental evolution of KMS (ie. add drm_bridge and
-> drm_panel, and refactor the existing encoder-slave).  Keeping it
-> inside drm means that we can evolve it more easily, and avoid layers
-> of glue code for no good reason.
-
-I think CDF could allow vendors to re-use code they've written
-for their Android driver stack in DRM drivers more easily. Though
-I guess ideally KMS would evolve to a point where it could be used
-by an Android driver stack. I.e. Support explicit fences.
-
-
-Cheers,
-
-Tom
+Cheers
+---Dave
