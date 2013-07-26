@@ -1,64 +1,181 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Jul 2013 11:36:13 -0500
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy> <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy> <20130726141016.GF9858@sirena.org.uk>
- <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
-Message-ID: <51F2A57D.1090704@gmail.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 26 Jul 2013 18:41:29 +0200
+Subject: [PATCH v2 02/42] ARM: at91: add PMC main clock
+In-Reply-To: <1374068404-13654-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+ <1374068404-13654-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <51F2A6B9.1010401@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 10:49 AM, Olof Johansson wrote:
-> On Fri, Jul 26, 2013 at 7:10 AM, Mark Brown <broonie@kernel.org> wrote:
->> On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
->>
->>> Unless I totally misunderstood, the thread is talking about letting
->>> established bindings change with each new kernel version.  I am
->>> opposed to that.
->>
->> No, nobody is really saying that is a particularly good idea.  There is
->> some debate about how we work out what an established binding is but
->> there's no serious suggestion that we don't want stable bindings.
-> 
-> Yes, what Mark said -- _today_ all bindings are subject to change and
-> can be changed in lockstep with the kernel. This has been necessary as
-> part of development to sort out all of the various bootstrapping
-> issues across platforms.
+On 17/07/2013 15:40, Boris BREZILLON wrote:
+> This is the at91 main oscillator clock implementation using common
+> clk framework.
+>
+> If rate is not provided during clock registraction it is computed using
+> the slow clock (main clk parent in this case) rate and the MCFR register.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>   drivers/clk/at91/Makefile   |    5 ++
+>   drivers/clk/at91/clk-main.c |  106 +++++++++++++++++++++++++++++++++++++++++++
+>   include/linux/clk/at91.h    |   10 ++++
+>   3 files changed, 121 insertions(+)
+>   create mode 100644 drivers/clk/at91/Makefile
+>   create mode 100644 drivers/clk/at91/clk-main.c
+>
+> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+> new file mode 100644
+> index 0000000..42c084e
+> --- /dev/null
+> +++ b/drivers/clk/at91/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for at91 specific clk
+> +#
+> +
+> +obj-y += clk-main.o
+> diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
+> new file mode 100644
+> index 0000000..738fa39
+> --- /dev/null
+> +++ b/drivers/clk/at91/clk-main.c
+> @@ -0,0 +1,106 @@
+> +/*
+> + * drivers/clk/at91/clk-main.c
+> + *
+> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+> + *
+> + * This mainram is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk/at91.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/io.h>
+> +
+> +#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
+> +struct clk_main {
+> +	struct clk_hw hw;
+> +	unsigned long rate;
+> +};
+> +
+> +static unsigned long clk_main_recalc_rate(struct clk_hw *hw,
+> +					  unsigned long parent_rate)
+> +{
+> +	u32 tmp;
+> +	struct clk_main *clkmain = to_clk_main(hw);
+> +	if (clkmain->rate)
+> +		return clkmain->rate;
+> +	while ((tmp = at91_pmc_read(AT91_CKGR_MCFR)) & AT91_PMC_MAINRDY)
+> +		;
+wrong test here, should be:
 
-This is absolutely not true on a global basis. Any binding used on
-powerpc or sparc is not subject to change. Furthermore, there are ARM
-platforms such as highbank where the bindings are expected to be stable.
-That's not saying they don't change (new properties for SATA just
-today), but they only change in a backwards compatible way.
+while (!((tmp = at91_pmc_read(AT91_CKGR_MCFR)) & AT91_PMC_MAINRDY))
+	;
 
-Rob
 
-> 
-> What we're talking about is to end that mode of operation, and moving
-> over to locking in bindings. Device tree contents, as mentioned
-> elsewhere, might still be changed just like code is -- bugs are fixed,
-> etc. But it's time to start locking down the bindings, in particular
-> no longer change the established ones.
-> 
-> Long term, final goal is likely to be close to what Russell is saying
-> -- nothing should go into the kernel tree unless the binding is in a
-> fully stable state. However, we have a transitional period between now
-> and then, and even when we're at the final state there will be need to
-> have some sort of sandbox for development and test of future bindings.
-> Dealing with all that, as well as the actual process for locking in
-> bindings, is what needs to be sorted out.
-> 
-> I think we're all in agreement that bindings that change over time are
-> nothing but pain, but we're arguing that in circles anyway.
-> 
-> 
-> -Olof
-> 
+> +	tmp &= AT91_PMC_MAINF;
+> +	clkmain->rate = (tmp * parent_rate) / 16;
+> +	return clkmain->rate;
+> +}
+> +
+> +static const struct clk_ops main_ops = {
+> +	.recalc_rate = clk_main_recalc_rate,
+> +};
+> +
+> +struct clk * __init
+> +at91_clk_register_main(const char *name,
+> +		       const char *parent_name,
+> +		       unsigned long rate)
+> +{
+> +	struct clk_main *clkmain;
+> +	struct clk *clk = NULL;
+> +	struct clk_init_data init;
+> +
+> +	if (!rate && !parent_name)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	clkmain = kzalloc(sizeof(*clkmain), GFP_KERNEL);
+> +	if (!clkmain)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.ops = &main_ops;
+> +	init.parent_names = parent_name ? &parent_name : NULL;
+> +	init.num_parents = parent_name ? 1 : 0;
+> +	init.flags = parent_name ? 0 : CLK_IS_ROOT;
+> +
+> +	clkmain->hw.init = &init;
+> +	clkmain->rate = rate;
+> +
+> +	clk = clk_register(NULL, &clkmain->hw);
+> +
+> +	if (IS_ERR(clk))
+> +		kfree(clkmain);
+> +
+> +	return clk;
+> +}
+> +
+> +
+> +
+> +#if defined(CONFIG_OF)
+> +static void __init
+> +of_at91_clk_main_setup(struct device_node *np)
+> +{
+> +	struct clk *clk;
+> +	const char *parent_name;
+> +	const char *name = np->name;
+> +	u32 rate = 0;
+> +
+> +	parent_name = of_clk_get_parent_name(np, 0);
+> +	of_property_read_string(np, "clock-output-names", &name);
+> +	of_property_read_u32(np, "clock-frequency", &rate);
+> +
+> +	clk = at91_clk_register_main(name, parent_name, rate);
+> +
+> +	if (!IS_ERR(clk))
+> +		return;
+> +
+> +	of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +}
+> +
+> +static void __init of_at91rm9200_clk_main_setup(struct device_node *np)
+> +{
+> +	of_at91_clk_main_setup(np);
+> +}
+> +CLK_OF_DECLARE(at91rm9200_clk_main, "atmel,at91rm9200-clk-main",
+> +	       of_at91rm9200_clk_main_setup);
+> +#endif
+> diff --git a/include/linux/clk/at91.h b/include/linux/clk/at91.h
+> index 0ce9586..8e83942 100644
+> --- a/include/linux/clk/at91.h
+> +++ b/include/linux/clk/at91.h
+> @@ -16,6 +16,8 @@
+>   #ifndef AT91_PMC_H
+>   #define AT91_PMC_H
+>   
+> +#include <linux/clk-provider.h>
+> +
+>   #ifndef __ASSEMBLY__
+>   extern void __iomem *at91_pmc_base;
+>   
+> @@ -187,4 +189,12 @@ extern void __iomem *at91_pmc_base;
+>   #define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
+>   #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
+>   
+> +
+> +
+> +
+> +struct clk * __init
+> +at91_clk_register_main(const char *name,
+> +		       const char *parent_name,
+> +		       unsigned long rate);
+> +
+>   #endif
