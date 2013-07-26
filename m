@@ -1,85 +1,27 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Jul 2013 13:18:00 -0700
-Subject: [PATCH 1/3] clk: exynos5250: Add G2D gate clock
-In-Reply-To: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
-References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <20130726201800.7598.54329@quantum>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Fri, 26 Jul 2013 13:25:42 -0700
+Subject: [PATCH v3 0/3] ARM: bcm281xx: GPIO driver
+Message-ID: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sachin Kamat (2013-07-05 01:42:27)
-> Adds gate clock for G2D IP for Exynos5250 SoC.
-> 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
+This patch series adds the GPIO driver, and its device tree bindings,
+for the Broadcom bcm281xx family of chips.
 
-I've taken patch #1 into clk-next.
+Markus Mayer (3):
+  ARM: bcm281xx: Add GPIO driver
+  ARM: bcm281xx: Device Tree bindings for GPIO driver
+  ARM: bcm281xx: Enable GPIO driver
 
-> ---
-> This patch depends on the following patch:
-> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20581
+ .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   41 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |   16 +
+ arch/arm/mach-bcm/Kconfig                          |    2 +-
+ drivers/gpio/Kconfig                               |    6 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-kona.c                       |  697 ++++++++++++++++++++
+ 6 files changed, 762 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+ create mode 100644 drivers/gpio/gpio-bcm-kona.c
 
-I think I've gotten all three series you sent out, can you confirm?
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20581
-http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20829
-http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20582
-
-Regards,
-Mike
-
-> ---
->  .../devicetree/bindings/clock/exynos5250-clock.txt |    1 +
->  drivers/clk/samsung/clk-exynos5250.c               |    5 ++++-
->  2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> index 1a05761..7e88242 100644
-> --- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> @@ -155,6 +155,7 @@ clock which they consume.
->    dp                   342
->    mixer                        343
->    hdmi                 344
-> +  g2d                  345
->  
->  Example 1: An example of a clock controller node is listed below.
->  
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-> index 6f767c5..3da0bdf 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -62,6 +62,7 @@
->  #define SRC_CDREX              0x20200
->  #define PLL_DIV2_SEL           0x20a24
->  #define GATE_IP_DISP1          0x10928
-> +#define GATE_IP_ACP            0x10000
->  
->  /*
->   * Let each supported clock get a unique id. This id is used to lookup the clock
-> @@ -99,7 +100,7 @@ enum exynos5250_clks {
->         spi2, i2s1, i2s2, pcm1, pcm2, pwm, spdif, ac97, hsi2c0, hsi2c1, hsi2c2,
->         hsi2c3, chipid, sysreg, pmu, cmu_top, cmu_core, cmu_mem, tzpc0, tzpc1,
->         tzpc2, tzpc3, tzpc4, tzpc5, tzpc6, tzpc7, tzpc8, tzpc9, hdmi_cec, mct,
-> -       wdt, rtc, tmu, fimd1, mie1, dsim0, dp, mixer, hdmi,
-> +       wdt, rtc, tmu, fimd1, mie1, dsim0, dp, mixer, hdmi, g2d,
->  
->         nr_clks,
->  };
-> @@ -152,6 +153,7 @@ static __initdata unsigned long exynos5250_clk_regs[] = {
->         SRC_CDREX,
->         PLL_DIV2_SEL,
->         GATE_IP_DISP1,
-> +       GATE_IP_ACP,
->  };
->  
->  /* list of all parent clock list */
-> @@ -463,6 +465,7 @@ struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
->         GATE(dp, "dp", "aclk200", GATE_IP_DISP1, 4, 0, 0),
->         GATE(mixer, "mixer", "aclk200", GATE_IP_DISP1, 5, 0, 0),
->         GATE(hdmi, "hdmi", "aclk200", GATE_IP_DISP1, 6, 0, 0),
-> +       GATE(g2d, "g2d", "aclk200", GATE_IP_ACP, 3, 0, 0),
->  };
->  
->  static __initdata struct of_device_id ext_clk_match[] = {
-> -- 
-> 1.7.9.5
+-- 
+1.7.9.5
