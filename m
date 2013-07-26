@@ -1,65 +1,74 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Fri, 26 Jul 2013 10:39:37 -0400
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130726142140.GR24642@n2100.arm.linux.org.uk>
-References: <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy>
- <20130726132709.GH29916@titan.lakedaemon.net>
- <1374846070.14574.92.camel@i7.infradead.org>
- <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
- <20130726142140.GR24642@n2100.arm.linux.org.uk>
-Message-ID: <CAKON4Oyu2hXa959zeuMWwT7jNpVFb31FoWqcD3gkJVz63jLEMw@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Fri, 26 Jul 2013 16:39:28 +0200
+Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+In-Reply-To: <20130726085542.GA17886@mudshark.cambridge.arm.com>
+References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
+ <1374792135-30343-2-git-send-email-hauke@hauke-m.de>
+ <20130726085542.GA17886@mudshark.cambridge.arm.com>
+Message-ID: <51F28A20.7060105@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 10:21 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 26, 2013 at 10:14:32AM -0400, jonsmirl at gmail.com wrote:
->> Yes, yes - that's why the schema should be written down and used as a
->> validation input to dtc. Then dtc can spit out errors for non-standard
->> items. There would be two versions - the standard one and a legacy one
->> that includes the standard one plus the hacks that can't be undone.
+On 07/26/2013 10:55 AM, Will Deacon wrote:
+> On Thu, Jul 25, 2013 at 11:42:13PM +0100, Hauke Mehrtens wrote:
+>> This patch adds support for the BCM5301X/BCM470X SoCs with an ARM CPUs.
+>> Currently just booting to a shell is working and nothing else, no
+>> Ethernet, wifi, flash, ...
 >>
->> But more importantly it provides a framework for people creating new
->> node definitions. Now they can't work in a vacuum and come up with
->> random names and structure for everything.
+>> This SoC is used in small office and home router with Broadcom SoCs.
+>> This code should support the BCM4707, BCM4708, BCM4709, BCM53010,
+>> BCM53011 and BCM53012 SoC. It uses one or two ARM Cortex A9
+>> Cores, some highlights are 2 PCIe 2.0 controllers, 4 Gigabit Ethernet
+>> MACs and a USB 3.0 host controller.
 >>
->> Most of the problems express in the thread would go away if the schema
->> was written down and discussed. The rule going forward would be no new
->> nodes that aren't part of the standard schema.
->
-> So this is why I'm seeing patches just a short time ago removing existing
-> compatible strings from the DT descriptions and associated driver, and
-> replacing them with new ones... meaning that the old DT files won't work
-> with newer kernels.
->
-> What that means is using the descriptions as the schema won't catch that
-> because they're changing those as well to match.
->
-> There's a solution to that: dtc becomes a separate project external to
-> the kernel which also contains the schemas that it verifies against.
-> That way, if you want to make changes such as that above, you need to
-> get it past not only kernel people but also past dtc maintainers -
-> which increases the chances of such stuff being caught.
+>> This SoC uses a dual core CPU, but this is currently not implemented.
+>> More information about this SoC can be found here:
+>> http://www.anandtech.com/show/5925/broadcom-announces-bcm4708x-and-bcm5301x-socs-for-80211ac-routers
+> 
+> [...]
+> 
+>> +static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
+>> +				 struct pt_regs *regs)
+>> +{
+>> +	/*
+>> +	 * These happen for no good reason, possibly left over from CFE
+>> +	 */
+>> +	pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
+>> +		addr, fsr);
+>> +
+>> +	/* Returning non-zero causes fault display and panic */
+>> +	return 0;
+>> +}
+>> +
+>> +static void __init bcm5301x_init_early(void)
+>> +{
+>> +	/* Install our hook */
+>> +	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, 0,
+>> +			"imprecise external abort");
+>> +}
+> 
+> Surely you can't be serious?
+> 
+> At least, we need a pretty good explanation of what *exactly* is causing
+> these spurious aborts before we start ignoring them unconditionally like
+> this. You're effectively masking an extremely serious error indicator with
+> this change.
 
-I don't see that it has to be outside of the kernel. It could still be
-inside and just have different maintainers.
+This fault occurs once every boot sometime early in the boot process,
+but the actual time this happens varies randomly.
 
-The real value of having that schema inside of the kernel is so that
-people writing new drivers have some rules to look at. It would really
-help in stopping 37 different descriptions of DMA controllers that are
-all slightly different. You'd have to match you DMA controller
-description to the generic form or making a convincing argument as to
-why you need the master schema to be changed.
+Sadly I do not understand this completely, and I copied this from the
+vendor BSP with the corresponding code documentation. They think CFE
+(Common Firmware Environment, the bootloader used on these devices), did
+something wrong, but I do not have the actual source of CFE and I do not
+have the chip documentation. This occurs just once as far as I have seen
+this, we could just catch the first one. Changing the boot loader is
+also not an option, because I want to use this code on devices already
+shipped to costumers and I do not have access to the boot loader source
+code.
+
+Do you know what this fault normally indicates?
 
 
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Hauke
