@@ -1,220 +1,95 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Fri, 26 Jul 2013 09:28:52 -0700
-Subject: [PATCH 0/1] ARM: atomic64: fix endian-ness in atomic.h
-Message-ID: <1374856133-2939-1-git-send-email-victor.kamensky@linaro.org>
+Date: Fri, 26 Jul 2013 09:28:53 -0700
+Subject: [PATCH 1/1] ARM: atomic64: fix endian-ness in atomic.h
+In-Reply-To: <1374856133-2939-1-git-send-email-victor.kamensky@linaro.org>
+References: <1374856133-2939-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1374856133-2939-2-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes atomic64_xxx functions endian-ness isussues as it was discussed on
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/185898.html
-Patch itself follows in separate email. This cover letter describes what
-testing has been done
+Fix inline asm for atomic64_xxx functions in arm atomic.h. Instead of
+%H operand specifiers code should use %Q for least significant part
+of the value, and %R for the most significant part of the value. %H
+always returns the higher of the two register numbers, and therefore
+it is not endian neutral. %H should be used with ldrexd and strexd
+instructions.
 
-Tested on pandaboard for both cases: LE and BE, CONFIG_GENERIC_ATOMIC64 was
-forcefully disabled.
-
-In BE case it was tested on top of Ben's other BE patches covered by 
-(updates for be8  patch series).
-
-The following tests passed:
-
-1) CONFIG_ATOMIC64_SELFTEST
-
-2) The following module produced identical output for both LE, BE, 
-and GENERIC_ATOMIC64
-
-#include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/atomic.h>
-
-
-atomic64_t a = {0};
-
-#define STEP 0x40000000
-
-void atomic64_add_test1 (void)
-{
-    atomic64_add(STEP, &a);
-}    
-
-void test_atomic64_add(void)
-{
-    int i;
-
-    printk("atomic64_add\n");
-
-    atomic64_set(&a, 0);
-    
-    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
-
-    for (i = 0; i < 10; i++) {
-        atomic64_add_test1();
-        printk("i = %2d: a = 0x%llx (%lld)\n", i, a.counter, a.counter);
-    }
-}
-
-void atomic64_sub_test1 (void)
-{
-    atomic64_sub(STEP, &a);
-}
-
-void test_atomic64_sub(void)
-{
-    int i;
-
-    printk("atomic64_sub\n");
-
-    /* value of a is set by previos test */
-    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
-
-    for (i = 0; i < 20; i++) {
-        atomic64_sub_test1();
-        printk("i = %2d: a = 0x%llx (%lld)\n", i, a.counter, a.counter);
-    }
-}
-
-u64 atomic64_add_return_test1 (void)
-{
-    return atomic64_add_return(STEP, &a);
-}    
-
-void test_atomic64_add_return(void)
-{
-    int i;
-    u64 ret;
-
-    printk("atomic64_add_return\n");
-
-    atomic64_set(&a, 0);
-    
-    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
-
-    for (i = 0; i < 10; i++) {
-        ret = atomic64_add_return_test1();
-        printk("i = %2d: a = 0x%llx (%lld), ret = %llx (%lld)\n",
-               i, a.counter, a.counter, ret, ret);
-    }
-}
-
-u64 atomic64_sub_return_test1 (void)
-{
-    return atomic64_sub_return(STEP, &a);
-}
-
-void test_atomic64_sub_return(void)
-{
-    int i;
-    u64 ret;
-
-    printk("atomic64_sub_return\n");
-
-    /* value of a is set by previos test */
-    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
-
-    for (i = 0; i < 20; i++) {
-        ret = atomic64_sub_return_test1();
-        printk("i = %2d: a = 0x%llx (%lld), ret = %llx (%lld)\n",
-               i, a.counter, a.counter, ret, ret);
-    }
-}
-
-void atomic64_dec_if_positive_test1 (void)
-{
-    atomic64_dec_if_positive(&a);
-}
-
-void test1_atomic64_dec_if_positive (void)
-{
-    int i;    
-    printk("atomic64_dec_if_positive test1\n");
-
-    atomic64_set(&a, 0x100000003);    
-    /* value of a is set by previos test */
-    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
-
-    for (i = 0; i < 10; i++) {
-        atomic64_dec_if_positive_test1();
-        printk("i = %2d: a = 0x%llx (%lld))\n",
-               i, a.counter, a.counter);
-    }
-}
-
-void test2_atomic64_dec_if_positive (void)
-{
-    int i;    
-    printk("atomic64_dec_if_positive test2\n");
-
-    atomic64_set(&a, 0x3);    
-    /* value of a is set by previos test */
-    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
-
-    for (i = 0; i < 10; i++) {
-        atomic64_dec_if_positive_test1();
-        printk("i = %2d: a = 0x%llx (%lld))\n",
-               i, a.counter, a.counter);
-    }
-}
-
-void atomic64_add_unless_test1(long long u)
-{
-    atomic64_add_unless(&a, STEP, u);
-}
-
-void test_atomic64_add_unless(void)
-{
-    int i;
-    u64 prev;
-    
-    printk("atomic64_add_unless\n");
-
-    atomic64_set(&a, 0);
-    
-    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
-
-    for (i = 0; i < 10; i++) {
-        prev = a.counter;
-        atomic64_add_unless_test1(prev);
-        printk("i = %2d: no change: prev = 0x%llx (%lld), a = 0x%llx (%lld)\n", i,
-               prev, prev, a.counter, a.counter);
-        atomic64_add_unless_test1(prev - 1);
-        printk("i = %2d: change: prev = 0x%llx (%lld), a = 0x%llx (%lld)\n", i,
-               prev, prev, a.counter, a.counter);
-    }
-}
-
-
-int
-init_module (void)
-{
-    test_atomic64_add();
-    test_atomic64_sub();
-
-    test_atomic64_add_return();
-    test_atomic64_sub_return();
-
-    test1_atomic64_dec_if_positive();
-    test2_atomic64_dec_if_positive();
-
-    test_atomic64_add_unless();
-    
-    return 0;
-}
-
-void
-cleanup_module(void)
-{
-}
-
-MODULE_LICENSE("GPL");
-
-Thanks,
-Victor
-
-Victor Kamensky (1):
-  ARM: atomic64: fix endian-ness in atomic.h
-
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+---
  arch/arm/include/asm/atomic.h | 26 +++++++++++++-------------
  1 file changed, 13 insertions(+), 13 deletions(-)
 
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index da1c77d..6447a0b 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -301,8 +301,8 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_add\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	adds	%0, %0, %4\n"
+-"	adc	%H0, %H0, %H4\n"
++"	adds	%Q0, %Q0, %Q4\n"
++"	adc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -320,8 +320,8 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_add_return\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	adds	%0, %0, %4\n"
+-"	adc	%H0, %H0, %H4\n"
++"	adds	%Q0, %Q0, %Q4\n"
++"	adc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -341,8 +341,8 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_sub\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	subs	%0, %0, %4\n"
+-"	sbc	%H0, %H0, %H4\n"
++"	subs	%Q0, %Q0, %Q4\n"
++"	sbc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -360,8 +360,8 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_sub_return\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	subs	%0, %0, %4\n"
+-"	sbc	%H0, %H0, %H4\n"
++"	subs	%Q0, %Q0, %Q4\n"
++"	sbc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -428,9 +428,9 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	subs	%0, %0, #1\n"
+-"	sbc	%H0, %H0, #0\n"
+-"	teq	%H0, #0\n"
++"	subs	%Q0, %Q0, #1\n"
++"	sbc	%R0, %R0, #0\n"
++"	teq	%R0, #0\n"
+ "	bmi	2f\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+@@ -459,8 +459,8 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
+ "	teqeq	%H0, %H5\n"
+ "	moveq	%1, #0\n"
+ "	beq	2f\n"
+-"	adds	%0, %0, %6\n"
+-"	adc	%H0, %H0, %H6\n"
++"	adds	%Q0, %Q0, %Q6\n"
++"	adc	%R0, %R0, %R6\n"
+ "	strexd	%2, %0, %H0, [%4]\n"
+ "	teq	%2, #0\n"
+ "	bne	1b\n"
 -- 
 1.8.1.4
