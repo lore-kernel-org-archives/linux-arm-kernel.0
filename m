@@ -1,111 +1,55 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 26 Jul 2013 12:04:10 -0500
-Subject: [PATCH] ARM: debug: use generic option for ep93xx PL10x debug port
-In-Reply-To: <201307171048.17430.hartleys@visionengravers.com>
-References: <201307171048.17430.hartleys@visionengravers.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0021DAC5C2138@AUSP01VMBX24.collaborationhost.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 26 Jul 2013 11:08:07 -0600
+Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
+In-Reply-To: <20130726104908.GC17886@mudshark.cambridge.arm.com>
+References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
+ <20130726104908.GC17886@mudshark.cambridge.arm.com>
+Message-ID: <51F2ACF7.9000008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 07/26/2013 04:49 AM, Will Deacon wrote:
+> [Adding Stephen Warren since he has been working in this area]
+> 
+> On Fri, Jul 26, 2013 at 06:41:27AM +0100, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>>
+>> In case of normal kexec kernel load, all cpu's are offlined
+>> before calling machine_kexec() under kernel_kexec() function.
+>> But in case crash panic cpus are relaxed in
+>> machine_crash_nonpanic_core() SMP function but not offlined.
+>>
+>> When crash kernel is loaded with kexec and on panic trigger
+>> machine_kexec() checks for number of cpus online.
+>> If more than one cpu is online machine_kexec() fails to load
+>> with below error
+>>
+>> kexec: error: multiple CPUs still online
+>>
+>> In machine_crash_nonpanic_core() SMP function, offline CPU
+>> before cpu_relax
 
-Ping... Any comments on this?
+>> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
 
-Thanks,
-Hartley
+>> @@ -73,6 +73,7 @@ void machine_crash_nonpanic_core(void *unused)
+>>  	crash_save_cpu(&regs, smp_processor_id());
+>>  	flush_cache_all();
+>>  
+>> +	set_cpu_online(smp_processor_id(), false);
+>>  	atomic_dec(&waiting_for_crash_ipi);
+>>  	while (1)
+>>  		cpu_relax();
+> 
+> Ok, I guess this will work since the new kernel is loaded somewhere higher
+> in memory and the crashed kernel will stick around, so the non-crashing CPUs
+> can sit around spinning.
 
------Original Message-----
-From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of H Hartley Sweeten
-Sent: Wednesday, July 17, 2013 10:48 AM
-To: ARM Kernel
-Cc: Russell King; Ryan Mallon
-Subject: [PATCH] ARM: debug: use generic option for ep93xx PL10x debug port
+Does a kernel that's used as the crash kernel guarantee:
 
-The generic option DEBUG_LL_UART_PL01X is now used to select the UART
-type for the kernel low-level debugging on the ep93xx platform. This
-enables two config options to provide the physical and virtual base
-address of the debug UART.
+* Never to re-use the memory that was used by the previous kernel, so
+that the spin loop code/data won't be corrupted, ever, no matter how
+long the crash recovery kernel runs.
 
-Use the generic options instead of providing platform specific options
-to select the debug UART.
-
-UART1 is selected with:  DEBUG_UART_PHYS = 0x808c0000
-                         DEBUG_UART_VIRT = 0xfedc0000
-
-UART2 is selected with:  DEBUG_UART_PHYS = 0x808d0000
-                         DEBUG_UART_VIRT = 0xfedd0000
-
-UART3 is selected with:  DEBUG_UART_PHYS = 0x808e0000
-                         DEBUG_UART_VIRT = 0xfede0000
-
-The selected UART must already be initialized by the bootloader. If it
-isn't setup nothing will appear (which might be desired).
-
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Ryan Mallon <rmallon@gmail.com>
----
-This applies on top of Russell King's "Clean up the debugging support".
-
- arch/arm/mach-ep93xx/Kconfig                   | 14 --------------
- arch/arm/mach-ep93xx/include/mach/uncompress.h | 14 ++------------
- 2 files changed, 2 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
-index fe3c1fa..93e54fd 100644
---- a/arch/arm/mach-ep93xx/Kconfig
-+++ b/arch/arm/mach-ep93xx/Kconfig
-@@ -194,20 +194,6 @@ config MACH_VISION_EP9307
- 	  Say 'Y' here if you want your kernel to support the
- 	  Vision Engraving Systems EP9307 SoM.
- 
--choice
--	prompt "Select a UART for early kernel messages"
--
--config EP93XX_EARLY_UART1
--	bool "UART1"
--
--config EP93XX_EARLY_UART2
--	bool "UART2"
--
--config EP93XX_EARLY_UART3
--	bool "UART3"
--
--endchoice
--
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-ep93xx/include/mach/uncompress.h b/arch/arm/mach-ep93xx/include/mach/uncompress.h
-index b5cc77d..03c42e5 100644
---- a/arch/arm/mach-ep93xx/include/mach/uncompress.h
-+++ b/arch/arm/mach-ep93xx/include/mach/uncompress.h
-@@ -31,18 +31,8 @@ static void __raw_writel(unsigned int value, unsigned int ptr)
- 	*((volatile unsigned int *)ptr) = value;
- }
- 
--#if defined(CONFIG_EP93XX_EARLY_UART1)
--#define UART_BASE		EP93XX_UART1_PHYS_BASE
--#elif defined(CONFIG_EP93XX_EARLY_UART2)
--#define UART_BASE		EP93XX_UART2_PHYS_BASE
--#elif defined(CONFIG_EP93XX_EARLY_UART3)
--#define UART_BASE		EP93XX_UART3_PHYS_BASE
--#else
--#define UART_BASE		EP93XX_UART1_PHYS_BASE
--#endif
--
--#define PHYS_UART_DATA		(UART_BASE + 0x00)
--#define PHYS_UART_FLAG		(UART_BASE + 0x18)
-+#define PHYS_UART_DATA		(CONFIG_DEBUG_UART_PHYS + 0x00)
-+#define PHYS_UART_FLAG		(CONFIG_DEBUG_UART_PHYS + 0x18)
- #define UART_FLAG_TXFF		0x20
- 
- static inline void putc(int c)
--- 
-1.8.3.2
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+* Not use SMP, so there's never a need to re-activate the non-boot CPUs,
+which might not work if they aren't truly disabled but rather just
+running a pin loop?
