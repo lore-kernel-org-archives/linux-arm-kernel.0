@@ -1,73 +1,125 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Fri, 26 Jul 2013 12:09:03 -0700
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <20130726184702.GW24642@n2100.arm.linux.org.uk>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
- <51F29BFE.8000202@broadcom.com>
- <20130726171153.GN29916@titan.lakedaemon.net>
- <51F2AF2D.1000300@broadcom.com>
- <20130726184702.GW24642@n2100.arm.linux.org.uk>
-Message-ID: <51F2C94F.6020405@broadcom.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 26 Jul 2013 15:19:32 -0400 (EDT)
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value
+ to index into save array
+In-Reply-To: <20130726170402.GF28084@e102568-lin.cambridge.arm.com>
+References: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
+ <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307261032330.15022@syhkavp.arg>
+ <20130726153440.GD2282@localhost.localdomain>
+ <alpine.LFD.2.03.1307261139370.15022@syhkavp.arg>
+ <20130726170402.GF28084@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1307261351140.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-07-26 11:47 AM, Russell King - ARM Linux wrote:
-> On Fri, Jul 26, 2013 at 10:17:33AM -0700, Christian Daudt wrote:
->> Because ARCH_BCM is meant to be used for a number of SoC families. We've
->> started upstreaming one (the BCM281XX) but have 2 more internally that
->> we're working towards upstreaming. And in the future our plan is to keep
->> the Broadcom Mobile SoCs all building under this single ARCH_BCM
->> configuration as multiplatform code building a single zImage for them.
-> 1. We're moving to a single zImage for everything.  Not just Broadcom.
-> There's no need for Broadcom stuff to be treated any differently.
-> Participate in the single zImage project and you will get that benefit
-> without these games.
-I don't follow what is the game being played. The Broadcom mobile team 
-is planning on building all future chips out of a single ARCH_ config 
-(which we called ARCH_BCM), and others need a separate ARCH_ to build 
-(other) specific SoCs for different families. Our ARCH_BCM chip was one 
-of the first upstreamed with multiplatform enabled (multi_v7_defconfig 
-already selects ARCH_BCM). So right now there are the following 3:
-ARCH_BCM -> BCM281XX now + a few others to follow
-ARCH_BCM5301X -> BCM530X family
-ARCH_BCM4760 -> BCM4760 family.
+On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
 
-and these would all reside in mach-bcm. The only problem I see with the 
-above is that ARCH_BCM would probably have been more aptly named 
-ARCH_MOBILE_BCM as the SoCs showing up under that ARCH are all from the 
-mobile team @ Broadcom. And if that is what is confusing people, I'm ok 
-with changing that.
+> On Fri, Jul 26, 2013 at 04:43:34PM +0100, Nicolas Pitre wrote:
+> > On Fri, 26 Jul 2013, Dave Martin wrote:
+> > 
+> > > On Fri, Jul 26, 2013 at 10:41:38AM -0400, Nicolas Pitre wrote:
+> > > > On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
+> > > > 
+> > > > > On Thu, Jul 25, 2013 at 05:06:51PM +0100, Nicolas Pitre wrote:
+> > > > > > On Thu, 25 Jul 2013, Dave Martin wrote:
+> > > > > > 
+> > > > > > > On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
+> > > > > > > > On Wed, 24 Jul 2013, Dave Martin wrote:
+> > > > > > > > 
+> > > > > > > > > But this patch commits us to requiring that on the suspend path 
+> > > > > > > > > specifically -- I think that ought to be mentioned somewhere. A 
+> > > > > > > > > comment in the preamble for __cpu_suspend would be enough, I think.
+> > > > > > > > 
+> > > > > > > > What comment would you suggest?  I want to make sure the possible 
+> > > > > > > > confusion you see is properly addressed.
+> > > > > > > 
+> > > > > > > I think we just need to state that the value of
+> > > > > > > cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
+> > > > > > > CPU the suspending logical CPU will resume on.  Consequently, if doing a
+> > > > > > > migration, cpu_logical_map() must be updated appropriately somewhere
+> > > > > > > between cpu_pm_enter() and cpu_suspend().
+> > > > > > 
+> > > > > > Excellent.  I've amended the patch with this:
+> > > > > > 
+> > > > > > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> > > > > > index 2835d35234..caf938db62 100644
+> > > > > > --- a/arch/arm/kernel/suspend.c
+> > > > > > +++ b/arch/arm/kernel/suspend.c
+> > > > > > @@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
+> > > > > >  /*
+> > > > > >   * Hide the first two arguments to __cpu_suspend - these are an implementation
+> > > > > >   * detail which platform code shouldn't have to know about.
+> > > > > > + *
+> > > > > > + * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
+> > > > > > + * the MPIDR of the physical CPU the suspending logical CPU will resume on.
+> > > > > > + * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
+> > > > > > + * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
+> > > > > >   */
+> > > > > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> > > > > >  {
+> > > > > > 
+> > > > > > I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
+> > > > > > is what users should care about.
+> > > > > > 
+> > > > > > ACK?
+> > > > > 
+> > > > > We need this patch to allow IKS to store a cpu context at a specific
+> > > > > index, let's be honest. It is a moot point and I am not very happy
+> > > > > about changing this code for a very specific usage, but the way code is
+> > > > > implemented makes the change acceptable. I really do not think we should
+> > > > > write guidelines on how cpu_suspend users have to change cpu_logical_map
+> > > > > though, that's not needed apart from IKS and that should be limited to IKS
+> > > > > code only.
+> > > > > 
+> > > > > Again, that's just my opinion, but cpu_suspend API must be kept as it is
+> > > > > and we should not encourage people to use it in creative ways.
+> > > > 
+> > > > I tend to agree, but I'm now stuck between two conflicting requests.
+> > > 
+> > > Would it make sense to keep the same API to cpu_suspend(), but make it
+> > > a wrapper for another function which has the MPIDR argument?  Then people
+> > > calling cpu_suspend() continue as normal.  Only IKS needs to know about
+> > > the underlying MPIDR handling when calling this.
+> > 
+> > The fact is that the switcher _does_ need to swizzle the cpu_logical_map 
+> > anyway before suspending.  Hence really there is no point creating extra
+> > wrappers for this.
+> > 
+> > So Lorenzo's suggestion to simply not advertise this too much for people 
+> > to not get too creative is probably the best compromize IMHO.
+> 
+> We could add a function cpu_migrate, almost identical to cpu_suspend
+> but accepting an MPIDR parameter as Dave said. cpu_suspend would read its
+> own MPIDR using read_cpuid_mpidr() and pass it to __cpu_suspend, keeping the
+> current behaviour unchanged (well, MPIDR is now read in cpu_suspend instead
+> of __cpu_suspend).
+> cpu_migrate will pass the mpidr to __cpu_suspend, to say "migrate this CPU to
+> the CPU identified by this MPIDR"; IKS can swizzle cpu_logical_map internally.
 
->
-> 2. "library" mach-* support code doesn't go into another mach-* directory.
-> That's why we have the plat-* stuff.  Please follow this well established
-> model.  plat-* directories are selected by CONFIG_PLAT_* symbols, so
-> you would need CONFIG_PLAT_BCM.
->
-> Please don't persue your own solutions to problems which were solved years
-> ago and have established solutions already in place.
-Maybe I missed something but with the migration to multiplatform (and 
-the minimalist size of the ensuing arch-specific files) my understanding 
-was that there is no need for PLAT going forward, that all socs from a 
-single company can just co-exist under the same mach- directory. If you 
-look at mach-bcm at present there are 2 .c files + 1 .S file. With the 
-cleanups we are doing to support > 1 family under ARCH_BCM, that number 
-is going to grow by 2-4 source files. Adding the 2 other ARCHes above 
-will add another handful to a grand total of < 10 source files. None of 
-these are 'library' files in the current sense (i.e. each subset of 
-these files will only be used for a single ARCH_ config option), so 
-there is nothing to move to a plat- directory.
-  As an alternative to what is currently being done, I guess could go 
-back to the 1-mach-directory-per-arch style so we'd have:
-mach-bcm -> ARCH_BCM
-mach-bcm5301x -> ARCH_BCM530X
-mach-bcm4760 -> ARCH_BCM4760
-but each of these dirs will have 2-3 source files. Which is what I heard 
-a while back we wanted to start avoiding (the explosition of mach- dirs 
-with next-to-nothing in each). Are you proposing we revert to this model ?
+Sorry but aren't we getting overboard with this?
 
-  thanks,
-    csd
+- IKS _has_ to swizzle cpu_logical_map
+
+- The suspend path has to get the MPIDR somehow
+
+- This patch keeps the change to a minimum
+
+- We don't necessarily want to "publish" a formal interface for this 
+  trick
+
+> Looks like lot of churn though, probably the intent is clearer and closer to
+> PSCI. Just an idea, probably useless.
+
+PSCI has to be invoked at a different level.  And frankly we don't need 
+to look for analogies to justify an extra interface which we may as well 
+dispense with.
+
+> I will apply and test the patch as it is first thing next week.
+
+Thanks.
+
+FYI this patch is already in Linaro's kernel and passed all our testing.
+
+
+Nicolas
