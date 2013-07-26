@@ -1,63 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Jul 2013 15:26:48 +0200
-Subject: [PATCH] pinctrl: sunxi: Fix gpio_set behaviour
-In-Reply-To: <20130726125445.612b2acf@skate>
-References: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130726125445.612b2acf@skate>
-Message-ID: <20130726132648.GG3056@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Jul 2013 14:28:50 +0100
+Subject: [PATCH RESEND v2] ARM: dt: Use the 'model' field for printing
+ the hardware revision
+In-Reply-To: <1374844784-2639-1-git-send-email-festevam@gmail.com>
+References: <1374844784-2639-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130726132850.GM24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Fri, Jul 26, 2013 at 12:54:45PM +0200, Thomas Petazzoni wrote:
-> On Thu, 25 Jul 2013 12:41:16 +0200, Maxime Ripard wrote:
-> > The current gpio_set function is ignoring the previous value set in the
-> > GPIO value register, which leads in erasing the values already set for
-> > the other GPIOs in the same bank when setting the value of a given GPIO.
-> > 
-> > Add the usual read/mask/write pattern to fix this brown paper bag bug.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/pinctrl/pinctrl-sunxi.c | 8 +++++++-
-> >  1 file changed, 7 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-> > index fc058b6..4f8bb18 100644
-> > --- a/drivers/pinctrl/pinctrl-sunxi.c
-> > +++ b/drivers/pinctrl/pinctrl-sunxi.c
-> > @@ -464,8 +464,14 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
-> >  	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
-> >  	u32 reg = sunxi_data_reg(offset);
-> >  	u8 index = sunxi_data_offset(offset);
-> > +	u32 regval = readl(pctl->membase + reg);
-> >  
-> > -	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
-> > +	if (value)
-> > +		regval |= BIT(index);
-> > +	else
-> > +		regval &= ~(BIT(index));
-> > +
-> > +	writel(regval, pctl->membase + reg);
+On Fri, Jul 26, 2013 at 10:19:44AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Hum, what about locking?
+> When booting a device tree kernel, we get the following output from 
+> 'cat /proc/cpuinfo': 
+> 
+> $ cat /proc/cpuinfo 
+> processor       : 0
+> model name      : ARMv7 Processor rev 5 (v7l)
+> BogoMIPS        : 531.66
+> Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls 
+> CPU implementer : 0x41
+> CPU architecture: 7
+> CPU variant     : 0x2
+> CPU part        : 0xc08
+> CPU revision    : 5
+> 
+> Hardware        : Freescale i.MX51 (Device Tree Support)
+> Revision        : 0000
+> Serial          : 0000000000000000
+> 
+> The Hardware line does not really describe the hardware type, as it is reading
+> the information from the dt 'machine' field.
+> 
+> In the dt case, read the 'model' field instead, so that we can have a better
+> description output as follows:
+> 
+> Hardware        : Freescale i.MX51 Babbage Board
+> 
+> The hardware output string is unchanged for the non-dt kernel case.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Right, I should probably use some spinlocks.
+While I can see the advantage of preserving old ways to do things, that's
+not always the best option.
 
-I'll do a followup patch, because this chunk won't be the only area
-impacted obviously.
+If userspace wants to get at the DT information about a platform, we already
+have ways that can happen already - we export the DT stuff so that kexec's
+tools can get at it.
 
-Maxime
+And... as the long term goal is to get rid of the individual machine_type
+structures for DT, there's no point introducing the new "model" field in
+that struct.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/6e3654a2/attachment.sig>
+And no, you're not supposed to write to mdesc structures.  Thanks for
+being the one to point out that they aren't const, I'll make them so now.
