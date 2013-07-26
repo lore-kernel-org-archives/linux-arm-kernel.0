@@ -1,60 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Jul 2013 17:11:32 -0500
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <51F1C412.1010602@wwwdotorg.org>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
- <20130725193135.GT23879@titan.lakedaemon.net>
- <CAL_Jsq+vWbTb8wNEDCR2c_M6sBnKW6e5HGk48QzmXSujQUdddA@mail.gmail.com>
- <51F1C412.1010602@wwwdotorg.org>
-Message-ID: <CAL_JsqLweU0Mt_8zsBu=-3Mx4Tc3Gn088j3xN27Hnq57etCofw@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Jul 2013 15:19:02 -0700
+Subject: [PATCH v2] clk: exynos4: Add CLK_GET_RATE_NOCACHE flag for the
+ Exynos4x12 ISP clocks
+In-Reply-To: <51F2F26E.4090909@gmail.com>
+References: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <20130726203026.7598.21711@quantum> <51F2F26E.4090909@gmail.com>
+Message-ID: <20130726221902.7598.22707@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 7:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 07/25/2013 01:16 PM, Rob Herring wrote:
->> On Thu, Jul 25, 2013 at 2:31 PM, Jason Cooper <jason@lakedaemon.net> wrote:
->>> On Thu, Jul 25, 2013 at 02:11:31PM -0500, Rob Herring wrote:
->>>> On Thu, Jul 25, 2013 at 11:09 AM, Olof Johansson <olof@lixom.net> wrote:
->>>
->>>>> One problem that needs to be solved is obviously how a binding
->>>>> graduates from tentative to locked. This work isn't going to be very
->>>>> interesting to most people, I suspect. Think standards committee type
->>>>> work.
->>>>
->>>> I think a time based stabilization period would be better than a
->>>> separate directory to apply bindings too. Or time plus periodic review
->>>> perhaps.
->>>
->>> The only problem with a time-based versus separate directory is how do
->>> users who've downloaded the tree determine which bindings are stable?
->>> If they pull a tarball, or receive an SDK, there is most likely no git
->>> history attached.
->>
->> Well, if time based includes moving the binding out of the kernel,
->> then that is what defines it as stable or not. I guess that is a form
->> of a separate directory. I don't think we want to be moving bindings
->> twice: tentative -> stable and kernel -> DT repo.
->>
->> The policy could be as simple as an binding without change in at least
->> N kernel releases is moved out and stable.
->
-> That might not be quite the right criteria. Just because something
-> didn't change doesn't mean it's "correct" and that any problems in the
-> binding have been addressed. As one example, on Tegra, we have a few
-> bindings that haven't changed in a while, yet rely on custom properties
-> for describing which DMA channel to use, rather than using the
-> fairly-recently-introduced standard DMA DT properties (this particular
-> example is being rectified now, but I'm sure there are plenty of similar
-> examples)
+Quoting Sylwester Nawrocki (2013-07-26 15:04:30)
+> On 07/26/2013 10:30 PM, Mike Turquette wrote:
+> > Quoting Sylwester Nawrocki (2013-07-25 14:07:05)
+> >> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> >>
+> >> The ISP clock registers belong to the ISP power domain and may change
+> >> their values if this power domain is switched off/on. Add
+> >> CLK_GET_RATE_NOCACHE flags to ensure we do not rely on invalid cached
+> >> data when setting or getting frequency of those clocks.
+> >>
+> >> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> >> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+> >
+> > Thanks for the fix. I've taken into clk-fixes. Is there a specific
+> > regression this fixes (besides just having wrong clock rates). I can
+> > amend the changelog if you have an example (e.g. device X explodes).
+> 
+> Hmm, yes, this fixes a pretty serious problem. There is a companion
+> commit [1] already in Linus' tree, more details can be found there.
+> 
+> Perhaps something like this could be added:
+> 
+> "Otherwise the FIMC-IS Cortex-A5 core and AXI bus clocks have
+> incorrect frequencies, which breaks the ISP operation and starting
+> the video pipeline fails with timeouts reported by the FIMC-IS
+> firmware.
+> 
+> See related commit 722a860ecb29aa34ec6f7d7f32b949209e8
+> "[media] exynos4-is: Fix FIMC-IS clocks initialization" for more
+> details."
 
-In this case, I would suggest that both bindings are stable and the
-conversion from one to the other is a platform decision. You could
-make the kernel support both if you wanted. Or you know the platform
-is not stable and are okay with having to keep dtb and kernel in sync.
+That's great.
 
-I think this highlights the need to separate stable bindings and
-stable dts files.
+Thanks,
+Mike
 
-Rob
+> 
+> [1] 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=722a860ecb29aa34ec6f7d7f32b949209e86a2f3
+> 
+> Thanks,
+> Sylwester
