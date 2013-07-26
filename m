@@ -1,53 +1,65 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 26 Jul 2013 20:31:01 +0900
-Subject: [PATCH v8 12/12] iommu/exynos: return 0 if iommu_attach_device()
- successes
-Message-ID: <004201ce89f3$9b849a20$d28dce60$@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 26 Jul 2013 12:31:10 +0100
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value to
+ index into save array
+In-Reply-To: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
+References: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
+Message-ID: <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iommu_attach_device() against exynos-iommu positive integer on success
-if the caller calls iommu_attach_device() with the same iommu_domain
-multiple times without call to iommu_detach_device() to inform the
-caller how many calls to iommu_detach_device() to really detach iommu.
+On Thu, Jul 25, 2013 at 05:06:51PM +0100, Nicolas Pitre wrote:
+> On Thu, 25 Jul 2013, Dave Martin wrote:
+> 
+> > On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
+> > > On Wed, 24 Jul 2013, Dave Martin wrote:
+> > > 
+> > > > But this patch commits us to requiring that on the suspend path 
+> > > > specifically -- I think that ought to be mentioned somewhere. A 
+> > > > comment in the preamble for __cpu_suspend would be enough, I think.
+> > > 
+> > > What comment would you suggest?  I want to make sure the possible 
+> > > confusion you see is properly addressed.
+> > 
+> > I think we just need to state that the value of
+> > cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
+> > CPU the suspending logical CPU will resume on.  Consequently, if doing a
+> > migration, cpu_logical_map() must be updated appropriately somewhere
+> > between cpu_pm_enter() and cpu_suspend().
+> 
+> Excellent.  I've amended the patch with this:
+> 
+> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> index 2835d35234..caf938db62 100644
+> --- a/arch/arm/kernel/suspend.c
+> +++ b/arch/arm/kernel/suspend.c
+> @@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
+>  /*
+>   * Hide the first two arguments to __cpu_suspend - these are an implementation
+>   * detail which platform code shouldn't have to know about.
+> + *
+> + * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
+> + * the MPIDR of the physical CPU the suspending logical CPU will resume on.
+> + * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
+> + * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
+>   */
+>  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  {
+> 
+> I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
+> is what users should care about.
+> 
+> ACK?
 
-However the convention of the return value of success of common API is
-zero, this patch makes iommu_attach_device() call against exynos-iommu
-always return zero if the given device is successfully attached to
-the given iommu_domain even though it is already attached to the same
-iommu_domain.
+We need this patch to allow IKS to store a cpu context at a specific
+index, let's be honest. It is a moot point and I am not very happy
+about changing this code for a very specific usage, but the way code is
+implemented makes the change acceptable. I really do not think we should
+write guidelines on how cpu_suspend users have to change cpu_logical_map
+though, that's not needed apart from IKS and that should be limited to IKS
+code only.
 
-Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
----
- drivers/iommu/exynos-iommu.c |   13 +++++++------
- 1 files changed, 7 insertions(+), 6 deletions(-)
+Again, that's just my opinion, but cpu_suspend API must be kept as it is
+and we should not encourage people to use it in creative ways.
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 51e5b35..6eed6d6 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -882,15 +882,16 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 
- 	spin_unlock_irqrestore(&priv->lock, flags);
- 
--	if (ret < 0)
-+	if (ret < 0) {
- 		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %#lx\n",
- 				__func__, __pa(priv->pgtable));
--	else
--		dev_dbg(dev, "%s: Attached IOMMU with pgtable 0x%lx%s\n",
--					__func__, __pa(priv->pgtable),
--					(ret == 0) ? "" : ", again");
-+		return ret;
-+	}
- 
--	return ret;
-+	dev_dbg(dev, "%s: Attached IOMMU with pgtable 0x%lx%s\n",
-+		__func__, __pa(priv->pgtable), (ret == 0) ? "" : ", again");
-+
-+	return 0;
- }
- 
- static void exynos_iommu_detach_device(struct iommu_domain *domain,
--- 
-1.7.2.5
+Lorenzo
