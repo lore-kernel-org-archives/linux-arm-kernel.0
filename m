@@ -1,63 +1,55 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 26 Jul 2013 17:15:02 +0800
-Subject: [PATCH 0/8] ARM: tegra: support LP1 suspend mode
-Message-ID: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+Date: Fri, 26 Jul 2013 17:15:04 +0800
+Subject: [PATCH 2/8] ARM: tegra: config the polarity of the request of sys
+ clock
+In-Reply-To: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1374830110-30685-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the support of LP1 suspend mode for Tegra.
+When suspending to LP1 mode, the SYSCLK will be clock gated. And different
+board may have different polarity of the request of SYSCLK, this patch
+configure the polarity from the DT for the board.
 
-Verified on Seaboard, Cardhu and Dalmore.
-And tested with THUMB2_KERNEL as well.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/pmc.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-P.S.
-A known issue on Dalmore, the LP1 resume may take 10 ~ 15 seconds due to
-the 792MHz BCT. It can't be reproduced on Seaboard or Cardhu. And the
-root cause of this is about the default settings of EMC registers that
-cause the DRAM can't leave self-refresh mode immediately. If you want
-to test with quick LP1 resume on Dalmore, I can provide another HACK for
-this.
-
-Joseph Lo (8):
-  ARM: tegra: add common resume handling code for LP1 resuming
-  ARM: tegra: config the polarity of the request of sys clock
-  clk: tegra114: add LP1 suspend/resume support
-  ARM: tegra: add common LP1 suspend support
-  ARM: tegra30: add LP1 suspend support
-  ARM: tegra20: add LP1 suspend support
-  ARM: tegra114: add LP1 suspend support
-  ARM: dts: tegra: enable LP1 suspend mode
-
- arch/arm/boot/dts/tegra114-dalmore.dts     |   2 +-
- arch/arm/boot/dts/tegra20-colibri-512.dtsi |   2 +-
- arch/arm/boot/dts/tegra20-harmony.dts      |   2 +-
- arch/arm/boot/dts/tegra20-paz00.dts        |   2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts     |   2 +-
- arch/arm/boot/dts/tegra20-tamonten.dtsi    |   2 +-
- arch/arm/boot/dts/tegra20-trimslice.dts    |   2 +-
- arch/arm/boot/dts/tegra20-ventana.dts      |   2 +-
- arch/arm/boot/dts/tegra20-whistler.dts     |   2 +-
- arch/arm/boot/dts/tegra30-beaver.dts       |   2 +-
- arch/arm/boot/dts/tegra30-cardhu.dtsi      |   2 +-
- arch/arm/mach-tegra/Makefile               |   3 +
- arch/arm/mach-tegra/iomap.h                |   6 +
- arch/arm/mach-tegra/pm-tegra20.c           |  37 ++
- arch/arm/mach-tegra/pm-tegra30.c           |  37 ++
- arch/arm/mach-tegra/pm.c                   | 121 +++++-
- arch/arm/mach-tegra/pm.h                   |  23 ++
- arch/arm/mach-tegra/pmc.c                  |  36 +-
- arch/arm/mach-tegra/pmc.h                  |   3 +
- arch/arm/mach-tegra/reset-handler.S        |  13 +
- arch/arm/mach-tegra/reset.c                |   2 +
- arch/arm/mach-tegra/reset.h                |   4 +
- arch/arm/mach-tegra/sleep-tegra20.S        | 300 ++++++++++++++
- arch/arm/mach-tegra/sleep-tegra30.S        | 615 +++++++++++++++++++++++++++++
- arch/arm/mach-tegra/sleep.S                |   8 +-
- arch/arm/mach-tegra/sleep.h                |  18 +
- drivers/clk/tegra/clk-tegra114.c           |  32 ++
- 27 files changed, 1259 insertions(+), 21 deletions(-)
- create mode 100644 arch/arm/mach-tegra/pm-tegra20.c
- create mode 100644 arch/arm/mach-tegra/pm-tegra30.c
-
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index 8345fcd..018bc87 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -27,6 +27,8 @@
+ #include "pmc.h"
+ #include "sleep.h"
+ 
++#define TEGRA_POWER_SYSCLK_POLARITY	(1 << 10)  /* sys clk polarity */
++#define TEGRA_POWER_SYSCLK_OE		(1 << 11)  /* system clock enable */
+ #define TEGRA_POWER_EFFECT_LP0		(1 << 14)  /* LP0 when CPU pwr gated */
+ #define TEGRA_POWER_CPU_PWRREQ_POLARITY	(1 << 15)  /* CPU pwr req polarity */
+ #define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
+@@ -238,6 +240,20 @@ void tegra_pmc_suspend_init(void)
+ 	reg = tegra_pmc_readl(PMC_CTRL);
+ 	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
+ 	tegra_pmc_writel(reg, PMC_CTRL);
++
++	reg = tegra_pmc_readl(PMC_CTRL);
++
++	if (!pmc_pm_data.sysclkreq_high)
++		reg |= TEGRA_POWER_SYSCLK_POLARITY;
++	else
++		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
++
++	/* configure the output inverts while the request is tristated */
++	tegra_pmc_writel(reg, PMC_CTRL);
++
++	/* now enable the request */
++	reg |= TEGRA_POWER_SYSCLK_OE;
++	tegra_pmc_writel(reg, PMC_CTRL);
+ }
+ #endif
+ 
 -- 
 1.8.3.4
