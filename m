@@ -1,32 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jul 2013 19:47:02 +0100
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <51F2AF2D.1000300@broadcom.com>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net> <51F29BFE.8000202@broadcom.com>
- <20130726171153.GN29916@titan.lakedaemon.net> <51F2AF2D.1000300@broadcom.com>
-Message-ID: <20130726184702.GW24642@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Jul 2013 13:55:34 -0500
+Subject: [PATCH v3 07/16] of/device: add helper to get cpu device node
+ from logical cpu index
+In-Reply-To: <51F2AB71.3070102@arm.com>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492747-13879-8-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <51F2AB71.3070102@arm.com>
+Message-ID: <CAL_JsqK5i8fxskOtdqmPYL1pPicesAYHfW6+2NLR41t_fkf+6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 10:17:33AM -0700, Christian Daudt wrote:
-> Because ARCH_BCM is meant to be used for a number of SoC families. We've  
-> started upstreaming one (the BCM281XX) but have 2 more internally that  
-> we're working towards upstreaming. And in the future our plan is to keep  
-> the Broadcom Mobile SoCs all building under this single ARCH_BCM  
-> configuration as multiplatform code building a single zImage for them.
+On Fri, Jul 26, 2013 at 12:01 PM, Sudeep KarkadaNagesha
+<Sudeep.KarkadaNagesha@arm.com> wrote:
+> Rob,
+>
+> On 22/07/13 12:32, Sudeep KarkadaNagesha wrote:
+>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>
+>> Multiple drivers need to get the cpu device node from the cpu logical
+>> index and then access the of_node.
+>>
+>> This patch adds helper function to fetch the device node directly.
+>>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>
+> If you have no objections with this patch, can I add your ACK ?
 
-1. We're moving to a single zImage for everything.  Not just Broadcom.
-There's no need for Broadcom stuff to be treated any differently.
-Participate in the single zImage project and you will get that benefit
-without these games.
+Yes.
 
-2. "library" mach-* support code doesn't go into another mach-* directory.
-That's why we have the plat-* stuff.  Please follow this well established
-model.  plat-* directories are selected by CONFIG_PLAT_* symbols, so
-you would need CONFIG_PLAT_BCM.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Please don't persue your own solutions to problems which were solved years
-ago and have established solutions already in place.
+>
+> Regards,
+> Sudeep
+>
+>> ---
+>>  include/linux/of_device.h | 15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+>> index 9d27475..82ce324 100644
+>> --- a/include/linux/of_device.h
+>> +++ b/include/linux/of_device.h
+>> @@ -1,6 +1,7 @@
+>>  #ifndef _LINUX_OF_DEVICE_H
+>>  #define _LINUX_OF_DEVICE_H
+>>
+>> +#include <linux/cpu.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/of_platform.h> /* temporary until merge */
+>>
+>> @@ -43,6 +44,15 @@ static inline void of_device_node_put(struct device *dev)
+>>       of_node_put(dev->of_node);
+>>  }
+>>
+>> +static inline struct device_node *of_cpu_device_node_get(int cpu)
+>> +{
+>> +     struct device *cpu_dev;
+>> +     cpu_dev = get_cpu_device(cpu);
+>> +     if (!cpu_dev)
+>> +             return NULL;
+>> +     return of_node_get(cpu_dev->of_node);
+>> +}
+>> +
+>>  #else /* CONFIG_OF */
+>>
+>>  static inline int of_driver_match_device(struct device *dev,
+>> @@ -67,6 +77,11 @@ static inline const struct of_device_id *of_match_device(
+>>  {
+>>       return NULL;
+>>  }
+>> +
+>> +static inline struct device_node *of_cpu_device_node_get(int cpu)
+>> +{
+>> +     return NULL;
+>> +}
+>>  #endif /* CONFIG_OF */
+>>
+>>  #endif /* _LINUX_OF_DEVICE_H */
+>>
+>
+>
+> -- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
