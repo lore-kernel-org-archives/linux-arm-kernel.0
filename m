@@ -1,38 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 26 Jul 2013 00:17:35 -0300
-Subject: [PATCH 1/2] ARM: mach-imx: Select ARM_CPU_SUSPEND at ARCH_MXC level
-Message-ID: <1374808656-28609-1-git-send-email-festevam@gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 25 Jul 2013 20:30:46 -0800
+Subject: [PATCH 3/4] msm_serial: Make baud_code detection more dynamic
+In-Reply-To: <1374691051-28544-4-git-send-email-sboyd@codeaurora.org>
+References: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
+ <1374691051-28544-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAJAp7Og1jwyAn0sGbb_1Bk5_fvBWa1AuDNsRV1b17S0Tijk9kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Jul 24, 2013 at 10:37 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> [snip]
+> +       unsigned int i, divisor;
+> +       const struct msm_baud_map *entry;
+> +       static const struct msm_baud_map table[] = {
+> +               { 1536, 0x00,  1 },
+> +               {  768, 0x11,  1 },
+> +               {  384, 0x22,  1 },
+> +               {  192, 0x33,  1 },
+> +               {   96, 0x44,  1 },
+> +               {   48, 0x55,  1 },
+> +               {   32, 0x66,  1 },
+> +               {   24, 0x77,  1 },
+> +               {   16, 0x88,  1 },
+> +               {   12, 0x99,  6 },
+> +               {    8, 0xaa,  6 },
+> +               {    6, 0xbb,  6 },
+> +               {    4, 0xcc,  6 },
+> +               {    3, 0xdd,  8 },
+> +               {    2, 0xee, 16 },
+> +               {    1, 0xff, 31 },
+> +       };
+> +
+> +       divisor = uart_get_divisor(port, baud);
+> +
+> +       for (i = 0, entry = table; i < ARRAY_SIZE(table); i++, entry++)
+> +               if (entry->divisor <= divisor)
+> +                       break;
+> +
+> +       return entry; /* Default to smallest divider */
 
-Instead of selecting ARM_CPU_SUSPEND only for mx6, we can select it for 
-all SoCs from the ARCH_MXC family.
+Shouldn't matter, but you're not defaulting to the smallest divider.
+Your are defaulting to an undefined value, as `entry` will be off the
+array once i == ARRAY_SIZE().
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index bb1cc9e..1cc219f 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_MXC
- 	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
-+	select ARM_CPU_SUSPEND if PM
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_PATCH_PHYS_VIRT
- 	select AUTO_ZRELADDR if !ZBOOT_ROM
-@@ -786,7 +787,6 @@ config SOC_IMX6Q
- 	bool "i.MX6 Quad/DualLite support"
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
--	select ARM_CPU_SUSPEND if PM
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_764369 if SMP
- 	select ARM_ERRATA_775420
--- 
-1.8.1.2
+Regards,
+Bjorn
