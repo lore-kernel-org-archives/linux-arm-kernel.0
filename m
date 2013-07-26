@@ -1,26 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jul 2013 15:06:18 +0100
-Subject: [PATCH V2 2/8] ASoC: Samsung: I2S: Add quirks as driver data
- in I2S
-In-Reply-To: <1374845812-7803-3-git-send-email-padma.v@samsung.com>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
- <1374845812-7803-3-git-send-email-padma.v@samsung.com>
-Message-ID: <20130726140618.GP24642@n2100.arm.linux.org.uk>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 26 Jul 2013 15:08:33 +0100
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726113809.GB29916@titan.lakedaemon.net>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
+ <20130725193135.GT23879@titan.lakedaemon.net>
+ <20130725231848.GJ24642@n2100.arm.linux.org.uk>
+ <CAKON4OwwOnP9kbN0JqR5L+F1svTucAQvz0RDwqU+Gy9UAFwHog@mail.gmail.com>
+ <20130726113809.GB29916@titan.lakedaemon.net>
+Message-ID: <1374847713.14574.100.camel@i7.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 07:06:46PM +0530, Padmavathi Venna wrote:
-> -- compatible : "samsung,i2s-v5"
-> +- compatible : should be one of the following.
-> +   - samsung,s3c6410-i2s: for 8/16/24bit stereo I2S. Previous versions
-> +     has only 8/16bit support.
-> +   - samsung,s3c6410-i2sv4: for 8/16/24bit multichannel(5.1 channel) I2S.
-> +     Introduced in s3c6410. This also applicable for s5p64x0 platforms.
-> +   - samsung,s5pc100-i2s: for 8/16/24bit multichannel(5.1 channel) I2S
-> +     with secondary fifo and s/w reset control.
-> +   - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S with
-> +     secondary fifo, s/w reset control and internal mux for root clk src.
-> +
+On Fri, 2013-07-26 at 07:38 -0400, Jason Cooper wrote:
+> > The scheme is also quite useful for new tree developers since it will
+> > show them the universe of device tree attributes that have already
+> > been standardized. By using comments, you could probably turn the
+> > device tree documentation into the schema source files.
+> 
+> One more note on schema, since DT is a description of hardware, it would
+> be useful to have two comments, a url to the datasheet, and a canonical
+> name of the datasheet suitable for $searchengine.  Where available, of
+> course.
 
-So what happens with your changes to everyone who is using a DT file with
-the "samsung,i2s-v5" compatible string?
+Yes, that's a very good idea. After all, the behaviour described in (a
+specific version of) the datasheet is an *implicit* part of the DT
+binding. If I tell you "there is an 8390 <here>", then we damn well
+ought to agree about how an 8390 behaves. And what revision of the chip
+can be assumed from a given 'compatible' string.
+
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/88a97073/attachment.bin>
