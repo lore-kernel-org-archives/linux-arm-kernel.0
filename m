@@ -1,57 +1,84 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 26 Jul 2013 23:30:01 +0200
-Subject: [PATCH v11] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <51F2E4A7.1040200@codethink.co.uk>
-References: <1374834384-8071-1-git-send-email-p.zabel@pengutronix.de>
- <51F2E4A7.1040200@codethink.co.uk>
-Message-ID: <51F2EA59.8010908@gmail.com>
+From: zubair.lutfullah@gmail.com (Zubair Lutfullah)
+Date: Fri, 26 Jul 2013 22:37:10 +0100
+Subject: [PATCH] mfd: input: arm: dts: doc: ti_am335x: typo fixes (coordiante
+ -> coordinate)
+In-Reply-To: <1374874630-25457-1-git-send-email-zubair.lutfullah@gmail.com>
+References: <1374874630-25457-1-git-send-email-zubair.lutfullah@gmail.com>
+Message-ID: <1374874630-25457-2-git-send-email-zubair.lutfullah@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 11:05 PM, Ben Dooks wrote:
-> On 26/07/13 11:26, Philipp Zabel wrote:
->> This driver implements a reset controller device that toggle a gpio
->> connected to a reset pin of a peripheral IC. The delay between assertion
->> and de-assertion of the reset signal can be configured via device tree.
->>
->> Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
->> Reviewed-by: Stephen Warren<swarren@nvidia.com>
->
-> [snip]
->
->> +static struct of_device_id gpio_reset_dt_ids[] = {
->> + { .compatible = "gpio-reset" },
->> + { }
->> +};
->
-> I think you need the following:
-> MODULE_DEVICE_TABLE(of, gpio_reset_dt_ids);
+Did a grep for 'coordiante' and replaced them all with 'coordinate'
 
-It's already there, at bottom of the file. But if I'm not mistaken
-the common practice is to keep it together with the actual array
-definition. At least that's the case with, e.g. EXPORT_SYMBOL*.
+Signed-off-by: Zubair Lutfullah <zubair.lutfullah@gmail.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ .../bindings/input/touchscreen/ti-tsc-adc.txt      |    4 ++--
+ arch/arm/boot/dts/am335x-evm.dts                   |    2 +-
+ drivers/input/touchscreen/ti_am335x_tsc.c          |    2 +-
+ drivers/mfd/ti_am335x_tscadc.c                     |    2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
->> +static struct platform_driver gpio_reset_driver = {
->> + .probe = gpio_reset_probe,
->> + .remove = gpio_reset_remove,
->> + .driver = {
->> + .name = "gpio-reset",
->> + .owner = THIS_MODULE,
->> + .of_match_table = of_match_ptr(gpio_reset_dt_ids),
->> + },
->> +};
->> +
->> +module_platform_driver(gpio_reset_driver);
->> +
->> +MODULE_AUTHOR("Philipp Zabel<p.zabel@pengutronix.de>");
->> +MODULE_DESCRIPTION("gpio reset controller");
-
-nit: shouldn't gpio be capitalized ?
-
->> +MODULE_LICENSE("GPL");
->> +MODULE_ALIAS("platform:gpio-reset");
->> +MODULE_DEVICE_TABLE(of, gpio_reset_dt_ids);
-
---
-Regards,
-Sylwester
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt b/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
+index 491c97b..3e22aec 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
+@@ -6,7 +6,7 @@ Required properties:
+ 	ti,wires: Wires refer to application modes i.e. 4/5/8 wire touchscreen
+ 		  support on the platform.
+ 	ti,x-plate-resistance: X plate resistance
+-	ti,coordiante-readouts: The sequencer supports a total of 16
++	ti,coordinate-readouts: The sequencer supports a total of 16
+ 				programmable steps each step is used to
+ 				read a single coordinate. A single
+                                 readout is enough but multiple reads can
+@@ -34,7 +34,7 @@ Example:
+ 		tsc {
+ 			ti,wires = <4>;
+ 			ti,x-plate-resistance = <200>;
+-			ti,coordiante-readouts = <5>;
++			ti,coordinate-readouts = <5>;
+ 			ti,wire-config = <0x00 0x11 0x22 0x33>;
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 0fa4c7f..e50b781 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -250,7 +250,7 @@
+ 	tsc {
+ 		ti,wires = <4>;
+ 		ti,x-plate-resistance = <200>;
+-		ti,coordiante-readouts = <5>;
++		ti,coordinate-readouts = <5>;
+ 		ti,wire-config = <0x00 0x11 0x22 0x33>;
+ 	};
+ 
+diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
+index 0e9f02a..6422f65 100644
+--- a/drivers/input/touchscreen/ti_am335x_tsc.c
++++ b/drivers/input/touchscreen/ti_am335x_tsc.c
+@@ -348,7 +348,7 @@ static int titsc_parse_dt(struct platform_device *pdev,
+ 	if (err < 0)
+ 		return err;
+ 
+-	err = of_property_read_u32(node, "ti,coordiante-readouts",
++	err = of_property_read_u32(node, "ti,coordinate-readouts",
+ 			&ts_dev->coordinate_readouts);
+ 	if (err < 0)
+ 		return err;
+diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+index cd74d59..1686ae6 100644
+--- a/drivers/mfd/ti_am335x_tscadc.c
++++ b/drivers/mfd/ti_am335x_tscadc.c
+@@ -106,7 +106,7 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
+ 
+ 	node = of_get_child_by_name(pdev->dev.of_node, "tsc");
+ 	of_property_read_u32(node, "ti,wires", &tsc_wires);
+-	of_property_read_u32(node, "ti,coordiante-readouts", &readouts);
++	of_property_read_u32(node, "ti,coordinate-readouts", &readouts);
+ 
+ 	node = of_get_child_by_name(pdev->dev.of_node, "adc");
+ 	of_property_for_each_u32(node, "ti,adc-channels", prop, cur, val) {
+-- 
+1.7.9.5
