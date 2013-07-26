@@ -1,42 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jul 2013 16:10:21 +0100
-Subject: [RFC/RFT PATCH 0/5] mm: ARM nobootmem and few dma_mask fixes
-In-Reply-To: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130726151021.GU24642@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 26 Jul 2013 11:10:53 -0400 (EDT)
+Subject: [PATCH 03/13] ARM: b.L: core switcher code
+In-Reply-To: <20130726145317.GT24642@n2100.arm.linux.org.uk>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-4-git-send-email-nicolas.pitre@linaro.org>
+ <20130726145317.GT24642@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1307261101550.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 12, 2013 at 05:48:09PM -0400, Santosh Shilimkar wrote:
-> The series is an attempt to move ARM port to NO_BOOTMEM. As discussed
-> on list NO_BOOTMEM move needed updates to max*pfn meaning to be maximum
-> PFNs but that breaks the dma_mask for few block layer drivers since
-> ARM start of physical memory is not PFN0 unlike most of the architectures.
-> Some more read on it is here:
-> 	http://lwn.net/Articles/543408/
-> 	http://lwn.net/Articles/543424/
-> 
-> To address this issue, we introduce generic dma_max_pfn() helper which
-> can be overridden from the architectures.
-> 	
-> Another intention behind move to nobootmem is also to convert ARM to
-> switch to memblock and getting rid of bootmem allocator dependency which
-> don't work for LPAE machines which has physical memory starting beyond
-> 4 GB boundary. It needs changes to core kernel and also a new memblock
-> API. More on this can be found here:
-> 	https://lkml.org/lkml/2013/6/29/77
-> 
-> I have been trying to cook up these patches with kind help from Russell
-> and we know series don't solve all the dma_mask bad assumptions. But at
-> least I am hoping that it can get the ball rolling.	
-> 
-> Comments/testing help is welcome !!
+On Fri, 26 Jul 2013, Russell King - ARM Linux wrote:
 
-As this is related to some of the cleanup of dma_mask which I've been
-doing, I think it may make sense to roll this into one tree.  Any
-objection to that?
+> On Mon, Jul 22, 2013 at 11:31:19PM -0400, Nicolas Pitre wrote:
+> > To solve both issues, we borrow some of the task space belonging to
+> > the init/idle task which, by its nature, is lightly used and therefore
+> > is unlikely to clash with our usage.  The init task is also never going
+> > away.
+> 
+> That is... quite a horrid hack - and it is a hack.  You claim that
+> the idle task is not likely to clash, but with 8 CPUs each of
+> 256 bytes of stack, that's 2k of stack.  With the thread data
+> structure at over 512 bytes, that's 2.5k of 8k.
 
-Can we get any acks on this stuff from Jens and Jejb etc - especially
-for the bits which touch block/ and for the scsi bits as these are
-touching other subsystems.  (oddly, linux-scsi wasn't on the original
-mail for this series summary.)
+It is a hack indeed.  This way of doing things does not survive until 
+the end of the patch series either.  But doing this for the actual first 
+switcher patch makes the code much simpler to review.
+
+> Don't forget that the amount of kernel stack used depends on many
+> things - not just what the thread does (in the case of the idle
+> thread, that includes cpuidle stuff) but also the function call
+> depth of any interrupt in the system, as well as the path used to
+> get into the idle thread.
+> 
+> If you want to do this, it would be much better to use the bottom
+> of the stack space for the idle thread associated with the CPU.  The
+> idle threads are all forked at boot for any possible CPUs before the
+> secondaries are brought online, and so are persistent.  That would
+> reduce the additional required space to 256 bytes on the stack, not
+> 2k on a single stack.
+
+What I do in a later patch is to use dedicated switcher threads per 
+logical CPU, and the separate stack is taken from each thread's stack.  
+That also means that only 2 special stack areas are needed instead of 8 
+or more.
+
+But kernel threads are introduced as a separate patch to ease review.
+
+
+Nicolas
