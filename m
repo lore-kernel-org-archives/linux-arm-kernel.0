@@ -1,43 +1,84 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 26 Jul 2013 15:05:22 -0700
-Subject: [GIT PULL] msm gpio fixes for 3.11
-Message-ID: <1374876322-2222-1-git-send-email-davidb@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 26 Jul 2013 16:08:59 -0600
+Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
+In-Reply-To: <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
+References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
+ <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <51F2F37B.8030306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+(CC'ing the DT bindings maintainers hence quoting the binding in full)
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+On 07/26/2013 02:25 PM, Markus Mayer wrote:
 
-are available in the git repository at:
+Some kind of patch description is always useful.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-3.11-fix1
+>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   41 ++++++++++++++++++++
+>  arch/arm/boot/dts/bcm11351.dtsi                    |   16 ++++++++
 
-for you to fetch changes up to 8fd62389a778c902c7e8532594ea924bbaf465e8:
+It's more usual to put the DT binding doc change and driver change in
+one patch, then "make use of that" in a later separate patch which edits
+*.dts and *.dtsi.
 
-  ARM: msm: Consolidate gpiomux for older architectures (2013-07-26 14:55:38 -0700)
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
 
-----------------------------------------------------------------
-Fixes for MSM for 3.11
+> +Broadcom Kona Family GPIO
+> +-------------------------
+> +
+> +This GPIO driver is used in the following Broadcom SoCs:
+> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+> +
+> +The GPIO controller only supports edge, not level triggering.
 
-Two small fixes for MSM.
+add "... of interrupts"? This might not be worth mentioning; it's
+clearly spelled out in the description of the interrupt cells below.
 
-The first fixes the a gpio controller register address.  I didn't see
-any acks from the devicetree maintainers, so I've copied them on this
-pull request.  The change itself is minor, and just to the register
-address.
+> +Required properties:
+> +  - compatible: "brcm,kona-gpio"
+> +  - reg: Physical base address and length of the controller's registers.
+> +  - interrupts: The interrupt outputs from the controller.
 
-The second change removes the gpiomux V1 code from MSM.  This was
-breaking compilation for some of the targets.
+How many entries are required? I notice there's more than 1 in the
+example below.
 
-----------------------------------------------------------------
-Rohit Vaswani (2):
-      ARM: msm: dts: Fix the gpio register address for msm8960
-      ARM: msm: Consolidate gpiomux for older architectures
+> +  - #gpio-cells: Should be <2>. The first cell is the pin number, the second
+> +    cell is used to specify optional parameters:
+> +    - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> +  - #interrupt-cells: Should be <2>. The first cell is the GPIO number.
+> +    The second cell is used to specify flags:
+> +    - trigger type (bits[1:0]):
+> +        1 = low-to-high edge triggered.
+> +        2 = high-to-low edge triggered.
+> +        3 = low-to-high or high-to-low edge triggered
+> +        Valid values are 1, 2, 3
+> +  - gpio-controller: Marks the device node as a GPIO controller.
+> +  - interrupt-controller: Marks the device node as an interrupt controller.
+> +
+> +Example:
+> +	gpio: gpio at 35003000 {
+> +		compatible = "brcm,kona-gpio";
+> +		reg = <0x35003000 0x800>;
+> +		interrupts =
+> +		       <0x0 106 0x4
+> +			0x0 115 0x4
+> +			0x0 114 0x4
+> +			0x0 113 0x4
+> +			0x0 112 0x4
+> +			0x0 111 0x4>;
+> +		#gpio-cells = <2>;
+> +		#interrupt-cells = <2>;
+> +		gpio-controller;
+> +		interrupt-controller;
+> +	};
 
- arch/arm/boot/dts/msm8960-cdp.dts |  4 ++--
- arch/arm/mach-msm/Kconfig         |  3 +--
- arch/arm/mach-msm/gpiomux-v1.c    | 33 ---------------------------------
- arch/arm/mach-msm/gpiomux.h       | 10 ----------
- 4 files changed, 3 insertions(+), 47 deletions(-)
- delete mode 100644 arch/arm/mach-msm/gpiomux-v1.c
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+
+> +	gpio: gpio at 35003000 {
+> +		compatible = "brcm,kona-gpio";
+
+In order to enable any later chip-specific quirking requirements, that
+compatible property should both specify the IP block and the specific
+chip it's included in, so I'd expect to see something like:
+
+		compatible = "brcm,brcm11351-gpio", "brcm,kona-gpio";
