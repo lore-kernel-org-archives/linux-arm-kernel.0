@@ -1,53 +1,76 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Jul 2013 08:42:58 -0500
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <20130726045433.GB4100@netboy>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 26 Jul 2013 09:45:51 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726133802.GN24642@n2100.arm.linux.org.uk>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
  <51F168FC.9070906@wwwdotorg.org>
  <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy> <20130725213753.GC17616@obsidianresearch.com>
- <20130726045433.GB4100@netboy>
-Message-ID: <51F27CE2.6050908@gmail.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+ <20130726132709.GH29916@titan.lakedaemon.net>
+ <20130726133802.GN24642@n2100.arm.linux.org.uk>
+Message-ID: <20130726134551.GI29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2013 11:54 PM, Richard Cochran wrote:
-> On Thu, Jul 25, 2013 at 03:37:53PM -0600, Jason Gunthorpe wrote:
+On Fri, Jul 26, 2013 at 02:38:02PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 26, 2013 at 09:27:09AM -0400, Jason Cooper wrote:
+> > On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
+> > > Unless I totally misunderstood, the thread is talking about letting
+> > > established bindings change with each new kernel version.  I am
+> > > opposed to that.
+> > > 
+> > > Of course, a user may want to change the values of his MAC addresses,
+> > > if he needs to. But he should never have to change *how* he specifies
+> > > those addresses.
+> > 
+> > The other dynamic change that bears mentioning here is attributes which
+> > have been configured by the bootloader.  For example, in mvebu, we have
+> > the Schrodinger's Cat register.  It allows you to reconfigure the base
+> > address of the registers from *within* that register range.  If the
+> > bootloader does this, the DT needs to be updated to reflect the current
+> > hardware configuration.  Otherwise, the kernel is stuck poking around at
+> > memory addresses hoping to find something sane.
+> > 
+> > But this falls into the same category as you mentioned, but outside of
+> > chosen {};.
 > 
->> We use DT has a kernel configuration input. Our environment is
->> designed to guarantee 100% that the kernel and DT match exactly. DT
->> very deliberately isn't an ABI boundary in our systems.
-> 
-> It is nice that you use DT in that way, but that is not how DT is
-> supposed to work. If you must keep your DT in sync with the kernel,
-> then there is no advantage over the old platfrom device method. At
-> least that had the virtue of being a C language interface (ABI), and
-> some mistakes were be caught by the compiler.
+> No, this falls within the remit of "describing the hardware" and it is
+> certainly something that is free to change.
 
-I agree, but there is one advantage in that how the data in the DT is
-described is unified. Before, how every platform defined and created
-devices was slightly different. Now you know where to go look and don't
-have things all over the place and hidden by custom macros. We could
-have fixed all that in C without DT, but DT conversion forced the clean-up.
+We agree, I was just highlighting that attributes outside of chosen can
+and need to be rewritten by the bootloader.
 
->> We've been doing this for years and have a proven in the field track
->> record of upgrades from pre-2.6.16 to 3.7 and beyond with multiple
->> SOCs. The same bootloader that was shipped to support non-DT 2.6.16
->> boots DT 3.7 just fine.
+> What should not "change" once a kernel is the method by which hardware is
+> described in DT.  "change" there in the sense that how it was described by
+> kernel 3.X should still be accepted by 3.X+n, even if 3.X+n comes up with
+> a much better way to describe it.
 > 
-> Try that with Freescale PowerPCs.  Good luck.
+> The actual data associated with those descriptions is free to change in
+> whatever way is necessary if the hardware itself changes due to things
+> being programmed differently.
 > 
-> Heck, even Paul's OMAP test reports have been spoiled by his not
-> deleting old dtb files. Of course, that is his fault (and not DT's, no
-> never).
->  
->> For closed system embedded DT has proven *WONDERFUL*.
+> Think of it as the difference between the design of an interface, and the
+> interface being used.  We don't mandate that the write() syscall shall
+> always be called for fd=1 with length=5 and bytes "Hello" in the buffer.
+> We mandate that the write() syscall shall be passed an integer fd, a
+> buffer pointer, and a length and we don't change that ever.
 > 
-> I too work on commercial embedded systems, and DT has proven to be
-> one gigantic *PITA*.
+> Think of "a better way to describe it" as introducing the writev() syscall
+> to supplement write() so that applications can do writes from scattered
+> memory locations.  We don't get rid of the write() syscall - we add to
+> the ABI that's already there leaving the existing interfaces with exactly
+> the same semantics, so that all the existing stuff continues to work as-is.
 
-Due to ABI breakage or other reasons?
+Yes, the manner in which the bootloader writes the changes should adhere
+to the binding.  In my example, it shouldn't replace the reg property
+with reg-mod.  It should just change the addresses to reflect the
+current state of the hardware the kernel will see.
 
-Rob
+thx,
+
+Jason.
