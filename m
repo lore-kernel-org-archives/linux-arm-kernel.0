@@ -1,38 +1,79 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 26 Jul 2013 09:05:17 +0800
-Subject: [PATCH, re-send] Always trap on BUG()
-In-Reply-To: <20130725220502.GI18254@gmail.com>
-References: <201307051738.35930.arnd@arndb.de>
- <20130715151612.9499c2b2ad40e88d183a4600@linux-foundation.org>
- <20130715222755.GY24642@n2100.arm.linux.org.uk> <51E47924.9030005@zytor.com>
- <20130723093628.GC19786@gmail.com> <51EF1936.7090801@asianux.com>
- <20130725220502.GI18254@gmail.com>
-Message-ID: <51F1CB4D.2020301@asianux.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 25 Jul 2013 18:39:24 -0700 (PDT)
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
+In-Reply-To: <20130726001052.GA28912@verge.net.au>
+References: <201307230218.01495.sergei.shtylyov@cogentembedded.com>
+ <201307230222.04763.sergei.shtylyov@cogentembedded.com>
+ <20130726001052.GA28912@verge.net.au>
+Message-ID: <87a9lacd6o.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 06:05 AM, Ingo Molnar wrote:
-> * Chen Gang <gang.chen@asianux.com> wrote:
-> 
->> On 07/23/2013 05:36 PM, Ingo Molnar wrote:
->>>
->>> (the crazies can keep a separate patch to remove even more of BUG() to win 
->>> a K or two.)
->>>
->>
->> Excuse me, my English is not quite well, I do not quite understand your
->> meaning, could you please repeat again in details or say more clearly ?
-> 
-> I meant: those people who'd like to have the tiny 
-> additional space savings offered by !CONFIG_BUG (and are 
-> crazy enough to live with non-determinism in exchange for a 
-> measly payment of 1 KB), can apply a separate, out of tree 
-> patch just fine and don't need upstream kernel support.
-> 
 
-Thank you for your reply in details.
+Hi
+
+> > +static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
+> > +	{
+> > +		.id	= HPBDMA_SLAVE_SDHI0_TX,
+> > +		.addr	= 0xffe4c000 + 0x30,
+> > +		.dcr	= DCR_SPDS_16BIT | DCR_DMDL | DCR_DPDS_16BIT,
+> > +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
+> > +			  ASYNCRSTR_ASRST23,
+> > +		.mdr	= ASYNCMDR_ASMD21_SINGLE,
+> > +		.mdm	= ASYNCMDR_ASMD21_MASK,
+> > +		.port	= 0x0D0C,
+> > +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
+> > +		.dma_ch	= 21,
+> > +	}, {
+> > +		.id	= HPBDMA_SLAVE_SDHI0_RX,
+> > +		.addr	= 0xffe4c000 + 0x30,
+> > +		.dcr	= DCR_SMDL | DCR_SPDS_16BIT | DCR_DPDS_16BIT,
+> > +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
+> > +			  ASYNCRSTR_ASRST23,
+> > +		.mdr	= ASYNCMDR_ASMD22_SINGLE,
+> > +		.mdm	= ASYNCMDR_ASMD22_MASK,
+> > +		.port	= 0x0D0C,
+> > +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
+> > +		.dma_ch	= 22,
+> > +	},
+
+I'm not sure detail of SDHI, but TX and RX are using same .port = 0x0D0C.
+Is this correct ?
+And what is 0x0C port ?
+My datasheet doens't have it on Ch21 - Ch23
+
+> > +static const struct hpb_dmae_channel hpb_dmae_channels[] = {
+> > +	/* ch. 21 SD0 */
+> > +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX),
+> > +	/* ch. 22 SD0 */
+> > +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX),
+> > +};
+> > +
+> > +static struct hpb_dmae_pdata dma_platform_data __initdata = {
+> > +	.slaves			= hpb_dmae_slaves,
+> > +	.num_slaves		= ARRAY_SIZE(hpb_dmae_slaves),
+> > +	.channels		= hpb_dmae_channels,
+> > +	.num_channels		= ARRAY_SIZE(hpb_dmae_channels),
+> > +	.ts_shift		= {
+> > +		[XMIT_SZ_8BIT]	= 0,
+> > +		[XMIT_SZ_16BIT]	= 1,
+> > +		[XMIT_SZ_32BIT]	= 2,
+> > +	},
+> > +	.num_hw_channels	= 39,
+> > +};
+
+This is not a big deal, but according to .num_hw_channels,
+we will have max 39 channels (or more over).
+
+I want 1 line for 1 channels on hpb_dmae_channels.
+like this
+
+static const struct hpb_dmae_channel hpb_dmae_channels[] = {
+	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch21 */
+	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch22 */
+}
 
 
-Thanks
--- 
-Chen Gang
+Best regards
+---
+Kuninori Morimoto
