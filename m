@@ -1,46 +1,49 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 26 Jul 2013 11:52:36 +0100
-Subject: fyi - kprobes testing patches
-In-Reply-To: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <51F254F4.5020900@codethink.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 26 Jul 2013 12:54:45 +0200
+Subject: [PATCH] pinctrl: sunxi: Fix gpio_set behaviour
+In-Reply-To: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130726125445.612b2acf@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/13 22:08, Ben Dooks wrote:
-> I've been working on kprobes and the kprobes-test driver. It seems
-> there are more issues with the kprobes-test that need looking in to
-> so I am putting this series out to see if anyone has any comments
+Dear Maxime Ripard,
 
-the testing logs show a few failures with BE8 mode, however with the
-patch series applied the kernel no longer oopses during testing.
-                 > FAIL: registers differ 
+On Thu, 25 Jul 2013 12:41:16 +0200, Maxime Ripard wrote:
+> The current gpio_set function is ignoring the previous value set in the
+> GPIO value register, which leads in erasing the values already set for
+> the other GPIOs in the same bank when setting the value of a given GPIO.
+> 
+> Add the usual read/mask/write pattern to fix this brown paper bag bug.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/pinctrl/pinctrl-sunxi.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+> index fc058b6..4f8bb18 100644
+> --- a/drivers/pinctrl/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/pinctrl-sunxi.c
+> @@ -464,8 +464,14 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
+>  	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
+>  	u32 reg = sunxi_data_reg(offset);
+>  	u8 index = sunxi_data_offset(offset);
+> +	u32 regval = readl(pctl->membase + reg);
+>  
+> -	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
+> +	if (value)
+> +		regval |= BIT(index);
+> +	else
+> +		regval &= ~(BIT(index));
+> +
+> +	writel(regval, pctl->membase + reg);
 
-> FAIL: Test mov  pc, r0, asl r1
-> FAIL: Scenario 0
-> initial_regs:
-> r0  8001b37c | r1  00000000 | r2  21522352 | r3  21522252
-> r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
-> r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
-> r12 21522d52 | sp  9f847dd4 | lr  21522f52 | pc  8001b370
-> cpsr 00000213
-> expected_regs:
-> expected_regs:
-> r0  8001b37c | r1  00000000 | r2  21522352 | r3  21522252
-> r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
-> r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
-> r12 21522d52 | sp  9f847dd4 | lr  21522f52 | pc  8001b374
-> cpsr 00000213
-> result_regs:
-> r0  8001b37c | r1  00000000 | r2  21522352 | r3  21522252
-> r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
-> r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
-> r12 21522d52 | sp  9f847dd4 | lr  21522f52 | pc  8001b37c
-> cpsr 00000213
+Hum, what about locking?
 
-
-
-
+Thomas
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
