@@ -1,24 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Jul 2013 18:09:49 +0100
-Subject: [PATCH 1/1] ARM: atomic64: fix endian-ness in atomic.h
-In-Reply-To: <1374856133-2939-2-git-send-email-victor.kamensky@linaro.org>
-References: <1374856133-2939-1-git-send-email-victor.kamensky@linaro.org>
- <1374856133-2939-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20130726170949.GJ17886@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 26 Jul 2013 13:11:53 -0400
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <51F29BFE.8000202@broadcom.com>
+References: <20130726145639.116237136@gmail.com>
+ <20130726151223.045835540@gmail.com>
+ <20130726152918.GL29916@titan.lakedaemon.net>
+ <51F29BFE.8000202@broadcom.com>
+Message-ID: <20130726171153.GN29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 05:28:53PM +0100, Victor Kamensky wrote:
-> Fix inline asm for atomic64_xxx functions in arm atomic.h. Instead of
-> %H operand specifiers code should use %Q for least significant part
-> of the value, and %R for the most significant part of the value. %H
-> always returns the higher of the two register numbers, and therefore
-> it is not endian neutral. %H should be used with ldrexd and strexd
-> instructions.
+Christian,
+
+On Fri, Jul 26, 2013 at 08:55:42AM -0700, Christian Daudt wrote:
+> [resend in plain text]
+> On 13-07-26 08:29 AM, Jason Cooper wrote:
+> >On Fri, Jul 26, 2013 at 04:56:40PM +0200, Domenico Andreoli wrote:
+> >>From: Domenico Andreoli<domenico.andreoli@linux.com>
+> >>
+> >>arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
+> >>separately. As a matter of flexibility and maintenance, it needs to be
+> >>always included in the build.
+> >
+> >So if I'm building mach-kirkwood, I _have_ to build Broadcom?  What is
+> >the *specific* problem you're encountering that this solves?
 > 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
+>  No it won't, as the Makefile inside mach-bcm will only pull in
+> files based on ARCH_ settings. This move is so that a number
+> different Broadcom SoCs can co-exist inside the mach-bcm directory.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
 
-Will
+Why wouldn't this work?
+
+---->8-------
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ba412e0..97b6aff 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -366,6 +366,12 @@ config ARCH_AT91
+ 	  This enables support for systems based on Atmel
+ 	  AT91RM9200 and AT91SAM9* processors.
+ 
++config ARCH_BCM
++	bool "Broadcom family SoCs"
++	help
++	  This enables support for systems based on the Broadcom
++	  bcm4760 and bcm281XX series SoCs.
++
+ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index f112895..4b1f9db 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -1,5 +1,9 @@
+-config ARCH_BCM
+-	bool "Broadcom SoC" if ARCH_MULTI_V7
++if ARCH_BCM
++
++menu "Broadcom SoC Implementations"
++
++config MACH_BCM281XX
++	bool "BCM281XX SoCs" if ARCH_MULTI_V7
+ 	depends on MMU
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_ERRATA_754322
+@@ -17,3 +21,7 @@ config ARCH_BCM
+ 	  It currently supports the 'BCM281XX' family, which includes
+ 	  BCM11130, BCM11140, BCM11351, BCM28145 and
+ 	  BCM28155 variants.
++
++endmenu
++
++endif
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index 6adb6aec..e3f8f27 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -10,6 +10,6 @@
+ # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ # GNU General Public License for more details.
+ 
+-obj-$(CONFIG_ARCH_BCM)		:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
++obj-$(CONFIG_MACH_BCM281XX)	:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
+ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
