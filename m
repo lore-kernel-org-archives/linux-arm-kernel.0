@@ -1,74 +1,54 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 26 Jul 2013 10:41:38 -0400 (EDT)
-Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value
- to index into save array
-In-Reply-To: <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
-References: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
- <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1307261032330.15022@syhkavp.arg>
+Date: Fri, 26 Jul 2013 10:46:45 -0400 (EDT)
+Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
+ prior to strex
+In-Reply-To: <20130726103404.GB17886@mudshark.cambridge.arm.com>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-5-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
+ <20130724111841.GD11072@mudshark.cambridge.arm.com>
+ <51F160EA.6030800@codeaurora.org> <51F1626C.3050008@codeaurora.org>
+ <20130725174555.GK12827@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307251622320.15022@syhkavp.arg>
+ <20130726103404.GB17886@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1307261042170.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
+On Fri, 26 Jul 2013, Will Deacon wrote:
 
-> On Thu, Jul 25, 2013 at 05:06:51PM +0100, Nicolas Pitre wrote:
-> > On Thu, 25 Jul 2013, Dave Martin wrote:
-> > 
-> > > On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
-> > > > On Wed, 24 Jul 2013, Dave Martin wrote:
+> Hi Nicolas,
+> 
+> On Thu, Jul 25, 2013 at 09:24:48PM +0100, Nicolas Pitre wrote:
+> > On Thu, 25 Jul 2013, Will Deacon wrote:
 > > > > 
-> > > > > But this patch commits us to requiring that on the suspend path 
-> > > > > specifically -- I think that ought to be mentioned somewhere. A 
-> > > > > comment in the preamble for __cpu_suspend would be enough, I think.
-> > > > 
-> > > > What comment would you suggest?  I want to make sure the possible 
-> > > > confusion you see is properly addressed.
+> > > > Oh joy. Why is rwlock's lock member marked volatile?
 > > > 
-> > > I think we just need to state that the value of
-> > > cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
-> > > CPU the suspending logical CPU will resume on.  Consequently, if doing a
-> > > migration, cpu_logical_map() must be updated appropriately somewhere
-> > > between cpu_pm_enter() and cpu_suspend().
+> > > Yeah, that was the problematic guy. However, I had to fix that anyway in
+> > > this patch because otherwise the definition for prefetchw when
+> > > !ARCH_HAS_PREFETCHW (which expands to __builtin_prefetch(x,1)) will explode.
 > > 
-> > Excellent.  I've amended the patch with this:
+> > Why not always keep ARCH_HAS_PREFETCHW defined then, and have 
+> > __builtin_prefetch([const volatile void *)x,1)) when we can't do better?
 > > 
-> > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-> > index 2835d35234..caf938db62 100644
-> > --- a/arch/arm/kernel/suspend.c
-> > +++ b/arch/arm/kernel/suspend.c
-> > @@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
-> >  /*
-> >   * Hide the first two arguments to __cpu_suspend - these are an implementation
-> >   * detail which platform code shouldn't have to know about.
-> > + *
-> > + * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
-> > + * the MPIDR of the physical CPU the suspending logical CPU will resume on.
-> > + * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
-> > + * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
-> >   */
-> >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-> >  {
-> > 
-> > I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
-> > is what users should care about.
-> > 
-> > ACK?
+> > Or why not adding this cast to the generic definition?
 > 
-> We need this patch to allow IKS to store a cpu context at a specific
-> index, let's be honest. It is a moot point and I am not very happy
-> about changing this code for a very specific usage, but the way code is
-> implemented makes the change acceptable. I really do not think we should
-> write guidelines on how cpu_suspend users have to change cpu_logical_map
-> though, that's not needed apart from IKS and that should be limited to IKS
-> code only.
+> Yes, I'd prefer to fix the generic definition as a separate patch. However,
+> I think the only case that this generates warnings is when a volatile * is
+> passed. If volatile is actually required, I question whether prefetching
+> from that location even makes sense in the first place since, in the kernel,
+> the keyword seems to be generally associated with IO rather than CPUs accessing
+> shared memory via caches.
 > 
-> Again, that's just my opinion, but cpu_suspend API must be kept as it is
-> and we should not encourage people to use it in creative ways.
+> What do you think?
 
-I tend to agree, but I'm now stuck between two conflicting requests.
-
-Are you saying you are willing to give me your ACK if I revert the 
-suggested change?
+The only thing volatile is good for is to tell the compiler not to 
+attempt any kind of optimization on the access.  Obviously this is 
+needed for IO accessors, but we don't want the compiler to think it can 
+cache a previous reading of the lock value either.  So as long as all 
+accesses are done through some accessors (you did add ACCESS_ONCE() in 
+your patch removing the volatile for that reason) then we don't need 
+that keyword in the lock definition.
 
 
 Nicolas
