@@ -1,50 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jul 2013 23:59:10 +0100
-Subject: OMAP2430 SDP boot broken after Linus' rmk merge
-In-Reply-To: <51F0CAA5.8010108@ti.com>
-References: <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com> <20130724145237.GB21614@n2100.arm.linux.org.uk>
- <51F0C841.8000900@ti.com> <51F0CAA5.8010108@ti.com>
-Message-ID: <20130726225910.GD21614@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 26 Jul 2013 17:09:56 -0600
+Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
+In-Reply-To: <CAPdLdqmU0aw5h_KYcD-E=isC9U3mZF6fzr_GVdjUUAW4_PUD5Q@mail.gmail.com>
+References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
+ <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
+ <51F2F37B.8030306@wwwdotorg.org>
+ <CAPdLdqmU0aw5h_KYcD-E=isC9U3mZF6fzr_GVdjUUAW4_PUD5Q@mail.gmail.com>
+Message-ID: <51F301C4.4070807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having worked out how to get around the MMC ordering issue without having
-to go and re-tweak it should it change again in the future, I've added
-the SDP back into the build.
+On 07/26/2013 04:51 PM, Markus Mayer wrote:
+> On 26 July 2013 15:08, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> (CC'ing the DT bindings maintainers hence quoting the binding in full)
+>>
+>> On 07/26/2013 02:25 PM, Markus Mayer wrote:
 
-On Thu, Jul 25, 2013 at 09:50:13AM +0300, Tomi Valkeinen wrote:
-> On 25/07/13 09:40, Tomi Valkeinen wrote:
-> > On 24/07/13 17:52, Russell King - ARM Linux wrote:
-> > 
-> >> I also continue to be disappointed by the lack of things working on the
-> >> 4430 - it's been a number of years now and _still_ the on-board LCDs do
-> >> not work.  People have tried to blame that on hardware faults and the
-> >> like, but they're just being idiotic when they say stuff like that.  It
-> >> can't be hardware faults when the kernel supplied with the board is able
-> >> to make them work to the extent that userspace can play back video on all
-> >> three output devices simultaneously, without hiccup or any imperfection.
-> >> I don't know whether it's just that the backlight support isn't working
-> >> or what - because any information on the 4430 seems to be a tightly
-> >> controlled secret that only a few select people are permitted to know
-> >> about.  As far as I'm concerned, much of the hardware is a black box to
-> >> me.
-> > 
-> > The 4430SDP's backlight hasn't been working in the mainline due to
-> > missing support from the TWL driver. But we finally did get that in for
-> > 3.10 (or maybe 3.9), and booting 3.10 non-DT kernel brings up the
-> > backlights. However, the BL doesn't work yet with DT boot, so again with
-> > 3.11, with no board files, the BL is out... Sigh.
+>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+
+>>> +Required properties:
+>>> +  - compatible: "brcm,kona-gpio"
+>>> +  - reg: Physical base address and length of the controller's registers.
+>>> +  - interrupts: The interrupt outputs from the controller.
+>>
+>> How many entries are required? I notice there's more than 1 in the
+>> example below.
 > 
-> Ah, sorry, I take that back. Backlight seems to be working fine with 3.11.
+> You only "need" the ones you want to use, i.e. at least one. The board
+> supports up to 6. I can mention as much in the description.
 
-... if you know how to configure stuff so it works.  It seems that the
-reason it hasn't been working, and the displays have been remaining
-blank is because I had no idea that CONFIG_PWM and CONFIG_PWM_TWL were
-required.  I've now added those to the config seed, so hopefully they
-should start working now.  Only taken... what... two years to find that
-out!
+Isn't this a property of the SoC's IP block, not of the board?
