@@ -1,32 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Jul 2013 12:39:34 +0100
-Subject: XCLKOUT in exynos5250 clock driver
-In-Reply-To: <51F247B6.9010902@linaro.org>
-References: <20130725145158.GI9858@sirena.org.uk> <51F247B6.9010902@linaro.org>
-Message-ID: <20130726113934.GD9858@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 26 Jul 2013 07:49:40 -0400
+Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
+ hooks to hw_pci
+In-Reply-To: <20130726101305.22a5c892@skate>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130725165659.GB27802@dhcp-172-17-186-34.nvidia.com>
+ <20130726101305.22a5c892@skate>
+Message-ID: <20130726114940.GD29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 03:26:06PM +0530, Tushar Behera wrote:
+On Fri, Jul 26, 2013 at 10:13:05AM +0200, Thomas Petazzoni wrote:
+> Dear Thierry Reding,
+> 
+> On Thu, 25 Jul 2013 09:57:00 -0700, Thierry Reding wrote:
+> > On Mon, Jul 15, 2013 at 01:52:44PM +0200, Thomas Petazzoni wrote:
+> > > Some PCI drivers may need to adjust the pci_bus structure after it has
+> > > been allocated by the Linux PCI core. The PCI core allows
+> > > architectures to implement the pcibios_add_bus() and
+> > > pcibios_remove_bus() for this purpose. This commit therefore extends
+> > > the hw_pci and pci_sys_data structures of the ARM PCI core to allow
+> > > PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
+> > > which will get called when a bus is added or removed from the system.
+> > > 
+> > > This will be used for example by the Marvell PCIe driver to connect a
+> > > particular PCI bus with its corresponding MSI chip to handle Message
+> > > Signaled Interrupts.
+> > > 
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+> > > ---
+> > >  arch/arm/include/asm/mach/pci.h |  4 ++++
+> > >  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
+> > >  2 files changed, 20 insertions(+)
+> > 
+> > Hi Russell,
+> > 
+> > Can we have your Acked-by on this patch so that it can be moved to a
+> > stable branch along with some of the other patches in this branch that
+> > both Marvell and Tegra PCIe drivers need?
+> 
+> I've pinged Russell a few times about this patch already, but haven't
+> received feedback from him. Do you think I can just go ahead and submit
+> the patch to Russell's patch system, after fixing the minor nits you
+> mentioned?
 
-> Information as per Exynos5250 user manual:
-> "XCLKOUT is an output pin for debugging clocks. Exynos5250 has a CLKOUT
-> logic which can select one of the clocks (within its clock domains) and
-> output that through XCLKOUT pin."
+When you do that, please ask Russell to place it in a publicly
+accessible, stable topic branch for us to base off of.
 
-Yeah, I know what XCLKOUT is but to implement this in the driver and DT
-I'd need to know about the register or registers that are used to
-configure the mux.
+thx,
 
-> Not sure if XCLKOUT on Arndale schematics means the same.
-
-I'd be astonished if it meant anything else, it's fairly clearly
-labelled as that on the schematics and this is a *very* common pattern
-in system designs using Samsung SoCs.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/4242f00d/attachment.sig>
+Jason.
