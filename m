@@ -1,58 +1,126 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 26 Jul 2013 10:17:53 -0300
-Subject: [PATCH v9 16/30] bus: mvebu-mbus: Factorize Armada 370/XP data
- structures
-In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374844687-19981-17-git-send-email-ezequiel.garcia@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 26 Jul 2013 10:19:44 -0300
+Subject: [PATCH RESEND v2] ARM: dt: Use the 'model' field for printing the
+ hardware revision
+Message-ID: <1374844784-2639-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-These structures were only different in the mapping tables.
-Now that those tables have been removed, it doesn't make any sense
-to keep different structures.
+When booting a device tree kernel, we get the following output from 
+'cat /proc/cpuinfo': 
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+$ cat /proc/cpuinfo 
+processor       : 0
+model name      : ARMv7 Processor rev 5 (v7l)
+BogoMIPS        : 531.66
+Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x2
+CPU part        : 0xc08
+CPU revision    : 5
+
+Hardware        : Freescale i.MX51 (Device Tree Support)
+Revision        : 0000
+Serial          : 0000000000000000
+
+The Hardware line does not really describe the hardware type, as it is reading
+the information from the dt 'machine' field.
+
+In the dt case, read the 'model' field instead, so that we can have a better
+description output as follows:
+
+Hardware        : Freescale i.MX51 Babbage Board
+
+The hardware output string is unchanged for the non-dt kernel case.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/bus/mvebu-mbus.c | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+Changes since v1:
+- Fix typo in 'architecture'
+ arch/arm/include/asm/mach/arch.h |  1 +
+ arch/arm/kernel/devtree.c        | 15 ++++++++-------
+ arch/arm/kernel/setup.c          |  7 ++++++-
+ 3 files changed, 15 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 26af145..19ab6ff 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -536,15 +536,7 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
- 	mvebu_mbus_dram_info.num_cs = cs;
- }
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 308ad7d..113d4af 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -23,6 +23,7 @@ struct smp_operations;
+ struct machine_desc {
+ 	unsigned int		nr;		/* architecture number	*/
+ 	const char		*name;		/* architecture name	*/
++	const char		*model;		/* architecture model */
+ 	unsigned long		atag_offset;	/* tagged list (relative) */
+ 	const char *const 	*dt_compat;	/* array of device tree
+ 						 * 'compatible' strings	*/
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 5af04f6..90d541a 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -178,7 +178,6 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 	struct machine_desc *mdesc, *mdesc_best = NULL;
+ 	unsigned int score, mdesc_score = ~1;
+ 	unsigned long dt_root;
+-	const char *model;
  
--static const struct mvebu_mbus_soc_data armada_370_mbus_data = {
--	.num_wins            = 20,
--	.num_remappable_wins = 8,
--	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
--	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
--	.show_cpu_target     = mvebu_sdram_debug_show_orion,
--};
--
--static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
-+static const struct mvebu_mbus_soc_data armada_370_xp_mbus_data = {
- 	.num_wins            = 20,
- 	.num_remappable_wins = 8,
- 	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
-@@ -604,9 +596,9 @@ static const struct mvebu_mbus_soc_data mv78xx0_mbus_data = {
-  */
- static const struct of_device_id of_mvebu_mbus_ids[] = {
- 	{ .compatible = "marvell,armada370-mbus",
--	  .data = &armada_370_mbus_data, },
-+	  .data = &armada_370_xp_mbus_data, },
- 	{ .compatible = "marvell,armadaxp-mbus",
--	  .data = &armada_xp_mbus_data, },
-+	  .data = &armada_370_xp_mbus_data, },
- 	{ .compatible = "marvell,kirkwood-mbus",
- 	  .data = &kirkwood_mbus_data, },
- 	{ .compatible = "marvell,dove-mbus",
+ #ifdef CONFIG_ARCH_MULTIPLATFORM
+ 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+@@ -224,12 +223,14 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 		dump_machine_table(); /* does not return */
+ 	}
+ 
+-	model = of_get_flat_dt_prop(dt_root, "model", NULL);
+-	if (!model)
+-		model = of_get_flat_dt_prop(dt_root, "compatible", NULL);
+-	if (!model)
+-		model = "<unknown>";
+-	pr_info("Machine: %s, model: %s\n", mdesc_best->name, model);
++	mdesc_best->model = of_get_flat_dt_prop(dt_root, "model", NULL);
++	if (!mdesc_best->model)
++		mdesc_best->model = of_get_flat_dt_prop(dt_root, "compatible",
++							NULL);
++	if (!mdesc_best->model)
++		mdesc_best->model = "<unknown>";
++	pr_info("Machine: %s, model: %s\n", mdesc_best->name,
++		mdesc_best->model);
+ 
+ 	/* Retrieve various information from the /chosen node */
+ 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 79e8d2f..d22f24b 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -137,6 +137,7 @@ EXPORT_SYMBOL(elf_platform);
+ 
+ static const char *cpu_name;
+ static const char *machine_name;
++static const char *model_name;
+ static char __initdata cmd_line[COMMAND_LINE_SIZE];
+ struct machine_desc *machine_desc __initdata;
+ 
+@@ -786,6 +787,7 @@ void __init setup_arch(char **cmdline_p)
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+ 	machine_desc = mdesc;
+ 	machine_name = mdesc->name;
++	model_name = mdesc->model;
+ 
+ 	setup_dma_zone(mdesc);
+ 
+@@ -950,7 +952,10 @@ static int c_show(struct seq_file *m, void *v)
+ 		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
+ 	}
+ 
+-	seq_printf(m, "Hardware\t: %s\n", machine_name);
++	if (model_name)
++		seq_printf(m, "Hardware\t: %s\n", model_name);
++	else
++		seq_printf(m, "Hardware\t: %s\n", machine_name);
+ 	seq_printf(m, "Revision\t: %04x\n", system_rev);
+ 	seq_printf(m, "Serial\t\t: %08x%08x\n",
+ 		   system_serial_high, system_serial_low);
 -- 
-1.8.1.5
+1.8.1.2
