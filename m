@@ -1,84 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Jul 2013 16:08:59 -0600
-Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
-In-Reply-To: <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
-References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
- <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
-Message-ID: <51F2F37B.8030306@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Jul 2013 17:11:32 -0500
+Subject: DT bindings as ABI [was: Do we have people interested in device
+ tree janitoring / cleanup?]
+In-Reply-To: <51F1C412.1010602@wwwdotorg.org>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
+ <20130725193135.GT23879@titan.lakedaemon.net>
+ <CAL_Jsq+vWbTb8wNEDCR2c_M6sBnKW6e5HGk48QzmXSujQUdddA@mail.gmail.com>
+ <51F1C412.1010602@wwwdotorg.org>
+Message-ID: <CAL_JsqLweU0Mt_8zsBu=-3Mx4Tc3Gn088j3xN27Hnq57etCofw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(CC'ing the DT bindings maintainers hence quoting the binding in full)
+On Thu, Jul 25, 2013 at 7:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/25/2013 01:16 PM, Rob Herring wrote:
+>> On Thu, Jul 25, 2013 at 2:31 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+>>> On Thu, Jul 25, 2013 at 02:11:31PM -0500, Rob Herring wrote:
+>>>> On Thu, Jul 25, 2013 at 11:09 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>
+>>>>> One problem that needs to be solved is obviously how a binding
+>>>>> graduates from tentative to locked. This work isn't going to be very
+>>>>> interesting to most people, I suspect. Think standards committee type
+>>>>> work.
+>>>>
+>>>> I think a time based stabilization period would be better than a
+>>>> separate directory to apply bindings too. Or time plus periodic review
+>>>> perhaps.
+>>>
+>>> The only problem with a time-based versus separate directory is how do
+>>> users who've downloaded the tree determine which bindings are stable?
+>>> If they pull a tarball, or receive an SDK, there is most likely no git
+>>> history attached.
+>>
+>> Well, if time based includes moving the binding out of the kernel,
+>> then that is what defines it as stable or not. I guess that is a form
+>> of a separate directory. I don't think we want to be moving bindings
+>> twice: tentative -> stable and kernel -> DT repo.
+>>
+>> The policy could be as simple as an binding without change in at least
+>> N kernel releases is moved out and stable.
+>
+> That might not be quite the right criteria. Just because something
+> didn't change doesn't mean it's "correct" and that any problems in the
+> binding have been addressed. As one example, on Tegra, we have a few
+> bindings that haven't changed in a while, yet rely on custom properties
+> for describing which DMA channel to use, rather than using the
+> fairly-recently-introduced standard DMA DT properties (this particular
+> example is being rectified now, but I'm sure there are plenty of similar
+> examples)
 
-On 07/26/2013 02:25 PM, Markus Mayer wrote:
+In this case, I would suggest that both bindings are stable and the
+conversion from one to the other is a platform decision. You could
+make the kernel support both if you wanted. Or you know the platform
+is not stable and are okay with having to keep dtb and kernel in sync.
 
-Some kind of patch description is always useful.
+I think this highlights the need to separate stable bindings and
+stable dts files.
 
->  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   41 ++++++++++++++++++++
->  arch/arm/boot/dts/bcm11351.dtsi                    |   16 ++++++++
-
-It's more usual to put the DT binding doc change and driver change in
-one patch, then "make use of that" in a later separate patch which edits
-*.dts and *.dtsi.
-
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
-
-> +Broadcom Kona Family GPIO
-> +-------------------------
-> +
-> +This GPIO driver is used in the following Broadcom SoCs:
-> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-> +
-> +The GPIO controller only supports edge, not level triggering.
-
-add "... of interrupts"? This might not be worth mentioning; it's
-clearly spelled out in the description of the interrupt cells below.
-
-> +Required properties:
-> +  - compatible: "brcm,kona-gpio"
-> +  - reg: Physical base address and length of the controller's registers.
-> +  - interrupts: The interrupt outputs from the controller.
-
-How many entries are required? I notice there's more than 1 in the
-example below.
-
-> +  - #gpio-cells: Should be <2>. The first cell is the pin number, the second
-> +    cell is used to specify optional parameters:
-> +    - bit 0 specifies polarity (0 for normal, 1 for inverted)
-> +  - #interrupt-cells: Should be <2>. The first cell is the GPIO number.
-> +    The second cell is used to specify flags:
-> +    - trigger type (bits[1:0]):
-> +        1 = low-to-high edge triggered.
-> +        2 = high-to-low edge triggered.
-> +        3 = low-to-high or high-to-low edge triggered
-> +        Valid values are 1, 2, 3
-> +  - gpio-controller: Marks the device node as a GPIO controller.
-> +  - interrupt-controller: Marks the device node as an interrupt controller.
-> +
-> +Example:
-> +	gpio: gpio at 35003000 {
-> +		compatible = "brcm,kona-gpio";
-> +		reg = <0x35003000 0x800>;
-> +		interrupts =
-> +		       <0x0 106 0x4
-> +			0x0 115 0x4
-> +			0x0 114 0x4
-> +			0x0 113 0x4
-> +			0x0 112 0x4
-> +			0x0 111 0x4>;
-> +		#gpio-cells = <2>;
-> +		#interrupt-cells = <2>;
-> +		gpio-controller;
-> +		interrupt-controller;
-> +	};
-
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-
-> +	gpio: gpio at 35003000 {
-> +		compatible = "brcm,kona-gpio";
-
-In order to enable any later chip-specific quirking requirements, that
-compatible property should both specify the IP block and the specific
-chip it's included in, so I'd expect to see something like:
-
-		compatible = "brcm,brcm11351-gpio", "brcm,kona-gpio";
+Rob
