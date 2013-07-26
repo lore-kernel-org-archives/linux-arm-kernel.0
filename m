@@ -1,61 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 26 Jul 2013 10:05:21 -0700
-Subject: [PATCH 3/4] msm_serial: Make baud_code detection more dynamic
-In-Reply-To: <CAJAp7Og1jwyAn0sGbb_1Bk5_fvBWa1AuDNsRV1b17S0Tijk9kg@mail.gmail.com>
-References: <1374691051-28544-1-git-send-email-sboyd@codeaurora.org>
- <1374691051-28544-4-git-send-email-sboyd@codeaurora.org>
- <CAJAp7Og1jwyAn0sGbb_1Bk5_fvBWa1AuDNsRV1b17S0Tijk9kg@mail.gmail.com>
-Message-ID: <20130726170521.GA11922@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 26 Jul 2013 11:05:23 -0600
+Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
+In-Reply-To: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
+References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <51F2AC53.3070607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25, Bjorn Andersson wrote:
-> On Wed, Jul 24, 2013 at 10:37 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > [snip]
-> > +       unsigned int i, divisor;
-> > +       const struct msm_baud_map *entry;
-> > +       static const struct msm_baud_map table[] = {
-> > +               { 1536, 0x00,  1 },
-> > +               {  768, 0x11,  1 },
-> > +               {  384, 0x22,  1 },
-> > +               {  192, 0x33,  1 },
-> > +               {   96, 0x44,  1 },
-> > +               {   48, 0x55,  1 },
-> > +               {   32, 0x66,  1 },
-> > +               {   24, 0x77,  1 },
-> > +               {   16, 0x88,  1 },
-> > +               {   12, 0x99,  6 },
-> > +               {    8, 0xaa,  6 },
-> > +               {    6, 0xbb,  6 },
-> > +               {    4, 0xcc,  6 },
-> > +               {    3, 0xdd,  8 },
-> > +               {    2, 0xee, 16 },
-> > +               {    1, 0xff, 31 },
-> > +       };
-> > +
-> > +       divisor = uart_get_divisor(port, baud);
-> > +
-> > +       for (i = 0, entry = table; i < ARRAY_SIZE(table); i++, entry++)
-> > +               if (entry->divisor <= divisor)
-> > +                       break;
-> > +
-> > +       return entry; /* Default to smallest divider */
+On 07/25/2013 11:41 PM, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 > 
-> Shouldn't matter, but you're not defaulting to the smallest divider.
-> Your are defaulting to an undefined value, as `entry` will be off the
-> array once i == ARRAY_SIZE().
+> In case of normal kexec kernel load, all cpu's are offlined
+> before calling machine_kexec() under kernel_kexec() function.
+
+I'm not sure that's true, unless perhaps you have CONFIG_KEXEC_JUMP enabled?
+
+> But in case crash panic cpus are relaxed in
+> machine_crash_nonpanic_core() SMP function but not offlined.
 > 
+> When crash kernel is loaded with kexec and on panic trigger
+> machine_kexec() checks for number of cpus online.
+> If more than one cpu is online machine_kexec() fails to load
+> with below error
+> 
+> kexec: error: multiple CPUs still online
+> 
+> In machine_crash_nonpanic_core() SMP function, offline CPU
+> before cpu_relax
 
-Yes because the if condition will always be true. Perhaps that's
-too confusing? We could add a subtraction by 1 to make it more
-obvious.
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
 
- for (i = 0; entry = table; i < ARRAY_SIZE(table) - 1; i++, entry++)
- 	if (entry->divisor <= divisor)
-		break;
+> @@ -73,6 +73,7 @@ void machine_crash_nonpanic_core(void *unused)
+>  	crash_save_cpu(&regs, smp_processor_id());
+>  	flush_cache_all();
+>  
+> +	set_cpu_online(smp_processor_id(), false);
 
- return entry; /* Default to smallest divider*/
+I'm not familiar with that API, but it looks like it's just setting the
+*current* CPU offline. That sounds problematic for two reasons:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1) Setting the current CPU offline sounds like a bad idea; after all,
+code is still running on it. Presumably you want to offline all other CPUs.
+
+2) On a dual-CPU system, I guess this will leave a single CPU marked
+online, and hence satisfy the test in machine_kexec(). However, on a
+quad-core system, won't this just reduce the online CPU count from 4 to
+3 and hence the test in machine_kexec() will still fail?
+
+Can't you call disable_nonboot_cpus() from machine_crash_nonpanic_core()
+just like machine_shutdown() does?
