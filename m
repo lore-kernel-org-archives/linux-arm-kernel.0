@@ -1,43 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Jul 2013 09:51:49 +0900
-Subject: [PATCH v3 0/4] ARM: shmobile: marzen: Switch to DT_MACHINE_START
-Message-ID: <1374799913-27461-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 26 Jul 2013 09:51:53 +0900
+Subject: [PATCH v3 4/4] ARM: shmobile: marzen: Enable ARM_APPENDED_DTB in
+ defconfig
+In-Reply-To: <1374799913-27461-1-git-send-email-horms+renesas@verge.net.au>
+References: <1374799913-27461-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1374799913-27461-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A short series to use DT_MACHINE_START on the marzen board.
+"ARM: shmobile: marzen: Switch to DT_MACHINE_START" moves marzen
+over to use DT_MACHINE_START, however, the prevalent boot loader
+does not support booting with a separate dtb. Thus, it makes
+sense to use ARM_APPENDED_DTB by default.
 
-Changes since v2
-* Break dtb changes out of "ARM: shmobile: marzen: Switch to
-  DT_MACHINE_START" and into their own patch "ARM: shmobile: marzen: Add
-  r8a7779-marzen.dtb"
-* Correct typo in changelog of "ARM: shmobile: marzen: Enable
-  ARM_APPENDED_DTB in defconfig"
+This is consistent with other shmobile defconfigs.
 
-Changes since v1
-* Add "ARM: shmobile: marzen: Enable ARM_APPENDED_DTB in defconfig" patch
-* Add "ARM: shmobile: r8a7779: Rely on DT for SMP CPU info" patch
-* Enhance "ARM: shmobile: marzen: Switch to DT_MACHINE_START" to:
-  - Select USE_OF in Kconfig
-  - Provide dt_compat in DT_MACHINE_START
-  - Provide r8a7779-marzen dts
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Magnus Damm (1):
-  ARM: shmobile: marzen: Switch to DT_MACHINE_START
+---
 
-Simon Horman (3):
-  ARM: shmobile: marzen: Add  r8a7779-marzen.dtb
-  ARM: shmobile: r8a7779: Rely on DT for SMP CPU info
-  ARM: shmobile: marzen: Enable ARM_APPENDED_DTB in defconfig
+v3
+* Corrected typo in changelog
 
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/r8a7779-marzen.dts  | 27 +++++++++++++++++++++++++++
- arch/arm/configs/marzen_defconfig     |  1 +
- arch/arm/mach-shmobile/Kconfig        |  1 +
- arch/arm/mach-shmobile/board-marzen.c |  8 +++++++-
- arch/arm/mach-shmobile/smp-r8a7779.c  | 12 +++---------
- 6 files changed, 40 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/boot/dts/r8a7779-marzen.dts
+v2
+* First post
+---
+ arch/arm/configs/marzen_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 494e70a..82e4040 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -29,6 +29,7 @@ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_CMDLINE="console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on"
+ CONFIG_CMDLINE_FORCE=y
+ CONFIG_KEXEC=y
 -- 
 1.8.2.1
