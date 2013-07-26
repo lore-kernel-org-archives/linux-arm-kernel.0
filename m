@@ -1,85 +1,42 @@
-From: nv-dung@jinso.co.jp (Nguyen Viet Dung)
-Date: Fri, 26 Jul 2013 19:33:39 +0900
-Subject: [PATCH v2 1/1 resend] i2c: rcar: modify I2C driver
-In-Reply-To: <1374834819-319-1-git-send-email-nv-dung@jinso.co.jp>
-References: <1374834819-319-1-git-send-email-nv-dung@jinso.co.jp>
-Message-ID: <1374834819-319-2-git-send-email-nv-dung@jinso.co.jp>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Jul 2013 11:34:05 +0100
+Subject: [PATCH 4/6] ARM: locks: prefetch the destination word for write
+ prior to strex
+In-Reply-To: <alpine.LFD.2.03.1307251622320.15022@syhkavp.arg>
+References: <1374579389-32704-1-git-send-email-will.deacon@arm.com>
+ <1374579389-32704-5-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1307231609170.15022@syhkavp.arg>
+ <20130724111841.GD11072@mudshark.cambridge.arm.com>
+ <51F160EA.6030800@codeaurora.org> <51F1626C.3050008@codeaurora.org>
+ <20130725174555.GK12827@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1307251622320.15022@syhkavp.arg>
+Message-ID: <20130726103404.GB17886@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modify calculate for clock in I2C driver.
+Hi Nicolas,
 
-Signed-off-by: Nguyen Viet Dung <nv-dung@jinso.co.jp>
----
- drivers/i2c/busses/i2c-rcar.c |   17 +++++++++++++++--
- include/linux/i2c/i2c-rcar.h  |    4 ++++
- 2 files changed, 19 insertions(+), 2 deletions(-)
+On Thu, Jul 25, 2013 at 09:24:48PM +0100, Nicolas Pitre wrote:
+> On Thu, 25 Jul 2013, Will Deacon wrote:
+> > > 
+> > > Oh joy. Why is rwlock's lock member marked volatile?
+> > 
+> > Yeah, that was the problematic guy. However, I had to fix that anyway in
+> > this patch because otherwise the definition for prefetchw when
+> > !ARCH_HAS_PREFETCHW (which expands to __builtin_prefetch(x,1)) will explode.
+> 
+> Why not always keep ARCH_HAS_PREFETCHW defined then, and have 
+> __builtin_prefetch([const volatile void *)x,1)) when we can't do better?
+> 
+> Or why not adding this cast to the generic definition?
 
-diff --git a/drivers/i2c/busses/i2c-rcar.c b/drivers/i2c/busses/i2c-rcar.c
-index 4ba4a95..85987c1 100644
---- a/drivers/i2c/busses/i2c-rcar.c
-+++ b/drivers/i2c/busses/i2c-rcar.c
-@@ -221,15 +221,28 @@ static int rcar_i2c_clock_calculate(struct rcar_i2c_priv *priv,
- 				    struct device *dev)
- {
- 	struct clk *clkp = clk_get(NULL, "peripheral_clk");
-+	struct i2c_rcar_platform_data *pdata = dev->platform_data;
- 	u32 scgd, cdf;
- 	u32 round, ick;
- 	u32 scl;
-+	u32 cdf_width;
-+	u32 flags = pdata ? pdata->flags : 0;
- 
- 	if (!clkp) {
- 		dev_err(dev, "there is no peripheral_clk\n");
- 		return -EIO;
- 	}
- 
-+	switch (flags & I2C_RCAR_FLAGS_ICCCR_MASK) {
-+	default:
-+	case I2C_RCAR_FLAGS_ICCCR_IS_2BIT:
-+		cdf_width = 2;
-+		break;
-+	case I2C_RCAR_FLAGS_ICCCR_IS_3BIT:
-+		cdf_width = 3;
-+		break;
-+	}
-+
- 	/*
- 	 * calculate SCL clock
- 	 * see
-@@ -245,7 +258,7 @@ static int rcar_i2c_clock_calculate(struct rcar_i2c_priv *priv,
- 	 * clkp : peripheral_clk
- 	 * F[]  : integer up-valuation
- 	 */
--	for (cdf = 0; cdf < 4; cdf++) {
-+	for (cdf = 0; cdf < (1 << cdf_width); cdf++) {
- 		ick = clk_get_rate(clkp) / (1 + cdf);
- 		if (ick < 20000000)
- 			goto ick_find;
-@@ -287,7 +300,7 @@ scgd_find:
- 	/*
- 	 * keep icccr value
- 	 */
--	priv->icccr = (scgd << 2 | cdf);
-+	priv->icccr = (scgd << (cdf_width) | cdf);
- 
- 	return 0;
- }
-diff --git a/include/linux/i2c/i2c-rcar.h b/include/linux/i2c/i2c-rcar.h
-index 496f5c2..572a6e5 100644
---- a/include/linux/i2c/i2c-rcar.h
-+++ b/include/linux/i2c/i2c-rcar.h
-@@ -5,6 +5,10 @@
- 
- struct i2c_rcar_platform_data {
- 	u32 bus_speed;
-+	u32 flags;
-+#define I2C_RCAR_FLAGS_ICCCR_MASK	(0xF << 0)
-+#define I2C_RCAR_FLAGS_ICCCR_IS_2BIT	(0 << 0) /* default */
-+#define I2C_RCAR_FLAGS_ICCCR_IS_3BIT	(1 << 0)
- };
- 
- #endif /* __I2C_R_CAR_H__ */
--- 
-1.7.9.5
+Yes, I'd prefer to fix the generic definition as a separate patch. However,
+I think the only case that this generates warnings is when a volatile * is
+passed. If volatile is actually required, I question whether prefetching
+from that location even makes sense in the first place since, in the kernel,
+the keyword seems to be generally associated with IO rather than CPUs accessing
+shared memory via caches.
+
+What do you think?
+
+Will
