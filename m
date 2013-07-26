@@ -1,79 +1,46 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 26 Jul 2013 23:59:00 +0200
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <20130726152918.GL29916@titan.lakedaemon.net>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
-Message-ID: <20130726215859.GA19469@glitch>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 27 Jul 2013 00:04:30 +0200
+Subject: [PATCH v2] clk: exynos4: Add CLK_GET_RATE_NOCACHE flag for the
+ Exynos4x12 ISP clocks
+In-Reply-To: <20130726203026.7598.21711@quantum>
+References: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <20130726203026.7598.21711@quantum>
+Message-ID: <51F2F26E.4090909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 11:29:18AM -0400, Jason Cooper wrote:
-> On Fri, Jul 26, 2013 at 04:56:40PM +0200, Domenico Andreoli wrote:
-> > From: Domenico Andreoli <domenico.andreoli@linux.com>
-> > 
-> > arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
-> > separately. As a matter of flexibility and maintenance, it needs to be
-> > always included in the build.
-> 
-> So if I'm building mach-kirkwood, I _have_ to build Broadcom?  What is
-> the *specific* problem you're encountering that this solves?
+On 07/26/2013 10:30 PM, Mike Turquette wrote:
+> Quoting Sylwester Nawrocki (2013-07-25 14:07:05)
+>> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>>
+>> The ISP clock registers belong to the ISP power domain and may change
+>> their values if this power domain is switched off/on. Add
+>> CLK_GET_RATE_NOCACHE flags to ensure we do not rely on invalid cached
+>> data when setting or getting frequency of those clocks.
+>>
+>> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+>
+> Thanks for the fix. I've taken into clk-fixes. Is there a specific
+> regression this fixes (besides just having wrong clock rates). I can
+> amend the changelog if you have an example (e.g. device X explodes).
 
-In mach-bcm we (or I, it's not very clear to me) want to have support for
-multiple SoCs.
+Hmm, yes, this fixes a pretty serious problem. There is a companion
+commit [1] already in Linus' tree, more details can be found there.
 
-In trying the approach
+Perhaps something like this could be added:
 
-machine-$(CONFIG_ARCH_BCM)		+= bcm
-machine-$(CONFIG_ARCH_BCM4760)		+= bcm
+"Otherwise the FIMC-IS Cortex-A5 core and AXI bus clocks have
+incorrect frequencies, which breaks the ISP operation and starting
+the video pipeline fails with timeouts reported by the FIMC-IS
+firmware.
 
-I got linker complains about multiple symbol definitiion in case both the
-config options are selected.
+See related commit 722a860ecb29aa34ec6f7d7f32b949209e8
+"[media] exynos4-is: Fix FIMC-IS clocks initialization" for more
+details."
 
-The first thought was to use a common option which purpose was only to
-include the subdir but then, given my allergy to the tons of config options
-with usually not straghtforward purpose, I opted for something more simple.
+[1] 
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=722a860ecb29aa34ec6f7d7f32b949209e86a2f3
 
-> 
-> Notice:
-> 
-> $ git grep '^machine-y'
-> $
-> 
-> thx,
-> 
-> Jason.
-> 
-> > Cc: Christian Daudt <csd@broadcom.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
-> > ---
-> >  arch/arm/Makefile |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > Index: b/arch/arm/Makefile
-> > ===================================================================
-> > --- a/arch/arm/Makefile
-> > +++ b/arch/arm/Makefile
-> > @@ -145,7 +145,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x0020
-> >  # Machine directory name.  This list is sorted alphanumerically
-> >  # by CONFIG_* macro name.
-> >  machine-$(CONFIG_ARCH_AT91)		+= at91
-> > -machine-$(CONFIG_ARCH_BCM)		+= bcm
-> > +machine-y				+= bcm
-> >  machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
-> >  machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
-> >  machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Sylwester
