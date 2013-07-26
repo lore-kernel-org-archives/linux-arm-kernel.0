@@ -1,167 +1,92 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Fri, 26 Jul 2013 17:44:43 +0200
-Subject: [PATCH v2 00/42] ARM: at91: move to common clk framework
-In-Reply-To: <51F28370.6050304@gmail.com>
-References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
- <51F28370.6050304@gmail.com>
-Message-ID: <51F2996B.6000406@overkiz.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jul 2013 16:45:34 +0100
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value to
+ index into save array
+In-Reply-To: <alpine.LFD.2.03.1307261139370.15022@syhkavp.arg>
+References: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
+ <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307261032330.15022@syhkavp.arg>
+ <20130726153440.GD2282@localhost.localdomain>
+ <alpine.LFD.2.03.1307261139370.15022@syhkavp.arg>
+Message-ID: <20130726154534.GE2282@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/2013 16:10, Richard Genoud wrote:
-> On 17/07/2013 15:34, Boris BREZILLON wrote:
->> Hello,
->>
->> This patch series is a proposal to move at91 clock implementation
->> to common clk framework.
->>
->> Most of the clock provided by the PMC (Power Management Controller) are
->> implemented :
->> - main clock (main oscillator)
->> - pll clocks
->> - master clock
->> - programmable clocks
->> - utmi clock
->> - peripheral clocks
->> - system clocks
->>
->> This implementation is compatible with device tree: the goal is
->> to define the whole clock tree in the device tree (all currently
->> available dt SoCs and boards are patched to support dt clocks).
->> Please feel free to comment the dt bindinds.
->>
->> I removed the register_clocks function in SoC supporting dt boards only:
->> - at91sam9x5 SoCs
->> - at91sam9n12 SoC
->> - sama5d3 SoCs
->>
->> This patch series is based on linux-next and has been tested on sama5d31ek
->> board using device tree. It compiles for other SoCs and both with and without
->> dt support, but it has not been tested.
->>
->> BTW could other people test it on other boards (I only have a kizbox and
->> a sama5d31ek dev kit).
->>
->> Best Regards,
->> Boris
->>
->> Changes since v1:
->>   - fix bugs in pll, programmable and system clock implementations
->>     (wrong bit position).
->>   - add usb clock configuration support (ohci and udc drivers +
->>     clk_lookup for non dt boards)
->>   - rework of the system clock interfaces (no need to define a parent clock,
->>     system clock is a gate with no rate info)
->>   - change system, peripheral and programmable clk dt bindings (1 master node
->>     and multiple child nodes each defining a system/peripheral or prog clock)
->>   - fix bugs in sama5 dt definition
->>
-> Hi Boris,
->
-> First of all: Big thumbs up for this work !
->
-> Then, I tested the serie on at91sam9g35ek (sam9x5 familly), and I see some problems:
-> kernel is next-20130725 with the v4 serie of "ARM: at91: prepare transition to common clk framework"
-> and v2 serie of "ARM: at91: move to common clk framework"
->
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 3.11.0-rc2-next-20130725+ (rgenoud at lnx-rg) (gcc version 4.7.3 (Buildroot 2013.05-00157-g6d1e60b-dirty) ) #61 Fri Jul 26 15:30:13 CEST 2013
-> [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
-> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> [    0.000000] Machine: Atmel AT91SAM (Device Tree), model: Atmel AT91SAM9G35-EK
-> [    0.000000] bootconsole [earlycon0] enabled
-> [    0.000000] Memory policy: ECC disabled, Data cache writeback
-> [    0.000000] AT91: Detected soc type: at91sam9x5
-> [    0.000000] AT91: Detected soc subtype: at91sam9g35
-> [    0.000000] AT91: sram at 0x300000 of 0x8000 mapped at 0xfef70000
-> [    0.000000] On node 0 totalpages: 32768
-> [    0.000000] free_area_init_node: node 0, pgdat c039d208, node_mem_map c03b5000
-> [    0.000000]   Normal zone: 256 pages used for memmap
-> [    0.000000]   Normal zone: 0 pages reserved
-> [    0.000000]   Normal zone: 32768 pages, LIFO batch:7
-> [    0.000000] pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
-> [    0.000000] pcpu-alloc: [0] 0
-> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
-> [    0.000000] Kernel command line: console=ttyS0,115200 loglevel=8 ip=dhcp root=/dev/nfs nfsroot=10.128.0.9:/nfsroot,v3 rw earlyprintk
-> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
-> [    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
-> [    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
-> [    0.000000] Memory: 126044K/131072K available (2804K kernel code, 126K rwdata, 592K rodata, 141K init, 93K bss, 5028K reserved)
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> [    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-> [    0.000000]     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
-> [    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
-> [    0.000000]       .text : 0xc0008000 - 0xc0359550   (3398 kB)
-> [    0.000000]       .init : 0xc035a000 - 0xc037d61c   ( 142 kB)
-> [    0.000000]       .data : 0xc037e000 - 0xc039d920   ( 127 kB)
-> [    0.000000]        .bss : 0xc039d920 - 0xc03b4ff4   (  94 kB)
-> [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> [    0.000000] AT91: PIT: mck rate = 0
-> [    0.000000] ------------[ cut here ]------------
-> [    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm/mach-at91/at91sam926x_time.c:259 at91sam926x_pit_init+0x114/0x234()
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.11.0-rc2-next-20130725+ #61
-> [    0.000000] [<c000ca18>] (unwind_backtrace+0x0/0xe0) from [<c000b0f0>] (show_stack+0x10/0x14)
-> [    0.000000] [<c000b0f0>] (show_stack+0x10/0x14) from [<c00144e0>] (warn_slowpath_common+0x5c/0x7c)
-> [    0.000000] [<c00144e0>] (warn_slowpath_common+0x5c/0x7c) from [<c00145b8>] (warn_slowpath_null+0x18/0x1c)
-> [    0.000000] [<c00145b8>] (warn_slowpath_null+0x18/0x1c) from [<c03607b0>] (at91sam926x_pit_init+0x114/0x234)
-> [    0.000000] [<c03607b0>] (at91sam926x_pit_init+0x114/0x234) from [<c035ca4c>] (time_init+0x1c/0x24)
-> [    0.000000] [<c035ca4c>] (time_init+0x1c/0x24) from [<c035a650>] (start_kernel+0x19c/0x2f4)
-> [    0.000000] [<c035a650>] (start_kernel+0x19c/0x2f4) from [<20008040>] (0x20008040)
-> [    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
-> [    0.000000] Division by zero in kernel.
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Tainted: G        W    3.11.0-rc2-next-20130725+ #61
-> [    0.000000] [<c000ca18>] (unwind_backtrace+0x0/0xe0) from [<c000b0f0>] (show_stack+0x10/0x14)
-> [    0.000000] [<c000b0f0>] (show_stack+0x10/0x14) from [<c013f0a0>] (Ldiv0_64+0x8/0x18)
-> [    0.000000] [<c013f0a0>] (Ldiv0_64+0x8/0x18) from [<c003b864>] (__clocksource_updatefreq_scale+0x30/0x104)
-> [    0.000000] [<c003b864>] (__clocksource_updatefreq_scale+0x30/0x104) from [<c003b944>] (__clocksource_register_scale+0xc/0x48)
-> [    0.000000] [<c003b944>] (__clocksource_register_scale+0xc/0x48) from [<c0360810>] (at91sam926x_pit_init+0x174/0x234)
-> [    0.000000] [<c0360810>] (at91sam926x_pit_init+0x174/0x234) from [<c035ca4c>] (time_init+0x1c/0x24)
-> [    0.000000] [<c035ca4c>] (time_init+0x1c/0x24) from [<c035a650>] (start_kernel+0x19c/0x2f4)
-> [    0.000000] [<c035a650>] (start_kernel+0x19c/0x2f4) from [<20008040>] (0x20008040)
-> [    0.000000] Division by zero in kernel.
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Tainted: G        W    3.11.0-rc2-next-20130725+ #61
-> [    0.000000] [<c000ca18>] (unwind_backtrace+0x0/0xe0) from [<c000b0f0>] (show_stack+0x10/0x14)
-> [    0.000000] [<c000b0f0>] (show_stack+0x10/0x14) from [<c013f0a0>] (Ldiv0_64+0x8/0x18)
-> [    0.000000] [<c013f0a0>] (Ldiv0_64+0x8/0x18) from [<c003b76c>] (clocks_calc_mult_shift+0x70/0xa4)
-> [    0.000000] [<c003b76c>] (clocks_calc_mult_shift+0x70/0xa4) from [<c003b8e4>] (__clocksource_updatefreq_scale+0xb0/0x104)
-> [    0.000000] [<c003b8e4>] (__clocksource_updatefreq_scale+0xb0/0x104) from [<c003b944>] (__clocksource_register_scale+0xc/0x48)
-> [    0.000000] [<c003b944>] (__clocksource_register_scale+0xc/0x48) from [<c0360810>] (at91sam926x_pit_init+0x174/0x234)
-> [    0.000000] [<c0360810>] (at91sam926x_pit_init+0x174/0x234) from [<c035ca4c>] (time_init+0x1c/0x24)
-> [    0.000000] [<c035ca4c>] (time_init+0x1c/0x24) from [<c035a650>] (start_kernel+0x19c/0x2f4)
-> [    0.000000] [<c035a650>] (start_kernel+0x19c/0x2f4) from [<20008040>] (0x20008040)
-> [...]
->
-> Best regards,
-> Richard
-Hi Richard,
+On Fri, Jul 26, 2013 at 11:43:34AM -0400, Nicolas Pitre wrote:
+> On Fri, 26 Jul 2013, Dave Martin wrote:
+> 
+> > On Fri, Jul 26, 2013 at 10:41:38AM -0400, Nicolas Pitre wrote:
+> > > On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
+> > > 
+> > > > On Thu, Jul 25, 2013 at 05:06:51PM +0100, Nicolas Pitre wrote:
+> > > > > On Thu, 25 Jul 2013, Dave Martin wrote:
+> > > > > 
+> > > > > > On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
+> > > > > > > On Wed, 24 Jul 2013, Dave Martin wrote:
+> > > > > > > 
+> > > > > > > > But this patch commits us to requiring that on the suspend path 
+> > > > > > > > specifically -- I think that ought to be mentioned somewhere. A 
+> > > > > > > > comment in the preamble for __cpu_suspend would be enough, I think.
+> > > > > > > 
+> > > > > > > What comment would you suggest?  I want to make sure the possible 
+> > > > > > > confusion you see is properly addressed.
+> > > > > > 
+> > > > > > I think we just need to state that the value of
+> > > > > > cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
+> > > > > > CPU the suspending logical CPU will resume on.  Consequently, if doing a
+> > > > > > migration, cpu_logical_map() must be updated appropriately somewhere
+> > > > > > between cpu_pm_enter() and cpu_suspend().
+> > > > > 
+> > > > > Excellent.  I've amended the patch with this:
+> > > > > 
+> > > > > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> > > > > index 2835d35234..caf938db62 100644
+> > > > > --- a/arch/arm/kernel/suspend.c
+> > > > > +++ b/arch/arm/kernel/suspend.c
+> > > > > @@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
+> > > > >  /*
+> > > > >   * Hide the first two arguments to __cpu_suspend - these are an implementation
+> > > > >   * detail which platform code shouldn't have to know about.
+> > > > > + *
+> > > > > + * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
+> > > > > + * the MPIDR of the physical CPU the suspending logical CPU will resume on.
+> > > > > + * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
+> > > > > + * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
+> > > > >   */
+> > > > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> > > > >  {
+> > > > > 
+> > > > > I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
+> > > > > is what users should care about.
+> > > > > 
+> > > > > ACK?
+> > > > 
+> > > > We need this patch to allow IKS to store a cpu context at a specific
+> > > > index, let's be honest. It is a moot point and I am not very happy
+> > > > about changing this code for a very specific usage, but the way code is
+> > > > implemented makes the change acceptable. I really do not think we should
+> > > > write guidelines on how cpu_suspend users have to change cpu_logical_map
+> > > > though, that's not needed apart from IKS and that should be limited to IKS
+> > > > code only.
+> > > > 
+> > > > Again, that's just my opinion, but cpu_suspend API must be kept as it is
+> > > > and we should not encourage people to use it in creative ways.
+> > > 
+> > > I tend to agree, but I'm now stuck between two conflicting requests.
+> > 
+> > Would it make sense to keep the same API to cpu_suspend(), but make it
+> > a wrapper for another function which has the MPIDR argument?  Then people
+> > calling cpu_suspend() continue as normal.  Only IKS needs to know about
+> > the underlying MPIDR handling when calling this.
+> 
+> The fact is that the switcher _does_ need to swizzle the cpu_logical_map 
+> anyway before suspending.  Hence really there is no point creating extra
+> wrappers for this.
+> 
+> So Lorenzo's suggestion to simply not advertise this too much for people 
+> to not get too creative is probably the best compromize IMHO.
 
-First, I'd like to thank you for your tests.
+Sure, I don't have a problem with that in light of the discussion.
 
-Regarding your problem, it seems that mck rate is calculated as 0, which 
-is either a bug in recalc_rate callback
-of master clock driver or a bug in master clock parent clk (no parent 
-found or bug in the current parent clk recalc_rate function).
-
-I checked the dts[i] files and I found a missing clock-frequency 
-property for main clock of some
-at91sam9x5 boards (those including at91sam9x5cm.dtsi).
-
-You'll find a patch adding this property in attachments.
-Tell me if this works for you. If not I'll make a patch adding pr_info 
-to trace the bug.
-
-Anyway, it should work without this property (main clock rate can be 
-computed using slow clock rate and MCFR register).
-I will investigate this bug...
-
-Best Regards,
-Boris
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-at91-dt-at91sam9x5cm-fix-main-clock-frequency-de.patch
-Type: text/x-patch
-Size: 1032 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/9e92f78f/attachment.bin>
+Cheers
+---Dave
