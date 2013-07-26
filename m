@@ -1,46 +1,43 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 27 Jul 2013 00:04:30 +0200
-Subject: [PATCH v2] clk: exynos4: Add CLK_GET_RATE_NOCACHE flag for the
- Exynos4x12 ISP clocks
-In-Reply-To: <20130726203026.7598.21711@quantum>
-References: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
- <20130726203026.7598.21711@quantum>
-Message-ID: <51F2F26E.4090909@gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 26 Jul 2013 15:05:22 -0700
+Subject: [GIT PULL] msm gpio fixes for 3.11
+Message-ID: <1374876322-2222-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 10:30 PM, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2013-07-25 14:07:05)
->> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
->>
->> The ISP clock registers belong to the ISP power domain and may change
->> their values if this power domain is switched off/on. Add
->> CLK_GET_RATE_NOCACHE flags to ensure we do not rely on invalid cached
->> data when setting or getting frequency of those clocks.
->>
->> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->
-> Thanks for the fix. I've taken into clk-fixes. Is there a specific
-> regression this fixes (besides just having wrong clock rates). I can
-> amend the changelog if you have an example (e.g. device X explodes).
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-Hmm, yes, this fixes a pretty serious problem. There is a companion
-commit [1] already in Linus' tree, more details can be found there.
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
-Perhaps something like this could be added:
+are available in the git repository at:
 
-"Otherwise the FIMC-IS Cortex-A5 core and AXI bus clocks have
-incorrect frequencies, which breaks the ISP operation and starting
-the video pipeline fails with timeouts reported by the FIMC-IS
-firmware.
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-3.11-fix1
 
-See related commit 722a860ecb29aa34ec6f7d7f32b949209e8
-"[media] exynos4-is: Fix FIMC-IS clocks initialization" for more
-details."
+for you to fetch changes up to 8fd62389a778c902c7e8532594ea924bbaf465e8:
 
-[1] 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=722a860ecb29aa34ec6f7d7f32b949209e86a2f3
+  ARM: msm: Consolidate gpiomux for older architectures (2013-07-26 14:55:38 -0700)
 
-Thanks,
-Sylwester
+----------------------------------------------------------------
+Fixes for MSM for 3.11
+
+Two small fixes for MSM.
+
+The first fixes the a gpio controller register address.  I didn't see
+any acks from the devicetree maintainers, so I've copied them on this
+pull request.  The change itself is minor, and just to the register
+address.
+
+The second change removes the gpiomux V1 code from MSM.  This was
+breaking compilation for some of the targets.
+
+----------------------------------------------------------------
+Rohit Vaswani (2):
+      ARM: msm: dts: Fix the gpio register address for msm8960
+      ARM: msm: Consolidate gpiomux for older architectures
+
+ arch/arm/boot/dts/msm8960-cdp.dts |  4 ++--
+ arch/arm/mach-msm/Kconfig         |  3 +--
+ arch/arm/mach-msm/gpiomux-v1.c    | 33 ---------------------------------
+ arch/arm/mach-msm/gpiomux.h       | 10 ----------
+ 4 files changed, 3 insertions(+), 47 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/gpiomux-v1.c
