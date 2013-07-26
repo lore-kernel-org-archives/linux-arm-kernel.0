@@ -1,49 +1,28 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 26 Jul 2013 22:05:43 +0100
-Subject: [PATCH v11] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1374834384-8071-1-git-send-email-p.zabel@pengutronix.de>
-References: <1374834384-8071-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <51F2E4A7.1040200@codethink.co.uk>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 26 Jul 2013 14:11:52 -0700
+Subject: Zynq clk fixes
+In-Reply-To: <20130726200703.7598.86150@quantum>
+References: <51F26716.6030701@monstr.eu>
+ <20130726200703.7598.86150@quantum>
+Message-ID: <a76b3a5d-dadc-43b3-87ee-3c65258c15d7@CO1EHSMHS029.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/13 11:26, Philipp Zabel wrote:
-> This driver implements a reset controller device that toggle a gpio
-> connected to a reset pin of a peripheral IC. The delay between assertion
-> and de-assertion of the reset signal can be configured via device tree.
->
-> Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
-> Reviewed-by: Stephen Warren<swarren@nvidia.com>
+On Fri, Jul 26, 2013 at 01:07:03PM -0700, Mike Turquette wrote:
+> Quoting Michal Simek (2013-07-26 05:09:58)
+> > Hi Mike, [cc: Arnd and Olof]
+> > 
+> > Soren has found two bug fixes in zynq clk code.
+> > Can you please add these two patches to your tree?
+> > Will be great if you can add them to v3.11.
+> > 
+> > Arnd, Olof: I expect that all these clock changes should go through Mike.
+> > If I am wrong please let me know.
+> 
+> Looks right to me. Do these fix regressions in the current -rc cycle?
 
-[snip]
+I doubt there are real regressions. But since it's still early in
+the release cycle and the driver was added in this merge window, I'd prefer
+having it hit a release kernel with these fixes included.
 
-> +static struct of_device_id gpio_reset_dt_ids[] = {
-> +	{ .compatible = "gpio-reset" },
-> +	{ }
-> +};
-
-I think you need the following:
-MODULE_DEVICE_TABLE(of, gpio_reset_dt_ids);
-
-> +static struct platform_driver gpio_reset_driver = {
-> +	.probe = gpio_reset_probe,
-> +	.remove = gpio_reset_remove,
-> +	.driver = {
-> +		.name = "gpio-reset",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(gpio_reset_dt_ids),
-> +	},
-> +};
-> +
-> +module_platform_driver(gpio_reset_driver);
-> +
-> +MODULE_AUTHOR("Philipp Zabel<p.zabel@pengutronix.de>");
-> +MODULE_DESCRIPTION("gpio reset controller");
-> +MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:gpio-reset");
-> +MODULE_DEVICE_TABLE(of, gpio_reset_dt_ids);
-
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+	S?ren
