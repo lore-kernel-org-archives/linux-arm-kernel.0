@@ -1,376 +1,62 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 26 Jul 2013 10:17:59 -0300
-Subject: [PATCH v9 22/30] ARM: mvebu: Relocate Armada 370/XP DeviceBus device
- tree nodes
+Date: Fri, 26 Jul 2013 10:18:01 -0300
+Subject: [PATCH v9 24/30] ARM: kirkwood: Split DT and legacy MBus
+ initialization
 In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374844687-19981-23-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374844687-19981-25-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that mbus has been added to the device tree, it's possible to
-move the DeviceBus out of internal registers, placing it directly
-below the mbus. This is a more accurate representation of the hardware.
+This commit replaces the legacy MBus initialization with the new
+DT-based in Kirkwood. For boards that are not yet converted to DT,
+we keep the legacy initialization.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi             | 94 +++++++++++++-----------
- arch/arm/boot/dts/armada-xp-db.dts               | 59 +++++++--------
- arch/arm/boot/dts/armada-xp-gp.dts               | 60 +++++++--------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 65 ++++++++--------
- 4 files changed, 140 insertions(+), 138 deletions(-)
+ arch/arm/mach-kirkwood/board-dt.c | 1 +
+ arch/arm/mach-kirkwood/common.c   | 8 ++++----
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 62639b4..073dd20 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -45,6 +45,56 @@
- 		controller = <&mbusc>;
- 		interrupt-parent = <&mpic>;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 6e122ed..682b7ac 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -87,6 +87,7 @@ static void __init kirkwood_dt_init(void)
+ 	 */
+ 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
  
-+		devbus-bootcs {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10400 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs0 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10408 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3e) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs1 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10410 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3d) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs2 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10418 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x3b) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		devbus-cs3 {
-+			compatible = "marvell,mvebu-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10420 0x8>;
-+			ranges = <0 MBUS_ID(0x01, 0x37) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
- 		internal-regs {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -200,50 +250,6 @@
- 				status = "disabled";
- 			};
++	BUG_ON(mvebu_mbus_dt_init());
+ 	kirkwood_setup_wins();
  
--			devbus-bootcs at 10400 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10400 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
+ 	kirkwood_l2_init();
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 165e751..15b7e72 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -534,10 +534,6 @@ void __init kirkwood_cpuidle_init(void)
+ void __init kirkwood_init_early(void)
+ {
+ 	orion_time_set_base(TIMER_VIRT_BASE);
 -
--			devbus-cs0 at 10408 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10408 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
--
--			devbus-cs1 at 10410 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10410 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
--
--			devbus-cs2 at 10418 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10418 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
--
--			devbus-cs3 at 10420 {
--				compatible = "marvell,mvebu-devbus";
--				reg = <0x10420 0x8>;
--				#address-cells = <1>;
--				#size-cells = <1>;
--				clocks = <&coreclk 0>;
--				status = "disabled";
--			};
- 		};
- 	};
-  };
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 857f272..76ae1a9 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -31,7 +31,36 @@
+-	mvebu_mbus_init("marvell,kirkwood-mbus",
+-			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
+-			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ);
+ }
  
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 16 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x1000000>;
-+				bank-width = <2>;
-+			};
-+		};
+ int kirkwood_tclk;
+@@ -713,6 +709,10 @@ void __init kirkwood_init(void)
+ 	 */
+ 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
  
- 		internal-regs {
- 			serial at 12000 {
-@@ -160,34 +189,6 @@
- 				};
- 			};
++	BUG_ON(mvebu_mbus_init("marvell,kirkwood-mbus",
++			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
++			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ));
++
+ 	kirkwood_setup_wins();
  
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x1000000>;
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 16 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x1000000>;
--					bank-width = <2>;
--				};
--			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 934dc46..8c0de20 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -40,7 +40,36 @@
- 
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 16 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x1000000>;
-+				bank-width = <2>;
-+			};
-+		};
- 
- 		internal-regs {
- 			serial at 12000 {
-@@ -126,35 +155,6 @@
- 				};
- 			};
- 
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 16 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x1000000>;
--					bank-width = <2>;
--				};
--			};
--
- 			pcie-controller {
- 				status = "okay";
- 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 1700f6f..2b60ee0 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -28,7 +28,36 @@
- 
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 128 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0x8000000>;
-+				bank-width = <2>;
-+			};
-+		};
- 
- 		internal-regs {
- 			serial at 12000 {
-@@ -148,40 +177,6 @@
- 				status = "okay";
- 			};
- 
--			/* USB interface in the mini-PCIe connector */
--			usb at 52000 {
--				status = "okay";
--			};
--
--			devbus-bootcs at 10400 {
--				status = "okay";
--				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
--
--				/* Device Bus parameters are required */
--
--				/* Read parameters */
--				devbus,bus-width    = <8>;
--				devbus,turn-off-ps  = <60000>;
--				devbus,badr-skew-ps = <0>;
--				devbus,acc-first-ps = <124000>;
--				devbus,acc-next-ps  = <248000>;
--				devbus,rd-setup-ps  = <0>;
--				devbus,rd-hold-ps   = <0>;
--
--				/* Write parameters */
--				devbus,sync-enable = <0>;
--				devbus,wr-high-ps  = <60000>;
--				devbus,wr-low-ps   = <60000>;
--				devbus,ale-wr-ps   = <60000>;
--
--				/* NOR 128 MiB */
--				nor at 0 {
--					compatible = "cfi-flash";
--					reg = <0 0x8000000>;
--					bank-width = <2>;
--				};
--			};
--
- 			pcie-controller {
- 				status = "okay";
- 				/* Internal mini-PCIe connector */
+ 	kirkwood_l2_init();
 -- 
 1.8.1.5
