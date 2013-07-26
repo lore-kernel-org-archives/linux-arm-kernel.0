@@ -1,64 +1,168 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jul 2013 14:14:23 +0100
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130726130927.GC4219@netboy>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy> <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy>
-Message-ID: <20130726131423.GL24642@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 26 Jul 2013 10:17:46 -0300
+Subject: [PATCH v9 09/30] bus: mvebu-mbus: Add static window allocation to the
+ DT binding
+In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374844687-19981-10-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
-> On Fri, Jul 26, 2013 at 10:42:24AM +0100, David Woodhouse wrote:
-> > On Fri, 2013-07-26 at 10:01 +0200, Richard Cochran wrote:
-> > > On Thu, Jul 25, 2013 at 03:37:53PM -0600, Jason Gunthorpe wrote:
-> > > > 
-> > > > We use DT has a kernel configuration input. Our environment is
-> > > > designed to guarantee 100% that the kernel and DT match exactly. DT
-> > > > very deliberately isn't an ABI boundary in our systems.
-> > > 
-> > > Think about what you just said.
-> > > 
-> > > The DT describes the *hardware* not the kernel. Why should you ever
-> > > need to update your DT at all?
-> > 
-> > Well, the nodes which describe hardware devices, according to the
-> > bindings which form an ABI contract between DT and drivers, should not
-> > normally change. Although they *can* change, if for example you change
-> > the MAC address and that's stored there. Or you change the PHY you want
-> > it to use. Or something like that. The *ABI* doesn't change, but the
-> > data you express *using* that ABI can change. That's kind of the point.
-> 
-> Unless I totally misunderstood, the thread is talking about letting
-> established bindings change with each new kernel version.  I am
-> opposed to that.
-> 
-> Of course, a user may want to change the values of his MAC addresses,
-> if he needs to. But he should never have to change *how* he specifies
-> those addresses.
-> 
-> So, as long as everyone can agree to the principle that a working DT
-> should remain working after a kernel upgrade, then I'll shut up. In
-> actual fact, this is not the case today, nor was it ever so in the
-> past, AFAICT, but it never hurts to set goals.
+This patch adds static window allocation to the device tree binding.
+Each first-child of the mbus-compatible node, with a suitable 'ranges'
+property, declaring an address translation, will trigger an address
+decoding window allocation.
 
-We agree.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+ drivers/bus/mvebu-mbus.c | 127 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 126 insertions(+), 1 deletion(-)
 
-That's precisely why I'm saying that once a binding appears in a -final
-released kernel, it is _stable_ by that very fact.  If there were any
-doubts about it, it should never have been accepted into the kernel tree
-in the first place.
-
-It's no different from how we treat syscalls.  Once we accept a syscall
-and it's published in a -final kernel, it can't then be altered - it can
-be supplemented by a new syscall with a different interface, but the old
-one remains and keeps its semantics for a great many years.
-
-There's no reason for DT to be any different in this regard.
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 44a07c4..78b8c04 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -902,6 +902,127 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ }
+ 
+ #ifdef CONFIG_OF
++/*
++ * The window IDs in the ranges DT property have the following format:
++ *  - bits 28 to 31: MBus custom field
++ *  - bits 24 to 27: window target ID
++ *  - bits 16 to 23: window attribute ID
++ *  - bits  0 to 15: unused
++ */
++#define CUSTOM(id) (((id) & 0xF0000000) >> 24)
++#define TARGET(id) (((id) & 0x0F000000) >> 24)
++#define ATTR(id)   (((id) & 0x00FF0000) >> 16)
++
++static int __init mbus_dt_setup_win(struct mvebu_mbus_state *mbus,
++				    u32 base, u32 size,
++				    u8 target, u8 attr)
++{
++	const struct mvebu_mbus_mapping *map = mbus->soc->map;
++	const char *name;
++	int i;
++
++	/* Search for a suitable window in the existing mappings */
++	for (i = 0; map[i].name; i++)
++		if (map[i].target == target &&
++		    map[i].attr == (attr & map[i].attrmask))
++			break;
++
++	name = map[i].name;
++	if (!name) {
++		pr_err("window 0x%x:0x%x is unknown, skipping\n",
++		       target, attr);
++		return -EINVAL;
++	}
++
++	if (!mvebu_mbus_window_conflicts(mbus, base, size, target, attr)) {
++		pr_err("cannot add window '%s', conflicts with another window\n",
++		       name);
++		return -EBUSY;
++	}
++
++	if (mvebu_mbus_alloc_window(mbus, base, size, MVEBU_MBUS_NO_REMAP,
++				    target, attr)) {
++		pr_err("cannot add window '%s', too many windows\n",
++		       name);
++		return -ENOMEM;
++	}
++	return 0;
++}
++
++static int __init
++mbus_parse_ranges(struct device_node *node,
++		  int *addr_cells, int *c_addr_cells, int *c_size_cells,
++		  int *cell_count, const __be32 **ranges_start,
++		  const __be32 **ranges_end)
++{
++	const __be32 *prop;
++	int ranges_len, tuple_len;
++
++	/* Allow a node with no 'ranges' property */
++	*ranges_start = of_get_property(node, "ranges", &ranges_len);
++	if (*ranges_start == NULL) {
++		*addr_cells = *c_addr_cells = *c_size_cells = *cell_count = 0;
++		*ranges_start = *ranges_end = NULL;
++		return 0;
++	}
++	*ranges_end = *ranges_start + ranges_len / sizeof(__be32);
++
++	*addr_cells = of_n_addr_cells(node);
++
++	prop = of_get_property(node, "#address-cells", NULL);
++	*c_addr_cells = be32_to_cpup(prop);
++
++	prop = of_get_property(node, "#size-cells", NULL);
++	*c_size_cells = be32_to_cpup(prop);
++
++	*cell_count = *addr_cells + *c_addr_cells + *c_size_cells;
++	tuple_len = (*cell_count) * sizeof(__be32);
++
++	if (ranges_len % tuple_len) {
++		pr_warn("malformed ranges entry '%s'\n", node->name);
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static int __init mbus_dt_setup(struct mvebu_mbus_state *mbus,
++				struct device_node *np)
++{
++	int addr_cells, c_addr_cells, c_size_cells;
++	int i, ret, cell_count;
++	const __be32 *r, *ranges_start, *ranges_end;
++
++	ret = mbus_parse_ranges(np, &addr_cells, &c_addr_cells,
++				&c_size_cells, &cell_count,
++				&ranges_start, &ranges_end);
++	if (ret < 0)
++		return ret;
++
++	for (i = 0, r = ranges_start; r < ranges_end; r += cell_count, i++) {
++		u32 windowid, base, size;
++		u8 target, attr;
++
++		/*
++		 * An entry with a non-zero custom field do not
++		 * correspond to a static window, so skip it.
++		 */
++		windowid = of_read_number(r, 1);
++		if (CUSTOM(windowid))
++			continue;
++
++		target = TARGET(windowid);
++		attr = ATTR(windowid);
++
++		base = of_read_number(r + c_addr_cells, addr_cells);
++		size = of_read_number(r + c_addr_cells + addr_cells,
++				      c_size_cells);
++		ret = mbus_dt_setup_win(mbus, base, size, target, attr);
++		if (ret < 0)
++			return ret;
++	}
++	return 0;
++}
++
+ int __init mvebu_mbus_dt_init(void)
+ {
+ 	struct resource mbuswins_res, sdramwins_res;
+@@ -946,6 +1067,10 @@ int __init mvebu_mbus_dt_init(void)
+ 				     resource_size(&mbuswins_res),
+ 				     sdramwins_res.start,
+ 				     resource_size(&sdramwins_res));
+-	return ret;
++	if (ret)
++		return ret;
++
++	/* Setup statically declared windows in the DT */
++	return mbus_dt_setup(&mbus_state, np);
+ }
+ #endif
+-- 
+1.8.1.5
