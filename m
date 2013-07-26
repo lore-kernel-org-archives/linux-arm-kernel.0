@@ -1,61 +1,44 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 26 Jul 2013 14:09:58 +0200
-Subject: Zynq clk fixes
-Message-ID: <51F26716.6030701@monstr.eu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 26 Jul 2013 08:14:38 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130725215315.GV7729@decadent.org.uk>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
+ <20130725193135.GT23879@titan.lakedaemon.net>
+ <CAL_Jsq+vWbTb8wNEDCR2c_M6sBnKW6e5HGk48QzmXSujQUdddA@mail.gmail.com>
+ <20130725203228.GX23879@titan.lakedaemon.net>
+ <20130725215315.GV7729@decadent.org.uk>
+Message-ID: <20130726121438.GF29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, [cc: Arnd and Olof]
+On Thu, Jul 25, 2013 at 10:53:15PM +0100, Ben Hutchings wrote:
+> On Thu, Jul 25, 2013 at 04:32:28PM -0400, Jason Cooper wrote:
+> [...]
+> > One of the things I've been trying to square up in my head is how to
+> > retain the history of the binding when moving to the new tree.  My
+> > current idea was to clone the kernel tree, add one patch deleting
+> > everything but the bindings and dts files, and one more patch moving
+> > things where we want them (arch/{powerpc,arm}/boot/dts -> dts).
+> > 
+> > Then, as needed, we could merge a kernel version tag and delete
+> > everything we don't need (code) in the merge commit.
+> > 
+> > The downside of this is it would be messy, the upside is that we could
+> > closely track the kernel tree (until the bindings and dts are moved
+> > out), and retain the history of the bindings and dts files.
+> [...]
+> 
+> It's *extremely* messy, but 'git filter-branch' might help to make a
+> clean tracking branch preserving history of just DT files.  David
+> Woodhouse did something like that for the linux-firmware repo
+> initially.
 
-Soren has found two bug fixes in zynq clk code.
-Can you please add these two patches to your tree?
-Will be great if you can add them to v3.11.
+ok, but once that is setup, asking patch submitters to keep binding doc
+and dts file changes in separate patches from code changes would allow
+us to put those patches in a separate branch, mergable into both trees.
 
-Arnd, Olof: I expect that all these clock changes should go through Mike.
-If I am wrong please let me know.
+thx,
 
-Thanks,
-Michal
-
-
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
-
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-fixes-for-3.11
-
-for you to fetch changes up to 97d58aef394831f6f0583653de29e03886a0e09e:
-
-  clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes (2013-07-17 08:36:53 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq clock fixes for v3.11
-
-- Fix watchdog clock registration
-- Fix gem clock propagation
-
-----------------------------------------------------------------
-Soren Brinkmann (2):
-      clk/zynq/clkc: Add dedicated spinlock for the SWDT
-      clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes
-
- drivers/clk/zynq/clkc.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/f30192d3/attachment.sig>
+Jason.
