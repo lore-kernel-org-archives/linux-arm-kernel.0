@@ -1,248 +1,48 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 26 Jul 2013 14:33:38 +0530
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <1374829418-27503-1-git-send-email-kishon@ti.com>
-References: <1374829418-27503-1-git-send-email-kishon@ti.com>
-Message-ID: <1374829418-27503-3-git-send-email-kishon@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 26 Jul 2013 18:09:32 +0900
+Subject: [PATCH] ARM: shmobile: lager: do not annotate gpio_buttons as
+ __initdata
+Message-ID: <1374829772-10939-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
-MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
-device name of the controller had *.auto* in it. Since with using
-PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
-the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
-So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
-change is done in board file here.
+When the gpio-keys device is registered using
+platform_device_register_data() the platform data argument,
+lager_keys_pdata is duplicated and thus should be marked as __initdata
+to avoid wasting memory. However, this is not true of gpio_buttons,
+a reference to it rather than its value is duplicated when lager_keys_pdata
+is duplicated.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+This avoids accessing freed memory if gpio-key events occur
+after unused kernel memory is freed late in the kernel's boot.
+
+This but was added when support for gpio-keys was added to lager
+in c3842e4fcbb7664276443b79187b7808c2e80a35
+("ARM: shmobile: lager: support GPIO switches") which was included
+in v3.11-rc1.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 ---
- arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
- arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
- arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
- arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
- arch/arm/mach-omap2/board-igep0020.c         |    2 +-
- arch/arm/mach-omap2/board-ldp.c              |    2 +-
- arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
- arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
- arch/arm/mach-omap2/board-omap3logic.c       |    2 +-
- arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
- arch/arm/mach-omap2/board-omap3stalker.c     |    2 +-
- arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
- arch/arm/mach-omap2/board-overo.c            |    2 +-
- arch/arm/mach-omap2/board-rm680.c            |    2 +-
- arch/arm/mach-omap2/board-rx51.c             |    2 +-
- arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
- 16 files changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-index 244d8a5..17bb076 100644
---- a/arch/arm/mach-omap2/board-2430sdp.c
-+++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
- 	omap_hsmmc_init(mmc);
+* Noticed when adding gpio-keys support to ape6evm
+* Compile tested only
+---
+ arch/arm/mach-shmobile/board-lager.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index 3c67b2a..3a1a6fd 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -63,7 +63,7 @@ static __initdata struct gpio_led_platform_data lager_leds_pdata = {
+ #define GPIO_KEY(c, g, d, ...) \
+ 	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
  
- 	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	board_smc91x_init();
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 23b004a..5f43fc4 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -590,7 +590,7 @@ static void __init omap_3430sdp_init(void)
- 	omap_ads7846_init(1, gpio_pendown, 310, NULL);
- 	omap_serial_init();
- 	omap_sdrc_init(hyb18m512160af6_sdrc_params, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	board_smc91x_init();
- 	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index d4622ed..1c3345d 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -691,7 +691,7 @@ static void __init cm_t3x_common_init(void)
- 	cm_t35_init_display();
- 	omap_twl4030_audio_init("cm-t3x", NULL);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	cm_t35_init_usbh();
- 	cm_t35_init_camera();
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index f1d91ba..b4d57ec 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -594,7 +594,7 @@ static void __init devkit8000_init(void)
- 
- 	omap_ads7846_init(2, OMAP3_DEVKIT_TS_GPIO, 0, NULL);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	usbhs_init(&usbhs_bdata);
- 	board_nand_init(devkit8000_nand_partitions,
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 87e65dd..b1cbbba 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -659,7 +659,7 @@ static void __init igep_init(void)
- 	omap_serial_init();
- 	omap_sdrc_init(m65kxxxxam_sdrc_params,
- 				  m65kxxxxam_sdrc_params);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	igep_flash_init();
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index 62e4f70..02d7505 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -377,7 +377,7 @@ static void __init omap_ldp_init(void)
- 	omap_ads7846_init(1, 54, 310, NULL);
- 	omap_serial_init();
- 	omap_sdrc_init(NULL, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	board_nand_init(ldp_nand_partitions, ARRAY_SIZE(ldp_nand_partitions),
- 			ZOOM_NAND_CS, 0, nand_default_timings);
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 04c1165..c9e6fc6 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -551,7 +551,7 @@ static void __init omap3_beagle_init(void)
- 	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
- 				  mt46h32m32lf6_sdrc_params);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init(&usbhs_bdata);
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 8c02626..daabe0c 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -706,7 +706,7 @@ static void __init omap3_evm_init(void)
- 		omap_mux_init_gpio(135, OMAP_PIN_OUTPUT);
- 		phy_data[0].reset_gpio = 135;
- 	}
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(&musb_board_data);
- 
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-index bab51e6..d9a6c38 100644
---- a/arch/arm/mach-omap2/board-omap3logic.c
-+++ b/arch/arm/mach-omap2/board-omap3logic.c
-@@ -216,7 +216,7 @@ static void __init omap3logic_init(void)
- 	board_mmc_init();
- 	board_smsc911x_init();
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	/* Ensure SDRC pins are mux'd for self-refresh */
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index b1547a0..fc5c133 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -611,7 +611,7 @@ static void __init omap3pandora_init(void)
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
- 	usbhs_init(&usbhs_bdata);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	gpmc_nand_init(&pandora_nand_data, NULL);
- 
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index d37e6b1..44a38d4 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -394,7 +394,7 @@ static void __init omap3_stalker_init(void)
- 
- 	omap_serial_init();
- 	omap_sdrc_init(mt46h32m32lf6_sdrc_params, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index 7da48bc..e8e053d 100644
---- a/arch/arm/mach-omap2/board-omap3touchbook.c
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -367,7 +367,7 @@ static void __init omap3_touchbook_init(void)
- 
- 	/* Touchscreen and accelerometer */
- 	omap_ads7846_init(4, OMAP3_TS_GPIO, 310, &ads7846_pdata);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index 5748b5d..1ea764d 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -473,7 +473,7 @@ static void __init overo_init(void)
- 				  mt46h32m32lf6_sdrc_params);
- 	board_nand_init(overo_nand_partitions,
- 			ARRAY_SIZE(overo_nand_partitions), NAND_CS, 0, NULL);
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 
- 	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
-index 345e8c4..d95d219 100644
---- a/arch/arm/mach-omap2/board-rm680.c
-+++ b/arch/arm/mach-omap2/board-rm680.c
-@@ -135,7 +135,7 @@ static void __init rm680_init(void)
- 	sdrc_params = nokia_get_sdram_timings();
- 	omap_sdrc_init(sdrc_params, sdrc_params);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	rm680_peripherals_init();
- }
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index d2ea68e..4deacd5 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -99,7 +99,7 @@ static void __init rx51_init(void)
- 	sdrc_params = nokia_get_sdram_timings();
- 	omap_sdrc_init(sdrc_params, sdrc_params);
- 
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(&musb_board_data);
- 	rx51_peripherals_init();
- 
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index a90375d..474ad1c 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -353,7 +353,7 @@ void __init zoom_peripherals_init(void)
- 	omap_i2c_init();
- 	pwm_add_table(zoom_pwm_lookup, ARRAY_SIZE(zoom_pwm_lookup));
- 	platform_add_devices(zoom_devices, ARRAY_SIZE(zoom_devices));
--	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
- 	usb_musb_init(NULL);
- 	enable_board_wakeup_source();
- 	omap_serial_init();
+-static __initdata struct gpio_keys_button gpio_buttons[] = {
++static struct gpio_keys_button gpio_buttons[] = {
+ 	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
+ 	GPIO_KEY(KEY_3,		RCAR_GP_PIN(1, 26),	"SW2-pin3"),
+ 	GPIO_KEY(KEY_2,		RCAR_GP_PIN(1, 24),	"SW2-pin2"),
 -- 
-1.7.10.4
+1.8.3.2
