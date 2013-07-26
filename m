@@ -1,202 +1,336 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 26 Jul 2013 11:39:02 -0400 (EDT)
-Subject: [PATCH 05/13] ARM: bL_switcher: move to dedicated threads rather
- than workqueues
-In-Reply-To: <20130726151838.GC28084@e102568-lin.cambridge.arm.com>
-References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
- <1374550289-25305-6-git-send-email-nicolas.pitre@linaro.org>
- <20130726151838.GC28084@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1307261127420.15022@syhkavp.arg>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Fri, 26 Jul 2013 21:13:30 +0530
+Subject: [PATCH 1/3] clk: s2mps11: Add support for s2mps11
+In-Reply-To: <1373197462-4033-2-git-send-email-yadi.brar@samsung.com>
+References: <1373197462-4033-1-git-send-email-yadi.brar@samsung.com>
+ <1373197462-4033-2-git-send-email-yadi.brar@samsung.com>
+Message-ID: <CAKew6eXabwATXWNXnLY=MFonKpPHF32n=rgQA1ati5AS0ybJFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
+Gentle ping ...
 
-> On Tue, Jul 23, 2013 at 04:31:21AM +0100, Nicolas Pitre wrote:
-> > The workqueues are problematic as they may be contended.
-> > They can't be scheduled with top priority either.  Also the optimization
-> > in bL_switch_request() to skip the workqueue entirely when the target CPU
-> > and the calling CPU were the same didn't allow for bL_switch_request() to
-> > be called from atomic context, as might be the case for some cpufreq
-> > drivers.
-> > 
-> > Let's move to dedicated kthreads instead.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> >  arch/arm/common/bL_switcher.c      | 101 ++++++++++++++++++++++++++++---------
-> >  arch/arm/include/asm/bL_switcher.h |   2 +-
-> >  2 files changed, 79 insertions(+), 24 deletions(-)
-> > 
-> > diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-> > index d6f7e507d9..c2355cafc9 100644
-> > --- a/arch/arm/common/bL_switcher.c
-> > +++ b/arch/arm/common/bL_switcher.c
-> > @@ -15,8 +15,10 @@
-> >  #include <linux/sched.h>
-> >  #include <linux/interrupt.h>
-> >  #include <linux/cpu_pm.h>
-> > +#include <linux/cpu.h>
-> >  #include <linux/cpumask.h>
-> > -#include <linux/workqueue.h>
-> > +#include <linux/kthread.h>
-> > +#include <linux/wait.h>
-> >  #include <linux/clockchips.h>
-> >  #include <linux/hrtimer.h>
-> >  #include <linux/tick.h>
-> > @@ -225,15 +227,48 @@ static int bL_switch_to(unsigned int new_cluster_id)
-> >  	return ret;
-> >  }
-> >  
-> > -struct switch_args {
-> > -	unsigned int cluster;
-> > -	struct work_struct work;
-> > +struct bL_thread {
-> > +	struct task_struct *task;
-> > +	wait_queue_head_t wq;
-> > +	int wanted_cluster;
-> >  };
-> >  
-> > -static void __bL_switch_to(struct work_struct *work)
-> > +static struct bL_thread bL_threads[MAX_CPUS_PER_CLUSTER];
-> > +
-> > +static int bL_switcher_thread(void *arg)
-> > +{
-> > +	struct bL_thread *t = arg;
-> > +	struct sched_param param = { .sched_priority = 1 };
-> > +	int cluster;
-> > +
-> > +	sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
-> > +
-> > +	do {
-> > +		if (signal_pending(current))
-> > +			flush_signals(current);
-> > +		wait_event_interruptible(t->wq,
-> > +				t->wanted_cluster != -1 ||
-> > +				kthread_should_stop());
-> > +		cluster = xchg(&t->wanted_cluster, -1);
-> > +		if (cluster != -1)
-> > +			bL_switch_to(cluster);
-> > +	} while (!kthread_should_stop());
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct task_struct * __init bL_switcher_thread_create(int cpu, void *arg)
-> >  {
-> > -	struct switch_args *args = container_of(work, struct switch_args, work);
-> > -	bL_switch_to(args->cluster);
-> > +	struct task_struct *task;
-> > +
-> > +	task = kthread_create_on_node(bL_switcher_thread, arg,
-> > +				      cpu_to_node(cpu), "kswitcher_%d", cpu);
-> > +	if (!IS_ERR(task)) {
-> > +		kthread_bind(task, cpu);
-> > +		wake_up_process(task);
-> > +	} else
-> > +		pr_err("%s failed for CPU %d\n", __func__, cpu);
-> > +	return task;
-> >  }
-> >  
-> >  /*
-> > @@ -242,26 +277,46 @@ static void __bL_switch_to(struct work_struct *work)
-> >   * @cpu: the CPU to switch
-> >   * @new_cluster_id: the ID of the cluster to switch to.
-> >   *
-> > - * This function causes a cluster switch on the given CPU.  If the given
-> > - * CPU is the same as the calling CPU then the switch happens right away.
-> > - * Otherwise the request is put on a work queue to be scheduled on the
-> > - * remote CPU.
-> > + * This function causes a cluster switch on the given CPU by waking up
-> > + * the appropriate switcher thread.  This function may or may not return
-> > + * before the switch has occurred.
-> >   */
-> > -void bL_switch_request(unsigned int cpu, unsigned int new_cluster_id)
-> > +int bL_switch_request(unsigned int cpu, unsigned int new_cluster_id)
-> >  {
-> > -	unsigned int this_cpu = get_cpu();
-> > -	struct switch_args args;
-> > +	struct bL_thread *t;
-> >  
-> > -	if (cpu == this_cpu) {
-> > -		bL_switch_to(new_cluster_id);
-> > -		put_cpu();
-> > -		return;
-> > +	if (cpu >= MAX_CPUS_PER_CLUSTER) {
-> > +		pr_err("%s: cpu %d out of bounds\n", __func__, cpu);
-> > +		return -EINVAL;
-> >  	}
-> > -	put_cpu();
-> >  
-> > -	args.cluster = new_cluster_id;
-> > -	INIT_WORK_ONSTACK(&args.work, __bL_switch_to);
-> > -	schedule_work_on(cpu, &args.work);
-> > -	flush_work(&args.work);
-> > +	t = &bL_threads[cpu];
-> > +	if (IS_ERR(t->task))
-> > +		return PTR_ERR(t->task);
-> > +	if (!t->task)
-> > +		return -ESRCH;
-> > +
-> > +	t->wanted_cluster = new_cluster_id;
-> > +	wake_up(&t->wq);
-> > +	return 0;
-> >  }
-> >  EXPORT_SYMBOL_GPL(bL_switch_request);
-> > +
-> > +static int __init bL_switcher_init(void)
-> > +{
-> > +	int cpu;
-> > +
-> > +	pr_info("big.LITTLE switcher initializing\n");
-> > +
-> > +	for_each_online_cpu(cpu) {
-> > +		struct bL_thread *t = &bL_threads[cpu];
-> > +		init_waitqueue_head(&t->wq);
-> 
-> Dereferencing &bL_threads[cpu] is wrong without checking the cpu index against
-> MAX_CPUS_PER_CLUSTER. I know you hotplug out half of the CPUs in a later patch but
-> still, this code needs fixing.
+Any review comments?
 
-I've now declared bL_threads[] with NR_CPUS instead.  A later patch 
-needed that to happen anyway.
-
-> > +		t->wanted_cluster = -1;
-> > +		t->task = bL_switcher_thread_create(cpu, t);
-> > +	}
-> > +
-> > +	pr_info("big.LITTLE switcher initialized\n");
-> > +	return 0;
-> > +}
-> > +
-> > +late_initcall(bL_switcher_init);
-> > diff --git a/arch/arm/include/asm/bL_switcher.h b/arch/arm/include/asm/bL_switcher.h
-> > index 72efe3f349..e0c0bba70b 100644
-> > --- a/arch/arm/include/asm/bL_switcher.h
-> > +++ b/arch/arm/include/asm/bL_switcher.h
-> > @@ -12,6 +12,6 @@
-> >  #ifndef ASM_BL_SWITCHER_H
-> >  #define ASM_BL_SWITCHER_H
-> >  
-> > -void bL_switch_request(unsigned int cpu, unsigned int new_cluster_id);
-> > +int bL_switch_request(unsigned int cpu, unsigned int new_cluster_id);
-> 
-> We probably discussed this before, and it is not strictly related to
-> this patch, but is locking/queuing necessary when requesting a switch ? I do
-> not remember the outcome of the discussion so I am asking again.
-
-Strictly speaking, there is no queueing/locking needed as we currently 
-only request a state.  If we request the big cluster, and another 
-request comes along for the little cluster in the mean time before the 
-request to the big cluster was acted upon, then there is effectively 
-nothing to do anymore and the fact that the previous request was 
-overwritten is fine.
-
-There is a patch introducing some kind of queueing in the part 2 of the 
-whole series that I didn't post yet.  The only reason we need that is to 
-call the cpufreq post notifier only after the switch is actually 
-complete.  I'll post that along with the patches connecting cpufreq with 
-this eventually.
-
-
-Nicolas
+On Sun, Jul 7, 2013 at 5:14 PM, Yadwinder Singh Brar
+<yadi.brar@samsung.com> wrote:
+> This patch adds support to register three(AP/CP/BT) buffered 32.768 KHz
+> outputs of mfd-s2mps11 with common clock framework.
+>
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> ---
+>  drivers/clk/Kconfig       |    6 +
+>  drivers/clk/Makefile      |    1 +
+>  drivers/clk/clk-s2mps11.c |  273 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 280 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clk/clk-s2mps11.c
+>
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 0357ac4..3fdf10e 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -65,6 +65,12 @@ config COMMON_CLK_SI5351
+>           This driver supports Silicon Labs 5351A/B/C programmable clock
+>           generators.
+>
+> +config COMMON_CLK_S2MPS11
+> +       tristate "Clock driver for S2MPS11 MFD"
+> +       depends on MFD_SEC_CORE
+> +       ---help---
+> +         This driver supports S2MPS11 crystal oscillator clock.
+> +
+>  config CLK_TWL6040
+>         tristate "External McPDM functional clock from twl6040"
+>         depends on TWL6040_CORE
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 137d3e7..5fd642d 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -38,4 +38,5 @@ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN) += clk-axi-clkgen.o
+>  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+>  obj-$(CONFIG_COMMON_CLK_MAX77686) += clk-max77686.o
+>  obj-$(CONFIG_COMMON_CLK_SI5351) += clk-si5351.o
+> +obj-$(CONFIG_COMMON_CLK_S2MPS11) += clk-s2mps11.o
+>  obj-$(CONFIG_CLK_TWL6040)      += clk-twl6040.o
+> diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
+> new file mode 100644
+> index 0000000..7be41e6
+> --- /dev/null
+> +++ b/drivers/clk/clk-s2mps11.c
+> @@ -0,0 +1,273 @@
+> +/*
+> + * clk-s2mps11.c - Clock driver for S2MPS11.
+> + *
+> + * Copyright (C) 2013 Samsung Electornics
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + *
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/regmap.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mfd/samsung/s2mps11.h>
+> +#include <linux/mfd/samsung/core.h>
+> +
+> +#define s2mps11_name(a) (a->hw.init->name)
+> +
+> +static struct clk **clk_table;
+> +static struct clk_onecell_data clk_data;
+> +
+> +enum {
+> +       S2MPS11_CLK_AP = 0,
+> +       S2MPS11_CLK_CP,
+> +       S2MPS11_CLK_BT,
+> +       S2MPS11_CLKS_NUM,
+> +};
+> +
+> +struct s2mps11_clk {
+> +       struct sec_pmic_dev *iodev;
+> +       struct clk_hw hw;
+> +       struct clk *clk;
+> +       struct clk_lookup *lookup;
+> +       u32 mask;
+> +       bool enabled;
+> +};
+> +
+> +static struct s2mps11_clk *to_s2mps11_clk(struct clk_hw *hw)
+> +{
+> +       return container_of(hw, struct s2mps11_clk, hw);
+> +}
+> +
+> +static int s2mps11_clk_prepare(struct clk_hw *hw)
+> +{
+> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
+> +       int ret;
+> +
+> +       ret = regmap_update_bits(s2mps11->iodev->regmap,
+> +                               S2MPS11_REG_RTC_CTRL,
+> +                                s2mps11->mask, s2mps11->mask);
+> +       if (!ret)
+> +               s2mps11->enabled = true;
+> +
+> +       return ret;
+> +}
+> +
+> +static void s2mps11_clk_unprepare(struct clk_hw *hw)
+> +{
+> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
+> +       int ret;
+> +
+> +       ret = regmap_update_bits(s2mps11->iodev->regmap, S2MPS11_REG_RTC_CTRL,
+> +                          s2mps11->mask, ~s2mps11->mask);
+> +
+> +       if (!ret)
+> +               s2mps11->enabled = false;
+> +}
+> +
+> +static int s2mps11_clk_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
+> +
+> +       return s2mps11->enabled;
+> +}
+> +
+> +static unsigned long s2mps11_clk_recalc_rate(struct clk_hw *hw,
+> +                                            unsigned long parent_rate)
+> +{
+> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
+> +       if (s2mps11->enabled)
+> +               return 32768;
+> +       else
+> +               return 0;
+> +}
+> +
+> +static struct clk_ops s2mps11_clk_ops = {
+> +       .prepare        = s2mps11_clk_prepare,
+> +       .unprepare      = s2mps11_clk_unprepare,
+> +       .is_enabled     = s2mps11_clk_is_enabled,
+> +       .recalc_rate    = s2mps11_clk_recalc_rate,
+> +};
+> +
+> +static struct clk_init_data s2mps11_clks_init[S2MPS11_CLKS_NUM] = {
+> +       [S2MPS11_CLK_AP] = {
+> +               .name = "s2mps11_ap",
+> +               .ops = &s2mps11_clk_ops,
+> +               .flags = CLK_IS_ROOT,
+> +       },
+> +       [S2MPS11_CLK_CP] = {
+> +               .name = "s2mps11_cp",
+> +               .ops = &s2mps11_clk_ops,
+> +               .flags = CLK_IS_ROOT,
+> +       },
+> +       [S2MPS11_CLK_BT] = {
+> +               .name = "s2mps11_bt",
+> +               .ops = &s2mps11_clk_ops,
+> +               .flags = CLK_IS_ROOT,
+> +       },
+> +};
+> +
+> +static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
+> +{
+> +       struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+> +       struct device_node *clk_np;
+> +       int i;
+> +
+> +       if (!iodev->dev->of_node)
+> +               return NULL;
+> +
+> +       clk_np = of_find_node_by_name(iodev->dev->of_node, "clocks");
+> +       if (!clk_np) {
+> +               dev_err(&pdev->dev, "could not find clock sub-node\n");
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk *) *
+> +                                S2MPS11_CLKS_NUM, GFP_KERNEL);
+> +       if (!clk_table)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
+> +               of_property_read_string_index(clk_np, "clock-output-names", i,
+> +                               &s2mps11_clks_init[i].name);
+> +
+> +       return clk_np;
+> +}
+> +
+> +static int s2mps11_clk_probe(struct platform_device *pdev)
+> +{
+> +       struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+> +       struct s2mps11_clk *s2mps11_clks, *s2mps11_clk;
+> +       struct device_node *clk_np = NULL;
+> +       int i, ret = 0;
+> +       u32 val;
+> +
+> +       s2mps11_clks = devm_kzalloc(&pdev->dev, sizeof(*s2mps11_clk) *
+> +                                       S2MPS11_CLKS_NUM, GFP_KERNEL);
+> +       if (!s2mps11_clks)
+> +               return -ENOMEM;
+> +
+> +       s2mps11_clk = s2mps11_clks;
+> +
+> +       clk_np = s2mps11_clk_parse_dt(pdev);
+> +       if (IS_ERR(clk_np))
+> +               return PTR_ERR(clk_np);
+> +
+> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++, s2mps11_clk++) {
+> +               s2mps11_clk->iodev = iodev;
+> +               s2mps11_clk->hw.init = &s2mps11_clks_init[i];
+> +               s2mps11_clk->mask = 1 << i;
+> +
+> +               ret = regmap_read(s2mps11_clk->iodev->regmap,
+> +                                 S2MPS11_REG_RTC_CTRL, &val);
+> +               if (ret < 0)
+> +                       goto err_reg;
+> +
+> +               s2mps11_clk->enabled = val & s2mps11_clk->mask;
+> +
+> +               s2mps11_clk->clk = devm_clk_register(&pdev->dev,
+> +                                                       &s2mps11_clk->hw);
+> +               if (IS_ERR(s2mps11_clk->clk)) {
+> +                       dev_err(&pdev->dev, "Fail to register : %s\n",
+> +                                               s2mps11_name(s2mps11_clk));
+> +                       ret = PTR_ERR(s2mps11_clk->clk);
+> +                       goto err_reg;
+> +               }
+> +
+> +               s2mps11_clk->lookup = devm_kzalloc(&pdev->dev,
+> +                                       sizeof(struct clk_lookup), GFP_KERNEL);
+> +               if (!s2mps11_clk->lookup) {
+> +                       ret = -ENOMEM;
+> +                       goto err_lup;
+> +               }
+> +
+> +               s2mps11_clk->lookup->con_id = s2mps11_name(s2mps11_clk);
+> +               s2mps11_clk->lookup->clk = s2mps11_clk->clk;
+> +
+> +               clkdev_add(s2mps11_clk->lookup);
+> +       }
+> +
+> +       if (clk_table) {
+> +               for (i = 0; i < S2MPS11_CLKS_NUM; i++)
+> +                       clk_table[i] = s2mps11_clks[i].clk;
+> +
+> +               clk_data.clks = clk_table;
+> +               clk_data.clk_num = S2MPS11_CLKS_NUM;
+> +               of_clk_add_provider(clk_np, of_clk_src_onecell_get, &clk_data);
+> +       }
+> +
+> +       platform_set_drvdata(pdev, s2mps11_clks);
+> +
+> +       return ret;
+> +err_lup:
+> +       devm_clk_unregister(&pdev->dev, s2mps11_clk->clk);
+> +err_reg:
+> +       while (s2mps11_clk > s2mps11_clks) {
+> +               if (s2mps11_clk->lookup) {
+> +                       clkdev_drop(s2mps11_clk->lookup);
+> +                       devm_clk_unregister(&pdev->dev, s2mps11_clk->clk);
+> +               }
+> +               s2mps11_clk--;
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static int s2mps11_clk_remove(struct platform_device *pdev)
+> +{
+> +       struct s2mps11_clk *s2mps11_clks = platform_get_drvdata(pdev);
+> +       int i;
+> +
+> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
+> +               clkdev_drop(s2mps11_clks[i].lookup);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct platform_device_id s2mps11_clk_id[] = {
+> +       { "s2mps11-clk", 0},
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(platform, s2mps11_clk_id);
+> +
+> +static struct platform_driver s2mps11_clk_driver = {
+> +       .driver = {
+> +               .name  = "s2mps11-clk",
+> +               .owner = THIS_MODULE,
+> +       },
+> +       .probe = s2mps11_clk_probe,
+> +       .remove = s2mps11_clk_remove,
+> +       .id_table = s2mps11_clk_id,
+> +};
+> +
+> +static int __init s2mps11_clk_init(void)
+> +{
+> +       return platform_driver_register(&s2mps11_clk_driver);
+> +}
+> +subsys_initcall(s2mps11_clk_init);
+> +
+> +static void __init s2mps11_clk_cleanup(void)
+> +{
+> +       platform_driver_unregister(&s2mps11_clk_driver);
+> +}
+> +module_exit(s2mps11_clk_cleanup);
+> +
+> +MODULE_DESCRIPTION("S2MPS11 Clock Driver");
+> +MODULE_AUTHOR("Yadwinder Singh Brar <yadi.brar@samsung.com>");
+> +MODULE_LICENSE("GPL");
+> --
+> 1.7.0.4
+>
