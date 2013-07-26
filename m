@@ -1,106 +1,145 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Fri, 26 Jul 2013 13:23:00 -0700
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <20130726193908.GX24642@n2100.arm.linux.org.uk>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
- <51F29BFE.8000202@broadcom.com>
- <20130726171153.GN29916@titan.lakedaemon.net>
- <51F2AF2D.1000300@broadcom.com>
- <20130726184702.GW24642@n2100.arm.linux.org.uk>
- <51F2C94F.6020405@broadcom.com>
- <20130726193908.GX24642@n2100.arm.linux.org.uk>
-Message-ID: <51F2DAA4.2090903@broadcom.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Jul 2013 13:30:26 -0700
+Subject: [PATCH v2] clk: exynos4: Add CLK_GET_RATE_NOCACHE flag for the
+ Exynos4x12 ISP clocks
+In-Reply-To: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <20130726203026.7598.21711@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-07-26 12:39 PM, Russell King - ARM Linux wrote:
-> On Fri, Jul 26, 2013 at 12:09:03PM -0700, Christian Daudt wrote:
->> On 13-07-26 11:47 AM, Russell King - ARM Linux wrote:
->>> On Fri, Jul 26, 2013 at 10:17:33AM -0700, Christian Daudt wrote:
->>>> Because ARCH_BCM is meant to be used for a number of SoC families. We've
->>>> started upstreaming one (the BCM281XX) but have 2 more internally that
->>>> we're working towards upstreaming. And in the future our plan is to keep
->>>> the Broadcom Mobile SoCs all building under this single ARCH_BCM
->>>> configuration as multiplatform code building a single zImage for them.
->>> 1. We're moving to a single zImage for everything.  Not just Broadcom.
->>> There's no need for Broadcom stuff to be treated any differently.
->>> Participate in the single zImage project and you will get that benefit
->>> without these games.
->> I don't follow what is the game being played.
-> I don't really mind what you do, but when you start talking about having
-> any ARM build always descend into mach-bcm, then something is very wrong
-> with how you're going about it - you don't see anyone else needing that
-> in the tree, not even OMAP.
->
-> I don't really care if your intention is to decend into mach-bcm and then
-> do nothing - that's not the point.  The point is we shouldn't even
-> decend into mach-bcm if there's nothing to be built there.
->
-Ok, how about creating a ARCH_BROADCOM to select descending into the 
-mach-bcm dir, and renaming ARCH_BCM to ARCH_BCMMOBILE, along the lines 
-of the attachment ?
+Quoting Sylwester Nawrocki (2013-07-25 14:07:05)
+> From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> 
+> The ISP clock registers belong to the ISP power domain and may change
+> their values if this power domain is switched off/on. Add
+> CLK_GET_RATE_NOCACHE flags to ensure we do not rely on invalid cached
+> data when setting or getting frequency of those clocks.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-  Thanks,
-    csd
+Thanks for the fix. I've taken into clk-fixes. Is there a specific
+regression this fixes (besides just having wrong clock rates). I can
+amend the changelog if you have an example (e.g. device X explodes).
 
+Regards,
+Mike
 
-
--------------- next part --------------
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c0ac0f5..cdb6662 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -145,7 +145,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
- # Machine directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
- machine-$(CONFIG_ARCH_AT91)		+= at91
--machine-$(CONFIG_ARCH_BCM)		+= bcm
-+machine-$(CONFIG_ARCH_BROADCOM)		+= bcm
- machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
- machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
- machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index f112895..0367f94 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -1,4 +1,11 @@
--config ARCH_BCM
-+config ARCH_BROADCOM
-+	bool "Broadcom Multiplatform SOCs"
-+
-+if ARCH_BROADCOM
-+
-+menu  "Broadcom SoC Family"
-+
-+config ARCH_BCMMOBILE
- 	bool "Broadcom SoC" if ARCH_MULTI_V7
- 	depends on MMU
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -13,7 +20,11 @@ config ARCH_BCM
- 	select SPARSE_IRQ
- 	select TICK_ONESHOT
- 	help
--	  This enables support for system based on Broadcom SoCs.
-+	  This enables support for systems based on Broadcom mobile SoCs.
- 	  It currently supports the 'BCM281XX' family, which includes
- 	  BCM11130, BCM11140, BCM11351, BCM28145 and
- 	  BCM28155 variants.
-+
-+endmenu
-+
-+endif
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 6adb6aec..08f9ebe 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -10,6 +10,6 @@
- # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU General Public License for more details.
- 
--obj-$(CONFIG_ARCH_BCM)		:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
-+obj-$(CONFIG_ARCH_BCMMOBILE)	:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
+> ---
+> 
+> Rebased onto v3.11-rc2.
+> 
+>  drivers/clk/samsung/clk-exynos4.c |   64 +++++++++++++++++++-----------------
+>  1 files changed, 34 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index 1bdb882..4e57397 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -581,11 +581,15 @@ struct samsung_div_clock exynos4x12_div_clks[] __initdata = {
+>         DIV(none, "div_spi1_isp", "mout_spi1_isp", E4X12_DIV_ISP, 16, 4),
+>         DIV(none, "div_spi1_isp_pre", "div_spi1_isp", E4X12_DIV_ISP, 20, 8),
+>         DIV(none, "div_uart_isp", "mout_uart_isp", E4X12_DIV_ISP, 28, 4),
+> -       DIV(div_isp0, "div_isp0", "aclk200", E4X12_DIV_ISP0, 0, 3),
+> -       DIV(div_isp1, "div_isp1", "aclk200", E4X12_DIV_ISP0, 4, 3),
+> +       DIV_F(div_isp0, "div_isp0", "aclk200", E4X12_DIV_ISP0, 0, 3,
+> +                                               CLK_GET_RATE_NOCACHE, 0),
+> +       DIV_F(div_isp1, "div_isp1", "aclk200", E4X12_DIV_ISP0, 4, 3,
+> +                                               CLK_GET_RATE_NOCACHE, 0),
+>         DIV(none, "div_mpwm", "div_isp1", E4X12_DIV_ISP1, 0, 3),
+> -       DIV(div_mcuisp0, "div_mcuisp0", "aclk400_mcuisp", E4X12_DIV_ISP1, 4, 3),
+> -       DIV(div_mcuisp1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1, 8, 3),
+> +       DIV_F(div_mcuisp0, "div_mcuisp0", "aclk400_mcuisp", E4X12_DIV_ISP1,
+> +                                               4, 3, CLK_GET_RATE_NOCACHE, 0),
+> +       DIV_F(div_mcuisp1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1,
+> +                                               8, 3, CLK_GET_RATE_NOCACHE, 0),
+>         DIV(sclk_fimg2d, "sclk_fimg2d", "mout_g2d", DIV_DMC1, 0, 4),
+>  };
+> 
+> @@ -863,57 +867,57 @@ struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+>         GATE_DA(i2s0, "samsung-i2s.0", "i2s0", "aclk100",
+>                         E4X12_GATE_IP_MAUDIO, 3, 0, 0, "iis"),
+>         GATE(fimc_isp, "isp", "aclk200", E4X12_GATE_ISP0, 0,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(fimc_drc, "drc", "aclk200", E4X12_GATE_ISP0, 1,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(fimc_fd, "fd", "aclk200", E4X12_GATE_ISP0, 2,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(fimc_lite0, "lite0", "aclk200", E4X12_GATE_ISP0, 3,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(fimc_lite1, "lite1", "aclk200", E4X12_GATE_ISP0, 4,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(mcuisp, "mcuisp", "aclk200", E4X12_GATE_ISP0, 5,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(gicisp, "gicisp", "aclk200", E4X12_GATE_ISP0, 7,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(smmu_isp, "smmu_isp", "aclk200", E4X12_GATE_ISP0, 8,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(smmu_drc, "smmu_drc", "aclk200", E4X12_GATE_ISP0, 9,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(smmu_fd, "smmu_fd", "aclk200", E4X12_GATE_ISP0, 10,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(smmu_lite0, "smmu_lite0", "aclk200", E4X12_GATE_ISP0, 11,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(smmu_lite1, "smmu_lite1", "aclk200", E4X12_GATE_ISP0, 12,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(ppmuispmx, "ppmuispmx", "aclk200", E4X12_GATE_ISP0, 20,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(ppmuispx, "ppmuispx", "aclk200", E4X12_GATE_ISP0, 21,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(mcuctl_isp, "mcuctl_isp", "aclk200", E4X12_GATE_ISP0, 23,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(mpwm_isp, "mpwm_isp", "aclk200", E4X12_GATE_ISP0, 24,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(i2c0_isp, "i2c0_isp", "aclk200", E4X12_GATE_ISP0, 25,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(i2c1_isp, "i2c1_isp", "aclk200", E4X12_GATE_ISP0, 26,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(mtcadc_isp, "mtcadc_isp", "aclk200", E4X12_GATE_ISP0, 27,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(pwm_isp, "pwm_isp", "aclk200", E4X12_GATE_ISP0, 28,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(wdt_isp, "wdt_isp", "aclk200", E4X12_GATE_ISP0, 30,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(uart_isp, "uart_isp", "aclk200", E4X12_GATE_ISP0, 31,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(asyncaxim, "asyncaxim", "aclk200", E4X12_GATE_ISP1, 0,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(smmu_ispcx, "smmu_ispcx", "aclk200", E4X12_GATE_ISP1, 4,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(spi0_isp, "spi0_isp", "aclk200", E4X12_GATE_ISP1, 12,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(spi1_isp, "spi1_isp", "aclk200", E4X12_GATE_ISP1, 13,
+> -                       CLK_IGNORE_UNUSED, 0),
+> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
+>         GATE(g2d, "g2d", "aclk200", GATE_IP_DMC, 23, 0, 0),
+>  };
+> 
+> --
+> 1.7.4.1
