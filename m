@@ -1,32 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Jul 2013 17:09:56 -0600
-Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
-In-Reply-To: <CAPdLdqmU0aw5h_KYcD-E=isC9U3mZF6fzr_GVdjUUAW4_PUD5Q@mail.gmail.com>
-References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
- <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
- <51F2F37B.8030306@wwwdotorg.org>
- <CAPdLdqmU0aw5h_KYcD-E=isC9U3mZF6fzr_GVdjUUAW4_PUD5Q@mail.gmail.com>
-Message-ID: <51F301C4.4070807@wwwdotorg.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 26 Jul 2013 16:10:08 -0700
+Subject: [PATCH v2 2/3] serial: mxs: enable the DMA only when the RTS/CTS
+ is valid
+In-Reply-To: <51E648C2.3010304@freescale.com>
+References: <1373957732-16638-1-git-send-email-b32955@freescale.com>
+ <1373957732-16638-3-git-send-email-b32955@freescale.com>
+ <20130716095449.GS12139@pengutronix.de>
+ <51E648C2.3010304@freescale.com>
+Message-ID: <20130726231008.GA32627@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 04:51 PM, Markus Mayer wrote:
-> On 26 July 2013 15:08, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> (CC'ing the DT bindings maintainers hence quoting the binding in full)
->>
->> On 07/26/2013 02:25 PM, Markus Mayer wrote:
-
->>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
-
->>> +Required properties:
->>> +  - compatible: "brcm,kona-gpio"
->>> +  - reg: Physical base address and length of the controller's registers.
->>> +  - interrupts: The interrupt outputs from the controller.
->>
->> How many entries are required? I notice there's more than 1 in the
->> example below.
+On Wed, Jul 17, 2013 at 03:33:22PM +0800, Huang Shijie wrote:
+> ? 2013?07?16? 17:54, Uwe Kleine-K?nig ??:
+> >On Tue, Jul 16, 2013 at 02:55:31PM +0800, Huang Shijie wrote:
+> >>The original DMA support works only when RTS/CTS is enabled.
+> >What is original here?
+> >
+> i will add more information for this in the next version.
+> >>But after several patches, DMA support has lost this limit.
+> >This is still misleading.
+> >
+> >>This patch adds an optional property for the UART DT node
+> >>which indicates the UART has RTS and CTS lines.
+> >>
+> >>This patch also adds a macro MXS_AUART_RTSCTS, and uses it to check
+> >>RTS/CTS before we enable the DMA for the UART.
+> >I still think this should go to stable. The options are:
+> >
+> >	a) also take patch 1 into stable
+> >	b) apply this patch without patch 1
+> >
+> >I don't know if option a) is OK, b) is probably preferable. And as Greg
+> to Greg:
 > 
-> You only "need" the ones you want to use, i.e. at least one. The board
-> supports up to 6. I can mention as much in the description.
+> I think a) is ok to me. what's your opinion?
 
-Isn't this a property of the SoC's IP block, not of the board?
+Please reorder them, making patch 2 first, and mark it for stable, then
+do patch 1, and the rest, so I don't have to take non-needed patches
+into the stable tree.
+
+thanks,
+
+greg k-h
