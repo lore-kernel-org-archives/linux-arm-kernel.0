@@ -1,84 +1,77 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 26 Jul 2013 09:01:23 +0200 (CEST)
-Subject: [PATCH 00/12] Remove platform callbacks from mmc_spi, sh_mmcif
- and sh_mobile_sdhi drivers
-In-Reply-To: <1374794808-21890-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1374794808-21890-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <Pine.LNX.4.64.1307260859410.20450@axis700.grange>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 26 Jul 2013 10:08:03 +0300
+Subject: [PATCH 00/21] ARM: OMAP2+: use new display drivers
+Message-ID: <1374822504-28949-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent
+Hi,
 
-On Fri, 26 Jul 2013, Laurent Pinchart wrote:
+The display drivers for new OMAP DSS driver model were merged in v3.11, but the
+board files were not changed to use them. This series changes the board files
+to take those new drivers into use.
 
-> Hello,
-> 
-> This patch set replaces callbacks to board code with regulators and GPIOs in
-> the mmc_spi, sh_mmcif and sh_mobile_sdhi MMC drivers.
-> 
-> Most of the required infrastructure is in place already on the drivers side,
-> except for CD/RO GPIOs support in the mmc_spi driver. The series thus starts
-> with patch 01/12 that adds this feature to the mmc_spi driver.
-> 
-> Patches 02/12 to 05/12 remove the board callbacks from the ecovec24 and
-> vision_ep9307 boards. The code has been compile-tested only as I don't have
-> access to those boards.
-> 
-> Patches 06/12 to 07/12 then proceed to remove the callbacks from the drivers
-> themselves and from the platform data structures.
-> 
-> This will be a bit messy to merge, as the series interleaves patches for
-> drivers and board files. Given that the mmc_spi driver is marked as orphan in
-> MAINTAINERS and that the vision_ep9307 hasn't seen any board-specific
-> modification in the last couple of kernel versions one option would be to
-> merge all patches (or at least patches 01/12 to 06/12) through Simon's tree if
-> all involved maintainers agree.
-> 
-> The series is based on tag renesas-devel-20130725 from
-> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
-> 
-> Laurent Pinchart (12):
->   mmc: mmc_spi: Support CD/RO GPIOs
->   ARM: ep93xx: vision_ep9307: Use MMC CD and RO GPIO
->   sh: ecovec24: Use MMC/SDHI CD and RO GPIO
->   sh: ecovec24: Remove mmcif .down_pwr() callback
->   sh: ecovec24: Remove MMCIF and SDHI .set_pwr() callbacks
->   mmc: mmc_spi: Remove platform data .get_cd() and .get_ro() callbacks
->   mmc: sh_mmcif: Remove .down_pwr() callback from platform data
->   mmc: sh_mmcif: Remove .set_pwr() callback from platform data
->   mmc: sh_mobile_sdhi: Remove .get_cd() callback from platform data
->   mmc: sh_mobile_sdhi: Remove .set_pwr() callback from platform data
->   mmc: tmio-mmc: Remove .get_cd() callback from platform data
->   mmc: tmio-mmc: Remove .set_pwr() callback from platform data
+There's mostly nothing special in the patches. One complication is with Overo
+board file, which adds two panel devices, located in add-on boards, that use
+the same GPIOs, meaning that the two panel devices cannot be probed at the same
+time. The solution used here is to parse the kernel command line, and decide
+the panel device to be added depending on the given default display.
 
-For #3-5, 7-12
+The omap2plus_defconfig is changed to include a few most commonly used display
+drivers as modules, and the old drivers are removed.
 
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Note: The first patch in this series has been sent separately
+(http://mid.gmane.org/1374570405-8301-2-git-send-email-tomi.valkeinen at ti.com),
+and is a fix for v3.11. It's included here as an another patch in the series
+depends on it.
 
-Thanks
-Guennadi
+Tested on 4430SDP, Panda, Beagle, Beagle xM, Overo.
 
->  arch/arm/mach-ep93xx/vision_ep9307.c | 56 ++---------------------
->  arch/sh/boards/mach-ecovec24/setup.c | 89 ++++--------------------------------
->  drivers/mmc/host/mmc_spi.c           | 48 +++++++++----------
->  drivers/mmc/host/of_mmc_spi.c        | 46 +++++--------------
->  drivers/mmc/host/sh_mmcif.c          |  3 --
->  drivers/mmc/host/sh_mobile_sdhi.c    | 18 --------
->  drivers/mmc/host/tmio_mmc.h          |  1 -
->  drivers/mmc/host/tmio_mmc_pio.c      | 23 +---------
->  include/linux/mfd/tmio.h             |  2 -
->  include/linux/mmc/sh_mmcif.h         |  2 -
->  include/linux/mmc/sh_mobile_sdhi.h   |  2 -
->  include/linux/spi/mmc_spi.h          | 18 ++++----
->  12 files changed, 56 insertions(+), 252 deletions(-)
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
+ Tomi
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Tomi Valkeinen (21):
+  ARM: OMAP: dss-common: fix Panda's DVI DDC channel
+  ARM: OMAP2+: Remove legacy DSS initialization for omap4
+  ARM: OMAP2+: Add selected display drivers to omap2plus_defconfig
+  ARM: OMAP: dss-common: use new display drivers
+  ARM: OMAP: 4430SDP: remove picodlp device data
+  ARM: OMAP: overo: use new display drivers
+  ARM: OMAP: rx51: use new display drivers
+  ARM: OMAP: beagle: use new display drivers
+  ARM: OMAP: devkit8000: use new display drivers
+  ARM: OMAP: 2430SDP: use new display drivers
+  ARM: OMAP: LDP: use new display drivers
+  ARM: OMAP: omap3stalker: use new display drivers
+  ARM: OMAP: igep0020: use new display drivers
+  ARM: OMAP: cm-t35: use new display drivers
+  ARM: OMAP: H4: use new display drivers
+  ARM: OMAP: 3430SDP: use new display drivers
+  ARM: OMAP: OMAP3EVM: use new display drivers
+  ARM: OMAP: Pandora: use new display drivers
+  ARM: OMAP: Zoom: use new display drivers
+  ARM: OMAP: AM3517EVM: use new display drivers
+  ARM: OMAP2+: Remove old display drivers from omap2plus_defconfig
+
+ arch/arm/configs/omap2plus_defconfig         |  12 +-
+ arch/arm/mach-omap2/board-2430sdp.c          |  57 ++++---
+ arch/arm/mach-omap2/board-3430sdp.c          |  83 +++++----
+ arch/arm/mach-omap2/board-am3517evm.c        | 113 +++++++++----
+ arch/arm/mach-omap2/board-cm-t35.c           | 100 +++++++----
+ arch/arm/mach-omap2/board-devkit8000.c       |  96 +++++++----
+ arch/arm/mach-omap2/board-h4.c               |  48 ++++--
+ arch/arm/mach-omap2/board-igep0020.c         |  36 ++--
+ arch/arm/mach-omap2/board-ldp.c              |  68 +++++---
+ arch/arm/mach-omap2/board-omap3beagle.c      |  56 +++---
+ arch/arm/mach-omap2/board-omap3evm.c         |  87 ++++++----
+ arch/arm/mach-omap2/board-omap3pandora.c     |  48 +++---
+ arch/arm/mach-omap2/board-omap3stalker.c     |  61 ++++---
+ arch/arm/mach-omap2/board-overo.c            | 160 +++++++++++-------
+ arch/arm/mach-omap2/board-rx51-peripherals.c |  12 ++
+ arch/arm/mach-omap2/board-rx51-video.c       |  35 ++--
+ arch/arm/mach-omap2/board-zoom-display.c     |  30 ++--
+ arch/arm/mach-omap2/dss-common.c             | 244 ++++++++++++---------------
+ arch/arm/mach-omap2/dss-common.h             |   2 -
+ 19 files changed, 787 insertions(+), 561 deletions(-)
+
+-- 
+1.8.1.2
