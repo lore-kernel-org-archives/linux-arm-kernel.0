@@ -1,65 +1,121 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 26 Jul 2013 12:32:13 +0800
-Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
+Date: Fri, 26 Jul 2013 12:32:14 +0800
+Subject: [PATCH v6 3/4] ARM: hi3xxx: add board support with device tree
 In-Reply-To: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1374813135-16238-4-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support UART0 debug ll on hisilicon Hi3620 SoC.
+Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
+
+Changelog:
+v3:
+1. Remove .map_io() in DT machine descriptor. Since debug_ll_io_init()
+is called by default.
+2. Remove .init_machine() in DT machine descriptor. Since
+of_platform_populate() is called by default in DT mode.
+
+v2:
+1. Remove .init_irq() in DT machine descriptor. Since irqchip_init()
+is called by default in DT mode.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/Kconfig.debug             | 15 +++++++++++++++
- arch/arm/include/debug/hisilicon.S | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
- create mode 100644 arch/arm/include/debug/hisilicon.S
+ .../bindings/arm/hisilicon/hisilicon.txt           | 10 ++++++
+ arch/arm/Kconfig                                   |  2 ++
+ arch/arm/Makefile                                  |  1 +
+ arch/arm/mach-hi3xxx/Kconfig                       | 13 ++++++++
+ arch/arm/mach-hi3xxx/Makefile                      |  5 +++
+ arch/arm/mach-hi3xxx/hi3xxx.c                      | 36 ++++++++++++++++++++++
+ 6 files changed, 67 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+ create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+ create mode 100644 arch/arm/mach-hi3xxx/Makefile
+ create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e401a76..289a248 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -272,6 +272,20 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to UART1 serial port on KEYSTONE2 devices.
- 
-+	config DEBUG_HI3620_UART
-+		bool "Hisilicon HI3620 Debug UART"
-+		depends on ARCH_HI3xxx
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HI3620 UART.
-+
-+	config DEBUG_HI3716_UART
-+		bool "Hisilicon Hi3716 Debug UART"
-+		depends on ARCH_HI3xxx
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HI3716 UART.
-+
- 	config DEBUG_MMP_UART2
- 		bool "Kernel low-level debugging message via MMP UART2"
- 		depends on ARCH_MMP
-@@ -765,6 +779,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/cns3xxx.S" if DEBUG_CNS3XXX
- 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
- 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
-+	default "debug/hisilicon.S" if DEBUG_HI3620_UART || DEBUG_HI3716_UART
- 	default "debug/icedcc.S" if DEBUG_ICEDCC
- 	default "debug/imx.S" if DEBUG_IMX1_UART || \
- 				 DEBUG_IMX25_UART || \
-diff --git a/arch/arm/include/debug/hisilicon.S b/arch/arm/include/debug/hisilicon.S
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
 new file mode 100644
-index 0000000..47ad019
+index 0000000..3be60c8
 --- /dev/null
-+++ b/arch/arm/include/debug/hisilicon.S
-@@ -0,0 +1,30 @@
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -0,0 +1,10 @@
++Hisilicon Platforms Device Tree Bindings
++----------------------------------------------------
++
++Hi3716 Development Board
++Required root node properties:
++	- compatible = "hisilicon,hi3716-dkb";
++
++Hi4511 Board
++Required root node properties:
++	- compatible = "hisilicon,hi3620-hi4511";
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ba412e0..29e119d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -944,6 +944,8 @@ source "arch/arm/mach-footbridge/Kconfig"
+ 
+ source "arch/arm/mach-gemini/Kconfig"
+ 
++source "arch/arm/mach-hi3xxx/Kconfig"
++
+ source "arch/arm/mach-highbank/Kconfig"
+ 
+ source "arch/arm/mach-integrator/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index c0ac0f5..bc69205 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -154,6 +154,7 @@ machine-$(CONFIG_ARCH_DOVE)		+= dove
+ machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
+ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
+ machine-$(CONFIG_ARCH_GEMINI)		+= gemini
++machine-$(CONFIG_ARCH_HI3xxx)		+= hi3xxx
+ machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
+ machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
+ machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
+diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
+new file mode 100644
+index 0000000..a991dee
+--- /dev/null
++++ b/arch/arm/mach-hi3xxx/Kconfig
+@@ -0,0 +1,13 @@
++config ARCH_HI3xxx
++	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GIC
++	select CACHE_L2X0
++	select CACHE_PL310
++	select CLKSRC_OF
++	select PINCTRL
++	select PINCTRL_SINGLE
++	select SERIAL_AMBA_PL011
++	select SERIAL_AMBA_PL011_CONSOLE
++	help
++	  Support for Hisilicon Hi36xx/Hi37xx processor family
+diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
+new file mode 100644
+index 0000000..d68ebb3
+--- /dev/null
++++ b/arch/arm/mach-hi3xxx/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for Hisilicon Hi36xx/Hi37xx processors line
++#
++
++obj-y	+= hi3xxx.o
+diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
+new file mode 100644
+index 0000000..e7c54bc
+--- /dev/null
++++ b/arch/arm/mach-hi3xxx/hi3xxx.c
+@@ -0,0 +1,36 @@
 +/*
-+ * Early serial output macro for Hisilicon SoC
++ * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
 + *
-+ * Copyright (C) 2012-2013 Hisilicon Technologies Co., Ltd.
-+ * Copyright (C) 2012-2013 Linaro Ltd.
++ * Copyright (c) 2012-2013 Hisilicon Ltd.
++ * Copyright (c) 2012-2013 Linaro Ltd.
 + *
 + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
 + *
@@ -68,22 +124,28 @@ index 0000000..47ad019
 + * published by the Free Software Foundation.
 +*/
 +
-+#if defined(CONFIG_DEBUG_HI3620_UART)
-+#define HS_UART_PHYS_BASE	0xfcb00000
-+#define HS_UART_VIRT_BASE	0xfeb00000
-+#elif defined(CONFIG_DEBUG_HI3716_UART)
-+#define HS_UART_PHYS_BASE	0xf8b00000
-+#define HS_UART_VIRT_BASE	0xfeb00000
-+#endif
++#include <linux/clk-provider.h>
++#include <linux/clocksource.h>
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
 +
-+#if defined(CONFIG_DEBUG_HI3620_UART) || defined(CONFIG_DEBUG_HI3716_UART)
-+		.macro	addruart,rp,rv,tmp
-+		ldr	\rp, =HS_UART_PHYS_BASE
-+		ldr	\rv, =HS_UART_VIRT_BASE
-+		.endm
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
 +
-+#include <asm/hardware/debug-pl01x.S>
++static void __init hi3xxx_timer_init(void)
++{
++	of_clk_init(NULL);
++	clocksource_of_init();
++}
 +
-+#endif
++static const char *hs_compat[] __initdata = {
++	"hisilicon,hi3620-hi4511",
++	NULL,
++};
++
++DT_MACHINE_START(HI3xxx, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
++	.init_time	= hi3xxx_timer_init,
++	.dt_compat	= hs_compat,
++MACHINE_END
 -- 
 1.8.1.2
