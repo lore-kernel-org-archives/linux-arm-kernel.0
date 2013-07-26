@@ -1,43 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Jul 2013 00:42:37 +0100
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <20130726231108.GA10812@obsidianresearch.com>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net> <20130726215859.GA19469@glitch>
- <20130726231108.GA10812@obsidianresearch.com>
-Message-ID: <20130726234237.GB24642@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 27 Jul 2013 03:46:33 +0400
+Subject: [PATCH] ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
+Message-ID: <201307270346.34002.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 05:11:08PM -0600, Jason Gunthorpe wrote:
-> On Fri, Jul 26, 2013 at 11:59:00PM +0200, Domenico Andreoli wrote:
-> 
-> > In mach-bcm we (or I, it's not very clear to me) want to have support for
-> > multiple SoCs.
-> > 
-> > In trying the approach
-> > 
-> > machine-$(CONFIG_ARCH_BCM)		+= bcm
-> > machine-$(CONFIG_ARCH_BCM4760)		+= bcm
-> > 
-> > I got linker complains about multiple symbol definitiion in case both the
-> > config options are selected.
-> 
-> You can't repeat the same dir. Maybe this?
-> 
-> bcm-machine-$(CONFIG_ARCH_BCM) := bmc
-> bcm-machine-$(CONFIG_ARCH_BCM4760) := bmc
-> machine-y += $(bcm-machine-y)
+The following message is printed on the BOCK-W kernel bootup: 
 
-Thank you for making me look at that file and see how people fail to read
-my comments about keeping stuff appropriately sorted.  Really makes me
-wonder why I bother.
+sh-pfc pfc-r8a7778: invalid group "sdhi0" for function "sdhi0" 
 
-Anyway, there's a simpler solutions to this:
+In addition, SD card cannot be detected.  The reason is apparently that commit
+ca7bb309485e4ec89a9addd47bea (ARM: shmobile: bockw: add SDHI0 support) matched
+the previous version of commit 564617d2f92473031d035deb273da5 (sh-pfc: r8a7778:
+add SDHI support).
 
-machdirs := $(patsubst %,arch/arm/mach-%/,$(sort $(machine-y)))
-platdirs := $(patsubst %,arch/arm/plat-%/,$(Sort $(plat-y)))
+Add the missing pin groups according to the BOCK-W board schematics.
 
-which will remove all duplicates.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+The patch is atop of Simon's 'renesas.git' repo, 'renesas-devel-20130726' tag.
+
+ arch/arm/mach-shmobile/board-bockw.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+Index: renesas/arch/arm/mach-shmobile/board-bockw.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
++++ renesas/arch/arm/mach-shmobile/board-bockw.c
+@@ -167,7 +167,13 @@ static const struct pinctrl_map bockw_pi
+ 				  "usb1", "usb1"),
+ 	/* SDHI0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
+-				  "sdhi0", "sdhi0"),
++				  "sdhi0_data4", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
++				  "sdhi0_ctrl", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
++				  "sdhi0_cd", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
++				  "sdhi0_wp", "sdhi0"),
+ };
+ 
+ #define FPGA	0x18200000
