@@ -1,56 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jul 2013 14:28:50 +0100
-Subject: [PATCH RESEND v2] ARM: dt: Use the 'model' field for printing
- the hardware revision
-In-Reply-To: <1374844784-2639-1-git-send-email-festevam@gmail.com>
-References: <1374844784-2639-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130726132850.GM24642@n2100.arm.linux.org.uk>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Fri, 26 Jul 2013 19:06:44 +0530
+Subject: [PATCH V2 0/8] Add audio support on smdk5420
+Message-ID: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 10:19:44AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> When booting a device tree kernel, we get the following output from 
-> 'cat /proc/cpuinfo': 
-> 
-> $ cat /proc/cpuinfo 
-> processor       : 0
-> model name      : ARMv7 Processor rev 5 (v7l)
-> BogoMIPS        : 531.66
-> Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls 
-> CPU implementer : 0x41
-> CPU architecture: 7
-> CPU variant     : 0x2
-> CPU part        : 0xc08
-> CPU revision    : 5
-> 
-> Hardware        : Freescale i.MX51 (Device Tree Support)
-> Revision        : 0000
-> Serial          : 0000000000000000
-> 
-> The Hardware line does not really describe the hardware type, as it is reading
-> the information from the dt 'machine' field.
-> 
-> In the dt case, read the 'model' field instead, so that we can have a better
-> description output as follows:
-> 
-> Hardware        : Freescale i.MX51 Babbage Board
-> 
-> The hardware output string is unchanged for the non-dt kernel case.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Samsung has different versions of I2S introduced in different
+platforms. Each version has some new support added for multichannel,
+secondary fifo, s/w reset control, internal mux for rclk src clk and
+tdm support. Each newly added change has a quirk. So this patch adds
+all the required quirks as driver data and based on compatible string
+from dtsi fetches the quirks. This also adds i2s support on exynos5420
+and make relevent changes in the dtsi files.
 
-While I can see the advantage of preserving old ways to do things, that's
-not always the best option.
+Changes since V1:
+	- Pass quirks as driver data and fetch the quirks based on
+	  compatible string from dtsi file as suggested by
+	  Tomasz Figa and Mark Brown
+	- Make the I2S driver more flexible with respect to register
+	  access as suggested by Tomasz Figa and Mark Brown
+	- Add 5420 support in the driver.
+	- Modify the dtsi files with the corresponding compatible
+	  strings and removed the i2s quirks from 5250 dtsi file.
+	- Updated the i2s Documentation with relevent changes and
+	  i2s versioning info.
+	- Add i2s nodes on exynos5420.dtsi
+	- Enable sound support on smdk5420
 
-If userspace wants to get at the DT information about a platform, we already
-have ways that can happen already - we export the DT stuff so that kexec's
-tools can get at it.
+This patch set is dependent on the following dma and audio subsystem
+clk controller patches.
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20661
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20668
 
-And... as the long term goal is to get rid of the individual machine_type
-structures for DT, there's no point introducing the new "model" field in
-that struct.
+This patch set is made based on Kukjin Kim for-next branch.
 
-And no, you're not supposed to write to mdesc structures.  Thanks for
-being the one to point out that they aren't const, I'll make them so now.
+Andrew Bresticker (1):
+  ARM: dts: exynos5420: add i2s controllers
+
+Padmavathi Venna (7):
+  platform: Increase platform name size
+  ASoC: Samsung: I2S: Add quirks as driver data in I2S
+  ARM: dts: Change i2s compatible string on exynos5250
+  ASoC: Samsung: I2S: Modify driver to give more flexibility
+  ASoC: Samsung: I2S: Modify the I2S driver to support I2S on
+    Exynos5420
+  ARM: dts: wm8994: Add wm8994 support on smdk5420
+  ARM: dts: Enable sound support on smdk5420
+
+ .../devicetree/bindings/sound/samsung-i2s.txt      |   25 ++-
+ arch/arm/boot/dts/exynos5250.dtsi                  |    9 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |   60 ++++++
+ arch/arm/boot/dts/exynos5420.dtsi                  |   44 +++++
+ include/linux/mod_devicetable.h                    |    2 +-
+ include/linux/platform_data/asoc-s3c.h             |    1 +
+ sound/soc/samsung/i2s-regs.h                       |   51 ++++--
+ sound/soc/samsung/i2s.c                            |  205 +++++++++++++++-----
+ 8 files changed, 312 insertions(+), 85 deletions(-)
+
+-- 
+1.7.4.4
