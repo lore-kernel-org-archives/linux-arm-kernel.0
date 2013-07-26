@@ -1,73 +1,44 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 26 Jul 2013 16:22:44 +0200
-Subject: [PATCH V2 0/8] Add audio support on smdk5420
-In-Reply-To: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
-Message-ID: <3356470.kOAo7kipSf@amdc1227>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Jul 2013 15:21:40 +0100
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+References: <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy> <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy> <20130726132709.GH29916@titan.lakedaemon.net>
+ <1374846070.14574.92.camel@i7.infradead.org>
+ <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+Message-ID: <20130726142140.GR24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padmavathi,
+On Fri, Jul 26, 2013 at 10:14:32AM -0400, jonsmirl at gmail.com wrote:
+> Yes, yes - that's why the schema should be written down and used as a
+> validation input to dtc. Then dtc can spit out errors for non-standard
+> items. There would be two versions - the standard one and a legacy one
+> that includes the standard one plus the hacks that can't be undone.
+> 
+> But more importantly it provides a framework for people creating new
+> node definitions. Now they can't work in a vacuum and come up with
+> random names and structure for everything.
+> 
+> Most of the problems express in the thread would go away if the schema
+> was written down and discussed. The rule going forward would be no new
+> nodes that aren't part of the standard schema.
 
-On Friday 26 of July 2013 19:06:44 Padmavathi Venna wrote:
-> Samsung has different versions of I2S introduced in different
-> platforms. Each version has some new support added for multichannel,
-> secondary fifo, s/w reset control, internal mux for rclk src clk and
-> tdm support. Each newly added change has a quirk. So this patch adds
-> all the required quirks as driver data and based on compatible string
-> from dtsi fetches the quirks. This also adds i2s support on exynos5420
-> and make relevent changes in the dtsi files.
-> 
-> Changes since V1:
-> 	- Pass quirks as driver data and fetch the quirks based on
-> 	  compatible string from dtsi file as suggested by
-> 	  Tomasz Figa and Mark Brown
-> 	- Make the I2S driver more flexible with respect to register
-> 	  access as suggested by Tomasz Figa and Mark Brown
-> 	- Add 5420 support in the driver.
-> 	- Modify the dtsi files with the corresponding compatible
-> 	  strings and removed the i2s quirks from 5250 dtsi file.
-> 	- Updated the i2s Documentation with relevent changes and
-> 	  i2s versioning info.
-> 	- Add i2s nodes on exynos5420.dtsi
-> 	- Enable sound support on smdk5420
-> 
-> This patch set is dependent on the following dma and audio subsystem
-> clk controller patches.
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20661
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20668
-> 
-> This patch set is made based on Kukjin Kim for-next branch.
-> 
-> Andrew Bresticker (1):
->   ARM: dts: exynos5420: add i2s controllers
-> 
-> Padmavathi Venna (7):
->   platform: Increase platform name size
->   ASoC: Samsung: I2S: Add quirks as driver data in I2S
->   ARM: dts: Change i2s compatible string on exynos5250
->   ASoC: Samsung: I2S: Modify driver to give more flexibility
->   ASoC: Samsung: I2S: Modify the I2S driver to support I2S on
->     Exynos5420
->   ARM: dts: wm8994: Add wm8994 support on smdk5420
->   ARM: dts: Enable sound support on smdk5420
-> 
->  .../devicetree/bindings/sound/samsung-i2s.txt      |   25 ++-
->  arch/arm/boot/dts/exynos5250.dtsi                  |    9 +-
->  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   60 ++++++
->  arch/arm/boot/dts/exynos5420.dtsi                  |   44 +++++
->  include/linux/mod_devicetable.h                    |    2 +-
->  include/linux/platform_data/asoc-s3c.h             |    1 +
->  sound/soc/samsung/i2s-regs.h                       |   51 ++++--
->  sound/soc/samsung/i2s.c                            |  205
-> +++++++++++++++----- 8 files changed, 312 insertions(+), 85 deletions(-)
+So this is why I'm seeing patches just a short time ago removing existing
+compatible strings from the DT descriptions and associated driver, and
+replacing them with new ones... meaning that the old DT files won't work
+with newer kernels.
 
-Please resend the whole series again using correct devicetree mailing list, 
-which is:
+What that means is using the descriptions as the schema won't catch that
+because they're changing those as well to match.
 
-devicetree at vger.kernel.org
-
-The old one (devicetree-discuss at lists.ozlabs.org) is no longer functioning.
-
-Best regards,
-Tomasz
+There's a solution to that: dtc becomes a separate project external to
+the kernel which also contains the schemas that it verifies against.
+That way, if you want to make changes such as that above, you need to
+get it past not only kernel people but also past dtc maintainers -
+which increases the chances of such stuff being caught.
