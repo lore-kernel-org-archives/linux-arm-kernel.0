@@ -1,53 +1,49 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 26 Jul 2013 07:49:40 -0400
-Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
- hooks to hw_pci
-In-Reply-To: <20130726101305.22a5c892@skate>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130725165659.GB27802@dhcp-172-17-186-34.nvidia.com>
- <20130726101305.22a5c892@skate>
-Message-ID: <20130726114940.GD29916@titan.lakedaemon.net>
+Date: Fri, 26 Jul 2013 08:01:53 -0400
+Subject: Location for a kind of GPIO bus driver
+In-Reply-To: <20130725221615.GA30881@kroah.com>
+References: <20130723151834.GJ9916@kw.sim.vm.gnt>
+ <CACRpkdZWQQUCeHvgPPLmxL3O1sw55pc_KbzbnqTSFJx+0_QanQ@mail.gmail.com>
+ <20130725221615.GA30881@kroah.com>
+Message-ID: <20130726120153.GE29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 10:13:05AM +0200, Thomas Petazzoni wrote:
-> Dear Thierry Reding,
-> 
-> On Thu, 25 Jul 2013 09:57:00 -0700, Thierry Reding wrote:
-> > On Mon, Jul 15, 2013 at 01:52:44PM +0200, Thomas Petazzoni wrote:
-> > > Some PCI drivers may need to adjust the pci_bus structure after it has
-> > > been allocated by the Linux PCI core. The PCI core allows
-> > > architectures to implement the pcibios_add_bus() and
-> > > pcibios_remove_bus() for this purpose. This commit therefore extends
-> > > the hw_pci and pci_sys_data structures of the ARM PCI core to allow
-> > > PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
-> > > which will get called when a bus is added or removed from the system.
-> > > 
-> > > This will be used for example by the Marvell PCIe driver to connect a
-> > > particular PCI bus with its corresponding MSI chip to handle Message
-> > > Signaled Interrupts.
-> > > 
-> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
-> > > ---
-> > >  arch/arm/include/asm/mach/pci.h |  4 ++++
-> > >  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
-> > >  2 files changed, 20 insertions(+)
+On Thu, Jul 25, 2013 at 03:16:15PM -0700, Greg KH wrote:
+> On Thu, Jul 25, 2013 at 11:46:42PM +0200, Linus Walleij wrote:
+> > On Tue, Jul 23, 2013 at 5:18 PM, Simon Guinot <simon.guinot@sequanux.org> wrote:
 > > 
-> > Hi Russell,
+> > > (...)  I am
+> > > thinking about moving the GPIO extension bus support into a separate
+> > > driver. The problem is that I can't find a proper location for a such
+> > > driver. AFAIK, it doesn't fit with anything existing supported by Linux.
+> > > Maybe I should consider drivers/bus ? Or even drivers/misc ?
 > > 
-> > Can we have your Acked-by on this patch so that it can be moved to a
-> > stable branch along with some of the other patches in this branch that
-> > both Marvell and Tegra PCIe drivers need?
+> > This is a question to Greg, the device core maintainer.
+> > AFAICT they go into drivers/base/foo-bus.c
 > 
-> I've pinged Russell a few times about this patch already, but haven't
-> received feedback from him. Do you think I can just go ahead and submit
-> the patch to Russell's patch system, after fixing the minor nits you
-> mentioned?
+> No, specific bus code does not go in drivers/base/ it goes where the
+> rest of the subsystem lives.
 
-When you do that, please ask Russell to place it in a publicly
-accessible, stable topic branch for us to base off of.
+We were thinking drivers/bus since it is addressable and has multiple
+devices hanging off of it (leds, power management).
+
+However, since each device is essentially an external gpio, drivers/gpio
+might be more appropriate.  It's not a gpio expander, more of an
+enhanced gpio controller (led 1, brightness 7)
+
+> > In this case I would first consider using MFD though,
+> > please make a case for why this is not simply a multi
+> > function device with a few cells (== platform devices).
+> 
+> I agree with this as well.
+
+To quote Simon from a different response:
+> I will definitively have a closer look at mfd. But as I understand,
+> mfd is more oriented platform device and resources. Here, the device
+> don't expose some memory regions but rather methods to configure a
+> CPLD through GPIOs. I am not sure how it can work with the mfd
+> framework.
 
 thx,
 
