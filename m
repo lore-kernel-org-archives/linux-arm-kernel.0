@@ -1,34 +1,50 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 26 Jul 2013 10:50:08 +0300
-Subject: [PATCH 1/6] usb: phy-nop: Use RESET Controller for managing the
- reset line
-In-Reply-To: <20130725172855.GJ25415@radagast>
-References: <1374137590-17865-1-git-send-email-rogerq@ti.com>
- <1374137590-17865-2-git-send-email-rogerq@ti.com>
- <20130725172855.GJ25415@radagast>
-Message-ID: <51F22A30.80507@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 26 Jul 2013 10:57:12 +0300
+Subject: [PATCH] video: nuc900fb: fix to pass correct device identity
+ to request_irq()
+In-Reply-To: <CAPgLHd9CZ=VponJTbTGKTXVTdvMQM6_T+-RWuPMrk0WYZPbW1Q@mail.gmail.com>
+References: <CAPgLHd9CZ=VponJTbTGKTXVTdvMQM6_T+-RWuPMrk0WYZPbW1Q@mail.gmail.com>
+Message-ID: <51F22BD8.8090604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2013 08:28 PM, Felipe Balbi wrote:
-> On Thu, Jul 18, 2013 at 11:53:05AM +0300, Roger Quadros wrote:
->> Till now we were modelling the RESET line as a voltage regulator and
->> using the regulator framework to manage it.
->>
->> [1] introduces a GPIO based reset controller driver. We use that
->> to manage the PHY reset line, at least for DT boots. For legacy boots,
->> will still need to use the regulator framework for reset lines.
->>
->> [1] - http://thread.gmane.org/gmane.linux.drivers.devicetree/41348
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
+On 16/07/13 03:07, Wei Yongjun wrote:
+> The IRQ handler nuc900fb_irqhandler() use dev_id as a type of
+> struct nuc900fb_info *, so we should pass fbi as the device
+> identity to request_irq().
 > 
-> that's not in mainline yet, right ? Is it guaranteed that it will hit
-> v3.12 merge window ?
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+> Was 'video: nuc900fb: fix to pass correct device identity to free_irq()'
+> ---
+>  drivers/video/nuc900fb.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-Right. It isn't yet. I'm not sure about 3.12. Let's ask Philipp.
+> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+> index 8c527e5..796e511 100644
+> --- a/drivers/video/nuc900fb.c
+> +++ b/drivers/video/nuc900fb.c
+> @@ -587,8 +587,7 @@ static int nuc900fb_probe(struct platform_device *pdev)
+>  	fbinfo->flags			= FBINFO_FLAG_DEFAULT;
+>  	fbinfo->pseudo_palette		= &fbi->pseudo_pal;
+>  
+> -	ret = request_irq(irq, nuc900fb_irqhandler, 0,
+> -			  pdev->name, fbinfo);
+> +	ret = request_irq(irq, nuc900fb_irqhandler, 0, pdev->name, fbi);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "cannot register irq handler %d -err %d\n",
+>  			irq, ret);
+> 
 
-Philipp, is your GPIO Reset driver scheduled for 3.12?
+Thanks, I've applied this into my 3.11-fixes/fbdev branch.
 
-cheers,
--roger
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/d6d5ff2b/attachment.sig>
