@@ -1,53 +1,48 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Jul 2013 15:19:02 -0700
-Subject: [PATCH v2] clk: exynos4: Add CLK_GET_RATE_NOCACHE flag for the
- Exynos4x12 ISP clocks
-In-Reply-To: <51F2F26E.4090909@gmail.com>
-References: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
- <20130726203026.7598.21711@quantum> <51F2F26E.4090909@gmail.com>
-Message-ID: <20130726221902.7598.22707@quantum>
+From: csd@broadcom.com (Christian Daudt)
+Date: Fri, 26 Jul 2013 15:16:52 -0700
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X
+ SoC with ARM CPU
+In-Reply-To: <20130726000412.GH5022@linaro.org>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+ <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
+ <20130719020611.GA4941@glitch> <20130723185733.GB6811@ohporter.com>
+ <CAGVrzcYnoN9NnJGvubS7=bVJDk37xSt4BimtvDWghe7OHEWALQ@mail.gmail.com>
+ <20130724231106.GB29801@glitch>
+ <CAGVrzcYudfgqs_eafje4BT2z2qE0kSJPx1B-xrq0WxtUkGxSFw@mail.gmail.com>
+ <20130726000412.GH5022@linaro.org>
+Message-ID: <51F2F554.8030709@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-07-26 15:04:30)
-> On 07/26/2013 10:30 PM, Mike Turquette wrote:
-> > Quoting Sylwester Nawrocki (2013-07-25 14:07:05)
-> >> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> >>
-> >> The ISP clock registers belong to the ISP power domain and may change
-> >> their values if this power domain is switched off/on. Add
-> >> CLK_GET_RATE_NOCACHE flags to ensure we do not rely on invalid cached
-> >> data when setting or getting frequency of those clocks.
-> >>
-> >> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> >> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
-> >
-> > Thanks for the fix. I've taken into clk-fixes. Is there a specific
-> > regression this fixes (besides just having wrong clock rates). I can
-> > amend the changelog if you have an example (e.g. device X explodes).
-> 
-> Hmm, yes, this fixes a pretty serious problem. There is a companion
-> commit [1] already in Linus' tree, more details can be found there.
-> 
-> Perhaps something like this could be added:
-> 
-> "Otherwise the FIMC-IS Cortex-A5 core and AXI bus clocks have
-> incorrect frequencies, which breaks the ISP operation and starting
-> the video pipeline fails with timeouts reported by the FIMC-IS
-> firmware.
-> 
-> See related commit 722a860ecb29aa34ec6f7d7f32b949209e8
-> "[media] exynos4-is: Fix FIMC-IS clocks initialization" for more
-> details."
-
-That's great.
-
-Thanks,
-Mike
-
-> 
-> [1] 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=722a860ecb29aa34ec6f7d7f32b949209e86a2f3
-> 
-> Thanks,
-> Sylwester
+On 13-07-25 05:04 PM, Matt Porter wrote:
+> On Thu, Jul 25, 2013 at 11:23:21PM +0100, Florian Fainelli wrote:
+>> 2013/7/25 Domenico Andreoli <cavokz@gmail.com>:
+>>> On Tue, Jul 23, 2013 at 08:05:28PM +0100, Florian Fainelli wrote:
+>>>> 2013/7/23 Matt Porter <matt.porter@linaro.org>:
+>>>>> On Fri, Jul 19, 2013 at 04:06:11AM +0200, Domenico Andreoli wrote:
+>>>>> It's pretty easy to see that the "ti" vendor prefix has no relation at
+>>>>> all to their TXN symbol so that blows that convention out of the water.
+>>>>> Rather, the prefix is based on somebody's notion of how that vendor's
+>>>>> part are normally referred to. In TI-land, it's TI AM335x or TI OMAP,
+>>>>> never TXN OMAP. :)
+>>>>>
+>>>>> For Broadcom, every part is BCMxxxxx so "bcm" is appropriate.
+>>>> It was appropriate before being the "wrong" vendor prefix was
+>>>> allocated, now that "brcm" has been allocated we should stick to it
+>>>> because otherwise we will break existing and on-going DT work.
+>>> I still prefer bcm to brcm and I find enough evidence that bcm would be
+>>> better in the long term.
+>>>
+>>> So if Broadcomers can agree on bcm, now it's still the cheapest time to
+>>> fix in that direction, later will not be better.
+>> If we are to fix it in stone, once and for all, let's go for the full name
+>> which would avoid any kind of future confusion (this also seems to be the
+>> tendency with new vendor prefixes these days). That way we could make
+>> everyone happy with say: "broadcom,bcm2835". Would that work for everyone?
+> I really like that.
+>
+> -Matt
+>
+broadcom works for me also.
+  thanks,
+    csd
