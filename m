@@ -1,126 +1,376 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 26 Jul 2013 10:19:44 -0300
-Subject: [PATCH RESEND v2] ARM: dt: Use the 'model' field for printing the
- hardware revision
-Message-ID: <1374844784-2639-1-git-send-email-festevam@gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 26 Jul 2013 10:17:59 -0300
+Subject: [PATCH v9 22/30] ARM: mvebu: Relocate Armada 370/XP DeviceBus device
+ tree nodes
+In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374844687-19981-23-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Now that mbus has been added to the device tree, it's possible to
+move the DeviceBus out of internal registers, placing it directly
+below the mbus. This is a more accurate representation of the hardware.
 
-When booting a device tree kernel, we get the following output from 
-'cat /proc/cpuinfo': 
-
-$ cat /proc/cpuinfo 
-processor       : 0
-model name      : ARMv7 Processor rev 5 (v7l)
-BogoMIPS        : 531.66
-Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls 
-CPU implementer : 0x41
-CPU architecture: 7
-CPU variant     : 0x2
-CPU part        : 0xc08
-CPU revision    : 5
-
-Hardware        : Freescale i.MX51 (Device Tree Support)
-Revision        : 0000
-Serial          : 0000000000000000
-
-The Hardware line does not really describe the hardware type, as it is reading
-the information from the dt 'machine' field.
-
-In the dt case, read the 'model' field instead, so that we can have a better
-description output as follows:
-
-Hardware        : Freescale i.MX51 Babbage Board
-
-The hardware output string is unchanged for the non-dt kernel case.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Changes since v1:
-- Fix typo in 'architecture'
- arch/arm/include/asm/mach/arch.h |  1 +
- arch/arm/kernel/devtree.c        | 15 ++++++++-------
- arch/arm/kernel/setup.c          |  7 ++++++-
- 3 files changed, 15 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi             | 94 +++++++++++++-----------
+ arch/arm/boot/dts/armada-xp-db.dts               | 59 +++++++--------
+ arch/arm/boot/dts/armada-xp-gp.dts               | 60 +++++++--------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 65 ++++++++--------
+ 4 files changed, 140 insertions(+), 138 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 308ad7d..113d4af 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -23,6 +23,7 @@ struct smp_operations;
- struct machine_desc {
- 	unsigned int		nr;		/* architecture number	*/
- 	const char		*name;		/* architecture name	*/
-+	const char		*model;		/* architecture model */
- 	unsigned long		atag_offset;	/* tagged list (relative) */
- 	const char *const 	*dt_compat;	/* array of device tree
- 						 * 'compatible' strings	*/
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 5af04f6..90d541a 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -178,7 +178,6 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 	struct machine_desc *mdesc, *mdesc_best = NULL;
- 	unsigned int score, mdesc_score = ~1;
- 	unsigned long dt_root;
--	const char *model;
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 62639b4..073dd20 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -45,6 +45,56 @@
+ 		controller = <&mbusc>;
+ 		interrupt-parent = <&mpic>;
  
- #ifdef CONFIG_ARCH_MULTIPLATFORM
- 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-@@ -224,12 +223,14 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 		dump_machine_table(); /* does not return */
- 	}
++		devbus-bootcs {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10400 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs0 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10408 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3e) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs1 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10410 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3d) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs2 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10418 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3b) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs3 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10420 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x37) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
+ 		internal-regs {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -200,50 +250,6 @@
+ 				status = "disabled";
+ 			};
  
--	model = of_get_flat_dt_prop(dt_root, "model", NULL);
--	if (!model)
--		model = of_get_flat_dt_prop(dt_root, "compatible", NULL);
--	if (!model)
--		model = "<unknown>";
--	pr_info("Machine: %s, model: %s\n", mdesc_best->name, model);
-+	mdesc_best->model = of_get_flat_dt_prop(dt_root, "model", NULL);
-+	if (!mdesc_best->model)
-+		mdesc_best->model = of_get_flat_dt_prop(dt_root, "compatible",
-+							NULL);
-+	if (!mdesc_best->model)
-+		mdesc_best->model = "<unknown>";
-+	pr_info("Machine: %s, model: %s\n", mdesc_best->name,
-+		mdesc_best->model);
+-			devbus-bootcs at 10400 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10400 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs0 at 10408 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10408 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs1 at 10410 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10410 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs2 at 10418 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10418 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs3 at 10420 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10420 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+ 		};
+ 	};
+  };
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 857f272..76ae1a9 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -31,7 +31,36 @@
  
- 	/* Retrieve various information from the /chosen node */
- 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 79e8d2f..d22f24b 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -137,6 +137,7 @@ EXPORT_SYMBOL(elf_platform);
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 16 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x1000000>;
++				bank-width = <2>;
++			};
++		};
  
- static const char *cpu_name;
- static const char *machine_name;
-+static const char *model_name;
- static char __initdata cmd_line[COMMAND_LINE_SIZE];
- struct machine_desc *machine_desc __initdata;
+ 		internal-regs {
+ 			serial at 12000 {
+@@ -160,34 +189,6 @@
+ 				};
+ 			};
  
-@@ -786,6 +787,7 @@ void __init setup_arch(char **cmdline_p)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
-+	model_name = mdesc->model;
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x1000000>;
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 16 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x1000000>;
+-					bank-width = <2>;
+-				};
+-			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 934dc46..8c0de20 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -40,7 +40,36 @@
  
- 	setup_dma_zone(mdesc);
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 16 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x1000000>;
++				bank-width = <2>;
++			};
++		};
  
-@@ -950,7 +952,10 @@ static int c_show(struct seq_file *m, void *v)
- 		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
- 	}
+ 		internal-regs {
+ 			serial at 12000 {
+@@ -126,35 +155,6 @@
+ 				};
+ 			};
  
--	seq_printf(m, "Hardware\t: %s\n", machine_name);
-+	if (model_name)
-+		seq_printf(m, "Hardware\t: %s\n", model_name);
-+	else
-+		seq_printf(m, "Hardware\t: %s\n", machine_name);
- 	seq_printf(m, "Revision\t: %04x\n", system_rev);
- 	seq_printf(m, "Serial\t\t: %08x%08x\n",
- 		   system_serial_high, system_serial_low);
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 16 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x1000000>;
+-					bank-width = <2>;
+-				};
+-			};
+-
+ 			pcie-controller {
+ 				status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 1700f6f..2b60ee0 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -28,7 +28,36 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 128 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x8000000>;
++				bank-width = <2>;
++			};
++		};
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+@@ -148,40 +177,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			/* USB interface in the mini-PCIe connector */
+-			usb at 52000 {
+-				status = "okay";
+-			};
+-
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 128 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x8000000>;
+-					bank-width = <2>;
+-				};
+-			};
+-
+ 			pcie-controller {
+ 				status = "okay";
+ 				/* Internal mini-PCIe connector */
 -- 
-1.8.1.2
+1.8.1.5
