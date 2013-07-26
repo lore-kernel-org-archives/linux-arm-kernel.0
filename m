@@ -1,145 +1,72 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Jul 2013 13:30:26 -0700
-Subject: [PATCH v2] clk: exynos4: Add CLK_GET_RATE_NOCACHE flag for the
- Exynos4x12 ISP clocks
-In-Reply-To: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1374786425-6697-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <20130726203026.7598.21711@quantum>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 26 Jul 2013 15:44:54 -0500
+Subject: [PATCH] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <51F2D5EA.7050108@wwwdotorg.org>
+References: <1374789881-20611-1-git-send-email-dinguyen@altera.com>
+ <51F2B0C4.8000301@wwwdotorg.org> <1374867220.20685.44.camel@linux-builds1>
+ <51F2D5EA.7050108@wwwdotorg.org>
+Message-ID: <1374871494.20685.46.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-07-25 14:07:05)
-> From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On Fri, 2013-07-26 at 14:02 -0600, Stephen Warren wrote:
+> On 07/26/2013 01:33 PM, Dinh Nguyen wrote:
+> > On Fri, 2013-07-26 at 11:24 -0600, Stephen Warren wrote:
+> >> On 07/25/2013 04:04 PM, dinguyen at altera.com wrote:
+> >>> From: Dinh Nguyen <dinguyen@altera.com>
+> >>>
+> >>> Add bindings for SD/MMC for SOCFPGA.
+> >>> Add "syscon" to the "altr,sys-mgr" binding.
 > 
-> The ISP clock registers belong to the ISP power domain and may change
-> their values if this power domain is switched off/on. Add
-> CLK_GET_RATE_NOCACHE flags to ensure we do not rely on invalid cached
-> data when setting or getting frequency of those clocks.
+> >>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >>> +Example:
+> >>> +
+> >>> +  The MSHC controller node can be split into two portions, SoC specific and
+> >>> +  board specific portions, as listed below.
+> >>
+> >> That doesn't sound like a good idea. There should be one DT node for
+> >> each logical block. The internal construction of the Linux drivers
+> >> (presumably you have entirely separate code to handle the two nodes in
+> >> Linux so far?) should not influence the DT construction at all.
+> > 
+> > In the end, there is only 1 DT node for each logical block:
+> 
+> Oh right, I see you were intending to show the distinction between the
+> SoC .dtsi and board .dts file. I hadn't realized that. I don't think
+> it's common to do that in the examples, so I would recommend just
+> merging the whole example together myself.
 
-Thanks for the fix. I've taken into clk-fixes. Is there a specific
-regression this fixes (besides just having wrong clock rates). I can
-amend the changelog if you have an example (e.g. device X explodes).
+I'll merge it.
 
-Regards,
-Mike
+> 
+> > dwmmc0 at ff704000 {
+> > 	compatible = "altr,socfpga-dw-mshc";
+> 
+> That should include the baseline synopsis compatible value too.
 
-> ---
+We don't need the baseline synopsis compatible because of
+dw_mci_pltfm_register() call.
+
+Thanks,
+Dinh
 > 
-> Rebased onto v3.11-rc2.
+> > 	reg = <0xff704000 0x00001000>;
+> > 	interrupts = <0x00000000 0x0000008b 0x00000004>;
+> > 	fifo-depth = <0x00000400>;
+> > 	#address-cells = <0x00000001>;
+> > 	#size-cells = <0x00000000>;
+> > 	clocks = <0x00000016 0x00000017>;
+> > 	clock-names = "biu", "ciu";
+> > 	num-slots = <0x00000001>;
+> > 	supports-highspeed;
+> > 	broken-cd;
+> >  	altr,dw-mshc-ciu-div = <0x00000003>;
+> >   	altr,dw-mshc-sdr-timing = <0x00000000 0x00000003>;
+> > 	slot at 0 {
+> > 		reg = <0x00000000>;
+> > 		bus-width = <0x00000004>;
+> > 		};
+> > 	};
 > 
->  drivers/clk/samsung/clk-exynos4.c |   64 +++++++++++++++++++-----------------
->  1 files changed, 34 insertions(+), 30 deletions(-)
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index 1bdb882..4e57397 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -581,11 +581,15 @@ struct samsung_div_clock exynos4x12_div_clks[] __initdata = {
->         DIV(none, "div_spi1_isp", "mout_spi1_isp", E4X12_DIV_ISP, 16, 4),
->         DIV(none, "div_spi1_isp_pre", "div_spi1_isp", E4X12_DIV_ISP, 20, 8),
->         DIV(none, "div_uart_isp", "mout_uart_isp", E4X12_DIV_ISP, 28, 4),
-> -       DIV(div_isp0, "div_isp0", "aclk200", E4X12_DIV_ISP0, 0, 3),
-> -       DIV(div_isp1, "div_isp1", "aclk200", E4X12_DIV_ISP0, 4, 3),
-> +       DIV_F(div_isp0, "div_isp0", "aclk200", E4X12_DIV_ISP0, 0, 3,
-> +                                               CLK_GET_RATE_NOCACHE, 0),
-> +       DIV_F(div_isp1, "div_isp1", "aclk200", E4X12_DIV_ISP0, 4, 3,
-> +                                               CLK_GET_RATE_NOCACHE, 0),
->         DIV(none, "div_mpwm", "div_isp1", E4X12_DIV_ISP1, 0, 3),
-> -       DIV(div_mcuisp0, "div_mcuisp0", "aclk400_mcuisp", E4X12_DIV_ISP1, 4, 3),
-> -       DIV(div_mcuisp1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1, 8, 3),
-> +       DIV_F(div_mcuisp0, "div_mcuisp0", "aclk400_mcuisp", E4X12_DIV_ISP1,
-> +                                               4, 3, CLK_GET_RATE_NOCACHE, 0),
-> +       DIV_F(div_mcuisp1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1,
-> +                                               8, 3, CLK_GET_RATE_NOCACHE, 0),
->         DIV(sclk_fimg2d, "sclk_fimg2d", "mout_g2d", DIV_DMC1, 0, 4),
->  };
-> 
-> @@ -863,57 +867,57 @@ struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
->         GATE_DA(i2s0, "samsung-i2s.0", "i2s0", "aclk100",
->                         E4X12_GATE_IP_MAUDIO, 3, 0, 0, "iis"),
->         GATE(fimc_isp, "isp", "aclk200", E4X12_GATE_ISP0, 0,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(fimc_drc, "drc", "aclk200", E4X12_GATE_ISP0, 1,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(fimc_fd, "fd", "aclk200", E4X12_GATE_ISP0, 2,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(fimc_lite0, "lite0", "aclk200", E4X12_GATE_ISP0, 3,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(fimc_lite1, "lite1", "aclk200", E4X12_GATE_ISP0, 4,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(mcuisp, "mcuisp", "aclk200", E4X12_GATE_ISP0, 5,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(gicisp, "gicisp", "aclk200", E4X12_GATE_ISP0, 7,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(smmu_isp, "smmu_isp", "aclk200", E4X12_GATE_ISP0, 8,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(smmu_drc, "smmu_drc", "aclk200", E4X12_GATE_ISP0, 9,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(smmu_fd, "smmu_fd", "aclk200", E4X12_GATE_ISP0, 10,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(smmu_lite0, "smmu_lite0", "aclk200", E4X12_GATE_ISP0, 11,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(smmu_lite1, "smmu_lite1", "aclk200", E4X12_GATE_ISP0, 12,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(ppmuispmx, "ppmuispmx", "aclk200", E4X12_GATE_ISP0, 20,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(ppmuispx, "ppmuispx", "aclk200", E4X12_GATE_ISP0, 21,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(mcuctl_isp, "mcuctl_isp", "aclk200", E4X12_GATE_ISP0, 23,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(mpwm_isp, "mpwm_isp", "aclk200", E4X12_GATE_ISP0, 24,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(i2c0_isp, "i2c0_isp", "aclk200", E4X12_GATE_ISP0, 25,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(i2c1_isp, "i2c1_isp", "aclk200", E4X12_GATE_ISP0, 26,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(mtcadc_isp, "mtcadc_isp", "aclk200", E4X12_GATE_ISP0, 27,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(pwm_isp, "pwm_isp", "aclk200", E4X12_GATE_ISP0, 28,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(wdt_isp, "wdt_isp", "aclk200", E4X12_GATE_ISP0, 30,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(uart_isp, "uart_isp", "aclk200", E4X12_GATE_ISP0, 31,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(asyncaxim, "asyncaxim", "aclk200", E4X12_GATE_ISP1, 0,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(smmu_ispcx, "smmu_ispcx", "aclk200", E4X12_GATE_ISP1, 4,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(spi0_isp, "spi0_isp", "aclk200", E4X12_GATE_ISP1, 12,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(spi1_isp, "spi1_isp", "aclk200", E4X12_GATE_ISP1, 13,
-> -                       CLK_IGNORE_UNUSED, 0),
-> +                       CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
->         GATE(g2d, "g2d", "aclk200", GATE_IP_DMC, 23, 0, 0),
->  };
-> 
-> --
-> 1.7.4.1
