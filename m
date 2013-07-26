@@ -1,43 +1,94 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Fri, 26 Jul 2013 11:11:27 +0530
-Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
-Message-ID: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Fri, 26 Jul 2013 14:38:06 +0800
+Subject: [PATCH v9 0/3] ahci: enable ahci sata support on imx6q
+Message-ID: <1374820689-12837-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+v9: add imx6q specific ahci sata support
+  - Let ahci_imx depend on the MFD_SYSCON, to fix the build error
+  reported by Randy.
+  "
+  on i386.
+  # CONFIG_MFD_SYSCON is not set
 
-In case of normal kexec kernel load, all cpu's are offlined
-before calling machine_kexec() under kernel_kexec() function.
-But in case crash panic cpus are relaxed in
-machine_crash_nonpanic_core() SMP function but not offlined.
+  when ahci_imx.c is built as a loadable module:
+  ERROR: "syscon_regmap_lookup_by_compatible" [drivers/ata/ahci_imx.ko] undefined!
+  "
+  -
+v8: http://www.spinics.net/lists/linux-ide/msg45798.html
+  - Regarding to Tejun's comments, rename the sata_imx driver
+  to be ahci_imx
+  - Add Shawn's ack and review signoff.
+  - 
 
-When crash kernel is loaded with kexec and on panic trigger
-machine_kexec() checks for number of cpus online.
-If more than one cpu is online machine_kexec() fails to load
-with below error
+v7: http://www.spinics.net/lists/linux-ide/msg45738.html
+  Thanks to Sergei Shtylyow and Shawn.
+  - According to ePAPR [1] section 2.2.2, re-name
+  the node from 'ahci' to 'sata'
+  - Move the initialization of the ahb clock of the private
+  data to the probe function.
+  - Remove the platform_set_drvdata(..., NULL), and devm_clk_put
+  (..., ...).
+  - 
 
-kexec: error: multiple CPUs still online
+v6: http://www.spinics.net/lists/linux-ide/msg45719.html
+  Thanks for Shawn's comments.
+  - Speicify the ahb clock in the sata related dts changes.
+  - Move the initialization of the sata PHY clock of the private
+  data to the probe function.
+  - Remove the empty device release function.
+  - In order to be more readable, rename the imx_dev/imx_ahci_pdev
+  to be ahci_dev/ahci_pdev, and do some other changes, such as typo
+  error, more readable name of the variable.
+  - 
 
-In machine_crash_nonpanic_core() SMP function, offline CPU
-before cpu_relax
+v5: http://www.spinics.net/lists/linux-ide/msg45712.html
+  - Fix the wrong referrence usage of the private data.
+  - Use the private data to contain the poninter of the PHY
+  signals adjustment window(gpr)
+  - Tested on imx6q sd board.
+  - 
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
----
- arch/arm/kernel/machine_kexec.c |    1 +
- 1 file changed, 1 insertion(+)
+v4: http://www.spinics.net/lists/linux-ide/msg45699.html
+  Thanks for the review comments provided by Sascha, and Alexander.
+  - Use the private data and keep a pointer to the PHY clock.
+  - Don't use the global platform device variable, because that
+  it would make the driver broken for mutiple instances.
+  - Don't do the "writel" with assignment.
+  - Other minor changes, such as print the error code when printing
+  error message, use a u32 type to store readl results, and so on.
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 4fb074c..163b160 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -73,6 +73,7 @@ void machine_crash_nonpanic_core(void *unused)
- 	crash_save_cpu(&regs, smp_processor_id());
- 	flush_cache_all();
- 
-+	set_cpu_online(smp_processor_id(), false);
- 	atomic_dec(&waiting_for_crash_ipi);
- 	while (1)
- 		cpu_relax();
--- 
-1.7.9.5
+v3: http://www.spinics.net/lists/linux-ide/msg45688.html
+  - Keep arch/arm and ahci_platform driver clean.
+  - Add the sata_imx standalone driver contained all the
+  specific setup
+  - Add the release function, support the loadable module
+  driver.
+  - Tested on imx6q sd board.
+
+v2: http://www.spinics.net/lists/linux-ide/msg45666.html 
+ - Setup standalone imx ahci sata driver, because of
+ the misalignments of the bits definition of the HBA register.
+ - Replace the node by the label in the board dts.
+ - 
+
+v1: http://www.spinics.net/lists/linux-ide/msg45581.html
+ - add imx6q specific ahci sata support to arch/arm/mach-imx/mach-imx6q.c
+
+These patches is based on imx/dt branch of
+"http://git.linaro.org/git-ro/people/shawnguo/linux-2.6.git"
+
+[v9 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
+[v9 2/3] ARM: imx6q: update the sata bits definitions of gpr13
+[v9 3/3] ahci_imx: add ahci sata support on imx platforms
+
+arch/arm/boot/dts/imx6q-sabreauto.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabrelite.dts       |    4 +
+arch/arm/boot/dts/imx6q-sabresd.dts         |    4 +
+arch/arm/boot/dts/imx6q.dtsi                |    9 +
+drivers/ata/Kconfig                         |    9 +
+drivers/ata/Makefile                        |    1 +
+drivers/ata/ahci_imx.c                      |  236 +++++++++++++++++++++++++++
+include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  121 ++++++++++----
+8 files changed, 351 insertions(+), 37 deletions(-)
