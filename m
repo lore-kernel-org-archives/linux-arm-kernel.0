@@ -1,98 +1,220 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 26 Jul 2013 12:28:26 -0400
-Subject: [RFC/RFT PATCH 0/5] mm: ARM nobootmem and few dma_mask fixes
-In-Reply-To: <20130726151021.GU24642@n2100.arm.linux.org.uk>
-References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
- <20130726151021.GU24642@n2100.arm.linux.org.uk>
-Message-ID: <51F2A3AA.4060801@ti.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Fri, 26 Jul 2013 09:28:52 -0700
+Subject: [PATCH 0/1] ARM: atomic64: fix endian-ness in atomic.h
+Message-ID: <1374856133-2939-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 July 2013 11:10 AM, Russell King - ARM Linux wrote:
-> On Fri, Jul 12, 2013 at 05:48:09PM -0400, Santosh Shilimkar wrote:
->> The series is an attempt to move ARM port to NO_BOOTMEM. As discussed
->> on list NO_BOOTMEM move needed updates to max*pfn meaning to be maximum
->> PFNs but that breaks the dma_mask for few block layer drivers since
->> ARM start of physical memory is not PFN0 unlike most of the architectures.
->> Some more read on it is here:
->> 	http://lwn.net/Articles/543408/
->> 	http://lwn.net/Articles/543424/
->>
->> To address this issue, we introduce generic dma_max_pfn() helper which
->> can be overridden from the architectures.
->> 	
->> Another intention behind move to nobootmem is also to convert ARM to
->> switch to memblock and getting rid of bootmem allocator dependency which
->> don't work for LPAE machines which has physical memory starting beyond
->> 4 GB boundary. It needs changes to core kernel and also a new memblock
->> API. More on this can be found here:
->> 	https://lkml.org/lkml/2013/6/29/77
->>
->> I have been trying to cook up these patches with kind help from Russell
->> and we know series don't solve all the dma_mask bad assumptions. But at
->> least I am hoping that it can get the ball rolling.	
->>
->> Comments/testing help is welcome !!
-> 
-> As this is related to some of the cleanup of dma_mask which I've been
-> doing, I think it may make sense to roll this into one tree.  Any
-> objection to that?
-> 
-> Can we get any acks on this stuff from Jens and Jejb etc - especially
-> for the bits which touch block/ and for the scsi bits as these are
-> touching other subsystems.  (oddly, linux-scsi wasn't on the original
-> mail for this series summary.)
-> 
-Sorry I missed the scsi lists on the summary patch.
+Fixes atomic64_xxx functions endian-ness isussues as it was discussed on
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/185898.html
+Patch itself follows in separate email. This cover letter describes what
+testing has been done
 
-While browsing the code I found another spot in mmc layer which
-needs fixing. The patch is at the end of the email with Chris
-and linux-mmc cc'ed here.
+Tested on pandaboard for both cases: LE and BE, CONFIG_GENERIC_ATOMIC64 was
+forcefully disabled.
 
-Regards,
-Santosh
+In BE case it was tested on top of Ben's other BE patches covered by 
+(updates for be8  patch series).
 
->From 06a27a784a1fd86bf22adf1b247ac82a7c21d46b Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Fri, 19 Jul 2013 21:36:46 -0400
-Subject: [PATCH] mmc: Use dma_max_pfn(dev) helper for bounce_limit
- calculations
+The following tests passed:
 
-DMA bounce limit is the maximum direct DMA'able memory beyond which
-bounce buffers has to be used to perform dma operations. MMC queue layer
-relies on dma_mask but its calculation is based on max_*pfn which
-don't have uniform meaning across architectures. So make use of
-dma_max_pfn() which is expected to return the DMAable maximum pfn
-value across architectures.
+1) CONFIG_ATOMIC64_SELFTEST
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Chris Ball <cjb@laptop.org>
+2) The following module produced identical output for both LE, BE, 
+and GENERIC_ATOMIC64
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/mmc/card/queue.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/atomic.h>
 
-diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
-index fa9632e..357bbc5 100644
---- a/drivers/mmc/card/queue.c
-+++ b/drivers/mmc/card/queue.c
-@@ -15,6 +15,7 @@
- #include <linux/freezer.h>
- #include <linux/kthread.h>
- #include <linux/scatterlist.h>
-+#include <linux/dma-mapping.h>
- 
- #include <linux/mmc/card.h>
- #include <linux/mmc/host.h>
-@@ -196,7 +197,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
- 	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
- 
- 	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
--		limit = *mmc_dev(host)->dma_mask;
-+		limit = dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
- 
- 	mq->card = card;
- 	mq->queue = blk_init_queue(mmc_request_fn, lock);
+
+atomic64_t a = {0};
+
+#define STEP 0x40000000
+
+void atomic64_add_test1 (void)
+{
+    atomic64_add(STEP, &a);
+}    
+
+void test_atomic64_add(void)
+{
+    int i;
+
+    printk("atomic64_add\n");
+
+    atomic64_set(&a, 0);
+    
+    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
+
+    for (i = 0; i < 10; i++) {
+        atomic64_add_test1();
+        printk("i = %2d: a = 0x%llx (%lld)\n", i, a.counter, a.counter);
+    }
+}
+
+void atomic64_sub_test1 (void)
+{
+    atomic64_sub(STEP, &a);
+}
+
+void test_atomic64_sub(void)
+{
+    int i;
+
+    printk("atomic64_sub\n");
+
+    /* value of a is set by previos test */
+    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
+
+    for (i = 0; i < 20; i++) {
+        atomic64_sub_test1();
+        printk("i = %2d: a = 0x%llx (%lld)\n", i, a.counter, a.counter);
+    }
+}
+
+u64 atomic64_add_return_test1 (void)
+{
+    return atomic64_add_return(STEP, &a);
+}    
+
+void test_atomic64_add_return(void)
+{
+    int i;
+    u64 ret;
+
+    printk("atomic64_add_return\n");
+
+    atomic64_set(&a, 0);
+    
+    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
+
+    for (i = 0; i < 10; i++) {
+        ret = atomic64_add_return_test1();
+        printk("i = %2d: a = 0x%llx (%lld), ret = %llx (%lld)\n",
+               i, a.counter, a.counter, ret, ret);
+    }
+}
+
+u64 atomic64_sub_return_test1 (void)
+{
+    return atomic64_sub_return(STEP, &a);
+}
+
+void test_atomic64_sub_return(void)
+{
+    int i;
+    u64 ret;
+
+    printk("atomic64_sub_return\n");
+
+    /* value of a is set by previos test */
+    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
+
+    for (i = 0; i < 20; i++) {
+        ret = atomic64_sub_return_test1();
+        printk("i = %2d: a = 0x%llx (%lld), ret = %llx (%lld)\n",
+               i, a.counter, a.counter, ret, ret);
+    }
+}
+
+void atomic64_dec_if_positive_test1 (void)
+{
+    atomic64_dec_if_positive(&a);
+}
+
+void test1_atomic64_dec_if_positive (void)
+{
+    int i;    
+    printk("atomic64_dec_if_positive test1\n");
+
+    atomic64_set(&a, 0x100000003);    
+    /* value of a is set by previos test */
+    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
+
+    for (i = 0; i < 10; i++) {
+        atomic64_dec_if_positive_test1();
+        printk("i = %2d: a = 0x%llx (%lld))\n",
+               i, a.counter, a.counter);
+    }
+}
+
+void test2_atomic64_dec_if_positive (void)
+{
+    int i;    
+    printk("atomic64_dec_if_positive test2\n");
+
+    atomic64_set(&a, 0x3);    
+    /* value of a is set by previos test */
+    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
+
+    for (i = 0; i < 10; i++) {
+        atomic64_dec_if_positive_test1();
+        printk("i = %2d: a = 0x%llx (%lld))\n",
+               i, a.counter, a.counter);
+    }
+}
+
+void atomic64_add_unless_test1(long long u)
+{
+    atomic64_add_unless(&a, STEP, u);
+}
+
+void test_atomic64_add_unless(void)
+{
+    int i;
+    u64 prev;
+    
+    printk("atomic64_add_unless\n");
+
+    atomic64_set(&a, 0);
+    
+    printk("a = 0x%llx (%lld)\n", a.counter, a.counter);
+
+    for (i = 0; i < 10; i++) {
+        prev = a.counter;
+        atomic64_add_unless_test1(prev);
+        printk("i = %2d: no change: prev = 0x%llx (%lld), a = 0x%llx (%lld)\n", i,
+               prev, prev, a.counter, a.counter);
+        atomic64_add_unless_test1(prev - 1);
+        printk("i = %2d: change: prev = 0x%llx (%lld), a = 0x%llx (%lld)\n", i,
+               prev, prev, a.counter, a.counter);
+    }
+}
+
+
+int
+init_module (void)
+{
+    test_atomic64_add();
+    test_atomic64_sub();
+
+    test_atomic64_add_return();
+    test_atomic64_sub_return();
+
+    test1_atomic64_dec_if_positive();
+    test2_atomic64_dec_if_positive();
+
+    test_atomic64_add_unless();
+    
+    return 0;
+}
+
+void
+cleanup_module(void)
+{
+}
+
+MODULE_LICENSE("GPL");
+
+Thanks,
+Victor
+
+Victor Kamensky (1):
+  ARM: atomic64: fix endian-ness in atomic.h
+
+ arch/arm/include/asm/atomic.h | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
+
 -- 
-1.7.9.5
+1.8.1.4
