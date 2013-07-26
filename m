@@ -1,65 +1,80 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 26 Jul 2013 02:07:06 +0200
-Subject: [RESEND] cpuidle for ARM pull request
-In-Reply-To: <2075555.RCmWLFAfjq@vostro.rjw.lan>
-References: <51E536C5.1020609@linaro.org> <1766778.ZYeDKBOsjV@vostro.rjw.lan>
- <2075555.RCmWLFAfjq@vostro.rjw.lan>
-Message-ID: <1598661.FpX5cmjM1U@vostro.rjw.lan>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 26 Jul 2013 02:04:34 +0200
+Subject: [PATCH 01/12] mmc: mmc_spi: Support CD/RO GPIOs
+In-Reply-To: <51F1B896.8020005@gmail.com>
+References: <1374794808-21890-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1374794808-21890-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <51F1B896.8020005@gmail.com>
+Message-ID: <3057612.zXvbbdByqU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 26, 2013 12:41:09 AM Rafael J. Wysocki wrote:
-> On Friday, July 26, 2013 12:29:08 AM Rafael J. Wysocki wrote:
-> > On Friday, July 26, 2013 12:07:03 AM Daniel Lezcano wrote:
-> > > On 07/16/2013 02:04 PM, Daniel Lezcano wrote:
-> > > > 
-> > > > Hi,
-> > > > 
-> > > > The first PR was against the linux-pm-next tree including the patch:
-> > > > 
-> > > > "cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq"
-> > > > 
-> > > > This patch has been dropped in the meantime.
-> > > > 
-> > > > Here is a new PR where my tree has been rebased against linux-pm-next
-> > > > and adding the patch mentioned above.
-> > > > 
-> > > > As stated by Rafael, I will handle the ARM specific patches from now.
-> > > > 
-> > > > The following changes since commit 48f99d5a97d32d70c0738d6e314d9f4dbefd89bf:
-> > > > 
-> > > >   Merge branch 'pm-cpuidle-next' into linux-next (2013-07-16 02:41:06 +0200)
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > > 
-> > > >   git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
-> > > > 
-> > > > for you to fetch changes up to 2b7e79f4a75e803184f483985a25cc751a990f06:
-> > > > 
-> > > >   ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
-> > > > (2013-07-16 13:57:24 +0200)
-> > > 
-> > > ping ?
+Hi Ryan,
+
+On Friday 26 July 2013 09:45:26 Ryan Mallon wrote:
+> On 26/07/13 09:26, Laurent Pinchart wrote:
+> > Add support for passing CD/RO GPIO numbers directly to the mmc_spi
+> > driver instead of relying solely on board code callbacks to retrieve the
+> > CD/RO signals values.
 > > 
-> > Sorry, something distracted me.  I'll pull it later today unless there are any
-> > problems (in which case I'll let you know).
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  drivers/mmc/host/mmc_spi.c    | 32 +++++++++++++++++++++---------
+> >  drivers/mmc/host/of_mmc_spi.c | 46 ++++++++++----------------------------
+> >  include/linux/spi/mmc_spi.h   | 11 +++++++++++
+> >  3 files changed, 46 insertions(+), 43 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/mmc_spi.c b/drivers/mmc/host/mmc_spi.c
+> > index 74145d1..4e83908 100644
+> > --- a/drivers/mmc/host/mmc_spi.c
+> > +++ b/drivers/mmc/host/mmc_spi.c
+> > @@ -36,6 +36,7 @@
+> > 
+> >  #include <linux/mmc/host.h>
+> >  #include <linux/mmc/mmc.h>		/* for R1_SPI_* bit values */
+> > +#include <linux/mmc/slot-gpio.h>
+> >  #include <linux/spi/spi.h>
+> >  #include <linux/spi/mmc_spi.h>
+> > 
+> > @@ -1278,11 +1279,8 @@ static int mmc_spi_get_ro(struct mmc_host *mmc)
+> >  	if (host->pdata && host->pdata->get_ro)
+> >  		return !!host->pdata->get_ro(mmc->parent);
+> > 
+> > -	/*
+> > -	 * Board doesn't support read only detection; let the mmc core
+> > -	 * decide what to do.
+> > -	 */
+> > -	return -ENOSYS;
+> > +	else
+> > +		return mmc_gpio_get_ro(mmc);
 > 
-> Well, there are some.
-> 
-> It is based on my linux-next branch, but please rebase it on top of 3.11-rc2.
-> 
-> Generally, please send me pull requests based on -rc kernels only (or major
-> releases).
+> Why not just have the board file assign mmc_gpio_get_ro as
+> host->pdata->get_ro? This would eliminate the need for the
+> MMC_SPI_USE_RO_GPIO flag.
 
-Unless your material depends on new things in my linux-next branch, in which
-case please let me know and I'll set up a stable branch for you to base things
-on.
+Because the idea is to get rid of board callbacks and rely on proper kernel 
+abstraction layers such as the GPIO subsystem. This will be especially 
+important when adding device tree support to the mmc_spi driver.
 
-Thanks,
-Rafael
+> Also, if host->pdata->get_ro is not set then this will assume
+> mmc_gpio_get_ro is valid, even if MMC_SPI_USE_RO_GPIO is not set. I'm
+> guessing it will end up returning -ENOSYS, but they way the code reads is
+> that if the host doesn't have get_ro function set, then it is must be a
+> gpio.
 
+mmc_gpio_get_ro() will indeed return -ENOSYS when the MMC_SPI_USE_RO_GPIO flag 
+isn't set, as the mmc_spi driver will not call mmc_gpio_request_ro() in that 
+case.
+
+This patch hides the -ENOSYS value from the mmc_spi_get_ro() and 
+mmc_spi_get_cd() functions, perhaps making them slightly confusing, but patch 
+06/12 then gets rid of those functions, so I don't think it's a bit issue.
+
+> Same applies for the other callbacks.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Regards,
+
+Laurent Pinchart
