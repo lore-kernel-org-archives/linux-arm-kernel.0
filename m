@@ -1,35 +1,35 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Sat, 27 Jul 2013 01:30:18 +0200
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <20130726223829.GY24642@n2100.arm.linux.org.uk>
-References: <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
- <51F29BFE.8000202@broadcom.com>
- <20130726171153.GN29916@titan.lakedaemon.net>
- <51F2AF2D.1000300@broadcom.com>
- <20130726184702.GW24642@n2100.arm.linux.org.uk>
- <51F2C94F.6020405@broadcom.com>
- <20130726193908.GX24642@n2100.arm.linux.org.uk>
- <20130726222809.GB19469@glitch>
- <20130726223829.GY24642@n2100.arm.linux.org.uk>
-Message-ID: <20130726233018.GB6953@glitch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 27 Jul 2013 01:31:05 +0200
+Subject: [PATCH] pinctrl: tegra: expose config options for individual SoCs
+In-Reply-To: <51E81F36.3030802@wwwdotorg.org>
+References: <1374014077-22536-1-git-send-email-swarren@wwwdotorg.org>
+ <51E81F36.3030802@wwwdotorg.org>
+Message-ID: <CACRpkdaUeLG_y1SyinPKsdb9XDNJFup_sf9+EMOMjyW+7u_ZZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 11:38:29PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Jul 27, 2013 at 12:28:09AM +0200, Domenico Andreoli wrote:
-> > I've got the point but didn't fully understand why would be so wrong to
-> > walk one more subdir even if nothing is going to be built.
-> 
-> Consider what would happen if we decended the 61 mach- subdirectories
-> on every build run when only one was really required.  Even though
-> kbuild tries to be fast, there's still a non-zero amount of time
-> involved with finding out there's nothing to be done - and you
-> will still end up generating a built-in.o file even though there's
-> no other objects, which will then also be included in the final
-> link - again, adding to the work which has to be done.
+On Thu, Jul 18, 2013 at 7:00 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/16/2013 04:34 PM, Stephen Warren wrote:
+>> I'm planning to remove CONFIG_ARCH_TEGRA_*_SOC, leaving just ARCH_TEGRA.
+>> This will reduce the number of configurations that need to be supported
+>> by core Tegra code, e.g. CPU idle, hotplug. As a precursor, we need to
+>> update Kconfig for all Tegra drivers not to reference ARCH_TEGRA_*_SOC.
+>>
+>> The Tegra pinctrl driver contains a fairly large amount of SoC-specific
+>> code and data. Introduce explicit config options so that the user can
+>> trim the set of supported SoCs if they wish. Default these to on, since
+>> most people will probably want to enable support for all SoCs. This also
+>> avoids the need to change any defconfig files.
+>
+> I'd like to defer actually applying this patch. There is some discussion
+> (in the thread for the equivalent ASoC patches) re: the best way to
+> handle the ARCH_TEGRA_*_SOC Kconfig options which might affect this
+> patch. Any review comment is still appreciated.
 
-crystal clear. thanks.
+Just poke me when the discussion settles.
 
-Domenico
+I'm totally unenlightened on this issue myself so not of much
+help...
+
+Yours,
+Linus Walleij
