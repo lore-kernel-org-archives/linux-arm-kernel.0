@@ -1,96 +1,66 @@
 From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 26 Jul 2013 13:25:44 -0700
-Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO
- driver
+Date: Fri, 26 Jul 2013 13:25:45 -0700
+Subject: [PATCH v3 3/3] ARM: bcm281xx: Enable GPIO driver
 In-Reply-To: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
 References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <1374870345-8276-4-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This patch adds the Kconfig and Makefile glue to compile the GPIO
+driver for bcm281xx when CONFIG_GPIO_BCM=y.
 
 Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
 Reviewed-by: Christian Daudt <csd@broadcom.com>
 Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 Reviewed-by: Matt Porter <matt.porter@linaro.org>
 ---
- .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   41 ++++++++++++++++++++
- arch/arm/boot/dts/bcm11351.dtsi                    |   16 ++++++++
- 2 files changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+ arch/arm/mach-bcm/Kconfig |    2 +-
+ drivers/gpio/Kconfig      |    6 ++++++
+ drivers/gpio/Makefile     |    1 +
+ 3 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
-new file mode 100644
-index 0000000..08e9b5a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
-@@ -0,0 +1,41 @@
-+Broadcom Kona Family GPIO
-+-------------------------
-+
-+This GPIO driver is used in the following Broadcom SoCs:
-+  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-+
-+The GPIO controller only supports edge, not level triggering.
-+
-+Required properties:
-+  - compatible: "brcm,kona-gpio"
-+  - reg: Physical base address and length of the controller's registers.
-+  - interrupts: The interrupt outputs from the controller.
-+  - #gpio-cells: Should be <2>. The first cell is the pin number, the second
-+    cell is used to specify optional parameters:
-+    - bit 0 specifies polarity (0 for normal, 1 for inverted)
-+  - #interrupt-cells: Should be <2>. The first cell is the GPIO number.
-+    The second cell is used to specify flags:
-+    - trigger type (bits[1:0]):
-+        1 = low-to-high edge triggered.
-+        2 = high-to-low edge triggered.
-+        3 = low-to-high or high-to-low edge triggered
-+        Valid values are 1, 2, 3
-+  - gpio-controller: Marks the device node as a GPIO controller.
-+  - interrupt-controller: Marks the device node as an interrupt controller.
-+
-+Example:
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <0x0 106 0x4
-+			0x0 115 0x4
-+			0x0 114 0x4
-+			0x0 113 0x4
-+			0x0 112 0x4
-+			0x0 111 0x4>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index c0cdf66..13aaa06 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -63,6 +63,22 @@
- 		clock-frequency = <32768>;
- 	};
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index f112895..5819126 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -9,7 +9,7 @@ config ARCH_BCM
+ 	select CLKSRC_OF
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_TIME
+-	select GPIO_BCM
++	select GPIO_BCM_KONA
+ 	select SPARSE_IRQ
+ 	select TICK_ONESHOT
+ 	help
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index b2450ba..87d3a23 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -714,6 +714,12 @@ config GPIO_MSIC
+ 	  Enable support for GPIO on intel MSIC controllers found in
+ 	  intel MID devices
  
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <0x0 106 0x4
-+			0x0 115 0x4
-+			0x0 114 0x4
-+			0x0 113 0x4
-+			0x0 112 0x4
-+			0x0 111 0x4>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
++config GPIO_BCM_KONA
++	bool "Broadcom Kona GPIO"
++	depends on ARCH_BCM
++	help
++	  Turn on GPIO support for Broadcom "Kona" chips.
 +
- 	sdio0: sdio at 0x3f180000 {
- 		compatible = "bcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
+ comment "USB GPIO expanders:"
+ 
+ config GPIO_VIPERBOARD
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index ef3e983..fcd0751 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_GPIO_ADP5520)	+= gpio-adp5520.o
+ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
+ obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
+ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
++obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
+ obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
+ obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
+ obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
 -- 
 1.7.9.5
