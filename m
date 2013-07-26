@@ -1,41 +1,88 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 26 Jul 2013 12:26:37 +0200
-Subject: [PATCH v8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <CAOesGMgi0j_mPyeBLVHb_QW+DwtAPoFY697eQO3-yp9tnP1vmA@mail.gmail.com>
-References: <1369904940-716-1-git-send-email-p.zabel@pengutronix.de>
- <20130716015038.GD28375@S2101-09.ap.freescale.net>
- <51E4BF98.8030604@wwwdotorg.org>
- <20130716041056.GA30067@S2101-09.ap.freescale.net>
- <51E56AA7.7020103@wwwdotorg.org>
- <20130717030246.GA4541@S2101-09.ap.freescale.net>
- <51E6CCE4.20705@wwwdotorg.org> <20130717213836.GA13324@amd.pavel.ucw.cz>
- <51E719A6.6070105@wwwdotorg.org> <20130718112555.GB1021@amd.pavel.ucw.cz>
- <CAOesGMgi0j_mPyeBLVHb_QW+DwtAPoFY697eQO3-yp9tnP1vmA@mail.gmail.com>
-Message-ID: <1374834397.4013.15.camel@pizza.hi.pengutronix.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 26 Jul 2013 11:31:42 +0100
+Subject: [PATCH] ARM: kdgb: use .inst for data to be assembled as
+ intruction
+In-Reply-To: <20130725180912.GG2546@localhost.localdomain>
+References: <1374763778-5305-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374763778-5305-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20130725171130.GE2546@localhost.localdomain>
+ <51F15CAE.7020008@codethink.co.uk>
+ <20130725180912.GG2546@localhost.localdomain>
+Message-ID: <51F2500E.5040107@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 18.07.2013, 11:45 -0700 schrieb Olof Johansson:
-> Hi,
-> 
-> On Thu, Jul 18, 2013 at 4:25 AM, Pavel Machek <pavel@denx.de> wrote:
-> 
-> > It sound to me like keeping ammount of -EPROBE_DEFER to minimum is
-> > still preferred.
-> 
-> Hand-crafting initcall level ordering of various drivers and subsystem
-> is probably an even greater evil though. We've done it in the past,
-> but now that we have deferred probe we have the option of not having
-> to do it every time, such as this.
-> 
-> You're spending an awful lot of energy arguing over this, but nobody
-> has actually shown data of how much deferral is happening -- and that
-> it's a real problem. Until someone does so there's no reason to change
-> it from the default module init level at all, I'd say.
+On 25/07/13 19:09, Dave Martin wrote:
+> On Thu, Jul 25, 2013 at 06:13:18PM +0100, Ben Dooks wrote:
+>> On 25/07/13 18:11, Dave Martin wrote:
+>>> On Thu, Jul 25, 2013 at 03:49:38PM +0100, Ben Dooks wrote:
+>>>> The arch_kgdb_breakpoint() function uses an inline assembly directive
+>>>> to assemble a specific instruction using .word. This means the linker
+>>>> will not treat is as an instruction, and therefore incorrectly swap
+>>>> the endian-ness if running BE8.
+>>>>
+>>>> Note, not tested, please comment if this is wrong.
+>>>>
+>>>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+>>>> ---
+>>>>   arch/arm/include/asm/kgdb.h |    2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+>>>> index 48066ce..76227c8 100644
+>>>> --- a/arch/arm/include/asm/kgdb.h
+>>>> +++ b/arch/arm/include/asm/kgdb.h
+>>>> @@ -41,7 +41,7 @@
+>>>>
+>>>>   static inline void arch_kgdb_breakpoint(void)
+>>>>   {
+>>>> -	asm(".word 0xe7ffdeff");
+>>>> +	asm(".inst 0xe7ffdeff");
+>>>
+>>> Yikes, this isn't going to work in a Thumb kernel.
+>>>
+>>> We should make HAVE_ARCH_KGDB depend on !THUMB2_KERNEL until/unless that
+>>> gets fixed...  It looks like the incompatibilities may be more extensive
+>>> than just this one instruction.
+>>>
+>>>
+>>> For the ARM case, similarly to the other patches, please use the __inst
+>>> macros from<asm/opcodes.h>   instead of emitting the opcode explicitly.
+>>
+>> See previous objections to that, plus they're marked for internal use
+>> only!
+>
+> Ditto my counterarguments.  I'm not emotionally attached to __inst*(), but
+> we should use one or the other: either .inst or __inst(), not a mixture.
+> However, the __inst macros work for inline asm and .S, and do more than
+> just emitting a single opcode; see opcodes-virt.h for example, so while
+> removing them isn't rocket science, it would involve churn in a few places.
+>
+>
+> Note, the "Don't use these directly" comment only applies to the triple-
+> underscored helpers.
+>
+> The broader "using these macros directly is poor practice" comment was
+> an attempt to engourage people to write the likes of
+>
+> #define __KGDB_BKPT_INSTR __inst_arm(0xxe7ffdeff)
+>
+> static inline void arch_kgdb_breakpoint(void)
+> {
+> 	asm(__KGDB_BKPT_INSTR);
+> }
+>
+> ...on the basis that this ought to be more readable.
+>
+> But this is a bit moot in a situation like this where the opcode is
+> only used in one place, by itself, in a wrapper whose name makes the
+> intent clear anyway.
 
-Alright, I've backed out the arch_initcall change and resent the patch.
-If you are fine with that, I'll send you a pull request for this and the
-"reset: allow drivers to request probe deferral" patch.
+Ok, I will look into changing the patches in the next day or so
+and do the same fixes for kprobes.
 
-regards
-Philipp
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
