@@ -1,92 +1,173 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Thu, 25 Jul 2013 20:04:13 -0400
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
- with ARM CPU
-In-Reply-To: <CAGVrzcYudfgqs_eafje4BT2z2qE0kSJPx1B-xrq0WxtUkGxSFw@mail.gmail.com>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
- <20130719020611.GA4941@glitch> <20130723185733.GB6811@ohporter.com>
- <CAGVrzcYnoN9NnJGvubS7=bVJDk37xSt4BimtvDWghe7OHEWALQ@mail.gmail.com>
- <20130724231106.GB29801@glitch>
- <CAGVrzcYudfgqs_eafje4BT2z2qE0kSJPx1B-xrq0WxtUkGxSFw@mail.gmail.com>
-Message-ID: <20130726000412.GH5022@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 26 Jul 2013 09:10:53 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
+In-Reply-To: <201307230222.04763.sergei.shtylyov@cogentembedded.com>
+References: <201307230218.01495.sergei.shtylyov@cogentembedded.com>
+ <201307230222.04763.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130726001052.GA28912@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:23:21PM +0100, Florian Fainelli wrote:
-> 2013/7/25 Domenico Andreoli <cavokz@gmail.com>:
-> > On Tue, Jul 23, 2013 at 08:05:28PM +0100, Florian Fainelli wrote:
-> >> 2013/7/23 Matt Porter <matt.porter@linaro.org>:
-> >> > On Fri, Jul 19, 2013 at 04:06:11AM +0200, Domenico Andreoli wrote:
-> >> >> On Wed, Jul 17, 2013 at 12:08:30AM +0100, Florian Fainelli wrote:
-> >> >> > Hello,
-> >> >> >
-> >> >> > Le mardi 16 juillet 2013 11:14:36 Matt Porter a ?crit :
-> >> >> > > > + compatible = "brcm,bcm5301x";
-> >> >> > >
-> >> >> > > Ok, this was nagging at me before I went on my very long
-> vacation. I see
-> >> >> > > the "brcm" vendor prefix as a real consistency problem. I noticed
-> on the
-> >> >> > > bcm281xx/kona family, we have been using "bcm" which is not
-> logged in
-> >> >> > > vendor-prefixes.txt as a legitimate prefix. I see that bcm2835 had
-> >> >> > > already established use of "brcm" before any of the bcm281xx
-> support
-> >> >> > > came in. Ideally, the vendor prefix should change to "bcm" since
-> every
-> >> >> > > reference in the family names is BCM. However, if others want the
-> least
-> >> >> > > amount of churn in making this consistent, we might have to go
-> with
-> >> >> > > "brcm" across the board.
-> >> >> >
-> >> >> > I would like to keep "brcm" here because that is what has been
-> defined as a
-> >> >> > vendor prefix, and is used beyond the scope of the ARM Linux kernel
-> support
-> >> >> > even within Broadcom. Maybe it was an oversight, or rather a
-> mistake to let
-> >> >>
-> >> >> brcm is the stock ticker. As far as I can search, this is the
-> convention
-> >> >> for the vendor prefixes.
-> >> >
-> >> > No, correlation does not equal causation. The fact that some vendor
-> >> > prefixes in DT match the stock symbol is by chance of 3-4 character
-> name
-> >> > being the same...nothing more.
-> >>
-> >> That was a bad argument as was later explained to me, I won't use that
-> >> reason again.
-> >
-> > I cited the stock ticker only because IIRC it's the reason my initial
-> > proposal for bcm has been ditched in favour of brcm when bcm2835 was
-> > initially proposed.
-> >
-> >> > It's pretty easy to see that the "ti" vendor prefix has no relation at
-> >> > all to their TXN symbol so that blows that convention out of the water.
-> >> > Rather, the prefix is based on somebody's notion of how that vendor's
-> >> > part are normally referred to. In TI-land, it's TI AM335x or TI OMAP,
-> >> > never TXN OMAP. :)
-> >> >
-> >> > For Broadcom, every part is BCMxxxxx so "bcm" is appropriate.
-> >>
-> >> It was appropriate before being the "wrong" vendor prefix was
-> >> allocated, now that "brcm" has been allocated we should stick to it
-> >> because otherwise we will break existing and on-going DT work.
-> >
-> > I still prefer bcm to brcm and I find enough evidence that bcm would be
-> > better in the long term.
-> >
-> > So if Broadcomers can agree on bcm, now it's still the cheapest time to
-> > fix in that direction, later will not be better.
+[ Cc Morimoto-san ]
+
+On Tue, Jul 23, 2013 at 02:22:04AM +0400, Sergei Shtylyov wrote:
+> From: Max Filippov <max.filippov@cogentembedded.com>
 > 
-> If we are to fix it in stone, once and for all, let's go for the full name
-> which would avoid any kind of future confusion (this also seems to be the
-> tendency with new vendor prefixes these days). That way we could make
-> everyone happy with say: "broadcom,bcm2835". Would that work for everyone?
+> Add HPB-DMAC platform device on R8A7778 SoC along with its slave and channel
+> configurations.
+> 
+> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+> [Sergei: moved *enum* declaring HPB-DMAC slave IDs from now removed <mach/dma.h>
+> to <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c, removed
+> SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[] and
+> hpb_dmae_channels[].]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+> Changes in version 2:
+> - moved *enum* declaring HPB-DMAC slave IDs from the separate header file to
+>   <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c;
+> - removed SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[]
+>   and hpb_dmae_channels[].
+> 
+>  arch/arm/mach-shmobile/include/mach/r8a7778.h |    8 ++
+>  arch/arm/mach-shmobile/setup-r8a7778.c        |   80 ++++++++++++++++++++++++++
+>  2 files changed, 88 insertions(+)
 
-I really like that.
+Morimoto-san, Magnus,
 
--Matt
+could you please review this?
+
+> 
+> Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7778.h
+> +++ renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
+> @@ -1,6 +1,7 @@
+>  /*
+>   * Copyright (C) 2013  Renesas Solutions Corp.
+>   * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> + * Copyright (C) 2013  Cogent Embedded, Inc.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License as published by
+> @@ -23,6 +24,13 @@
+>  #include <linux/sh_eth.h>
+>  #include <linux/platform_data/usb-rcar-phy.h>
+>  
+> +/* HPB-DMA slave IDs */
+> +enum {
+> +	HPBDMA_SLAVE_DUMMY,
+> +	HPBDMA_SLAVE_SDHI0_TX,
+> +	HPBDMA_SLAVE_SDHI0_RX,
+> +};
+> +
+>  extern void r8a7778_add_standard_devices(void);
+>  extern void r8a7778_add_standard_devices_dt(void);
+>  extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
+> Index: renesas/arch/arm/mach-shmobile/setup-r8a7778.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7778.c
+> +++ renesas/arch/arm/mach-shmobile/setup-r8a7778.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/irqchip/arm-gic.h>
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/platform_data/dma-rcar-hpbdma.h>
+>  #include <linux/platform_data/gpio-rcar.h>
+>  #include <linux/platform_data/irq-renesas-intc-irqpin.h>
+>  #include <linux/platform_device.h>
+> @@ -333,6 +334,84 @@ void __init r8a7778_add_mmc_device(struc
+>  		info, sizeof(*info));
+>  }
+>  
+> +/* HPB-DMA */
+> +
+> +/* Asynchronous mode register (ASYNCMDR) bits */
+> +#define	ASYNCMDR_ASMD22_MASK	BIT(2)	/* SDHI0 */
+> +#define	ASYNCMDR_ASMD22_SINGLE	BIT(2)	/* SDHI0 */
+> +#define	ASYNCMDR_ASMD22_MULTI	0	/* SDHI0 */
+> +#define	ASYNCMDR_ASMD21_MASK	BIT(1)	/* SDHI0 */
+> +#define	ASYNCMDR_ASMD21_SINGLE	BIT(1)	/* SDHI0 */
+> +#define	ASYNCMDR_ASMD21_MULTI	0	/* SDHI0 */
+> +
+> +static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
+> +	{
+> +		.id	= HPBDMA_SLAVE_SDHI0_TX,
+> +		.addr	= 0xffe4c000 + 0x30,
+> +		.dcr	= DCR_SPDS_16BIT | DCR_DMDL | DCR_DPDS_16BIT,
+> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
+> +			  ASYNCRSTR_ASRST23,
+> +		.mdr	= ASYNCMDR_ASMD21_SINGLE,
+> +		.mdm	= ASYNCMDR_ASMD21_MASK,
+> +		.port	= 0x0D0C,
+> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
+> +		.dma_ch	= 21,
+> +	}, {
+> +		.id	= HPBDMA_SLAVE_SDHI0_RX,
+> +		.addr	= 0xffe4c000 + 0x30,
+> +		.dcr	= DCR_SMDL | DCR_SPDS_16BIT | DCR_DPDS_16BIT,
+> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
+> +			  ASYNCRSTR_ASRST23,
+> +		.mdr	= ASYNCMDR_ASMD22_SINGLE,
+> +		.mdm	= ASYNCMDR_ASMD22_MASK,
+> +		.port	= 0x0D0C,
+> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
+> +		.dma_ch	= 22,
+> +	},
+> +};
+> +
+> +static const struct hpb_dmae_channel hpb_dmae_channels[] = {
+> +	/* ch. 21 SD0 */
+> +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX),
+> +	/* ch. 22 SD0 */
+> +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX),
+> +};
+> +
+> +static struct hpb_dmae_pdata dma_platform_data __initdata = {
+> +	.slaves			= hpb_dmae_slaves,
+> +	.num_slaves		= ARRAY_SIZE(hpb_dmae_slaves),
+> +	.channels		= hpb_dmae_channels,
+> +	.num_channels		= ARRAY_SIZE(hpb_dmae_channels),
+> +	.ts_shift		= {
+> +		[XMIT_SZ_8BIT]	= 0,
+> +		[XMIT_SZ_16BIT]	= 1,
+> +		[XMIT_SZ_32BIT]	= 2,
+> +	},
+> +	.num_hw_channels	= 39,
+> +};
+> +
+> +static struct resource hpb_dmae_resources[] __initdata = {
+> +	/* Channel registers */
+> +	DEFINE_RES_MEM(0xffc08000, 0x1000),
+> +	/* Common registers */
+> +	DEFINE_RES_MEM(0xffc09000, 0x170),
+> +	/* Asynchronous reset registers */
+> +	DEFINE_RES_MEM(0xffc00300, 4),
+> +	/* Asynchronous mode registers */
+> +	DEFINE_RES_MEM(0xffc00400, 4),
+> +	/* IRQ for DMA channels */
+> +	DEFINE_RES_NAMED(gic_iid(0x7b), 5, NULL, IORESOURCE_IRQ),
+> +};
+> +
+> +static void __init r8a7778_register_hpb_dmae(void)
+> +{
+> +	platform_device_register_resndata(&platform_bus, "hpb-dma-engine", -1,
+> +					  hpb_dmae_resources,
+> +					  ARRAY_SIZE(hpb_dmae_resources),
+> +					  &dma_platform_data,
+> +					  sizeof(dma_platform_data));
+> +}
+> +
+>  void __init r8a7778_add_standard_devices(void)
+>  {
+>  	int i;
+> @@ -355,6 +434,7 @@ void __init r8a7778_add_standard_devices
+>  
+>  	r8a7778_register_tmu(0);
+>  	r8a7778_register_tmu(1);
+> +	r8a7778_register_hpb_dmae();
+>  }
+>  
+>  void __init r8a7778_init_late(void)
+> 
