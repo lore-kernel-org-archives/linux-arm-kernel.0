@@ -1,23 +1,21 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Jul 2013 13:41:35 -0600
-Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
-In-Reply-To: <51F2D063.5010505@wwwdotorg.org>
-References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
- <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
- <51F2D063.5010505@wwwdotorg.org>
-Message-ID: <51F2D0EF.9070808@wwwdotorg.org>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 26 Jul 2013 12:54:14 -0700
+Subject: [GIT PULL] arm64 fixes for 3.11
+In-Reply-To: <20130726155458.GA31613@arm.com>
+References: <20130726155458.GA31613@arm.com>
+Message-ID: <CA+55aFzmEhGvqY883Bg568Gguewy41X9n1qDeaHkW2We6VVhZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 01:39 PM, Stephen Warren wrote:
-> On 07/23/2013 10:09 PM, Richard Zhao wrote:
->> - driver: remove use of nvidia,dma-request-selector
->> 	  use dma_request_slave_channel to request channel
->> - update binding doc
-> 
-> This patch needs to be amended so that the DMA channel is looked up
-> during probe() rather than open(), to guarantee that deferred probe
-> works. It's possible to hold off probe, but not possible AFAIK to hold
-> off opening the port.
+On Fri, Jul 26, 2013 at 8:55 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+>
+> - Stack size increased to 16K (similar to other 64-bit architectures)
 
-Hmm. I guess this comment actually applies to all/most of these patches.
+I pulled, but this is misleading.
+
+*Some* other 64-bit architectures do 16k stack sizes. But neither
+x86-64 nor powerpc do, afaik. Instead, they do irq stacks, which is
+generally a better idea than having one big stack.
+
+                Linus
