@@ -1,111 +1,40 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jul 2013 17:04:42 +0100
-Subject: [PATCH 2/4] ARM: traps: use <asm/opcodes.h> to get correct
- instruction order
-In-Reply-To: <51F10967.1090302@codethink.co.uk>
-References: <1374510833-25716-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374510833-25716-3-git-send-email-ben.dooks@codethink.co.uk>
- <20130724173435.GC4610@localhost.localdomain>
- <51F10967.1090302@codethink.co.uk>
-Message-ID: <20130726160441.GG2282@localhost.localdomain>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 26 Jul 2013 18:13:08 +0200
+Subject: Appended DTB files for multi-machine kernels
+In-Reply-To: <alpine.LFD.2.03.1307041322070.18597@syhkavp.arg>
+References: <51D5A938.30607@gmail.com>
+ <alpine.LFD.2.03.1307041322070.18597@syhkavp.arg>
+Message-ID: <51F2A014.7000209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 12:17:59PM +0100, Ben Dooks wrote:
-> On 24/07/13 18:34, Dave Martin wrote:
-> >On Mon, Jul 22, 2013 at 05:33:51PM +0100, Ben Dooks wrote:
-> >>The trap handler needs to take into account the endian configuration of
-> >>the system when loading instructions. Use<asm/opcodes.h>  to provide the
-> >>necessary conversion functions.
-> >>
-> >>Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
-> >>---
-> >>  arch/arm/kernel/traps.c |   10 ++++++----
-> >>  1 file changed, 6 insertions(+), 4 deletions(-)
-> >>
-> >>diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> >>index 1c08911..0a56e13 100644
-> >>--- a/arch/arm/kernel/traps.c
-> >>+++ b/arch/arm/kernel/traps.c
-> >>@@ -34,6 +34,7 @@
-> >>  #include<asm/unwind.h>
-> >>  #include<asm/tls.h>
-> >>  #include<asm/system_misc.h>
-> >>+#include<asm/opcodes.h>
-> >>
-> >>  #include "signal.h"
-> >
-> >Looks like is_valid_bugaddr() might need fixing too?
-> >
-> >That will need __mem_to_opcode_thumb16() or __mem_to_opcode_arm()
-> >depending on CONFIG_THUMB2_KERNEL.
-> 
-> I was looking at that, and was considering if this is the right
-> thing to do or to change the value of BUG_INSTR_VALUE depending
-> on this.
-> 
-> It is possible the linker may try and change the ordering of the
-> BUG() instruction as it is being placed in the output with either
-> a .hword or .word value. I will go and check this as soon as possible.
+On 04.07.2013 19:28, Nicolas Pitre wrote:
+> On Thu, 4 Jul 2013, Daniel Mack wrote:
+>> In short, devices that have been deployed in quantities come in three
+>> hardware variants, which all boot with a unique machine-id. We ship
+>> kernel images that have board support for all three machine types, and
+>> do minor fixups to platform data of some drivers at runtime, depending
+>> on the board revision number (passed in via ATAGs).
+>>
 
-I guess the way would be to leave BUG_INSTR_VALUE as-is, and
-inject it into the code using the appropriate __inst (similarly to the
-KGDB case).
-
+> What you describe above more or less fits the definition of what I 
+> called the "impedance matcher".  However it doesn't need to be part of 
+> the kernel at all.  But you should make it into a separate binary.
 > 
-> >>@@ -411,23 +412,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
-> >>  	if (processor_mode(regs) == SVC_MODE) {
-> >>  #ifdef CONFIG_THUMB2_KERNEL
-> >>  		if (thumb_mode(regs)) {
-> >>-			instr = ((u16 *)pc)[0];
-> >>+			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
-> >>  			if (is_wide_instruction(instr)) {
-> >>  				instr<<= 16;
-> >>-				instr |= ((u16 *)pc)[1];
-> >>+				instr |= __mem_to_opcode_thumb16(((u16 *)pc)[1]);
-> >
-> >Could use __opcode_thumb32_compose(), in which case it might look like
-> >
-> >			if (is_wide_instruction(instr)) {
-> >				unsigned int instr2 = __mem_to_opcode_thumb16(
-> >					((u16 *)pc)[1]);
-> >				instr = __opcode_thumb32_compose(instr, instr2);
-> >
-> >(Hmmm, I just noticed that is_wide_instruction and __opcode_is_thumb16()
-> >kinda duplicate each other.  Could change that too, but it would look
-> >more like pointless churn...  is_wide_instruction() is used in a fair
-> >few places already.)
-> 
-> It is possible that it could be changed, but I will avoid that for this
-> particular patch
+> Please have a look at the bottom of this post for a more comprehensive 
+> description: http://article.gmane.org/gmane.linux.ports.arm.kernel/242929
 
-No problem, that was just cosmetic.
+FWIW, I gave that approach a try today for a PXA based hardware
+platform, and in fact it seems to work very well. Thanks again for
+sharing the idea.
 
-> 
-> >>  			}
-> >>  		} else
-> >>  #endif
-> >>-			instr = *(u32 *) pc;
-> >>+			instr = __mem_to_opcode_arm(*(u32 *) pc);
-> >>  	} else if (thumb_mode(regs)) {
-> >>  		if (get_user(instr, (u16 __user *)pc))
-> >>  			goto die_sig;
-> >>+		instr = __mem_to_opcode_thumb16(instr);
-> >>  		if (is_wide_instruction(instr)) {
-> >>  			unsigned int instr2;
-> >>  			if (get_user(instr2, (u16 __user *)pc+1))
-> >>  				goto die_sig;
-> >>  			instr<<= 16;
-> >>-			instr |= instr2;
-> >>+			instr |= __mem_to_opcode_thumb16(instr2);
-> >>  		}
-> >>  	} else if (get_user(instr, (u32 __user *)pc)) {
-> >
-> >This also needs mem-to-opcode'ing.
-> 
-> Thanks, will check.
+In case anyone is interested, the repository is here:
 
-OK.
+  https://github.com/zonque/pxa-impedance-matcher
 
-Cheers
----Dave
+As the README says, it's completely specific to my use case, but maybe
+anyone can use the code base to spin a different version for a different
+board.
+
+
+Daniel
