@@ -1,116 +1,104 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 26 Jul 2013 13:33:00 -0400
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <51F2AF2D.1000300@broadcom.com>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
- <51F29BFE.8000202@broadcom.com>
- <20130726171153.GN29916@titan.lakedaemon.net>
- <51F2AF2D.1000300@broadcom.com>
-Message-ID: <20130726173300.GO29916@titan.lakedaemon.net>
+From: grundler@chromium.org (Grant Grundler)
+Date: Fri, 26 Jul 2013 10:35:59 -0700
+Subject: [PATCH v8 08/12] iommu/exynos: remove prefetch buffer setting
+ when enabling System MMU
+In-Reply-To: <003e01ce89f3$4cdb45e0$e691d1a0$@samsung.com>
+References: <003e01ce89f3$4cdb45e0$e691d1a0$@samsung.com>
+Message-ID: <CANEJEGtWTZHZEr=XzPXHFbJtP7U5JFD-o58kRjLe23XaTzv=fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 10:17:33AM -0700, Christian Daudt wrote:
-> On 13-07-26 10:11 AM, Jason Cooper wrote:
-> >Christian,
-> >
-> >On Fri, Jul 26, 2013 at 08:55:42AM -0700, Christian Daudt wrote:
-> >>[resend in plain text]
-> >>On 13-07-26 08:29 AM, Jason Cooper wrote:
-> >>>On Fri, Jul 26, 2013 at 04:56:40PM +0200, Domenico Andreoli wrote:
-> >>>>From: Domenico Andreoli<domenico.andreoli@linux.com>
-> >>>>
-> >>>>arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
-> >>>>separately. As a matter of flexibility and maintenance, it needs to be
-> >>>>always included in the build.
-> >>>So if I'm building mach-kirkwood, I _have_ to build Broadcom?  What is
-> >>>the *specific* problem you're encountering that this solves?
-> >>  No it won't, as the Makefile inside mach-bcm will only pull in
-> >>files based on ARCH_ settings. This move is so that a number
-> >>different Broadcom SoCs can co-exist inside the mach-bcm directory.
-> >
-> >Why wouldn't this work?
-> >
-> >---->8-------
-> >diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >index ba412e0..97b6aff 100644
-> >--- a/arch/arm/Kconfig
-> >+++ b/arch/arm/Kconfig
-> >@@ -366,6 +366,12 @@ config ARCH_AT91
-> >  	  This enables support for systems based on Atmel
-> >  	  AT91RM9200 and AT91SAM9* processors.
-> >+config ARCH_BCM
-> >+	bool "Broadcom family SoCs"
-> >+	help
-> >+	  This enables support for systems based on the Broadcom
-> >+	  bcm4760 and bcm281XX series SoCs.
-> >+
-> >  config ARCH_CLPS711X
-> >  	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
-> >  	select ARCH_REQUIRE_GPIOLIB
-> >diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> >index f112895..4b1f9db 100644
-> >--- a/arch/arm/mach-bcm/Kconfig
-> >+++ b/arch/arm/mach-bcm/Kconfig
-> >@@ -1,5 +1,9 @@
-> >-config ARCH_BCM
-> >-	bool "Broadcom SoC" if ARCH_MULTI_V7
-> >+if ARCH_BCM
-> >+
-> >+menu "Broadcom SoC Implementations"
-> >+
-> >+config MACH_BCM281XX
-> >+	bool "BCM281XX SoCs" if ARCH_MULTI_V7
-> >  	depends on MMU
-> >  	select ARCH_REQUIRE_GPIOLIB
-> >  	select ARM_ERRATA_754322
-> >@@ -17,3 +21,7 @@ config ARCH_BCM
-> >  	  It currently supports the 'BCM281XX' family, which includes
-> >  	  BCM11130, BCM11140, BCM11351, BCM28145 and
-> >  	  BCM28155 variants.
-> >+
-> >+endmenu
-> >+
-> >+endif
-> >diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> >index 6adb6aec..e3f8f27 100644
-> >--- a/arch/arm/mach-bcm/Makefile
-> >+++ b/arch/arm/mach-bcm/Makefile
-> >@@ -10,6 +10,6 @@
-> >  # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >  # GNU General Public License for more details.
-> >-obj-$(CONFIG_ARCH_BCM)		:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
-> >+obj-$(CONFIG_MACH_BCM281XX)	:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
-> >  plus_sec := $(call as-instr,.arch_extension sec,+sec)
-> >  AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
-> >
-> Because ARCH_BCM is meant to be used for a number of SoC families.
+On Fri, Jul 26, 2013 at 4:28 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> Prefetch buffer must be handled accurately, exact range of a buffer,
+> frame by frame manually. Otherwise, it may causes page fault or
+> deadlock in System MMU.
+> Thus this patch removes prefetch buffer setting when System MMU is
+> initialized(enabled).
+>
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 
-As is ARCH_MVEBU for Marvell.  As kirkwood, dove, orion5x and mv78xx0
-complete their conversion to DT and are multiplatform capable, they will
-be migrated to mach-mvebu.  As is, it already contains two flavors of
-their Armada SoCs.  mach-mvebu/Kconfig does things a little differently
-than what I proposed above.  But the end result is the same because the
-mach-mvebu/Kconfig file gets sourced, just like mach-bcm/Kconfig.
+Reviewed-by: Grant Grundler <grundler@chromium.org>
 
-> We've started upstreaming one (the BCM281XX) but have 2 more
-> internally that we're working towards upstreaming. And in the future
-> our plan is to keep the Broadcom Mobile SoCs all building under this
-> single ARCH_BCM configuration as multiplatform code building a
-> single zImage for them.
-> The intent of mach-bcm on the other hand is to aggregate future SoC
-> chips beyond ARCH_BCM (which is mobile SoC focused) to include other
-> Broadcom ARM based SoCs. And there are 2 in the wings at the moment
-> making their way into mainline as patches. The idea here being that
-> with the new multiplatform code, the mach- dirs contain so little
-> code that it makes sense to aggregate a bunch of SoCs from the same
-> company in there (and we are the guinea pig on this one).
+BTW, cscope doesn't find any callers of exynos_sysmmu_enable().
+Want to submit another patch to remove it?
 
-So are we ;-)
+(Note I'm talking about exynos_sysmmu_enable() without "__" prefix).
 
-thx,
+cheers,
+grant
 
-Jason.
+> ---
+>  drivers/iommu/exynos-iommu.c |   32 +++++++++++++++++++++++++++-----
+>  1 files changed, 27 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index cfc02ed..87f6bb7 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -80,6 +80,8 @@
+>  #define CTRL_BLOCK     0x7
+>  #define CTRL_DISABLE   0x0
+>
+> +#define CFG_FLPDCACHE  (1 << 20) /* System MMU 3.2+ only */
+> +
+>  #define REG_MMU_CTRL           0x000
+>  #define REG_MMU_CFG            0x004
+>  #define REG_MMU_STATUS         0x008
+> @@ -96,6 +98,9 @@
+>
+>  #define REG_MMU_VERSION                0x034
+>
+> +#define MMU_MAJ_VER(reg)       (reg >> 28)
+> +#define MMU_MIN_VER(reg)       ((reg >> 21) & 0x7F)
+> +
+>  #define REG_PB0_SADDR          0x04C
+>  #define REG_PB0_EADDR          0x050
+>  #define REG_PB1_SADDR          0x054
+> @@ -200,6 +205,22 @@ static bool is_sysmmu_active(struct sysmmu_drvdata *data)
+>         return data->activations > 0;
+>  }
+>
+> +static unsigned int __sysmmu_version(struct sysmmu_drvdata *data,
+> +                                    int idx, unsigned int *minor)
+> +{
+> +       unsigned long major;
+> +
+> +       major = readl(data->sfrbases[idx] + REG_MMU_VERSION);
+> +
+> +       if (minor)
+> +               *minor = MMU_MIN_VER(major);
+> +
+> +       if (MMU_MAJ_VER(major) > 3)
+> +               return 1;
+> +
+> +       return MMU_MAJ_VER(major);
+> +}
+> +
+>  static void sysmmu_unblock(void __iomem *sfrbase)
+>  {
+>         __raw_writel(CTRL_ENABLE, sfrbase + REG_MMU_CTRL);
+> @@ -460,14 +481,15 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+>         data->pgtable = pgtable;
+>
+>         for (i = 0; i < data->nsfrs; i++) {
+> +               unsigned int min;
+> +
+>                 __sysmmu_set_ptbase(data->sfrbases[i], pgtable);
+>
+> -               if ((readl(data->sfrbases[i] + REG_MMU_VERSION) >> 28) == 3) {
+> -                       /* System MMU version is 3.x */
+> -                       __raw_writel((1 << 12) | (2 << 28),
+> +               if ((__sysmmu_version(data, i, &min) == 3) && (min > 1)) {
+> +                       unsigned long cfg;
+> +                       cfg = __raw_readl(data->sfrbases[i] + REG_MMU_CFG);
+> +                       __raw_writel(cfg | CFG_FLPDCACHE,
+>                                         data->sfrbases[i] + REG_MMU_CFG);
+> -                       __sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 0);
+> -                       __sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 1);
+>                 }
+>
+>                 __raw_writel(CTRL_ENABLE, data->sfrbases[i] + REG_MMU_CTRL);
+> --
+> 1.7.2.5
+>
+>
