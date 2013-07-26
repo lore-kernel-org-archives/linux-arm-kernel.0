@@ -1,45 +1,26 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 27 Jul 2013 03:46:33 +0400
-Subject: [PATCH] ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
-Message-ID: <201307270346.34002.sergei.shtylyov@cogentembedded.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 27 Jul 2013 09:47:53 +1000
+Subject: [GIT PULL] arm64 fixes for 3.11
+In-Reply-To: <CA+55aFzmEhGvqY883Bg568Gguewy41X9n1qDeaHkW2We6VVhZg@mail.gmail.com>
+References: <20130726155458.GA31613@arm.com>
+ <CA+55aFzmEhGvqY883Bg568Gguewy41X9n1qDeaHkW2We6VVhZg@mail.gmail.com>
+Message-ID: <1374882473.9200.33.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following message is printed on the BOCK-W kernel bootup: 
+On Fri, 2013-07-26 at 12:54 -0700, Linus Torvalds wrote:
+> 
+> *Some* other 64-bit architectures do 16k stack sizes. But neither
+> x86-64 nor powerpc do, afaik. Instead, they do irq stacks, which is
+> generally a better idea than having one big stack.
 
-sh-pfc pfc-r8a7778: invalid group "sdhi0" for function "sdhi0" 
+Sadly you over estimated us here :-) We do 16K *and* irq stacks on
+64-bit ... Remember our ABI with it's 112 bytes minimum per frame ?
 
-In addition, SD card cannot be detected.  The reason is apparently that commit
-ca7bb309485e4ec89a9addd47bea (ARM: shmobile: bockw: add SDHI0 support) matched
-the previous version of commit 564617d2f92473031d035deb273da5 (sh-pfc: r8a7778:
-add SDHI support).
+It's been a while since I've last audited our actual usage mind you, we
+*might* be able to reduce it but at this stage, since our typical
+configs use a 64K base page size, it's not a big deal (ie, it's not an
+order-N allocation).
 
-Add the missing pin groups according to the BOCK-W board schematics.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-The patch is atop of Simon's 'renesas.git' repo, 'renesas-devel-20130726' tag.
-
- arch/arm/mach-shmobile/board-bockw.c |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -167,7 +167,13 @@ static const struct pinctrl_map bockw_pi
- 				  "usb1", "usb1"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
--				  "sdhi0", "sdhi0"),
-+				  "sdhi0_data4", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
-+				  "sdhi0_ctrl", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
-+				  "sdhi0_cd", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
-+				  "sdhi0_wp", "sdhi0"),
- };
- 
- #define FPGA	0x18200000
+Cheers,
+Ben.
