@@ -1,51 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Jul 2013 15:53:19 +0100
-Subject: [PATCH V2 2/8] ASoC: Samsung: I2S: Add quirks as driver data in
- I2S
-In-Reply-To: <1374845812-7803-3-git-send-email-padma.v@samsung.com>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
- <1374845812-7803-3-git-send-email-padma.v@samsung.com>
-Message-ID: <20130726145319.GI9858@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Jul 2013 15:53:17 +0100
+Subject: [PATCH 03/13] ARM: b.L: core switcher code
+In-Reply-To: <1374550289-25305-4-git-send-email-nicolas.pitre@linaro.org>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-4-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130726145317.GT24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 07:06:46PM +0530, Padmavathi Venna wrote:
-> Samsung has different versions of I2S introduced in different
-> platforms. Each version has some new support added for multichannel,
-> secondary fifo, s/w reset control and internal mux for rclk src clk.
-> Each newly added change has a quirk. So this patch adds all the
-> required quirks as driver data and based on compatible string from
-> dtsi fetches the quirks.
+On Mon, Jul 22, 2013 at 11:31:19PM -0400, Nicolas Pitre wrote:
+> To solve both issues, we borrow some of the task space belonging to
+> the init/idle task which, by its nature, is lightly used and therefore
+> is unlikely to clash with our usage.  The init task is also never going
+> away.
 
-As Russell indicated you should really keep the old name around, though
-marking them as deprecated is OK.  However I'm not sure anyone will have
-deployed this so I'm not sure how much it matters - every downstream
-kernel I've seen was still using board files anyway.
+That is... quite a horrid hack - and it is a hack.  You claim that
+the idle task is not likely to clash, but with 8 CPUs each of
+256 bytes of stack, that's 2k of stack.  With the thread data
+structure at over 512 bytes, that's 2.5k of 8k.
 
-The actual meat of the patch changing to a quirk scheme does look good,
-though.
+Don't forget that the amount of kernel stack used depends on many
+things - not just what the thread does (in the case of the idle
+thread, that includes cpuidle stuff) but also the function call
+depth of any interrupt in the system, as well as the path used to
+get into the idle thread.
 
-> -- compatible : "samsung,i2s-v5"
-> +- compatible : should be one of the following.
-> +   - samsung,s3c6410-i2s: for 8/16/24bit stereo I2S. Previous versions
-> +     has only 8/16bit support.
-> +   - samsung,s3c6410-i2sv4: for 8/16/24bit multichannel(5.1 channel) I2S.
-> +     Introduced in s3c6410. This also applicable for s5p64x0 platforms.
-> +   - samsung,s5pc100-i2s: for 8/16/24bit multichannel(5.1 channel) I2S
-> +     with secondary fifo and s/w reset control.
-> +   - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S with
-> +     secondary fifo, s/w reset control and internal mux for root clk src.
-> +
+If you want to do this, it would be much better to use the bottom
+of the stack space for the idle thread associated with the CPU.  The
+idle threads are all forked at boot for any possible CPUs before the
+secondaries are brought online, and so are persistent.  That would
+reduce the additional required space to 256 bytes on the stack, not
+2k on a single stack.
 
-I think the -vN naming scheme was fine - I see where this came from but
-the main point was about having things identified by a string not
-switching the naming scheme.  As you can see from the s3c6410 stuff the
-SoC isn't that helpful as a naming scheme as multiple IP versions appear
-on the same SoC.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/fc821e65/attachment.sig>
+It also means that if we see larger clusters, we won't have this
+in-built limitation caused by the size of the kernel stack.
