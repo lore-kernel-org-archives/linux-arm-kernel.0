@@ -1,83 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 26 Jul 2013 07:38:09 -0400
-Subject: DT bindings as ABI [was: Do we have people interested in
- device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4OwwOnP9kbN0JqR5L+F1svTucAQvz0RDwqU+Gy9UAFwHog@mail.gmail.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
- <20130725193135.GT23879@titan.lakedaemon.net>
- <20130725231848.GJ24642@n2100.arm.linux.org.uk>
- <CAKON4OwwOnP9kbN0JqR5L+F1svTucAQvz0RDwqU+Gy9UAFwHog@mail.gmail.com>
-Message-ID: <20130726113809.GB29916@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 26 Jul 2013 12:39:34 +0100
+Subject: XCLKOUT in exynos5250 clock driver
+In-Reply-To: <51F247B6.9010902@linaro.org>
+References: <20130725145158.GI9858@sirena.org.uk> <51F247B6.9010902@linaro.org>
+Message-ID: <20130726113934.GD9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 08:27:15PM -0400, jonsmirl at gmail.com wrote:
-> On Thu, Jul 25, 2013 at 7:18 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Jul 25, 2013 at 03:31:35PM -0400, Jason Cooper wrote:
-> >> On Thu, Jul 25, 2013 at 02:11:31PM -0500, Rob Herring wrote:
-> >> > On Thu, Jul 25, 2013 at 11:09 AM, Olof Johansson <olof@lixom.net> wrote:
-> >>
-> >> > > One problem that needs to be solved is obviously how a binding
-> >> > > graduates from tentative to locked. This work isn't going to be very
-> >> > > interesting to most people, I suspect. Think standards committee type
-> >> > > work.
-> >> >
-> >> > I think a time based stabilization period would be better than a
-> >> > separate directory to apply bindings too. Or time plus periodic review
-> >> > perhaps.
-> >>
-> >> The only problem with a time-based versus separate directory is how do
-> >> users who've downloaded the tree determine which bindings are stable?
-> >> If they pull a tarball, or receive an SDK, there is most likely no git
-> >> history attached.
-> >>
-> >> I think the idea of a 'tentative' directory (or 'locked') is churnish,
-> >> but necessary.  If I DL'd a tarball and had to type 'tentative' to get
-> >> to the binding doc I wanted, that would be a pretty clear clue to be
-> >> delicate about how I trust/use/plan with that binding.
-> >
-> > It's actually extremely simple.  If the bindings are in development,
-> > they must not appear in a -final released kernel.  Anything that appears
-> > in a -final kernel becomes part of the ABI at that point.
-> >
-> > That obviously does not mean you remove them in the last -rc and put
-> > them back during the merge window!
-> >
-> > That's how we handle every other ABI thing in the kernel tree, why should
-> > DT files be any different?  (I've added Linus and Grant to this discussion.)
-> >
-> > As I've already stated, it is intended to eventually remove the DT files
-> > from the kernel tree and have them as a separately maintained project,
-> > which means they will be independent of the kernel version.
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> Having a schema system for the device trees is closely related to this
-> discussion.  In this case the schema would probably be equal to the
-> stable set of nodes. This has been discussed before on the device tree
-> mailing list. The dtc compiler would take this schema and validate the
-> trees it compiles against it issuing warnings for 'non-standard'
-> usage. Over time the schema would be updated to allow these usages
-> when everyone agrees to it. Note that there would be a single schema
-> describing all possible legal Linux device trees.
+On Fri, Jul 26, 2013 at 03:26:06PM +0530, Tushar Behera wrote:
 
-s/Linux// ?
+> Information as per Exynos5250 user manual:
+> "XCLKOUT is an output pin for debugging clocks. Exynos5250 has a CLKOUT
+> logic which can select one of the clocks (within its clock domains) and
+> output that through XCLKOUT pin."
 
-> The scheme is also quite useful for new tree developers since it will
-> show them the universe of device tree attributes that have already
-> been standardized. By using comments, you could probably turn the
-> device tree documentation into the schema source files.
+Yeah, I know what XCLKOUT is but to implement this in the driver and DT
+I'd need to know about the register or registers that are used to
+configure the mux.
 
-One more note on schema, since DT is a description of hardware, it would
-be useful to have two comments, a url to the datasheet, and a canonical
-name of the datasheet suitable for $searchengine.  Where available, of
-course.
+> Not sure if XCLKOUT on Arndale schematics means the same.
 
-thx,
-
-Jason.
+I'd be astonished if it meant anything else, it's fairly clearly
+labelled as that on the schematics and this is a *very* common pattern
+in system designs using Samsung SoCs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/4242f00d/attachment.sig>
