@@ -1,89 +1,46 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jul 2013 15:59:10 +0100
-Subject: [PATCH] ARM: kdgb: use .inst for data to be assembled as
- intruction
-In-Reply-To: <51F2500E.5040107@codethink.co.uk>
-References: <1374763778-5305-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374763778-5305-2-git-send-email-ben.dooks@codethink.co.uk>
- <20130725171130.GE2546@localhost.localdomain>
- <51F15CAE.7020008@codethink.co.uk>
- <20130725180912.GG2546@localhost.localdomain>
- <51F2500E.5040107@codethink.co.uk>
-Message-ID: <20130726145910.GC2282@localhost.localdomain>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 26 Jul 2013 16:00:02 +0100
+Subject: [PATCH] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1374850185.20685.12.camel@linux-builds1>
+References: <1374789881-20611-1-git-send-email-dinguyen@altera.com>
+ <1374846562.3213.56.camel@hornet> <1374850185.20685.12.camel@linux-builds1>
+Message-ID: <1374850802.3213.87.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 11:31:42AM +0100, Ben Dooks wrote:
-> On 25/07/13 19:09, Dave Martin wrote:
-> >On Thu, Jul 25, 2013 at 06:13:18PM +0100, Ben Dooks wrote:
-> >>On 25/07/13 18:11, Dave Martin wrote:
-> >>>On Thu, Jul 25, 2013 at 03:49:38PM +0100, Ben Dooks wrote:
-> >>>>The arch_kgdb_breakpoint() function uses an inline assembly directive
-> >>>>to assemble a specific instruction using .word. This means the linker
-> >>>>will not treat is as an instruction, and therefore incorrectly swap
-> >>>>the endian-ness if running BE8.
-> >>>>
-> >>>>Note, not tested, please comment if this is wrong.
-> >>>>
-> >>>>Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
-> >>>>---
-> >>>>  arch/arm/include/asm/kgdb.h |    2 +-
-> >>>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>>
-> >>>>diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-> >>>>index 48066ce..76227c8 100644
-> >>>>--- a/arch/arm/include/asm/kgdb.h
-> >>>>+++ b/arch/arm/include/asm/kgdb.h
-> >>>>@@ -41,7 +41,7 @@
-> >>>>
-> >>>>  static inline void arch_kgdb_breakpoint(void)
-> >>>>  {
-> >>>>-	asm(".word 0xe7ffdeff");
-> >>>>+	asm(".inst 0xe7ffdeff");
-> >>>
-> >>>Yikes, this isn't going to work in a Thumb kernel.
-> >>>
-> >>>We should make HAVE_ARCH_KGDB depend on !THUMB2_KERNEL until/unless that
-> >>>gets fixed...  It looks like the incompatibilities may be more extensive
-> >>>than just this one instruction.
-> >>>
-> >>>
-> >>>For the ARM case, similarly to the other patches, please use the __inst
-> >>>macros from<asm/opcodes.h>   instead of emitting the opcode explicitly.
-> >>
-> >>See previous objections to that, plus they're marked for internal use
-> >>only!
-> >
-> >Ditto my counterarguments.  I'm not emotionally attached to __inst*(), but
-> >we should use one or the other: either .inst or __inst(), not a mixture.
-> >However, the __inst macros work for inline asm and .S, and do more than
-> >just emitting a single opcode; see opcodes-virt.h for example, so while
-> >removing them isn't rocket science, it would involve churn in a few places.
-> >
-> >
-> >Note, the "Don't use these directly" comment only applies to the triple-
-> >underscored helpers.
-> >
-> >The broader "using these macros directly is poor practice" comment was
-> >an attempt to engourage people to write the likes of
-> >
-> >#define __KGDB_BKPT_INSTR __inst_arm(0xxe7ffdeff)
-> >
-> >static inline void arch_kgdb_breakpoint(void)
-> >{
-> >	asm(__KGDB_BKPT_INSTR);
-> >}
-> >
-> >...on the basis that this ought to be more readable.
-> >
-> >But this is a bit moot in a situation like this where the opcode is
-> >only used in one place, by itself, in a wrapper whose name makes the
-> >intent clear anyway.
+On Fri, 2013-07-26 at 15:49 +0100, Dinh Nguyen wrote:
+> Dinh please...
+
+Uh, accept my apologies. I know exactly how it feels ;-)
+
+> > I've also noticed that Exynos defines almost identical bindings:
+> > 
+> > > samsung,dw-mshc-ciu-div
+> > > samsung,dw-mshc-sdr-timing
+> > > samsung,dw-mshc-ddr-timing
 > 
-> Ok, I will look into changing the patches in the next day or so
-> and do the same fixes for kprobes.
+> Yes, I agree.
+> > 
+> > Aren't you both using the same "Synopsis Designware Mobile Storage Host
+> > Controller" by any chance? Are you sharing a driver? And if not,
+> > why? ;-) If the timings really must be parametrised, would it be
+> > possible to come up with a common set of "synopsis" properties, instead
+> > of "samsung" and "altr" ones? 
+> 
+> We are using the same driver. This is just a platform specifc entries
+> for how the IP can be implemented. I also agree that we can come up with
+> a shared set of properties for these.
+> 
+> But since the platform-driver part has already been picked into the
+> master tree, can I work on a common set after this patch? That way it
+> enables SD/MMC to work on SocFPGA for the time being.
 
-OK, thanks.
+Ah, I see. You should have included the binding documentation in the
+driver using the bindings, not in the patch adding the required nodes to
+DTS files... Than no one would have any comments on this patch ;-)
 
-Cheers
----Dave
+So yes, if the driver part got merged I will shut up now, providing you
+promise to work on "consolidating" the bindings for the next cycle. The
+sooner, the better. Does it sound like a deal?
+
+Pawel
