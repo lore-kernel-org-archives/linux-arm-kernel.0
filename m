@@ -1,42 +1,74 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 26 Jul 2013 15:41:24 +0100
-Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
-In-Reply-To: <CAF6AEGtNEOpuKqcr7vfieCx0mot44L2bZzOt4ipcmUVv4FwUVw@mail.gmail.com>
-References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
- <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
- <1374847564.3213.70.camel@hornet>
- <CAF6AEGtNEOpuKqcr7vfieCx0mot44L2bZzOt4ipcmUVv4FwUVw@mail.gmail.com>
-Message-ID: <1374849684.3213.81.camel@hornet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 26 Jul 2013 10:41:38 -0400 (EDT)
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value
+ to index into save array
+In-Reply-To: <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
+References: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
+ <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1307261032330.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-07-26 at 15:21 +0100, Rob Clark wrote:
-> Well, if you have something complex enough to benefit from CDF, then
-> you probably ought to be looking at drm/kms. 
+On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
 
-That's what we're doing - hope you appreciate Tom's effort of re-writing
-a driver for something that pre-dates DRM/KMS by generations ;-)
+> On Thu, Jul 25, 2013 at 05:06:51PM +0100, Nicolas Pitre wrote:
+> > On Thu, 25 Jul 2013, Dave Martin wrote:
+> > 
+> > > On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
+> > > > On Wed, 24 Jul 2013, Dave Martin wrote:
+> > > > 
+> > > > > But this patch commits us to requiring that on the suspend path 
+> > > > > specifically -- I think that ought to be mentioned somewhere. A 
+> > > > > comment in the preamble for __cpu_suspend would be enough, I think.
+> > > > 
+> > > > What comment would you suggest?  I want to make sure the possible 
+> > > > confusion you see is properly addressed.
+> > > 
+> > > I think we just need to state that the value of
+> > > cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
+> > > CPU the suspending logical CPU will resume on.  Consequently, if doing a
+> > > migration, cpu_logical_map() must be updated appropriately somewhere
+> > > between cpu_pm_enter() and cpu_suspend().
+> > 
+> > Excellent.  I've amended the patch with this:
+> > 
+> > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> > index 2835d35234..caf938db62 100644
+> > --- a/arch/arm/kernel/suspend.c
+> > +++ b/arch/arm/kernel/suspend.c
+> > @@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
+> >  /*
+> >   * Hide the first two arguments to __cpu_suspend - these are an implementation
+> >   * detail which platform code shouldn't have to know about.
+> > + *
+> > + * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
+> > + * the MPIDR of the physical CPU the suspending logical CPU will resume on.
+> > + * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
+> > + * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
+> >   */
+> >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> >  {
+> > 
+> > I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
+> > is what users should care about.
+> > 
+> > ACK?
+> 
+> We need this patch to allow IKS to store a cpu context at a specific
+> index, let's be honest. It is a moot point and I am not very happy
+> about changing this code for a very specific usage, but the way code is
+> implemented makes the change acceptable. I really do not think we should
+> write guidelines on how cpu_suspend users have to change cpu_logical_map
+> though, that's not needed apart from IKS and that should be limited to IKS
+> code only.
+> 
+> Again, that's just my opinion, but cpu_suspend API must be kept as it is
+> and we should not encourage people to use it in creative ways.
 
-> I guess I don't really care about what goes in fbdev.  
+I tend to agree, but I'm now stuck between two conflicting requests.
 
-Well, I've guessed that ;-)
+Are you saying you are willing to give me your ACK if I revert the 
+suggested change?
 
-> My main concern is that we have more than enough work to do,
-> and have more than enough complexity.  If we end up w/ bunch of glue
-> to tie things in to drm properties, how drm helpers sequence things
-> during modeset, locking, etc.. I just don't see that turning out well.
->  And also, just on the logistical side, having something shared across
-> subsystems makes changes more of a pain during the merge window.  Not
-> to mention backports to stable kernels, distro kernels, etc.  It all
-> just seems like it will be a lot of unnecessary headache.
 
-I won't argue that, however it seems to me that CDF is such a small
-variable in the equation that it would disappear in the noise. Surely
-you have (or will have) standard DRM interface to drive the display
-pipeline where CDF would be one of many back-ends? In the end you'll
-have to solve the same problem - how to represent a random pipeline in a
-generic way so different components can be plugged one into another.
-Anyway, I'm not planning to stick my nose between DRM and CDF, really.
-I'm just hoping for a solution that will fit my needs :-)
-
-Pawel
+Nicolas
