@@ -1,35 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 27 Jul 2013 01:22:37 +0200
-Subject: [PATCH 1/3] pinctrl: rollback check for !dev->pins in
- pinctrl_pm_select*() APIs
-In-Reply-To: <20130717154038.GK7656@atomide.com>
-References: <1374061312-25469-1-git-send-email-grygorii.strashko@ti.com>
- <1374061312-25469-2-git-send-email-grygorii.strashko@ti.com>
- <20130717154038.GK7656@atomide.com>
-Message-ID: <CACRpkdYZOFYNXDwMr6om=3Fuj9z3DnaXYHQ_3B-xfTk9dsWdnQ@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Sat, 27 Jul 2013 01:28:58 +0200
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <20130726231108.GA10812@obsidianresearch.com>
+References: <20130726145639.116237136@gmail.com>
+ <20130726151223.045835540@gmail.com>
+ <20130726152918.GL29916@titan.lakedaemon.net>
+ <20130726215859.GA19469@glitch>
+ <20130726231108.GA10812@obsidianresearch.com>
+Message-ID: <20130726232858.GA6953@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 5:40 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [130717 04:49]:
->> The pinctrl support in Device core assumed to be optional - so, It's
->> valid case, when there are no definition for default device's pinctrl
->> states in DT at all ("default", "active", "idle", "sleep").
->> And in this case dev->pins == NULL and pinctrl_pm_select*() API
->> should return 0 always.
->>
->> Now the checks for !dev->pins have been removed from
->> pinctrl_pm_select*() API mistakenly by the patch
->> pinctrl: Remove duplicate code in pinctrl_pm_select_state functions
->> http://www.spinics.net/lists/arm-kernel/msg258829.html
->>
->> Hence, rollback these checks in in pinctrl_pm_select*() APIs.
->
-> Thanks, it's best that I fold this fix into my patch as it has not
-> been committed yet.
+On Fri, Jul 26, 2013 at 05:11:08PM -0600, Jason Gunthorpe wrote:
+> On Fri, Jul 26, 2013 at 11:59:00PM +0200, Domenico Andreoli wrote:
+> 
+> > In mach-bcm we (or I, it's not very clear to me) want to have support for
+> > multiple SoCs.
+> > 
+> > In trying the approach
+> > 
+> > machine-$(CONFIG_ARCH_BCM)		+= bcm
+> > machine-$(CONFIG_ARCH_BCM4760)		+= bcm
+> > 
+> > I got linker complains about multiple symbol definitiion in case both the
+> > config options are selected.
+> 
+> You can't repeat the same dir. Maybe this?
+> 
+> bcm-machine-$(CONFIG_ARCH_BCM) := bmc
+> bcm-machine-$(CONFIG_ARCH_BCM4760) := bmc
+> machine-y += $(bcm-machine-y)
 
-I think I've applied the correct v2 version,
-please check that linux-next is in good shape...
+nice! I prefer this to the config option used only to descend the dir,
+you never know how it is going to be abused.
 
-Yours,
-Linus Walleij
+Christian, would you agree in ditching ARCH_BROADCOM then?
+
+Russel, is it ok?
+
+thanks,
+Domenico
