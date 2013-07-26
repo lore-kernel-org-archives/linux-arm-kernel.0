@@ -1,50 +1,166 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:19 +0800
-Subject: [PATCH v13 03/14] usb: chipidea: imx: add return value check for
- devm_regulator_get
+Date: Fri, 26 Jul 2013 17:18:21 +0800
+Subject: [PATCH v13 05/14] usb: chipidea: otg: Add otg file used to access
+ otgsc
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-4-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-6-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- If devm_regulator_get returns -EPROBE_DEFER, we also return
--EPROBE_DEFER to wait regulator being ready later.
-- If devm_regulator_get returns -ENODEV, we think there is
-no "vbus-supply" node at DT, it means this board doesn't need
-vbus control.
-- If devm_regulator_get returns other error values, it means
-there are something wrong for getting this regulator.
+This file is mainly used to access otgsc currently, it may
+add otg related things in the future.
 
+Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c |   14 ++++++++++++--
- 1 files changed, 12 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/Makefile |    2 +-
+ drivers/usb/chipidea/bits.h   |   10 ++++++++
+ drivers/usb/chipidea/core.c   |    3 +-
+ drivers/usb/chipidea/otg.c    |   50 +++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/otg.h    |   19 +++++++++++++++
+ 5 files changed, 82 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index d06355e..0ced8c1 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -144,8 +144,18 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index 6cf5f68..a99d980 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
  
- 	/* Get the vbus regulator */
- 	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
--	if (IS_ERR(pdata.reg_vbus))
--		pdata.reg_vbus = NULL;
-+	if (PTR_ERR(pdata.reg_vbus) == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		goto err_clk;
-+	} else if (PTR_ERR(pdata.reg_vbus) == -ENODEV) {
-+		pdata.reg_vbus = NULL; /* no vbus regualator is needed */
-+	} else if (IS_ERR(pdata.reg_vbus)) {
-+		dev_err(&pdev->dev,
-+				"Getting regulator error: %ld\n",
-+					PTR_ERR(pdata.reg_vbus));
-+		ret = PTR_ERR(pdata.reg_vbus);
-+		goto err_clk;
-+	}
+ obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
  
- 	if (!pdev->dev.dma_mask)
- 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+-ci_hdrc-y				:= core.o
++ci_hdrc-y				:= core.o otg.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+index aefa026..dd0cf9e 100644
+--- a/drivers/usb/chipidea/bits.h
++++ b/drivers/usb/chipidea/bits.h
+@@ -79,11 +79,21 @@
+ #define OTGSC_ASVIS	      BIT(18)
+ #define OTGSC_BSVIS	      BIT(19)
+ #define OTGSC_BSEIS	      BIT(20)
++#define OTGSC_1MSIS	      BIT(21)
++#define OTGSC_DPIS	      BIT(22)
+ #define OTGSC_IDIE	      BIT(24)
+ #define OTGSC_AVVIE	      BIT(25)
+ #define OTGSC_ASVIE	      BIT(26)
+ #define OTGSC_BSVIE	      BIT(27)
+ #define OTGSC_BSEIE	      BIT(28)
++#define OTGSC_1MSIE	      BIT(29)
++#define OTGSC_DPIE	      BIT(30)
++#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
++				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
++				| OTGSC_DPIE)
++#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
++				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
++				| OTGSC_DPIS)
+ 
+ /* USBMODE */
+ #define USBMODE_CM            (0x03UL <<  0)
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index a5df24c..761f7e8 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -71,6 +71,7 @@
+ #include "bits.h"
+ #include "host.h"
+ #include "debug.h"
++#include "otg.h"
+ 
+ /* Controller register map */
+ static uintptr_t ci_regs_nolpm[] = {
+@@ -508,7 +509,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		goto stop;
+ 
+ 	if (ci->is_otg)
+-		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
++		ci_hdrc_otg_init(ci);
+ 
+ 	ret = dbg_create_files(ci);
+ 	if (!ret)
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+new file mode 100644
+index 0000000..abefb4d
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.c
+@@ -0,0 +1,50 @@
++/*
++ * otg.c - ChipIdea USB IP core OTG driver
++ *
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Peter Chen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * This file mainly handles otgsc register, it may include OTG operation
++ * in the future.
++ */
++
++#include <linux/usb/otg.h>
++#include <linux/usb/gadget.h>
++#include <linux/usb/chipidea.h>
++
++#include "ci.h"
++#include "bits.h"
++
++void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
++{
++	/* Only clear request bits */
++	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
++}
++
++void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
++{
++	hw_write(ci, OP_OTGSC, bits, bits);
++}
++
++void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
++{
++	hw_write(ci, OP_OTGSC, bits, 0);
++}
++
++/**
++ * ci_hdrc_otg_init - initialize otgsc bits
++ * ci: the controller
++ */
++int ci_hdrc_otg_init(struct ci_hdrc *ci)
++{
++	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
++
++	return 0;
++}
+diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
+new file mode 100644
+index 0000000..f24ec37
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Peter Chen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
++#define __DRIVERS_USB_CHIPIDEA_OTG_H
++
++int ci_hdrc_otg_init(struct ci_hdrc *ci);
++void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits);
++void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
++void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
++
++#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
 -- 
 1.7.0.4
