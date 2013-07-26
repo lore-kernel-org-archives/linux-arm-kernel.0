@@ -1,508 +1,313 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 26 Jul 2013 10:18:02 -0300
-Subject: [PATCH v9 25/30] ARM: kirkwood: Use the preprocessor on device tree
- files
+Date: Fri, 26 Jul 2013 10:18:06 -0300
+Subject: [PATCH v9 29/30] bus: mvebu-mbus: Add devicetree binding
 In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374844687-19981-26-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374844687-19981-30-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Introduce the devicetree binding for the mvebu MBus driver
+avaiable in the mvebu SoCs (Armada 370/XP, Kirkwood, Dove, ...).
+
+This binding provides an accurate model of the SoC address space,
+and allows to declare the address and size of the decoding windows the MBus
+needs to access the peripherals, together with the target ID and attribute
+for those windows.
+
+The binding is composed of two required nodes: one for the MBus bus
+and one for the MBus controller.
+
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-cloudbox.dts                | 4 ++--
- arch/arm/boot/dts/kirkwood-db-88f6281.dts              | 4 ++--
- arch/arm/boot/dts/kirkwood-db-88f6282.dts              | 4 ++--
- arch/arm/boot/dts/kirkwood-db.dtsi                     | 2 +-
- arch/arm/boot/dts/kirkwood-dns320.dts                  | 2 +-
- arch/arm/boot/dts/kirkwood-dns325.dts                  | 2 +-
- arch/arm/boot/dts/kirkwood-dnskw.dtsi                  | 4 ++--
- arch/arm/boot/dts/kirkwood-dockstar.dts                | 4 ++--
- arch/arm/boot/dts/kirkwood-dreamplug.dts               | 4 ++--
- arch/arm/boot/dts/kirkwood-goflexnet.dts               | 4 ++--
- arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts    | 4 ++--
- arch/arm/boot/dts/kirkwood-ib62x0.dts                  | 4 ++--
- arch/arm/boot/dts/kirkwood-iconnect.dts                | 4 ++--
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts          | 4 ++--
- arch/arm/boot/dts/kirkwood-is2.dts                     | 2 +-
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts             | 4 ++--
- arch/arm/boot/dts/kirkwood-lschlv2.dts                 | 2 +-
- arch/arm/boot/dts/kirkwood-lsxhl.dts                   | 2 +-
- arch/arm/boot/dts/kirkwood-lsxl.dtsi                   | 4 ++--
- arch/arm/boot/dts/kirkwood-mplcec4.dts                 | 4 ++--
- arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 4 ++--
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi             | 4 ++--
- arch/arm/boot/dts/kirkwood-ns2.dts                     | 2 +-
- arch/arm/boot/dts/kirkwood-ns2lite.dts                 | 2 +-
- arch/arm/boot/dts/kirkwood-ns2max.dts                  | 2 +-
- arch/arm/boot/dts/kirkwood-ns2mini.dts                 | 2 +-
- arch/arm/boot/dts/kirkwood-nsa310.dts                  | 4 ++--
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts           | 4 ++--
- arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi      | 4 ++--
- arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts        | 2 +-
- arch/arm/boot/dts/kirkwood-sheevaplug.dts              | 2 +-
- arch/arm/boot/dts/kirkwood-topkick.dts                 | 4 ++--
- arch/arm/boot/dts/kirkwood-ts219-6281.dts              | 6 +++---
- arch/arm/boot/dts/kirkwood-ts219-6282.dts              | 6 +++---
- 34 files changed, 58 insertions(+), 58 deletions(-)
+ .../devicetree/bindings/bus/mvebu-mbus.txt         | 276 +++++++++++++++++++++
+ 1 file changed, 276 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/mvebu-mbus.txt
 
-diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-index 00c48d2..9bf139c 100644
---- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
-+++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "LaCie CloudBox";
-diff --git a/arch/arm/boot/dts/kirkwood-db-88f6281.dts b/arch/arm/boot/dts/kirkwood-db-88f6281.dts
-index 9d777ed..f420cbe 100644
---- a/arch/arm/boot/dts/kirkwood-db-88f6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-db-88f6281.dts
-@@ -11,8 +11,8 @@
- 
- /dts-v1/;
- 
--/include/ "kirkwood-db.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood-db.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Marvell DB-88F6281-BP Development Board";
-diff --git a/arch/arm/boot/dts/kirkwood-db-88f6282.dts b/arch/arm/boot/dts/kirkwood-db-88f6282.dts
-index f4c8528..c5df866 100644
---- a/arch/arm/boot/dts/kirkwood-db-88f6282.dts
-+++ b/arch/arm/boot/dts/kirkwood-db-88f6282.dts
-@@ -11,8 +11,8 @@
- 
- /dts-v1/;
- 
--/include/ "kirkwood-db.dtsi"
--/include/ "kirkwood-6282.dtsi"
-+#include "kirkwood-db.dtsi"
-+#include "kirkwood-6282.dtsi"
- 
- / {
- 	model = "Marvell DB-88F6282-BP Development Board";
-diff --git a/arch/arm/boot/dts/kirkwood-db.dtsi b/arch/arm/boot/dts/kirkwood-db.dtsi
-index c87cfb8..29bd98e 100644
---- a/arch/arm/boot/dts/kirkwood-db.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-db.dtsi
-@@ -12,7 +12,7 @@
-  * and 6282 variants of the Marvell Kirkwood Development Board.
-  */
- 
--/include/ "kirkwood.dtsi"
-+#include "kirkwood.dtsi"
- 
- / {
- 	memory {
-diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
-index 14d4cee..e112ca6 100644
---- a/arch/arm/boot/dts/kirkwood-dns320.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns320.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-dnskw.dtsi"
-+#include "kirkwood-dnskw.dtsi"
- 
- / {
- 	model = "D-Link DNS-320 NAS (Rev A1)";
-diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
-index 6387257..5119fb8 100644
---- a/arch/arm/boot/dts/kirkwood-dns325.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns325.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-dnskw.dtsi"
-+#include "kirkwood-dnskw.dtsi"
- 
- / {
- 	model = "D-Link DNS-325 NAS (Rev A1)";
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 0afe1d0..2e04284 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -1,5 +1,5 @@
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "D-Link DNS NASes (kirkwood-based)";
-diff --git a/arch/arm/boot/dts/kirkwood-dockstar.dts b/arch/arm/boot/dts/kirkwood-dockstar.dts
-index 7714742..4387ae8 100644
---- a/arch/arm/boot/dts/kirkwood-dockstar.dts
-+++ b/arch/arm/boot/dts/kirkwood-dockstar.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Seagate FreeAgent Dockstar";
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 36c7ba3..c628378 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Globalscale Technologies Dreamplug";
-diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-index 31caa64..e571180 100644
---- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
-+++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Seagate GoFlex Net";
-diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-index 1e642f3..2c5673a 100644
---- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-+++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Globalscale Technologies Guruplug Server Plus";
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index 20c4b08..158161f 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "RaidSonic ICY BOX IB-NAS62x0 (Rev B)";
-diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-index 441204e..1a98487 100644
---- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Iomega Iconnect";
-diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-index 00a7bfe..fd7f053 100644
---- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-+++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Iomega StorCenter ix2-200";
-diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
-index c3f036b..bd88a23 100644
---- a/arch/arm/boot/dts/kirkwood-is2.dts
-+++ b/arch/arm/boot/dts/kirkwood-is2.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-ns2-common.dtsi"
-+#include "kirkwood-ns2-common.dtsi"
- 
- / {
- 	model = "LaCie Internet Space v2";
-diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-index 5d9f5ea..b071d37 100644
---- a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-+++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-98dx4122.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-98dx4122.dtsi"
- 
- / {
- 	model = "Keymile Kirkwood Reference Design";
-diff --git a/arch/arm/boot/dts/kirkwood-lschlv2.dts b/arch/arm/boot/dts/kirkwood-lschlv2.dts
-index 9f55d95..e2fa368 100644
---- a/arch/arm/boot/dts/kirkwood-lschlv2.dts
-+++ b/arch/arm/boot/dts/kirkwood-lschlv2.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-lsxl.dtsi"
-+#include "kirkwood-lsxl.dtsi"
- 
- / {
- 	model = "Buffalo Linkstation LS-CHLv2";
-diff --git a/arch/arm/boot/dts/kirkwood-lsxhl.dts b/arch/arm/boot/dts/kirkwood-lsxhl.dts
-index 5c84c11..8d89cdf 100644
---- a/arch/arm/boot/dts/kirkwood-lsxhl.dts
-+++ b/arch/arm/boot/dts/kirkwood-lsxhl.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-lsxl.dtsi"
-+#include "kirkwood-lsxl.dtsi"
- 
- / {
- 	model = "Buffalo Linkstation LS-XHL";
-diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-index 31b17f5..f7e247c 100644
---- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-@@ -1,5 +1,5 @@
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	chosen {
-diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-index 6179333..382ad99 100644
---- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-+++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "MPL CEC4";
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index ad6ade7..8be68bd 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6282.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6282.dtsi"
- 
- / {
- 	model = "NETGEAR ReadyNAS Duo v2";
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index 2afac04..d0fb34d 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -1,5 +1,5 @@
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	chosen {
-diff --git a/arch/arm/boot/dts/kirkwood-ns2.dts b/arch/arm/boot/dts/kirkwood-ns2.dts
-index b50e93d..0599f3c 100644
---- a/arch/arm/boot/dts/kirkwood-ns2.dts
-+++ b/arch/arm/boot/dts/kirkwood-ns2.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-ns2-common.dtsi"
-+#include "kirkwood-ns2-common.dtsi"
- 
- / {
- 	model = "LaCie Network Space v2";
-diff --git a/arch/arm/boot/dts/kirkwood-ns2lite.dts b/arch/arm/boot/dts/kirkwood-ns2lite.dts
-index af8259f..b0e1798 100644
---- a/arch/arm/boot/dts/kirkwood-ns2lite.dts
-+++ b/arch/arm/boot/dts/kirkwood-ns2lite.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-ns2-common.dtsi"
-+#include "kirkwood-ns2-common.dtsi"
- 
- / {
- 	model = "LaCie Network Space Lite v2";
-diff --git a/arch/arm/boot/dts/kirkwood-ns2max.dts b/arch/arm/boot/dts/kirkwood-ns2max.dts
-index 85f24d2..d4f6a58 100644
---- a/arch/arm/boot/dts/kirkwood-ns2max.dts
-+++ b/arch/arm/boot/dts/kirkwood-ns2max.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-ns2-common.dtsi"
-+#include "kirkwood-ns2-common.dtsi"
- 
- / {
- 	model = "LaCie Network Space Max v2";
-diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-index 329e530..f30e05a 100644
---- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
-+++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "kirkwood-ns2-common.dtsi"
-+#include "kirkwood-ns2-common.dtsi"
- 
- / {
- 	/* This machine is embedded in the first LaCie CloudBox product. */
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index 6900359..8fd683c 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	model = "ZyXEL NSA310";
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index 38dc851..365b792 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6282.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6282.dtsi"
- 
- / {
- 	model = "Plat'Home OpenBlocksA6";
-diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-index f7143f1..0cc5f26 100644
---- a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-@@ -6,8 +6,8 @@
-  * Licensed under GPLv2
-  */
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
- 
- / {
- 	memory {
-diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
-index f620ce4..eac6a21 100644
---- a/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
-+++ b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
-@@ -8,7 +8,7 @@
- 
- /dts-v1/;
- 
--/include/ "kirkwood-sheevaplug-common.dtsi"
-+#include "kirkwood-sheevaplug-common.dtsi"
- 
- / {
- 	model = "Globalscale Technologies eSATA SheevaPlug";
-diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug.dts b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
-index bf1dff2..bb61918 100644
---- a/arch/arm/boot/dts/kirkwood-sheevaplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
-@@ -8,7 +8,7 @@
- 
- /dts-v1/;
- 
--/include/ "kirkwood-sheevaplug-common.dtsi"
-+#include "kirkwood-sheevaplug-common.dtsi"
- 
- / {
- 	model = "Globalscale Technologies SheevaPlug";
-diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-index f2052d7..974f1e0 100644
---- a/arch/arm/boot/dts/kirkwood-topkick.dts
-+++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -1,7 +1,7 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6282.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6282.dtsi"
- 
- / {
- 	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6281.dts b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-index 6dd1038..3867ae3 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-@@ -1,8 +1,8 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6281.dtsi"
--/include/ "kirkwood-ts219.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+#include "kirkwood-ts219.dtsi"
- 
- / {
- 	ocp at f1000000 {
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6282.dts b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-index 6fdc5ff..7d6cc86 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-@@ -1,8 +1,8 @@
- /dts-v1/;
- 
--/include/ "kirkwood.dtsi"
--/include/ "kirkwood-6282.dtsi"
--/include/ "kirkwood-ts219.dtsi"
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6282.dtsi"
-+#include "kirkwood-ts219.dtsi"
- 
- / {
- 	ocp at f1000000 {
+diff --git a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+new file mode 100644
+index 0000000..7586fb6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+@@ -0,0 +1,276 @@
++
++* Marvell MBus
++
++Required properties:
++
++- compatible:	 Should be set to one of the following:
++		 marvell,armada370-mbus
++		 marvell,armadaxp-mbus
++		 marvell,armada370-mbus
++		 marvell,armadaxp-mbus
++		 marvell,kirkwood-mbus
++		 marvell,dove-mbus
++		 marvell,orion5x-88f5281-mbus
++		 marvell,orion5x-88f5182-mbus
++		 marvell,orion5x-88f5181-mbus
++		 marvell,orion5x-88f6183-mbus
++		 marvell,mv78xx0-mbus
++
++- address-cells: Must be '2'. The first cell for the MBus ID encoding,
++                 the second cell for the address offset within the window.
++
++- size-cells:    Must be '1'.
++
++- ranges:        Must be set up to provide a proper translation for each child.
++	         See the examples below.
++
++- controller:    Contains a single phandle referring to the MBus controller
++                 node. This allows to specify the node that contains the
++		 registers that control the MBus, which is typically contained
++		 within the internal register window (see below).
++
++Optional properties:
++
++- pcie-mem-aperture:	This optional property contains the aperture for
++			the memory region of the PCIe driver.
++			If it's defined, it must encode the base address and
++			size for the address decoding windows allocated for
++			the PCIe memory region.
++
++- pcie-io-aperture:	Just as explained for the above property, this
++			optional property contains the aperture for the
++			I/O region of the PCIe driver.
++
++* Marvell MBus controller
++
++Required properties:
++
++- compatible:	Should be set to "marvell,mbus-controller".
++
++- reg:          Device's register space.
++		Two entries are expected (see the examples below):
++		the first one controls the devices decoding window and
++		the second one controls the SDRAM decoding window.
++
++Example:
++
++	soc {
++		compatible = "marvell,armada370-mbus", "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		controller = <&mbusc>;
++		pcie-mem-aperture = <0xe0000000 0x8000000>;
++		pcie-io-aperture  = <0xe8000000 0x100000>;
++
++		internal-regs {
++			compatible = "simple-bus";
++
++			mbusc: mbus-controller at 20000 {
++				compatible = "marvell,mbus-controller";
++				reg = <0x20000 0x100>, <0x20180 0x20>;
++			};
++
++			/* more children ...*/
++		};
++	};
++
++** MBus address decoding window specification
++
++The MBus children address space is comprised of two cells: the first one for
++the window ID and the second one for the offset within the window.
++In order to allow to describe valid and non-valid window entries, the
++following encoding is used:
++
++  0xSIAA0000 0x00oooooo
++
++Where:
++
++  S = 0x0 for a MBus valid window
++  S = 0xf for a non-valid window (see below)
++
++If S = 0x0, then:
++
++   I = 4-bit window target ID
++  AA = windpw attribute
++
++If S = 0xf, then:
++
++   I = don't care
++   AA = 1 for internal register
++
++Following the above encoding, for each ranges entry for a MBus valid window
++(S = 0x0), an address decoding window is allocated. On the other side,
++entries for translation that do not correspond to valid windows (S = 0xf)
++are skipped.
++
++	soc {
++		compatible = "marvell,armada370-mbus", "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		controller = <&mbusc>;
++
++		ranges = <0xf0010000 0 0 0xd0000000 0x100000
++			  0x01e00000 0 0 0xfff00000 0x100000>;
++
++		bootrom {
++			compatible = "marvell,bootrom";
++			reg = <0x01e00000 0 0x100000>;
++		};
++
++		/* other children */
++		...
++
++		internal-regs {
++			compatible = "simple-bus";
++			ranges = <0 0xf0010000 0 0x100000>;
++
++			mbusc: mbus-controller at 20000 {
++				compatible = "marvell,mbus-controller";
++				reg = <0x20000 0x100>, <0x20180 0x20>;
++			};
++
++			/* more children ...*/
++		};
++	};
++
++In the shown example, the translation entry in the 'ranges' property is what
++makes the MBus driver create a static decoding window for the corresponding
++given child device. Note that the binding does not require child nodes to be
++present. Of course, child nodes are needed to probe the devices.
++
++Since each window is identified by its target ID and attribute ID there's
++a special macro that can be use to simplify the translation entries:
++
++#define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
++
++Using this macro, the above example would be:
++
++	soc {
++		compatible = "marvell,armada370-mbus", "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		controller = <&mbusc>;
++
++		ranges = < MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
++			   MBUS_ID(0x01, 0xe0) 0 0 0xfff00000 0x100000>;
++
++		bootrom {
++			compatible = "marvell,bootrom";
++			reg = <MBUS_ID(0x01, 0xe0) 0 0x100000>;
++		};
++
++		/* other children */
++		...
++
++		internal-regs {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
++
++			mbusc: mbus-controller at 20000 {
++				compatible = "marvell,mbus-controller";
++				reg = <0x20000 0x100>, <0x20180 0x20>;
++			};
++
++			/* other children */
++			...
++		};
++	};
++
++
++** About the window base address
++
++Remember the MBus controller allows a great deal of flexibility for choosing
++the decoding window base address. When planning the device tree layout it's
++possible to choose any address as the base address, provided of course there's
++a region large enough available, and with the required alignment.
++
++Yet in other words: there's nothing preventing us from setting a base address
++of 0xf0000000, or 0xd0000000 for the NOR device shown above, if such region is
++unused.
++
++** Window allocation policy
++
++The mbus-node ranges property defines a set of mbus windows that are expected
++to be set by the operating system and that are guaranteed to be free of overlaps
++with one another or with the system memory ranges.
++
++Each entry in the property refers to exactly one window. If the operating system
++choses to use a different set of mbus windows, it must ensure that any address
++translations performed from downstream devices are adapted accordingly.
++
++The operating system may insert additional mbus windows that do not conflict
++with the ones listed in the ranges, e.g. for mapping PCIe devices.
++As a special case, the internal register window must be set up by the boot
++loader at the address listed in the ranges property, since access to that region
++is needed to set up the other windows.
++
++** Example
++
++See the example below, where a more complete device tree is shown:
++
++	soc {
++		compatible = "marvell,armadaxp-mbus", "simple-bus";
++		controller = <&mbusc>;
++
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000   /* internal-regs */
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
++
++		bootrom {
++			compatible = "marvell,bootrom";
++			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
++		};
++
++		devbus-bootcs {
++			status = "okay";
++			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x8000000>;
++
++			/* NOR */
++			nor {
++				compatible = "cfi-flash";
++				reg = <0 0x8000000>;
++				bank-width = <2>;
++			};
++		};
++
++		pcie-controller {
++			compatible = "marvell,armada-xp-pcie";
++			status = "okay";
++			device_type = "pci";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++
++			ranges =
++			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
++				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
++				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
++				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
++				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
++				0x82000800 0 0xe0000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0 0x08000000 /* Port 0.0 MEM */
++				0x81000800 0 0          MBUS_ID(0x04, 0xe0) 0xe8000000 0 0x00100000 /* Port 0.0 IO */>;
++
++
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++		};
++
++		internal-regs {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
++
++			mbusc: mbus-controller at 20000 {
++				reg = <0x20000 0x100>, <0x20180 0x20>;
++			};
++
++			interrupt-controller at 20000 {
++			      reg = <0x20a00 0x2d0>, <0x21070 0x58>;
++			};
++		};
++	};
 -- 
 1.8.1.5
