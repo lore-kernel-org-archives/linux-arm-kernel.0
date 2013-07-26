@@ -1,48 +1,39 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Fri, 26 Jul 2013 15:16:52 -0700
-Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X
- SoC with ARM CPU
-In-Reply-To: <20130726000412.GH5022@linaro.org>
-References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
- <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
- <20130719020611.GA4941@glitch> <20130723185733.GB6811@ohporter.com>
- <CAGVrzcYnoN9NnJGvubS7=bVJDk37xSt4BimtvDWghe7OHEWALQ@mail.gmail.com>
- <20130724231106.GB29801@glitch>
- <CAGVrzcYudfgqs_eafje4BT2z2qE0kSJPx1B-xrq0WxtUkGxSFw@mail.gmail.com>
- <20130726000412.GH5022@linaro.org>
-Message-ID: <51F2F554.8030709@broadcom.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Jul 2013 15:25:01 -0700
+Subject: Zynq clk fixes
+In-Reply-To: <a76b3a5d-dadc-43b3-87ee-3c65258c15d7@CO1EHSMHS029.ehs.local>
+References: <51F26716.6030701@monstr.eu> <20130726200703.7598.86150@quantum>
+ <a76b3a5d-dadc-43b3-87ee-3c65258c15d7@CO1EHSMHS029.ehs.local>
+Message-ID: <20130726222501.7598.33060@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-07-25 05:04 PM, Matt Porter wrote:
-> On Thu, Jul 25, 2013 at 11:23:21PM +0100, Florian Fainelli wrote:
->> 2013/7/25 Domenico Andreoli <cavokz@gmail.com>:
->>> On Tue, Jul 23, 2013 at 08:05:28PM +0100, Florian Fainelli wrote:
->>>> 2013/7/23 Matt Porter <matt.porter@linaro.org>:
->>>>> On Fri, Jul 19, 2013 at 04:06:11AM +0200, Domenico Andreoli wrote:
->>>>> It's pretty easy to see that the "ti" vendor prefix has no relation at
->>>>> all to their TXN symbol so that blows that convention out of the water.
->>>>> Rather, the prefix is based on somebody's notion of how that vendor's
->>>>> part are normally referred to. In TI-land, it's TI AM335x or TI OMAP,
->>>>> never TXN OMAP. :)
->>>>>
->>>>> For Broadcom, every part is BCMxxxxx so "bcm" is appropriate.
->>>> It was appropriate before being the "wrong" vendor prefix was
->>>> allocated, now that "brcm" has been allocated we should stick to it
->>>> because otherwise we will break existing and on-going DT work.
->>> I still prefer bcm to brcm and I find enough evidence that bcm would be
->>> better in the long term.
->>>
->>> So if Broadcomers can agree on bcm, now it's still the cheapest time to
->>> fix in that direction, later will not be better.
->> If we are to fix it in stone, once and for all, let's go for the full name
->> which would avoid any kind of future confusion (this also seems to be the
->> tendency with new vendor prefixes these days). That way we could make
->> everyone happy with say: "broadcom,bcm2835". Would that work for everyone?
-> I really like that.
->
-> -Matt
->
-broadcom works for me also.
-  thanks,
-    csd
+Quoting S?ren Brinkmann (2013-07-26 14:11:52)
+> On Fri, Jul 26, 2013 at 01:07:03PM -0700, Mike Turquette wrote:
+> > Quoting Michal Simek (2013-07-26 05:09:58)
+> > > Hi Mike, [cc: Arnd and Olof]
+> > > 
+> > > Soren has found two bug fixes in zynq clk code.
+> > > Can you please add these two patches to your tree?
+> > > Will be great if you can add them to v3.11.
+> > > 
+> > > Arnd, Olof: I expect that all these clock changes should go through Mike.
+> > > If I am wrong please let me know.
+> > 
+> > Looks right to me. Do these fix regressions in the current -rc cycle?
+> 
+> I doubt there are real regressions. But since it's still early in
+> the release cycle and the driver was added in this merge window, I'd prefer
+> having it hit a release kernel with these fixes included.
+
+I've taken these into clk-fixes and added the following to the changelog
+for each patch:
+
+"This does not fix a specific regression but the clock driver was merged
+for 3.11-rc1, so best to fix the known bugs before the release."
+
+Regards,
+Mike
+
+> 
+>         S?ren
