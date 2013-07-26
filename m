@@ -1,46 +1,41 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 26 Jul 2013 16:17:15 +0200
-Subject: [PATCH] ARM: clocksource: moxart: documentation: update device tree
- bindings document
-Message-ID: <1374848235-21734-1-git-send-email-jonas.jensen@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 26 Jul 2013 16:21:16 +0200
+Subject: [PATCH V2 2/8] ASoC: Samsung: I2S: Add quirks as driver data	in
+ I2S
+In-Reply-To: <20130726140618.GP24642@n2100.arm.linux.org.uk>
+References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
+ <1374845812-7803-3-git-send-email-padma.v@samsung.com>
+ <20130726140618.GP24642@n2100.arm.linux.org.uk>
+Message-ID: <1479924.YVrWxe87Mh@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. describe compatible variable "Must be" instead of "Should be".
-2. change description so it's from the point of view of the device
+Hi Russell,
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+On Friday 26 of July 2013 15:06:18 Russell King - ARM Linux wrote:
+> On Fri, Jul 26, 2013 at 07:06:46PM +0530, Padmavathi Venna wrote:
+> > -- compatible : "samsung,i2s-v5"
+> > +- compatible : should be one of the following.
+> > +   - samsung,s3c6410-i2s: for 8/16/24bit stereo I2S. Previous versions
+> > +     has only 8/16bit support.
+> > +   - samsung,s3c6410-i2sv4: for 8/16/24bit multichannel(5.1 channel)
+> > I2S. +     Introduced in s3c6410. This also applicable for s5p64x0
+> > platforms. +   - samsung,s5pc100-i2s: for 8/16/24bit multichannel(5.1
+> > channel) I2S +     with secondary fifo and s/w reset control.
+> > +   - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S with
+> > +     secondary fifo, s/w reset control and internal mux for root clk
+> > src. +
+> 
+> So what happens with your changes to everyone who is using a DT file with
+> the "samsung,i2s-v5" compatible string?
 
-Notes:
-    Hi Daniel,
-    
-    The device tree bindings document (already merged) needs another update.
-    
-    Can be applied directly to timers/clockevents-next.
-    
-    Best regards,
-    Jonas
+AFAIK we decided that current bindings, if broken, can be redone correctly, 
+without caring for compatibility with old DTBs and only then, after 
+reviewing these new bindings by DT people, they can be stabilized.
 
- Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Other issue, though, is that this patch breaks things until they get fixed 
+by patch 3. Support for new bindings should be added first, then users fixed 
+and only then old bindings can be removed.
 
-diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-index ad0bf7f..da2d510 100644
---- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-@@ -2,10 +2,10 @@ MOXA ART timer
- 
- Required properties:
- 
--- compatible : Should be "moxa,moxart-timer"
-+- compatible : Must be "moxa,moxart-timer"
- - reg : Should contain registers location and length
- - interrupts : Should contain the timer interrupt number
--- clocks : Should contain phandle for the MOXA ART core clock "coreclk"
-+- clocks : Should contain phandle for the clock that drives the counter
- 
- Example:
- 
--- 
-1.8.2.1
+Best regards,
+Tomasz
