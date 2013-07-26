@@ -1,184 +1,88 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Fri, 26 Jul 2013 09:16:59 -0700
-Subject: [PATCH v8 03/12] iommu/exynos: fix page table maintenance
-In-Reply-To: <003901ce89f3$126c0390$37440ab0$@samsung.com>
-References: <003901ce89f3$126c0390$37440ab0$@samsung.com>
-Message-ID: <CANEJEGvp1msjkMLN-8TfykYXmrT+sq8dMkNsVEoh9i2vDoh=tg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 26 Jul 2013 17:24:10 +0100
+Subject: [PATCH 1/4] ARM: vexpress/dcscb: fix cache disabling sequences
+In-Reply-To: <20130726160015.GF2282@localhost.localdomain>
+References: <alpine.LFD.2.03.1307181452480.14924@syhkavp.arg>
+ <20130719102844.GA3746@localhost.localdomain>
+ <20130719105907.GB27389@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307221353360.15022@syhkavp.arg>
+ <20130723104352.GA3023@localhost.localdomain>
+ <alpine.LFD.2.03.1307230821270.15022@syhkavp.arg>
+ <20130723163319.GA781@e102568-lin.cambridge.arm.com>
+ <20130725120424.GC2546@localhost.localdomain>
+ <alpine.LFD.2.03.1307261047380.15022@syhkavp.arg>
+ <20130726160015.GF2282@localhost.localdomain>
+Message-ID: <20130726162410.GE28084@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 4:27 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> This prevents allocating lv2 page table for the lv1 page table entry
-> that already has 1MB page mapping. In addition some BUG_ON() is
-> changed to WARN_ON().
->
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+On Fri, Jul 26, 2013 at 05:00:15PM +0100, Dave Martin wrote:
+> On Fri, Jul 26, 2013 at 10:58:27AM -0400, Nicolas Pitre wrote:
+> > On Thu, 25 Jul 2013, Dave Martin wrote:
+> > 
+> > > On Tue, Jul 23, 2013 at 05:33:19PM +0100, Lorenzo Pieralisi wrote:
+> > > > On Tue, Jul 23, 2013 at 01:28:16PM +0100, Nicolas Pitre wrote:
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > > > + * - The CPU is obviously no longer coherent with the other CPUs.
+> > > > > > > + *
+> > > > > > > + * Further considerations:
+> > > > > > > + *
+> > > > > > > + * - This relies on the presence and behavior of the AUXCR.SMP bit as
+> > > > > > > + *   documented in the ARMv7 TRM.  Vendor implementations that deviate from
+> > > > > > 
+> > > > > > Sorry to be pedantic here, but there is no "ARMv7 TRM".  The SMP bit is
+> > > > > > not part of ARMv7 at all.
+> > > > > 
+> > > > > Well, I just copied Lorenzo's words here, trusting he knew more about it 
+> > > > > than I do.
+> > > > > 
+> > > > > > Also, it seems that A9 isn't precisely the
+> > > > > > same: two ACTLR bits need to be twiddled.  R-class CPUs are generally
+> > > > > > not the same either.
+> > > > 
+> > > > If you mean the ACTLR.FW bit in A9, A5, and R7, then, IIRC, we do not need to
+> > > > clear it, clearing the SMP bit is enough.
+> > > > 
+> > > > See, Dave has a point, there is no explicit "unified v7 TRM disable
+> > > > clean and exit coherency procedure" even though the designers end goal is to
+> > > > have one and that's the one you wrote. The code you posted is perfectly ok on
+> > > > all v7 implementations in the kernel I am aware of, I stand to be corrected
+> > > > but to the best of my knowledge that's the case.
+> > > 
+> > > What I'm really concerned about here is not Cortex-*, but the vendors
+> > > who have their own CPU implementations.  I don't think I've ever seen
+> > > a TRM for one of those.
+> > 
+> > Could we wait until they materialize before worrying about possible 
+> > incompatibility issues?  After all this is not a user space ABI that 
+> > cannot be changed afterwards.  Remember this is Linux internal code we 
+> > have the ability to change when needed, hence we should resist the 
+> > temptation to over-engineer.
+> 
+> If I could think of a better name, I would suggest it ... but unless we call
+> it "cortexa" or something, I don't know what it should be.  I'm not sure
+> how much I like that either.  Strictly speaking, that's still not correct.
+> 
+> So I guess this comes down to being clear about which CPUs we expect it to
+> work for.
+> 
+> Right now, we know it works for A7 and A15.
+> 
+> It sounds like we believe it might work for A9.  Lorenzo might know about
+> A5, A7 etc.  But I'm not sure this exact sequence has been tested on any
+> of those CPUs(?)
 
-Reviewed-by: Grant Grundler <grundler@chromium.org>
+I tested this sequence on A9 MP a while ago, even though, obviously was not
+this same macro. I know for certain it has been tested on A5, again not the
+same macro but the same sequence.
 
-In reviewing this, I noticed another issue that is related, but not
-caused by this patch. See below.
+On R7 honestly I can't certify.
 
-> ---
->  drivers/iommu/exynos-iommu.c |   52 +++++++++++++++++++++++++++++------------
->  1 files changed, 37 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index e3be3e5..6c4ecce 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -52,11 +52,11 @@
->  #define lv2ent_large(pent) ((*(pent) & 3) == 1)
->
->  #define section_phys(sent) (*(sent) & SECT_MASK)
-> -#define section_offs(iova) ((iova) & 0xFFFFF)
-> +#define section_offs(iova) ((iova) & ~SECT_MASK)
->  #define lpage_phys(pent) (*(pent) & LPAGE_MASK)
-> -#define lpage_offs(iova) ((iova) & 0xFFFF)
-> +#define lpage_offs(iova) ((iova) & ~LPAGE_MASK)
->  #define spage_phys(pent) (*(pent) & SPAGE_MASK)
-> -#define spage_offs(iova) ((iova) & 0xFFF)
-> +#define spage_offs(iova) ((iova) & ~SPAGE_MASK)
->
->  #define lv1ent_offset(iova) ((iova) >> SECT_ORDER)
->  #define lv2ent_offset(iova) (((iova) & 0xFF000) >> SPAGE_ORDER)
-> @@ -862,12 +862,14 @@ static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
->                 pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
->                 BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
->                 if (!pent)
-> -                       return NULL;
-> +                       return ERR_PTR(-ENOMEM);
->
->                 *sent = mk_lv1ent_page(__pa(pent));
->                 *pgcounter = NUM_LV2ENTRIES;
->                 pgtable_flush(pent, pent + NUM_LV2ENTRIES);
->                 pgtable_flush(sent, sent + 1);
-> +       } else if (lv1ent_section(sent)) {
-> +               return ERR_PTR(-EADDRINUSE);
->         }
->
->         return page_entry(sent, iova);
-> @@ -894,6 +896,12 @@ static int lv1set_section(unsigned long *sent, phys_addr_t paddr, short *pgcnt)
->         return 0;
->  }
->
-> +static void clear_page_table(unsigned long *ent, int n)
-> +{
-> +       if (n > 0)
-> +               memset(ent, 0, sizeof(*ent) * n);
-> +}
-> +
->  static int lv2set_page(unsigned long *pent, phys_addr_t paddr, size_t size,
->                                                                 short *pgcnt)
->  {
-> @@ -908,7 +916,7 @@ static int lv2set_page(unsigned long *pent, phys_addr_t paddr, size_t size,
->                 int i;
->                 for (i = 0; i < SPAGES_PER_LPAGE; i++, pent++) {
->                         if (!lv2ent_fault(pent)) {
-> -                               memset(pent, 0, sizeof(*pent) * i);
-> +                               clear_page_table(pent - i, i);
->                                 return -EADDRINUSE;
+What if we postpone the consolidation till MCPM for some A9 platforms
+(eg Tegra) is posted (and in the meantime you leave the macro in mach-vexpress
+to avoid duplication) ?
 
-I am wondering about two issues with this error handling:
-1) we don't call pgtable_flush() in this case - I think just for
-consistency we should - don't rush to add since my next comment is to
-change this error handling completely.
-
-2) If  -EADDRINUSE is correct, why does the code clear the IO Page
-table entries?
-
-   I think this error path should either
-   (a) BUG_ON (ie panic) since this is an inconsistency between
-generic IOMMU page allocation and chip specific IOMMU mapping code OR
-   (b) WARN_ON, not clear the entries, and hope whoever was using it
-can finish using the system before crashing or gracefully shutting
-down.
-
-In any case, I'm pretty sure this code needs to change and it should
-be in a follow up to this series.
-
-thanks,
-grant
-
->                         }
->
-> @@ -944,17 +952,16 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
->                 pent = alloc_lv2entry(entry, iova,
->                                         &priv->lv2entcnt[lv1ent_offset(iova)]);
->
-> -               if (!pent)
-> -                       ret = -ENOMEM;
-> +               if (IS_ERR(pent))
-> +                       ret = PTR_ERR(pent);
->                 else
->                         ret = lv2set_page(pent, paddr, size,
->                                         &priv->lv2entcnt[lv1ent_offset(iova)]);
->         }
->
-> -       if (ret) {
-> -               pr_debug("%s: Failed to map iova 0x%lx/0x%x bytes\n",
-> -                                                       __func__, iova, size);
-> -       }
-> +       if (ret)
-> +               pr_err("%s: Failed(%d) to map 0x%#x bytes @ %#lx\n",
-> +                       __func__, ret, size, iova);
->
->         spin_unlock_irqrestore(&priv->pgtablelock, flags);
->
-> @@ -968,6 +975,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->         struct sysmmu_drvdata *data;
->         unsigned long flags;
->         unsigned long *ent;
-> +       size_t err_pgsize;
->
->         BUG_ON(priv->pgtable == NULL);
->
-> @@ -976,7 +984,10 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->         ent = section_entry(priv->pgtable, iova);
->
->         if (lv1ent_section(ent)) {
-> -               BUG_ON(size < SECT_SIZE);
-> +               if (WARN_ON(size < SECT_SIZE)) {
-> +                       err_pgsize = SECT_SIZE;
-> +                       goto err;
-> +               }
->
->                 *ent = 0;
->                 pgtable_flush(ent, ent + 1);
-> @@ -1008,9 +1019,12 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->         }
->
->         /* lv1ent_large(ent) == true here */
-> -       BUG_ON(size < LPAGE_SIZE);
-> +       if (WARN_ON(size < LPAGE_SIZE)) {
-> +               err_pgsize = LPAGE_SIZE;
-> +               goto err;
-> +       }
->
-> -       memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
-> +       clear_page_table(ent, SPAGES_PER_LPAGE);
->         pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
->
->         size = LPAGE_SIZE;
-> @@ -1023,8 +1037,16 @@ done:
->                 sysmmu_tlb_invalidate_entry(data->dev, iova);
->         spin_unlock_irqrestore(&priv->lock, flags);
->
-> -
->         return size;
-> +err:
-> +       spin_unlock_irqrestore(&priv->pgtablelock, flags);
-> +
-> +       pr_err("%s: Failed due to size(%#x) @ %#lx is"\
-> +               " smaller than page size %#x\n",
-> +               __func__, size, iova, err_pgsize);
-> +
-> +       return 0;
-> +
->  }
->
->  static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
-> --
-> 1.7.2.5
->
->
+Thank you,
+Lorenzo
