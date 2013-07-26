@@ -1,45 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 26 Jul 2013 16:10:08 -0700
-Subject: [PATCH v2 2/3] serial: mxs: enable the DMA only when the RTS/CTS
- is valid
-In-Reply-To: <51E648C2.3010304@freescale.com>
-References: <1373957732-16638-1-git-send-email-b32955@freescale.com>
- <1373957732-16638-3-git-send-email-b32955@freescale.com>
- <20130716095449.GS12139@pengutronix.de>
- <51E648C2.3010304@freescale.com>
-Message-ID: <20130726231008.GA32627@kroah.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 26 Jul 2013 17:11:08 -0600
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <20130726215859.GA19469@glitch>
+References: <20130726145639.116237136@gmail.com>
+ <20130726151223.045835540@gmail.com>
+ <20130726152918.GL29916@titan.lakedaemon.net>
+ <20130726215859.GA19469@glitch>
+Message-ID: <20130726231108.GA10812@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 03:33:22PM +0800, Huang Shijie wrote:
-> ? 2013?07?16? 17:54, Uwe Kleine-K?nig ??:
-> >On Tue, Jul 16, 2013 at 02:55:31PM +0800, Huang Shijie wrote:
-> >>The original DMA support works only when RTS/CTS is enabled.
-> >What is original here?
-> >
-> i will add more information for this in the next version.
-> >>But after several patches, DMA support has lost this limit.
-> >This is still misleading.
-> >
-> >>This patch adds an optional property for the UART DT node
-> >>which indicates the UART has RTS and CTS lines.
-> >>
-> >>This patch also adds a macro MXS_AUART_RTSCTS, and uses it to check
-> >>RTS/CTS before we enable the DMA for the UART.
-> >I still think this should go to stable. The options are:
-> >
-> >	a) also take patch 1 into stable
-> >	b) apply this patch without patch 1
-> >
-> >I don't know if option a) is OK, b) is probably preferable. And as Greg
-> to Greg:
+On Fri, Jul 26, 2013 at 11:59:00PM +0200, Domenico Andreoli wrote:
+
+> In mach-bcm we (or I, it's not very clear to me) want to have support for
+> multiple SoCs.
 > 
-> I think a) is ok to me. what's your opinion?
+> In trying the approach
+> 
+> machine-$(CONFIG_ARCH_BCM)		+= bcm
+> machine-$(CONFIG_ARCH_BCM4760)		+= bcm
+> 
+> I got linker complains about multiple symbol definitiion in case both the
+> config options are selected.
 
-Please reorder them, making patch 2 first, and mark it for stable, then
-do patch 1, and the rest, so I don't have to take non-needed patches
-into the stable tree.
+You can't repeat the same dir. Maybe this?
 
-thanks,
+bcm-machine-$(CONFIG_ARCH_BCM) := bmc
+bcm-machine-$(CONFIG_ARCH_BCM4760) := bmc
+machine-y += $(bcm-machine-y)
 
-greg k-h
+Regards,
+Jason
