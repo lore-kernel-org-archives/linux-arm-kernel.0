@@ -1,1114 +1,360 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 26 Jul 2013 18:05:32 +0800
-Subject: [PATCH v6 10/11] ARM: dts: support common clock in arch mmp
+Date: Fri, 26 Jul 2013 18:05:33 +0800
+Subject: [PATCH v6 11/11] ARM: mmp: avoid to use cpu_is_xxx in timer
 In-Reply-To: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1374833133-21119-11-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1374833133-21119-12-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support common clock in DTS file for arch mmp.
+Avoid to use cpu_is_xxx() in timer-mmp driver, since it blocks the
+multiplatform build. Now add mmp2_mode variable for legacy mode.
+In DT mode, set the right clock rate in DTS file.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/boot/dts/pxa168-aspenite.dts |   3 +
- arch/arm/boot/dts/pxa168-clk.dtsi     | 304 ++++++++++++++++++
- arch/arm/boot/dts/pxa168.dtsi         |  10 +
- arch/arm/boot/dts/pxa910-clk.dtsi     | 569 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/pxa910-dkb.dts      |  11 +
- arch/arm/boot/dts/pxa910.dtsi         |  12 +-
- 6 files changed, 908 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/pxa168-clk.dtsi
- create mode 100644 arch/arm/boot/dts/pxa910-clk.dtsi
+ arch/arm/Kconfig                      |  1 +
+ arch/arm/boot/dts/mmp2-brownstone.dts |  4 ++
+ arch/arm/boot/dts/pxa168-aspenite.dts |  1 +
+ arch/arm/boot/dts/pxa910-dkb.dts      |  1 +
+ arch/arm/mach-mmp/common.h            |  2 +-
+ arch/arm/mach-mmp/mmp-dt.c            | 14 ++++---
+ arch/arm/mach-mmp/mmp2-dt.c           | 12 ++++--
+ arch/arm/mach-mmp/mmp2.c              |  2 +-
+ arch/arm/mach-mmp/pxa168.c            |  2 +-
+ arch/arm/mach-mmp/pxa910.c            |  2 +-
+ drivers/clocksource/timer-mmp.c       | 72 +++++++++++++++++++++--------------
+ 11 files changed, 72 insertions(+), 41 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 76793a6..eed4919 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -553,6 +553,7 @@ config ARCH_MMP
+ 	depends on MMU
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
++	select CLKSRC_OF if OF
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_CLOCKEVENTS
+ 	select GPIO_PXA
+diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
+index 7f70a39..29c7dc6 100644
+--- a/arch/arm/boot/dts/mmp2-brownstone.dts
++++ b/arch/arm/boot/dts/mmp2-brownstone.dts
+@@ -24,6 +24,10 @@
+ 
+ 	soc {
+ 		apb at d4000000 {
++			timer0: timer at d4014000 {
++				clock-frequency = <6500000>;
++				status = "okay";
++			};
+ 			uart3: uart at d4018000 {
+ 				status = "okay";
+ 			};
 diff --git a/arch/arm/boot/dts/pxa168-aspenite.dts b/arch/arm/boot/dts/pxa168-aspenite.dts
-index e762fac..2597e98 100644
+index 2597e98..9b3d6d9 100644
 --- a/arch/arm/boot/dts/pxa168-aspenite.dts
 +++ b/arch/arm/boot/dts/pxa168-aspenite.dts
-@@ -24,6 +24,9 @@
- 
+@@ -25,6 +25,7 @@
  	soc {
  		apb at d4000000 {
-+			timer0: timer at d4014000 {
-+				status = "okay";
-+			};
- 			uart1: uart at d4017000 {
+ 			timer0: timer at d4014000 {
++				clock-frequency = <3250000>;
  				status = "okay";
  			};
-diff --git a/arch/arm/boot/dts/pxa168-clk.dtsi b/arch/arm/boot/dts/pxa168-clk.dtsi
-new file mode 100644
-index 0000000..c0d5bd1
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa168-clk.dtsi
-@@ -0,0 +1,304 @@
-+/*
-+ *  Copyright (C) 2013
-+ *  Author: Haojian Zhuang <haojian.zhuang@gmail.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	soc {
-+		apb at d4000000 {	/* APB */
-+			compatible = "mrvl,apb-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0xd4000000 0x00200000>;
-+			ranges;
-+
-+			mpmu: clocks at 50000 {
-+				compatible = "marvell,mmp-mpmu";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0xd4050000 0x1100>;
-+
-+				osc_32k: osc32khz {
-+					compatible = "fixed-clock";
-+					#clock-cells = <0>;
-+					clock-frequency = <32768>;
-+					clock-output-names = "osc32khz";
-+				};
-+				osc_26m: osc26mhz {
-+					compatible = "fixed-clock";
-+					#clock-cells = <0>;
-+					clock-frequency = <26000000>;
-+					clock-output-names = "osc26mhz";
-+				};
-+				pll1_312m: refclk312mhz {
-+					compatible = "marvell,mmp-fixed-clkrate";
-+					#clock-cells = <0>;
-+					clocks = <&osc_26m>;
-+					clock-frequency = <312000000>;
-+					clock-output-names = "refclk312mhz";
-+				};
-+				refclk156m: refclk156mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_312m>;
-+					clock-output-names = "refclk156mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk118m: refclk117mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk156m>;
-+					/* 117.9648MHz */
-+					clock-output-names = "refclk118mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <6144 8125>;
-+				};
-+				refclk104m: refclk104mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_312m>;
-+					clock-output-names = "refclk104mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 3>;
-+				};
-+				refclk59m: refclk59mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk118m>;
-+					clock-names = "baud_58.98mhz";
-+					/* 58.9824MHz */
-+					clock-output-names = "refclk59mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk15m: refclk15mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk156m>;
-+					clock-names = "baud_14.86mhz";
-+					/* 14.857MHz */
-+					clock-output-names = "refclk15mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <2 21>;
-+				};
-+			};
-+
-+			apbc: clocks at 15000 {
-+				compatible = "marvell,mmp-apbc";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				#clock-cells = <0>;
-+				reg = <0xd4015000 0x100>;
-+
-+				apbc_twsi1_clk: apbc_twsi1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&refclk32m>;
-+					clock-names = "apbc_twsi1_clk";
-+					/* register value of each item */
-+					mmp-clk-sel = <0>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x2c 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_twsi2_clk: apbc_twsi2_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&refclk32m>;
-+					clock-names = "apbc_twsi2_clk";
-+					/* register value of each item */
-+					mmp-clk-sel = <0>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x6c 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_rtc_clk: apbc_rtc_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&osc_32k>;
-+					clock-names = "apbc_rtc_clk";
-+					mmp-clk-sel = <0>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x28 0x70>;
-+					marvell,mmp-apbc-power-ctl;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_gpio_clk: apbc_gpio_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&refclk26m>;
-+					clock-names = "apbc_gpio_clk";
-+					mmp-clk-sel = <0>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x8 0x0>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_uart1_mux: apbc_uart1_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk59m &refclk15m>;
-+					clock-output-names = "apbc_uart1_mux";
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x0 0x70>;
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x10>;
-+				};
-+				apbc_uart1_clk: apbc_uart1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_uart1_mux>;
-+					clock-names = "apbc_uart1_clk";
-+					mmp-clk-reg = <0x0 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_uart2_mux: apbc_uart2_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk59m &refclk15m>;
-+					clock-output-names = "apbc_uart2_mux";
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0x70>;
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x10>;
-+				};
-+				apbc_uart2_clk: apbc_uart2_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_uart2_mux>;
-+					clock-names = "apbc_uart2_clk";
-+					mmp-clk-reg = <0x4 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_uart3_mux: apbc_uart3_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk59m &refclk15m>;
-+					clock-output-names = "apbc_uart3_mux";
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x70 0x70>;
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x10>;
-+				};
-+				apbc_uart3_clk: apbc_uart3_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_uart3_mux>;
-+					clock-names = "apbc_uart3_clk";
-+					mmp-clk-reg = <0x70 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm1_mux: apbc_pwm1_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm1_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0xc 0x70>;
-+				};
-+				apbc_pwm1_clk: apbc_pwm1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm1_mux>;
-+					clock-names = "apbc_pwm1_clk";
-+					mmp-clk-reg = <0xc 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm2_mux: apbc_pwm2_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm2_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0x10 0x70>;
-+				};
-+				apbc_pwm2_clk: apbc_pwm2_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm2_mux>;
-+					clock-names = "apbc_pwm2_clk";
-+					mmp-clk-reg = <0x10 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm3_mux: apbc_pwm3_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm3_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0x14 0x70>;
-+				};
-+				apbc_pwm3_clk: apbc_pwm3_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm3_mux>;
-+					clock-names = "apbc_pwm3_clk";
-+					mmp-clk-reg = <0x14 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm4_mux: apbc_pwm4_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm4_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0x18 0x70>;
-+				};
-+				apbc_pwm4_clk: apbc_pwm4_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm4_mux>;
-+					clock-names = "apbc_pwm4_clk";
-+					mmp-clk-reg = <0x18 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_kpc_mux: apbc_kpc_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&osc_32k &refclk16k &refclk26m>;
-+					clock-output-names = "apbc_kpc_mux";
-+					mmp-clk-sel = <0 0x10 0x20>;
-+					mmp-clk-reg = <0x30 0x70>;
-+				};
-+				apbc_kpc_clk: apbc_kpc_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_kpc_mux>;
-+					clock-names = "apbc_kpc_clk";
-+					mmp-clk-reg = <0x30 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_timer0_mux: apbc_timer0_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k &refclk7m &refclk3m>;
-+					clock-output-names = "apbc_timer0_mux";
-+					mmp-clk-sel = <0 0x10 0x20 0x30>;
-+					mmp-clk-reg = <0x34 0x70>;
-+				};
-+				apbc_timer0_clk: apbc_timer0_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&timer0_mux>;
-+					clock-names = "apbc_timer0_clk";
-+					mmp-clk-reg = <0x34 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+			};
-+			timer0_mux: timer0_mux {
-+				compatible = "marvell,mmp-clkmux";
-+				#clock-cells = <0>;
-+				clocks = <&apbc_timer0_mux &osc_32k>;
-+				clock-output-names = "timer0_mux";
-+				mmp-clk-sel = <0 0x2>;
-+				mmp-clk-reg = <0x14000 0x1c>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/pxa168.dtsi b/arch/arm/boot/dts/pxa168.dtsi
-index 975dad2..250bf2c 100644
---- a/arch/arm/boot/dts/pxa168.dtsi
-+++ b/arch/arm/boot/dts/pxa168.dtsi
-@@ -8,6 +8,7 @@
-  */
- 
- /include/ "skeleton.dtsi"
-+/include/ "pxa910-clk.dtsi"
- 
- / {
- 	aliases {
-@@ -53,12 +54,15 @@
- 				compatible = "mrvl,mmp-timer";
- 				reg = <0xd4014000 0x100>;
- 				interrupts = <13>;
-+				clocks = <&apbc_timer0_clk>;
-+				status = "disabled";
- 			};
- 
  			uart1: uart at d4017000 {
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4017000 0x1000>;
- 				interrupts = <27>;
-+				clocks = <&apbc_uart1_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -66,6 +70,7 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4018000 0x1000>;
- 				interrupts = <28>;
-+				clocks = <&apbc_uart2_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -73,6 +78,7 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4026000 0x1000>;
- 				interrupts = <29>;
-+				clocks = <&apbc_uart3_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -87,6 +93,7 @@
- 				interrupt-names = "gpio_mux";
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
-+				clocks = <&apbc_gpio_clk>;
- 				ranges;
- 
- 				gcb0: gpio at d4019000 {
-@@ -111,6 +118,7 @@
- 				reg = <0xd4011000 0x1000>;
- 				interrupts = <7>;
- 				mrvl,i2c-fast-mode;
-+				clocks = <&apbc_twsi1_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -118,6 +126,7 @@
- 				compatible = "mrvl,mmp-twsi";
- 				reg = <0xd4025000 0x1000>;
- 				interrupts = <58>;
-+				clocks = <&apbc_twsi2_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -126,6 +135,7 @@
- 				reg = <0xd4010000 0x1000>;
- 				interrupts = <5 6>;
- 				interrupt-names = "rtc 1Hz", "rtc alarm";
-+				clocks = <&apbc_rtc_clk>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/pxa910-clk.dtsi b/arch/arm/boot/dts/pxa910-clk.dtsi
-new file mode 100644
-index 0000000..2d9f9ca
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa910-clk.dtsi
-@@ -0,0 +1,569 @@
-+/*
-+ *  Copyright (C) 2013
-+ *  Author: Haojian Zhuang <haojian.zhuang@gmail.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	soc {
-+		axi at d4200000 {	/* AXI */
-+			compatible = "mrvl,axi-bus", "simple-bus";
-+			reg = <0xd4200000 0x00200000>;
-+			ranges;
-+
-+			apmu: clocks at 82800 {
-+				compatible = "marvell,mmp-apmu";
-+				reg = <0xd4282800 0x100>;
-+
-+				/*
-+				 * Processor clocks: pclk, pdclk, baclk, xpclk
-+				 * DDR Controller clocks: dclk
-+				 * AXI Fabric clocks: aclk
-+				 */
-+				pclk_refclk: refclk_pclk {
-+					compatible = "marvell,mmp-apmu-clkdiv";
-+					#clock-cells = <0>;
-+					clocks = <&pj1_refclk>;
-+					clock-output-names = "pclk";
-+					marvell,mmp-clock-frequency = <104000000 156000000 208000000 312000000 500500000 624000000 806000000 1001000000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0x7>;
-+				};
-+				/* pdclk -- DDR Interface clock */
-+				pdclk_refclk: refclk_pdclk {
-+					compatible = "marvell,mmp-apmu-clkdiv";
-+					#clock-cells = <0>;
-+					clocks = <&pj1_refclk>;
-+					clock-output-names = "pdclk";
-+					marvell,mmp-clock-frequency = <78000000 104000000 156000000 201000000 250250000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0x38>;
-+				};
-+				/* baclk -- AXI Fabric Bus Interface clock */
-+				baclk_refclk: refclk_baclk {
-+					compatible = "marvell,mmp-apmu-clkdiv";
-+					#clock-cells = <0>;
-+					clocks = <&pj1_refclk>;
-+					clock-output-names = "baclk";
-+					marvell,mmp-clock-frequency = <78000000 104000000 156000000 201000000 250250000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0x1c0>;
-+				};
-+				/* xpclk -- L2 interface clock */
-+				xpclk_refclk: refclk_xpclk {
-+					compatible = "marvell,mmp-apmu-clkdiv";
-+					#clock-cells = <0>;
-+					clocks = <&pj1_refclk>;
-+					clock-output-names = "xpclk";
-+					marvell,mmp-clock-frequency = <104000000 156000000 250250000 312000000 403000000 500500000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0xe00>;
-+				};
-+				/* dclk -- DDR Controller clock */
-+				dclk2x_refclk: refclk_dclk2x {
-+					compatible = "marvell,mmp-apmu-clkdiv";
-+					#clock-cells = <0>;
-+					clocks = <&ddr_refclk>;
-+					clock-output-names = "dclk2x";
-+					marvell,mmp-clock-frequency = <208000000 312000000 402000000 500500000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0x7000>;
-+				};
-+				dclk_refclk: refclk_dclk {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&dclk2x_refclk>;
-+					clock-output-names = "dclk";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				/* aclk -- AXI Fabric clock */
-+				aclk_refclk: refclk_aclk {
-+					compatible = "marvell,mmp-apmu-clkdiv";
-+					#clock-cells = <0>;
-+					clocks = <&axi_refclk>;
-+					clock-output-names = "aclk";
-+					marvell,mmp-clock-frequency = <104000000 156000000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0x38000>;
-+				};
-+			};
-+		};
-+
-+		apb at d4000000 {	/* APB */
-+			compatible = "mrvl,apb-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0xd4000000 0x00200000>;
-+			ranges;
-+
-+			mpmu: clocks at 50000 {
-+				compatible = "marvell,mmp-mpmu";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0xd4050000 0x1100>;
-+
-+				osc_32k: osc32khz {
-+					compatible = "fixed-clock";
-+					#clock-cells = <0>;
-+					clock-frequency = <32768>;
-+					clock-output-names = "osc32khz";
-+				};
-+				osc_26m: osc26mhz {
-+					compatible = "fixed-clock";
-+					#clock-cells = <0>;
-+					clock-frequency = <26000000>;
-+					clock-output-names = "osc26mhz";
-+				};
-+				pll1_312m: refclk312mhz {
-+					compatible = "marvell,mmp-fixed-clkrate";
-+					#clock-cells = <0>;
-+					clocks = <&osc_26m>;
-+					clock-frequency = <312000000>;
-+					clock-output-names = "refclk312mhz";
-+				};
-+				pll1_624m: refclk624mhz {
-+					compatible = "marvell,mmp-fixed-clkrate";
-+					#clock-cells = <0>;
-+					clocks = <&osc_26m>;
-+					clock-frequency = <624000000>;
-+					clock-output-names = "refclk624mhz";
-+				};
-+				pj1_refclk: refclk_pj1 {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_312m &pll1_624m &pll2>;
-+					clock-output-names = "refclk_pj1";
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x20000000 0x40000000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x8 0xe0000000>;
-+				};
-+				ddr_refclk: refclk_ddr {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_312m &pll1_624m &pll2>;
-+					clock-output-names = "refclk_ddr";
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x00800000 0x01000000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x8 0x01800000>;
-+				};
-+				axi_refclk: refclk_axi {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_312m &pll1_624m>;
-+					clock-output-names = "refclk_axi";
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x00080000>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x8 0x00080000>;
-+				};
-+				refclk156m: refclk156mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_312m>;
-+					clock-output-names = "refclk156mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk118m: refclk117mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk156m>;
-+					/* 117.9648MHz */
-+					clock-output-names = "refclk118mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <6144 8125>;
-+				};
-+				refclk104m: refclk104mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_312m>;
-+					clock-output-names = "refclk104mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 3>;
-+				};
-+				refclk59m: refclk59mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk118m>;
-+					clock-names = "baud_58.98mhz";
-+					/* 58.9824MHz */
-+					clock-output-names = "refclk59mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk52m: refclk52mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk104m>;
-+					clock-output-names = "refclk52mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk48m: refclk48mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&pll1_624m>;
-+					clock-output-names = "refclk48mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 13>;
-+				};
-+				refclk32m: refclk32mhz@ {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk48m>;
-+					clock-output-names = "refclk32mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <2 3>;
-+				};
-+				refclk26m: refclk26mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk52m>;
-+					clock-output-names = "refclk26mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk15m: refclk15mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk156m>;
-+					clock-names = "baud_14.86mhz";
-+					/* 14.857MHz */
-+					clock-output-names = "refclk15mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <2 21>;
-+				};
-+				refclk13m: refclk13mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk26m>;
-+					clock-output-names = "refclk13mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk7m: refclk7mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m>;
-+					clock-output-names = "refclk7mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk3m: refclk3mhz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&refclk7m>;
-+					clock-output-names = "refclk3mhz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+				refclk16k: refclk16khz {
-+					compatible = "marvell,mmp-fixed-clkfactor";
-+					#clock-cells = <0>;
-+					clocks = <&osc_32k>;
-+					clock-output-names = "refclk16khz";
-+					/* multiple & divider */
-+					mmp-fixed-factor = <1 2>;
-+				};
-+			};
-+
-+			apbc: clocks at 15000 {
-+				compatible = "marvell,mmp-apbc";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				#clock-cells = <0>;
-+				reg = <0xd4015000 0x100>;
-+
-+				apbc_twsi1_clk: apbc_twsi1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&refclk32m>;
-+					clock-names = "apbc_twsi1_clk";
-+					/* register value of each item */
-+					mmp-clk-sel = <0>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x2c 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_rtc_clk: apbc_rtc_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&osc_32k>;
-+					clock-names = "apbc_rtc_clk";
-+					mmp-clk-sel = <0>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x28 0x70>;
-+					marvell,mmp-apbc-power-ctl;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_gpio_clk: apbc_gpio_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&refclk26m>;
-+					clock-names = "apbc_gpio_clk";
-+					mmp-clk-sel = <0>;
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x8 0x0>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_uart1_mux: apbc_uart1_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk59m &refclk15m>;
-+					clock-output-names = "apbc_uart1_mux";
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x0 0x70>;
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x10>;
-+				};
-+				apbc_uart1_clk: apbc_uart1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_uart1_mux>;
-+					clock-names = "apbc_uart1_clk";
-+					mmp-clk-reg = <0x0 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_uart2_mux: apbc_uart2_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk59m &refclk15m>;
-+					clock-output-names = "apbc_uart2_mux";
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x4 0x70>;
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x10>;
-+				};
-+				apbc_uart2_clk: apbc_uart2_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_uart2_mux>;
-+					clock-names = "apbc_uart2_clk";
-+					mmp-clk-reg = <0x4 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm1_mux: apbc_pwm1_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm1_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0xc 0x70>;
-+				};
-+				apbc_pwm1_clk: apbc_pwm1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm1_mux>;
-+					clock-names = "apbc_pwm1_clk";
-+					mmp-clk-reg = <0xc 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm2_mux: apbc_pwm2_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm2_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0x10 0x70>;
-+				};
-+				apbc_pwm2_clk: apbc_pwm2_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm2_mux>;
-+					clock-names = "apbc_pwm2_clk";
-+					mmp-clk-reg = <0x10 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm3_mux: apbc_pwm3_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm3_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0x14 0x70>;
-+				};
-+				apbc_pwm3_clk: apbc_pwm3_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm3_mux>;
-+					clock-names = "apbc_pwm3_clk";
-+					mmp-clk-reg = <0x14 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_pwm4_mux: apbc_pwm4_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k>;
-+					clock-output-names = "apbc_pwm4_mux";
-+					mmp-clk-sel = <0 0x10>;
-+					mmp-clk-reg = <0x18 0x70>;
-+				};
-+				apbc_pwm4_clk: apbc_pwm4_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_pwm4_mux>;
-+					clock-names = "apbc_pwm4_clk";
-+					mmp-clk-reg = <0x18 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_ssp1_mux: apbc_ssp1_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk7m &refclk13m &refclk26m &refclk52m>;
-+					clock-output-names = "apbc_ssp1_mux";
-+					mmp-clk-sel = <0 0x10 0x20 0x30>;
-+					mmp-clk-reg = <0x1c 0x70>;
-+				};
-+				apbc_ssp1_clk: apbc_ssp1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_ssp1_mux>;
-+					clock-names = "apbc_ssp1_clk";
-+					mmp-clk-reg = <0x1c 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_ssp2_mux: apbc_ssp2_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk7m &refclk13m &refclk26m &refclk52m>;
-+					clock-output-names = "apbc_ssp2_mux";
-+					mmp-clk-sel = <0 0x10 0x20 0x30>;
-+					mmp-clk-reg = <0x20 0x70>;
-+				};
-+				apbc_ssp2_clk: apbc_ssp2_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_ssp2_mux>;
-+					clock-names = "apbc_ssp2_clk";
-+					mmp-clk-reg = <0x20 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_ssp3_mux: apbc_ssp3_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk7m &refclk13m &refclk26m &refclk52m>;
-+					clock-output-names = "apbc_ssp3_mux";
-+					mmp-clk-sel = <0 0x10 0x20 0x30>;
-+					mmp-clk-reg = <0x4c 0x70>;
-+				};
-+				apbc_ssp3_clk: apbc_ssp3_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_ssp3_mux>;
-+					clock-names = "apbc_ssp3_clk";
-+					mmp-clk-reg = <0x4c 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_kpc_mux: apbc_kpc_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&osc_32k &refclk16k &refclk26m>;
-+					clock-output-names = "apbc_kpc_mux";
-+					mmp-clk-sel = <0 0x10 0x20>;
-+					mmp-clk-reg = <0x30 0x70>;
-+				};
-+				apbc_kpc_clk: apbc_kpc_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbc_kpc_mux>;
-+					clock-names = "apbc_kpc_clk";
-+					mmp-clk-reg = <0x30 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_timer0_mux: apbc_timer0_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k &refclk7m &refclk3m>;
-+					clock-output-names = "apbc_timer0_mux";
-+					mmp-clk-sel = <0 0x10 0x20 0x30>;
-+					mmp-clk-reg = <0x34 0x70>;
-+				};
-+				apbc_timer0_clk: apbc_timer0_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&timer0_mux>;
-+					clock-names = "apbc_timer0_clk";
-+					mmp-clk-reg = <0x34 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbc_timer1_mux: apbc_timer1_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk13m &osc_32k &refclk7m &refclk3m>;
-+					clock-output-names = "apbc_timer1_mux";
-+					mmp-clk-sel = <0 0x10 0x20 0x30>;
-+					mmp-clk-reg = <0x44 0x70>;
-+				};
-+				apbc_timer1_clk: apbc_timer1_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&timer1_mux>;
-+					clock-names = "apbc_timer1_clk";
-+					mmp-clk-reg = <0x44 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+			};
-+
-+			apbcp: clocks at 3b000 {
-+				compatible = "marvell,mmp-apbcp";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0xd403b000 0x100>;
-+
-+				apbcp_twsi2_clk: apbcp_twsi2_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&refclk32m>;
-+					clock-output-names = "apbcp_twsi2_clk";
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x28 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+				apbcp_uart3_mux: apbcp_uart3_mux {
-+					compatible = "marvell,mmp-clkmux";
-+					#clock-cells = <0>;
-+					clocks = <&refclk59m &refclk15m>;
-+					clock-output-names = "apbcp_uart3_mux";
-+					/* register offset & mask */
-+					mmp-clk-reg = <0x1c 0x70>;
-+					/* register value of each item */
-+					mmp-clk-sel = <0 0x10>;
-+				};
-+				apbcp_uart3_clk: apbcp_uart3_clk {
-+					compatible = "marvell,mmp-apbc-clk";
-+					#clock-cells = <0>;
-+					clocks = <&apbcp_uart3_mux>;
-+					clock-names = "apbcp_uart3_clk";
-+					mmp-clk-reg = <0x1c 0x70>;
-+					mmp-clk-delay = <10>;
-+				};
-+			};
-+
-+			timer0_mux: timer0_mux {
-+				compatible = "marvell,mmp-clkmux";
-+				#clock-cells = <0>;
-+				clocks = <&refclk3m &osc_32k &apbc_timer0_mux>;
-+				clock-output-names = "timer0_mux";
-+				mmp-clk-sel = <0 0x1 0x3>;
-+				mmp-clk-reg = <0x14000 0x1c>;
-+			};
-+
-+			timer1_mux: timer1_mux {
-+				compatible = "marvell,mmp-clkmux";
-+				#clock-cells = <0>;
-+				clocks = <&refclk3m &osc_32k &apbc_timer1_mux>;
-+				clock-output-names = "timer1_mux";
-+				mmp-clk-sel = <0 0x1 0x3>;
-+				mmp-clk-reg = <0x16000 0x1c>;
-+			};
-+		};
-+	};
-+};
 diff --git a/arch/arm/boot/dts/pxa910-dkb.dts b/arch/arm/boot/dts/pxa910-dkb.dts
-index 595492a..b892ebe 100644
+index b892ebe..3cd1a85 100644
 --- a/arch/arm/boot/dts/pxa910-dkb.dts
 +++ b/arch/arm/boot/dts/pxa910-dkb.dts
-@@ -24,6 +24,17 @@
- 
- 	soc {
- 		apb at d4000000 {
-+			pll2: refclk1001mhz {
-+				/* Reference clock for internal PLL2 */
-+				compatible = "marvell,mmp-fixed-clkrate";
-+				#clock-cells = <0>;
-+				clocks = <&osc_26m>;
-+				clock-frequency = <1001000000>;
-+				clock-output-names = "refclk1001mhz";
-+			};
-+			timer0: timer at d4014000 {
-+				status = "okay";
-+			};
- 			uart1: uart at d4017000 {
+@@ -33,6 +33,7 @@
+ 				clock-output-names = "refclk1001mhz";
+ 			};
+ 			timer0: timer at d4014000 {
++				clock-frequency = <3250000>;
  				status = "okay";
  			};
-diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
-index 0247c62..cd888d3 100644
---- a/arch/arm/boot/dts/pxa910.dtsi
-+++ b/arch/arm/boot/dts/pxa910.dtsi
-@@ -8,6 +8,7 @@
+ 			uart1: uart at d4017000 {
+diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
+index 22e67c6..2415282 100644
+--- a/arch/arm/mach-mmp/common.h
++++ b/arch/arm/mach-mmp/common.h
+@@ -1,7 +1,7 @@
+ #include <linux/reboot.h>
+ #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
+ 
+-extern void timer_init(void __iomem *base, int irq);
++extern void timer_init(void __iomem *base, int irq, int mmp2_mode);
+ 
+ extern void __init mmp_map_io(void);
+ extern void mmp_restart(enum reboot_mode, const char *);
+diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
+index f109bf6..8d0253b 100644
+--- a/arch/arm/mach-mmp/mmp-dt.c
++++ b/arch/arm/mach-mmp/mmp-dt.c
+@@ -10,6 +10,7 @@
   */
  
- /include/ "skeleton.dtsi"
-+/include/ "pxa910-clk.dtsi"
+ #include <linux/clk-provider.h>
++#include <linux/clocksource.h>
+ #include <linux/irqchip.h>
+ #include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
+@@ -17,8 +18,6 @@
  
- / {
- 	aliases {
-@@ -44,7 +45,6 @@
- 				reg = <0xd4282000 0x1000>;
- 				mrvl,intc-nr-irqs = <64>;
- 			};
+ #include "common.h"
+ 
+-extern void __init mmp_dt_init_timer(void);
 -
- 		};
+ static const struct of_dev_auxdata pxa168_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
+ 	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
+@@ -49,7 +48,6 @@ static void __init pxa168_dt_init(void)
  
- 		apb at d4000000 {	/* APB */
-@@ -58,12 +58,15 @@
- 				compatible = "mrvl,mmp-timer";
- 				reg = <0xd4014000 0x100>;
- 				interrupts = <13>;
-+				clocks = <&apbc_timer0_clk>;
-+				status = "disabled";
- 			};
+ static void __init pxa910_dt_init(void)
+ {
+-	of_clk_init(NULL);
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     pxa910_auxdata_lookup, NULL);
+ }
+@@ -60,16 +58,22 @@ static const char *mmp_dt_board_compat[] __initdata = {
+ 	NULL,
+ };
  
- 			timer1: timer at d4016000 {
- 				compatible = "mrvl,mmp-timer";
- 				reg = <0xd4016000 0x100>;
- 				interrupts = <29>;
-+				clocks = <&apbc_timer1_clk>;
- 				status = "disabled";
- 			};
++static void __init mmp_init_timer(void)
++{
++	of_clk_init(NULL);
++	clocksource_of_init();
++}
++
+ DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
+ 	.map_io		= mmp_map_io,
+-	.init_time	= mmp_dt_init_timer,
++	.init_time	= mmp_init_timer,
+ 	.init_machine	= pxa168_dt_init,
+ 	.dt_compat	= mmp_dt_board_compat,
+ MACHINE_END
  
-@@ -71,6 +74,7 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4017000 0x1000>;
- 				interrupts = <27>;
-+				clocks = <&apbc_uart1_clk>;
- 				status = "disabled";
- 			};
+ DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
+ 	.map_io		= mmp_map_io,
+-	.init_time	= mmp_dt_init_timer,
++	.init_time	= mmp_init_timer,
+ 	.init_machine	= pxa910_dt_init,
+ 	.dt_compat	= mmp_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
+index 023cb45..2229d1d 100644
+--- a/arch/arm/mach-mmp/mmp2-dt.c
++++ b/arch/arm/mach-mmp/mmp2-dt.c
+@@ -9,6 +9,8 @@
+  *  publishhed by the Free Software Foundation.
+  */
  
-@@ -78,6 +82,7 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4018000 0x1000>;
- 				interrupts = <28>;
-+				clocks = <&apbc_uart2_clk>;
- 				status = "disabled";
- 			};
++#include <linux/clk-provider.h>
++#include <linux/clocksource.h>
+ #include <linux/io.h>
+ #include <linux/irqchip.h>
+ #include <linux/of_platform.h>
+@@ -17,8 +19,6 @@
  
-@@ -85,6 +90,7 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4036000 0x1000>;
- 				interrupts = <59>;
-+				clocks = <&apbcp_uart3_clk>;
- 				status = "disabled";
- 			};
+ #include "common.h"
  
-@@ -99,6 +105,7 @@
- 				interrupt-names = "gpio_mux";
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
-+				clocks = <&apbc_gpio_clk>;
- 				ranges;
+-extern void __init mmp_dt_init_timer(void);
+-
+ static const struct of_dev_auxdata mmp2_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4030000, "pxa2xx-uart.0", NULL),
+ 	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.1", NULL),
+@@ -37,6 +37,12 @@ static void __init mmp2_dt_init(void)
+ 			     mmp2_auxdata_lookup, NULL);
+ }
  
- 				gcb0: gpio at d4019000 {
-@@ -124,6 +131,7 @@
- 				#size-cells = <0>;
- 				reg = <0xd4011000 0x1000>;
- 				interrupts = <7>;
-+				clocks = <&apbc_twsi1_clk>;
- 				mrvl,i2c-fast-mode;
- 				status = "disabled";
- 			};
-@@ -134,6 +142,7 @@
- 				#size-cells = <0>;
- 				reg = <0xd4037000 0x1000>;
- 				interrupts = <54>;
-+				clocks = <&apbcp_twsi2_clk>;
- 				status = "disabled";
- 			};
++static void __init mmp2_init_timer(void)
++{
++	of_clk_init(NULL);
++	clocksource_of_init();
++}
++
+ static const char *mmp2_dt_board_compat[] __initdata = {
+ 	"mrvl,mmp2-brownstone",
+ 	NULL,
+@@ -44,7 +50,7 @@ static const char *mmp2_dt_board_compat[] __initdata = {
  
-@@ -142,6 +151,7 @@
- 				reg = <0xd4010000 0x1000>;
- 				interrupts = <5 6>;
- 				interrupt-names = "rtc 1Hz", "rtc alarm";
-+				clocks = <&apbc_rtc_clk>;
- 				status = "disabled";
- 			};
- 		};
+ DT_MACHINE_START(MMP2_DT, "Marvell MMP2 (Device Tree Support)")
+ 	.map_io		= mmp_map_io,
+-	.init_time	= mmp_dt_init_timer,
++	.init_time	= mmp2_init_timer,
+ 	.init_machine	= mmp2_dt_init,
+ 	.dt_compat	= mmp2_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index a0abfd7..d00c0fe 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -131,7 +131,7 @@ void __init mmp2_timer_init(void)
+ 	clk_rst = APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(1);
+ 	__raw_writel(clk_rst, APBC_TIMERS);
+ 
+-	timer_init(TIMER1_VIRT_BASE, IRQ_MMP2_TIMER1);
++	timer_init(TIMER1_VIRT_BASE, IRQ_MMP2_TIMER1, 1);
+ }
+ 
+ /* on-chip devices */
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index a332d51..28fba2b 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -78,7 +78,7 @@ void __init pxa168_timer_init(void)
+ 	/* 3.25MHz, bus/functional clock enabled, release reset */
+ 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
+ 
+-	timer_init(TIMER1_VIRT_BASE, IRQ_PXA168_TIMER1);
++	timer_init(TIMER1_VIRT_BASE, IRQ_PXA168_TIMER1, 0);
+ }
+ 
+ void pxa168_clear_keypad_wakeup(void)
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 1a84800..0e98bf3 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -112,7 +112,7 @@ void __init pxa910_timer_init(void)
+ 	__raw_writel(APBC_APBCLK | APBC_RST, APBC_TIMERS);
+ 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
+ 
+-	timer_init(TIMER1_VIRT_BASE, IRQ_PXA910_AP1_TIMER1);
++	timer_init(TIMER1_VIRT_BASE, IRQ_PXA910_AP1_TIMER1, 0);
+ }
+ 
+ /* on-chip devices */
+diff --git a/drivers/clocksource/timer-mmp.c b/drivers/clocksource/timer-mmp.c
+index 937d51e..7e1fc75 100644
+--- a/drivers/clocksource/timer-mmp.c
++++ b/drivers/clocksource/timer-mmp.c
+@@ -21,6 +21,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
++#include <linux/clk-provider.h>
+ #include <linux/clockchips.h>
+ 
+ #include <linux/io.h>
+@@ -30,8 +31,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/sched_clock.h>
+ 
+-#include <mach/irqs.h>
+-#include <mach/cputype.h>
+ #include <asm/mach/time.h>
+ 
+ #define TMR_CCR		(0x0000)
+@@ -177,16 +176,19 @@ static struct clocksource cksrc = {
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+-static void __init timer_config(void)
++static void __init timer_init_clk(int mmp2_mode)
+ {
+ 	uint32_t ccr = __raw_readl(mmp_timer_base + TMR_CCR);
+ 
+ 	__raw_writel(0x0, mmp_timer_base + TMR_CER); /* disable */
+ 
+-	ccr &= (cpu_is_mmp2()) ? (TMR_CCR_CS_0(0) | TMR_CCR_CS_1(0)) :
++	ccr &= mmp2_mode ? (TMR_CCR_CS_0(0) | TMR_CCR_CS_1(0)) :
+ 		(TMR_CCR_CS_0(3) | TMR_CCR_CS_1(3));
+ 	__raw_writel(ccr, mmp_timer_base + TMR_CCR);
++}
+ 
++static void __init timer_config(void)
++{
+ 	/* set timer 0 to periodic mode, and timer 1 to free-running mode */
+ 	__raw_writel(0x2, mmp_timer_base + TMR_CMR);
+ 
+@@ -209,11 +211,12 @@ static struct irqaction timer_irq = {
+ 	.dev_id		= &ckevt,
+ };
+ 
+-void __init timer_init(void __iomem *base, int irq)
++void __init timer_init(void __iomem *base, int irq, int mmp2_mode)
+ {
+ 	BUG_ON(!base);
+ 	mmp_timer_base = base;
+ 
++	timer_init_clk(mmp2_mode);
+ 	timer_config();
+ 
+ 	setup_sched_clock(mmp_read_sched_clock, 32, CLOCK_TICK_RATE);
+@@ -227,36 +230,47 @@ void __init timer_init(void __iomem *base, int irq)
+ 					MIN_DELTA, MAX_DELTA);
+ }
+ 
+-#ifdef CONFIG_OF
+-static struct of_device_id mmp_timer_dt_ids[] = {
+-	{ .compatible = "mrvl,mmp-timer", },
+-	{}
+-};
+-
+-void __init mmp_dt_init_timer(void)
++static void __init mmp_dt_init_timer(struct device_node *np)
+ {
+-	struct device_node *np;
+-	int irq, ret;
+-
+-	np = of_find_matching_node(NULL, mmp_timer_dt_ids);
+-	if (!np) {
+-		ret = -ENODEV;
+-		goto out;
++	struct clk *clk;
++	int irq;
++	u32 rate = 0;
++
++	if (!of_device_is_available(np))
++		return;
++	if (of_property_read_u32(np, "clock-frequency", &rate)) {
++		pr_err("failed to find clock-frequency property\n");
++		return;
+ 	}
+-
+ 	irq = irq_of_parse_and_map(np, 0);
+-	if (!irq) {
+-		ret = -EINVAL;
+-		goto out;
++	if (!irq)
++		return;
++	clk = of_clk_get(np, 0);
++	if (IS_ERR(clk)) {
++		pr_err("failed to get timer clock\n");
++		return;
+ 	}
+ 	mmp_timer_base = of_iomap(np, 0);
+-	if (!mmp_timer_base) {
+-		ret = -ENOMEM;
++	if (!mmp_timer_base)
+ 		goto out;
+-	}
+-	timer_init(mmp_timer_base, irq);
++
++	__raw_writel(0x0, mmp_timer_base + TMR_CER); /* disable */
++	if (rate)
++		clk_set_rate(clk, rate);
++	clk_prepare_enable(clk);
++	timer_config();
++
++	setup_sched_clock(mmp_read_sched_clock, 32, rate);
++
++	ckevt.cpumask = cpumask_of(0);
++
++	setup_irq(irq, &timer_irq);
++
++	clocksource_register_hz(&cksrc, rate);
++	clockevents_config_and_register(&ckevt, rate,
++					MIN_DELTA, MAX_DELTA);
+ 	return;
+ out:
+-	pr_err("Failed to get timer from device tree with error:%d\n", ret);
++	clk_put(clk);
+ }
+-#endif
++CLOCKSOURCE_OF_DECLARE(mmp_timer, "mrvl,mmp-timer", mmp_dt_init_timer);
 -- 
 1.8.1.2
