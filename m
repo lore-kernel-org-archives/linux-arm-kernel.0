@@ -1,160 +1,88 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 26 Jul 2013 09:11:26 +0900
-Subject: [PATCH v2] ARM: shmobile: Add lager defconfig
-In-Reply-To: <1374566966-30345-1-git-send-email-horms+renesas@verge.net.au>
-References: <1374566966-30345-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130726001125.GB28912@verge.net.au>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 25 Jul 2013 19:19:52 -0500
+Subject: [PATCH 02/12] ARM: ep93xx: vision_ep9307: Use MMC CD and RO GPIO
+In-Reply-To: <1374794808-21890-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374794808-21890-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1374794808-21890-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0021DAC5C20AC@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 05:09:26PM +0900, Simon Horman wrote:
-> This is intended to be used until multi-arch is able to be
-> used for the lager board at which time a more generic configuration
-> will be used in place of this one.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Magnus, could your review this?
-
-> 
+On Thursday, July 25, 2013 4:27 PM, Laurent Pinchart wrote:
+>
+> Pass the CD and RO GPIO numbers to the MMC SPI driver and remove the
+> custom .get_cd() and .get_ro() callback functions.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > ---
-> 
-> v2
-> * Place defconfig in correct directory
-> * Bump SERIAL_SH_SCI_NR_UARTS up to 10 to reflect the
->   number of devices present
-> ---
->  arch/arm/configs/lager_defconfig | 121 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 121 insertions(+)
->  create mode 100644 arch/arm/configs/lager_defconfig
-> 
-> diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
-> new file mode 100644
-> index 0000000..f9efae1
-> --- /dev/null
-> +++ b/arch/arm/configs/lager_defconfig
-> @@ -0,0 +1,121 @@
-> +CONFIG_SYSVIPC=y
-> +CONFIG_NO_HZ=y
-> +CONFIG_IKCONFIG=y
-> +CONFIG_IKCONFIG_PROC=y
-> +CONFIG_LOG_BUF_SHIFT=16
-> +CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-> +CONFIG_SYSCTL_SYSCALL=y
-> +CONFIG_EMBEDDED=y
-> +CONFIG_PERF_EVENTS=y
-> +CONFIG_SLAB=y
-> +# CONFIG_LBDAF is not set
-> +# CONFIG_BLK_DEV_BSG is not set
-> +# CONFIG_IOSCHED_DEADLINE is not set
-> +# CONFIG_IOSCHED_CFQ is not set
-> +CONFIG_ARCH_SHMOBILE=y
-> +CONFIG_ARCH_R8A7790=y
-> +CONFIG_MACH_LAGER=y
-> +# CONFIG_SH_TIMER_TMU is not set
-> +# CONFIG_EM_TIMER_STI is not set
-> +# CONFIG_SWP_EMULATE is not set
-> +CONFIG_ARM_ERRATA_430973=y
-> +CONFIG_ARM_ERRATA_458693=y
-> +CONFIG_ARM_ERRATA_460075=y
-> +CONFIG_ARM_ERRATA_743622=y
-> +CONFIG_ARM_ERRATA_754322=y
-> +CONFIG_SMP=y
-> +CONFIG_NR_CPUS=2
-> +# CONFIG_LOCAL_TIMERS is not set
-> +CONFIG_AEABI=y
-> +# CONFIG_OABI_COMPAT is not set
-> +CONFIG_FORCE_MAX_ZONEORDER=13
-> +CONFIG_ZBOOT_ROM_TEXT=0x0
-> +CONFIG_ZBOOT_ROM_BSS=0x0
-> +CONFIG_ARM_APPENDED_DTB=y
-> +CONFIG_KEXEC=y
-> +CONFIG_AUTO_ZRELADDR=y
-> +CONFIG_VFP=y
-> +CONFIG_NEON=y
-> +# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-> +CONFIG_PM_RUNTIME=y
-> +CONFIG_NET=y
-> +CONFIG_PACKET=y
-> +CONFIG_UNIX=y
-> +CONFIG_INET=y
-> +CONFIG_IP_PNP=y
-> +CONFIG_IP_PNP_DHCP=y
-> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-> +# CONFIG_INET_XFRM_MODE_BEET is not set
-> +# CONFIG_INET_LRO is not set
-> +# CONFIG_INET_DIAG is not set
-> +# CONFIG_IPV6 is not set
-> +# CONFIG_WIRELESS is not set
-> +CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> +CONFIG_NETDEVICES=y
-> +# CONFIG_NET_CORE is not set
-> +# CONFIG_NET_VENDOR_ARC is not set
-> +# CONFIG_NET_CADENCE is not set
-> +# CONFIG_NET_VENDOR_BROADCOM is not set
-> +# CONFIG_NET_VENDOR_CIRRUS is not set
-> +# CONFIG_NET_VENDOR_FARADAY is not set
-> +# CONFIG_NET_VENDOR_INTEL is not set
-> +# CONFIG_NET_VENDOR_MARVELL is not set
-> +# CONFIG_NET_VENDOR_MICREL is not set
-> +# CONFIG_NET_VENDOR_NATSEMI is not set
-> +CONFIG_SH_ETH=y
-> +# CONFIG_NET_VENDOR_SEEQ is not set
-> +# CONFIG_NET_VENDOR_SMSC is not set
-> +# CONFIG_NET_VENDOR_STMICRO is not set
-> +# CONFIG_NET_VENDOR_VIA is not set
-> +# CONFIG_NET_VENDOR_WIZNET is not set
-> +# CONFIG_WLAN is not set
-> +# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-> +CONFIG_INPUT_EVDEV=y
-> +# CONFIG_KEYBOARD_ATKBD is not set
-> +CONFIG_KEYBOARD_GPIO=y
-> +# CONFIG_INPUT_MOUSE is not set
-> +# CONFIG_SERIO is not set
-> +# CONFIG_LEGACY_PTYS is not set
-> +CONFIG_SERIAL_SH_SCI=y
-> +CONFIG_SERIAL_SH_SCI_NR_UARTS=10
-> +CONFIG_SERIAL_SH_SCI_CONSOLE=y
-> +# CONFIG_HW_RANDOM is not set
-> +CONFIG_I2C=y
-> +CONFIG_I2C_GPIO=y
-> +CONFIG_I2C_SH_MOBILE=y
-> +CONFIG_GPIO_SH_PFC=y
-> +CONFIG_GPIOLIB=y
-> +CONFIG_GPIO_RCAR=y
-> +# CONFIG_HWMON is not set
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +# CONFIG_USB_SUPPORT is not set
-> +CONFIG_MMC=y
-> +CONFIG_MMC_SDHI=y
-> +CONFIG_MMC_SH_MMCIF=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
-> +CONFIG_RTC_CLASS=y
-> +CONFIG_DMADEVICES=y
-> +CONFIG_SH_DMAE=y
-> +# CONFIG_IOMMU_SUPPORT is not set
-> +# CONFIG_DNOTIFY is not set
-> +CONFIG_MSDOS_FS=y
-> +CONFIG_VFAT_FS=y
-> +CONFIG_TMPFS=y
-> +CONFIG_CONFIGFS_FS=y
-> +# CONFIG_MISC_FILESYSTEMS is not set
-> +CONFIG_NFS_FS=y
-> +CONFIG_NFS_V3_ACL=y
-> +CONFIG_NFS_V4=y
-> +CONFIG_NFS_V4_1=y
-> +CONFIG_ROOT_NFS=y
-> +CONFIG_NLS_CODEPAGE_437=y
-> +CONFIG_NLS_ISO8859_1=y
-> +# CONFIG_ENABLE_WARN_DEPRECATED is not set
-> +# CONFIG_ENABLE_MUST_CHECK is not set
-> +# CONFIG_ARM_UNWIND is not set
-> +# CONFIG_CRYPTO_ANSI_CPRNG is not set
-> +# CONFIG_CRYPTO_HW is not set
-> -- 
-> 1.8.2.1
-> 
+>  arch/arm/mach-ep93xx/vision_ep9307.c | 56 +++---------------------------------
+>  1 file changed, 4 insertions(+), 52 deletions(-)
+>
+> diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+> index 605956f..ab94dc5 100644
+> --- a/arch/arm/mach-ep93xx/vision_ep9307.c
+> +++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+> @@ -224,62 +224,14 @@ static struct ep93xx_spi_chip_ops vision_spi_flash_hw = {
+>  #define VISION_SPI_MMC_WP	EP93XX_GPIO_LINE_F(0)
+>  #define VISION_SPI_MMC_CD	EP93XX_GPIO_LINE_EGPIO15
+>  
+> -static struct gpio vision_spi_mmc_gpios[] = {
+> -	{ VISION_SPI_MMC_WP, GPIOF_DIR_IN, "mmc_spi:wp" },
+> -	{ VISION_SPI_MMC_CD, GPIOF_DIR_IN, "mmc_spi:cd" },
+> -};
+> -
+> -static int vision_spi_mmc_init(struct device *pdev,
+> -			irqreturn_t (*func)(int, void *), void *pdata)
+> -{
+> -	int err;
+> -
+> -	err = gpio_request_array(vision_spi_mmc_gpios,
+> -				 ARRAY_SIZE(vision_spi_mmc_gpios));
+> -	if (err)
+> -		return err;
+> -
+> -	err = gpio_set_debounce(VISION_SPI_MMC_CD, 1);
+> -	if (err)
+> -		goto exit_err;
+
+I tested this and it _kind_ of works.
+
+The card detect is a bit flaky due to the gpio interrupt debounce not being enabled.
+
+The only way I can see to fix this is add the following to this patch:
+
+@@ -233,8 +233,31 @@ static struct mmc_spi_platform_data vision_spi_mmc_data = {
+        .caps2          = MMC_CAP2_RO_ACTIVE_HIGH,
+ };
+ 
++static int vision_spi_mmc_enable_cd_debounce(struct spi_device *spi)
++{
++       int ret;
++
++       ret = gpio_request_one(VISION_SPI_MMC_CD, GPIOF_DIR_IN, spi->modalias);
++       if (ret)
++               return ret;
++
++       ret = gpio_set_debounce(VISION_SPI_MMC_CD, 1);
++       if (ret)
++               return ret;
++
++       gpio_free(VISION_SPI_MMC_CD);
++
++       return 0;
++}
++
+ static int vision_spi_mmc_hw_setup(struct spi_device *spi)
+ {
++       int ret;
++
++       ret = vision_spi_mmc_enable_cd_debounce(spi);
++       if (ret)
++               return ret;
++
+        return gpio_request_one(VISION_SPI_MMC_CS, GPIOF_INIT_HIGH,
+                                spi->modalias);
+ }
+
+Regards,
+Hartley
