@@ -1,88 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Jul 2013 11:24:20 -0600
-Subject: [PATCH] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1374789881-20611-1-git-send-email-dinguyen@altera.com>
-References: <1374789881-20611-1-git-send-email-dinguyen@altera.com>
-Message-ID: <51F2B0C4.8000301@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 26 Jul 2013 10:24:53 -0700
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <20130726151223.045835540@gmail.com>
+References: <20130726145639.116237136@gmail.com>
+ <20130726151223.045835540@gmail.com>
+Message-ID: <CAOesGMjRAxjh-jEA=qqMVeuS5bXeSL9sa7CLd8jkZ6AL8kUuRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2013 04:04 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Add bindings for SD/MMC for SOCFPGA.
-> Add "syscon" to the "altr,sys-mgr" binding.
+Hi,
 
-> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+On Fri, Jul 26, 2013 at 7:56 AM, Domenico Andreoli
+<domenico.andreoli@linux.com> wrote:
+> From: Domenico Andreoli <domenico.andreoli@linux.com>
+>
+> arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
+> separately. As a matter of flexibility and maintenance, it needs to be
+> always included in the build.
+>
+> Cc: Christian Daudt <csd@broadcom.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+> ---
+>  arch/arm/Makefile |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Index: b/arch/arm/Makefile
+> ===================================================================
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -145,7 +145,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x0020
+>  # Machine directory name.  This list is sorted alphanumerically
+>  # by CONFIG_* macro name.
+>  machine-$(CONFIG_ARCH_AT91)            += at91
+> -machine-$(CONFIG_ARCH_BCM)             += bcm
+> +machine-y                              += bcm
+>  machine-$(CONFIG_ARCH_BCM2835)         += bcm2835
+>  machine-$(CONFIG_ARCH_CLPS711X)                += clps711x
+>  machine-$(CONFIG_ARCH_CNS3XXX)         += cns3xxx
 
-> +* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
-> +  Storage Host Controller
+It's hard to tell what you're trying to do here, since the current
+in-tree code works just fine and you're alluding to it having
+problems. :)
 
-If these are extensions to an existing binding, it feels like the
-documentation should be part of that binding, although suppose it's
-reasonable to create a HW-specific "sub-class" of an existing binding.
+Are you looking to add new selection of per-SoC config options? If so,
+I propose keeping ARCH_BCM as a common, but silent, option that is
+just selected by the other SoCs.  See how OMAP does it where
+OMAP2/3/4/5 all select ARCH_OMAP2PLUS for comparison.
 
-> +Required Properties:
-> +
-> +* compatible: should be
-> +	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
-> +	  specific extensions.
 
-The "altr" vendor prefix doesn't appear in
-Documentation/devicetree/bindings/vendor-prefixes.txt. Is there another
-patch in flight to add it?
-
-> +* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
-> +  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
-> +  value is fixed at 3, which means parent_clock/4.
-
-Should the clocks be represented using the common clock DT binding? If
-this register is something that will always be handled entirely
-internally to the HW module, then perhaps there's no need. If the driver
-is going to need to call clk_set_rate() at all, then representing the
-clock using the standard bindings seems better, unless you expect the
-driver to call clk_set_rate(desired_rate * internal_divider) instead of
-clk_set_rate(desired_rate) everywhere. That might not be unreasonable
-though.
-
-> +Required properties for a slot:
-> +
-> +* bus-width: Data width for card slot. 4-bit or 8-bit data.
-
-Isn't that already part of the standard MMC bindings, and hence not
-something you need to duplicate here?
-
-> +Example:
-> +
-> +  The MSHC controller node can be split into two portions, SoC specific and
-> +  board specific portions, as listed below.
-
-That doesn't sound like a good idea. There should be one DT node for
-each logical block. The internal construction of the Linux drivers
-(presumably you have entirely separate code to handle the two nodes in
-Linux so far?) should not influence the DT construction at all.
-
-> +	dwmmc0 at ff704000 {
-> +		compatible = "altr,socfpga-dw-mshc";
-> +		reg = <0xff704000 0x1000>;
-> +		interrupts = <0 139 4>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +	};
-> +
-> +	dwmmc0 at ff704000 {
-> +		num-slots = <1>;
-> +		supports-highspeed;
-> +		broken-cd;
-> +		fifo-depth = <0x400>;
-> +		altr,dw-mshc-ciu-div = <3>;
-> +      		altr,dw-mshc-sdr-timing = <0 3>;
-> +
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <4>;
-> +		};
-> +	};
-> +
-
-You might want to trim that trailing blank line.
+-Olof
