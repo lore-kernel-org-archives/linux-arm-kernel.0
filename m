@@ -1,52 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Jul 2013 11:49:08 +0100
-Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
-In-Reply-To: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
-References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20130726104908.GC17886@mudshark.cambridge.arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 26 Jul 2013 11:52:36 +0100
+Subject: fyi - kprobes testing patches
+In-Reply-To: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <51F254F4.5020900@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Stephen Warren since he has been working in this area]
+On 25/07/13 22:08, Ben Dooks wrote:
+> I've been working on kprobes and the kprobes-test driver. It seems
+> there are more issues with the kprobes-test that need looking in to
+> so I am putting this series out to see if anyone has any comments
 
-On Fri, Jul 26, 2013 at 06:41:27AM +0100, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> 
-> In case of normal kexec kernel load, all cpu's are offlined
-> before calling machine_kexec() under kernel_kexec() function.
-> But in case crash panic cpus are relaxed in
-> machine_crash_nonpanic_core() SMP function but not offlined.
-> 
-> When crash kernel is loaded with kexec and on panic trigger
-> machine_kexec() checks for number of cpus online.
-> If more than one cpu is online machine_kexec() fails to load
-> with below error
-> 
-> kexec: error: multiple CPUs still online
-> 
-> In machine_crash_nonpanic_core() SMP function, offline CPU
-> before cpu_relax
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> ---
->  arch/arm/kernel/machine_kexec.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-> index 4fb074c..163b160 100644
-> --- a/arch/arm/kernel/machine_kexec.c
-> +++ b/arch/arm/kernel/machine_kexec.c
-> @@ -73,6 +73,7 @@ void machine_crash_nonpanic_core(void *unused)
->  	crash_save_cpu(&regs, smp_processor_id());
->  	flush_cache_all();
->  
-> +	set_cpu_online(smp_processor_id(), false);
->  	atomic_dec(&waiting_for_crash_ipi);
->  	while (1)
->  		cpu_relax();
+the testing logs show a few failures with BE8 mode, however with the
+patch series applied the kernel no longer oopses during testing.
+                 > FAIL: registers differ 
 
-Ok, I guess this will work since the new kernel is loaded somewhere higher
-in memory and the crashed kernel will stick around, so the non-crashing CPUs
-can sit around spinning.
+> FAIL: Test mov  pc, r0, asl r1
+> FAIL: Scenario 0
+> initial_regs:
+> r0  8001b37c | r1  00000000 | r2  21522352 | r3  21522252
+> r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
+> r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
+> r12 21522d52 | sp  9f847dd4 | lr  21522f52 | pc  8001b370
+> cpsr 00000213
+> expected_regs:
+> expected_regs:
+> r0  8001b37c | r1  00000000 | r2  21522352 | r3  21522252
+> r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
+> r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
+> r12 21522d52 | sp  9f847dd4 | lr  21522f52 | pc  8001b374
+> cpsr 00000213
+> result_regs:
+> r0  8001b37c | r1  00000000 | r2  21522352 | r3  21522252
+> r4  21522552 | r5  21522452 | r6  21522752 | r7  21522652
+> r8  21522952 | r9  21522852 | r10 21522b52 | r11 21522a52
+> r12 21522d52 | sp  9f847dd4 | lr  21522f52 | pc  8001b37c
+> cpsr 00000213
 
-Will
+
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
