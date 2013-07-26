@@ -1,90 +1,109 @@
 From: christian.ruppert@abilis.com (Christian Ruppert)
-Date: Fri, 26 Jul 2013 11:26:01 +0200
+Date: Fri, 26 Jul 2013 11:26:00 +0200
 Subject: Issue with gpio and pinmux
-In-Reply-To: <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+In-Reply-To: <51EEA58A.30206@wwwdotorg.org>
 References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
  <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
- <51EB590A.4010600@wwwdotorg.org>
- <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
-Message-ID: <20130726092601.GA1909@ab42.lan>
+ <51EB590A.4010600@wwwdotorg.org> <20130722083535.GA19685@ab42.lan>
+ <51EEA58A.30206@wwwdotorg.org>
+Message-ID: <20130726092559.GB7207@ab42.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 11:37:52AM +0200, Linus Walleij wrote:
-> On Sun, Jul 21, 2013 at 5:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Tue, Jul 23, 2013 at 08:47:22AM -0700, Stephen Warren wrote:
+> On 07/22/2013 01:35 AM, Christian Ruppert wrote:
+> > On Sat, Jul 20, 2013 at 09:44:10PM -0600, Stephen Warren wrote:
+> >> On 07/20/2013 04:44 PM, Linus Walleij wrote:
+> > [...]
+> > [ An introductory note on terminology: in the following, "port" refers
+> > to a set of pins who's mux is controlled through the same bit field in
+> > the same register,
 > 
-> > Actually, a better way to do (c) might be to just add an extra "op" to
-> > struct pinmux_ops; something like validate_gpio_mux(), passing in
-> > information such as whether a mux function is in effect on that pin,
-> > whether the pin is already claimed as a GPIO, and whether the function
-> > is being called to check a GPIO-claim or mux-claim operation . If the op
-> > is missing, no "dual claim" is allowed. If the op is present, the code
-> > in the op validates whether the particular GPIO is allowed to be claimed
-> > while the particular mux function is active.
-> >
-> > That way, I think any driver that doesn't want to allow dual-claim
-> > doesn't have to do anything, but the few drivers that do can code up
-> > whatever algorithm they want; for Tegra, I'd just allow everything for
-> > simplicity, but we could always enhance that later if we want.
+> I believe that's exactly what a "pingroup" is in pinctrl subsystem
+> terminology. Where there is already an existing name for something, it'd
+> be best to use that so that every person doesn't use a different name
+> for everything.
+
+Actually, I use this terminology because in my head a pingroup is "just"
+an abstract data structure (i.e. a named list of pins). I think one of
+our points of discussion is if this data structure should be used only
+to represent what I call ports or if it can also represent things like
+interfaces, gpio-ranges etc. Thus, we need a terminology to talk about
+the "physical equivalents"...
+
+> > "interface" refers to the set of pins comprising a
+> > functional unit, e.g. SCL and SDA of an I2C interface or the four pins
+> > of an SPI interface ]
+> > 
+> > In my understanding, the problem stems from the fact that we always
+> > claim an entire port instead of just the pins required for a given
+> > functionality.
 > 
-> You are right, this would be an elegant solution.
+> Yes.
 > 
-> Christian, are you interested in coding this up?
+> > The pinctrl core is already well equipped to manage
+> > claiming interfaces instead of ports and thus a fourth alternative would
+> > be to
+> 
+> I would argue that's not the case. pinctrl knows absolutely nothing
+> about "interfaces"; there is no data structure defines that describes
+> interfaces at all.
 
-When thinking about it, we require the same mechanism the other way
-round: If a GPIO is claimed first we need a mechanism to forbid
-incompatible reconfiguration of other functionalities until that GPIO is
-free again.
+Well, pin groups are perfectly capable of representing interfaces
+instead of ports (see my remark above).
 
-I like Stephen's proposal (in another mail) to claim GPIOs from the
-pinctrl drivers but instead of modifying the callback prototypes I
-suggest to add the following functions:
+> That's not saying such a thing could not be added; I'm simply arguing
+> that "well equipped" doesn't seem to be true at the moment.
 
-/*
- * Claim GPIO pin (in the sense: forbid acutal GPIO usage)
- */
-int claim_gpios(struct pinctrl_dev *pctl, unsigned *pins
-                unsigned port_selector, unsigned func_selector);
+Intuitively, I would implement this by adding a second level of
+semantics on top of pin groups (at the same level as the "functions" we
+already have).
 
-/* allow GPIO usage of the given pins */
-void unclaim_gpios(struct pinctrl_dev *pctl, unsigned *pins);
+Alternatively, one could add the notion of interfaces to functions (a
+function provides one or more interfaces) but I'm a bit afraid that this
+encodes tb10x-specific logic into the core...
 
-Claiming could be fully dynamic. This way, driver authors don't need to
-implement additional callbacks or modify their existing ones. In the
-simplest case they do nothing. The entire conflict-checking logic is
-confined inside the core.
+> > d) implement gpio/pin conflict management in the already existing
+> > callbacks inside the driver: Today, both enable and gpio_request_enable
+> > exist (and can refuse a request for a configuration/pin).
+> > If we only claim the pins used by a given interface instead of the
+> > entire port, conflict management becomes natural (see
+> > http://lkml.indiana.edu/hypermail/linux/kernel/1306.2/00749.html and the
+> > following).
+> 
+> OK, that's basically the same as my proposal to add a new callback; it's
+> simply re-using and existing driver callback rather than creating a new
+> one solely for conflict checking.
+> 
+> Re-using the existing callback(s) seems fine, with appropriate prototype
+> modification to pass back the list of pins that can-or-can't be
+> dual-claimed I suppose.
 
-Alternatively, a similar set of functions could make the use of GPIOs
-exclusive with other functions for a given set of pins. This would work
-very well with the proposal below and would be easier to manage for most
-driver authors: The configuration would be static in most cases.
-(We just have to discuss about the default mode, do we want to keep the
-backward-compatible inclusive default or change everything to exclusive
-by default?).
+I like this proposal but I would rather add a set of functions to the
+core than modifying the prototype (more details in a separate email in
+response to LinusW).
 
-A last point I would like to address before passing on to implementation
-is to introduce the notion of interfaces: I think it is important to
-introduce some orthogonality between unrelated interfaces which happen
-to be muxed on the same port and ideally we implement this coherently
-with the above.
+> > IMHO, the pinctrl drivers are the right place for everything but the
+> > most basic pin conflict management since constraints on what can be
+> > muxed at the same time are highly hardware implementation dependent. One
+> > could e.g. imagine an implementation where a GPIO can override and snoop
+> > a pin's output value in one mux configuration, just snoop the pin value
+> > in another and do neither in a third.
+> > 
+> > I see two (independent) ways to enhance the pinctrl core in order to
+> > support drivers in this task:
+> > a) Add two functions pin_is_claimed and gpio_is_claimed which allow the
+> > pinctrl driver to query if a given pin/gpio is available for muxing.
+> > b) Add four functions lock_gpio/unlock_gpio and lock_pin/unlock_pin
+> > which allow the pinctrl driver to prevent the core from granting
+> > requests on GPIOs/pins.
+> 
+> Yes, either of those are basically what I proposed in my followup to the
+> email you're replying to.
 
-I would like to know your opinion if the following proposal is generic
-enough or if it encodes too much chip-specific logic into the core:
-
-- We extend the notion of pin groups to represent either ports (as it is
-  currently the case) or interfaces. No need to use name pin groups in
-  both cases, I'm open to proposals for better terminology.
-- Functions are associated either to one port or a set of interfaces.
-- Functions continue to apply to an entire port but they only claim the
-  pins of the interfaces they are associated with.
-- A client can request either a function or an interface from the
-  pinctrl core. In the second case, the core will figure out if the
-  request is coherent with previous requests (i.e. if there is a
-  function providing all requested interfaces) and call the driver
-  accordingly.
-
-We'll have to figure out a few details but I would like to have an
-agreement on fundamentals before spending time on implementation.
+Actually what I was thinking of was the inverse of your suggestion: In
+your suggestion the *_is_claimed functions were part of each driver, in
+mine they were part of the core.
 
 Greetings,
   Christian
