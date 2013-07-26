@@ -1,56 +1,54 @@
 From: cavokz@gmail.com (Domenico Andreoli)
-Date: Sat, 27 Jul 2013 00:28:09 +0200
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <20130726193908.GX24642@n2100.arm.linux.org.uk>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
- <51F29BFE.8000202@broadcom.com>
- <20130726171153.GN29916@titan.lakedaemon.net>
- <51F2AF2D.1000300@broadcom.com>
- <20130726184702.GW24642@n2100.arm.linux.org.uk>
- <51F2C94F.6020405@broadcom.com>
- <20130726193908.GX24642@n2100.arm.linux.org.uk>
-Message-ID: <20130726222809.GB19469@glitch>
+Date: Sat, 27 Jul 2013 00:29:12 +0200
+Subject: [PATCH] bcm53xx: initial support for the BCM5301/BCM470X SoC
+ with ARM CPU
+In-Reply-To: <51F2F554.8030709@broadcom.com>
+References: <1373982727-5492-1-git-send-email-hauke@hauke-m.de>
+ <20130716151435.GB3871@linaro.org> <2043662.BcW19XTTMG@lenovo>
+ <20130719020611.GA4941@glitch> <20130723185733.GB6811@ohporter.com>
+ <CAGVrzcYnoN9NnJGvubS7=bVJDk37xSt4BimtvDWghe7OHEWALQ@mail.gmail.com>
+ <20130724231106.GB29801@glitch>
+ <CAGVrzcYudfgqs_eafje4BT2z2qE0kSJPx1B-xrq0WxtUkGxSFw@mail.gmail.com>
+ <20130726000412.GH5022@linaro.org> <51F2F554.8030709@broadcom.com>
+Message-ID: <20130726222912.GC19469@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 08:39:08PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 26, 2013 at 12:09:03PM -0700, Christian Daudt wrote:
-> > On 13-07-26 11:47 AM, Russell King - ARM Linux wrote:
-> >> On Fri, Jul 26, 2013 at 10:17:33AM -0700, Christian Daudt wrote:
-> >>> Because ARCH_BCM is meant to be used for a number of SoC families. We've
-> >>> started upstreaming one (the BCM281XX) but have 2 more internally that
-> >>> we're working towards upstreaming. And in the future our plan is to keep
-> >>> the Broadcom Mobile SoCs all building under this single ARCH_BCM
-> >>> configuration as multiplatform code building a single zImage for them.
-> >> 1. We're moving to a single zImage for everything.  Not just Broadcom.
-> >> There's no need for Broadcom stuff to be treated any differently.
-> >> Participate in the single zImage project and you will get that benefit
-> >> without these games.
-> > I don't follow what is the game being played.
-> 
-> I don't really mind what you do, but when you start talking about having
-> any ARM build always descend into mach-bcm, then something is very wrong
-> with how you're going about it - you don't see anyone else needing that
-> in the tree, not even OMAP.
+On Fri, Jul 26, 2013 at 03:16:52PM -0700, Christian Daudt wrote:
+> On 13-07-25 05:04 PM, Matt Porter wrote:
+> >On Thu, Jul 25, 2013 at 11:23:21PM +0100, Florian Fainelli wrote:
+> >>2013/7/25 Domenico Andreoli <cavokz@gmail.com>:
+> >>>On Tue, Jul 23, 2013 at 08:05:28PM +0100, Florian Fainelli wrote:
+> >>>>2013/7/23 Matt Porter <matt.porter@linaro.org>:
+> >>>>>On Fri, Jul 19, 2013 at 04:06:11AM +0200, Domenico Andreoli wrote:
+> >>>>>It's pretty easy to see that the "ti" vendor prefix has no relation at
+> >>>>>all to their TXN symbol so that blows that convention out of the water.
+> >>>>>Rather, the prefix is based on somebody's notion of how that vendor's
+> >>>>>part are normally referred to. In TI-land, it's TI AM335x or TI OMAP,
+> >>>>>never TXN OMAP. :)
+> >>>>>
+> >>>>>For Broadcom, every part is BCMxxxxx so "bcm" is appropriate.
+> >>>>It was appropriate before being the "wrong" vendor prefix was
+> >>>>allocated, now that "brcm" has been allocated we should stick to it
+> >>>>because otherwise we will break existing and on-going DT work.
+> >>>I still prefer bcm to brcm and I find enough evidence that bcm would be
+> >>>better in the long term.
+> >>>
+> >>>So if Broadcomers can agree on bcm, now it's still the cheapest time to
+> >>>fix in that direction, later will not be better.
+> >>If we are to fix it in stone, once and for all, let's go for the full name
+> >>which would avoid any kind of future confusion (this also seems to be the
+> >>tendency with new vendor prefixes these days). That way we could make
+> >>everyone happy with say: "broadcom,bcm2835". Would that work for everyone?
+> >I really like that.
+> >
+> >-Matt
+> >
+> broadcom works for me also.
+>  thanks,
+>    csd
 
-That was a Great Idea(tm) of mine that obviously needed some rebuttal.
-No insult was implied for those not having had it in solving the very
-same problem.
-
-BTW I asked this very same question [1] and got _zero_ feedback so I
-thought it was worth a patch.
-
-> I don't really care if your intention is to decend into mach-bcm and then
-> do nothing - that's not the point.  The point is we shouldn't even
-> decend into mach-bcm if there's nothing to be built there.
-
-I've got the point but didn't fully understand why would be so wrong to
-walk one more subdir even if nothing is going to be built.
+seconded
 
 thanks,
 Domenico
-
-[1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/253500
