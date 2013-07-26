@@ -1,99 +1,39 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:18 +0800
-Subject: [PATCH v13 02/14] usb: chipidea: imx: remove vbus regulator operation
+Date: Fri, 26 Jul 2013 17:18:29 +0800
+Subject: [PATCH v13 13/14] usb: chipidea: udc: .pullup is valid when vbus is
+ on at CI_HDRC_PULLUP_ON_VBUS
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-14-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we have added vbus reguatlor operation at common
-host file (chipidea/host.c), the glue layer vbus operation
-isn't needed any more.
+When the flag CI_HDRC_PULLUP_ON_VBUS is set, .pullup should only be
+called when the vbus is active. When the CI_HDRC_PULLUP_ON_VBUS
+is set, the controller only begins to run when the vbus is on,
+So, it is only meaningful software set pullup/pulldown after
+the controller begins to run.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c |   30 +++++++-----------------------
- 1 files changed, 7 insertions(+), 23 deletions(-)
+ drivers/usb/chipidea/udc.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 14362c0..d06355e 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -31,7 +31,6 @@ struct ci_hdrc_imx_data {
- 	struct usb_phy *phy;
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
--	struct regulator *reg_vbus;
- };
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 45abf4d..b7ead5f 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1514,6 +1514,10 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
+ {
+ 	struct ci_hdrc *ci = container_of(_gadget, struct ci_hdrc, gadget);
  
- static const struct usbmisc_ops *usbmisc_ops;
-@@ -141,22 +140,13 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		goto err_clk;
- 	}
- 
--	/* we only support host now, so enable vbus here */
--	data->reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
--	if (!IS_ERR(data->reg_vbus)) {
--		ret = regulator_enable(data->reg_vbus);
--		if (ret) {
--			dev_err(&pdev->dev,
--				"Failed to enable vbus regulator, err=%d\n",
--				ret);
--			goto err_clk;
--		}
--	} else {
--		data->reg_vbus = NULL;
--	}
--
- 	pdata.phy = data->phy;
- 
-+	/* Get the vbus regulator */
-+	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-+	if (IS_ERR(pdata.reg_vbus))
-+		pdata.reg_vbus = NULL;
++	if ((ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)
++			&& !ci->vbus_active)
++		return -EOPNOTSUPP;
 +
- 	if (!pdev->dev.dma_mask)
- 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
- 	if (!pdev->dev.coherent_dma_mask)
-@@ -167,7 +157,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		if (ret) {
- 			dev_err(&pdev->dev,
- 				"usbmisc init failed, ret=%d\n", ret);
--			goto err;
-+			goto err_clk;
- 		}
- 	}
- 
-@@ -179,7 +169,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"Can't register ci_hdrc platform device, err=%d\n",
- 			ret);
--		goto err;
-+		goto err_clk;
- 	}
- 
- 	if (usbmisc_ops && usbmisc_ops->post) {
-@@ -200,9 +190,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 
- disable_device:
- 	ci_hdrc_remove_device(data->ci_pdev);
--err:
--	if (data->reg_vbus)
--		regulator_disable(data->reg_vbus);
- err_clk:
- 	clk_disable_unprepare(data->clk);
- 	return ret;
-@@ -215,9 +202,6 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 	ci_hdrc_remove_device(data->ci_pdev);
- 
--	if (data->reg_vbus)
--		regulator_disable(data->reg_vbus);
--
- 	if (data->phy) {
- 		usb_phy_shutdown(data->phy);
- 		module_put(data->phy->dev->driver->owner);
+ 	if (is_on)
+ 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+ 	else
 -- 
 1.7.0.4
