@@ -1,79 +1,68 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 25 Jul 2013 18:39:24 -0700 (PDT)
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
-In-Reply-To: <20130726001052.GA28912@verge.net.au>
-References: <201307230218.01495.sergei.shtylyov@cogentembedded.com>
- <201307230222.04763.sergei.shtylyov@cogentembedded.com>
- <20130726001052.GA28912@verge.net.au>
-Message-ID: <87a9lacd6o.wl%kuninori.morimoto.gx@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 26 Jul 2013 11:38:39 +0900
+Subject: [PATCH] ARM: shmobile: sh73a0: Rely on DT for SMP CPU info
+In-Reply-To: <20130724072739.28333.44251.sendpatchset@w520>
+References: <20130724072739.28333.44251.sendpatchset@w520>
+Message-ID: <20130726023838.GC32490@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 24, 2013 at 04:27:39PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Remove sh73a0 specific ->smp_init_cpus() callback and
+> instead of relying on shmobile_smp_init_cpus() simply
+> use DT for CPU core information.
+> 
+> This assumes that DT_MACHINE_START is used which is
+> the case when AG5EVM and Kota2 are removed.
 
-Hi
+And indeed they are queued-up for removal.
 
-> > +static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
-> > +	{
-> > +		.id	= HPBDMA_SLAVE_SDHI0_TX,
-> > +		.addr	= 0xffe4c000 + 0x30,
-> > +		.dcr	= DCR_SPDS_16BIT | DCR_DMDL | DCR_DPDS_16BIT,
-> > +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
-> > +			  ASYNCRSTR_ASRST23,
-> > +		.mdr	= ASYNCMDR_ASMD21_SINGLE,
-> > +		.mdm	= ASYNCMDR_ASMD21_MASK,
-> > +		.port	= 0x0D0C,
-> > +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
-> > +		.dma_ch	= 21,
-> > +	}, {
-> > +		.id	= HPBDMA_SLAVE_SDHI0_RX,
-> > +		.addr	= 0xffe4c000 + 0x30,
-> > +		.dcr	= DCR_SMDL | DCR_SPDS_16BIT | DCR_DPDS_16BIT,
-> > +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
-> > +			  ASYNCRSTR_ASRST23,
-> > +		.mdr	= ASYNCMDR_ASMD22_SINGLE,
-> > +		.mdm	= ASYNCMDR_ASMD22_MASK,
-> > +		.port	= 0x0D0C,
-> > +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
-> > +		.dma_ch	= 22,
-> > +	},
+I have queued-up this patch for v3.12 in the dt2 branch.
 
-I'm not sure detail of SDHI, but TX and RX are using same .port = 0x0D0C.
-Is this correct ?
-And what is 0x0C port ?
-My datasheet doens't have it on Ch21 - Ch23
-
-> > +static const struct hpb_dmae_channel hpb_dmae_channels[] = {
-> > +	/* ch. 21 SD0 */
-> > +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX),
-> > +	/* ch. 22 SD0 */
-> > +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX),
-> > +};
-> > +
-> > +static struct hpb_dmae_pdata dma_platform_data __initdata = {
-> > +	.slaves			= hpb_dmae_slaves,
-> > +	.num_slaves		= ARRAY_SIZE(hpb_dmae_slaves),
-> > +	.channels		= hpb_dmae_channels,
-> > +	.num_channels		= ARRAY_SIZE(hpb_dmae_channels),
-> > +	.ts_shift		= {
-> > +		[XMIT_SZ_8BIT]	= 0,
-> > +		[XMIT_SZ_16BIT]	= 1,
-> > +		[XMIT_SZ_32BIT]	= 2,
-> > +	},
-> > +	.num_hw_channels	= 39,
-> > +};
-
-This is not a big deal, but according to .num_hw_channels,
-we will have max 39 channels (or more over).
-
-I want 1 line for 1 channels on hpb_dmae_channels.
-like this
-
-static const struct hpb_dmae_channel hpb_dmae_channels[] = {
-	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch21 */
-	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch22 */
-}
-
-
-Best regards
----
-Kuninori Morimoto
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  arch/arm/mach-shmobile/smp-sh73a0.c |   11 ++---------
+>  1 file changed, 2 insertions(+), 9 deletions(-)
+> 
+> --- 0001/arch/arm/mach-shmobile/smp-sh73a0.c
+> +++ work/arch/arm/mach-shmobile/smp-sh73a0.c	2013-07-24 15:59:16.000000000 +0900
+> @@ -62,6 +62,8 @@ static int sh73a0_boot_secondary(unsigne
+>  
+>  static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+> +	/* setup sh73a0 specific SCU base */
+> +	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
+>  	scu_enable(shmobile_scu_base);
+>  
+>  	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
+> @@ -74,14 +76,6 @@ static void __init sh73a0_smp_prepare_cp
+>  	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+>  }
+>  
+> -static void __init sh73a0_smp_init_cpus(void)
+> -{
+> -	/* setup sh73a0 specific SCU base */
+> -	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
+> -
+> -	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
+> -}
+> -
+>  #ifdef CONFIG_HOTPLUG_CPU
+>  static int sh73a0_cpu_kill(unsigned int cpu)
+>  {
+> @@ -120,7 +114,6 @@ static int sh73a0_cpu_disable(unsigned i
+>  #endif /* CONFIG_HOTPLUG_CPU */
+>  
+>  struct smp_operations sh73a0_smp_ops __initdata = {
+> -	.smp_init_cpus		= sh73a0_smp_init_cpus,
+>  	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
+>  	.smp_boot_secondary	= sh73a0_boot_secondary,
+>  #ifdef CONFIG_HOTPLUG_CPU
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
