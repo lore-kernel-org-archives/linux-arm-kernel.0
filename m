@@ -1,42 +1,131 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 26 Jul 2013 15:08:33 +0100
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130726113809.GB29916@titan.lakedaemon.net>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
- <20130725193135.GT23879@titan.lakedaemon.net>
- <20130725231848.GJ24642@n2100.arm.linux.org.uk>
- <CAKON4OwwOnP9kbN0JqR5L+F1svTucAQvz0RDwqU+Gy9UAFwHog@mail.gmail.com>
- <20130726113809.GB29916@titan.lakedaemon.net>
-Message-ID: <1374847713.14574.100.camel@i7.infradead.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 26 Jul 2013 15:08:34 +0100
+Subject: [PATCH 4/4] ARM: kprobes-test: move to using a pointer to the
+ title text
+In-Reply-To: <20130726140236.GB2282@localhost.localdomain>
+References: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374786537-10726-5-git-send-email-ben.dooks@codethink.co.uk>
+ <20130726140236.GB2282@localhost.localdomain>
+Message-ID: <51F282E2.8020802@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-07-26 at 07:38 -0400, Jason Cooper wrote:
-> > The scheme is also quite useful for new tree developers since it will
-> > show them the universe of device tree attributes that have already
-> > been standardized. By using comments, you could probably turn the
-> > device tree documentation into the schema source files.
-> 
-> One more note on schema, since DT is a description of hardware, it would
-> be useful to have two comments, a url to the datasheet, and a canonical
-> name of the datasheet suitable for $searchengine.  Where available, of
-> course.
+On 26/07/13 15:02, Dave Martin wrote:
+> On Thu, Jul 25, 2013 at 10:08:57PM +0100, Ben Dooks wrote:
+>> When testing the kprobes test code with BE8, there is either an
+>> issue with the linker or how the code is being built. The issue
+>> is with embedding the title text as the first part of the test.
+>>
+>> Change to placing a pointer to .rodata with the text title in it
+>> for the test which seems to stop the issue of the alignment of
+>> the data following it being changed arbitrarily by the linker.
+>>
+>> The proper thing to do here is to fix the linker, however this
+>> patch also makes the output much easier to read as there are no
+>> variable length data items here any more.
+>
+> Can you elaborate?  I don't understand from this what problem you are
+> trying to solve.  Can you give a more concrete example?
+>
+> It should be impossible for the linker to change the alignment of
+> anything _within_ an input section (bugs notwithstanding).
+>
+> The assembler might be doing something unexpected, particularly
+> for Thumb kernels, but I don't know of any bug relating to this.
 
-Yes, that's a very good idea. After all, the behaviour described in (a
-specific version of) the datasheet is an *implicit* part of the DT
-binding. If I tell you "there is an 8390 <here>", then we damn well
-ought to agree about how an 8390 behaves. And what revision of the chip
-can be assumed from a given 'compatible' string.
+The output in vmlinux looked ok, but there was some weird problems
+with some of the structures ending up un-swapped and some swapped.
+
+I do not have a concrete example of this as I didn't have time to
+work out exactly what was happening to the binary when it was being
+produced.
+
+Placing the strings in the .rodata section seemed to fix the whole
+issue which allowed me to turn the kprobes test on without them
+blowing up due to mis-reading their list of actions.
+
+> Cheers
+> ---Dave
+>
+>>
+>> CC: Jon Medhurst<tixy@yxit.co.uk>
+>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+>> ---
+>>   arch/arm/kernel/kprobes-test.c |   12 +++++-------
+>>   arch/arm/kernel/kprobes-test.h |    6 ++++--
+>>   2 files changed, 9 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+>> index 6cfa04d..a915ac3 100644
+>> --- a/arch/arm/kernel/kprobes-test.c
+>> +++ b/arch/arm/kernel/kprobes-test.c
+>> @@ -111,9 +111,7 @@
+>>    *	@ TESTCASE_START
+>>    *	bl	__kprobes_test_case_start
+>>    *	@ start of inline data...
+>> - *	.ascii "mov r0, r7"	@ text title for test case
+>> - *	.byte	0
+>> - *	.align	2
+>> + *	.word	title_addr	 @ text title for test case
+>>    *
+>>    *	@ TEST_ARG_REG
+>>    *	.byte	ARG_TYPE_REG
+>> @@ -959,7 +957,7 @@ void __naked __kprobes_test_case_start(void)
+>>   	__asm__ __volatile__ (
+>>   		"stmdb	sp!, {r4-r11}				\n\t"
+>>   		"sub	sp, sp, #"__stringify(TEST_MEMORY_SIZE)"\n\t"
+>> -		"bic	r0, lr, #1  @ r0 = inline title string	\n\t"
+>> +		"bic	r0, lr, #3  @ r0 = inline title block	\n\t"
+>>   		"mov	r1, sp					\n\t"
+>>   		"bl	kprobes_test_case_start			\n\t"
+>>   		"bx	r0					\n\t"
+>> @@ -1336,15 +1334,15 @@ static unsigned long next_instruction(unsigned long pc)
+>>   	return pc + 4;
+>>   }
+>>
+>> -static uintptr_t __used kprobes_test_case_start(const char *title, void *stack)
+>> +static uintptr_t __used kprobes_test_case_start(const char **title, void *stack)
+>>   {
+>>   	struct test_arg *args;
+>>   	struct test_arg_end *end_arg;
+>>   	unsigned long test_code;
+>>
+>> -	args = (struct test_arg *)PTR_ALIGN(title + strlen(title) + 1, 4);
+>> +	args = (struct test_arg *)(title + 1);
+>>
+>> -	current_title = title;
+>> +	current_title = *title;
+>>   	current_args = args;
+>>   	current_stack = stack;
+>>
+>> diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/kernel/kprobes-test.h
+>> index e28a869..a71db09 100644
+>> --- a/arch/arm/kernel/kprobes-test.h
+>> +++ b/arch/arm/kernel/kprobes-test.h
+>> @@ -113,9 +113,11 @@ struct test_arg_end {
+>>   	"bl	__kprobes_test_case_start		\n\t"	\
+>>   	/* don't use .asciz here as 'title' may be */		\
+>>   	/* multiple strings to be concatenated.  */		\
+>> -	".ascii "#title"				\n\t"	\
+>> +	".pushsection .rodata				\n\t"	\
+>> +	"9999: .ascii "#title"				\n\t"	\
+>>   	".byte	0					\n\t"	\
+>> -	".align	2					\n\t"
+>> +	".popsection					\n\t"	\
+>> +	".word	9999b					\n\t"
+>>
+>>   #define	TEST_ARG_REG(reg, val)					\
+>>   	".byte	"__stringify(ARG_TYPE_REG)"		\n\t"	\
+>> --
+>> 1.7.10.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 
 -- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/88a97073/attachment.bin>
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
