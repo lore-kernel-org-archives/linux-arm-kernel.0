@@ -1,49 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 26 Jul 2013 12:54:45 +0200
-Subject: [PATCH] pinctrl: sunxi: Fix gpio_set behaviour
-In-Reply-To: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130726125445.612b2acf@skate>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 26 Jul 2013 11:55:19 +0100
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <CAL_JsqJQWOLC9f1igEpsgJB2X8mFDpqLDaFFRjGGVHctjWZLgQ@mail.gmail.com>
+Message-ID: <20130726105519.GZ9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maxime Ripard,
+On Thu, Jul 25, 2013 at 02:11:31PM -0500, Rob Herring wrote:
 
-On Thu, 25 Jul 2013 12:41:16 +0200, Maxime Ripard wrote:
-> The current gpio_set function is ignoring the previous value set in the
-> GPIO value register, which leads in erasing the values already set for
-> the other GPIOs in the same bank when setting the value of a given GPIO.
-> 
-> Add the usual read/mask/write pattern to fix this brown paper bag bug.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/pinctrl/pinctrl-sunxi.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-> index fc058b6..4f8bb18 100644
-> --- a/drivers/pinctrl/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/pinctrl-sunxi.c
-> @@ -464,8 +464,14 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
->  	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
->  	u32 reg = sunxi_data_reg(offset);
->  	u8 index = sunxi_data_offset(offset);
-> +	u32 regval = readl(pctl->membase + reg);
->  
-> -	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
-> +	if (value)
-> +		regval |= BIT(index);
-> +	else
-> +		regval &= ~(BIT(index));
-> +
-> +	writel(regval, pctl->membase + reg);
+> I would argue that little has gone in (if reviewed) with the
+> expectation that the binding will change. Many of the common bindings
+> have had many rounds of review and they have not changed. My position
+> any time I see an incompatible change has been that it require anyone
+> affected to be okay with the change. This has pretty much been limited
+> to specific platforms from what I've seen.
 
-Hum, what about locking?
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The big exception I've seen has been the OMAP hwmod stuff.  Plus of
+course the case where things get moved into the DT bindings from the
+board file as things are built up, but this should be becoming a non
+issue as people move onto DT only boards (though I am worried about
+people on systems where the SoC is described in DT).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/b7ddc32a/attachment-0001.sig>
