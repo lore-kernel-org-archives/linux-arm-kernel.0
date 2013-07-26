@@ -1,93 +1,64 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 26 Jul 2013 10:17:45 -0300
-Subject: [PATCH v9 08/30] bus: mvebu-mbus: Introduce device tree binding
-In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374844687-19981-9-git-send-email-ezequiel.garcia@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Jul 2013 14:14:23 +0100
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726130927.GC4219@netboy>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy> <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+Message-ID: <20130726131423.GL24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the most fundamental device-tree initialization.
-We only introduce what's required to be able to probe the mvebu-mbus
-driver from the DT. Follow-up patches will extend the device tree binding,
-allowing to describe static address decoding windows.
+On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
+> On Fri, Jul 26, 2013 at 10:42:24AM +0100, David Woodhouse wrote:
+> > On Fri, 2013-07-26 at 10:01 +0200, Richard Cochran wrote:
+> > > On Thu, Jul 25, 2013 at 03:37:53PM -0600, Jason Gunthorpe wrote:
+> > > > 
+> > > > We use DT has a kernel configuration input. Our environment is
+> > > > designed to guarantee 100% that the kernel and DT match exactly. DT
+> > > > very deliberately isn't an ABI boundary in our systems.
+> > > 
+> > > Think about what you just said.
+> > > 
+> > > The DT describes the *hardware* not the kernel. Why should you ever
+> > > need to update your DT at all?
+> > 
+> > Well, the nodes which describe hardware devices, according to the
+> > bindings which form an ABI contract between DT and drivers, should not
+> > normally change. Although they *can* change, if for example you change
+> > the MAC address and that's stored there. Or you change the PHY you want
+> > it to use. Or something like that. The *ABI* doesn't change, but the
+> > data you express *using* that ABI can change. That's kind of the point.
+> 
+> Unless I totally misunderstood, the thread is talking about letting
+> established bindings change with each new kernel version.  I am
+> opposed to that.
+> 
+> Of course, a user may want to change the values of his MAC addresses,
+> if he needs to. But he should never have to change *how* he specifies
+> those addresses.
+> 
+> So, as long as everyone can agree to the principle that a working DT
+> should remain working after a kernel upgrade, then I'll shut up. In
+> actual fact, this is not the case today, nor was it ever so in the
+> past, AFAICT, but it never hurts to set goals.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
- drivers/bus/mvebu-mbus.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mbus.h     |  1 +
- 2 files changed, 50 insertions(+)
+We agree.
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 1b17954..44a07c4 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -900,3 +900,52 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
- 			sdramwins_phys_base,
- 			sdramwins_size);
- }
-+
-+#ifdef CONFIG_OF
-+int __init mvebu_mbus_dt_init(void)
-+{
-+	struct resource mbuswins_res, sdramwins_res;
-+	struct device_node *np, *controller;
-+	const struct of_device_id *of_id;
-+	const __be32 *prop;
-+	int ret;
-+
-+	np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
-+	if (!np) {
-+		pr_err("could not find a matching SoC family\n");
-+		return -ENODEV;
-+	}
-+
-+	of_id = of_match_node(of_mvebu_mbus_ids, np);
-+	mbus_state.soc = of_id->data;
-+
-+	prop = of_get_property(np, "controller", NULL);
-+	if (!prop) {
-+		pr_err("required 'controller' property missing\n");
-+		return -EINVAL;
-+	}
-+
-+	controller = of_find_node_by_phandle(be32_to_cpup(prop));
-+	if (!controller) {
-+		pr_err("could not find an 'mbus-controller' node\n");
-+		return -ENODEV;
-+	}
-+
-+	if (of_address_to_resource(controller, 0, &mbuswins_res)) {
-+		pr_err("cannot get MBUS register address\n");
-+		return -EINVAL;
-+	}
-+
-+	if (of_address_to_resource(controller, 1, &sdramwins_res)) {
-+		pr_err("cannot get SDRAM register address\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = mvebu_mbus_common_init(&mbus_state,
-+				     mbuswins_res.start,
-+				     resource_size(&mbuswins_res),
-+				     sdramwins_res.start,
-+				     resource_size(&sdramwins_res));
-+	return ret;
-+}
-+#endif
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index 9245b66..eadefd6 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -74,5 +74,6 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
- int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
- 		    size_t mbus_size, phys_addr_t sdram_phys_base,
- 		    size_t sdram_size);
-+int mvebu_mbus_dt_init(void);
- 
- #endif /* __LINUX_MBUS_H */
--- 
-1.8.1.5
+That's precisely why I'm saying that once a binding appears in a -final
+released kernel, it is _stable_ by that very fact.  If there were any
+doubts about it, it should never have been accepted into the kernel tree
+in the first place.
+
+It's no different from how we treat syscalls.  Once we accept a syscall
+and it's published in a -final kernel, it can't then be altered - it can
+be supplemented by a new syscall with a different interface, but the old
+one remains and keeps its semantics for a great many years.
+
+There's no reason for DT to be any different in this regard.
