@@ -1,50 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 26 Jul 2013 08:01:53 -0400
-Subject: Location for a kind of GPIO bus driver
-In-Reply-To: <20130725221615.GA30881@kroah.com>
-References: <20130723151834.GJ9916@kw.sim.vm.gnt>
- <CACRpkdZWQQUCeHvgPPLmxL3O1sw55pc_KbzbnqTSFJx+0_QanQ@mail.gmail.com>
- <20130725221615.GA30881@kroah.com>
-Message-ID: <20130726120153.GE29916@titan.lakedaemon.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 26 Jul 2013 14:09:58 +0200
+Subject: Zynq clk fixes
+Message-ID: <51F26716.6030701@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 03:16:15PM -0700, Greg KH wrote:
-> On Thu, Jul 25, 2013 at 11:46:42PM +0200, Linus Walleij wrote:
-> > On Tue, Jul 23, 2013 at 5:18 PM, Simon Guinot <simon.guinot@sequanux.org> wrote:
-> > 
-> > > (...)  I am
-> > > thinking about moving the GPIO extension bus support into a separate
-> > > driver. The problem is that I can't find a proper location for a such
-> > > driver. AFAIK, it doesn't fit with anything existing supported by Linux.
-> > > Maybe I should consider drivers/bus ? Or even drivers/misc ?
-> > 
-> > This is a question to Greg, the device core maintainer.
-> > AFAICT they go into drivers/base/foo-bus.c
-> 
-> No, specific bus code does not go in drivers/base/ it goes where the
-> rest of the subsystem lives.
+Hi Mike, [cc: Arnd and Olof]
 
-We were thinking drivers/bus since it is addressable and has multiple
-devices hanging off of it (leds, power management).
+Soren has found two bug fixes in zynq clk code.
+Can you please add these two patches to your tree?
+Will be great if you can add them to v3.11.
 
-However, since each device is essentially an external gpio, drivers/gpio
-might be more appropriate.  It's not a gpio expander, more of an
-enhanced gpio controller (led 1, brightness 7)
+Arnd, Olof: I expect that all these clock changes should go through Mike.
+If I am wrong please let me know.
 
-> > In this case I would first consider using MFD though,
-> > please make a case for why this is not simply a multi
-> > function device with a few cells (== platform devices).
-> 
-> I agree with this as well.
+Thanks,
+Michal
 
-To quote Simon from a different response:
-> I will definitively have a closer look at mfd. But as I understand,
-> mfd is more oriented platform device and resources. Here, the device
-> don't expose some memory regions but rather methods to configure a
-> CPLD through GPIOs. I am not sure how it can work with the mfd
-> framework.
 
-thx,
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-Jason.
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-fixes-for-3.11
+
+for you to fetch changes up to 97d58aef394831f6f0583653de29e03886a0e09e:
+
+  clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes (2013-07-17 08:36:53 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq clock fixes for v3.11
+
+- Fix watchdog clock registration
+- Fix gem clock propagation
+
+----------------------------------------------------------------
+Soren Brinkmann (2):
+      clk/zynq/clkc: Add dedicated spinlock for the SWDT
+      clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes
+
+ drivers/clk/zynq/clkc.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/f30192d3/attachment.sig>
