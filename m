@@ -1,67 +1,65 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 26 Jul 2013 16:37:48 +0200
-Subject: [PATCH V2 2/8] ASoC: Samsung: I2S: Add quirks as driver data
- in	I2S
-In-Reply-To: <20130726142722.GS24642@n2100.arm.linux.org.uk>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
- <1479924.YVrWxe87Mh@amdc1227> <20130726142722.GS24642@n2100.arm.linux.org.uk>
-Message-ID: <4423918.aj7FtAoYyV@amdc1227>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Fri, 26 Jul 2013 10:39:37 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
+ interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726142140.GR24642@n2100.arm.linux.org.uk>
+References: <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+ <20130726132709.GH29916@titan.lakedaemon.net>
+ <1374846070.14574.92.camel@i7.infradead.org>
+ <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+ <20130726142140.GR24642@n2100.arm.linux.org.uk>
+Message-ID: <CAKON4Oyu2hXa959zeuMWwT7jNpVFb31FoWqcD3gkJVz63jLEMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 of July 2013 15:27:22 Russell King - ARM Linux wrote:
-> On Fri, Jul 26, 2013 at 04:21:16PM +0200, Tomasz Figa wrote:
-> > Hi Russell,
-> > 
-> > On Friday 26 of July 2013 15:06:18 Russell King - ARM Linux wrote:
-> > > On Fri, Jul 26, 2013 at 07:06:46PM +0530, Padmavathi Venna wrote:
-> > > > -- compatible : "samsung,i2s-v5"
-> > > > +- compatible : should be one of the following.
-> > > > +   - samsung,s3c6410-i2s: for 8/16/24bit stereo I2S. Previous
-> > > > versions
-> > > > +     has only 8/16bit support.
-> > > > +   - samsung,s3c6410-i2sv4: for 8/16/24bit multichannel(5.1
-> > > > channel)
-> > > > I2S. +     Introduced in s3c6410. This also applicable for s5p64x0
-> > > > platforms. +   - samsung,s5pc100-i2s: for 8/16/24bit
-> > > > multichannel(5.1
-> > > > channel) I2S +     with secondary fifo and s/w reset control.
-> > > > +   - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S
-> > > > with
-> > > > +     secondary fifo, s/w reset control and internal mux for root
-> > > > clk
-> > > > src. +
-> > > 
-> > > So what happens with your changes to everyone who is using a DT file
-> > > with the "samsung,i2s-v5" compatible string?
-> > 
-> > AFAIK we decided that current bindings, if broken, can be redone
-> > correctly, without caring for compatibility with old DTBs and only
-> > then, after reviewing these new bindings by DT people, they can be
-> > stabilized.
-> > 
-> > Other issue, though, is that this patch breaks things until they get
-> > fixed by patch 3. Support for new bindings should be added first, then
-> > users fixed and only then old bindings can be removed.
-> 
-> So, these bindings were merged in the v3.9 merge window, using the
-> "samsung,i2s-v5" compatible string, and now for the v3.12 merge window,
-> you're proposing to break the audio description in any DT file which has
-> been used with v3.9..v3.11 inclusive?
+On Fri, Jul 26, 2013 at 10:21 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jul 26, 2013 at 10:14:32AM -0400, jonsmirl at gmail.com wrote:
+>> Yes, yes - that's why the schema should be written down and used as a
+>> validation input to dtc. Then dtc can spit out errors for non-standard
+>> items. There would be two versions - the standard one and a legacy one
+>> that includes the standard one plus the hacks that can't be undone.
+>>
+>> But more importantly it provides a framework for people creating new
+>> node definitions. Now they can't work in a vacuum and come up with
+>> random names and structure for everything.
+>>
+>> Most of the problems express in the thread would go away if the schema
+>> was written down and discussed. The rule going forward would be no new
+>> nodes that aren't part of the standard schema.
+>
+> So this is why I'm seeing patches just a short time ago removing existing
+> compatible strings from the DT descriptions and associated driver, and
+> replacing them with new ones... meaning that the old DT files won't work
+> with newer kernels.
+>
+> What that means is using the descriptions as the schema won't catch that
+> because they're changing those as well to match.
+>
+> There's a solution to that: dtc becomes a separate project external to
+> the kernel which also contains the schemas that it verifies against.
+> That way, if you want to make changes such as that above, you need to
+> get it past not only kernel people but also past dtc maintainers -
+> which increases the chances of such stuff being caught.
 
-It depends whether we want to keep all the broken stuff. At current state 
-dts is still pretty much coupled with kernel version from which it comes 
-from, so there is not yet too late to replace the broken bindings with 
-something acceptable.
+I don't see that it has to be outside of the kernel. It could still be
+inside and just have different maintainers.
 
-> 
-> The way you should be doing this is to keep the existing stuff working
-> and supplement it with the new method of describing the hardware.
+The real value of having that schema inside of the kernel is so that
+people writing new drivers have some rules to look at. It would really
+help in stopping 37 different descriptions of DMA controllers that are
+all slightly different. You'd have to match you DMA controller
+description to the generic form or making a convincing argument as to
+why you need the master schema to be changed.
 
-Ideally yes and we are moving towards this with all the plans to separate 
-stable and staging bindings. However we are currently half-drowning in a 
-swamp of broken bindings, so we would rather try to clean the mess ASAP, 
-before things stabilize.
 
-Best regards,
-Tomasz
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
