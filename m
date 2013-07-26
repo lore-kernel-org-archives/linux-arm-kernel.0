@@ -1,167 +1,142 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 26 Jul 2013 18:05:25 +0800
-Subject: [PATCH v6 03/11] irqchip: mmp: support MULTI_IRQ_HANDLER
+Date: Fri, 26 Jul 2013 18:05:26 +0800
+Subject: [PATCH v6 04/11] ARM: mmp: avoid to include head file in mach-mmp
 In-Reply-To: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1374833133-21119-4-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1374833133-21119-5-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support CONFIG_MULTI_IRQ_HANDLER in ARCH_MMP. So remove entry-macro.S.
+pxa910_set_wake() & mmp2_set_wake() are both declared in head files
+of arch/arm/mach-mmp/include/mach directory. If we include these
+head files in irq-mmp driver, it blocks the multiplatform build.
+So adjust the code.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/Kconfig                             |  1 +
- arch/arm/mach-mmp/include/mach/entry-macro.S | 26 -----------------
- drivers/irqchip/irq-mmp.c                    | 42 +++++++++++++++++++++++++++-
- 3 files changed, 42 insertions(+), 27 deletions(-)
- delete mode 100644 arch/arm/mach-mmp/include/mach/entry-macro.S
+ arch/arm/mach-mmp/mmp2.c    |  4 ++++
+ arch/arm/mach-mmp/pxa910.c  |  4 ++++
+ drivers/irqchip/irq-mmp.c   | 15 +--------------
+ include/linux/irqchip/mmp.h |  6 ++++++
+ 4 files changed, 15 insertions(+), 14 deletions(-)
+ create mode 100644 include/linux/irqchip/mmp.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..76793a6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -557,6 +557,7 @@ config ARCH_MMP
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_PXA
- 	select IRQ_DOMAIN
-+	select MULTI_IRQ_HANDLER
- 	select NEED_MACH_GPIO_H
- 	select PINCTRL
- 	select PLAT_PXA
-diff --git a/arch/arm/mach-mmp/include/mach/entry-macro.S b/arch/arm/mach-mmp/include/mach/entry-macro.S
-deleted file mode 100644
-index bd152e2..0000000
---- a/arch/arm/mach-mmp/include/mach/entry-macro.S
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- * linux/arch/arm/mach-mmp/include/mach/entry-macro.S
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <asm/irq.h>
--#include <mach/regs-icu.h>
--
--	.macro	get_irqnr_preamble, base, tmp
--	mrc	p15, 0, \tmp, c0, c0, 0		@ CPUID
--	and	\tmp, \tmp, #0xff00
--	cmp	\tmp, #0x5800
--	ldr	\base, =mmp_icu_base
--	ldr	\base, [\base, #0]
--	addne	\base, \base, #0x10c		@ PJ1 AP INT SEL register
--	addeq	\base, \base, #0x104		@ PJ4 IRQ SEL register
--	.endm
--
--	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--	ldr	\tmp, [\base, #0]
--	and	\irqnr, \tmp, #0x3f
--	tst	\tmp, #(1 << 6)
--	.endm
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index c7592f1..09fbe7d 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -13,6 +13,8 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip/mmp.h>
+ #include <linux/platform_device.h>
+ 
+ #include <asm/hardware/cache-tauros2.h>
+@@ -26,6 +28,7 @@
+ #include <mach/mfp.h>
+ #include <mach/devices.h>
+ #include <mach/mmp2.h>
++#include <mach/pm-mmp2.h>
+ 
+ #include "common.h"
+ 
+@@ -94,6 +97,7 @@ void mmp2_clear_pmic_int(void)
+ void __init mmp2_init_irq(void)
+ {
+ 	mmp2_init_icu();
++	icu_irq_chip.irq_set_wake = mmp2_set_wake;
+ }
+ 
+ static int __init mmp2_init(void)
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index a586742..96e125b 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -12,6 +12,8 @@
+ #include <linux/init.h>
+ #include <linux/list.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip/mmp.h>
+ #include <linux/platform_device.h>
+ 
+ #include <asm/hardware/cache-tauros2.h>
+@@ -23,6 +25,7 @@
+ #include <mach/dma.h>
+ #include <mach/mfp.h>
+ #include <mach/devices.h>
++#include <mach/pm-pxa910.h>
+ #include <mach/pxa910.h>
+ 
+ #include "common.h"
+@@ -80,6 +83,7 @@ static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
+ void __init pxa910_init_irq(void)
+ {
+ 	icu_init_irq();
++	icu_irq_chip.irq_set_wake = pxa910_set_wake;
+ }
+ 
+ static int __init pxa910_init(void)
 diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
-index 275709b..84d51ff 100644
+index 84d51ff..1f81432 100644
 --- a/drivers/irqchip/irq-mmp.c
 +++ b/drivers/irqchip/irq-mmp.c
-@@ -21,6 +21,9 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
+@@ -26,13 +26,6 @@
  
-+#include <asm/exception.h>
-+#include <asm/mach/irq.h>
-+
  #include <mach/irqs.h>
  
- #ifdef CONFIG_CPU_MMP2
-@@ -34,6 +37,13 @@
+-#ifdef CONFIG_CPU_MMP2
+-#include <mach/pm-mmp2.h>
+-#endif
+-#ifdef CONFIG_CPU_PXA910
+-#include <mach/pm-pxa910.h>
+-#endif
+-
+ #include "irqchip.h"
  
  #define MAX_ICU_NR		16
+@@ -132,7 +125,7 @@ static void icu_unmask_irq(struct irq_data *d)
+ 	}
+ }
  
-+#define PJ1_INT_SEL		0x10c
-+#define PJ4_INT_SEL		0x104
-+
-+/* bit fields in PJ1_INT_SEL and PJ4_INT_SEL */
-+#define SEL_INT_PENDING		(1 << 6)
-+#define SEL_INT_NUM_MASK	0x3f
-+
- struct icu_chip_data {
- 	int			nr_irqs;
- 	unsigned int		virq_base;
-@@ -54,7 +64,7 @@ struct mmp_intc_conf {
- 	unsigned int	conf_mask;
- };
- 
--void __iomem *mmp_icu_base;
-+static void __iomem *mmp_icu_base;
- static struct icu_chip_data icu_data[MAX_ICU_NR];
- static int max_icu_nr;
- 
-@@ -193,6 +203,32 @@ static struct mmp_intc_conf mmp2_conf = {
- 	.conf_mask	= 0x7f,
- };
- 
-+static asmlinkage void __exception_irq_entry
-+mmp_handle_irq(struct pt_regs *regs)
-+{
-+	int irq, hwirq;
-+
-+	hwirq = readl_relaxed(mmp_icu_base + PJ1_INT_SEL);
-+	if (!(hwirq & SEL_INT_PENDING))
-+		return;
-+	hwirq &= SEL_INT_NUM_MASK;
-+	irq = irq_find_mapping(icu_data[0].domain, hwirq);
-+	handle_IRQ(irq, regs);
-+}
-+
-+static asmlinkage void __exception_irq_entry
-+mmp2_handle_irq(struct pt_regs *regs)
-+{
-+	int irq, hwirq;
-+
-+	hwirq = readl_relaxed(mmp_icu_base + PJ4_INT_SEL);
-+	if (!(hwirq & SEL_INT_PENDING))
-+		return;
-+	hwirq &= SEL_INT_NUM_MASK;
-+	irq = irq_find_mapping(icu_data[0].domain, hwirq);
-+	handle_IRQ(irq, regs);
-+}
-+
- /* MMP (ARMv5) */
- void __init icu_init_irq(void)
- {
-@@ -214,6 +250,7 @@ void __init icu_init_irq(void)
- 		set_irq_flags(irq, IRQF_VALID);
+-static struct irq_chip icu_irq_chip = {
++struct irq_chip icu_irq_chip = {
+ 	.name		= "icu_irq",
+ 	.irq_mask	= icu_mask_irq,
+ 	.irq_mask_ack	= icu_mask_ack_irq,
+@@ -251,9 +244,6 @@ void __init icu_init_irq(void)
  	}
  	irq_set_default_host(icu_data[0].domain);
-+	set_handle_irq(mmp_handle_irq);
- #ifdef CONFIG_CPU_PXA910
- 	icu_irq_chip.irq_set_wake = pxa910_set_wake;
- #endif
-@@ -320,6 +357,7 @@ void __init mmp2_init_icu(void)
- 		set_irq_flags(irq, IRQF_VALID);
+ 	set_handle_irq(mmp_handle_irq);
+-#ifdef CONFIG_CPU_PXA910
+-	icu_irq_chip.irq_set_wake = pxa910_set_wake;
+-#endif
+ }
+ 
+ /* MMP2 (ARMv7) */
+@@ -358,9 +348,6 @@ void __init mmp2_init_icu(void)
  	}
  	irq_set_default_host(icu_data[0].domain);
-+	set_handle_irq(mmp2_handle_irq);
- #ifdef CONFIG_CPU_MMP2
- 	icu_irq_chip.irq_set_wake = mmp2_set_wake;
- #endif
-@@ -380,6 +418,7 @@ static int __init mmp_of_init(struct device_node *node,
- 	icu_data[0].conf_disable = mmp_conf.conf_disable;
- 	icu_data[0].conf_mask = mmp_conf.conf_mask;
- 	irq_set_default_host(icu_data[0].domain);
-+	set_handle_irq(mmp_handle_irq);
- 	max_icu_nr = 1;
- 	return 0;
+ 	set_handle_irq(mmp2_handle_irq);
+-#ifdef CONFIG_CPU_MMP2
+-	icu_irq_chip.irq_set_wake = mmp2_set_wake;
+-#endif
  }
-@@ -398,6 +437,7 @@ static int __init mmp2_of_init(struct device_node *node,
- 	icu_data[0].conf_disable = mmp2_conf.conf_disable;
- 	icu_data[0].conf_mask = mmp2_conf.conf_mask;
- 	irq_set_default_host(icu_data[0].domain);
-+	set_handle_irq(mmp2_handle_irq);
- 	max_icu_nr = 1;
- 	return 0;
- }
+ 
+ #ifdef CONFIG_OF
+diff --git a/include/linux/irqchip/mmp.h b/include/linux/irqchip/mmp.h
+new file mode 100644
+index 0000000..c78a892
+--- /dev/null
++++ b/include/linux/irqchip/mmp.h
+@@ -0,0 +1,6 @@
++#ifndef	__IRQCHIP_MMP_H
++#define	__IRQCHIP_MMP_H
++
++extern struct irq_chip icu_irq_chip;
++
++#endif	/* __IRQCHIP_MMP_H */
 -- 
 1.8.1.2
