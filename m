@@ -1,68 +1,71 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri, 26 Jul 2013 21:22:18 +0800
-Subject: [PATCH v4 2/2] i2c: designware: add two optional property
- tx/rx-fifo-size
-In-Reply-To: <1374844938-25505-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1374844938-25505-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1374844938-25505-3-git-send-email-zhangfei.gao@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 26 Jul 2013 09:27:09 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726130927.GC4219@netboy>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+Message-ID: <20130726132709.GH29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platform can not get fifo-size info form register DW_IC_COMP_PARAM_1.
-Give chance to update rx-fifo-size and tx-fifo-size if provided in dts.
+On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
+> On Fri, Jul 26, 2013 at 10:42:24AM +0100, David Woodhouse wrote:
+> > On Fri, 2013-07-26 at 10:01 +0200, Richard Cochran wrote:
+> > > On Thu, Jul 25, 2013 at 03:37:53PM -0600, Jason Gunthorpe wrote:
+> > > > 
+> > > > We use DT has a kernel configuration input. Our environment is
+> > > > designed to guarantee 100% that the kernel and DT match exactly. DT
+> > > > very deliberately isn't an ABI boundary in our systems.
+> > > 
+> > > Think about what you just said.
+> > > 
+> > > The DT describes the *hardware* not the kernel. Why should you ever
+> > > need to update your DT at all?
+> > 
+> > Well, the nodes which describe hardware devices, according to the
+> > bindings which form an ABI contract between DT and drivers, should not
+> > normally change. Although they *can* change, if for example you change
+> > the MAC address and that's stored there. Or you change the PHY you want
+> > it to use. Or something like that. The *ABI* doesn't change, but the
+> > data you express *using* that ABI can change. That's kind of the point.
+> 
+> Unless I totally misunderstood, the thread is talking about letting
+> established bindings change with each new kernel version.  I am
+> opposed to that.
+> 
+> Of course, a user may want to change the values of his MAC addresses,
+> if he needs to. But he should never have to change *how* he specifies
+> those addresses.
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Acked-by: Baruch Siach <baruch@tkos.co.il>
----
- .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
- drivers/i2c/busses/i2c-designware-platdrv.c        |    3 +++
- 2 files changed, 10 insertions(+)
+The other dynamic change that bears mentioning here is attributes which
+have been configured by the bootloader.  For example, in mvebu, we have
+the Schrodinger's Cat register.  It allows you to reconfigure the base
+address of the registers from *within* that register range.  If the
+bootloader does this, the DT needs to be updated to reflect the current
+hardware configuration.  Otherwise, the kernel is stuck poking around at
+memory addresses hoping to find something sane.
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-index 7fd7fa2..af0bf8f 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-@@ -6,6 +6,11 @@ Required properties :
-  - reg : Offset and length of the register set for the device
-  - interrupts : <IRQ> where IRQ is the interrupt number.
- 
-+Optional properties:
-+
-+ - rx-fifo-size : 1 cell, Rx fifo size
-+ - tx-fifo-size : 1 cell, Tx fifo size
-+
- Recommended properties :
- 
-  - clock-frequency : desired I2C bus clock frequency in Hz.
-@@ -22,6 +27,8 @@ Example :
- 		compatible = "snps,designware-i2c";
- 		reg = <0xf0000 0x1000>;
- 		interrupts = <11>;
-+		rx-fifo-size = <16>;
-+		tx-fifo-size = <16>;
- 		clock-frequency = <400000>;
- 	};
- 
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 36ceebc..f657e65 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -86,6 +86,7 @@ static int dw_i2c_probe(struct platform_device *pdev)
- 	struct dw_i2c_dev *dev;
- 	struct i2c_adapter *adap;
- 	struct resource *mem;
-+	struct device_node *np = pdev->dev.of_node;
- 	int irq, r;
- 
- 	irq = platform_get_irq(pdev, 0);
-@@ -145,6 +146,8 @@ static int dw_i2c_probe(struct platform_device *pdev)
- 		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
- 		dev->adapter.nr = pdev->id;
- 	}
-+	of_property_read_u32(np, "rx-fifo-size", &dev->rx_fifo_depth);
-+	of_property_read_u32(np, "tx-fifo-size", &dev->tx_fifo_depth);
- 	r = i2c_dw_init(dev);
- 	if (r)
- 		return r;
--- 
-1.7.9.5
+But this falls into the same category as you mentioned, but outside of
+chosen {};.
+
+> So, as long as everyone can agree to the principle that a working DT
+> should remain working after a kernel upgrade, then I'll shut up. In
+> actual fact, this is not the case today, nor was it ever so in the
+> past, AFAICT, but it never hurts to set goals.
+
+Some instability is necessary as we figure out what 'stable' is.
+Otherwise, things would've been so rigid, we'd've never made any
+progress.  I'd say we now a sufficient body of code and experience to
+start enforcing the goal.
+
+thx,
+
+Jason.
