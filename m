@@ -1,26 +1,32 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 27 Jul 2013 09:47:53 +1000
-Subject: [GIT PULL] arm64 fixes for 3.11
-In-Reply-To: <CA+55aFzmEhGvqY883Bg568Gguewy41X9n1qDeaHkW2We6VVhZg@mail.gmail.com>
-References: <20130726155458.GA31613@arm.com>
- <CA+55aFzmEhGvqY883Bg568Gguewy41X9n1qDeaHkW2We6VVhZg@mail.gmail.com>
-Message-ID: <1374882473.9200.33.camel@pasglop>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 27 Jul 2013 03:55:12 +0400
+Subject: [PATCH] ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
+In-Reply-To: <201307270346.34002.sergei.shtylyov@cogentembedded.com>
+References: <201307270346.34002.sergei.shtylyov@cogentembedded.com>
+Message-ID: <51F30C60.5050504@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-07-26 at 12:54 -0700, Linus Torvalds wrote:
-> 
-> *Some* other 64-bit architectures do 16k stack sizes. But neither
-> x86-64 nor powerpc do, afaik. Instead, they do irq stacks, which is
-> generally a better idea than having one big stack.
+Hello.
 
-Sadly you over estimated us here :-) We do 16K *and* irq stacks on
-64-bit ... Remember our ABI with it's 112 bytes minimum per frame ?
+On 07/27/2013 03:46 AM, Sergei Shtylyov wrote:
 
-It's been a while since I've last audited our actual usage mind you, we
-*might* be able to reduce it but at this stage, since our typical
-configs use a 64K base page size, it's not a big deal (ie, it's not an
-order-N allocation).
+> The following message is printed on the BOCK-W kernel bootup:
 
-Cheers,
-Ben.
+> sh-pfc pfc-r8a7778: invalid group "sdhi0" for function "sdhi0"
+
+> In addition, SD card cannot be detected.  The reason is apparently that commit
+> ca7bb309485e4ec89a9addd47bea (ARM: shmobile: bockw: add SDHI0 support) matched
+> the previous version of commit 564617d2f92473031d035deb273da5 (sh-pfc: r8a7778:
+> add SDHI support).
+
+> Add the missing pin groups according to the BOCK-W board schematics.
+
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+> ---
+> The patch is atop of Simon's 'renesas.git' repo, 'renesas-devel-20130726' tag.
+
+    It also applies to the current Linus' tree cleanly. Please push it for 3.11.
+
+WBR, Sergei
