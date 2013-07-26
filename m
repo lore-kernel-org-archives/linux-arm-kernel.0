@@ -1,105 +1,40 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:27 +0800
-Subject: [PATCH v13 11/14] usb: chipidea: add wait vbus lower than OTGSC_BSV
- before role starts
+Date: Fri, 26 Jul 2013 17:18:20 +0800
+Subject: [PATCH v13 04/14] usb: chipidea: udc: otg_set_peripheral is useless
+ for some chipidea users
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-5-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the gadget role starts, we need to make sure the vbus is lower
-than OTGSC_BSV, or there will be an vbus interrupt since we use
-B_SESSION_VALID as vbus interrupt to indicate connect and disconnect.
-When the host role starts, it may not be useful to wait vbus to lower
-than OTGSC_BSV, but it can indicate some hardware problems like the
-vbus is still higher than OTGSC_BSV after we disconnect to host some
-time later (5000 milliseconds currently), which is obvious not correct.
+It is useless at below cases:
+- If we implement both usb host and device at chipidea driver.
+- If we don't need phy->otg.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci.h   |    3 +++
- drivers/usb/chipidea/core.c |   32 ++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.c  |    4 ++++
- 3 files changed, 39 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/udc.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 3160363..1c94fc5 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -308,4 +308,7 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
- 
- u8 hw_port_test_get(struct ci_hdrc *ci);
- 
-+int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
-+				u32 value, unsigned int timeout_ms);
-+
- #endif	/* __DRIVERS_USB_CHIPIDEA_CI_H */
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 0fbeb45..6f9e04d 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -295,6 +295,38 @@ int hw_device_reset(struct ci_hdrc *ci, u32 mode)
- 	return 0;
- }
- 
-+/**
-+ * hw_wait_reg: wait the register value
-+ *
-+ * Sometimes, it needs to wait register value before going on.
-+ * Eg, when switch to device mode, the vbus value should be lower
-+ * than OTGSC_BSV before connects to host.
-+ *
-+ * @ci: the controller
-+ * @reg: register index
-+ * @mask: mast bit
-+ * @value: the bit value to wait
-+ * @timeout_ms: timeout in millisecond
-+ *
-+ * This function returns an error code if timeout
-+ */
-+int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
-+				u32 value, unsigned int timeout_ms)
-+{
-+	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
-+
-+	while (hw_read(ci, reg, mask) != value) {
-+		if (time_after(jiffies, elapse)) {
-+			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
-+					mask, reg);
-+			return -ETIMEDOUT;
-+		}
-+		msleep(20);
-+	}
-+
-+	return 0;
-+}
-+
- static irqreturn_t ci_irq(int irq, void *data)
- {
- 	struct ci_hdrc *ci = data;
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index c74194d..d39cce8 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -67,6 +67,7 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
- 		usb_gadget_vbus_disconnect(&ci->gadget);
- }
- 
-+#define CI_VBUS_STABLE_TIMEOUT_MS 5000
- static void ci_handle_id_switch(struct ci_hdrc *ci)
- {
- 	enum ci_role role = ci_otg_role(ci);
-@@ -76,6 +77,9 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
- 			ci_role(ci)->name, ci->roles[role]->name);
- 
- 		ci_role_stop(ci);
-+		/* wait vbus lower than OTGSC_BSV */
-+		hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
-+				CI_VBUS_STABLE_TIMEOUT_MS);
- 		ci_role_start(ci, role);
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index e475fcd..116c762 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1805,7 +1805,12 @@ static int udc_start(struct ci_hdrc *ci)
+ 	if (ci->transceiver) {
+ 		retval = otg_set_peripheral(ci->transceiver->otg,
+ 						&ci->gadget);
+-		if (retval)
++		/*
++		 * If we implement all USB functions using chipidea drivers,
++		 * it doesn't need to call above API, meanwhile, if we only
++		 * use gadget function, calling above API is useless.
++		 */
++		if (retval && retval != -ENOTSUPP)
+ 			goto put_transceiver;
  	}
- }
+ 
 -- 
 1.7.0.4
