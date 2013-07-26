@@ -1,39 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Jul 2013 15:40:47 +0100
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130726142140.GR24642@n2100.arm.linux.org.uk>
-References: <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy>
- <20130726132709.GH29916@titan.lakedaemon.net>
- <1374846070.14574.92.camel@i7.infradead.org>
- <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
- <20130726142140.GR24642@n2100.arm.linux.org.uk>
-Message-ID: <20130726144047.GH9858@sirena.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 26 Jul 2013 15:41:24 +0100
+Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <CAF6AEGtNEOpuKqcr7vfieCx0mot44L2bZzOt4ipcmUVv4FwUVw@mail.gmail.com>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
+ <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
+ <1374847564.3213.70.camel@hornet>
+ <CAF6AEGtNEOpuKqcr7vfieCx0mot44L2bZzOt4ipcmUVv4FwUVw@mail.gmail.com>
+Message-ID: <1374849684.3213.81.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 03:21:40PM +0100, Russell King - ARM Linux wrote:
+On Fri, 2013-07-26 at 15:21 +0100, Rob Clark wrote:
+> Well, if you have something complex enough to benefit from CDF, then
+> you probably ought to be looking at drm/kms. 
 
-> So this is why I'm seeing patches just a short time ago removing existing
-> compatible strings from the DT descriptions and associated driver, and
-> replacing them with new ones... meaning that the old DT files won't work
-> with newer kernels.
+That's what we're doing - hope you appreciate Tom's effort of re-writing
+a driver for something that pre-dates DRM/KMS by generations ;-)
 
-The big question is if you're seeing such patches merged.  People making
-mistakes on submissions is totally normal.
+> I guess I don't really care about what goes in fbdev.  
 
-If it's the case I think you mean TBH I'm not sure anyone cares, I don't
-think anyone is using that stuff in production yet as those chips go
-almost exclusively into Android phones.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/235a3d4f/attachment.sig>
+Well, I've guessed that ;-)
+
+> My main concern is that we have more than enough work to do,
+> and have more than enough complexity.  If we end up w/ bunch of glue
+> to tie things in to drm properties, how drm helpers sequence things
+> during modeset, locking, etc.. I just don't see that turning out well.
+>  And also, just on the logistical side, having something shared across
+> subsystems makes changes more of a pain during the merge window.  Not
+> to mention backports to stable kernels, distro kernels, etc.  It all
+> just seems like it will be a lot of unnecessary headache.
+
+I won't argue that, however it seems to me that CDF is such a small
+variable in the equation that it would disappear in the noise. Surely
+you have (or will have) standard DRM interface to drive the display
+pipeline where CDF would be one of many back-ends? In the end you'll
+have to solve the same problem - how to represent a random pipeline in a
+generic way so different components can be plugged one into another.
+Anyway, I'm not planning to stick my nose between DRM and CDF, really.
+I'm just hoping for a solution that will fit my needs :-)
+
+Pawel
