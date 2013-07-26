@@ -1,45 +1,43 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 26 Jul 2013 06:54:33 +0200
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <20130725213753.GC17616@obsidianresearch.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
-Message-ID: <20130726045433.GB4100@netboy>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Fri, 26 Jul 2013 11:11:27 +0530
+Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
+Message-ID: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 03:37:53PM -0600, Jason Gunthorpe wrote:
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-> We use DT has a kernel configuration input. Our environment is
-> designed to guarantee 100% that the kernel and DT match exactly. DT
-> very deliberately isn't an ABI boundary in our systems.
+In case of normal kexec kernel load, all cpu's are offlined
+before calling machine_kexec() under kernel_kexec() function.
+But in case crash panic cpus are relaxed in
+machine_crash_nonpanic_core() SMP function but not offlined.
 
-It is nice that you use DT in that way, but that is not how DT is
-supposed to work. If you must keep your DT in sync with the kernel,
-then there is no advantage over the old platfrom device method. At
-least that had the virtue of being a C language interface (ABI), and
-some mistakes were be caught by the compiler.
+When crash kernel is loaded with kexec and on panic trigger
+machine_kexec() checks for number of cpus online.
+If more than one cpu is online machine_kexec() fails to load
+with below error
 
-> We've been doing this for years and have a proven in the field track
-> record of upgrades from pre-2.6.16 to 3.7 and beyond with multiple
-> SOCs. The same bootloader that was shipped to support non-DT 2.6.16
-> boots DT 3.7 just fine.
+kexec: error: multiple CPUs still online
 
-Try that with Freescale PowerPCs.  Good luck.
+In machine_crash_nonpanic_core() SMP function, offline CPU
+before cpu_relax
 
-Heck, even Paul's OMAP test reports have been spoiled by his not
-deleting old dtb files. Of course, that is his fault (and not DT's, no
-never).
+Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+---
+ arch/arm/kernel/machine_kexec.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 4fb074c..163b160 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -73,6 +73,7 @@ void machine_crash_nonpanic_core(void *unused)
+ 	crash_save_cpu(&regs, smp_processor_id());
+ 	flush_cache_all();
  
-> For closed system embedded DT has proven *WONDERFUL*.
-
-I too work on commercial embedded systems, and DT has proven to be
-one gigantic *PITA*.
-
-Thanks,
-Richard
++	set_cpu_online(smp_processor_id(), false);
+ 	atomic_dec(&waiting_for_crash_ipi);
+ 	while (1)
+ 		cpu_relax();
+-- 
+1.7.9.5
