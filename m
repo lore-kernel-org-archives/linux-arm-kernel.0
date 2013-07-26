@@ -1,50 +1,40 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 26 Jul 2013 10:57:12 +0300
-Subject: [PATCH] video: nuc900fb: fix to pass correct device identity
- to request_irq()
-In-Reply-To: <CAPgLHd9CZ=VponJTbTGKTXVTdvMQM6_T+-RWuPMrk0WYZPbW1Q@mail.gmail.com>
-References: <CAPgLHd9CZ=VponJTbTGKTXVTdvMQM6_T+-RWuPMrk0WYZPbW1Q@mail.gmail.com>
-Message-ID: <51F22BD8.8090604@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 26 Jul 2013 11:59:57 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzJdIHZpZGVvOiBpbXhmYjogQWRkIGZlYXR1cmUgdG8g?=
+ =?UTF-8?B?c2V0dXAgUFdNIENvbnRyYXN0IENvbnRyb2wgUmVnaXN0ZXI=?=
+In-Reply-To: <20130726073848.GF2737@pengutronix.de>
+References: <1374395709-20898-1-git-send-email-shc_work@mail.ru>
+ <20130725212053.b39198a8610efc157a91b7be@mail.ru>
+ <20130726073848.GF2737@pengutronix.de>
+Message-ID: <1374825597.724071106@f170.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/13 03:07, Wei Yongjun wrote:
-> The IRQ handler nuc900fb_irqhandler() use dev_id as a type of
-> struct nuc900fb_info *, so we should pass fbi as the device
-> identity to request_irq().
+> On Thu, Jul 25, 2013 at 09:20:53PM +0400, Alexander Shiyan wrote:
+> > On Thu, 25 Jul 2013 15:38:56 +0200
+> > Markus Pargmann <mpa@pengutronix.de> wrote:
+> > 
+> > > Hi,
+> > > 
+> > > On Sun, Jul 21, 2013 at 12:35:09PM +0400, Alexander Shiyan wrote:
+> > > > This patch adds feature to setup PWM Contrast Control Register.
+> > > > This register is used to control the signal output at the contrast pin,
+> > > > which controls contrast of the LCD panel.
+> > > 
+> > > http://www.spinics.net/lists/linux-fbdev/msg10002.html
+> > 
+> > PWM? I can not understand how the PWM driver will be connected to the
+> > framebuffer driver. It is not backlight, this is contrast.
+> > Even if we imagine that the driver will be connected through phandle,
+> > then we will need to have at least 4! additional parameters in the framebuffer
+> > driver: freq source, frequency and active pulse period + phandle to PWM.
+> > Is it worth it, given that these parameters should not be adjustable?
+> > On my opinion, the only one additional parameter in framebuffer is enough.
+> > Thanks.
 > 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
-> Was 'video: nuc900fb: fix to pass correct device identity to free_irq()'
-> ---
->  drivers/video/nuc900fb.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-> index 8c527e5..796e511 100644
-> --- a/drivers/video/nuc900fb.c
-> +++ b/drivers/video/nuc900fb.c
-> @@ -587,8 +587,7 @@ static int nuc900fb_probe(struct platform_device *pdev)
->  	fbinfo->flags			= FBINFO_FLAG_DEFAULT;
->  	fbinfo->pseudo_palette		= &fbi->pseudo_pal;
->  
-> -	ret = request_irq(irq, nuc900fb_irqhandler, 0,
-> -			  pdev->name, fbinfo);
-> +	ret = request_irq(irq, nuc900fb_irqhandler, 0, pdev->name, fbi);
->  	if (ret) {
->  		dev_err(&pdev->dev, "cannot register irq handler %d -err %d\n",
->  			irq, ret);
-> 
+> Why should the contrast of a display not be adjustable?
 
-Thanks, I've applied this into my 3.11-fixes/fbdev branch.
+I still can not understand the interface through which it can be changed.
+Same as how the default settings can be passed to the framebuffer driver.
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/d6d5ff2b/attachment.sig>
+---
