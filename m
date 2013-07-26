@@ -1,27 +1,43 @@
-From: zubair.lutfullah@gmail.com (Zubair Lutfullah)
-Date: Fri, 26 Jul 2013 22:37:09 +0100
-Subject: [PATCH] mfd: input: arm: dts: doc: ti_am335x: typo fix (coordiante ->
- coordinate)
-Message-ID: <1374874630-25457-1-git-send-email-zubair.lutfullah@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 26 Jul 2013 18:55:48 -0300
+Subject: [PATCH] ARM: dts: imx53-qsb: Make USBH1 functional
+In-Reply-To: <87ehalunfx.fsf@lebrac.rtp-net.org>
+References: <1374787113-6628-1-git-send-email-fabio.estevam@freescale.com>
+ <87ehalunfx.fsf@lebrac.rtp-net.org>
+Message-ID: <CAOMZO5DRd097fKfbnQJY1rtGosnqP5FK=5ZxrzJcH-CSwweWsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-Small typo fix. Received ack from mfd already.
-Awaiting acks from all the rest.
+Hi Arnaud,
 
-As Lee from mfd stated, we can remove these during staging now.
-or we'll have to leave typos as is later on.
+On Fri, Jul 26, 2013 at 4:32 PM, Arnaud Patard
+<arnaud.patard@rtp-net.org> wrote:
+> Fabio Estevam <fabio.estevam@freescale.com> writes:
+> Hi,
+>
+> [...]
+>
+>> @@ -302,7 +312,9 @@
+>>  };
+>>
+>>  &usbh1 {
+>> -       status = "okay";
+>> +     vbus-supply = <&reg_usb_vbus>;
+>> +     phy_type = "utmi";
+>> +     status = "okay";
+>>  };
+>>
+>>  &usbotg {
+>
+> why not putting the vbus supply on the otg node too ?
 
-Zubair Lutfullah (1):
-  mfd: input: arm: dts: doc: ti_am335x: typo fixes (coordiante ->
-    coordinate)
+I think it would be better to use the otg port as peripheral mode
+(after Peter Chen's patches get accepted), so that's why I did not
+place the regulatoe into the otg node.
 
- .../bindings/input/touchscreen/ti-tsc-adc.txt      |    4 ++--
- arch/arm/boot/dts/am335x-evm.dts                   |    2 +-
- drivers/input/touchscreen/ti_am335x_tsc.c          |    2 +-
- drivers/mfd/ti_am335x_tscadc.c                     |    2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+If I recall correctly usb role switch does not work on this board, so
+better to use peripheral on otg port and host in USBH1.
 
--- 
-1.7.9.5
+Regards,
+
+Fabio Estevam
