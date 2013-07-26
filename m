@@ -1,336 +1,88 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Fri, 26 Jul 2013 21:13:30 +0530
-Subject: [PATCH 1/3] clk: s2mps11: Add support for s2mps11
-In-Reply-To: <1373197462-4033-2-git-send-email-yadi.brar@samsung.com>
-References: <1373197462-4033-1-git-send-email-yadi.brar@samsung.com>
- <1373197462-4033-2-git-send-email-yadi.brar@samsung.com>
-Message-ID: <CAKew6eXabwATXWNXnLY=MFonKpPHF32n=rgQA1ati5AS0ybJFw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 26 Jul 2013 11:43:34 -0400 (EDT)
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value
+ to index into save array
+In-Reply-To: <20130726153440.GD2282@localhost.localdomain>
+References: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
+ <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307261032330.15022@syhkavp.arg>
+ <20130726153440.GD2282@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1307261139370.15022@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle ping ...
+On Fri, 26 Jul 2013, Dave Martin wrote:
 
-Any review comments?
+> On Fri, Jul 26, 2013 at 10:41:38AM -0400, Nicolas Pitre wrote:
+> > On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
+> > 
+> > > On Thu, Jul 25, 2013 at 05:06:51PM +0100, Nicolas Pitre wrote:
+> > > > On Thu, 25 Jul 2013, Dave Martin wrote:
+> > > > 
+> > > > > On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
+> > > > > > On Wed, 24 Jul 2013, Dave Martin wrote:
+> > > > > > 
+> > > > > > > But this patch commits us to requiring that on the suspend path 
+> > > > > > > specifically -- I think that ought to be mentioned somewhere. A 
+> > > > > > > comment in the preamble for __cpu_suspend would be enough, I think.
+> > > > > > 
+> > > > > > What comment would you suggest?  I want to make sure the possible 
+> > > > > > confusion you see is properly addressed.
+> > > > > 
+> > > > > I think we just need to state that the value of
+> > > > > cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
+> > > > > CPU the suspending logical CPU will resume on.  Consequently, if doing a
+> > > > > migration, cpu_logical_map() must be updated appropriately somewhere
+> > > > > between cpu_pm_enter() and cpu_suspend().
+> > > > 
+> > > > Excellent.  I've amended the patch with this:
+> > > > 
+> > > > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> > > > index 2835d35234..caf938db62 100644
+> > > > --- a/arch/arm/kernel/suspend.c
+> > > > +++ b/arch/arm/kernel/suspend.c
+> > > > @@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
+> > > >  /*
+> > > >   * Hide the first two arguments to __cpu_suspend - these are an implementation
+> > > >   * detail which platform code shouldn't have to know about.
+> > > > + *
+> > > > + * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
+> > > > + * the MPIDR of the physical CPU the suspending logical CPU will resume on.
+> > > > + * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
+> > > > + * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
+> > > >   */
+> > > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> > > >  {
+> > > > 
+> > > > I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
+> > > > is what users should care about.
+> > > > 
+> > > > ACK?
+> > > 
+> > > We need this patch to allow IKS to store a cpu context at a specific
+> > > index, let's be honest. It is a moot point and I am not very happy
+> > > about changing this code for a very specific usage, but the way code is
+> > > implemented makes the change acceptable. I really do not think we should
+> > > write guidelines on how cpu_suspend users have to change cpu_logical_map
+> > > though, that's not needed apart from IKS and that should be limited to IKS
+> > > code only.
+> > > 
+> > > Again, that's just my opinion, but cpu_suspend API must be kept as it is
+> > > and we should not encourage people to use it in creative ways.
+> > 
+> > I tend to agree, but I'm now stuck between two conflicting requests.
+> 
+> Would it make sense to keep the same API to cpu_suspend(), but make it
+> a wrapper for another function which has the MPIDR argument?  Then people
+> calling cpu_suspend() continue as normal.  Only IKS needs to know about
+> the underlying MPIDR handling when calling this.
 
-On Sun, Jul 7, 2013 at 5:14 PM, Yadwinder Singh Brar
-<yadi.brar@samsung.com> wrote:
-> This patch adds support to register three(AP/CP/BT) buffered 32.768 KHz
-> outputs of mfd-s2mps11 with common clock framework.
->
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> ---
->  drivers/clk/Kconfig       |    6 +
->  drivers/clk/Makefile      |    1 +
->  drivers/clk/clk-s2mps11.c |  273 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 280 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/clk-s2mps11.c
->
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 0357ac4..3fdf10e 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -65,6 +65,12 @@ config COMMON_CLK_SI5351
->           This driver supports Silicon Labs 5351A/B/C programmable clock
->           generators.
->
-> +config COMMON_CLK_S2MPS11
-> +       tristate "Clock driver for S2MPS11 MFD"
-> +       depends on MFD_SEC_CORE
-> +       ---help---
-> +         This driver supports S2MPS11 crystal oscillator clock.
-> +
->  config CLK_TWL6040
->         tristate "External McPDM functional clock from twl6040"
->         depends on TWL6040_CORE
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 137d3e7..5fd642d 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -38,4 +38,5 @@ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN) += clk-axi-clkgen.o
->  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
->  obj-$(CONFIG_COMMON_CLK_MAX77686) += clk-max77686.o
->  obj-$(CONFIG_COMMON_CLK_SI5351) += clk-si5351.o
-> +obj-$(CONFIG_COMMON_CLK_S2MPS11) += clk-s2mps11.o
->  obj-$(CONFIG_CLK_TWL6040)      += clk-twl6040.o
-> diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-> new file mode 100644
-> index 0000000..7be41e6
-> --- /dev/null
-> +++ b/drivers/clk/clk-s2mps11.c
-> @@ -0,0 +1,273 @@
-> +/*
-> + * clk-s2mps11.c - Clock driver for S2MPS11.
-> + *
-> + * Copyright (C) 2013 Samsung Electornics
-> + *
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/regmap.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mfd/samsung/s2mps11.h>
-> +#include <linux/mfd/samsung/core.h>
-> +
-> +#define s2mps11_name(a) (a->hw.init->name)
-> +
-> +static struct clk **clk_table;
-> +static struct clk_onecell_data clk_data;
-> +
-> +enum {
-> +       S2MPS11_CLK_AP = 0,
-> +       S2MPS11_CLK_CP,
-> +       S2MPS11_CLK_BT,
-> +       S2MPS11_CLKS_NUM,
-> +};
-> +
-> +struct s2mps11_clk {
-> +       struct sec_pmic_dev *iodev;
-> +       struct clk_hw hw;
-> +       struct clk *clk;
-> +       struct clk_lookup *lookup;
-> +       u32 mask;
-> +       bool enabled;
-> +};
-> +
-> +static struct s2mps11_clk *to_s2mps11_clk(struct clk_hw *hw)
-> +{
-> +       return container_of(hw, struct s2mps11_clk, hw);
-> +}
-> +
-> +static int s2mps11_clk_prepare(struct clk_hw *hw)
-> +{
-> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
-> +       int ret;
-> +
-> +       ret = regmap_update_bits(s2mps11->iodev->regmap,
-> +                               S2MPS11_REG_RTC_CTRL,
-> +                                s2mps11->mask, s2mps11->mask);
-> +       if (!ret)
-> +               s2mps11->enabled = true;
-> +
-> +       return ret;
-> +}
-> +
-> +static void s2mps11_clk_unprepare(struct clk_hw *hw)
-> +{
-> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
-> +       int ret;
-> +
-> +       ret = regmap_update_bits(s2mps11->iodev->regmap, S2MPS11_REG_RTC_CTRL,
-> +                          s2mps11->mask, ~s2mps11->mask);
-> +
-> +       if (!ret)
-> +               s2mps11->enabled = false;
-> +}
-> +
-> +static int s2mps11_clk_is_enabled(struct clk_hw *hw)
-> +{
-> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
-> +
-> +       return s2mps11->enabled;
-> +}
-> +
-> +static unsigned long s2mps11_clk_recalc_rate(struct clk_hw *hw,
-> +                                            unsigned long parent_rate)
-> +{
-> +       struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
-> +       if (s2mps11->enabled)
-> +               return 32768;
-> +       else
-> +               return 0;
-> +}
-> +
-> +static struct clk_ops s2mps11_clk_ops = {
-> +       .prepare        = s2mps11_clk_prepare,
-> +       .unprepare      = s2mps11_clk_unprepare,
-> +       .is_enabled     = s2mps11_clk_is_enabled,
-> +       .recalc_rate    = s2mps11_clk_recalc_rate,
-> +};
-> +
-> +static struct clk_init_data s2mps11_clks_init[S2MPS11_CLKS_NUM] = {
-> +       [S2MPS11_CLK_AP] = {
-> +               .name = "s2mps11_ap",
-> +               .ops = &s2mps11_clk_ops,
-> +               .flags = CLK_IS_ROOT,
-> +       },
-> +       [S2MPS11_CLK_CP] = {
-> +               .name = "s2mps11_cp",
-> +               .ops = &s2mps11_clk_ops,
-> +               .flags = CLK_IS_ROOT,
-> +       },
-> +       [S2MPS11_CLK_BT] = {
-> +               .name = "s2mps11_bt",
-> +               .ops = &s2mps11_clk_ops,
-> +               .flags = CLK_IS_ROOT,
-> +       },
-> +};
-> +
-> +static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
-> +{
-> +       struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-> +       struct device_node *clk_np;
-> +       int i;
-> +
-> +       if (!iodev->dev->of_node)
-> +               return NULL;
-> +
-> +       clk_np = of_find_node_by_name(iodev->dev->of_node, "clocks");
-> +       if (!clk_np) {
-> +               dev_err(&pdev->dev, "could not find clock sub-node\n");
-> +               return ERR_PTR(-EINVAL);
-> +       }
-> +
-> +       clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk *) *
-> +                                S2MPS11_CLKS_NUM, GFP_KERNEL);
-> +       if (!clk_table)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +               of_property_read_string_index(clk_np, "clock-output-names", i,
-> +                               &s2mps11_clks_init[i].name);
-> +
-> +       return clk_np;
-> +}
-> +
-> +static int s2mps11_clk_probe(struct platform_device *pdev)
-> +{
-> +       struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-> +       struct s2mps11_clk *s2mps11_clks, *s2mps11_clk;
-> +       struct device_node *clk_np = NULL;
-> +       int i, ret = 0;
-> +       u32 val;
-> +
-> +       s2mps11_clks = devm_kzalloc(&pdev->dev, sizeof(*s2mps11_clk) *
-> +                                       S2MPS11_CLKS_NUM, GFP_KERNEL);
-> +       if (!s2mps11_clks)
-> +               return -ENOMEM;
-> +
-> +       s2mps11_clk = s2mps11_clks;
-> +
-> +       clk_np = s2mps11_clk_parse_dt(pdev);
-> +       if (IS_ERR(clk_np))
-> +               return PTR_ERR(clk_np);
-> +
-> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++, s2mps11_clk++) {
-> +               s2mps11_clk->iodev = iodev;
-> +               s2mps11_clk->hw.init = &s2mps11_clks_init[i];
-> +               s2mps11_clk->mask = 1 << i;
-> +
-> +               ret = regmap_read(s2mps11_clk->iodev->regmap,
-> +                                 S2MPS11_REG_RTC_CTRL, &val);
-> +               if (ret < 0)
-> +                       goto err_reg;
-> +
-> +               s2mps11_clk->enabled = val & s2mps11_clk->mask;
-> +
-> +               s2mps11_clk->clk = devm_clk_register(&pdev->dev,
-> +                                                       &s2mps11_clk->hw);
-> +               if (IS_ERR(s2mps11_clk->clk)) {
-> +                       dev_err(&pdev->dev, "Fail to register : %s\n",
-> +                                               s2mps11_name(s2mps11_clk));
-> +                       ret = PTR_ERR(s2mps11_clk->clk);
-> +                       goto err_reg;
-> +               }
-> +
-> +               s2mps11_clk->lookup = devm_kzalloc(&pdev->dev,
-> +                                       sizeof(struct clk_lookup), GFP_KERNEL);
-> +               if (!s2mps11_clk->lookup) {
-> +                       ret = -ENOMEM;
-> +                       goto err_lup;
-> +               }
-> +
-> +               s2mps11_clk->lookup->con_id = s2mps11_name(s2mps11_clk);
-> +               s2mps11_clk->lookup->clk = s2mps11_clk->clk;
-> +
-> +               clkdev_add(s2mps11_clk->lookup);
-> +       }
-> +
-> +       if (clk_table) {
-> +               for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +                       clk_table[i] = s2mps11_clks[i].clk;
-> +
-> +               clk_data.clks = clk_table;
-> +               clk_data.clk_num = S2MPS11_CLKS_NUM;
-> +               of_clk_add_provider(clk_np, of_clk_src_onecell_get, &clk_data);
-> +       }
-> +
-> +       platform_set_drvdata(pdev, s2mps11_clks);
-> +
-> +       return ret;
-> +err_lup:
-> +       devm_clk_unregister(&pdev->dev, s2mps11_clk->clk);
-> +err_reg:
-> +       while (s2mps11_clk > s2mps11_clks) {
-> +               if (s2mps11_clk->lookup) {
-> +                       clkdev_drop(s2mps11_clk->lookup);
-> +                       devm_clk_unregister(&pdev->dev, s2mps11_clk->clk);
-> +               }
-> +               s2mps11_clk--;
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +static int s2mps11_clk_remove(struct platform_device *pdev)
-> +{
-> +       struct s2mps11_clk *s2mps11_clks = platform_get_drvdata(pdev);
-> +       int i;
-> +
-> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +               clkdev_drop(s2mps11_clks[i].lookup);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct platform_device_id s2mps11_clk_id[] = {
-> +       { "s2mps11-clk", 0},
-> +       { },
-> +};
-> +MODULE_DEVICE_TABLE(platform, s2mps11_clk_id);
-> +
-> +static struct platform_driver s2mps11_clk_driver = {
-> +       .driver = {
-> +               .name  = "s2mps11-clk",
-> +               .owner = THIS_MODULE,
-> +       },
-> +       .probe = s2mps11_clk_probe,
-> +       .remove = s2mps11_clk_remove,
-> +       .id_table = s2mps11_clk_id,
-> +};
-> +
-> +static int __init s2mps11_clk_init(void)
-> +{
-> +       return platform_driver_register(&s2mps11_clk_driver);
-> +}
-> +subsys_initcall(s2mps11_clk_init);
-> +
-> +static void __init s2mps11_clk_cleanup(void)
-> +{
-> +       platform_driver_unregister(&s2mps11_clk_driver);
-> +}
-> +module_exit(s2mps11_clk_cleanup);
-> +
-> +MODULE_DESCRIPTION("S2MPS11 Clock Driver");
-> +MODULE_AUTHOR("Yadwinder Singh Brar <yadi.brar@samsung.com>");
-> +MODULE_LICENSE("GPL");
-> --
-> 1.7.0.4
->
+The fact is that the switcher _does_ need to swizzle the cpu_logical_map 
+anyway before suspending.  Hence really there is no point creating extra
+wrappers for this.
+
+So Lorenzo's suggestion to simply not advertise this too much for people 
+to not get too creative is probably the best compromize IMHO.
+
+
+Nicolas
