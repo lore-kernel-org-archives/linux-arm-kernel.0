@@ -1,92 +1,54 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jul 2013 16:45:34 +0100
-Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value to
- index into save array
-In-Reply-To: <alpine.LFD.2.03.1307261139370.15022@syhkavp.arg>
-References: <alpine.LFD.2.03.1307251203550.15022@syhkavp.arg>
- <20130726113110.GB28084@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1307261032330.15022@syhkavp.arg>
- <20130726153440.GD2282@localhost.localdomain>
- <alpine.LFD.2.03.1307261139370.15022@syhkavp.arg>
-Message-ID: <20130726154534.GE2282@localhost.localdomain>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 26 Jul 2013 08:49:43 -0700
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
+ interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726141016.GF9858@sirena.org.uk>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+ <20130726141016.GF9858@sirena.org.uk>
+Message-ID: <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 11:43:34AM -0400, Nicolas Pitre wrote:
-> On Fri, 26 Jul 2013, Dave Martin wrote:
-> 
-> > On Fri, Jul 26, 2013 at 10:41:38AM -0400, Nicolas Pitre wrote:
-> > > On Fri, 26 Jul 2013, Lorenzo Pieralisi wrote:
-> > > 
-> > > > On Thu, Jul 25, 2013 at 05:06:51PM +0100, Nicolas Pitre wrote:
-> > > > > On Thu, 25 Jul 2013, Dave Martin wrote:
-> > > > > 
-> > > > > > On Wed, Jul 24, 2013 at 02:55:00PM -0400, Nicolas Pitre wrote:
-> > > > > > > On Wed, 24 Jul 2013, Dave Martin wrote:
-> > > > > > > 
-> > > > > > > > But this patch commits us to requiring that on the suspend path 
-> > > > > > > > specifically -- I think that ought to be mentioned somewhere. A 
-> > > > > > > > comment in the preamble for __cpu_suspend would be enough, I think.
-> > > > > > > 
-> > > > > > > What comment would you suggest?  I want to make sure the possible 
-> > > > > > > confusion you see is properly addressed.
-> > > > > > 
-> > > > > > I think we just need to state that the value of
-> > > > > > cpu_logical_map(smp_processor_id()) must be the MPIDR of the physical
-> > > > > > CPU the suspending logical CPU will resume on.  Consequently, if doing a
-> > > > > > migration, cpu_logical_map() must be updated appropriately somewhere
-> > > > > > between cpu_pm_enter() and cpu_suspend().
-> > > > > 
-> > > > > Excellent.  I've amended the patch with this:
-> > > > > 
-> > > > > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-> > > > > index 2835d35234..caf938db62 100644
-> > > > > --- a/arch/arm/kernel/suspend.c
-> > > > > +++ b/arch/arm/kernel/suspend.c
-> > > > > @@ -17,6 +17,11 @@ extern void cpu_resume_mmu(void);
-> > > > >  /*
-> > > > >   * Hide the first two arguments to __cpu_suspend - these are an implementation
-> > > > >   * detail which platform code shouldn't have to know about.
-> > > > > + *
-> > > > > + * On SMP systems, the value of cpu_logical_map(smp_processor_id()) must be
-> > > > > + * the MPIDR of the physical CPU the suspending logical CPU will resume on.
-> > > > > + * Consequently, if doing a physical CPU migration, cpu_logical_map() must be
-> > > > > + * updated appropriately somewhere between cpu_pm_enter() and cpu_suspend().
-> > > > >   */
-> > > > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-> > > > >  {
-> > > > > 
-> > > > > I've put it against cpu_suspend() rather than __cpu_suspend(() as this 
-> > > > > is what users should care about.
-> > > > > 
-> > > > > ACK?
-> > > > 
-> > > > We need this patch to allow IKS to store a cpu context at a specific
-> > > > index, let's be honest. It is a moot point and I am not very happy
-> > > > about changing this code for a very specific usage, but the way code is
-> > > > implemented makes the change acceptable. I really do not think we should
-> > > > write guidelines on how cpu_suspend users have to change cpu_logical_map
-> > > > though, that's not needed apart from IKS and that should be limited to IKS
-> > > > code only.
-> > > > 
-> > > > Again, that's just my opinion, but cpu_suspend API must be kept as it is
-> > > > and we should not encourage people to use it in creative ways.
-> > > 
-> > > I tend to agree, but I'm now stuck between two conflicting requests.
-> > 
-> > Would it make sense to keep the same API to cpu_suspend(), but make it
-> > a wrapper for another function which has the MPIDR argument?  Then people
-> > calling cpu_suspend() continue as normal.  Only IKS needs to know about
-> > the underlying MPIDR handling when calling this.
-> 
-> The fact is that the switcher _does_ need to swizzle the cpu_logical_map 
-> anyway before suspending.  Hence really there is no point creating extra
-> wrappers for this.
-> 
-> So Lorenzo's suggestion to simply not advertise this too much for people 
-> to not get too creative is probably the best compromize IMHO.
+On Fri, Jul 26, 2013 at 7:10 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
+>
+>> Unless I totally misunderstood, the thread is talking about letting
+>> established bindings change with each new kernel version.  I am
+>> opposed to that.
+>
+> No, nobody is really saying that is a particularly good idea.  There is
+> some debate about how we work out what an established binding is but
+> there's no serious suggestion that we don't want stable bindings.
 
-Sure, I don't have a problem with that in light of the discussion.
+Yes, what Mark said -- _today_ all bindings are subject to change and
+can be changed in lockstep with the kernel. This has been necessary as
+part of development to sort out all of the various bootstrapping
+issues across platforms.
 
-Cheers
----Dave
+What we're talking about is to end that mode of operation, and moving
+over to locking in bindings. Device tree contents, as mentioned
+elsewhere, might still be changed just like code is -- bugs are fixed,
+etc. But it's time to start locking down the bindings, in particular
+no longer change the established ones.
+
+Long term, final goal is likely to be close to what Russell is saying
+-- nothing should go into the kernel tree unless the binding is in a
+fully stable state. However, we have a transitional period between now
+and then, and even when we're at the final state there will be need to
+have some sort of sandbox for development and test of future bindings.
+Dealing with all that, as well as the actual process for locking in
+bindings, is what needs to be sorted out.
+
+I think we're all in agreement that bindings that change over time are
+nothing but pain, but we're arguing that in circles anyway.
+
+
+-Olof
