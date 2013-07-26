@@ -1,89 +1,89 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 26 Jul 2013 10:08:18 +0300
-Subject: [PATCH 15/21] ARM: OMAP: H4: use new display drivers
+Date: Fri, 26 Jul 2013 10:08:22 +0300
+Subject: [PATCH 19/21] ARM: OMAP: Zoom: use new display drivers
 In-Reply-To: <1374822504-28949-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1374822504-28949-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1374822504-28949-16-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1374822504-28949-20-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use new display drivers for H4 board.
+Use new display drivers for Zoom board.
 
 The new OMAP display drivers were merged for 3.11, and we can now change
 the board files to use the new ones and phase out the old ones.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/mach-omap2/board-h4.c | 48 +++++++++++++++++++++++++++++-------------
- 1 file changed, 33 insertions(+), 15 deletions(-)
+ arch/arm/mach-omap2/board-zoom-display.c | 30 +++++++++++-------------------
+ 1 file changed, 11 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index 69c0acf..87e41a8 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -194,30 +194,48 @@ static struct platform_device h4_flash_device = {
- 	.resource	= &h4_flash_resource,
- };
+diff --git a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
+index c2a079c..3d8ecc1 100644
+--- a/arch/arm/mach-omap2/board-zoom-display.c
++++ b/arch/arm/mach-omap2/board-zoom-display.c
+@@ -25,32 +25,23 @@
+ #define LCD_PANEL_RESET_GPIO_PILOT	55
+ #define LCD_PANEL_QVGA_GPIO		56
  
--static struct platform_device *h4_devices[] __initdata = {
--	&h4_flash_device,
-+static const struct display_timing cm_t35_lcd_videomode = {
-+	.pixelclock	= { 0, 6250000, 0 },
-+
-+	.hactive = { 0, 240, 0 },
-+	.hfront_porch = { 0, 15, 0 },
-+	.hback_porch = { 0, 60, 0 },
-+	.hsync_len = { 0, 15, 0 },
-+
-+	.vactive = { 0, 320, 0 },
-+	.vfront_porch = { 0, 1, 0 },
-+	.vback_porch = { 0, 1, 0 },
-+	.vsync_len = { 0, 1, 0 },
-+
-+	.flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH |
-+		DISPLAY_FLAGS_DE_HIGH | DISPLAY_FLAGS_PIXDATA_POSEDGE,
- };
- 
--static struct panel_generic_dpi_data h4_panel_data = {
--	.name			= "h4",
-+static struct panel_dpi_platform_data cm_t35_lcd_pdata = {
+-static struct panel_nec_nl8048_data zoom_lcd_data = {
+-	/* res_gpio filled in code */
+-	.qvga_gpio = LCD_PANEL_QVGA_GPIO,
+-};
++static struct panel_nec_nl8048hl11_platform_data zoom_lcd_pdata = {
 +	.name                   = "lcd",
 +	.source                 = "dpi.0",
-+
-+	.data_lines		= 16,
-+
-+	.display_timing		= &cm_t35_lcd_videomode,
-+
-+	.enable_gpio		= -1,
-+	.backlight_gpio		= -1,
- };
  
--static struct omap_dss_device h4_lcd_device = {
+-static struct omap_dss_device zoom_lcd_device = {
 -	.name			= "lcd",
--	.driver_name		= "generic_dpi_panel",
+-	.driver_name		= "NEC_8048_panel",
 -	.type			= OMAP_DISPLAY_TYPE_DPI,
--	.phy.dpi.data_lines	= 16,
--	.data			= &h4_panel_data,
-+static struct platform_device cm_t35_lcd_device = {
-+	.name                   = "panel-dpi",
-+	.id                     = 0,
-+	.dev.platform_data      = &cm_t35_lcd_pdata,
+-	.phy.dpi.data_lines	= 24,
+-	.data			= &zoom_lcd_data,
+-};
++	.data_lines		= 24,
+ 
+-static struct omap_dss_device *zoom_dss_devices[] = {
+-	&zoom_lcd_device,
++	.res_gpio		= -1,	/* filled in code */
++	.qvga_gpio		= LCD_PANEL_QVGA_GPIO,
  };
  
--static struct omap_dss_device *h4_dss_devices[] = {
--	&h4_lcd_device,
-+static struct platform_device *h4_devices[] __initdata = {
-+	&h4_flash_device,
-+	&cm_t35_lcd_device,
- };
- 
- static struct omap_dss_board_info h4_dss_data = {
--	.num_devices	= ARRAY_SIZE(h4_dss_devices),
--	.devices	= h4_dss_devices,
--	.default_device	= &h4_lcd_device,
+ static struct omap_dss_board_info zoom_dss_data = {
+-	.num_devices		= ARRAY_SIZE(zoom_dss_devices),
+-	.devices		= zoom_dss_devices,
+-	.default_device		= &zoom_lcd_device,
 +	.default_display_name = "lcd",
  };
  
- /* 2420 Sysboot setup (2430 is different) */
+ static void __init zoom_lcd_panel_init(void)
+ {
+-	zoom_lcd_data.res_gpio = (omap_rev() > OMAP3430_REV_ES3_0) ?
++	zoom_lcd_pdata.res_gpio = (omap_rev() > OMAP3430_REV_ES3_0) ?
+ 			LCD_PANEL_RESET_GPIO_PROD :
+ 			LCD_PANEL_RESET_GPIO_PILOT;
+ }
+@@ -61,19 +52,20 @@ static struct omap2_mcspi_device_config dss_lcd_mcspi_config = {
+ 
+ static struct spi_board_info nec_8048_spi_board_info[] __initdata = {
+ 	[0] = {
+-		.modalias		= "nec_8048_spi",
++		.modalias		= "panel-nec-nl8048hl11",
+ 		.bus_num		= 1,
+ 		.chip_select		= 2,
+ 		.max_speed_hz		= 375000,
+ 		.controller_data	= &dss_lcd_mcspi_config,
++		.platform_data		= &zoom_lcd_pdata,
+ 	},
+ };
+ 
+ void __init zoom_display_init(void)
+ {
+ 	omap_display_init(&zoom_dss_data);
++	zoom_lcd_panel_init();
+ 	spi_register_board_info(nec_8048_spi_board_info,
+ 				ARRAY_SIZE(nec_8048_spi_board_info));
+-	zoom_lcd_panel_init();
+ }
+ 
 -- 
 1.8.1.2
