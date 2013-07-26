@@ -1,99 +1,113 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:17 +0800
-Subject: [PATCH v13 01/14] usb: chipidea: add vbus regulator control
+Date: Fri, 26 Jul 2013 17:18:23 +0800
+Subject: [PATCH v13 07/14] usb: chipidea: add flag CI_HDRC_DUAL_ROLE_NOT_OTG
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For boards which have board level vbus control (eg, through gpio), we
-need to vbus operation according to below rules:
-- For host, we need open vbus before start hcd, and close it
-after remove hcd.
-- For otg, the vbus needs to be on/off when usb role switches.
-When the host roles begins, it opens vbus; when the host role
-finishes, it closes vbus.
+Since we need otgsc to know vbus's status at some chipidea
+controllers even it is peripheral-only mode. Besides, some
+SoCs (eg, AR9331 SoC) don't have otgsc register even
+the DCCPARAMS_DC and DCCPARAMS_HC are both 1 at CAP_DCCPARAMS.
 
-We put vbus operation to host as host is the only vbus user,
-When we are at host mode, the vbus is on, when we are not at
-host mode, vbus should be off.
+We inroduce flag CI_HDRC_DUAL_ROLE_NOT_OTG to indicate if the
+controller is dual role, but not supports OTG. If this flag is
+not set, we follow the rule that if DCCPARAMS_DC and DCCPARAMS_HC
+are both 1 at CAP_DCCPARAMS, then this controller is otg capable.
 
-Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/host.c  |   23 ++++++++++++++++++++++-
- include/linux/usb/chipidea.h |    1 +
- 2 files changed, 23 insertions(+), 1 deletions(-)
+ drivers/usb/chipidea/core.c  |   38 +++++++++++++++++++++++++++++++-------
+ include/linux/usb/chipidea.h |    5 +++++
+ 2 files changed, 36 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 40d0fda..e94e52b 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -24,6 +24,7 @@
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
- #include <linux/usb/chipidea.h>
-+#include <linux/regulator/consumer.h>
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 93961ff..28983c3 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -405,6 +405,18 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
+ 	ci_hdrc_host_destroy(ci);
+ }
  
- #include "../host/ehci.h"
++static void ci_get_otg_capable(struct ci_hdrc *ci)
++{
++	if (ci->platdata->flags & CI_HDRC_DUAL_ROLE_NOT_OTG)
++		ci->is_otg = false;
++	else
++		ci->is_otg = (hw_read(ci, CAP_DCCPARAMS,
++				DCCPARAMS_DC | DCCPARAMS_HC)
++					== (DCCPARAMS_DC | DCCPARAMS_HC));
++	if (ci->is_otg)
++		dev_dbg(ci->dev, "It is OTG capable controller\n");
++}
++
+ static int ci_hdrc_probe(struct platform_device *pdev)
+ {
+ 	struct device	*dev = &pdev->dev;
+@@ -461,6 +473,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
-@@ -64,9 +65,19 @@ static int host_start(struct ci_hdrc *ci)
- 	ehci->caps = ci->hw_bank.cap;
- 	ehci->has_hostpc = ci->hw_bank.lpm;
++	/* To know if controller is OTG capable or not */
++	ci_get_otg_capable(ci);
++
+ 	if (!ci->platdata->phy_mode)
+ 		ci->platdata->phy_mode = of_usb_get_phy_mode(dev->of_node);
  
-+	if (ci->platdata->reg_vbus) {
-+		ret = regulator_enable(ci->platdata->reg_vbus);
-+		if (ret) {
-+			dev_err(ci->dev,
-+				"Failed to enable vbus regulator, ret=%d\n",
-+				ret);
-+			goto put_hcd;
+@@ -491,10 +506,22 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+-		ci->is_otg = true;
+-		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
+-		mdelay(2);
+-		ci->role = ci_otg_role(ci);
++		if (ci->is_otg) {
++			/*
++			 * ID pin needs 1ms debouce time,
++			 * we delay 2ms for safe.
++			 */
++			mdelay(2);
++			ci->role = ci_otg_role(ci);
++			ci_hdrc_otg_init(ci);
++		} else {
++			/*
++			 * If the controller is not OTG capable, but support
++			 * role switch, the defalt role is gadget, and the
++			 * user can switch it through debugfs (proc in future?)
++			 */
++			ci->role = CI_ROLE_GADGET;
 +		}
-+	}
-+
- 	ret = usb_add_hcd(hcd, 0, 0);
+ 	} else {
+ 		ci->role = ci->roles[CI_ROLE_HOST]
+ 			? CI_ROLE_HOST
+@@ -514,9 +541,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
  	if (ret)
--		usb_put_hcd(hcd);
-+		goto disable_reg;
- 	else
- 		ci->hcd = hcd;
+ 		goto stop;
  
-@@ -74,6 +85,14 @@ static int host_start(struct ci_hdrc *ci)
- 		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
- 
- 	return ret;
-+
-+disable_reg:
-+	regulator_disable(ci->platdata->reg_vbus);
-+
-+put_hcd:
-+	usb_put_hcd(hcd);
-+
-+	return ret;
- }
- 
- static void host_stop(struct ci_hdrc *ci)
-@@ -82,6 +101,8 @@ static void host_stop(struct ci_hdrc *ci)
- 
- 	usb_remove_hcd(hcd);
- 	usb_put_hcd(hcd);
-+	if (ci->platdata->reg_vbus)
-+		regulator_disable(ci->platdata->reg_vbus);
- }
- 
- int ci_hdrc_host_init(struct ci_hdrc *ci)
+-	if (ci->is_otg)
+-		ci_hdrc_otg_init(ci);
+-
+ 	ret = dbg_create_files(ci);
+ 	if (!ret)
+ 		return 0;
 diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 2562994..118bf66 100644
+index 118bf66..e94dc2e 100644
 --- a/include/linux/usb/chipidea.h
 +++ b/include/linux/usb/chipidea.h
-@@ -24,6 +24,7 @@ struct ci_hdrc_platform_data {
+@@ -20,6 +20,11 @@ struct ci_hdrc_platform_data {
+ #define CI_HDRC_REQUIRE_TRANSCEIVER	BIT(1)
+ #define CI_HDRC_PULLUP_ON_VBUS		BIT(2)
+ #define CI_HDRC_DISABLE_STREAMING	BIT(3)
++	/*
++	 * Only set it when DCCPARAMS.DC==1 and DCCPARAMS.HC==1,
++	 * but otg is not supported (no register otgsc).
++	 */
++#define CI_HDRC_DUAL_ROLE_NOT_OTG	BIT(4)
+ 	enum usb_dr_mode	dr_mode;
  #define CI_HDRC_CONTROLLER_RESET_EVENT		0
  #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
-+	struct regulator *reg_vbus;
- };
- 
- /* Default offset of capability registers */
 -- 
 1.7.0.4
