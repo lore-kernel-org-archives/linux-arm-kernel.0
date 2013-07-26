@@ -1,173 +1,160 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 26 Jul 2013 09:10:53 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
-In-Reply-To: <201307230222.04763.sergei.shtylyov@cogentembedded.com>
-References: <201307230218.01495.sergei.shtylyov@cogentembedded.com>
- <201307230222.04763.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130726001052.GA28912@verge.net.au>
+Date: Fri, 26 Jul 2013 09:11:26 +0900
+Subject: [PATCH v2] ARM: shmobile: Add lager defconfig
+In-Reply-To: <1374566966-30345-1-git-send-email-horms+renesas@verge.net.au>
+References: <1374566966-30345-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130726001125.GB28912@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Cc Morimoto-san ]
+On Tue, Jul 23, 2013 at 05:09:26PM +0900, Simon Horman wrote:
+> This is intended to be used until multi-arch is able to be
+> used for the lager board at which time a more generic configuration
+> will be used in place of this one.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-On Tue, Jul 23, 2013 at 02:22:04AM +0400, Sergei Shtylyov wrote:
-> From: Max Filippov <max.filippov@cogentembedded.com>
-> 
-> Add HPB-DMAC platform device on R8A7778 SoC along with its slave and channel
-> configurations.
-> 
-> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-> [Sergei: moved *enum* declaring HPB-DMAC slave IDs from now removed <mach/dma.h>
-> to <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c, removed
-> SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[] and
-> hpb_dmae_channels[].]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Magnus, could your review this?
+
 > 
 > ---
-> Changes in version 2:
-> - moved *enum* declaring HPB-DMAC slave IDs from the separate header file to
->   <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c;
-> - removed SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[]
->   and hpb_dmae_channels[].
 > 
->  arch/arm/mach-shmobile/include/mach/r8a7778.h |    8 ++
->  arch/arm/mach-shmobile/setup-r8a7778.c        |   80 ++++++++++++++++++++++++++
->  2 files changed, 88 insertions(+)
-
-Morimoto-san, Magnus,
-
-could you please review this?
-
+> v2
+> * Place defconfig in correct directory
+> * Bump SERIAL_SH_SCI_NR_UARTS up to 10 to reflect the
+>   number of devices present
+> ---
+>  arch/arm/configs/lager_defconfig | 121 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 121 insertions(+)
+>  create mode 100644 arch/arm/configs/lager_defconfig
 > 
-> Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7778.h
-> +++ renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-> @@ -1,6 +1,7 @@
->  /*
->   * Copyright (C) 2013  Renesas Solutions Corp.
->   * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> + * Copyright (C) 2013  Cogent Embedded, Inc.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
-> @@ -23,6 +24,13 @@
->  #include <linux/sh_eth.h>
->  #include <linux/platform_data/usb-rcar-phy.h>
->  
-> +/* HPB-DMA slave IDs */
-> +enum {
-> +	HPBDMA_SLAVE_DUMMY,
-> +	HPBDMA_SLAVE_SDHI0_TX,
-> +	HPBDMA_SLAVE_SDHI0_RX,
-> +};
-> +
->  extern void r8a7778_add_standard_devices(void);
->  extern void r8a7778_add_standard_devices_dt(void);
->  extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
-> Index: renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7778.c
-> +++ renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-> @@ -24,6 +24,7 @@
->  #include <linux/irqchip/arm-gic.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/platform_data/dma-rcar-hpbdma.h>
->  #include <linux/platform_data/gpio-rcar.h>
->  #include <linux/platform_data/irq-renesas-intc-irqpin.h>
->  #include <linux/platform_device.h>
-> @@ -333,6 +334,84 @@ void __init r8a7778_add_mmc_device(struc
->  		info, sizeof(*info));
->  }
->  
-> +/* HPB-DMA */
-> +
-> +/* Asynchronous mode register (ASYNCMDR) bits */
-> +#define	ASYNCMDR_ASMD22_MASK	BIT(2)	/* SDHI0 */
-> +#define	ASYNCMDR_ASMD22_SINGLE	BIT(2)	/* SDHI0 */
-> +#define	ASYNCMDR_ASMD22_MULTI	0	/* SDHI0 */
-> +#define	ASYNCMDR_ASMD21_MASK	BIT(1)	/* SDHI0 */
-> +#define	ASYNCMDR_ASMD21_SINGLE	BIT(1)	/* SDHI0 */
-> +#define	ASYNCMDR_ASMD21_MULTI	0	/* SDHI0 */
-> +
-> +static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
-> +	{
-> +		.id	= HPBDMA_SLAVE_SDHI0_TX,
-> +		.addr	= 0xffe4c000 + 0x30,
-> +		.dcr	= DCR_SPDS_16BIT | DCR_DMDL | DCR_DPDS_16BIT,
-> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
-> +			  ASYNCRSTR_ASRST23,
-> +		.mdr	= ASYNCMDR_ASMD21_SINGLE,
-> +		.mdm	= ASYNCMDR_ASMD21_MASK,
-> +		.port	= 0x0D0C,
-> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
-> +		.dma_ch	= 21,
-> +	}, {
-> +		.id	= HPBDMA_SLAVE_SDHI0_RX,
-> +		.addr	= 0xffe4c000 + 0x30,
-> +		.dcr	= DCR_SMDL | DCR_SPDS_16BIT | DCR_DPDS_16BIT,
-> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
-> +			  ASYNCRSTR_ASRST23,
-> +		.mdr	= ASYNCMDR_ASMD22_SINGLE,
-> +		.mdm	= ASYNCMDR_ASMD22_MASK,
-> +		.port	= 0x0D0C,
-> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
-> +		.dma_ch	= 22,
-> +	},
-> +};
-> +
-> +static const struct hpb_dmae_channel hpb_dmae_channels[] = {
-> +	/* ch. 21 SD0 */
-> +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX),
-> +	/* ch. 22 SD0 */
-> +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX),
-> +};
-> +
-> +static struct hpb_dmae_pdata dma_platform_data __initdata = {
-> +	.slaves			= hpb_dmae_slaves,
-> +	.num_slaves		= ARRAY_SIZE(hpb_dmae_slaves),
-> +	.channels		= hpb_dmae_channels,
-> +	.num_channels		= ARRAY_SIZE(hpb_dmae_channels),
-> +	.ts_shift		= {
-> +		[XMIT_SZ_8BIT]	= 0,
-> +		[XMIT_SZ_16BIT]	= 1,
-> +		[XMIT_SZ_32BIT]	= 2,
-> +	},
-> +	.num_hw_channels	= 39,
-> +};
-> +
-> +static struct resource hpb_dmae_resources[] __initdata = {
-> +	/* Channel registers */
-> +	DEFINE_RES_MEM(0xffc08000, 0x1000),
-> +	/* Common registers */
-> +	DEFINE_RES_MEM(0xffc09000, 0x170),
-> +	/* Asynchronous reset registers */
-> +	DEFINE_RES_MEM(0xffc00300, 4),
-> +	/* Asynchronous mode registers */
-> +	DEFINE_RES_MEM(0xffc00400, 4),
-> +	/* IRQ for DMA channels */
-> +	DEFINE_RES_NAMED(gic_iid(0x7b), 5, NULL, IORESOURCE_IRQ),
-> +};
-> +
-> +static void __init r8a7778_register_hpb_dmae(void)
-> +{
-> +	platform_device_register_resndata(&platform_bus, "hpb-dma-engine", -1,
-> +					  hpb_dmae_resources,
-> +					  ARRAY_SIZE(hpb_dmae_resources),
-> +					  &dma_platform_data,
-> +					  sizeof(dma_platform_data));
-> +}
-> +
->  void __init r8a7778_add_standard_devices(void)
->  {
->  	int i;
-> @@ -355,6 +434,7 @@ void __init r8a7778_add_standard_devices
->  
->  	r8a7778_register_tmu(0);
->  	r8a7778_register_tmu(1);
-> +	r8a7778_register_hpb_dmae();
->  }
->  
->  void __init r8a7778_init_late(void)
+> diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+> new file mode 100644
+> index 0000000..f9efae1
+> --- /dev/null
+> +++ b/arch/arm/configs/lager_defconfig
+> @@ -0,0 +1,121 @@
+> +CONFIG_SYSVIPC=y
+> +CONFIG_NO_HZ=y
+> +CONFIG_IKCONFIG=y
+> +CONFIG_IKCONFIG_PROC=y
+> +CONFIG_LOG_BUF_SHIFT=16
+> +CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+> +CONFIG_SYSCTL_SYSCALL=y
+> +CONFIG_EMBEDDED=y
+> +CONFIG_PERF_EVENTS=y
+> +CONFIG_SLAB=y
+> +# CONFIG_LBDAF is not set
+> +# CONFIG_BLK_DEV_BSG is not set
+> +# CONFIG_IOSCHED_DEADLINE is not set
+> +# CONFIG_IOSCHED_CFQ is not set
+> +CONFIG_ARCH_SHMOBILE=y
+> +CONFIG_ARCH_R8A7790=y
+> +CONFIG_MACH_LAGER=y
+> +# CONFIG_SH_TIMER_TMU is not set
+> +# CONFIG_EM_TIMER_STI is not set
+> +# CONFIG_SWP_EMULATE is not set
+> +CONFIG_ARM_ERRATA_430973=y
+> +CONFIG_ARM_ERRATA_458693=y
+> +CONFIG_ARM_ERRATA_460075=y
+> +CONFIG_ARM_ERRATA_743622=y
+> +CONFIG_ARM_ERRATA_754322=y
+> +CONFIG_SMP=y
+> +CONFIG_NR_CPUS=2
+> +# CONFIG_LOCAL_TIMERS is not set
+> +CONFIG_AEABI=y
+> +# CONFIG_OABI_COMPAT is not set
+> +CONFIG_FORCE_MAX_ZONEORDER=13
+> +CONFIG_ZBOOT_ROM_TEXT=0x0
+> +CONFIG_ZBOOT_ROM_BSS=0x0
+> +CONFIG_ARM_APPENDED_DTB=y
+> +CONFIG_KEXEC=y
+> +CONFIG_AUTO_ZRELADDR=y
+> +CONFIG_VFP=y
+> +CONFIG_NEON=y
+> +# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> +CONFIG_PM_RUNTIME=y
+> +CONFIG_NET=y
+> +CONFIG_PACKET=y
+> +CONFIG_UNIX=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+> +# CONFIG_INET_XFRM_MODE_BEET is not set
+> +# CONFIG_INET_LRO is not set
+> +# CONFIG_INET_DIAG is not set
+> +# CONFIG_IPV6 is not set
+> +# CONFIG_WIRELESS is not set
+> +CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> +CONFIG_NETDEVICES=y
+> +# CONFIG_NET_CORE is not set
+> +# CONFIG_NET_VENDOR_ARC is not set
+> +# CONFIG_NET_CADENCE is not set
+> +# CONFIG_NET_VENDOR_BROADCOM is not set
+> +# CONFIG_NET_VENDOR_CIRRUS is not set
+> +# CONFIG_NET_VENDOR_FARADAY is not set
+> +# CONFIG_NET_VENDOR_INTEL is not set
+> +# CONFIG_NET_VENDOR_MARVELL is not set
+> +# CONFIG_NET_VENDOR_MICREL is not set
+> +# CONFIG_NET_VENDOR_NATSEMI is not set
+> +CONFIG_SH_ETH=y
+> +# CONFIG_NET_VENDOR_SEEQ is not set
+> +# CONFIG_NET_VENDOR_SMSC is not set
+> +# CONFIG_NET_VENDOR_STMICRO is not set
+> +# CONFIG_NET_VENDOR_VIA is not set
+> +# CONFIG_NET_VENDOR_WIZNET is not set
+> +# CONFIG_WLAN is not set
+> +# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+> +CONFIG_INPUT_EVDEV=y
+> +# CONFIG_KEYBOARD_ATKBD is not set
+> +CONFIG_KEYBOARD_GPIO=y
+> +# CONFIG_INPUT_MOUSE is not set
+> +# CONFIG_SERIO is not set
+> +# CONFIG_LEGACY_PTYS is not set
+> +CONFIG_SERIAL_SH_SCI=y
+> +CONFIG_SERIAL_SH_SCI_NR_UARTS=10
+> +CONFIG_SERIAL_SH_SCI_CONSOLE=y
+> +# CONFIG_HW_RANDOM is not set
+> +CONFIG_I2C=y
+> +CONFIG_I2C_GPIO=y
+> +CONFIG_I2C_SH_MOBILE=y
+> +CONFIG_GPIO_SH_PFC=y
+> +CONFIG_GPIOLIB=y
+> +CONFIG_GPIO_RCAR=y
+> +# CONFIG_HWMON is not set
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> +# CONFIG_USB_SUPPORT is not set
+> +CONFIG_MMC=y
+> +CONFIG_MMC_SDHI=y
+> +CONFIG_MMC_SH_MMCIF=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_RTC_CLASS=y
+> +CONFIG_DMADEVICES=y
+> +CONFIG_SH_DMAE=y
+> +# CONFIG_IOMMU_SUPPORT is not set
+> +# CONFIG_DNOTIFY is not set
+> +CONFIG_MSDOS_FS=y
+> +CONFIG_VFAT_FS=y
+> +CONFIG_TMPFS=y
+> +CONFIG_CONFIGFS_FS=y
+> +# CONFIG_MISC_FILESYSTEMS is not set
+> +CONFIG_NFS_FS=y
+> +CONFIG_NFS_V3_ACL=y
+> +CONFIG_NFS_V4=y
+> +CONFIG_NFS_V4_1=y
+> +CONFIG_ROOT_NFS=y
+> +CONFIG_NLS_CODEPAGE_437=y
+> +CONFIG_NLS_ISO8859_1=y
+> +# CONFIG_ENABLE_WARN_DEPRECATED is not set
+> +# CONFIG_ENABLE_MUST_CHECK is not set
+> +# CONFIG_ARM_UNWIND is not set
+> +# CONFIG_CRYPTO_ANSI_CPRNG is not set
+> +# CONFIG_CRYPTO_HW is not set
+> -- 
+> 1.8.2.1
 > 
