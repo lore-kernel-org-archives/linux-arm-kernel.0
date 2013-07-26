@@ -1,23 +1,52 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Jul 2013 13:25:20 -0600
-Subject: [PATCH 0/9] ARM: tegra: move to generic DMA DT binding
-In-Reply-To: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
+Date: Fri, 26 Jul 2013 13:27:58 -0600
+Subject: [PATCH 2/9] dma: tegra20-apbdma: move to generic device tree
+ bindings
+In-Reply-To: <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
 References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
-Message-ID: <51F2CD20.6030700@wwwdotorg.org>
+ <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
+Message-ID: <51F2CDBE.40802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 10:09 PM, Richard Zhao wrote:
-> The patch series aim to move apbdma to generic DT binding.
-> 
-> Changes:
-> - It add dmas/dma-names properties while leave
->   nvidia,dma-request-selector to be compatible.
-> - update apbdma driver and dma client drivers
-> - ASoC tegra adds a new struct to pass device and dma-name.
-> - at last, remove legacy nvidia,dma-request-selector
+(Stripping the Cc list a lot)
 
-I would like to take this series through the Tegra tree to simplify
-dependencies. So, I'm looking for ack's on the drivers rather than for
-them to be applied. I had hoped Richard would point this out when
-posting the patches.
+On 07/23/2013 10:09 PM, Richard Zhao wrote:
+> Update tegra20-apbdma driver to adopt generic DMA device tree bindings.
+> It calls of_dma_controller_register() with of_dma_simple_xlate to get
+> the generic DMA device tree helper support. The #dma-cells for apbdma
+> must be 1, which is slave ID.
+> 
+> The existing nvidia,dma-request-selector still works there, and the
+> support will be removed after all clients get converted to generic DMA
+> device tree helper.
+
+(BTW, I would like to take this series through the Tegra tree to
+simplify dependencies. So, I'm looking for ack's on the drivers rather
+than for them to be applied. I had hoped Richard would point this out
+when posting the patches)
+
+> diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+
+> +static bool tegra_dma_filter_fn(struct dma_chan *dc, void *param)
+> +{
+> +	if (dc->device->dev->driver == &tegra_dmac_driver.driver) {
+> +		struct tegra_dma_channel *tdc = to_tegra_dma_chan(dc);
+> +		unsigned req = *(unsigned *)param;
+> +
+> +		tdc->slave_id = req;
+> +
+> +		return true;
+> +	}
+> +	return false;
+> +}
+> +
+> +static struct of_dma_filter_info tegra_dma_info = {
+> +	.filter_fn = tegra_dma_filter_fn,
+> +};
+
+Why does this driver need to define a filter function? I thought the
+dmaengine's DT support would already match DMA clients/engines based on
+the phandle in DT? Isn't the need to pass the slave channel ID into
+drivers something pretty fundamental to dmaengine, and hence something
+it already supports?
