@@ -1,28 +1,59 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 26 Jul 2013 14:11:52 -0700
-Subject: Zynq clk fixes
-In-Reply-To: <20130726200703.7598.86150@quantum>
-References: <51F26716.6030701@monstr.eu>
- <20130726200703.7598.86150@quantum>
-Message-ID: <a76b3a5d-dadc-43b3-87ee-3c65258c15d7@CO1EHSMHS029.ehs.local>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 26 Jul 2013 15:13:01 -0600
+Subject: [PATCH] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1374871494.20685.46.camel@linux-builds1>
+References: <1374789881-20611-1-git-send-email-dinguyen@altera.com>
+ <51F2B0C4.8000301@wwwdotorg.org> <1374867220.20685.44.camel@linux-builds1>
+ <51F2D5EA.7050108@wwwdotorg.org> <1374871494.20685.46.camel@linux-builds1>
+Message-ID: <51F2E65D.8090705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 01:07:03PM -0700, Mike Turquette wrote:
-> Quoting Michal Simek (2013-07-26 05:09:58)
-> > Hi Mike, [cc: Arnd and Olof]
-> > 
-> > Soren has found two bug fixes in zynq clk code.
-> > Can you please add these two patches to your tree?
-> > Will be great if you can add them to v3.11.
-> > 
-> > Arnd, Olof: I expect that all these clock changes should go through Mike.
-> > If I am wrong please let me know.
+On 07/26/2013 02:44 PM, Dinh Nguyen wrote:
+> On Fri, 2013-07-26 at 14:02 -0600, Stephen Warren wrote:
+>> On 07/26/2013 01:33 PM, Dinh Nguyen wrote:
+>>> On Fri, 2013-07-26 at 11:24 -0600, Stephen Warren wrote:
+>>>> On 07/25/2013 04:04 PM, dinguyen at altera.com wrote:
+>>>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>>>
+>>>>> Add bindings for SD/MMC for SOCFPGA.
+>>>>> Add "syscon" to the "altr,sys-mgr" binding.
+>>
+>>>>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+>>
+>>>>> +Example:
+>>>>> +
+>>>>> +  The MSHC controller node can be split into two portions, SoC specific and
+>>>>> +  board specific portions, as listed below.
+>>>>
+>>>> That doesn't sound like a good idea. There should be one DT node for
+>>>> each logical block. The internal construction of the Linux drivers
+>>>> (presumably you have entirely separate code to handle the two nodes in
+>>>> Linux so far?) should not influence the DT construction at all.
+>>>
+>>> In the end, there is only 1 DT node for each logical block:
+>>
+>> Oh right, I see you were intending to show the distinction between the
+>> SoC .dtsi and board .dts file. I hadn't realized that. I don't think
+>> it's common to do that in the examples, so I would recommend just
+>> merging the whole example together myself.
 > 
-> Looks right to me. Do these fix regressions in the current -rc cycle?
+> I'll merge it.
+> 
+>>
+>>> dwmmc0 at ff704000 {
+>>> 	compatible = "altr,socfpga-dw-mshc";
+>>
+>> That should include the baseline synopsis compatible value too.
+> 
+> We don't need the baseline synopsis compatible because of
+> dw_mci_pltfm_register() call.
 
-I doubt there are real regressions. But since it's still early in
-the release cycle and the driver was added in this merge window, I'd prefer
-having it hit a release kernel with these fixes included.
+It's not a matter of whether it's strictly necessary for the SW to work
+right now. The compatible property should include entries for everything
+that the HW is actually compatible with.
 
-	S?ren
+Of course, if a plain driver for the raw synopsis controller/binding
+wouldn't actually work on this HW at all, without explicit knowledge of
+the extra details of the more HW-specific binding, then that's a good
+argument for leaving it out of compatible.
