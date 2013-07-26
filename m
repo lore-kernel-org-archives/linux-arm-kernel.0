@@ -1,52 +1,56 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:24 +0800
-Subject: [PATCH v13 08/14] usb: chipidea: disable all interrupts and clear all
- interrupts status
+Date: Fri, 26 Jul 2013 17:18:28 +0800
+Subject: [PATCH v13 12/14] usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED
+ and CI_HDRC_PULLUP_ON_VBUS
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-9-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-13-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the initialization, it needs to disable all interrupts
-enable bit as well as clear all interrupts status bits to avoid
-exceptional interrupt.
+CI_HDRC_REGS_SHARED stands for the controller registers is shared
+with other USB drivers, if all USB drivers are at chipidea/, it doesn't
+needed to set.
+CI_HDRC_PULLUP_ON_VBUS stands for pullup dp when the vbus is on. This
+flag doesn't need to set if the vbus is always on for gadget
+since dp has always pulled up after the gadget has initialized.
+
+So, the current code seems to misuse this two flags.
+- When the gadget initializes, the controller doesn't need to run if
+it depends on vbus (CI_HDRC_PULLUP_ON_VBUS), it does not
+relate to shared register.
+- When the gadget starts (load one gadget module), the controller
+can run if vbus is on (CI_HDRC_PULLUP_ON_VBUS), it also does not
+relate to shared register.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/core.c |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+ drivers/usb/chipidea/udc.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 28983c3..8884af6 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -198,6 +198,12 @@ static int hw_device_init(struct ci_hdrc *ci, void __iomem *base)
- 	if (ci->hw_ep_max > ENDPT_MAX)
- 		return -ENODEV;
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index c70ce38..45abf4d 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1637,8 +1637,7 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 	pm_runtime_get_sync(&ci->gadget.dev);
+ 	if (ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) {
+ 		if (ci->vbus_active) {
+-			if (ci->platdata->flags & CI_HDRC_REGS_SHARED)
+-				hw_device_reset(ci, USBMODE_CM_DC);
++			hw_device_reset(ci, USBMODE_CM_DC);
+ 		} else {
+ 			pm_runtime_put_sync(&ci->gadget.dev);
+ 			goto done;
+@@ -1801,7 +1800,7 @@ static int udc_start(struct ci_hdrc *ci)
+ 		}
+ 	}
  
-+	/* Disable all interrupts bits */
-+	hw_write(ci, OP_USBINTR, 0xffffffff, 0);
-+
-+	/* Clear all interrupts status bits*/
-+	hw_write(ci, OP_USBSTS, 0xffffffff, 0xffffffff);
-+
- 	dev_dbg(ci->dev, "ChipIdea HDRC found, lpm: %d; cap: %p op: %p\n",
- 		ci->hw_bank.lpm, ci->hw_bank.cap, ci->hw_bank.op);
- 
-@@ -413,8 +419,11 @@ static void ci_get_otg_capable(struct ci_hdrc *ci)
- 		ci->is_otg = (hw_read(ci, CAP_DCCPARAMS,
- 				DCCPARAMS_DC | DCCPARAMS_HC)
- 					== (DCCPARAMS_DC | DCCPARAMS_HC));
--	if (ci->is_otg)
-+	if (ci->is_otg) {
- 		dev_dbg(ci->dev, "It is OTG capable controller\n");
-+		ci_disable_otg_interrupt(ci, OTGSC_INT_EN_BITS);
-+		ci_clear_otg_interrupt(ci, OTGSC_INT_STATUS_BITS);
-+	}
- }
- 
- static int ci_hdrc_probe(struct platform_device *pdev)
+-	if (!(ci->platdata->flags & CI_HDRC_REGS_SHARED)) {
++	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)) {
+ 		retval = hw_device_reset(ci, USBMODE_CM_DC);
+ 		if (retval)
+ 			goto put_transceiver;
 -- 
 1.7.0.4
