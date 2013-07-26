@@ -1,44 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Jul 2013 09:51:53 +0900
-Subject: [PATCH v3 4/4] ARM: shmobile: marzen: Enable ARM_APPENDED_DTB in
- defconfig
+Date: Fri, 26 Jul 2013 09:51:52 +0900
+Subject: [PATCH v3 3/4] ARM: shmobile: r8a7779: Rely on DT for SMP CPU info
 In-Reply-To: <1374799913-27461-1-git-send-email-horms+renesas@verge.net.au>
 References: <1374799913-27461-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1374799913-27461-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1374799913-27461-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"ARM: shmobile: marzen: Switch to DT_MACHINE_START" moves marzen
-over to use DT_MACHINE_START, however, the prevalent boot loader
-does not support booting with a separate dtb. Thus, it makes
-sense to use ARM_APPENDED_DTB by default.
+Remove r8a7779 specific ->smp_init_cpus() callback and
+instead of relying on shmobile_smp_init_cpus() simply
+use DT for CPU core information.
 
-This is consistent with other shmobile defconfigs.
+Based on work for the sh73a0 by Magnus Damm.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 
-v3
-* Corrected typo in changelog
-
 v2
 * First post
 ---
- arch/arm/configs/marzen_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-shmobile/smp-r8a7779.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 494e70a..82e4040 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -29,6 +29,7 @@ CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
- CONFIG_CMDLINE="console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on"
- CONFIG_CMDLINE_FORCE=y
- CONFIG_KEXEC=y
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 9bdf810..42170af 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -99,6 +99,9 @@ static int r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
+ {
++
++	/* setup r8a7779 specific SCU base */
++	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
+ 	scu_enable(shmobile_scu_base);
+ 
+ 	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
+@@ -117,14 +120,6 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
+ 	r8a7779_platform_cpu_kill(3);
+ }
+ 
+-static void __init r8a7779_smp_init_cpus(void)
+-{
+-	/* setup r8a7779 specific SCU base */
+-	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
+-
+-	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
+-}
+-
+ #ifdef CONFIG_HOTPLUG_CPU
+ static int r8a7779_scu_psr_core_disabled(int cpu)
+ {
+@@ -175,7 +170,6 @@ static int r8a7779_cpu_disable(unsigned int cpu)
+ #endif /* CONFIG_HOTPLUG_CPU */
+ 
+ struct smp_operations r8a7779_smp_ops  __initdata = {
+-	.smp_init_cpus		= r8a7779_smp_init_cpus,
+ 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
+ 	.smp_boot_secondary	= r8a7779_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
 1.8.2.1
