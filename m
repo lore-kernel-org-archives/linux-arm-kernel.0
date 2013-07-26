@@ -1,48 +1,46 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 26 Jul 2013 15:16:39 +0100
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy>
- <20130726132709.GH29916@titan.lakedaemon.net>
- <1374846070.14574.92.camel@i7.infradead.org>
- <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
-Message-ID: <1374848199.14574.103.camel@i7.infradead.org>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 26 Jul 2013 16:17:15 +0200
+Subject: [PATCH] ARM: clocksource: moxart: documentation: update device tree
+ bindings document
+Message-ID: <1374848235-21734-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-07-26 at 10:14 -0400, jonsmirl at gmail.com wrote:
-> 
-> Yes, yes - that's why the schema should be written down and used as a
-> validation input to dtc. Then dtc can spit out errors for non-standard
-> items. There would be two versions - the standard one and a legacy one
-> that includes the standard one plus the hacks that can't be undone.
-> 
-> But more importantly it provides a framework for people creating new
-> node definitions. Now they can't work in a vacuum and come up with
-> random names and structure for everything.
-> 
-> Most of the problems express in the thread would go away if the schema
-> was written down and discussed. The rule going forward would be no new
-> nodes that aren't part of the standard schema.
+1. describe compatible variable "Must be" instead of "Should be".
+2. change description so it's from the point of view of the device
 
-Yes, that seems eminently sensible.
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
+Notes:
+    Hi Daniel,
+    
+    The device tree bindings document (already merged) needs another update.
+    
+    Can be applied directly to timers/clockevents-next.
+    
+    Best regards,
+    Jonas
+
+ Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+index ad0bf7f..da2d510 100644
+--- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
++++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+@@ -2,10 +2,10 @@ MOXA ART timer
+ 
+ Required properties:
+ 
+-- compatible : Should be "moxa,moxart-timer"
++- compatible : Must be "moxa,moxart-timer"
+ - reg : Should contain registers location and length
+ - interrupts : Should contain the timer interrupt number
+-- clocks : Should contain phandle for the MOXA ART core clock "coreclk"
++- clocks : Should contain phandle for the clock that drives the counter
+ 
+ Example:
+ 
 -- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130726/27cb750a/attachment.bin>
+1.8.2.1
