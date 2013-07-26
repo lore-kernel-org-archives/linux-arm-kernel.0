@@ -1,42 +1,39 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 26 Jul 2013 12:35:59 +0200
-Subject: [PATCH 04/10] ARM: sun6i: Add restart code for the A31
-In-Reply-To: <1374618312-19001-5-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 26 Jul 2013 12:37:47 +0200
+Subject: [PATCH 05/10] ARM: sunxi: Add Allwinner A31 DTSI
+In-Reply-To: <1374618312-19001-6-git-send-email-maxime.ripard@free-electrons.com>
 References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
- <1374618312-19001-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130726123559.66216580@skate>
+ <1374618312-19001-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130726123747.7c88d976@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Maxime Ripard,
 
-On Wed, 24 Jul 2013 00:25:06 +0200, Maxime Ripard wrote:
-> The Allwinner A31 has a sligthly different watchdog that requires a
-> different restart code.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/mach-sunxi/sunxi.c | 37 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 11326d9..c18ef3a 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -32,6 +32,15 @@
->  #define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
->  #define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
->  
-> +#define SUN6I_WATCHDOG1_IRQ_REG		0x00
-> +#define SUN6I_WATCHDOG1_CTRL_REG	0x10
-> +#define SUN6I_WATCHDOG1_CTRL_RESTART		(1 << 0)
-> +#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
-> +#define SUN6I_WATCHDOG1_CONFIG_RESTART		(1 << 0)
-> +#define SUN6I_WATCHDOG1_CONFIG_IRQ		(1 << 1)
-> +#define SUN6I_WATCHDOG1_MODE_REG	0x18
-> +#define SUN6I_WATCHDOG1_MODE_ENABLE		(1 << 0)
+On Wed, 24 Jul 2013 00:25:07 +0200, Maxime Ripard wrote:
 
-Alignment is not nice, and the BIT() macro should be used.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 641b3c9..1482533 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -210,7 +210,8 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+>  	sun4i-a10-mini-xplus.dtb \
+>  	sun4i-a10-hackberry.dtb \
+>  	sun5i-a10s-olinuxino-micro.dtb \
+> -	sun5i-a13-olinuxino.dtb
+> +	sun5i-a13-olinuxino.dtb \
+> +	sun6i-a31-colombus.dtb
+
+Wrong patch for this chunk. The colombus .dts is added in PATCH 06/10.
+
+> +	soc at 01c20000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x01c20000 0x300000>;
+> +		ranges;
+
+Just curious, what are these reg and ranges properties for?
 
 Thomas
 -- 
