@@ -1,75 +1,158 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 26 Jul 2013 10:17:55 -0300
-Subject: [PATCH v9 18/30] ARM: mvebu: Initialize MBus using the DT binding
+Date: Fri, 26 Jul 2013 10:17:56 -0300
+Subject: [PATCH v9 19/30] ARM: mvebu: Use the preprocessor on Armada 370/XP
+ device tree files
 In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1374844687-19981-19-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1374844687-19981-20-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Now that the mbus device tree binding has been introduced, we can
-switch over to it.
-
-Also, and since the initialization of the mbus driver is quite
-fundamental for the system to work properly, this patch adds a BUG()
-in case mbus fails to initialize.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.c | 34 +---------------------------------
- 1 file changed, 1 insertion(+), 33 deletions(-)
+ arch/arm/boot/dts/armada-370-db.dts              | 2 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts         | 2 +-
+ arch/arm/boot/dts/armada-370-rd.dts              | 2 +-
+ arch/arm/boot/dts/armada-370.dtsi                | 2 +-
+ arch/arm/boot/dts/armada-xp-db.dts               | 2 +-
+ arch/arm/boot/dts/armada-xp-gp.dts               | 2 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 2 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 2 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 2 +-
+ arch/arm/boot/dts/armada-xp.dtsi                 | 2 +-
+ 10 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 97cbb80..829b573 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -34,44 +34,12 @@ static void __init armada_370_xp_map_io(void)
- 	debug_ll_io_init();
- }
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index beee169..55b986c 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -14,7 +14,7 @@
+  */
  
--/*
-- * This initialization will be replaced by a DT-based
-- * initialization once the mvebu-mbus driver gains DT support.
-- */
--
--#define ARMADA_370_XP_MBUS_WINS_OFFS   0x20000
--#define ARMADA_370_XP_MBUS_WINS_SIZE   0x100
--#define ARMADA_370_XP_SDRAM_WINS_OFFS  0x20180
--#define ARMADA_370_XP_SDRAM_WINS_SIZE  0x20
--
--static void __init armada_370_xp_mbus_init(void)
--{
--	char *mbus_soc_name;
--	struct device_node *dn;
--	const __be32 mbus_wins_offs = cpu_to_be32(ARMADA_370_XP_MBUS_WINS_OFFS);
--	const __be32 sdram_wins_offs = cpu_to_be32(ARMADA_370_XP_SDRAM_WINS_OFFS);
--
--	if (of_machine_is_compatible("marvell,armada370"))
--		mbus_soc_name = "marvell,armada370-mbus";
--	else
--		mbus_soc_name = "marvell,armadaxp-mbus";
--
--	dn = of_find_node_by_name(NULL, "internal-regs");
--	BUG_ON(!dn);
--
--	mvebu_mbus_init(mbus_soc_name,
--			of_translate_address(dn, &mbus_wins_offs),
--			ARMADA_370_XP_MBUS_WINS_SIZE,
--			of_translate_address(dn, &sdram_wins_offs),
--			ARMADA_370_XP_SDRAM_WINS_SIZE);
--}
--
- static void __init armada_370_xp_timer_and_clk_init(void)
- {
- 	of_clk_init(NULL);
- 	armada_370_xp_timer_init();
- 	coherency_init();
--	armada_370_xp_mbus_init();
-+	BUG_ON(mvebu_mbus_dt_init());
- #ifdef CONFIG_CACHE_L2X0
- 	l2x0_of_init(0, ~0UL);
- #endif
+ /dts-v1/;
+-/include/ "armada-370.dtsi"
++#include "armada-370.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada 370 Evaluation Board";
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 45b1077..37530af 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -9,7 +9,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-370.dtsi"
++#include "armada-370.dtsi"
+ 
+ / {
+ 	model = "Globalscale Mirabox";
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index a3a2fed..7aa2171 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -12,7 +12,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-370.dtsi"
++#include "armada-370.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada 370 Reference Design";
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index fa3dfc6..08ec6e3 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -15,7 +15,7 @@
+  * common to all Armada SoCs.
+  */
+ 
+-/include/ "armada-370-xp.dtsi"
++#include "armada-370-xp.dtsi"
+ /include/ "skeleton.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index e28e68f..a9bd766 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -14,7 +14,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-xp-mv78460.dtsi"
++#include "armada-xp-mv78460.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP Evaluation Board";
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index c87b2de..54843e5 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -14,7 +14,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-xp-mv78460.dtsi"
++#include "armada-xp-mv78460.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP Development Board DB-MV784MP-GP";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 2d9335d..985373a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -13,7 +13,7 @@
+  * common to all Armada XP SoCs.
+  */
+ 
+-/include/ "armada-xp.dtsi"
++#include "armada-xp.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP MV78260 SoC";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index c7b1f4d..f8bf25a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -13,7 +13,7 @@
+  * common to all Armada XP SoCs.
+  */
+ 
+-/include/ "armada-xp.dtsi"
++#include "armada-xp.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP MV78460 SoC";
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 8f51045..d090264 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -11,7 +11,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-xp-mv78260.dtsi"
++#include "armada-xp-mv78260.dtsi"
+ 
+ / {
+ 	model = "PlatHome OpenBlocks AX3-4 board";
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 416eb94..8c07bfe 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -16,7 +16,7 @@
+  * common to all Armada SoCs.
+  */
+ 
+-/include/ "armada-370-xp.dtsi"
++#include "armada-370-xp.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP family SoC";
 -- 
 1.8.1.5
