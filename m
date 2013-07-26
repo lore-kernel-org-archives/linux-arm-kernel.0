@@ -1,166 +1,195 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:21 +0800
-Subject: [PATCH v13 05/14] usb: chipidea: otg: Add otg file used to access
- otgsc
+Date: Fri, 26 Jul 2013 17:18:30 +0800
+Subject: [PATCH v13 14/14] usb: chipidea: udc: fix the oops when plugs in usb
+ cable after rmmod gadget
 In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
 References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1374830310-21765-15-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file is mainly used to access otgsc currently, it may
-add otg related things in the future.
+When we rmmod gadget, the ci->driver needs to be cleared.
+Otherwise, we plug in usb cable again, the driver will
+consider gadget is there, in fact, it was removed.
+
+Besides, consolidate the calling of ci->driver->disconnect, when
+we do rmmod gadget, the gadget's disconnect should be called from
+udc core.
+
+Below is the oops this patch fixes.
+
+root at freescale ~$ ci_hdrc ci_hdrc.0: Connected to host
+Unable to handle kernel paging request at virtual address 7f01171c
+pgd = 80004000
+[7f01171c] *pgd=4fa1e811, *pte=00000000, *ppte=00000000
+Internal error: Oops: 7 [#1] SMP ARM
+Modules linked in: f_acm libcomposite u_serial [last unloaded: g_serial]
+CPU: 0    Not tainted  (3.8.0-rc5+ #221)
+PC is at _gadget_stop_activity+0xbc/0x128
+LR is at ep_fifo_flush+0x68/0xa0
+pc : [<803634cc>]    lr : [<80363938>]    psr: 20000193
+sp : 806c7dc8  ip : 00000000  fp : 806c7de4
+r10: 00000000  r9 : 80710ea4  r8 : 00000000
+r7 : bf834094  r6 : bf834098  r5 : bf834010  r4 : bf8340a0
+r3 : 7f011708  r2 : 01940194  r1 : a0000193  r0 : bf834014
+Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c53c7d  Table: 4f06404a  DAC: 00000017
+Process swapper/0 (pid: 0, stack limit = 0x806c6238)
+Stack: (0x806c7dc8 to 0x806c8000)
+7dc0:                   bf834010 bf809950 bf834010 0000004b 806c7e44 806c7de8
+7de0: 80365400 8036341c 0000ec1c 00000000 0000ec1c 00000040 fff5ede0 bf834014
+7e00: 000a1220 00000000 0000002e ffffd958 806c7e3c 806c7e20 8004e870 bf834010
+7e20: bf809950 0000004b 0000004b 00000000 80710ea4 00000000 806c7e5c 806c7e48
+7e40: 80362888 80365154 bfb35180 bf809950 806c7e9c 806c7e60 8008111c 803627f4
+7e60: 00989680 00000000 bf809900 bf809964 812df8c0 bf809900 bf809950 806c3f2c
+7e80: 0000004b 00000000 412fc09a 00000000 806c7eb4 806c7ea0 80081368 800810b8
+7ea0: bf809900 bf809950 806c7ecc 806c7eb8 800843c8 8008130c 0000004b 806cf748
+7ec0: 806c7ee4 806c7ed0 80081088 8008432c 806c6000 806cf748 806c7f0c 806c7ee8
+7ee0: 8000fa44 8008105c f400010c 806ce974 806c7f30 f4000110 806d29e8 412fc09a
+7f00: 806c7f2c 806c7f10 80008584 8000f9f4 8000fbd0 60000013 ffffffff 806c7f64
+7f20: 806c7f84 806c7f30 8000eac0 80008554 00000000 00000000 0000000f 8001aea0
+7f40: 806c6000 80712a48 804f0040 00000000 806d29e8 412fc09a 00000000 806c7f84
+7f60: 806c7f88 806c7f78 8000fbcc 8000fbd0 60000013 ffffffff 806c7fac 806c7f88
+7f80: 8001015c 8000fb9c 806cf5b0 80712980 806a4528 8fffffff 1000406a 412fc09a
+7fa0: 806c7fbc 806c7fb0 804e5334 800100ac 806c7ff4 806c7fc0 80668940 804e52d4
+7fc0: ffffffff ffffffff 806684bc 00000000 00000000 806a4528 10c53c7d 806ce94c
+7fe0: 806a4524 806d29dc 00000000 806c7ff8 10008078 806686b0 00000000 00000000
+Backtrace:
+[<80363410>] (_gadget_stop_activity+0x0/0x128) from [<80365400>] (udc_irq+0x2b8/0xf38)
+ r7:0000004b r6:bf834010 r5:bf809950 r4:bf834010
+ [<80365148>] (udc_irq+0x0/0xf38) from [<80362888>] (ci_irq+0xa0/0xf4)
+[<803627e8>] (ci_irq+0x0/0xf4) from [<8008111c>] (handle_irq_event_percpu+0x70/0x254)
+ r5:bf809950 r4:bfb35180
+ [<800810ac>] (handle_irq_event_percpu+0x0/0x254) from [<80081368>] (handle_irq_event+0x68/0x88)
+[<80081300>] (handle_irq_event+0x0/0x88) from [<800843c8>] (handle_fasteoi_irq+0xa8/0x178)
+ r5:bf809950 r4:bf809900
+ [<80084320>] (handle_fasteoi_irq+0x0/0x178) from [<80081088>] (generic_handle_irq+0x38/0x40)
+ r5:806cf748 r4:0000004b
+ [<80081050>] (generic_handle_irq+0x0/0x40) from [<8000fa44>] (handle_IRQ+0x5c/0xbc)
+ r5:806cf748 r4:806c6000
+ [<8000f9e8>] (handle_IRQ+0x0/0xbc) from [<80008584>] (gic_handle_irq+0x3c/0x70)
+ r9:412fc09a r8:806d29e8 r7:f4000110 r6:806c7f30 r5:806ce974
+ r4:f400010c
+ [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
+Exception stack(0x806c7f30 to 0x806c7f78)
+7f20:                                     00000000 00000000 0000000f 8001aea0
+7f40: 806c6000 80712a48 804f0040 00000000 806d29e8 412fc09a 00000000 806c7f84
+7f60: 806c7f88 806c7f78 8000fbcc 8000fbd0 60000013 ffffffff
+ r7:806c7f64 r6:ffffffff r5:60000013 r4:8000fbd0
+ [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e5334>] (rest_init+0x6c/0x84)
+ r9:412fc09a r8:1000406a r7:8fffffff r6:806a4528 r5:80712980
+ r4:806cf5b0
+ [<804e52c8>] (rest_init+0x0/0x84) from [<80668940>] (start_kernel+0x29c/0x2ec)
+[<806686a4>] (start_kernel+0x0/0x2ec) from [<10008078>] (0x10008078)
+Code: e12fff33 e5953200 e3530000 0a000002 (e5933014)
+---[ end trace aade28ad434062bd ]---
+Kernel panic - not syncing: 0xbf8bdfa8)
+df60: 00000000 00000000 0000000f 8001aea0 bf8bc000 80712a48 804f0040 00000000
+df80: 806d29e8 412fc09a 00000000 bf8bdfb4 bf8bdfb8 bf8bdfa8 8000fbcc 8000fbd0
+dfa0: 60000013 ffffffff
+ r7:bf8bdf94 r6:ffffffff r5:60000013 r4:8000fbd0
+ [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
+ r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000002
+ r4:806e2008
+ [<804e7810>] (secondary_start_kernel+0x0/0x148) from [<104e7148>] (0x104e7148)
+ r5:0000001f r4:4f8a806a
+ CPU3: stopping
+ Backtrace:
+ [<800132e8>] (dump_backtrace+0x0/0x114) from [<804ea684>] (dump_stack+0x20/0x24)
+ r7:00000000 r6:806c3f2c r5:806cf748 r4:80712d18
+ [<804ea664>] (dump_stack+0x0/0x24) from [<80014adc>] (handle_IPI+0x140/0x18c)
+[<8001499c>] (handle_IPI+0x0/0x18c) from [<800085b0>] (gic_handle_irq+0x68/0x70)
+ r9:412fc09a r8:806d29e8 r7:f4000110 r6:bf8bff60 r5:806ce974
+ r4:f400010c
+ [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
+Exception stack(0xbf8bff60 to 0xbf8bffa8)
+ff60: 00000000 00000000 0000000f 8001aea0 bf8be000 80712a48 804f0040 00000000
+ff80: 806d29e8 412fc09a 00000000 bf8bffb4 bf8bffb8 bf8bffa8 8000fbcc 8000fbd0
+ffa0: 60000013 ffffffff
+ r7:bf8bff94 r6:ffffffff r5:60000013 r4:8000fbd0
+ [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
+ r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000003
+ r4:806e2008
+ [<804e7810>] (secondary_start_kernel+0x0/0x148) from [<104e7148>] (0x104e7148)
+ r5:0000001f r4:4f8a806a
+ CPU1: stopping
+ Backtrace:
+ [<800132e8>] (dump_backtrace+0x0/0x114) from [<804ea684>] (dump_stack+0x20/0x24)
+ r7:00000000 r6:806c3f2c r5:806cf748 r4:80712d18
+ [<804ea664>] (dump_stack+0x0/0x24) from [<80014adc>] (handle_IPI+0x140/0x18c)
+[<8001499c>] (handle_IPI+0x0/0x18c) from [<800085b0>] (gic_handle_irq+0x68/0x70)
+ r9:412fc09a r8:806d29e8 r7:f4000110 r6:bf8bbf60 r5:806ce974
+ r4:f400010c
+ [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
+Exception stack(0xbf8bbf60 to 0xbf8bbfa8)
+bf60: 00000000 00000000 0000000f 8001aea0 bf8ba000 80712a48 804f0040 00000000
+bf80: 806d29e8 412fc09a 00000000 bf8bbfb4 bf8bbfb8 bf8bbfa8 8000fbcc 8000fbd0
+bfa0: 60000013 ffffffff
+ r7:bf8bbf94 r6:ffffffff r5:60000013 r4:8000fbd0
+ [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
+ r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000001
+ r4:806e2008
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/Makefile |    2 +-
- drivers/usb/chipidea/bits.h   |   10 ++++++++
- drivers/usb/chipidea/core.c   |    3 +-
- drivers/usb/chipidea/otg.c    |   50 +++++++++++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.h    |   19 +++++++++++++++
- 5 files changed, 82 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/udc.c |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index 6cf5f68..a99d980 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index b7ead5f..aeabdcf 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -686,9 +686,6 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
+ 	usb_ep_fifo_flush(&ci->ep0out->ep);
+ 	usb_ep_fifo_flush(&ci->ep0in->ep);
  
- obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
+-	if (ci->driver)
+-		ci->driver->disconnect(gadget);
+-
+ 	/* make sure to disable all endpoints */
+ 	gadget_for_each_ep(ep, gadget) {
+ 		usb_ep_disable(ep);
+@@ -717,6 +714,11 @@ __acquires(ci->lock)
+ {
+ 	int retval;
  
--ci_hdrc-y				:= core.o
-+ci_hdrc-y				:= core.o otg.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index aefa026..dd0cf9e 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -79,11 +79,21 @@
- #define OTGSC_ASVIS	      BIT(18)
- #define OTGSC_BSVIS	      BIT(19)
- #define OTGSC_BSEIS	      BIT(20)
-+#define OTGSC_1MSIS	      BIT(21)
-+#define OTGSC_DPIS	      BIT(22)
- #define OTGSC_IDIE	      BIT(24)
- #define OTGSC_AVVIE	      BIT(25)
- #define OTGSC_ASVIE	      BIT(26)
- #define OTGSC_BSVIE	      BIT(27)
- #define OTGSC_BSEIE	      BIT(28)
-+#define OTGSC_1MSIE	      BIT(29)
-+#define OTGSC_DPIE	      BIT(30)
-+#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
-+				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
-+				| OTGSC_DPIE)
-+#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
-+				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
-+				| OTGSC_DPIS)
++	if (ci->gadget.speed != USB_SPEED_UNKNOWN) {
++		if (ci->driver)
++			ci->driver->disconnect(&ci->gadget);
++	}
++
+ 	spin_unlock(&ci->lock);
+ 	retval = _gadget_stop_activity(&ci->gadget);
+ 	if (retval)
+@@ -1464,6 +1466,8 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
+ 			hw_device_state(ci, ci->ep0out->qh.dma);
+ 			dev_dbg(ci->dev, "Connected to host\n");
+ 		} else {
++			if (ci->driver)
++				ci->driver->disconnect(&ci->gadget);
+ 			hw_device_state(ci, 0);
+ 			if (ci->platdata->notify_event)
+ 				ci->platdata->notify_event(ci,
+@@ -1674,13 +1678,14 @@ static int ci_udc_stop(struct usb_gadget *gadget,
+ 		if (ci->platdata->notify_event)
+ 			ci->platdata->notify_event(ci,
+ 			CI_HDRC_CONTROLLER_STOPPED_EVENT);
+-		ci->driver = NULL;
+ 		spin_unlock_irqrestore(&ci->lock, flags);
+ 		_gadget_stop_activity(&ci->gadget);
+ 		spin_lock_irqsave(&ci->lock, flags);
+ 		pm_runtime_put(&ci->gadget.dev);
+ 	}
  
- /* USBMODE */
- #define USBMODE_CM            (0x03UL <<  0)
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index a5df24c..761f7e8 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -71,6 +71,7 @@
- #include "bits.h"
- #include "host.h"
- #include "debug.h"
-+#include "otg.h"
++	ci->driver = NULL;
++
+ 	spin_unlock_irqrestore(&ci->lock, flags);
  
- /* Controller register map */
- static uintptr_t ci_regs_nolpm[] = {
-@@ -508,7 +509,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		goto stop;
- 
- 	if (ci->is_otg)
--		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
-+		ci_hdrc_otg_init(ci);
- 
- 	ret = dbg_create_files(ci);
- 	if (!ret)
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-new file mode 100644
-index 0000000..abefb4d
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.c
-@@ -0,0 +1,50 @@
-+/*
-+ * otg.c - ChipIdea USB IP core OTG driver
-+ *
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * This file mainly handles otgsc register, it may include OTG operation
-+ * in the future.
-+ */
-+
-+#include <linux/usb/otg.h>
-+#include <linux/usb/gadget.h>
-+#include <linux/usb/chipidea.h>
-+
-+#include "ci.h"
-+#include "bits.h"
-+
-+void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	/* Only clear request bits */
-+	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
-+}
-+
-+void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	hw_write(ci, OP_OTGSC, bits, bits);
-+}
-+
-+void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	hw_write(ci, OP_OTGSC, bits, 0);
-+}
-+
-+/**
-+ * ci_hdrc_otg_init - initialize otgsc bits
-+ * ci: the controller
-+ */
-+int ci_hdrc_otg_init(struct ci_hdrc *ci)
-+{
-+	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
-+
-+	return 0;
-+}
-diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-new file mode 100644
-index 0000000..f24ec37
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
-+#define __DRIVERS_USB_CHIPIDEA_OTG_H
-+
-+int ci_hdrc_otg_init(struct ci_hdrc *ci);
-+void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+
-+#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
+ 	return 0;
 -- 
 1.7.0.4
