@@ -1,228 +1,96 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Jul 2013 17:18:25 +0800
-Subject: [PATCH v13 09/14] usb: chipidea: move otg relate things to otg file
-In-Reply-To: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1374830310-21765-10-git-send-email-peter.chen@freescale.com>
+From: christian.ruppert@abilis.com (Christian Ruppert)
+Date: Fri, 26 Jul 2013 11:26:01 +0200
+Subject: Issue with gpio and pinmux
+In-Reply-To: <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+References: <51E667BC.3070804@parrot.com> <51E82FBB.1080905@wwwdotorg.org>
+ <CACRpkdb1n07KoQZSme1EMJfV-9pHr-kd_1eJ6HsBV5gz7Dh3Ww@mail.gmail.com>
+ <51EB590A.4010600@wwwdotorg.org>
+ <CACRpkdZdbxEt67+YBKif4-BKAToOmN0_c8HFOdjSG91dtJwJQw@mail.gmail.com>
+Message-ID: <20130726092601.GA1909@ab42.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move otg relate things to otg file.
+On Thu, Jul 25, 2013 at 11:37:52AM +0200, Linus Walleij wrote:
+> On Sun, Jul 21, 2013 at 5:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> 
+> > Actually, a better way to do (c) might be to just add an extra "op" to
+> > struct pinmux_ops; something like validate_gpio_mux(), passing in
+> > information such as whether a mux function is in effect on that pin,
+> > whether the pin is already claimed as a GPIO, and whether the function
+> > is being called to check a GPIO-claim or mux-claim operation . If the op
+> > is missing, no "dual claim" is allowed. If the op is present, the code
+> > in the op validates whether the particular GPIO is allowed to be claimed
+> > while the particular mux function is active.
+> >
+> > That way, I think any driver that doesn't want to allow dual-claim
+> > doesn't have to do anything, but the few drivers that do can code up
+> > whatever algorithm they want; for Tegra, I'd just allow everything for
+> > simplicity, but we could always enhance that later if we want.
+> 
+> You are right, this would be an elegant solution.
+> 
+> Christian, are you interested in coding this up?
 
-Tested-by: Marek Vasut <marex@denx.de>
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/core.c |   63 +++++++++----------------------------------
- drivers/usb/chipidea/otg.c  |   57 +++++++++++++++++++++++++++++++++++++-
- drivers/usb/chipidea/otg.h  |    2 +
- 3 files changed, 70 insertions(+), 52 deletions(-)
+When thinking about it, we require the same mechanism the other way
+round: If a GPIO is claimed first we need a mechanism to forbid
+incompatible reconfiguration of other functionalities until that GPIO is
+free again.
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 8884af6..78c4721 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -295,40 +295,6 @@ int hw_device_reset(struct ci_hdrc *ci, u32 mode)
- 	return 0;
- }
- 
--/**
-- * ci_otg_role - pick role based on ID pin state
-- * @ci: the controller
-- */
--static enum ci_role ci_otg_role(struct ci_hdrc *ci)
--{
--	u32 sts = hw_read(ci, OP_OTGSC, ~0);
--	enum ci_role role = sts & OTGSC_ID
--		? CI_ROLE_GADGET
--		: CI_ROLE_HOST;
--
--	return role;
--}
--
--/**
-- * ci_role_work - perform role changing based on ID pin
-- * @work: work struct
-- */
--static void ci_role_work(struct work_struct *work)
--{
--	struct ci_hdrc *ci = container_of(work, struct ci_hdrc, work);
--	enum ci_role role = ci_otg_role(ci);
--
--	if (role != ci->role) {
--		dev_dbg(ci->dev, "switching from %s to %s\n",
--			ci_role(ci)->name, ci->roles[role]->name);
--
--		ci_role_stop(ci);
--		ci_role_start(ci, role);
--	}
--
--	enable_irq(ci->irq);
--}
--
- static irqreturn_t ci_irq(int irq, void *data)
- {
- 	struct ci_hdrc *ci = data;
-@@ -409,6 +375,8 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
- {
- 	ci_hdrc_gadget_destroy(ci);
- 	ci_hdrc_host_destroy(ci);
-+	if (ci->is_otg)
-+		ci_hdrc_otg_destory(ci);
- }
- 
- static void ci_get_otg_capable(struct ci_hdrc *ci)
-@@ -475,13 +443,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	INIT_WORK(&ci->work, ci_role_work);
--	ci->wq = create_singlethread_workqueue("ci_otg");
--	if (!ci->wq) {
--		dev_err(dev, "can't create workqueue\n");
--		return -ENODEV;
--	}
--
- 	/* To know if controller is OTG capable or not */
- 	ci_get_otg_capable(ci);
- 
-@@ -510,8 +471,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
--		ret = -ENODEV;
--		goto rm_wq;
-+		return -ENODEV;
-+	}
-+
-+	if (ci->is_otg) {
-+		ret = ci_hdrc_otg_init(ci);
-+		if (ret) {
-+			dev_err(dev, "init otg fails, ret = %d\n", ret);
-+			goto stop;
-+		}
- 	}
- 
- 	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
-@@ -522,7 +490,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 			 */
- 			mdelay(2);
- 			ci->role = ci_otg_role(ci);
--			ci_hdrc_otg_init(ci);
-+			ci_enable_otg_interrupt(ci, OTGSC_IDIE);
- 		} else {
- 			/*
- 			 * If the controller is not OTG capable, but support
-@@ -541,7 +509,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	if (ret) {
- 		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
- 		ret = -ENODEV;
--		goto rm_wq;
-+		goto stop;
- 	}
- 
- 	platform_set_drvdata(pdev, ci);
-@@ -557,9 +525,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	free_irq(ci->irq, ci);
- stop:
- 	ci_role_destroy(ci);
--rm_wq:
--	flush_workqueue(ci->wq);
--	destroy_workqueue(ci->wq);
- 
- 	return ret;
- }
-@@ -569,8 +534,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
- 	struct ci_hdrc *ci = platform_get_drvdata(pdev);
- 
- 	dbg_remove_files(ci);
--	flush_workqueue(ci->wq);
--	destroy_workqueue(ci->wq);
- 	free_irq(ci->irq, ci);
- 	ci_role_destroy(ci);
- 
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index abefb4d..68f2faf 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -39,12 +39,65 @@ void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
- }
- 
- /**
-- * ci_hdrc_otg_init - initialize otgsc bits
-+ * ci_otg_role - pick role based on ID pin state
-+ * @ci: the controller
-+ */
-+enum ci_role ci_otg_role(struct ci_hdrc *ci)
-+{
-+	u32 sts = hw_read(ci, OP_OTGSC, ~0);
-+	enum ci_role role = sts & OTGSC_ID
-+		? CI_ROLE_GADGET
-+		: CI_ROLE_HOST;
-+
-+	return role;
-+}
-+
-+/**
-+ * ci_role_work - perform role changing based on ID pin
-+ * @work: work struct
-+ */
-+static void ci_role_work(struct work_struct *work)
-+{
-+	struct ci_hdrc *ci = container_of(work, struct ci_hdrc, work);
-+	enum ci_role role = ci_otg_role(ci);
-+
-+	if (role != ci->role) {
-+		dev_dbg(ci->dev, "switching from %s to %s\n",
-+			ci_role(ci)->name, ci->roles[role]->name);
-+
-+		ci_role_stop(ci);
-+		ci_role_start(ci, role);
-+	}
-+
-+	enable_irq(ci->irq);
-+}
-+
-+/**
-+ * ci_hdrc_otg_init - initialize otg struct
-  * ci: the controller
-  */
- int ci_hdrc_otg_init(struct ci_hdrc *ci)
- {
--	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
-+	INIT_WORK(&ci->work, ci_role_work);
-+	ci->wq = create_singlethread_workqueue("ci_otg");
-+	if (!ci->wq) {
-+		dev_err(ci->dev, "can't create workqueue\n");
-+		return -ENODEV;
-+	}
- 
- 	return 0;
- }
-+
-+/**
-+ * ci_hdrc_otg_destroy - destory otg struct
-+ * ci: the controller
-+ */
-+void ci_hdrc_otg_destory(struct ci_hdrc *ci)
-+{
-+	if (ci->wq) {
-+		flush_workqueue(ci->wq);
-+		destroy_workqueue(ci->wq);
-+	}
-+	ci_disable_otg_interrupt(ci, OTGSC_INT_EN_BITS);
-+	ci_clear_otg_interrupt(ci, OTGSC_INT_STATUS_BITS);
-+}
-diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-index f24ec37..8913062 100644
---- a/drivers/usb/chipidea/otg.h
-+++ b/drivers/usb/chipidea/otg.h
-@@ -15,5 +15,7 @@ int ci_hdrc_otg_init(struct ci_hdrc *ci);
- void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits);
- void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
- void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+void ci_hdrc_otg_destory(struct ci_hdrc *ci);
-+enum ci_role ci_otg_role(struct ci_hdrc *ci);
- 
- #endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
+I like Stephen's proposal (in another mail) to claim GPIOs from the
+pinctrl drivers but instead of modifying the callback prototypes I
+suggest to add the following functions:
+
+/*
+ * Claim GPIO pin (in the sense: forbid acutal GPIO usage)
+ */
+int claim_gpios(struct pinctrl_dev *pctl, unsigned *pins
+                unsigned port_selector, unsigned func_selector);
+
+/* allow GPIO usage of the given pins */
+void unclaim_gpios(struct pinctrl_dev *pctl, unsigned *pins);
+
+Claiming could be fully dynamic. This way, driver authors don't need to
+implement additional callbacks or modify their existing ones. In the
+simplest case they do nothing. The entire conflict-checking logic is
+confined inside the core.
+
+Alternatively, a similar set of functions could make the use of GPIOs
+exclusive with other functions for a given set of pins. This would work
+very well with the proposal below and would be easier to manage for most
+driver authors: The configuration would be static in most cases.
+(We just have to discuss about the default mode, do we want to keep the
+backward-compatible inclusive default or change everything to exclusive
+by default?).
+
+A last point I would like to address before passing on to implementation
+is to introduce the notion of interfaces: I think it is important to
+introduce some orthogonality between unrelated interfaces which happen
+to be muxed on the same port and ideally we implement this coherently
+with the above.
+
+I would like to know your opinion if the following proposal is generic
+enough or if it encodes too much chip-specific logic into the core:
+
+- We extend the notion of pin groups to represent either ports (as it is
+  currently the case) or interfaces. No need to use name pin groups in
+  both cases, I'm open to proposals for better terminology.
+- Functions are associated either to one port or a set of interfaces.
+- Functions continue to apply to an entire port but they only claim the
+  pins of the interfaces they are associated with.
+- A client can request either a function or an interface from the
+  pinctrl core. In the second case, the core will figure out if the
+  request is coherent with previous requests (i.e. if there is a
+  function providing all requested interfaces) and call the driver
+  accordingly.
+
+We'll have to figure out a few details but I would like to have an
+agreement on fundamentals before spending time on implementation.
+
+Greetings,
+  Christian
+
 -- 
-1.7.0.4
+  Christian Ruppert              ,          <christian.ruppert@abilis.com>
+                                /|
+  Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
+                             _// | bilis Systems   CH-1228 Plan-les-Ouates
