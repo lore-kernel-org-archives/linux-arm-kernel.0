@@ -1,187 +1,459 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 27 Jul 2013 13:31:53 +0200
-Subject: [PATCH v10 4/7] ASoC: fsl-ssi: Add support for imx-pcm-fiq
+Date: Sat, 27 Jul 2013 13:31:55 +0200
+Subject: [PATCH v10 6/7] ASoC: fsl-ssi: ac97-slave support
 In-Reply-To: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
 References: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1374924716-23475-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1374924716-23475-7-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for non-dma pcm for imx platforms with imx-pcm-fiq support.
-Instead of imx-pcm-audio, in this case imx-pcm-fiq-audio device is added
-and the SIER flags are set differently.
+This patch adds ac97-slave support.
 
-We need imx-pcm-fiq for some boards that use an incompatible codec.
-imx-pcm-fiq handles those codecs differently and allows to operate with
-them. DMA is not possible because some data sent by the codecs, e.g.
-wm9712, is not in the datastream. Also some data is mixed up in the
-fifos, so that we need to sort them out manually.
+For ac97, the registers have to be setup earlier than for other ssi
+modes because there is some communication with the external device
+before streaming. So this patch introduces a fsl_ssi_setup function to
+setup the registers for different ssi operation modes seperately.
+
+This patch was tested with imx27-pca100.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Tested-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../devicetree/bindings/sound/fsl,ssi.txt          |  4 ++
- sound/soc/fsl/fsl_ssi.c                            | 79 ++++++++++++++++++----
- 2 files changed, 71 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/sound/fsl,ssi.txt          |   4 +
+ sound/soc/fsl/fsl_ssi.c                            | 346 ++++++++++++++++-----
+ 2 files changed, 280 insertions(+), 70 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/sound/fsl,ssi.txt b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
-index 5ff76c9..e45cbce 100644
+index 088a2c0..4303b6a 100644
 --- a/Documentation/devicetree/bindings/sound/fsl,ssi.txt
 +++ b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
-@@ -47,6 +47,10 @@ Optional properties:
+@@ -43,6 +43,10 @@ Required properties:
+                     together.  This would still allow different sample sizes,
+                     but not different sample rates.
+ 
++Required are also ac97 link bindings if ac97 is used. See
++Documentation/devicetree/bindings/sound/soc-ac97link.txt for the necessary
++bindings.
++
+ Optional properties:
  - codec-handle:     Phandle to a 'codec' node that defines an audio
                      codec connected to this SSI.  This node is typically
-                     a child of an I2C or other control node.
-+- fsl,fiq-stream-filter: Bool property. Disabled DMA and use FIQ instead to
-+		    filter the codec stream. This is necessary for some boards
-+		    where an incompatible codec is connected to this SSI, e.g.
-+		    on pca100 and pcm043.
- 
- Child 'codec' node required properties:
- - compatible:       Compatible list, contains the name of the codec
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 4d78df7..8b075ef 100644
+index 0c072ff..827af75 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -8,6 +8,26 @@
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-  * kind, whether express or implied.
-+ *
-+ *
-+ * Some notes why imx-pcm-fiq is used instead of DMA on some boards:
-+ *
-+ * The i.MX SSI core has some nasty limitations in AC97 mode. While most
-+ * sane processor vendors have a FIFO per AC97 slot, the i.MX has only
-+ * one FIFO which combines all valid receive slots. We cannot even select
-+ * which slots we want to receive. The WM9712 with which this driver
-+ * was developed with always sends GPIO status data in slot 12 which
-+ * we receive in our (PCM-) data stream. The only chance we have is to
-+ * manually skip this data in the FIQ handler. With sampling rates different
-+ * from 48000Hz not every frame has valid receive data, so the ratio
-+ * between pcm data and GPIO status data changes. Our FIQ handler is not
-+ * able to handle this, hence this driver only works with 48000Hz sampling
-+ * rate.
-+ * Reading and writing AC97 registers is another challenge. The core
-+ * provides us status bits when the read register is updated with *another*
-+ * value. When we read the same register two times (and the register still
-+ * contains the same value) these status bits are not set. We work
-+ * around this by not polling these bits but only wait a fixed delay.
-  */
- 
- #include <linux/init.h>
-@@ -121,11 +141,13 @@ struct fsl_ssi_private {
+@@ -141,6 +141,7 @@ struct fsl_ssi_private {
  
  	bool new_binding;
  	bool ssi_on_imx;
-+	bool use_dma;
++	bool imx_ac97;
+ 	bool use_dma;
  	struct clk *clk;
  	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
- 	struct imx_dma_data filter_data_tx;
- 	struct imx_dma_data filter_data_rx;
-+	struct imx_pcm_fiq_params fiq_params;
+@@ -320,6 +321,124 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	return ret;
+ }
  
- 	struct {
- 		unsigned int rfrc;
-@@ -355,7 +377,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 */
- 
- 		/* Enable the interrupts and DMA requests */
--		write_ssi(SIER_FLAGS, &ssi->sier);
++static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
++{
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	u8 i2s_mode;
++	u8 wm;
++	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates;
++
++	if (ssi_private->imx_ac97)
++		i2s_mode = CCSR_SSI_SCR_I2S_MODE_NORMAL | CCSR_SSI_SCR_NET;
++	else
++		i2s_mode = CCSR_SSI_SCR_I2S_MODE_SLAVE;
++
++	/*
++	 * Section 16.5 of the MPC8610 reference manual says that the SSI needs
++	 * to be disabled before updating the registers we set here.
++	 */
++	write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
++
++	/*
++	 * Program the SSI into I2S Slave Non-Network Synchronous mode. Also
++	 * enable the transmit and receive FIFO.
++	 *
++	 * FIXME: Little-endian samples require a different shift dir
++	 */
++	write_ssi_mask(&ssi->scr,
++		CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN,
++		CCSR_SSI_SCR_TFR_CLK_DIS |
++		i2s_mode |
++		(synchronous ? CCSR_SSI_SCR_SYN : 0));
++
++	write_ssi(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
++		 CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TEFS |
++		 CCSR_SSI_STCR_TSCKP, &ssi->stcr);
++
++	write_ssi(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
++		 CCSR_SSI_SRCR_RFSI | CCSR_SSI_SRCR_REFS |
++		 CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
++	/*
++	 * The DC and PM bits are only used if the SSI is the clock master.
++	 */
++
++	/*
++	 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We don't
++	 * use FIFO 1. We program the transmit water to signal a DMA transfer
++	 * if there are only two (or fewer) elements left in the FIFO. Two
++	 * elements equals one frame (left channel, right channel). This value,
++	 * however, depends on the depth of the transmit buffer.
++	 *
++	 * We set the watermark on the same level as the DMA burstsize.  For
++	 * fiq it is probably better to use the biggest possible watermark
++	 * size.
++	 */
++	if (ssi_private->use_dma)
++		wm = ssi_private->fifo_depth - 2;
++	else
++		wm = ssi_private->fifo_depth;
++
++	write_ssi(CCSR_SSI_SFCSR_TFWM0(wm) | CCSR_SSI_SFCSR_RFWM0(wm) |
++		CCSR_SSI_SFCSR_TFWM1(wm) | CCSR_SSI_SFCSR_RFWM1(wm),
++		&ssi->sfcsr);
++
++	/*
++	 * For non-ac97 setups, we keep the SSI disabled because if we enable
++	 * it, then the DMA controller will start. It's not supposed to start
++	 * until the SCR.TE (or SCR.RE) bit is set, but it does anyway. The DMA
++	 * controller will transfer one "BWC" of data (i.e. the amount of data
++	 * that the MR.BWC bits are set to). The reason this is bad is because
++	 * at this point, the PCM driver has not finished initializing the DMA
++	 * controller.
++	 */
++
++
++	/*
++	 * For ac97 interrupts are enabled with the startup of the substream
++	 * because it is also running without an active substream. Normally SSI
++	 * is only enabled when there is a substream.
++	 */
++	if (!ssi_private->imx_ac97) {
++		/* Enable the interrupts and DMA requests */
 +		if (ssi_private->use_dma)
 +			write_ssi(SIER_FLAGS, &ssi->sier);
 +		else
 +			write_ssi(CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN |
 +					CCSR_SSI_SIER_RIE |
 +					CCSR_SSI_SIER_RFF0_EN, &ssi->sier);
++	} else {
++		/*
++		 * Setup the clock control register
++		 */
++		write_ssi(CCSR_SSI_SxCCR_WL(17) | CCSR_SSI_SxCCR_DC(13),
++				&ssi->stccr);
++		write_ssi(CCSR_SSI_SxCCR_WL(17) | CCSR_SSI_SxCCR_DC(13),
++				&ssi->srccr);
++
++		/*
++		 * Enable AC97 mode and startup the SSI
++		 */
++		write_ssi(CCSR_SSI_SACNT_AC97EN | CCSR_SSI_SACNT_FV,
++				&ssi->sacnt);
++		write_ssi(0xff, &ssi->saccdis);
++		write_ssi(0x300, &ssi->saccen);
++
++		/*
++		 * Enable SSI
++		 */
++		write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_SSIEN);
++		write_ssi(CCSR_SSI_SOR_WAIT(3), &ssi->sor);
++
++		/*
++		 * Enable Transmit and Receive
++		 */
++		write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE);
++	}
++
++	return 0;
++}
++
++
+ /**
+  * fsl_ssi_startup: create a new substream
+  *
+@@ -341,75 +460,14 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 	 * and initialize the SSI registers.
+ 	 */
+ 	if (!ssi_private->first_stream) {
+-		struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+-
+ 		ssi_private->first_stream = substream;
  
  		/*
- 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
-@@ -543,7 +570,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
- {
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(dai);
- 
--	if (ssi_private->ssi_on_imx) {
-+	if (ssi_private->ssi_on_imx && ssi_private->use_dma) {
- 		dai->playback_dma_data = &ssi_private->dma_params_tx;
- 		dai->capture_dma_data = &ssi_private->dma_params_rx;
- 	}
-@@ -683,6 +710,9 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 
- 	strcpy(ssi_private->name, p);
- 
-+	ssi_private->use_dma = !of_property_read_bool(np,
-+			"fsl,fiq-stream-filter");
-+
- 	/* Initialize this copy of the CPU DAI driver structure */
- 	memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_dai_template,
- 	       sizeof(fsl_ssi_dai_template));
-@@ -707,12 +737,16 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
- 
--	/* The 'name' should not have any slashes in it. */
--	ret = devm_request_irq(&pdev->dev, ssi_private->irq, fsl_ssi_isr, 0,
--			       ssi_private->name, ssi_private);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "could not claim irq %u\n", ssi_private->irq);
--		goto error_irqmap;
-+	if (ssi_private->use_dma) {
-+		/* The 'name' should not have any slashes in it. */
-+		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
-+					fsl_ssi_isr, 0, ssi_private->name,
-+					ssi_private);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "could not claim irq %u\n",
-+					ssi_private->irq);
-+			goto error_irqmap;
-+		}
- 	}
- 
- 	/* Are the RX and the TX clocks locked? */
-@@ -766,7 +800,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+-		 * Section 16.5 of the MPC8610 reference manual says that the
+-		 * SSI needs to be disabled before updating the registers we set
+-		 * here.
+-		 */
+-		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
+-
+-		/*
+-		 * Program the SSI into I2S Slave Non-Network Synchronous mode.
+-		 * Also enable the transmit and receive FIFO.
+-		 *
+-		 * FIXME: Little-endian samples require a different shift dir
+-		 */
+-		write_ssi_mask(&ssi->scr,
+-			CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN,
+-			CCSR_SSI_SCR_TFR_CLK_DIS | CCSR_SSI_SCR_I2S_MODE_SLAVE
+-			| (synchronous ? CCSR_SSI_SCR_SYN : 0));
+-
+-		write_ssi(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
+-			 CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TEFS |
+-			 CCSR_SSI_STCR_TSCKP, &ssi->stcr);
+-
+-		write_ssi(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
+-			 CCSR_SSI_SRCR_RFSI | CCSR_SSI_SRCR_REFS |
+-			 CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
+-
+-		/*
+-		 * The DC and PM bits are only used if the SSI is the clock
+-		 * master.
+-		 */
+-
+-		/* Enable the interrupts and DMA requests */
+-		if (ssi_private->use_dma)
+-			write_ssi(SIER_FLAGS, &ssi->sier);
+-		else
+-			write_ssi(CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN |
+-					CCSR_SSI_SIER_RIE |
+-					CCSR_SSI_SIER_RFF0_EN, &ssi->sier);
+-
+-		/*
+-		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
+-		 * don't use FIFO 1.  We program the transmit water to signal a
+-		 * DMA transfer if there are only two (or fewer) elements left
+-		 * in the FIFO.  Two elements equals one frame (left channel,
+-		 * right channel).  This value, however, depends on the depth of
+-		 * the transmit buffer.
+-		 *
+-		 * We program the receive FIFO to notify us if at least two
+-		 * elements (one frame) have been written to the FIFO.  We could
+-		 * make this value larger (and maybe we should), but this way
+-		 * data will be written to memory as soon as it's available.
+-		 */
+-		write_ssi(CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
+-			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2),
+-			&ssi->sfcsr);
+-
+-		/*
+-		 * We keep the SSI disabled because if we enable it, then the
+-		 * DMA controller will start.  It's not supposed to start until
+-		 * the SCR.TE (or SCR.RE) bit is set, but it does anyway.  The
+-		 * DMA controller will transfer one "BWC" of data (i.e. the
+-		 * amount of data that the MR.BWC bits are set to).  The reason
+-		 * this is bad is because at this point, the PCM driver has not
+-		 * finished initializing the DMA controller.
++		 * fsl_ssi_setup was already called by ac97_init earlier if
++		 * the driver is in ac97 mode.
  		 */
- 		ret = of_property_read_u32_array(pdev->dev.of_node,
- 					"fsl,ssi-dma-events", dma_events, 2);
--		if (ret) {
-+		if (ret && !ssi_private->use_dma) {
- 			dev_err(&pdev->dev, "could not get dma events\n");
- 			goto error_clk;
- 		}
-@@ -805,9 +839,30 @@ static int fsl_ssi_probe(struct platform_device *pdev)
++		if (!ssi_private->imx_ac97)
++			fsl_ssi_setup(ssi_private);
+ 	} else {
+ 		if (synchronous) {
+ 			struct snd_pcm_runtime *first_runtime =
+@@ -538,7 +596,8 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		else
+ 			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_RE, 0);
+ 
+-		if ((read_ssi(&ssi->scr) & (CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0)
++		if (!ssi_private->imx_ac97 && (read_ssi(&ssi->scr) &
++					(CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0)
+ 			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
+ 		break;
+ 
+@@ -608,6 +667,133 @@ static const struct snd_soc_component_driver fsl_ssi_component = {
+ 	.name		= "fsl-ssi",
+ };
+ 
++/**
++ * fsl_ssi_ac97_trigger: start and stop the AC97 receive/transmit.
++ *
++ * This function is called by ALSA to start, stop, pause, and resume the
++ * transfer of data.
++ */
++static int fsl_ssi_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
++			   struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(
++			rtd->cpu_dai);
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_TIE |
++					CCSR_SSI_SIER_TFE0_EN);
++		else
++			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_RIE |
++					CCSR_SSI_SIER_RFF0_EN);
++		break;
++
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_TIE |
++					CCSR_SSI_SIER_TFE0_EN, 0);
++		else
++			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_RIE |
++					CCSR_SSI_SIER_RFF0_EN, 0);
++		break;
++
++	default:
++		return -EINVAL;
++	}
++
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		write_ssi(CCSR_SSI_SOR_TX_CLR, &ssi->sor);
++	else
++		write_ssi(CCSR_SSI_SOR_RX_CLR, &ssi->sor);
++
++	return 0;
++}
++
++static const struct snd_soc_dai_ops fsl_ssi_ac97_dai_ops = {
++	.startup	= fsl_ssi_startup,
++	.shutdown	= fsl_ssi_shutdown,
++	.trigger	= fsl_ssi_ac97_trigger,
++};
++
++static struct snd_soc_dai_driver fsl_ssi_ac97_dai = {
++	.ac97_control = 1,
++	.playback = {
++		.stream_name = "AC97 Playback",
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = SNDRV_PCM_RATE_8000_48000,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE,
++	},
++	.capture = {
++		.stream_name = "AC97 Capture",
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = SNDRV_PCM_RATE_48000,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE,
++	},
++	.ops = &fsl_ssi_ac97_dai_ops,
++};
++
++
++static struct fsl_ssi_private *fsl_ac97_data;
++
++static void fsl_ssi_ac97_init(void)
++{
++	fsl_ssi_setup(fsl_ac97_data);
++}
++
++void fsl_ssi_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
++		unsigned short val)
++{
++	struct ccsr_ssi *ssi = fsl_ac97_data->ssi;
++	unsigned int lreg;
++	unsigned int lval;
++
++	if (reg > 0x7f)
++		return;
++
++
++	lreg = reg <<  12;
++	write_ssi(lreg, &ssi->sacadd);
++
++	lval = val << 4;
++	write_ssi(lval , &ssi->sacdat);
++
++	write_ssi_mask(&ssi->sacnt, CCSR_SSI_SACNT_RDWR_MASK,
++			CCSR_SSI_SACNT_WR);
++	udelay(100);
++}
++
++unsigned short fsl_ssi_ac97_read(struct snd_ac97 *ac97,
++		unsigned short reg)
++{
++	struct ccsr_ssi *ssi = fsl_ac97_data->ssi;
++
++	unsigned short val = -1;
++	unsigned int lreg;
++
++	lreg = (reg & 0x7f) <<  12;
++	write_ssi(lreg, &ssi->sacadd);
++	write_ssi_mask(&ssi->sacnt, CCSR_SSI_SACNT_RDWR_MASK,
++			CCSR_SSI_SACNT_RD);
++
++	udelay(100);
++
++	val = (read_ssi(&ssi->sacdat) >> 4) & 0xffff;
++
++	return val;
++}
++
++static struct snd_ac97_bus_ops fsl_ssi_ac97_ops = {
++	.read		= fsl_ssi_ac97_read,
++	.write		= fsl_ssi_ac97_write,
++};
++
+ /* Show the statistics of a flag only if its interrupt is enabled.  The
+  * compiler will optimze this code to a no-op if the interrupt is not
+  * enabled.
+@@ -684,6 +870,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	struct resource res;
+ 	char name[64];
+ 	bool shared;
++	bool ac97 = false;
+ 
+ 	/* SSIs that are not connected on the board should have a
+ 	 *      status = "disabled"
+@@ -694,7 +881,13 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 
+ 	/* We only support the SSI in "I2S Slave" mode */
+ 	sprop = of_get_property(np, "fsl,mode", NULL);
+-	if (!sprop || strcmp(sprop, "i2s-slave")) {
++	if (!sprop) {
++		dev_err(&pdev->dev, "fsl,mode property is necessary\n");
++		return -EINVAL;
++	}
++	if (!strcmp(sprop, "ac97-slave")) {
++		ac97 = true;
++	} else if (strcmp(sprop, "i2s-slave")) {
+ 		dev_notice(&pdev->dev, "mode %s is unsupported\n", sprop);
+ 		return -ENODEV;
+ 	}
+@@ -713,9 +906,19 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	ssi_private->use_dma = !of_property_read_bool(np,
+ 			"fsl,fiq-stream-filter");
+ 
+-	/* Initialize this copy of the CPU DAI driver structure */
+-	memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_dai_template,
+-	       sizeof(fsl_ssi_dai_template));
++	if (ac97) {
++		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
++				sizeof(fsl_ssi_ac97_dai));
++
++		fsl_ac97_data = ssi_private;
++		ssi_private->imx_ac97 = true;
++
++		snd_soc_set_ac97_ops_of_reset(&fsl_ssi_ac97_ops, pdev);
++	} else {
++		/* Initialize this copy of the CPU DAI driver structure */
++		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_dai_template,
++		       sizeof(fsl_ssi_dai_template));
++	}
+ 	ssi_private->cpu_dai_drv.name = ssi_private->name;
+ 
+ 	/* Get the addresses and IRQ */
+@@ -901,6 +1104,9 @@ static int fsl_ssi_probe(struct platform_device *pdev)
  	}
  
- 	if (ssi_private->ssi_on_imx) {
--		ret = imx_pcm_dma_init(pdev);
--		if (ret)
--			goto error_dev;
-+		if (!ssi_private->use_dma) {
+ done:
++	if (ssi_private->imx_ac97)
++		fsl_ssi_ac97_init();
 +
-+			/*
-+			 * Some boards use an incompatible codec. To get it
-+			 * working, we are using imx-fiq-pcm-audio, that
-+			 * can handle those codecs. DMA is not possible in this
-+			 * situation.
-+			 */
-+
-+			ssi_private->fiq_params.irq = ssi_private->irq;
-+			ssi_private->fiq_params.base = ssi_private->ssi;
-+			ssi_private->fiq_params.dma_params_rx =
-+				&ssi_private->dma_params_rx;
-+			ssi_private->fiq_params.dma_params_tx =
-+				&ssi_private->dma_params_tx;
-+
-+			ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
-+			if (ret)
-+				goto error_dev;
-+		} else {
-+			ret = imx_pcm_dma_init(pdev);
-+			if (ret)
-+				goto error_dev;
-+		}
- 	}
+ 	return 0;
  
- 	/*
+ error_dai:
 -- 
 1.8.3.2
