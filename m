@@ -1,120 +1,70 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 27 Jul 2013 13:31:52 +0200
-Subject: [PATCH v10 3/7] ASoC: imx-audmux: Read default configuration from
- devicetree
+Date: Sat, 27 Jul 2013 13:31:54 +0200
+Subject: [PATCH v10 5/7] ASoC: fsl-ssi: Use generic DMA bindings if possible
 In-Reply-To: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
 References: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1374924716-23475-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1374924716-23475-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a function to parse a default port configuration from devicetree.
+There may be some platforms using fsl-ssi that do not have a DMA driver
+with generic DMA bindings. So this patch adds support for the generic
+DMA bindings, while still accepting the old "fsl,dma-events" property if
+"dmas" is not found.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../devicetree/bindings/sound/imx-audmux.txt       |  9 ++++
- sound/soc/fsl/imx-audmux.c                         | 62 ++++++++++++++++++++++
- 2 files changed, 71 insertions(+)
+ Documentation/devicetree/bindings/sound/fsl,ssi.txt |  4 ++++
+ sound/soc/fsl/fsl_ssi.c                             | 20 ++++++++++++--------
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/imx-audmux.txt b/Documentation/devicetree/bindings/sound/imx-audmux.txt
-index 215aa98..f88a00e 100644
---- a/Documentation/devicetree/bindings/sound/imx-audmux.txt
-+++ b/Documentation/devicetree/bindings/sound/imx-audmux.txt
-@@ -5,6 +5,15 @@ Required properties:
-   or "fsl,imx31-audmux" for the version firstly used on i.MX31.
- - reg : Should contain AUDMUX registers location and length
+diff --git a/Documentation/devicetree/bindings/sound/fsl,ssi.txt b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+index e45cbce..088a2c0 100644
+--- a/Documentation/devicetree/bindings/sound/fsl,ssi.txt
++++ b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+@@ -51,6 +51,10 @@ Optional properties:
+ 		    filter the codec stream. This is necessary for some boards
+ 		    where an incompatible codec is connected to this SSI, e.g.
+ 		    on pca100 and pcm043.
++- dmas:		    Generic dma devicetree binding as described in
++		    Documentation/devicetree/bindings/dma/dma.txt.
++- dma-names:	    Two dmas have to be defined, "tx" and "rx", if fsl,imx-fiq
++		    is not defined.
  
-+An initial configuration can be setup using child nodes.
-+
-+Required properties of optional child nodes:
-+- fsl,audmux-port : Integer of the audmux port that is configured by this
-+  child node.
-+- fsl,port-config : List of configuration options for the specific port. For
-+  imx31-audmux and above, it is a list of tuples <ptcr pdcr>. For
-+  imx21-audmux it is a list of pcr values.
-+
- Example:
- 
- audmux at 021d8000 {
-diff --git a/sound/soc/fsl/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
-index 1a5da1e..103d1b0 100644
---- a/sound/soc/fsl/imx-audmux.c
-+++ b/sound/soc/fsl/imx-audmux.c
-@@ -251,6 +251,66 @@ int imx_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
- }
- EXPORT_SYMBOL_GPL(imx_audmux_v2_configure_port);
- 
-+static int imx_audmux_parse_dt_defaults(struct platform_device *pdev,
-+		struct device_node *of_node)
-+{
-+	struct device_node *child;
-+
-+	for_each_available_child_of_node(of_node, child) {
-+		unsigned int port;
-+		unsigned int ptcr = 0;
-+		unsigned int pdcr = 0;
-+		unsigned int pcr = 0;
-+		unsigned int val;
-+		int ret;
-+		int i = 0;
-+
-+		ret = of_property_read_u32(child, "fsl,audmux-port", &port);
-+		if (ret) {
-+			dev_warn(&pdev->dev, "Failed to get fsl,audmux-port of child node \"%s\"\n",
-+					child->full_name);
-+			continue;
-+		}
-+		if (!of_property_read_bool(child, "fsl,port-config")) {
-+			dev_warn(&pdev->dev, "child node \"%s\" does not have property fsl,port-config\n",
-+					child->full_name);
-+			continue;
-+		}
-+
-+		for (i = 0; (ret = of_property_read_u32_index(child,
-+					"fsl,port-config\n", i, &val)) == 0;
-+				++i) {
-+			if (audmux_type == IMX31_AUDMUX) {
-+				if (i % 2)
-+					pdcr |= val;
-+				else
-+					ptcr |= val;
-+			} else {
-+				pcr |= val;
+ Child 'codec' node required properties:
+ - compatible:       Compatible list, contains the name of the codec
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 8b075ef..0c072ff 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -794,15 +794,19 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			&ssi_private->filter_data_tx;
+ 		ssi_private->dma_params_rx.filter_data =
+ 			&ssi_private->filter_data_rx;
+-		/*
+-		 * TODO: This is a temporary solution and should be changed
+-		 * to use generic DMA binding later when the helplers get in.
+-		 */
+-		ret = of_property_read_u32_array(pdev->dev.of_node,
++		if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
++				ssi_private->use_dma) {
++			/*
++			 * FIXME: This is a temporary solution until all
++			 * necessary dma drivers support the generic dma
++			 * bindings.
++			 */
++			ret = of_property_read_u32_array(pdev->dev.of_node,
+ 					"fsl,ssi-dma-events", dma_events, 2);
+-		if (ret && !ssi_private->use_dma) {
+-			dev_err(&pdev->dev, "could not get dma events\n");
+-			goto error_clk;
++			if (ret && ssi_private->use_dma) {
++				dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
++				goto error_clk;
 +			}
-+		}
-+
-+		if (ret != -ENODATA) {
-+			dev_err(&pdev->dev, "Failed to read u32 at index %d of child %s\n",
-+					i, child->full_name);
-+			continue;
-+		}
-+
-+		if (audmux_type == IMX31_AUDMUX) {
-+			if (i % 2) {
-+				dev_err(&pdev->dev, "One pdcr value is missing in child node %s\n",
-+						child->full_name);
-+				continue;
-+			}
-+			imx_audmux_v2_configure_port(port, ptcr, pdcr);
-+		} else {
-+			imx_audmux_v1_configure_port(port, pcr);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static int imx_audmux_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-@@ -275,6 +335,8 @@ static int imx_audmux_probe(struct platform_device *pdev)
- 	if (audmux_type == IMX31_AUDMUX)
- 		audmux_debugfs_init();
+ 		}
  
-+	imx_audmux_parse_dt_defaults(pdev, pdev->dev.of_node);
-+
- 	return 0;
- }
- 
+ 		shared = of_device_is_compatible(of_get_parent(np),
 -- 
 1.8.3.2
