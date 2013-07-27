@@ -1,37 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 27 Jul 2013 13:05:22 +0100
-Subject: [PATCH v10 1/7] ASoC: core: Generic ac97 link reset functions
-In-Reply-To: <1374924716-23475-2-git-send-email-mpa@pengutronix.de>
-References: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
- <1374924716-23475-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130727120522.GG9858@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 27 Jul 2013 13:22:21 +0100
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+ <20130722184325.GA21614@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+ <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com>
+ <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com>
+ <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+Message-ID: <20130727122221.GB6618@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 01:31:50PM +0200, Markus Pargmann wrote:
+On Sat, Jul 27, 2013 at 05:10:56AM +0100, Paul Walmsley wrote:
+> 
+> Tonight I put on a Jon Hopkins album, in recollection of my UK ARM Linux 
+> colleagues perhaps, and started testing, and eventually wound up with this 
+> one:
+> 
+> commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc
+> Author: Will Deacon <will.deacon@arm.com>
 
-This is a really nice approach to the problem, just one thing I'd like
-to see changed in the bindings:
+Oh, great...
 
-> +ssi {
-> +	...
-> +
-> +	pinctrl-names = "default", "ac97-running", "ac97-reset", "ac97-warm-reset";
+> Date:   Wed Jun 12 12:25:56 2013 +0100
+> 
+>     ARM: 7757/1: mm: don't flush icache in switch_mm with hardware broadcasting
+>     
+>     When scheduling an mm on a CPU where it hasn't previously been used, we
+>     flush the icache on that CPU so that any code loaded previously on
+>     a different core can be safely executed.
+>     
+>     For cores with hardware broadcasting of cache maintenance operations,
+>     this is clearly unnecessary, since the inner-shareable invalidation in
+>     __sync_icache_dcache will affect all CPUs.
+>     
+>     This patch conditionalises the icache flush in switch_mm based on
+>     cache_ops_need_broadcast().
+>     
+>     Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>     Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
+>     Signed-off-by: Will Deacon <will.deacon@arm.com>
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> ...
+> 
+> v3.11-rc2 boots with it reverted.  What also works is v3.11-rc2 with the 
+> below patch applied.
 
-I'd like to see some documentation of this "default" state - I'd expect
-this corresponds to the bus being idle and waiting for a wakeup from the
-CODEC which is definitely a useful state to have for power optimisation
-so it'd be good to bake it into the bindings.
+That's very odd -- I *suspect* your bootloader is up to no good (iirc, we've
+had issues with the bootloader on this machine in the past, since it enters
+the kernel in ABT mode or something).
 
-Alternatively it could be the bus being totally idle with no possibility
-of wakeup in which case it'd be good to say that too then someone can
-add the waiting for wakeup state later.
+> Would be pleased to boot-test anything you'd care to send my way, as long 
+> as you can tolerate response latency jitter.
 
-Please also note the new list devicetree at vger.kernel.org.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130727/39a1016c/attachment.sig>
+Can you try this quick hack please? It clobbers the I-cache as soon as we
+enter the kernel, so it should tell us whether my theory is correct.
+
+Cheers,
+
+Will
+
+--->8
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 9cf6063..d74c64c 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -83,6 +83,9 @@ ENTRY(stext)
+  THUMB(        .thumb                  )       @ switch to Thumb now.
+  THUMB(1:                      )
+ 
++       mov     r9, #0
++       mcr     p15, 0, r9, c7, c5, 0
++
+ #ifdef CONFIG_ARM_VIRT_EXT
+        bl      __hyp_stub_install
+ #endif
