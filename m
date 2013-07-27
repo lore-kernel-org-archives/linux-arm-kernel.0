@@ -1,95 +1,144 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Sun, 28 Jul 2013 01:28:46 +1000
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130726131423.GL24642@n2100.arm.linux.org.uk>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy>
- <20130726131423.GL24642@n2100.arm.linux.org.uk>
-Message-ID: <20130727152845.GB29970@voom.fritz.box>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Sat, 27 Jul 2013 18:12:10 +0200
+Subject: [PATCH 0/8] ARM: tegra: support LP1 suspend mode
+In-Reply-To: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+Message-ID: <2389689.JgQlW00RdN@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 02:14:23PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
-> > On Fri, Jul 26, 2013 at 10:42:24AM +0100, David Woodhouse wrote:
-> > > On Fri, 2013-07-26 at 10:01 +0200, Richard Cochran wrote:
-> > > > On Thu, Jul 25, 2013 at 03:37:53PM -0600, Jason Gunthorpe wrote:
-> > > > > 
-> > > > > We use DT has a kernel configuration input. Our environment is
-> > > > > designed to guarantee 100% that the kernel and DT match exactly. DT
-> > > > > very deliberately isn't an ABI boundary in our systems.
-> > > > 
-> > > > Think about what you just said.
-> > > > 
-> > > > The DT describes the *hardware* not the kernel. Why should you ever
-> > > > need to update your DT at all?
-> > > 
-> > > Well, the nodes which describe hardware devices, according to the
-> > > bindings which form an ABI contract between DT and drivers, should not
-> > > normally change. Although they *can* change, if for example you change
-> > > the MAC address and that's stored there. Or you change the PHY you want
-> > > it to use. Or something like that. The *ABI* doesn't change, but the
-> > > data you express *using* that ABI can change. That's kind of the point.
-> > 
-> > Unless I totally misunderstood, the thread is talking about letting
-> > established bindings change with each new kernel version.  I am
-> > opposed to that.
-> > 
-> > Of course, a user may want to change the values of his MAC addresses,
-> > if he needs to. But he should never have to change *how* he specifies
-> > those addresses.
-> > 
-> > So, as long as everyone can agree to the principle that a working DT
-> > should remain working after a kernel upgrade, then I'll shut up. In
-> > actual fact, this is not the case today, nor was it ever so in the
-> > past, AFAICT, but it never hurts to set goals.
+On Friday 26 July 2013 17:15:02 Joseph Lo wrote:
+> This series adds the support of LP1 suspend mode for Tegra.
 > 
-> We agree.
+> Verified on Seaboard, Cardhu and Dalmore.
+
+tested on AC100 and worked fine, except
+
+[   68.448007] PM: Syncing filesystems ... done.
+[   71.370086] Freezing user space processes ... (elapsed 0.001 seconds) done.
+[   71.370088] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) 
+done.
+[   71.371253] Suspending console(s) (use no_console_suspend to debug)
+[   71.638481] PM: suspend of devices complete after 266.604 msecs
+[   71.638905] PM: late suspend of devices complete after 0.417 msecs
+[   71.639477] PM: noirq suspend of devices complete after 0.568 msecs
+[   71.639480] Disabling non-boot CPUs ...
+[   71.640242] CPU1: shutdown
+[   71.641216] Entering suspend state LP1
+[   71.641267] Enabling non-boot CPUs ...
+[   71.643125] CPU1: Booted secondary processor
+[   71.643449] CPU1 is up
+[   71.643786] PM: noirq resume of devices complete after 0.331 msecs
+[   71.644300] PM: early resume of devices complete after 0.364 msecs
+[   71.648038] ------------[ cut here ]------------
+[   71.648061] WARNING: CPU: 0 PID: 1025 at kernel/irq/manage.c:529 
+irq_set_irq_wake+0xb8/0xf0()
+[   71.648064] Unbalanced IRQ 384 wake disable
+[   71.648068] Modules linked in:
+[   71.648075] CPU: 0 PID: 1025 Comm: bash Not tainted 3.11.0-rc2-
+next-20130726-00008-gef01509-dirty #6
+[   71.648107] [<c001551c>] (unwind_backtrace+0x0/0xf8) from [<c001154c>] 
+(show_stack+0x10/0x14)
+[   71.648128] [<c001154c>] (show_stack+0x10/0x14) from [<c0515288>] 
+(dump_stack+0x80/0xc4)
+[   71.648142] [<c0515288>] (dump_stack+0x80/0xc4) from [<c0025340>] 
+(warn_slowpath_common+0x64/0x88)
+[   71.648151] [<c0025340>] (warn_slowpath_common+0x64/0x88) from [<c00253f8>] 
+(warn_slowpath_fmt+0x30/0x40)
+[   71.648161] [<c00253f8>] (warn_slowpath_fmt+0x30/0x40) from [<c007ff8c>] 
+(irq_set_irq_wake+0xb8/0xf0)
+[   71.648178] [<c007ff8c>] (irq_set_irq_wake+0xb8/0xf0) from [<c0334d00>] 
+(tps6586x_rtc_resume+0x30/0x38)
+[   71.648192] [<c0334d00>] (tps6586x_rtc_resume+0x30/0x38) from [<c02951d0>] 
+(platform_pm_resume+0x2c/0x4c)
+[   71.648202] [<c02951d0>] (platform_pm_resume+0x2c/0x4c) from [<c0299d40>] 
+(dpm_run_callback.isra.5+0x18/0x38)
+[   71.648211] [<c0299d40>] (dpm_run_callback.isra.5+0x18/0x38) from 
+[<c029a044>] (device_resume+0xb0/0x170)
+[   71.648219] [<c029a044>] (device_resume+0xb0/0x170) from [<c029aeb4>] 
+(dpm_resume+0xe8/0x20c)
+[   71.648227] [<c029aeb4>] (dpm_resume+0xe8/0x20c) from [<c029b174>] 
+(dpm_resume_end+0xc/0x18)
+[   71.648245] [<c029b174>] (dpm_resume_end+0xc/0x18) from [<c005e480>] 
+(suspend_devices_and_enter+0xdc/0x2f8)
+[   71.648256] [<c005e480>] (suspend_devices_and_enter+0xdc/0x2f8) from 
+[<c005e810>] (pm_suspend+0x174/0x1e8)
+[   71.648265] [<c005e810>] (pm_suspend+0x174/0x1e8) from [<c005d710>] 
+(state_store+0x6c/0xbc)
+[   71.648285] [<c005d710>] (state_store+0x6c/0xbc) from [<c01eca78>] 
+(kobj_attr_store+0x14/0x20)
+[   71.648298] [<c01eca78>] (kobj_attr_store+0x14/0x20) from [<c011e970>] 
+(sysfs_write_file+0x168/0x198)
+[   71.648312] [<c011e970>] (sysfs_write_file+0x168/0x198) from [<c00cd060>] 
+(vfs_write+0xb0/0x188)
+[   71.648321] [<c00cd060>] (vfs_write+0xb0/0x188) from [<c00cd410>] 
+(SyS_write+0x3c/0x70)
+[   71.648330] [<c00cd410>] (SyS_write+0x3c/0x70) from [<c000e560>] 
+(ret_fast_syscall+0x0/0x30)
+[   71.648334] ---[ end trace e5ed8212ac4db5da ]---
+[   72.063578] mmc1: power class selection to bus width 8 failed
+[   72.297753] usb 2-1: reset high-speed USB device number 2 using tegra-ehci
+[   72.567736] usb 3-1: reset high-speed USB device number 2 using tegra-ehci
+[   73.022058] usb 3-1.3: reset high-speed USB device number 4 using tegra-
+ehci
+[   73.216064] usb 3-1.2: reset high-speed USB device number 3 using tegra-
+ehci
+[   73.360225] PM: resume of devices complete after 1715.937 msecs
+[   73.361008] Restarting tasks ... done.
+
+and sdcard being offline after resume (fixed by CONFIG_MMC_UNSAFE_RESUME=y). 
+Anyway, thanks for your great work!
+
+Tested-By: Marc Dietrich <marvin24@gmx.de>
+
+> And tested with THUMB2_KERNEL as well.
 > 
-> That's precisely why I'm saying that once a binding appears in a -final
-> released kernel, it is _stable_ by that very fact.  If there were any
-> doubts about it, it should never have been accepted into the kernel tree
-> in the first place.
+> P.S.
+> A known issue on Dalmore, the LP1 resume may take 10 ~ 15 seconds due to
+> the 792MHz BCT. It can't be reproduced on Seaboard or Cardhu. And the
+> root cause of this is about the default settings of EMC registers that
+> cause the DRAM can't leave self-refresh mode immediately. If you want
+> to test with quick LP1 resume on Dalmore, I can provide another HACK for
+> this.
 > 
-> It's no different from how we treat syscalls.  Once we accept a syscall
-> and it's published in a -final kernel, it can't then be altered - it can
-> be supplemented by a new syscall with a different interface, but the old
-> one remains and keeps its semantics for a great many years.
+> Joseph Lo (8):
+>   ARM: tegra: add common resume handling code for LP1 resuming
+>   ARM: tegra: config the polarity of the request of sys clock
+>   clk: tegra114: add LP1 suspend/resume support
+>   ARM: tegra: add common LP1 suspend support
+>   ARM: tegra30: add LP1 suspend support
+>   ARM: tegra20: add LP1 suspend support
+>   ARM: tegra114: add LP1 suspend support
+>   ARM: dts: tegra: enable LP1 suspend mode
 > 
-> There's no reason for DT to be any different in this regard.
-
-I agree, and the fact that we have a bunch of bad bindings in the wild
-is a mess which is difficult but necessary to clean up.
-
-Something that helps, is that just as it's possible to support old,
-badly-thought out syscalls with a compat shim over newer
-implementations, we can in many cases localize handling of bad device
-tree bindings to early boot code, so that old bad ideas don't have to
-infect every part of every driver.
-
-It would probably be a good idea to implement a DT quirks mechanism,
-to be run immediately after unflattening.  That way a driver can just
-register a fixup function to patch the DT up to a newer standard,
-instead of scattering if (old-style-representation) throughout the
-code.
-
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130728/54e30f87/attachment.sig>
+>  arch/arm/boot/dts/tegra114-dalmore.dts     |   2 +-
+>  arch/arm/boot/dts/tegra20-colibri-512.dtsi |   2 +-
+>  arch/arm/boot/dts/tegra20-harmony.dts      |   2 +-
+>  arch/arm/boot/dts/tegra20-paz00.dts        |   2 +-
+>  arch/arm/boot/dts/tegra20-seaboard.dts     |   2 +-
+>  arch/arm/boot/dts/tegra20-tamonten.dtsi    |   2 +-
+>  arch/arm/boot/dts/tegra20-trimslice.dts    |   2 +-
+>  arch/arm/boot/dts/tegra20-ventana.dts      |   2 +-
+>  arch/arm/boot/dts/tegra20-whistler.dts     |   2 +-
+>  arch/arm/boot/dts/tegra30-beaver.dts       |   2 +-
+>  arch/arm/boot/dts/tegra30-cardhu.dtsi      |   2 +-
+>  arch/arm/mach-tegra/Makefile               |   3 +
+>  arch/arm/mach-tegra/iomap.h                |   6 +
+>  arch/arm/mach-tegra/pm-tegra20.c           |  37 ++
+>  arch/arm/mach-tegra/pm-tegra30.c           |  37 ++
+>  arch/arm/mach-tegra/pm.c                   | 121 +++++-
+>  arch/arm/mach-tegra/pm.h                   |  23 ++
+>  arch/arm/mach-tegra/pmc.c                  |  36 +-
+>  arch/arm/mach-tegra/pmc.h                  |   3 +
+>  arch/arm/mach-tegra/reset-handler.S        |  13 +
+>  arch/arm/mach-tegra/reset.c                |   2 +
+>  arch/arm/mach-tegra/reset.h                |   4 +
+>  arch/arm/mach-tegra/sleep-tegra20.S        | 300 ++++++++++++++
+>  arch/arm/mach-tegra/sleep-tegra30.S        | 615
+> +++++++++++++++++++++++++++++ arch/arm/mach-tegra/sleep.S                | 
+>  8 +-
+>  arch/arm/mach-tegra/sleep.h                |  18 +
+>  drivers/clk/tegra/clk-tegra114.c           |  32 ++
+>  27 files changed, 1259 insertions(+), 21 deletions(-)
+>  create mode 100644 arch/arm/mach-tegra/pm-tegra20.c
+>  create mode 100644 arch/arm/mach-tegra/pm-tegra30.c
