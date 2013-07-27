@@ -1,48 +1,69 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 27 Jul 2013 17:26:40 +0200
-Subject: [RFC 0/8] ARM: imx27 pinctrl
-Message-ID: <1374938808-27316-1-git-send-email-mpa@pengutronix.de>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Sun, 28 Jul 2013 01:19:49 +1000
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726142140.GR24642@n2100.arm.linux.org.uk>
+References: <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+ <20130726132709.GH29916@titan.lakedaemon.net>
+ <1374846070.14574.92.camel@i7.infradead.org>
+ <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+ <20130726142140.GR24642@n2100.arm.linux.org.uk>
+Message-ID: <20130727151949.GA29970@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 26, 2013 at 03:21:40PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 26, 2013 at 10:14:32AM -0400, jonsmirl at gmail.com wrote:
+> > Yes, yes - that's why the schema should be written down and used as a
+> > validation input to dtc. Then dtc can spit out errors for non-standard
+> > items. There would be two versions - the standard one and a legacy one
+> > that includes the standard one plus the hacks that can't be undone.
+> > 
+> > But more importantly it provides a framework for people creating new
+> > node definitions. Now they can't work in a vacuum and come up with
+> > random names and structure for everything.
+> > 
+> > Most of the problems express in the thread would go away if the schema
+> > was written down and discussed. The rule going forward would be no new
+> > nodes that aren't part of the standard schema.
+> 
+> So this is why I'm seeing patches just a short time ago removing existing
+> compatible strings from the DT descriptions and associated driver, and
+> replacing them with new ones... meaning that the old DT files won't work
+> with newer kernels.
+> 
+> What that means is using the descriptions as the schema won't catch that
+> because they're changing those as well to match.
+> 
+> There's a solution to that: dtc becomes a separate project external to
+> the kernel which also contains the schemas that it verifies against.
 
-this series implements a imx27 pinctrl driver. imx27/21 have a register format
-that is not compatible with the rest of imx series processors. I added some
-functions to support it within the core imx pinctrl driver.
+dtc has always been a separate project external to the kernel.  Though
+we do have to keep reminding people to send their patches to upstream
+first.
 
-The gpio data registers are between iomux control registers. In this series,
-the gpio devices are initialized as subdevices of the iomux device, sharing the
-mapped registers.
+It's had minimal support for validation of the tree contents for a
+long time.  It has no more than minimal support (including "schemas"
+as such for bindings), simply because no-one's implemented it yet.
 
-Regards,
+> That way, if you want to make changes such as that above, you need to
+> get it past not only kernel people but also past dtc maintainers -
+> which increases the chances of such stuff being caught.
 
-Markus
-
-
-Markus Pargmann (8):
-      gpio: mxc: Use devm_ functions
-      gpio: mxc: Support for initialization as submodule
-      pinctrl: imx: Move private struct to header file
-      pinctrl: imx: Support imx21 register format
-      pinctrl: imx27: imx27 pincontrol driver
-      ARM: imx27: enable pinctrl
-      ARM: dts: imx27 pin functions
-      ARM: dts: imx27 pinctrl
-
- .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  53 ++
- arch/arm/boot/dts/imx27-pinfunc.h                  | 520 +++++++++++++++++++
- arch/arm/boot/dts/imx27.dtsi                       | 217 +++++---
- arch/arm/mach-imx/Kconfig                          |   2 +
- drivers/gpio/gpio-mxc.c                            |  51 +-
- drivers/pinctrl/Kconfig                            |   8 +
- drivers/pinctrl/Makefile                           |   1 +
- drivers/pinctrl/pinctrl-imx.c                      | 272 +++++++++-
- drivers/pinctrl/pinctrl-imx.h                      |  12 +
- drivers/pinctrl/pinctrl-imx27.c                    | 553 +++++++++++++++++++++
- include/linux/gpio-mxc.h                           |  17 +
- 11 files changed, 1597 insertions(+), 109 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
- create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
- create mode 100644 drivers/pinctrl/pinctrl-imx27.c
- create mode 100644 include/linux/gpio-mxc.h
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130728/d749095c/attachment.sig>
