@@ -1,69 +1,111 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Sat, 27 Jul 2013 23:11:29 +0400
-Subject: [PATCH 0/8] ARM: tegra: support LP1 suspend mode
-In-Reply-To: <1515727.YuaSFu1ggc@ax5200p>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <4555938.6N2HxzJnNO@ax5200p> <51F410BE.3000904@gmail.com>
- <1515727.YuaSFu1ggc@ax5200p>
-Message-ID: <51F41B61.7030402@gmail.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sat, 27 Jul 2013 15:22:52 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
+ interested in device tree janitoring / cleanup?]
+In-Reply-To: <1441731.8CGUI1tUxh@flatron>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F39FD8.6080808@broadcom.com> <20130727183059.GD4813@netboy>
+ <1441731.8CGUI1tUxh@flatron>
+Message-ID: <CAKON4Owg7guXo7TjtW3_C2Q07jNT8L6f6648AwXYBOxx2GA28w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-27.07.2013 23:03, Marc Dietrich ?????:
-> On Saturday 27 July 2013 22:26:06 Dmitry Osipenko wrote:
->> 27.07.2013 22:09, Marc Dietrich ?????:
->>> On Saturday 27 July 2013 20:20:38 Dmitry Osipenko wrote:
->>>> 27.07.2013 20:12, Marc Dietrich ?????:
->>>>> On Friday 26 July 2013 17:15:02 Joseph Lo wrote:
->>>>>> This series adds the support of LP1 suspend mode for Tegra.
->>>>>>
->>>>>> Verified on Seaboard, Cardhu and Dalmore.
->>>>>
->>>>> tested on AC100 and worked fine, except
->>>>>
->>>>> [   68.448007] PM: Syncing filesystems ... done.
->>>>> [   71.370086] Freezing user space processes ... (elapsed 0.001 seconds)
->>>>> done. [   71.370088] Freezing remaining freezable tasks ... (elapsed
->>>>> 0.001 seconds) done.
->>>>> [   71.371253] Suspending console(s) (use no_console_suspend to debug)
->>>>> [   71.638481] PM: suspend of devices complete after 266.604 msecs
->>>>> [   71.638905] PM: late suspend of devices complete after 0.417 msecs
->>>>> [   71.639477] PM: noirq suspend of devices complete after 0.568 msecs
->>>>> [   71.639480] Disabling non-boot CPUs ...
->>>>> [   71.640242] CPU1: shutdown
->>>>> [   71.641216] Entering suspend state LP1
->>>>> [   71.641267] Enabling non-boot CPUs ...
->>>>> [   71.643125] CPU1: Booted secondary processor
->>>>> [   71.643449] CPU1 is up
->>>>> [   71.643786] PM: noirq resume of devices complete after 0.331 msecs
->>>>> [   71.644300] PM: early resume of devices complete after 0.364 msecs
->>>>> [   71.648038] ------------[ cut here ]------------
->>>>> [   71.648061] WARNING: CPU: 0 PID: 1025 at kernel/irq/manage.c:529
->>>>> irq_set_irq_wake+0xb8/0xf0()
->>>>> [   71.648064] Unbalanced IRQ 384 wake disable
->>>>> [   71.648068] Modules linked in:
->>>>> [   71.648075] CPU: 0 PID: 1025 Comm: bash Not tainted 3.11.0-rc2-
->>>>> next-20130726-00008-gef01509-dirty #6
-> 
->>> Stephen Warren said on IRC that this is known and on the internal bug
->>> tracker already. I just posted it so others are not surprised. Well, I
->>> should have added that it's a know problem. Sorry for that.
+On Sat, Jul 27, 2013 at 2:51 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Saturday 27 of July 2013 20:31:01 Richard Cochran wrote:
+>> On Sat, Jul 27, 2013 at 12:24:24PM +0200, Arend van Spriel wrote:
+>> > That is a nice summary of how we got from null to now and Richard
+>> > seems to be simply saying: let's stop mucking about and make this a
+>> > project with a well-defined process of dealing with staging and
+>> > stable bindings and keep stable bindings stable.
 >>
->> It might be a known problem only for those who faced with it. Since it's on
->> their internal irc, it wasn't a known issue.
+>> Yes, that is right.
 >>
->> It also would be interesting to know if suspend with thumb2 works correctly.
->> On 3.8 I've ported lp0 suspend and it works fine with arm compiled kernel,
->> thumb2 also works but only for about 5-10 hours (resuming on each 5-30
->> minutes, default android behavior) and after I'm getting pmd corruption. I
->> have no idea from where that corruption comes from without ability for hw
->> debugging.
-> 
-> I don't think anyone can comment on this because lp0 support for mainline is 
-> not published yet. On the other hand, if you have patches for which you want 
-> some review, feel free to post them here.
-> 
-> Marc
-> 
-I'm not expecting comment on it, just for notice :) I'll try this patches in
-some near future.
+>> Frankly, I am really surprised and shocked at the cavalier attitude
+>> expressed here WRT DT bindings in released kernels. Think about the
+>> *users* of this code. Not everyone working with ARM Linux is a kernel
+>> developer or a DT guru. There is really no indication at all that the
+>> ARM Linux DT stuff released so far are not stable and trustworthy.
+>>
+>> It is not nice to provide such a mess, and the idea that we *must*
+>> have a mess because the whole system in still in development is bogus,
+>> IMHO. Just make sure that the mainline kernel is really working and
+>> that the DT bindings *there* are for keeps.
+>>
+>> It is your job as kernel developers.
+>
+> Well, it depends on how we use the DT. There are (at least) two possible
+> usage scenarios:
+>
+>  a) using DT as direct replacement for board files - this means that you
+>     are free to say that DTSes are strictly coupled with kernel version
+>     and you are free to modify the bindings - see the analogy to board
+>     files, where you could modify the platform data structures and could
+>     not directly copy board file from one kernel version to another,
+>
+>  b) using DT as an ABI - this is the original way, i.e. define stable
+>     bindings and make sure that anu DTB built for older kernel will work,
+>     with equal or greater set of functionality on newer kernels.
+
+c) There was very good suggestion earlier about using quirks to fix up
+legacy DTBs.  I really like that since the DTB can both be an ABI and
+we can continue to evolve the kernel. The quirk code will have little
+impact since it will be run at boot time and then discarded.
+
+So there would be an evolving schema that represents the device tree
+as understood by a particular kernel.  And then there would be a bunch
+of quirks for converting the 'legacy' deployed DTBs into this
+tree.These deployed DTBs are only the ones in boot loaders since they
+are the only ones that can be seen by multiple kernels.
+
+There are a lot of good places in this process to attach error
+checking. For example the quirk code could complain about any DTBs it
+is unable to fix up. And verifying things against the schema provides
+a single point of contact for device tree design. The universal schema
+will force discussion of how to create generic bindings for things
+like DMA controllers.
+
+Plus it is still possible to experiment in this model. Bind your DTB
+to the kernel. Those DTBs won't be run through the quirk code. You'll
+be able to have experimental elements that dtc will flag as not
+matching the schema but they'll still be there.
+
+Evolution also works very well. Each release of the kernel will
+archive the schema and quirks at the point in time when it is
+released.
+
+
+>
+> Now I believe in this thread the point whether we should use a) or b) or a
+> combination of both has been raised.
+>
+> As for current situation, from users' perspective it's almost no
+> difference. With a) they can use appended DTB feature (or hack, whatever
+> you prefer). With b) they just upload new zImage/uImage/whatever, leaving
+> old DTB as is, if they don't want any new functionality. If there is
+> support added for new functionality, they must update their DTBs anyway,
+> so there is no clear advantage of b) over a) in this matter.
+>
+> So, basically, this is not an obvious issue. Without analyzing (and
+> discussing) possible use cases, issues, consequences and whatever, there
+> is no obvious answer, such as "just stabilize whatever we have now!" or
+> "go back to board files!".
+>
+> We have what we have, it is not perfect, some things have been screwed up,
+> but we can't just leave that behind and say "now we'll be doing everything
+> correctly", we must fix that up. People don't do everything correctly from
+> the start, this is what the whole staging vs stable topic is about.
+>
+> Best regards,
+> Tomasz
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
