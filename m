@@ -1,111 +1,55 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sat, 27 Jul 2013 15:22:52 -0400
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 27 Jul 2013 13:37:19 -0600
 Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
  interested in device tree janitoring / cleanup?]
-In-Reply-To: <1441731.8CGUI1tUxh@flatron>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F39FD8.6080808@broadcom.com> <20130727183059.GD4813@netboy>
- <1441731.8CGUI1tUxh@flatron>
-Message-ID: <CAKON4Owg7guXo7TjtW3_C2Q07jNT8L6f6648AwXYBOxx2GA28w@mail.gmail.com>
+In-Reply-To: <20130726142140.GR24642@n2100.arm.linux.org.uk>
+References: <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy> <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy> <20130726132709.GH29916@titan.lakedaemon.net>
+ <1374846070.14574.92.camel@i7.infradead.org>
+ <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+ <20130726142140.GR24642@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6v9G0aeAHQoymhg1=aTyNqf2w9OEcuK06GR=8rXCbB+fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 2:51 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Saturday 27 of July 2013 20:31:01 Richard Cochran wrote:
->> On Sat, Jul 27, 2013 at 12:24:24PM +0200, Arend van Spriel wrote:
->> > That is a nice summary of how we got from null to now and Richard
->> > seems to be simply saying: let's stop mucking about and make this a
->> > project with a well-defined process of dealing with staging and
->> > stable bindings and keep stable bindings stable.
+On Fri, Jul 26, 2013 at 8:21 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jul 26, 2013 at 10:14:32AM -0400, jonsmirl at gmail.com wrote:
+>> Yes, yes - that's why the schema should be written down and used as a
+>> validation input to dtc. Then dtc can spit out errors for non-standard
+>> items. There would be two versions - the standard one and a legacy one
+>> that includes the standard one plus the hacks that can't be undone.
 >>
->> Yes, that is right.
+>> But more importantly it provides a framework for people creating new
+>> node definitions. Now they can't work in a vacuum and come up with
+>> random names and structure for everything.
 >>
->> Frankly, I am really surprised and shocked at the cavalier attitude
->> expressed here WRT DT bindings in released kernels. Think about the
->> *users* of this code. Not everyone working with ARM Linux is a kernel
->> developer or a DT guru. There is really no indication at all that the
->> ARM Linux DT stuff released so far are not stable and trustworthy.
->>
->> It is not nice to provide such a mess, and the idea that we *must*
->> have a mess because the whole system in still in development is bogus,
->> IMHO. Just make sure that the mainline kernel is really working and
->> that the DT bindings *there* are for keeps.
->>
->> It is your job as kernel developers.
+>> Most of the problems express in the thread would go away if the schema
+>> was written down and discussed. The rule going forward would be no new
+>> nodes that aren't part of the standard schema.
 >
-> Well, it depends on how we use the DT. There are (at least) two possible
-> usage scenarios:
+> So this is why I'm seeing patches just a short time ago removing existing
+> compatible strings from the DT descriptions and associated driver, and
+> replacing them with new ones... meaning that the old DT files won't work
+> with newer kernels.
 >
->  a) using DT as direct replacement for board files - this means that you
->     are free to say that DTSes are strictly coupled with kernel version
->     and you are free to modify the bindings - see the analogy to board
->     files, where you could modify the platform data structures and could
->     not directly copy board file from one kernel version to another,
+> What that means is using the descriptions as the schema won't catch that
+> because they're changing those as well to match.
 >
->  b) using DT as an ABI - this is the original way, i.e. define stable
->     bindings and make sure that anu DTB built for older kernel will work,
->     with equal or greater set of functionality on newer kernels.
+> There's a solution to that: dtc becomes a separate project external to
+> the kernel which also contains the schemas that it verifies against.
+> That way, if you want to make changes such as that above, you need to
+> get it past not only kernel people but also past dtc maintainers -
+> which increases the chances of such stuff being caught.
 
-c) There was very good suggestion earlier about using quirks to fix up
-legacy DTBs.  I really like that since the DTB can both be an ABI and
-we can continue to evolve the kernel. The quirk code will have little
-impact since it will be run at boot time and then discarded.
++1
 
-So there would be an evolving schema that represents the device tree
-as understood by a particular kernel.  And then there would be a bunch
-of quirks for converting the 'legacy' deployed DTBs into this
-tree.These deployed DTBs are only the ones in boot loaders since they
-are the only ones that can be seen by multiple kernels.
+dtc has always been a separate project that happens to be mirrored in
+the kernel tree, but the bindings need to come out be turned into
+schema that can be validated.
 
-There are a lot of good places in this process to attach error
-checking. For example the quirk code could complain about any DTBs it
-is unable to fix up. And verifying things against the schema provides
-a single point of contact for device tree design. The universal schema
-will force discussion of how to create generic bindings for things
-like DMA controllers.
-
-Plus it is still possible to experiment in this model. Bind your DTB
-to the kernel. Those DTBs won't be run through the quirk code. You'll
-be able to have experimental elements that dtc will flag as not
-matching the schema but they'll still be there.
-
-Evolution also works very well. Each release of the kernel will
-archive the schema and quirks at the point in time when it is
-released.
-
-
->
-> Now I believe in this thread the point whether we should use a) or b) or a
-> combination of both has been raised.
->
-> As for current situation, from users' perspective it's almost no
-> difference. With a) they can use appended DTB feature (or hack, whatever
-> you prefer). With b) they just upload new zImage/uImage/whatever, leaving
-> old DTB as is, if they don't want any new functionality. If there is
-> support added for new functionality, they must update their DTBs anyway,
-> so there is no clear advantage of b) over a) in this matter.
->
-> So, basically, this is not an obvious issue. Without analyzing (and
-> discussing) possible use cases, issues, consequences and whatever, there
-> is no obvious answer, such as "just stabilize whatever we have now!" or
-> "go back to board files!".
->
-> We have what we have, it is not perfect, some things have been screwed up,
-> but we can't just leave that behind and say "now we'll be doing everything
-> correctly", we must fix that up. People don't do everything correctly from
-> the start, this is what the whole staging vs stable topic is about.
->
-> Best regards,
-> Tomasz
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+g.
