@@ -1,30 +1,63 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 27 Jul 2013 10:56:52 +0400
-Subject: [PATCH] ARM: i.MX6Q clocks: Fix CKIH clock name
-Message-ID: <1374908212-32008-1-git-send-email-shc_work@mail.ru>
+Date: Sat, 27 Jul 2013 11:19:45 +0400
+Subject: [PATCH] ARM: i.MX5 clocks: Remove optional clock setup (CKIH1) from
+ i.MX51 template
+Message-ID: <1374909585-2724-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q have only one High-frequency reference clock (CKIH).
-Patch removes index from CKIH and makes name according datasheet.
+External high frequency clock CKIH1 is optional for i.MX51, so move
+it setup into boards where it is used.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx51-apf51.dts   | 4 ----
+ arch/arm/boot/dts/imx51-babbage.dts | 4 ++++
+ arch/arm/boot/dts/imx51.dtsi        | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 9181a24..8f2a8b5 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -292,7 +292,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+diff --git a/arch/arm/boot/dts/imx51-apf51.dts b/arch/arm/boot/dts/imx51-apf51.dts
+index 8f7f9ac..b360699 100644
+--- a/arch/arm/boot/dts/imx51-apf51.dts
++++ b/arch/arm/boot/dts/imx51-apf51.dts
+@@ -26,10 +26,6 @@
+ 	};
  
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
- 	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
--	clk[ckih] = imx_obtain_fixed_clock("ckih1", 0);
-+	clk[ckih] = imx_obtain_fixed_clock("ckih", 0);
- 	clk[osc] = imx_obtain_fixed_clock("osc", 0);
+ 	clocks {
+-		ckih1 {
+-			clock-frequency = <0>;
+-		};
+-
+ 		osc {
+ 			clock-frequency = <33554432>;
+ 		};
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 7c670a6..1d337d9 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -63,6 +63,10 @@
+ 	};
  
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+ 	clocks {
++		ckih1 {
++			clock-frequency = <22579200>;
++		};
++
+ 		clk_26M: codec_clock {
+ 			compatible = "fixed-clock";
+ 			reg=<0>;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index d7b0646..f0b25c9 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -47,7 +47,7 @@
+ 
+ 		ckih1 {
+ 			compatible = "fsl,imx-ckih1", "fixed-clock";
+-			clock-frequency = <22579200>;
++			clock-frequency = <0>;
+ 		};
+ 
+ 		ckih2 {
 -- 
 1.8.1.5
