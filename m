@@ -1,101 +1,82 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 27 Jul 2013 23:43:13 +0200
-Subject: [RESEND] cpuidle for ARM pull request
-In-Reply-To: <2224191.VjCA0rsPcU@vostro.rjw.lan>
-References: <51E536C5.1020609@linaro.org> <1598661.FpX5cmjM1U@vostro.rjw.lan>
- <51F3650B.8080708@linaro.org> <2224191.VjCA0rsPcU@vostro.rjw.lan>
-Message-ID: <51F43EF1.1020108@linaro.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Sat, 27 Jul 2013 18:32:46 -0500
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <1374515989-7391-1-git-send-email-joelf@ti.com>
+References: <1374515989-7391-1-git-send-email-joelf@ti.com>
+Message-ID: <51F4589E.5070108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2013 02:37 PM, Rafael J. Wysocki wrote:
-> On Saturday, July 27, 2013 08:13:31 AM Daniel Lezcano wrote:
->> On 07/26/2013 02:07 AM, Rafael J. Wysocki wrote:
->>> On Friday, July 26, 2013 12:41:09 AM Rafael J. Wysocki wrote:
->>>> On Friday, July 26, 2013 12:29:08 AM Rafael J. Wysocki wrote:
->>>>> On Friday, July 26, 2013 12:07:03 AM Daniel Lezcano wrote:
->>>>>> On 07/16/2013 02:04 PM, Daniel Lezcano wrote:
->>>>>>>
->>>>>>> Hi,
->>>>>>>
->>>>>>> The first PR was against the linux-pm-next tree including the patch:
->>>>>>>
->>>>>>> "cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq"
->>>>>>>
->>>>>>> This patch has been dropped in the meantime.
->>>>>>>
->>>>>>> Here is a new PR where my tree has been rebased against linux-pm-next
->>>>>>> and adding the patch mentioned above.
->>>>>>>
->>>>>>> As stated by Rafael, I will handle the ARM specific patches from now.
->>>>>>>
->>>>>>> The following changes since commit 48f99d5a97d32d70c0738d6e314d9f4dbefd89bf:
->>>>>>>
->>>>>>>   Merge branch 'pm-cpuidle-next' into linux-next (2013-07-16 02:41:06 +0200)
->>>>>>>
->>>>>>> are available in the git repository at:
->>>>>>>
->>>>>>>
->>>>>>>   git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
->>>>>>>
->>>>>>> for you to fetch changes up to 2b7e79f4a75e803184f483985a25cc751a990f06:
->>>>>>>
->>>>>>>   ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
->>>>>>> (2013-07-16 13:57:24 +0200)
->>>>>>
->>>>>> ping ?
->>>>>
->>>>> Sorry, something distracted me.  I'll pull it later today unless there are any
->>>>> problems (in which case I'll let you know).
->>>>
->>>> Well, there are some.
->>>>
->>>> It is based on my linux-next branch, but please rebase it on top of 3.11-rc2.
->>>>
->>>> Generally, please send me pull requests based on -rc kernels only (or major
->>>> releases).
->>>
->>> Unless your material depends on new things in my linux-next branch, in which
->>> case please let me know and I'll set up a stable branch for you to base things
->>> on.
->>
->> Hi Rafael,
->>
->> I rebased my branch on top of 3.11-rc2, you can try to pull it again.
+Hi Tony or Sekhar,
+
+If this patch looks ok, could you pick it up for -rc cycle?
+
+It fixes DMA breakages after the merge window for devices for which DMA
+resources are being populated in device tree instead pdev.
+
+Thanks,
+
+-Joel
+
+
+On 07/22/2013 12:59 PM, Joel Fernandes wrote:
+> HWMOD removal for MMC is breaking edma_start as the events are being manually
+> triggered due to unused channel list not being clear, Thanks to Balaji TK for
+> finding this issue.
 > 
-> Pulled, thanks!
+> This patch fixes the issue, by reading the "dmas" property from the DT node if
+> it exists and clearing the bits in the unused channel list.
 > 
-> Next time, can you please add a general description of what the patches do and
-> why they do that to the pull request?
-
-Yes, sure. I will do.
-
->> I thought it would have been easier for us if I could based my PRs on
->> top of your linux-next branch, so acting as a proxy for ARM patches. I
->> am maintaining the clocksource drivers and I am basing my tree on top of
->> tip/core.
->>
->> I guess you are rebasing your tree often and this is an issue for you,
->> right ?
+> Cc: Balaji T K <balajitk@ti.com>
+> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+> v2 changes: Fixed compiler warning
 > 
-> Yes, my linux-next branch may contain commits that will be modified later
-> (e.g. ACKs added, fixes folded in etc.).
+>  arch/arm/common/edma.c |   31 +++++++++++++++++++++++--------
+>  1 file changed, 23 insertions(+), 8 deletions(-)
 > 
-> Anyway, as I said, as long as the material you have for me doesn't depend on
-> anything new in my tree, it's better to base it on top of an -rc kernel.
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index a432e6c..765d578 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -561,14 +561,29 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+>  static int prepare_unused_channel_list(struct device *dev, void *data)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> -	int i, ctlr;
+> -
+> -	for (i = 0; i < pdev->num_resources; i++) {
+> -		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+> -				(int)pdev->resource[i].start >= 0) {
+> -			ctlr = EDMA_CTLR(pdev->resource[i].start);
+> -			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+> -					edma_cc[ctlr]->edma_unused);
+> +	int i = 0, ctlr;
+> +	u32 dma_chan;
+> +	const __be32 *dma_chan_p;
+> +	struct property *prop;
+> +
+> +	if (dev->of_node) {
+> +		of_property_for_each_u32(dev->of_node, "dmas", prop, \
+> +					 dma_chan_p, dma_chan) {
+> +			if (i++ & 1) {
+> +				ctlr = EDMA_CTLR(dma_chan);
+> +				clear_bit(EDMA_CHAN_SLOT(dma_chan),
+> +						edma_cc[ctlr]->edma_unused);
+> +			}
+> +		}
+> +	} else {
+> +		for (; i < pdev->num_resources; i++) {
+> +			if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+> +			    (int)pdev->resource[i].start >= 0) {
+> +				ctlr = EDMA_CTLR(pdev->resource[i].start);
+> +				clear_bit(EDMA_CHAN_SLOT(
+> +					  pdev->resource[i].start),
+> +					  edma_cc[ctlr]->edma_unused);
+> +			}
+>  		}
+>  	}
+>  
 > 
-> In case it does depend on that, I've put the entire outstanding cpuidle
-> material into my pm-cpuidle branch (including your ARM commits just pulled).
-
-Ok, thanks.
-
-  -- Daniel
-
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
