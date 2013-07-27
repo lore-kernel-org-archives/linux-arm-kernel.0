@@ -1,88 +1,113 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 27 Jul 2013 12:36:30 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <51F39FD8.6080808@broadcom.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
-Message-ID: <2460092.aLmjrOVh1g@flatron>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 27 Jul 2013 11:38:11 +0100
+Subject: [PATCH] pinctrl: shut up a couple of pinctrl warnings
+Message-ID: <20130727103811.GD24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 of July 2013 12:24:24 Arend van Spriel wrote:
-> On 07/27/2013 11:51 AM, Tomasz Figa wrote:
-> > On Saturday 27 of July 2013 07:04:08 Richard Cochran wrote:
-> >> On Fri, Jul 26, 2013 at 08:49:43AM -0700, Olof Johansson wrote:
-> >>> Long term, final goal is likely to be close to what Russell is
-> >>> saying
-> >> 
-> >> Why is this a long term goal? Start today.
-> >> 
-> >>> -- nothing should go into the kernel tree unless the binding is in a
-> >>> fully stable state. However, we have a transitional period between
-> >>> now
-> >>> and then, and even when we're at the final state there will be need
-> >>> to
-> >>> have some sort of sandbox for development and test of future
-> >>> bindings.
-> >> 
-> >> Why not just set up a git tree right away?
-> >> 
-> >>> Dealing with all that, as well as the actual process for locking in
-> >>> bindings, is what needs to be sorted out.
-> >>> 
-> >>> I think we're all in agreement that bindings that change over time
-> >>> are
-> >>> nothing but pain, but we're arguing that in circles anyway.
-> >> 
-> >> No.
-> >> 
-> >> I keep saying, the bindings must be stable ABI, *today*.
-> >> 
-> >> You keep saying, maybe later, but until then we will make things up
-> >> as
-> >> we go along.
-> > 
-> > We have currently a lot of broken bindings, because people didn't know
-> > how to define ones and those they defined have not been properly
-> > reviewed. Do you really want such broken ABI in the kernel?
-> > 
-> > Sure, there are many existing bindings that can be just made stable
-> > and
-> > well they probably are already de facto stable. This is mostly about
-> > subsystem bindings and whatever already has many users, both made them
-> > get more thought when designing and more review before merging.
-> > 
-> > Still, a lot of device and platform-specific bindings are simply
-> > broken. Take max8925 backlight driver, that Olof started this whole
-> > discussion with, as an example. We need to sort them out before they
-> > can be stabilized.
-> 
-> That is a nice summary of how we got from null to now and Richard seems
-> to be simply saying: let's stop mucking about and make this a project
-> with a well-defined process of dealing with staging and stable bindings
-> and keep stable bindings stable. Whether it should be within the kernel
-> repo as a separate subsystem or in an entire different repo is a trivial
-> decision, but still a decision that needs to be made.
+So, I notice that we get a couple of warnings from the pinctrl code:
 
-Yes, basically that's our current situation.
+drivers/pinctrl/pinconf.c: In function 'pinconf_dbg_config_print':
+drivers/pinctrl/pinconf.c:433:36: warning: 'configs' may be used uninitialized in this function
+drivers/pinctrl/pinconf.c: In function 'pinconf_dbg_config_write':
+drivers/pinctrl/pinconf.c:511:36: warning: 'configs' may be used uninitialized in this function
 
-Still, I would disagree about the decision being trivial, as each choice 
-will have further, and likely pretty significant, consequences on binding 
-maintenance, submission, review and for dependent things, like drivers or 
-platforms using such bindings. This needs to be discussed enough.
+While the compiler might not be able to work out that "configs" is
+safe, the code doesn't lend itself very well to identifying that
+fact when reading it either.  This can be trivially solved by a slight
+restructuring of the code - which also reduces the LOC.
 
-> Apart from stable DT bindings I would love to see a DT compiler that
-> that next to DT syntax detects mistakes in properties used for the
-> selfish reason that I spent hours debugging regulator code, because I
-> typed vmmc_supply iso vmmc-supply. I did not go through all the
-> bindings, but this may require a more formal description so it could be
-> compiled/read in the DT compiler.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+This patch is not yet build tested; it'll go through the build system
+tonight though.
 
-This bothered me as well and that's why I'm working on this. I still can't 
-get myself to write a very long mail (I'm more a coder than writer...) 
-about the whole idea, my proposal of how it could look and problems we 
-need to solve, but I'll try better this evening.
+ drivers/pinctrl/pinconf.c |   29 +++++++++++------------------
+ 1 files changed, 11 insertions(+), 18 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+index e875f21..0674df3 100644
+--- a/drivers/pinctrl/pinconf.c
++++ b/drivers/pinctrl/pinconf.c
+@@ -428,12 +428,11 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
+ {
+ 	struct pinctrl_maps *maps_node;
+ 	const struct pinctrl_map *map;
+-	struct pinctrl_dev *pctldev = NULL;
++	const struct pinctrl_map *found = NULL;
++	struct pinctrl_dev *pctldev;
+ 	const struct pinconf_ops *confops = NULL;
+-	const struct pinctrl_map_configs *configs;
+ 	struct dbg_cfg *dbg = &pinconf_dbg_conf;
+ 	int i, j;
+-	bool found = false;
+ 	unsigned long config;
+ 
+ 	mutex_lock(&pinctrl_maps_mutex);
+@@ -450,14 +449,8 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
+ 		for (j = 0; j < map->data.configs.num_configs; j++) {
+ 			if (!strcmp(map->data.configs.group_or_pin,
+ 					dbg->pin_name)) {
+-				/*
+-				 * We found the right pin / state, read the
+-				 * config and he pctldev for later use
+-				 */
+-				configs = &map->data.configs;
+-				pctldev = get_pinctrl_dev_from_devname
+-					(map->ctrl_dev_name);
+-				found = true;
++				/* We found the right pin / state */
++				found = map;
+ 				break;
+ 			}
+ 		}
+@@ -473,7 +466,8 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
+ 		goto exit;
+ 	}
+ 
+-	config = *(configs->configs);
++	pctldev = get_pinctrl_dev_from_devname(found->ctrl_dev_name);
++	config = *found->data.configs.configs;
+ 	seq_printf(s, "Dev %s has config of %s in state %s: 0x%08lX\n",
+ 			dbg->dev_name, dbg->pin_name,
+ 			dbg->state_name, config);
+@@ -505,12 +499,12 @@ static int pinconf_dbg_config_write(struct file *file,
+ {
+ 	struct pinctrl_maps *maps_node;
+ 	const struct pinctrl_map *map;
+-	struct pinctrl_dev *pctldev = NULL;
++	const struct pinctrl_map *found = NULL;
++	struct pinctrl_dev *pctldev;
+ 	const struct pinconf_ops *confops = NULL;
+ 	struct dbg_cfg *dbg = &pinconf_dbg_conf;
+ 	const struct pinctrl_map_configs *configs;
+ 	char config[MAX_NAME_LEN+1];
+-	bool found = false;
+ 	char buf[128];
+ 	char *b = &buf[0];
+ 	int buf_size;
+@@ -588,10 +582,7 @@ static int pinconf_dbg_config_write(struct file *file,
+ 
+ 		/*  we found the right pin / state, so overwrite config */
+ 		if (!strcmp(map->data.configs.group_or_pin, dbg->pin_name)) {
+-			found = true;
+-			pctldev = get_pinctrl_dev_from_devname(
+-					map->ctrl_dev_name);
+-			configs = &map->data.configs;
++			found = map;
+ 			break;
+ 		}
+ 	}
+@@ -601,10 +592,12 @@ static int pinconf_dbg_config_write(struct file *file,
+ 		goto exit;
+ 	}
+ 
++	pctldev = get_pinctrl_dev_from_devname(map->ctrl_dev_name);
+ 	if (pctldev)
+ 		confops = pctldev->desc->confops;
+ 
+ 	if (confops && confops->pin_config_dbg_parse_modify) {
++		configs = &map->data.configs;
+ 		for (i = 0; i < configs->num_configs; i++) {
+ 			confops->pin_config_dbg_parse_modify(pctldev,
+ 						     config,
