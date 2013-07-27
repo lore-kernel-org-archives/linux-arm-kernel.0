@@ -1,65 +1,73 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 27 Jul 2013 16:35:39 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBpbXg6IHBsbHYxOiBGaXggUExMIGNhbGN1bGF0?=
- =?UTF-8?B?aW9uIGZvciBpLk1YMjc=?=
-In-Reply-To: <1374896500-21862-1-git-send-email-shc_work@mail.ru>
-References: <1374896500-21862-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1374928539.407887609@f303.i.mail.ru>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 27 Jul 2013 14:41:05 +0200
+Subject: [PATCH v2 1/8] clk: mux: Add support for read-only muxes.
+In-Reply-To: <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+ <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1460068.oJXN9T0Uhp@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Incorrect. Please forget about this patch.
+Hi Mike,
 
-> MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
-> is a just sign bit. This patch makes different calculation for i.MX27.
+On Tuesday 23 of July 2013 01:49:18 Tomasz Figa wrote:
+> Some platforms have read-only clock muxes that are preconfigured at
+> reset and cannot be changed at runtime. This patch extends mux clock
+> driver to allow handling such read-only muxes by adding new
+> CLK_MUX_READ_ONLY mux flag.
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 > ---
->  arch/arm/mach-imx/clk-pllv1.c | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+>  drivers/clk/clk-mux.c        | 10 +++++++++-
+>  include/linux/clk-provider.h |  2 ++
+>  2 files changed, 11 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
-> index c1eaee3..e76d601 100644
-> --- a/arch/arm/mach-imx/clk-pllv1.c
-> +++ b/arch/arm/mach-imx/clk-pllv1.c
-> @@ -25,6 +25,11 @@ struct clk_pllv1 {
->  
->  #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
->  
-> +static inline bool allow_signed_mfn(void)
-> +{
-> +	return !cpu_is_mx1() && !cpu_is_mx21();
-> +}
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 614444c..92f1a1b 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -107,6 +107,11 @@ const struct clk_ops clk_mux_ops = {
+>  };
+>  EXPORT_SYMBOL_GPL(clk_mux_ops);
+> 
+> +const struct clk_ops clk_mux_ro_ops = {
+> +	.get_parent = clk_mux_get_parent,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
 > +
->  static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  		unsigned long parent_rate)
->  {
-> @@ -59,9 +64,14 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  	/*
->  	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
->  	 * 2's complements number
-> +	 * On i.MX27 the bit 9 is the sign bit.
->  	 */
-> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
-> -		mfn_abs = 0x400 - mfn;
-> +	if (allow_signed_mfn() && (mfn & 0x200)) {
-> +		if (cpu_is_mx27())
-> +			mfn_abs = mfn & 0x200;
-> +		else
-> +			mfn_abs = 0x400 - mfn;
-> +	}
->  
->  	rate = parent_rate * 2;
->  	rate /= pd + 1;
-> @@ -70,7 +80,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  
->  	do_div(ll, mfd + 1);
->  
-> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
-> +	if (allow_signed_mfn() && (mfn & 0x200))
->  		ll = -ll;
->  
->  	ll = (rate * mfi) + ll;
-> -- 
+>  struct clk *clk_register_mux_table(struct device *dev, const char
+> *name, const char **parent_names, u8 num_parents, unsigned long flags,
+> void __iomem *reg, u8 shift, u32 mask,
+> @@ -133,7 +138,10 @@ struct clk *clk_register_mux_table(struct device
+> *dev, const char *name, }
+> 
+>  	init.name = name;
+> -	init.ops = &clk_mux_ops;
+> +	if (clk_mux_flags & CLK_MUX_READ_ONLY)
+> +		init.ops = &clk_mux_ro_ops;
+> +	else
+> +		init.ops = &clk_mux_ops;
+>  	init.flags = flags | CLK_IS_BASIC;
+>  	init.parent_names = parent_names;
+>  	init.num_parents = num_parents;
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 1ec14a7..9487b96 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -327,8 +327,10 @@ struct clk_mux {
+>  #define CLK_MUX_INDEX_ONE		BIT(0)
+>  #define CLK_MUX_INDEX_BIT		BIT(1)
+>  #define CLK_MUX_HIWORD_MASK		BIT(2)
+> +#define CLK_MUX_READ_ONLY	BIT(3) /* mux setting cannot be changed */
+> 
+>  extern const struct clk_ops clk_mux_ops;
+> +extern const struct clk_ops clk_mux_ro_ops;
+> 
+>  struct clk *clk_register_mux(struct device *dev, const char *name,
+>  		const char **parent_names, u8 num_parents, unsigned long 
+flags,
 
----
+What do you think about this?
+
+Best regards,
+Tomasz
