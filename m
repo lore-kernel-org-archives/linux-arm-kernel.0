@@ -1,34 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 27 Jul 2013 21:49:16 +0200
-Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
- BCM5301X/BCM470X SoCs with ARM CPU
-In-Reply-To: <20130726165311.GH17886@mudshark.cambridge.arm.com>
-References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
- <51F28A20.7060105@hauke-m.de>
- <20130726165311.GH17886@mudshark.cambridge.arm.com>
-Message-ID: <201307272149.17108.arnd@arndb.de>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sat, 27 Jul 2013 16:01:10 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
+ interested in device tree janitoring / cleanup?]
+In-Reply-To: <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
+ <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
+ <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
+Message-ID: <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 July 2013, Will Deacon wrote:
-> > > At least, we need a pretty good explanation of what exactly is causing
-> > > these spurious aborts before we start ignoring them unconditionally like
-> > > this. You're effectively masking an extremely serious error indicator with
-> > > this change.
-> > 
-> > This fault occurs once every boot sometime early in the boot process,
-> > but the actual time this happens varies randomly.
-> 
-> Well that's interesting in itself. It sounds like we don't know *for sure*
-> whether the abort is triggered by Linux. Since the abort is imprecise, the
-> timing will vary.
+On Sat, Jul 27, 2013 at 3:45 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Sat, Jul 27, 2013 at 4:59 AM, Arend van Spriel <arend@broadcom.com> wrote:
+>> Let's see how many people go and scream if I say this: Too bad .dts files
+>> are not done using XML format as DT bindings could be described using XML
+>> Schema.
+>
+> Draft an example and show us how it would look!  :-)  There is
+> absolutely nothing preventing us from expressing a DT in XML format,
+> or even using XSLT to define DT schema while still using our current
+> .dts syntax. It would be trivial to do lossless translation between
+> .dts syntax and xml.
+>
+> The problem that I have with XML and XSLT is that it is very verbose
+> and not entirely friendly to mere-mortals. However, I'm more than
+> willing to be proved wrong on this point.
 
-It might be possible to find out the culprit if you just enter an endless loop
-in the early kernel boot code. If you enter the loop before Linux does something
-wrong, it won't crash, otherwise it will. After that, you could bisect the
-boot process by moving the busy loop around.
+I considered this approach a while ago and discarded it. It would work
+but it is just too much of a Frankenstein monster.
 
-If it even crashes at the point where Linux gets entered, it's a bug in the
-boot loader.
+Much cleaner to modify dtc to take a schema as part of the compilation
+process. The schema language itself has no requirement to look like
+DTS syntax. Whoever wrote dtc probably has a favorite language that
+would be good for writing schemas in.
 
-	Arnd
+
+>
+> g.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
