@@ -1,73 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 27 Jul 2013 14:41:05 +0200
-Subject: [PATCH v2 1/8] clk: mux: Add support for read-only muxes.
-In-Reply-To: <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1460068.oJXN9T0Uhp@flatron>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Sat, 27 Jul 2013 18:59:56 +0530
+Subject: [PATCH 1/3] clk: exynos5250: Add G2D gate clock
+In-Reply-To: <20130726201800.7598.54329@quantum>
+References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
+ <20130726201800.7598.54329@quantum>
+Message-ID: <CAK9yfHw6KtVDAns-1JhNpiS0brTeUpfiHS-v3q7H2GLWkY-Adw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 27 July 2013 01:48, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Sachin Kamat (2013-07-05 01:42:27)
+>> Adds gate clock for G2D IP for Exynos5250 SoC.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>
+> I've taken patch #1 into clk-next.
 
-On Tuesday 23 of July 2013 01:49:18 Tomasz Figa wrote:
-> Some platforms have read-only clock muxes that are preconfigured at
-> reset and cannot be changed at runtime. This patch extends mux clock
-> driver to allow handling such read-only muxes by adding new
-> CLK_MUX_READ_ONLY mux flag.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  drivers/clk/clk-mux.c        | 10 +++++++++-
->  include/linux/clk-provider.h |  2 ++
->  2 files changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 614444c..92f1a1b 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -107,6 +107,11 @@ const struct clk_ops clk_mux_ops = {
->  };
->  EXPORT_SYMBOL_GPL(clk_mux_ops);
-> 
-> +const struct clk_ops clk_mux_ro_ops = {
-> +	.get_parent = clk_mux_get_parent,
-> +};
-> +EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
-> +
->  struct clk *clk_register_mux_table(struct device *dev, const char
-> *name, const char **parent_names, u8 num_parents, unsigned long flags,
-> void __iomem *reg, u8 shift, u32 mask,
-> @@ -133,7 +138,10 @@ struct clk *clk_register_mux_table(struct device
-> *dev, const char *name, }
-> 
->  	init.name = name;
-> -	init.ops = &clk_mux_ops;
-> +	if (clk_mux_flags & CLK_MUX_READ_ONLY)
-> +		init.ops = &clk_mux_ro_ops;
-> +	else
-> +		init.ops = &clk_mux_ops;
->  	init.flags = flags | CLK_IS_BASIC;
->  	init.parent_names = parent_names;
->  	init.num_parents = num_parents;
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 1ec14a7..9487b96 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -327,8 +327,10 @@ struct clk_mux {
->  #define CLK_MUX_INDEX_ONE		BIT(0)
->  #define CLK_MUX_INDEX_BIT		BIT(1)
->  #define CLK_MUX_HIWORD_MASK		BIT(2)
-> +#define CLK_MUX_READ_ONLY	BIT(3) /* mux setting cannot be changed */
-> 
->  extern const struct clk_ops clk_mux_ops;
-> +extern const struct clk_ops clk_mux_ro_ops;
-> 
->  struct clk *clk_register_mux(struct device *dev, const char *name,
->  		const char **parent_names, u8 num_parents, unsigned long 
-flags,
+Thanks Mike.
 
-What do you think about this?
+>
+>> ---
+>> This patch depends on the following patch:
+>> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20581
+>
+> I think I've gotten all three series you sent out, can you confirm?
 
-Best regards,
-Tomasz
+I haven't seen any update in your tree [1] since quite some time. The
+last commit I see in clk-next branch is 45e3ec3784 ("clk: tegra: fix
+ifdef for tegra_periph_reset_assert inline"). I hope I am looking at
+the right tree?
+
+[1] git://git.linaro.org/people/mturquette/linux.git
+
+-- 
+With warm regards,
+Sachin
