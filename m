@@ -1,88 +1,65 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 27 Jul 2013 14:37:59 +0200
-Subject: [RESEND] cpuidle for ARM pull request
-In-Reply-To: <51F3650B.8080708@linaro.org>
-References: <51E536C5.1020609@linaro.org> <1598661.FpX5cmjM1U@vostro.rjw.lan>
- <51F3650B.8080708@linaro.org>
-Message-ID: <2224191.VjCA0rsPcU@vostro.rjw.lan>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sat, 27 Jul 2013 16:35:39 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBpbXg6IHBsbHYxOiBGaXggUExMIGNhbGN1bGF0?=
+ =?UTF-8?B?aW9uIGZvciBpLk1YMjc=?=
+In-Reply-To: <1374896500-21862-1-git-send-email-shc_work@mail.ru>
+References: <1374896500-21862-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1374928539.407887609@f303.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 27, 2013 08:13:31 AM Daniel Lezcano wrote:
-> On 07/26/2013 02:07 AM, Rafael J. Wysocki wrote:
-> > On Friday, July 26, 2013 12:41:09 AM Rafael J. Wysocki wrote:
-> >> On Friday, July 26, 2013 12:29:08 AM Rafael J. Wysocki wrote:
-> >>> On Friday, July 26, 2013 12:07:03 AM Daniel Lezcano wrote:
-> >>>> On 07/16/2013 02:04 PM, Daniel Lezcano wrote:
-> >>>>>
-> >>>>> Hi,
-> >>>>>
-> >>>>> The first PR was against the linux-pm-next tree including the patch:
-> >>>>>
-> >>>>> "cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq"
-> >>>>>
-> >>>>> This patch has been dropped in the meantime.
-> >>>>>
-> >>>>> Here is a new PR where my tree has been rebased against linux-pm-next
-> >>>>> and adding the patch mentioned above.
-> >>>>>
-> >>>>> As stated by Rafael, I will handle the ARM specific patches from now.
-> >>>>>
-> >>>>> The following changes since commit 48f99d5a97d32d70c0738d6e314d9f4dbefd89bf:
-> >>>>>
-> >>>>>   Merge branch 'pm-cpuidle-next' into linux-next (2013-07-16 02:41:06 +0200)
-> >>>>>
-> >>>>> are available in the git repository at:
-> >>>>>
-> >>>>>
-> >>>>>   git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
-> >>>>>
-> >>>>> for you to fetch changes up to 2b7e79f4a75e803184f483985a25cc751a990f06:
-> >>>>>
-> >>>>>   ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
-> >>>>> (2013-07-16 13:57:24 +0200)
-> >>>>
-> >>>> ping ?
-> >>>
-> >>> Sorry, something distracted me.  I'll pull it later today unless there are any
-> >>> problems (in which case I'll let you know).
-> >>
-> >> Well, there are some.
-> >>
-> >> It is based on my linux-next branch, but please rebase it on top of 3.11-rc2.
-> >>
-> >> Generally, please send me pull requests based on -rc kernels only (or major
-> >> releases).
-> > 
-> > Unless your material depends on new things in my linux-next branch, in which
-> > case please let me know and I'll set up a stable branch for you to base things
-> > on.
+Incorrect. Please forget about this patch.
+
+> MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
+> is a just sign bit. This patch makes different calculation for i.MX27.
 > 
-> Hi Rafael,
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/clk-pllv1.c | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
 > 
-> I rebased my branch on top of 3.11-rc2, you can try to pull it again.
+> diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+> index c1eaee3..e76d601 100644
+> --- a/arch/arm/mach-imx/clk-pllv1.c
+> +++ b/arch/arm/mach-imx/clk-pllv1.c
+> @@ -25,6 +25,11 @@ struct clk_pllv1 {
+>  
+>  #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+>  
+> +static inline bool allow_signed_mfn(void)
+> +{
+> +	return !cpu_is_mx1() && !cpu_is_mx21();
+> +}
+> +
+>  static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  		unsigned long parent_rate)
+>  {
+> @@ -59,9 +64,14 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  	/*
+>  	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+>  	 * 2's complements number
+> +	 * On i.MX27 the bit 9 is the sign bit.
+>  	 */
+> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+> -		mfn_abs = 0x400 - mfn;
+> +	if (allow_signed_mfn() && (mfn & 0x200)) {
+> +		if (cpu_is_mx27())
+> +			mfn_abs = mfn & 0x200;
+> +		else
+> +			mfn_abs = 0x400 - mfn;
+> +	}
+>  
+>  	rate = parent_rate * 2;
+>  	rate /= pd + 1;
+> @@ -70,7 +80,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  
+>  	do_div(ll, mfd + 1);
+>  
+> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+> +	if (allow_signed_mfn() && (mfn & 0x200))
+>  		ll = -ll;
+>  
+>  	ll = (rate * mfi) + ll;
+> -- 
 
-Pulled, thanks!
-
-Next time, can you please add a general description of what the patches do and
-why they do that to the pull request?
-
-> I thought it would have been easier for us if I could based my PRs on
-> top of your linux-next branch, so acting as a proxy for ARM patches. I
-> am maintaining the clocksource drivers and I am basing my tree on top of
-> tip/core.
-> 
-> I guess you are rebasing your tree often and this is an issue for you,
-> right ?
-
-Yes, my linux-next branch may contain commits that will be modified later
-(e.g. ACKs added, fixes folded in etc.).
-
-Anyway, as I said, as long as the material you have for me doesn't depend on
-anything new in my tree, it's better to base it on top of an -rc kernel.
-
-In case it does depend on that, I've put the entire outstanding cpuidle
-material into my pm-cpuidle branch (including your ARM commits just pulled).
-
-Thanks,
-Rafael
+---
