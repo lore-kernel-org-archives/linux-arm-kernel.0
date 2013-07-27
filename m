@@ -1,43 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 26 Jul 2013 17:05:55 -0700
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <20130727000453.GC24642@n2100.arm.linux.org.uk>
-References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
- <20130726215859.GA19469@glitch>
- <20130726231108.GA10812@obsidianresearch.com>
- <20130726234237.GB24642@n2100.arm.linux.org.uk>
- <CAOesGMiPHh1FcWM1Tfvq+e-9znQ6zRKGwmzJGe+jGj5GZsaGqA@mail.gmail.com>
- <20130727000453.GC24642@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMh01WMmhUyNa-usF8q-mYVp41RZRc=j1LPbv-hu0ftDyQ@mail.gmail.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 26 Jul 2013 17:13:46 -0700
+Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
+In-Reply-To: <CAPdLdqnq21zPNdJ_4iYS96yQH1XeuTp-TbwHpvkwsECHEKOKaQ@mail.gmail.com>
+References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
+ <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
+ <51F2F37B.8030306@wwwdotorg.org>
+ <CAPdLdqmU0aw5h_KYcD-E=isC9U3mZF6fzr_GVdjUUAW4_PUD5Q@mail.gmail.com>
+ <51F301C4.4070807@wwwdotorg.org>
+ <CAPdLdqnq21zPNdJ_4iYS96yQH1XeuTp-TbwHpvkwsECHEKOKaQ@mail.gmail.com>
+Message-ID: <CAAYSxhrXg=dnhUzMuV=t=oQrnMQUWvLFydGEJD2pZV+EEPGLuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 5:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 26, 2013 at 05:01:08PM -0700, Olof Johansson wrote:
->> On Fri, Jul 26, 2013 at 4:42 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > Thank you for making me look at that file and see how people fail to read
->> > my comments about keeping stuff appropriately sorted.  Really makes me
->> > wonder why I bother.
->>
->> Grmbl. This one escaped me probably because the comment is at the top,
->> so I didn't see it when just reviewing the patch. I should obviously
->> have caught it anyway since the list was so obviously sorted before.
->> My bad. I'll send a patch in a bit.
+On Fri, Jul 26, 2013 at 4:22 PM, Markus Mayer <markus.mayer@linaro.org> wrote:
+> On 26 July 2013 16:09, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> Isn't this a property of the SoC's IP block, not of the board?
 >
-> I've already a patch in my fixes.  It'll appear in -next probably after
-> the weekend (as next doesn't update over weekends.)
+> Yes. I wasn't very precise with my statement.
 >
-> Note that the misordering is not due to these patches, but other previous
-> patches.
+> What I added to the description is "Specify at least 1 GPIO interrupt.
+> The maximum number is 6."
 
-Ok, sounds good.
-
-And yeah, it's pretty obvious based on the order that it has crept in over time.
-
-
--Olof
+The IP has a configurable number of banks, each of which has its own
+interrupt.  If a particular SoC was configured to have six banks then
+you need to list six interrupts in the DTS.  Perhaps it would help to
+spell that out that relationship explicitly in the documentation
+rather than talking about a minimum or maximum number of interrupts?
+Also, you may want to mention that interrupts should to be ordered by
+bank number.
