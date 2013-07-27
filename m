@@ -1,21 +1,37 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Sat, 27 Jul 2013 22:29:23 +0400
-Subject: [PATCH 0/8] ARM: tegra: support LP1 suspend mode
-In-Reply-To: <51F410BE.3000904@gmail.com>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <2389689.JgQlW00RdN@ax5200p> <51F3F356.8080709@gmail.com>
- <4555938.6N2HxzJnNO@ax5200p> <51F410BE.3000904@gmail.com>
-Message-ID: <51F41183.5070305@gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat, 27 Jul 2013 20:31:01 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <51F39FD8.6080808@broadcom.com>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
+ <20130727050406.GB4221@netboy> <2007664.vYsECFSKrV@flatron>
+ <51F39FD8.6080808@broadcom.com>
+Message-ID: <20130727183059.GD4813@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-27.07.2013 22:26, Dmitry Osipenko ?????:
-> It might be a known problem only for those who faced with it. Since it's on
-> their internal irc, it wasn't a known issue.
+On Sat, Jul 27, 2013 at 12:24:24PM +0200, Arend van Spriel wrote:
 > 
-> It also would be interesting to know if suspend with thumb2 works correctly. On
-> 3.8 I've ported lp0 suspend and it works fine with arm compiled kernel, thumb2
-> also works but only for about 5-10 hours (resuming on each 5-30 minutes, default
-> android behavior) and after I'm getting pmd corruption. I have no idea from
-> where that corruption comes from without ability for hw debugging.
-s/irc/bug tracker/ :)
+> That is a nice summary of how we got from null to now and Richard
+> seems to be simply saying: let's stop mucking about and make this a
+> project with a well-defined process of dealing with staging and
+> stable bindings and keep stable bindings stable.
+
+Yes, that is right.
+
+Frankly, I am really surprised and shocked at the cavalier attitude
+expressed here WRT DT bindings in released kernels. Think about the
+*users* of this code. Not everyone working with ARM Linux is a kernel
+developer or a DT guru. There is really no indication at all that the
+ARM Linux DT stuff released so far are not stable and trustworthy.
+
+It is not nice to provide such a mess, and the idea that we *must*
+have a mess because the whole system in still in development is bogus,
+IMHO. Just make sure that the mainline kernel is really working and
+that the DT bindings *there* are for keeps.
+
+It is your job as kernel developers.
+
+Thanks,
+Richard
