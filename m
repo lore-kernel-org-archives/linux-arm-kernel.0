@@ -1,59 +1,66 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 27 Jul 2013 07:41:40 +0400
-Subject: [PATCH] ARM: imx: pllv1: Fix PLL calculation for i.MX27
-Message-ID: <1374896500-21862-1-git-send-email-shc_work@mail.ru>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 27 Jul 2013 04:10:56 +0000 (UTC)
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+ <20130722184325.GA21614@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+ <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com> <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
-is a just sign bit. This patch makes different calculation for i.MX27.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/clk-pllv1.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+Tonight I put on a Jon Hopkins album, in recollection of my UK ARM Linux 
+colleagues perhaps, and started testing, and eventually wound up with this 
+one:
 
-diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
-index c1eaee3..e76d601 100644
---- a/arch/arm/mach-imx/clk-pllv1.c
-+++ b/arch/arm/mach-imx/clk-pllv1.c
-@@ -25,6 +25,11 @@ struct clk_pllv1 {
- 
- #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
- 
-+static inline bool allow_signed_mfn(void)
-+{
-+	return !cpu_is_mx1() && !cpu_is_mx21();
-+}
-+
- static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
- 		unsigned long parent_rate)
- {
-@@ -59,9 +64,14 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
- 	/*
- 	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
- 	 * 2's complements number
-+	 * On i.MX27 the bit 9 is the sign bit.
+commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Wed Jun 12 12:25:56 2013 +0100
+
+    ARM: 7757/1: mm: don't flush icache in switch_mm with hardware broadcasting
+    
+    When scheduling an mm on a CPU where it hasn't previously been used, we
+    flush the icache on that CPU so that any code loaded previously on
+    a different core can be safely executed.
+    
+    For cores with hardware broadcasting of cache maintenance operations,
+    this is clearly unnecessary, since the inner-shareable invalidation in
+    __sync_icache_dcache will affect all CPUs.
+    
+    This patch conditionalises the icache flush in switch_mm based on
+    cache_ops_need_broadcast().
+    
+    Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+    Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+...
+
+v3.11-rc2 boots with it reverted.  What also works is v3.11-rc2 with the 
+below patch applied.
+
+Would be pleased to boot-test anything you'd care to send my way, as long 
+as you can tolerate response latency jitter.
+
+
+- Paul
+
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index b5792b7..8dfb295 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -112,7 +112,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ 	 * so check for possible thread migration and invalidate the I-cache
+ 	 * if we're new to this CPU.
  	 */
--	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
--		mfn_abs = 0x400 - mfn;
-+	if (allow_signed_mfn() && (mfn & 0x200)) {
-+		if (cpu_is_mx27())
-+			mfn_abs = mfn & 0x200;
-+		else
-+			mfn_abs = 0x400 - mfn;
-+	}
- 
- 	rate = parent_rate * 2;
- 	rate /= pd + 1;
-@@ -70,7 +80,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
- 
- 	do_div(ll, mfd + 1);
- 
--	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
-+	if (allow_signed_mfn() && (mfn & 0x200))
- 		ll = -ll;
- 
- 	ll = (rate * mfi) + ll;
--- 
-1.8.1.5
+-	if (cache_ops_need_broadcast() &&
++	if (1 &&
+ 	    !cpumask_empty(mm_cpumask(next)) &&
+ 	    !cpumask_test_cpu(cpu, mm_cpumask(next)))
+ 		__flush_icache_all();
