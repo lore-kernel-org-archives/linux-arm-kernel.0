@@ -1,58 +1,59 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Sat, 27 Jul 2013 06:46:40 +0530
-Subject: [PATCH V2 7/8] ARM: dts: wm8994: Add wm8994 support on smdk5420
-In-Reply-To: <20130726151902.GL9858@sirena.org.uk>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
- <1374845812-7803-8-git-send-email-padma.v@samsung.com>
- <20130726151902.GL9858@sirena.org.uk>
-Message-ID: <CAAgF-Be8SNxTZv1yFCwH6yJ-O_3R4reh=3y+pSCLJYW7S9TkUg@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 27 Jul 2013 07:41:40 +0400
+Subject: [PATCH] ARM: imx: pllv1: Fix PLL calculation for i.MX27
+Message-ID: <1374896500-21862-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
+is a just sign bit. This patch makes different calculation for i.MX27.
 
-On Fri, Jul 26, 2013 at 8:49 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jul 26, 2013 at 07:06:51PM +0530, Padmavathi Venna wrote:
->> This patch adds wm8994 codec node on i2c bus1 and the required
->> regulator supplies and properties on smdk5420 board.
->
-> This isn't a device tree patch for WM8994, it's a patch for the
-> SMDK5420.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-pllv1.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-Yes. I will correct the subject.
-
->
->> +     vdd: fixed-regulator at 0 {
->> +             compatible = "regulator-fixed";
->> +             regulator-name = "vdd-supply";
->
-> These names look wrong - they should reflect the names in the schematic
-> as they're for human comprehensibility.  This may just be a case of
-> dropping the -supply.
-
-OK.
-
->
->> +             wm8994: wm8994 at 1a {
->> +                     compatible = "wlf,wm8994";
->> +                     reg = <0x1a>;
->> +
->> +                     gpio-controller;
->> +                     #gpio-cells = <2>;
->> +
->> +                     AVDD2-supply = <&vdd>;
->> +                     CPVDD-supply = <&vdd>;
->> +                     DBVDD-supply = <&dbvdd>;
->> +                     SPKVDD1-supply = <&spkvdd>;
->> +                     SPKVDD2-supply = <&spkvdd>;
->> +             };
->
-> It would be helpful to also add a clock binding (I posted a binding
-> documentation update the other day, it's in my tree now) but it's not
-> essential and I suspect it needs some work on the clock driver side
-> still.
-
-OK. I will check this.
-
-Thanks
-Padma
+diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+index c1eaee3..e76d601 100644
+--- a/arch/arm/mach-imx/clk-pllv1.c
++++ b/arch/arm/mach-imx/clk-pllv1.c
+@@ -25,6 +25,11 @@ struct clk_pllv1 {
+ 
+ #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+ 
++static inline bool allow_signed_mfn(void)
++{
++	return !cpu_is_mx1() && !cpu_is_mx21();
++}
++
+ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 		unsigned long parent_rate)
+ {
+@@ -59,9 +64,14 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 	/*
+ 	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+ 	 * 2's complements number
++	 * On i.MX27 the bit 9 is the sign bit.
+ 	 */
+-	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+-		mfn_abs = 0x400 - mfn;
++	if (allow_signed_mfn() && (mfn & 0x200)) {
++		if (cpu_is_mx27())
++			mfn_abs = mfn & 0x200;
++		else
++			mfn_abs = 0x400 - mfn;
++	}
+ 
+ 	rate = parent_rate * 2;
+ 	rate /= pd + 1;
+@@ -70,7 +80,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 
+ 	do_div(ll, mfd + 1);
+ 
+-	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
++	if (allow_signed_mfn() && (mfn & 0x200))
+ 		ll = -ll;
+ 
+ 	ll = (rate * mfi) + ll;
+-- 
+1.8.1.5
