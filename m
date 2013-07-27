@@ -1,42 +1,29 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 27 Jul 2013 16:06:40 +0200
-Subject: [PATCH v8 07/12] iommu/exynos: support for device tree
-In-Reply-To: <003d01ce89f3$44ec2cf0$cec486d0$@samsung.com>
-References: <003d01ce89f3$44ec2cf0$cec486d0$@samsung.com>
-Message-ID: <1743111.Ek7FldnHal@flatron>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 27 Jul 2013 15:21:21 +0100
+Subject: [PATCH v10 2/7] ASoC: codec: wm9712 simple DT bindings
+In-Reply-To: <20130727134452.GF16871@s25.your-server.de>
+References: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
+ <1374924716-23475-3-git-send-email-mpa@pengutronix.de>
+ <20130727115950.GF9858@sirena.org.uk>
+ <20130727134452.GF16871@s25.your-server.de>
+Message-ID: <20130727142121.GI9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jul 27, 2013 at 03:44:52PM +0200, Markus Pargmann wrote:
+> On Sat, Jul 27, 2013 at 12:59:50PM +0100, Mark Brown wrote:
 
-On Friday 26 of July 2013 20:28:36 Cho KyongHo wrote:
-> This commit adds device tree support for System MMU.
-> This also include the following changes and enhancements:
-> 
-> * use managed device helper functions.
-> Simplyfies System MMU device driver.
-> 
-> * use only a single clock descriptor.
-> System MMU device descriptor is seperate if it is imposible to make
-> a single clock descriptor to make a device descriptor for a group of
-> System MMUs.
-> 
-> * removed dbgname member from sysmmu_drvdata structure.
-> debugging kernel message for a System MMU is distinguisheable with the
-> name of device descroptors.
-> 
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/Kconfig        |    5 +-
->  drivers/iommu/exynos-iommu.c |  182
-> ++++++++++++++++-------------------------- 2 files changed, 70
-> insertions(+), 117 deletions(-)
+> > AC'97 is an enumerable bus, we shouldn't need this...
 
-Whenever you introduce or modify (extend) a device tree binding please 
-don't forget about reflecting that in documentation 
-(Documentation/devicetree/bindings) and CCing devicetree mailing list 
-(devicetree at vger.kernel.org). Both of these steps are necessary to get any 
-device tree stuff merged.
+> What do you mean exactly? Is there a way to automaticaly discover
+> connected codecs and register them?
 
-Best regards,
-Tomasz
+Yes, of coure - just read the ID registers.  Look at how the non-ASoC
+AC'97 code works.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130727/e7bfe6d5/attachment.sig>
