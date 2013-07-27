@@ -1,44 +1,101 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 27 Jul 2013 14:25:02 -0600
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
- <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
- <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
- <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
-Message-ID: <CACxGe6uE6jOE-vz0onW5h93Es-soGiBAcFBM7Dvxh+HvCNrHkw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sat, 27 Jul 2013 23:43:13 +0200
+Subject: [RESEND] cpuidle for ARM pull request
+In-Reply-To: <2224191.VjCA0rsPcU@vostro.rjw.lan>
+References: <51E536C5.1020609@linaro.org> <1598661.FpX5cmjM1U@vostro.rjw.lan>
+ <51F3650B.8080708@linaro.org> <2224191.VjCA0rsPcU@vostro.rjw.lan>
+Message-ID: <51F43EF1.1020108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 2:01 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Sat, Jul 27, 2013 at 3:45 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Sat, Jul 27, 2013 at 4:59 AM, Arend van Spriel <arend@broadcom.com> wrote:
->>> Let's see how many people go and scream if I say this: Too bad .dts files
->>> are not done using XML format as DT bindings could be described using XML
->>> Schema.
+On 07/27/2013 02:37 PM, Rafael J. Wysocki wrote:
+> On Saturday, July 27, 2013 08:13:31 AM Daniel Lezcano wrote:
+>> On 07/26/2013 02:07 AM, Rafael J. Wysocki wrote:
+>>> On Friday, July 26, 2013 12:41:09 AM Rafael J. Wysocki wrote:
+>>>> On Friday, July 26, 2013 12:29:08 AM Rafael J. Wysocki wrote:
+>>>>> On Friday, July 26, 2013 12:07:03 AM Daniel Lezcano wrote:
+>>>>>> On 07/16/2013 02:04 PM, Daniel Lezcano wrote:
+>>>>>>>
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> The first PR was against the linux-pm-next tree including the patch:
+>>>>>>>
+>>>>>>> "cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq"
+>>>>>>>
+>>>>>>> This patch has been dropped in the meantime.
+>>>>>>>
+>>>>>>> Here is a new PR where my tree has been rebased against linux-pm-next
+>>>>>>> and adding the patch mentioned above.
+>>>>>>>
+>>>>>>> As stated by Rafael, I will handle the ARM specific patches from now.
+>>>>>>>
+>>>>>>> The following changes since commit 48f99d5a97d32d70c0738d6e314d9f4dbefd89bf:
+>>>>>>>
+>>>>>>>   Merge branch 'pm-cpuidle-next' into linux-next (2013-07-16 02:41:06 +0200)
+>>>>>>>
+>>>>>>> are available in the git repository at:
+>>>>>>>
+>>>>>>>
+>>>>>>>   git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
+>>>>>>>
+>>>>>>> for you to fetch changes up to 2b7e79f4a75e803184f483985a25cc751a990f06:
+>>>>>>>
+>>>>>>>   ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
+>>>>>>> (2013-07-16 13:57:24 +0200)
+>>>>>>
+>>>>>> ping ?
+>>>>>
+>>>>> Sorry, something distracted me.  I'll pull it later today unless there are any
+>>>>> problems (in which case I'll let you know).
+>>>>
+>>>> Well, there are some.
+>>>>
+>>>> It is based on my linux-next branch, but please rebase it on top of 3.11-rc2.
+>>>>
+>>>> Generally, please send me pull requests based on -rc kernels only (or major
+>>>> releases).
+>>>
+>>> Unless your material depends on new things in my linux-next branch, in which
+>>> case please let me know and I'll set up a stable branch for you to base things
+>>> on.
 >>
->> Draft an example and show us how it would look!  :-)  There is
->> absolutely nothing preventing us from expressing a DT in XML format,
->> or even using XSLT to define DT schema while still using our current
->> .dts syntax. It would be trivial to do lossless translation between
->> .dts syntax and xml.
+>> Hi Rafael,
 >>
->> The problem that I have with XML and XSLT is that it is very verbose
->> and not entirely friendly to mere-mortals. However, I'm more than
->> willing to be proved wrong on this point.
->
-> I considered this approach a while ago and discarded it. It would work
-> but it is just too much of a Frankenstein monster.
->
-> Much cleaner to modify dtc to take a schema as part of the compilation
-> process. The schema language itself has no requirement to look like
-> DTS syntax. Whoever wrote dtc probably has a favorite language that
-> would be good for writing schemas in.
+>> I rebased my branch on top of 3.11-rc2, you can try to pull it again.
+> 
+> Pulled, thanks!
+> 
+> Next time, can you please add a general description of what the patches do and
+> why they do that to the pull request?
 
-Making it part of dtc is a required feature as far as I'm concerned.
-Using XML/XSLT and dtc-integration are not mutually exclusive, but I
-digress.
+Yes, sure. I will do.
 
-g.
+>> I thought it would have been easier for us if I could based my PRs on
+>> top of your linux-next branch, so acting as a proxy for ARM patches. I
+>> am maintaining the clocksource drivers and I am basing my tree on top of
+>> tip/core.
+>>
+>> I guess you are rebasing your tree often and this is an issue for you,
+>> right ?
+> 
+> Yes, my linux-next branch may contain commits that will be modified later
+> (e.g. ACKs added, fixes folded in etc.).
+> 
+> Anyway, as I said, as long as the material you have for me doesn't depend on
+> anything new in my tree, it's better to base it on top of an -rc kernel.
+> 
+> In case it does depend on that, I've put the entire outstanding cpuidle
+> material into my pm-cpuidle branch (including your ARM commits just pulled).
+
+Ok, thanks.
+
+  -- Daniel
+
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
