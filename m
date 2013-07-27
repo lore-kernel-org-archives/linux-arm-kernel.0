@@ -1,38 +1,65 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sat, 27 Jul 2013 19:37:48 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130727104018.GC9858@sirena.org.uk>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
- <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726045433.GB4100@netboy>
- <20130726171524.GB28895@obsidianresearch.com>
- <20130727084825.GA4707@netboy>
- <20130727104018.GC9858@sirena.org.uk>
-Message-ID: <20130727173748.GA4813@netboy>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Sat, 27 Jul 2013 18:38:16 +0100
+Subject: [PATCH v11] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51F2EA59.8010908@gmail.com>
+References: <1374834384-8071-1-git-send-email-p.zabel@pengutronix.de>
+ <51F2E4A7.1040200@codethink.co.uk> <51F2EA59.8010908@gmail.com>
+Message-ID: <51F40588.9020907@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 11:40:18AM +0100, Mark Brown wrote:
-> On Sat, Jul 27, 2013 at 10:48:26AM +0200, Richard Cochran wrote:
-> 
-> > [ I disagree about the "more thought" part. The current discussion,
-> >   coming years too late after the introduction of DT to ARM Linux, is
-> >   contrary evidence enough. ]
-> 
-> We did have exactly the same discussion when the DT transition was
-> started - this isn't something that people only just realised might be
-> an issue.  There was a deliberate decision to focus on getting the
-> technology deployed to the point where it could be used as a straight
-> replacement for board files and accept that sometimes the results won't
-> be perfect and that we may need to rework as a result.
+On 26/07/13 22:30, Sylwester Nawrocki wrote:
+> On 07/26/2013 11:05 PM, Ben Dooks wrote:
+>> On 26/07/13 11:26, Philipp Zabel wrote:
+>>> This driver implements a reset controller device that toggle a gpio
+>>> connected to a reset pin of a peripheral IC. The delay between assertion
+>>> and de-assertion of the reset signal can be configured via device tree.
+>>>
+>>> Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
+>>> Reviewed-by: Stephen Warren<swarren@nvidia.com>
+>>
+>> [snip]
+>>
+>>> +static struct of_device_id gpio_reset_dt_ids[] = {
+>>> + { .compatible = "gpio-reset" },
+>>> + { }
+>>> +};
+>>
+>> I think you need the following:
+>> MODULE_DEVICE_TABLE(of, gpio_reset_dt_ids);
+>
+> It's already there, at bottom of the file. But if I'm not mistaken
+> the common practice is to keep it together with the actual array
+> definition. At least that's the case with, e.g. EXPORT_SYMBOL*.
+>
+>>> +static struct platform_driver gpio_reset_driver = {
+>>> + .probe = gpio_reset_probe,
+>>> + .remove = gpio_reset_remove,
+>>> + .driver = {
+>>> + .name = "gpio-reset",
+>>> + .owner = THIS_MODULE,
+>>> + .of_match_table = of_match_ptr(gpio_reset_dt_ids),
+>>> + },
+>>> +};
+>>> +
+>>> +module_platform_driver(gpio_reset_driver);
+>>> +
+>>> +MODULE_AUTHOR("Philipp Zabel<p.zabel@pengutronix.de>");
+>>> +MODULE_DESCRIPTION("gpio reset controller");
+>
+> nit: shouldn't gpio be capitalized ?
+>
+>>> +MODULE_LICENSE("GPL");
+>>> +MODULE_ALIAS("platform:gpio-reset");
+>>> +MODULE_DEVICE_TABLE(of, gpio_reset_dt_ids);
+>
+> --
+> Regards,
+> Sylwester
 
-Can you tell a bit more about this decision? When was it made? Who
-made it? How was it made public?
+ta, that's why I missed it. Nice if it stays with the table it
+references.
 
-Thanks,
-Richard
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
