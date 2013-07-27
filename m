@@ -1,41 +1,37 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 27 Jul 2013 13:56:43 +0200
-Subject: [PATCH V2 2/8] ASoC: Samsung: I2S: Add quirks as driver data in
- I2S
-In-Reply-To: <20130726152551.GM9858@sirena.org.uk>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
- <1417636.4d7IlsSAyI@amdc1227> <20130726152551.GM9858@sirena.org.uk>
-Message-ID: <2425397.IIfnern1kk@flatron>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 27 Jul 2013 12:59:50 +0100
+Subject: [PATCH v10 2/7] ASoC: codec: wm9712 simple DT bindings
+In-Reply-To: <1374924716-23475-3-git-send-email-mpa@pengutronix.de>
+References: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
+ <1374924716-23475-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130727115950.GF9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 of July 2013 16:25:51 Mark Brown wrote:
-> On Fri, Jul 26, 2013 at 05:02:46PM +0200, Tomasz Figa wrote:
-> > IMHO this SoC-based identification looks much better, especially
-> > considering the fact that IP version isn't something easily
-> > determinable, as even the documentation can sometimes be not really
-> > clear about that.
-> 
-> Yeah, it's not terribly clever either way.  We've been using the version
-> numbers in audio for a long time partly because it is documented
-> sometimes and partly because most of the SoCs tend to have one fully
-> featured controller and a bunch of secondary controllers on older IP
-> revisions.
-> 
-> > However the s3c6410-i2sv4 string looks a bit unfortunate. AFAIK there
-> > were two types of I2S IPs on S3C6410 - normal I2S and I2S
-> > multichannel. What about having a compatible like s3c6410-i2s-multi?
-> 
-> It was explicitly identified as I2Sv4 in the S3C6410 datasheet so no
-> real issue there.
+On Sat, Jul 27, 2013 at 01:31:51PM +0200, Markus Pargmann wrote:
 
-Well, the datasheet I have calls it either "I2S V40" or "IIS MULTI AUDIO 
-INTERFACE". I like the latter much more, because it actually says what's 
-the difference compared to previous I2S IPs.
+> +static const struct of_device_id wm9712_codec_of_dev_id[] = {
+> +	{
+> +		.compatible = "wlf,wm9712",
+> +	}, {
+> +		/* sentinel */
+> +	}
+> +};
+> +
+>  static struct platform_driver wm9712_codec_driver = {
+>  	.driver = {
+>  		.name = "wm9712-codec",
+>  		.owner = THIS_MODULE,
+> +		.of_match_table = wm9712_codec_of_dev_id,
+>  	},
+>  
+>  	.probe = wm9712_probe,
 
-I'm not strongly against using the v4 suffix, but since we decided to use 
-more meaningful compatible values elsewhere, I think this way would be 
-better for sound drivers as well.
-
-Best regards,
-Tomasz
+AC'97 is an enumerable bus, we shouldn't need this...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130727/5c73c832/attachment-0001.sig>
