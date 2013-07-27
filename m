@@ -1,30 +1,65 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 26 Jul 2013 17:13:46 -0700
-Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
-In-Reply-To: <CAPdLdqnq21zPNdJ_4iYS96yQH1XeuTp-TbwHpvkwsECHEKOKaQ@mail.gmail.com>
-References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
- <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
- <51F2F37B.8030306@wwwdotorg.org>
- <CAPdLdqmU0aw5h_KYcD-E=isC9U3mZF6fzr_GVdjUUAW4_PUD5Q@mail.gmail.com>
- <51F301C4.4070807@wwwdotorg.org>
- <CAPdLdqnq21zPNdJ_4iYS96yQH1XeuTp-TbwHpvkwsECHEKOKaQ@mail.gmail.com>
-Message-ID: <CAAYSxhrXg=dnhUzMuV=t=oQrnMQUWvLFydGEJD2pZV+EEPGLuA@mail.gmail.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Sat, 27 Jul 2013 06:38:02 +0530
+Subject: [PATCH V2 2/8] ASoC: Samsung: I2S: Add quirks as driver data in
+ I2S
+In-Reply-To: <20130726145319.GI9858@sirena.org.uk>
+References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
+ <1374845812-7803-3-git-send-email-padma.v@samsung.com>
+ <20130726145319.GI9858@sirena.org.uk>
+Message-ID: <CAAgF-BerOfvhPJemVf0HBK5L4edw7pgm9bgwKGL+XSMpoaR3vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 4:22 PM, Markus Mayer <markus.mayer@linaro.org> wrote:
-> On 26 July 2013 16:09, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> Isn't this a property of the SoC's IP block, not of the board?
->
-> Yes. I wasn't very precise with my statement.
->
-> What I added to the description is "Specify at least 1 GPIO interrupt.
-> The maximum number is 6."
+Hi Mark,
 
-The IP has a configurable number of banks, each of which has its own
-interrupt.  If a particular SoC was configured to have six banks then
-you need to list six interrupts in the DTS.  Perhaps it would help to
-spell that out that relationship explicitly in the documentation
-rather than talking about a minimum or maximum number of interrupts?
-Also, you may want to mention that interrupts should to be ordered by
-bank number.
+On Fri, Jul 26, 2013 at 8:23 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Jul 26, 2013 at 07:06:46PM +0530, Padmavathi Venna wrote:
+>> Samsung has different versions of I2S introduced in different
+>> platforms. Each version has some new support added for multichannel,
+>> secondary fifo, s/w reset control and internal mux for rclk src clk.
+>> Each newly added change has a quirk. So this patch adds all the
+>> required quirks as driver data and based on compatible string from
+>> dtsi fetches the quirks.
+>
+> As Russell indicated you should really keep the old name around, though
+> marking them as deprecated is OK.  However I'm not sure anyone will have
+> deployed this so I'm not sure how much it matters - every downstream
+> kernel I've seen was still using board files anyway.
+
+
+This is there only on exynos5250.dtsi, so changing this file alone is
+enough. patch3 in
+this series have the same.
+
+>
+> The actual meat of the patch changing to a quirk scheme does look good,
+> though.
+>
+>> -- compatible : "samsung,i2s-v5"
+>> +- compatible : should be one of the following.
+>> +   - samsung,s3c6410-i2s: for 8/16/24bit stereo I2S. Previous versions
+>> +     has only 8/16bit support.
+>> +   - samsung,s3c6410-i2sv4: for 8/16/24bit multichannel(5.1 channel) I2S.
+>> +     Introduced in s3c6410. This also applicable for s5p64x0 platforms.
+>> +   - samsung,s5pc100-i2s: for 8/16/24bit multichannel(5.1 channel) I2S
+>> +     with secondary fifo and s/w reset control.
+>> +   - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S with
+>> +     secondary fifo, s/w reset control and internal mux for root clk src.
+>> +
+>
+> I think the -vN naming scheme was fine - I see where this came from but
+> the main point was about having things identified by a string not
+> switching the naming scheme.  As you can see from the s3c6410 stuff the
+> SoC isn't that helpful as a naming scheme as multiple IP versions appear
+> on the same SoC.
+
+Having only the version info is confusing. When I posted my previous version of
+patches I was clear which version introduced in which platform and
+again if I come
+back today and see I again had to search each SoC datasheet. So I think this
+patch now clearly explains what new support introduced in which
+version of IP and which
+SoC platform.
+
+Thanks
+Padma
