@@ -1,93 +1,94 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sat, 27 Jul 2013 18:42:08 +0800
-Subject: [RFC][PATCH 2/2] ARM64: introduce cluster id and make a difference
- between socket id
-In-Reply-To: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
-References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1374921728-9007-2-git-send-email-hanjun.guo@linaro.org>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Sat, 27 Jul 2013 12:59:58 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <2460092.aLmjrOVh1g@flatron>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
+ <2460092.aLmjrOVh1g@flatron>
+Message-ID: <51F3A82E.2000907@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the cpu topology information, we define topology_physical_package_id()
-as cpu socket id, which means that the socket id is the idenfication for
-physical processor, not for a cluster in a cpu die.
+On 07/27/2013 12:36 PM, Tomasz Figa wrote:
+> On Saturday 27 of July 2013 12:24:24 Arend van Spriel wrote:
+>> On 07/27/2013 11:51 AM, Tomasz Figa wrote:
+>>> On Saturday 27 of July 2013 07:04:08 Richard Cochran wrote:
+>>>> On Fri, Jul 26, 2013 at 08:49:43AM -0700, Olof Johansson wrote:
+>>>>> Long term, final goal is likely to be close to what Russell is
+>>>>> saying
+>>>>
+>>>> Why is this a long term goal? Start today.
+>>>>
+>>>>> -- nothing should go into the kernel tree unless the binding is in a
+>>>>> fully stable state. However, we have a transitional period between
+>>>>> now
+>>>>> and then, and even when we're at the final state there will be need
+>>>>> to
+>>>>> have some sort of sandbox for development and test of future
+>>>>> bindings.
+>>>>
+>>>> Why not just set up a git tree right away?
+>>>>
+>>>>> Dealing with all that, as well as the actual process for locking in
+>>>>> bindings, is what needs to be sorted out.
+>>>>>
+>>>>> I think we're all in agreement that bindings that change over time
+>>>>> are
+>>>>> nothing but pain, but we're arguing that in circles anyway.
+>>>>
+>>>> No.
+>>>>
+>>>> I keep saying, the bindings must be stable ABI, *today*.
+>>>>
+>>>> You keep saying, maybe later, but until then we will make things up
+>>>> as
+>>>> we go along.
+>>>
+>>> We have currently a lot of broken bindings, because people didn't know
+>>> how to define ones and those they defined have not been properly
+>>> reviewed. Do you really want such broken ABI in the kernel?
+>>>
+>>> Sure, there are many existing bindings that can be just made stable
+>>> and
+>>> well they probably are already de facto stable. This is mostly about
+>>> subsystem bindings and whatever already has many users, both made them
+>>> get more thought when designing and more review before merging.
+>>>
+>>> Still, a lot of device and platform-specific bindings are simply
+>>> broken. Take max8925 backlight driver, that Olof started this whole
+>>> discussion with, as an example. We need to sort them out before they
+>>> can be stabilized.
+>>
+>> That is a nice summary of how we got from null to now and Richard seems
+>> to be simply saying: let's stop mucking about and make this a project
+>> with a well-defined process of dealing with staging and stable bindings
+>> and keep stable bindings stable. Whether it should be within the kernel
+>> repo as a separate subsystem or in an entire different repo is a trivial
+>> decision, but still a decision that needs to be made.
+>
+> Yes, basically that's our current situation.
+>
+> Still, I would disagree about the decision being trivial, as each choice
+> will have further, and likely pretty significant, consequences on binding
+> maintenance, submission, review and for dependent things, like drivers or
+> platforms using such bindings. This needs to be discussed enough.
+>
+>> Apart from stable DT bindings I would love to see a DT compiler that
+>> that next to DT syntax detects mistakes in properties used for the
+>> selfish reason that I spent hours debugging regulator code, because I
+>> typed vmmc_supply iso vmmc-supply. I did not go through all the
+>> bindings, but this may require a more formal description so it could be
+>> compiled/read in the DT compiler.
+>
+> This bothered me as well and that's why I'm working on this. I still can't
+> get myself to write a very long mail (I'm more a coder than writer...)
+> about the whole idea, my proposal of how it could look and problems we
+> need to solve, but I'll try better this evening.
 
-On ARM64 platform, multi cluster in a cpu die will be normal, here is a
-example with 2 cores in a cluster and 2 cluster in a socket:
+Let's see how many people go and scream if I say this: Too bad .dts 
+files are not done using XML format as DT bindings could be described 
+using XML Schema.
 
-|--------------------------------------|
-|                socket                |
-|                                      |
-| |---------------|  |---------------| |
-| |    cluster    |  |    cluster    | |
-| |               |  |               | |
-| | |----| |----| |  | |----| |----| | |
-| | |core| |core| |  | |core| |core| | |
-| | |----| |----| |  | |----| |----| | |
-| |               |  |               | |
-| |---------------|  |---------------| |
-|                                      |
-|--------------------------------------|
-
-ARM64 extended the MPIDR into 64 bit and introduce another affinity level,
-we can use this affinity level for socket id and use the third highest level
-affinity for cluster id, which  make the socket id behavior in its original
-way.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/include/asm/topology.h |    1 +
- arch/arm64/kernel/topology.c      |    8 ++++++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index 8631808..ff68ecc 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -8,6 +8,7 @@
- struct cputopo_arm64 {
- 	int thread_id;
- 	int core_id;
-+	int cluster_id;
- 	int socket_id;
- 	cpumask_t thread_sibling;
- 	cpumask_t core_sibling;
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 1eb0435..6d1e5a6 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -80,12 +80,14 @@ void store_cpu_topology(unsigned int cpuid)
- 			/* core performance interdependency */
- 			cpuid_topo->thread_id = MPIDR_AFFINITY_LEVEL_0(mpidr);
- 			cpuid_topo->core_id = MPIDR_AFFINITY_LEVEL_1(mpidr);
--			cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL_2(mpidr);
-+			cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL_2(mpidr);
-+			cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL_3(mpidr);
- 		} else {
- 			/* largely independent cores */
- 			cpuid_topo->thread_id = -1;
- 			cpuid_topo->core_id = MPIDR_AFFINITY_LEVEL_0(mpidr);
--			cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL_1(mpidr);
-+			cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL_1(mpidr);
-+			cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL_2(mpidr);
- 		}
- 	} else {
- 		/*
-@@ -95,6 +97,7 @@ void store_cpu_topology(unsigned int cpuid)
- 		 */
- 		cpuid_topo->thread_id = -1;
- 		cpuid_topo->core_id = 0;
-+		cpuid_topo->cluster_id = -1;
- 		cpuid_topo->socket_id = -1;
- 	}
- 
-@@ -120,6 +123,7 @@ void __init init_cpu_topology(void)
- 
- 		topo->thread_id = -1;
- 		topo->core_id =  -1;
-+		topo->cluster_id = -1;
- 		topo->socket_id = -1;
- 		cpumask_clear(&topo->core_sibling);
- 		cpumask_clear(&topo->thread_sibling);
--- 
-1.7.9.5
+Regards,
+Arend
