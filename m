@@ -1,84 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 27 Jul 2013 13:22:21 +0100
-Subject: OMAP2430 SDP boot broken after Linus' rmk merge
-In-Reply-To: <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com>
- <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com>
- <20130724142059.GJ11072@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
-Message-ID: <20130727122221.GB6618@mudshark.cambridge.arm.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 27 Jul 2013 14:37:59 +0200
+Subject: [RESEND] cpuidle for ARM pull request
+In-Reply-To: <51F3650B.8080708@linaro.org>
+References: <51E536C5.1020609@linaro.org> <1598661.FpX5cmjM1U@vostro.rjw.lan>
+ <51F3650B.8080708@linaro.org>
+Message-ID: <2224191.VjCA0rsPcU@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 05:10:56AM +0100, Paul Walmsley wrote:
+On Saturday, July 27, 2013 08:13:31 AM Daniel Lezcano wrote:
+> On 07/26/2013 02:07 AM, Rafael J. Wysocki wrote:
+> > On Friday, July 26, 2013 12:41:09 AM Rafael J. Wysocki wrote:
+> >> On Friday, July 26, 2013 12:29:08 AM Rafael J. Wysocki wrote:
+> >>> On Friday, July 26, 2013 12:07:03 AM Daniel Lezcano wrote:
+> >>>> On 07/16/2013 02:04 PM, Daniel Lezcano wrote:
+> >>>>>
+> >>>>> Hi,
+> >>>>>
+> >>>>> The first PR was against the linux-pm-next tree including the patch:
+> >>>>>
+> >>>>> "cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq"
+> >>>>>
+> >>>>> This patch has been dropped in the meantime.
+> >>>>>
+> >>>>> Here is a new PR where my tree has been rebased against linux-pm-next
+> >>>>> and adding the patch mentioned above.
+> >>>>>
+> >>>>> As stated by Rafael, I will handle the ARM specific patches from now.
+> >>>>>
+> >>>>> The following changes since commit 48f99d5a97d32d70c0738d6e314d9f4dbefd89bf:
+> >>>>>
+> >>>>>   Merge branch 'pm-cpuidle-next' into linux-next (2013-07-16 02:41:06 +0200)
+> >>>>>
+> >>>>> are available in the git repository at:
+> >>>>>
+> >>>>>
+> >>>>>   git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
+> >>>>>
+> >>>>> for you to fetch changes up to 2b7e79f4a75e803184f483985a25cc751a990f06:
+> >>>>>
+> >>>>>   ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
+> >>>>> (2013-07-16 13:57:24 +0200)
+> >>>>
+> >>>> ping ?
+> >>>
+> >>> Sorry, something distracted me.  I'll pull it later today unless there are any
+> >>> problems (in which case I'll let you know).
+> >>
+> >> Well, there are some.
+> >>
+> >> It is based on my linux-next branch, but please rebase it on top of 3.11-rc2.
+> >>
+> >> Generally, please send me pull requests based on -rc kernels only (or major
+> >> releases).
+> > 
+> > Unless your material depends on new things in my linux-next branch, in which
+> > case please let me know and I'll set up a stable branch for you to base things
+> > on.
 > 
-> Tonight I put on a Jon Hopkins album, in recollection of my UK ARM Linux 
-> colleagues perhaps, and started testing, and eventually wound up with this 
-> one:
+> Hi Rafael,
 > 
-> commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc
-> Author: Will Deacon <will.deacon@arm.com>
+> I rebased my branch on top of 3.11-rc2, you can try to pull it again.
 
-Oh, great...
+Pulled, thanks!
 
-> Date:   Wed Jun 12 12:25:56 2013 +0100
+Next time, can you please add a general description of what the patches do and
+why they do that to the pull request?
+
+> I thought it would have been easier for us if I could based my PRs on
+> top of your linux-next branch, so acting as a proxy for ARM patches. I
+> am maintaining the clocksource drivers and I am basing my tree on top of
+> tip/core.
 > 
->     ARM: 7757/1: mm: don't flush icache in switch_mm with hardware broadcasting
->     
->     When scheduling an mm on a CPU where it hasn't previously been used, we
->     flush the icache on that CPU so that any code loaded previously on
->     a different core can be safely executed.
->     
->     For cores with hardware broadcasting of cache maintenance operations,
->     this is clearly unnecessary, since the inner-shareable invalidation in
->     __sync_icache_dcache will affect all CPUs.
->     
->     This patch conditionalises the icache flush in switch_mm based on
->     cache_ops_need_broadcast().
->     
->     Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->     Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
->     Signed-off-by: Will Deacon <will.deacon@arm.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> ...
-> 
-> v3.11-rc2 boots with it reverted.  What also works is v3.11-rc2 with the 
-> below patch applied.
+> I guess you are rebasing your tree often and this is an issue for you,
+> right ?
 
-That's very odd -- I *suspect* your bootloader is up to no good (iirc, we've
-had issues with the bootloader on this machine in the past, since it enters
-the kernel in ABT mode or something).
+Yes, my linux-next branch may contain commits that will be modified later
+(e.g. ACKs added, fixes folded in etc.).
 
-> Would be pleased to boot-test anything you'd care to send my way, as long 
-> as you can tolerate response latency jitter.
+Anyway, as I said, as long as the material you have for me doesn't depend on
+anything new in my tree, it's better to base it on top of an -rc kernel.
 
-Can you try this quick hack please? It clobbers the I-cache as soon as we
-enter the kernel, so it should tell us whether my theory is correct.
+In case it does depend on that, I've put the entire outstanding cpuidle
+material into my pm-cpuidle branch (including your ARM commits just pulled).
 
-Cheers,
-
-Will
-
---->8
-
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 9cf6063..d74c64c 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -83,6 +83,9 @@ ENTRY(stext)
-  THUMB(        .thumb                  )       @ switch to Thumb now.
-  THUMB(1:                      )
- 
-+       mov     r9, #0
-+       mcr     p15, 0, r9, c7, c5, 0
-+
- #ifdef CONFIG_ARM_VIRT_EXT
-        bl      __hyp_stub_install
- #endif
+Thanks,
+Rafael
