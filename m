@@ -1,40 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Jul 2013 18:18:58 +0200
-Subject: Location for a kind of GPIO bus driver
-In-Reply-To: <20130726085623.GM9916@kw.sim.vm.gnt>
-References: <20130723151834.GJ9916@kw.sim.vm.gnt>
- <20130725160324.GJ23879@titan.lakedaemon.net>
- <20130726085623.GM9916@kw.sim.vm.gnt>
-Message-ID: <201307261818.59002.arnd@arndb.de>
+Date: Sat, 27 Jul 2013 16:38:16 +0200
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <20130726234237.GB24642@n2100.arm.linux.org.uk>
+References: <20130726145639.116237136@gmail.com>
+ <20130726231108.GA10812@obsidianresearch.com>
+ <20130726234237.GB24642@n2100.arm.linux.org.uk>
+Message-ID: <201307271638.16289.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 July 2013, Simon Guinot wrote:
-> On Thu, Jul 25, 2013 at 12:03:24PM -0400, Jason Cooper wrote:
-> > On Thu, Jul 25, 2013 at 05:49:32PM +0200, Simon Guinot wrote:
-
-> > > > I would try drivers/gpio.  If there are complaints, it should be trivial
-> > > > to move it in a new version of the series.
-> > > 
-> > > Why not, as long it is clear that the resulting driver will not provide
-> > > a GPIO chip but rather functions as a library.
-> > 
-> > right, but the end result of what the library would do is expose a
-> > series of LEDs and PM 'virtual gpios'.  So, even though it's not a gpio
-> > expander per-se, it's still filling that role.  Or am I still missing
-> > something?
+On Saturday 27 July 2013, Russell King - ARM Linux wrote:
+> On Fri, Jul 26, 2013 at 05:11:08PM -0600, Jason Gunthorpe wrote:
+> > On Fri, Jul 26, 2013 at 11:59:00PM +0200, Domenico Andreoli wrote:
+>
+> Anyway, there's a simpler solutions to this:
 > 
-> The library could expose a function allowing to set the address and data
-> registers: gpio_ext_set_value(int addr, int value).
+> machdirs := $(patsubst %,arch/arm/mach-%/,$(sort $(machine-y)))
+> platdirs := $(patsubst %,arch/arm/plat-%/,$(Sort $(plat-y)))
 > 
-> Actually, it is how it works inside leds-netxbig. Simply this function
-> would be also accessible by other drivers.
+> which will remove all duplicates.
 
-With that prototype it still sounds like a regular gpiochip driver would
-fit that role well, since the function you describe is just like
-gpio_set_value().
-
-Maybe you can post the driver to let others understand what you are
-trying to do if it's not just a gpio expander.
+This does sound like the easiest solution, although I still think
+Olof's suggestion of making ARCH_BCM a silent Kconfig symbol would be
+just as good if we just have this one instance.
 
 	Arnd
