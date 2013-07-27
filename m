@@ -1,81 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 27 Jul 2013 08:13:31 +0200
-Subject: [RESEND] cpuidle for ARM pull request
-In-Reply-To: <1598661.FpX5cmjM1U@vostro.rjw.lan>
-References: <51E536C5.1020609@linaro.org> <1766778.ZYeDKBOsjV@vostro.rjw.lan>
- <2075555.RCmWLFAfjq@vostro.rjw.lan> <1598661.FpX5cmjM1U@vostro.rjw.lan>
-Message-ID: <51F3650B.8080708@linaro.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 27 Jul 2013 10:56:52 +0400
+Subject: [PATCH] ARM: i.MX6Q clocks: Fix CKIH clock name
+Message-ID: <1374908212-32008-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 02:07 AM, Rafael J. Wysocki wrote:
-> On Friday, July 26, 2013 12:41:09 AM Rafael J. Wysocki wrote:
->> On Friday, July 26, 2013 12:29:08 AM Rafael J. Wysocki wrote:
->>> On Friday, July 26, 2013 12:07:03 AM Daniel Lezcano wrote:
->>>> On 07/16/2013 02:04 PM, Daniel Lezcano wrote:
->>>>>
->>>>> Hi,
->>>>>
->>>>> The first PR was against the linux-pm-next tree including the patch:
->>>>>
->>>>> "cpuidle: Add Kconfig.arm and move calxeda, kirkwood and zynq"
->>>>>
->>>>> This patch has been dropped in the meantime.
->>>>>
->>>>> Here is a new PR where my tree has been rebased against linux-pm-next
->>>>> and adding the patch mentioned above.
->>>>>
->>>>> As stated by Rafael, I will handle the ARM specific patches from now.
->>>>>
->>>>> The following changes since commit 48f99d5a97d32d70c0738d6e314d9f4dbefd89bf:
->>>>>
->>>>>   Merge branch 'pm-cpuidle-next' into linux-next (2013-07-16 02:41:06 +0200)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>>
->>>>>   git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
->>>>>
->>>>> for you to fetch changes up to 2b7e79f4a75e803184f483985a25cc751a990f06:
->>>>>
->>>>>   ARM: ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle
->>>>> (2013-07-16 13:57:24 +0200)
->>>>
->>>> ping ?
->>>
->>> Sorry, something distracted me.  I'll pull it later today unless there are any
->>> problems (in which case I'll let you know).
->>
->> Well, there are some.
->>
->> It is based on my linux-next branch, but please rebase it on top of 3.11-rc2.
->>
->> Generally, please send me pull requests based on -rc kernels only (or major
->> releases).
-> 
-> Unless your material depends on new things in my linux-next branch, in which
-> case please let me know and I'll set up a stable branch for you to base things
-> on.
+i.MX6Q have only one High-frequency reference clock (CKIH).
+Patch removes index from CKIH and makes name according datasheet.
 
-Hi Rafael,
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I rebased my branch on top of 3.11-rc2, you can try to pull it again.
-
-I thought it would have been easier for us if I could based my PRs on
-top of your linux-next branch, so acting as a proxy for ARM patches. I
-am maintaining the clocksource drivers and I am basing my tree on top of
-tip/core.
-
-I guess you are rebasing your tree often and this is an issue for you,
-right ?
-
-Thanks
-  -- Daniel
-
-
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 9181a24..8f2a8b5 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -292,7 +292,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+ 	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
+-	clk[ckih] = imx_obtain_fixed_clock("ckih1", 0);
++	clk[ckih] = imx_obtain_fixed_clock("ckih", 0);
+ 	clk[osc] = imx_obtain_fixed_clock("osc", 0);
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.1.5
