@@ -1,55 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 28 Jul 2013 09:10:09 +0200
-Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
-In-Reply-To: <0eaf01ce8863$89d3c4e0$9d7b4ea0$@org>
-References: <0e7d01ce8840$82f79070$88e6b150$@org>
- <1374659615-29447-1-git-send-email-amit.daniel@samsung.com>
- <0eaf01ce8863$89d3c4e0$9d7b4ea0$@org>
-Message-ID: <51F4C3D1.2060901@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 28 Jul 2013 10:34:36 +0200
+Subject: [RFC 4/8] pinctrl: imx: Support imx21 register format
+In-Reply-To: <1374938808-27316-5-git-send-email-mpa@pengutronix.de>
+References: <1374938808-27316-1-git-send-email-mpa@pengutronix.de>
+ <1374938808-27316-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130728083436.GI2737@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 01:47 PM, Kukjin Kim wrote:
-> Amit Daniel Kachhap wrote:
->>
->> This patch skips the deep C1(AFTR -Arm off top running) state for
->> exynos5440
->> soc as this soc does not support this state. All the cpu's only allows the
->> basic
->> C0 state.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  arch/arm/mach-exynos/cpuidle.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
->> exynos/cpuidle.c
->> index 17a18ff..9a776a1 100644
->> --- a/arch/arm/mach-exynos/cpuidle.c
->> +++ b/arch/arm/mach-exynos/cpuidle.c
->> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
->>  		device->cpu = cpu_id;
->>
->>  		/* Support IDLE only */
->> -		if (cpu_id != 0)
->> +		if (soc_is_exynos5440() || cpu_id != 0)
->>  			device->state_count = 1;
->>
->>  		ret = cpuidle_register_device(device);
->> --
->> 1.7.1
+Hi Markus,
+
+On Sat, Jul 27, 2013 at 05:26:44PM +0200, Markus Pargmann wrote:
+> The imx pinctrl core driver does not support the imx21 register format
+> yet. This patch adds support for the strange iomux control registers of
+> imx21 and imx27. Next to a slightly different DT parse function.
 > 
-> Applied, thanks.
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/pinctrl/pinctrl-imx.c | 264 +++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 250 insertions(+), 14 deletions(-)
 
-You shouldn't have. This patch means exynos5540 has no cpuidle driver at
-all. It should be fixed in the Kconfig to unselect CONFIG_CPU_IDLE for
-an exynos5540.
+Is it really worth sharing the i.MX1/21/27 support with the imx driver?
+It seems most of the code is rewritten. I just tried and removed all
+lines from pinctrl-imx.c you don't use. There's not much left to share.
 
+Sascha
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
