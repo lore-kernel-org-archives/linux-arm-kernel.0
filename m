@@ -1,31 +1,32 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 28 Jul 2013 14:38:25 +0200
-Subject: [PATCH v3 2/8] clk: samsung: pll: Add support for PLL6552 and
- PLL6553
-In-Reply-To: <20130728123051.GQ9858@sirena.org.uk>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <11551938.yDBcNngaZN@flatron> <20130728123051.GQ9858@sirena.org.uk>
-Message-ID: <3758744.oOA9YxCvpA@flatron>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sun, 28 Jul 2013 15:19:03 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <1416484.XDfk5G56BI@flatron>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1441731.8CGUI1tUxh@flatron> <20130728085650.GA4683@netboy>
+ <1416484.XDfk5G56BI@flatron>
+Message-ID: <20130728131901.GA8864@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 of July 2013 13:30:51 Mark Brown wrote:
-> On Wed, Jul 24, 2013 at 01:52:19AM +0200, Tomasz Figa wrote:
-> > Changes since v2:
-> >  - Reworked to use new PLL registration method introduced by Yadwinder
-> >  
-> >    Singh Brar's patch series:
-> >    ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20041 )
-> 
-> I'm not able to test this series since that lot isn't in -next and I
-> didn't get a copy.
+On Sun, Jul 28, 2013 at 11:12:53AM +0200, Tomasz Figa wrote:
 
-Hmm, I wonder what happened with that series, as Mike was supposed to
-try applying it to clk tree [1].
+> I'm not really sure what effect on users this has. Maybe you should define 
+> "users".
 
-Mike, could you shed some light on this?
+...
 
-Best regards,
-Tomasz
+> Care to explain this reasoning?
 
-[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20041/focus=21003
+Use Case
+~~~~~~~~
+
+User acquires a machine running ARM Linux version 3.x, with u-boot
+and dtb in a read only flash partition. The board boots and works just
+fine. However, for his application, the user requires a new kernel
+feature that appeared in version 3.y where y > x. He compiles the new
+kernel, and it also works.
+
+Thanks,
+Richard
