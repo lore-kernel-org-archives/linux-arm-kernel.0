@@ -1,33 +1,49 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Sun, 28 Jul 2013 18:41:27 +0100
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4OzQ8BYuP00L6Ugt-tAteTdqqh58YuMfZCWQPirkGf9XMA@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1416484.XDfk5G56BI@flatron> <20130728131901.GA8864@netboy>
- <2529481.u8xHuXumcd@flatron>
- <CAKON4OzReTRb5JnJE+07vNJ-uDndLfqq8ha04J7K3x=WtsZEWw@mail.gmail.com>
- <20130728153546.GB5224@netboy>
- <CAKON4OzQ8BYuP00L6Ugt-tAteTdqqh58YuMfZCWQPirkGf9XMA@mail.gmail.com>
-Message-ID: <20130728174127.GB9858@sirena.org.uk>
+Date: Sun, 28 Jul 2013 19:41:11 +0100
+Subject: [PATCH v2 4/4] spi:Add Freescale DSPI driver for Vybrid VF610
+ platform
+In-Reply-To: <20130726072130.GA3029@pengutronix.de>
+References: <1374643943-3324-1-git-send-email-b44548@freescale.com>
+ <1374643943-3324-5-git-send-email-b44548@freescale.com>
+ <20130726072130.GA3029@pengutronix.de>
+Message-ID: <20130728184111.GG9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 28, 2013 at 11:50:19AM -0400, jonsmirl at gmail.com wrote:
+On Fri, Jul 26, 2013 at 09:21:30AM +0200, Sascha Hauer wrote:
+> On Wed, Jul 24, 2013 at 01:32:23PM +0800, Chao Fu wrote:
 
-> "furture proof" is much easier to say that it is to do. We've been
-> messing around with the audio bindings for three years and still don't
-> have a really good scheme. It is pretty easy to come up with the first
-> 90% of a device tree. It is really hard to work out that last 10%.
+Sascha, please delete unneeded context from your mails - it makes it
+much easier to find the new text.
 
-I wouldn't say that for audio - we've got a pretty solid idea of what's
-going on and little if any churn.  If some more of the subsystems that
-we rely on were working well we could do a bit more but it's mostly just
-extensions of where we're at now.
+> > +	tx_word = is_word_transfer(dspi);
+> > +	/* If we are in word mode, but only have a single byte to transfer
+> > +	 * then switch to byte mode temporarily.  Will switch back at the
+> > +	 * end of the transfer. */
+
+> Not sure if I understand this, but if you are in word mode then I would
+> consider it a bug when there's only one byte to transfer.
+
+Yes, this is a definite bug - especially since SPI in word mode has a
+fixed word order on the bus.  The driver should never put the hardware
+into a word size other than that explicitly requested by the client and
+then it should insist on getting exact multiples of that word size.
+
+> > +static int dspi_prepare_transfer_hw(struct spi_master *master)
+> > +{
+> > +	struct fsl_dspi *dspi = spi_master_get_devdata(master);
+> > +
+> > +	pm_runtime_get_sync(&dspi->pdev->dev);
+> > +
+> > +	return 0;
+> > +}
+
+I just posted a patch series which would allow you to have the core do
+this for you, please rebase on top of that.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130728/4fb8f828/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130728/fb3f560b/attachment.sig>
