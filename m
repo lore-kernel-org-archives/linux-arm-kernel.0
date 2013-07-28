@@ -1,82 +1,39 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 27 Jul 2013 18:32:46 -0500
-Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
- resources
-In-Reply-To: <1374515989-7391-1-git-send-email-joelf@ti.com>
-References: <1374515989-7391-1-git-send-email-joelf@ti.com>
-Message-ID: <51F4589E.5070108@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 28 Jul 2013 12:00:20 +1200
+Subject: [PATCH] dts: wandboard: Add support for SDIO bcm4329
+Message-ID: <1374969621-4187-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony or Sekhar,
+The wandboard has a Broadcom 4329 WiFi connected via SDIO. This patch
+sets the required pins to enable the wifi module.
 
-If this patch looks ok, could you pick it up for -rc cycle?
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-It fixes DMA breakages after the merge window for devices for which DMA
-resources are being populated in device tree instead pdev.
-
-Thanks,
-
--Joel
-
-
-On 07/22/2013 12:59 PM, Joel Fernandes wrote:
-> HWMOD removal for MMC is breaking edma_start as the events are being manually
-> triggered due to unused channel list not being clear, Thanks to Balaji TK for
-> finding this issue.
-> 
-> This patch fixes the issue, by reading the "dmas" property from the DT node if
-> it exists and clearing the bits in the unused channel list.
-> 
-> Cc: Balaji T K <balajitk@ti.com>
-> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
-> v2 changes: Fixed compiler warning
-> 
->  arch/arm/common/edma.c |   31 +++++++++++++++++++++++--------
->  1 file changed, 23 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index a432e6c..765d578 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -561,14 +561,29 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
->  static int prepare_unused_channel_list(struct device *dev, void *data)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
-> -	int i, ctlr;
-> -
-> -	for (i = 0; i < pdev->num_resources; i++) {
-> -		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
-> -				(int)pdev->resource[i].start >= 0) {
-> -			ctlr = EDMA_CTLR(pdev->resource[i].start);
-> -			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
-> -					edma_cc[ctlr]->edma_unused);
-> +	int i = 0, ctlr;
-> +	u32 dma_chan;
-> +	const __be32 *dma_chan_p;
-> +	struct property *prop;
-> +
-> +	if (dev->of_node) {
-> +		of_property_for_each_u32(dev->of_node, "dmas", prop, \
-> +					 dma_chan_p, dma_chan) {
-> +			if (i++ & 1) {
-> +				ctlr = EDMA_CTLR(dma_chan);
-> +				clear_bit(EDMA_CHAN_SLOT(dma_chan),
-> +						edma_cc[ctlr]->edma_unused);
-> +			}
-> +		}
-> +	} else {
-> +		for (; i < pdev->num_resources; i++) {
-> +			if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
-> +			    (int)pdev->resource[i].start >= 0) {
-> +				ctlr = EDMA_CTLR(pdev->resource[i].start);
-> +				clear_bit(EDMA_CHAN_SLOT(
-> +					  pdev->resource[i].start),
-> +					  edma_cc[ctlr]->edma_unused);
-> +			}
->  		}
->  	}
->  
-> 
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 7a46f64..2fb0e9b 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -73,9 +73,14 @@
+ 	hog {
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_GPIO_0__CCM_CLKO1 	0x130b0
+-				MX6QDL_PAD_GPIO_2__GPIO1_IO02	0x80000000
+-				MX6QDL_PAD_EIM_DA9__GPIO3_IO09	0x80000000
++				MX6QDL_PAD_GPIO_0__CCM_CLKO1 	 0x130b0
++				MX6QDL_PAD_GPIO_2__GPIO1_IO02	 0x80000000
++				MX6QDL_PAD_EIM_DA9__GPIO3_IO09	 0x80000000
++				MX6QDL_PAD_EIM_EB1__GPIO2_IO29   0x80000000 /* WL_REF_ON */
++				MX6QDL_PAD_EIM_A25__GPIO5_IO02   0x80000000 /* WL_RST_N */
++				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* WL_REG_ON */
++				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000 /* WL_HOST_WAKE */
++				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* WL_WAKE */
+ 			>;
+ 		};
+ 	};
+-- 
+1.7.9.5
