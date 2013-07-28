@@ -1,49 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 28 Jul 2013 12:27:46 +0100
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130727173748.GA4813@netboy>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726045433.GB4100@netboy>
- <20130726171524.GB28895@obsidianresearch.com>
- <20130727084825.GA4707@netboy>
- <20130727104018.GC9858@sirena.org.uk>
- <20130727173748.GA4813@netboy>
-Message-ID: <20130728112746.GM9858@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 28 Jul 2013 12:52:20 +0100
+Subject: [PATCH] ARM: v6: avoid read_cpuid_ext() on ARM1136r0 in
+ cache_ops_need_broadcast()
+In-Reply-To: <20130728111038.GA9374@mudshark.cambridge.arm.com>
+References: <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com> <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+ <20130727122221.GB6618@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
+ <20130728111038.GA9374@mudshark.cambridge.arm.com>
+Message-ID: <20130728115220.GE21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 07:37:48PM +0200, Richard Cochran wrote:
-> On Sat, Jul 27, 2013 at 11:40:18AM +0100, Mark Brown wrote:
+On Sun, Jul 28, 2013 at 12:10:38PM +0100, Will Deacon wrote:
+> Hi Paul,
+> 
+> Cheers for sticking with this!
+> 
+> On Sun, Jul 28, 2013 at 06:43:24AM +0100, Paul Walmsley wrote:
+> > 
+> > Commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc ("ARM: 7757/1: mm:
+> > don't flush icache in switch_mm with hardware broadcasting") breaks
+> > the boot on OMAP2430SDP with omap2plus_defconfig.  Tracked to an
+> > undefined instruction abort from the CP15 read in
+> > cache_ops_need_broadcast().  It turns out that early ARM1136 variants
+> > don't support several CP15 registers that later ARM cores do.
+> > ARM1136JF-S TRM section 3.2.1 "Register allocation" has the details.
+> 
+> Intriguing... I wouldn't expect a cp15 read to be emitted for 1136, since
+> the SMP_ON_UP magic should have caused is_smp() to return false.
 
-> > We did have exactly the same discussion when the DT transition was
-> > started - this isn't something that people only just realised might be
-> > an issue.  There was a deliberate decision to focus on getting the
-> > technology deployed to the point where it could be used as a straight
-> > replacement for board files and accept that sometimes the results won't
-> > be perfect and that we may need to rework as a result.
+The compiler seems to be doing something quite odd with schedule():
 
-> Can you tell a bit more about this decision? When was it made? Who
-> made it? How was it made public?
+00000540 <__schedule>:
+ 558:   ee103ff1        mrc     15, 0, r3, cr0, cr1, {7}
+ 560:   e1a03623        lsr     r3, r3, #12
+ 564:   e203300f        and     r3, r3, #15
+ 570:   e50b3080        str     r3, [fp, #-128] ; 0x80
+...
+ 6e8:   e59f3428        ldr     r3, [pc, #1064] ; b18 <__schedule+0x5d8>
+ 6f0:   e5933000        ldr     r3, [r3]
+ 6f4:   e3530000        cmp     r3, #0
+ 6f8:   1a000027        bne     79c <__schedule+0x25c>
+ 6fc:   e2851f65        add     r1, r5, #404    ; 0x194
+ 700:   ebfffffe        bl      0 <_test_and_set_bit>
+                        700: R_ARM_CALL _test_and_set_bit
+...
+ 79c:   e51b1080        ldr     r1, [fp, #-128] ; 0x80
+ 7a0:   e3510000        cmp     r1, #0
+ 7a4:   1affffd4        bne     6fc <__schedule+0x1bc>
+                        b18: R_ARM_ABS32        smp_on_up
 
-I honestly can't remember exactly - it was part of the discussion about
-keeping the .dtb files in the kernel IIRC.  Given the timing and the
-fact that I remember it it'd have been a mailing list discussion but I
-couldn't point you at it without searching for a needle in a haystack,
-sorry.  Perhaps there's a LWN writeup or something.
+Yes - that's right, it's reading from the mcr at the very start of
+__schedule and storing it on the stack for just one test later on.  The
+act of storing it on the stack and reading it back of is likely a lot
+more expensive than reading it from CP15 in the first place!
 
-It's not the "we don't care" that you're seeing, it's more a product of
-"we're not sure what we're doing yet, let's give ourselves a pass if we
-mess things up while we're still learning" so it's probably buried in
-some thread.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130728/4f4a3fe8/attachment.sig>
+We don't want to make the asm() itself volatile, because that means the
+asm() statement can't be optimised away.
+
+Adding a memory clobber to that asm seems to place it more appropriately,
+but again, that's not particularly desirable.
+
+Another solution would be to make both tlb_ops_need_broadcast and
+cache_ops_need_broadcast both be a flag test, but that introduces a
+memory load in all those paths no matter if we're running on SMP_ON_UP
+or not.
