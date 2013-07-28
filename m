@@ -1,7 +1,7 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 28 Jul 2013 05:58:10 +0000 (UTC)
-Subject: [PATCH] ARM: v6: avoid remaining accesses to missing CP15
- registers on ARM1136 r0
+Date: Sun, 28 Jul 2013 06:00:26 +0000 (UTC)
+Subject: [PATCH v2] ARM: v6: avoid remaining accesses to missing CP15 registers
+ on ARM1136 r0
 In-Reply-To: <alpine.DEB.2.02.1307280543370.8385@utopia.booyaka.com>
 References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
  <20130722184325.GA21614@n2100.arm.linux.org.uk>
@@ -14,18 +14,60 @@ References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
  <20130727122221.GB6618@mudshark.cambridge.arm.com>
  <alpine.DEB.2.02.1307280527430.8385@utopia.booyaka.com>
  <alpine.DEB.2.02.1307280543370.8385@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1307280557130.8385@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1307280559330.8385@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Jul 2013, Paul Walmsley wrote:
+Ensure that the remaining callers of read_cpuid_ext can't attempt an 
+extended CP15 register read on ARMv6 cores that don't support it.  The 
+only one that appears dodgy is tlb_ops_need_broadcast().
 
-> Ensure that the remaining callers of read_cpuid_ext can't attempt an
-> extended CP15 register read on ARMv6.
+While here, convert feat_v6_fixup() to use cpu_is_arm1136_r0() to save
+a few lines of code.
 
-This description is somewhat inaccurate - it should read something like 
-"can't attempt an extended CP15 register read on ARMv6 cores that don't 
-support it".  Will resend.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/smp_plat.h | 3 +++
+ arch/arm/kernel/setup.c         | 7 +------
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
-
-- Paul
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 76214cb..ad07564 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -30,6 +30,9 @@ static inline bool is_smp(void)
+ #else
+ static inline int tlb_ops_need_broadcast(void)
+ {
++	if (cpu_is_arm1136_r0())
++		return 0;
++
+ 	if (!is_smp())
+ 		return 0;
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 63af9a7..a601843 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -389,16 +389,11 @@ static void __init cpuid_init_hwcaps(void)
+ 
+ static void __init feat_v6_fixup(void)
+ {
+-	int id = read_cpuid_id();
+-
+-	if ((id & 0xff0f0000) != 0x41070000)
+-		return;
+-
+ 	/*
+ 	 * HWCAP_TLS is available only on 1136 r1p0 and later,
+ 	 * see also kuser_get_tls_init.
+ 	 */
+-	if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
++	if (cpu_is_arm1136_r0())
+ 		elf_hwcap &= ~HWCAP_TLS;
+ }
+ 
+-- 
+1.8.3.2
