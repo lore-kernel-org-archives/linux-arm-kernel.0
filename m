@@ -1,119 +1,97 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 28 Jul 2013 16:56:34 -0500
-Subject: [PATCH 3/7] ARM: PSCI: add ops for system restart and power off
+Date: Sun, 28 Jul 2013 16:56:35 -0500
+Subject: [PATCH 4/7] cpuidle: calxeda: add support to use PSCI calls
 In-Reply-To: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
 References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1375048598-15637-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1375048598-15637-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-In PSCI v0.2 spec, operations for system level restart and power off are
-added. This adds kernel support for those operations. The behavior for
-picking restart function matches the psci_smp_ops such that the PSCI
-restart function will be used when present even if a platform defines
-a mdesc->restart entry. As pm_power_off depends on platform init code to
-setup, using the PSCI version relies on the platform code to not override
-it.
+This updates the Calxeda cpuidle driver to use PSCI calls to powergate
+cores. This is needed to enable cpuidle for the ECX-2000.
+
+This could possibly become a generic PSCI driver, but there are no other
+PSCI users in the kernel other than mach-virt.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-pm at vger.kernel.org
 ---
- arch/arm/include/asm/psci.h |  2 ++
- arch/arm/kernel/psci.c      | 40 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+ drivers/cpuidle/cpuidle-calxeda.c | 40 ++++++---------------------------------
+ 1 file changed, 6 insertions(+), 34 deletions(-)
 
-diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-index c4ae171..04ee1b2 100644
---- a/arch/arm/include/asm/psci.h
-+++ b/arch/arm/include/asm/psci.h
-@@ -29,6 +29,8 @@ struct psci_operations {
- 	int (*cpu_off)(struct psci_power_state state);
- 	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
- 	int (*migrate)(unsigned long cpuid);
-+	void (*system_off)(void);
-+	void (*system_reset)(void);
- };
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+index 0e6e408..01cfecf3 100644
+--- a/drivers/cpuidle/cpuidle-calxeda.c
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -22,51 +22,23 @@
  
- extern struct psci_operations psci_ops;
-diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-index 4693188..ffc4a7c 100644
---- a/arch/arm/kernel/psci.c
-+++ b/arch/arm/kernel/psci.c
-@@ -17,12 +17,14 @@
- 
+ #include <linux/cpuidle.h>
  #include <linux/init.h>
+-#include <linux/io.h>
  #include <linux/of.h>
-+#include <linux/pm.h>
+-#include <linux/time.h>
+-#include <linux/delay.h>
+-#include <linux/suspend.h>
+ #include <asm/cpuidle.h>
+-#include <asm/proc-fns.h>
+-#include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+-#include <asm/cacheflush.h>
+-#include <asm/cp15.h>
+-
+-extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+-extern void *scu_base_addr;
+-
+-static noinline void calxeda_idle_restore(void)
+-{
+-	set_cr(get_cr() | CR_C);
+-	set_auxcr(get_auxcr() | 0x40);
+-	scu_power_mode(scu_base_addr, SCU_PM_NORMAL);
+-}
++#include <asm/psci.h>
  
- #include <asm/compiler.h>
- #include <asm/errno.h>
- #include <asm/opcodes-sec.h>
- #include <asm/opcodes-virt.h>
- #include <asm/psci.h>
-+#include <asm/system_misc.h>
- 
- struct psci_operations psci_ops;
- 
-@@ -33,6 +35,8 @@ enum psci_function {
- 	PSCI_FN_CPU_ON,
- 	PSCI_FN_CPU_OFF,
- 	PSCI_FN_MIGRATE,
-+	PSCI_FN_SYS_OFF,
-+	PSCI_FN_SYS_RESET,
- 	PSCI_FN_MAX,
- };
- 
-@@ -153,6 +157,30 @@ static int psci_migrate(unsigned long cpuid)
- 	return psci_to_linux_errno(err);
+ static int calxeda_idle_finish(unsigned long val)
+ {
+-	/* Already flushed cache, but do it again as the outer cache functions
+-	 * dirty the cache with spinlocks */
+-	flush_cache_all();
+-
+-	set_auxcr(get_auxcr() & ~0x40);
+-	set_cr(get_cr() & ~CR_C);
+-
+-	scu_power_mode(scu_base_addr, SCU_PM_DORMANT);
+-
+-	cpu_do_idle();
+-
+-	/* Restore things if we didn't enter power-gating */
+-	calxeda_idle_restore();
+-	return 1;
++	const struct psci_power_state ps = {
++		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
++	};
++	return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
  }
  
-+static void psci_system_off(void)
-+{
-+	u32 fn = psci_function_id[PSCI_FN_SYS_OFF];
-+	invoke_psci_fn(fn, 0, 0, 0);
-+}
-+
-+static void psci_system_reset(void)
-+{
-+	u32 fn = psci_function_id[PSCI_FN_SYS_RESET];
-+	invoke_psci_fn(fn, 0, 0, 0);
-+}
-+
-+void psci_pm_power_off(void)
-+{
-+	if (psci_ops.system_off)
-+		psci_ops.system_off();
-+}
-+
-+void psci_restart(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+	if (psci_ops.system_off)
-+		psci_ops.system_reset();
-+}
-+
- static const struct of_device_id psci_of_match[] __initconst = {
- 	{ .compatible = "arm,psci",	},
- 	{},
-@@ -204,6 +232,18 @@ void __init psci_init(void)
- 		psci_ops.migrate = psci_migrate;
- 	}
+ static int calxeda_pwrdown_idle(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+ {
+-	highbank_set_cpu_jump(smp_processor_id(), cpu_resume);
+ 	cpu_suspend(0, calxeda_idle_finish);
+ 	return index;
+ }
+@@ -90,7 +62,7 @@ static struct cpuidle_driver calxeda_idle_driver = {
  
-+	if (!of_property_read_u32(np, "system_off", &id)) {
-+		psci_function_id[PSCI_FN_SYS_OFF] = id;
-+		psci_ops.system_off = psci_system_off;
-+		pm_power_off = psci_pm_power_off;
-+	}
-+
-+	if (!of_property_read_u32(np, "system_reset", &id)) {
-+		psci_function_id[PSCI_FN_SYS_RESET] = id;
-+		psci_ops.system_reset = psci_system_reset;
-+		arm_pm_restart = psci_restart;
-+	}
-+
- out_put_node:
- 	of_node_put(np);
- 	return;
+ static int __init calxeda_cpuidle_init(void)
+ {
+-	if (!of_machine_is_compatible("calxeda,highbank"))
++	if (!of_machine_is_compatible("calxeda,highbank") || !psci_ops.cpu_suspend)
+ 		return -ENODEV;
+ 
+ 	return cpuidle_register(&calxeda_idle_driver, NULL);
 -- 
 1.8.1.2
