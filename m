@@ -1,54 +1,61 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 27 Jul 2013 23:00:21 -0600
-Subject: How to create IRQ mappings in a GPIO driver that doesn't control
- its IRQ domain ?
-In-Reply-To: <1681089.qGWOhLKTTo@avalon>
-References: <1624911.6TtmtVmU1T@avalon> <1408178.cxAUTUGJc5@avalon>
- <20130725131556.GD9858@sirena.org.uk> <1681089.qGWOhLKTTo@avalon>
-Message-ID: <20130728050021.4370E3E0A24@localhost>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sat, 27 Jul 2013 22:11:16 -0700
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <CACxGe6vw9=y5a+EgF1gO39SwGAdGofD2MYjyJ3jYu6uN3ke70A@mail.gmail.com>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
+ <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
+ <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
+ <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
+ <CACxGe6uE6jOE-vz0onW5h93Es-soGiBAcFBM7Dvxh+HvCNrHkw@mail.gmail.com>
+ <CACxGe6vw9=y5a+EgF1gO39SwGAdGofD2MYjyJ3jYu6uN3ke70A@mail.gmail.com>
+Message-ID: <1374988276.1973.29.camel@dabdike>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Jul 2013 15:22:29 +0200, Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
-> Hi Mark,
+On Sat, 2013-07-27 at 21:28 -0600, Grant Likely wrote:
+> On Sat, Jul 27, 2013 at 2:25 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > On Sat, Jul 27, 2013 at 2:01 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> >> On Sat, Jul 27, 2013 at 3:45 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> >>> On Sat, Jul 27, 2013 at 4:59 AM, Arend van Spriel <arend@broadcom.com> wrote:
+> >>>> Let's see how many people go and scream if I say this: Too bad .dts files
+> >>>> are not done using XML format as DT bindings could be described using XML
+> >>>> Schema.
+> >>>
+> >>> Draft an example and show us how it would look!  :-)  There is
+> >>> absolutely nothing preventing us from expressing a DT in XML format,
+> >>> or even using XSLT to define DT schema while still using our current
+> >>> .dts syntax. It would be trivial to do lossless translation between
+> >>> .dts syntax and xml.
+> >>>
+> >>> The problem that I have with XML and XSLT is that it is very verbose
+> >>> and not entirely friendly to mere-mortals. However, I'm more than
+> >>> willing to be proved wrong on this point.
+> >>
+> >> I considered this approach a while ago and discarded it. It would work
+> >> but it is just too much of a Frankenstein monster.
+> >>
+> >> Much cleaner to modify dtc to take a schema as part of the compilation
+> >> process. The schema language itself has no requirement to look like
+> >> DTS syntax. Whoever wrote dtc probably has a favorite language that
+> >> would be good for writing schemas in.
+> >
+> > Making it part of dtc is a required feature as far as I'm concerned.
+> > Using XML/XSLT and dtc-integration are not mutually exclusive, but I
+> > digress.
 > 
-> On Thursday 25 July 2013 14:15:56 Mark Brown wrote:
-> > On Thu, Jul 25, 2013 at 11:45:33AM +0200, Laurent Pinchart wrote:
-> > > The two devices are independent, so there's no real parent/child
-> > > relationship. However, as Grant proposed, I could list all the interrupts
-> > > associated with GPIOs in the GPIO controller DT node. I would then just
-> > > call irq_of_parse_and_map() in the .to_irq() handler to magically
-> > > translate the GPIO number to a mapped IRQ number.
-> > > 
-> > > The number of interrupts can be pretty high (up to 58 in the worst case so
-> > > far), so an alternative would be to specify the interrupt-parent only, and
-> > > call irq_create_of_mapping() directly. What solution would you prefer ?
-> > 
-> > Are the interrupts in a contiguous block in the controller so you can just
-> > pass around the controller and a base number?
-> 
-> In two of the three SoCs I need to fix they are. I've just realized that in 
-> the last one the interrupts are in two contiguous blocks in two different 
-> parents. I will thus need at least a list of <parent-phandle base count>. Our 
-> standard interrupt bindings don't seem to support multiple parents,
+> Oops, ignore the XSLT bit. XSLT isn't schema and has no bearing on the
+> discussion of schema. Sorry for the noise.
 
-You can actually do it by using a dummy node with interrupt-map and
-interrupt-map-mask properties, but it is a pretty ugly solution in my
-opinion.
+XSLT is a transform language ... you'd use it say to transform xml to
+dtc, so it would be an integral component of an xml/xslt based schema.
 
-> is that 
-> something that we want to fix or should I go for custom bindings ?
+If you want actually to describe and have validated the xml schema
+itself, then you'd use xsd (XML schema description language) and its
+associated tools.
 
-Yes, I think it is something that we want to fix. Jean-Christophe was
-going to propose an alternative to the interrupts property which allows
-an array of <phandle interrupt-specifier> tuples, but I've not seen
-anything yet. Go ahead and make a proposal.
+I'm not saying you *should* do this, just that it's possible (plus I've
+just blown my kernel cred by knowing about xml, sigh).
 
-You could try to encode a base+count variant, but honestly I don't think
-it would be a good idea because it only would work with a very narrow
-set of use cases. Consider if #interrupt-cells was set to 2. Which cell
-gets incremented in the range of interrupts specified? Better I think to
-merely have an array of fully specified irqs. Support for that property
-could be transparently baked into the core interrupt parsing functions.
-
-g.
+James
