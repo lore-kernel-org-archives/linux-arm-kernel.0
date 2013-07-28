@@ -1,29 +1,41 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 27 Jul 2013 23:13:45 -0600
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <1374988276.1973.29.camel@dabdike>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
- <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
- <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
- <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
- <CACxGe6uE6jOE-vz0onW5h93Es-soGiBAcFBM7Dvxh+HvCNrHkw@mail.gmail.com>
- <CACxGe6vw9=y5a+EgF1gO39SwGAdGofD2MYjyJ3jYu6uN3ke70A@mail.gmail.com>
- <1374988276.1973.29.camel@dabdike>
-Message-ID: <CACxGe6tpfbhb6SQVQYieEX9OT56zWTRf04cg0NJFr4M4LJz5Cw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 28 Jul 2013 05:38:06 +0000 (UTC)
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <20130727122221.GB6618@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+ <20130722184325.GA21614@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+ <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com> <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+ <20130727122221.GB6618@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1307280527430.8385@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 11:11 PM, James Bottomley
-<James.Bottomley@hansenpartnership.com> wrote:
-> If you want actually to describe and have validated the xml schema
-> itself, then you'd use xsd (XML schema description language) and its
-> associated tools.
->
-> I'm not saying you *should* do this, just that it's possible (plus I've
-> just blown my kernel cred by knowing about xml, sigh).
+Hi Will,
 
-:)
+On Sat, 27 Jul 2013, Will Deacon wrote:
 
-g.
+> That's very odd -- I *suspect* your bootloader is up to no good (iirc, we've
+> had issues with the bootloader on this machine in the past, since it enters
+> the kernel in ABT mode or something).
+
+Maybe you're thinking of the (2420-based) Nokia N800?  The 2430SDP here 
+uses u-boot:
+
+http://www.pwsan.com/omap/testlogs/test_v3.10-rc7/20130630191558/boot/2430sdp/
+
+> Can you try this quick hack please? It clobbers the I-cache as soon as we
+> enter the kernel, so it should tell us whether my theory is correct.
+
+Tried it and still hangs.  Spent some time debugging - turns out it's due 
+to the extended CP15 register read in cache_ops_need_broadcast().. the 
+extended regs aren't present on ARM1136 r0* and trigger an undefined 
+instruction abort :-(  Sorry about that, should have taken the time to 
+send along an earlyprintk trace.  Patches in a few moments -
+
+
+- Paul
