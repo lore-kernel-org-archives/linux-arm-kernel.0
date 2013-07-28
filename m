@@ -1,107 +1,138 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 27 Jul 2013 22:11:26 -0600
-Subject: [PATCHv5 01/11] irqdomain: add irq_alloc_mapping() function
-In-Reply-To: <1373889167-27878-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Sat, 27 Jul 2013 22:33:10 -0600
+Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
+In-Reply-To: <51E41F7A.4010502@gmail.com>
 References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130728041127.068613E08F8@localhost>
+ <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <51E41F7A.4010502@gmail.com>
+Message-ID: <20130728043310.6CF1D3E08FE@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Jul 2013 13:52:37 +0200, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-> This commit extends the irqdomain subsystem with an
-> irq_alloc_mapping() function which allows to let the irqdomain code
-> find an available hwirq number in the range [ 0 ; domain size ] for
-> the given domain, and create a virq mapping for it.
+On Mon, 15 Jul 2013 11:12:42 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On 07/15/2013 06:52 AM, Thomas Petazzoni wrote:
+> > This commit adds a very basic registry of msi_chip structures, so that
+> > an IRQ controller driver can register an msi_chip, and a PCIe host
+> > controller can find it, based on a 'struct device_node'.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  include/linux/irqdomain.h |  2 ++
->  kernel/irq/irqdomain.c    | 32 ++++++++++++++++++++++++++++++++
->  2 files changed, 34 insertions(+)
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Actually, I'm going to disagree on this one and say NAK. I don't think
+it is a good idea to create a completely separate registry of msi_chips
+for binding to dt nodes. I think it would be better to include the
+msi_chip pointer directly into the irq_domain which has to be there
+anyway. It then becomes another feature for irq controllers if it can
+support doing MSI.
+
+In fact, I would even go so far as to say it would make sense for the
+msi_chip functionality to be rolled directly into the irq_domain without
+a separate structure; but I'm not nacking on that point.
+
+g.
+
 > 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index c983ed1..1ffa336 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -195,6 +195,8 @@ static inline unsigned int irq_linear_revmap(struct irq_domain *domain,
->  extern unsigned int irq_find_mapping(struct irq_domain *host,
->  				     irq_hw_number_t hwirq);
->  extern unsigned int irq_create_direct_mapping(struct irq_domain *host);
-> +extern unsigned int irq_alloc_mapping(struct irq_domain *host,
-> +				      irq_hw_number_t *hwirq);
->  extern int irq_create_strict_mappings(struct irq_domain *domain,
->  				      unsigned int irq_base,
->  				      irq_hw_number_t hwirq_base, int count);
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 706724e..b9ddb94 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -375,6 +375,38 @@ unsigned int irq_create_direct_mapping(struct irq_domain *domain)
->  EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
->  
->  /**
-> + * irq_alloc_mapping() - Allocate an irq for mapping
-> + * @domain: domain to allocate the irq for or NULL for default domain
-> + * @hwirq:  reference to the returned hwirq
-> + *
-> + * This routine are used for irq controllers which can choose the
-> + * hardware interrupt number from a range [ 0 ; domain size ], such as
-> + * is often the case with PCI MSI controllers. The function will
-> + * returned the allocated hwirq number in the hwirq pointer, and the
-> + * corresponding virq number as the return value.
-> + */
-> +unsigned int irq_alloc_mapping(struct irq_domain *domain,
-> +			       irq_hw_number_t *out_hwirq)
-> +{
-> +	irq_hw_number_t hwirq;
-> +
-> +	pr_debug("irq_alloc_mapping(0x%p)\n", domain);
-> +
-> +	for (hwirq = 0; hwirq < domain->hwirq_max; hwirq++)
-> +		if (!irq_find_mapping(domain, hwirq))
-> +			break;
-
-Okay, you can add my acked-by, but only if you change the above hunk to:
-
-	for (hwirq = 0; hwirq < domain->revmap_size; hwirq++)
-		if (domain->linear_revmap[hwirq] == 0)
-			break;
-
-In some cases hwirq_max will be set to ~0, which means calling
-irq_find_mapping about 4 billion times. Not safe. The above change
-prevents that problem, but it also means the function won't work for the
-tree map. A followup patch can be crafted to add support for the tree
-mapping.
-
-> +
-> +	if (hwirq == domain->hwirq_max) {
-> +		pr_debug("-> no available hwirq found\n");
-> +		return 0;
-> +	}
-> +
-> +	*out_hwirq = hwirq;
-> +	return irq_create_mapping(domain, hwirq);
-
-out_hwirq should *not* be modified if irq_create_mapping fails. You'll
-need to rework the above to:
-
-	rc = irq_create_mapping(domain, hwirq);
-	if (rc)
-		*out_hwirq = hwirq;
-	return rc;
-
-When the above two issues are fixed:
-
-Acked-by: Grant Likely <grant.likely@linaro.org>
-
-> +}
-> +EXPORT_SYMBOL_GPL(irq_alloc_mapping);
-> +
-> +/**
->   * irq_create_mapping() - Map a hardware interrupt into linux irq space
->   * @domain: domain owning this hardware interrupt or NULL for default domain
->   * @hwirq: hardware irq number in that domain space
-> -- 
-> 1.8.1.2
+> 
+> > ---
+> >  drivers/of/of_pci.c    | 45 +++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/msi.h    |  2 ++
+> >  include/linux/of_pci.h | 12 ++++++++++++
+> >  3 files changed, 59 insertions(+)
+> > 
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index 42c687a..e5ca008 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> > @@ -89,3 +89,48 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+> >  	return 0;
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+> > +
+> > +#ifdef CONFIG_PCI_MSI
+> > +
+> > +static LIST_HEAD(of_pci_msi_chip_list);
+> > +static DEFINE_MUTEX(of_pci_msi_chip_mutex);
+> > +
+> > +int of_pci_msi_chip_add(struct msi_chip *chip)
+> > +{
+> > +	if (!of_property_read_bool(chip->of_node, "msi-controller"))
+> > +		return -EINVAL;
+> > +
+> > +	mutex_lock(&of_pci_msi_chip_mutex);
+> > +	list_add(&chip->list, &of_pci_msi_chip_list);
+> > +	mutex_unlock(&of_pci_msi_chip_mutex);
+> > +
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_pci_msi_chip_add);
+> > +
+> > +void of_pci_msi_chip_remove(struct msi_chip *chip)
+> > +{
+> > +	mutex_lock(&of_pci_msi_chip_mutex);
+> > +	list_del(&chip->list);
+> > +	mutex_unlock(&of_pci_msi_chip_mutex);
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_pci_msi_chip_remove);
+> > +
+> > +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node)
+> > +{
+> > +	struct msi_chip *c;
+> > +
+> > +	mutex_lock(&of_pci_msi_chip_mutex);
+> > +	list_for_each_entry(c, &of_pci_msi_chip_list, list) {
+> > +		if (c->of_node == of_node) {
+> > +			mutex_unlock(&of_pci_msi_chip_mutex);
+> > +			return c;
+> > +		}
+> > +	}
+> > +	mutex_unlock(&of_pci_msi_chip_mutex);
+> > +
+> > +	return NULL;
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
+> > +
+> > +#endif /* CONFIG_PCI_MSI */
+> > diff --git a/include/linux/msi.h b/include/linux/msi.h
+> > index cbf5d05..80900e0 100644
+> > --- a/include/linux/msi.h
+> > +++ b/include/linux/msi.h
+> > @@ -67,6 +67,8 @@ void default_teardown_msi_irqs(struct pci_dev *dev);
+> >  struct msi_chip {
+> >  	struct module *owner;
+> >  	struct device *dev;
+> > +	struct device_node *of_node;
+> > +	struct list_head list;
+> >  
+> >  	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+> >  			 struct msi_desc *desc);
+> > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> > index 7a04826..29631eb 100644
+> > --- a/include/linux/of_pci.h
+> > +++ b/include/linux/of_pci.h
+> > @@ -2,6 +2,7 @@
+> >  #define __OF_PCI_H
+> >  
+> >  #include <linux/pci.h>
+> > +#include <linux/msi.h>
+> >  
+> >  struct pci_dev;
+> >  struct of_irq;
+> > @@ -13,4 +14,15 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+> >  int of_pci_get_devfn(struct device_node *np);
+> >  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+> >  
+> > +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> > +int of_pci_msi_chip_add(struct msi_chip *chip);
+> > +void of_pci_msi_chip_remove(struct msi_chip *chip);
+> > +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node);
+> > +#else
+> > +static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
+> > +static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
+> > +static inline struct msi_chip *
+> > +of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
+> > +#endif
+> > +
+> >  #endif
+> > 
 > 
