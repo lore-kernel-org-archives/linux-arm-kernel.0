@@ -1,106 +1,63 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 28 Jul 2013 12:46:16 +0200
-Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
-In-Reply-To: <51F4F317.1040001@linaro.org>
-References: <0e7d01ce8840$82f79070$88e6b150$@org> <1877730.qZVs3NAG5h@flatron>
- <51F4F317.1040001@linaro.org>
-Message-ID: <1449250.PNC13edUOF@flatron>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 28 Jul 2013 12:10:38 +0100
+Subject: [PATCH] ARM: v6: avoid read_cpuid_ext() on ARM1136r0 in
+ cache_ops_need_broadcast()
+In-Reply-To: <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+ <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com>
+ <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com>
+ <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+ <20130727122221.GB6618@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
+Message-ID: <20130728111038.GA9374@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 of July 2013 12:31:51 Daniel Lezcano wrote:
-> On 07/28/2013 11:22 AM, Tomasz Figa wrote:
-> > On Sunday 28 of July 2013 09:10:09 Daniel Lezcano wrote:
-> >> On 07/24/2013 01:47 PM, Kukjin Kim wrote:
-> >>> Amit Daniel Kachhap wrote:
-> >>>> This patch skips the deep C1(AFTR -Arm off top running) state for
-> >>>> exynos5440
-> >>>> soc as this soc does not support this state. All the cpu's only
-> >>>> allows the basic
-> >>>> C0 state.
-> >>>> 
-> >>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> >>>> ---
-> >>>> 
-> >>>>  arch/arm/mach-exynos/cpuidle.c |    2 +-
-> >>>>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >>>> 
-> >>>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
-> >>>> exynos/cpuidle.c
-> >>>> index 17a18ff..9a776a1 100644
-> >>>> --- a/arch/arm/mach-exynos/cpuidle.c
-> >>>> +++ b/arch/arm/mach-exynos/cpuidle.c
-> >>>> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
-> >>>> 
-> >>>>  		device->cpu = cpu_id;
-> >>>>  		
-> >>>>  		/* Support IDLE only */
-> >>>> 
-> >>>> -		if (cpu_id != 0)
-> >>>> +		if (soc_is_exynos5440() || cpu_id != 0)
-> >>>> 
-> >>>>  			device->state_count = 1;
-> >>>>  		
-> >>>>  		ret = cpuidle_register_device(device);
-> >>>> 
-> >>>> --
-> >>>> 1.7.1
-> >>> 
-> >>> Applied, thanks.
-> >> 
-> >> You shouldn't have. This patch means exynos5540 has no cpuidle driver
-> >> at all. It should be fixed in the Kconfig to unselect
-> >> CONFIG_CPU_IDLE for an exynos5540.
-> > 
-> > To shed more light on this, let me add that you need to register a
-> > cpuidle driver only if you have more states than a simple WFI or you
-> > need some crazy steps to enter WFI. Default setup falls back to
-> > generic ARM WFI. (Daniel, do we get the nice idle stats as provided
-> > by cpuidle core then?)
-> Nope, but with one state, idle vs busy stats do the trick.
+Hi Paul,
+
+Cheers for sticking with this!
+
+On Sun, Jul 28, 2013 at 06:43:24AM +0100, Paul Walmsley wrote:
 > 
-> BTW, I am writing a tool to do some stats based on the idle events [1].
-> It is still at a very early development stage but we can get some
-> interesting informations.
+> Commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc ("ARM: 7757/1: mm:
+> don't flush icache in switch_mm with hardware broadcasting") breaks
+> the boot on OMAP2430SDP with omap2plus_defconfig.  Tracked to an
+> undefined instruction abort from the CP15 read in
+> cache_ops_need_broadcast().  It turns out that early ARM1136 variants
+> don't support several CP15 registers that later ARM cores do.
+> ARM1136JF-S TRM section 3.2.1 "Register allocation" has the details.
 
-Sounds good.
+Intriguing... I wouldn't expect a cp15 read to be emitted for 1136, since
+the SMP_ON_UP magic should have caused is_smp() to return false.
 
-By the way, a random idea that just came to my mind is that since we 
-already support multiple cpuidle drivers, what about providing a default 
-cpuidle-wfi driver that gets used in case no other driver is available?
+> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+> index 6462a72..76214cb 100644
+> --- a/arch/arm/include/asm/smp_plat.h
+> +++ b/arch/arm/include/asm/smp_plat.h
+> @@ -25,7 +25,6 @@ static inline bool is_smp(void)
+>  #endif
+>  }
+>  
+> -/* all SMP configurations have the extended CPUID registers */
+>  #ifndef CONFIG_MMU
+>  #define tlb_ops_need_broadcast()	0
+>  #else
+> @@ -43,6 +42,9 @@ static inline int tlb_ops_need_broadcast(void)
+>  #else
+>  static inline int cache_ops_need_broadcast(void)
+>  {
+> +	if (cpu_is_arm1136_r0())
+> +		return 0;
+> +
+>  	if (!is_smp())
+>  		return 0;
 
-This would give us cpuidle stats at the same place as with other cpuidle 
-drivers and might also unify some code paths.
+So we should have returned 0 here without exploding (this just reads a
+.globl initialised in head.S). Are we somehow misidentifying your 1136
+as an SMP core?
 
-As I said, it's just a random idea, so feel free to redirect it to 
-/dev/null.
-
-> > Anyway, Exynos cpuidle is using an initcall to initialize and we
-> > support multiple Exynos SoCs in single zImage, so deselecting
-> > CONFIG_CPU_IDLE is not an option.
-> 
-> Good point.
-> 
-> > Considering multiplatform requirements, the driver has to
-> > 
-> > be modified to initialize only on supported platforms, either by:
-> >  a) dropping the initcall and calling the init function directly from
-> > 
-> > arch/arm/mach-exynos
-> > 
-> >  or
-> >  
-> >  b) checking if machine we are running on is supported, which would
-> >  mean a> 
-> > long list of all Exynos SoCs that needs to be checked.
-> > 
-> > An evolution of option a) is registering a platform device somewhere
-> > in
-> > arch/arm/mach-exynos and making exynos-cpuidle a platform driver.
-> 
-> Yes, I am favorable to this solution [2].
-
-OK, looks good.
-
-Best regards,
-Tomasz
+Will
