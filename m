@@ -1,38 +1,54 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 27 Jul 2013 22:39:25 -0600
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
-References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
-Message-ID: <20130728043925.8F3BE3E08FE@localhost>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 27 Jul 2013 23:00:21 -0600
+Subject: How to create IRQ mappings in a GPIO driver that doesn't control
+ its IRQ domain ?
+In-Reply-To: <1681089.qGWOhLKTTo@avalon>
+References: <1624911.6TtmtVmU1T@avalon> <1408178.cxAUTUGJc5@avalon>
+ <20130725131556.GD9858@sirena.org.uk> <1681089.qGWOhLKTTo@avalon>
+Message-ID: <20130728050021.4370E3E0A24@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Jul 2013 09:09:19 -0700, Olof Johansson <olof@lixom.net> wrote:
-> [I'm adding LKML and ksummit-discuss to this thread, since the ACPI/DT
-> discussions have been covered there and this overlaps some with that]
+On Thu, 25 Jul 2013 15:22:29 +0200, Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+> Hi Mark,
 > 
-> On Thu, Jul 25, 2013 at 7:38 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Thu, Jul 25, 2013 at 03:27:02PM +0100, Russell King - ARM Linux wrote:
-> >> Remember the stated assertion when DT was first added to the kernel: the
-> >> DT descriptions _will_ become a separately maintained project which is
-> >> independent of the kernel.  They will _not_ be kernel version specific.
-> >
-> > I'm looking forward to this.
-> >
-> > Question for the DT guys: what are the plans here? Are we going to get
-> > rid of the .dts files inside the kernel tree?
+> On Thursday 25 July 2013 14:15:56 Mark Brown wrote:
+> > On Thu, Jul 25, 2013 at 11:45:33AM +0200, Laurent Pinchart wrote:
+> > > The two devices are independent, so there's no real parent/child
+> > > relationship. However, as Grant proposed, I could list all the interrupts
+> > > associated with GPIOs in the GPIO controller DT node. I would then just
+> > > call irq_of_parse_and_map() in the .to_irq() handler to magically
+> > > translate the GPIO number to a mapped IRQ number.
+> > > 
+> > > The number of interrupts can be pretty high (up to 58 in the worst case so
+> > > far), so an alternative would be to specify the interrupt-parent only, and
+> > > call irq_create_of_mapping() directly. What solution would you prefer ?
+> > 
+> > Are the interrupts in a contiguous block in the controller so you can just
+> > pass around the controller and a base number?
 > 
-> In the discussions we had in Dublin, a couple of options on how to
-> lock in bindings were discussed. I'm a little surprised that Grant
-> didn't cover them in his initial emails on the new maintainership
-> model, but maybe he wanted the new group to handle it. And they didn't
-> bring it up yet either. So I am. :-)
+> In two of the three SoCs I need to fix they are. I've just realized that in 
+> the last one the interrupts are in two contiguous blocks in two different 
+> parents. I will thus need at least a list of <parent-phandle base count>. Our 
+> standard interrupt bindings don't seem to support multiple parents,
 
-Excellent! My plan to avoid responsibility for stuff is proceeding.
-Actually, I think I touched on it, but the details got lost in my head
-among all the other stuff we discussed two weeks ago. Thanks for getting
-this detail down into an email.
+You can actually do it by using a dummy node with interrupt-map and
+interrupt-map-mask properties, but it is a pretty ugly solution in my
+opinion.
+
+> is that 
+> something that we want to fix or should I go for custom bindings ?
+
+Yes, I think it is something that we want to fix. Jean-Christophe was
+going to propose an alternative to the interrupts property which allows
+an array of <phandle interrupt-specifier> tuples, but I've not seen
+anything yet. Go ahead and make a proposal.
+
+You could try to encode a base+count variant, but honestly I don't think
+it would be a good idea because it only would work with a very narrow
+set of use cases. Consider if #interrupt-cells was set to 2. Which cell
+gets incremented in the range of interrupts specified? Better I think to
+merely have an array of fully specified irqs. Support for that property
+could be transparently baked into the core interrupt parsing functions.
 
 g.
