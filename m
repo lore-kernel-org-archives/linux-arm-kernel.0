@@ -1,85 +1,42 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 28 Jul 2013 12:07:48 +0200
-Subject: How to create IRQ mappings in a GPIO driver that doesn't control
- its IRQ domain ?
-In-Reply-To: <1624911.6TtmtVmU1T@avalon>
-References: <1624911.6TtmtVmU1T@avalon>
-Message-ID: <12170068.F0utKQgh5l@flatron>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 28 Jul 2013 12:22:15 +0200
+Subject: [RFC 4/8] pinctrl: imx: Support imx21 register format
+In-Reply-To: <20130728083436.GI2737@pengutronix.de>
+References: <1374938808-27316-1-git-send-email-mpa@pengutronix.de>
+ <1374938808-27316-5-git-send-email-mpa@pengutronix.de>
+ <20130728083436.GI2737@pengutronix.de>
+Message-ID: <20130728102215.GH16871@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Sascha,
 
-On Wednesday 24 of July 2013 01:21:44 Laurent Pinchart wrote:
-> Hello,
+On Sun, Jul 28, 2013 at 10:34:36AM +0200, Sascha Hauer wrote:
+> Hi Markus,
 > 
-> I'm running into an issue on several Renesas SoC with IRQ domains and
-> GPIOs.
+> On Sat, Jul 27, 2013 at 05:26:44PM +0200, Markus Pargmann wrote:
+> > The imx pinctrl core driver does not support the imx21 register format
+> > yet. This patch adds support for the strange iomux control registers of
+> > imx21 and imx27. Next to a slightly different DT parse function.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  drivers/pinctrl/pinctrl-imx.c | 264 +++++++++++++++++++++++++++++++++++++++---
+> >  1 file changed, 250 insertions(+), 14 deletions(-)
 > 
-> On sh73a0, r8a73a4 and r8a7740, GPIOs and external interrupts are
-> handled by two separate IP cores, namely the PFC (Pin Function
-> Controller) and INTC (Interrupt Controller). The former is handled by
-> the sh-pfc driver (drivers/pinctrl/sh-pfc) and the later by the
-> irq-renesas-intc-irqpin driver (drivers/irqchip), referred to below as
-> the irqpin driver.
+> Is it really worth sharing the i.MX1/21/27 support with the imx driver?
+> It seems most of the code is rewritten. I just tried and removed all
+> lines from pinctrl-imx.c you don't use. There's not much left to share.
 
-Is the INTC used for anything more than just external interrupts on GPIO 
-lines?
+Yes it's really not that much to share. I will move it to a seperate
+file for imx1/21/27.
 
-> The sh73a0, for instance, has 32 external interrupt lines that are
-> multiplexed on pins usable as GPIOs. Both the GPIO and external
-> interrupt functions are usable at the same time, which allows reading
-> the state of the interrupt lines.
-> 
-> These external interrupts are for MMC/SD support, among other devices.
-> In this specific case the MMC/SD Card Detect signal is wired to one of
-> the external interrupt signals, and the corresponding GPIO is passed to
-> the MMC/SD controller driver. Depending on other configuration
-> parameters the driver can then either poll the Card Detect signal, or
-> register an interrupt handler to detect changes in the signal state.
-> This features is implemented by the MMC/SD core, which call
-> gpio_to_irq() on the GPIO to retrieve the corresponding IRQ number.
-> 
-> On non-DT systems the external IRQs are statically mapped at a known
-> offset. The sh-pfc driver, to implement the gpio_to_irq() function
-> (through its gpiochip .to_irq() handler), simply searches a
-> SoC-specific lookup table for the fixed IRQ number associated with a
-> given GPIO.
-> 
-> However, on DT systems, IRQs are mapped dynamically on demand. The
-> irqpin driver registers a simple IRQ domain, and the
-> irq_create_mapping() function can then be used to map a given IRQ,
-> specified as an offset in the domain. This is where the problem
-> appears, as the irqchip .to_irq() function is implemented in the sh-pfc
+Thanks,
 
-I assume it should be s/irqchip/gpiochip/ in the line above, shouldn't it?
+Markus
 
-> driver, which doesn't have access to the IRQ domain registered by the
-> irqpin driver.
-> 
-> I could hack around this by exporting a function in the irqpin driver
-> that would map an IRQ, and call that function from the sh-pfc driver.
-> I'd rather avoid that solution as it would add a direct dependency
-> between the two drivers.
-
-If you could just get the IRQ domain registered by irqpin driver and use 
-it in sh-pfc, then I guess it would solve your problem, as you could 
-simply call irq_create_mapping() with the domain and hwirq as args in your 
-gpiochip .to_irq() callback.
-
-I'm not sure if it's not a hack, but you could add a property to the node 
-of your pin controller that would contain a phandle to your interrupt 
-controller. Then you could use of_parse_phandle() to get to device node of 
-the INTC and then irq_find_host() to retrieve irq domain associated with 
-it.
-
-> Has anyone run into a similar issue ? My gut feeling is that the
-> architecture isn't right somewhere, but I can't really pinpoint where.
-> As the external IRQs are handled by an IP core separate from the PFC
-
-Well, the fact that it's separate doesn't mean anything yet. Here my 
-question whether it's used exclusively for GPIO interrupts or not becomes 
-significant. If yes, maybe it could be simply moved to the pinctrl driver?
-
-Best regards,
-Tomasz
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
