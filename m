@@ -1,73 +1,55 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 28 Jul 2013 06:00:26 +0000 (UTC)
-Subject: [PATCH v2] ARM: v6: avoid remaining accesses to missing CP15 registers
- on ARM1136 r0
-In-Reply-To: <alpine.DEB.2.02.1307280543370.8385@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com> <20130724142059.GJ11072@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
- <20130727122221.GB6618@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307280527430.8385@utopia.booyaka.com>
- <alpine.DEB.2.02.1307280543370.8385@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1307280559330.8385@utopia.booyaka.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 28 Jul 2013 09:10:09 +0200
+Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
+In-Reply-To: <0eaf01ce8863$89d3c4e0$9d7b4ea0$@org>
+References: <0e7d01ce8840$82f79070$88e6b150$@org>
+ <1374659615-29447-1-git-send-email-amit.daniel@samsung.com>
+ <0eaf01ce8863$89d3c4e0$9d7b4ea0$@org>
+Message-ID: <51F4C3D1.2060901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that the remaining callers of read_cpuid_ext can't attempt an 
-extended CP15 register read on ARMv6 cores that don't support it.  The 
-only one that appears dodgy is tlb_ops_need_broadcast().
+On 07/24/2013 01:47 PM, Kukjin Kim wrote:
+> Amit Daniel Kachhap wrote:
+>>
+>> This patch skips the deep C1(AFTR -Arm off top running) state for
+>> exynos5440
+>> soc as this soc does not support this state. All the cpu's only allows the
+>> basic
+>> C0 state.
+>>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/cpuidle.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
+>> exynos/cpuidle.c
+>> index 17a18ff..9a776a1 100644
+>> --- a/arch/arm/mach-exynos/cpuidle.c
+>> +++ b/arch/arm/mach-exynos/cpuidle.c
+>> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
+>>  		device->cpu = cpu_id;
+>>
+>>  		/* Support IDLE only */
+>> -		if (cpu_id != 0)
+>> +		if (soc_is_exynos5440() || cpu_id != 0)
+>>  			device->state_count = 1;
+>>
+>>  		ret = cpuidle_register_device(device);
+>> --
+>> 1.7.1
+> 
+> Applied, thanks.
 
-While here, convert feat_v6_fixup() to use cpu_is_arm1136_r0() to save
-a few lines of code.
+You shouldn't have. This patch means exynos5540 has no cpuidle driver at
+all. It should be fixed in the Kconfig to unselect CONFIG_CPU_IDLE for
+an exynos5540.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/smp_plat.h | 3 +++
- arch/arm/kernel/setup.c         | 7 +------
- 2 files changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 76214cb..ad07564 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -30,6 +30,9 @@ static inline bool is_smp(void)
- #else
- static inline int tlb_ops_need_broadcast(void)
- {
-+	if (cpu_is_arm1136_r0())
-+		return 0;
-+
- 	if (!is_smp())
- 		return 0;
- 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 63af9a7..a601843 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -389,16 +389,11 @@ static void __init cpuid_init_hwcaps(void)
- 
- static void __init feat_v6_fixup(void)
- {
--	int id = read_cpuid_id();
--
--	if ((id & 0xff0f0000) != 0x41070000)
--		return;
--
- 	/*
- 	 * HWCAP_TLS is available only on 1136 r1p0 and later,
- 	 * see also kuser_get_tls_init.
- 	 */
--	if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
-+	if (cpu_is_arm1136_r0())
- 		elf_hwcap &= ~HWCAP_TLS;
- }
- 
 -- 
-1.8.3.2
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
