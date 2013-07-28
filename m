@@ -1,78 +1,85 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 28 Jul 2013 11:22:39 +0200
-Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
-In-Reply-To: <51F4C3D1.2060901@linaro.org>
-References: <0e7d01ce8840$82f79070$88e6b150$@org>
- <0eaf01ce8863$89d3c4e0$9d7b4ea0$@org> <51F4C3D1.2060901@linaro.org>
-Message-ID: <1877730.qZVs3NAG5h@flatron>
+Date: Sun, 28 Jul 2013 12:07:48 +0200
+Subject: How to create IRQ mappings in a GPIO driver that doesn't control
+ its IRQ domain ?
+In-Reply-To: <1624911.6TtmtVmU1T@avalon>
+References: <1624911.6TtmtVmU1T@avalon>
+Message-ID: <12170068.F0utKQgh5l@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 of July 2013 09:10:09 Daniel Lezcano wrote:
-> On 07/24/2013 01:47 PM, Kukjin Kim wrote:
-> > Amit Daniel Kachhap wrote:
-> >> This patch skips the deep C1(AFTR -Arm off top running) state for
-> >> exynos5440
-> >> soc as this soc does not support this state. All the cpu's only
-> >> allows the basic
-> >> C0 state.
-> >> 
-> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> >> ---
-> >> 
-> >>  arch/arm/mach-exynos/cpuidle.c |    2 +-
-> >>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
-> >> exynos/cpuidle.c
-> >> index 17a18ff..9a776a1 100644
-> >> --- a/arch/arm/mach-exynos/cpuidle.c
-> >> +++ b/arch/arm/mach-exynos/cpuidle.c
-> >> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
-> >> 
-> >>  		device->cpu = cpu_id;
-> >>  		
-> >>  		/* Support IDLE only */
-> >> 
-> >> -		if (cpu_id != 0)
-> >> +		if (soc_is_exynos5440() || cpu_id != 0)
-> >> 
-> >>  			device->state_count = 1;
-> >>  		
-> >>  		ret = cpuidle_register_device(device);
-> >> 
-> >> --
-> >> 1.7.1
-> > 
-> > Applied, thanks.
+Hi Laurent,
+
+On Wednesday 24 of July 2013 01:21:44 Laurent Pinchart wrote:
+> Hello,
 > 
-> You shouldn't have. This patch means exynos5540 has no cpuidle driver at
-> all. It should be fixed in the Kconfig to unselect CONFIG_CPU_IDLE for
-> an exynos5540.
+> I'm running into an issue on several Renesas SoC with IRQ domains and
+> GPIOs.
+> 
+> On sh73a0, r8a73a4 and r8a7740, GPIOs and external interrupts are
+> handled by two separate IP cores, namely the PFC (Pin Function
+> Controller) and INTC (Interrupt Controller). The former is handled by
+> the sh-pfc driver (drivers/pinctrl/sh-pfc) and the later by the
+> irq-renesas-intc-irqpin driver (drivers/irqchip), referred to below as
+> the irqpin driver.
 
-To shed more light on this, let me add that you need to register a cpuidle 
-driver only if you have more states than a simple WFI or you need some 
-crazy steps to enter WFI. Default setup falls back to generic ARM WFI. 
-(Daniel, do we get the nice idle stats as provided by cpuidle core then?)
+Is the INTC used for anything more than just external interrupts on GPIO 
+lines?
 
-Anyway, Exynos cpuidle is using an initcall to initialize and we support 
-multiple Exynos SoCs in single zImage, so deselecting CONFIG_CPU_IDLE is 
-not an option. Considering multiplatform requirements, the driver has to 
-be modified to initialize only on supported platforms, either by:
+> The sh73a0, for instance, has 32 external interrupt lines that are
+> multiplexed on pins usable as GPIOs. Both the GPIO and external
+> interrupt functions are usable at the same time, which allows reading
+> the state of the interrupt lines.
+> 
+> These external interrupts are for MMC/SD support, among other devices.
+> In this specific case the MMC/SD Card Detect signal is wired to one of
+> the external interrupt signals, and the corresponding GPIO is passed to
+> the MMC/SD controller driver. Depending on other configuration
+> parameters the driver can then either poll the Card Detect signal, or
+> register an interrupt handler to detect changes in the signal state.
+> This features is implemented by the MMC/SD core, which call
+> gpio_to_irq() on the GPIO to retrieve the corresponding IRQ number.
+> 
+> On non-DT systems the external IRQs are statically mapped at a known
+> offset. The sh-pfc driver, to implement the gpio_to_irq() function
+> (through its gpiochip .to_irq() handler), simply searches a
+> SoC-specific lookup table for the fixed IRQ number associated with a
+> given GPIO.
+> 
+> However, on DT systems, IRQs are mapped dynamically on demand. The
+> irqpin driver registers a simple IRQ domain, and the
+> irq_create_mapping() function can then be used to map a given IRQ,
+> specified as an offset in the domain. This is where the problem
+> appears, as the irqchip .to_irq() function is implemented in the sh-pfc
 
- a) dropping the initcall and calling the init function directly from 
-arch/arm/mach-exynos
+I assume it should be s/irqchip/gpiochip/ in the line above, shouldn't it?
 
- or
+> driver, which doesn't have access to the IRQ domain registered by the
+> irqpin driver.
+> 
+> I could hack around this by exporting a function in the irqpin driver
+> that would map an IRQ, and call that function from the sh-pfc driver.
+> I'd rather avoid that solution as it would add a direct dependency
+> between the two drivers.
 
- b) checking if machine we are running on is supported, which would mean a 
-long list of all Exynos SoCs that needs to be checked.
+If you could just get the IRQ domain registered by irqpin driver and use 
+it in sh-pfc, then I guess it would solve your problem, as you could 
+simply call irq_create_mapping() with the domain and hwirq as args in your 
+gpiochip .to_irq() callback.
 
-An evolution of option a) is registering a platform device somewhere in 
-arch/arm/mach-exynos and making exynos-cpuidle a platform driver. The 
-problem is that you must register a static platform device from arch code, 
-because cpuidle is not a real hardware block that can be put into device 
-tree.
+I'm not sure if it's not a hack, but you could add a property to the node 
+of your pin controller that would contain a phandle to your interrupt 
+controller. Then you could use of_parse_phandle() to get to device node of 
+the INTC and then irq_find_host() to retrieve irq domain associated with 
+it.
+
+> Has anyone run into a similar issue ? My gut feeling is that the
+> architecture isn't right somewhere, but I can't really pinpoint where.
+> As the external IRQs are handled by an IP core separate from the PFC
+
+Well, the fact that it's separate doesn't mean anything yet. Here my 
+question whether it's used exclusively for GPIO interrupts or not becomes 
+significant. If yes, maybe it could be simply moved to the pinctrl driver?
 
 Best regards,
 Tomasz
