@@ -1,94 +1,54 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 28 Jul 2013 16:14:08 -0500
-Subject: [PATCH v2] ARM: Add check for Cortex-A15 errata 798181 ECO
-Message-ID: <1375046048-25853-1-git-send-email-robherring2@gmail.com>
+Date: Sun, 28 Jul 2013 16:56:31 -0500
+Subject: [PATCH v3 0/7] PSCI support for highbank
+Message-ID: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-The work-around for A15 errata 798181 is not needed if appropriate ECO
-fixes have been applied to r3p2 and earlier core revisions. This can be
-checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
-then the IPI broadcast can be skipped.
+This is an updated series converting highbank platform to use PSCI calls
+for smp_ops, cpuidle, suspend, reset and poweroff. Since the last posting,
+the PSCI spec has been updated by ARM to version 0.2 [1]. The primary
+kernel visible change in the specification is the addition of system level
+reset and poweroff functions.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
-v2:
-- Determine the work-around needed and save in a static varible instead
-  of re-reading the ID registers.
+Rob
 
- arch/arm/include/asm/cputype.h |  1 +
- arch/arm/kernel/smp_tlb.c      | 31 +++++++++++++++++++++++--------
- 2 files changed, 24 insertions(+), 8 deletions(-)
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0022b/index.html
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 8c25dc4..e5952b7 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -10,6 +10,7 @@
- #define CPUID_TLBTYPE	3
- #define CPUID_MPUIR	4
- #define CPUID_MPIDR	5
-+#define CPUID_REVIDR	6
- 
- #ifdef CONFIG_CPU_V7M
- #define CPUID_EXT_PFR0	0x40
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index a98b62d..da20db1 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -73,12 +73,29 @@ static inline void ipi_flush_bp_all(void *ignored)
- #ifdef CONFIG_ARM_ERRATA_798181
- static int erratum_a15_798181(void)
- {
--	unsigned int midr = read_cpuid_id();
--
--	/* Cortex-A15 r0p0..r3p2 affected */
--	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
--		return 0;
--	return 1;
-+	static int errata_fix_needed = -1;
-+
-+	if (unlikely(errata_fix_needed == -1)) {
-+		unsigned int midr = read_cpuid_id();
-+		unsigned int revidr = read_cpuid(CPUID_REVIDR);
-+
-+		/* Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
-+		if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
-+		    (revidr & 0x210) == 0x210) {
-+			errata_fix_needed = 0;	/* No work-around needed */
-+			return 0;
-+		}
-+		if (revidr & 0x10)
-+			errata_fix_needed = 1;	/* Only TLB flush needed */
-+		else
-+			errata_fix_needed = 2;	/* IPI broadcast needed */
-+	}
-+
-+	if (errata_fix_needed)
-+		dummy_flush_tlb_a15_erratum();
-+
-+	/* Return 1 if IPI broadcast to other cores is needed */
-+	return (errata_fix_needed == 2) ? 1: 0;
- }
- #else
- static int erratum_a15_798181(void)
-@@ -97,7 +114,6 @@ static void broadcast_tlb_a15_erratum(void)
- 	if (!erratum_a15_798181())
- 		return;
- 
--	dummy_flush_tlb_a15_erratum();
- 	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
- }
- 
-@@ -109,7 +125,6 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
- 	if (!erratum_a15_798181())
- 		return;
- 
--	dummy_flush_tlb_a15_erratum();
- 	this_cpu = get_cpu();
- 	a15_erratum_get_cpumask(this_cpu, mm, &mask);
- 	smp_call_function_many(&mask, ipi_flush_tlb_a15_erratum, NULL, 1);
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/159519.html
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/151820.html
+
+Rob Herring (7):
+  dt: update PSCI binding documentation for v0.2
+  ARM: PSCI: remove unnecessary include of arm-gic.h
+  ARM: PSCI: add ops for system restart and power off
+  cpuidle: calxeda: add support to use PSCI calls
+  ARM: highbank: clean-up some unused includes
+  ARM: highbank: adapt to use ARM PSCI calls
+  dts: calxeda: add ARM PSCI binding
+
+ Documentation/devicetree/bindings/arm/psci.txt | 25 ++++++--
+ arch/arm/boot/dts/ecx-common.dtsi              | 10 +++
+ arch/arm/include/asm/psci.h                    |  2 +
+ arch/arm/kernel/psci.c                         | 40 ++++++++++++
+ arch/arm/kernel/psci_smp.c                     |  1 -
+ arch/arm/mach-highbank/Kconfig                 |  2 +-
+ arch/arm/mach-highbank/Makefile                |  4 +-
+ arch/arm/mach-highbank/core.h                  |  9 ---
+ arch/arm/mach-highbank/highbank.c              | 55 +---------------
+ arch/arm/mach-highbank/hotplug.c               | 37 -----------
+ arch/arm/mach-highbank/platsmp.c               | 68 --------------------
+ arch/arm/mach-highbank/pm.c                    | 27 +++-----
+ arch/arm/mach-highbank/sysregs.h               | 86 --------------------------
+ arch/arm/mach-highbank/system.c                | 33 ----------
+ drivers/cpuidle/cpuidle-calxeda.c              | 40 ++----------
+ 15 files changed, 89 insertions(+), 350 deletions(-)
+ delete mode 100644 arch/arm/mach-highbank/hotplug.c
+ delete mode 100644 arch/arm/mach-highbank/platsmp.c
+ delete mode 100644 arch/arm/mach-highbank/sysregs.h
+ delete mode 100644 arch/arm/mach-highbank/system.c
+
 -- 
 1.8.1.2
