@@ -1,91 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 28 Jul 2013 20:16:29 +0000 (UTC)
-Subject: [PATCH] ARM: v6: prevent gcc from reordering extended CP15 reads
- above is_smp() test
-In-Reply-To: <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com> <20130724142059.GJ11072@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
- <20130727122221.GB6618@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 28 Jul 2013 13:55:25 -0700
+Subject: [PATCH 3/4] arm64: KVM: let other tasks run when hitting WFE
+In-Reply-To: <51ED3A66.4050407@linux.vnet.ibm.com>
+References: <1374242035-13199-1-git-send-email-marc.zyngier@arm.com>
+ <1374242035-13199-4-git-send-email-marc.zyngier@arm.com>
+ <CAC4Lta17bmNjBck6LzziBeU0Xc36F1Jms2tQPv6+GaXvik6Wyg@mail.gmail.com>
+ <CAMJs5B8Sg1MPHPsRV75mmagnYxkhzA0MKWVkwW2y0WdDVWTSxQ@mail.gmail.com>
+ <51ED3A66.4050407@linux.vnet.ibm.com>
+Message-ID: <20130728205525.GA14863@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 22, 2013 at 07:27:58PM +0530, Raghavendra K T wrote:
+> On 07/22/2013 06:21 PM, Christoffer Dall wrote:
+> >On 22 July 2013 10:53, Raghavendra KT <raghavendra.kt.linux@gmail.com> wrote:
+> >>On Fri, Jul 19, 2013 at 7:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>>So far, when a guest executes WFE (like when waiting for a spinlock
+> >>>to become unlocked), we don't do a thing and let it run uninterrupted.
+> >>>
+> >>>Another option is to trap a blocking WFE and offer the opportunity
+> >>>to the scheduler to switch to another task, potentially giving the
+> >>>vcpu holding the spinlock a chance to run sooner.
+> >>>
+> >>
+> >>Idea looks to be correct from my experiments on x86. It does bring some
+> >>percentage of benefits in overcommitted guests. Infact,
+> >>
+> >>https://lkml.org/lkml/2013/7/22/41 tries to do the same thing for x86.
+> >>(this results in using ple handler heuristics in vcpu_block pach).
+> >
+> >What about the adverse effect in the non-overcommitted case?
+> >
+> 
+> Ideally is should fail to schedule any other task and comeback to halt
+> loop. This should not hurt AFAICS. But I agree that, numbers needed to
+> support this argument.
 
-Commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc ("ARM: 7757/1: mm:
-don't flush icache in switch_mm with hardware broadcasting") breaks
-the boot on OMAP2430SDP with omap2plus_defconfig.  Tracked to an
-undefined instruction abort from the CP15 read in
-cache_ops_need_broadcast().  It turns out that gcc reorders the
-extended CP15 read above the is_smp() test.  This breaks ARM1136 r0
-cores, since they don't support several CP15 registers that later ARM
-cores do.  ARM1136JF-S TRM section 3.2.1 "Register allocation" has the
-details.
+So if two VCPUs are scheduled on two PCPUs and the waiting VCPU would
+normally wait, say, 1000 cycles to grab the lock, the latency for
+grabbing the lock will now be (at least) a couple of thousand cycles
+even for a tight switch back into the host and back into the guest (on
+currently available hardware).
 
-So, when the kernel is built for ARMv6 cores, mark the extended CP15
-read as clobbering memory, which seems to prevent the compiler from
-reordering it before the is_smp() test.  Russell states that the code
-generated from this approach is preferable to marking the inline asm
-as volatile.
+> 
+> For x86, I had seen no side effects with the experiments.
+> 
 
-This patch was developed in collaboration with Will Deacon and Russell
-King.
+I suspect some workloads on x86 would indeed show some side effects, but
+much smaller on ARM, since x86 has a much more hardware-optimized VMEXIT
+cycle time on relatively recent CPUs.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
-
-Thought I'd respin this to have a discussion strawman.  It boots cleanly 
-on 2430SDP.
-
-[ Updated "ARM: v6: avoid read_cpuid_ext() on ARM1136r0 in 
-cache_ops_need_broadcast()" to drop the unnecessary ARM1136 r0 test, to 
-switch to a memory clobber per rmk's suggestion, and to update the commit 
-message. ]
-
-Intended for v3.11-rc.
-
-
- arch/arm/include/asm/cputype.h | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 8c25dc4..f428eb0 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -89,13 +89,25 @@ extern unsigned int processor_id;
- 		__val;							\
- 	})
- 
-+
-+# if defined(CONFIG_CPU_V6)
-+/*
-+ * The mrc in the read_cpuid_ext macro must not be reordered on ARMv6,
-+ * else the compiler may move it before an is_smp() test, causing
-+ * undefined instruction aborts on ARM1136 r0.
-+ */
-+# define CPUID_EXT_REORDER	"cc", "memory"
-+# else
-+# define CPUID_EXT_REORDER	"cc"
-+# endif
-+
- #define read_cpuid_ext(ext_reg)						\
- 	({								\
- 		unsigned int __val;					\
- 		asm("mrc	p15, 0, %0, c0, " ext_reg		\
- 		    : "=r" (__val)					\
- 		    :							\
--		    : "cc");						\
-+		    : CPUID_EXT_REORDER);				\
- 		__val;							\
- 	})
- 
--- 
-1.8.3.2
+-Christoffer
