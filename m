@@ -1,54 +1,77 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 28 Jul 2013 16:56:31 -0500
-Subject: [PATCH v3 0/7] PSCI support for highbank
-Message-ID: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+Date: Sun, 28 Jul 2013 16:56:32 -0500
+Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
+In-Reply-To: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1375048598-15637-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This is an updated series converting highbank platform to use PSCI calls
-for smp_ops, cpuidle, suspend, reset and poweroff. Since the last posting,
-the PSCI spec has been updated by ARM to version 0.2 [1]. The primary
-kernel visible change in the specification is the addition of system level
-reset and poweroff functions.
+The PSCI spec from ARM has been updated to 0.2 version. Update the
+binding document to reflect the spec changes. For the binding, the
+major changes are addition of system reset and poweroff functions.
+The recommended function id numbering has also changed.
 
-Rob
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: devicetree at vger.kernel.org
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 25 +++++++++++++++++++------
+ 1 file changed, 19 insertions(+), 6 deletions(-)
 
-[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0022b/index.html
-
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/159519.html
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/151820.html
-
-Rob Herring (7):
-  dt: update PSCI binding documentation for v0.2
-  ARM: PSCI: remove unnecessary include of arm-gic.h
-  ARM: PSCI: add ops for system restart and power off
-  cpuidle: calxeda: add support to use PSCI calls
-  ARM: highbank: clean-up some unused includes
-  ARM: highbank: adapt to use ARM PSCI calls
-  dts: calxeda: add ARM PSCI binding
-
- Documentation/devicetree/bindings/arm/psci.txt | 25 ++++++--
- arch/arm/boot/dts/ecx-common.dtsi              | 10 +++
- arch/arm/include/asm/psci.h                    |  2 +
- arch/arm/kernel/psci.c                         | 40 ++++++++++++
- arch/arm/kernel/psci_smp.c                     |  1 -
- arch/arm/mach-highbank/Kconfig                 |  2 +-
- arch/arm/mach-highbank/Makefile                |  4 +-
- arch/arm/mach-highbank/core.h                  |  9 ---
- arch/arm/mach-highbank/highbank.c              | 55 +---------------
- arch/arm/mach-highbank/hotplug.c               | 37 -----------
- arch/arm/mach-highbank/platsmp.c               | 68 --------------------
- arch/arm/mach-highbank/pm.c                    | 27 +++-----
- arch/arm/mach-highbank/sysregs.h               | 86 --------------------------
- arch/arm/mach-highbank/system.c                | 33 ----------
- drivers/cpuidle/cpuidle-calxeda.c              | 40 ++----------
- 15 files changed, 89 insertions(+), 350 deletions(-)
- delete mode 100644 arch/arm/mach-highbank/hotplug.c
- delete mode 100644 arch/arm/mach-highbank/platsmp.c
- delete mode 100644 arch/arm/mach-highbank/sysregs.h
- delete mode 100644 arch/arm/mach-highbank/system.c
-
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..b8b4d9f 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -21,7 +21,7 @@ to #0.
+ 
+ Main node required properties:
+ 
+- - compatible    : Must be "arm,psci"
++ - compatible    : Must be "arm,psci-0.2" or "arm,psci"
+ 
+  - method        : The method of calling the PSCI firmware. Permitted
+                    values are:
+@@ -32,6 +32,9 @@ Main node required properties:
+                    "hvc" : HVC #0, with the register assignments specified
+ 		           in this binding.
+ 
++ - psci_version  : Function ID for PSCI_VERSION operation. Required for
++                   "arm,psci-0.2" compatible version or later.
++
+ Main node optional properties:
+ 
+  - cpu_suspend   : Function ID for CPU_SUSPEND operation
+@@ -42,14 +45,24 @@ Main node optional properties:
+ 
+  - migrate       : Function ID for MIGRATE operation
+ 
++ - system_reset  : Function ID for SYSTEM_RESET operation
++
++ - system_off    : Function ID for SYSTEM_OFF operation
++
+ 
+ Example:
+ 
+ 	psci {
+-		compatible	= "arm,psci";
++		compatible	= "arm,psci-0.2";
+ 		method		= "smc";
+-		cpu_suspend	= <0x95c10000>;
+-		cpu_off		= <0x95c10001>;
+-		cpu_on		= <0x95c10002>;
+-		migrate		= <0x95c10003>;
++		psci_version	= <0x84000000>;
++		cpu_suspend	= <0x84000001>;
++		cpu_off		= <0x84000002>;
++		cpu_on		= <0x84000003>;
++		affinity_info	= <0x84000004>; 
++		migrate		= <0x84000005>;
++		migrate_info_type = <0x84000006>; 
++		migrate_info_up_cpu = <0x84000007>; 
++		system_off	= <0x84000008>; 
++		system_reset	= <0x84000009>; 
+ 	};
 -- 
 1.8.1.2
