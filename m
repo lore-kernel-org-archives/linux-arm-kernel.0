@@ -1,64 +1,47 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Jul 2013 14:30:16 +0200
-Subject: [PATCH v2 0/4] Add PWM polarity flag macro for DT
-In-Reply-To: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20130729123015.GF23152@manwe>
+Date: Mon, 29 Jul 2013 14:31:03 +0200
+Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
+ hooks to hw_pci
+In-Reply-To: <20130726224607.GZ24642@n2100.arm.linux.org.uk>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130725165659.GB27802@dhcp-172-17-186-34.nvidia.com>
+ <20130726224607.GZ24642@n2100.arm.linux.org.uk>
+Message-ID: <20130729123102.GG23152@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 12:54:20AM +0200, Laurent Pinchart wrote:
-> Hello,
+On Fri, Jul 26, 2013 at 11:46:07PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 25, 2013 at 09:57:00AM -0700, Thierry Reding wrote:
+> > On Mon, Jul 15, 2013 at 01:52:44PM +0200, Thomas Petazzoni wrote:
+> > > Some PCI drivers may need to adjust the pci_bus structure after it has
+> > > been allocated by the Linux PCI core. The PCI core allows
+> > > architectures to implement the pcibios_add_bus() and
+> > > pcibios_remove_bus() for this purpose. This commit therefore extends
+> > > the hw_pci and pci_sys_data structures of the ARM PCI core to allow
+> > > PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
+> > > which will get called when a bus is added or removed from the system.
+> > > 
+> > > This will be used for example by the Marvell PCIe driver to connect a
+> > > particular PCI bus with its corresponding MSI chip to handle Message
+> > > Signaled Interrupts.
+> > > 
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+> > > ---
+> > >  arch/arm/include/asm/mach/pci.h |  4 ++++
+> > >  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
+> > >  2 files changed, 20 insertions(+)
+> > 
+> > Hi Russell,
+> > 
+> > Can we have your Acked-by on this patch so that it can be moved to a
+> > stable branch along with some of the other patches in this branch that
+> > both Marvell and Tegra PCIe drivers need?
 > 
-> Here's a small patch set that replaces PWM polarity numerical constants with
-> macros in DT.
-> 
-> The series is the result of splitting the original patch into four patches
-> that
-> 
-> - add the flag macro (both in a header file and in the PWM DT binding core
->   documentation)
-> - use the macro in the PWM core code
-> - update existing DT bindings to refer to the PWM DT bindings core
->   documentation
-> - update existing DT sources to use the new macro
-> 
-> I believe I've taken all comments received so far into account. Most notable
-> changes include
-> 
-> - splitting the original patch
-> - removing the PWM_POLARITY_NORMAL flag, which wasn't a flag but was defined
->   as 0
-> - renaming the PWM_POLARITY_INVERSED DT flag to PWM_POLARITY_INVERTED
-> - not relying on DT flags and PWM C flags having identical names and values
-> 
-> Laurent Pinchart (4):
->   pwm: Add PWM polarity flag macro for DT
->   pwm: Use the DT macro directly when parsing PWM DT flags
->   pwm: Update DT bindings to reference pwm.txt for cells documentation
->   ARM: dts: Use the PWM polarity flags
-> 
->  Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt    |  8 +++-----
->  Documentation/devicetree/bindings/pwm/imx-pwm.txt          |  4 ++--
->  Documentation/devicetree/bindings/pwm/mxs-pwm.txt          |  4 ++--
->  .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt         |  5 ++---
->  Documentation/devicetree/bindings/pwm/nxp,pca9685-pwm.txt  |  4 ++--
->  Documentation/devicetree/bindings/pwm/pwm-samsung.txt      | 10 +++-------
->  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt       |  8 +++-----
->  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt     |  8 +++-----
->  Documentation/devicetree/bindings/pwm/pwm.txt              |  7 ++++---
->  Documentation/devicetree/bindings/pwm/spear-pwm.txt        |  5 ++---
->  Documentation/devicetree/bindings/pwm/ti,twl-pwm.txt       |  4 ++--
->  Documentation/devicetree/bindings/pwm/ti,twl-pwmled.txt    |  4 ++--
->  Documentation/devicetree/bindings/pwm/vt8500-pwm.txt       |  8 +++-----
->  arch/arm/boot/dts/am335x-evmsk.dts                         |  3 ++-
->  arch/arm/boot/dts/wm8850-w70v2.dts                         |  3 ++-
->  drivers/pwm/core.c                                         |  7 +++----
->  include/dt-bindings/pwm/pwm.h                              | 14 ++++++++++++++
->  17 files changed, 54 insertions(+), 52 deletions(-)
->  create mode 100644 include/dt-bindings/pwm/pwm.h
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Applied, thanks.
+Thanks, Russell.
 
 Thierry
 -------------- next part --------------
@@ -67,4 +50,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/f79bfd7b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/978fd981/attachment-0001.sig>
