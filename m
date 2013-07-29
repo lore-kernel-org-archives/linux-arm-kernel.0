@@ -1,123 +1,67 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 29 Jul 2013 09:01:41 +0100
-Subject: [PATCH 1/4] ARM: kprobes: fix instruction fetch order with
- <asm/opcodes.h>
-In-Reply-To: <1374786537-10726-2-git-send-email-ben.dooks@codethink.co.uk>
-References: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
- <1374786537-10726-2-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1375084901.3521.3.camel@linaro1.home>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 29 Jul 2013 13:35:28 +0530
+Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of
+ Exynos SoCs
+In-Reply-To: <003e01ce8c31$41d0c450$c5724cf0$@samsung.com>
+References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
+ <CAK9yfHy2btp1W+5-GiVQnkffDnJ-CgqXuAjGktkiKYyf7kKQbQ@mail.gmail.com>
+ <003e01ce8c31$41d0c450$c5724cf0$@samsung.com>
+Message-ID: <CAK9yfHyeOQZzf_3Nv-fmuYdZtL8dzZequdx2ZddnUyXDn66bOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-07-25 at 22:08 +0100, Ben Dooks wrote:
-> If we are running BE8, the data and instruction endian-ness do not
-> match, so use <asm/opcodes.h> to correctly translate memory accesses
-> into ARM instructions.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>y
-> ---
->  arch/arm/kernel/kprobes-common.c |   14 ++++++++------
->  arch/arm/kernel/kprobes.c        |    9 +++++----
->  2 files changed, 13 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
-> index 18a7628..c0b202e 100644
-> --- a/arch/arm/kernel/kprobes-common.c
-> +++ b/arch/arm/kernel/kprobes-common.c
-> @@ -14,6 +14,7 @@
->  #include <linux/kernel.h>
->  #include <linux/kprobes.h>
->  #include <asm/system_info.h>
-> +#include <asm/opcodes.h>
->  
->  #include "kprobes.h"
->  
-> @@ -305,7 +306,8 @@ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
->  
->  	if (handler) {
->  		/* We can emulate the instruction in (possibly) modified form */
-> -		asi->insn[0] = (insn & 0xfff00000) | (rn << 16) | reglist;
-> +		asi->insn[0] = __opcode_to_mem_arm((insn & 0xfff00000) |
-> +						   (rn << 16) | reglist);
->  		asi->insn_handler = handler;
->  		return INSN_GOOD;
->  	}
-> @@ -338,9 +340,9 @@ prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->  		thumb_insn[2] = 0x4770; /* Thumb bx lr */
+On 29 July 2013 13:27, Cho KyongHo <pullip.cho@samsung.com> wrote:
+>> -----Original Message-----
+>> From: Cho KyongHo [mailto:pullip.cho at samsung.com]
+>> Sent: Monday, July 29, 2013 4:20 PM
+>>
+>> > -----Original Message-----
+>> > From: Sachin Kamat [mailto:sachin.kamat at linaro.org]
+>> > Sent: Monday, July 29, 2013 3:38 PM
+>> >
+>> > Hi KyongHo,
+>> >
+>> > On 26 July 2013 16:58, Cho KyongHo <pullip.cho@samsung.com> wrote:
+>> > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+>> > > ---
+>> > >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
+>> > >  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
+>> > >  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
+>> > >  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
+>> > >  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
+>> > >  5 files changed, 617 insertions(+), 0 deletions(-)
+>> > >  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+>> >
+>> > This patch does not apply on the mainline Linus' tree (3.11-rc2). Please rebase.
+>> >
+>>
+>> OK. I will rebase the next patches on that.
+>
+> I don't get any conflict both on the latest of Linus's tree (3.11-rc3)
+> and for-next branch  of Samsung git.
+> Can you show me the diff?
+>
 
-The line above and the one before it not in this diff also need fixing
-by changing to __opcode_to_mem_thumb16(0x4770).
+I get the following error when I do git am on this patch (linus' tree
+3.11-rc3). Other patches apply fine.
 
->  		return insn;
->  	}
-> -	asi->insn[1] = 0xe12fff1e; /* ARM bx lr */
-> +	asi->insn[1] = __opcode_to_mem_arm(0xe12fff1e); /* ARM bx lr */
->  #else
-> -	asi->insn[1] = 0xe1a0f00e; /* mov pc, lr */
-> +	asi->insn[1] = __opcode_to_mem_arm(0xe1a0f00e); /* mov pc, lr */
->  #endif
->  	/* Make an ARM instruction unconditional */
->  	if (insn < 0xe0000000)
-> @@ -360,12 +362,12 @@ set_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->  	if (thumb) {
->  		u16 *ip = (u16 *)asi->insn;
->  		if (is_wide_instruction(insn))
-> -			*ip++ = insn >> 16;
-> -		*ip++ = insn;
-> +			*ip++ = ___asm_opcode_to_mem_thumb16(insn >> 16);
-> +		*ip++ = ___asm_opcode_to_mem_thumb16(insn);
+Applying: ARM: dts: Add description of System MMU of Exynos SoCs
+<local_path>/linux/.git/rebase-apply/patch:120: new blank line at EOF.
++
+error: patch failed: arch/arm/boot/dts/exynos4.dtsi:161
+error: arch/arm/boot/dts/exynos4.dtsi: patch does not apply
+error: patch failed: arch/arm/boot/dts/exynos4210.dtsi:119
+error: arch/arm/boot/dts/exynos4210.dtsi: patch does not apply
+error: patch failed: arch/arm/boot/dts/exynos4x12.dtsi:79
+error: arch/arm/boot/dts/exynos4x12.dtsi: patch does not apply
+error: patch failed: arch/arm/boot/dts/exynos5250.dtsi:614
+error: arch/arm/boot/dts/exynos5250.dtsi: patch does not apply
+Patch failed at 0001 ARM: dts: Add description of System MMU of Exynos SoCs
+When you have resolved this problem run "git am --resolved".
+If you would prefer to skip this patch, instead run "git am --skip".
+To restore the original branch and stop patching run "git am --abort".
 
-
-Should these two ___asm_opcode_thumb32_compose() not be
-__opcode_thumb32_compose() ?
-
->  		return;
->  	}
->  #endif
-> -	asi->insn[0] = insn;
-> +	asi->insn[0] = __opcode_to_mem_arm(insn);
->  }
->  
->  /*
-> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-> index 170e9f3..3775af1 100644
-> --- a/arch/arm/kernel/kprobes.c
-> +++ b/arch/arm/kernel/kprobes.c
-> @@ -26,6 +26,7 @@
->  #include <linux/stop_machine.h>
->  #include <linux/stringify.h>
->  #include <asm/traps.h>
-> +#include <asm/opcodes.h>
->  #include <asm/cacheflush.h>
->  
->  #include "kprobes.h"
-> @@ -62,10 +63,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->  #ifdef CONFIG_THUMB2_KERNEL
->  	thumb = true;
->  	addr &= ~1; /* Bit 0 would normally be set to indicate Thumb code */
-> -	insn = ((u16 *)addr)[0];
-> +	insn = __mem_to_opcode_thumb16(((u16 *)addr)[0]);
->  	if (is_wide_instruction(insn)) {
-> -		insn <<= 16;
-> -		insn |= ((u16 *)addr)[1];
-> +		u16 inst2 = __mem_to_opcode_thumb16(((u16 *)addr)[1]);
-> +		insn = ___asm_opcode_thumb32_compose(insn, inst2);
-
-Again, __opcode_thumb32_compose instead of
-___asm_opcode_thumb32_compose
-
->  		decode_insn = thumb32_kprobe_decode_insn;
->  	} else
->  		decode_insn = thumb16_kprobe_decode_insn;
-> @@ -73,7 +74,7 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->  	thumb = false;
->  	if (addr & 0x3)
->  		return -EINVAL;
-> -	insn = *p->addr;
-> +	insn = __mem_to_opcode_arm(*p->addr);
->  	decode_insn = arm_kprobe_decode_insn;
->  #endif
->  
 
 -- 
-Tixy
+With warm regards,
+Sachin
