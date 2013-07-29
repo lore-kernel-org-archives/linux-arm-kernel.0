@@ -1,70 +1,242 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Jul 2013 15:23:44 +0300
-Subject: [PATCH v2 1/6] usb: phy: msm: Move mach depndend code to
- platform data
-In-Reply-To: <1375081464-14206-2-git-send-email-iivanov@mm-sol.com>
-References: <1375081464-14206-1-git-send-email-iivanov@mm-sol.com>
- <1375081464-14206-2-git-send-email-iivanov@mm-sol.com>
-Message-ID: <20130729122344.GH24801@radagast>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 29 Jul 2013 14:26:00 +0200
+Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
+In-Reply-To: <20130729065431.GA1115@manwe>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <51E41F7A.4010502@gmail.com> <20130728043310.6CF1D3E08FE@localhost>
+ <20130728162711.32a9a21e@skate> <20130729065431.GA1115@manwe>
+Message-ID: <20130729142600.63eeab50@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Thierry Reding,
 
-On Mon, Jul 29, 2013 at 10:04:19AM +0300, Ivan T. Ivanov wrote:
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> 
-> This patch fix compilation error and is an intermediate step
-> before the addition of DeviceTree support for newer targets.
-> Fix suggested here: https://lkml.org/lkml/2013/6/19/381
-> 
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-usb at vger.kernel.org
-> 
-> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> ---
->  arch/arm/mach-msm/board-msm7x30.c |   35 +++++++++++++++++++++++
->  arch/arm/mach-msm/board-qsd8x50.c |   35 +++++++++++++++++++++++
+On Mon, 29 Jul 2013 08:54:31 +0200, Thierry Reding wrote:
 
-I need acks for these.
-
->  drivers/usb/phy/phy-msm-usb.c     |   55 ++++++++++---------------------------
->  include/linux/usb/msm_hsusb.h     |    3 ++
->  4 files changed, 87 insertions(+), 41 deletions(-)
+> > So what is your suggestion to allow the PCIe controller to retrieve the
+> > correct irq_domain if we have only one DT node for the IRQ controller
+> > that registers two irq_domains ?
 > 
-> diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-> index db3d8c0..6b35953 100644
-> --- a/arch/arm/mach-msm/board-msm7x30.c
-> +++ b/arch/arm/mach-msm/board-msm7x30.c
-> @@ -31,6 +31,7 @@
->  #include <asm/setup.h>
->  
->  #include <mach/board.h>
-> +#include <mach/clk.h>
->  #include <mach/msm_iomap.h>
->  #include <mach/dma.h>
->  
-> @@ -61,10 +62,44 @@ static int hsusb_phy_init_seq[] = {
->  	-1
->  };
->  
-> +static int hsusb_link_clk_reset(struct clk *link_clk, bool assert)
+> If I understand correctly, Grant isn't objecting to the introduction of
+> the lookup function, but rather its implementation. You could add a
+> pointer to a struct msi_chip within struct irq_domain and then iterate
+> over all irq_domain instances (see irq_find_host()) and find one which
+> has the correct device_node pointer and the msi_chip pointer set.
 
-looks like you should be using the reset controller framework ?
-(drivers/reset)
+Ah ok. The only trick is that we have to change irq_find_host() to
+*not* match on MSI domains. Can you check the below patch to see if it
+matches what Grant suggested? It works for me, and it allows to completely
+remove the registry of msi_chip in drivers/of, as well as the of_node
+pointer in struct msi_chip.
+
+Thanks!
+
+Thomas
+
+>From c2c0137cb110270f96e1e0fa298a5d585b8d829e Mon Sep 17 00:00:00 2001
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Mon, 29 Jul 2013 14:12:31 +0200
+Subject: [PATCHv6 05/11] irqdomain: add support to associate an irq_domain
+ with a msi_chip
+
+Message Signaled Interrupts are a PCI-specific mechanism that allows
+PCI devices to notify interrupts to the CPU using in-band
+messages. The PCI subsystem represents an MSI-capable interrupt
+controller as an msi_chip structure, and this patch improves the
+irqdomain subsystem with a new pointer associating an irq_domain with
+the corresponding msi_chip.
+
+The __irq_domain_add() function is augmented with an additional
+argument, the 'msi_chip' pointer, and all callers of this function are
+updated.
+
+A new function irq_domain_add_msi() function is added to allow the
+registration of an MSI-type irq domain.
+
+The irq_find_host() function is modified to not match on MSI-type irq
+domains: a given DT device node may represent both a normal interrupt
+controller and a MSI interrupt controller. irq_find_host() should
+return the irq_domain that corresponds to the normal interupt
+controller.
+
+An irq_find_msi() function is added to get the MSI_type irq domain
+given a DT device node.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ include/linux/irqdomain.h | 20 +++++++++++++++++---
+ kernel/irq/irqdomain.c    | 35 +++++++++++++++++++++++++++++++++--
+ 2 files changed, 50 insertions(+), 5 deletions(-)
+
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 1ffa336..f1b11c8 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -38,6 +38,7 @@
+ struct device_node;
+ struct irq_domain;
+ struct of_device_id;
++struct msi_chip;
+ 
+ /* Number of irqs reserved for a legacy isa controller */
+ #define NUM_ISA_INTERRUPTS	16
+@@ -101,6 +102,7 @@ struct irq_domain {
+ 	/* Optional data */
+ 	struct device_node *of_node;
+ 	struct irq_domain_chip_generic *gc;
++	struct msi_chip *msi_chip;
+ 
+ 	/* reverse map data. The linear map gets appended to the irq_domain */
+ 	irq_hw_number_t hwirq_max;
+@@ -114,6 +116,7 @@ struct irq_domain {
+ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+ 				    irq_hw_number_t hwirq_max, int direct_max,
+ 				    const struct irq_domain_ops *ops,
++				    struct msi_chip *msi_chip,
+ 				    void *host_data);
+ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
+ 					 unsigned int size,
+@@ -127,6 +130,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+ 					 const struct irq_domain_ops *ops,
+ 					 void *host_data);
+ extern struct irq_domain *irq_find_host(struct device_node *node);
++extern struct irq_domain *irq_find_msi(struct device_node *node);
+ extern void irq_set_default_host(struct irq_domain *host);
+ 
+ /**
+@@ -141,14 +145,15 @@ static inline struct irq_domain *irq_domain_add_linear(struct device_node *of_no
+ 					 const struct irq_domain_ops *ops,
+ 					 void *host_data)
+ {
+-	return __irq_domain_add(of_node, size, size, 0, ops, host_data);
++	return __irq_domain_add(of_node, size, size, 0, ops, NULL, host_data);
+ }
+ static inline struct irq_domain *irq_domain_add_nomap(struct device_node *of_node,
+ 					 unsigned int max_irq,
+ 					 const struct irq_domain_ops *ops,
+ 					 void *host_data)
+ {
+-	return __irq_domain_add(of_node, 0, max_irq, max_irq, ops, host_data);
++	return __irq_domain_add(of_node, 0, max_irq, max_irq, ops, NULL,
++				host_data);
+ }
+ static inline struct irq_domain *irq_domain_add_legacy_isa(
+ 				struct device_node *of_node,
+@@ -162,7 +167,16 @@ static inline struct irq_domain *irq_domain_add_tree(struct device_node *of_node
+ 					 const struct irq_domain_ops *ops,
+ 					 void *host_data)
+ {
+-	return __irq_domain_add(of_node, 0, ~0, 0, ops, host_data);
++	return __irq_domain_add(of_node, 0, ~0, 0, ops, NULL, host_data);
++}
++static inline struct irq_domain *irq_domain_add_msi(struct device_node *of_node,
++						    unsigned int size,
++						    const struct irq_domain_ops *ops,
++						    struct msi_chip *msi_chip,
++						    void *host_data)
++{
++	return __irq_domain_add(of_node, size, size, 0, ops,
++				msi_chip, host_data);
+ }
+ 
+ extern void irq_domain_remove(struct irq_domain *host);
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index b9ddb94..80dc1ca 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -29,6 +29,7 @@ static struct irq_domain *irq_default_domain;
+  * @direct_max: Maximum value of direct maps; Use ~0 for no limit; 0 for no
+  *              direct mapping
+  * @ops: map/unmap domain callbacks
++ * @msi_chip: pointer to MSI chip structure, for MSI domains
+  * @host_data: Controller private data pointer
+  *
+  * Allocates and initialize and irq_domain structure.  Caller is expected to
+@@ -38,6 +39,7 @@ static struct irq_domain *irq_default_domain;
+ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+ 				    irq_hw_number_t hwirq_max, int direct_max,
+ 				    const struct irq_domain_ops *ops,
++				    struct msi_chip *msi_chip,
+ 				    void *host_data)
+ {
+ 	struct irq_domain *domain;
+@@ -52,6 +54,7 @@ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+ 	domain->ops = ops;
+ 	domain->host_data = host_data;
+ 	domain->of_node = of_node_get(of_node);
++	domain->msi_chip = msi_chip;
+ 	domain->hwirq_max = hwirq_max;
+ 	domain->revmap_size = size;
+ 	domain->revmap_direct_max_irq = direct_max;
+@@ -127,7 +130,7 @@ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
+ {
+ 	struct irq_domain *domain;
+ 
+-	domain = __irq_domain_add(of_node, size, size, 0, ops, host_data);
++	domain = __irq_domain_add(of_node, size, size, 0, ops, NULL, host_data);
+ 	if (!domain)
+ 		return NULL;
+ 
+@@ -172,7 +175,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+ 	struct irq_domain *domain;
+ 
+ 	domain = __irq_domain_add(of_node, first_hwirq + size,
+-				  first_hwirq + size, 0, ops, host_data);
++				  first_hwirq + size, 0, ops, NULL, host_data);
+ 	if (!domain)
+ 		return NULL;
+ 
+@@ -198,6 +201,12 @@ struct irq_domain *irq_find_host(struct device_node *node)
+ 	 */
+ 	mutex_lock(&irq_domain_mutex);
+ 	list_for_each_entry(h, &irq_domain_list, link) {
++		/*
++		 * We only want to match normal interrupt domains, not
++		 * MSI domains
++		 */
++		if (h->msi_chip)
++			continue;
+ 		if (h->ops->match)
+ 			rc = h->ops->match(h, node);
+ 		else
+@@ -214,6 +223,28 @@ struct irq_domain *irq_find_host(struct device_node *node)
+ EXPORT_SYMBOL_GPL(irq_find_host);
+ 
+ /**
++ * irq_find_msi() - Locates a MSI domain for a given device node
++ * @node: device-tree node of the interrupt controller
++ */
++struct irq_domain *irq_find_msi(struct device_node *node)
++{
++	struct irq_domain *h, *found = NULL;
++
++	mutex_lock(&irq_domain_mutex);
++	list_for_each_entry(h, &irq_domain_list, link) {
++		if (!h->msi_chip)
++			continue;
++		if (h->of_node && h->of_node == node) {
++			found = h;
++			break;
++		}
++	}
++	mutex_unlock(&irq_domain_mutex);
++	return found;
++}
++EXPORT_SYMBOL_GPL(irq_find_msi);
++
++/**
+  * irq_set_default_host() - Set a "default" irq domain
+  * @domain: default domain pointer
+  *
+-- 
+1.8.1.2
+
+
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/77f677a7/attachment-0001.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
