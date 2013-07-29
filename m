@@ -1,94 +1,60 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 29 Jul 2013 21:00:58 +0530
-Subject: [RESEND PATCH v10 1/8] drivers: phy: add generic PHY framework
-In-Reply-To: <023801ce8c70$427cbd20$c7763760$%debski@samsung.com>
-References: <1374842963-13545-1-git-send-email-kishon@ti.com>
- <1374842963-13545-2-git-send-email-kishon@ti.com>
- <023801ce8c70$427cbd20$c7763760$%debski@samsung.com>
-Message-ID: <51F68AB2.5090402@ti.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Mon, 29 Jul 2013 11:32:05 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130726144047.GH9858@sirena.org.uk>
+References: <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+ <20130726132709.GH29916@titan.lakedaemon.net>
+ <1374846070.14574.92.camel@i7.infradead.org>
+ <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
+ <20130726142140.GR24642@n2100.arm.linux.org.uk>
+ <20130726144047.GH9858@sirena.org.uk>
+Message-ID: <20130729153204.GJ5022@ohporter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 July 2013 08:58 PM, Kamil Debski wrote:
-> Hi Kishon,
+On Fri, Jul 26, 2013 at 03:40:47PM +0100, Mark Brown wrote:
+> On Fri, Jul 26, 2013 at 03:21:40PM +0100, Russell King - ARM Linux wrote:
 > 
-> A small fix follows inline.
+> > So this is why I'm seeing patches just a short time ago removing existing
+> > compatible strings from the DT descriptions and associated driver, and
+> > replacing them with new ones... meaning that the old DT files won't work
+> > with newer kernels.
 > 
->> From: linux-media-owner at vger.kernel.org [mailto:linux-media-
->> owner at vger.kernel.org] On Behalf Of Kishon Vijay Abraham I
->> Sent: Friday, July 26, 2013 2:49 PM
->>
->> The PHY framework provides a set of APIs for the PHY drivers to
->> create/destroy a PHY and APIs for the PHY users to obtain a reference
->> to the PHY with or without using phandle. For dt-boot, the PHY drivers
->> should also register *PHY provider* with the framework.
->>
->> PHY drivers should create the PHY by passing id and ops like init, exit,
->> power_on and power_off. This framework is also pm runtime enabled.
->>
->> The documentation for the generic PHY framework is added in
->> Documentation/phy.txt and the documentation for dt binding can be found
->> at Documentation/devicetree/bindings/phy/phy-bindings.txt
->>
->> Cc: Tomasz Figa <t.figa@samsung.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->>  .../devicetree/bindings/phy/phy-bindings.txt       |   66 ++
->>  Documentation/phy.txt                              |  166 +++++
->>  MAINTAINERS                                        |    8 +
->>  drivers/Kconfig                                    |    2 +
->>  drivers/Makefile                                   |    2 +
->>  drivers/phy/Kconfig                                |   18 +
->>  drivers/phy/Makefile                               |    5 +
->>  drivers/phy/phy-core.c                             |  714
->> ++++++++++++++++++++
->>  include/linux/phy/phy.h                            |  270 ++++++++
->>  9 files changed, 1251 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/phy-
->> bindings.txt
->>  create mode 100644 Documentation/phy.txt  create mode 100644
->> drivers/phy/Kconfig  create mode 100644 drivers/phy/Makefile  create
->> mode 100644 drivers/phy/phy-core.c  create mode 100644
->> include/linux/phy/phy.h
->>
-> 
-> [snip]
-> 
->> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h new file
->> mode 100644 index 0000000..e444b23
->> --- /dev/null
->> +++ b/include/linux/phy/phy.h
->> @@ -0,0 +1,270 @@
-> 
-> [snip]
-> 
->> +struct phy_init_data {
->> +	unsigned int num_consumers;
->> +	struct phy_consumer *consumers;
->> +};
->> +
->> +#define PHY_CONSUMER(_dev_name, _port)				\
->> +{								\
->> +	.dev_name	= _dev_name,				\
->> +	.port		= _port,				\
->> +}
->> +
->> +#define	to_phy(dev)	(container_of((dev), struct phy, dev))
->> +
->> +#define	of_phy_provider_register(dev, xlate)	\
->> +	__of_phy_provider_register((dev), THIS_MODULE, (xlate))
->> +
->> +#define	devm_of_phy_provider_register(dev, xlate)	\
->> +	__of_phy_provider_register((dev), THIS_MODULE, (xlate))
-> 
-> I think this should be:
-> +	__devm_of_phy_provider_register((dev), THIS_MODULE, (xlate))
-> Right?
+> The big question is if you're seeing such patches merged.  People making
+> mistakes on submissions is totally normal.
 
-right.. thanks for spotting this.
+Over in the bcm53xx thread, we've discussed such a patch to fix
+inconsistencies. The problem here is that there is no canonical answer
+to what a mistake is. I can make a strong argument that the support for
+these parts is in such an early stage that the bindings (in this case
+specifically the two different compatible strings for one vendor) should
+be considered unstable and ok to fix the consistency issue. Mark Rutland
+suggests we should change nothing and possibly add a third vendor prefix
+for new bindings. I'm having trouble accepting that just because these
+bindings made it into a final kernel during a period where
+scrutinization of these things was not very high that we need to forever
+carry this inconsistency in the "specification".
 
-Regards
-Kishon
+http://www.spinics.net/lists/arm-kernel/msg262059.html
+
+> 
+> If it's the case I think you mean TBH I'm not sure anyone cares, I don't
+> think anyone is using that stuff in production yet as those chips go
+> almost exclusively into Android phones.
+
+At least the bcm281xx stuff falls into this category as you describe.
+There's simply nobody that would be upset if its bindings changed from
+bcm-><something_else> as there's just nobody using the DT-based upstream
+work except for internal Broadcom and a couple people external working
+closely with them.
+
+This situation seems to illustrate the strong need for an unstable
+binding period that's longer than just inclusion in a final kernel
+release.
+
+-Matt
