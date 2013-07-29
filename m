@@ -1,225 +1,110 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 29 Jul 2013 12:06:16 +0200
-Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
-In-Reply-To: <CADGdYn6zsr7HTcV2PD++Ze1Otwf5A51D7GwLDmUuqMdRiN+h=Q@mail.gmail.com>
-References: <0e7d01ce8840$82f79070$88e6b150$@org> <51F4F317.1040001@linaro.org>
- <CADGdYn761S+rDe=GaypFwAYdtQxFZRv0W=jmX9-KomogK5T7ww@mail.gmail.com>
- <13615299.reg39gbbhi@flatron>
- <CADGdYn6zsr7HTcV2PD++Ze1Otwf5A51D7GwLDmUuqMdRiN+h=Q@mail.gmail.com>
-Message-ID: <51F63E98.3090906@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 29 Jul 2013 11:13:03 +0100
+Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
+In-Reply-To: <1375048598-15637-2-git-send-email-robherring2@gmail.com>
+References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+ <1375048598-15637-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20130729101302.GJ3528@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 11:33 AM, amit daniel kachhap wrote:
-> Hi Tomasz,
+Hi Rob,
+
+On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> On Mon, Jul 29, 2013 at 2:03 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On Monday 29 of July 2013 10:16:14 amit daniel kachhap wrote:
->>> Hi Daniel/Tomasz,
->>>
->>> From the discussion I can conclude that SOC check is needed in the
->>> cpuidle driver for deeper C states.
->>
->> A check is needed for the whole cpuidle driver, so it registers only on
->> Exynos SoCs which support deeper C states.
+> The PSCI spec from ARM has been updated to 0.2 version. Update the
+> binding document to reflect the spec changes. For the binding, the
+> major changes are addition of system reset and poweroff functions.
+> The recommended function id numbering has also changed.
 > 
->>
->>> Only the question is where to
->>> insert this.
->>
->> Exynos doesn't support multiplatform yet, but we must make sure that any
->> code being added is multiplatform-aware. So initcall is not a good idea. I
->> would put this somewhere on Exynos-specific initialization path, i.e.
->> something that would not called for all platforms compiled in (in case of
->> multiplatform).
->>
->> As I discussed with Daniel, this should be using a traditional
->> platform_driver model, with the difference that it can't be registered
->> from device tree, but rather statically in mach code.
->>
->> For example, you can add an exynos_register_cpuidle() function in
->> arch/arm/mach-exynos/common.c, which registers such platform device and
->> always call it from exynos4_dt_machine_init() in mach-exynos4-dt.c. In
->> mach-exynos5-dt.c you could make this conditional and check if
->> !soc_is_exynos5440().
-> thanks for the detailed explanation. Certainly initcall is not good
-> for multikernel. Still I have few concerns.
-> 1) Each C state might be SOC specific. Say there are 3 C states
-> C0(basic wfi), c1(single CPU power down) and C2 (System wide power
-> down like AFTR). In this case some exynos soc may support few of these
-> states and cpuidle driver should bind C-state to correct SOC.
-> 2) Even for default C0 ( simple wfi) currently there is no sysfs
-> information if the cpuidle driver is not registered(Not quite sure).
-> I will try to post the new driver by dynamically creating the
-> cpuidle_state table based on SOC capability and removing the initcall.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: devicetree at vger.kernel.org
+> ---
+>  Documentation/devicetree/bindings/arm/psci.txt | 25 +++++++++++++++++++------
+>  1 file changed, 19 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+> index 433afe9..b8b4d9f 100644
+> --- a/Documentation/devicetree/bindings/arm/psci.txt
+> +++ b/Documentation/devicetree/bindings/arm/psci.txt
+> @@ -21,7 +21,7 @@ to #0.
+>  
+>  Main node required properties:
+>  
+> - - compatible    : Must be "arm,psci"
+> + - compatible    : Must be "arm,psci-0.2" or "arm,psci"
 
-Why don't you create a cpuidle driver for each SoC family ?
+For the purposes of handling different firmware implementations (which
+may have different bugs to work around and may require different
+arguments to cpu_suspend), it may be better to state "must contain"
+rather than "must be". 
 
-I am cleaning up all the drivers to unify the code, hoping we can factor
-all the drivers through a single ARM driver and assign the ops for the
-different states.
+>  
+>   - method        : The method of calling the PSCI firmware. Permitted
+>                     values are:
+> @@ -32,6 +32,9 @@ Main node required properties:
+>                     "hvc" : HVC #0, with the register assignments specified
+>  		           in this binding.
+>  
+> + - psci_version  : Function ID for PSCI_VERSION operation. Required for
+> +                   "arm,psci-0.2" compatible version or later.
+> +
+>  Main node optional properties:
+>  
+>   - cpu_suspend   : Function ID for CPU_SUSPEND operation
 
-As Thomasz said, the platform driver model should be used, no need of
-initcall, the code path will initialize the driver or not depending of
-the SoC. You should not have any "soc_is_*" checks. This is the
-direction all the ARM drivers are going to.
+The low bits of CPU_SUSPEND's power_state argument are platform specific
+and we'll need to deal with them if an implementation actually uses them
+for something. We can probably associate this with a specific
+implementation's compatible string, as we'll almost certainly need
+special code to handle the differences between them.
 
-Look at the example I sent with the ux500, it illustrates the idea.
-There are other examples also: cpuidle-kirkwood.c, cpuidle for davinci.
+If we have a compatible string for the first platform that ignores the
+argument (or just uses zero), that can be shared by all those
+implementations that don't give any fine-grained control here.
 
-Concerning the "single cpu power down" state, is the exynos able to
-handle that ? I mean, is it possible to power down a core and have it
-woken up by an interrupt ?
+> @@ -42,14 +45,24 @@ Main node optional properties:
+>  
+>   - migrate       : Function ID for MIGRATE operation
+>  
+> + - system_reset  : Function ID for SYSTEM_RESET operation
+> +
+> + - system_off    : Function ID for SYSTEM_OFF operation
+> +
+>  
+>  Example:
+>  
+>  	psci {
+> -		compatible	= "arm,psci";
+> +		compatible	= "arm,psci-0.2";
+>  		method		= "smc";
+> -		cpu_suspend	= <0x95c10000>;
+> -		cpu_off		= <0x95c10001>;
+> -		cpu_on		= <0x95c10002>;
+> -		migrate		= <0x95c10003>;
+> +		psci_version	= <0x84000000>;
+> +		cpu_suspend	= <0x84000001>;
+> +		cpu_off		= <0x84000002>;
+> +		cpu_on		= <0x84000003>;
+> +		affinity_info	= <0x84000004>; 
+> +		migrate		= <0x84000005>;
+> +		migrate_info_type = <0x84000006>; 
+> +		migrate_info_up_cpu = <0x84000007>; 
+> +		system_off	= <0x84000008>; 
+> +		system_reset	= <0x84000009>; 
+>  	};
 
-Concerning the AFTR state : Is there a way to use this state with *all*
-cpus online ? If not, shall we use the same approach than omap4, that is
-CPU0 power down CPU1 and goes to AFTR (all interrupts migrated to CPU0)
-and then wake up CPU1 when CPU0 is woken up ?
+One of the things changed in PSCI 0.2 was the SMC calling convention,
+though this isn't clear in the PSCI document. The function IDs for 32bit
+and 64bit callers may differ, and we need to support describing an
+arbitrary configuration of the two (same ID for both, different across
+32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
 
-Concerning WFI and sysfs, if there are no cpuidle driver registered, no
-sysfs. I would not focus on and spent too much effort for the statistics
-because a lot of changes will certainly happen with the power aware
-scheduler and the statistics will likely appear at this level.
+I'd like to ensure the binding can deal with that from the start. We
+could do this by having -32 and -64 variants of each function id (e.g.
+cpu_off-64) , if the IDs actually differ, and use the regular combined
+ID if they don't.
 
-Regards
-  -- Daniel
-
-
-
->> Best regards,
->> Tomasz
->>
->>> Also to perform the SOC there can be 2 ways like
->>> 1) each SOC check 4120, 4412, 5250 etc (long list)
->>> 2) negate the nonsupporting SOC's like 5440 (small list like current
->>> patch) Any opinion?
->>>  As Bartlomiej suggested that this patch conflicts with Daniel's
->>> earlier patch http://marc.info/?l=linux-arm-kernel&m=137467935712513&w=2
->>> So I can re-base my patch on top of this one if needed.
->>>
->>> Thanks,
->>> Amit Daniel
->>>
->>> On Sun, Jul 28, 2013 at 4:01 PM, Daniel Lezcano
->>>
->>> <daniel.lezcano@linaro.org> wrote:
->>>> On 07/28/2013 11:22 AM, Tomasz Figa wrote:
->>>>> On Sunday 28 of July 2013 09:10:09 Daniel Lezcano wrote:
->>>>>> On 07/24/2013 01:47 PM, Kukjin Kim wrote:
->>>>>>> Amit Daniel Kachhap wrote:
->>>>>>>> This patch skips the deep C1(AFTR -Arm off top running) state for
->>>>>>>> exynos5440
->>>>>>>> soc as this soc does not support this state. All the cpu's only
->>>>>>>> allows the basic
->>>>>>>> C0 state.
->>>>>>>>
->>>>>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>>>>>> ---
->>>>>>>>
->>>>>>>>  arch/arm/mach-exynos/cpuidle.c |    2 +-
->>>>>>>>  1 files changed, 1 insertions(+), 1 deletions(-)
->>>>>>>>
->>>>>>>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
->>>>>>>> exynos/cpuidle.c
->>>>>>>> index 17a18ff..9a776a1 100644
->>>>>>>> --- a/arch/arm/mach-exynos/cpuidle.c
->>>>>>>> +++ b/arch/arm/mach-exynos/cpuidle.c
->>>>>>>> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
->>>>>>>>
->>>>>>>>            device->cpu = cpu_id;
->>>>>>>>
->>>>>>>>            /* Support IDLE only */
->>>>>>>>
->>>>>>>> -          if (cpu_id != 0)
->>>>>>>> +          if (soc_is_exynos5440() || cpu_id != 0)
->>>>>>>>
->>>>>>>>                    device->state_count = 1;
->>>>>>>>
->>>>>>>>            ret = cpuidle_register_device(device);
->>>>>>>>
->>>>>>>> --
->>>>>>>> 1.7.1
->>>>>>>
->>>>>>> Applied, thanks.
->>>>>>
->>>>>> You shouldn't have. This patch means exynos5540 has no cpuidle
->>>>>> driver at all. It should be fixed in the Kconfig to unselect
->>>>>> CONFIG_CPU_IDLE for an exynos5540.
->>>>>
->>>>> To shed more light on this, let me add that you need to register a
->>>>> cpuidle driver only if you have more states than a simple WFI or you
->>>>> need some crazy steps to enter WFI. Default setup falls back to
->>>>> generic ARM WFI. (Daniel, do we get the nice idle stats as provided
->>>>> by cpuidle core then?)>
->>>> Nope, but with one state, idle vs busy stats do the trick.
->>>>
->>>> BTW, I am writing a tool to do some stats based on the idle events
->>>> [1].
->>>> It is still at a very early development stage but we can get some
->>>> interesting informations.
->>>>
->>>>> Anyway, Exynos cpuidle is using an initcall to initialize and we
->>>>> support multiple Exynos SoCs in single zImage, so deselecting
->>>>> CONFIG_CPU_IDLE is not an option.
->>>>
->>>> Good point.
->>>>
->>>>> Considering multiplatform requirements, the driver has to
->>>>>
->>>>> be modified to initialize only on supported platforms, either by:
->>>>>  a) dropping the initcall and calling the init function directly from
->>>>>
->>>>> arch/arm/mach-exynos
->>>>>
->>>>>  or
->>>>>
->>>>>  b) checking if machine we are running on is supported, which would
->>>>>  mean a>>
->>>>> long list of all Exynos SoCs that needs to be checked.
->>>>>
->>>>> An evolution of option a) is registering a platform device somewhere
->>>>> in
->>>>> arch/arm/mach-exynos and making exynos-cpuidle a platform driver.
->>>>
->>>> Yes, I am favorable to this solution [2].
->>>>
->>>>> The
->>>>> problem is that you must register a static platform device from arch
->>>>> code, because cpuidle is not a real hardware block that can be put
->>>>> into device tree.
->>>>
->>>> Thanks
->>>>
->>>>   -- Daniel
->>>>
->>>> [1]
->>>> https://git.linaro.org/gitweb?p=people/dlezcano/idlestat.git;a=summar
->>>> y [2] http://patches.linaro.org/18368/
->>>>
->>>> --
->>>>
->>>>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM
->>>>  SoCs
->>>>
->>>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->>>> <http://twitter.com/#!/linaroorg> Twitter |
->>>> <http://www.linaro.org/linaro-blog/> Blog
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe
->>>> linux-samsung-soc" in the body of a message to
->>>> majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks,
+Mark.
