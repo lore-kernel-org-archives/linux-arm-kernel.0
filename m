@@ -1,55 +1,48 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 29 Jul 2013 14:36:30 +0100
-Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
-In-Reply-To: <20130729095400.GB32383@mudshark.cambridge.arm.com>
-References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
- <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
- <20130729095400.GB32383@mudshark.cambridge.arm.com>
-Message-ID: <20130729133625.GA2280@localhost.localdomain>
+From: benoit.cousson@gmail.com (Benoit Cousson)
+Date: Mon, 29 Jul 2013 15:39:59 +0200
+Subject: [PATCH 0/9] ARM: dts: omap5-uevm: fixup wrong regulator
+ configuration
+In-Reply-To: <51F66B65.4030702@ti.com>
+References: <1374079538-19548-1-git-send-email-nm@ti.com>
+ <51F63C74.6070503@ti.com> <51F66B65.4030702@ti.com>
+Message-ID: <51F670AF.9080808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 10:54:01AM +0100, Will Deacon wrote:
-> On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
-> > On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > > Power aware scheduling needs the cpu topology information to improve the
-> > > cpu scheduler decision making.
-> > 
-> > It's not only power aware scheduling. The scheduler already uses
-> > topology and cache sharing when  CONFIG_SCHED_MC and/or
-> > CONFIG_SCHED_SMT are enable. So you should also add these configs for
-> > arm64 so the scheduler can use it
-> 
-> ... except that the architecture doesn't define what the AFF fields in MPIDR
-> really represent. Using them to make key scheduling decisions relating to
+Hi Nishanth,
 
-In fact, the ARM Architecture doesn't place any requirements on MPIDRs to
-force the aff fields to exist _at all_.  It's just a recommendation.
-Instead, you have a 24 or 32-bit number which is unique per CPU, and which
-is _probably_ assigned in a way resembling the aff fields.
+On 29/07/2013 15:17, Nishanth Menon wrote:
+> On 07/29/2013 04:57 AM, Keerthy wrote:
+>> Hi Nishanth,
+>>
+>> On Wednesday 17 July 2013 10:15 PM, Nishanth Menon wrote:
+>>> Due to wrong older revision of documentation used as reference, we
+>>> seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
+>>> series is based power tree on production board 750-2628-XXX platform.
+>>> Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
+>>> supply hardware blocks at voltages that are out of specification.
+>>
+>> This series looks good to me.
+>>
+>> Acked-by:  J Keerthy <j-keerthy@ti.com>
+>
+> Tony, Benoit - this series could prevent OMAP5 from being damaged on
+> uEVMs with current 3.11 rc - could you suggest what we need to do to
+> get it in?
 
-> cache proximity seems pretty risky to me, especially given the track record
-> we've seen already on AArch32 silicon. It's a convenient register if it
-> contains the data we want it to contain, but we need to force ourselves to
-> come to terms with reality here and simply use it as an identifier for a
-> CPU.
+I'm still on vacation with no way to pull any patch... but I can still
+comment on the series quickly.
 
-+1
+It seems to me that this series contains some real fixes that might
+damage the board due to hihest voltage than expected and some which are
+just improvement like for the SMPS9 or LDO[28]. In theory they should no
+go necesseraly to -rc, but, I guess that's fine for that one.
 
-Also, we should align arm and arm64.  The problem is basically exactly
-the same, and the solution needs to be the same.  struct cputopo_arm is
-already being abused  -- for example, TC2 describes the A15 and A7
-clusters on a single die as having different "socket_id" values, even
-though this is obviously nonsense.  But there's no other way to describe
-that system today.
+All the "fixes" are sharing more than 50% of the changelog content with
+only 2 changes in the code, so you'd better squash them into one patch
+to avoid repeating the same thing again and again.
 
-> Can't we just use the device-tree to represent this topological data for
-> arm64? Lorenzo has been working on bindings in this area.
+Beside that, I will ack the updated one to allow Tony to push them ASAP.
 
-This may become more important as we start to see things like asymmetric
-topologies appearing (different numbers of nodes and different
-interdependence characteristics in adjacent branches of the topology
-etc.)
-
-Cheers
----Dave
+Regards,
+Benoit
