@@ -1,50 +1,147 @@
-From: benoit.cousson@gmail.com (Benoit Cousson)
-Date: Tue, 30 Jul 2013 00:18:11 +0200
-Subject: [PATCH V2 0/3] ARM: dts: omap5-uevm: fixup wrong regulator
- configuration
-In-Reply-To: <1375117383-19285-1-git-send-email-nm@ti.com>
-References: <51F67D7D.9070003@ti.com>
- <1375117383-19285-1-git-send-email-nm@ti.com>
-Message-ID: <51F6EA23.50803@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 30 Jul 2013 00:20:35 +0200
+Subject: Defining schemas for Device Tree
+In-Reply-To: <51F6E30B.7060106@wwwdotorg.org>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+Message-ID: <6809706.cRofzbG9CV@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+On Monday 29 of July 2013 15:47:55 Stephen Warren wrote:
+> On 07/28/2013 06:21 PM, Tomasz Figa wrote:
+> ...
+> 
+> > b) What information should be specified in schemas? What level of
+> > 
+> >    granularity is required?
+> > 
+> > For each property we need to have at least following data specified:
+> >  - property name (or property name format, e.g. regex),
+> >  - whether the property is mandatory or optional,
+> >  - data type of value.
+> 
+> We might want general restrictions on node/property names, e.g. it seems
+> we generally prefer - rather than _ in them, although there are a few
+> entrenched exceptions.
 
-Thanks for the quick update.
+Yes.
 
-On 29/07/2013 19:03, Nishanth Menon wrote:
-> Due to wrong older revision of documentation used as reference, we
-> seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
-> series is based power tree on production board 750-2628-XXX platform.
-> Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
-> supply hardware blocks at voltages that are out of specification.
->
-> Also available at:
-> based on v3.11-rc1 tag
-> http link: https://github.com/nmenon/linux-2.6-playground/commits/push/omap5-palmas-fixes-v2
-> git link: git://github.com/nmenon/linux-2.6-playground.git
-> branch: push/omap5-palmas-fixes-v2
->
-> Changes since V1:
->  - squash of patches
->  - picked up Ack from Keerthy
->  - based on v3.11-rc3 tag
->
-> V1: http://marc.info/?t=137407980100008&r=1&w=2
->
-> Nishanth Menon (3):
->   ARM: dts: omap5-uevm: document regulator signals used on the actual
->     board
->   ARM: dts: omap5-uevm: fix regulator configurations mandatory for SoC
->   ARM: dts: omap5-uevm: update optional/unused regulator configurations
->
->  arch/arm/boot/dts/omap5-uevm.dts |   78 ++++++++++++++++++++++++--------------
->  1 file changed, 49 insertions(+), 29 deletions(-)
->
-> Regards,
-> Nishanth Menon
+> > As for now, I can think of following data types used in device trees:
+> >  - boolean (i.e. without value),
+> >  - array of strings (including single string),
+> >  - array of u32 (including single u32),
+> >  - specifier (aka phandle with args, including cases with 0 args),
+> >  - variable-length cells (e.g. #address-cells of u32s).
+> > 
+> > Some properties might require a combination of data types to be specified
+> 
+> I believe phandles are just cells in terms of the storage type at least.
+> Hence, I'd argue we don't need mixing of types (boolean, cell, string),
+> but I see your point about semantically needing to represent different
+> cells meaning different things.
 
-For the whole series:
+Let me return to this point a bit later in this message.
 
-Acked-by: Benoit Cousson <benoit.cousson@gmail.com>
+> > or even an array of combinations, like interrupt-map property, which is an
+> > 
+> > array of entries consisting of:
+> >  - #address-cells u32s,
+> >  - #interrupt-cells u32s,
+> >  - specifier (phandle of interrupt controller and u32 of count defined by
+> >  
+> >    #interrupt-cells of the controller).
+> > 
+> > We probably want to define allowed range of values for given property, be
+> > it contiguous or enumerated.
+> 
+> Where defining the length of a property (or part of it) in terms of
+> another #xxx-cells property, we need to specify where that other
+> property exists. Sometimes it's the nearest parent node containing the
+> property (typical for #address-cells), sometimes it's the node
+> containing the property itself (typical for one of the #address-cells
+> referenced by a ranges property), and sometimes it's in the node
+> referenced by the phandle associated with a specifier.
+> 
+> Other content restrictions might be:
+> 
+> * List must contain (at least) these entries/values.
+> 
+> * List can't contain any other entries/values not specified here.
+> 
+> * List must be in this order vs. any order.
+> 
+> * List logical length (in entries, not bytes/cells) must match the
+> logical length of another cell (consider clocks/clock-names).
+> 
+> * Ordering of one property must match ordering of another property
+> (again consider clocks/clock-names), although it'd be difficult to tell
+> whether this condition was met, perhaps we can at least document it.
+> 
+> I'm sure there will be many more criteria to validate that we're
+> forgetting. This is possible the most complex area?
+
+Right. Still, this is about the granularity of checks we really need. Do we 
+need to check for all those restrictions?
+
+> > As for subnodes, I think we need to define following constraints:
+> >  - node name (or node name format, e.g. regex),
+> 
+> I don't think node names are supposed to convey any semantic meaning, so
+> they probably shouldn't be restricted (much?) by schema.
+
+There are bindings currently that require specific node names. Since 
+of_match_node() can do matching by names as well, I think we should care about 
+node names too,
+
+> > d) When should the validation happen and what should handle it?
+> 
+> ...
+> 
+> > well. Nothing stops us from running validation on already compiled dtbs,
+> > though, using an extra tool.
+> 
+> In a DTB, I'm not sure whether all the type information is still present.
+> 
+> For example, in DTS, the following are very obviously different:
+> 
+> prop = "abc", "def";
+> prop = <0x61626300> <0x64656600>;
+> 
+> ... whereas in the DTB, I think they are both just two 32-bit values
+> that just happen to encode string data or not. Presumably we want the
+> validator to force string properties to be specified using string syntax?
+> 
+> Equally, I'm not sure there's any difference between:
+> 
+> prop = <&node>;
+> prop = <0x23648689>;
+> 
+> ... in the DTB, except that the value just *happens* to match another
+> node's phandle value, which could end up leading to false positive
+> matches if only applied on the raw values not the syntax?
+
+This is a good point. From driver's perspective it doesn't matter how you 
+specify value of some property, as long as it can be parsed using the same 
+code. As a more trivial example, consider following dts code:
+
+	array-prop = <0>, <1>, <2>;
+	array-prop-2 = <0 1 2>;
+
+Both array props contain the same data and can be parsed using the same code, 
+but from reader's perspective they mean something slightly different - an array 
+with 1 cell per element and a single entry of 3 cells.
+
+Now back to the point I deferred my reply to, I think we need different 
+handling for at least phandles and properties of which number of cells is 
+specified by one or more properties (possibly in other nodes).
+
+At DTS level phandle properties should use the phandle syntax, pointing at 
+some node, while at DTB level a raw phandle value could be validated by 
+checking if it matches with phandle of some node.
+
+For properties ussing #xxx-cells properties we need to check for correct 
+number of cells., which involves getting values of right #xxx-cells 
+properties.
+
+Best regards,
+Tomasz
