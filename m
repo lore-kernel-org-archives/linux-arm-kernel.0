@@ -1,110 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 29 Jul 2013 11:13:03 +0100
-Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <1375048598-15637-2-git-send-email-robherring2@gmail.com>
-References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
- <1375048598-15637-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20130729101302.GJ3528@e106331-lin.cambridge.arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 29 Jul 2013 12:13:44 +0200
+Subject: [PATCH v2 01/22] [HACK] of: dev_node has struct device pointer
+In-Reply-To: <20130716231629.GA12189@dhcp-172-17-186-34.nvidia.com>
+References: <1373021097-32420-2-git-send-email-hdoyu@nvidia.com><51E5CFBF.5080407@wwwdotorg.org><20130716231629.GA12189@dhcp-172-17-186-34.nvidia.com>
+Message-ID: <20130729.131344.1221933042559369096.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 17 Jul 2013 01:16:30 +0200:
 
-On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+> * PGP Signed by an unknown key
 > 
-> The PSCI spec from ARM has been updated to 0.2 version. Update the
-> binding document to reflect the spec changes. For the binding, the
-> major changes are addition of system reset and poweroff functions.
-> The recommended function id numbering has also changed.
+> On Tue, Jul 16, 2013 at 04:57:03PM -0600, Stephen Warren wrote:
+> > On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> > > To prevent of_platform_populate() from trying to populate duplicate
+> > > devices if a device has been already populated.
+> > 
+> > You need to send drivers/of patches to the DT maintainer and
+> > devicetree-discuss mailing list.
+> > 
+> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > ---
+> > > Need to take care of early_platform_devices, or alternative solution.
+> > 
+> > I assume that's a TODO item... Are you planning on fleshing out this
+> > patch to address that issue?
+>
+> There was some more discussion about it, which can be found in the
+> following thread:
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/arm/psci.txt | 25 +++++++++++++++++++------
->  1 file changed, 19 insertions(+), 6 deletions(-)
+> 	https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036934.html
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-> index 433afe9..b8b4d9f 100644
-> --- a/Documentation/devicetree/bindings/arm/psci.txt
-> +++ b/Documentation/devicetree/bindings/arm/psci.txt
-> @@ -21,7 +21,7 @@ to #0.
->  
->  Main node required properties:
->  
-> - - compatible    : Must be "arm,psci"
-> + - compatible    : Must be "arm,psci-0.2" or "arm,psci"
+> That's one of the last messages and it should have most of the
+> background. If not you may have to walk up the thread for more context.
+> In a nutshell I raised the question as to why we can't simply call
+> of_platform_populate() earlier and side-step all the workarounds that
+> have found their way into the kernel to side-step the issue of their not
+> being a struct device associated with the struct device_node.
 
-For the purposes of handling different firmware implementations (which
-may have different bugs to work around and may require different
-arguments to cpu_suspend), it may be better to state "must contain"
-rather than "must be". 
-
->  
->   - method        : The method of calling the PSCI firmware. Permitted
->                     values are:
-> @@ -32,6 +32,9 @@ Main node required properties:
->                     "hvc" : HVC #0, with the register assignments specified
->  		           in this binding.
->  
-> + - psci_version  : Function ID for PSCI_VERSION operation. Required for
-> +                   "arm,psci-0.2" compatible version or later.
-> +
->  Main node optional properties:
->  
->   - cpu_suspend   : Function ID for CPU_SUSPEND operation
-
-The low bits of CPU_SUSPEND's power_state argument are platform specific
-and we'll need to deal with them if an implementation actually uses them
-for something. We can probably associate this with a specific
-implementation's compatible string, as we'll almost certainly need
-special code to handle the differences between them.
-
-If we have a compatible string for the first platform that ignores the
-argument (or just uses zero), that can be shared by all those
-implementations that don't give any fine-grained control here.
-
-> @@ -42,14 +45,24 @@ Main node optional properties:
->  
->   - migrate       : Function ID for MIGRATE operation
->  
-> + - system_reset  : Function ID for SYSTEM_RESET operation
-> +
-> + - system_off    : Function ID for SYSTEM_OFF operation
-> +
->  
->  Example:
->  
->  	psci {
-> -		compatible	= "arm,psci";
-> +		compatible	= "arm,psci-0.2";
->  		method		= "smc";
-> -		cpu_suspend	= <0x95c10000>;
-> -		cpu_off		= <0x95c10001>;
-> -		cpu_on		= <0x95c10002>;
-> -		migrate		= <0x95c10003>;
-> +		psci_version	= <0x84000000>;
-> +		cpu_suspend	= <0x84000001>;
-> +		cpu_off		= <0x84000002>;
-> +		cpu_on		= <0x84000003>;
-> +		affinity_info	= <0x84000004>; 
-> +		migrate		= <0x84000005>;
-> +		migrate_info_type = <0x84000006>; 
-> +		migrate_info_up_cpu = <0x84000007>; 
-> +		system_off	= <0x84000008>; 
-> +		system_reset	= <0x84000009>; 
->  	};
-
-One of the things changed in PSCI 0.2 was the SMC calling convention,
-though this isn't clear in the PSCI document. The function IDs for 32bit
-and 64bit callers may differ, and we need to support describing an
-arbitrary configuration of the two (same ID for both, different across
-32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
-
-I'd like to ensure the binding can deal with that from the start. We
-could do this by having -32 and -64 variants of each function id (e.g.
-cpu_off-64) , if the IDs actually differ, and use the regular combined
-ID if they don't.
-
-Thanks,
-Mark.
+This is the thread which Lorenzo started originally. He may have some
+plan to implement/proceed with this, Lorenzo?
