@@ -1,50 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 29 Jul 2013 00:30:11 -0700
-Subject: [PATCH] ARM: v6: prevent gcc from reordering extended CP15
- reads above is_smp() test
-In-Reply-To: <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
-References: <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com>
- <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com>
- <20130724142059.GJ11072@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
- <20130727122221.GB6618@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
- <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
-Message-ID: <20130729073010.GU7656@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Jul 2013 09:31:23 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130728131901.GA8864@netboy>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1441731.8CGUI1tUxh@flatron> <20130728085650.GA4683@netboy>
+ <1416484.XDfk5G56BI@flatron> <20130728131901.GA8864@netboy>
+Message-ID: <20130729073123.GB1441@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-* Paul Walmsley <paul@pwsan.com> [130728 13:23]:
+On Sun, Jul 28, 2013 at 03:19:03PM +0200, Richard Cochran wrote:
+> On Sun, Jul 28, 2013 at 11:12:53AM +0200, Tomasz Figa wrote:
 > 
-> Commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc ("ARM: 7757/1: mm:
-> don't flush icache in switch_mm with hardware broadcasting") breaks
-> the boot on OMAP2430SDP with omap2plus_defconfig.  Tracked to an
-> undefined instruction abort from the CP15 read in
-> cache_ops_need_broadcast().  It turns out that gcc reorders the
-> extended CP15 read above the is_smp() test.  This breaks ARM1136 r0
-> cores, since they don't support several CP15 registers that later ARM
-> cores do.  ARM1136JF-S TRM section 3.2.1 "Register allocation" has the
-> details.
+> > I'm not really sure what effect on users this has. Maybe you should define 
+> > "users".
 > 
-> So, when the kernel is built for ARMv6 cores, mark the extended CP15
-> read as clobbering memory, which seems to prevent the compiler from
-> reordering it before the is_smp() test.  Russell states that the code
-> generated from this approach is preferable to marking the inline asm
-> as volatile.
+> ...
 > 
-> This patch was developed in collaboration with Will Deacon and Russell
-> King.
+> > Care to explain this reasoning?
 > 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Use Case
+> ~~~~~~~~
+> 
+> User acquires a machine running ARM Linux version 3.x, with u-boot
+> and dtb in a read only flash partition. The board boots and works just
+> fine. However, for his application, the user requires a new kernel
+> feature that appeared in version 3.y where y > x. He compiles the new
+> kernel, and it also works.
 
-Sorry to be late to this party, I was offline last week. This
-patch fixes the issue for me:
+I'm afraid this kind of use case will never be properly supported, DT
+stable ABI or not.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Think about this: what kernel will actually be shipped in that board?
+Most likely, it will be a BSP kernel from the vendor. Does the vendor
+will have made that commitment to have a stable ABI for the DT? Will it
+use the same bindings than mainline? Do we want to support all the crazy
+bindings every vendor will come up with?
+
+I'm afraid the answer to these three questions will most of the time be
+"no.".
+
+That doesn't mean we shouldn't aim for *mainline* having a stable DT
+ABI, but that kind of use case doesn't seem very realistic to me.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/3a51fbe2/attachment-0001.sig>
