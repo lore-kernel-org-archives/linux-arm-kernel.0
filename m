@@ -1,166 +1,128 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 29 Jul 2013 00:04:15 -0300
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: Cleanup imx_v6_v7_defconfig
-Message-ID: <1375067056-6370-1-git-send-email-festevam@gmail.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Mon, 29 Jul 2013 10:16:14 +0530
+Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
+In-Reply-To: <51F4F317.1040001@linaro.org>
+References: <0e7d01ce8840$82f79070$88e6b150$@org>
+ <0eaf01ce8863$89d3c4e0$9d7b4ea0$@org> <51F4C3D1.2060901@linaro.org>
+ <1877730.qZVs3NAG5h@flatron> <51F4F317.1040001@linaro.org>
+Message-ID: <CADGdYn761S+rDe=GaypFwAYdtQxFZRv0W=jmX9-KomogK5T7ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Daniel/Tomasz,
 
-Generate imx_v6_v7_defconfig by doing:
+>From the discussion I can conclude that SOC check is needed in the
+cpuidle driver for deeper C states. Only the question is where to
+insert this.
+Also to perform the SOC there can be 2 ways like
+1) each SOC check 4120, 4412, 5250 etc (long list)
+2) negate the nonsupporting SOC's like 5440 (small list like current patch)
+Any opinion?
+ As Bartlomiej suggested that this patch conflicts with Daniel's
+earlier patch http://marc.info/?l=linux-arm-kernel&m=137467935712513&w=2
+So I can re-base my patch on top of this one if needed.
 
-make savedefconfig
+Thanks,
+Amit Daniel
 
-cp defconfig arch/arm/configs/imx_v6_v7_defconfig
-
-No functional change. The goal here is to cleanup imx_v6_v7_defconfig file to
-make easier and cleaner the addition of new entries.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 37 +++++++++++++-----------------------
- 1 file changed, 13 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index f1662d3..ab85d4a 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_KERNEL_LZO=y
- CONFIG_SYSVIPC=y
-@@ -17,10 +16,8 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_MODULE_SRCVERSION_ALL=y
- # CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_MXC=y
- CONFIG_ARCH_MULTI_V6=y
--CONFIG_ARCH_MULTI_V7=y
--CONFIG_MACH_IMX31_DT=y
-+CONFIG_ARCH_MXC=y
- CONFIG_MACH_MX31LILLY=y
- CONFIG_MACH_MX31LITE=y
- CONFIG_MACH_PCM037=y
-@@ -30,6 +27,7 @@ CONFIG_MACH_MX31MOBOARD=y
- CONFIG_MACH_QONG=y
- CONFIG_MACH_ARMADILLO5X0=y
- CONFIG_MACH_KZM_ARM11_01=y
-+CONFIG_MACH_IMX31_DT=y
- CONFIG_MACH_PCM043=y
- CONFIG_MACH_MX35_3DS=y
- CONFIG_MACH_VPR200=y
-@@ -39,7 +37,6 @@ CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
- CONFIG_SOC_VF610=y
--CONFIG_MXC_PWM=y
- CONFIG_SMP=y
- CONFIG_VMSPLIT_2G=y
- CONFIG_PREEMPT_VOLUNTARY=y
-@@ -72,7 +69,6 @@ CONFIG_IMX_WEIM=y
- CONFIG_CONNECTOR=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_JEDECPROBE=y
-@@ -104,7 +100,6 @@ CONFIG_ATA=y
- CONFIG_PATA_IMX=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
- CONFIG_CS89x0=y
- CONFIG_CS89x0_PLATFORM=y
- # CONFIG_NET_VENDOR_FARADAY is not set
-@@ -140,11 +135,9 @@ CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_HW_RANDOM_MXC_RNGA=y
--CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
- # CONFIG_I2C_HELPER_AUTO is not set
--CONFIG_I2C_ALGOBIT=m
- CONFIG_I2C_ALGOPCF=m
- CONFIG_I2C_ALGOPCA=m
- CONFIG_I2C_IMX=y
-@@ -160,32 +153,26 @@ CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
--CONFIG_REGULATOR_DA9052=y
- CONFIG_REGULATOR_ANATOP=y
-+CONFIG_REGULATOR_DA9052=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
--CONFIG_VIDEO_DEV=y
--CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
--CONFIG_SOC_CAMERA_OV2640=y
--CONFIG_DRM=y
- CONFIG_VIDEO_MX3=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_CODA=y
--CONFIG_FB=y
--CONFIG_LCD_PLATFORM=y
-+CONFIG_SOC_CAMERA_OV2640=y
-+CONFIG_DRM=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
-+CONFIG_LCD_PLATFORM=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
--CONFIG_FONTS=y
--CONFIG_FONT_8x8=y
--CONFIG_FONT_8x16=y
- CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-@@ -195,16 +182,15 @@ CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
- CONFIG_SND_SOC_IMX_WM8962=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
--CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_USB_PHY=y
- CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_MXS_PHY=y
--CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
-@@ -221,10 +207,10 @@ CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
- CONFIG_STAGING=y
- CONFIG_DRM_IMX=y
--CONFIG_DRM_IMX_TVE=y
--CONFIG_DRM_IMX_LDB=y
- CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
-+CONFIG_DRM_IMX_TVE=y
-+CONFIG_DRM_IMX_LDB=y
- CONFIG_DRM_IMX_IPUV3_CORE=y
- CONFIG_DRM_IMX_IPUV3=y
- CONFIG_COMMON_CLK_DEBUG=y
-@@ -278,3 +264,6 @@ CONFIG_CRC_CCITT=m
- CONFIG_CRC_T10DIF=y
- CONFIG_CRC7=m
- CONFIG_LIBCRC32C=m
-+CONFIG_FONTS=y
-+CONFIG_FONT_8x8=y
-+CONFIG_FONT_8x16=y
--- 
-1.8.1.2
+On Sun, Jul 28, 2013 at 4:01 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 07/28/2013 11:22 AM, Tomasz Figa wrote:
+>> On Sunday 28 of July 2013 09:10:09 Daniel Lezcano wrote:
+>>> On 07/24/2013 01:47 PM, Kukjin Kim wrote:
+>>>> Amit Daniel Kachhap wrote:
+>>>>> This patch skips the deep C1(AFTR -Arm off top running) state for
+>>>>> exynos5440
+>>>>> soc as this soc does not support this state. All the cpu's only
+>>>>> allows the basic
+>>>>> C0 state.
+>>>>>
+>>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>>> ---
+>>>>>
+>>>>>  arch/arm/mach-exynos/cpuidle.c |    2 +-
+>>>>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
+>>>>> exynos/cpuidle.c
+>>>>> index 17a18ff..9a776a1 100644
+>>>>> --- a/arch/arm/mach-exynos/cpuidle.c
+>>>>> +++ b/arch/arm/mach-exynos/cpuidle.c
+>>>>> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
+>>>>>
+>>>>>            device->cpu = cpu_id;
+>>>>>
+>>>>>            /* Support IDLE only */
+>>>>>
+>>>>> -          if (cpu_id != 0)
+>>>>> +          if (soc_is_exynos5440() || cpu_id != 0)
+>>>>>
+>>>>>                    device->state_count = 1;
+>>>>>
+>>>>>            ret = cpuidle_register_device(device);
+>>>>>
+>>>>> --
+>>>>> 1.7.1
+>>>>
+>>>> Applied, thanks.
+>>>
+>>> You shouldn't have. This patch means exynos5540 has no cpuidle driver at
+>>> all. It should be fixed in the Kconfig to unselect CONFIG_CPU_IDLE for
+>>> an exynos5540.
+>>
+>> To shed more light on this, let me add that you need to register a cpuidle
+>> driver only if you have more states than a simple WFI or you need some
+>> crazy steps to enter WFI. Default setup falls back to generic ARM WFI.
+>> (Daniel, do we get the nice idle stats as provided by cpuidle core then?)
+>
+> Nope, but with one state, idle vs busy stats do the trick.
+>
+> BTW, I am writing a tool to do some stats based on the idle events [1].
+> It is still at a very early development stage but we can get some
+> interesting informations.
+>
+>
+>> Anyway, Exynos cpuidle is using an initcall to initialize and we support
+>> multiple Exynos SoCs in single zImage, so deselecting CONFIG_CPU_IDLE is
+>> not an option.
+>
+> Good point.
+>
+>> Considering multiplatform requirements, the driver has to
+>> be modified to initialize only on supported platforms, either by:
+>>
+>>  a) dropping the initcall and calling the init function directly from
+>> arch/arm/mach-exynos
+>>
+>>  or
+>>
+>>  b) checking if machine we are running on is supported, which would mean a
+>> long list of all Exynos SoCs that needs to be checked.
+>>
+>> An evolution of option a) is registering a platform device somewhere in
+>> arch/arm/mach-exynos and making exynos-cpuidle a platform driver.
+>
+> Yes, I am favorable to this solution [2].
+>
+>> The
+>> problem is that you must register a static platform device from arch code,
+>> because cpuidle is not a real hardware block that can be put into device
+>> tree.
+>
+> Thanks
+>   -- Daniel
+>
+> [1] https://git.linaro.org/gitweb?p=people/dlezcano/idlestat.git;a=summary
+> [2] http://patches.linaro.org/18368/
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
