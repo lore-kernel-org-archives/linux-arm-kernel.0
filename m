@@ -1,48 +1,30 @@
-From: benoit.cousson@gmail.com (Benoit Cousson)
-Date: Mon, 29 Jul 2013 15:39:59 +0200
-Subject: [PATCH 0/9] ARM: dts: omap5-uevm: fixup wrong regulator
- configuration
-In-Reply-To: <51F66B65.4030702@ti.com>
-References: <1374079538-19548-1-git-send-email-nm@ti.com>
- <51F63C74.6070503@ti.com> <51F66B65.4030702@ti.com>
-Message-ID: <51F670AF.9080808@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Jul 2013 14:40:12 +0100
+Subject: [RFC/RFT PATCH 0/5] mm: ARM nobootmem and few dma_mask fixes
+In-Reply-To: <51F66D94.9060706@ti.com>
+References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130726151021.GU24642@n2100.arm.linux.org.uk> <51F2A3AA.4060801@ti.com>
+ <20130729111503.GG24642@n2100.arm.linux.org.uk> <51F66D94.9060706@ti.com>
+Message-ID: <20130729134012.GK24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+On Mon, Jul 29, 2013 at 09:26:44AM -0400, Santosh Shilimkar wrote:
+> On Monday 29 July 2013 07:15 AM, Russell King - ARM Linux wrote:
+> > Would you mind putting them all in the patch system, I can add the acks
+> > should anyone supply them later, and I'll repost them along with my set
+> > of dma-mask patches.  Thanks.
+> > 
+> Done.
+> 7794/1, 7795/1, 7796/1, 7797/1, 7798/1, 7799/1
+> 
+> Didn't know how to get XXXX/1,2,3,4... pushed into the tracker.
+> BTW, I have also pushed the patched on my git tree branch [1] just
+> in case you or some one needs it.
 
-On 29/07/2013 15:17, Nishanth Menon wrote:
-> On 07/29/2013 04:57 AM, Keerthy wrote:
->> Hi Nishanth,
->>
->> On Wednesday 17 July 2013 10:15 PM, Nishanth Menon wrote:
->>> Due to wrong older revision of documentation used as reference, we
->>> seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
->>> series is based power tree on production board 750-2628-XXX platform.
->>> Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
->>> supply hardware blocks at voltages that are out of specification.
->>
->> This series looks good to me.
->>
->> Acked-by:  J Keerthy <j-keerthy@ti.com>
->
-> Tony, Benoit - this series could prevent OMAP5 from being damaged on
-> uEVMs with current 3.11 rc - could you suggest what we need to do to
-> get it in?
+Thanks.  I'd prefer not to have them as stable commits yet because should
+we get acks from Jens, Jejb or cjb, we will need to add their acks to them.
 
-I'm still on vacation with no way to pull any patch... but I can still
-comment on the series quickly.
-
-It seems to me that this series contains some real fixes that might
-damage the board due to hihest voltage than expected and some which are
-just improvement like for the SMPS9 or LDO[28]. In theory they should no
-go necesseraly to -rc, but, I guess that's fine for that one.
-
-All the "fixes" are sharing more than 50% of the changelog content with
-only 2 changes in the code, so you'd better squash them into one patch
-to avoid repeating the same thing again and again.
-
-Beside that, I will ack the updated one to allow Tony to push them ASAP.
-
-Regards,
-Benoit
+My dma-masks branch is still very much unstable at the moment (which is
+why its not published) but I shall be posting the patches during this
+week.
