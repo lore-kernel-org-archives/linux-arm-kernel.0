@@ -1,53 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Jul 2013 14:31:03 +0200
-Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
- hooks to hw_pci
-In-Reply-To: <20130726224607.GZ24642@n2100.arm.linux.org.uk>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130725165659.GB27802@dhcp-172-17-186-34.nvidia.com>
- <20130726224607.GZ24642@n2100.arm.linux.org.uk>
-Message-ID: <20130729123102.GG23152@manwe>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 29 Jul 2013 14:31:51 +0200
+Subject: [PATCH 2/5] ARM: dove: add MBUS_ID macro to Dove DT
+In-Reply-To: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1375101114-28858-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 11:46:07PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 25, 2013 at 09:57:00AM -0700, Thierry Reding wrote:
-> > On Mon, Jul 15, 2013 at 01:52:44PM +0200, Thomas Petazzoni wrote:
-> > > Some PCI drivers may need to adjust the pci_bus structure after it has
-> > > been allocated by the Linux PCI core. The PCI core allows
-> > > architectures to implement the pcibios_add_bus() and
-> > > pcibios_remove_bus() for this purpose. This commit therefore extends
-> > > the hw_pci and pci_sys_data structures of the ARM PCI core to allow
-> > > PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
-> > > which will get called when a bus is added or removed from the system.
-> > > 
-> > > This will be used for example by the Marvell PCIe driver to connect a
-> > > particular PCI bus with its corresponding MSI chip to handle Message
-> > > Signaled Interrupts.
-> > > 
-> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
-> > > ---
-> > >  arch/arm/include/asm/mach/pci.h |  4 ++++
-> > >  arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
-> > >  2 files changed, 20 insertions(+)
-> > 
-> > Hi Russell,
-> > 
-> > Can we have your Acked-by on this patch so that it can be moved to a
-> > stable branch along with some of the other patches in this branch that
-> > both Marvell and Tegra PCIe drivers need?
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+This adds a macro used for defining address window's target ID and
+attribute cells for the MBus ranges entry.
 
-Thanks, Russell.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/dove.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/978fd981/attachment-0001.sig>
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 90257c7..397674c 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -1,5 +1,7 @@
+ /include/ "skeleton.dtsi"
+ 
++#define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
++
+ / {
+ 	compatible = "marvell,dove";
+ 	model = "Marvell Armada 88AP510 SoC";
+-- 
+1.7.10.4
