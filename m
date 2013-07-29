@@ -1,45 +1,28 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Mon, 29 Jul 2013 12:01:02 +0100
-Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
-In-Reply-To: <20130725174416.7598.73819@quantum>
-References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
- <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
- <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
- <51F0F035.8010705@arm.com> <20130725174416.7598.73819@quantum>
-Message-ID: <51F64B6E.4070300@arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 29 Jul 2013 13:06:46 +0200
+Subject: [PATCH v2 05/22] ARM: dt: tegra30: iommu: Add
+ "nvidia,memory-client"
+In-Reply-To: <51E5D3D9.2090608@wwwdotorg.org>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-6-git-send-email-hdoyu@nvidia.com><51E5D3D9.2090608@wwwdotorg.org>
+Message-ID: <20130729.140646.649065361266278007.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/13 18:44, Mike Turquette wrote:
-> Quoting Jonathan Austin (2013-07-25 02:30:29)
->> On 24/07/13 20:32, Linus Walleij wrote:
->>> On Tue, Jul 23, 2013 at 5:42 PM, Jonathan Austin
->>> <jonathan.austin@arm.com> wrote:
->>>
->>>> The order of arguments in the call to vco_set() for the ICST clocks appears to
->>>> have been switched in error, which results in the VCO not being initialised
->>>> correctly. This in turn stops the integrated LCD on things like Integrator/CP
->>>> from working correctly.
->>>>
->>>> This patch fixes the order and restores the expected functionality.
->>>>
->>>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>>> Cc: Mike Turquette <mturquette@linaro.org>
->>>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
->>>
->>> Good catch! Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->>> You should probably mark this for stable as well.
->>>
->>
->> Mike, will you add Cc: stable when you take the fix or shall I resubmit
->> the patch somehow else?
->
-> I'll add it.
->
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 17 Jul 2013 01:14:33 +0200:
 
-Thanks very much.
+> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> > Add "nvidia,memory-client" to identify which swgroup ID a device
+> > belongs to.
+> 
+> This property also isn't in the documentation.
+> 
+> Again, if client devices are required to have this new property, the DT
+> isn't backwards-compatible; fail:-(
 
-Linus or Mike: Should I put 1/2 in this series in to Russell's tree, or 
-should that go in elsewise?
-
-Jonny
+If there's no this property, just falling back to use the system
+default address space. I think that this won't break the
+compatibility basically. Only problem may be the inconsistency of
+setting this property among the HWs in the same group. If one of them
+is set in one AS, but not for the other, then the other H/W won't
+work. If we really want to have this kind of constraint implmeneted in
+DT, some kind of bus model is needed.
