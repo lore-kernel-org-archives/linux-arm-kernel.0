@@ -1,67 +1,43 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Tue, 30 Jul 2013 00:47:17 +0200
-Subject: [PATCH v13 03/14] usb: chipidea: imx: add return value check
- for devm_regulator_get
-In-Reply-To: <1374830310-21765-4-git-send-email-peter.chen@freescale.com>
-References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
- <1374830310-21765-4-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130729224717.GB7109@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 29 Jul 2013 16:47:37 -0600
+Subject: [PATCH 2/8] ARM: tegra: config the polarity of the request of
+ sys clock
+In-Reply-To: <1374830110-30685-3-git-send-email-josephl@nvidia.com>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+ <1374830110-30685-3-git-send-email-josephl@nvidia.com>
+Message-ID: <51F6F109.8010102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 05:18:19PM +0800, Peter Chen wrote:
-> - If devm_regulator_get returns -EPROBE_DEFER, we also return
-> -EPROBE_DEFER to wait regulator being ready later.
-> - If devm_regulator_get returns -ENODEV, we think there is
-> no "vbus-supply" node at DT, it means this board doesn't need
-> vbus control.
-> - If devm_regulator_get returns other error values, it means
-> there are something wrong for getting this regulator.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/ci_hdrc_imx.c |   14 ++++++++++++--
->  1 files changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-> index d06355e..0ced8c1 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-> @@ -144,8 +144,18 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
->  
->  	/* Get the vbus regulator */
->  	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-> -	if (IS_ERR(pdata.reg_vbus))
-> -		pdata.reg_vbus = NULL;
-> +	if (PTR_ERR(pdata.reg_vbus) == -EPROBE_DEFER) {
-> +		ret = -EPROBE_DEFER;
-> +		goto err_clk;
-> +	} else if (PTR_ERR(pdata.reg_vbus) == -ENODEV) {
-> +		pdata.reg_vbus = NULL; /* no vbus regualator is needed */
-> +	} else if (IS_ERR(pdata.reg_vbus)) {
-> +		dev_err(&pdev->dev,
-> +				"Getting regulator error: %ld\n",
-> +					PTR_ERR(pdata.reg_vbus));
-> +		ret = PTR_ERR(pdata.reg_vbus);
-> +		goto err_clk;
-> +	}
->  
->  	if (!pdev->dev.dma_mask)
->  		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> -- 
+On 07/26/2013 03:15 AM, Joseph Lo wrote:
+> When suspending to LP1 mode, the SYSCLK will be clock gated. And different
+> board may have different polarity of the request of SYSCLK, this patch
+> configure the polarity from the DT for the board.
 
-This is wrong, you should squash that into the previous patch. And
-as already mentioned, this can probably go into core.c as well.
+> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
 
-Pick up the habit *not* to change code in one series which another patch
-of the same series introduced. This only adds *dusty* unused history in the
-patchstack that nobody needs. A *clean* and *coherent* series with discrete
-patches is much easier to review and will get accepted much faster.
+> @@ -238,6 +240,20 @@ void tegra_pmc_suspend_init(void)
+>  	reg = tegra_pmc_readl(PMC_CTRL);
+>  	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
+>  	tegra_pmc_writel(reg, PMC_CTRL);
+> +
+> +	reg = tegra_pmc_readl(PMC_CTRL);
+> +
+> +	if (!pmc_pm_data.sysclkreq_high)
+> +		reg |= TEGRA_POWER_SYSCLK_POLARITY;
+> +	else
+> +		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
+> +
+> +	/* configure the output inverts while the request is tristated */
+> +	tegra_pmc_writel(reg, PMC_CTRL);
 
-Michael
+I think s/inverts/polarity/ in that comment would make a lot more sense.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Must _OE be disabled for the code to work correctly? If so, should the
+code explicitly clear _OE first, since who knows what state it was
+originally in? Can't we just set the new polarity and enable _OE in a
+single register write?
+
+> +	/* now enable the request */
+> +	reg |= TEGRA_POWER_SYSCLK_OE;
+> +	tegra_pmc_writel(reg, PMC_CTRL);
