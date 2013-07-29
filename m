@@ -1,116 +1,269 @@
 From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 29 Jul 2013 12:24:57 +0100
-Subject: [PATCH v6 0/5] clk: implement remuxing during set_rate
-Message-ID: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+Date: Mon, 29 Jul 2013 12:24:59 +0100
+Subject: [PATCH v6 2/5] clk: move some parent related functions upwards
+In-Reply-To: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+References: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1375097102-28892-3-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for automatic selection of the best parent
-for a clock mux, i.e. the one which can provide the closest clock rate
-to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
-flag (which is set for all uses of clk_register_mux().
+Move some parent related functions up in clk.c so they can be used by
+the modifications in the following patch which enables clock reparenting
+during set_rate. No other changes are made so this patch makes no
+functional difference in isolation. This is separate from the following
+patch primarily to ease readability of that patch.
 
-This works by way of adding a new op, determine_rate, similar to
-round_rate but with an extra parameter to allow the clock driver to
-optionally select a different parent clock. This is used in
-clk_calc_new_rates to decide whether to initiate a set_parent operation.
-
-Changes in v6:
-
-* Rebased on v3.11-rc1.
-* Added changes to samsung/clk-exynos-audss.c, zynq/clkc.c.
-
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
 Changes in v5:
 
 * Rebased on latest clk-next ("clk: tegra: Use common of_clk_init
   function")
-* Updated clock hardware characteristics table in documentation.
 
 Changes in v4:
 
-* rebased on clk-next ("clk: sun5i: Add compatibles for Allwinner A13").
-* replace __clk_set_parent_no_recalc with __clk_set_parent.
-* never pass NULL to determine_rate's best_parent_clk parameter, and
-  slight refactor of __clk_round_rate to use local copy of clk->parent.
-* a few new comments around use of clk::new_child.
 * new patch (patch 2) split out of patch 3 to avoid having to declare
   static __clk_set_parent() at the top of clk.c, and to ease readability
   of patch 3.
 
-Changes in v3:
+ drivers/clk/clk.c | 208 +++++++++++++++++++++++++++---------------------------
+ 1 file changed, 104 insertions(+), 104 deletions(-)
 
-* rebased on v3.10-rc1.
-* remove double underscore prefix from clk_get_parent_by_index()
-* store new_parent_index in struct clk too (calculated from
-  clk_fetch_parent_index, and passed through __clk_set_parent_no_recalc
-  to __clk_set_parent).
-* allow determine_rate to satisfy recalc_rate check in __clk_init.
-* rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
-  to patch 3.
-* patch 3: add CLK_SET_RATE_NO_REPARENT flag to all callers of
-  clk_register_mux. If you don't mind your clocks being reparented in
-  response to set_rate please let me know and I'll drop the relevant
-  portion of the patch.
-
-Changes in v2:
-
-I've moved the mux determine_rate implementation into a core helper, but
-I haven't pushed it fully into the core, as I think it just wouldn't
-work correctly for more complex clocks, e.g. if you (theoretically) had
-a combined mux and divide, you'd want to intercept the determine_rate
-and ask for a larger rate from the parent clocks, then return the
-divided rate. This should be possible by wrapping the mux determine_rate
-helper.
-
-Patch 1 still exports the __clk_get_parent_by_index as it seems like it
-might be a useful thing for clock implementations to have access to if
-they ever wanted to do something more fancy with changing clock parents.
-
-I haven't made any attempt to implement the atomic set_parent+set_rate
-as I don't have hardware that could take proper advantage of it, but it
-shouldn't be too difficult for others to implement if they wanted since
-they're fairly close to one another (in clk_change_rate()).
-
-* switched to using new determine_rate op rather than adding an argument
-  to round_rate.
-* moved mux implementation into a single helper which should be usable
-  from more complex clocks which can mux.
-* rewrite main implementation so that no changes are made until after
-  the PRE notifications have been sent, and in a way that should ensure
-  correct notifications without duplicates, and I think should be safe
-  in the event of a notification failing.
-* various tidy ups and fixes.
-
-James Hogan (5):
-  clk: abstract parent cache
-  clk: move some parent related functions upwards
-  clk: add support for clock reparent on set_rate
-  clk: add CLK_SET_RATE_NO_REPARENT flag
-  clk: clk-mux: implement remuxing on set_rate
-
- Documentation/clk.txt                  |  46 ++--
- arch/arm/mach-imx/clk.h                |   5 +-
- drivers/clk/clk-mux.c                  |   1 +
- drivers/clk/clk.c                      | 420 +++++++++++++++++++++------------
- drivers/clk/mmp/clk-mmp2.c             |  39 ++-
- drivers/clk/mmp/clk-pxa168.c           |  40 ++--
- drivers/clk/mmp/clk-pxa910.c           |  31 ++-
- drivers/clk/mxs/clk.h                  |   4 +-
- drivers/clk/samsung/clk-exynos-audss.c |   6 +-
- drivers/clk/samsung/clk.h              |   2 +-
- drivers/clk/spear/spear1310_clock.c    | 179 +++++++-------
- drivers/clk/spear/spear1340_clock.c    |  97 ++++----
- drivers/clk/spear/spear3xx_clock.c     |  57 +++--
- drivers/clk/spear/spear6xx_clock.c     |  35 +--
- drivers/clk/sunxi/clk-sunxi.c          |   3 +-
- drivers/clk/tegra/clk-tegra114.c       |  36 ++-
- drivers/clk/tegra/clk-tegra20.c        |   6 +-
- drivers/clk/tegra/clk-tegra30.c        |  33 ++-
- drivers/clk/versatile/clk-vexpress.c   |   4 +-
- drivers/clk/zynq/clkc.c                |  86 ++++---
- include/linux/clk-private.h            |   3 +
- include/linux/clk-provider.h           |  12 +
- 22 files changed, 692 insertions(+), 453 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index e06a9ac..b766db1 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1027,6 +1027,110 @@ unsigned long clk_get_rate(struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(clk_get_rate);
+ 
++static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
++{
++	u8 i;
++
++	if (!clk->parents)
++		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
++								GFP_KERNEL);
++
++	/*
++	 * find index of new parent clock using cached parent ptrs,
++	 * or if not yet cached, use string name comparison and cache
++	 * them now to avoid future calls to __clk_lookup.
++	 */
++	for (i = 0; i < clk->num_parents; i++) {
++		if (clk->parents && clk->parents[i] == parent)
++			break;
++		else if (!strcmp(clk->parent_names[i], parent->name)) {
++			if (clk->parents)
++				clk->parents[i] = __clk_lookup(parent->name);
++			break;
++		}
++	}
++
++	return i;
++}
++
++static void clk_reparent(struct clk *clk, struct clk *new_parent)
++{
++	hlist_del(&clk->child_node);
++
++	if (new_parent)
++		hlist_add_head(&clk->child_node, &new_parent->children);
++	else
++		hlist_add_head(&clk->child_node, &clk_orphan_list);
++
++	clk->parent = new_parent;
++}
++
++static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
++{
++	unsigned long flags;
++	int ret = 0;
++	struct clk *old_parent = clk->parent;
++
++	/*
++	 * Migrate prepare state between parents and prevent race with
++	 * clk_enable().
++	 *
++	 * If the clock is not prepared, then a race with
++	 * clk_enable/disable() is impossible since we already have the
++	 * prepare lock (future calls to clk_enable() need to be preceded by
++	 * a clk_prepare()).
++	 *
++	 * If the clock is prepared, migrate the prepared state to the new
++	 * parent and also protect against a race with clk_enable() by
++	 * forcing the clock and the new parent on.  This ensures that all
++	 * future calls to clk_enable() are practically NOPs with respect to
++	 * hardware and software states.
++	 *
++	 * See also: Comment for clk_set_parent() below.
++	 */
++	if (clk->prepare_count) {
++		__clk_prepare(parent);
++		clk_enable(parent);
++		clk_enable(clk);
++	}
++
++	/* update the clk tree topology */
++	flags = clk_enable_lock();
++	clk_reparent(clk, parent);
++	clk_enable_unlock(flags);
++
++	/* change clock input source */
++	if (parent && clk->ops->set_parent)
++		ret = clk->ops->set_parent(clk->hw, p_index);
++
++	if (ret) {
++		flags = clk_enable_lock();
++		clk_reparent(clk, old_parent);
++		clk_enable_unlock(flags);
++
++		if (clk->prepare_count) {
++			clk_disable(clk);
++			clk_disable(parent);
++			__clk_unprepare(parent);
++		}
++		return ret;
++	}
++
++	/*
++	 * Finish the migration of prepare state and undo the changes done
++	 * for preventing a race with clk_enable().
++	 */
++	if (clk->prepare_count) {
++		clk_disable(clk);
++		clk_disable(old_parent);
++		__clk_unprepare(old_parent);
++	}
++
++	/* update debugfs with new clk tree topology */
++	clk_debug_reparent(clk, parent);
++	return 0;
++}
++
+ /**
+  * __clk_speculate_rates
+  * @clk: first clk in the subtree
+@@ -1334,18 +1438,6 @@ out:
+ 	return ret;
+ }
+ 
+-static void clk_reparent(struct clk *clk, struct clk *new_parent)
+-{
+-	hlist_del(&clk->child_node);
+-
+-	if (new_parent)
+-		hlist_add_head(&clk->child_node, &new_parent->children);
+-	else
+-		hlist_add_head(&clk->child_node, &clk_orphan_list);
+-
+-	clk->parent = new_parent;
+-}
+-
+ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+ {
+ 	clk_reparent(clk, new_parent);
+@@ -1353,98 +1445,6 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+ 	__clk_recalc_rates(clk, POST_RATE_CHANGE);
+ }
+ 
+-static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+-{
+-	u8 i;
+-
+-	if (!clk->parents)
+-		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
+-								GFP_KERNEL);
+-
+-	/*
+-	 * find index of new parent clock using cached parent ptrs,
+-	 * or if not yet cached, use string name comparison and cache
+-	 * them now to avoid future calls to __clk_lookup.
+-	 */
+-	for (i = 0; i < clk->num_parents; i++) {
+-		if (clk->parents && clk->parents[i] == parent)
+-			break;
+-		else if (!strcmp(clk->parent_names[i], parent->name)) {
+-			if (clk->parents)
+-				clk->parents[i] = __clk_lookup(parent->name);
+-			break;
+-		}
+-	}
+-
+-	return i;
+-}
+-
+-static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+-{
+-	unsigned long flags;
+-	int ret = 0;
+-	struct clk *old_parent = clk->parent;
+-
+-	/*
+-	 * Migrate prepare state between parents and prevent race with
+-	 * clk_enable().
+-	 *
+-	 * If the clock is not prepared, then a race with
+-	 * clk_enable/disable() is impossible since we already have the
+-	 * prepare lock (future calls to clk_enable() need to be preceded by
+-	 * a clk_prepare()).
+-	 *
+-	 * If the clock is prepared, migrate the prepared state to the new
+-	 * parent and also protect against a race with clk_enable() by
+-	 * forcing the clock and the new parent on.  This ensures that all
+-	 * future calls to clk_enable() are practically NOPs with respect to
+-	 * hardware and software states.
+-	 *
+-	 * See also: Comment for clk_set_parent() below.
+-	 */
+-	if (clk->prepare_count) {
+-		__clk_prepare(parent);
+-		clk_enable(parent);
+-		clk_enable(clk);
+-	}
+-
+-	/* update the clk tree topology */
+-	flags = clk_enable_lock();
+-	clk_reparent(clk, parent);
+-	clk_enable_unlock(flags);
+-
+-	/* change clock input source */
+-	if (parent && clk->ops->set_parent)
+-		ret = clk->ops->set_parent(clk->hw, p_index);
+-
+-	if (ret) {
+-		flags = clk_enable_lock();
+-		clk_reparent(clk, old_parent);
+-		clk_enable_unlock(flags);
+-
+-		if (clk->prepare_count) {
+-			clk_disable(clk);
+-			clk_disable(parent);
+-			__clk_unprepare(parent);
+-		}
+-		return ret;
+-	}
+-
+-	/*
+-	 * Finish the migration of prepare state and undo the changes done
+-	 * for preventing a race with clk_enable().
+-	 */
+-	if (clk->prepare_count) {
+-		clk_disable(clk);
+-		clk_disable(old_parent);
+-		__clk_unprepare(old_parent);
+-	}
+-
+-	/* update debugfs with new clk tree topology */
+-	clk_debug_reparent(clk, parent);
+-	return 0;
+-}
+-
+ /**
+  * clk_set_parent - switch the parent of a mux clk
+  * @clk: the mux clk whose input we are switching
 -- 
 1.8.1.2
