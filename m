@@ -1,51 +1,85 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 29 Jul 2013 11:06:26 -0400
-Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
- for every GPIO on DT"
-In-Reply-To: <51F681C4.3000400@ahsoftware.de>
-References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
- <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
- <51F633AE.8090308@collabora.co.uk> <51F63864.9000601@collabora.co.uk>
- <51F666B7.7020209@ti.com> <51F681C4.3000400@ahsoftware.de>
-Message-ID: <51F684F2.5050308@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Jul 2013 18:06:38 +0300
+Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
+ usb_bind_phy
+In-Reply-To: <1374829418-27503-3-git-send-email-kishon@ti.com>
+References: <1374829418-27503-1-git-send-email-kishon@ti.com>
+ <1374829418-27503-3-git-send-email-kishon@ti.com>
+Message-ID: <20130729150638.GD3063@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 July 2013 10:52 AM, Alexander Holler wrote:
-> Am 29.07.2013 14:57, schrieb Santosh Shilimkar:
-> 
->> With some helps from MMC and other guys, we validated the Linus's tip which includes
->> your patches. It actually doesn't break anything and as OMAP hsmmc maintainer
->> clarified, the cd-gpios isn't supported yet for DT. While supporting that it
->> can use appropriate binding whichever works.
->>
->> But with OMAP1 breakage reported by Paul, I think we are not left with choice
->> but to revert those commits. We *must* respect rc rules for the fixes.
->> *No regression*
->>
->> Thanks for your hardwork to cook up those patches but now Linus's W proposal
->> is going to be generic, hopefully the issue can be address better. Till
->> then we can't get the ethernet support.
-> 
-> The problem never was just the omap_hsmmc driver. I rather would say all drivers which do use GPIOs as IRQs were affected.
-> 
-> I've only used the omap_hsmmc driver as example, because that was the driver I've tried to actually use with sd-cards, which is rather impossible without having a working CD-signal. And all code was already there and seems to work (at least during my few tests), so I've just added an entry to the dts to be able to use a mmc-slot as one would expect a mmc-slot does work.
-> 
-> If someone wants to test a new feature at the same front, I would suggest to try it out using gpio-keys. That driver should work on almost any architecture/platform/hardware which supports gpios and is small enough to be a good test candidate. Having had a short look at gpio-keys.c, I think the same problems as with omap_hsmmc would have been occured when someone had tried to use that driver with 3.11-rc2.
-> 
-The 3 OMAP platforms which supports DT are AM33XX, OMAP4 and OMAP5.
-OMAP3 based boards are getting converted but they are bit far from being
-DT only. So my statement was again from what we support on mainline today
-and those platform don't use gpio-keys. But for testing perspective,
-I guess its good idea.
+Hi,
 
-As mentioned above, we are going ahead with revert and possible better
-alternative to the root of the problem.
+On Fri, Jul 26, 2013 at 02:33:38PM +0530, Kishon Vijay Abraham I wrote:
+> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
+> MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
+> device name of the controller had *.auto* in it. Since with using
+> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
+> the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
+> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
+> change is done in board file here.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
+>  arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
+>  arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
+>  arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
+>  arch/arm/mach-omap2/board-igep0020.c         |    2 +-
+>  arch/arm/mach-omap2/board-ldp.c              |    2 +-
+>  arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
+>  arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+>  arch/arm/mach-omap2/board-omap3logic.c       |    2 +-
+>  arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
+>  arch/arm/mach-omap2/board-omap3stalker.c     |    2 +-
+>  arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
+>  arch/arm/mach-omap2/board-overo.c            |    2 +-
+>  arch/arm/mach-omap2/board-rm680.c            |    2 +-
+>  arch/arm/mach-omap2/board-rx51.c             |    2 +-
+>  arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
+>  16 files changed, 16 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+> index 244d8a5..17bb076 100644
+> --- a/arch/arm/mach-omap2/board-2430sdp.c
+> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
+>  	omap_hsmmc_init(mmc);
+>  
+>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
+> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
 
-Regards,
-Santosh
-P.S: Please sensibly wrap your email replies to 80 chars so that
-people can read it without scrolling to the end of the line.
+how about moving usb_bind_phy() calls to omap2430.c ?
 
-Regards,
-Santosh
+diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+index f44e8b5..b6abc1a 100644
+--- a/drivers/usb/musb/omap2430.c
++++ b/drivers/usb/musb/omap2430.c
+@@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
+ 
+ 		pdata->board_data	= data;
+ 		pdata->config		= config;
++	} else {
++		/* bind the PHY */
++		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
+ 	}
+ 
+ 	if (pdata->has_mailbox) {
+
+The only problem is if some board comes with a PHY other than
+twl4030_usb, but in that case we can add a separate compatible flag and
+treat it properly. We only need to bind the phy in non-DT case anyway,
+so that's temporary. It might be better than to reintroduce the IDR in
+musb_core.c.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/a53c525b/attachment-0001.sig>
