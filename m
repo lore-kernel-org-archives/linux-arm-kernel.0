@@ -1,93 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 29 Jul 2013 15:21:28 +0200
-Subject: [PATCHv2 2/2] net: mvneta: support big endian
-In-Reply-To: <1375104088-24654-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375104088-24654-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375104088-24654-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Jul 2013 14:26:24 +0100
+Subject: ZTEXTADDR
+In-Reply-To: <CANEcUBWQgoEQ2nrzV4F-dbPzQQYW1NqFwGxwGMOBzo3g-aAuug@mail.gmail.com>
+References: <CANEcUBWQgoEQ2nrzV4F-dbPzQQYW1NqFwGxwGMOBzo3g-aAuug@mail.gmail.com>
+Message-ID: <20130729132624.GJ24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the "swap descriptor" feature of the hardware to properly swap the
-descriptors when running in big endian mode. Since the swapping occurs
-on 64 bits words, we also need to provide a separate structure layout
-for the DMA descriptors between little endian and big endian mode,
-like is done in the mv643xx_eth driver.
+On Mon, Jul 29, 2013 at 09:12:58PM +0800, zhaobin xv wrote:
+> hi
+>    I see some blogs aboot ZTEXTADDR
+> in linux 2.4.18 :
+> in kernel/arch/arm/boot/Makefile?
+>  ifeq ($(CONFIG_ARCH_S3C2410),y)
+> ZTEXTADDR = 0x30008000
+> ZRELADDR = 0x30008000
+> endif
+> but
+> in linux 2.6. :
+> in kernel/arch/arm/boot/Makefile:
+> ZTEXTADDR = 0
+> 
+> 
+> I want to know why to change?
+> ZTEXTADDR is link addr or phs addr?
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 35 ++++++++++++++++++++++++++++++++---
- 1 file changed, 32 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 649162e..9647976 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -79,10 +79,10 @@
- #define MVNETA_MAC_ADDR_HIGH                     0x2418
- #define MVNETA_SDMA_CONFIG                       0x241c
- #define      MVNETA_SDMA_BRST_SIZE_16            4
--#define      MVNETA_NO_DESC_SWAP                 0x0
- #define      MVNETA_RX_BRST_SZ_MASK(burst)       ((burst) << 1)
- #define      MVNETA_RX_NO_DATA_SWAP              BIT(4)
- #define      MVNETA_TX_NO_DATA_SWAP              BIT(5)
-+#define      MVNETA_DESC_SWAP                    BIT(6)
- #define      MVNETA_TX_BRST_SZ_MASK(burst)       ((burst) << 22)
- #define MVNETA_PORT_STATUS                       0x2444
- #define      MVNETA_TX_IN_PRGRS                  BIT(1)
-@@ -287,6 +287,7 @@ struct mvneta_port {
- #define MVNETA_RXD_FIRST_LAST_DESC	(BIT(26) | BIT(27))
- #define MVNETA_RXD_L4_CSUM_OK		BIT(30)
- 
-+#if defined(__LITTLE_ENDIAN)
- struct mvneta_tx_desc {
- 	u32  command;		/* Options used by HW for packet transmitting.*/
- 	u16  reserverd1;	/* csum_l4 (for future use)		*/
-@@ -311,6 +312,32 @@ struct mvneta_rx_desc {
- 	u32  reserved5;		/* pnc_extra PnC (for future use, PnC)	*/
- 	u32  reserved6;		/* hw_cmd (for future use, PnC and HWF)	*/
- };
-+#else
-+struct mvneta_tx_desc {
-+	u16  data_size;		/* Data size of transmitted packet in bytes */
-+	u16  reserverd1;	/* csum_l4 (for future use)		*/
-+	u32  command;		/* Options used by HW for packet transmitting.*/
-+	u32  reserved2;		/* hw_cmd - (for future use, PMT)	*/
-+	u32  buf_phys_addr;	/* Physical addr of transmitted buffer	*/
-+	u32  reserved3[4];	/* Reserved - (for future use)		*/
-+};
-+
-+struct mvneta_rx_desc {
-+	u16  data_size;		/* Size of received packet in bytes	*/
-+	u16  reserved1;		/* pnc_info - (for future use, PnC)	*/
-+	u32  status;		/* Info about received packet		*/
-+
-+	u32  reserved2;		/* pnc_flow_id  (for future use, PnC)	*/
-+	u32  buf_phys_addr;	/* Physical address of the buffer	*/
-+
-+	u16  reserved4;		/* csum_l4 - (for future use, PnC)	*/
-+	u16  reserved3;		/* prefetch_cmd, for future use		*/
-+	u32  buf_cookie;	/* cookie for access to RX buffer in rx path */
-+
-+	u32  reserved5;		/* pnc_extra PnC (for future use, PnC)	*/
-+	u32  reserved6;		/* hw_cmd (for future use, PnC and HWF)	*/
-+};
-+#endif
- 
- struct mvneta_tx_queue {
- 	/* Number of this TX queue, in the range 0-7 */
-@@ -908,9 +935,11 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
- 	/* Default burst size */
- 	val |= MVNETA_TX_BRST_SZ_MASK(MVNETA_SDMA_BRST_SIZE_16);
- 	val |= MVNETA_RX_BRST_SZ_MASK(MVNETA_SDMA_BRST_SIZE_16);
-+	val |= MVNETA_RX_NO_DATA_SWAP | MVNETA_TX_NO_DATA_SWAP;
- 
--	val |= (MVNETA_RX_NO_DATA_SWAP | MVNETA_TX_NO_DATA_SWAP |
--		MVNETA_NO_DESC_SWAP);
-+#if defined(__BIG_ENDIAN)
-+	val |= MVNETA_DESC_SWAP;
-+#endif
- 
- 	/* Assign port SDMA configuration */
- 	mvreg_write(pp, MVNETA_SDMA_CONFIG, val);
--- 
-1.8.1.2
+ZTEXTADDR is mostly irrelevant now for everyone who places the kernel
+image in RAM, because the entire thing is position independent.
