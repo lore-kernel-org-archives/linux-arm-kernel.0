@@ -1,58 +1,60 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 29 Jul 2013 14:13:44 +0100
-Subject: [PATCH v2 01/22] [HACK] of: dev_node has struct device pointer
-In-Reply-To: <20130729.131344.1221933042559369096.hdoyu@nvidia.com>
-References: <1373021097-32420-2-git-send-email-hdoyu@nvidia.com>
- <51E5CFBF.5080407@wwwdotorg.org>
- <20130716231629.GA12189@dhcp-172-17-186-34.nvidia.com>
- <20130729.131344.1221933042559369096.hdoyu@nvidia.com>
-Message-ID: <20130729131344.GB6184@e102568-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 29 Jul 2013 15:14:27 +0200
+Subject: [PATCH v4 5/6] ARM: rockchip: add power-management-unit dt node
+In-Reply-To: <201307291510.31679.heiko@sntech.de>
+References: <201307291510.31679.heiko@sntech.de>
+Message-ID: <201307291514.27779.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hiroshi,
+The pmu is needed to bring up the cores during smp operations.
+Therefore add a node and documentation for it.
 
-On Mon, Jul 29, 2013 at 11:13:44AM +0100, Hiroshi Doyu wrote:
-> Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 17 Jul 2013 01:16:30 +0200:
-> 
-> > * PGP Signed by an unknown key
-> > 
-> > On Tue, Jul 16, 2013 at 04:57:03PM -0600, Stephen Warren wrote:
-> > > On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> > > > To prevent of_platform_populate() from trying to populate duplicate
-> > > > devices if a device has been already populated.
-> > > 
-> > > You need to send drivers/of patches to the DT maintainer and
-> > > devicetree-discuss mailing list.
-> > > 
-> > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > > > ---
-> > > > Need to take care of early_platform_devices, or alternative solution.
-> > > 
-> > > I assume that's a TODO item... Are you planning on fleshing out this
-> > > patch to address that issue?
-> >
-> > There was some more discussion about it, which can be found in the
-> > following thread:
-> > 
-> > 	https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036934.html
-> > 
-> > That's one of the last messages and it should have most of the
-> > background. If not you may have to walk up the thread for more context.
-> > In a nutshell I raised the question as to why we can't simply call
-> > of_platform_populate() earlier and side-step all the workarounds that
-> > have found their way into the kernel to side-step the issue of their not
-> > being a struct device associated with the struct device_node.
-> 
-> This is the thread which Lorenzo started originally. He may have some
-> plan to implement/proceed with this, Lorenzo?
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+---
+ Documentation/devicetree/bindings/arm/rockchip/pmu.txt |   16 ++++++++++++++++
+ arch/arm/boot/dts/rk3066a.dtsi                         |    5 +++++
+ 2 files changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
 
-I was trying to raise the issue and apparently I succeeded. For now,
-I put in place yet-another-temporary-solution to the problem in one
-of the drivers I need for power management, but certainly the problem is
-not solved, and I can't allocate time to do it myself unfortunately.
-
-I am more than happy to review patches though.
-
-Thanks,
-Lorenzo
+diff --git a/Documentation/devicetree/bindings/arm/rockchip/pmu.txt b/Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+new file mode 100644
+index 0000000..3ee9b42
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+@@ -0,0 +1,16 @@
++Rockchip power-management-unit:
++-------------------------------
++
++The pmu is used to turn off and on different power domains of the SoCs
++This includes the power to the CPU cores.
++
++Required node properties:
++- compatible value : = "rockchip,rk3066-pmu";
++- reg : physical base address and the size of the registers window
++
++Example:
++
++	pmu at 20004000 {
++		compatible = "rockchip,rk3066-pmu";
++		reg = <0x20004000 0x100>;
++	};
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 24d1941..43ac7c8 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -59,6 +59,11 @@
+ 			mmio-sram-reserved = <0x0 0x50>;
+ 		};
+ 
++		pmu at 20004000 {
++			compatible = "rockchip,rk3066-pmu";
++			reg = <0x20004000 0x100>;
++		};
++
+ 		gic: interrupt-controller at 1013d000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			interrupt-controller;
+-- 
+1.7.10.4
