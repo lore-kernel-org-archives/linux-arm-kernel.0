@@ -1,33 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Jul 2013 13:43:09 +0200
-Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
- for every GPIO on DT"
-In-Reply-To: <D135FD6D-D4B6-4237-9866-4FFED36C03CD@collabora.co.uk>
-References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
- <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
- <51F633AE.8090308@collabora.co.uk>
- <alpine.DEB.2.02.1307290943000.30864@utopia.booyaka.com>
- <D135FD6D-D4B6-4237-9866-4FFED36C03CD@collabora.co.uk>
-Message-ID: <CACRpkdZ1E9zC_yyK=UkJSejCwb_k7sYfhNgH5NASZ8Nf-qt2KA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Jul 2013 13:44:38 +0200
+Subject: [PATCH v4 12/20] pwm: samsung: Rename to pwm-samsung-legacy
+In-Reply-To: <1374278673-25615-14-git-send-email-tomasz.figa@gmail.com>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1374278673-25615-14-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20130729114437.GB23152@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 12:19 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
+On Sat, Jul 20, 2013 at 02:04:25AM +0200, Tomasz Figa wrote:
+> This patch renames the old pwm-samsung driver to pwm-samsung-legacy to
+> create place for the new, rewritten, DT-aware pwm-samsung driver using
+> Samsung PWM/timer master driver.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  drivers/pwm/Makefile                                | 2 +-
+>  drivers/pwm/{pwm-samsung.c => pwm-samsung-legacy.c} | 0
+>  2 files changed, 1 insertion(+), 1 deletion(-)
+>  rename drivers/pwm/{pwm-samsung.c => pwm-samsung-legacy.c} (100%)
 
-> I guess the safer approach is to just revert these since they are causing
-> a regression and what the patches aims to fix as been broken since the
-> initial OMAP migration to DT anyways.
-
-I have already reverted these and pushed to linux-next.
-
-Actually input-hogs was not such a good idea either, after
-meditating on this I realized that the information about what
-GPIOs are used as interrupts is a piece of information that
-already exist in the device tree, albeit a bit distributed.
-
-So I'm drafting an RFC to indicate how I think this should
-be solved.
-
-Yours,
-Linus Walleij
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/b9cc565c/attachment-0001.sig>
