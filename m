@@ -1,85 +1,18 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Jul 2013 18:06:38 +0300
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <1374829418-27503-3-git-send-email-kishon@ti.com>
-References: <1374829418-27503-1-git-send-email-kishon@ti.com>
- <1374829418-27503-3-git-send-email-kishon@ti.com>
-Message-ID: <20130729150638.GD3063@radagast>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Jul 2013 16:08:27 +0100
+Subject: [PATCH 1/2] dma: mv_xor: use readl/writel instead of
+ __raw_{readl, writel}
+In-Reply-To: <1375110310-26276-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375110310-26276-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375110310-26276-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130729150827.GL24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 29, 2013 at 05:05:09PM +0200, Thomas Petazzoni wrote:
+> In order to support big-endian execution, the mv_xor driver is changed
+> to use thhe readl() and writel() accessors that properly convert from
+> the CPU endianess to the device endianess (which in the case of
+> Marvell XOR hardware is always little-endian).
 
-On Fri, Jul 26, 2013 at 02:33:38PM +0530, Kishon Vijay Abraham I wrote:
-> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
-> MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
-> device name of the controller had *.auto* in it. Since with using
-> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
-> the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
-> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
-> change is done in board file here.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
->  arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
->  arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
->  arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
->  arch/arm/mach-omap2/board-igep0020.c         |    2 +-
->  arch/arm/mach-omap2/board-ldp.c              |    2 +-
->  arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
->  arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
->  arch/arm/mach-omap2/board-omap3logic.c       |    2 +-
->  arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
->  arch/arm/mach-omap2/board-omap3stalker.c     |    2 +-
->  arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
->  arch/arm/mach-omap2/board-overo.c            |    2 +-
->  arch/arm/mach-omap2/board-rm680.c            |    2 +-
->  arch/arm/mach-omap2/board-rx51.c             |    2 +-
->  arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
->  16 files changed, 16 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-> index 244d8a5..17bb076 100644
-> --- a/arch/arm/mach-omap2/board-2430sdp.c
-> +++ b/arch/arm/mach-omap2/board-2430sdp.c
-> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
->  	omap_hsmmc_init(mmc);
->  
->  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
-> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
-
-how about moving usb_bind_phy() calls to omap2430.c ?
-
-diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-index f44e8b5..b6abc1a 100644
---- a/drivers/usb/musb/omap2430.c
-+++ b/drivers/usb/musb/omap2430.c
-@@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
- 
- 		pdata->board_data	= data;
- 		pdata->config		= config;
-+	} else {
-+		/* bind the PHY */
-+		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
- 	}
- 
- 	if (pdata->has_mailbox) {
-
-The only problem is if some board comes with a PHY other than
-twl4030_usb, but in that case we can add a separate compatible flag and
-treat it properly. We only need to bind the phy in non-DT case anyway,
-so that's temporary. It might be better than to reintroduce the IDR in
-musb_core.c.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/a53c525b/attachment-0001.sig>
+Is it necessary that all these be barrier-ied IO operations?
