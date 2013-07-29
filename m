@@ -1,192 +1,105 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 29 Jul 2013 16:02:00 +0200
-Subject: [PATCH v4 2/6] misc: sram: add ability to mark sram sections as
- reserved
-In-Reply-To: <201307291512.25126.heiko@sntech.de>
-References: <201307291510.31679.heiko@sntech.de>
- <201307291512.25126.heiko@sntech.de>
-Message-ID: <1375106520.4223.24.camel@pizza.hi.pengutronix.de>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 29 Jul 2013 15:03:55 +0100
+Subject: [PATCH] arm: update advice on kernel and FDT load address.
+In-Reply-To: <20130729135000.GK32383@mudshark.cambridge.arm.com>
+References: <1375102578-5869-1-git-send-email-ian.campbell@citrix.com>
+ <20130729135000.GK32383@mudshark.cambridge.arm.com>
+Message-ID: <1375106635.12741.8.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-Am Montag, den 29.07.2013, 15:12 +0200 schrieb Heiko St?bner:
-> Some SoCs need parts of their sram for special purposes. So while being part
-> of the peripheral, it should not be part of the genpool controlling the sram.
+On Mon, 2013-07-29 at 14:50 +0100, Will Deacon wrote:
+> Hi Ian,
 > 
-> Therefore add an option mmio-sram-reserved to keep arbitrary portions of the
-> sram from being part of the pool.
+> /me plays English teacher :)
 > 
-> Suggested-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
-> ---
-> Philipp: I didn't carry the ack, because the loop changed significantly again.
-> So if it looks ok, could you re-ack it please?
-
-I'd prefer the first loop to contain the magic and produce a list of
-useable chunks, instead of a list of reserved blocks. The second loop
-could then iterate over the array and just call gen_pool_add_virt
-repeatedly.
-
-regards
-Philipp
-
->  Documentation/devicetree/bindings/misc/sram.txt |    8 ++
->  drivers/misc/sram.c                             |  101 +++++++++++++++++++++--
->  2 files changed, 101 insertions(+), 8 deletions(-)
+> On Mon, Jul 29, 2013 at 01:56:18PM +0100, Ian Campbell wrote:
+> > Based on the discussion in [0]:
+> >   - Recommend that the kernel be placed under 128MiB ("for automatic RAM
+> >     location to work", says Nico)
+> >   - Recommend that DTB larger than ~16KiB be placed after the 128MiB boundary
+> >     (in order to avoid conflicting with the kernel decompressor, kernel is at
+> >     most 32MiB) and within the lowmem region. Somewhat arbitrarily recommend
+> >     placement below the 256MiB boundary, the real lowmem limit is likely up
+> >     around 600-800MiB but varies.
+> > 
+> > [0] http://article.gmane.org/gmane.linux.ports.arm.kernel/254538
+> > 
+> > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Dave Martin <dave.martin@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > ---
+> >  Documentation/arm/Booting |   14 +++++++++++---
+> >  1 files changed, 11 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
+> > index 0c1f475..72c035e 100644
+> > --- a/Documentation/arm/Booting
+> > +++ b/Documentation/arm/Booting
+> > @@ -125,6 +125,13 @@ with the caveat that it may not be located at physical address 0 since
+> >  the kernel interprets a value of 0 in r2 to mean neither a tagged list
+> >  nor a dtb were passed.
+> >  
+> > +If the DTB is larger than ~16KiB, such that placement in the first
+> > +16KiB would lead to a conflict with the kernel loaded at 32KiB (as
+> > +recommended below) which uses the memory between 16KiB-32KiB itself,
+> > +then the DTB should be placed after the first 128MiB of RAM in order
+> > +to avoid conflicting with the kernel decompressor. The recommnded
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-> index 4d0a00e..3b7a5c1 100644
-> --- a/Documentation/devicetree/bindings/misc/sram.txt
-> +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> @@ -8,9 +8,17 @@ Required properties:
->  
->  - reg : SRAM iomem address range
->  
-> +Optional properties:
-> +
-> +- mmio-sram-reserved: ordered list of reserved chunks inside the sram that
-> +  should not be used by the OS.
-> +  Format is <base size>, <base size>, ...; with base being relative to the
-> +  reg property base.
-> +
->  Example:
->  
->  sram: sram at 5c000000 {
->  	compatible = "mmio-sram";
->  	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-> +	mmio-sram-reserved = <0x0 0x100>; /* reserve 0x5c000000-0x5c000100 */
->  };
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> index afe66571..b3ceefb 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -36,13 +36,23 @@ struct sram_dev {
->  	struct clk *clk;
->  };
->  
-> +struct sram_reserve {
-> +	unsigned long start;
-> +	unsigned long size;
-> +};
-> +
->  static int sram_probe(struct platform_device *pdev)
->  {
->  	void __iomem *virt_base;
->  	struct sram_dev *sram;
->  	struct resource *res;
-> -	unsigned long size;
-> -	int ret;
-> +	unsigned long size, cur_start, cur_size;
-> +	const __be32 *reserved_list = NULL;
-> +	int reserved_size = 0;
-> +	struct sram_reserve *rblocks;
-> +	unsigned int nblocks;
-> +	int ret = 0;
-> +	int i;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	virt_base = devm_ioremap_resource(&pdev->dev, res);
-> @@ -65,19 +75,94 @@ static int sram_probe(struct platform_device *pdev)
->  	if (!sram->pool)
->  		return -ENOMEM;
->  
-> -	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
-> -				res->start, size, -1);
-> -	if (ret < 0) {
-> -		if (sram->clk)
-> -			clk_disable_unprepare(sram->clk);
-> -		return ret;
-> +	if (pdev->dev.of_node) {
-> +		reserved_list = of_get_property(pdev->dev.of_node,
-> +						"mmio-sram-reserved",
-> +						&reserved_size);
-> +		if (reserved_list) {
-> +			reserved_size /= sizeof(*reserved_list);
-> +			if (!reserved_size || reserved_size % 2) {
-> +				dev_warn(&pdev->dev, "wrong number of arguments in mmio-sram-reserved\n");
-> +				reserved_list = NULL;
-> +				reserved_size = 0;
-> +			}
-> +		}
->  	}
->  
-> +	/*
-> +	 * We need an additional block to mark the end of the memory region
-> +	 * after the reserved blocks from the dt are processed.
-> +	 */
-> +	nblocks = reserved_size / 2 + 1;
-> +	rblocks = kmalloc((nblocks) * sizeof(*rblocks), GFP_KERNEL);
-> +	if (!rblocks) {
-> +		ret = -ENOMEM;
-> +		goto err_alloc;
-> +	}
-> +
-> +	for (i = 0; i < nblocks - 1; i++) {
-> +		rblocks[i].start = be32_to_cpu(*reserved_list++);
-> +		rblocks[i].size = be32_to_cpu(*reserved_list++);
-> +
-> +		dev_dbg(&pdev->dev, "found reserved block 0x%lx-0x%lx\n",
-> +			rblocks[i].start,
-> +			rblocks[i].start + rblocks[i].size);
-> +	}
-> +
-> +	/* the last chunk marks the end of the region */
-> +	rblocks[nblocks - 1].start = size;
-> +	rblocks[nblocks - 1].size = 0;
-> +
-> +	cur_start = 0;
-> +	for (i = 0; i < nblocks; i++) {
-> +		/* catch unsorted list entries */
-> +		if (rblocks[i].start < cur_start) {
-> +			dev_err(&pdev->dev,
-> +				"unsorted reserved list (0x%lx before current 0x%lx)\n",
-> +				rblocks[i].start, cur_start);
-> +			ret = -EINVAL;
-> +			goto err_chunks;
-> +		}
-> +
-> +		/* current start is in a reserved block, so continue after it */
-> +		if (rblocks[i].start == cur_start) {
-> +			cur_start = rblocks[i].start + rblocks[i].size;
-> +			continue;
-> +		}
-> +
-> +		/*
-> +		 * allocate the space between the current starting
-> +		 * address and the following reserved block, or the
-> +		 * end of the region.
-> +		 */
-> +		cur_size = rblocks[i].start - cur_start;
-> +
-> +		dev_dbg(&pdev->dev, "adding chunk 0x%lx-0x%lx\n",
-> +			cur_start, cur_start + cur_size);
-> +		ret = gen_pool_add_virt(sram->pool,
-> +				(unsigned long)virt_base + cur_start,
-> +				res->start + cur_start, cur_size, -1);
-> +		if (ret < 0)
-> +			goto err_chunks;
-> +
-> +		/* next allocation after this reserved block */
-> +		cur_start = rblocks[i].start + rblocks[i].size;
-> +	}
-> +
-> +	kfree(rblocks);
-> +
->  	platform_set_drvdata(pdev, sram);
->  
->  	dev_dbg(&pdev->dev, "SRAM pool: %ld KiB @ 0x%p\n", size / 1024, virt_base);
->  
->  	return 0;
-> +
-> +err_chunks:
-> +	kfree(rblocks);
-> +err_alloc:
-> +	if (sram->clk)
-> +		clk_disable_unprepare(sram->clk);
-> +	return ret;
->  }
->  
->  static int sram_remove(struct platform_device *pdev)
+> recommended
+
+Should've pressed F5, sorry...
+
+> It also looks like you're repeating part of what is said later regarding the
+> 16k of page tables below the image.
+
+yes, this was tricky since I wanted to justify the larger than 16KiB but
+that was a forward reference. I went with "as recommended below".
+Perhaps I should just omit the justification? Or perhaps "If the DTB is
+larger than ~16KiB (see below for why this particular value
+matters)...". Clunky :-(
+
+> Also, we use 20k with LPAE.
+
+I'll fold in an update along those lines too.
+
+However given that this then makes everything more complicated (e.g.
+it's now DTB > ~12KiB in that case) perhaps we should just ditch the
+original recommendation to use the first 16KiB and switch to a
+recommendation of "as high as possible below 256MiB" across the board?
+That would remove the issue with repeating stuff from the next section
+too.
+
+> > +placement in this case just below the 256MiB boundary.
+> > +
+> >  5. Calling the kernel image
+> >  ---------------------------
+> >  
+> > @@ -136,9 +143,10 @@ is stored in flash, and is linked correctly to be run from flash,
+> >  then it is legal for the boot loader to call the zImage in flash
+> >  directly.
+> >  
+> > -The zImage may also be placed in system RAM (at any location) and
+> > -called there.  Note that the kernel uses 16K of RAM below the image
+> > -to store page tables.  The recommended placement is 32KiB into RAM.
+> > +The zImage may also be placed in system RAM and called there.  The
+> > +kernel should be placed in the first 128MiB of RAM. Note that the
+> > +kernel uses 16KiB of RAM below the image to store page tables.  The
+> > +recommended placement is 32KiB into RAM.
+> 
+> This is a bit clunky since you say that the zImage may be placed in system
+> RAM, then restrict that in the next sentence.
+
+How about:
+
+        The kernel may also be placed in the first 128MiB of system RAM
+        and called there. Note that the kernel uses 16KiB of RAM below
+        the image to store page tables.  The recommended placement is
+        32KiB into RAM.
+
+?
+Ian.
