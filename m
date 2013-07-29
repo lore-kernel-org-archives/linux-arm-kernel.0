@@ -1,62 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Jul 2013 16:38:59 -0600
-Subject: [PATCH 1/8] ARM: tegra: add common resume handling code for LP1
- resuming
-In-Reply-To: <1374830110-30685-2-git-send-email-josephl@nvidia.com>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-2-git-send-email-josephl@nvidia.com>
-Message-ID: <51F6EF03.9000003@wwwdotorg.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 30 Jul 2013 00:45:24 +0200
+Subject: Defining schemas for Device Tree
+In-Reply-To: <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+Message-ID: <1706112.Xn49tiCSKF@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 03:15 AM, Joseph Lo wrote:
-> The common LP1 resuming procedures of LP1 on Tegra was checking the LP1
-> mask first. The LP1 mask indicated that the Tegra device was in LP1 then
-> we need to resume the Tegra from the LP1 reset handler.
-> 
-> And the LP1 was putting the SDRAM to self-refresh mode, the SDRAM wasn't
-> accessible when resuming from LP1. We need to copy the LP1 reset handler
-> to IRAM before suspending. That's why you can see the address of LP1
-> reset handler was located in IRAM.
+On Monday 29 of July 2013 18:23:30 jonsmirl at gmail.com wrote:
+> The schema should enforce some kind of regularity into the description
+> of similar devices.  Take SPI for example. I pulled these SPI
+> controller definitions from the kernel source. Obviously all of these
+> controllers are different, but it seems to me that their definitions
+> could be made more regular. DMA seems like it could use a lot of help.
 
-That's rather hard to understand. How about:
+Well, there is not much in common in bindings for all those SPI controllers, 
+other than general device attributes, such as compatible and reg (not even 
+interrupts - see spi-gpio).
 
-==========
-Add support to the Tegra CPU reset vector to detect whether the CPU is
-resuming from LP1 suspend state. If it is, branch to the LP1-specific
-resume code.
+There is a lot of generic binding templates (as I called this kind of bindings 
+in my first mail) involved here, though.
 
-When Tegra enters the LP1 suspend state, the SDRAM controller is placed
-into a self-refresh state. For this reason, we must place the LP1 resume
-code into IRAM, so that it is accessible before SDRAM access has been
-re-enabled.
-==========
+Taking one of the controllers as the example:
+> spi0: spi at f0000000 {
+> #address-cells = <1>;
+> #size-cells = <0>;
+> compatible = "atmel,at91rm9200-spi";
+> reg = <0xf0000000 0x100>;
+> interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
 
-Talking about *copying* the LP1 resume code to IRAM isn't appropriate
-here, since nothing in this patch performs any copying of the resume code.
+/inherit/ "interrupts.dtss", 1;
 
-> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+> dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(1)>,
+>       <&dma0 1 AT91_DMA_CFG_PER_ID(2)>;
+> dma-names = "tx", "rx";
 
-> @@ -182,6 +182,19 @@ after_errata:
->  1:
->  #endif
->  
-> +	/* Waking up from LP1? */
-> +	ldr	r8, [r12, #RESET_DATA(MASK_LP1)]
-> +	tst	r8, r11				@ if in_lp1
-> +	beq	__is_not_lp1
-> +	cmp	r10, #0
-> +	bne	__die				@ only CPU0 can be here
-> +	ldr	lr, [r12, #RESET_DATA(STARTUP_LP1)]
-> + THUMB(	add	lr, lr, #1 )			@ switch to Thumb mode
-> +	cmp	lr, #0
-> +	bleq	__die				@ no LP1 startup handler
+/inherit/ "dma.dtss", "tx", "rx";
 
-On thumb, lr==#1 at this point. I think you want to move the THUMB()
-instruction after the bleq.
+> pinctrl-names = "default";
+> pinctrl-0 = <&pinctrl_spi0>;
 
-> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+/inherit/ "pinctrl.dtss","default";
 
-> +#define TEGRA_IRAM_CODE_AREA	(TEGRA_IRAM_BASE + SZ_4K)
+> status = "disabled";
+> };
 
-The layout of IRAM should be described in irammap.h not sleep.h.
+Best regards,
+Tomasz
