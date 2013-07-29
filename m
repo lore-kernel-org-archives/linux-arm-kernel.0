@@ -1,39 +1,54 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 29 Jul 2013 09:42:18 -0400
-Subject: [RFC/RFT PATCH 0/5] mm: ARM nobootmem and few dma_mask fixes
-In-Reply-To: <20130729134012.GK24642@n2100.arm.linux.org.uk>
-References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
- <20130726151021.GU24642@n2100.arm.linux.org.uk> <51F2A3AA.4060801@ti.com>
- <20130729111503.GG24642@n2100.arm.linux.org.uk> <51F66D94.9060706@ti.com>
- <20130729134012.GK24642@n2100.arm.linux.org.uk>
-Message-ID: <51F6713A.1080403@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 29 Jul 2013 14:43:11 +0100
+Subject: [PATCH V2 7/8] ARM: dts: wm8994: Add wm8994 support on smdk5420
+In-Reply-To: <CAAgF-Bexp_fGT8KV+TQ0_kZLJBtq7UK=TG4eYRA6qpTSL+scxg@mail.gmail.com>
+References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
+ <1374845812-7803-8-git-send-email-padma.v@samsung.com>
+ <20130726151902.GL9858@sirena.org.uk>
+ <CAAgF-Be8SNxTZv1yFCwH6yJ-O_3R4reh=3y+pSCLJYW7S9TkUg@mail.gmail.com>
+ <CAAgF-Bexp_fGT8KV+TQ0_kZLJBtq7UK=TG4eYRA6qpTSL+scxg@mail.gmail.com>
+Message-ID: <20130729134311.GX9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 July 2013 09:40 AM, Russell King - ARM Linux wrote:
-> On Mon, Jul 29, 2013 at 09:26:44AM -0400, Santosh Shilimkar wrote:
->> On Monday 29 July 2013 07:15 AM, Russell King - ARM Linux wrote:
->>> Would you mind putting them all in the patch system, I can add the acks
->>> should anyone supply them later, and I'll repost them along with my set
->>> of dma-mask patches.  Thanks.
->>>
->> Done.
->> 7794/1, 7795/1, 7796/1, 7797/1, 7798/1, 7799/1
->>
->> Didn't know how to get XXXX/1,2,3,4... pushed into the tracker.
->> BTW, I have also pushed the patched on my git tree branch [1] just
->> in case you or some one needs it.
-> 
-> Thanks.  I'd prefer not to have them as stable commits yet because should
-> we get acks from Jens, Jejb or cjb, we will need to add their acks to them.
->
-right.
- 
-> My dma-masks branch is still very much unstable at the moment (which is
-> why its not published) but I shall be posting the patches during this
-> week.
-> 
-Sure.
+On Mon, Jul 29, 2013 at 05:31:16PM +0530, Padma Venkat wrote:
+> On Sat, Jul 27, 2013 at 6:46 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
 
-Regards,
-Santosh
+> >>> +     vdd: fixed-regulator at 0 {
+> >>> +             compatible = "regulator-fixed";
+> >>> +             regulator-name = "vdd-supply";
+
+> >> These names look wrong - they should reflect the names in the schematic
+> >> as they're for human comprehensibility.  This may just be a case of
+> >> dropping the -supply.
+
+> When I posted the same patch for smdk5250, you asked me to club all
+> the same supply regulators. So I clubbed AVDD2 and CPVDD. So any other
+> better name for representing both supplies?
+
+No, I'd have told you to combine things taht come from the same supply
+on the board - things like the speaker supplies for example aren't going
+to be coming from separate places.  The names should reflect whatever
+the names on the schemaric are, like I say that's probably just removing
+the -supply.
+
+> >> documentation update the other day, it's in my tree now) but it's not
+> >> essential and I suspect it needs some work on the clock driver side
+> >> still.
+
+> > OK. I will check this.
+
+> As per schemata, input clock to MCLK1 is an oscillator clock with
+> 16.9MHz and MCLK2 not showing any input clock. So here I need to add a
+> fixed rate clock with 16.9MHz as MCLK1 in the smdk board file.
+
+> Is it correct?
+
+Yes, in the DTS (or to XCLKOUT on the AP?).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/9290a566/attachment.sig>
