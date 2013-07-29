@@ -1,54 +1,86 @@
-From: a0393675@ti.com (Keerthy)
-Date: Mon, 29 Jul 2013 15:27:08 +0530
-Subject: [PATCH 0/9] ARM: dts: omap5-uevm: fixup wrong regulator
- configuration
-In-Reply-To: <1374079538-19548-1-git-send-email-nm@ti.com>
-References: <1374079538-19548-1-git-send-email-nm@ti.com>
-Message-ID: <51F63C74.6070503@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Jul 2013 11:02:43 +0100
+Subject: [PATCH] ARM: v6: prevent gcc from reordering extended CP15 reads
+ above is_smp() test
+In-Reply-To: <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
+References: <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com>
+ <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com>
+ <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+ <20130727122221.GB6618@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
+Message-ID: <20130729100243.GC32383@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Hi Paul,
 
-On Wednesday 17 July 2013 10:15 PM, Nishanth Menon wrote:
-> Due to wrong older revision of documentation used as reference, we
-> seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
-> series is based power tree on production board 750-2628-XXX platform.
-> Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
-> supply hardware blocks at voltages that are out of specification.
+On Sun, Jul 28, 2013 at 09:16:29PM +0100, Paul Walmsley wrote:
+> 
+> Commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc ("ARM: 7757/1: mm:
+> don't flush icache in switch_mm with hardware broadcasting") breaks
+> the boot on OMAP2430SDP with omap2plus_defconfig.  Tracked to an
+> undefined instruction abort from the CP15 read in
+> cache_ops_need_broadcast().  It turns out that gcc reorders the
+> extended CP15 read above the is_smp() test.  This breaks ARM1136 r0
+> cores, since they don't support several CP15 registers that later ARM
+> cores do.  ARM1136JF-S TRM section 3.2.1 "Register allocation" has the
+> details.
 
-This series looks good to me.
+Cheers for tracking this down. Interestingly, I can't reproduce this with
+anything other than GCC 4.5.* tools -- 4.6+ do what we want. Still, it looks
+like a valid (if not misguided) thing to do.
 
-Acked-by:  J Keerthy <j-keerthy@ti.com>
-> Also available at:
-> based on v3.11-rc1 tag
-> http link: https://github.com/nmenon/linux-2.6-playground/commits/push/omap5-palmas-fixes
-> git link: git://github.com/nmenon/linux-2.6-playground.git
-> branch: push/omap5-palmas-fixes
->
-> Tested with https://patchwork.kernel.org/patch/2545061/
->   + https://git.kernel.org/cgit/linux/kernel/git/ssantosh/linux.git/log/?h=for_3.11/out_of_tree/omap5_clk_data
-> Test result: http://pastebin.com/YqASYkXG
->
-> Relevant documentation:
-> - OMAP5 uEVM documentation: https://www.svtronics.com/omap/omap54xx?product_id=33
-> - OMAP5432 Data Manual: http://www.ti.com/product/OMAP5432
-> - TWL6037 / OTP information: Currently available only under NDA
->
-> Nishanth Menon (9):
->    ARM: dts: omap5-uevm: document regulator signals used on the actual
->      board
->    ARM: dts: omap5-uevm: update SMPS9 settings
->    ARM: dts: omap5-uevm: update and disable unused regulators LDO[28]
->    ARM: dts: omap5-uevm: update LDO1 voltage to 1.5V and settings
->    ARM: dts: omap5-uevm: update LDO3 voltage to 1.5V and settings
->    ARM: dts: omap5-uevm: update LDO4 voltage to 1.5V and settings
->    ARM: dts: omap5-uevm: update LDO6 voltage to 1.2V
->    ARM: dts: omap5-uevm: update LDO7 voltage to 2V and settings
->    ARM: dts: omap5-uevm: update SDCARD LDO9 and resource REGEN3
->
->   arch/arm/boot/dts/omap5-uevm.dts |   78 ++++++++++++++++++++++++--------------
->   1 file changed, 49 insertions(+), 29 deletions(-)
->
-Regards,
-Keerthy
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index 8c25dc4..f428eb0 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -89,13 +89,25 @@ extern unsigned int processor_id;
+>  		__val;							\
+>  	})
+>  
+> +
+> +# if defined(CONFIG_CPU_V6)
+> +/*
+> + * The mrc in the read_cpuid_ext macro must not be reordered on ARMv6,
+> + * else the compiler may move it before an is_smp() test, causing
+> + * undefined instruction aborts on ARM1136 r0.
+> + */
+> +# define CPUID_EXT_REORDER	"cc", "memory"
+> +# else
+> +# define CPUID_EXT_REORDER	"cc"
+> +# endif
+> +
+>  #define read_cpuid_ext(ext_reg)						\
+>  	({								\
+>  		unsigned int __val;					\
+>  		asm("mrc	p15, 0, %0, c0, " ext_reg		\
+>  		    : "=r" (__val)					\
+>  		    :							\
+> -		    : "cc");						\
+> +		    : CPUID_EXT_REORDER);				\
+>  		__val;							\
+>  	})
+
+I wouldn't worry about checking for CPU_V6. Besides, we probably need this
+to be re-evaluated across barrier() when we get CPU migration on a
+big-little platform anyway (we should probably also drop the
+__attribute_const__ for that).
+
+So you can just replace the "cc" (now that Nico kindly explained why those
+aren't needed the other day) with "memory".
+
+An alternative is to add barrier() between is_smp() and the read_cpuid_ext()
+in all callers, adding a fake read from the stack to the latter (like I did
+for the per-cpu accessor). However, this relies on fixing all callers for
+very little gain, so I don't think it's worth the hassle.
+
+I can cook a patch if you're tied up with other things -- just let me know.
+
+Cheers,
+
+Will
