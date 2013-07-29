@@ -1,83 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 29 Jul 2013 02:21:16 -0700
-Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
-In-Reply-To: <51E98C71.5010709@wwwdotorg.org>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090536.5541.36289.stgit@localhost>
- <51E70B5D.6030802@wwwdotorg.org>
- <20130718073638.GP7656@atomide.com>
- <51E84180.6080902@wwwdotorg.org>
- <20130719073957.GZ7656@atomide.com>
- <51E98C71.5010709@wwwdotorg.org>
-Message-ID: <20130729092116.GA7656@atomide.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 29 Jul 2013 11:25:42 +0200
+Subject: [PATCH v2 00/42] ARM: at91: move to common clk framework
+In-Reply-To: <CACQ1gAgw-v3z_sWcsk7SqFFW-ERLjS0RS5GTgAdd5Y1tj3Z1FA@mail.gmail.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+ <51F28370.6050304@gmail.com> <51F2996B.6000406@overkiz.com>
+ <51F2A556.8020109@overkiz.com>
+ <CACQ1gAgw-v3z_sWcsk7SqFFW-ERLjS0RS5GTgAdd5Y1tj3Z1FA@mail.gmail.com>
+Message-ID: <51F63516.8090000@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130719 12:05]:
-> On 07/19/2013 01:39 AM, Tony Lindgren wrote:
-> > 
-> > I think the only sane way to deal with this is to make the I2C controller
-> > to show up as two separate I2C controller instances. Then use runtime
-> > PM to save and restore the state for each instance, and locking between
-> > the two driver instances.
-> > 
-> > For the pin muxing part, I'd do this:
-> > 
-> > 			i2c1 instance	i2c2 instance	notes
-> > default_state		0 pins		0 pins		(or dedicated pins only)
-> > active_state		all pins	alls pins
-> > idle_state		safe mode	safe mode
-> > 
-> > Then when i2c1 instance is done, it's runtime PM suspend muxes the pins
-> > to safe mode, or some nop state. Then when i2c2 instance is woken, it's
-> > runtime PM resume muxes pins to i2c2.
-> 
-> I see two issues with that approach:
-> 
-> 1) Runtime PM doesn't always put a device into an idle state as soon as
-> its work is done. Sometimes (always?) there is a delay between when the
-> device is last used and when the HW is actually made idle so that if the
-> device is re-activated quickly, the kernel hasn't wasted time making it
-> idle then active again. You'd have to force that delay to complete when
-> switching between the two virtual controller devices.
+On 29/07/2013 10:00, Richard Genoud wrote:
+> 2013/7/26 boris brezillon <b.brezillon@overkiz.com>:
+>> On 26/07/2013 17:44, boris brezillon wrote:
+>> I found 2 bugs:
+>> 1) the main frequency ready test in recalc_rate function is wrong
+>> 2) the common clk framework uses the first match for dt clk registration
+>>     and main clk has this compatible property:
+>>     compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
+>>     As a result the main clk is always bound to the fixed-clock driver
+>>     which set the clock frequency to 0 if 'clock-frequency' property is
+>>     missing.
+>>
+>> These bugs will be fixed in next version.
+>> Tell me if you want need thesse patches for testing purpose.
+> Hi Boris,
+>
+> I tested your patch, the clock is not at 0 anymore:
+> AT91: PIT: mck rate = 8333333
+>
+> And it's booting correctly.
+> There's a small bug I found in the at91sam9x5 dtsi file (ssc id is 28,
+> not 27). (patch attached)
+>
+> And yes, I could use your patches for some more tests !
+>
+> Thanks,
+>
+> Richard.
+Hi Richard,
 
-There is the autosuspend timeout for delayed transitions, but I think
-runtime PM already has calls for making the state change immediate also.
- 
-> 2) This requires two separate device objects for the two I2C instances.
-> I guess you could have the driver for the one I2C mux node end up
-> instantiating two child devices for this purpose, and hence make that
-> happen without needing to change the DT ABI. However, that sure feels
-> complex...
+Thanks for the bug report.
 
-Yes but you will also automatically get quite a bit of sanity to your
-I2C driver code rather than trying to handle the two separate instances
-within the driver alone. Consider things like scanning the I2C buses for
-devices and just dev_dbg().
- 
-> I wonder if it wouldn't be better to have active/idle/sleep as
-> "modifiers" to the state name rather than alternatives, so you end up
-> with states named:
-> 
-> default
-> nobus:active
-> nobus:idle
-> nobus:sleep
-> bus0:active
-> bus0:idle
-> bus0:sleep
-> bus1:active
-> bus1:idle
-> bus1:sleep
-> 
-> Of course, if you continue on with that approach (i.e. you add more
-> sub-fields each separated by a colon), you end up with a huge
-> combinatorial mess of state names.
+You'll find in attachements the pre-v3 series fixing the detected bugs 
+(including the ssc clock id bug).
 
-Right :) Sooner or later we'll have some totally messed up piece of
-hardware pop up that multiplexes one controller across a large number
-number buses..
+If you need anything else please let me know.
 
-Regards,
+Best Regards,
 
-Tony
+Boris
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: at91-clk-v3.tgz
+Type: application/x-compressed-tar
+Size: 61170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/5d4fdc8f/attachment-0001.bin>
