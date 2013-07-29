@@ -1,105 +1,80 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Mon, 29 Jul 2013 15:03:55 +0100
-Subject: [PATCH] arm: update advice on kernel and FDT load address.
-In-Reply-To: <20130729135000.GK32383@mudshark.cambridge.arm.com>
-References: <1375102578-5869-1-git-send-email-ian.campbell@citrix.com>
- <20130729135000.GK32383@mudshark.cambridge.arm.com>
-Message-ID: <1375106635.12741.8.camel@kazak.uk.xensource.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 29 Jul 2013 15:04:31 +0100
+Subject: [PATCH 04/10] ARM: sun6i: Add restart code for the A31
+In-Reply-To: <1374618312-19001-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1374618312-19001-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130729140430.GA25264@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-07-29 at 14:50 +0100, Will Deacon wrote:
-> Hi Ian,
+On Tue, Jul 23, 2013 at 11:25:06PM +0100, Maxime Ripard wrote:
+> The Allwinner A31 has a sligthly different watchdog that requires a
+> different restart code.
 > 
-> /me plays English teacher :)
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/mach-sunxi/sunxi.c | 37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
 > 
-> On Mon, Jul 29, 2013 at 01:56:18PM +0100, Ian Campbell wrote:
-> > Based on the discussion in [0]:
-> >   - Recommend that the kernel be placed under 128MiB ("for automatic RAM
-> >     location to work", says Nico)
-> >   - Recommend that DTB larger than ~16KiB be placed after the 128MiB boundary
-> >     (in order to avoid conflicting with the kernel decompressor, kernel is at
-> >     most 32MiB) and within the lowmem region. Somewhat arbitrarily recommend
-> >     placement below the 256MiB boundary, the real lowmem limit is likely up
-> >     around 600-800MiB but varies.
-> > 
-> > [0] http://article.gmane.org/gmane.linux.ports.arm.kernel/254538
-> > 
-> > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Dave Martin <dave.martin@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  Documentation/arm/Booting |   14 +++++++++++---
-> >  1 files changed, 11 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-> > index 0c1f475..72c035e 100644
-> > --- a/Documentation/arm/Booting
-> > +++ b/Documentation/arm/Booting
-> > @@ -125,6 +125,13 @@ with the caveat that it may not be located at physical address 0 since
-> >  the kernel interprets a value of 0 in r2 to mean neither a tagged list
-> >  nor a dtb were passed.
-> >  
-> > +If the DTB is larger than ~16KiB, such that placement in the first
-> > +16KiB would lead to a conflict with the kernel loaded at 32KiB (as
-> > +recommended below) which uses the memory between 16KiB-32KiB itself,
-> > +then the DTB should be placed after the first 128MiB of RAM in order
-> > +to avoid conflicting with the kernel decompressor. The recommnded
-> 
-> recommended
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 11326d9..c18ef3a 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -32,6 +32,15 @@
+>  #define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
+>  #define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
+>  
+> +#define SUN6I_WATCHDOG1_IRQ_REG		0x00
+> +#define SUN6I_WATCHDOG1_CTRL_REG	0x10
+> +#define SUN6I_WATCHDOG1_CTRL_RESTART		(1 << 0)
+> +#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
+> +#define SUN6I_WATCHDOG1_CONFIG_RESTART		(1 << 0)
+> +#define SUN6I_WATCHDOG1_CONFIG_IRQ		(1 << 1)
+> +#define SUN6I_WATCHDOG1_MODE_REG	0x18
+> +#define SUN6I_WATCHDOG1_MODE_ENABLE		(1 << 0)
+> +
+>  static void __iomem *wdt_base;
+>  
+>  static void sun4i_restart(enum reboot_mode mode, const char *cmd)
+> @@ -56,8 +65,36 @@ static void sun4i_restart(enum reboot_mode mode, const char *cmd)
+>  	}
+>  }
+>  
+> +static void sun6i_restart(char mode, const char *cmd)
+> +{
+> +	if (!wdt_base)
+> +		return;
+> +
+> +	/* Disable interrupts */
+> +	writel(0, wdt_base + SUN6I_WATCHDOG1_IRQ_REG);
+> +
+> +	/* We want to disable the IRQ and just reset the whole system */
+> +	writel(SUN6I_WATCHDOG1_CONFIG_RESTART,
+> +		wdt_base + SUN6I_WATCHDOG1_CONFIG_REG);
+> +
+> +	/* Enable timer. The default and lowest interval value is 0.5s */
+> +	writel(SUN6I_WATCHDOG1_MODE_ENABLE,
+> +		wdt_base + SUN6I_WATCHDOG1_MODE_REG);
+> +
+> +	/* Restart the watchdog. */
+> +	writel(SUN6I_WATCHDOG1_CTRL_RESTART,
+> +		wdt_base + SUN6I_WATCHDOG1_CTRL_REG);
+> +
+> +	while (1) {
+> +		mdelay(5);
+> +		writel(SUN6I_WATCHDOG1_MODE_ENABLE,
+> +			wdt_base + SUN6I_WATCHDOG1_MODE_REG);
+> +	}
+> +}
+> +
+>  static struct of_device_id sunxi_restart_ids[] = {
+>  	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
+> +	{ .compatible = "allwinner,sun6i-wdt", .data = sun6i_restart },
 
-Should've pressed F5, sorry...
+Is there a corresponding binding document addition? 
 
-> It also looks like you're repeating part of what is said later regarding the
-> 16k of page tables below the image.
+sun4i-wdt.txt could be turned into a more general sunxi-wdt.txt.
 
-yes, this was tricky since I wanted to justify the larger than 16KiB but
-that was a forward reference. I went with "as recommended below".
-Perhaps I should just omit the justification? Or perhaps "If the DTB is
-larger than ~16KiB (see below for why this particular value
-matters)...". Clunky :-(
-
-> Also, we use 20k with LPAE.
-
-I'll fold in an update along those lines too.
-
-However given that this then makes everything more complicated (e.g.
-it's now DTB > ~12KiB in that case) perhaps we should just ditch the
-original recommendation to use the first 16KiB and switch to a
-recommendation of "as high as possible below 256MiB" across the board?
-That would remove the issue with repeating stuff from the next section
-too.
-
-> > +placement in this case just below the 256MiB boundary.
-> > +
-> >  5. Calling the kernel image
-> >  ---------------------------
-> >  
-> > @@ -136,9 +143,10 @@ is stored in flash, and is linked correctly to be run from flash,
-> >  then it is legal for the boot loader to call the zImage in flash
-> >  directly.
-> >  
-> > -The zImage may also be placed in system RAM (at any location) and
-> > -called there.  Note that the kernel uses 16K of RAM below the image
-> > -to store page tables.  The recommended placement is 32KiB into RAM.
-> > +The zImage may also be placed in system RAM and called there.  The
-> > +kernel should be placed in the first 128MiB of RAM. Note that the
-> > +kernel uses 16KiB of RAM below the image to store page tables.  The
-> > +recommended placement is 32KiB into RAM.
-> 
-> This is a bit clunky since you say that the zImage may be placed in system
-> RAM, then restrict that in the next sentence.
-
-How about:
-
-        The kernel may also be placed in the first 128MiB of system RAM
-        and called there. Note that the kernel uses 16KiB of RAM below
-        the image to store page tables.  The recommended placement is
-        32KiB into RAM.
-
-?
-Ian.
+Thanks,
+Mark.
