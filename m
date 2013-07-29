@@ -1,99 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Jul 2013 12:00:06 -0600
-Subject: [PATCH v2 16/22] iommu/tegra: smmu: Get "nvidia,swgroup" from DT
-In-Reply-To: <20130729.143950.524913713971518557.hdoyu@nvidia.com>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-17-git-send-email-hdoyu@nvidia.com><51E84FFA.8020509@wwwdotorg.org>
- <20130729.143950.524913713971518557.hdoyu@nvidia.com>
-Message-ID: <51F6ADA6.3040006@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 29 Jul 2013 12:05:13 -0600
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <1441731.8CGUI1tUxh@flatron>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F39FD8.6080808@broadcom.com> <20130727183059.GD4813@netboy>
+ <1441731.8CGUI1tUxh@flatron>
+Message-ID: <20130729180513.GB1884@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 05:39 AM, Hiroshi Doyu wrote:
-> Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 18 Jul 2013 22:28:42 +0200:
+On Sat, Jul 27, 2013 at 11:51:06AM -0700, Tomasz Figa wrote:
+
+> Well, it depends on how we use the DT. There are (at least) two possible 
+> usage scenarios:
 > 
->> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
->>> This provides the info about which H/W Accelerators are supported on
->>> Tegra SoC. This info is passed from DT. This is necessary to have the
->>> unified SMMU driver among Tegra SoCs. Instead of using platform data,
->>> DT passes "nvidia,swgroup" now. DT is mandatory in Tegra.
->>
->>> diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
->>
->>> +- nvidia,swgroups: A bitmap of supported HardWare Accelerators(HWA).
->>> +  Each bit represents one swgroup. The assignments may be found in header
->>> +  file <dt-bindings/memory/tegra-swgroup.h>.
->>
->> There needs to be a default for this field if one is not specified so
->> that existing DTs continue to work without modification.
+>  a) using DT as direct replacement for board files - this means that you 
+>     are free to say that DTSes are strictly coupled with kernel version 
+>     and you are free to modify the bindings - see the analogy to board 
+>     files, where you could modify the platform data structures and could 
+>     not directly copy board file from one kernel version to another,
 > 
-> Only enabling PPCS(AHB) can be an option because PPCS has SD/MMC where
-> rootfs can be located ususally.
-
-There's no reason that the root filesystem has to be on SD/MMC. Either
-way, the DT binding shouldn't be influenced by the root fs location at all.
-
-I think more explanation of exactly what this property does and why is
-required.
-
->> How many cells big is this property?
+>  b) using DT as an ABI - this is the original way, i.e. define stable 
+>     bindings and make sure that anu DTB built for older kernel will work,
+>     with equal or greater set of functionality on newer kernels.
 > 
-> 64
+> Now I believe in this thread the point whether we should use a) or b) or a 
+> combination of both has been raised.
 
-I assume that's bits, so 2 cells? To be clear: the document needs to
-include this information, not just this email thread.
+Right, and I think it is very important to consider that different
+systems can legitimately fall into those categories.
 
->> Is this really a bitmap of HWAs? Surely it's a bitmap of SMMU client
->> IDs?
-> 
-> At least this info can be used for PMC too.
+Clearly general purpose systems (eg servers, workstations, etc) with
+*full featured firmware* fall into category b. Linux already basically
+has stable DT for those systems - but the firmware is expected to do
+lots of work and hide all the low level details from the
+kernel. Basically, the DT should stick to approximately ePAR and
+everything else is hidden by the firmware. This is essentially how x86
+works and achieves its compatibility.
 
-How and why? A complete explanation of how the SMMU and PMC are expected
-to interact is required.
+Systems that have minimalist firmware, where firmware functions are
+pushed into the kernel and the DT is now required to describe
+intricate and unique SOC specific functions are clearly very
+different, and I think it makes sense to encourage those environments
+to be case 'a'.
 
-The PMC DT binding should include all information related to the PMC;
-the binding definitions probably shouldn't expect a PMC driver to go
-grovelling in an SMMU node to find information.
+Basically, minimalist firmware should have a boot process design that
+*can* couple the DT and kernel, while full featured firmware should
+keep them seperate. IMHO that should be the clear message to people
+implementing this stuff.
 
-> .....
->>> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
->>
->>> @@ -265,7 +265,7 @@ struct smmu_client {
->>>  	struct device		*dev;
->>>  	struct list_head	list;
->>>  	struct smmu_as		*as;
->>> -	u32			hwgrp;
->>> +	u64			hwgrp;
->>
->> Why is that "hwgrp" not "swgrp"? Don't they represent the same
->> thing?
-> 
-> They are same but initial SMMU driver used the term "hwgroup". Should
-> this be renamed with another patch or can it be left as it is?
+After enough time the DT for 'a' should become stable and churn free,
+but expecting/demanding that from day 0 is not helping anyone, IMHO.
 
-I thought there had already been a patch to do this rename. Was it not
-complete? If so, that work should probably be completed.
-
-> ....
->>>  static int __smmu_client_set_hwgrp(struct smmu_client *c,
->>> -				   unsigned long map, int on)
->>> +				   u64 map, int on)
->>>  {
->>>  	int i;
->>>  	struct smmu_as *as = c->as;
->>> @@ -398,12 +400,11 @@ static int __smmu_client_set_hwgrp(struct smmu_client *c,
->>>  	if (!on)
->>>  		map = smmu_client_hwgrp(c);
->>>  
->>> -	for_each_set_bit(i, &map, HWGRP_COUNT) {
->>> +	for_each_set_bit(i, (unsigned long *)&map,
->>> +			 sizeof(map) * BITS_PER_BYTE) {
->>
->> Why change the type if it just forces you to add this cast?
-> 
-> u32 map; -> u64 map;
-> 
-> for_each_set_bit() expects "unsigned long *" for any length of bitmap.
-
-Shouldn't the map just be an "unsigned long map[]" then, so no casts are
-needed anywhere? Equally, that pointer could just be passed to the
-function rather than copying the data to the stack?
+Jason
