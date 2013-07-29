@@ -1,274 +1,275 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 29 Jul 2013 04:05:52 -0700
-Subject: [PATCH v5] watchdog: Add MOXA ART watchdog driver
-In-Reply-To: <1375093215-7136-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374229402-20432-1-git-send-email-jonas.jensen@gmail.com>
- <1375093215-7136-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <51F64C90.4080400@roeck-us.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 29 Jul 2013 13:14:57 +0200
+Subject: [PATCH 4/5] fb: Add DCU framebuffer driver for Vybrid VF610
+ platform
+In-Reply-To: <1373609276-14566-5-git-send-email-b18965@freescale.com>
+References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
+ <1373609276-14566-5-git-send-email-b18965@freescale.com>
+Message-ID: <20130729111457.GB3029@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 03:20 AM, Jonas Jensen wrote:
-> Add watchdog driver for MOXA ART SoCs.
->
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
->
-> Notes:
->      Changes since v4:
->
->      1. #include <linux/err.h> because IS_ERR comes from there
->      2. #include <linux/kernel.h> because UINT_MAX comes from there
->      3. #include <linux/moduleparam.h> because module_param() comes from there
->
->      device tree bindings document:
->      4. describe compatible variable "Must be" instead of "Should be".
->      5. change description so it's from the point of view of the device
->
->      Applies to next-20130729
->
->   .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
->   drivers/watchdog/Kconfig                           |  10 ++
->   drivers/watchdog/Makefile                          |   1 +
->   drivers/watchdog/moxart_wdt.c                      | 169 +++++++++++++++++++++
->   4 files changed, 195 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
->   create mode 100644 drivers/watchdog/moxart_wdt.c
->
-> diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-> new file mode 100644
-> index 0000000..1169857
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-> @@ -0,0 +1,15 @@
-> +MOXA ART Watchdog timer
-> +
-> +Required properties:
-> +
-> +- compatible : Must be "moxa,moxart-watchdog"
-> +- reg : Should contain registers location and length
-> +- clocks : Should contain phandle for the clock that drives the counter
-> +
-> +Example:
-> +
-> +	watchdog: watchdog at 98500000 {
-> +		compatible = "moxa,moxart-watchdog";
-> +		reg = <0x98500000 0x10>;
-> +		clocks = <&coreclk>;
-> +	};
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 362085d..6883aab 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -382,6 +382,16 @@ config RETU_WATCHDOG
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called retu_wdt.
->
-> +config MOXART_WDT
-> +	tristate "MOXART watchdog"
-> +	depends on ARCH_MOXART
-> +	help
-> +	  Say Y here to include Watchdog timer support for the watchdog
-> +	  existing on the MOXA ART SoC series platforms.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called moxart_wdt.
-> +
->   # AVR32 Architecture
->
->   config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 2f26a0b..7cab53a 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
->   obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
->   obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
->   obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-> +obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
->
->   # AVR32 Architecture
->   obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
-> new file mode 100644
-> index 0000000..d79dc9c
-> --- /dev/null
-> +++ b/drivers/watchdog/moxart_wdt.c
-> @@ -0,0 +1,169 @@
-> +/*
-> + * MOXA ART SoCs watchdog driver.
-> + *
-> + * Copyright (C) 2013 Jonas Jensen
-> + *
-> + * Jonas Jensen <jonas.jensen@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/err.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/watchdog.h>
-> +#include <linux/moduleparam.h>
-> +
-> +#define REG_COUNT			0x4
-> +#define REG_MODE			0x8
-> +#define REG_ENABLE			0xC
-> +
-> +struct moxart_wdt_dev {
-> +	struct watchdog_device dev;
-> +	void __iomem *base;
-> +	unsigned int clock_frequency;
-> +};
-> +
-> +static int heartbeat;
-> +
-> +static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
-> +{
-> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-> +
-> +	writel(0, moxart_wdt->base + REG_ENABLE);
-> +
-> +	return 0;
-> +}
-> +
-> +static int moxart_wdt_start(struct watchdog_device *wdt_dev)
-> +{
-> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-> +
-> +	writel(moxart_wdt->clock_frequency * moxart_wdt->dev.timeout,
-> +	       moxart_wdt->base + REG_COUNT);
-> +	writel(0x5ab9, moxart_wdt->base + REG_MODE);
-> +	writel(0x03, moxart_wdt->base + REG_ENABLE);
-> +
-> +	return 0;
-> +}
-> +
-> +static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
-> +				  unsigned int timeout)
-> +{
-> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-> +
-> +	dev_dbg(wdt_dev->dev, "%s: timeout=%u\n", __func__, timeout);
-> +
-> +	moxart_wdt->dev.timeout = timeout;
-> +
-Stumbled over this one. Unless I am missing something, &moxart_wdt->dev
-and dev are the same, so
-	dev->timeout = timeout;
-would accomplish the same.
+On Fri, Jul 12, 2013 at 02:07:55PM +0800, Alison Wang wrote:
+> The Display Controller Unit (DCU) module is a system master that
+> fetches graphics stored in internal or external memory and displays
+> them on a TFT LCD panel. A wide range of panel sizes is supported
+> and the timing of the interface signals is highly configurable.
+> Graphics are read directly from memory and then blended in real-time,
+> which allows for dynamic content creation with minimal CPU intervention.
 
-Guenter
+Only a review of the code inline.
 
-> +	return 0;
-> +}
+Maybe the real question is whether we want to introduce another
+framebuffer driver at all instead of making it a DRM driver.
+
 > +
-> +static const struct watchdog_info moxart_wdt_info = {
-> +	.identity       = "moxart-wdt",
-> +	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
-> +			  WDIOF_MAGICCLOSE,
+> +#define DRIVER_NAME			"fsl-dcu-fb"
+> +
+> +#define DCU_DCU_MODE			0x0010
+> +#define DCU_MODE_BLEND_ITER(x)		(x << 20)
+
+What's the result of DCU_MODE_BLEND_ITER(1 + 1)?
+
+> +static struct fb_videomode dcu_mode_db[] = {
+> +	{
+> +		.name		= "480x272",
+> +		.refresh	= 75,
+> +		.xres		= 480,
+> +		.yres		= 272,
+> +		.pixclock	= 91996,
+> +		.left_margin	= 2,
+> +		.right_margin	= 2,
+> +		.upper_margin	= 1,
+> +		.lower_margin	= 1,
+> +		.hsync_len	= 41,
+> +		.vsync_len	= 2,
+> +		.sync		= FB_SYNC_COMP_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+> +		.vmode		= FB_VMODE_NONINTERLACED,
+> +	},
 > +};
+
+We have ways to describe a panel in dt. Use them.
+
 > +
-> +static const struct watchdog_ops moxart_wdt_ops = {
-> +	.owner          = THIS_MODULE,
-> +	.start          = moxart_wdt_start,
-> +	.stop           = moxart_wdt_stop,
-> +	.set_timeout    = moxart_wdt_set_timeout,
-> +};
-> +
-> +static int moxart_wdt_probe(struct platform_device *pdev)
+> +static struct mfb_info mfb_template[] = {
+> +	{
+> +	.index = LAYER0,
+> +	.id = "Layer0",
+> +	.alpha = 0xff,
+> +	.blend = 0,
+> +	.count = 0,
+> +	.x_layer_d = 0,
+> +	.y_layer_d = 0,
+> +	},
+
+Wrong indentation.
+
+> +	default:
+> +		printk(KERN_ERR "unsupported color depth: %u\n",
+> +			var->bits_per_pixel);
+
+Use dev_* for printing messages in drivers.
+
+> +static int fsl_dcu_check_var(struct fb_var_screeninfo *var,
+> +		struct fb_info *info)
 > +{
-> +	struct moxart_wdt_dev *moxart_wdt;
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *node = dev->of_node;
-> +	struct resource *res;
-> +	struct clk *clk;
-> +	int err;
-> +	unsigned int max_timeout;
-> +	bool nowayout = WATCHDOG_NOWAYOUT;
+> +	if (var->xres_virtual < var->xres)
+> +		var->xres_virtual = var->xres;
+> +	if (var->yres_virtual < var->yres)
+> +		var->yres_virtual = var->yres;
 > +
-> +	moxart_wdt = devm_kzalloc(&pdev->dev, sizeof(*moxart_wdt), GFP_KERNEL);
-> +	if (!moxart_wdt)
-> +		return -ENOMEM;
+> +	if (var->xoffset < 0)
+> +		var->xoffset = 0;
 > +
-> +	platform_set_drvdata(pdev, moxart_wdt);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	moxart_wdt->base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(moxart_wdt->base))
-> +		return PTR_ERR(moxart_wdt->base);
-> +
-> +	clk = of_clk_get(node, 0);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: of_clk_get failed\n", __func__);
-> +		return PTR_ERR(clk);
-> +	}
-> +
-> +	moxart_wdt->clock_frequency = clk_get_rate(clk);
-> +	if (moxart_wdt->clock_frequency == 0) {
-> +		pr_err("%s: incorrect clock frequency\n", __func__);
+> +	if (var->yoffset < 0)
+> +		var->yoffset = 0;
+
+Ever seen an unsigned value going below zero?
+
+> +	default:
+> +		printk(KERN_ERR "unsupported color depth: %u\n",
+> +			var->bits_per_pixel);
+
+BUG(). This can't happen since you make that sure above.
+
 > +		return -EINVAL;
 > +	}
 > +
-> +	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
-> +
-> +	moxart_wdt->dev.info = &moxart_wdt_info;
-> +	moxart_wdt->dev.ops = &moxart_wdt_ops;
-> +	moxart_wdt->dev.timeout = max_timeout;
-> +	moxart_wdt->dev.min_timeout = 1;
-> +	moxart_wdt->dev.max_timeout = max_timeout;
-> +	moxart_wdt->dev.parent = &pdev->dev;
-> +
-> +	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, &pdev->dev);
-> +	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
-> +
-> +	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
-> +
-> +	err = watchdog_register_device(&moxart_wdt->dev);
-> +	if (unlikely(err))
-> +		return err;
-> +
-> +	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
-> +		moxart_wdt->dev.timeout, nowayout);
-> +
 > +	return 0;
 > +}
 > +
-> +static int moxart_wdt_remove(struct platform_device *pdev)
+> +static int calc_div_ratio(struct fb_info *info)
 > +{
-> +	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
+
+Use a consistent namespace for function names (fsl_dcu_)
+
+> +	writel(DCU_THRESHOLD_LS_BF_VS(0x3) | DCU_THRESHOLD_OUT_BUF_HIGH(0x78) |
+> +		DCU_THRESHOLD_OUT_BUF_LOW(0), dcufb->reg_base + DCU_THRESHOLD);
 > +
-> +	moxart_wdt_stop(&moxart_wdt->dev);
-> +	watchdog_unregister_device(&moxart_wdt->dev);
+> +	enable_controller(info);
+> +}
+
+Make your functions symmetric. If there's update_controller(), the
+function should do exactly that, it should *not* enable the controller.
+Call this from the users of this function if necessary.
+
+> +		if (copy_to_user(buf, &alpha, sizeof(alpha)))
+> +			return -EFAULT;
+> +		break;
+> +	case MFB_SET_ALPHA:
+> +		if (copy_from_user(&alpha, buf, sizeof(alpha)))
+> +			return -EFAULT;
+> +		mfbi->blend = 1;
+> +		mfbi->alpha = alpha;
+> +		fsl_dcu_set_par(info);
+> +		break;
+
+Is it still state of the art to introduce ioctls in the fb framework
+without any kind of documentation?
+
+> +	default:
+> +		printk(KERN_ERR "unknown ioctl command (0x%08X)\n", cmd);
+
+What shall a reader of the kernel log do with a message like this? It's
+utterly useless when he doesn't even now which device failed here. Just
+drop this.
+
+> +static void enable_interrupts(struct dcu_fb_data *dcufb)
+> +{
+> +	u32 int_mask = readl(dcufb->reg_base + DCU_INT_MASK);
 > +
-> +	return 0;
+> +	writel(int_mask & ~DCU_INT_MASK_UNDRUN, dcufb->reg_base + DCU_INT_MASK);
+> +}
+
+Inline this code where you need it. Introducing a function for a single
+register write seems quite useless.
+
+> +static int install_framebuffer(struct fb_info *info)
+> +{
+> +	struct mfb_info *mfbi = info->par;
+> +	struct fb_videomode *db = dcu_mode_db;
+> +	unsigned int dbsize = ARRAY_SIZE(dcu_mode_db);
+> +	int ret;
+> +
+> +	info->var.activate = FB_ACTIVATE_NOW;
+> +	info->fbops = &fsl_dcu_ops;
+> +	info->flags = FBINFO_FLAG_DEFAULT;
+> +	info->pseudo_palette = &mfbi->pseudo_palette;
+> +
+> +	fb_alloc_cmap(&info->cmap, 16, 0);
+> +
+> +	ret = fb_find_mode(&info->var, info, fb_mode, db, dbsize,
+> +			NULL, default_bpp);
+> +
+> +	if (fsl_dcu_check_var(&info->var, info)) {
+> +		ret = -EINVAL;
+
+Propagate the error.
+
+> +		goto failed_checkvar;
+> +	}
+> +
+> +	if (register_framebuffer(info) < 0) {
+> +		ret = -EINVAL;
+
+ditto
+
+> +static irqreturn_t fsl_dcu_irq(int irq, void *dev_id)
+> +{
+> +	struct dcu_fb_data *dcufb = dev_id;
+> +	unsigned int status = readl(dcufb->reg_base + DCU_INT_STATUS);
+> +	u32 dcu_mode;
+> +
+> +	if (status) {
+
+Save indendation level by bailing out early.
+
+> +		if (status & DCU_INT_STATUS_UNDRUN) {
+> +			dcu_mode = readl(dcufb->reg_base + DCU_DCU_MODE);
+> +			dcu_mode &= ~DCU_MODE_DCU_MODE_MASK;
+> +			writel(dcu_mode | DCU_MODE_DCU_MODE(DCU_MODE_OFF),
+> +				dcufb->reg_base + DCU_DCU_MODE);
+> +			udelay(1);
+> +			writel(dcu_mode | DCU_MODE_DCU_MODE(DCU_MODE_NORMAL),
+> +				dcufb->reg_base + DCU_DCU_MODE);
+> +		}
+> +		writel(status, dcufb->reg_base + DCU_INT_STATUS);
+> +		return IRQ_HANDLED;
+> +	}
+> +	return IRQ_NONE;
 > +}
 > +
-> +static const struct of_device_id moxart_watchdog_match[] = {
-> +	{ .compatible = "moxa,moxart-watchdog" },
-> +	{ },
-> +};
+> +	if (IS_ERR(tcon_clk)) {
+> +		ret = PTR_ERR(tcon_clk);
+> +		goto failed_getclock;
+> +	}
+> +	clk_prepare_enable(tcon_clk);
 > +
-> +static struct platform_driver moxart_wdt_driver = {
-> +	.probe      = moxart_wdt_probe,
-> +	.remove     = moxart_wdt_remove,
-> +	.driver     = {
-> +		.name		= "moxart-watchdog",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= moxart_watchdog_match,
-> +	},
-> +};
-> +module_platform_driver(moxart_wdt_driver);
+> +	tcon_reg = of_iomap(tcon_np, 0);
+
+Use devm_*
+
+> +	dcufb->irq = platform_get_irq(pdev, 0);
+> +	if (!dcufb->irq) {
+> +		ret = -EINVAL;
+> +		goto failed_getirq;
+> +	}
 > +
-> +module_param(heartbeat, int, 0);
-> +MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
+> +	ret = request_irq(dcufb->irq, fsl_dcu_irq, 0, DRIVER_NAME, dcufb);
+
+Use devm_request_irq
+
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "could not request irq\n");
+> +		goto failed_requestirq;
+> +	}
 > +
-> +MODULE_DESCRIPTION("MOXART watchdog driver");
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
->
+> +	/* Put TCON in bypass mode, so the input signals from DCU are passed
+> +	 * through TCON unchanged */
+> +	ret = bypass_tcon(pdev->dev.of_node);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "could not bypass TCON\n");
+> +		goto failed_bypasstcon;
+> +	}
+> +
+> +	dcufb->clk = devm_clk_get(&pdev->dev, "dcu");
+> +	if (IS_ERR(dcufb->clk)) {
+> +		dev_err(&pdev->dev, "could not get clock\n");
+> +		goto failed_getclock;
+
+You will return 0 here.
+
+> +	}
+> +	clk_prepare_enable(dcufb->clk);
+> +
+> +	for (i = 0; i < ARRAY_SIZE(dcufb->fsl_dcu_info); i++) {
+> +		dcufb->fsl_dcu_info[i] =
+> +			framebuffer_alloc(sizeof(struct mfb_info), &pdev->dev);
+> +		if (!dcufb->fsl_dcu_info[i]) {
+> +			ret = ENOMEM;
+
+-ENOMEM
+
+> +failed_alloc_framebuffer:
+> +failed_getclock:
+> +failed_bypasstcon:
+> +	free_irq(dcufb->irq, dcufb);
+> +failed_requestirq:
+> +failed_getirq:
+> +	iounmap(dcufb->reg_base);
+
+You used devm_ioremap, so drop this.
+
+> +failed_ioremap:
+> +	kfree(dcufb);
+
+This is allocated with devm_*. Drop this.
+
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
