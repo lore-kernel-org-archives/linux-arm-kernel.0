@@ -1,77 +1,96 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 29 Jul 2013 09:34:37 -0500
-Subject: [PATCH 0/9] ARM: dts: omap5-uevm: fixup wrong regulator
- configuration
-In-Reply-To: <CADz42=M8LQ=i2q30=JJU+F-Qx89D1PwU7pW3DH7F1iYiC8-pFA@mail.gmail.com>
-References: <1374079538-19548-1-git-send-email-nm@ti.com>
- <51F63C74.6070503@ti.com> <51F66B65.4030702@ti.com>
- <51F670AF.9080808@gmail.com> <51F67875.9020602@ti.com>
- <CADz42=M8LQ=i2q30=JJU+F-Qx89D1PwU7pW3DH7F1iYiC8-pFA@mail.gmail.com>
-Message-ID: <51F67D7D.9070003@ti.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 29 Jul 2013 16:34:39 +0200
+Subject: [PATCH v2 00/42] ARM: at91: move to common clk framework
+In-Reply-To: <CACQ1gAi53KN=zE8zDxQO=+BY2zvQXakD=OSuzUqc0VLwWLySCA@mail.gmail.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+ <51F28370.6050304@gmail.com> <51F2996B.6000406@overkiz.com>
+ <51F2A556.8020109@overkiz.com>
+ <CACQ1gAgw-v3z_sWcsk7SqFFW-ERLjS0RS5GTgAdd5Y1tj3Z1FA@mail.gmail.com>
+ <51F63516.8090000@overkiz.com>
+ <CACQ1gAi53KN=zE8zDxQO=+BY2zvQXakD=OSuzUqc0VLwWLySCA@mail.gmail.com>
+Message-ID: <51F67D7F.1050906@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 09:19 AM, Benoit Cousson wrote:
-> 2013/7/29 Nishanth Menon <nm at ti.com <mailto:nm@ti.com>>
+On 29/07/2013 16:18, Richard Genoud wrote:
+> 2013/7/29 boris brezillon <b.brezillon@overkiz.com>:
+>> On 29/07/2013 10:00, Richard Genoud wrote:
+>>> 2013/7/26 boris brezillon <b.brezillon@overkiz.com>:
+>>>> On 26/07/2013 17:44, boris brezillon wrote:
+>>>> I found 2 bugs:
+>>>> 1) the main frequency ready test in recalc_rate function is wrong
+>>>> 2) the common clk framework uses the first match for dt clk registration
+>>>>      and main clk has this compatible property:
+>>>>      compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
+>>>>      As a result the main clk is always bound to the fixed-clock driver
+>>>>      which set the clock frequency to 0 if 'clock-frequency' property is
+>>>>      missing.
+>>>>
+>>>> These bugs will be fixed in next version.
+>>>> Tell me if you want need thesse patches for testing purpose.
+>>> Hi Boris,
+>>>
+>>> I tested your patch, the clock is not at 0 anymore:
+>>> AT91: PIT: mck rate = 8333333
+>>>
+>>> And it's booting correctly.
+>>> There's a small bug I found in the at91sam9x5 dtsi file (ssc id is 28,
+>>> not 27). (patch attached)
+>>>
+>>> And yes, I could use your patches for some more tests !
+>>>
+>>> Thanks,
+>>>
+>>> Richard.
+>> Hi Richard,
+>>
+>> Thanks for the bug report.
+>>
+>> You'll find in attachements the pre-v3 series fixing the detected bugs
+>> (including the ssc clock id bug).
+>>
+>> If you need anything else please let me know.
+> Working on sam9g35ek !
+> you can add my:
+> Tested-by: Richard Genoud <richard.genoud@gmail.com>
 >
-> Well you're lucky I'm now in an area with Wifi and 3G access... last
-> week it whould have been impossible to receive it :-)
-hehe :)
+>
+> One remark though:
+> Maybe it would be interesting to keep using the defines in the device
+> tree for peripheral IDs.
+> For instance, in arch/arm/boot/dts/at91sam9x5.dtsi : (patch 33)
+> ssc_clk at 28 {
+> 	id = <28>;
+> };
+> May be more readable with the SSC id AT91SAM9X5_ID_SSC, as it was
+> defined in arch/arm/mach-at91/at91sam9x5.c (removed with patch 20)
+>
+> IMHO, all AT91SAM9X5_ID_xxx in
+> arch/arm/mach-at91/include/mach/at91sam9x5.h can me moved in
+> include/dt-bindings/ and used in at91sam9x5.dtsi
+This was requested by Jean-Christophe too.
+I'll add these macro files and make use of it in next version.
 
->
->> All the "fixes" are sharing more than 50% of the changelog
->> content with
->> only 2 changes in the code, so you'd better squash them into one
->> patch
->> to avoid repeating the same thing again and again.
->
->> Reason for keeping them separate was to allow any future git bisect
->> to narrow down to precise patch.
->>     <--->
-> Mmm, why? Do you expect some settings to not work or generate crash?
+BTW where should I put these macro files 
+(include/dt-bindings/at91/'soc-name'/peripherals.h) ?
+Should I use macros for address fied of clocks or just for id property 
+(or drop the address) ?
 
-It has worked with a backport to full fledged OS on top and I do not 
-expect it to fail, however, I am never sure about how the future issues 
-look like :)
+ssc_clk at AT91SAM9X5_ID_SSC {
+         id = <AT91SAM9X5_ID_SSC>;
+};
 
->       ARM: dts: omap5-uevm: update SMPS9 settings
->        ARM: dts: omap5-uevm: update and disable unused regulators LDO[28]
->        ARM: dts: omap5-uevm: update LDO1 voltage to 1.5V and settings
->        ARM: dts: omap5-uevm: update LDO3 voltage to 1.5V and settings
->        ARM: dts: omap5-uevm: update LDO4 voltage to 1.5V and settings
->        ARM: dts: omap5-uevm: update LDO6 voltage to 1.2V
->        ARM: dts: omap5-uevm: update LDO7 voltage to 2V and settings
->        ARM: dts: omap5-uevm: update SDCARD LDO9 and resource REGEN3
->     <---->
->
->     Would you have suggestions on what to squash up?
->
->
->
-> I guess one patch for all the mandatory fixes, and another one with the
-> improvements should be good enough.
->
-> Does that sounds OK to you?
+or
 
-patch #1 ARM: dts: omap5-uevm: document regulator signals used on the 
-actual board
-   -> as is, since it is a documentation patch
-Patch #2: ARM: dts: omap5-uevm: fix regulator configurations mandatory 
-for SoC
-squash of:
--> ARM: dts: omap5-uevm: update LDO1 voltage to 1.5V and settings
--> ARM: dts: omap5-uevm: update LDO3 voltage to 1.5V and settings
--> ARM: dts: omap5-uevm: update LDO4 voltage to 1.5V and settings
--> ARM: dts: omap5-uevm: update LDO6 voltage to 1.2V
--> ARM: dts: omap5-uevm: update LDO7 voltage to 2V and settings
--> ARM: dts: omap5-uevm: update SDCARD LDO9 and resource REGEN3
+ssc_clk at 28 {
+         id = <AT91SAM9X5_ID_SSC>;
+};
 
-Patch #3: ARM: dts: omap5-uevm: update optional regulator configurations
-squash of:
-  -> ARM: dts: omap5-uevm: update SMPS9 settings
-  -> ARM: dts: omap5-uevm: update and disable unused regulators LDO[28]
+or
 
-Does that sound fine?
--- 
-Regards,
-Nishanth Menon
+ssc_clk {
+         id = <AT91SAM9X5_ID_SSC>;
+};
+>
+> Best regards,
+> Richard.
