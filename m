@@ -1,59 +1,40 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 29 Jul 2013 22:02:58 +0300
-Subject: [PATCH v2 1/6] usb: phy: msm: Move mach depndend code to
- platform data
-In-Reply-To: <20130729122344.GH24801@radagast>
-References: <1375081464-14206-1-git-send-email-iivanov@mm-sol.com>
- <1375081464-14206-2-git-send-email-iivanov@mm-sol.com>
- <20130729122344.GH24801@radagast>
-Message-ID: <1375124578.5444.2.camel@localhost>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 29 Jul 2013 15:21:12 -0400
+Subject: NSA310 + DT
+In-Reply-To: <51F6A0DC.3020501@uni-bremen.de>
+References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
+Message-ID: <20130729192112.GY29916@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+Hi Finn,
 
-> > Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Cc: linux-usb at vger.kernel.org
-> > 
-> > Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> > ---
-> >  arch/arm/mach-msm/board-msm7x30.c |   35 +++++++++++++++++++++++
-> >  arch/arm/mach-msm/board-qsd8x50.c |   35 +++++++++++++++++++++++
+On Mon, Jul 29, 2013 at 07:05:32PM +0200, Finn Hoffmann wrote:
+> Hello,
 > 
-> I need acks for these.
-> 
-> >  drivers/usb/phy/phy-msm-usb.c     |   55 ++++++++++---------------------------
-> >  include/linux/usb/msm_hsusb.h     |    3 ++
-> >  4 files changed, 87 insertions(+), 41 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-> > index db3d8c0..6b35953 100644
-> > --- a/arch/arm/mach-msm/board-msm7x30.c
-> > +++ b/arch/arm/mach-msm/board-msm7x30.c
-> > @@ -31,6 +31,7 @@
-> >  #include <asm/setup.h>
-> >  
-> >  #include <mach/board.h>
-> > +#include <mach/clk.h>
-> >  #include <mach/msm_iomap.h>
-> >  #include <mach/dma.h>
-> >  
-> > @@ -61,10 +62,44 @@ static int hsusb_phy_init_seq[] = {
-> >  	-1
-> >  };
-> >  
-> > +static int hsusb_link_clk_reset(struct clk *link_clk, bool assert)
-> 
-> looks like you should be using the reset controller framework ?
-> (drivers/reset)
+> I have tried to get a current Kernel running on my NSA310.
 
-Probably, but there still nothing in place in the msm,
-which provide this functionality. I am looking it to
-right now.
+Nice.
 
-Regards,
-Ivan
+> Everything works well on Kernels before DT with the mentioned
+> patches from https://github.com/peeter123/NSA310-320-debian .
+> I have linux-3.10.2 running and after I changed the dts file to lm85
+> sensors and fanconrtol work but GPIO does not.
+> I tried https://github.com/lunn/linux/tree/v3.11-rc1-nsa310-tdc and
+> linux-3.11.0-rc3.
+> Both have the problem that r8169 is not working:
+> r8169: eth0: unknown chipset (mac_version = 0).
+> and console is spammed with
+> r8169 0000:01:00.0 eth0: rtl_phyar_cond == 0 (loop: 20, delay: 25).
+> until I take eth0 down.
+> GPIO is working.
+> 
+> Any ideas?
+
+Adding Andrew Lunn to the Cc: as he is more familiar with those DT
+changes.  In future, please Cc myself, Andrew, and Gregory Clement so we
+don't miss the email.
+
+thx,
+
+Jason.
