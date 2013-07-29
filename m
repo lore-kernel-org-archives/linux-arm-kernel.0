@@ -1,60 +1,59 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 29 Jul 2013 11:32:05 -0400
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130726144047.GH9858@sirena.org.uk>
-References: <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy>
- <20130726132709.GH29916@titan.lakedaemon.net>
- <1374846070.14574.92.camel@i7.infradead.org>
- <CAKON4OzrkHzUzKkULWCgiEpAtJ5gLxUm78R5ctd7p6trqq_gCA@mail.gmail.com>
- <20130726142140.GR24642@n2100.arm.linux.org.uk>
- <20130726144047.GH9858@sirena.org.uk>
-Message-ID: <20130729153204.GJ5022@ohporter.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Mon, 29 Jul 2013 19:37:23 +0400
+Subject: [PATCH v2] ARM: imx: pllv1: Fix PLL calculation for i.MX27
+Message-ID: <1375112243-1557-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 03:40:47PM +0100, Mark Brown wrote:
-> On Fri, Jul 26, 2013 at 03:21:40PM +0100, Russell King - ARM Linux wrote:
-> 
-> > So this is why I'm seeing patches just a short time ago removing existing
-> > compatible strings from the DT descriptions and associated driver, and
-> > replacing them with new ones... meaning that the old DT files won't work
-> > with newer kernels.
-> 
-> The big question is if you're seeing such patches merged.  People making
-> mistakes on submissions is totally normal.
+MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
+is a just sign bit. This patch makes different calculation for i.MX27.
 
-Over in the bcm53xx thread, we've discussed such a patch to fix
-inconsistencies. The problem here is that there is no canonical answer
-to what a mistake is. I can make a strong argument that the support for
-these parts is in such an early stage that the bindings (in this case
-specifically the two different compatible strings for one vendor) should
-be considered unstable and ok to fix the consistency issue. Mark Rutland
-suggests we should change nothing and possibly add a third vendor prefix
-for new bindings. I'm having trouble accepting that just because these
-bindings made it into a final kernel during a period where
-scrutinization of these things was not very high that we need to forever
-carry this inconsistency in the "specification".
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-pllv1.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-http://www.spinics.net/lists/arm-kernel/msg262059.html
-
-> 
-> If it's the case I think you mean TBH I'm not sure anyone cares, I don't
-> think anyone is using that stuff in production yet as those chips go
-> almost exclusively into Android phones.
-
-At least the bcm281xx stuff falls into this category as you describe.
-There's simply nobody that would be upset if its bindings changed from
-bcm-><something_else> as there's just nobody using the DT-based upstream
-work except for internal Broadcom and a couple people external working
-closely with them.
-
-This situation seems to illustrate the strong need for an unstable
-binding period that's longer than just inclusion in a final kernel
-release.
-
--Matt
+diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+index c1eaee3..a289ccd 100644
+--- a/arch/arm/mach-imx/clk-pllv1.c
++++ b/arch/arm/mach-imx/clk-pllv1.c
+@@ -25,6 +25,11 @@ struct clk_pllv1 {
+ 
+ #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+ 
++static inline bool allow_signed_mfn(void)
++{
++	return !cpu_is_mx1() && !cpu_is_mx21();
++}
++
+ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 		unsigned long parent_rate)
+ {
+@@ -59,9 +64,14 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 	/*
+ 	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+ 	 * 2's complements number
++	 * On i.MX27 the bit 9 is the sign bit.
+ 	 */
+-	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+-		mfn_abs = 0x400 - mfn;
++	if (allow_signed_mfn() && (mfn & 0x200)) {
++		if (cpu_is_mx27())
++			mfn_abs = mfn & 0x1ff;
++		else
++			mfn_abs = 0x400 - mfn;
++	}
+ 
+ 	rate = parent_rate * 2;
+ 	rate /= pd + 1;
+@@ -70,7 +80,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 
+ 	do_div(ll, mfd + 1);
+ 
+-	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
++	if (allow_signed_mfn() && (mfn & 0x200))
+ 		ll = -ll;
+ 
+ 	ll = (rate * mfi) + ll;
+-- 
+1.8.1.5
