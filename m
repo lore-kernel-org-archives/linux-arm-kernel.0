@@ -1,64 +1,63 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 29 Jul 2013 13:41:49 +0100
-Subject: [PATCH 1/4] ARM: dove: add cpu device tree node
-In-Reply-To: <1375100946-28521-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1375100946-28521-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <51F6630D.5010603@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 29 Jul 2013 20:46:58 +0800
+Subject: [PATCH] DMAEngine: sirf: let the users be able to pause and
+ resume specific buffer
+In-Reply-To: <20130729121715.GI24642@n2100.arm.linux.org.uk>
+References: <1372927373-17407-1-git-send-email-Baohua.Song@csr.com>
+ <CAGsJ_4wOdDMku-pNWiH-DoS_v39PfFwNYcU4T1Thsd-+L9A8AQ@mail.gmail.com>
+ <20130729060819.GE29095@intel.com>
+ <CAGsJ_4yVxAJc0UNTFMM1yjKQh6=xv12qPYpnUFZ=wmzrdpUOXQ@mail.gmail.com>
+ <20130729121715.GI24642@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4zRZ96L8ezQVyz6LQ8VgBCExML6RF_3DtTQR+ntsJHnZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/13 13:29, Sebastian Hesselbarth wrote:
-> This adds a node for the Marvell Sheeva PJ4A CPU found on Dove SoCs.
-> While at it, also move the l2-cache node out of internal registers and
-> consistently name different nodes.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove.dtsi |   52 ++++++++++++++++++++++++++-----------------
->  1 file changed, 32 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 8d5be1e8..09d9710 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -10,6 +10,23 @@
->  		gpio2 = &gpio2;
->  	};
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			compatible = "marvell,pj4a", "marvell,sheeva-v7";
-> +			device_type = "cpu";
-> +			next-level-cache = <&l2>;
-> +			reg = <0>;
-> +		};
-> +	};
-> +
-> +	l2: l2-cache {
-> +		compatible = "marvell,tauros2-cache";
-> +		marvell,tauros2-cache-features = <0>;
-> +	};
-Hi Sebastian,
+2013/7/29 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Jul 29, 2013 at 03:20:31PM +0800, Barry Song wrote:
+>> 2013/7/29 Vinod Koul <vinod.koul@intel.com>:
+>> > The above can be done by
+>> > a) have two buffers:
+>> >         - prepare first and submit, and start
+>> >         - while first is ongoing, prepare second and start
+>> >         - first is completed, so you start processing that while second is
+>> >           getting DMAed
+>> >         - when processing is completed, submit first again
+>> >         - when second is completed, start processing that and submit that once
+>> >           proocessed
+>> >
+>> > b) have multiple buffers, A, B, C & D and redo above schema.
+>>
+>> yes, that is the original idea for multiple buffer management for DMA.
+>>
+>> the reason which pushed us to the ping-pong pause is that we don't
+>> need to issue software dma descriptor every time for every buffer as
+>> hardware can do that.
+>
+> If your DMA engine is correctly implemented (and this only works for
+> correctly implemented DMA engines), what you can do is:
+>
+> - at the start of the transfer, prepare, submit and issue two buffers,
+>   each with a callback.
+> - when the first callback happens
+>   - that buffer has been transferred.
+>   - you can now do whatever you need with that data.
+>   - prepare, submit and issue the next buffer
+>
+> This means the DMA engine always has a buffer available to it, so if
+> your CPU is fast enough, you can keep the transfer going without the
+> DMA channel ever stopping or having to be paused.  If your CPU isn't
+> fast enough to keep up, the DMA engine will stop at the end of the
+> last queued and issued buffer automatically.
+>
 
-This is not entirely related to the patch but thought of checking with
-you. I was trying to get info on L2 cache controller on Marvell SoCs,
-mainly structure or way/set size. Is that something we can get
-dynamically ? Some specification I referred said its integrated and some
-said its separate(not unified). Basically I need information around
-various L2 cache implementations(Tauros2/Feroceon) from Marvell.
+yes, suppose there are 4 buffers, we can issue all of buffer 0,1,2,3
+at first. if buffer 0 has been read when buffer 3 is transferred,
+buffer0 must have been issued again.
+so that will keep buffers always alive if cpu is fast enough.
 
-Any pointers or contacts to get this information will be helpful.
+> Bonus points if you have implemented the "move to next buffer" correctly
+> too, so that the hardware can do a continuous transfer without having to
+> stop and wait between the buffers (provided of course that the next
+> transfer is compatible with the previous.)
 
-Regards,
-Sudeep
+-barry
