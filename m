@@ -1,50 +1,79 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 29 Jul 2013 13:24:09 +0200
-Subject: [PATCH v2 13/22] iommu/tegra: smmu: Create default IOVA maps
-In-Reply-To: <51E84BB5.9010303@wwwdotorg.org>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-14-git-send-email-hdoyu@nvidia.com><51E84BB5.9010303@wwwdotorg.org>
-Message-ID: <20130729.142409.995770519696534476.hdoyu@nvidia.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 29 Jul 2013 12:24:58 +0100
+Subject: [PATCH v6 1/5] clk: abstract parent cache
+In-Reply-To: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+References: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1375097102-28892-2-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 18 Jul 2013 22:10:29 +0200:
+Abstract access to the clock parent cache by defining
+clk_get_parent_by_index(clk, index). This allows access to parent
+clocks from clock drivers.
 
-> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> > Create default IOVA maps at boot-up which can be attached to devices.
-> 
-> > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-> 
-> >  static int tegra_smmu_probe(struct platform_device *pdev)
-> >  {
-> >  	struct smmu_device *smmu;
-> 
-> > @@ -1160,13 +1182,15 @@ static int tegra_smmu_probe(struct platform_device *pdev)
-> >  	if (of_property_read_u32(dev->of_node, "nvidia,#asids", &asids))
-> >  		return -ENODEV;
-> >  
-> > -	bytes = sizeof(*smmu) + asids * sizeof(*smmu->as);
-> > +	bytes = sizeof(*smmu) + asids * (sizeof(*smmu->as) +
-> > +					 sizeof(struct dma_iommu_mapping *));
-> >  	smmu = devm_kzalloc(dev, bytes, GFP_KERNEL);
-> >  	if (!smmu) {
-> >  		dev_err(dev, "failed to allocate smmu_device\n");
-> >  		return -ENOMEM;
-> >  	}
-> >  
-> > +	smmu->map = (struct dma_iommu_mapping **)(smmu->as + asids);
-> 
-> Shouldn't "+ asids" be "+ asids * sizeof(*smmu->as)" to match the
-> calculation of "bytes" above?
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+Changes in v3:
 
-The structure is:
+* remove double underscore prefix from clk_get_parent_by_index()
 
-smmu {
-     ....
-     struct dma_iommu_mapping **map;
-     ....	
-     struct smmu_as	as[0];
-};
+ drivers/clk/clk.c            | 21 ++++++++++++++-------
+ include/linux/clk-provider.h |  1 +
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
-I think that this is correct, but is the following better?
-
-+ smmu->map = (struct dma_iommu_mapping **)&smmu->as[asids];
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 54a191c..e06a9ac 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -559,6 +559,19 @@ struct clk *__clk_get_parent(struct clk *clk)
+ 	return !clk ? NULL : clk->parent;
+ }
+ 
++struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
++{
++	if (!clk || index >= clk->num_parents)
++		return NULL;
++	else if (!clk->parents)
++		return __clk_lookup(clk->parent_names[index]);
++	else if (!clk->parents[index])
++		return clk->parents[index] =
++			__clk_lookup(clk->parent_names[index]);
++	else
++		return clk->parents[index];
++}
++
+ unsigned int __clk_get_enable_count(struct clk *clk)
+ {
+ 	return !clk ? 0 : clk->enable_count;
+@@ -1315,13 +1328,7 @@ static struct clk *__clk_init_parent(struct clk *clk)
+ 			kzalloc((sizeof(struct clk*) * clk->num_parents),
+ 					GFP_KERNEL);
+ 
+-	if (!clk->parents)
+-		ret = __clk_lookup(clk->parent_names[index]);
+-	else if (!clk->parents[index])
+-		ret = clk->parents[index] =
+-			__clk_lookup(clk->parent_names[index]);
+-	else
+-		ret = clk->parents[index];
++	ret = clk_get_parent_by_index(clk, index);
+ 
+ out:
+ 	return ret;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1ec14a7..e54dac5 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -418,6 +418,7 @@ const char *__clk_get_name(struct clk *clk);
+ struct clk_hw *__clk_get_hw(struct clk *clk);
+ u8 __clk_get_num_parents(struct clk *clk);
+ struct clk *__clk_get_parent(struct clk *clk);
++struct clk *clk_get_parent_by_index(struct clk *clk, u8 index);
+ unsigned int __clk_get_enable_count(struct clk *clk);
+ unsigned int __clk_get_prepare_count(struct clk *clk);
+ unsigned long __clk_get_rate(struct clk *clk);
+-- 
+1.8.1.2
