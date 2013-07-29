@@ -1,59 +1,162 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 29 Jul 2013 08:29:44 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <51CB4C20.3060306@ti.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com>
- <alpine.DEB.2.02.1306261713260.6135@utopia.booyaka.com>
- <51CB4C20.3060306@ti.com>
-Message-ID: <alpine.DEB.2.02.1307290826180.30864@utopia.booyaka.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 29 Jul 2013 10:33:28 +0200
+Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
+In-Reply-To: <CADGdYn761S+rDe=GaypFwAYdtQxFZRv0W=jmX9-KomogK5T7ww@mail.gmail.com>
+References: <0e7d01ce8840$82f79070$88e6b150$@org> <51F4F317.1040001@linaro.org>
+ <CADGdYn761S+rDe=GaypFwAYdtQxFZRv0W=jmX9-KomogK5T7ww@mail.gmail.com>
+Message-ID: <13615299.reg39gbbhi@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wed, 26 Jun 2013, Tom Rini wrote:
-
-> On 06/26/2013 01:19 PM, Paul Walmsley wrote:
-> > On Tue, 25 Jun 2013, Tom Rini wrote:
-> > 
-> >> On 06/25/2013 02:20 PM, Paul Walmsley wrote:
-> >>
-> >>> BeagleBone-white has the additional complication that it is not easy 
-> >>> to automate, due to the way that power is delivered to the board, so 
-> >>> there is an extra dimension of difficulty there.
-> >>
-> >> Ah-ha, I reproduced your failure.  If I make up a concat uImage + DTB,
-> >> rather than pass them separately, it fails to boot.  If you switch to
-> >> mainline U-Boot (v2012.10 or later) you get support for separate image +
-> >> dtb (v2013.04 gives you bootz and zImage support).
-> > 
-> > Yeah, I've tried to keep the original bootloader that came on the first SD 
-> > card image that was used on that device.  But am starting to think that 
-> > it's time to stop my bootloader independence jihad, since appended DTB 
-> > booting is so broken - have seen similar problems on SoCs from other 
-> > vendors as well :-(
+On Monday 29 of July 2013 10:16:14 amit daniel kachhap wrote:
+> Hi Daniel/Tomasz,
 > 
-> Well, me?  I'm all in favor of people using latest release of U-Boot for
-> their board and yelling and screaming (or just reporting bugs) when
-> things don't work.  I'm biased of course.
+> From the discussion I can conclude that SOC check is needed in the
+> cpuidle driver for deeper C states.
 
-That's exactly how bootloader developers should be testing their changes.  
-But most of the rest of us kernel folks don't want to deal with constantly 
-replacing bootloaders, and then dealing with the inevitable bootloader 
-regressions, when what we're really trying to test is the kernel...
-The kernel should be completely independent of the bootloader used.  
+A check is needed for the whole cpuidle driver, so it registers only on 
+Exynos SoCs which support deeper C states.
 
-> And assuming rmk answers the way I expect he will, like it or not, the 
-> version(s) we kit up and get in the box need to be factored into our 
-> test system setup so if folks don't want to avail themselves of 
-> improvements, they still get a functional system too.
+> Only the question is where to
+> insert this.
 
-Yep seems like a good idea from a customer service point of view.  Also 
-most OMAP devices out there probably have locked bootloaders, so replacing 
-the bootloader is often not an option.
+Exynos doesn't support multiplatform yet, but we must make sure that any 
+code being added is multiplatform-aware. So initcall is not a good idea. I 
+would put this somewhere on Exynos-specific initialization path, i.e. 
+something that would not called for all platforms compiled in (in case of 
+multiplatform).
 
+As I discussed with Daniel, this should be using a traditional 
+platform_driver model, with the difference that it can't be registered 
+from device tree, but rather statically in mach code.
 
-- Paul
+For example, you can add an exynos_register_cpuidle() function in 
+arch/arm/mach-exynos/common.c, which registers such platform device and 
+always call it from exynos4_dt_machine_init() in mach-exynos4-dt.c. In 
+mach-exynos5-dt.c you could make this conditional and check if 
+!soc_is_exynos5440().
+
+Best regards,
+Tomasz
+
+> Also to perform the SOC there can be 2 ways like
+> 1) each SOC check 4120, 4412, 5250 etc (long list)
+> 2) negate the nonsupporting SOC's like 5440 (small list like current
+> patch) Any opinion?
+>  As Bartlomiej suggested that this patch conflicts with Daniel's
+> earlier patch http://marc.info/?l=linux-arm-kernel&m=137467935712513&w=2
+> So I can re-base my patch on top of this one if needed.
+> 
+> Thanks,
+> Amit Daniel
+> 
+> On Sun, Jul 28, 2013 at 4:01 PM, Daniel Lezcano
+> 
+> <daniel.lezcano@linaro.org> wrote:
+> > On 07/28/2013 11:22 AM, Tomasz Figa wrote:
+> >> On Sunday 28 of July 2013 09:10:09 Daniel Lezcano wrote:
+> >>> On 07/24/2013 01:47 PM, Kukjin Kim wrote:
+> >>>> Amit Daniel Kachhap wrote:
+> >>>>> This patch skips the deep C1(AFTR -Arm off top running) state for
+> >>>>> exynos5440
+> >>>>> soc as this soc does not support this state. All the cpu's only
+> >>>>> allows the basic
+> >>>>> C0 state.
+> >>>>> 
+> >>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> >>>>> ---
+> >>>>> 
+> >>>>>  arch/arm/mach-exynos/cpuidle.c |    2 +-
+> >>>>>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >>>>> 
+> >>>>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
+> >>>>> exynos/cpuidle.c
+> >>>>> index 17a18ff..9a776a1 100644
+> >>>>> --- a/arch/arm/mach-exynos/cpuidle.c
+> >>>>> +++ b/arch/arm/mach-exynos/cpuidle.c
+> >>>>> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
+> >>>>> 
+> >>>>>            device->cpu = cpu_id;
+> >>>>>            
+> >>>>>            /* Support IDLE only */
+> >>>>> 
+> >>>>> -          if (cpu_id != 0)
+> >>>>> +          if (soc_is_exynos5440() || cpu_id != 0)
+> >>>>> 
+> >>>>>                    device->state_count = 1;
+> >>>>>            
+> >>>>>            ret = cpuidle_register_device(device);
+> >>>>> 
+> >>>>> --
+> >>>>> 1.7.1
+> >>>> 
+> >>>> Applied, thanks.
+> >>> 
+> >>> You shouldn't have. This patch means exynos5540 has no cpuidle
+> >>> driver at all. It should be fixed in the Kconfig to unselect
+> >>> CONFIG_CPU_IDLE for an exynos5540.
+> >> 
+> >> To shed more light on this, let me add that you need to register a
+> >> cpuidle driver only if you have more states than a simple WFI or you
+> >> need some crazy steps to enter WFI. Default setup falls back to
+> >> generic ARM WFI. (Daniel, do we get the nice idle stats as provided
+> >> by cpuidle core then?)> 
+> > Nope, but with one state, idle vs busy stats do the trick.
+> > 
+> > BTW, I am writing a tool to do some stats based on the idle events
+> > [1].
+> > It is still at a very early development stage but we can get some
+> > interesting informations.
+> > 
+> >> Anyway, Exynos cpuidle is using an initcall to initialize and we
+> >> support multiple Exynos SoCs in single zImage, so deselecting
+> >> CONFIG_CPU_IDLE is not an option.
+> > 
+> > Good point.
+> > 
+> >> Considering multiplatform requirements, the driver has to
+> >> 
+> >> be modified to initialize only on supported platforms, either by:
+> >>  a) dropping the initcall and calling the init function directly from
+> >> 
+> >> arch/arm/mach-exynos
+> >> 
+> >>  or
+> >>  
+> >>  b) checking if machine we are running on is supported, which would
+> >>  mean a>> 
+> >> long list of all Exynos SoCs that needs to be checked.
+> >> 
+> >> An evolution of option a) is registering a platform device somewhere
+> >> in
+> >> arch/arm/mach-exynos and making exynos-cpuidle a platform driver.
+> > 
+> > Yes, I am favorable to this solution [2].
+> > 
+> >> The
+> >> problem is that you must register a static platform device from arch
+> >> code, because cpuidle is not a real hardware block that can be put
+> >> into device tree.
+> > 
+> > Thanks
+> > 
+> >   -- Daniel
+> > 
+> > [1]
+> > https://git.linaro.org/gitweb?p=people/dlezcano/idlestat.git;a=summar
+> > y [2] http://patches.linaro.org/18368/
+> > 
+> > --
+> > 
+> >  <http://www.linaro.org/> Linaro.org ? Open source software for ARM
+> >  SoCs
+> > 
+> > Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> > <http://twitter.com/#!/linaroorg> Twitter |
+> > <http://www.linaro.org/linaro-blog/> Blog
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+> > linux-samsung-soc" in the body of a message to
+> > majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
