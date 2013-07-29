@@ -1,66 +1,54 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 29 Jul 2013 16:11:44 +0200
-Subject: [GIT PULL FOR v3.12] sh-pfc fixes and enhancements
-Message-ID: <4601856.fyKLDdx1qP@avalon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 29 Jul 2013 15:11:54 +0100
+Subject: [PATCH 05/10] ARM: sunxi: Add Allwinner A31 DTSI
+In-Reply-To: <1374618312-19001-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1374618312-19001-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130729141154.GB25264@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Jul 23, 2013 at 11:25:07PM +0100, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile       |   3 +-
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 155 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 157 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/sun6i-a31.dtsi
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+[...]
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> +	soc at 01c20000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x01c20000 0x300000>;
 
-are available in the git repository at:
+That's unnecessary, nothing should be using this for a simple-bus.
 
-  git://linuxtv.org/pinchartl/fbdev.git pinmux/next/fixes
+> +		ranges;
+> +
+> +		timer at 01c20c00 {
+> +			compatible = "allwinner,sun4i-timer";
+> +			reg = <0x01c20c00 0xa0>;
+> +			interrupts = <
+> +					0 18 1
+> +					0 19 1
+> +					0 20 1
+> +					0 21 1
+> +					0 22 1
+> +					>;
 
-for you to fetch changes up to e120cacfaac24d4de31b181371daaef6a5773ee3:
+A cosmetic issue, but this would be nicer with each tuple bracketed:
 
-  sh-pfc: r8a7790: Add VIN pin groups and functions (2013-07-29 15:52:14 
-+0200)
+			interrupts = <0 18 1>,
+				     <0 19 1>,
+				     <0 20 1>,
+				     <0 21 1>,
+				     <0 22 1>;
 
-The patches don't conflict with the 'pin-no-gpio' series, the two series can 
-be applied independently.
+> +			clocks = <&osc>;
+> +		};
 
-----------------------------------------------------------------
-Kunihito Higashiyama (1):
-      sh-pfc: r8a7790: Add MSIOF pin groups and functions
-
-Laurent Pinchart (5):
-      sh-pfc: Remove unneeded mach/<soc>.h includes
-      sh-pfc: sh7372: Replace <mach/irqs.h> with <linux/sh_intc.h>
-      sh-pfc: sh73a0: Remove EXT_IRQ16L and EXT_IRQ16H macros
-      sh-pfc: r8a7790: Sort pin groups and functions alphabetically
-      sh-pfc: r8a7790: Add SCIF2 pin groups and functions
-
-Phil Edworthy (1):
-      sh-pfc: r8a7779: Add I2C pin groups
-
-Shinobu Uehara (2):
-      sh-pfc: r8a7790: Add USB pin groups and functions
-      sh-pfc: r8a7790: Add VIN pin groups and functions
-
-Shinya Kuribayashi (9):
-      sh-pfc: r8a7790: Rename I2C SDA/SCL pins
-      sh-pfc: r8a7790: Remove trailing '_TANS' string from RTS/CTS pins
-      sh-pfc: r8a7790: Remove deprecated Ethernet MII/RMII pins
-      sh-pfc: r8a7790: Remove deprecated RDS pins
-      sh-pfc: r8a7790: Remove deprecated SPV_EVEN pin
-      sh-pfc: r8a7790: Swap SCIFA2_RXD_B and HRX0_C configurations
-      sh-pfc: r8a7790: Add TCLK1 pin configuration support
-      sh-pfc: r8a7790: Add SCIF2 pins configuration support
-      sh-pfc: r8a7790: Fix miscellaneous pinmux configuration tables mistakes
-
- drivers/pinctrl/sh-pfc/pfc-r8a73a4.c |    1 -
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c |    1 -
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c |  105 +++
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 1621 ++++++++++++++++++++-------------
- drivers/pinctrl/sh-pfc/pfc-sh7372.c  |    4 +-
- drivers/pinctrl/sh-pfc/pfc-sh73a0.c  |   68 +-
- 6 files changed, 1132 insertions(+), 668 deletions(-)
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Mark.
