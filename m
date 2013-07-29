@@ -1,56 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 29 Jul 2013 15:23:27 +0100
-Subject: [RFC PATCH 3/3] cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver
-In-Reply-To: <51F67581.5080207@linaro.org>
-References: <1374750866-750-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1374750866-750-4-git-send-email-lorenzo.pieralisi@arm.com>
- <51F67581.5080207@linaro.org>
-Message-ID: <20130729142327.GC6184@e102568-lin.cambridge.arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 29 Jul 2013 16:18:06 +0200
+Subject: [PATCH v2 00/42] ARM: at91: move to common clk framework
+In-Reply-To: <51F63516.8090000@overkiz.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+ <51F28370.6050304@gmail.com> <51F2996B.6000406@overkiz.com>
+ <51F2A556.8020109@overkiz.com>
+ <CACQ1gAgw-v3z_sWcsk7SqFFW-ERLjS0RS5GTgAdd5Y1tj3Z1FA@mail.gmail.com>
+ <51F63516.8090000@overkiz.com>
+Message-ID: <CACQ1gAi53KN=zE8zDxQO=+BY2zvQXakD=OSuzUqc0VLwWLySCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 03:00:33PM +0100, Daniel Lezcano wrote:
-> On 07/25/2013 01:14 PM, Lorenzo Pieralisi wrote:
+2013/7/29 boris brezillon <b.brezillon@overkiz.com>:
+> On 29/07/2013 10:00, Richard Genoud wrote:
+>>
+>> 2013/7/26 boris brezillon <b.brezillon@overkiz.com>:
+>>>
+>>> On 26/07/2013 17:44, boris brezillon wrote:
+>>> I found 2 bugs:
+>>> 1) the main frequency ready test in recalc_rate function is wrong
+>>> 2) the common clk framework uses the first match for dt clk registration
+>>>     and main clk has this compatible property:
+>>>     compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
+>>>     As a result the main clk is always bound to the fixed-clock driver
+>>>     which set the clock frequency to 0 if 'clock-frequency' property is
+>>>     missing.
+>>>
+>>> These bugs will be fixed in next version.
+>>> Tell me if you want need thesse patches for testing purpose.
+>>
+>> Hi Boris,
+>>
+>> I tested your patch, the clock is not at 0 anymore:
+>> AT91: PIT: mck rate = 8333333
+>>
+>> And it's booting correctly.
+>> There's a small bug I found in the at91sam9x5 dtsi file (ssc id is 28,
+>> not 27). (patch attached)
+>>
+>> And yes, I could use your patches for some more tests !
+>>
+>> Thanks,
+>>
+>> Richard.
+>
+> Hi Richard,
+>
+> Thanks for the bug report.
+>
+> You'll find in attachements the pre-v3 series fixing the detected bugs
+> (including the ssc clock id bug).
+>
+> If you need anything else please let me know.
 
-[...]
+Working on sam9g35ek !
+you can add my:
+Tested-by: Richard Genoud <richard.genoud@gmail.com>
 
-> > +/**
-> > + * bl_enter_powerdown - Programs CPU to enter the specified state
-> > + * @dev: cpuidle device
-> > + * @drv: The target state to be programmed
-> > + * @idx: state index
-> > + *
-> > + * Called from the CPUidle framework to program the device to the
-> > + * specified target state selected by the governor.
-> > + */
-> > +static int bl_enter_powerdown(struct cpuidle_device *dev,
-> > +				struct cpuidle_driver *drv, int idx)
-> > +{
-> > +	struct timespec ts_preidle, ts_postidle, ts_idle;
-> > +	int ret;
-> > +
-> > +	/* Used to keep track of the total time in idle */
-> > +	getnstimeofday(&ts_preidle);
-> > +
-> > +	cpu_pm_enter();
-> > +
-> > +	ret = cpu_suspend(0, bl_powerdown_finisher);
-> > +	/* signals the MCPM core that CPU is out of low power state */
-> > +	mcpm_cpu_powered_up();
-> > +
-> > +	cpu_pm_exit();
-> > +
-> > +	getnstimeofday(&ts_postidle);
-> > +	ts_idle = timespec_sub(ts_postidle, ts_preidle);
-> > +
-> > +	dev->last_residency = ts_idle.tv_nsec / NSEC_PER_USEC +
-> > +					ts_idle.tv_sec * USEC_PER_SEC;
-> > +	local_irq_enable();
-> 
-> time computation and local irq enablement are handled by the cpuidle
-> framework.
 
-Absolutely, rebase leftover, sorry.
+One remark though:
+Maybe it would be interesting to keep using the defines in the device
+tree for peripheral IDs.
+For instance, in arch/arm/boot/dts/at91sam9x5.dtsi : (patch 33)
+ssc_clk at 28 {
+	id = <28>;
+};
+May be more readable with the SSC id AT91SAM9X5_ID_SSC, as it was
+defined in arch/arm/mach-at91/at91sam9x5.c (removed with patch 20)
 
-Thanks,
-Lorenzo
+IMHO, all AT91SAM9X5_ID_xxx in
+arch/arm/mach-at91/include/mach/at91sam9x5.h can me moved in
+include/dt-bindings/ and used in at91sam9x5.dtsi
+
+Best regards,
+Richard.
