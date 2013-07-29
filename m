@@ -1,117 +1,57 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 29 Jul 2013 16:14:51 +0200
-Subject: [PATCH 4/7] cpuidle: calxeda: add support to use PSCI calls
-In-Reply-To: <1375048598-15637-5-git-send-email-robherring2@gmail.com>
-References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
- <1375048598-15637-5-git-send-email-robherring2@gmail.com>
-Message-ID: <51F678DB.3030308@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 29 Jul 2013 16:23:20 +0200
+Subject: [PATCH 3/5] ARM: dove: add MBus DT node
+In-Reply-To: <20130729135227.GA2417@localhost>
+References: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1375101114-28858-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <51F661DE.1070106@gmail.com> <20130729135227.GA2417@localhost>
+Message-ID: <51F67AD8.1070904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2013 11:56 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This updates the Calxeda cpuidle driver to use PSCI calls to powergate
-> cores. This is needed to enable cpuidle for the ECX-2000.
-> 
-> This could possibly become a generic PSCI driver, but there are no other
-> PSCI users in the kernel other than mach-virt.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: linux-pm at vger.kernel.org
-> ---
+On 07/29/2013 03:52 PM, Ezequiel Garcia wrote:
+> Hi Sebastian,
+>
+> (Ccing devicetree ML)
+>
+> On Mon, Jul 29, 2013 at 02:36:46PM +0200, Sebastian Hesselbarth wrote:
+>> On 07/29/2013 02:31 PM, Sebastian Hesselbarth wrote:
+>>> This adds a MBus node including ranges and pcie apertures required later.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+>>>    arch/arm/boot/dts/dove.dtsi |   19 +++++++++++++++++++
+>>>    1 file changed, 19 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+>>> index 397674c..bdda016 100644
+>>> --- a/arch/arm/boot/dts/dove.dtsi
+>>> +++ b/arch/arm/boot/dts/dove.dtsi
+>>> @@ -29,6 +29,20 @@
+>>>    		marvell,tauros2-cache-features = <0>;
+>>>    	};
+>>>
+>>> +	mbus {
+>>> +		compatible = "marvell,dove-mbus", "marvell,mbus", "simple-bus";
+>>> +		#address-cells = <2>;
+>>> +		#size-cells = <1>;
+>>> +		pcie-mem-aperture = <0xe0000000 0x10000000>; /* 256M MEM space */
+>>> +		pcie-io-aperture  = <0xf2000000 0x00200000>; /*   2M I/O space */
+>>
+>> Actually, current v9 of the mbus patch set still requires "controller"
+>> property to match the corresponding controller node. I had a short
+>> discussion with Ezequiel to possibly just use of_find_compatible_node
+>> and blindly assumed post-v8 will already use it.
+>
+> Ah, regarding this: despite your good arguin against the 'controller' property approach,
+> I still feel a bit inclined for it, as I like the way it tightly-binds the two nodes.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+I understand that the phandle property *shows* you that both are
+related. But with DT you should always ask for every property, if
+(a) it is really required to do the job and (b) does it really
+describe the HW or just your SW needs/wishes.
 
-Rob,
+So for the phandle property, I'd prefer to not put it into DT but
+let the driver handle it.
 
-Shall I take the patch in my tree ?
-
-Thanks
-  -- Daniel
-
-
->  drivers/cpuidle/cpuidle-calxeda.c | 40 ++++++---------------------------------
->  1 file changed, 6 insertions(+), 34 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-> index 0e6e408..01cfecf3 100644
-> --- a/drivers/cpuidle/cpuidle-calxeda.c
-> +++ b/drivers/cpuidle/cpuidle-calxeda.c
-> @@ -22,51 +22,23 @@
->  
->  #include <linux/cpuidle.h>
->  #include <linux/init.h>
-> -#include <linux/io.h>
->  #include <linux/of.h>
-> -#include <linux/time.h>
-> -#include <linux/delay.h>
-> -#include <linux/suspend.h>
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
-> -#include <asm/smp_scu.h>
->  #include <asm/suspend.h>
-> -#include <asm/cacheflush.h>
-> -#include <asm/cp15.h>
-> -
-> -extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
-> -extern void *scu_base_addr;
-> -
-> -static noinline void calxeda_idle_restore(void)
-> -{
-> -	set_cr(get_cr() | CR_C);
-> -	set_auxcr(get_auxcr() | 0x40);
-> -	scu_power_mode(scu_base_addr, SCU_PM_NORMAL);
-> -}
-> +#include <asm/psci.h>
->  
->  static int calxeda_idle_finish(unsigned long val)
->  {
-> -	/* Already flushed cache, but do it again as the outer cache functions
-> -	 * dirty the cache with spinlocks */
-> -	flush_cache_all();
-> -
-> -	set_auxcr(get_auxcr() & ~0x40);
-> -	set_cr(get_cr() & ~CR_C);
-> -
-> -	scu_power_mode(scu_base_addr, SCU_PM_DORMANT);
-> -
-> -	cpu_do_idle();
-> -
-> -	/* Restore things if we didn't enter power-gating */
-> -	calxeda_idle_restore();
-> -	return 1;
-> +	const struct psci_power_state ps = {
-> +		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-> +	};
-> +	return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
->  }
->  
->  static int calxeda_pwrdown_idle(struct cpuidle_device *dev,
->  				struct cpuidle_driver *drv,
->  				int index)
->  {
-> -	highbank_set_cpu_jump(smp_processor_id(), cpu_resume);
->  	cpu_suspend(0, calxeda_idle_finish);
->  	return index;
->  }
-> @@ -90,7 +62,7 @@ static struct cpuidle_driver calxeda_idle_driver = {
->  
->  static int __init calxeda_cpuidle_init(void)
->  {
-> -	if (!of_machine_is_compatible("calxeda,highbank"))
-> +	if (!of_machine_is_compatible("calxeda,highbank") || !psci_ops.cpu_suspend)
->  		return -ENODEV;
->  
->  	return cpuidle_register(&calxeda_idle_driver, NULL);
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Sebastian
