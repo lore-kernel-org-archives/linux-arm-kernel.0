@@ -1,86 +1,288 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 29 Jul 2013 15:04:38 +0200
-Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
-In-Reply-To: <20130729125826.GH23152@manwe>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E41F7A.4010502@gmail.com> <20130728043310.6CF1D3E08FE@localhost>
- <20130728162711.32a9a21e@skate> <20130729065431.GA1115@manwe>
- <20130729142600.63eeab50@skate> <20130729125826.GH23152@manwe>
-Message-ID: <20130729150438.4872da76@skate>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 29 Jul 2013 15:06:01 +0200
+Subject: [PATCH v4] gpio: Add MOXA ART GPIO driver
+In-Reply-To: <1374053693-6166-1-git-send-email-jonas.jensen@gmail.com>
+References: <1374053693-6166-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1375103161-12460-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+Add GPIO driver for MOXA ART SoCs.
 
-On Mon, 29 Jul 2013 14:58:27 +0200, Thierry Reding wrote:
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-> >  /**
-> > + * irq_find_msi() - Locates a MSI domain for a given device node
-> > + * @node: device-tree node of the interrupt controller
-> > + */
-> > +struct irq_domain *irq_find_msi(struct device_node *node)
-> > +{
-> > +	struct irq_domain *h, *found = NULL;
-> > +
-> > +	mutex_lock(&irq_domain_mutex);
-> > +	list_for_each_entry(h, &irq_domain_list, link) {
-> > +		if (!h->msi_chip)
-> > +			continue;
-> > +		if (h->of_node && h->of_node == node) {
-> > +			found = h;
-> > +			break;
-> > +		}
-> > +	}
-> > +	mutex_unlock(&irq_domain_mutex);
-> > +	return found;
-> > +}
-> > +EXPORT_SYMBOL_GPL(irq_find_msi);
-> 
-> This doesn't quite copy what irq_find_host() does, since it ignores the
-> associated ops->match().
+Notes:
+    Changes since v3:
+    
+    1. use local struct device *dev pointer, replace "&pdev->dev" with "dev"
+    
+    device tree bindings document:
+    2. describe compatible variable "Must be" instead of "Should be".
+    
+    Applies to next-20130729
 
-Correct.
+ .../devicetree/bindings/gpio/moxa,moxart-gpio.txt  |  23 +++
+ drivers/gpio/Kconfig                               |   7 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-moxart.c                         | 189 +++++++++++++++++++++
+ 4 files changed, 220 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
+ create mode 100644 drivers/gpio/gpio-moxart.c
 
-> But given that ops->match() already provides a way to hook into the
-> lookup, perhaps we could add a function such as this:
-> 
-> 	int irq_domain_supports_msi(struct irq_domain *d, struct device_node *node)
-> 	{
-> 		if ((d->of_node == NULL) || (d->of_node != node))
-> 			return 0;
-> 
-> 		return d->msi_chip != NULL;
-> 	}
-> 
-> Then use that in drivers that expose MSI functionality via an IRQ domain
-> like this:
-> 
-> 	static const struct irq_domain_ops foo_irq_domain_ops = {
-> 		...
-> 		.match = irq_domain_supports_msi,
-> 		...
-> 	};
->
-> One problem with this is that it doesn't solve your problem where two
-> different IRQ domains are exposed by the same device, because the
-> irq_find_host() will still match the MSI IRQ domain for the non-MSI
-> device node as well.
-
-Indeed.
-
-> This could be solved by adding another match function...
-
-But this would involve changing all the users of irq_find_host(), no?
-
-> This goes in hand with the helper-style API that I mentioned above. But
-> it's really up to Grant to decide which way he wants this to go.
-
-Yes, Grant, your suggestions are welcome on this. Thanks!
-
-Thomas
+diff --git a/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt b/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
+new file mode 100644
+index 0000000..795afab
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
+@@ -0,0 +1,23 @@
++MOXA ART GPIO Controller
++
++Required properties:
++
++- #gpio-cells : Should be 2
++- compatible : Must be "moxa,moxart-gpio"
++- reg : Should contain registers location and length
++	index 0 : input, output, and direction control
++	index 1 : enable/disable individual pins, pin 0-31
++- gpio-ready-led : ready LED gpio, with zero flags
++- gpio-reset-switch : reset switch gpio, with zero flags
++
++Example:
++
++	gpio: gpio at 98700000 {
++		gpio-controller;
++		#gpio-cells = <2>;
++		compatible = "moxa,moxart-gpio";
++		reg =	<0x98700000 0xC>,
++			<0x98100100 0x4>;
++		gpio-ready-led = <&gpio 27 0>;
++		gpio-reset-switch = <&gpio 25 0>;
++	};
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 4b7ba53..5419413 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -741,6 +741,13 @@ config GPIO_MSIC
+ 	  Enable support for GPIO on intel MSIC controllers found in
+ 	  intel MID devices
+ 
++config GPIO_MOXART
++	bool "MOXART GPIO support"
++	depends on ARCH_MOXART
++	help
++	  Select this option to enable GPIO driver for
++	  MOXA ART SoC devices.
++
+ comment "USB GPIO expanders:"
+ 
+ config GPIO_VIPERBOARD
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 156fd28..c7a7a2b 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -43,6 +43,7 @@ obj-$(CONFIG_GPIO_MC9S08DZ60)	+= gpio-mc9s08dz60.o
+ obj-$(CONFIG_GPIO_MCP23S08)	+= gpio-mcp23s08.o
+ obj-$(CONFIG_GPIO_ML_IOH)	+= gpio-ml-ioh.o
+ obj-$(CONFIG_GPIO_MM_LANTIQ)	+= gpio-mm-lantiq.o
++obj-$(CONFIG_GPIO_MOXART)	+= gpio-moxart.o
+ obj-$(CONFIG_GPIO_MPC5200)	+= gpio-mpc5200.o
+ obj-$(CONFIG_GPIO_MPC8XXX)	+= gpio-mpc8xxx.o
+ obj-$(CONFIG_GPIO_MSIC)		+= gpio-msic.o
+diff --git a/drivers/gpio/gpio-moxart.c b/drivers/gpio/gpio-moxart.c
+new file mode 100644
+index 0000000..a5bdbca
+--- /dev/null
++++ b/drivers/gpio/gpio-moxart.c
+@@ -0,0 +1,189 @@
++/*
++ * MOXA ART SoCs GPIO driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/gpio.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/delay.h>
++#include <linux/timer.h>
++
++#define GPIO_DATA_OUT		0x00
++#define GPIO_DATA_IN		0x04
++#define GPIO_PIN_DIRECTION	0x08
++
++static void __iomem *moxart_pincontrol_base;
++static void __iomem *moxart_gpio_base;
++
++void moxart_gpio_enable(u32 gpio)
++{
++	writel(readl(moxart_pincontrol_base) | gpio, moxart_pincontrol_base);
++}
++
++void moxart_gpio_disable(u32 gpio)
++{
++	writel(readl(moxart_pincontrol_base) & ~gpio, moxart_pincontrol_base);
++}
++
++static int moxart_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	moxart_gpio_enable(1 << offset);
++	return pinctrl_request_gpio(offset);
++}
++
++static void moxart_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	pinctrl_free_gpio(offset);
++	moxart_gpio_disable(1 << offset);
++}
++
++static int moxart_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	void __iomem *ioaddr = moxart_gpio_base + GPIO_PIN_DIRECTION;
++
++	writel(readl(ioaddr) & ~(1 << offset), ioaddr);
++	return 0;
++}
++
++static int moxart_gpio_direction_output(struct gpio_chip *chip,
++					unsigned offset, int value)
++{
++	void __iomem *ioaddr = moxart_gpio_base + GPIO_PIN_DIRECTION;
++
++	writel(readl(ioaddr) | (1 << offset), ioaddr);
++	return 0;
++}
++
++static void moxart_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	void __iomem *ioaddr = moxart_gpio_base + GPIO_DATA_OUT;
++	u32 reg = readl(ioaddr);
++
++	(value) ?	writel(reg | (1 << offset), ioaddr) :
++			writel(reg & ~(1 << offset), ioaddr);
++}
++
++static int moxart_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	u32 ret = readl(moxart_gpio_base + GPIO_PIN_DIRECTION);
++
++	if (ret & (1 << offset))
++		ret = readl(moxart_gpio_base + GPIO_DATA_OUT) & (1 << offset);
++	else
++		ret = readl(moxart_gpio_base + GPIO_DATA_IN) & (1 << offset);
++
++	return ret;
++}
++
++static struct gpio_chip moxart_gpio_chip = {
++	.label			= "moxart-gpio",
++	.request		= moxart_gpio_request,
++	.free			= moxart_gpio_free,
++	.direction_input	= moxart_gpio_direction_input,
++	.direction_output	= moxart_gpio_direction_output,
++	.set			= moxart_gpio_set,
++	.get			= moxart_gpio_get,
++	.base			= 0,
++	.ngpio			= 32,
++	.can_sleep		= 0,
++};
++
++static int moxart_gpio_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	int ret, gpio_ready_led, gpio_reset_switch;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	moxart_gpio_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(moxart_gpio_base)) {
++		dev_err(dev, "%s: devm_ioremap_resource res_gpio failed\n",
++			dev->of_node->full_name);
++		return PTR_ERR(moxart_gpio_base);
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	moxart_pincontrol_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(moxart_pincontrol_base)) {
++		dev_err(dev, "%s: devm_ioremap_resource res_pmu failed\n",
++			dev->of_node->full_name);
++		return PTR_ERR(moxart_pincontrol_base);
++	}
++
++	moxart_gpio_chip.dev = dev;
++
++	ret = gpiochip_add(&moxart_gpio_chip);
++	if (ret)
++		dev_err(dev, "%s: gpiochip_add failed\n",
++			dev->of_node->full_name);
++
++
++	gpio_ready_led = of_get_named_gpio(dev->of_node,
++					   "gpio-ready-led", 0);
++	if (!gpio_is_valid(gpio_ready_led)) {
++		dev_err(dev, "invalid gpio (gpio-ready-led): %d\n",
++			gpio_ready_led);
++		return gpio_ready_led;
++	}
++
++	gpio_reset_switch = of_get_named_gpio(dev->of_node,
++					      "gpio-reset-switch", 0);
++	if (!gpio_is_valid(gpio_reset_switch)) {
++		dev_err(dev, "invalid gpio (gpio-reset-switch): %d\n",
++			gpio_reset_switch);
++		return gpio_reset_switch;
++	}
++
++	moxart_gpio_enable(gpio_ready_led | gpio_reset_switch);
++
++	moxart_gpio_direction_input(&moxart_gpio_chip, gpio_reset_switch);
++
++	/*
++	 * gpio_ready_led=0 ready LED on
++	 * gpio_ready_led=1 ready LED off
++	 */
++	moxart_gpio_direction_output(&moxart_gpio_chip, gpio_ready_led, 0);
++	moxart_gpio_set(&moxart_gpio_chip, gpio_ready_led, 0);
++
++	return 0;
++}
++
++static const struct of_device_id moxart_gpio_match[] = {
++	{ .compatible = "moxa,moxart-gpio" },
++	{ }
++};
++
++static struct platform_driver moxart_gpio_driver = {
++	.driver	= {
++		.name		= "moxart-gpio",
++		.owner		= THIS_MODULE,
++		.of_match_table	= moxart_gpio_match,
++	},
++	.probe	= moxart_gpio_probe,
++};
++
++static int __init moxart_gpio_init(void)
++{
++	return platform_driver_register(&moxart_gpio_driver);
++}
++
++postcore_initcall(moxart_gpio_init);
++
++MODULE_DESCRIPTION("MOXART GPIO chip driver");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.2.1
