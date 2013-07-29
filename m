@@ -1,128 +1,49 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 29 Jul 2013 10:16:14 +0530
-Subject: [PATCH] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
-In-Reply-To: <51F4F317.1040001@linaro.org>
-References: <0e7d01ce8840$82f79070$88e6b150$@org>
- <0eaf01ce8863$89d3c4e0$9d7b4ea0$@org> <51F4C3D1.2060901@linaro.org>
- <1877730.qZVs3NAG5h@flatron> <51F4F317.1040001@linaro.org>
-Message-ID: <CADGdYn761S+rDe=GaypFwAYdtQxFZRv0W=jmX9-KomogK5T7ww@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 28 Jul 2013 22:29:02 -0700
+Subject: [PATCH 0/3] networking: Use ETH_ALEN where appropriate
+Message-ID: <cover.1375075325.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel/Tomasz,
+Convert the uses mac addresses to ETH_ALEN so
+it's easier to find and verify where mac addresses
+need to be __aligned(2)
 
->From the discussion I can conclude that SOC check is needed in the
-cpuidle driver for deeper C states. Only the question is where to
-insert this.
-Also to perform the SOC there can be 2 ways like
-1) each SOC check 4120, 4412, 5250 etc (long list)
-2) negate the nonsupporting SOC's like 5440 (small list like current patch)
-Any opinion?
- As Bartlomiej suggested that this patch conflicts with Daniel's
-earlier patch http://marc.info/?l=linux-arm-kernel&m=137467935712513&w=2
-So I can re-base my patch on top of this one if needed.
+Joe Perches (3):
+  uapi: Convert some uses of 6 to ETH_ALEN
+  include: Convert ethernet mac address declarations to use ETH_ALEN
+  ethernet: Convert mac address uses of 6 to ETH_ALEN
 
-Thanks,
-Amit Daniel
+ drivers/net/ethernet/8390/ax88796.c                |  4 +-
+ drivers/net/ethernet/amd/pcnet32.c                 |  6 +--
+ drivers/net/ethernet/broadcom/cnic_if.h            |  6 +--
+ drivers/net/ethernet/dec/tulip/tulip_core.c        |  8 +--
+ drivers/net/ethernet/i825xx/sun3_82586.h           |  4 +-
+ drivers/net/ethernet/myricom/myri10ge/myri10ge.c   |  2 +-
+ drivers/net/ethernet/nuvoton/w90p910_ether.c       |  4 +-
+ drivers/net/ethernet/pasemi/pasemi_mac.c           | 13 ++---
+ drivers/net/ethernet/pasemi/pasemi_mac.h           |  4 +-
+ drivers/net/ethernet/qlogic/netxen/netxen_nic_hw.c |  4 +-
+ drivers/net/ethernet/qlogic/qlge/qlge.h            |  2 +-
+ include/acpi/actbl2.h                              |  4 +-
+ include/linux/dm9000.h                             |  4 +-
+ include/linux/fs_enet_pd.h                         |  3 +-
+ include/linux/ieee80211.h                          | 59 +++++++++++-----------
+ include/linux/mlx4/device.h                        | 11 ++--
+ include/linux/mlx4/qp.h                            |  5 +-
+ include/linux/mv643xx_eth.h                        |  3 +-
+ include/linux/sh_eth.h                             |  3 +-
+ include/linux/smsc911x.h                           |  3 +-
+ include/linux/uwb/spec.h                           |  5 +-
+ include/media/tveeprom.h                           |  4 +-
+ include/net/irda/irlan_common.h                    |  3 +-
+ include/uapi/linux/dn.h                            |  3 +-
+ include/uapi/linux/if_bridge.h                     |  3 +-
+ include/uapi/linux/netfilter_bridge/ebt_802_3.h    |  5 +-
+ include/uapi/linux/netfilter_ipv4/ipt_CLUSTERIP.h  |  3 +-
+ include/uapi/linux/virtio_net.h                    |  2 +-
+ include/uapi/linux/wimax/i2400m.h                  |  4 +-
+ 29 files changed, 103 insertions(+), 81 deletions(-)
 
-On Sun, Jul 28, 2013 at 4:01 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 07/28/2013 11:22 AM, Tomasz Figa wrote:
->> On Sunday 28 of July 2013 09:10:09 Daniel Lezcano wrote:
->>> On 07/24/2013 01:47 PM, Kukjin Kim wrote:
->>>> Amit Daniel Kachhap wrote:
->>>>> This patch skips the deep C1(AFTR -Arm off top running) state for
->>>>> exynos5440
->>>>> soc as this soc does not support this state. All the cpu's only
->>>>> allows the basic
->>>>> C0 state.
->>>>>
->>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>>> ---
->>>>>
->>>>>  arch/arm/mach-exynos/cpuidle.c |    2 +-
->>>>>  1 files changed, 1 insertions(+), 1 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
->>>>> exynos/cpuidle.c
->>>>> index 17a18ff..9a776a1 100644
->>>>> --- a/arch/arm/mach-exynos/cpuidle.c
->>>>> +++ b/arch/arm/mach-exynos/cpuidle.c
->>>>> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
->>>>>
->>>>>            device->cpu = cpu_id;
->>>>>
->>>>>            /* Support IDLE only */
->>>>>
->>>>> -          if (cpu_id != 0)
->>>>> +          if (soc_is_exynos5440() || cpu_id != 0)
->>>>>
->>>>>                    device->state_count = 1;
->>>>>
->>>>>            ret = cpuidle_register_device(device);
->>>>>
->>>>> --
->>>>> 1.7.1
->>>>
->>>> Applied, thanks.
->>>
->>> You shouldn't have. This patch means exynos5540 has no cpuidle driver at
->>> all. It should be fixed in the Kconfig to unselect CONFIG_CPU_IDLE for
->>> an exynos5540.
->>
->> To shed more light on this, let me add that you need to register a cpuidle
->> driver only if you have more states than a simple WFI or you need some
->> crazy steps to enter WFI. Default setup falls back to generic ARM WFI.
->> (Daniel, do we get the nice idle stats as provided by cpuidle core then?)
->
-> Nope, but with one state, idle vs busy stats do the trick.
->
-> BTW, I am writing a tool to do some stats based on the idle events [1].
-> It is still at a very early development stage but we can get some
-> interesting informations.
->
->
->> Anyway, Exynos cpuidle is using an initcall to initialize and we support
->> multiple Exynos SoCs in single zImage, so deselecting CONFIG_CPU_IDLE is
->> not an option.
->
-> Good point.
->
->> Considering multiplatform requirements, the driver has to
->> be modified to initialize only on supported platforms, either by:
->>
->>  a) dropping the initcall and calling the init function directly from
->> arch/arm/mach-exynos
->>
->>  or
->>
->>  b) checking if machine we are running on is supported, which would mean a
->> long list of all Exynos SoCs that needs to be checked.
->>
->> An evolution of option a) is registering a platform device somewhere in
->> arch/arm/mach-exynos and making exynos-cpuidle a platform driver.
->
-> Yes, I am favorable to this solution [2].
->
->> The
->> problem is that you must register a static platform device from arch code,
->> because cpuidle is not a real hardware block that can be put into device
->> tree.
->
-> Thanks
->   -- Daniel
->
-> [1] https://git.linaro.org/gitweb?p=people/dlezcano/idlestat.git;a=summary
-> [2] http://patches.linaro.org/18368/
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+1.8.1.2.459.gbcd45b4.dirty
