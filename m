@@ -1,53 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Jul 2013 11:54:09 -0600
-Subject: [PATCH v2 14/22] iommu/tegra: smmu: Register platform_device
- to IOMMU dynamically
-In-Reply-To: <20130729.142752.1020949402019811407.hdoyu@nvidia.com>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-15-git-send-email-hdoyu@nvidia.com><51E84D51.2030404@wwwdotorg.org>
- <20130729.142752.1020949402019811407.hdoyu@nvidia.com>
-Message-ID: <51F6AC41.30007@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 29 Jul 2013 11:54:00 -0600
+Subject: DT bindings as ABI [was: Do we have people interested in device
+ tree janitoring / cleanup?]
+In-Reply-To: <20130727084825.GA4707@netboy>
+References: <CAOesGMhJ+je8FZqeFxhAcYwU0CHYer+aGP6DA_8x3azrzfA2sw@mail.gmail.com>
+ <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726045433.GB4100@netboy>
+ <20130726171524.GB28895@obsidianresearch.com>
+ <20130727084825.GA4707@netboy>
+Message-ID: <20130729175400.GB15861@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 05:27 AM, Hiroshi Doyu wrote:
-> Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 18 Jul 2013 22:17:21 +0200:
+On Sat, Jul 27, 2013 at 10:48:26AM +0200, Richard Cochran wrote:
+
+> > Of course all this could have been done in C, but it wasn't/hasn't been..
 > 
->> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
->>> Register platform_devices to IOMMU dynamically via
->>> ops->{add,remove}_device().
->>
->>> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
->>
->>> +/*
->>> + * ASID[0] for the system default
->>> + * ASID[1] for PPCS, which has SDMMC
->>
->> I have no idea what PPCS is. The patch description for 21/22 implies
->> much more than SDMMC is "in PPCS"...
+> You have identified the real issue: poor quality of the ARM board
+> support process within the kernel. Churn is still churn, whether in DT
+> or in platform devices, but the DT people promised to end the churn.
+
+Actually my experience in this area was mainly from PPC, and granted
+it spanned the PPC32/PPC64 merge.
+
+> [ I disagree about the "more thought" part. The current discussion,
+>   coming years too late after the introduction of DT to ARM Linux, is
+>   contrary evidence enough. ]
+
+The current discussion has little to do with the quality of the
+bindings, look at the new kirkwood bindings - they have had much more
+thought put into them than the old board.c stuff they are replacing.
+
+> > I can't delay shipping while upstream sorts this out - so I know
+> > *absolutely* that the DT schema will change. This has been planned for
+> > and designed into the boot system and won't be a problem.
+> > 
+> > Why would anyone do embedded any other way?
 > 
-> "PPCS" is all AHB bus children/(client).
-
-Just to be clear: I was hoping that the comment would be fixed.
-
->>> + * ASID[2][3].. open for drivers, first come, first served.
->>> + */
->>> +enum {
->>> +	SYSTEM_DEFAULT,
->>> +	SYSTEM_PROTECTED,
->>> +};
->>
->> Why hard-code this mapping? Can't devices be assigned to ASIDs based on
->> a DT property? I assume there's nothing in the SMMU HW that requires
->> specific ASIDs to be used?
+> Yep, that is the embedded way: ship it!
 > 
-> Right. Where should those policy be passed, board DT files?
+> We can do better than that.
 
-Is the HW module (== SW group?) to ASID mapping policy or is a
-particular mapping required by HW?
+I think you missed the point.
 
-Can the ASID mapping just happen dynamically in SW rather than DT
-dictating a particular mapping?
+There is no way I can possibly ship a product with a DT that is
+finished. I can't tie my company's product release cycles to the whims
+of the kernel community.
 
-I assume the mapping must be set up before any HW is used, and can't be
-modified later, so there's no much chance of deferring any policy
-decisions to user-space etc.?
+So embedded people are going to ship with unfinished DT and upgrade
+later. They have to. There is no choice. Stable DT doesn't change
+anything unless you can create perfect stable bindings for a new SOC
+instantaneously.
+
+This is where I see the whole disconnect in this
+discussion. General-purpose and embedded are *DIFFERENT* users, and
+they have different use-cases and different needs.
+
+Jason
