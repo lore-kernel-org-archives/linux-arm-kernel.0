@@ -1,70 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 29 Jul 2013 15:30:50 +0100
-Subject: [PATCH 7/7] dts: calxeda: add ARM PSCI binding
-In-Reply-To: <51F66A72.7070209@gmail.com>
-References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
- <1375048598-15637-8-git-send-email-robherring2@gmail.com>
- <20130729102424.GA24255@e106331-lin.cambridge.arm.com>
- <51F66A72.7070209@gmail.com>
-Message-ID: <20130729143050.GC25264@e106331-lin.cambridge.arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 29 Jul 2013 11:32:23 -0300
+Subject: [PATCH 0/5] ARM: dove: switch to DT MBus
+In-Reply-To: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130729143222.GB2417@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 02:13:22PM +0100, Rob Herring wrote:
-> On 07/29/2013 05:24 AM, Mark Rutland wrote:
-> > On Sun, Jul 28, 2013 at 10:56:38PM +0100, Rob Herring wrote:
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> Add the PSCI binding for Calxeda SOCs. The PSCI function numbers are
-> >> different from the DT binding example because the numbering changed in
-> >> revisions of the PSCI spec and are already fixed in highbank firmware.
-> >> Since the numbering is transparent to the kernel, this difference is not
-> >> significant.
-> >>
-> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >> ---
-> >>  arch/arm/boot/dts/ecx-common.dtsi | 10 ++++++++++
-> >>  1 file changed, 10 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
-> >> index e8559b7..f1dfc09 100644
-> >> --- a/arch/arm/boot/dts/ecx-common.dtsi
-> >> +++ b/arch/arm/boot/dts/ecx-common.dtsi
-> >> @@ -19,6 +19,16 @@
-> >>  		bootargs = "console=ttyAMA0";
-> >>  	};
-> >>  
-> >> +	psci {
-> >> +		compatible	= "arm,psci";
-> >> +		method		= "smc";
-> >> +		cpu_suspend	= <0x84000002>;
-> >> +		cpu_off		= <0x84000004>;
-> >> +		cpu_on		= <0x84000006>;
-> >> +		system_off	= <0x84000100>;
-> >> +		system_reset	= <0x84000101>;
-> >> +	};
-> >> +
-> > 
-> > I see this is somewhat beyond the original PSCI, given the addition of
-> > SYSTEM_OFF and SYSTEM_RESET, but not quite PSCI 0.2 as you don't have
-> > PSCI_VERSION.
+Hello Sebastian,
+
+On Mon, Jul 29, 2013 at 02:31:49PM +0200, Sebastian Hesselbarth wrote:
+> This patch set converts DT based Dove boards to DT probed MBus to be
+> introduced with v3.12.
 > 
-> I do actually support PSCI_VERSION. Forgot to add that to the dts.
-
-Ah, ok. Can you upgrade the compatible string to include "arm,psci-0.2"
-while you're at it?
-
+> The first two patches prepare Dove DT nodes for MBus ID remapping by using
+> preprocessor includes and adding the MBUS_ID macro. The third patch adds a
+> MBus DT node to Dove SoC dtsi with required ranges for internal MBus and
+> AXI registers, and PCIe mem and I/O apertures. The forth patch relocates
+> the nodes for the internal devices to the new MBus node. Also, internal-regs
+> ranges are updated to allow proper translation of MBus children's reg
+> properties. Finally, legacy MBus init is replaced by DT based MBus init
+> for DT based Dove.
 > 
-> > It would be nice it the compatible string were more specific here to
-> > deal with this and any implementation-specific power_state ID values.
-> > Something like "calxeda,highbank-psci", "arm,psci" ?
+> The patch set depends on the MBus device tree patches that should appear
+> in v3.12. Currently, it is based on v3.11-rc2 with Dove DT cleanup patches
+> and MBus patch set v8 applied.
 > 
-> Is that something we always want to do? You can't really know the
-> implementation quirks up front.
+> The patch set is _not_ sent to devicetree mainling list, because the MBus
+> binding will be discussed there on the MBus patches itself.
+> 
+> Sebastian Hesselbarth (5):
+>   ARM: dove: use preprocessor on device tree files
+>   ARM: dove: add MBUS_ID macro to Dove DT
+>   ARM: dove: add MBus DT node
+>   ARM: dove: relocate internal registers device nodes
 
-While we might not know the quirks up front, it'll mean that when we
-discover one we have a greater chance of being able to find out the
-presence of the quirk from an old dts.
+Great, thanks for doing this. I just have a minor suggestion
+on the patch 4/5 "ARM: dove: relocate internal registers device nodes".
 
-Thanks,
-Mark.
+Regards,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
