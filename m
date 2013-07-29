@@ -1,38 +1,31 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 29 Jul 2013 10:07:45 +0200
-Subject: [PATCH] ARM: i.MX6Q clocks: Fix CKIH clock name
-In-Reply-To: <1374908212-32008-1-git-send-email-shc_work@mail.ru>
-References: <1374908212-32008-1-git-send-email-shc_work@mail.ru>
-Message-ID: <51F622D1.5030009@de.bosch.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 29 Jul 2013 09:27:32 +0100
+Subject: Defining schemas for Device Tree
+In-Reply-To: <CAKON4OzgqH5AiOtismEGop5Y++gvu1ZVZEXhwJB3f-6_eczkqQ@mail.gmail.com>
+References: <2469263.vMN09Q7Tzi@flatron>
+ <CAKON4OzgqH5AiOtismEGop5Y++gvu1ZVZEXhwJB3f-6_eczkqQ@mail.gmail.com>
+Message-ID: <1375086452.2923.106.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.07.2013 08:56, Alexander Shiyan wrote:
-> i.MX6Q have only one High-frequency reference clock (CKIH).
-> Patch removes index from CKIH and makes name according datasheet.
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->   arch/arm/mach-imx/clk-imx6q.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 9181a24..8f2a8b5 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -292,7 +292,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->
->   	clk[dummy] = imx_clk_fixed("dummy", 0);
->   	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
-> -	clk[ckih] = imx_obtain_fixed_clock("ckih1", 0);
-> +	clk[ckih] = imx_obtain_fixed_clock("ckih", 0);
->   	clk[osc] = imx_obtain_fixed_clock("osc", 0);
->
->   	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+On Sun, 2013-07-28 at 21:30 -0400, jonsmirl at gmail.com wrote:
+> Imagine what might be possible with device trees in a few years...
+> 
+> A single kernel image can load on any embedded system. The device tree
+> sorts out all of the driver loading and tells how everything is wired
+> together. There is zero board specific code in the kernel. We're
+> getting close to this one.
 
-Just for my understanding: This is a cosmetic change, only? And doesn't 
-change any functionality? Correct?
+Weren't we doing this years ago on PowerPC? I'm sure I've heard of
+Freescale bringing up a new SoC without touching a line of kernel code.
 
-Thanks,
+-- 
+dwmw2
 
-Dirk
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/f5c1e814/attachment.bin>
