@@ -1,59 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 29 Jul 2013 08:13:22 -0500
-Subject: [PATCH 7/7] dts: calxeda: add ARM PSCI binding
-In-Reply-To: <20130729102424.GA24255@e106331-lin.cambridge.arm.com>
-References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
- <1375048598-15637-8-git-send-email-robherring2@gmail.com>
- <20130729102424.GA24255@e106331-lin.cambridge.arm.com>
-Message-ID: <51F66A72.7070209@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 29 Jul 2013 14:13:44 +0100
+Subject: [PATCH v2 01/22] [HACK] of: dev_node has struct device pointer
+In-Reply-To: <20130729.131344.1221933042559369096.hdoyu@nvidia.com>
+References: <1373021097-32420-2-git-send-email-hdoyu@nvidia.com>
+ <51E5CFBF.5080407@wwwdotorg.org>
+ <20130716231629.GA12189@dhcp-172-17-186-34.nvidia.com>
+ <20130729.131344.1221933042559369096.hdoyu@nvidia.com>
+Message-ID: <20130729131344.GB6184@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 05:24 AM, Mark Rutland wrote:
-> On Sun, Jul 28, 2013 at 10:56:38PM +0100, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Add the PSCI binding for Calxeda SOCs. The PSCI function numbers are
->> different from the DT binding example because the numbering changed in
->> revisions of the PSCI spec and are already fixed in highbank firmware.
->> Since the numbering is transparent to the kernel, this difference is not
->> significant.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->>  arch/arm/boot/dts/ecx-common.dtsi | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
->> index e8559b7..f1dfc09 100644
->> --- a/arch/arm/boot/dts/ecx-common.dtsi
->> +++ b/arch/arm/boot/dts/ecx-common.dtsi
->> @@ -19,6 +19,16 @@
->>  		bootargs = "console=ttyAMA0";
->>  	};
->>  
->> +	psci {
->> +		compatible	= "arm,psci";
->> +		method		= "smc";
->> +		cpu_suspend	= <0x84000002>;
->> +		cpu_off		= <0x84000004>;
->> +		cpu_on		= <0x84000006>;
->> +		system_off	= <0x84000100>;
->> +		system_reset	= <0x84000101>;
->> +	};
->> +
+Hi Hiroshi,
+
+On Mon, Jul 29, 2013 at 11:13:44AM +0100, Hiroshi Doyu wrote:
+> Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 17 Jul 2013 01:16:30 +0200:
 > 
-> I see this is somewhat beyond the original PSCI, given the addition of
-> SYSTEM_OFF and SYSTEM_RESET, but not quite PSCI 0.2 as you don't have
-> PSCI_VERSION.
+> > * PGP Signed by an unknown key
+> > 
+> > On Tue, Jul 16, 2013 at 04:57:03PM -0600, Stephen Warren wrote:
+> > > On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> > > > To prevent of_platform_populate() from trying to populate duplicate
+> > > > devices if a device has been already populated.
+> > > 
+> > > You need to send drivers/of patches to the DT maintainer and
+> > > devicetree-discuss mailing list.
+> > > 
+> > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > > ---
+> > > > Need to take care of early_platform_devices, or alternative solution.
+> > > 
+> > > I assume that's a TODO item... Are you planning on fleshing out this
+> > > patch to address that issue?
+> >
+> > There was some more discussion about it, which can be found in the
+> > following thread:
+> > 
+> > 	https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036934.html
+> > 
+> > That's one of the last messages and it should have most of the
+> > background. If not you may have to walk up the thread for more context.
+> > In a nutshell I raised the question as to why we can't simply call
+> > of_platform_populate() earlier and side-step all the workarounds that
+> > have found their way into the kernel to side-step the issue of their not
+> > being a struct device associated with the struct device_node.
+> 
+> This is the thread which Lorenzo started originally. He may have some
+> plan to implement/proceed with this, Lorenzo?
 
-I do actually support PSCI_VERSION. Forgot to add that to the dts.
+I was trying to raise the issue and apparently I succeeded. For now,
+I put in place yet-another-temporary-solution to the problem in one
+of the drivers I need for power management, but certainly the problem is
+not solved, and I can't allocate time to do it myself unfortunately.
 
-> It would be nice it the compatible string were more specific here to
-> deal with this and any implementation-specific power_state ID values.
-> Something like "calxeda,highbank-psci", "arm,psci" ?
+I am more than happy to review patches though.
 
-Is that something we always want to do? You can't really know the
-implementation quirks up front.
-
-Rob
+Thanks,
+Lorenzo
