@@ -1,116 +1,85 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 29 Jul 2013 14:29:06 +0200
-Subject: [PATCH 4/4] ARM: dove: add initial DT file for Globalscale D2Plug
-In-Reply-To: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1375100946-28521-5-git-send-email-sebastian.hesselbarth@gmail.com>
+From: trini@ti.com (Tom Rini)
+Date: Mon, 29 Jul 2013 08:29:24 -0400
+Subject: OMAP baseline test results for v3.10-rc6
+In-Reply-To: <alpine.DEB.2.02.1307290826180.30864@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
+ <20130625160243.GE22312@arwen.pp.htv.fi>
+ <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
+ <51C9F0A8.1050607@ti.com>
+ <alpine.DEB.2.02.1306261713260.6135@utopia.booyaka.com>
+ <51CB4C20.3060306@ti.com>
+ <alpine.DEB.2.02.1307290826180.30864@utopia.booyaka.com>
+Message-ID: <51F66024.1030804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an initial DT file for the Globalscale D2Plug with Dove SoC.
-Currently, one LED is missing and I have not been able to get SD8787 driver
-working. Those will be taken care of later.
+On 07/29/2013 04:29 AM, Paul Walmsley wrote:
+> Hi
+> 
+> On Wed, 26 Jun 2013, Tom Rini wrote:
+> 
+>> On 06/26/2013 01:19 PM, Paul Walmsley wrote:
+>>> On Tue, 25 Jun 2013, Tom Rini wrote:
+>>>
+>>>> On 06/25/2013 02:20 PM, Paul Walmsley wrote:
+>>>>
+>>>>> BeagleBone-white has the additional complication that it is not easy 
+>>>>> to automate, due to the way that power is delivered to the board, so 
+>>>>> there is an extra dimension of difficulty there.
+>>>>
+>>>> Ah-ha, I reproduced your failure.  If I make up a concat uImage + DTB,
+>>>> rather than pass them separately, it fails to boot.  If you switch to
+>>>> mainline U-Boot (v2012.10 or later) you get support for separate image +
+>>>> dtb (v2013.04 gives you bootz and zImage support).
+>>>
+>>> Yeah, I've tried to keep the original bootloader that came on the first SD 
+>>> card image that was used on that device.  But am starting to think that 
+>>> it's time to stop my bootloader independence jihad, since appended DTB 
+>>> booting is so broken - have seen similar problems on SoCs from other 
+>>> vendors as well :-(
+>>
+>> Well, me?  I'm all in favor of people using latest release of U-Boot for
+>> their board and yelling and screaming (or just reporting bugs) when
+>> things don't work.  I'm biased of course.
+> 
+> That's exactly how bootloader developers should be testing their changes.  
+> But most of the rest of us kernel folks don't want to deal with constantly 
+> replacing bootloaders, and then dealing with the inevitable bootloader 
+> regressions, when what we're really trying to test is the kernel...
+> The kernel should be completely independent of the bootloader used.  
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/Makefile        |    1 +
- arch/arm/boot/dts/dove-d2plug.dts |   69 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
- create mode 100644 arch/arm/boot/dts/dove-d2plug.dts
+And thus the chicken and egg problems we have today.  The kernel should
+be independent, but unless someone is also testing more recent U-Boots
+as well, we may or may not have more hidden clock problems.  Or if there
+is a bug in the bootloader for some particular use case, we don't find
+out until a new device ships out with broken code for that case, and now
+we're stuck for "forever".
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 641b3c9..6f10a07 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -47,6 +47,7 @@ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
- 	dove-cubox.dtb \
-+	dove-d2plug.dtb \
- 	dove-dove-db.dtb
- dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4210-smdkv310.dtb \
-diff --git a/arch/arm/boot/dts/dove-d2plug.dts b/arch/arm/boot/dts/dove-d2plug.dts
-new file mode 100644
-index 0000000..e2222ce
---- /dev/null
-+++ b/arch/arm/boot/dts/dove-d2plug.dts
-@@ -0,0 +1,69 @@
-+/dts-v1/;
-+
-+/include/ "dove.dtsi"
-+
-+/ {
-+	model = "Globalscale D2Plug";
-+	compatible = "globalscale,d2plug", "marvell,dove";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_gpio_0 &pmx_gpio_1 &pmx_gpio_2>;
-+		pinctrl-names = "default";
-+
-+		wlan-ap {
-+			label = "wlan-ap";
-+			gpios = <&gpio0 0 1>;
-+		};
-+
-+		wlan-act {
-+			label = "wlan-act";
-+			gpios = <&gpio0 1 1>;
-+		};
-+
-+		bluetooth-act {
-+			label = "bt-act";
-+			gpios = <&gpio0 2 1>;
-+		};
-+	};
-+};
-+
-+&uart0 { status = "okay"; };
-+&sata0 { status = "okay"; };
-+&i2c0 { status = "okay"; };
-+&mdio { status = "okay"; };
-+&eth { status = "okay"; };
-+
-+/* Samsung M8G2F eMMC */
-+&sdio0 {
-+	status = "okay";
-+	non-removable;
-+	bus-width = <4>;
-+};
-+
-+/* Marvell SD8787 WLAN/BT */
-+&sdio1 {
-+	status = "okay";
-+	non-removable;
-+	bus-width = <4>;
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	/* spi0.0: 4M Flash Macronix MX25L3205D */
-+	spi-flash at 0 {
-+		compatible = "st,m25l3205d";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+};
+I don't suspect what I'm going to say now will have a lot of traction,
+but I really think that much like user space, every once in a while (6
+months? year?) one ought to update their environment and make sure
+things are still working too.
+
+You folks don't need to test ever rev of U-Boot (that's my job), but it
+often feels like there's this cycle of "U-Boot sucks and can't do ... !"
+"We've had that fixed / improved / changed for years now, upgrade?" "No,
+can't / won't!".  And...
+
+>> And assuming rmk answers the way I expect he will, like it or not, the 
+>> version(s) we kit up and get in the box need to be factored into our 
+>> test system setup so if folks don't want to avail themselves of 
+>> improvements, they still get a functional system too.
+> 
+> Yep seems like a good idea from a customer service point of view.  Also 
+> most OMAP devices out there probably have locked bootloaders, so replacing 
+> the bootloader is often not an option.
+
+For shipping consumer product, or however you want to call those kind of
+devices, yes, appended dtb needs to work since the bootloader is locked,
+and making that boot something else to boot the kernel is an exercise
+for us oddballs :)  But the boards which are designed as reference
+platform, we can make your lives easier, if you let us help.  If
+something is a pain to do, give us feedback.
+
 -- 
-1.7.10.4
+Tom
