@@ -1,37 +1,50 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 29 Jul 2013 12:28:24 +0200
-Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
-In-Reply-To: <51F640AB.2050709@arm.com>
-References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
- <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
- <51F640AB.2050709@arm.com>
-Message-ID: <CAKfTPtDBJUy6smFuACjQNVywQUiQs_iPMFs9T6uCwJOX5f7e8w@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 29 Jul 2013 12:31:55 +0200
+Subject: [PATCH v2 21/22] iommu/tegra: smmu: Support Multiple ASID
+In-Reply-To: <51E8535A.30605@wwwdotorg.org>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-22-git-send-email-hdoyu@nvidia.com><51E8535A.30605@wwwdotorg.org>
+Message-ID: <20130729.133155.1836775489422797370.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2013 12:15, Sudeep KarkadaNagesha
-<Sudeep.KarkadaNagesha@arm.com> wrote:
-> On 29/07/13 10:46, Vincent Guittot wrote:
->> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>> Power aware scheduling needs the cpu topology information to improve the
->>> cpu scheduler decision making.
->>
->> It's not only power aware scheduling. The scheduler already uses
->> topology and cache sharing when  CONFIG_SCHED_MC and/or
->> CONFIG_SCHED_SMT are enable. So you should also add these configs for
->> arm64 so the scheduler can use it
->>
-> Just for my knowledge, I thought power aware using SCHED_MC/SMT was
-> removed. I see commit 8e7fbcbc22c12414bcc9dfdd683637f58fb32759 "sched:
-> Remove stale power aware scheduling remnants and dysfunctional knobs"
-> I may be missing something here.
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 18 Jul 2013 22:43:06 +0200:
 
-It's a common mistake to mixed SCHED_MC and powersaving balance with
-SCHED_MC. Only the powersaving policy has been removed but the
-SCHED_MC and SCHED_SMT are always in the scheduler and gives perf
-improvement on arm 32bits
+> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+> > Support Multiple Address Space(AS). Tegra SMMU can have multiple
+> > ASes. We reserve 2 of them for static assignment, AS[0] for system
+> > default, AS[1] for AHB clusters as protected domain from others, where
+> > there are many traditional pheripheral devices like USB, SD/MMC. They
+> > should be isolated from some smart devices like host1x for system
+> > robustness. Even if smart devices behaves wrongly, the traditional
+> > devices(SD/MMC, USB) wouldn't be affected, and the system could
+> > continue most likely.
+> 
+> > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+> 
+> >  static int smmu_iommu_add_device(struct device *dev)
+> >  {
+> >  	int err;
+> > -	struct dma_iommu_mapping *map = smmu_handle->map[SYSTEM_DEFAULT];
+> > +	u64 swgroup;
+> > +	struct dma_iommu_mapping *map = NULL;
+> > +
+> > +	swgroup = smmu_of_get_memory_client(dev);
+> > +	switch (swgroup) {
+> > +	case TEGRA_SWGROUP_BIT(PPCS):
+> > +		map = smmu_handle->map[SYSTEM_PROTECTED];
+> > +		break;
+> > +	default:
+> > +		map = smmu_handle->map[SYSTEM_DEFAULT];
+> 
+> I already mentioned this, but just for completeness: What is
+> smmu->num_as <= SYSTEM_DEFAULT?
 
->
-> Regards,
-> Sudeep
->
+I think that this belongs to the system operation policy. Which H/W
+should be configured to which Address Space(AS). This put all AHB
+clients(PPCS) into AS[1](SYSTEM_PROTECTED), and the rest into
+AS[0](SYSTEM_DEFAULT). AHB clients are mainly traditional H/Ws like
+USB and SD/MMC so that they should be kept separated from the smart
+IOMMU clients like host1x.
+
+Is there any place to configure this kind of board specific policy
+rather than here?
