@@ -1,61 +1,39 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Mon, 29 Jul 2013 15:10:31 +0200
-Subject: [PATCH v4 0/6] ARM: rockchip: add smp functionality
-Message-ID: <201307291510.31679.heiko@sntech.de>
+Date: Mon, 29 Jul 2013 15:11:20 +0200
+Subject: [PATCH v4 1/6] misc: sram: fix error path in sram_probe
+In-Reply-To: <201307291510.31679.heiko@sntech.de>
+References: <201307291510.31679.heiko@sntech.de>
+Message-ID: <201307291511.21067.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables the use of the additional cores on Rockchip
-Cortex-A9 SoCs.
+The pool is created thru devm_gen_pool_create, so the call to
+gen_pool_destroy is not necessary.
+Instead the sram-clock must be turned off again if it exists.
 
-To achieve this, add the scu, the needed sram and power-management-unit.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Only included for reference and completeness, as it is already
+added to the char-misc git tree.
 
-Tested on a rk3066a (dual core) by me and on a rk3188 (quad core)
-by Ulrich Prinz.
+ drivers/misc/sram.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-(Note: rk3188 support in general needs additional upcoming patchsets)
-
-changes since v3:
-- address comments from Rob Herring:
-  - split the gathering of the reserve-data into a separate loop
-  - spelling and style fixes
-- first patch only included for reference, already part of the
-  char-misc git tree
-
-changes since v2:
-- rework the sram allocation following the suggestion from Philipp Zabel
-
-changes since v1:
-- add reserved block feature for mmio-sram, to not use two logical
-  sram nodes
-- the sram content is kept intact while the device is running, so
-  copying the trampoline is only needed once
-
-Heiko Stuebner (6):
-  misc: sram: fix error path in sram_probe
-  misc: sram: add ability to mark sram sections as reserved
-  ARM: rockchip: add snoop-control-unit
-  ARM: rockchip: add sram dt nodes and documentation
-  ARM: rockchip: add power-management-unit dt node
-  ARM: rockchip: add smp bringup code
-
- .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
- .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 +++
- Documentation/devicetree/bindings/misc/sram.txt    |    8 +
- arch/arm/boot/dts/rk3066a.dtsi                     |   16 ++
- arch/arm/mach-rockchip/Kconfig                     |    1 +
- arch/arm/mach-rockchip/Makefile                    |    1 +
- arch/arm/mach-rockchip/core.h                      |   22 +++
- arch/arm/mach-rockchip/headsmp.S                   |   32 +++
- arch/arm/mach-rockchip/platsmp.c                   |  203 ++++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c                  |    2 +
- drivers/misc/sram.c                                |  100 +++++++++-
- 11 files changed, 417 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
- create mode 100644 arch/arm/mach-rockchip/core.h
- create mode 100644 arch/arm/mach-rockchip/headsmp.S
- create mode 100644 arch/arm/mach-rockchip/platsmp.c
-
+diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+index d87cc91..afe66571 100644
+--- a/drivers/misc/sram.c
++++ b/drivers/misc/sram.c
+@@ -68,7 +68,8 @@ static int sram_probe(struct platform_device *pdev)
+ 	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+ 				res->start, size, -1);
+ 	if (ret < 0) {
+-		gen_pool_destroy(sram->pool);
++		if (sram->clk)
++			clk_disable_unprepare(sram->clk);
+ 		return ret;
+ 	}
+ 
 -- 
 1.7.10.4
