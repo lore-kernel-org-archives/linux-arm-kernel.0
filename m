@@ -1,43 +1,50 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 29 Jul 2013 20:38:52 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130729073123.GB1441@lukather>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 29 Jul 2013 12:40:48 -0600
+Subject: DT bindings as ABI [was: Do we have people interested in device
+ tree janitoring / cleanup?]
+In-Reply-To: <20130729181607.GM24642@n2100.arm.linux.org.uk>
 References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1441731.8CGUI1tUxh@flatron> <20130728085650.GA4683@netboy>
- <1416484.XDfk5G56BI@flatron> <20130728131901.GA8864@netboy>
- <20130729073123.GB1441@lukather>
-Message-ID: <20130729183851.GB4209@netboy>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726045433.GB4100@netboy>
+ <20130726171524.GB28895@obsidianresearch.com>
+ <20130727084825.GA4707@netboy>
+ <20130729175400.GB15861@obsidianresearch.com>
+ <20130729181607.GM24642@n2100.arm.linux.org.uk>
+Message-ID: <20130729184048.GE15861@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 09:31:23AM +0200, Maxime Ripard wrote:
-> 
-> I'm afraid this kind of use case will never be properly supported, DT
-> stable ABI or not.
-> 
-> Think about this: what kernel will actually be shipped in that board?
-> Most likely, it will be a BSP kernel from the vendor. Does the vendor
-> will have made that commitment to have a stable ABI for the DT? Will it
-> use the same bindings than mainline? Do we want to support all the crazy
-> bindings every vendor will come up with?
-> 
-> I'm afraid the answer to these three questions will most of the time be
-> "no.".
+On Mon, Jul 29, 2013 at 07:16:07PM +0100, Russell King - ARM Linux wrote:
 
-Yes, I know, and it is sad but true.
- 
-We can't stop the vendors from shipping half-baked BSPs. I really
-don't mind that they do that. After all, they want to get *something*
-working when they launch their chips.
+> What does it take?  Good practice, care, thought and planning.  All
+> the qualities which should already be present for kernel _engineers_.
+> Not an "lets create something for me, I don't care about anyone else"
+> attitude.
 
-> That doesn't mean we shouldn't aim for *mainline* having a stable DT
-> ABI, but that kind of use case doesn't seem very realistic to me.
+I agree with what you've written, but we are looking at this from
+different ends of the problem.
 
-Right, we can and should do better. I got the beaglebone Ethernet
-working in mainline (not by writing the driver, but by complaining
-over and over again). I except that it will continue to work and not
-fall victim to some random DT change.
+I fully agree you can create a main line kernel GIT tree that has a
+stable DT ABI.
 
-Thanks,
-Richard
+However, I as an ODM, with time pressure, cannot wait for the kernel
+folks to finish this work. So from my perspective the DT will not be
+stable, as I will put whatever interm stuff I choose to have a
+shippable product.
+
+Thus I have to design my systems for an unstable DT, and the message
+from the kernel community to people in my posistion should be:
+
+  When you ship early with non-mainlined DT schema, design your boot
+  system around an unstable DT. Plan to migrate your DT to upstream
+  once it becomes finalized.
+
+Here is the rub: Once I design for an unstable DT I simply don't
+derive value from the kernel communities work to create a stable DT.
+
+So who is getting the benefit of this work, and is it worth the cost?
+
+Jason
