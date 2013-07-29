@@ -1,22 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 29 Jul 2013 20:45:20 +0200
-Subject: [PATCH 4/4] ARM: dove: add initial DT file for Globalscale D2Plug
-In-Reply-To: <1375100946-28521-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1375100946-28521-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130729184520.GI24782@lunn.ch>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 29 Jul 2013 20:51:02 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130729183851.GB4209@netboy>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1441731.8CGUI1tUxh@flatron> <20130728085650.GA4683@netboy>
+ <1416484.XDfk5G56BI@flatron> <20130728131901.GA8864@netboy>
+ <20130729073123.GB1441@lukather> <20130729183851.GB4209@netboy>
+Message-ID: <20130729185100.GC4209@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 02:29:06PM +0200, Sebastian Hesselbarth wrote:
-> This adds an initial DT file for the Globalscale D2Plug with Dove SoC.
-> Currently, one LED is missing and I have not been able to get SD8787 driver
-> working. Those will be taken care of later.
+On Mon, Jul 29, 2013 at 08:38:52PM +0200, Richard Cochran wrote:
+> 
+> Right, we can and should do better. I got the beaglebone Ethernet
+> working in mainline (not by writing the driver, but by complaining
+> over and over again). I except that it will continue to work and not
+                          ^^^^^^
+expect
 
-Hi Sebastion
+> fall victim to some random DT change.
 
-I took a hard look at SDIO and failed to get it working when doing
-DMA. Polled IO does however work. I guess we need some help from
-Marvell engineers before we get stable SDIO with DMA.
-
-	Andrew
+Thanks,
+Richard
