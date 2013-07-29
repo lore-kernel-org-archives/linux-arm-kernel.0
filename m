@@ -1,28 +1,274 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 29 Jul 2013 13:06:46 +0200
-Subject: [PATCH v2 05/22] ARM: dt: tegra30: iommu: Add
- "nvidia,memory-client"
-In-Reply-To: <51E5D3D9.2090608@wwwdotorg.org>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-6-git-send-email-hdoyu@nvidia.com><51E5D3D9.2090608@wwwdotorg.org>
-Message-ID: <20130729.140646.649065361266278007.hdoyu@nvidia.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 29 Jul 2013 04:05:52 -0700
+Subject: [PATCH v5] watchdog: Add MOXA ART watchdog driver
+In-Reply-To: <1375093215-7136-1-git-send-email-jonas.jensen@gmail.com>
+References: <1374229402-20432-1-git-send-email-jonas.jensen@gmail.com>
+ <1375093215-7136-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <51F64C90.4080400@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 17 Jul 2013 01:14:33 +0200:
+On 07/29/2013 03:20 AM, Jonas Jensen wrote:
+> Add watchdog driver for MOXA ART SoCs.
+>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+>
+> Notes:
+>      Changes since v4:
+>
+>      1. #include <linux/err.h> because IS_ERR comes from there
+>      2. #include <linux/kernel.h> because UINT_MAX comes from there
+>      3. #include <linux/moduleparam.h> because module_param() comes from there
+>
+>      device tree bindings document:
+>      4. describe compatible variable "Must be" instead of "Should be".
+>      5. change description so it's from the point of view of the device
+>
+>      Applies to next-20130729
+>
+>   .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
+>   drivers/watchdog/Kconfig                           |  10 ++
+>   drivers/watchdog/Makefile                          |   1 +
+>   drivers/watchdog/moxart_wdt.c                      | 169 +++++++++++++++++++++
+>   4 files changed, 195 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+>   create mode 100644 drivers/watchdog/moxart_wdt.c
+>
+> diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+> new file mode 100644
+> index 0000000..1169857
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+> @@ -0,0 +1,15 @@
+> +MOXA ART Watchdog timer
+> +
+> +Required properties:
+> +
+> +- compatible : Must be "moxa,moxart-watchdog"
+> +- reg : Should contain registers location and length
+> +- clocks : Should contain phandle for the clock that drives the counter
+> +
+> +Example:
+> +
+> +	watchdog: watchdog at 98500000 {
+> +		compatible = "moxa,moxart-watchdog";
+> +		reg = <0x98500000 0x10>;
+> +		clocks = <&coreclk>;
+> +	};
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 362085d..6883aab 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -382,6 +382,16 @@ config RETU_WATCHDOG
+>   	  To compile this driver as a module, choose M here: the
+>   	  module will be called retu_wdt.
+>
+> +config MOXART_WDT
+> +	tristate "MOXART watchdog"
+> +	depends on ARCH_MOXART
+> +	help
+> +	  Say Y here to include Watchdog timer support for the watchdog
+> +	  existing on the MOXA ART SoC series platforms.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called moxart_wdt.
+> +
+>   # AVR32 Architecture
+>
+>   config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 2f26a0b..7cab53a 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+>   obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+>   obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
+>   obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
+> +obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
+>
+>   # AVR32 Architecture
+>   obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
+> new file mode 100644
+> index 0000000..d79dc9c
+> --- /dev/null
+> +++ b/drivers/watchdog/moxart_wdt.c
+> @@ -0,0 +1,169 @@
+> +/*
+> + * MOXA ART SoCs watchdog driver.
+> + *
+> + * Copyright (C) 2013 Jonas Jensen
+> + *
+> + * Jonas Jensen <jonas.jensen@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/err.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/watchdog.h>
+> +#include <linux/moduleparam.h>
+> +
+> +#define REG_COUNT			0x4
+> +#define REG_MODE			0x8
+> +#define REG_ENABLE			0xC
+> +
+> +struct moxart_wdt_dev {
+> +	struct watchdog_device dev;
+> +	void __iomem *base;
+> +	unsigned int clock_frequency;
+> +};
+> +
+> +static int heartbeat;
+> +
+> +static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
+> +{
+> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
+> +
+> +	writel(0, moxart_wdt->base + REG_ENABLE);
+> +
+> +	return 0;
+> +}
+> +
+> +static int moxart_wdt_start(struct watchdog_device *wdt_dev)
+> +{
+> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
+> +
+> +	writel(moxart_wdt->clock_frequency * moxart_wdt->dev.timeout,
+> +	       moxart_wdt->base + REG_COUNT);
+> +	writel(0x5ab9, moxart_wdt->base + REG_MODE);
+> +	writel(0x03, moxart_wdt->base + REG_ENABLE);
+> +
+> +	return 0;
+> +}
+> +
+> +static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
+> +				  unsigned int timeout)
+> +{
+> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
+> +
+> +	dev_dbg(wdt_dev->dev, "%s: timeout=%u\n", __func__, timeout);
+> +
+> +	moxart_wdt->dev.timeout = timeout;
+> +
+Stumbled over this one. Unless I am missing something, &moxart_wdt->dev
+and dev are the same, so
+	dev->timeout = timeout;
+would accomplish the same.
 
-> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> > Add "nvidia,memory-client" to identify which swgroup ID a device
-> > belongs to.
-> 
-> This property also isn't in the documentation.
-> 
-> Again, if client devices are required to have this new property, the DT
-> isn't backwards-compatible; fail:-(
+Guenter
 
-If there's no this property, just falling back to use the system
-default address space. I think that this won't break the
-compatibility basically. Only problem may be the inconsistency of
-setting this property among the HWs in the same group. If one of them
-is set in one AS, but not for the other, then the other H/W won't
-work. If we really want to have this kind of constraint implmeneted in
-DT, some kind of bus model is needed.
+> +	return 0;
+> +}
+> +
+> +static const struct watchdog_info moxart_wdt_info = {
+> +	.identity       = "moxart-wdt",
+> +	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
+> +			  WDIOF_MAGICCLOSE,
+> +};
+> +
+> +static const struct watchdog_ops moxart_wdt_ops = {
+> +	.owner          = THIS_MODULE,
+> +	.start          = moxart_wdt_start,
+> +	.stop           = moxart_wdt_stop,
+> +	.set_timeout    = moxart_wdt_set_timeout,
+> +};
+> +
+> +static int moxart_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct moxart_wdt_dev *moxart_wdt;
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	struct resource *res;
+> +	struct clk *clk;
+> +	int err;
+> +	unsigned int max_timeout;
+> +	bool nowayout = WATCHDOG_NOWAYOUT;
+> +
+> +	moxart_wdt = devm_kzalloc(&pdev->dev, sizeof(*moxart_wdt), GFP_KERNEL);
+> +	if (!moxart_wdt)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, moxart_wdt);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	moxart_wdt->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(moxart_wdt->base))
+> +		return PTR_ERR(moxart_wdt->base);
+> +
+> +	clk = of_clk_get(node, 0);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: of_clk_get failed\n", __func__);
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	moxart_wdt->clock_frequency = clk_get_rate(clk);
+> +	if (moxart_wdt->clock_frequency == 0) {
+> +		pr_err("%s: incorrect clock frequency\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
+> +
+> +	moxart_wdt->dev.info = &moxart_wdt_info;
+> +	moxart_wdt->dev.ops = &moxart_wdt_ops;
+> +	moxart_wdt->dev.timeout = max_timeout;
+> +	moxart_wdt->dev.min_timeout = 1;
+> +	moxart_wdt->dev.max_timeout = max_timeout;
+> +	moxart_wdt->dev.parent = &pdev->dev;
+> +
+> +	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, &pdev->dev);
+> +	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
+> +
+> +	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
+> +
+> +	err = watchdog_register_device(&moxart_wdt->dev);
+> +	if (unlikely(err))
+> +		return err;
+> +
+> +	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
+> +		moxart_wdt->dev.timeout, nowayout);
+> +
+> +	return 0;
+> +}
+> +
+> +static int moxart_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
+> +
+> +	moxart_wdt_stop(&moxart_wdt->dev);
+> +	watchdog_unregister_device(&moxart_wdt->dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id moxart_watchdog_match[] = {
+> +	{ .compatible = "moxa,moxart-watchdog" },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver moxart_wdt_driver = {
+> +	.probe      = moxart_wdt_probe,
+> +	.remove     = moxart_wdt_remove,
+> +	.driver     = {
+> +		.name		= "moxart-watchdog",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= moxart_watchdog_match,
+> +	},
+> +};
+> +module_platform_driver(moxart_wdt_driver);
+> +
+> +module_param(heartbeat, int, 0);
+> +MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
+> +
+> +MODULE_DESCRIPTION("MOXART watchdog driver");
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+>
