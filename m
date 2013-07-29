@@ -1,48 +1,63 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Mon, 29 Jul 2013 09:44:30 +0100
-Subject: Requirements for FDT load address on ARM
-In-Reply-To: <alpine.LFD.2.03.1307241625190.15022@syhkavp.arg>
-References: <1374677923.6623.194.camel@hastur.hellion.org.uk>
- <alpine.LFD.2.03.1307241116200.15022@syhkavp.arg>
- <1374690705.30195.18.camel@hastur.hellion.org.uk>
- <alpine.LFD.2.03.1307241625190.15022@syhkavp.arg>
-Message-ID: <1375087470.14896.14.camel@kazak.uk.xensource.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Jul 2013 01:50:21 -0700
+Subject: [PATCH 2/4] pinctrl: single: Add hardware specific hooks for
+ IRQ and GPIO wake-up events
+In-Reply-To: <CACRpkdZNGHRJX3_HRCAfKgrRGLMVbqNzFBfu7wP-3YrhOUESkw@mail.gmail.com>
+References: <20130607203936.16513.57494.stgit@localhost>
+ <20130607205040.16513.36794.stgit@localhost>
+ <CAN1soZznJ1YxWhaFZ4rhQx+uk3aCigAcVeuLpOU+3oPzmfXF6w@mail.gmail.com>
+ <20130610153637.GK8164@atomide.com>
+ <CACRpkdZNGHRJX3_HRCAfKgrRGLMVbqNzFBfu7wP-3YrhOUESkw@mail.gmail.com>
+Message-ID: <20130729085020.GV7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-07-24 at 17:27 -0400, Nicolas Pitre wrote:
-> On Wed, 24 Jul 2013, Ian Campbell wrote:
+* Linus Walleij <linus.walleij@linaro.org> [130722 14:50]:
+> On Mon, Jun 10, 2013 at 5:36 PM, Tony Lindgren <tony@atomide.com> wrote:
 > 
-> > On Wed, 2013-07-24 at 11:24 -0400, Nicolas Pitre wrote:
-> > > On Wed, 24 Jul 2013, Ian Campbell wrote:
-> > > 
-> > > > [apologies if this is a repeat, I don't see it in the archives and at
-> > > > least one CC'd recipient (Julien) didn't receive it either. Beasties in
-> > > > our email server I expect...]
-> > > > 
-> > > > Are there any requirements about where the FDT may be loaded by the
-> > > > bootloader?
-> > > 
-> > > It must be located where it is unlikely to be overwritten by the zImage 
-> > > decompressor relocating itself.  Same goes for the initrd.
-> > 
-> > Right. That's a bit hard to determine programmaticaly from a bootloader
-> > though :-(
+> > At least on omaps, each board typically has at least one device
+> > configured as wake-up capable from deeper idle modes. In the
+> > deeper idle modes the normal interrupt wake-up path won't work
+> > as the logic is powered off and separate wake-up hardware is
+> > available either via IO ring or GPIO hardware.
 > 
-> Well... The kernel has to be loaded in the first 128MB of RAM for the 
-> automatic RAM location to work.  So you simply have to load the ftd and 
-> initrd sequentially above the 128MB mark.  The kernel cannot grow above 
-> 16MB in size or we lose the ability to link modules without far calls, 
-> or 32MB for the kernel itself after wich the kernel itself doesn't link.  
-> This means the decompressor will never relocate anything above the 128MB 
-> mark in any case.
+> What I do not understand is why the irq_set_wake() should
+> not fall through to that IO ring / GPIO hardware.
 
-Thanks, that's good info, I shall incorporate it in some way into the
-patch (which I'll write as soon as I deal with this post-travel email
-backlog!)
+That certainly makes sense.
 
-> In practice this limit can even be lowered to 64MB.
+> For example: a composite GPIO+irqchip driver should surely
+> set the wake up for a certain line for irq_set_wake()?
 
-I like 128M, nice and conservative ;-)
+Yes we might be able to make it all transparent to consumer
+drivers. Although irq_set_wake() is for suspend/resume only
+AFAIK, but ideally we would not have to configure anything
+from the consumer drivers for runtime PM.
 
-Ian.
+For the GPIO wake-up events, GPIO + irqchip driver is not
+enough as we also need the mapping between pinctrl registers
+and GPIO numbers. And to stay out of the database business,
+that mapping should ideally come from device tree as it's
+only needed for the pins used, not for all hundreds of pins
+on a SoC.
+ 
+> > The wake-up
+> > event can be device specific, or may need to be dynamically
+> > remuxed to GPIO input for wake-up events. When the wake-up
+> > event happens, it's IRQ need to be called so the device won't
+> > lose interrupts.
+> 
+> I recognize this hardware type. The name I use for these
+> things are "latent interrupts".
+
+OK
+ 
+> What I think is that they should maybe be modeled as
+> irqchip from end to end, so that we don't orthogonally use
+> any pinctrl states to set this up.
+
+OK I'll take a look.
+
+Regards,
+
+Tony
