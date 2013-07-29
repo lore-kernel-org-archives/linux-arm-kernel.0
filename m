@@ -1,46 +1,123 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 29 Jul 2013 10:00:01 +0200
-Subject: [PATCH v2 00/42] ARM: at91: move to common clk framework
-In-Reply-To: <51F2A556.8020109@overkiz.com>
-References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
- <51F28370.6050304@gmail.com> <51F2996B.6000406@overkiz.com>
- <51F2A556.8020109@overkiz.com>
-Message-ID: <CACQ1gAgw-v3z_sWcsk7SqFFW-ERLjS0RS5GTgAdd5Y1tj3Z1FA@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 29 Jul 2013 09:01:41 +0100
+Subject: [PATCH 1/4] ARM: kprobes: fix instruction fetch order with
+ <asm/opcodes.h>
+In-Reply-To: <1374786537-10726-2-git-send-email-ben.dooks@codethink.co.uk>
+References: <1374786537-10726-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1374786537-10726-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1375084901.3521.3.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/26 boris brezillon <b.brezillon@overkiz.com>:
-> On 26/07/2013 17:44, boris brezillon wrote:
-> I found 2 bugs:
-> 1) the main frequency ready test in recalc_rate function is wrong
-> 2) the common clk framework uses the first match for dt clk registration
->    and main clk has this compatible property:
->    compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
->    As a result the main clk is always bound to the fixed-clock driver
->    which set the clock frequency to 0 if 'clock-frequency' property is
->    missing.
->
-> These bugs will be fixed in next version.
-> Tell me if you want need thesse patches for testing purpose.
+On Thu, 2013-07-25 at 22:08 +0100, Ben Dooks wrote:
+> If we are running BE8, the data and instruction endian-ness do not
+> match, so use <asm/opcodes.h> to correctly translate memory accesses
+> into ARM instructions.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>y
+> ---
+>  arch/arm/kernel/kprobes-common.c |   14 ++++++++------
+>  arch/arm/kernel/kprobes.c        |    9 +++++----
+>  2 files changed, 13 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
+> index 18a7628..c0b202e 100644
+> --- a/arch/arm/kernel/kprobes-common.c
+> +++ b/arch/arm/kernel/kprobes-common.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/kprobes.h>
+>  #include <asm/system_info.h>
+> +#include <asm/opcodes.h>
+>  
+>  #include "kprobes.h"
+>  
+> @@ -305,7 +306,8 @@ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+>  
+>  	if (handler) {
+>  		/* We can emulate the instruction in (possibly) modified form */
+> -		asi->insn[0] = (insn & 0xfff00000) | (rn << 16) | reglist;
+> +		asi->insn[0] = __opcode_to_mem_arm((insn & 0xfff00000) |
+> +						   (rn << 16) | reglist);
+>  		asi->insn_handler = handler;
+>  		return INSN_GOOD;
+>  	}
+> @@ -338,9 +340,9 @@ prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>  		thumb_insn[2] = 0x4770; /* Thumb bx lr */
 
-Hi Boris,
+The line above and the one before it not in this diff also need fixing
+by changing to __opcode_to_mem_thumb16(0x4770).
 
-I tested your patch, the clock is not at 0 anymore:
-AT91: PIT: mck rate = 8333333
+>  		return insn;
+>  	}
+> -	asi->insn[1] = 0xe12fff1e; /* ARM bx lr */
+> +	asi->insn[1] = __opcode_to_mem_arm(0xe12fff1e); /* ARM bx lr */
+>  #else
+> -	asi->insn[1] = 0xe1a0f00e; /* mov pc, lr */
+> +	asi->insn[1] = __opcode_to_mem_arm(0xe1a0f00e); /* mov pc, lr */
+>  #endif
+>  	/* Make an ARM instruction unconditional */
+>  	if (insn < 0xe0000000)
+> @@ -360,12 +362,12 @@ set_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>  	if (thumb) {
+>  		u16 *ip = (u16 *)asi->insn;
+>  		if (is_wide_instruction(insn))
+> -			*ip++ = insn >> 16;
+> -		*ip++ = insn;
+> +			*ip++ = ___asm_opcode_to_mem_thumb16(insn >> 16);
+> +		*ip++ = ___asm_opcode_to_mem_thumb16(insn);
 
-And it's booting correctly.
-There's a small bug I found in the at91sam9x5 dtsi file (ssc id is 28,
-not 27). (patch attached)
 
-And yes, I could use your patches for some more tests !
+Should these two ___asm_opcode_thumb32_compose() not be
+__opcode_thumb32_compose() ?
 
-Thanks,
+>  		return;
+>  	}
+>  #endif
+> -	asi->insn[0] = insn;
+> +	asi->insn[0] = __opcode_to_mem_arm(insn);
+>  }
+>  
+>  /*
+> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+> index 170e9f3..3775af1 100644
+> --- a/arch/arm/kernel/kprobes.c
+> +++ b/arch/arm/kernel/kprobes.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/stop_machine.h>
+>  #include <linux/stringify.h>
+>  #include <asm/traps.h>
+> +#include <asm/opcodes.h>
+>  #include <asm/cacheflush.h>
+>  
+>  #include "kprobes.h"
+> @@ -62,10 +63,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  	thumb = true;
+>  	addr &= ~1; /* Bit 0 would normally be set to indicate Thumb code */
+> -	insn = ((u16 *)addr)[0];
+> +	insn = __mem_to_opcode_thumb16(((u16 *)addr)[0]);
+>  	if (is_wide_instruction(insn)) {
+> -		insn <<= 16;
+> -		insn |= ((u16 *)addr)[1];
+> +		u16 inst2 = __mem_to_opcode_thumb16(((u16 *)addr)[1]);
+> +		insn = ___asm_opcode_thumb32_compose(insn, inst2);
 
-Richard.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-at91-dt-at91sam9x5-fix-wrong-SSC-clock-ID.patch
-Type: application/octet-stream
-Size: 769 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/d3e6ee98/attachment.obj>
+Again, __opcode_thumb32_compose instead of
+___asm_opcode_thumb32_compose
+
+>  		decode_insn = thumb32_kprobe_decode_insn;
+>  	} else
+>  		decode_insn = thumb16_kprobe_decode_insn;
+> @@ -73,7 +74,7 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  	thumb = false;
+>  	if (addr & 0x3)
+>  		return -EINVAL;
+> -	insn = *p->addr;
+> +	insn = __mem_to_opcode_arm(*p->addr);
+>  	decode_insn = arm_kprobe_decode_insn;
+>  #endif
+>  
+
+-- 
+Tixy
