@@ -1,85 +1,70 @@
-From: trini@ti.com (Tom Rini)
-Date: Mon, 29 Jul 2013 08:29:24 -0400
-Subject: OMAP baseline test results for v3.10-rc6
-In-Reply-To: <alpine.DEB.2.02.1307290826180.30864@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306170521020.9909@utopia.booyaka.com>
- <20130625160243.GE22312@arwen.pp.htv.fi>
- <alpine.DEB.2.02.1306251746060.14373@utopia.booyaka.com>
- <51C9F0A8.1050607@ti.com>
- <alpine.DEB.2.02.1306261713260.6135@utopia.booyaka.com>
- <51CB4C20.3060306@ti.com>
- <alpine.DEB.2.02.1307290826180.30864@utopia.booyaka.com>
-Message-ID: <51F66024.1030804@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Jul 2013 14:30:16 +0200
+Subject: [PATCH v2 0/4] Add PWM polarity flag macro for DT
+In-Reply-To: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1374101664-21112-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20130729123015.GF23152@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 04:29 AM, Paul Walmsley wrote:
-> Hi
+On Thu, Jul 18, 2013 at 12:54:20AM +0200, Laurent Pinchart wrote:
+> Hello,
 > 
-> On Wed, 26 Jun 2013, Tom Rini wrote:
+> Here's a small patch set that replaces PWM polarity numerical constants with
+> macros in DT.
 > 
->> On 06/26/2013 01:19 PM, Paul Walmsley wrote:
->>> On Tue, 25 Jun 2013, Tom Rini wrote:
->>>
->>>> On 06/25/2013 02:20 PM, Paul Walmsley wrote:
->>>>
->>>>> BeagleBone-white has the additional complication that it is not easy 
->>>>> to automate, due to the way that power is delivered to the board, so 
->>>>> there is an extra dimension of difficulty there.
->>>>
->>>> Ah-ha, I reproduced your failure.  If I make up a concat uImage + DTB,
->>>> rather than pass them separately, it fails to boot.  If you switch to
->>>> mainline U-Boot (v2012.10 or later) you get support for separate image +
->>>> dtb (v2013.04 gives you bootz and zImage support).
->>>
->>> Yeah, I've tried to keep the original bootloader that came on the first SD 
->>> card image that was used on that device.  But am starting to think that 
->>> it's time to stop my bootloader independence jihad, since appended DTB 
->>> booting is so broken - have seen similar problems on SoCs from other 
->>> vendors as well :-(
->>
->> Well, me?  I'm all in favor of people using latest release of U-Boot for
->> their board and yelling and screaming (or just reporting bugs) when
->> things don't work.  I'm biased of course.
+> The series is the result of splitting the original patch into four patches
+> that
 > 
-> That's exactly how bootloader developers should be testing their changes.  
-> But most of the rest of us kernel folks don't want to deal with constantly 
-> replacing bootloaders, and then dealing with the inevitable bootloader 
-> regressions, when what we're really trying to test is the kernel...
-> The kernel should be completely independent of the bootloader used.  
-
-And thus the chicken and egg problems we have today.  The kernel should
-be independent, but unless someone is also testing more recent U-Boots
-as well, we may or may not have more hidden clock problems.  Or if there
-is a bug in the bootloader for some particular use case, we don't find
-out until a new device ships out with broken code for that case, and now
-we're stuck for "forever".
-
-I don't suspect what I'm going to say now will have a lot of traction,
-but I really think that much like user space, every once in a while (6
-months? year?) one ought to update their environment and make sure
-things are still working too.
-
-You folks don't need to test ever rev of U-Boot (that's my job), but it
-often feels like there's this cycle of "U-Boot sucks and can't do ... !"
-"We've had that fixed / improved / changed for years now, upgrade?" "No,
-can't / won't!".  And...
-
->> And assuming rmk answers the way I expect he will, like it or not, the 
->> version(s) we kit up and get in the box need to be factored into our 
->> test system setup so if folks don't want to avail themselves of 
->> improvements, they still get a functional system too.
+> - add the flag macro (both in a header file and in the PWM DT binding core
+>   documentation)
+> - use the macro in the PWM core code
+> - update existing DT bindings to refer to the PWM DT bindings core
+>   documentation
+> - update existing DT sources to use the new macro
 > 
-> Yep seems like a good idea from a customer service point of view.  Also 
-> most OMAP devices out there probably have locked bootloaders, so replacing 
-> the bootloader is often not an option.
+> I believe I've taken all comments received so far into account. Most notable
+> changes include
+> 
+> - splitting the original patch
+> - removing the PWM_POLARITY_NORMAL flag, which wasn't a flag but was defined
+>   as 0
+> - renaming the PWM_POLARITY_INVERSED DT flag to PWM_POLARITY_INVERTED
+> - not relying on DT flags and PWM C flags having identical names and values
+> 
+> Laurent Pinchart (4):
+>   pwm: Add PWM polarity flag macro for DT
+>   pwm: Use the DT macro directly when parsing PWM DT flags
+>   pwm: Update DT bindings to reference pwm.txt for cells documentation
+>   ARM: dts: Use the PWM polarity flags
+> 
+>  Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt    |  8 +++-----
+>  Documentation/devicetree/bindings/pwm/imx-pwm.txt          |  4 ++--
+>  Documentation/devicetree/bindings/pwm/mxs-pwm.txt          |  4 ++--
+>  .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt         |  5 ++---
+>  Documentation/devicetree/bindings/pwm/nxp,pca9685-pwm.txt  |  4 ++--
+>  Documentation/devicetree/bindings/pwm/pwm-samsung.txt      | 10 +++-------
+>  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt       |  8 +++-----
+>  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt     |  8 +++-----
+>  Documentation/devicetree/bindings/pwm/pwm.txt              |  7 ++++---
+>  Documentation/devicetree/bindings/pwm/spear-pwm.txt        |  5 ++---
+>  Documentation/devicetree/bindings/pwm/ti,twl-pwm.txt       |  4 ++--
+>  Documentation/devicetree/bindings/pwm/ti,twl-pwmled.txt    |  4 ++--
+>  Documentation/devicetree/bindings/pwm/vt8500-pwm.txt       |  8 +++-----
+>  arch/arm/boot/dts/am335x-evmsk.dts                         |  3 ++-
+>  arch/arm/boot/dts/wm8850-w70v2.dts                         |  3 ++-
+>  drivers/pwm/core.c                                         |  7 +++----
+>  include/dt-bindings/pwm/pwm.h                              | 14 ++++++++++++++
+>  17 files changed, 54 insertions(+), 52 deletions(-)
+>  create mode 100644 include/dt-bindings/pwm/pwm.h
 
-For shipping consumer product, or however you want to call those kind of
-devices, yes, appended dtb needs to work since the bootloader is locked,
-and making that boot something else to boot the kernel is an exercise
-for us oddballs :)  But the boards which are designed as reference
-platform, we can make your lives easier, if you let us help.  If
-something is a pain to do, give us feedback.
+Applied, thanks.
 
--- 
-Tom
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/f79bfd7b/attachment.sig>
