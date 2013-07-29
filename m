@@ -1,33 +1,133 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 29 Jul 2013 20:48:29 +0100
-Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
-In-Reply-To: <20130729172339.GT29916@titan.lakedaemon.net>
-References: <2469263.vMN09Q7Tzi@flatron>
- <20130729150124.GS29916@titan.lakedaemon.net>
- <20130729164905.GB2280@localhost.localdomain>
- <20130729172339.GT29916@titan.lakedaemon.net>
-Message-ID: <20130729194829.GG9858@sirena.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 29 Jul 2013 15:18:43 -0500
+Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
+In-Reply-To: <20130729101302.GJ3528@e106331-lin.cambridge.arm.com>
+References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+ <1375048598-15637-2-git-send-email-robherring2@gmail.com>
+ <20130729101302.GJ3528@e106331-lin.cambridge.arm.com>
+Message-ID: <51F6CE23.30306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
+On 07/29/2013 05:13 AM, Mark Rutland wrote:
+> Hi Rob,
+> 
+> On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> The PSCI spec from ARM has been updated to 0.2 version. Update the
+>> binding document to reflect the spec changes. For the binding, the
+>> major changes are addition of system reset and poweroff functions.
+>> The recommended function id numbering has also changed.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: devicetree at vger.kernel.org
+>> ---
+>>  Documentation/devicetree/bindings/arm/psci.txt | 25 +++++++++++++++++++------
+>>  1 file changed, 19 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+>> index 433afe9..b8b4d9f 100644
+>> --- a/Documentation/devicetree/bindings/arm/psci.txt
+>> +++ b/Documentation/devicetree/bindings/arm/psci.txt
+>> @@ -21,7 +21,7 @@ to #0.
+>>  
+>>  Main node required properties:
+>>  
+>> - - compatible    : Must be "arm,psci"
+>> + - compatible    : Must be "arm,psci-0.2" or "arm,psci"
+> 
+> For the purposes of handling different firmware implementations (which
+> may have different bugs to work around and may require different
+> arguments to cpu_suspend), it may be better to state "must contain"
+> rather than "must be". 
+> 
+>>  
+>>   - method        : The method of calling the PSCI firmware. Permitted
+>>                     values are:
+>> @@ -32,6 +32,9 @@ Main node required properties:
+>>                     "hvc" : HVC #0, with the register assignments specified
+>>  		           in this binding.
+>>  
+>> + - psci_version  : Function ID for PSCI_VERSION operation. Required for
+>> +                   "arm,psci-0.2" compatible version or later.
+>> +
+>>  Main node optional properties:
+>>  
+>>   - cpu_suspend   : Function ID for CPU_SUSPEND operation
+> 
+> The low bits of CPU_SUSPEND's power_state argument are platform specific
+> and we'll need to deal with them if an implementation actually uses them
+> for something. We can probably associate this with a specific
+> implementation's compatible string, as we'll almost certainly need
+> special code to handle the differences between them.
 
-> true, the answer to this problem may be to create a depgraph of the
-> nodes based on phandles and child status, then init.  However, if the
-> goal is to accelerate boot times, then that should not be calculated
-> during each boot, especially since it doesn't likely change from boot to
-> boot.
+I'm not a fan of
 
-FWIW this is broadly speaking what deferred probing is supposed to do -
-it seemed too complex and fragile to make the graph for board files so
-Grant came up with the idea of deferred probing which aims to sidestep
-the problem and work it out dynamically, also providing a fallback in
-case something that has actually optimised the ordering misses some case
-(cleaning up after the effects of parallel probes for example).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/2f39878e/attachment.sig>
+> If we have a compatible string for the first platform that ignores the
+> argument (or just uses zero), that can be shared by all those
+> implementations that don't give any fine-grained control here.
+> 
+>> @@ -42,14 +45,24 @@ Main node optional properties:
+>>  
+>>   - migrate       : Function ID for MIGRATE operation
+>>  
+>> + - system_reset  : Function ID for SYSTEM_RESET operation
+>> +
+>> + - system_off    : Function ID for SYSTEM_OFF operation
+>> +
+>>  
+>>  Example:
+>>  
+>>  	psci {
+>> -		compatible	= "arm,psci";
+>> +		compatible	= "arm,psci-0.2";
+>>  		method		= "smc";
+>> -		cpu_suspend	= <0x95c10000>;
+>> -		cpu_off		= <0x95c10001>;
+>> -		cpu_on		= <0x95c10002>;
+>> -		migrate		= <0x95c10003>;
+>> +		psci_version	= <0x84000000>;
+>> +		cpu_suspend	= <0x84000001>;
+>> +		cpu_off		= <0x84000002>;
+>> +		cpu_on		= <0x84000003>;
+>> +		affinity_info	= <0x84000004>; 
+>> +		migrate		= <0x84000005>;
+>> +		migrate_info_type = <0x84000006>; 
+>> +		migrate_info_up_cpu = <0x84000007>; 
+>> +		system_off	= <0x84000008>; 
+>> +		system_reset	= <0x84000009>; 
+>>  	};
+> 
+> One of the things changed in PSCI 0.2 was the SMC calling convention,
+> though this isn't clear in the PSCI document. The function IDs for 32bit
+> and 64bit callers may differ, and we need to support describing an
+> arbitrary configuration of the two (same ID for both, different across
+> 32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
+> 
+> I'd like to ensure the binding can deal with that from the start. We
+> could do this by having -32 and -64 variants of each function id (e.g.
+> cpu_off-64) , if the IDs actually differ, and use the regular combined
+> ID if they don't.
+
+Uggg. I guess I should have read the SMC calling convention doc... I was
+simply documenting what is already in the PSCI doc, but obviously that
+is not fully flushed out.
+
+How about something like this (for the complicated case of both 32 and
+64 bit):
+
+	method		= "smc", "smc64";
+	psci_version	= <0x84000000 0xc4000000>;
+	cpu_suspend	= <0x84000001 0xc4000001>;
+	cpu_off		= <0x84000002 0xc4000002>;
+	cpu_on		= <0x84000003 0xc4000003>;
+
+"smc" is a synonym for smc32 for compatibility. The number and order of
+methods determines the number and order of function IDs.
+
+A variation on this would be keep method as is and add a "#psci-cells"
+property to specify the number of function IDs. You can determine the
+64-bit vs. 32-bit support based on the function ID itself.
+
+Rob
