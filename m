@@ -1,58 +1,43 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 29 Jul 2013 20:30:06 +0200
-Subject: [PATCH 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <1374723797-22169-2-git-send-email-dinguyen@altera.com>
-References: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
- <1374723797-22169-2-git-send-email-dinguyen@altera.com>
-Message-ID: <20130729183006.GB10346@amd.pavel.ucw.cz>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 29 Jul 2013 20:38:52 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130729073123.GB1441@lukather>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1441731.8CGUI1tUxh@flatron> <20130728085650.GA4683@netboy>
+ <1416484.XDfk5G56BI@flatron> <20130728131901.GA8864@netboy>
+ <20130729073123.GB1441@lukather>
+Message-ID: <20130729183851.GB4209@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Jul 29, 2013 at 09:31:23AM +0200, Maxime Ripard wrote:
+> 
+> I'm afraid this kind of use case will never be properly supported, DT
+> stable ABI or not.
+> 
+> Think about this: what kernel will actually be shipped in that board?
+> Most likely, it will be a BSP kernel from the vendor. Does the vendor
+> will have made that commitment to have a stable ABI for the DT? Will it
+> use the same bindings than mainline? Do we want to support all the crazy
+> bindings every vendor will come up with?
+> 
+> I'm afraid the answer to these three questions will most of the time be
+> "no.".
 
-> The read_sched_clock should return the ~value because the clock is a
-> countdown implementation. read_sched_clock() should be the same as
-> __apbt_read_clocksource().
+Yes, I know, and it is sad but true.
+ 
+We can't stop the vendors from shipping half-baked BSPs. I really
+don't mind that they do that. After all, they want to get *something*
+working when they launch their chips.
 
-...for altera boards. But AFAICT:
+> That doesn't mean we shouldn't aim for *mainline* having a stable DT
+> ABI, but that kind of use case doesn't seem very realistic to me.
 
-> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-> index 4cbae4f..8e00929 100644
-> --- a/drivers/clocksource/dw_apb_timer_of.c
-> +++ b/drivers/clocksource/dw_apb_timer_of.c
-> @@ -102,18 +102,17 @@ static void add_clocksource(struct device_node *source_timer)
->  	 * timer is found. sched_io_base then points to the current_value
->  	 * register of the clocksource timer.
->  	 */
-> -	sched_io_base = iobase + 0x04;
-> +	sched_io_base = iobase;
->  	sched_rate = rate;
->  }
->  
->  static u32 read_sched_clock(void)
->  {
-> -	return __raw_readl(sched_io_base);
-> +	return ~__raw_readl(sched_io_base + 0x4);
->  }
->  
->  static const struct of_device_id sptimer_ids[] __initconst = {
->  	{ .compatible = "picochip,pc3x2-rtc" },
-> -	{ .compatible = "snps,dw-apb-timer-sp" },
->  	{ /* Sentinel */ },
->  };
->
-
-picochip,pc3x2-rtc is _not_ compatible with snps,dw-apb-timer, and
-does count up. You correctly remove snps,dw-apb-timer-sp
-compatibility, but AFAICT the ~value change will do something
-interesting on picochip boards.
-
-Or maybe I'm just confused about all the timers? Jamie acked this so
-it should be fine...?
+Right, we can and should do better. I got the beaglebone Ethernet
+working in mainline (not by writing the driver, but by complaining
+over and over again). I except that it will continue to work and not
+fall victim to some random DT change.
 
 Thanks,
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Richard
