@@ -1,46 +1,198 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sun, 28 Jul 2013 21:30:22 -0400
-Subject: Defining schemas for Device Tree
-In-Reply-To: <2469263.vMN09Q7Tzi@flatron>
-References: <2469263.vMN09Q7Tzi@flatron>
-Message-ID: <CAKON4OzgqH5AiOtismEGop5Y++gvu1ZVZEXhwJB3f-6_eczkqQ@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 29 Jul 2013 10:14:24 +0800
+Subject: [PATCH] DMAEngine: sirf: let the users be able to pause and
+ resume specific buffer
+In-Reply-To: <1372927373-17407-1-git-send-email-Baohua.Song@csr.com>
+References: <1372927373-17407-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <CAGsJ_4wOdDMku-pNWiH-DoS_v39PfFwNYcU4T1Thsd-+L9A8AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is another angle to this problem -- how do we make a single
-schema for all device trees accepted by the kernel? We certainly don't
-want a schema for each vendor where they can do whatever they want.
+2013/7/4 Barry Song <Baohua.Song@csr.com>
+>
+> From: Qipan Li <Qipan.Li@csr.com>
+>
+> this patch adds a buffer_index in pause and resume entries, then users
+> can pause and resume a buffer they want, but don't pause the whole dma.
+>
+> a typical application scenerios is Ping-Pang in two buffers:
+> at the beginning, we enable buf1 and buf2 to receive dma data, after
+> buf1 is full, we pause buf1 and handle the data in this buffer to avoid
+> overflow in buf1. but at the same time, dma is still tranferring in buf2.
+> once we have finished data process in buf1, we enable buf1 again.
+> this will maximize the chance of dma transferring. users pause buf1 by:
+> dmaengine_device_control(sirfport->rx_dma_chan, DMA_PAUSE, 1);
+> users pause buf2 by:
+> dmaengine_device_control(sirfport->rx_dma_chan, DMA_PAUSE, 2);
+> users can still pause the whole dma transferring by dmaengine_pause().
+>
+> Signed-off-by: Qipan Li <Qipan.Li@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  drivers/dma/sirf-dma.c | 102
+> ++++++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 80 insertions(+), 22 deletions(-)
 
-Obviously all devices in a device class are not identical but many of
-their attributes are. The purpose of a unified schema is stop one
-vendor from naming an attribute VOLTAGE, another VOLTS, another V, etc
-when all of these attributes are doing the same thing - setting a
-voltage. It is possible to use different names right now since they
-are different device drivers. There's no overall architecture glue
-(schema) holding the device class design together.
+Hi Vinod, as we still have some other patches of dma clients depending
+on this, would you give some comments about it?
 
-The main point of this unified schema is to help people creating new
-device drivers. When ypu construct your device tree representation you
-should first try your best to get it to fit into the existing device
-class schema. Only after you determine that it is impossible to make
-do with the current schema should you ask for the generic schema to be
-extended to include whatever attribute you think you need. At that
-point peer review will happen and hopefully a good solution will
-ensue.
+>
+> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> index 1d627e2..7d500d2 100644
+> --- a/drivers/dma/sirf-dma.c
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -315,43 +315,101 @@ static int sirfsoc_dma_terminate_all(struct
+> sirfsoc_dma_chan *schan)
+>         return 0;
+>  }
+>
+> -static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
+> +static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan,
+> +                                               unsigned long buf_index)
+>  {
+>         struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
+>         int cid = schan->chan.chan_id;
+>         unsigned long flags;
+> +       unsigned long loop_ctrl_val;
+>
+>         spin_lock_irqsave(&schan->lock, flags);
+> -
+> -       if (!sdma->is_marco)
+> -               writel_relaxed(readl_relaxed(sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL)
+> -                       & ~((1 << cid) | 1 << (cid + 16)),
+> -                       sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+> -       else
+> -               writel_relaxed((1 << cid) | 1 << (cid + 16),
+> -                       sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+> -
+> +       if (!sdma->is_marco) {
+> +               loop_ctrl_val = readl_relaxed(sdma->base +
+> +                               SIRFSOC_DMA_CH_LOOP_CTRL);
+> +               switch (buf_index) {
+> +               case 1:
+> +                       writel_relaxed(loop_ctrl_val & ~(1 << cid),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               case 2:
+> +                       writel_relaxed(loop_ctrl_val & ~(1 << (cid + 16)),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               case 0:
+> +               default:
+> +                       writel_relaxed(loop_ctrl_val &
+> +                                       ~((1 << cid) | 1 << (cid + 16)),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               }
+> +       } else {
+> +               switch (buf_index) {
+> +               case 1:
+> +                       writel_relaxed((1 << cid), sdma->base +
+> +
+> SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+> +                       break;
+> +               case 2:
+> +                       writel_relaxed(1 << (cid + 16), sdma->base +
+> +
+> SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+> +                       break;
+> +               case 0:
+> +               default:
+> +                       writel_relaxed((1 << cid) | 1 << (cid + 16),
+> +                               sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+> +                       break;
+> +               }
+> +       }
+>         spin_unlock_irqrestore(&schan->lock, flags);
+>
+>         return 0;
+>  }
+>
+> -static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
+> +static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan,
+> +                                               unsigned long buf_index)
+>  {
+>         struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
+>         int cid = schan->chan.chan_id;
+>         unsigned long flags;
+> +       unsigned long loop_ctrl_val;
+>
+>         spin_lock_irqsave(&schan->lock, flags);
+> -
+> -       if (!sdma->is_marco)
+> -               writel_relaxed(readl_relaxed(sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL)
+> -                       | ((1 << cid) | 1 << (cid + 16)),
+> -                       sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+> -       else
+> -               writel_relaxed((1 << cid) | 1 << (cid + 16),
+> -                       sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+> -
+> +       if (!sdma->is_marco) {
+> +               loop_ctrl_val = readl_relaxed(sdma->base +
+> +                               SIRFSOC_DMA_CH_LOOP_CTRL);
+> +               switch (buf_index) {
+> +               case 1:
+> +                       writel_relaxed(loop_ctrl_val | (1 << cid),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               case 2:
+> +                       writel_relaxed(loop_ctrl_val | 1 << (cid + 16),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               case 0:
+> +               default:
+> +                       writel_relaxed(loop_ctrl_val | (1 << cid) |
+> +                                       1 << (cid + 16),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               }
+> +       } else {
+> +               switch (buf_index) {
+> +               case 1:
+> +                       writel_relaxed((1 << cid),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               case 2:
+> +                       writel_relaxed((1 << (cid + 16)),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               case 0:
+> +               default:
+> +                       writel_relaxed((1 << cid) | 1 << (cid + 16),
+> +                                       sdma->base +
+> SIRFSOC_DMA_CH_LOOP_CTRL);
+> +                       break;
+> +               }
+> +       }
+>         spin_unlock_irqrestore(&schan->lock, flags);
+>
+>         return 0;
+> @@ -365,9 +423,9 @@ static int sirfsoc_dma_control(struct dma_chan *chan,
+> enum dma_ctrl_cmd cmd,
+>
+>         switch (cmd) {
+>         case DMA_PAUSE:
+> -               return sirfsoc_dma_pause_chan(schan);
+> +               return sirfsoc_dma_pause_chan(schan, arg);
+>         case DMA_RESUME:
+> -               return sirfsoc_dma_resume_chan(schan);
+> +               return sirfsoc_dma_resume_chan(schan, arg);
+>         case DMA_TERMINATE_ALL:
+>                 return sirfsoc_dma_terminate_all(schan);
+>         case DMA_SLAVE_CONFIG:
+> --
+> 1.8.2.3
 
-----------------
 
-Imagine what might be possible with device trees in a few years...
-
-A single kernel image can load on any embedded system. The device tree
-sorts out all of the driver loading and tells how everything is wired
-together. There is zero board specific code in the kernel. We're
-getting close to this one.
-
-And in the far future - send your device tree off to a cloud PCB
-printer and get your custom embedded system back in the mail. Sign me
-up for this one!
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+-barry
