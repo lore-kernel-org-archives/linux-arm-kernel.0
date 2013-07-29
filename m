@@ -1,47 +1,37 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 29 Jul 2013 15:15:57 +0530
-Subject: [PATCH] dma: edma: add device_slave_caps() support
-In-Reply-To: <20130725072351.GJ18642@intel.com>
-References: <1374597804-3961-1-git-send-email-joelf@ti.com>
- <51EF8A52.90902@metafoo.de> <51EF8C2B.2030409@ti.com>
- <51EF8F4E.8080806@metafoo.de>
- <FB20353E-4890-4462-A671-3587A3841B4A@ti.com>
- <51EF92F2.3030405@metafoo.de> <51F0231C.7000401@ti.com>
- <20130724183329.GH18642@intel.com> <51F02CBA.5060704@ti.com>
- <20130725072351.GJ18642@intel.com>
-Message-ID: <20130729094557.GG29095@intel.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 29 Jul 2013 12:28:24 +0200
+Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
+In-Reply-To: <51F640AB.2050709@arm.com>
+References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
+ <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+ <51F640AB.2050709@arm.com>
+Message-ID: <CAKfTPtDBJUy6smFuACjQNVywQUiQs_iPMFs9T6uCwJOX5f7e8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 12:53:51PM +0530, Vinod Koul wrote:
-> On Wed, Jul 24, 2013 at 02:36:26PM -0500, Joel Fernandes wrote:
-> > > Also another point worth considering is the approach Russell suggested, I havent
-> > > gotten a chance to dig deeper but if I understood it correctly then programming
-> > > the device_dma_parameters should be the right thing to do. Again I need to look
-> > > deeper and esp wrt edma
-> > 
-> > OK. I have some patches sitting in my tree too that I'm working on. With
-> > that I don't need to know about maximum number of allowed segments and
-> > can send along any number of segment. I will rework them and post them.
-> > fwiw, I will also implement caps API incase like Lars did populating the
-> > other fields though these will not be unused.
-> > 
-> > For segment size, at this time I don't know any driver that uses it
-> > other than davinci-pcm. For this reason the calculations can be done as
-> > Lars suggested (for minimum of maximum). Do you know in advance if
-> > you're going to amend to drop segment size if we go with what Russell
-> > suggested, or are you going to leave the seg-size in the caps API anyway.
-> I am just back and havent really done my work on this. Let me check and as I
-> said if my understanding is right I would be inclined to remove these fields...
-Okay so the max sg_len should be done by setting the device_dma_parameters.
+On 29 July 2013 12:15, Sudeep KarkadaNagesha
+<Sudeep.KarkadaNagesha@arm.com> wrote:
+> On 29/07/13 10:46, Vincent Guittot wrote:
+>> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>> Power aware scheduling needs the cpu topology information to improve the
+>>> cpu scheduler decision making.
+>>
+>> It's not only power aware scheduling. The scheduler already uses
+>> topology and cache sharing when  CONFIG_SCHED_MC and/or
+>> CONFIG_SCHED_SMT are enable. So you should also add these configs for
+>> arm64 so the scheduler can use it
+>>
+> Just for my knowledge, I thought power aware using SCHED_MC/SMT was
+> removed. I see commit 8e7fbcbc22c12414bcc9dfdd683637f58fb32759 "sched:
+> Remove stale power aware scheduling remnants and dysfunctional knobs"
+> I may be missing something here.
 
-See the example in MXS DMA and MMC drivers
+It's a common mistake to mixed SCHED_MC and powersaving balance with
+SCHED_MC. Only the powersaving policy has been removed but the
+SCHED_MC and SCHED_SMT are always in the scheduler and gives perf
+improvement on arm 32bits
 
-Now for second parameter why do you need that to be passed, I thought in edma the
-clients needs this value somehow to program the channel. It would be good that
-if we can delink from this and let edma derive. Also there should be no such
-thing as max_sg, the driver should be able to perform any size of sg_list.
-Internally it can be breaking the dma into multiple trasnactions.
-
-~Vinod
--- 
+>
+> Regards,
+> Sudeep
+>
