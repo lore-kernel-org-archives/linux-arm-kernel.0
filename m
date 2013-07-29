@@ -1,39 +1,53 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 29 Jul 2013 14:16:11 +0200
-Subject: [GIT PULL] Reset controller changes for 3.12
-Message-ID: <1375100171.4223.10.camel@pizza.hi.pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Jul 2013 13:17:15 +0100
+Subject: [PATCH] DMAEngine: sirf: let the users be able to pause and
+ resume specific buffer
+In-Reply-To: <CAGsJ_4yVxAJc0UNTFMM1yjKQh6=xv12qPYpnUFZ=wmzrdpUOXQ@mail.gmail.com>
+References: <1372927373-17407-1-git-send-email-Baohua.Song@csr.com>
+ <CAGsJ_4wOdDMku-pNWiH-DoS_v39PfFwNYcU4T1Thsd-+L9A8AQ@mail.gmail.com>
+ <20130729060819.GE29095@intel.com>
+ <CAGsJ_4yVxAJc0UNTFMM1yjKQh6=xv12qPYpnUFZ=wmzrdpUOXQ@mail.gmail.com>
+Message-ID: <20130729121715.GI24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Mon, Jul 29, 2013 at 03:20:31PM +0800, Barry Song wrote:
+> 2013/7/29 Vinod Koul <vinod.koul@intel.com>:
+> > The above can be done by
+> > a) have two buffers:
+> >         - prepare first and submit, and start
+> >         - while first is ongoing, prepare second and start
+> >         - first is completed, so you start processing that while second is
+> >           getting DMAed
+> >         - when processing is completed, submit first again
+> >         - when second is completed, start processing that and submit that once
+> >           proocessed
+> >
+> > b) have multiple buffers, A, B, C & D and redo above schema.
+> 
+> yes, that is the original idea for multiple buffer management for DMA.
+> 
+> the reason which pushed us to the ping-pong pause is that we don't
+> need to issue software dma descriptor every time for every buffer as
+> hardware can do that.
 
-with the cosmetic issues pointed out by Ben and Sylwester fixed in the
-gpio-reset driver, the following changes since commit
-5ae90d8e467e625e447000cb4335c4db973b1095:
+If your DMA engine is correctly implemented (and this only works for
+correctly implemented DMA engines), what you can do is:
 
-  Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+- at the start of the transfer, prepare, submit and issue two buffers,
+  each with a callback.
+- when the first callback happens
+  - that buffer has been transferred.
+  - you can now do whatever you need with that data.
+  - prepare, submit and issue the next buffer
 
-are available in the git repository at:
+This means the DMA engine always has a buffer available to it, so if
+your CPU is fast enough, you can keep the transfer going without the
+DMA channel ever stopping or having to be paused.  If your CPU isn't
+fast enough to keep up, the DMA engine will stop at the end of the
+last queued and issued buffer automatically.
 
-  git://git.pengutronix.de/git/pza/linux.git reset/for_v3.12
-
-for you to fetch changes up to f4d36f8a5166405154c638c1e49e253f2f017dd7:
-
-  reset: allow drivers to request probe deferral (2013-07-29 14:03:40
-+0200)
-
-----------------------------------------------------------------
-Philipp Zabel (2):
-      reset: Add driver for gpio-controlled reset pins
-      reset: allow drivers to request probe deferral
-
- .../devicetree/bindings/reset/gpio-reset.txt       |  35 +++++
- drivers/reset/Kconfig                              |  11 ++
- drivers/reset/Makefile                             |   1 +
- drivers/reset/core.c                               |   2 +-
- drivers/reset/gpio-reset.c                         | 174
-+++++++++++++++++++++
- 5 files changed, 222 insertions(+), 1 deletion(-)
- create mode 100644
-Documentation/devicetree/bindings/reset/gpio-reset.txt
- create mode 100644 drivers/reset/gpio-reset.c
+Bonus points if you have implemented the "move to next buffer" correctly
+too, so that the hardware can do a continuous transfer without having to
+stop and wait between the buffers (provided of course that the next
+transfer is compatible with the previous.)
