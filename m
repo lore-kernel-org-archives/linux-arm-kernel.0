@@ -1,46 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 29 Jul 2013 01:57:34 -0700
-Subject: [PATCH 1/4] pinctrl: single: Prepare for supporting SoC
- specific features
-In-Reply-To: <CACRpkdapXZO003xhRCVg5sfQCfJUPMzunui5u6npmht-2hP7Tg@mail.gmail.com>
+Date: Mon, 29 Jul 2013 01:59:31 -0700
+Subject: [PATCH 0/4] pinctrl single support for SoC specific features
+In-Reply-To: <CACRpkdYGHy0jZ0TD8NejiT6TaR3txmXHKgvS=JXBV1-74jZeGw@mail.gmail.com>
 References: <20130607203936.16513.57494.stgit@localhost>
- <20130607205037.16513.84242.stgit@localhost>
- <CAN1soZzLYpiakcgPR7mBOC7_mLFW=mZwOG98Dq6JpO+JHUW=cw@mail.gmail.com>
- <20130608152732.GR3331@atomide.com>
- <CACRpkdapXZO003xhRCVg5sfQCfJUPMzunui5u6npmht-2hP7Tg@mail.gmail.com>
-Message-ID: <20130729085731.GW7656@atomide.com>
+ <51DD4F30.7050603@ti.com> <20130710122417.GT5523@atomide.com>
+ <CACRpkdYGHy0jZ0TD8NejiT6TaR3txmXHKgvS=JXBV1-74jZeGw@mail.gmail.com>
+Message-ID: <20130729085930.GX7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130722 14:22]:
-> On Sat, Jun 8, 2013 at 5:27 PM, Tony Lindgren <tony@atomide.com> wrote:
+* Linus Walleij <linus.walleij@linaro.org> [130722 14:01]:
+> On Wed, Jul 10, 2013 at 2:24 PM, Tony Lindgren <tony@atomide.com> wrote:
 > 
-> > Subject: [PATCH] pinctrl: single: Prepare for supporting SoC specific features
+> > How about I'll push an immutable branch against v3.11-rc1 when it's
+> > tagged and send a pull request to Linus W for the first three patches?
 > >
-> > Let's replace is_pinconf with flags and add struct pcs_soc so we
-> > can support also other features like pin wake-up events. Let's
-> > export the probe so the SoC specific modules can pass their
-> > SoC specific data to pinctrl-single if needed.
+> > That way we can base other branches on this if needed.
+> >
+> > Linus, does that sound OK to you?
 > 
-> I don't quite understand this motivation. Can this be more verbose and
-> include a bit about the mechanics?
-> 
-> - Why is this necessary? For example, pinctrl-single already supports
->  generic pinconf, and we can surely add a PIN_CONFIG_WAKEUP
->  to include/linux/pinctrl/pinconf-generic.h.
+> OK but I still need to look closer at them as well, so no guarantee
+> I will pull it...
 
-OK I'll take a look. I like the irqchip idea, let's see what all is
-missing after that.
- 
-> - Also: how does this cooperate with irq_set_wake()? If a pin is
->  set to GPIO it is often backed by a GPIO driver (which is calling
->  pinctrl_request_gpio() etc), maybe we should just add a
->  pinctrl_set_wake() then that the irqchip portions of the GPIO drivers
->  can call down to so the pinctrl driver sets this bit if need be?
-
-Yes currently we're missing the mapping between GPIO registers and
-pinctrl registers. But your idea of using irqchip + pinctrl_set_wake()
-might sort that issue.
+Good comments, let's try to make it all transparent. I'll drop
+my branch and will repost the patches when I have things working
+using irqchip.
 
 Regards,
 
