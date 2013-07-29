@@ -1,44 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 29 Jul 2013 14:31:49 +0200
-Subject: [PATCH 0/5] ARM: dove: switch to DT MBus
-Message-ID: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 29 Jul 2013 14:31:52 +0200
+Subject: [PATCH 3/5] ARM: dove: add MBus DT node
+In-Reply-To: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1375101114-28858-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set converts DT based Dove boards to DT probed MBus to be
-introduced with v3.12.
+This adds a MBus node including ranges and pcie apertures required later.
 
-The first two patches prepare Dove DT nodes for MBus ID remapping by using
-preprocessor includes and adding the MBUS_ID macro. The third patch adds a
-MBus DT node to Dove SoC dtsi with required ranges for internal MBus and
-AXI registers, and PCIe mem and I/O apertures. The forth patch relocates
-the nodes for the internal devices to the new MBus node. Also, internal-regs
-ranges are updated to allow proper translation of MBus children's reg
-properties. Finally, legacy MBus init is replaced by DT based MBus init
-for DT based Dove.
-
-The patch set depends on the MBus device tree patches that should appear
-in v3.12. Currently, it is based on v3.11-rc2 with Dove DT cleanup patches
-and MBus patch set v8 applied.
-
-The patch set is _not_ sent to devicetree mainling list, because the MBus
-binding will be discussed there on the MBus patches itself.
-
-Sebastian Hesselbarth (5):
-  ARM: dove: use preprocessor on device tree files
-  ARM: dove: add MBUS_ID macro to Dove DT
-  ARM: dove: add MBus DT node
-  ARM: dove: relocate internal registers device nodes
-  ARM: dove: switch to DT probed mbus address windows
-
- arch/arm/boot/dts/dove-cm-a510.dts |    2 +-
- arch/arm/boot/dts/dove-cubox.dts   |    2 +-
- arch/arm/boot/dts/dove-d2plug.dts  |    2 +-
- arch/arm/boot/dts/dove-dove-db.dts |    2 +-
- arch/arm/boot/dts/dove.dtsi        |  958 ++++++++++++++++++------------------
- arch/arm/mach-dove/board-dt.c      |   10 +-
- 6 files changed, 491 insertions(+), 485 deletions(-)
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
@@ -46,5 +17,46 @@ Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/dove.dtsi |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 397674c..bdda016 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -29,6 +29,20 @@
+ 		marvell,tauros2-cache-features = <0>;
+ 	};
+ 
++	mbus {
++		compatible = "marvell,dove-mbus", "marvell,mbus", "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		pcie-mem-aperture = <0xe0000000 0x10000000>; /* 256M MEM space */
++		pcie-io-aperture  = <0xf2000000 0x00200000>; /*   2M I/O space */
++
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x0100000   /* MBUS regs  1M */
++			  MBUS_ID(0xf0, 0x02) 0 0xf1800000 0x1000000   /* AXI  regs 16M */
++			  MBUS_ID(0x01, 0xfd) 0 0xf8000000 0x8000000   /* BootROM  128M */
++			  MBUS_ID(0x03, 0x01) 0 0xc8000000 0x0100000   /* CESA SRAM  1M */
++			  MBUS_ID(0x0d, 0x00) 0 0xf0000000 0x0100000>; /* PMU  SRAM  1M */
++	};
++
+ 	soc at f1000000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -44,6 +58,11 @@
+ 		          0xf2100000 0xf2100000 0x0100000   /* PCIe0 I/O   1M */
+ 		          0xf8000000 0xf8000000 0x8000000>; /* BootROM   128M */
+ 
++		mbusc: mbus-ctrl at 20000 {
++			compatible = "marvell,mbus-controller";
++			reg = <0x20000 0x80>, <0x800100 0x8>;
++		};
++
+ 		timer: timer at 20300 {
+ 			compatible = "marvell,orion-timer";
+ 			reg = <0x20300 0x20>;
 -- 
 1.7.10.4
