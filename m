@@ -1,63 +1,56 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Tue, 30 Jul 2013 09:49:22 +1000
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130729231425.GA4439@obsidianresearch.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F39FD8.6080808@broadcom.com> <20130727183059.GD4813@netboy>
- <1441731.8CGUI1tUxh@flatron>
- <20130729180513.GB1884@obsidianresearch.com>
- <20130729222039.GE29970@voom.fritz.box>
- <20130729231425.GA4439@obsidianresearch.com>
-Message-ID: <20130729234922.GI29970@voom.fritz.box>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 29 Jul 2013 17:53:35 -0600
+Subject: [PATCH 7/8] ARM: tegra114: add LP1 suspend support
+In-Reply-To: <1374830110-30685-8-git-send-email-josephl@nvidia.com>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+ <1374830110-30685-8-git-send-email-josephl@nvidia.com>
+Message-ID: <51F7007F.6090200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 05:14:25PM -0600, Jason Gunthorpe wrote:
-> On Tue, Jul 30, 2013 at 08:20:39AM +1000, David Gibson wrote:
-> 
-> > > Clearly general purpose systems (eg servers, workstations, etc) with
-> > > *full featured firmware* fall into category b. Linux already basically
-> > > has stable DT for those systems - but the firmware is expected to do
-> > > lots of work and hide all the low level details from the
-> > > kernel.  Basically, the DT should stick to approximately ePAR and
-> > > everything else is hidden by the firmware.
-> > 
-> > No.  With the exception of the hypervisor/virtualization extensions,
-> > ePAPR describes (for now) an entirely passive firmware interface.
-> > That is, once the handover to the OS has happened, there is *no*
-> > further firmware interaction.  It is not capable of hiding any details
-> > from the OS, except those which can be done by one-time
-> > initialization.
-> 
-> Well, one-time initialization details are actually exactly one of the
-> areas I am thinking about. Some of the embedded SOCs have extensive
-> one time initization code in the kernel that is highly SOC specific
-> and on x86 it would live in the firmware.
-> 
-> But I see what you mean, ePAPR was the wrong reference, I didn't
-> carefully check it. I ment the kind of DT use we've seen in SPARC,
-> POWER servers, Apple stuff, etc - systems explicitly designed so that
-> new hardware will boot old OSs.
+On 07/26/2013 03:15 AM, Joseph Lo wrote:
+> The LP1 suspend mode will power off the CPU, clock gated the PLLs and put
+> SDRAM to self-refresh mode. Any interrupt can wake up device from LP1. The
+> sequence when LP1 suspending:
 
-Yeah, and at least for POWER servers and Apples, like every other
-attempt at this, ever, it at best sorta-kinda worked.  It's not *as*
-bad as the mess of broken BIOSes on x86 (mostly due to smaller
-variety), but there's still plenty of broken crap in Apple workstation
-and IBM server firmwares and device trees.
+> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+> index 5ae7ee5..36cadaa 100644
+> --- a/arch/arm/mach-tegra/pm.c
+> +++ b/arch/arm/mach-tegra/pm.c
+> @@ -214,6 +214,7 @@ static bool tegra_lp1_iram_hook(void)
+>  		tegra20_lp1_iram_hook();
+>  		break;
+>  	case TEGRA30:
+> +	case TEGRA114:
+>  		tegra30_lp1_iram_hook();
 
-You see a clear line between "full featured" and "minimal" firmwares
-where none exists.
+That's in pm-tegra30.c, which is only compiled in if
+CONFIG_ARCH_TEGRA_3x_SOC is enabled. Similarly, this patch adds a lot of
+code to sleep-tegra30.S, which also isn't built/linked if
+!CONFIG_ARCH_TEGRA_3x_SOC.
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/8890d07e/attachment.sig>
+Does this series built with all 7 combinations of Tegra20/30/114 support
+enabled?
+
+> diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+
+> @@ -96,9 +100,15 @@
+>  	orreq	\rd, \rd, #(1 << 30)
+>  	streq	\rd, [\r_car_base, #\pll_base]
+>  	/* Enable lock detector */
+> +	.if	\pll_misc
+> +	ldr	\rd, [\r_car_base, #\pll_misc]
+> +	bic	\rd, \rd, #(1 << 18)
+> +	str	\rd, [\r_car_base, #\pll_misc]
+> +	ldr	\rd, [\r_car_base, #\pll_misc]
+>  	ldr	\rd, [\r_car_base, #\pll_misc]
+>  	orr	\rd, \rd, #(1 << 18)
+>  	str	\rd, [\r_car_base, #\pll_misc]
+> +	.endif
+
+Hmm. Those last 3 lines that aren't touched by this patch already
+touched the pll_misc register even if !pll_misc. Was that a bug in a
+previous patch?
+
+Is git bisect maintained for both compile and run-time across this whole
+patch series?
