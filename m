@@ -1,114 +1,34 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Mon, 29 Jul 2013 16:32:25 +0900
-Subject: [PATCH v8 08/12] iommu/exynos: remove prefetch buffer setting when
- enabling System MMU
-In-Reply-To: <CANEJEGtWTZHZEr=XzPXHFbJtP7U5JFD-o58kRjLe23XaTzv=fA@mail.gmail.com>
-References: <003e01ce89f3$4cdb45e0$e691d1a0$@samsung.com>
- <CANEJEGtWTZHZEr=XzPXHFbJtP7U5JFD-o58kRjLe23XaTzv=fA@mail.gmail.com>
-Message-ID: <003d01ce8c2d$c5c349d0$5149dd70$@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 29 Jul 2013 07:52:56 +0000 (UTC)
+Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping for
+ every GPIO on DT"
+Message-ID: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: grundler at google.com [mailto:grundler at google.com] On Behalf Of Grant Grundler
-> Sent: Saturday, July 27, 2013 2:36 AM
-> 
-> On Fri, Jul 26, 2013 at 4:28 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> > Prefetch buffer must be handled accurately, exact range of a buffer,
-> > frame by frame manually. Otherwise, it may causes page fault or
-> > deadlock in System MMU.
-> > Thus this patch removes prefetch buffer setting when System MMU is
-> > initialized(enabled).
-> >
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> 
-> Reviewed-by: Grant Grundler <grundler@chromium.org>
-> 
-> BTW, cscope doesn't find any callers of exynos_sysmmu_enable().
-> Want to submit another patch to remove it?
-> 
-> (Note I'm talking about exynos_sysmmu_enable() without "__" prefix).
 
-Oh, I missed removing that function.
+Hi
 
-Thank you.
+your commit 0e970cec05635adbe7b686063e2548a8e4afb8f4 ("gpio/omap: don't 
+create an IRQ mapping for every GPIO on DT") breaks the boot on the 
+OMAP5912 OSK:
 
-> 
-> cheers,
-> grant
-> 
-> > ---
-> >  drivers/iommu/exynos-iommu.c |   32 +++++++++++++++++++++++++++-----
-> >  1 files changed, 27 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> > index cfc02ed..87f6bb7 100644
-> > --- a/drivers/iommu/exynos-iommu.c
-> > +++ b/drivers/iommu/exynos-iommu.c
-> > @@ -80,6 +80,8 @@
-> >  #define CTRL_BLOCK     0x7
-> >  #define CTRL_DISABLE   0x0
-> >
-> > +#define CFG_FLPDCACHE  (1 << 20) /* System MMU 3.2+ only */
-> > +
-> >  #define REG_MMU_CTRL           0x000
-> >  #define REG_MMU_CFG            0x004
-> >  #define REG_MMU_STATUS         0x008
-> > @@ -96,6 +98,9 @@
-> >
-> >  #define REG_MMU_VERSION                0x034
-> >
-> > +#define MMU_MAJ_VER(reg)       (reg >> 28)
-> > +#define MMU_MIN_VER(reg)       ((reg >> 21) & 0x7F)
-> > +
-> >  #define REG_PB0_SADDR          0x04C
-> >  #define REG_PB0_EADDR          0x050
-> >  #define REG_PB1_SADDR          0x054
-> > @@ -200,6 +205,22 @@ static bool is_sysmmu_active(struct sysmmu_drvdata *data)
-> >         return data->activations > 0;
-> >  }
-> >
-> > +static unsigned int __sysmmu_version(struct sysmmu_drvdata *data,
-> > +                                    int idx, unsigned int *minor)
-> > +{
-> > +       unsigned long major;
-> > +
-> > +       major = readl(data->sfrbases[idx] + REG_MMU_VERSION);
-> > +
-> > +       if (minor)
-> > +               *minor = MMU_MIN_VER(major);
-> > +
-> > +       if (MMU_MAJ_VER(major) > 3)
-> > +               return 1;
-> > +
-> > +       return MMU_MAJ_VER(major);
-> > +}
-> > +
-> >  static void sysmmu_unblock(void __iomem *sfrbase)
-> >  {
-> >         __raw_writel(CTRL_ENABLE, sfrbase + REG_MMU_CTRL);
-> > @@ -460,14 +481,15 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
-> >         data->pgtable = pgtable;
-> >
-> >         for (i = 0; i < data->nsfrs; i++) {
-> > +               unsigned int min;
-> > +
-> >                 __sysmmu_set_ptbase(data->sfrbases[i], pgtable);
-> >
-> > -               if ((readl(data->sfrbases[i] + REG_MMU_VERSION) >> 28) == 3) {
-> > -                       /* System MMU version is 3.x */
-> > -                       __raw_writel((1 << 12) | (2 << 28),
-> > +               if ((__sysmmu_version(data, i, &min) == 3) && (min > 1)) {
-> > +                       unsigned long cfg;
-> > +                       cfg = __raw_readl(data->sfrbases[i] + REG_MMU_CFG);
-> > +                       __raw_writel(cfg | CFG_FLPDCACHE,
-> >                                         data->sfrbases[i] + REG_MMU_CFG);
-> > -                       __sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 0);
-> > -                       __sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 1);
-> >                 }
-> >
-> >                 __raw_writel(CTRL_ENABLE, data->sfrbases[i] + REG_MMU_CTRL);
-> > --
-> > 1.7.2.5
-> >
-> >
+http://www.pwsan.com/omap/testlogs/bisect_5912osk_boot_fail_v3.11-rc3/20130729013931/boot/5912osk/5912osk_log.txt
+
+This test included a stripped-down version of your commit 
+949eb1a4d29dc75e0b5b16b03747886b52ecf854 ("gpio/omap: fix build error when 
+OF_GPIO is not defined."), since 0e970cec also broke the build.
+
+The previous commit ad81f0545ef01ea651886dddac4bef6cec930092 ("Linux 
+3.11-rc1") boots cleanly:
+
+http://www.pwsan.com/omap/testlogs/test_v3.11-rc1/20130721020309/boot/5912osk/5912osk_log.txt
+
+OMAP5912 OSK is an OMAP1 platform, and therefore non-DT.
+
+Could you please put together a fix for this?
+
+
+regards,
+
+- Paul
