@@ -1,54 +1,83 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Mon, 29 Jul 2013 11:19:10 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
- <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
- <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
- <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
-Message-ID: <51F6338E.8020101@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Jul 2013 02:21:16 -0700
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <51E98C71.5010709@wwwdotorg.org>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+ <51E70B5D.6030802@wwwdotorg.org>
+ <20130718073638.GP7656@atomide.com>
+ <51E84180.6080902@wwwdotorg.org>
+ <20130719073957.GZ7656@atomide.com>
+ <51E98C71.5010709@wwwdotorg.org>
+Message-ID: <20130729092116.GA7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2013 10:01 PM, jonsmirl at gmail.com wrote:
-> On Sat, Jul 27, 2013 at 3:45 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Sat, Jul 27, 2013 at 4:59 AM, Arend van Spriel <arend@broadcom.com> wrote:
->>> Let's see how many people go and scream if I say this: Too bad .dts files
->>> are not done using XML format as DT bindings could be described using XML
->>> Schema.
->>
->> Draft an example and show us how it would look!  :-)  There is
->> absolutely nothing preventing us from expressing a DT in XML format,
->> or even using XSLT to define DT schema while still using our current
->> .dts syntax. It would be trivial to do lossless translation between
->> .dts syntax and xml.
->>
->> The problem that I have with XML and XSLT is that it is very verbose
->> and not entirely friendly to mere-mortals. However, I'm more than
->> willing to be proved wrong on this point.
->
-> I considered this approach a while ago and discarded it. It would work
-> but it is just too much of a Frankenstein monster.
+* Stephen Warren <swarren@wwwdotorg.org> [130719 12:05]:
+> On 07/19/2013 01:39 AM, Tony Lindgren wrote:
+> > 
+> > I think the only sane way to deal with this is to make the I2C controller
+> > to show up as two separate I2C controller instances. Then use runtime
+> > PM to save and restore the state for each instance, and locking between
+> > the two driver instances.
+> > 
+> > For the pin muxing part, I'd do this:
+> > 
+> > 			i2c1 instance	i2c2 instance	notes
+> > default_state		0 pins		0 pins		(or dedicated pins only)
+> > active_state		all pins	alls pins
+> > idle_state		safe mode	safe mode
+> > 
+> > Then when i2c1 instance is done, it's runtime PM suspend muxes the pins
+> > to safe mode, or some nop state. Then when i2c2 instance is woken, it's
+> > runtime PM resume muxes pins to i2c2.
+> 
+> I see two issues with that approach:
+> 
+> 1) Runtime PM doesn't always put a device into an idle state as soon as
+> its work is done. Sometimes (always?) there is a delay between when the
+> device is last used and when the HW is actually made idle so that if the
+> device is re-activated quickly, the kernel hasn't wasted time making it
+> idle then active again. You'd have to force that delay to complete when
+> switching between the two virtual controller devices.
 
-Ah, but he is so cute. At least I do not think it is more monstrous as 
-the bindings files. I just browsed through a couple of arm binding files 
-as I felt challenged to come up with an example. I did not get the 
-impression that there is some kind of template in place to get consitent 
-bindings descriptions.
+There is the autosuspend timeout for delayed transitions, but I think
+runtime PM already has calls for making the state change immediate also.
+ 
+> 2) This requires two separate device objects for the two I2C instances.
+> I guess you could have the driver for the one I2C mux node end up
+> instantiating two child devices for this purpose, and hence make that
+> happen without needing to change the DT ABI. However, that sure feels
+> complex...
 
-> Much cleaner to modify dtc to take a schema as part of the compilation
-> process. The schema language itself has no requirement to look like
-> DTS syntax. Whoever wrote dtc probably has a favorite language that
-> would be good for writing schemas in.
+Yes but you will also automatically get quite a bit of sanity to your
+I2C driver code rather than trying to handle the two separate instances
+within the driver alone. Consider things like scanning the I2C buses for
+devices and just dev_dbg().
+ 
+> I wonder if it wouldn't be better to have active/idle/sleep as
+> "modifiers" to the state name rather than alternatives, so you end up
+> with states named:
+> 
+> default
+> nobus:active
+> nobus:idle
+> nobus:sleep
+> bus0:active
+> bus0:idle
+> bus0:sleep
+> bus1:active
+> bus1:idle
+> bus1:sleep
+> 
+> Of course, if you continue on with that approach (i.e. you add more
+> sub-fields each separated by a colon), you end up with a huge
+> combinatorial mess of state names.
 
-Not sure if I can follow here. I guess you mean the dts compilation, 
-right? There are tools freely available to validate XML files against 
-XSD specification files. As an example libxml2 has support for it. I 
-suspect it is not desired to have a dependency for DTC with an 
-out-of-tree library, but it could be incorporated and have DTC spew the 
-validation results.
+Right :) Sooner or later we'll have some totally messed up piece of
+hardware pop up that multiplexes one controller across a large number
+number buses..
 
 Regards,
-Arend
+
+Tony
