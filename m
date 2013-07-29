@@ -1,54 +1,45 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 29 Jul 2013 12:53:36 +0200
-Subject: [PATCH v2 03/22] ARM: tegra: Create a DT header defining
- swgroups ID
-In-Reply-To: <51E5D220.1070708@wwwdotorg.org>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-4-git-send-email-hdoyu@nvidia.com><51E5D220.1070708@wwwdotorg.org>
-Message-ID: <20130729.135336.943359637886118972.hdoyu@nvidia.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Mon, 29 Jul 2013 12:01:02 +0100
+Subject: [PATCH 2/2] clk: fixup argument order when setting VCO parameters
+In-Reply-To: <20130725174416.7598.73819@quantum>
+References: <1374594138-17080-1-git-send-email-jonathan.austin@arm.com>
+ <1374594138-17080-3-git-send-email-jonathan.austin@arm.com>
+ <CACRpkdbEiNPG0b89zXKpvNgXtAbsKeV9A9ibgEJCBgNa6vQvCw@mail.gmail.com>
+ <51F0F035.8010705@arm.com> <20130725174416.7598.73819@quantum>
+Message-ID: <51F64B6E.4070300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 17 Jul 2013 01:07:12 +0200:
+On 25/07/13 18:44, Mike Turquette wrote:
+> Quoting Jonathan Austin (2013-07-25 02:30:29)
+>> On 24/07/13 20:32, Linus Walleij wrote:
+>>> On Tue, Jul 23, 2013 at 5:42 PM, Jonathan Austin
+>>> <jonathan.austin@arm.com> wrote:
+>>>
+>>>> The order of arguments in the call to vco_set() for the ICST clocks appears to
+>>>> have been switched in error, which results in the VCO not being initialised
+>>>> correctly. This in turn stops the integrated LCD on things like Integrator/CP
+>>>> from working correctly.
+>>>>
+>>>> This patch fixes the order and restores the expected functionality.
+>>>>
+>>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>>> Cc: Mike Turquette <mturquette@linaro.org>
+>>>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+>>>
+>>> Good catch! Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>>> You should probably mark this for stable as well.
+>>>
+>>
+>> Mike, will you add Cc: stable when you take the fix or shall I resubmit
+>> the patch somehow else?
+>
+> I'll add it.
+>
 
-> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> > Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-> > binding. "swgroup" is a group of H/W clients in Tegra SoC from S/W POV.
-> > 
-> > This will allow the same header to be used by both device tree files,
-> > and drivers implementing this binding, which guarantees that the two
-> > stay in sync. This also makes device trees more readable by using names
-> > instead of magic numbers.
-> 
-> Why does the driver need these constants; shouldn't it simply support
-> 0..n SW group IDs that all work the same way? Or, is there some reason
-> for it to know the identities?
-> 
-> > diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
-> 
-> s/memory/iommu/?
+Thanks very much.
 
-This info would be used in PMC code as well, which H/W belongs to
-which swgroup. So I use the term "memory(-client)" instead of "iommu".
+Linus or Mike: Should I put 1/2 in this series in to Russell's tree, or 
+should that go in elsewise?
 
-> s/tegra-swgroup.h/tegra-smmu.h/?
-
-Is "tegra-memory-clients.h" preferable, then?
-
-> > +#define TEGRA_SWGROUP_AFI 0
-> 
-> Should this file document which values are valid for which SoCs? Should
-> there be separate files for each SoC; I don't know if it's guaranteed
-> that IDs won't be re-assigned between different SoCs.
-
-I've checked all SoC which I can refer. Those IDs are calculated from
-the register offset. But I haven't got any explicit guarantee from H/W
-designers yet.
-
-> > +#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-> > +
-> > +#define TEGRA30_SWGROUP_ALL	<0x00000000 0x000779ff>
-> > +#define TEGRA114_SWGROUP_ALL	<0x00000000 0x01b659fe>
-> 
-> Are those 3 values needed by DT files, or just the driver?
-
-Only from DT.
+Jonny
