@@ -1,69 +1,59 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Mon, 29 Jul 2013 15:13:50 +0200
-Subject: [PATCH v4 4/6] ARM: rockchip: add sram dt nodes and documentation
-In-Reply-To: <201307291510.31679.heiko@sntech.de>
-References: <201307291510.31679.heiko@sntech.de>
-Message-ID: <201307291513.50507.heiko@sntech.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 29 Jul 2013 08:13:22 -0500
+Subject: [PATCH 7/7] dts: calxeda: add ARM PSCI binding
+In-Reply-To: <20130729102424.GA24255@e106331-lin.cambridge.arm.com>
+References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+ <1375048598-15637-8-git-send-email-robherring2@gmail.com>
+ <20130729102424.GA24255@e106331-lin.cambridge.arm.com>
+Message-ID: <51F66A72.7070209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rockchip SoCs need a special part of their sram for bringup
-of additional cores. Therefore also add a reserved section when adding the
-mmio-sram node to keep the sram driver from using this space.
+On 07/29/2013 05:24 AM, Mark Rutland wrote:
+> On Sun, Jul 28, 2013 at 10:56:38PM +0100, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Add the PSCI binding for Calxeda SOCs. The PSCI function numbers are
+>> different from the DT binding example because the numbering changed in
+>> revisions of the PSCI spec and are already fixed in highbank firmware.
+>> Since the numbering is transparent to the kernel, this difference is not
+>> significant.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>>  arch/arm/boot/dts/ecx-common.dtsi | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
+>> index e8559b7..f1dfc09 100644
+>> --- a/arch/arm/boot/dts/ecx-common.dtsi
+>> +++ b/arch/arm/boot/dts/ecx-common.dtsi
+>> @@ -19,6 +19,16 @@
+>>  		bootargs = "console=ttyAMA0";
+>>  	};
+>>  
+>> +	psci {
+>> +		compatible	= "arm,psci";
+>> +		method		= "smc";
+>> +		cpu_suspend	= <0x84000002>;
+>> +		cpu_off		= <0x84000004>;
+>> +		cpu_on		= <0x84000006>;
+>> +		system_off	= <0x84000100>;
+>> +		system_reset	= <0x84000101>;
+>> +	};
+>> +
+> 
+> I see this is somewhat beyond the original PSCI, given the addition of
+> SYSTEM_OFF and SYSTEM_RESET, but not quite PSCI 0.2 as you don't have
+> PSCI_VERSION.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
----
- .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 ++++++++++++++++++++
- arch/arm/boot/dts/rk3066a.dtsi                     |    6 +++++
- 2 files changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+I do actually support PSCI_VERSION. Forgot to add that to the dts.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt b/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
-new file mode 100644
-index 0000000..80c878e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
-@@ -0,0 +1,23 @@
-+Rockchip SRAM for smp bringup:
-+------------------------------
-+
-+Rockchip's smp-capable SoCs use the first part of the sram for the bringup
-+of the cores. Once the core gets powered up it executes the code that is
-+residing at the very beginning of the sram.
-+
-+Therefore a reserved section has to be added to the mmio-sram declaration.
-+
-+Required node properties:
-+- compatible : should contain both "rockchip,rk3066-sram", "mmio-sram"
-+  so that the smp code can select the correct sram node.
-+
-+The rest of the properties should follow the generic mmio-sram discription
-+found in ../../misc/sram.txt
-+
-+Example:
-+
-+	sram: sram at 10080000 {
-+		compatible = "rockchip,rk3066-sram", "mmio-sram";
-+		reg = <0x10080000 0x10000>;
-+		mmio-sram-reserved = <0x0 0x50>;
-+	};
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 26c4311..24d1941 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -53,6 +53,12 @@
- 			reg = <0x1013c000 0x100>;
- 		};
- 
-+		sram: sram at 10080000 {
-+			compatible = "rockchip,rk3066-sram", "mmio-sram";
-+			reg = <0x10080000 0x10000>;
-+			mmio-sram-reserved = <0x0 0x50>;
-+		};
-+
- 		gic: interrupt-controller at 1013d000 {
- 			compatible = "arm,cortex-a9-gic";
- 			interrupt-controller;
--- 
-1.7.10.4
+> It would be nice it the compatible string were more specific here to
+> deal with this and any implementation-specific power_state ID values.
+> Something like "calxeda,highbank-psci", "arm,psci" ?
+
+Is that something we always want to do? You can't really know the
+implementation quirks up front.
+
+Rob
