@@ -1,37 +1,69 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 29 Jul 2013 15:26:37 +0200
-Subject: [repost] ARM big-endian support
-In-Reply-To: <51EFFB53.5060003@codethink.co.uk>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <51EFFB53.5060003@codethink.co.uk>
-Message-ID: <20130729152637.204c2622@skate>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 29 Jul 2013 09:26:44 -0400
+Subject: [RFC/RFT PATCH 0/5] mm: ARM nobootmem and few dma_mask fixes
+In-Reply-To: <20130729111503.GG24642@n2100.arm.linux.org.uk>
+References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130726151021.GU24642@n2100.arm.linux.org.uk> <51F2A3AA.4060801@ti.com>
+ <20130729111503.GG24642@n2100.arm.linux.org.uk>
+Message-ID: <51F66D94.9060706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
-
-On Wed, 24 Jul 2013 17:05:39 +0100, Ben Dooks wrote:
-> On 24/07/13 11:27, Ben Dooks wrote:
-> > A repost (as requested) of the current big-endian core work for review.
+On Monday 29 July 2013 07:15 AM, Russell King - ARM Linux wrote:
+> On Fri, Jul 26, 2013 at 12:28:26PM -0400, Santosh Shilimkar wrote:
+>> On Friday 26 July 2013 11:10 AM, Russell King - ARM Linux wrote:
+>>> On Fri, Jul 12, 2013 at 05:48:09PM -0400, Santosh Shilimkar wrote:
+>>>> The series is an attempt to move ARM port to NO_BOOTMEM. As discussed
+>>>> on list NO_BOOTMEM move needed updates to max*pfn meaning to be maximum
+>>>> PFNs but that breaks the dma_mask for few block layer drivers since
+>>>> ARM start of physical memory is not PFN0 unlike most of the architectures.
+>>>> Some more read on it is here:
+>>>> 	http://lwn.net/Articles/543408/
+>>>> 	http://lwn.net/Articles/543424/
+>>>>
+>>>> To address this issue, we introduce generic dma_max_pfn() helper which
+>>>> can be overridden from the architectures.
+>>>> 	
+>>>> Another intention behind move to nobootmem is also to convert ARM to
+>>>> switch to memblock and getting rid of bootmem allocator dependency which
+>>>> don't work for LPAE machines which has physical memory starting beyond
+>>>> 4 GB boundary. It needs changes to core kernel and also a new memblock
+>>>> API. More on this can be found here:
+>>>> 	https://lkml.org/lkml/2013/6/29/77
+>>>>
+>>>> I have been trying to cook up these patches with kind help from Russell
+>>>> and we know series don't solve all the dma_mask bad assumptions. But at
+>>>> least I am hoping that it can get the ball rolling.	
+>>>>
+>>>> Comments/testing help is welcome !!
+>>>
+>>> As this is related to some of the cleanup of dma_mask which I've been
+>>> doing, I think it may make sense to roll this into one tree.  Any
+>>> objection to that?
+>>>
+>>> Can we get any acks on this stuff from Jens and Jejb etc - especially
+>>> for the bits which touch block/ and for the scsi bits as these are
+>>> touching other subsystems.  (oddly, linux-scsi wasn't on the original
+>>> mail for this series summary.)
+>>>
+>> Sorry I missed the scsi lists on the summary patch.
+>>
+>> While browsing the code I found another spot in mmc layer which
+>> needs fixing. The patch is at the end of the email with Chris
+>> and linux-mmc cc'ed here.
 > 
-> New branches at git.baserock.org/delta/linux.git
-> 	311/be/atags-v4
->   	311/be/core-v4
+> Would you mind putting them all in the patch system, I can add the acks
+> should anyone supply them later, and I'll repost them along with my set
+> of dma-mask patches.  Thanks.
+> 
+Done.
+7794/1, 7795/1, 7796/1, 7797/1, 7798/1, 7799/1
 
-Thanks. Can you post a patch set based on top of 3.11-rc, so that it
-can hopefully be merged? Posting something based on 3.10 has no chance
-of being merged. Again, if you need any help on this, do not hesitate
-to ask.
+Didn't know how to get XXXX/1,2,3,4... pushed into the tracker.
+BTW, I have also pushed the patched on my git tree branch [1] just
+in case you or some one needs it.
 
-Also, would it be possible to get cover letters that include a proper
-changelog, as well as version number for each posting of the patch
-series?
-
-Thanks a lot!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Santosh
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+3.12/nobootmem_n_dma-mask
