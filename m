@@ -1,176 +1,124 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Jul 2013 17:45:13 -0600
-Subject: [PATCH 5/8] ARM: tegra30: add LP1 suspend support
-In-Reply-To: <1374830110-30685-6-git-send-email-josephl@nvidia.com>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-6-git-send-email-josephl@nvidia.com>
-Message-ID: <51F6FE89.4060402@wwwdotorg.org>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Tue, 30 Jul 2013 09:45:32 +1000
+Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
+In-Reply-To: <20130729224840.GZ29916@titan.lakedaemon.net>
+References: <2469263.vMN09Q7Tzi@flatron>
+ <20130729150124.GS29916@titan.lakedaemon.net>
+ <20130729164905.GB2280@localhost.localdomain>
+ <20130729172339.GT29916@titan.lakedaemon.net>
+ <20130729222920.GF29970@voom.fritz.box>
+ <20130729224840.GZ29916@titan.lakedaemon.net>
+Message-ID: <20130729234532.GH29970@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 03:15 AM, Joseph Lo wrote:
-> The LP1 suspend mode will power off the CPU, clock gated the PLLs and put
-> SDRAM to self-refresh mode. Any interrupt can wake up device from LP1. The
-> sequence when LP1 suspending:
+On Mon, Jul 29, 2013 at 06:48:40PM -0400, Jason Cooper wrote:
+> On Tue, Jul 30, 2013 at 08:29:20AM +1000, David Gibson wrote:
+> > On Mon, Jul 29, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
+> > > On Mon, Jul 29, 2013 at 05:49:05PM +0100, Dave Martin wrote:
+> > > > On Mon, Jul 29, 2013 at 11:01:24AM -0400, Jason Cooper wrote:
+> > > > > On Mon, Jul 29, 2013 at 02:21:52AM +0200, Tomasz Figa wrote:
+> > > 
+> > > > > > b) What information should be specified in schemas? What level of 
+> > > > > >    granularity is required?
+> > > > > 
+> > > > > One item I don't see in this list is node ordering.  There's been some
+> > > > > discussion lately on deferred probing (re boot times).  If we were to
+> > > > > intentionally declare that DT are parsed in the order written, then a
+> > > > > lot of deferred probes could be avoided by moving eg the pinctrl node to
+> > > > > near the top of the tree.
+> > > > > 
+> > > > > This doesn't impact buses as much, since the nodes needing the bus are
+> > > > > already children.  However, anything accessed via phandles: pins,
+> > > > > clocks, regulators, etc could benefit from declaring and enforcing this.
+> > > > > Eg having the dtc warn when a phandle is used before it's corresponding
+> > > > > node is declared.
+> > > > > 
+> > > > > Not critical though, just a thought.
+> > > > 
+> > > > I don't think that siblings have any defined order in DT.  If reading a
+> > > > device tree, there's no guarantee you get nodes or properties out in the
+> > > > same order as the original .dts file.
+> > > 
+> > > That's why I raised the point.  If people think encoding initialization
+> > > order in the DT is a good idea, then we should change the dtc so it
+> > > compiles/decompiles in the same order.
+> > 
+> > I've always considered the DT to be unordered, although the flattened
+> > representation obviously has to have some order.  It is much safer to
+> > explicitly represent any required orderings with properties, rather
+> > than to rely on the flattened tree order.  I really don't think trying
+> > to have dtc magically understand device initialization ordering in
+> > this way is a good idea.
+> > 
+> > Fwiw, dtc generally preserves order between input and output, with the
+> > exception of the -s option, which sorts the subnodes of each node by
+> > name (useful for dtdiff).
+> > 
+> > > > Provided child/parent relationships are maintained and the set of nodes
+> > > > and values is the same, I think completely rearranging a .dts file does
+> > > > not change its meaning.
+> > > > 
+> > > > "depends-on" relationships mostly have to come from the semantics of
+> > > > the bindings themselves: for example, if a device is connected to some
+> > > > clocks and regulators, the kernel may need to probe those first.
+> > > 
+> > > true, the answer to this problem may be to create a depgraph of the
+> > > nodes based on phandles and child status, then init.  However, if the
+> > > goal is to accelerate boot times, then that should not be calculated
+> > > during each boot, especially since it doesn't likely change from boot to
+> > > boot.
+> > > 
+> > > Which means it would either go in the dtc (dts node ordering is
+> > > irrelevant), or in the dts.  I'm inclined to say dtc should do it, but I
+> > > like the aesthetics of things being in the proper order in something I
+> > > can read.  After all, C requires functions to be declared before use,
+> > > even though the compiler could figure it out.
+> > 
+> > It's not necessarily possible to encode device initialization order in
+> > flattened tree order.  Suppose you have bus A with devices A1 and A2,
+> > and bus B with devices B1 and B2.  A1 must be initialized before B1,
+> > but B2 must be initialized before A2.  There are no loops there, it's
+> > a valid set of initialization order constraints, but you can't get
+> > both of them right in the flat tree ordering.
+> 
+> True, but is there a real scenario where this is the case?  In any
+> event, this could still fall back to deferred probing.
 
-> diff --git a/arch/arm/mach-tegra/pm-tegra30.c b/arch/arm/mach-tegra/pm-tegra30.c
+I never count on weird and wonderful arrangements _not_ appearing in
+embedded.
 
-> +void tegra30_lp1_iram_hook(void)
-> +{
-> +	tegra30_lp1_iram.start_addr = &tegra30_iram_start;
-> +	tegra30_lp1_iram.end_addr = &tegra30_iram_end;
+But, in regards to falling back do deferred probing.  If you're
+thinking of the fdt ordering as purely an optimization, rather than
+_required_ to get device init correct, then that's a very different
+matter.  I have no problem with optimizing the ordering, as long as
+its expected that the kernel will still be correct with arbitrary
+ordering.
 
-If you need to fill in the values in that struct dynamically anyway, why
-not make tegra_lp1_iram be a struct rather than a pointer, and write
-directly to it?
+> As I think about it more, working with only what dtc can definitely see,
+> eg busses and phandles, some ordering optimization could be done to
+> reduce the number of probe deferrals.
 
-That said, aren't tegra30_iram_start constants that the linker can work
-out, so I think you can just initialize the structure at compile-time,
-and save some code.
+Well.  It depends what you mean here.  To do this fully would require
+dtc to interpret properties much more than it currently does - in
+nearly all cases it treats them as opaque blobs, whereas many
+different kinds of properties can potentially include phandles, and
+you have to know how to parse them to discover them.
 
-> +	tegra_lp1_iram = &tegra30_lp1_iram;
-> +}
-> +
-> +void tegra30_sleep_core_init(void)
-> +{
-> +	tegra_sleep_core_finish = tegra30_sleep_core_finish;
-> +}
+On the other hand, if what you're referring to is dtc's &-syntax for
+phandle references, then I guess we could topsort on that.  As long as
+we bear in mind that that can miss cases, if people hand craft their
+phandles, instead of using references.
 
-Is there a need to have separate iram_hook()/sleep_core_init()
-functions? Perhaps they can be combined into a single function for
-simplicity.
-
-> diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-
-> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> +void tegra30_lp1_iram_hook(void);
-> +void tegra30_sleep_core_init(void);
-> +#else
-> +static inline void tegra30_lp1_iram_hook(void) {}
-> +static inline void void tegra30_sleep_core_init(void) {}
-> +#endif
-
-It'd be nice to be consistent re: whether we define dummy static
-inlines, or use IS_ENABLED() at the call-site. IIRC, there's lots of use
-of IS_ENABLED() in the Tegra PM code now, so perhaps these patches
-should use that instead?
-
-> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-
-> +/* waits until the microsecond counter (base) ticks, for exact timing loops */
-> +.macro wait_for_us, rd, base, tmp
-> +	ldr	\rd, [\base]
-> +1001:	ldr	\tmp, [\base]
-> +	cmp	\rd, \tmp
-> +	beq	1001b
-> +.endm
-
-Doesn't this wait any amount of time from 0..1uS, and hence it actually
-/isn't/ very exact?
-
-> +/* waits until the microsecond counter (base) is > rn */
-> +.macro wait_until, rn, base, tmp
-> +	add	\rn, \rn, #1
-> +1002:	ldr	\tmp, [\base]
-> +	cmp	\tmp, \rn
-> +	bmi	1002b
-> +.endm
-
-Parameter "rn" could be renamed to make its purpose clear from the name.
-How about target_us or wait_until_this_time? "wait_until" is also rather
-a generic name; wait_until_us would be much better, which would require
-renaming wait_until_us above, which I think might be better deleted, or
-renamed to wait_until_next_us?
-
-> diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-
-> +ENTRY(tegra30_sleep_core_finish)
-
-> +	/*
-> +	 * Preload all the address literals that are needed for the
-> +	 * CPU power-gating process, to avoid loading from SDRAM which
-> +	 * are not supported once SDRAM is put into self-refresh.
-> +	 * LP0 / LP1 use physical address, since the MMU needs to be
-> +	 * disalbed before putting SDRAM into self-refresh to avoid
-
-s/disalbed/disabled/
-
-> +/*
-> + * tegra30_lp1_reset
-> + *
-> + * reset vector for LP1 restore; copied into IRAM during suspend.
-> + * Brings the system back up to a safe staring point (SDRAM out of
-> + * self-refresh, PLLC, PLLM and PLLP reenabled, CPU running on PLLX,
-> + * system clock running on the same PLL that it suspended at), and
-> + * jumps to tegra_resume to restore virtual addressing.
-> + * The physical address of tegra_resume expected to be stored in
-> + * PMC_SCRATCH41.
-> + *
-> + * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_CODE_AREA AND MUST BE FIRST.
-
-What does "AND MUST BE FIRST" mean?
-
-> +ENTRY(tegra30_lp1_reset)
-> +	/*
-> +	 * The CPU and system bus are running at 32KHz and executing from
-> +	 * IRAM when this code is executed; immediately switch to CLKM and
-> +	 * enable PLLP, PLLM, PLLC, PLLA and PLLX.
-> +	 */
-> +	mov32	r0, TEGRA_CLK_RESET_BASE
-> +
-> +	mov	r1, #(1 << 28)
-
-Some #defines for the various magic values used in this code would be
-useful.
-
-> +tegra30_sdram_pad_save:
-> +	.word	0
-> +	.word	0
-> +	.word	0
-> +	.word	0
-> +	.word	0
-> +	.word	0
-> +	.word	0
-> +	.word	0
-
-This might be simpler, and easier to validate it's the right length:
-
-        .rept   8
-        .long   0
-        .endr
-
-> +tegra30_sdram_pad_address:
-> +	.word	TEGRA_EMC_BASE + EMC_CFG				@0x0
-> +	.word	TEGRA_EMC_BASE + EMC_ZCAL_INTERVAL			@0x4
-> +	.word	TEGRA_EMC_BASE + EMC_AUTO_CAL_INTERVAL			@0x8
-> +	.word	TEGRA_EMC_BASE + EMC_XM2VTTGENPADCTRL			@0xc
-> +	.word	TEGRA_EMC_BASE + EMC_XM2VTTGENPADCTRL2			@0x10
-> +	.word	TEGRA_PMC_BASE + PMC_IO_DPD_STATUS			@0x14
-> +	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_CLK_SOURCE_MSELECT	@0x18
-> +	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_SCLK_BURST		@0x1c
-> +
-> +tegra30_sdram_pad_size:
-> +	.word	tegra30_sdram_pad_address - tegra30_sdram_pad_save
-
-Perhaps if you swapp the order of declaring tegra30_sdram_pad_save and
-tegra30_sdram_pad_address, you can even do something like:
-
-	.rept (tegra30_sdram_pad_addr_end - tegra30_sdram_pad_addr) / 4
-
-?
-
-> +tegra30_switch_cpu_to_clk32k:
-> +	/*
-> +	 * start by jumping to CLKM to safely disable PLLs, then jump to
-
-jumping sounds like a CPU program counter operation.
-s/jumping/switching/ ?
-
-> +	/* 2uS delay delay between changing SCLK and CCLK */
-> +	wait_for_us r1, r7, r9
-> +	add	r1, r1, #2
-> +	wait_until r1, r7, r9
-
-Ah, I see how wait_for_us is used now. Perhaps rename it
-wait_for_us_boundary or wait_for_us_tick? Alternatively, perhaps
-wait_until can just incorporate that logic itself?
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/04bf655e/attachment.sig>
