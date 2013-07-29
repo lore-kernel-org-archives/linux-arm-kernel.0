@@ -1,47 +1,46 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Mon, 29 Jul 2013 16:57:22 +0900
-Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of Exynos
- SoCs
-References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
- <CAK9yfHy2btp1W+5-GiVQnkffDnJ-CgqXuAjGktkiKYyf7kKQbQ@mail.gmail.com>
-Message-ID: <003e01ce8c31$41d0c450$c5724cf0$@samsung.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 29 Jul 2013 10:00:01 +0200
+Subject: [PATCH v2 00/42] ARM: at91: move to common clk framework
+In-Reply-To: <51F2A556.8020109@overkiz.com>
+References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
+ <51F28370.6050304@gmail.com> <51F2996B.6000406@overkiz.com>
+ <51F2A556.8020109@overkiz.com>
+Message-ID: <CACQ1gAgw-v3z_sWcsk7SqFFW-ERLjS0RS5GTgAdd5Y1tj3Z1FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Cho KyongHo [mailto:pullip.cho at samsung.com]
-> Sent: Monday, July 29, 2013 4:20 PM
-> 
-> > -----Original Message-----
-> > From: Sachin Kamat [mailto:sachin.kamat at linaro.org]
-> > Sent: Monday, July 29, 2013 3:38 PM
-> >
-> > Hi KyongHo,
-> >
-> > On 26 July 2013 16:58, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > > ---
-> > >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
-> > >  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
-> > >  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
-> > >  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
-> > >  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
-> > >  5 files changed, 617 insertions(+), 0 deletions(-)
-> > >  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> >
-> > This patch does not apply on the mainline Linus' tree (3.11-rc2). Please rebase.
-> >
-> 
-> OK. I will rebase the next patches on that.
+2013/7/26 boris brezillon <b.brezillon@overkiz.com>:
+> On 26/07/2013 17:44, boris brezillon wrote:
+> I found 2 bugs:
+> 1) the main frequency ready test in recalc_rate function is wrong
+> 2) the common clk framework uses the first match for dt clk registration
+>    and main clk has this compatible property:
+>    compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
+>    As a result the main clk is always bound to the fixed-clock driver
+>    which set the clock frequency to 0 if 'clock-frequency' property is
+>    missing.
+>
+> These bugs will be fixed in next version.
+> Tell me if you want need thesse patches for testing purpose.
 
-I don't get any conflict both on the latest of Linus's tree (3.11-rc3)
-and for-next branch  of Samsung git.
-Can you show me the diff?
+Hi Boris,
 
-> 
-> Thank you.
-> 
-> Cho KyongHo.
-> > --
-> > With warm regards,
-> > Sachin
+I tested your patch, the clock is not at 0 anymore:
+AT91: PIT: mck rate = 8333333
+
+And it's booting correctly.
+There's a small bug I found in the at91sam9x5 dtsi file (ssc id is 28,
+not 27). (patch attached)
+
+And yes, I could use your patches for some more tests !
+
+Thanks,
+
+Richard.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-at91-dt-at91sam9x5-fix-wrong-SSC-clock-ID.patch
+Type: application/octet-stream
+Size: 769 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/d3e6ee98/attachment.obj>
