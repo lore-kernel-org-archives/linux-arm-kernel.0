@@ -1,74 +1,256 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 29 Jul 2013 13:39:50 +0200
-Subject: [PATCH v2 16/22] iommu/tegra: smmu: Get "nvidia,swgroup" from DT
-In-Reply-To: <51E84FFA.8020509@wwwdotorg.org>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-17-git-send-email-hdoyu@nvidia.com><51E84FFA.8020509@wwwdotorg.org>
-Message-ID: <20130729.143950.524913713971518557.hdoyu@nvidia.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 29 Jul 2013 13:41:33 +0200
+Subject: [PATCH v6] watchdog: Add MOXA ART watchdog driver
+In-Reply-To: <1375093215-7136-1-git-send-email-jonas.jensen@gmail.com>
+References: <1375093215-7136-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1375098093-8975-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 18 Jul 2013 22:28:42 +0200:
+Add watchdog driver for MOXA ART SoCs.
 
-> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> > This provides the info about which H/W Accelerators are supported on
-> > Tegra SoC. This info is passed from DT. This is necessary to have the
-> > unified SMMU driver among Tegra SoCs. Instead of using platform data,
-> > DT passes "nvidia,swgroup" now. DT is mandatory in Tegra.
-> 
-> > diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
-> 
-> > +- nvidia,swgroups: A bitmap of supported HardWare Accelerators(HWA).
-> > +  Each bit represents one swgroup. The assignments may be found in header
-> > +  file <dt-bindings/memory/tegra-swgroup.h>.
-> 
-> There needs to be a default for this field if one is not specified so
-> that existing DTs continue to work without modification.
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Only enabling PPCS(AHB) can be an option because PPCS has SD/MMC where
-rootfs can be located ususally.
+Notes:
+    Changes since v5:
+    
+    1. replace "moxart_wdt->dev.timeout" with "wdt_dev->timeout"
+    
+    Applies to next-20130729
 
-> How many cells big is this property?
+ .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
+ drivers/watchdog/Kconfig                           |  10 ++
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/moxart_wdt.c                      | 165 +++++++++++++++++++++
+ 4 files changed, 191 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+ create mode 100644 drivers/watchdog/moxart_wdt.c
 
-64
-
-> Is this really a bitmap of HWAs? Surely it's a bitmap of SMMU client
-> IDs?
-
-At least this info can be used for PMC too.
-
-.....
-> > diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-> 
-> > @@ -265,7 +265,7 @@ struct smmu_client {
-> >  	struct device		*dev;
-> >  	struct list_head	list;
-> >  	struct smmu_as		*as;
-> > -	u32			hwgrp;
-> > +	u64			hwgrp;
-> 
-> Why is that "hwgrp" not "swgrp"? Don't they represent the same
-> thing?
-
-They are same but initial SMMU driver used the term "hwgroup". Should
-this be renamed with another patch or can it be left as it is?
-
-....
-> >  static int __smmu_client_set_hwgrp(struct smmu_client *c,
-> > -				   unsigned long map, int on)
-> > +				   u64 map, int on)
-> >  {
-> >  	int i;
-> >  	struct smmu_as *as = c->as;
-> > @@ -398,12 +400,11 @@ static int __smmu_client_set_hwgrp(struct smmu_client *c,
-> >  	if (!on)
-> >  		map = smmu_client_hwgrp(c);
-> >  
-> > -	for_each_set_bit(i, &map, HWGRP_COUNT) {
-> > +	for_each_set_bit(i, (unsigned long *)&map,
-> > +			 sizeof(map) * BITS_PER_BYTE) {
-> 
-> Why change the type if it just forces you to add this cast?
-
-u32 map; -> u64 map;
-
-for_each_set_bit() expects "unsigned long *" for any length of bitmap.
+diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+new file mode 100644
+index 0000000..1169857
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+@@ -0,0 +1,15 @@
++MOXA ART Watchdog timer
++
++Required properties:
++
++- compatible : Must be "moxa,moxart-watchdog"
++- reg : Should contain registers location and length
++- clocks : Should contain phandle for the clock that drives the counter
++
++Example:
++
++	watchdog: watchdog at 98500000 {
++		compatible = "moxa,moxart-watchdog";
++		reg = <0x98500000 0x10>;
++		clocks = <&coreclk>;
++	};
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 362085d..6883aab 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -382,6 +382,16 @@ config RETU_WATCHDOG
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called retu_wdt.
+ 
++config MOXART_WDT
++	tristate "MOXART watchdog"
++	depends on ARCH_MOXART
++	help
++	  Say Y here to include Watchdog timer support for the watchdog
++	  existing on the MOXA ART SoC series platforms.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called moxart_wdt.
++
+ # AVR32 Architecture
+ 
+ config AT32AP700X_WDT
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 2f26a0b..7cab53a 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+ obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+ obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
+ obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
++obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
+ 
+ # AVR32 Architecture
+ obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
+new file mode 100644
+index 0000000..70b5806
+--- /dev/null
++++ b/drivers/watchdog/moxart_wdt.c
+@@ -0,0 +1,165 @@
++/*
++ * MOXA ART SoCs watchdog driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/watchdog.h>
++#include <linux/moduleparam.h>
++
++#define REG_COUNT			0x4
++#define REG_MODE			0x8
++#define REG_ENABLE			0xC
++
++struct moxart_wdt_dev {
++	struct watchdog_device dev;
++	void __iomem *base;
++	unsigned int clock_frequency;
++};
++
++static int heartbeat;
++
++static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
++{
++	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
++
++	writel(0, moxart_wdt->base + REG_ENABLE);
++
++	return 0;
++}
++
++static int moxart_wdt_start(struct watchdog_device *wdt_dev)
++{
++	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
++
++	writel(moxart_wdt->clock_frequency * wdt_dev->timeout,
++	       moxart_wdt->base + REG_COUNT);
++	writel(0x5ab9, moxart_wdt->base + REG_MODE);
++	writel(0x03, moxart_wdt->base + REG_ENABLE);
++
++	return 0;
++}
++
++static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
++				  unsigned int timeout)
++{
++	wdt_dev->timeout = timeout;
++
++	return 0;
++}
++
++static const struct watchdog_info moxart_wdt_info = {
++	.identity       = "moxart-wdt",
++	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
++			  WDIOF_MAGICCLOSE,
++};
++
++static const struct watchdog_ops moxart_wdt_ops = {
++	.owner          = THIS_MODULE,
++	.start          = moxart_wdt_start,
++	.stop           = moxart_wdt_stop,
++	.set_timeout    = moxart_wdt_set_timeout,
++};
++
++static int moxart_wdt_probe(struct platform_device *pdev)
++{
++	struct moxart_wdt_dev *moxart_wdt;
++	struct device *dev = &pdev->dev;
++	struct device_node *node = dev->of_node;
++	struct resource *res;
++	struct clk *clk;
++	int err;
++	unsigned int max_timeout;
++	bool nowayout = WATCHDOG_NOWAYOUT;
++
++	moxart_wdt = devm_kzalloc(&pdev->dev, sizeof(*moxart_wdt), GFP_KERNEL);
++	if (!moxart_wdt)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, moxart_wdt);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	moxart_wdt->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(moxart_wdt->base))
++		return PTR_ERR(moxart_wdt->base);
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk)) {
++		pr_err("%s: of_clk_get failed\n", __func__);
++		return PTR_ERR(clk);
++	}
++
++	moxart_wdt->clock_frequency = clk_get_rate(clk);
++	if (moxart_wdt->clock_frequency == 0) {
++		pr_err("%s: incorrect clock frequency\n", __func__);
++		return -EINVAL;
++	}
++
++	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
++
++	moxart_wdt->dev.info = &moxart_wdt_info;
++	moxart_wdt->dev.ops = &moxart_wdt_ops;
++	moxart_wdt->dev.timeout = max_timeout;
++	moxart_wdt->dev.min_timeout = 1;
++	moxart_wdt->dev.max_timeout = max_timeout;
++	moxart_wdt->dev.parent = &pdev->dev;
++
++	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, &pdev->dev);
++	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
++
++	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
++
++	err = watchdog_register_device(&moxart_wdt->dev);
++	if (unlikely(err))
++		return err;
++
++	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
++		moxart_wdt->dev.timeout, nowayout);
++
++	return 0;
++}
++
++static int moxart_wdt_remove(struct platform_device *pdev)
++{
++	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
++
++	moxart_wdt_stop(&moxart_wdt->dev);
++	watchdog_unregister_device(&moxart_wdt->dev);
++
++	return 0;
++}
++
++static const struct of_device_id moxart_watchdog_match[] = {
++	{ .compatible = "moxa,moxart-watchdog" },
++	{ },
++};
++
++static struct platform_driver moxart_wdt_driver = {
++	.probe      = moxart_wdt_probe,
++	.remove     = moxart_wdt_remove,
++	.driver     = {
++		.name		= "moxart-watchdog",
++		.owner		= THIS_MODULE,
++		.of_match_table	= moxart_watchdog_match,
++	},
++};
++module_platform_driver(moxart_wdt_driver);
++
++module_param(heartbeat, int, 0);
++MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
++
++MODULE_DESCRIPTION("MOXART watchdog driver");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+-- 
+1.8.2.1
