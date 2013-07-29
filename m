@@ -1,178 +1,206 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Jul 2013 14:58:27 +0200
-Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
-In-Reply-To: <20130729142600.63eeab50@skate>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E41F7A.4010502@gmail.com> <20130728043310.6CF1D3E08FE@localhost>
- <20130728162711.32a9a21e@skate> <20130729065431.GA1115@manwe>
- <20130729142600.63eeab50@skate>
-Message-ID: <20130729125826.GH23152@manwe>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 29 Jul 2013 15:03:01 +0200 (CEST)
+Subject: [BUILD BREAKAGE] today's next build broken for pcm037
+Message-ID: <Pine.LNX.4.64.1307291458560.14405@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 02:26:00PM +0200, Thomas Petazzoni wrote:
-> Dear Thierry Reding,
-> 
-> On Mon, 29 Jul 2013 08:54:31 +0200, Thierry Reding wrote:
-> 
-> > > So what is your suggestion to allow the PCIe controller to retrieve the
-> > > correct irq_domain if we have only one DT node for the IRQ controller
-> > > that registers two irq_domains ?
-> > 
-> > If I understand correctly, Grant isn't objecting to the introduction of
-> > the lookup function, but rather its implementation. You could add a
-> > pointer to a struct msi_chip within struct irq_domain and then iterate
-> > over all irq_domain instances (see irq_find_host()) and find one which
-> > has the correct device_node pointer and the msi_chip pointer set.
-> 
-> Ah ok. The only trick is that we have to change irq_find_host() to
-> *not* match on MSI domains. Can you check the below patch to see if it
-> matches what Grant suggested? It works for me, and it allows to completely
-> remove the registry of msi_chip in drivers/of, as well as the of_node
-> pointer in struct msi_chip.
-> 
-> Thanks!
-> 
-> Thomas
-> 
-> From c2c0137cb110270f96e1e0fa298a5d585b8d829e Mon Sep 17 00:00:00 2001
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Date: Mon, 29 Jul 2013 14:12:31 +0200
-> Subject: [PATCHv6 05/11] irqdomain: add support to associate an irq_domain
->  with a msi_chip
-> 
-> Message Signaled Interrupts are a PCI-specific mechanism that allows
-> PCI devices to notify interrupts to the CPU using in-band
-> messages. The PCI subsystem represents an MSI-capable interrupt
-> controller as an msi_chip structure, and this patch improves the
-> irqdomain subsystem with a new pointer associating an irq_domain with
-> the corresponding msi_chip.
-> 
-> The __irq_domain_add() function is augmented with an additional
-> argument, the 'msi_chip' pointer, and all callers of this function are
-> updated.
-> 
-> A new function irq_domain_add_msi() function is added to allow the
-> registration of an MSI-type irq domain.
-> 
-> The irq_find_host() function is modified to not match on MSI-type irq
-> domains: a given DT device node may represent both a normal interrupt
-> controller and a MSI interrupt controller. irq_find_host() should
-> return the irq_domain that corresponds to the normal interupt
+Hi Sascha,
 
-"interupt" -> "interrupt"
+Attached .config fails to build for me with today's next as follows:
 
-> controller.
-> 
-> An irq_find_msi() function is added to get the MSI_type irq domain
+ERROR: "imx_pcm_dma_init" [sound/soc/fsl/snd-soc-fsl-ssi.ko] undefined!
+ERROR: "imx_pcm_dma_exit" [sound/soc/fsl/snd-soc-fsl-ssi.ko] undefined!
+make[2]: *** [__modpost] Error 1
+make[1]: *** [modules] Error 2
+make: *** [sub-make] Error 2
 
-"MSI_type" -> "MSI-type".
-
-> given a DT device node.
-
-And "irq domain" -> "IRQ domain" in all of the above.
-
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-[...]
-> @@ -162,7 +167,16 @@ static inline struct irq_domain *irq_domain_add_tree(struct device_node *of_node
->  					 const struct irq_domain_ops *ops,
->  					 void *host_data)
->  {
-> -	return __irq_domain_add(of_node, 0, ~0, 0, ops, host_data);
-> +	return __irq_domain_add(of_node, 0, ~0, 0, ops, NULL, host_data);
-> +}
-> +static inline struct irq_domain *irq_domain_add_msi(struct device_node *of_node,
-> +						    unsigned int size,
-> +						    const struct irq_domain_ops *ops,
-> +						    struct msi_chip *msi_chip,
-> +						    void *host_data)
-> +{
-> +	return __irq_domain_add(of_node, size, size, 0, ops,
-> +				msi_chip, host_data);
->  }
-
-Given that the majority of interrupt controllers probably don't have any
-MSI functionality, I wonder if perhaps this should be done in a more
-helper-oriented way, see below...
-
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-[...]
-> @@ -198,6 +201,12 @@ struct irq_domain *irq_find_host(struct device_node *node)
->  	 */
->  	mutex_lock(&irq_domain_mutex);
->  	list_for_each_entry(h, &irq_domain_list, link) {
-> +		/*
-> +		 * We only want to match normal interrupt domains, not
-> +		 * MSI domains
-> +		 */
-> +		if (h->msi_chip)
-> +			continue;
->  		if (h->ops->match)
->  			rc = h->ops->match(h, node);
->  		else
-> @@ -214,6 +223,28 @@ struct irq_domain *irq_find_host(struct device_node *node)
->  EXPORT_SYMBOL_GPL(irq_find_host);
->  
->  /**
-> + * irq_find_msi() - Locates a MSI domain for a given device node
-> + * @node: device-tree node of the interrupt controller
-> + */
-> +struct irq_domain *irq_find_msi(struct device_node *node)
-> +{
-> +	struct irq_domain *h, *found = NULL;
-> +
-> +	mutex_lock(&irq_domain_mutex);
-> +	list_for_each_entry(h, &irq_domain_list, link) {
-> +		if (!h->msi_chip)
-> +			continue;
-> +		if (h->of_node && h->of_node == node) {
-> +			found = h;
-> +			break;
-> +		}
-> +	}
-> +	mutex_unlock(&irq_domain_mutex);
-> +	return found;
-> +}
-> +EXPORT_SYMBOL_GPL(irq_find_msi);
-
-This doesn't quite copy what irq_find_host() does, since it ignores the
-associated ops->match().
-
-But given that ops->match() already provides a way to hook into the
-lookup, perhaps we could add a function such as this:
-
-	int irq_domain_supports_msi(struct irq_domain *d, struct device_node *node)
-	{
-		if ((d->of_node == NULL) || (d->of_node != node))
-			return 0;
-
-		return d->msi_chip != NULL;
-	}
-
-Then use that in drivers that expose MSI functionality via an IRQ domain
-like this:
-
-	static const struct irq_domain_ops foo_irq_domain_ops = {
-		...
-		.match = irq_domain_supports_msi,
-		...
-	};
-
-One problem with this is that it doesn't solve your problem where two
-different IRQ domains are exposed by the same device, because the
-irq_find_host() will still match the MSI IRQ domain for the non-MSI
-device node as well. This could be solved by adding another match
-function...
-
-This goes in hand with the helper-style API that I mentioned above. But
-it's really up to Grant to decide which way he wants this to go.
-
-Thierry
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/4b52a29e/attachment-0001.sig>
+CONFIG_LOCALVERSION="-pcm037"
+# CONFIG_LOCALVERSION_AUTO is not set
+CONFIG_SYSVIPC=y
+CONFIG_POSIX_MQUEUE=y
+CONFIG_FHANDLE=y
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_BSD_PROCESS_ACCT=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+CONFIG_LOG_BUF_SHIFT=14
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_SYSCTL_SYSCALL=y
+CONFIG_EMBEDDED=y
+CONFIG_SLAB=y
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+# CONFIG_LBDAF is not set
+# CONFIG_BLK_DEV_BSG is not set
+CONFIG_PARTITION_ADVANCED=y
+# CONFIG_EFI_PARTITION is not set
+# CONFIG_IOSCHED_DEADLINE is not set
+# CONFIG_IOSCHED_CFQ is not set
+CONFIG_ARCH_MULTI_V6=y
+# CONFIG_ARCH_MULTI_V7 is not set
+CONFIG_GPIO_PCA953X=m
+CONFIG_ARCH_MXC=y
+# CONFIG_MACH_MX31ADS is not set
+CONFIG_MACH_PCM037=y
+# CONFIG_CACHE_L2X0 is not set
+CONFIG_PREEMPT_VOLUNTARY=y
+CONFIG_AEABI=y
+# CONFIG_OABI_COMPAT is not set
+# CONFIG_COMPACTION is not set
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+CONFIG_CMDLINE="ro"
+CONFIG_VFP=y
+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+CONFIG_PM_RUNTIME=y
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+CONFIG_IP_PNP=y
+CONFIG_IP_PNP_DHCP=y
+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+# CONFIG_INET_XFRM_MODE_BEET is not set
+# CONFIG_INET_LRO is not set
+# CONFIG_INET_DIAG is not set
+# CONFIG_IPV6 is not set
+CONFIG_NETLINK_MMAP=y
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+CONFIG_MTD=y
+CONFIG_MTD_CMDLINE_PARTS=y
+# CONFIG_MTD_OF_PARTS is not set
+CONFIG_MTD_BLOCK=y
+CONFIG_MTD_CFI=y
+CONFIG_MTD_CFI_INTELEXT=y
+CONFIG_MTD_PHYSMAP=y
+# CONFIG_BLK_DEV is not set
+CONFIG_SCSI=y
+CONFIG_BLK_DEV_SD=y
+# CONFIG_SCSI_LOWLEVEL is not set
+CONFIG_NETDEVICES=y
+# CONFIG_NET_VENDOR_ARC is not set
+# CONFIG_NET_CADENCE is not set
+# CONFIG_NET_VENDOR_BROADCOM is not set
+# CONFIG_NET_VENDOR_CIRRUS is not set
+# CONFIG_NET_VENDOR_FARADAY is not set
+# CONFIG_NET_VENDOR_FREESCALE is not set
+# CONFIG_NET_VENDOR_INTEL is not set
+# CONFIG_NET_VENDOR_MARVELL is not set
+# CONFIG_NET_VENDOR_MICREL is not set
+# CONFIG_NET_VENDOR_NATSEMI is not set
+# CONFIG_NET_VENDOR_SEEQ is not set
+CONFIG_SMSC911X=y
+# CONFIG_NET_VENDOR_STMICRO is not set
+# CONFIG_NET_VENDOR_VIA is not set
+# CONFIG_NET_VENDOR_WIZNET is not set
+# CONFIG_WLAN is not set
+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
+# CONFIG_SERIO is not set
+# CONFIG_LEGACY_PTYS is not set
+CONFIG_SERIAL_IMX=y
+CONFIG_SERIAL_IMX_CONSOLE=y
+# CONFIG_HW_RANDOM is not set
+CONFIG_I2C=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_I2C_IMX=y
+CONFIG_GPIO_SYSFS=y
+# CONFIG_HWMON is not set
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_MEDIA_SUPPORT=m
+CONFIG_MEDIA_CAMERA_SUPPORT=y
+CONFIG_MEDIA_CONTROLLER=y
+CONFIG_VIDEO_V4L2_SUBDEV_API=y
+CONFIG_V4L_PLATFORM_DRIVERS=y
+CONFIG_SOC_CAMERA=m
+CONFIG_SOC_CAMERA_PLATFORM=m
+CONFIG_VIDEO_MX3=m
+CONFIG_VIDEO_SH_MOBILE_CSI2=m
+CONFIG_VIDEO_SH_MOBILE_CEU=m
+CONFIG_V4L_TEST_DRIVERS=y
+CONFIG_VIDEO_VIVI=m
+CONFIG_VIDEO_MEM2MEM_TESTDEV=m
+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+CONFIG_VIDEO_MT9P031=m
+CONFIG_SOC_CAMERA_IMX074=m
+CONFIG_SOC_CAMERA_MT9M001=m
+CONFIG_SOC_CAMERA_MT9M111=m
+CONFIG_SOC_CAMERA_MT9T031=m
+CONFIG_SOC_CAMERA_MT9T112=m
+CONFIG_SOC_CAMERA_MT9V022=m
+CONFIG_SOC_CAMERA_OV2640=m
+CONFIG_SOC_CAMERA_OV5642=m
+CONFIG_SOC_CAMERA_OV6650=m
+CONFIG_SOC_CAMERA_OV772X=m
+CONFIG_SOC_CAMERA_OV9640=m
+CONFIG_SOC_CAMERA_OV9740=m
+CONFIG_SOC_CAMERA_RJ54N1=m
+CONFIG_SOC_CAMERA_TW9910=m
+# CONFIG_DVB_AU8522_V4L is not set
+# CONFIG_DVB_TUNER_DIB0070 is not set
+# CONFIG_DVB_TUNER_DIB0090 is not set
+CONFIG_FB=y
+CONFIG_BACKLIGHT_LCD_SUPPORT=y
+CONFIG_LCD_CLASS_DEVICE=y
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+# CONFIG_BACKLIGHT_GENERIC is not set
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_LOGO=y
+# CONFIG_LOGO_LINUX_MONO is not set
+CONFIG_SOUND=m
+CONFIG_SND=m
+CONFIG_SND_MIXER_OSS=m
+CONFIG_SND_PCM_OSS=m
+# CONFIG_SND_DRIVERS is not set
+# CONFIG_SND_ARM is not set
+# CONFIG_SND_USB is not set
+CONFIG_SND_SOC=m
+CONFIG_SND_IMX_SOC=m
+CONFIG_SND_SOC_IMX_SGTL5000=m
+CONFIG_SND_SIMPLE_CARD=m
+CONFIG_USB=m
+CONFIG_USB_EHCI_HCD=m
+CONFIG_USB_EHCI_HCD_PLATFORM=m
+CONFIG_USB_STORAGE=m
+CONFIG_MMC=y
+CONFIG_NEW_LEDS=y
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_DRV_PCF8563=m
+CONFIG_DMADEVICES=y
+CONFIG_EXT2_FS=m
+CONFIG_EXT3_FS=m
+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+# CONFIG_DNOTIFY is not set
+CONFIG_FANOTIFY=y
+CONFIG_VFAT_FS=m
+CONFIG_FAT_DEFAULT_CODEPAGE=850
+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-15"
+CONFIG_TMPFS=y
+CONFIG_JFFS2_FS=y
+CONFIG_NFS_FS=y
+CONFIG_ROOT_NFS=y
+CONFIG_NLS=y
+CONFIG_NLS_DEFAULT="iso8859-15"
+CONFIG_NLS_CODEPAGE_850=y
+CONFIG_NLS_ISO8859_15=y
+CONFIG_PRINTK_TIME=y
+CONFIG_READABLE_ASM=y
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_DETECT_HUNG_TASK=y
+CONFIG_DEBUG_ATOMIC_SLEEP=y
+# CONFIG_FTRACE is not set
+CONFIG_DEBUG_USER=y
+CONFIG_FONTS=y
+CONFIG_FONT_8x8=y
