@@ -1,62 +1,107 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Mon, 29 Jul 2013 12:16:10 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <51F6338E.8020101@broadcom.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
- <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
- <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
- <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
- <51F6338E.8020101@broadcom.com>
-Message-ID: <51F640EA.7040509@broadcom.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 29 Jul 2013 12:19:22 +0200
+Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
+ for every GPIO on DT"
+In-Reply-To: <alpine.DEB.2.02.1307290943000.30864@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
+ <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
+ <51F633AE.8090308@collabora.co.uk>
+ <alpine.DEB.2.02.1307290943000.30864@utopia.booyaka.com>
+Message-ID: <D135FD6D-D4B6-4237-9866-4FFED36C03CD@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 11:19 AM, Arend van Spriel wrote:
-> On 07/27/2013 10:01 PM, jonsmirl at gmail.com wrote:
->> On Sat, Jul 27, 2013 at 3:45 PM, Grant Likely
->> <grant.likely@secretlab.ca> wrote:
->>> On Sat, Jul 27, 2013 at 4:59 AM, Arend van Spriel
->>> <arend@broadcom.com> wrote:
->>>> Let's see how many people go and scream if I say this: Too bad .dts
->>>> files
->>>> are not done using XML format as DT bindings could be described
->>>> using XML
->>>> Schema.
->>>
->>> Draft an example and show us how it would look!  :-)  There is
->>> absolutely nothing preventing us from expressing a DT in XML format,
->>> or even using XSLT to define DT schema while still using our current
->>> .dts syntax. It would be trivial to do lossless translation between
->>> .dts syntax and xml.
->>>
->>> The problem that I have with XML and XSLT is that it is very verbose
->>> and not entirely friendly to mere-mortals. However, I'm more than
->>> willing to be proved wrong on this point.
->>
->> I considered this approach a while ago and discarded it. It would work
->> but it is just too much of a Frankenstein monster.
->
-> Ah, but he is so cute. At least I do not think it is more monstrous as
-> the bindings files. I just browsed through a couple of arm binding files
-> as I felt challenged to come up with an example. I did not get the
-> impression that there is some kind of template in place to get consitent
-> bindings descriptions.
->
->> Much cleaner to modify dtc to take a schema as part of the compilation
->> process. The schema language itself has no requirement to look like
->> DTS syntax. Whoever wrote dtc probably has a favorite language that
->> would be good for writing schemas in.
->
-> Not sure if I can follow here. I guess you mean the dts compilation,
-> right? There are tools freely available to validate XML files against
-> XSD specification files. As an example libxml2 has support for it. I
-> suspect it is not desired to have a dependency for DTC with an
-> out-of-tree library, but it could be incorporated and have DTC spew the
-> validation results.
+On 29/07/2013, at 11:47, Paul Walmsley <paul@pwsan.com> wrote:
 
-crap. Probably not as libxml2 has MIT-license.
+> Hi
+> 
+> On Mon, 29 Jul 2013, Javier Martinez Canillas wrote:
+> 
+>> I've looked at this and it seems that irq_create_mapping() does not call the
+>> irq_domain_ops .map function handler since OMAP1 still uses legacy domain
+>> mapping. I don't have an OMAP1 platform to test but could you please see if the
+>> following patch [1] makes your OMAP1 platforms to boot again?
+>> 
+>> But I agree with Linus and probably we should just go and revert the whole
+>> series since it is very hard to get it right. In another thread a user reported
+>> that this change also broke his DTS tree.
+>> 
+>> I really tried to get this right without breaking anything but there are just
+>> too many OMAP platforms behaving differently and most OMAP drivers are only half
+>> converted to DT so this is really a can of worms.
+>> 
+>> Thanks a lot and sorry for the inconvenience,
+>> Javier
+>> 
+>> [1]:
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index c57244e..f1c6da8 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -1090,8 +1090,18 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+>>         * are used as interrupts.
+>>         */
+>>        if (!omap_gpio_chip_boot_dt(&bank->chip))
+>> -               for (j = 0; j < bank->width; j++)
+>> -                       irq_create_mapping(bank->domain, j);
+>> +               for (j = 0; j < bank->width; j++) {
+>> +                       int irq = irq_create_mapping(bank->domain, j);
+>> +                       irq_set_lockdep_class(irq, &gpio_lock_class);
+>> +                       irq_set_chip_data(irq, bank);
+>> +                       if (bank->is_mpuio) {
+>> +                               omap_mpuio_alloc_gc(bank, irq, bank->width);
+>> +                       } else {
+>> +                               irq_set_chip_and_handler(irq, &gpio_irq_chip,
+>> +                                                        handle_simple_irq);
+>> +                               set_irq_flags(irq, IRQF_VALID);
+>> +                       }
+>> +               }
+>>        irq_set_chained_handler(bank->irq, gpio_irq_handler);
+>>        irq_set_handler_data(bank->irq, bank);
+> 
+> For some reason this patch didn't apply cleanly on v3.11-rc3, so 
+> hand-applied the following patch.  It still doesn't boot on v3.11-rc3:
+> 
+> http://www.pwsan.com/omap/testlogs/bisect_5912osk_boot_fail_v3.11-rc3/20130729032525/boot/5912osk/5912osk_log.txt
+> 
+> 
+> - Paul
+> 
 
-Regards,
-Arend
+Weird since it was against -rc3, maybe my mail client corrupted somehow.
+
+I'm out of ideas now and I don't have an OMAP1 platform to further debug this issue.
+
+I guess the safer approach is to just revert these since they are causing a regression and what the patches aims to fix as been broken since the initial OMAP migration to DT anyways.
+
+Unless the current gpio-omap maintainers are willing to keep these patches and know how to fix this OMAP1 regression
+
+Thanks a lot and sorry for this mess,
+Javier
+
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index c57244e..23da829 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1090,8 +1090,19 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+>     * are used as interrupts.
+>     */
+>    if (!omap_gpio_chip_boot_dt(&bank->chip))
+> -        for (j = 0; j < bank->width; j++)
+> -            irq_create_mapping(bank->domain, j);
+> +        for (j = 0; j < bank->width; j++) {
+> +            int irq = irq_create_mapping(bank->domain, j);
+> +            irq_set_lockdep_class(irq, &gpio_lock_class);
+> +            irq_set_chip_data(irq, bank);
+> +            if (bank->is_mpuio) {
+> +                omap_mpuio_alloc_gc(bank, irq, bank->width);
+> +            } else {
+> +                irq_set_chip_and_handler(irq, &gpio_irq_chip,
+> +                             handle_simple_irq);
+> +                set_irq_flags(irq, IRQF_VALID);
+> +            }
+> +        }
+> +
+>    irq_set_chained_handler(bank->irq, gpio_irq_handler);
+>    irq_set_handler_data(bank->irq, bank);
+> }
