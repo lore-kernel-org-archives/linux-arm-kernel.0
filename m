@@ -1,29 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Jul 2013 14:26:24 +0100
-Subject: ZTEXTADDR
-In-Reply-To: <CANEcUBWQgoEQ2nrzV4F-dbPzQQYW1NqFwGxwGMOBzo3g-aAuug@mail.gmail.com>
-References: <CANEcUBWQgoEQ2nrzV4F-dbPzQQYW1NqFwGxwGMOBzo3g-aAuug@mail.gmail.com>
-Message-ID: <20130729132624.GJ24642@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 29 Jul 2013 15:26:37 +0200
+Subject: [repost] ARM big-endian support
+In-Reply-To: <51EFFB53.5060003@codethink.co.uk>
+References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
+ <51EFFB53.5060003@codethink.co.uk>
+Message-ID: <20130729152637.204c2622@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 09:12:58PM +0800, zhaobin xv wrote:
-> hi
->    I see some blogs aboot ZTEXTADDR
-> in linux 2.4.18 :
-> in kernel/arch/arm/boot/Makefile?
->  ifeq ($(CONFIG_ARCH_S3C2410),y)
-> ZTEXTADDR = 0x30008000
-> ZRELADDR = 0x30008000
-> endif
-> but
-> in linux 2.6. :
-> in kernel/arch/arm/boot/Makefile:
-> ZTEXTADDR = 0
-> 
-> 
-> I want to know why to change?
-> ZTEXTADDR is link addr or phs addr?
+Dear Ben Dooks,
 
-ZTEXTADDR is mostly irrelevant now for everyone who places the kernel
-image in RAM, because the entire thing is position independent.
+On Wed, 24 Jul 2013 17:05:39 +0100, Ben Dooks wrote:
+> On 24/07/13 11:27, Ben Dooks wrote:
+> > A repost (as requested) of the current big-endian core work for review.
+> 
+> New branches at git.baserock.org/delta/linux.git
+> 	311/be/atags-v4
+>   	311/be/core-v4
+
+Thanks. Can you post a patch set based on top of 3.11-rc, so that it
+can hopefully be merged? Posting something based on 3.10 has no chance
+of being merged. Again, if you need any help on this, do not hesitate
+to ask.
+
+Also, would it be possible to get cover letters that include a proper
+changelog, as well as version number for each posting of the patch
+series?
+
+Thanks a lot!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
