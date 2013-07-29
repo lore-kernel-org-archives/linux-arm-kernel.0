@@ -1,31 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 29 Jul 2013 01:59:31 -0700
-Subject: [PATCH 0/4] pinctrl single support for SoC specific features
-In-Reply-To: <CACRpkdYGHy0jZ0TD8NejiT6TaR3txmXHKgvS=JXBV1-74jZeGw@mail.gmail.com>
-References: <20130607203936.16513.57494.stgit@localhost>
- <51DD4F30.7050603@ti.com> <20130710122417.GT5523@atomide.com>
- <CACRpkdYGHy0jZ0TD8NejiT6TaR3txmXHKgvS=JXBV1-74jZeGw@mail.gmail.com>
-Message-ID: <20130729085930.GX7656@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Jul 2013 11:01:17 +0200
+Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
+ for every GPIO on DT"
+In-Reply-To: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
+Message-ID: <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130722 14:01]:
-> On Wed, Jul 10, 2013 at 2:24 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > How about I'll push an immutable branch against v3.11-rc1 when it's
-> > tagged and send a pull request to Linus W for the first three patches?
-> >
-> > That way we can base other branches on this if needed.
-> >
-> > Linus, does that sound OK to you?
-> 
-> OK but I still need to look closer at them as well, so no guarantee
-> I will pull it...
+Hi Paul,
 
-Good comments, let's try to make it all transparent. I'll drop
-my branch and will repost the patches when I have things working
-using irqchip.
+On Mon, Jul 29, 2013 at 9:52 AM, Paul Walmsley <paul@pwsan.com> wrote:
 
-Regards,
+> your commit 0e970cec05635adbe7b686063e2548a8e4afb8f4 ("gpio/omap: don't
+> create an IRQ mapping for every GPIO on DT") breaks the boot on the
+> OMAP5912 OSK:
 
-Tony
+I'm contemplating just reverting this whole series, as I didn't like
+the approach from the beginning and it has exploded in exactly
+the way I thought it would.
+
+If we revert these three patches:
+
+commit 949eb1a4d29dc75e0b5b16b03747886b52ecf854
+"gpio/omap: fix build error when OF_GPIO is not defined."
+commit b4419e1a15905191661ffe75ba2f9e649f5d565e
+"gpio/omap: auto request GPIO as input if used as IRQ via DT"
+commit 0e970cec05635adbe7b686063e2548a8e4afb8f4
+"gpio/omap: don't create an IRQ mapping for every GPIO on DT"
+
+Does the OMAP1 boot again after this?
+
+I think it's a way better idea to proceed with input-hogs on the gpiochip
+DT node and use that to get auto-request on the GPIO lines that
+will be used as IRQs only.
+
+Yours,
+Linus Walleij
