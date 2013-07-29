@@ -1,40 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 29 Jul 2013 15:21:12 -0400
-Subject: NSA310 + DT
-In-Reply-To: <51F6A0DC.3020501@uni-bremen.de>
-References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
-Message-ID: <20130729192112.GY29916@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 29 Jul 2013 20:48:29 +0100
+Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
+In-Reply-To: <20130729172339.GT29916@titan.lakedaemon.net>
+References: <2469263.vMN09Q7Tzi@flatron>
+ <20130729150124.GS29916@titan.lakedaemon.net>
+ <20130729164905.GB2280@localhost.localdomain>
+ <20130729172339.GT29916@titan.lakedaemon.net>
+Message-ID: <20130729194829.GG9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Finn,
+On Mon, Jul 29, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
 
-On Mon, Jul 29, 2013 at 07:05:32PM +0200, Finn Hoffmann wrote:
-> Hello,
-> 
-> I have tried to get a current Kernel running on my NSA310.
+> true, the answer to this problem may be to create a depgraph of the
+> nodes based on phandles and child status, then init.  However, if the
+> goal is to accelerate boot times, then that should not be calculated
+> during each boot, especially since it doesn't likely change from boot to
+> boot.
 
-Nice.
-
-> Everything works well on Kernels before DT with the mentioned
-> patches from https://github.com/peeter123/NSA310-320-debian .
-> I have linux-3.10.2 running and after I changed the dts file to lm85
-> sensors and fanconrtol work but GPIO does not.
-> I tried https://github.com/lunn/linux/tree/v3.11-rc1-nsa310-tdc and
-> linux-3.11.0-rc3.
-> Both have the problem that r8169 is not working:
-> r8169: eth0: unknown chipset (mac_version = 0).
-> and console is spammed with
-> r8169 0000:01:00.0 eth0: rtl_phyar_cond == 0 (loop: 20, delay: 25).
-> until I take eth0 down.
-> GPIO is working.
-> 
-> Any ideas?
-
-Adding Andrew Lunn to the Cc: as he is more familiar with those DT
-changes.  In future, please Cc myself, Andrew, and Gregory Clement so we
-don't miss the email.
-
-thx,
-
-Jason.
+FWIW this is broadly speaking what deferred probing is supposed to do -
+it seemed too complex and fragile to make the graph for board files so
+Grant came up with the idea of deferred probing which aims to sidestep
+the problem and work it out dynamically, also providing a fallback in
+case something that has actually optimised the ordering misses some case
+(cleaning up after the effects of parallel probes for example).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/2f39878e/attachment.sig>
