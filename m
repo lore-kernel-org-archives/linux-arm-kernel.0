@@ -1,50 +1,109 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 29 Jul 2013 11:38:19 +0530
-Subject: [PATCH] DMAEngine: sirf: let the users be able to pause and
- resume specific buffer
-In-Reply-To: <CAGsJ_4wOdDMku-pNWiH-DoS_v39PfFwNYcU4T1Thsd-+L9A8AQ@mail.gmail.com>
-References: <1372927373-17407-1-git-send-email-Baohua.Song@csr.com>
- <CAGsJ_4wOdDMku-pNWiH-DoS_v39PfFwNYcU4T1Thsd-+L9A8AQ@mail.gmail.com>
-Message-ID: <20130729060819.GE29095@intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Jul 2013 08:54:31 +0200
+Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
+In-Reply-To: <20130728162711.32a9a21e@skate>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <51E41F7A.4010502@gmail.com> <20130728043310.6CF1D3E08FE@localhost>
+ <20130728162711.32a9a21e@skate>
+Message-ID: <20130729065431.GA1115@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 10:14:24AM +0800, Barry Song wrote:
-> 2013/7/4 Barry Song <Baohua.Song@csr.com>
-well the submitter didn't cc me. So this wasnt in my INBOX!
+On Sun, Jul 28, 2013 at 04:27:11PM +0200, Thomas Petazzoni wrote:
+> Dear Grant Likely,
+> 
+> Thanks for your feedback! Some comments below.
+> 
+> On Sat, 27 Jul 2013 22:33:10 -0600, Grant Likely wrote:
+> 
+> > > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > 
+> > > Acked-by: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Actually, I'm going to disagree on this one and say NAK. I don't think
+> > it is a good idea to create a completely separate registry of msi_chips
+> > for binding to dt nodes. I think it would be better to include the
+> > msi_chip pointer directly into the irq_domain which has to be there
+> > anyway. It then becomes another feature for irq controllers if it can
+> > support doing MSI.
+> 
+> The problem that this patch tries to solve is how can the PCIe driver
+> work get a pointer to the msi_chip structure from the DT device node
+> pointed to by the 'msi-parent' property. I.e, we have:
+> 
+> 	interrupt-parent = <&mpic>;
+> 
+> 	mpic {
+> 		reg = <...>;
+> 		compatible = "...";
+> 		interrupt-controller;
+> 		msi-controller;
+> 	};
+> 
+> 	pcie-controller {
+> 		msi-parent = <&mpic>;
+> 	};
+> 
+> The 'mpic' driver registers two irq_domains, one for the "normal"
+> interrupts, and one for the MSI interrupts. Both irq_domain cannot be
+> associated to the same &mpic node, or the irq_domain lookup for
+> interrupt-parent and msi-parent is going to be confused.
+> 
+> In the very first version of this patch set, I was using two separate
+> DT device nodes to avoid this problem:
+> 
+> 	interrupt-parent = <&mpic>;
+> 
+> 	interrupt-controller {
+> 		reg = <...>;
+> 		compatible = "...";
+> 
+> 		mpic {
+> 			interrupt-controller;
+> 		};
+> 
+> 		msi {
+> 			msi-controller;
+> 		};
+> 	};
+> 
+> 	pcie-controller {
+> 		msi-parent = <&msi>;
+> 	};
+> 
+> This way, each of the two irq_domain was associated to a distinct DT
+> device node, and everything was working fine. But during the review, I
+> was pointed by Arnd that it wasn't the proper way of describing the
+> interrupt controller, and that there should be only one DT device node
+> having both the interrupt-controller and msi-controller roles.
+> 
+> So what is your suggestion to allow the PCIe controller to retrieve the
+> correct irq_domain if we have only one DT node for the IRQ controller
+> that registers two irq_domains ?
 
-> >
-> > From: Qipan Li <Qipan.Li@csr.com>
-> >
-> > this patch adds a buffer_index in pause and resume entries, then users
-> > can pause and resume a buffer they want, but don't pause the whole dma.
-> >
-> > a typical application scenerios is Ping-Pang in two buffers:
-typo, pong	          		^^^^^^^^^
-> > at the beginning, we enable buf1 and buf2 to receive dma data, after
-> > buf1 is full, we pause buf1 and handle the data in this buffer to avoid
-> > overflow in buf1. but at the same time, dma is still tranferring in buf2.
-> > once we have finished data process in buf1, we enable buf1 again.
-> > this will maximize the chance of dma transferring. users pause buf1 by:
-> > dmaengine_device_control(sirfport->rx_dma_chan, DMA_PAUSE, 1);
-> > users pause buf2 by:
-> > dmaengine_device_control(sirfport->rx_dma_chan, DMA_PAUSE, 2);
-> > users can still pause the whole dma transferring by dmaengine_pause().
-Well this is odd, the second arg is not supposed to be valid for PAUSE op. And
-PAUSE means you pause the whole channel.
+If I understand correctly, Grant isn't objecting to the introduction of
+the lookup function, but rather its implementation. You could add a
+pointer to a struct msi_chip within struct irq_domain and then iterate
+over all irq_domain instances (see irq_find_host()) and find one which
+has the correct device_node pointer and the msi_chip pointer set.
 
-The above can be done by 
-a) have two buffers:
-	- prepare first and submit, and start
-	- while first is ongoing, prepare second and start
-	- first is completed, so you start processing that while second is
-	  getting DMAed
-	- when processing is completed, submit first again
-	- when second is completed, start processing that and submit that once
-	  proocessed
+So I think that pretty much boils down to setting the (new) .msi_chip
+field of armada_370_xp_msi_domain to the newly allocated MSI chip in
+armada_370_xp_msi_init() and modify the lookup function to use the
+irq_domain_list instead of the list of of_pci_msi_chip_list(). And a
+whole lot of the infrastructure code can go away because it's already
+there for irq_domain.
 
-b) have multiple buffers, A, B, C & D and redo above schema.
+The good thing about it is that it couples the MSI chip more strongly
+with its associated IRQ domain. And as a bonus we get to omit the list
+and of_node fields from struct msi_chip. =)
 
-Since patch is not the right approach and doesnt use API correctly NAK from me on that
-
-~Vinod
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/3994fc92/attachment.sig>
