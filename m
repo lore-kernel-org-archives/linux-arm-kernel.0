@@ -1,50 +1,93 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 30 Jul 2013 00:45:24 +0200
-Subject: Defining schemas for Device Tree
-In-Reply-To: <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
-References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
- <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
-Message-ID: <1706112.Xn49tiCSKF@thinkpad>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 30 Jul 2013 02:46:23 +0400
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
+In-Reply-To: <87a9lacd6o.wl%kuninori.morimoto.gx@renesas.com>
+References: <201307230218.01495.sergei.shtylyov@cogentembedded.com>
+ <201307230222.04763.sergei.shtylyov@cogentembedded.com>
+ <20130726001052.GA28912@verge.net.au>
+ <87a9lacd6o.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <51F6F0BF.2030004@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 of July 2013 18:23:30 jonsmirl at gmail.com wrote:
-> The schema should enforce some kind of regularity into the description
-> of similar devices.  Take SPI for example. I pulled these SPI
-> controller definitions from the kernel source. Obviously all of these
-> controllers are different, but it seems to me that their definitions
-> could be made more regular. DMA seems like it could use a lot of help.
+Hello.
 
-Well, there is not much in common in bindings for all those SPI controllers, 
-other than general device attributes, such as compatible and reg (not even 
-interrupts - see spi-gpio).
+On 07/26/2013 05:39 AM, Kuninori Morimoto wrote:
 
-There is a lot of generic binding templates (as I called this kind of bindings 
-in my first mail) involved here, though.
+>>> +static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
+>>> +	{
+>>> +		.id	= HPBDMA_SLAVE_SDHI0_TX,
+>>> +		.addr	= 0xffe4c000 + 0x30,
+>>> +		.dcr	= DCR_SPDS_16BIT | DCR_DMDL | DCR_DPDS_16BIT,
+>>> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
+>>> +			  ASYNCRSTR_ASRST23,
+>>> +		.mdr	= ASYNCMDR_ASMD21_SINGLE,
+>>> +		.mdm	= ASYNCMDR_ASMD21_MASK,
+>>> +		.port	= 0x0D0C,
+>>> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
+>>> +		.dma_ch	= 21,
+>>> +	}, {
+>>> +		.id	= HPBDMA_SLAVE_SDHI0_RX,
+>>> +		.addr	= 0xffe4c000 + 0x30,
+>>> +		.dcr	= DCR_SMDL | DCR_SPDS_16BIT | DCR_DPDS_16BIT,
+>>> +		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
+>>> +			  ASYNCRSTR_ASRST23,
+>>> +		.mdr	= ASYNCMDR_ASMD22_SINGLE,
+>>> +		.mdm	= ASYNCMDR_ASMD22_MASK,
+>>> +		.port	= 0x0D0C,
+>>> +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
+>>> +		.dma_ch	= 22,
+>>> +	},
 
-Taking one of the controllers as the example:
-> spi0: spi at f0000000 {
-> #address-cells = <1>;
-> #size-cells = <0>;
-> compatible = "atmel,at91rm9200-spi";
-> reg = <0xf0000000 0x100>;
-> interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+> I'm not sure detail of SDHI, but TX and RX are using same .port = 0x0D0C.
 
-/inherit/ "interrupts.dtss", 1;
+    It's not one port, it's a pair of ports, source and destination.
 
-> dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(1)>,
->       <&dma0 1 AT91_DMA_CFG_PER_ID(2)>;
-> dma-names = "tx", "rx";
+> Is this correct ?
+> And what is 0x0C port ?
 
-/inherit/ "dma.dtss", "tx", "rx";
+    SDHI0 if you look into the table 16.7 of the R-Car M1A manual 1.00 for the 
+channels 21 thru 23.
 
-> pinctrl-names = "default";
-> pinctrl-0 = <&pinctrl_spi0>;
+> My datasheet doens't have it on Ch21 - Ch23
 
-/inherit/ "pinctrl.dtss","default";
+    Maybe you're looking at the wrong table or an obsolete manual?
 
-> status = "disabled";
-> };
+>>> +static const struct hpb_dmae_channel hpb_dmae_channels[] = {
+>>> +	/* ch. 21 SD0 */
+>>> +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX),
+>>> +	/* ch. 22 SD0 */
+>>> +	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX),
+>>> +};
+>>> +
+>>> +static struct hpb_dmae_pdata dma_platform_data __initdata = {
+>>> +	.slaves			= hpb_dmae_slaves,
+>>> +	.num_slaves		= ARRAY_SIZE(hpb_dmae_slaves),
+>>> +	.channels		= hpb_dmae_channels,
+>>> +	.num_channels		= ARRAY_SIZE(hpb_dmae_channels),
+>>> +	.ts_shift		= {
+>>> +		[XMIT_SZ_8BIT]	= 0,
+>>> +		[XMIT_SZ_16BIT]	= 1,
+>>> +		[XMIT_SZ_32BIT]	= 2,
+>>> +	},
+>>> +	.num_hw_channels	= 39,
+>>> +};
 
-Best regards,
-Tomasz
+> This is not a big deal, but according to .num_hw_channels,
+> we will have max 39 channels (or more over).
+
+> I want 1 line for 1 channels on hpb_dmae_channels.
+> like this
+
+> static const struct hpb_dmae_channel hpb_dmae_channels[] = {
+> 	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch21 */
+> 	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch22 */
+> }
+
+    OK, done.
+
+> Best regards
+> ---
+> Kuninori Morimoto
+
+WBR, Sergei
