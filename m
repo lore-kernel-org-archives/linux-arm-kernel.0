@@ -1,14 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 29 Jul 2013 14:29:04 +0200
-Subject: [PATCH 2/4] ARM: dove: add common pinmux functions to DT
+Date: Mon, 29 Jul 2013 14:29:03 +0200
+Subject: [PATCH 1/4] ARM: dove: add cpu device tree node
 In-Reply-To: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1375100946-28521-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1375100946-28521-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds common dedicated and gpio pinmux functions to SoC pinctrl
-node. It also relocates pinctrl references to corresponding DT nodes.
+This adds a node for the Marvell Sheeva PJ4A CPU found on Dove SoCs.
+While at it, also move the l2-cache node out of internal registers and
+consistently name different nodes.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -19,276 +20,177 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/dove-cubox.dts |   23 +----
- arch/arm/boot/dts/dove.dtsi      |  183 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 186 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/dove.dtsi |   52 ++++++++++++++++++++++++++-----------------
+ 1 file changed, 32 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-index 955188f..525fb45 100644
---- a/arch/arm/boot/dts/dove-cubox.dts
-+++ b/arch/arm/boot/dts/dove-cubox.dts
-@@ -42,6 +42,8 @@
- 			regulator-always-on;
- 			regulator-boot-on;
- 			gpio = <&gpio0 1 0>;
-+			pinctrl-0 = <&pmx_gpio_1>;
-+			pinctrl-names = "default";
- 		};
- 	};
- 
-@@ -110,6 +112,7 @@
- 	status = "okay";
- 	/* sdio0 card detect is connected to wrong pin on CuBox */
- 	cd-gpios = <&gpio0 12 1>;
-+	pinctrl-0 = <&pmx_sdio0 &pmx_gpio_12>;
- };
- 
- &spi0 {
-@@ -122,23 +125,3 @@
- 		reg = <0>;
- 	};
- };
--
--&pinctrl {
--	pinctrl-0 = <&pmx_gpio_1 &pmx_gpio_12>;
--	pinctrl-names = "default";
--
--	pmx_gpio_1: pmx-gpio-1 {
--		marvell,pins = "mpp1";
--		marvell,function = "gpio";
--	};
--
--	pmx_gpio_12: pmx-gpio-12 {
--		marvell,pins = "mpp12";
--		marvell,function = "gpio";
--	};
--
--	pmx_gpio_18: pmx-gpio-18 {
--		marvell,pins = "mpp18";
--		marvell,function = "gpio";
--	};
--};
 diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 09d9710..90257c7 100644
+index 8d5be1e8..09d9710 100644
 --- a/arch/arm/boot/dts/dove.dtsi
 +++ b/arch/arm/boot/dts/dove.dtsi
-@@ -99,6 +99,8 @@
- 			reg-shift = <2>;
- 			interrupts = <8>;
+@@ -10,6 +10,23 @@
+ 		gpio2 = &gpio2;
+ 	};
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			compatible = "marvell,pj4a", "marvell,sheeva-v7";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <0>;
++		};
++	};
++
++	l2: l2-cache {
++		compatible = "marvell,tauros2-cache";
++		marvell,tauros2-cache-features = <0>;
++	};
++
+ 	soc at f1000000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -25,11 +42,6 @@
+ 		          0xf2100000 0xf2100000 0x0100000   /* PCIe0 I/O   1M */
+ 		          0xf8000000 0xf8000000 0x8000000>; /* BootROM   128M */
+ 
+-		l2: l2-cache {
+-			compatible = "marvell,tauros2-cache";
+-			marvell,tauros2-cache-features = <0>;
+-		};
+-
+ 		timer: timer at 20300 {
+ 			compatible = "marvell,orion-timer";
+ 			reg = <0x20300 0x20>;
+@@ -60,14 +72,14 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
+-		gate_clk: clock-gating-control at d0038 {
++		gate_clk: clock-gating-ctrl at d0038 {
+ 			compatible = "marvell,dove-gating-clock";
+ 			reg = <0xd0038 0x4>;
  			clocks = <&core_clk 0>;
-+			pinctrl-0 = <&pmx_uart1>;
-+			pinctrl-names = "default";
+ 			#clock-cells = <1>;
+ 		};
+ 
+-		thermal: thermal at d001c {
++		thermal: thermal-diode at d001c {
+ 			compatible = "marvell,dove-thermal";
+ 			reg = <0xd001c 0x0c>, <0xd005c 0x08>;
+ 		};
+@@ -108,7 +120,7 @@
  			status = "disabled";
  		};
  
-@@ -154,6 +156,181 @@
+-		gpio0: gpio at d0400 {
++		gpio0: gpio-ctrl at d0400 {
+ 			compatible = "marvell,orion-gpio";
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+@@ -119,7 +131,7 @@
+ 			interrupts = <12>, <13>, <14>, <60>;
+ 		};
+ 
+-		gpio1: gpio at d0420 {
++		gpio1: gpio-ctrl at d0420 {
+ 			compatible = "marvell,orion-gpio";
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+@@ -130,7 +142,7 @@
+ 			interrupts = <61>;
+ 		};
+ 
+-		gpio2: gpio at e8400 {
++		gpio2: gpio-ctrl at e8400 {
+ 			compatible = "marvell,orion-gpio";
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+@@ -138,13 +150,13 @@
+ 			ngpios = <8>;
+ 		};
+ 
+-		pinctrl: pinctrl at d0200 {
++		pinctrl: pin-ctrl at d0200 {
  			compatible = "marvell,dove-pinctrl";
  			reg = <0xd0200 0x10>;
  			clocks = <&gate_clk 22>;
-+
-+			pmx_gpio_0: pmx-gpio-0 {
-+				marvell,pins = "mpp0";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_1: pmx-gpio-1 {
-+				marvell,pins = "mpp1";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_2: pmx-gpio-2 {
-+				marvell,pins = "mpp2";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_3: pmx-gpio-3 {
-+				marvell,pins = "mpp3";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_4: pmx-gpio-4 {
-+				marvell,pins = "mpp4";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_5: pmx-gpio-5 {
-+				marvell,pins = "mpp5";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_6: pmx-gpio-6 {
-+				marvell,pins = "mpp6";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_7: pmx-gpio-7 {
-+				marvell,pins = "mpp7";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_8: pmx-gpio-8 {
-+				marvell,pins = "mpp8";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_9: pmx-gpio-9 {
-+				marvell,pins = "mpp9";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_10: pmx-gpio-10 {
-+				marvell,pins = "mpp10";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_11: pmx-gpio-11 {
-+				marvell,pins = "mpp11";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_12: pmx-gpio-12 {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_13: pmx-gpio-13 {
-+				marvell,pins = "mpp13";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_14: pmx-gpio-14 {
-+				marvell,pins = "mpp14";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_15: pmx-gpio-15 {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_16: pmx-gpio-16 {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_17: pmx-gpio-17 {
-+				marvell,pins = "mpp17";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_18: pmx-gpio-18 {
-+				marvell,pins = "mpp18";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_19: pmx-gpio-19 {
-+				marvell,pins = "mpp19";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_20: pmx-gpio-20 {
-+				marvell,pins = "mpp20";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_gpio_21: pmx-gpio-21 {
-+				marvell,pins = "mpp21";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_camera: pmx-camera {
-+				marvell,pins = "mpp_camera";
-+				marvell,function = "camera";
-+			};
-+
-+			pmx_camera_gpio: pmx-camera-gpio {
-+				marvell,pins = "mpp_camera";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_sdio0: pmx-sdio0 {
-+				marvell,pins = "mpp_sdio0";
-+				marvell,function = "sdio0";
-+			};
-+
-+			pmx_sdio0_gpio: pmx-sdio0-gpio {
-+				marvell,pins = "mpp_sdio0";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_sdio1: pmx-sdio1 {
-+				marvell,pins = "mpp_sdio1";
-+				marvell,function = "sdio1";
-+			};
-+
-+			pmx_sdio1_gpio: pmx-sdio1-gpio {
-+				marvell,pins = "mpp_sdio1";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_audio1_gpio: pmx-audio1-gpio {
-+				marvell,pins = "mpp_audio1";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_spi0: pmx-spi0 {
-+				marvell,pins = "mpp_spi0";
-+				marvell,function = "spi0";
-+			};
-+
-+			pmx_spi0_gpio: pmx-spi0-gpio {
-+				marvell,pins = "mpp_spi0";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_uart1: pmx-uart1 {
-+				marvell,pins = "mpp_uart1";
-+				marvell,function = "uart1";
-+			};
-+
-+			pmx_uart1_gpio: pmx-uart1-gpio {
-+				marvell,pins = "mpp_uart1";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_nand: pmx-nand {
-+				marvell,pins = "mpp_nand";
-+				marvell,function = "nand";
-+			};
-+
-+			pmx_nand_gpo: pmx-nand-gpo {
-+				marvell,pins = "mpp_nand";
-+				marvell,function = "gpo";
-+			};
  		};
  
- 		spi0: spi-ctrl at 10600 {
-@@ -164,6 +341,8 @@
- 			interrupts = <6>;
- 			reg = <0x10600 0x28>;
- 			clocks = <&core_clk 0>;
-+			pinctrl-0 = <&pmx_spi0>;
-+			pinctrl-names = "default";
+-		spi0: spi at 10600 {
++		spi0: spi-ctrl at 10600 {
+ 			compatible = "marvell,orion-spi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -155,7 +167,7 @@
  			status = "disabled";
  		};
  
-@@ -211,6 +390,8 @@
+-		spi1: spi at 14600 {
++		spi1: spi-ctrl at 14600 {
+ 			compatible = "marvell,orion-spi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -166,7 +178,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		i2c0: i2c at 11000 {
++		i2c0: i2c-ctrl at 11000 {
+ 			compatible = "marvell,mv64xxx-i2c";
+ 			reg = <0x11000 0x20>;
+ 			#address-cells = <1>;
+@@ -194,7 +206,7 @@
+ 			status = "okay";
+ 		};
+ 
+-		sdio0: sdio at 92000 {
++		sdio0: sdio-host at 92000 {
+ 			compatible = "marvell,dove-sdhci";
  			reg = <0x92000 0x100>;
  			interrupts = <35>, <37>;
- 			clocks = <&gate_clk 8>;
-+			pinctrl-0 = <&pmx_sdio0>;
-+			pinctrl-names = "default";
+@@ -202,7 +214,7 @@
  			status = "disabled";
  		};
  
-@@ -219,6 +400,8 @@
+-		sdio1: sdio at 90000 {
++		sdio1: sdio-host at 90000 {
+ 			compatible = "marvell,dove-sdhci";
  			reg = <0x90000 0x100>;
  			interrupts = <36>, <38>;
- 			clocks = <&gate_clk 9>;
-+			pinctrl-0 = <&pmx_sdio1>;
-+			pinctrl-names = "default";
+@@ -210,7 +222,7 @@
  			status = "disabled";
  		};
  
+-		sata0: sata at a0000 {
++		sata0: sata-host at a0000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0xa0000 0x2400>;
+ 			interrupts = <62>;
+@@ -219,12 +231,12 @@
+ 			status = "disabled";
+ 		};
+ 
+-		rtc at d8500 {
++		rtc: real-time-clock at d8500 {
+ 			compatible = "marvell,orion-rtc";
+ 			reg = <0xd8500 0x20>;
+ 		};
+ 
+-		crypto: crypto at 30000 {
++		crypto: crypto-engine at 30000 {
+ 			compatible = "marvell,orion-crypto";
+ 			reg = <0x30000 0x10000>,
+ 			      <0xc8000000 0x800>;
+@@ -291,7 +303,7 @@
+ 			};
+ 		};
+ 
+-		eth: ethernet-controller at 72000 {
++		eth: ethernet-ctrl at 72000 {
+ 			compatible = "marvell,orion-eth";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 1.7.10.4
