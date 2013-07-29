@@ -1,26 +1,33 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 29 Jul 2013 11:29:52 -0600
-Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
-In-Reply-To: <20130729172339.GT29916@titan.lakedaemon.net>
-References: <2469263.vMN09Q7Tzi@flatron>
- <20130729150124.GS29916@titan.lakedaemon.net>
- <20130729164905.GB2280@localhost.localdomain>
- <20130729172339.GT29916@titan.lakedaemon.net>
-Message-ID: <20130729172952.GA1884@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 29 Jul 2013 11:33:58 -0600
+Subject: Board-specific GPIO setup code
+In-Reply-To: <CAOMZO5DCPvKVJNVp9cZMiMvY3bxhXdjmJs+dqNXdhxDDoSLQmQ@mail.gmail.com>
+References: <51F568AD.8030001@prisktech.co.nz> <51F69D2B.6030605@wwwdotorg.org>
+ <CAOMZO5DCPvKVJNVp9cZMiMvY3bxhXdjmJs+dqNXdhxDDoSLQmQ@mail.gmail.com>
+Message-ID: <51F6A786.4080709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
+On 07/29/2013 11:21 AM, Fabio Estevam wrote:
+> On Mon, Jul 29, 2013 at 1:49 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 07/28/2013 12:53 PM, Tony Prisk wrote:
+>>> On the Wandboard (IMX6Q SoC), there is a WiFi module connected via SDIO
+>>> that requires a reset procedure to enable it. This would be board
+>>> specific setup, but gpio_* functions can't be used in
+>>> arch/arm/mach-imx/imx6q.c
+>>>
+>>> What would be the correct place to perform the reset code (basically a
+>>> series of gpio calls) to reset the WiFi controller or should it be done
+>>> earlier in uboot?
+>>
+>> The correct approach is probably to enhance the SDIO controller (or SDIO
+>> core) to know how to power/reset/... the device that's attached to it.
+> 
+> Can't we just use the gpio reset driver proposed by Philipp Zabel?
+> http://www.spinics.net/lists/arm-kernel/msg261771.html
 
-> true, the answer to this problem may be to create a depgraph of the
-> nodes based on phandles and child status, then init.  However, if the
-> goal is to accelerate boot times, then that should not be calculated
-> during each boot, especially since it doesn't likely change from boot to
-> boot.
+Quite possibly, but the SD binding and driver still would need to be
+updated to actually invoke it.
 
-That seems like a really smart idea. dtc could store the startup-order
-and dependencies in the dtb someplace and the kernel can just run
-through that. Using a combination of declaration order and
-topo-phandle sorting would probably cover all cases???
-
-Jason
+Also, that only covers reset, not any enable GPIO, 32KHz clock,
+regulator, etc.
