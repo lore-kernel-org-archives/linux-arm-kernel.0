@@ -1,66 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 29 Jul 2013 14:36:46 +0200
-Subject: [PATCH 3/5] ARM: dove: add MBus DT node
-In-Reply-To: <1375101114-28858-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1375101114-28858-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <51F661DE.1070106@gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 29 Jul 2013 14:40:33 +0200
+Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
+ for every GPIO on DT"
+In-Reply-To: <CACRpkdZ1E9zC_yyK=UkJSejCwb_k7sYfhNgH5NASZ8Nf-qt2KA@mail.gmail.com>
+References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
+ <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
+ <51F633AE.8090308@collabora.co.uk>
+ <alpine.DEB.2.02.1307290943000.30864@utopia.booyaka.com>
+ <D135FD6D-D4B6-4237-9866-4FFED36C03CD@collabora.co.uk>
+ <CACRpkdZ1E9zC_yyK=UkJSejCwb_k7sYfhNgH5NASZ8Nf-qt2KA@mail.gmail.com>
+Message-ID: <798C2D39-EE8E-4C73-A98D-63231375599C@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 02:31 PM, Sebastian Hesselbarth wrote:
-> This adds a MBus node including ranges and pcie apertures required later.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
->   arch/arm/boot/dts/dove.dtsi |   19 +++++++++++++++++++
->   1 file changed, 19 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 397674c..bdda016 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -29,6 +29,20 @@
->   		marvell,tauros2-cache-features = <0>;
->   	};
->
-> +	mbus {
-> +		compatible = "marvell,dove-mbus", "marvell,mbus", "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		pcie-mem-aperture = <0xe0000000 0x10000000>; /* 256M MEM space */
-> +		pcie-io-aperture  = <0xf2000000 0x00200000>; /*   2M I/O space */
+On 29/07/2013, at 13:43, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Actually, current v9 of the mbus patch set still requires "controller"
-property to match the corresponding controller node. I had a short
-discussion with Ezequiel to possibly just use of_find_compatible_node
-and blindly assumed post-v8 will already use it.
+> On Mon, Jul 29, 2013 at 12:19 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+> 
+>> I guess the safer approach is to just revert these since they are causing
+>> a regression and what the patches aims to fix as been broken since the
+>> initial OMAP migration to DT anyways.
+> 
+> I have already reverted these and pushed to linux-next.
+> 
 
-I will re-post the final patch set anyway on what mbus binding will be
-merged for v3.12.
+Thanks for doing that and sorry for all the inconvenience.
 
-Sebastian
+Too bad this regression was not found before the patches hit mainline and they even were on linux-next for some time but shit happens :-(
 
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x0100000   /* MBUS regs  1M */
-> +			  MBUS_ID(0xf0, 0x02) 0 0xf1800000 0x1000000   /* AXI  regs 16M */
-> +			  MBUS_ID(0x01, 0xfd) 0 0xf8000000 0x8000000   /* BootROM  128M */
-> +			  MBUS_ID(0x03, 0x01) 0 0xc8000000 0x0100000   /* CESA SRAM  1M */
-> +			  MBUS_ID(0x0d, 0x00) 0 0xf0000000 0x0100000>; /* PMU  SRAM  1M */
-> +	};
-> +
->   	soc at f1000000 {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> @@ -44,6 +58,11 @@
->   		          0xf2100000 0xf2100000 0x0100000   /* PCIe0 I/O   1M */
->   		          0xf8000000 0xf8000000 0x8000000>; /* BootROM   128M */
->
-> +		mbusc: mbus-ctrl at 20000 {
-> +			compatible = "marvell,mbus-controller";
-> +			reg = <0x20000 0x80>, <0x800100 0x8>;
-> +		};
-> +
->   		timer: timer at 20300 {
->   			compatible = "marvell,orion-timer";
->   			reg = <0x20300 0x20>;
->
+> Actually input-hogs was not such a good idea either, after
+> meditating on this I realized that the information about what
+> GPIOs are used as interrupts is a piece of information that
+> already exist in the device tree, albeit a bit distributed.
+> 
+> So I'm drafting an RFC to indicate how I think this should
+> be solved.
+> 
+
+Great, I hope we can finally have a good solution for this long standing issue.
+
+> Yours,
+> Linus Walleij
+
+Best regards,
+Javier
