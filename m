@@ -1,71 +1,66 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 29 Jul 2013 16:10:19 +0200
-Subject: [PATCH 1/4] ARM: dove: add cpu device tree node
-In-Reply-To: <51F6630D.5010603@arm.com>
-References: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1375100946-28521-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <51F6630D.5010603@arm.com>
-Message-ID: <51F677CB.4090100@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 29 Jul 2013 16:11:44 +0200
+Subject: [GIT PULL FOR v3.12] sh-pfc fixes and enhancements
+Message-ID: <4601856.fyKLDdx1qP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 02:41 PM, Sudeep KarkadaNagesha wrote:
-> On 29/07/13 13:29, Sebastian Hesselbarth wrote:
->> This adds a node for the Marvell Sheeva PJ4A CPU found on Dove SoCs.
->> While at it, also move the l2-cache node out of internal registers and
->> consistently name different nodes.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>   arch/arm/boot/dts/dove.dtsi |   52 ++++++++++++++++++++++++++-----------------
->>   1 file changed, 32 insertions(+), 20 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
->> index 8d5be1e8..09d9710 100644
->> --- a/arch/arm/boot/dts/dove.dtsi
->> +++ b/arch/arm/boot/dts/dove.dtsi
->> @@ -10,6 +10,23 @@
->>   		gpio2 = &gpio2;
->>   	};
->>
->> +	cpus {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		cpu0: cpu at 0 {
->> +			compatible = "marvell,pj4a", "marvell,sheeva-v7";
->> +			device_type = "cpu";
->> +			next-level-cache = <&l2>;
->> +			reg = <0>;
->> +		};
->> +	};
->> +
->> +	l2: l2-cache {
->> +		compatible = "marvell,tauros2-cache";
->> +		marvell,tauros2-cache-features = <0>;
->> +	};
-> Hi Sebastian,
->
-> This is not entirely related to the patch but thought of checking with
-> you. I was trying to get info on L2 cache controller on Marvell SoCs,
-> mainly structure or way/set size. Is that something we can get
-> dynamically ? Some specification I referred said its integrated and some
-> said its separate(not unified). Basically I need information around
-> various L2 cache implementations(Tauros2/Feroceon) from Marvell.
->
-> Any pointers or contacts to get this information will be helpful.
+Hi Linus,
 
-Sudeep,
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-I added Maen and Lior on Cc. Unfortunately, public Marvell SoC
-datasheets only refer some closed Marvell datasheets when it comes
-to CPU(s) used. Maybe they can help out.
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
-Sebastian
+are available in the git repository at:
+
+  git://linuxtv.org/pinchartl/fbdev.git pinmux/next/fixes
+
+for you to fetch changes up to e120cacfaac24d4de31b181371daaef6a5773ee3:
+
+  sh-pfc: r8a7790: Add VIN pin groups and functions (2013-07-29 15:52:14 
++0200)
+
+The patches don't conflict with the 'pin-no-gpio' series, the two series can 
+be applied independently.
+
+----------------------------------------------------------------
+Kunihito Higashiyama (1):
+      sh-pfc: r8a7790: Add MSIOF pin groups and functions
+
+Laurent Pinchart (5):
+      sh-pfc: Remove unneeded mach/<soc>.h includes
+      sh-pfc: sh7372: Replace <mach/irqs.h> with <linux/sh_intc.h>
+      sh-pfc: sh73a0: Remove EXT_IRQ16L and EXT_IRQ16H macros
+      sh-pfc: r8a7790: Sort pin groups and functions alphabetically
+      sh-pfc: r8a7790: Add SCIF2 pin groups and functions
+
+Phil Edworthy (1):
+      sh-pfc: r8a7779: Add I2C pin groups
+
+Shinobu Uehara (2):
+      sh-pfc: r8a7790: Add USB pin groups and functions
+      sh-pfc: r8a7790: Add VIN pin groups and functions
+
+Shinya Kuribayashi (9):
+      sh-pfc: r8a7790: Rename I2C SDA/SCL pins
+      sh-pfc: r8a7790: Remove trailing '_TANS' string from RTS/CTS pins
+      sh-pfc: r8a7790: Remove deprecated Ethernet MII/RMII pins
+      sh-pfc: r8a7790: Remove deprecated RDS pins
+      sh-pfc: r8a7790: Remove deprecated SPV_EVEN pin
+      sh-pfc: r8a7790: Swap SCIFA2_RXD_B and HRX0_C configurations
+      sh-pfc: r8a7790: Add TCLK1 pin configuration support
+      sh-pfc: r8a7790: Add SCIF2 pins configuration support
+      sh-pfc: r8a7790: Fix miscellaneous pinmux configuration tables mistakes
+
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c |    1 -
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c |    1 -
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c |  105 +++
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 1621 ++++++++++++++++++++-------------
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c  |    4 +-
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c  |   68 +-
+ 6 files changed, 1132 insertions(+), 668 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
