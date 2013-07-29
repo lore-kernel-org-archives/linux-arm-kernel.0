@@ -1,28 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Jul 2013 16:36:11 +0200
-Subject: [GIT PULL FOR v3.12] sh-pfc fixes and enhancements
-In-Reply-To: <CACRpkdYjjEt4pKznz95FMkmYi4AkKGmb_=Cdbrrqp5x0B5GnzA@mail.gmail.com>
-References: <4601856.fyKLDdx1qP@avalon>
- <CACRpkdYjjEt4pKznz95FMkmYi4AkKGmb_=Cdbrrqp5x0B5GnzA@mail.gmail.com>
-Message-ID: <CACRpkdanWFjFCpZKGNt601bPAa7Fx6PrPJfw5esZUsJEK2TwyQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 29 Jul 2013 09:39:36 -0500
+Subject: [PATCH 4/7] cpuidle: calxeda: add support to use PSCI calls
+In-Reply-To: <51F678DB.3030308@linaro.org>
+References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+ <1375048598-15637-5-git-send-email-robherring2@gmail.com>
+ <51F678DB.3030308@linaro.org>
+Message-ID: <51F67EA8.8010603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 4:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Jul 29, 2013 at 4:11 PM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
->
->> Hi Linus,
+On 07/29/2013 09:14 AM, Daniel Lezcano wrote:
+> On 07/28/2013 11:56 PM, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
 >>
->> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+>> This updates the Calxeda cpuidle driver to use PSCI calls to powergate
+>> cores. This is needed to enable cpuidle for the ECX-2000.
 >>
->>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+>> This could possibly become a generic PSCI driver, but there are no other
+>> PSCI users in the kernel other than mach-virt.
 >>
->> are available in the git repository at:
->
-> Excellent Laurent, pulled and pushed for-next for testing.
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: linux-pm at vger.kernel.org
+>> ---
+> 
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-I re-pulled this on top of the GPIO fixes and pushed.
+Thanks.
 
-Yours,
-Linus Walleij
+> 
+> Rob,
+> 
+> Shall I take the patch in my tree ?
+
+No, there are interdependencies with the rest of the series, so I plan
+to send to arm-soc.
+
+Rob
