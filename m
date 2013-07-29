@@ -1,48 +1,103 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Mon, 29 Jul 2013 16:39:45 -0500
-Subject: [PATCH v4 2/6] misc: sram: add ability to mark sram sections as
- reserved
-In-Reply-To: <1375106520.4223.24.camel@pizza.hi.pengutronix.de>
-References: <201307291510.31679.heiko@sntech.de>
- <201307291512.25126.heiko@sntech.de>
- <1375106520.4223.24.camel@pizza.hi.pengutronix.de>
-Message-ID: <CAHCPf3vSQHtRkk-_cs3monHfrF-hVx3vTDt1ctcax_bspXDmsg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 29 Jul 2013 15:47:55 -0600
+Subject: Defining schemas for Device Tree
+In-Reply-To: <2469263.vMN09Q7Tzi@flatron>
+References: <2469263.vMN09Q7Tzi@flatron>
+Message-ID: <51F6E30B.7060106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 9:02 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Hi Heiko,
->
-> Am Montag, den 29.07.2013, 15:12 +0200 schrieb Heiko St?bner:
->> Some SoCs need parts of their sram for special purposes. So while being part
->> of the peripheral, it should not be part of the genpool controlling the sram.
->>
->> Therefore add an option mmio-sram-reserved to keep arbitrary portions of the
->> sram from being part of the pool.
->>
->> Suggested-by: Rob Herring <robherring2@gmail.com>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
->> ---
->> Philipp: I didn't carry the ack, because the loop changed significantly again.
->> So if it looks ok, could you re-ack it please?
->
-> I'd prefer the first loop to contain the magic and produce a list of
-> useable chunks, instead of a list of reserved blocks. The second loop
-> could then iterate over the array and just call gen_pool_add_virt
-> repeatedly.
->
-> regards
-> Philipp
+On 07/28/2013 06:21 PM, Tomasz Figa wrote:
+...
+> b) What information should be specified in schemas? What level of 
+>    granularity is required?
+> 
+> For each property we need to have at least following data specified:
+>  - property name (or property name format, e.g. regex),
+>  - whether the property is mandatory or optional,
+>  - data type of value.
 
-Agreed, however specifying chunks of memory should probably match the
-format of the standard memory@ node "available" property - mostly
-because it would be the same syntax and definition as defining any
-other chunk of memory, as OpenFirmware and device trees have been
-doing since the dark ages. In this case, why not re-use the
-"available" property name instead of creating a new one? Standard OF
-memory parsing code is then free for you to use to pull the chunks
-out.
+We might want general restrictions on node/property names, e.g. it seems
+we generally prefer - rather than _ in them, although there are a few
+entrenched exceptions.
 
--- 
-Matt Sealey <mwsealey@gmail.com>
+> As for now, I can think of following data types used in device trees:
+>  - boolean (i.e. without value),
+>  - array of strings (including single string),
+>  - array of u32 (including single u32),
+>  - specifier (aka phandle with args, including cases with 0 args),
+>  - variable-length cells (e.g. #address-cells of u32s).
+> 
+> Some properties might require a combination of data types to be specified 
+
+I believe phandles are just cells in terms of the storage type at least.
+Hence, I'd argue we don't need mixing of types (boolean, cell, string),
+but I see your point about semantically needing to represent different
+cells meaning different things.
+
+> or even an array of combinations, like interrupt-map property, which is an 
+> array of entries consisting of:
+>  - #address-cells u32s,
+>  - #interrupt-cells u32s,
+>  - specifier (phandle of interrupt controller and u32 of count defined by 
+>    #interrupt-cells of the controller).
+> 
+> We probably want to define allowed range of values for given property, be 
+> it contiguous or enumerated.
+
+Where defining the length of a property (or part of it) in terms of
+another #xxx-cells property, we need to specify where that other
+property exists. Sometimes it's the nearest parent node containing the
+property (typical for #address-cells), sometimes it's the node
+containing the property itself (typical for one of the #address-cells
+referenced by a ranges property), and sometimes it's in the node
+referenced by the phandle associated with a specifier.
+
+Other content restrictions might be:
+
+* List must contain (at least) these entries/values.
+
+* List can't contain any other entries/values not specified here.
+
+* List must be in this order vs. any order.
+
+* List logical length (in entries, not bytes/cells) must match the
+logical length of another cell (consider clocks/clock-names).
+
+* Ordering of one property must match ordering of another property
+(again consider clocks/clock-names), although it'd be difficult to tell
+whether this condition was met, perhaps we can at least document it.
+
+I'm sure there will be many more criteria to validate that we're
+forgetting. This is possible the most complex area?
+
+> As for subnodes, I think we need to define following constraints:
+>  - node name (or node name format, e.g. regex),
+
+I don't think node names are supposed to convey any semantic meaning, so
+they probably shouldn't be restricted (much?) by schema.
+
+> d) When should the validation happen and what should handle it?
+...
+> well. Nothing stops us from running validation on already compiled dtbs, 
+> though, using an extra tool.
+
+In a DTB, I'm not sure whether all the type information is still present.
+
+For example, in DTS, the following are very obviously different:
+
+prop = "abc", "def";
+prop = <0x61626300> <0x64656600>;
+
+... whereas in the DTB, I think they are both just two 32-bit values
+that just happen to encode string data or not. Presumably we want the
+validator to force string properties to be specified using string syntax?
+
+Equally, I'm not sure there's any difference between:
+
+prop = <&node>;
+prop = <0x23648689>;
+
+... in the DTB, except that the value just *happens* to match another
+node's phandle value, which could end up leading to false positive
+matches if only applied on the raw values not the syntax?
