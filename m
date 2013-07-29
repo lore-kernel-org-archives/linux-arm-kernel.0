@@ -1,68 +1,61 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 29 Jul 2013 15:08:52 +0200
-Subject: [PATCH v6 02/20] clocksource: samsung_pwm_timer: Correct
- definition of AUTORELOAD bit
-In-Reply-To: <2416336.ny4L9Sf7Ts@flatron>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <1658534.7nG6RFjcTc@flatron> <51EDA3EA.9020502@linaro.org>
- <2416336.ny4L9Sf7Ts@flatron>
-Message-ID: <51F66964.1090803@linaro.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 29 Jul 2013 15:10:31 +0200
+Subject: [PATCH v4 0/6] ARM: rockchip: add smp functionality
+Message-ID: <201307291510.31679.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2013 01:32 AM, Tomasz Figa wrote:
-> PWM channel 4 has its autoreload bit located at different position. This
-> patch fixes the driver to account for that.
-> 
-> This fixes a problem with the clocksource hanging after it overflows because
-> it is not reloaded any more.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+To achieve this, add the scu, the needed sram and power-management-unit.
 
+Tested on a rk3066a (dual core) by me and on a rk3188 (quad core)
+by Ulrich Prinz.
 
->  drivers/clocksource/samsung_pwm_timer.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> Changes since v5:
->  - Added more detailed comment about bit layout in TCON register.
-> 
-> diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
-> index 3fa5b07..5d0049f 100644
-> --- a/drivers/clocksource/samsung_pwm_timer.c
-> +++ b/drivers/clocksource/samsung_pwm_timer.c
-> @@ -44,10 +44,21 @@
->  #define TCFG1_SHIFT(x)	  		((x) * 4)
->  #define TCFG1_MUX_MASK	  		0xf
->  
-> +/*
-> + * Each channel occupies 4 bits in TCON register, but there is a gap of 4
-> + * bits (one channel) after channel 0, so channels have different numbering
-> + * when accessing TCON register.
-> + *
-> + * In addition, the location of autoreload bit for channel 4 (TCON channel 5)
-> + * in its set of bits is 2 as opposed to 3 for other channels.
-> + */
->  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
->  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
->  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
-> -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
-> +#define _TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
-> +#define _TCON_AUTORELOAD4(chan)		(1 << (4 * (chan) + 2))
-> +#define TCON_AUTORELOAD(chan)		\
-> +	((chan < 5) ? _TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
->  
->  DEFINE_SPINLOCK(samsung_pwm_lock);
->  EXPORT_SYMBOL(samsung_pwm_lock);
-> 
+(Note: rk3188 support in general needs additional upcoming patchsets)
 
+changes since v3:
+- address comments from Rob Herring:
+  - split the gathering of the reserve-data into a separate loop
+  - spelling and style fixes
+- first patch only included for reference, already part of the
+  char-misc git tree
+
+changes since v2:
+- rework the sram allocation following the suggestion from Philipp Zabel
+
+changes since v1:
+- add reserved block feature for mmio-sram, to not use two logical
+  sram nodes
+- the sram content is kept intact while the device is running, so
+  copying the trampoline is only needed once
+
+Heiko Stuebner (6):
+  misc: sram: fix error path in sram_probe
+  misc: sram: add ability to mark sram sections as reserved
+  ARM: rockchip: add snoop-control-unit
+  ARM: rockchip: add sram dt nodes and documentation
+  ARM: rockchip: add power-management-unit dt node
+  ARM: rockchip: add smp bringup code
+
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 +++
+ Documentation/devicetree/bindings/misc/sram.txt    |    8 +
+ arch/arm/boot/dts/rk3066a.dtsi                     |   16 ++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/core.h                      |   22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |   32 +++
+ arch/arm/mach-rockchip/platsmp.c                   |  203 ++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ drivers/misc/sram.c                                |  100 +++++++++-
+ 11 files changed, 417 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.10.4
