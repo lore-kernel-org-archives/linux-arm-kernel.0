@@ -1,94 +1,99 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Jul 2013 20:54:13 +0300
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <51F68A56.8060805@ti.com>
-References: <1374829418-27503-1-git-send-email-kishon@ti.com>
- <1374829418-27503-3-git-send-email-kishon@ti.com>
- <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
-Message-ID: <20130729175413.GC4964@radagast>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 29 Jul 2013 12:00:06 -0600
+Subject: [PATCH v2 16/22] iommu/tegra: smmu: Get "nvidia,swgroup" from DT
+In-Reply-To: <20130729.143950.524913713971518557.hdoyu@nvidia.com>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com><1373021097-32420-17-git-send-email-hdoyu@nvidia.com><51E84FFA.8020509@wwwdotorg.org>
+ <20130729.143950.524913713971518557.hdoyu@nvidia.com>
+Message-ID: <51F6ADA6.3040006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jul 29, 2013 at 08:59:26PM +0530, Kishon Vijay Abraham I wrote:
-> >> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
-> >> MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
-> >> device name of the controller had *.auto* in it. Since with using
-> >> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
-> >> the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
-> >> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
-> >> change is done in board file here.
-> >>
-> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >> ---
-> >>  arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
-> >>  arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
-> >>  arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
-> >>  arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
-> >>  arch/arm/mach-omap2/board-igep0020.c         |    2 +-
-> >>  arch/arm/mach-omap2/board-ldp.c              |    2 +-
-> >>  arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
-> >>  arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
-> >>  arch/arm/mach-omap2/board-omap3logic.c       |    2 +-
-> >>  arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
-> >>  arch/arm/mach-omap2/board-omap3stalker.c     |    2 +-
-> >>  arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
-> >>  arch/arm/mach-omap2/board-overo.c            |    2 +-
-> >>  arch/arm/mach-omap2/board-rm680.c            |    2 +-
-> >>  arch/arm/mach-omap2/board-rx51.c             |    2 +-
-> >>  arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
-> >>  16 files changed, 16 insertions(+), 16 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-> >> index 244d8a5..17bb076 100644
-> >> --- a/arch/arm/mach-omap2/board-2430sdp.c
-> >> +++ b/arch/arm/mach-omap2/board-2430sdp.c
-> >> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
-> >>  	omap_hsmmc_init(mmc);
-> >>  
-> >>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
-> >> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> >> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
-> > 
-> > how about moving usb_bind_phy() calls to omap2430.c ?
-> > 
-> > diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> > index f44e8b5..b6abc1a 100644
-> > --- a/drivers/usb/musb/omap2430.c
-> > +++ b/drivers/usb/musb/omap2430.c
-> > @@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
-> >  
-> >  		pdata->board_data	= data;
-> >  		pdata->config		= config;
-> > +	} else {
-> > +		/* bind the PHY */
-> > +		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
+On 07/29/2013 05:39 AM, Hiroshi Doyu wrote:
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 18 Jul 2013 22:28:42 +0200:
 > 
-> This looks like a hack IMHO to workaround the usb phy library. otherwise it is
-> similar to get_phy_by_name.
-
-actually, this is a workaround to the fact that we're not creating all
-platform_devices in arch/arm/mach-omap2/ :-)
-
-If we had the musb allocation there, we could easily handle
-usb_bind_phy()
-
-> > so that's temporary. It might be better than to reintroduce the IDR in
-> > musb_core.c.
+>> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
+>>> This provides the info about which H/W Accelerators are supported on
+>>> Tegra SoC. This info is passed from DT. This is necessary to have the
+>>> unified SMMU driver among Tegra SoCs. Instead of using platform data,
+>>> DT passes "nvidia,swgroup" now. DT is mandatory in Tegra.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt b/Documentation/devicetree/bindings/iommu/nvidia,tegra30-smmu.txt
+>>
+>>> +- nvidia,swgroups: A bitmap of supported HardWare Accelerators(HWA).
+>>> +  Each bit represents one swgroup. The assignments may be found in header
+>>> +  file <dt-bindings/memory/tegra-swgroup.h>.
+>>
+>> There needs to be a default for this field if one is not specified so
+>> that existing DTs continue to work without modification.
 > 
-> that?s needed for generic phy framework anyway :-s
+> Only enabling PPCS(AHB) can be an option because PPCS has SD/MMC where
+> rootfs can be located ususally.
 
-right, but generic phy framework can handle everything just fine, the
-only problem is that names are changing.
+There's no reason that the root filesystem has to be on SD/MMC. Either
+way, the DT binding shouldn't be influenced by the root fs location at all.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/36df298b/attachment.sig>
+I think more explanation of exactly what this property does and why is
+required.
+
+>> How many cells big is this property?
+> 
+> 64
+
+I assume that's bits, so 2 cells? To be clear: the document needs to
+include this information, not just this email thread.
+
+>> Is this really a bitmap of HWAs? Surely it's a bitmap of SMMU client
+>> IDs?
+> 
+> At least this info can be used for PMC too.
+
+How and why? A complete explanation of how the SMMU and PMC are expected
+to interact is required.
+
+The PMC DT binding should include all information related to the PMC;
+the binding definitions probably shouldn't expect a PMC driver to go
+grovelling in an SMMU node to find information.
+
+> .....
+>>> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+>>
+>>> @@ -265,7 +265,7 @@ struct smmu_client {
+>>>  	struct device		*dev;
+>>>  	struct list_head	list;
+>>>  	struct smmu_as		*as;
+>>> -	u32			hwgrp;
+>>> +	u64			hwgrp;
+>>
+>> Why is that "hwgrp" not "swgrp"? Don't they represent the same
+>> thing?
+> 
+> They are same but initial SMMU driver used the term "hwgroup". Should
+> this be renamed with another patch or can it be left as it is?
+
+I thought there had already been a patch to do this rename. Was it not
+complete? If so, that work should probably be completed.
+
+> ....
+>>>  static int __smmu_client_set_hwgrp(struct smmu_client *c,
+>>> -				   unsigned long map, int on)
+>>> +				   u64 map, int on)
+>>>  {
+>>>  	int i;
+>>>  	struct smmu_as *as = c->as;
+>>> @@ -398,12 +400,11 @@ static int __smmu_client_set_hwgrp(struct smmu_client *c,
+>>>  	if (!on)
+>>>  		map = smmu_client_hwgrp(c);
+>>>  
+>>> -	for_each_set_bit(i, &map, HWGRP_COUNT) {
+>>> +	for_each_set_bit(i, (unsigned long *)&map,
+>>> +			 sizeof(map) * BITS_PER_BYTE) {
+>>
+>> Why change the type if it just forces you to add this cast?
+> 
+> u32 map; -> u64 map;
+> 
+> for_each_set_bit() expects "unsigned long *" for any length of bitmap.
+
+Shouldn't the map just be an "unsigned long map[]" then, so no casts are
+needed anywhere? Equally, that pointer could just be passed to the
+function rather than copying the data to the stack?
