@@ -1,70 +1,16 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Jul 2013 16:08:44 -0600
-Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
-In-Reply-To: <20130729092116.GA7656@atomide.com>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090536.5541.36289.stgit@localhost> <51E70B5D.6030802@wwwdotorg.org>
- <20130718073638.GP7656@atomide.com> <51E84180.6080902@wwwdotorg.org>
- <20130719073957.GZ7656@atomide.com> <51E98C71.5010709@wwwdotorg.org>
- <20130729092116.GA7656@atomide.com>
-Message-ID: <51F6E7EC.4000402@wwwdotorg.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 29 Jul 2013 15:18:13 -0700
+Subject: [PATCH v7] watchdog: Add MOXA ART watchdog driver
+In-Reply-To: <1375101228-10930-1-git-send-email-jonas.jensen@gmail.com>
+References: <1375098093-8975-1-git-send-email-jonas.jensen@gmail.com>
+ <1375101228-10930-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <51F6EA25.6090105@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 03:21 AM, Tony Lindgren wrote:
-> * Stephen Warren <swarren@wwwdotorg.org> [130719 12:05]:
->> On 07/19/2013 01:39 AM, Tony Lindgren wrote:
->>>
->>> I think the only sane way to deal with this is to make the I2C controller
->>> to show up as two separate I2C controller instances. Then use runtime
->>> PM to save and restore the state for each instance, and locking between
->>> the two driver instances.
->>>
->>> For the pin muxing part, I'd do this:
->>>
->>> 			i2c1 instance	i2c2 instance	notes
->>> default_state		0 pins		0 pins		(or dedicated pins only)
->>> active_state		all pins	alls pins
->>> idle_state		safe mode	safe mode
->>>
->>> Then when i2c1 instance is done, it's runtime PM suspend muxes the pins
->>> to safe mode, or some nop state. Then when i2c2 instance is woken, it's
->>> runtime PM resume muxes pins to i2c2.
->>
->> I see two issues with that approach:
->>
->> 1) Runtime PM doesn't always put a device into an idle state as soon as
->> its work is done. Sometimes (always?) there is a delay between when the
->> device is last used and when the HW is actually made idle so that if the
->> device is re-activated quickly, the kernel hasn't wasted time making it
->> idle then active again. You'd have to force that delay to complete when
->> switching between the two virtual controller devices.
-> 
-> There is the autosuspend timeout for delayed transitions, but I think
-> runtime PM already has calls for making the state change immediate also.
+On 07/29/2013 05:33 AM, Jonas Jensen wrote:
+> Add watchdog driver for MOXA ART SoCs.
+>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
-True, but I /think/ that then you could never use the APIs that perform
-delayed idle, since you'd always need to force immediate idle to
-guarantee you could always immediately switch to the other
-state/virtual-controller.
-
->> 2) This requires two separate device objects for the two I2C instances.
->> I guess you could have the driver for the one I2C mux node end up
->> instantiating two child devices for this purpose, and hence make that
->> happen without needing to change the DT ABI. However, that sure feels
->> complex...
-> 
-> Yes but you will also automatically get quite a bit of sanity to your
-> I2C driver code rather than trying to handle the two separate instances
-> within the driver alone. Consider things like scanning the I2C buses for
-> devices and just dev_dbg().
-
-The I2C mux is already very simple. IIRC, it instantiates a separate
-"struct i2c_adapter" for each "virtual" I2C controller. It actually
-looks like each of those already embeds its own "struct device", so
-perhaps this issue is a little moot. However, we'd have to find some way
-of redirecting pinctrl requests from those child devices to the
-top-level I2C mux struct device itself, since that's what the pinctrl
-mapping table entries are defined for. It seems much simpler to just
-leave the pinctrl stuff controlled by that top-level device, rather than
-pushing it down to the child virtual devices/adapters.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
