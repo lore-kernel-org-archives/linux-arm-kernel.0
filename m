@@ -1,50 +1,52 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 29 Jul 2013 12:40:48 -0600
-Subject: DT bindings as ABI [was: Do we have people interested in device
- tree janitoring / cleanup?]
-In-Reply-To: <20130729181607.GM24642@n2100.arm.linux.org.uk>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726045433.GB4100@netboy>
- <20130726171524.GB28895@obsidianresearch.com>
- <20130727084825.GA4707@netboy>
- <20130729175400.GB15861@obsidianresearch.com>
- <20130729181607.GM24642@n2100.arm.linux.org.uk>
-Message-ID: <20130729184048.GE15861@obsidianresearch.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 29 Jul 2013 11:41:41 -0700
+Subject: [PATCH] time: sched_clock: fix integer overflow
+In-Reply-To: <20130729055939.GK5161@tarshish>
+References: <232c026d1b8d2556679aea56cf77a6811f9a96c5.1374054369.git.baruch@tkos.co.il>
+ <20130729055939.GK5161@tarshish>
+Message-ID: <51F6B765.9030404@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 07:16:07PM +0100, Russell King - ARM Linux wrote:
+On 07/28/13 22:59, Baruch Siach wrote:
+> Hi Thomas, John,
+>
+> On Wed, Jul 17, 2013 at 12:46:53PM +0300, Baruch Siach wrote:
+>> The expression '(1 << 32)' happens to evaluate as 0 on ARM, but it evaluates as
+>> 1 on xtensa and x86_64. This zeros sched_clock_mask, and breaks sched_clock().
+>> Set the type of 1 to 'unsigned long long' to get the value we need.
+> Ping? -rc3 is out, and this bug (which currently breaks xtensa) is not fixed 
+> yet. Please consider applying.
 
-> What does it take?  Good practice, care, thought and planning.  All
-> the qualities which should already be present for kernel _engineers_.
-> Not an "lets create something for me, I don't care about anyone else"
-> attitude.
+Looks good to me.
 
-I agree with what you've written, but we are looking at this from
-different ends of the problem.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-I fully agree you can create a main line kernel GIT tree that has a
-stable DT ABI.
+>
+>> Reported-by: Max Filippov <jcmvbkbc@gmail.com>
+>> Tested-by: Max Filippov <jcmvbkbc@gmail.com>
+>> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+>> ---
+>>  kernel/time/sched_clock.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+>> index a326f27..0b479a6 100644
+>> --- a/kernel/time/sched_clock.c
+>> +++ b/kernel/time/sched_clock.c
+>> @@ -121,7 +121,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+>>  	BUG_ON(bits > 32);
+>>  	WARN_ON(!irqs_disabled());
+>>  	read_sched_clock = read;
+>> -	sched_clock_mask = (1 << bits) - 1;
+>> +	sched_clock_mask = (1ULL << bits) - 1;
+>>  	cd.rate = rate;
+>>  
+>>  	/* calculate the mult/shift to convert counter ticks to ns. */
+>> -- 
 
-However, I as an ODM, with time pressure, cannot wait for the kernel
-folks to finish this work. So from my perspective the DT will not be
-stable, as I will put whatever interm stuff I choose to have a
-shippable product.
 
-Thus I have to design my systems for an unstable DT, and the message
-from the kernel community to people in my posistion should be:
-
-  When you ship early with non-mainlined DT schema, design your boot
-  system around an unstable DT. Plan to migrate your DT to upstream
-  once it becomes finalized.
-
-Here is the rub: Once I design for an unstable DT I simply don't
-derive value from the kernel communities work to create a stable DT.
-
-So who is getting the benefit of this work, and is it worth the cost?
-
-Jason
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
