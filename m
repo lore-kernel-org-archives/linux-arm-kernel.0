@@ -1,52 +1,39 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 29 Jul 2013 17:05:07 +0530
-Subject: [PATCH] DMAEngine: sirf: let the users be able to pause and
- resume specific buffer
-In-Reply-To: <20130729120830.GH24642@n2100.arm.linux.org.uk>
-References: <1372927373-17407-1-git-send-email-Baohua.Song@csr.com>
- <CAGsJ_4wOdDMku-pNWiH-DoS_v39PfFwNYcU4T1Thsd-+L9A8AQ@mail.gmail.com>
- <20130729120830.GH24642@n2100.arm.linux.org.uk>
-Message-ID: <20130729113507.GJ29095@intel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 29 Jul 2013 14:16:11 +0200
+Subject: [GIT PULL] Reset controller changes for 3.12
+Message-ID: <1375100171.4223.10.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 01:08:30PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 29, 2013 at 10:14:24AM +0800, Barry Song wrote:
-> > 2013/7/4 Barry Song <Baohua.Song@csr.com>
-> > >
-> > > From: Qipan Li <Qipan.Li@csr.com>
-> > >
-> > > this patch adds a buffer_index in pause and resume entries, then users can
-> > > pause and resume a buffer they want, but don't pause the whole dma.
-> > >
-> > > a typical application scenerios is Ping-Pang in two buffers: at the
-> > > beginning, we enable buf1 and buf2 to receive dma data, after buf1 is
-> > > full, we pause buf1 and handle the data in this buffer to avoid overflow
-> > > in buf1. but at the same time, dma is still tranferring in buf2.  once we
-> > > have finished data process in buf1, we enable buf1 again.  this will
-> > > maximize the chance of dma transferring. users pause buf1 by:
-> > > dmaengine_device_control(sirfport->rx_dma_chan, DMA_PAUSE, 1); users pause
-> > > buf2 by: dmaengine_device_control(sirfport->rx_dma_chan, DMA_PAUSE, 2);
-> > > users can still pause the whole dma transferring by dmaengine_pause().
-> > >
-> > > Signed-off-by: Qipan Li <Qipan.Li@csr.com> Signed-off-by: Barry Song
-> > > <Baohua.Song@csr.com> --- drivers/dma/sirf-dma.c | 102
-> > > ++++++++++++++++++++++++++++++++++++++----------- 1 file changed, 80
-> > > insertions(+), 22 deletions(-)
-> > 
-> > Hi Vinod, as we still have some other patches of dma clients depending on
-> > this, would you give some comments about it?
-> 
-> You at least need to write up some documentation about this new feature - you
-> need to describe exactly how this argument relates to a set of queued DMA
-> descriptor(s) and its semantics with respect to those queued descriptors.
-As I commented earlier today, I dont think we need this way. This can also be
-achieved with submitting descriptors after the buffer has been processed.
+Hi Olof,
 
-> From the looks of this patch, it has nothing to do with any particular
-> queued descriptor, but you're exposing internal knowledge of the SiRF
-> DMA engine.
-More than dmaengine its the way of modelling here which seems to be the issue
+with the cosmetic issues pointed out by Ben and Sylwester fixed in the
+gpio-reset driver, the following changes since commit
+5ae90d8e467e625e447000cb4335c4db973b1095:
 
-~Vinod
--- 
+  Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git reset/for_v3.12
+
+for you to fetch changes up to f4d36f8a5166405154c638c1e49e253f2f017dd7:
+
+  reset: allow drivers to request probe deferral (2013-07-29 14:03:40
++0200)
+
+----------------------------------------------------------------
+Philipp Zabel (2):
+      reset: Add driver for gpio-controlled reset pins
+      reset: allow drivers to request probe deferral
+
+ .../devicetree/bindings/reset/gpio-reset.txt       |  35 +++++
+ drivers/reset/Kconfig                              |  11 ++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/core.c                               |   2 +-
+ drivers/reset/gpio-reset.c                         | 174
++++++++++++++++++++++
+ 5 files changed, 222 insertions(+), 1 deletion(-)
+ create mode 100644
+Documentation/devicetree/bindings/reset/gpio-reset.txt
+ create mode 100644 drivers/reset/gpio-reset.c
