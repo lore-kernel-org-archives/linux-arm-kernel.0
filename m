@@ -1,34 +1,26 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Mon, 29 Jul 2013 17:06:05 +0100
-Subject: [PATCH] xen/arm: missing put_cpu in xen_percpu_init
-Message-ID: <1375113966-2859-1-git-send-email-julien.grall@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Jul 2013 18:20:13 +0200
+Subject: [PATCH 07/10] pinctrl: sunxi: Add Allwinner A31 pins set
+In-Reply-To: <1374618312-19001-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1374618312-19001-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdZ1RhsLMC0xWDDr9Hmy78i+uU-9x0-2Y+_NvRZ-yefmVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PREEMPT is enabled, Linux will not be able to boot and warn:
-[    4.127825] ------------[ cut here ]------------
-[    4.133376] WARNING: at init/main.c:699 do_one_initcall+0x150/0x158()
-[    4.140738] initcall xen_init_events+0x0/0x10c returned with preemption imbalance
+On Wed, Jul 24, 2013 at 12:25 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-This is because xen_percpu_init uses get_cpu but doesn't have the corresponding
-put_cpu.
+> The Allwinner A31 SoC uses the same IP than the one found in the
+> A10/A13, with only different pins. Add the pins and the associated
+> functions found in the A31.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
----
- arch/arm/xen/enlighten.c |    1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index f71c37e..dc9f284 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -170,6 +170,7 @@ static void __init xen_percpu_init(void *unused)
- 	per_cpu(xen_vcpu, cpu) = vcpup;
- 
- 	enable_percpu_irq(xen_events_irq, 0);
-+	put_cpu();
- }
- 
- static void xen_restart(char str, const char *cmd)
--- 
-1.7.10.4
+Will you carry this through ARM SoC or do you want me to merge
+this into the pinctrl tree? It seems pretty independent.
+
+Yours,
+Linus Walleij
