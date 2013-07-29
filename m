@@ -1,42 +1,27 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 29 Jul 2013 12:13:44 +0200
-Subject: [PATCH v2 01/22] [HACK] of: dev_node has struct device pointer
-In-Reply-To: <20130716231629.GA12189@dhcp-172-17-186-34.nvidia.com>
-References: <1373021097-32420-2-git-send-email-hdoyu@nvidia.com><51E5CFBF.5080407@wwwdotorg.org><20130716231629.GA12189@dhcp-172-17-186-34.nvidia.com>
-Message-ID: <20130729.131344.1221933042559369096.hdoyu@nvidia.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 29 Jul 2013 11:15:07 +0100
+Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
+In-Reply-To: <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
+ <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+Message-ID: <51F640AB.2050709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> wrote @ Wed, 17 Jul 2013 01:16:30 +0200:
+On 29/07/13 10:46, Vincent Guittot wrote:
+> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> Power aware scheduling needs the cpu topology information to improve the
+>> cpu scheduler decision making.
+> 
+> It's not only power aware scheduling. The scheduler already uses
+> topology and cache sharing when  CONFIG_SCHED_MC and/or
+> CONFIG_SCHED_SMT are enable. So you should also add these configs for
+> arm64 so the scheduler can use it
+> 
+Just for my knowledge, I thought power aware using SCHED_MC/SMT was
+removed. I see commit 8e7fbcbc22c12414bcc9dfdd683637f58fb32759 "sched:
+Remove stale power aware scheduling remnants and dysfunctional knobs"
+I may be missing something here.
 
-> * PGP Signed by an unknown key
-> 
-> On Tue, Jul 16, 2013 at 04:57:03PM -0600, Stephen Warren wrote:
-> > On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> > > To prevent of_platform_populate() from trying to populate duplicate
-> > > devices if a device has been already populated.
-> > 
-> > You need to send drivers/of patches to the DT maintainer and
-> > devicetree-discuss mailing list.
-> > 
-> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > > ---
-> > > Need to take care of early_platform_devices, or alternative solution.
-> > 
-> > I assume that's a TODO item... Are you planning on fleshing out this
-> > patch to address that issue?
->
-> There was some more discussion about it, which can be found in the
-> following thread:
-> 
-> 	https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036934.html
-> 
-> That's one of the last messages and it should have most of the
-> background. If not you may have to walk up the thread for more context.
-> In a nutshell I raised the question as to why we can't simply call
-> of_platform_populate() earlier and side-step all the workarounds that
-> have found their way into the kernel to side-step the issue of their not
-> being a struct device associated with the struct device_node.
-
-This is the thread which Lorenzo started originally. He may have some
-plan to implement/proceed with this, Lorenzo?
+Regards,
+Sudeep
