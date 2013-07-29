@@ -1,63 +1,119 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Mon, 29 Jul 2013 13:56:18 +0100
-Subject: [PATCH] arm: update advice on kernel and FDT load address.
-Message-ID: <1375102578-5869-1-git-send-email-ian.campbell@citrix.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 29 Jul 2013 08:57:27 -0400
+Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
+ for every GPIO on DT"
+In-Reply-To: <51F63864.9000601@collabora.co.uk>
+References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
+ <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
+ <51F633AE.8090308@collabora.co.uk> <51F63864.9000601@collabora.co.uk>
+Message-ID: <51F666B7.7020209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on the discussion in [0]:
-  - Recommend that the kernel be placed under 128MiB ("for automatic RAM
-    location to work", says Nico)
-  - Recommend that DTB larger than ~16KiB be placed after the 128MiB boundary
-    (in order to avoid conflicting with the kernel decompressor, kernel is at
-    most 32MiB) and within the lowmem region. Somewhat arbitrarily recommend
-    placement below the 256MiB boundary, the real lowmem limit is likely up
-    around 600-800MiB but varies.
+Javier,
 
-[0] http://article.gmane.org/gmane.linux.ports.arm.kernel/254538
+On Monday 29 July 2013 05:39 AM, Javier Martinez Canillas wrote:
+> On 07/29/2013 11:19 AM, Javier Martinez Canillas wrote:
+>> On 07/29/2013 11:01 AM, Linus Walleij wrote:
+>>> Hi Paul,
+>>>
+>>> On Mon, Jul 29, 2013 at 9:52 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>>>
+>>>> your commit 0e970cec05635adbe7b686063e2548a8e4afb8f4 ("gpio/omap: don't
+>>>> create an IRQ mapping for every GPIO on DT") breaks the boot on the
+>>>> OMAP5912 OSK:
+>>>
+>>> I'm contemplating just reverting this whole series, as I didn't like
+>>> the approach from the beginning and it has exploded in exactly
+>>> the way I thought it would.
+>>>
+>>> If we revert these three patches:
+>>>
+>>> commit 949eb1a4d29dc75e0b5b16b03747886b52ecf854
+>>> "gpio/omap: fix build error when OF_GPIO is not defined."
+>>> commit b4419e1a15905191661ffe75ba2f9e649f5d565e
+>>> "gpio/omap: auto request GPIO as input if used as IRQ via DT"
+>>> commit 0e970cec05635adbe7b686063e2548a8e4afb8f4
+>>> "gpio/omap: don't create an IRQ mapping for every GPIO on DT"
+>>>
+>>> Does the OMAP1 boot again after this?
+>>>
+>>> I think it's a way better idea to proceed with input-hogs on the gpiochip
+>>> DT node and use that to get auto-request on the GPIO lines that
+>>> will be used as IRQs only.
+>>>
+>>> Yours,
+>>> Linus Walleij
+>>>
+>>
+>> Hi Paul,
+>>
+>> I've looked at this and it seems that irq_create_mapping() does not call the
+>> irq_domain_ops .map function handler since OMAP1 still uses legacy domain
+>> mapping. I don't have an OMAP1 platform to test but could you please see if the
+>> following patch [1] makes your OMAP1 platforms to boot again?
+>>
+>> But I agree with Linus and probably we should just go and revert the whole
+>> series since it is very hard to get it right. In another thread a user reported
+>> that this change also broke his DTS tree.
+>>
+>> I really tried to get this right without breaking anything but there are just
+>> too many OMAP platforms behaving differently and most OMAP drivers are only half
+>> converted to DT so this is really a can of worms.
+>>
+>> Thanks a lot and sorry for the inconvenience,
+>> Javier
+>>
+>> [1]:
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index c57244e..f1c6da8 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -1090,8 +1090,18 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+>>          * are used as interrupts.
+>>          */
+>>         if (!omap_gpio_chip_boot_dt(&bank->chip))
+>> -               for (j = 0; j < bank->width; j++)
+>> -                       irq_create_mapping(bank->domain, j);
+>> +               for (j = 0; j < bank->width; j++) {
+>> +                       int irq = irq_create_mapping(bank->domain, j);
+>> +                       irq_set_lockdep_class(irq, &gpio_lock_class);
+>> +                       irq_set_chip_data(irq, bank);
+>> +                       if (bank->is_mpuio) {
+>> +                               omap_mpuio_alloc_gc(bank, irq, bank->width);
+>> +                       } else {
+>> +                               irq_set_chip_and_handler(irq, &gpio_irq_chip,
+>> +                                                        handle_simple_irq);
+>> +                               set_irq_flags(irq, IRQF_VALID);
+>> +                       }
+>> +               }
+>>         irq_set_chained_handler(bank->irq, gpio_irq_handler);
+>>         irq_set_handler_data(bank->irq, bank);
+>>
+> 
+> In case this solves Paul issue, a cleaned patch with a commit message is [2].
+> But we should decide if is better to fix this or just drop the patches and go
+> with Linus' input-hogs idea to do the GPIO auto request.
+> 
+> Santosh, Kevin, Grant, what do you think we should do?
+> 
+With some helps from MMC and other guys, we validated the Linus's tip which includes
+your patches. It actually doesn't break anything and as OMAP hsmmc maintainer
+clarified, the cd-gpios isn't supported yet for DT. While supporting that it
+can use appropriate binding whichever works.
 
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Dave Martin <dave.martin@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: linux-arm-kernel at lists.infradead.org
----
- Documentation/arm/Booting |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+But with OMAP1 breakage reported by Paul, I think we are not left with choice
+but to revert those commits. We *must* respect rc rules for the fixes.
+*No regression*
 
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index 0c1f475..72c035e 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -125,6 +125,13 @@ with the caveat that it may not be located at physical address 0 since
- the kernel interprets a value of 0 in r2 to mean neither a tagged list
- nor a dtb were passed.
- 
-+If the DTB is larger than ~16KiB, such that placement in the first
-+16KiB would lead to a conflict with the kernel loaded at 32KiB (as
-+recommended below) which uses the memory between 16KiB-32KiB itself,
-+then the DTB should be placed after the first 128MiB of RAM in order
-+to avoid conflicting with the kernel decompressor. The recommnded
-+placement in this case just below the 256MiB boundary.
-+
- 5. Calling the kernel image
- ---------------------------
- 
-@@ -136,9 +143,10 @@ is stored in flash, and is linked correctly to be run from flash,
- then it is legal for the boot loader to call the zImage in flash
- directly.
- 
--The zImage may also be placed in system RAM (at any location) and
--called there.  Note that the kernel uses 16K of RAM below the image
--to store page tables.  The recommended placement is 32KiB into RAM.
-+The zImage may also be placed in system RAM and called there.  The
-+kernel should be placed in the first 128MiB of RAM. Note that the
-+kernel uses 16KiB of RAM below the image to store page tables.  The
-+recommended placement is 32KiB into RAM.
- 
- In either case, the following conditions must be met:
- 
--- 
-1.7.2.5
+Thanks for your hardwork to cook up those patches but now Linus's W proposal
+is going to be generic, hopefully the issue can be address better. Till
+then we can't get the ethernet support.
+
+Linus,
+I guess you have already gone ahead on revert path as seen from other email.
+Lets just make that official. We are sorry for cause you trouble over a
+week-end.
+
+Regards,
+Santosh
