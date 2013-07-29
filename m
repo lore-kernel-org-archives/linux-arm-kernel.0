@@ -1,53 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 29 Jul 2013 11:24:24 +0100
-Subject: [PATCH 7/7] dts: calxeda: add ARM PSCI binding
-In-Reply-To: <1375048598-15637-8-git-send-email-robherring2@gmail.com>
-References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
- <1375048598-15637-8-git-send-email-robherring2@gmail.com>
-Message-ID: <20130729102424.GA24255@e106331-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 29 Jul 2013 15:15:57 +0530
+Subject: [PATCH] dma: edma: add device_slave_caps() support
+In-Reply-To: <20130725072351.GJ18642@intel.com>
+References: <1374597804-3961-1-git-send-email-joelf@ti.com>
+ <51EF8A52.90902@metafoo.de> <51EF8C2B.2030409@ti.com>
+ <51EF8F4E.8080806@metafoo.de>
+ <FB20353E-4890-4462-A671-3587A3841B4A@ti.com>
+ <51EF92F2.3030405@metafoo.de> <51F0231C.7000401@ti.com>
+ <20130724183329.GH18642@intel.com> <51F02CBA.5060704@ti.com>
+ <20130725072351.GJ18642@intel.com>
+Message-ID: <20130729094557.GG29095@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 28, 2013 at 10:56:38PM +0100, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Add the PSCI binding for Calxeda SOCs. The PSCI function numbers are
-> different from the DT binding example because the numbering changed in
-> revisions of the PSCI spec and are already fixed in highbank firmware.
-> Since the numbering is transparent to the kernel, this difference is not
-> significant.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/boot/dts/ecx-common.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
-> index e8559b7..f1dfc09 100644
-> --- a/arch/arm/boot/dts/ecx-common.dtsi
-> +++ b/arch/arm/boot/dts/ecx-common.dtsi
-> @@ -19,6 +19,16 @@
->  		bootargs = "console=ttyAMA0";
->  	};
->  
-> +	psci {
-> +		compatible	= "arm,psci";
-> +		method		= "smc";
-> +		cpu_suspend	= <0x84000002>;
-> +		cpu_off		= <0x84000004>;
-> +		cpu_on		= <0x84000006>;
-> +		system_off	= <0x84000100>;
-> +		system_reset	= <0x84000101>;
-> +	};
-> +
+On Thu, Jul 25, 2013 at 12:53:51PM +0530, Vinod Koul wrote:
+> On Wed, Jul 24, 2013 at 02:36:26PM -0500, Joel Fernandes wrote:
+> > > Also another point worth considering is the approach Russell suggested, I havent
+> > > gotten a chance to dig deeper but if I understood it correctly then programming
+> > > the device_dma_parameters should be the right thing to do. Again I need to look
+> > > deeper and esp wrt edma
+> > 
+> > OK. I have some patches sitting in my tree too that I'm working on. With
+> > that I don't need to know about maximum number of allowed segments and
+> > can send along any number of segment. I will rework them and post them.
+> > fwiw, I will also implement caps API incase like Lars did populating the
+> > other fields though these will not be unused.
+> > 
+> > For segment size, at this time I don't know any driver that uses it
+> > other than davinci-pcm. For this reason the calculations can be done as
+> > Lars suggested (for minimum of maximum). Do you know in advance if
+> > you're going to amend to drop segment size if we go with what Russell
+> > suggested, or are you going to leave the seg-size in the caps API anyway.
+> I am just back and havent really done my work on this. Let me check and as I
+> said if my understanding is right I would be inclined to remove these fields...
+Okay so the max sg_len should be done by setting the device_dma_parameters.
 
-I see this is somewhat beyond the original PSCI, given the addition of
-SYSTEM_OFF and SYSTEM_RESET, but not quite PSCI 0.2 as you don't have
-PSCI_VERSION.
+See the example in MXS DMA and MMC drivers
 
-It would be nice it the compatible string were more specific here to
-deal with this and any implementation-specific power_state ID values.
-Something like "calxeda,highbank-psci", "arm,psci" ?
+Now for second parameter why do you need that to be passed, I thought in edma the
+clients needs this value somehow to program the channel. It would be good that
+if we can delink from this and let edma derive. Also there should be no such
+thing as max_sg, the driver should be able to perform any size of sg_list.
+Internally it can be breaking the dma into multiple trasnactions.
 
-Thanks,
-Mark.
+~Vinod
+-- 
