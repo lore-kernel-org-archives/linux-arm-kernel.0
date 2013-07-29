@@ -1,288 +1,68 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 29 Jul 2013 15:06:01 +0200
-Subject: [PATCH v4] gpio: Add MOXA ART GPIO driver
-In-Reply-To: <1374053693-6166-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374053693-6166-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1375103161-12460-1-git-send-email-jonas.jensen@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 29 Jul 2013 15:08:52 +0200
+Subject: [PATCH v6 02/20] clocksource: samsung_pwm_timer: Correct
+ definition of AUTORELOAD bit
+In-Reply-To: <2416336.ny4L9Sf7Ts@flatron>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1658534.7nG6RFjcTc@flatron> <51EDA3EA.9020502@linaro.org>
+ <2416336.ny4L9Sf7Ts@flatron>
+Message-ID: <51F66964.1090803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO driver for MOXA ART SoCs.
+On 07/24/2013 01:32 AM, Tomasz Figa wrote:
+> PWM channel 4 has its autoreload bit located at different position. This
+> patch fixes the driver to account for that.
+> 
+> This fixes a problem with the clocksource hanging after it overflows because
+> it is not reloaded any more.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Notes:
-    Changes since v3:
-    
-    1. use local struct device *dev pointer, replace "&pdev->dev" with "dev"
-    
-    device tree bindings document:
-    2. describe compatible variable "Must be" instead of "Should be".
-    
-    Applies to next-20130729
 
- .../devicetree/bindings/gpio/moxa,moxart-gpio.txt  |  23 +++
- drivers/gpio/Kconfig                               |   7 +
- drivers/gpio/Makefile                              |   1 +
- drivers/gpio/gpio-moxart.c                         | 189 +++++++++++++++++++++
- 4 files changed, 220 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
- create mode 100644 drivers/gpio/gpio-moxart.c
+>  drivers/clocksource/samsung_pwm_timer.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> Changes since v5:
+>  - Added more detailed comment about bit layout in TCON register.
+> 
+> diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
+> index 3fa5b07..5d0049f 100644
+> --- a/drivers/clocksource/samsung_pwm_timer.c
+> +++ b/drivers/clocksource/samsung_pwm_timer.c
+> @@ -44,10 +44,21 @@
+>  #define TCFG1_SHIFT(x)	  		((x) * 4)
+>  #define TCFG1_MUX_MASK	  		0xf
+>  
+> +/*
+> + * Each channel occupies 4 bits in TCON register, but there is a gap of 4
+> + * bits (one channel) after channel 0, so channels have different numbering
+> + * when accessing TCON register.
+> + *
+> + * In addition, the location of autoreload bit for channel 4 (TCON channel 5)
+> + * in its set of bits is 2 as opposed to 3 for other channels.
+> + */
+>  #define TCON_START(chan)		(1 << (4 * (chan) + 0))
+>  #define TCON_MANUALUPDATE(chan)		(1 << (4 * (chan) + 1))
+>  #define TCON_INVERT(chan)		(1 << (4 * (chan) + 2))
+> -#define TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
+> +#define _TCON_AUTORELOAD(chan)		(1 << (4 * (chan) + 3))
+> +#define _TCON_AUTORELOAD4(chan)		(1 << (4 * (chan) + 2))
+> +#define TCON_AUTORELOAD(chan)		\
+> +	((chan < 5) ? _TCON_AUTORELOAD(chan) : _TCON_AUTORELOAD4(chan))
+>  
+>  DEFINE_SPINLOCK(samsung_pwm_lock);
+>  EXPORT_SYMBOL(samsung_pwm_lock);
+> 
 
-diff --git a/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt b/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
-new file mode 100644
-index 0000000..795afab
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
-@@ -0,0 +1,23 @@
-+MOXA ART GPIO Controller
-+
-+Required properties:
-+
-+- #gpio-cells : Should be 2
-+- compatible : Must be "moxa,moxart-gpio"
-+- reg : Should contain registers location and length
-+	index 0 : input, output, and direction control
-+	index 1 : enable/disable individual pins, pin 0-31
-+- gpio-ready-led : ready LED gpio, with zero flags
-+- gpio-reset-switch : reset switch gpio, with zero flags
-+
-+Example:
-+
-+	gpio: gpio at 98700000 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		compatible = "moxa,moxart-gpio";
-+		reg =	<0x98700000 0xC>,
-+			<0x98100100 0x4>;
-+		gpio-ready-led = <&gpio 27 0>;
-+		gpio-reset-switch = <&gpio 25 0>;
-+	};
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 4b7ba53..5419413 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -741,6 +741,13 @@ config GPIO_MSIC
- 	  Enable support for GPIO on intel MSIC controllers found in
- 	  intel MID devices
- 
-+config GPIO_MOXART
-+	bool "MOXART GPIO support"
-+	depends on ARCH_MOXART
-+	help
-+	  Select this option to enable GPIO driver for
-+	  MOXA ART SoC devices.
-+
- comment "USB GPIO expanders:"
- 
- config GPIO_VIPERBOARD
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 156fd28..c7a7a2b 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_GPIO_MC9S08DZ60)	+= gpio-mc9s08dz60.o
- obj-$(CONFIG_GPIO_MCP23S08)	+= gpio-mcp23s08.o
- obj-$(CONFIG_GPIO_ML_IOH)	+= gpio-ml-ioh.o
- obj-$(CONFIG_GPIO_MM_LANTIQ)	+= gpio-mm-lantiq.o
-+obj-$(CONFIG_GPIO_MOXART)	+= gpio-moxart.o
- obj-$(CONFIG_GPIO_MPC5200)	+= gpio-mpc5200.o
- obj-$(CONFIG_GPIO_MPC8XXX)	+= gpio-mpc8xxx.o
- obj-$(CONFIG_GPIO_MSIC)		+= gpio-msic.o
-diff --git a/drivers/gpio/gpio-moxart.c b/drivers/gpio/gpio-moxart.c
-new file mode 100644
-index 0000000..a5bdbca
---- /dev/null
-+++ b/drivers/gpio/gpio-moxart.c
-@@ -0,0 +1,189 @@
-+/*
-+ * MOXA ART SoCs GPIO driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_gpio.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/delay.h>
-+#include <linux/timer.h>
-+
-+#define GPIO_DATA_OUT		0x00
-+#define GPIO_DATA_IN		0x04
-+#define GPIO_PIN_DIRECTION	0x08
-+
-+static void __iomem *moxart_pincontrol_base;
-+static void __iomem *moxart_gpio_base;
-+
-+void moxart_gpio_enable(u32 gpio)
-+{
-+	writel(readl(moxart_pincontrol_base) | gpio, moxart_pincontrol_base);
-+}
-+
-+void moxart_gpio_disable(u32 gpio)
-+{
-+	writel(readl(moxart_pincontrol_base) & ~gpio, moxart_pincontrol_base);
-+}
-+
-+static int moxart_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	moxart_gpio_enable(1 << offset);
-+	return pinctrl_request_gpio(offset);
-+}
-+
-+static void moxart_gpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	pinctrl_free_gpio(offset);
-+	moxart_gpio_disable(1 << offset);
-+}
-+
-+static int moxart_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	void __iomem *ioaddr = moxart_gpio_base + GPIO_PIN_DIRECTION;
-+
-+	writel(readl(ioaddr) & ~(1 << offset), ioaddr);
-+	return 0;
-+}
-+
-+static int moxart_gpio_direction_output(struct gpio_chip *chip,
-+					unsigned offset, int value)
-+{
-+	void __iomem *ioaddr = moxart_gpio_base + GPIO_PIN_DIRECTION;
-+
-+	writel(readl(ioaddr) | (1 << offset), ioaddr);
-+	return 0;
-+}
-+
-+static void moxart_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	void __iomem *ioaddr = moxart_gpio_base + GPIO_DATA_OUT;
-+	u32 reg = readl(ioaddr);
-+
-+	(value) ?	writel(reg | (1 << offset), ioaddr) :
-+			writel(reg & ~(1 << offset), ioaddr);
-+}
-+
-+static int moxart_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	u32 ret = readl(moxart_gpio_base + GPIO_PIN_DIRECTION);
-+
-+	if (ret & (1 << offset))
-+		ret = readl(moxart_gpio_base + GPIO_DATA_OUT) & (1 << offset);
-+	else
-+		ret = readl(moxart_gpio_base + GPIO_DATA_IN) & (1 << offset);
-+
-+	return ret;
-+}
-+
-+static struct gpio_chip moxart_gpio_chip = {
-+	.label			= "moxart-gpio",
-+	.request		= moxart_gpio_request,
-+	.free			= moxart_gpio_free,
-+	.direction_input	= moxart_gpio_direction_input,
-+	.direction_output	= moxart_gpio_direction_output,
-+	.set			= moxart_gpio_set,
-+	.get			= moxart_gpio_get,
-+	.base			= 0,
-+	.ngpio			= 32,
-+	.can_sleep		= 0,
-+};
-+
-+static int moxart_gpio_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	int ret, gpio_ready_led, gpio_reset_switch;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	moxart_gpio_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(moxart_gpio_base)) {
-+		dev_err(dev, "%s: devm_ioremap_resource res_gpio failed\n",
-+			dev->of_node->full_name);
-+		return PTR_ERR(moxart_gpio_base);
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	moxart_pincontrol_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(moxart_pincontrol_base)) {
-+		dev_err(dev, "%s: devm_ioremap_resource res_pmu failed\n",
-+			dev->of_node->full_name);
-+		return PTR_ERR(moxart_pincontrol_base);
-+	}
-+
-+	moxart_gpio_chip.dev = dev;
-+
-+	ret = gpiochip_add(&moxart_gpio_chip);
-+	if (ret)
-+		dev_err(dev, "%s: gpiochip_add failed\n",
-+			dev->of_node->full_name);
-+
-+
-+	gpio_ready_led = of_get_named_gpio(dev->of_node,
-+					   "gpio-ready-led", 0);
-+	if (!gpio_is_valid(gpio_ready_led)) {
-+		dev_err(dev, "invalid gpio (gpio-ready-led): %d\n",
-+			gpio_ready_led);
-+		return gpio_ready_led;
-+	}
-+
-+	gpio_reset_switch = of_get_named_gpio(dev->of_node,
-+					      "gpio-reset-switch", 0);
-+	if (!gpio_is_valid(gpio_reset_switch)) {
-+		dev_err(dev, "invalid gpio (gpio-reset-switch): %d\n",
-+			gpio_reset_switch);
-+		return gpio_reset_switch;
-+	}
-+
-+	moxart_gpio_enable(gpio_ready_led | gpio_reset_switch);
-+
-+	moxart_gpio_direction_input(&moxart_gpio_chip, gpio_reset_switch);
-+
-+	/*
-+	 * gpio_ready_led=0 ready LED on
-+	 * gpio_ready_led=1 ready LED off
-+	 */
-+	moxart_gpio_direction_output(&moxart_gpio_chip, gpio_ready_led, 0);
-+	moxart_gpio_set(&moxart_gpio_chip, gpio_ready_led, 0);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id moxart_gpio_match[] = {
-+	{ .compatible = "moxa,moxart-gpio" },
-+	{ }
-+};
-+
-+static struct platform_driver moxart_gpio_driver = {
-+	.driver	= {
-+		.name		= "moxart-gpio",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= moxart_gpio_match,
-+	},
-+	.probe	= moxart_gpio_probe,
-+};
-+
-+static int __init moxart_gpio_init(void)
-+{
-+	return platform_driver_register(&moxart_gpio_driver);
-+}
-+
-+postcore_initcall(moxart_gpio_init);
-+
-+MODULE_DESCRIPTION("MOXART GPIO chip driver");
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+
 -- 
-1.8.2.1
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
