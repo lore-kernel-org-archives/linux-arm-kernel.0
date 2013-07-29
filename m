@@ -1,119 +1,49 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 29 Jul 2013 11:41:25 -0300
-Subject: [PATCH 4/5] ARM: dove: relocate internal registers device nodes
-In-Reply-To: <1375101114-28858-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1375101114-28858-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130729144124.GC2417@localhost>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 29 Jul 2013 16:46:40 +0200
+Subject: [PATCH 4/7] cpuidle: calxeda: add support to use PSCI calls
+In-Reply-To: <51F67EA8.8010603@gmail.com>
+References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+ <1375048598-15637-5-git-send-email-robherring2@gmail.com>
+ <51F678DB.3030308@linaro.org> <51F67EA8.8010603@gmail.com>
+Message-ID: <51F68050.5070107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
-
-On Mon, Jul 29, 2013 at 02:31:53PM +0200, Sebastian Hesselbarth wrote:
-> With mbus node in place, now relocate all internal device nodes
-> to internal-regs node with proper address ranges.
+On 07/29/2013 04:39 PM, Rob Herring wrote:
+> On 07/29/2013 09:14 AM, Daniel Lezcano wrote:
+>> On 07/28/2013 11:56 PM, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> This updates the Calxeda cpuidle driver to use PSCI calls to powergate
+>>> cores. This is needed to enable cpuidle for the ECX-2000.
+>>>
+>>> This could possibly become a generic PSCI driver, but there are no other
+>>> PSCI users in the kernel other than mach-virt.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> Cc: linux-pm at vger.kernel.org
+>>> ---
+>>
+>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove.dtsi |  955 +++++++++++++++++++++----------------------
->  1 file changed, 474 insertions(+), 481 deletions(-)
+> Thanks.
 > 
+>>
+>> Rob,
+>>
+>> Shall I take the patch in my tree ?
+> 
+> No, there are interdependencies with the rest of the series, so I plan
+> to send to arm-soc.
 
-I think you might do this in a slightly different way, and achieve a
-less intrusive patch (fwiw, i personally try to avoid intrusive changes).
+Ok, thanks.
 
-Maybe it's just a matter of taste, so it's up to you to decide
-Anyway, here's my proposal:
 
-----------------------------8<----------------------------------------
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index db9ae00..0fbc30e 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -5,6 +5,7 @@
- / {
- 	compatible = "marvell,dove";
- 	model = "Marvell Armada 88AP510 SoC";
-+	interrupt-parent = <&intc>;
- 
- 	aliases {
- 		gpio0 = &gpio0;
-@@ -41,22 +42,17 @@
- 			  MBUS_ID(0x01, 0xfd) 0 0xf8000000 0x8000000   /* BootROM  128M */
- 			  MBUS_ID(0x03, 0x01) 0 0xc8000000 0x0100000   /* CESA SRAM  1M */
- 			  MBUS_ID(0x0d, 0x00) 0 0xf0000000 0x0100000>; /* PMU  SRAM  1M */
--	};
-+};
- 
--	soc at f1000000 {
-+mbus {
-+	internal-regs {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		interrupt-parent = <&intc>;
--
--		ranges = <0xc8000000 0xc8000000 0x0100000   /* CESA SRAM   1M */
--		          0xe0000000 0xe0000000 0x8000000   /* PCIe0 Mem 128M */
--		          0xe8000000 0xe8000000 0x8000000   /* PCIe1 Mem 128M */
--		          0xf0000000 0xf0000000 0x0100000   /* ScratchPad  1M */
--		          0x00000000 0xf1000000 0x1000000   /* SB/NB regs 16M */
--		          0xf2000000 0xf2000000 0x0100000   /* PCIe0 I/O   1M */
--		          0xf2100000 0xf2100000 0x0100000   /* PCIe0 I/O   1M */
--		          0xf8000000 0xf8000000 0x8000000>; /* BootROM   128M */
-+		ranges = <0x00000000 MBUS_ID(0xf0, 0x01) 0 0x0100000   /* MBUS regs  1M */
-+			  0x00800000 MBUS_ID(0xf0, 0x02) 0 0x1000000   /* AXI  regs 16M */
-+			  0xffffe000 MBUS_ID(0x03, 0x01) 0 0x0000800   /* CESA SRAM  2k */
-+			  0xfffff000 MBUS_ID(0x0d, 0x00) 0 0x0000800>; /* PMU  SRAM  2k */
- 
- 		mbusc: mbus-ctrl at 20000 {
- 			compatible = "marvell,mbus-controller";
-@@ -443,7 +439,7 @@
- 		crypto: crypto-engine at 30000 {
- 			compatible = "marvell,orion-crypto";
- 			reg = <0x30000 0x10000>,
--			      <0xc8000000 0x800>;
-+			      <0xffffe000 0x800>;
- 			reg-names = "regs", "sram";
- 			interrupts = <31>;
- 			clocks = <&gate_clk 15>;
-@@ -465,7 +461,6 @@
- 
- 			channel1 {
- 				interrupts = <40>;
--				dmacap,memset;
- 				dmacap,memcpy;
- 				dmacap,xor;
- 			};
-@@ -486,7 +481,6 @@
- 
- 			channel1 {
- 				interrupts = <43>;
--				dmacap,memset;
- 				dmacap,memcpy;
- 				dmacap,xor;
- 			};
------------------------------------>8-----------------------------------
-
-It has a much nicer diffstat:
-
- arch/arm/boot/dts/dove.dtsi | 24 +++++++++---------------
- 1 file changed, 9 insertions(+), 15 deletions(-)
-
-And in addition, it allows to see some (maybe unrelated?) changes
-other than the node-relocation.
-
-I've seen these kind of things in (e.g.) omap3-igep0020.dts, and it
-seems to me it could be a cleaner way of doing this relocation.
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
