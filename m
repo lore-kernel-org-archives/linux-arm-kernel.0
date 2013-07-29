@@ -1,109 +1,92 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Jul 2013 08:54:31 +0200
-Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
-In-Reply-To: <20130728162711.32a9a21e@skate>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E41F7A.4010502@gmail.com> <20130728043310.6CF1D3E08FE@localhost>
- <20130728162711.32a9a21e@skate>
-Message-ID: <20130729065431.GA1115@manwe>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 29 Jul 2013 12:31:45 +0530
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <1374515989-7391-1-git-send-email-joelf@ti.com>
+References: <1374515989-7391-1-git-send-email-joelf@ti.com>
+Message-ID: <51F61359.1090309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 28, 2013 at 04:27:11PM +0200, Thomas Petazzoni wrote:
-> Dear Grant Likely,
-> 
-> Thanks for your feedback! Some comments below.
-> 
-> On Sat, 27 Jul 2013 22:33:10 -0600, Grant Likely wrote:
-> 
-> > > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > 
-> > > Acked-by: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > Actually, I'm going to disagree on this one and say NAK. I don't think
-> > it is a good idea to create a completely separate registry of msi_chips
-> > for binding to dt nodes. I think it would be better to include the
-> > msi_chip pointer directly into the irq_domain which has to be there
-> > anyway. It then becomes another feature for irq controllers if it can
-> > support doing MSI.
-> 
-> The problem that this patch tries to solve is how can the PCIe driver
-> work get a pointer to the msi_chip structure from the DT device node
-> pointed to by the 'msi-parent' property. I.e, we have:
-> 
-> 	interrupt-parent = <&mpic>;
-> 
-> 	mpic {
-> 		reg = <...>;
-> 		compatible = "...";
-> 		interrupt-controller;
-> 		msi-controller;
-> 	};
-> 
-> 	pcie-controller {
-> 		msi-parent = <&mpic>;
-> 	};
-> 
-> The 'mpic' driver registers two irq_domains, one for the "normal"
-> interrupts, and one for the MSI interrupts. Both irq_domain cannot be
-> associated to the same &mpic node, or the irq_domain lookup for
-> interrupt-parent and msi-parent is going to be confused.
-> 
-> In the very first version of this patch set, I was using two separate
-> DT device nodes to avoid this problem:
-> 
-> 	interrupt-parent = <&mpic>;
-> 
-> 	interrupt-controller {
-> 		reg = <...>;
-> 		compatible = "...";
-> 
-> 		mpic {
-> 			interrupt-controller;
-> 		};
-> 
-> 		msi {
-> 			msi-controller;
-> 		};
-> 	};
-> 
-> 	pcie-controller {
-> 		msi-parent = <&msi>;
-> 	};
-> 
-> This way, each of the two irq_domain was associated to a distinct DT
-> device node, and everything was working fine. But during the review, I
-> was pointed by Arnd that it wasn't the proper way of describing the
-> interrupt controller, and that there should be only one DT device node
-> having both the interrupt-controller and msi-controller roles.
-> 
-> So what is your suggestion to allow the PCIe controller to retrieve the
-> correct irq_domain if we have only one DT node for the IRQ controller
-> that registers two irq_domains ?
+On Monday 22 July 2013 11:29 PM, Joel Fernandes wrote:
+> HWMOD removal for MMC is breaking edma_start as the events are being manually
+> triggered due to unused channel list not being clear, Thanks to Balaji TK for
+> finding this issue.
 
-If I understand correctly, Grant isn't objecting to the introduction of
-the lookup function, but rather its implementation. You could add a
-pointer to a struct msi_chip within struct irq_domain and then iterate
-over all irq_domain instances (see irq_find_host()) and find one which
-has the correct device_node pointer and the msi_chip pointer set.
+So, Reported-by: Balaji T K <balajitk@ti.com>
 
-So I think that pretty much boils down to setting the (new) .msi_chip
-field of armada_370_xp_msi_domain to the newly allocated MSI chip in
-armada_370_xp_msi_init() and modify the lookup function to use the
-irq_domain_list instead of the list of of_pci_msi_chip_list(). And a
-whole lot of the infrastructure code can go away because it's already
-there for irq_domain.
+?
 
-The good thing about it is that it couples the MSI chip more strongly
-with its associated IRQ domain. And as a bonus we get to omit the list
-and of_node fields from struct msi_chip. =)
+> 
+> This patch fixes the issue, by reading the "dmas" property from the DT node if
+> it exists and clearing the bits in the unused channel list.
+> 
+> Cc: Balaji T K <balajitk@ti.com>
+> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+> v2 changes: Fixed compiler warning
+> 
+>  arch/arm/common/edma.c |   31 +++++++++++++++++++++++--------
+>  1 file changed, 23 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index a432e6c..765d578 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -561,14 +561,29 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+>  static int prepare_unused_channel_list(struct device *dev, void *data)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> -	int i, ctlr;
+> -
+> -	for (i = 0; i < pdev->num_resources; i++) {
+> -		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+> -				(int)pdev->resource[i].start >= 0) {
+> -			ctlr = EDMA_CTLR(pdev->resource[i].start);
+> -			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+> -					edma_cc[ctlr]->edma_unused);
+> +	int i = 0, ctlr;
+> +	u32 dma_chan;
+> +	const __be32 *dma_chan_p;
+> +	struct property *prop;
+> +
+> +	if (dev->of_node) {
+> +		of_property_for_each_u32(dev->of_node, "dmas", prop, \
+> +					 dma_chan_p, dma_chan) {
+> +			if (i++ & 1) {
+> +				ctlr = EDMA_CTLR(dma_chan);
+> +				clear_bit(EDMA_CHAN_SLOT(dma_chan),
+> +						edma_cc[ctlr]->edma_unused);
+> +			}
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/3994fc92/attachment.sig>
+I think it will be cleaner if you use of_property_count_strings() on
+dma-names to get the count of DMA channels for this device and then use
+of_parse_phandle_with_args() to get access to the args. Honestly, I have
+not used these APIs myself, so if this doesn?t work the way I think it
+should then let me know and I will try to do some experiments myself.
+
+The current way of skipping over even fields really depends on
+#dma-cells for EDMA to be 1. That in itself is not such a bad
+assumption, but if you have APIs which already take care of this for
+you, why not use them?
+
+> +		}
+> +	} else {
+> +		for (; i < pdev->num_resources; i++) {
+> +			if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+> +			    (int)pdev->resource[i].start >= 0) {
+> +				ctlr = EDMA_CTLR(pdev->resource[i].start);
+> +				clear_bit(EDMA_CHAN_SLOT(
+> +					  pdev->resource[i].start),
+> +					  edma_cc[ctlr]->edma_unused);
+> +			}
+
+So there is very little in common between OF and non-OF versions of this
+function. Why not have two different versions of this function for the
+two cases? The OF version can reside under the CONFIG_OF conditional
+already in use in the file. This will also save you the ugly line breaks
+you had to resort to due to too deep indentation.
+
+Thanks,
+Sekhar
