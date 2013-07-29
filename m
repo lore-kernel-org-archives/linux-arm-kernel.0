@@ -1,50 +1,52 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 29 Jul 2013 08:29:53 -0500
-Subject: [PATCH 7/9] ARM: edma: Don't clear EMR of channel in edma_stop
+Date: Mon, 29 Jul 2013 08:29:54 -0500
+Subject: [PATCH 8/9] dma: edma: Link to dummy slot only for last SG list split
 In-Reply-To: <1375104595-16018-1-git-send-email-joelf@ti.com>
 References: <1375104595-16018-1-git-send-email-joelf@ti.com>
-Message-ID: <1375104595-16018-8-git-send-email-joelf@ti.com>
+Message-ID: <1375104595-16018-9-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We certainly don't want error conditions to be cleared anywhere
-as this will make us 'forget' about missed events. We depend on
-knowing which events were missed in order to be able to reissue them.
+Consider the case where we have a scatter-list like:
+SG1->SG2->SG3->SG4->SG5->SG6->Null
 
-This fixes a race condition where the EMR was being cleared
-by the transfer completion interrupt handler.
+For ex, for a MAX_NR_SG of 2, earlier we were splitting this as:
+SG1->SG2->Null
+SG3->SG4->Null
+SG5->SG6->Null
 
-Basically, what was happening was:
+Now we split it as
+SG1->SG2->Null
+SG3->SG4->Null
+SG5->SG6->Dummy
 
-            Missed event
-             |
-             |
-             V
-SG1-SG2-SG3-Null
-         \
-          \__TC Interrupt (Almost same time as ARM is executing
-TC interrupt handler, an event got missed and also forgotten
-by clearing the EMR).
-
-The EMR is ultimately being cleared by the Error interrupt
-handler once it is handled so we don't have to do it in edma_stop.
+This approach results in lesser unwanted interrupts that occur
+for the last list split. The Dummy slot has the property of not
+raising an error condition if events are missed unlike the Null
+slot. We are OK with this as we're done with processing the
+whole list once we reach Dummy.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/common/edma.c |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/dma/edma.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 10995b2..dec772e 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1328,7 +1328,6 @@ void edma_stop(unsigned channel)
- 		edma_shadow0_write_array(ctlr, SH_EECR, j, mask);
- 		edma_shadow0_write_array(ctlr, SH_ECR, j, mask);
- 		edma_shadow0_write_array(ctlr, SH_SECR, j, mask);
--		edma_write_array(ctlr, EDMA_EMCR, j, mask);
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index c72e8c9..0d3ebde 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -164,6 +164,12 @@ static void edma_execute(struct edma_chan *echan)
  
- 		pr_debug("EDMA: EER%d %08x\n", j,
- 				edma_shadow0_read_array(ctlr, SH_EER, j));
+ 	edesc->total_processed += total_process;
+ 
++	/* If this is either the last set in a set of SG-list transactions
++	   then setup a link to the dummy slot, this results in all future
++	   events being absorbed and that's OK because we're done */
++	if (edesc->total_processed == edesc->pset_nr)
++		edma_link(echan->slot[total_process-1], echan->ecc->dummy_slot);
++
+ 	edma_resume(echan->ch_num);
+ 
+ 	if (edesc->total_processed <= MAX_NR_SG) {
 -- 
 1.7.9.5
