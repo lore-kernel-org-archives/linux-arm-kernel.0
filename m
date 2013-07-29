@@ -1,32 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jul 2013 10:54:01 +0100
-Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
-In-Reply-To: <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
-References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
- <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
-Message-ID: <20130729095400.GB32383@mudshark.cambridge.arm.com>
+From: a0393675@ti.com (Keerthy)
+Date: Mon, 29 Jul 2013 15:27:08 +0530
+Subject: [PATCH 0/9] ARM: dts: omap5-uevm: fixup wrong regulator
+ configuration
+In-Reply-To: <1374079538-19548-1-git-send-email-nm@ti.com>
+References: <1374079538-19548-1-git-send-email-nm@ti.com>
+Message-ID: <51F63C74.6070503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
-> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > Power aware scheduling needs the cpu topology information to improve the
-> > cpu scheduler decision making.
-> 
-> It's not only power aware scheduling. The scheduler already uses
-> topology and cache sharing when  CONFIG_SCHED_MC and/or
-> CONFIG_SCHED_SMT are enable. So you should also add these configs for
-> arm64 so the scheduler can use it
+Hi Nishanth,
 
-... except that the architecture doesn't define what the AFF fields in MPIDR
-really represent. Using them to make key scheduling decisions relating to
-cache proximity seems pretty risky to me, especially given the track record
-we've seen already on AArch32 silicon. It's a convenient register if it
-contains the data we want it to contain, but we need to force ourselves to
-come to terms with reality here and simply use it as an identifier for a
-CPU.
+On Wednesday 17 July 2013 10:15 PM, Nishanth Menon wrote:
+> Due to wrong older revision of documentation used as reference, we
+> seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
+> series is based power tree on production board 750-2628-XXX platform.
+> Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
+> supply hardware blocks at voltages that are out of specification.
 
-Can't we just use the device-tree to represent this topological data for
-arm64? Lorenzo has been working on bindings in this area.
+This series looks good to me.
 
-Will
+Acked-by:  J Keerthy <j-keerthy@ti.com>
+> Also available at:
+> based on v3.11-rc1 tag
+> http link: https://github.com/nmenon/linux-2.6-playground/commits/push/omap5-palmas-fixes
+> git link: git://github.com/nmenon/linux-2.6-playground.git
+> branch: push/omap5-palmas-fixes
+>
+> Tested with https://patchwork.kernel.org/patch/2545061/
+>   + https://git.kernel.org/cgit/linux/kernel/git/ssantosh/linux.git/log/?h=for_3.11/out_of_tree/omap5_clk_data
+> Test result: http://pastebin.com/YqASYkXG
+>
+> Relevant documentation:
+> - OMAP5 uEVM documentation: https://www.svtronics.com/omap/omap54xx?product_id=33
+> - OMAP5432 Data Manual: http://www.ti.com/product/OMAP5432
+> - TWL6037 / OTP information: Currently available only under NDA
+>
+> Nishanth Menon (9):
+>    ARM: dts: omap5-uevm: document regulator signals used on the actual
+>      board
+>    ARM: dts: omap5-uevm: update SMPS9 settings
+>    ARM: dts: omap5-uevm: update and disable unused regulators LDO[28]
+>    ARM: dts: omap5-uevm: update LDO1 voltage to 1.5V and settings
+>    ARM: dts: omap5-uevm: update LDO3 voltage to 1.5V and settings
+>    ARM: dts: omap5-uevm: update LDO4 voltage to 1.5V and settings
+>    ARM: dts: omap5-uevm: update LDO6 voltage to 1.2V
+>    ARM: dts: omap5-uevm: update LDO7 voltage to 2V and settings
+>    ARM: dts: omap5-uevm: update SDCARD LDO9 and resource REGEN3
+>
+>   arch/arm/boot/dts/omap5-uevm.dts |   78 ++++++++++++++++++++++++--------------
+>   1 file changed, 49 insertions(+), 29 deletions(-)
+>
+Regards,
+Keerthy
