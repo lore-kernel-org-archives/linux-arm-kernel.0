@@ -1,32 +1,46 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 29 Jul 2013 13:20:31 -0700
-Subject: [PATCH v2 6/9] ARM: msm: Move mach/board.h contents to common.h
-In-Reply-To: <1374699274-18388-7-git-send-email-sboyd@codeaurora.org>
-References: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
- <1374699274-18388-7-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130729202031.GA20694@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 29 Jul 2013 22:43:15 +0200
+Subject: NSA310 + DT
+In-Reply-To: <20130729192112.GY29916@titan.lakedaemon.net>
+References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
+ <20130729192112.GY29916@titan.lakedaemon.net>
+Message-ID: <20130729204315.GK24782@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 01:54:31PM -0700, Stephen Boyd wrote:
->The contents of mach/board.h are only used by files within
->mach-msm so there is no need to export this file outside of the
->mach-msm directory. Move the contents of the file to common.h to
->allow us to compile MSM in the multi-platform kernel.
->
->Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
->Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->---
-> drivers/video/msm/msm_fb.c             |  1 -
+On Mon, Jul 29, 2013 at 03:21:12PM -0400, Jason Cooper wrote:
+> Hi Finn,
+> 
+> On Mon, Jul 29, 2013 at 07:05:32PM +0200, Finn Hoffmann wrote:
+> > Hello,
+> > 
+> > I have tried to get a current Kernel running on my NSA310.
+> 
+> Nice.
+> 
+> > Everything works well on Kernels before DT with the mentioned
+> > patches from https://github.com/peeter123/NSA310-320-debian .
+> > I have linux-3.10.2 running and after I changed the dts file to lm85
+> > sensors and fanconrtol work but GPIO does not.
+> > I tried https://github.com/lunn/linux/tree/v3.11-rc1-nsa310-tdc and
+> > linux-3.11.0-rc3.
+> > Both have the problem that r8169 is not working:
+> > r8169: eth0: unknown chipset (mac_version = 0).
+> > and console is spammed with
+> > r8169 0000:01:00.0 eth0: rtl_phyar_cond == 0 (loop: 20, delay: 25).
+> > until I take eth0 down.
+> > GPIO is working.
 
-It'd be nice to get a framebuffer Ack from this part.
+Hi Finn
 
-original patch:
-  https://patchwork.kernel.org/patch/2833029/
+Thanks for testing my tree. I based it on the patches found in 
+https://github.com/peeter123/NSA310-320-debian.
 
-David
+The patch-3.6.9-nsa310.diff does not contain any changes to the
+ethernet driver. So you best bet is to ask on the netdev mailing
+list.
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Once you have it solved, it would be nice if you can send a tested-by:
+signoff to my patches.
+
+	Andrew
