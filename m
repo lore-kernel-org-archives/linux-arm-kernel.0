@@ -1,53 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Jul 2013 13:17:15 +0100
-Subject: [PATCH] DMAEngine: sirf: let the users be able to pause and
- resume specific buffer
-In-Reply-To: <CAGsJ_4yVxAJc0UNTFMM1yjKQh6=xv12qPYpnUFZ=wmzrdpUOXQ@mail.gmail.com>
-References: <1372927373-17407-1-git-send-email-Baohua.Song@csr.com>
- <CAGsJ_4wOdDMku-pNWiH-DoS_v39PfFwNYcU4T1Thsd-+L9A8AQ@mail.gmail.com>
- <20130729060819.GE29095@intel.com>
- <CAGsJ_4yVxAJc0UNTFMM1yjKQh6=xv12qPYpnUFZ=wmzrdpUOXQ@mail.gmail.com>
-Message-ID: <20130729121715.GI24642@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Jul 2013 15:23:44 +0300
+Subject: [PATCH v2 1/6] usb: phy: msm: Move mach depndend code to
+ platform data
+In-Reply-To: <1375081464-14206-2-git-send-email-iivanov@mm-sol.com>
+References: <1375081464-14206-1-git-send-email-iivanov@mm-sol.com>
+ <1375081464-14206-2-git-send-email-iivanov@mm-sol.com>
+Message-ID: <20130729122344.GH24801@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 03:20:31PM +0800, Barry Song wrote:
-> 2013/7/29 Vinod Koul <vinod.koul@intel.com>:
-> > The above can be done by
-> > a) have two buffers:
-> >         - prepare first and submit, and start
-> >         - while first is ongoing, prepare second and start
-> >         - first is completed, so you start processing that while second is
-> >           getting DMAed
-> >         - when processing is completed, submit first again
-> >         - when second is completed, start processing that and submit that once
-> >           proocessed
-> >
-> > b) have multiple buffers, A, B, C & D and redo above schema.
+Hi,
+
+On Mon, Jul 29, 2013 at 10:04:19AM +0300, Ivan T. Ivanov wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 > 
-> yes, that is the original idea for multiple buffer management for DMA.
+> This patch fix compilation error and is an intermediate step
+> before the addition of DeviceTree support for newer targets.
+> Fix suggested here: https://lkml.org/lkml/2013/6/19/381
 > 
-> the reason which pushed us to the ping-pong pause is that we don't
-> need to issue software dma descriptor every time for every buffer as
-> hardware can do that.
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-usb at vger.kernel.org
+> 
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> ---
+>  arch/arm/mach-msm/board-msm7x30.c |   35 +++++++++++++++++++++++
+>  arch/arm/mach-msm/board-qsd8x50.c |   35 +++++++++++++++++++++++
 
-If your DMA engine is correctly implemented (and this only works for
-correctly implemented DMA engines), what you can do is:
+I need acks for these.
 
-- at the start of the transfer, prepare, submit and issue two buffers,
-  each with a callback.
-- when the first callback happens
-  - that buffer has been transferred.
-  - you can now do whatever you need with that data.
-  - prepare, submit and issue the next buffer
+>  drivers/usb/phy/phy-msm-usb.c     |   55 ++++++++++---------------------------
+>  include/linux/usb/msm_hsusb.h     |    3 ++
+>  4 files changed, 87 insertions(+), 41 deletions(-)
+> 
+> diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+> index db3d8c0..6b35953 100644
+> --- a/arch/arm/mach-msm/board-msm7x30.c
+> +++ b/arch/arm/mach-msm/board-msm7x30.c
+> @@ -31,6 +31,7 @@
+>  #include <asm/setup.h>
+>  
+>  #include <mach/board.h>
+> +#include <mach/clk.h>
+>  #include <mach/msm_iomap.h>
+>  #include <mach/dma.h>
+>  
+> @@ -61,10 +62,44 @@ static int hsusb_phy_init_seq[] = {
+>  	-1
+>  };
+>  
+> +static int hsusb_link_clk_reset(struct clk *link_clk, bool assert)
 
-This means the DMA engine always has a buffer available to it, so if
-your CPU is fast enough, you can keep the transfer going without the
-DMA channel ever stopping or having to be paused.  If your CPU isn't
-fast enough to keep up, the DMA engine will stop at the end of the
-last queued and issued buffer automatically.
+looks like you should be using the reset controller framework ?
+(drivers/reset)
 
-Bonus points if you have implemented the "move to next buffer" correctly
-too, so that the hardware can do a continuous transfer without having to
-stop and wait between the buffers (provided of course that the next
-transfer is compatible with the previous.)
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130729/77f677a7/attachment-0001.sig>
