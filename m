@@ -1,32 +1,58 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 29 Jul 2013 20:25:54 +0200
-Subject: [PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and
- dw-apb-timer-sp to just dw-apb-timer
-In-Reply-To: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
-References: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20130729182554.GA10346@amd.pavel.ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Jul 2013 19:27:30 +0100
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130729180513.GB1884@obsidianresearch.com>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F39FD8.6080808@broadcom.com> <20130727183059.GD4813@netboy>
+ <1441731.8CGUI1tUxh@flatron> <20130729180513.GB1884@obsidianresearch.com>
+Message-ID: <20130729182730.GN24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2013-07-24 22:43:16, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
-> DW APB timer, just fed by different clocks.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> CC: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> CC: Jamie Iles <jamie@jamieiles.com>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
+On Mon, Jul 29, 2013 at 12:05:13PM -0600, Jason Gunthorpe wrote:
+> Clearly general purpose systems (eg servers, workstations, etc) with
+> *full featured firmware* fall into category b. Linux already basically
+> has stable DT for those systems - but the firmware is expected to do
+> lots of work and hide all the low level details from the
+> kernel. Basically, the DT should stick to approximately ePAR and
+> everything else is hidden by the firmware. This is essentially how x86
+> works and achieves its compatibility.
 
-Looks good to me, thanks!
-									Pavel
+and the downside of placing that trust in firmware is that it very often
+leads to bugs which can't be solved.
 
-Reviewed-by: Pavel Machek <pavel@denx.de>
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I have a set of patches for my laptop/docking station which gets the
+serial/printer ports working.  I've had them for many years now - and
+I thought I had a problem sorted.  I was wrong - the nice helpful ACPI
+reports on dock that the serial port is enabled, but the port is
+actually disabled in hardware.
+
+If I have ACPI/PNP stuff setup to always believe that this port is
+disabled, then on boot with the docking station connected, it comes up
+initially as ttyS0, and then, because the port is "disabled", the
+resources are busy so it gets reassigned to a different IO port.
+Undocking/redocking works because the port is now properly re-enabled
+after a dock event.
+
+If I report the ACPI status to the kernel, then on boot, it correctly
+remains as ttyS0.  However, after an undock/redock event, Linux
+believes that the port is back, but any attempt to use it gets the
+"LSR safety check engaged" message, because the port is actually
+disabled.  The only way to get it working again is to manually unbind
+the device and rebind it - so the ACPI disable + enable methods get
+called.
+
+I've had this problem for years, and it's basically unfixable for me -
+it's only fixable if you are IBM and can reflash the BIOS with alternative
+ACPI tables which are correct.  And I won't submit these patches all the
+time that I don't know they work correctly.
+
+That's the problem with "compatible systems" - you give away trust that
+someone else will do the right thing, and if they don't, you may be
+screwed in a way that is can not be worked around by quirks or similar
+- just like the above.
+
+Firmware is swings and roundabouts.  You give up some control to a
+third party so you don't have to think about XYZ, and you hope that
+they get it right.
