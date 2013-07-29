@@ -1,65 +1,43 @@
-From: jld@mozilla.com (Jed Davis)
-Date: Mon, 29 Jul 2013 14:21:40 -0700
-Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
-In-Reply-To: <20130722185234.GA14519@localhost.localdomain>
-References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
- <20130715135420.GG10000@mudshark.cambridge.arm.com>
- <20130720044655.GC9433@mozilla.com>
- <20130721213753.GA29879@mudshark.cambridge.arm.com>
- <20130722185234.GA14519@localhost.localdomain>
-Message-ID: <20130729212140.GB12681@mozilla.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 29 Jul 2013 21:24:00 +0000
+Subject: [PATCH 1/2] add cscope Makefile target
+In-Reply-To: <cover.1375131816.git.jason@lakedaemon.net>
+References: <cover.1375131816.git.jason@lakedaemon.net>
+Message-ID: <dcc21753a1bf975fc97c5f4c8d089e1fb4b00dd2.1375131816.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 07:52:39PM +0100, Dave Martin wrote:
-> On Sun, Jul 21, 2013 at 10:37:53PM +0100, Will Deacon wrote:
-> > Ok, I think I'm with you now. I also think that a better solution would be
-> > to try and limit the r7/fp confusion to one place, perhaps behind something
-> > like:
-> > 
-> > void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame);
-> > 
-> > then that function can act as the bridge between pt_regs (where we leave
-> > everything as it is) and stackframe (where we assign either r7 or fp into
-> > the fp member). Then we just fix up the call sites to pass the regs they're
-> > interested in to our new function.
-> > 
-> > What do you think?
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ .gitignore | 1 +
+ Makefile   | 6 ++++++
+ 2 files changed, 7 insertions(+)
 
-I can see that being useful if we wanted to opacify struct stackframe,
-but... all uses of stackframe that I see involve passing it to
-unwind_frame, which expands it back out into an array of registers.
-(Except with CONFIG_FRAME_POINTER, but "APCS variants that require a
-frame pointer register are obsolete.")
-
-So... why not make pt_regs and stackframe the same, and avoid the
-translations entirely?
-
-> Do the ARM unwind tables guarantee not to need knowledge of any
-> virtual registers for the purpose of processing the opcodes of a single
-> function's unwind table entry, except those virtual regs that we happen
-> to initialise?  Or do we just rely on luck?
-
-Yes, for some value of "luck".  The spec documents 0x90|N, for N a core
-register number other than 13 or 15, as setting the vSP to the value of
-virtual register N.  We can get away with some omissions for kernel code
-(e.g., unwind.c doesn't handle saved floating point registers, nor adding
-constants larger than 1024 to vSP), but is this one of them?
-
-[...]
-> The purist answer seems to be: we might need all the regs in struct
-> stackframe.
-> 
-> The pragmatic answer might be that we definitely need r7 for Thumb code,
-> but given the nimbleness of GCC to evolve we might get away with not
-> including extra registers for a long time yet.
-
-The other question to ask here might be: what does the "pragmatic
-answer" gain us over the "purist answer"?
-
-> A review of existing custom unwind annotations might be a good idea
-> anyway, to check whether any of them requires another register right now.
-
-`egrep -r '\.(setf|movs)p' arch/arm` finds nothing, for what it's worth.
-
---Jed
+diff --git a/.gitignore b/.gitignore
+index c3b59bf..ac4198c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,6 +1,7 @@
+ *.sh
+ *.o
+ *.bin
++cscope.*
+ matcher
+ uImage
+ input/zImage
+diff --git a/Makefile b/Makefile
+index 5ad5fc0..daeafa4 100644
+--- a/Makefile
++++ b/Makefile
+@@ -43,3 +43,9 @@ uImage: matcher.bin
+ clean:
+ 	rm -fr matcher.bin matcher *.o uImage
+ 
++distclean:
++	rm -fr cscope.*
++
++cscope:
++	-find . -name "*.[chS]" >cscope.files
++	-cscope -b -R
+-- 
+1.8.3.2
