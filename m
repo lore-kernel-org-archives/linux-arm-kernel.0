@@ -1,47 +1,64 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 29 Jul 2013 14:40:33 +0200
-Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
- for every GPIO on DT"
-In-Reply-To: <CACRpkdZ1E9zC_yyK=UkJSejCwb_k7sYfhNgH5NASZ8Nf-qt2KA@mail.gmail.com>
-References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
- <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
- <51F633AE.8090308@collabora.co.uk>
- <alpine.DEB.2.02.1307290943000.30864@utopia.booyaka.com>
- <D135FD6D-D4B6-4237-9866-4FFED36C03CD@collabora.co.uk>
- <CACRpkdZ1E9zC_yyK=UkJSejCwb_k7sYfhNgH5NASZ8Nf-qt2KA@mail.gmail.com>
-Message-ID: <798C2D39-EE8E-4C73-A98D-63231375599C@collabora.co.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 29 Jul 2013 13:41:49 +0100
+Subject: [PATCH 1/4] ARM: dove: add cpu device tree node
+In-Reply-To: <1375100946-28521-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1375100946-28521-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <51F6630D.5010603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/2013, at 13:43, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> On Mon, Jul 29, 2013 at 12:19 PM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
+On 29/07/13 13:29, Sebastian Hesselbarth wrote:
+> This adds a node for the Marvell Sheeva PJ4A CPU found on Dove SoCs.
+> While at it, also move the l2-cache node out of internal registers and
+> consistently name different nodes.
 > 
->> I guess the safer approach is to just revert these since they are causing
->> a regression and what the patches aims to fix as been broken since the
->> initial OMAP migration to DT anyways.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/dove.dtsi |   52 ++++++++++++++++++++++++++-----------------
+>  1 file changed, 32 insertions(+), 20 deletions(-)
 > 
-> I have already reverted these and pushed to linux-next.
-> 
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 8d5be1e8..09d9710 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -10,6 +10,23 @@
+>  		gpio2 = &gpio2;
+>  	};
+>  
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu0: cpu at 0 {
+> +			compatible = "marvell,pj4a", "marvell,sheeva-v7";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <0>;
+> +		};
+> +	};
+> +
+> +	l2: l2-cache {
+> +		compatible = "marvell,tauros2-cache";
+> +		marvell,tauros2-cache-features = <0>;
+> +	};
+Hi Sebastian,
 
-Thanks for doing that and sorry for all the inconvenience.
+This is not entirely related to the patch but thought of checking with
+you. I was trying to get info on L2 cache controller on Marvell SoCs,
+mainly structure or way/set size. Is that something we can get
+dynamically ? Some specification I referred said its integrated and some
+said its separate(not unified). Basically I need information around
+various L2 cache implementations(Tauros2/Feroceon) from Marvell.
 
-Too bad this regression was not found before the patches hit mainline and they even were on linux-next for some time but shit happens :-(
+Any pointers or contacts to get this information will be helpful.
 
-> Actually input-hogs was not such a good idea either, after
-> meditating on this I realized that the information about what
-> GPIOs are used as interrupts is a piece of information that
-> already exist in the device tree, albeit a bit distributed.
-> 
-> So I'm drafting an RFC to indicate how I think this should
-> be solved.
-> 
-
-Great, I hope we can finally have a good solution for this long standing issue.
-
-> Yours,
-> Linus Walleij
-
-Best regards,
-Javier
+Regards,
+Sudeep
