@@ -1,138 +1,65 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 29 Jul 2013 17:42:13 +0200
-Subject: [PATCHv2 1/2] mv_xor: use {readl,
- writel}_relaxed instead of __raw_{readl, writel}
-In-Reply-To: <1375112534-748-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375112534-748-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375112534-748-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Mon, 29 Jul 2013 11:45:55 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <51F168FC.9070906@wwwdotorg.org>
+ <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
+ <20130725184834.GA8296@netboy>
+ <20130725213753.GC17616@obsidianresearch.com>
+ <20130726080115.GA5436@netboy>
+ <1374831744.2923.42.camel@shinybook.infradead.org>
+ <20130726130927.GC4219@netboy>
+ <20130726141016.GF9858@sirena.org.uk>
+ <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
+Message-ID: <20130729154553.GK5022@ohporter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support big-endian execution, the mv_xor driver is changed
-to use the readl_relaxed() and writel_relaxed() accessors that
-properly convert from the CPU endianess to the device endianess (which
-in the case of Marvell XOR hardware is always little-endian).
+On Fri, Jul 26, 2013 at 08:49:43AM -0700, Olof Johansson wrote:
+> On Fri, Jul 26, 2013 at 7:10 AM, Mark Brown <broonie@kernel.org> wrote:
+> > On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
+> >
+> >> Unless I totally misunderstood, the thread is talking about letting
+> >> established bindings change with each new kernel version.  I am
+> >> opposed to that.
+> >
+> > No, nobody is really saying that is a particularly good idea.  There is
+> > some debate about how we work out what an established binding is but
+> > there's no serious suggestion that we don't want stable bindings.
+> 
+> Yes, what Mark said -- _today_ all bindings are subject to change and
+> can be changed in lockstep with the kernel. This has been necessary as
+> part of development to sort out all of the various bootstrapping
+> issues across platforms.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/dma/mv_xor.c | 36 ++++++++++++++++++------------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+However, we still have people arguing that we can't (or should not) change
+a binding right now even to fix inconsistency issues that are discovered
+after the fact. I'm hearing a different story depending on who is
+telling it at the moment.
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 200f1a3..c026b27 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -114,25 +114,25 @@ static void mv_desc_set_src_addr(struct mv_xor_desc_slot *desc,
- 
- static u32 mv_chan_get_current_desc(struct mv_xor_chan *chan)
- {
--	return __raw_readl(XOR_CURR_DESC(chan));
-+	return readl_relaxed(XOR_CURR_DESC(chan));
- }
- 
- static void mv_chan_set_next_descriptor(struct mv_xor_chan *chan,
- 					u32 next_desc_addr)
- {
--	__raw_writel(next_desc_addr, XOR_NEXT_DESC(chan));
-+	writel_relaxed(next_desc_addr, XOR_NEXT_DESC(chan));
- }
- 
- static void mv_chan_unmask_interrupts(struct mv_xor_chan *chan)
- {
--	u32 val = __raw_readl(XOR_INTR_MASK(chan));
-+	u32 val = readl_relaxed(XOR_INTR_MASK(chan));
- 	val |= XOR_INTR_MASK_VALUE << (chan->idx * 16);
--	__raw_writel(val, XOR_INTR_MASK(chan));
-+	writel_relaxed(val, XOR_INTR_MASK(chan));
- }
- 
- static u32 mv_chan_get_intr_cause(struct mv_xor_chan *chan)
- {
--	u32 intr_cause = __raw_readl(XOR_INTR_CAUSE(chan));
-+	u32 intr_cause = readl_relaxed(XOR_INTR_CAUSE(chan));
- 	intr_cause = (intr_cause >> (chan->idx * 16)) & 0xFFFF;
- 	return intr_cause;
- }
-@@ -149,13 +149,13 @@ static void mv_xor_device_clear_eoc_cause(struct mv_xor_chan *chan)
- {
- 	u32 val = ~(1 << (chan->idx * 16));
- 	dev_dbg(mv_chan_to_devp(chan), "%s, val 0x%08x\n", __func__, val);
--	__raw_writel(val, XOR_INTR_CAUSE(chan));
-+	writel_relaxed(val, XOR_INTR_CAUSE(chan));
- }
- 
- static void mv_xor_device_clear_err_status(struct mv_xor_chan *chan)
- {
- 	u32 val = 0xFFFF0000 >> (chan->idx * 16);
--	__raw_writel(val, XOR_INTR_CAUSE(chan));
-+	writel_relaxed(val, XOR_INTR_CAUSE(chan));
- }
- 
- static int mv_can_chain(struct mv_xor_desc_slot *desc)
-@@ -173,7 +173,7 @@ static void mv_set_mode(struct mv_xor_chan *chan,
- 			       enum dma_transaction_type type)
- {
- 	u32 op_mode;
--	u32 config = __raw_readl(XOR_CONFIG(chan));
-+	u32 config = readl_relaxed(XOR_CONFIG(chan));
- 
- 	switch (type) {
- 	case DMA_XOR:
-@@ -192,7 +192,7 @@ static void mv_set_mode(struct mv_xor_chan *chan,
- 
- 	config &= ~0x7;
- 	config |= op_mode;
--	__raw_writel(config, XOR_CONFIG(chan));
-+	writel_relaxed(config, XOR_CONFIG(chan));
- 	chan->current_type = type;
- }
- 
-@@ -201,14 +201,14 @@ static void mv_chan_activate(struct mv_xor_chan *chan)
- 	u32 activation;
- 
- 	dev_dbg(mv_chan_to_devp(chan), " activate chan.\n");
--	activation = __raw_readl(XOR_ACTIVATION(chan));
-+	activation = readl_relaxed(XOR_ACTIVATION(chan));
- 	activation |= 0x1;
--	__raw_writel(activation, XOR_ACTIVATION(chan));
-+	writel_relaxed(activation, XOR_ACTIVATION(chan));
- }
- 
- static char mv_chan_is_busy(struct mv_xor_chan *chan)
- {
--	u32 state = __raw_readl(XOR_ACTIVATION(chan));
-+	u32 state = readl_relaxed(XOR_ACTIVATION(chan));
- 
- 	state = (state >> 4) & 0x3;
- 
-@@ -755,22 +755,22 @@ static void mv_dump_xor_regs(struct mv_xor_chan *chan)
- {
- 	u32 val;
- 
--	val = __raw_readl(XOR_CONFIG(chan));
-+	val = readl_relaxed(XOR_CONFIG(chan));
- 	dev_err(mv_chan_to_devp(chan), "config       0x%08x\n", val);
- 
--	val = __raw_readl(XOR_ACTIVATION(chan));
-+	val = readl_relaxed(XOR_ACTIVATION(chan));
- 	dev_err(mv_chan_to_devp(chan), "activation   0x%08x\n", val);
- 
--	val = __raw_readl(XOR_INTR_CAUSE(chan));
-+	val = readl_relaxed(XOR_INTR_CAUSE(chan));
- 	dev_err(mv_chan_to_devp(chan), "intr cause   0x%08x\n", val);
- 
--	val = __raw_readl(XOR_INTR_MASK(chan));
-+	val = readl_relaxed(XOR_INTR_MASK(chan));
- 	dev_err(mv_chan_to_devp(chan), "intr mask    0x%08x\n", val);
- 
--	val = __raw_readl(XOR_ERROR_CAUSE(chan));
-+	val = readl_relaxed(XOR_ERROR_CAUSE(chan));
- 	dev_err(mv_chan_to_devp(chan), "error cause  0x%08x\n", val);
- 
--	val = __raw_readl(XOR_ERROR_ADDR(chan));
-+	val = readl_relaxed(XOR_ERROR_ADDR(chan));
- 	dev_err(mv_chan_to_devp(chan), "error addr   0x%08x\n", val);
- }
- 
--- 
-1.8.1.2
+Getting quickly to a definitive answer on the criteria for an
+"established" binding is will help end ongoing discussions as to whether
+we can fix a currently broken one or just have to leave it.
+
+> What we're talking about is to end that mode of operation, and moving
+> over to locking in bindings. Device tree contents, as mentioned
+> elsewhere, might still be changed just like code is -- bugs are fixed,
+> etc. But it's time to start locking down the bindings, in particular
+> no longer change the established ones.
+> 
+> Long term, final goal is likely to be close to what Russell is saying
+> -- nothing should go into the kernel tree unless the binding is in a
+> fully stable state. However, we have a transitional period between now
+> and then, and even when we're at the final state there will be need to
+> have some sort of sandbox for development and test of future bindings.
+> Dealing with all that, as well as the actual process for locking in
+> bindings, is what needs to be sorted out.
+> 
+> I think we're all in agreement that bindings that change over time are
+> nothing but pain, but we're arguing that in circles anyway.
+
++1
+
+-Matt
