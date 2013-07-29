@@ -1,39 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Jul 2013 11:01:17 +0200
-Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
- for every GPIO on DT"
-In-Reply-To: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
-Message-ID: <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Jul 2013 02:05:24 -0700
+Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
+In-Reply-To: <51E98AEC.5000802@wwwdotorg.org>
+References: <20130716090310.5541.36777.stgit@localhost>
+ <20130716090536.5541.36289.stgit@localhost>
+ <51E70953.1000601@wwwdotorg.org>
+ <20130718072034.GO7656@atomide.com>
+ <51E8401E.8040705@wwwdotorg.org>
+ <20130719072927.GY7656@atomide.com>
+ <51E98AEC.5000802@wwwdotorg.org>
+Message-ID: <20130729090524.GY7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+* Stephen Warren <swarren@wwwdotorg.org> [130719 11:59]:
+> On 07/19/2013 01:29 AM, Tony Lindgren wrote:
+> > 
+> > I'd vote for keeping the existing behaviour with pinctrl_select_state()
+> > when no active state is defined.
+> 
+> Yes, I think that will work, since the active state cannot exist before
+> this new scheme is in place.
 
-On Mon, Jul 29, 2013 at 9:52 AM, Paul Walmsley <paul@pwsan.com> wrote:
+Right.
+ 
+> But, this needs to be very clearly spell out in the DT binding
+> documentation: If you have states default/idle/sleep, they're complete
+> alternatives, whereas if you have states default/active/idle/sleep, the
+> latter 3 are alternatives that build on top of the first. I foresee mass
+> confusion, but perhaps I'm being pessimistic.
 
-> your commit 0e970cec05635adbe7b686063e2548a8e4afb8f4 ("gpio/omap: don't
-> create an IRQ mapping for every GPIO on DT") breaks the boot on the
-> OMAP5912 OSK:
+I'm hoping we can automate the runtime PM handling with default/active/idle
+completely from the consumer driver point of view. And then when that's
+working, we can probably deprecate any runtime PM related handling using
+pinctr_select_state() and print warnings. And we can also improve the
+documentation so no new users will use the default/idle/sleep for runtime
+PM unless they really want to.
 
-I'm contemplating just reverting this whole series, as I didn't like
-the approach from the beginning and it has exploded in exactly
-the way I thought it would.
+Regards,
 
-If we revert these three patches:
-
-commit 949eb1a4d29dc75e0b5b16b03747886b52ecf854
-"gpio/omap: fix build error when OF_GPIO is not defined."
-commit b4419e1a15905191661ffe75ba2f9e649f5d565e
-"gpio/omap: auto request GPIO as input if used as IRQ via DT"
-commit 0e970cec05635adbe7b686063e2548a8e4afb8f4
-"gpio/omap: don't create an IRQ mapping for every GPIO on DT"
-
-Does the OMAP1 boot again after this?
-
-I think it's a way better idea to proceed with input-hogs on the gpiochip
-DT node and use that to get auto-request on the GPIO lines that
-will be used as IRQs only.
-
-Yours,
-Linus Walleij
+Tony
