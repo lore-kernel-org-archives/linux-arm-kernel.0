@@ -1,266 +1,73 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 29 Jul 2013 04:57:22 -0700
-Subject: [PATCH v6] watchdog: Add MOXA ART watchdog driver
-In-Reply-To: <1375098093-8975-1-git-send-email-jonas.jensen@gmail.com>
-References: <1375093215-7136-1-git-send-email-jonas.jensen@gmail.com>
- <1375098093-8975-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <51F658A2.2010007@roeck-us.net>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Mon, 29 Jul 2013 17:31:16 +0530
+Subject: [PATCH V2 7/8] ARM: dts: wm8994: Add wm8994 support on smdk5420
+In-Reply-To: <CAAgF-Be8SNxTZv1yFCwH6yJ-O_3R4reh=3y+pSCLJYW7S9TkUg@mail.gmail.com>
+References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
+ <1374845812-7803-8-git-send-email-padma.v@samsung.com>
+ <20130726151902.GL9858@sirena.org.uk>
+ <CAAgF-Be8SNxTZv1yFCwH6yJ-O_3R4reh=3y+pSCLJYW7S9TkUg@mail.gmail.com>
+Message-ID: <CAAgF-Bexp_fGT8KV+TQ0_kZLJBtq7UK=TG4eYRA6qpTSL+scxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 04:41 AM, Jonas Jensen wrote:
-> Add watchdog driver for MOXA ART SoCs.
->
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
->
-> Notes:
->      Changes since v5:
->
->      1. replace "moxart_wdt->dev.timeout" with "wdt_dev->timeout"
->
->      Applies to next-20130729
->
->   .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
->   drivers/watchdog/Kconfig                           |  10 ++
->   drivers/watchdog/Makefile                          |   1 +
->   drivers/watchdog/moxart_wdt.c                      | 165 +++++++++++++++++++++
->   4 files changed, 191 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
->   create mode 100644 drivers/watchdog/moxart_wdt.c
->
-> diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-> new file mode 100644
-> index 0000000..1169857
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-> @@ -0,0 +1,15 @@
-> +MOXA ART Watchdog timer
-> +
-> +Required properties:
-> +
-> +- compatible : Must be "moxa,moxart-watchdog"
-> +- reg : Should contain registers location and length
-> +- clocks : Should contain phandle for the clock that drives the counter
-> +
-> +Example:
-> +
-> +	watchdog: watchdog at 98500000 {
-> +		compatible = "moxa,moxart-watchdog";
-> +		reg = <0x98500000 0x10>;
-> +		clocks = <&coreclk>;
-> +	};
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 362085d..6883aab 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -382,6 +382,16 @@ config RETU_WATCHDOG
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called retu_wdt.
->
-> +config MOXART_WDT
-> +	tristate "MOXART watchdog"
-> +	depends on ARCH_MOXART
-> +	help
-> +	  Say Y here to include Watchdog timer support for the watchdog
-> +	  existing on the MOXA ART SoC series platforms.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called moxart_wdt.
-> +
->   # AVR32 Architecture
->
->   config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 2f26a0b..7cab53a 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
->   obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
->   obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
->   obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-> +obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
->
->   # AVR32 Architecture
->   obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
-> new file mode 100644
-> index 0000000..70b5806
-> --- /dev/null
-> +++ b/drivers/watchdog/moxart_wdt.c
-> @@ -0,0 +1,165 @@
-> +/*
-> + * MOXA ART SoCs watchdog driver.
-> + *
-> + * Copyright (C) 2013 Jonas Jensen
-> + *
-> + * Jonas Jensen <jonas.jensen@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/err.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/watchdog.h>
-> +#include <linux/moduleparam.h>
-> +
-> +#define REG_COUNT			0x4
-> +#define REG_MODE			0x8
-> +#define REG_ENABLE			0xC
-> +
-> +struct moxart_wdt_dev {
-> +	struct watchdog_device dev;
-> +	void __iomem *base;
-> +	unsigned int clock_frequency;
-> +};
-> +
-> +static int heartbeat;
-> +
-> +static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
-> +{
-> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-> +
-> +	writel(0, moxart_wdt->base + REG_ENABLE);
-> +
-> +	return 0;
-> +}
-> +
-> +static int moxart_wdt_start(struct watchdog_device *wdt_dev)
-> +{
-> +	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-> +
-> +	writel(moxart_wdt->clock_frequency * wdt_dev->timeout,
-> +	       moxart_wdt->base + REG_COUNT);
-> +	writel(0x5ab9, moxart_wdt->base + REG_MODE);
-> +	writel(0x03, moxart_wdt->base + REG_ENABLE);
-> +
-> +	return 0;
-> +}
-> +
-> +static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
-> +				  unsigned int timeout)
-> +{
-> +	wdt_dev->timeout = timeout;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct watchdog_info moxart_wdt_info = {
-> +	.identity       = "moxart-wdt",
-> +	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
-> +			  WDIOF_MAGICCLOSE,
-> +};
-> +
-> +static const struct watchdog_ops moxart_wdt_ops = {
-> +	.owner          = THIS_MODULE,
-> +	.start          = moxart_wdt_start,
-> +	.stop           = moxart_wdt_stop,
-> +	.set_timeout    = moxart_wdt_set_timeout,
-> +};
-> +
-> +static int moxart_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct moxart_wdt_dev *moxart_wdt;
-> +	struct device *dev = &pdev->dev;
+Hi Mark,
 
-I have my nitpicking day ;). Even though you declare dev = &pdev->dev,
-you use &pdev->dev several times below.
-
-Assuming you change this, feel free to add
-
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-
-
-> +	struct device_node *node = dev->of_node;
-> +	struct resource *res;
-> +	struct clk *clk;
-> +	int err;
-> +	unsigned int max_timeout;
-> +	bool nowayout = WATCHDOG_NOWAYOUT;
-> +
-> +	moxart_wdt = devm_kzalloc(&pdev->dev, sizeof(*moxart_wdt), GFP_KERNEL);
-> +	if (!moxart_wdt)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, moxart_wdt);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	moxart_wdt->base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(moxart_wdt->base))
-> +		return PTR_ERR(moxart_wdt->base);
-> +
-> +	clk = of_clk_get(node, 0);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: of_clk_get failed\n", __func__);
-> +		return PTR_ERR(clk);
-> +	}
-> +
-> +	moxart_wdt->clock_frequency = clk_get_rate(clk);
-> +	if (moxart_wdt->clock_frequency == 0) {
-> +		pr_err("%s: incorrect clock frequency\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
-> +
-> +	moxart_wdt->dev.info = &moxart_wdt_info;
-> +	moxart_wdt->dev.ops = &moxart_wdt_ops;
-> +	moxart_wdt->dev.timeout = max_timeout;
-> +	moxart_wdt->dev.min_timeout = 1;
-> +	moxart_wdt->dev.max_timeout = max_timeout;
-> +	moxart_wdt->dev.parent = &pdev->dev;
-> +
-> +	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, &pdev->dev);
-> +	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
-> +
-> +	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
-> +
-> +	err = watchdog_register_device(&moxart_wdt->dev);
-> +	if (unlikely(err))
-> +		return err;
-> +
-> +	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
-> +		moxart_wdt->dev.timeout, nowayout);
-> +
-> +	return 0;
-> +}
-> +
-> +static int moxart_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
-> +
-> +	moxart_wdt_stop(&moxart_wdt->dev);
-> +	watchdog_unregister_device(&moxart_wdt->dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id moxart_watchdog_match[] = {
-> +	{ .compatible = "moxa,moxart-watchdog" },
-> +	{ },
-> +};
-> +
-> +static struct platform_driver moxart_wdt_driver = {
-> +	.probe      = moxart_wdt_probe,
-> +	.remove     = moxart_wdt_remove,
-> +	.driver     = {
-> +		.name		= "moxart-watchdog",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= moxart_watchdog_match,
-> +	},
-> +};
-> +module_platform_driver(moxart_wdt_driver);
-> +
-> +module_param(heartbeat, int, 0);
-> +MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
-> +
-> +MODULE_DESCRIPTION("MOXART watchdog driver");
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+On Sat, Jul 27, 2013 at 6:46 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
+> Hi Mark,
 >
+> On Fri, Jul 26, 2013 at 8:49 PM, Mark Brown <broonie@kernel.org> wrote:
+>> On Fri, Jul 26, 2013 at 07:06:51PM +0530, Padmavathi Venna wrote:
+>>> This patch adds wm8994 codec node on i2c bus1 and the required
+>>> regulator supplies and properties on smdk5420 board.
+>>
+>> This isn't a device tree patch for WM8994, it's a patch for the
+>> SMDK5420.
+>
+> Yes. I will correct the subject.
+>
+>>
+>>> +     vdd: fixed-regulator at 0 {
+>>> +             compatible = "regulator-fixed";
+>>> +             regulator-name = "vdd-supply";
+>>
+>> These names look wrong - they should reflect the names in the schematic
+>> as they're for human comprehensibility.  This may just be a case of
+>> dropping the -supply.
+>
+
+When I posted the same patch for smdk5250, you asked me to club all
+the same supply regulators. So I clubbed AVDD2 and CPVDD. So any other
+better name for representing both supplies?
+
+> OK.
+>
+>>
+>>> +             wm8994: wm8994 at 1a {
+>>> +                     compatible = "wlf,wm8994";
+>>> +                     reg = <0x1a>;
+>>> +
+>>> +                     gpio-controller;
+>>> +                     #gpio-cells = <2>;
+>>> +
+>>> +                     AVDD2-supply = <&vdd>;
+>>> +                     CPVDD-supply = <&vdd>;
+>>> +                     DBVDD-supply = <&dbvdd>;
+>>> +                     SPKVDD1-supply = <&spkvdd>;
+>>> +                     SPKVDD2-supply = <&spkvdd>;
+>>> +             };
+>>
+>> It would be helpful to also add a clock binding (I posted a binding
+>> documentation update the other day, it's in my tree now) but it's not
+>> essential and I suspect it needs some work on the clock driver side
+>> still.
+>
+> OK. I will check this.
+
+As per schemata, input clock to MCLK1 is an oscillator clock with
+16.9MHz and MCLK2 not showing any input clock. So here I need to add a
+fixed rate clock with 16.9MHz as MCLK1 in the smdk board file.
+
+Is it correct?
+
+Thanks
+Padma
