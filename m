@@ -1,29 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 29 Jul 2013 14:21:05 -0300
-Subject: Board-specific GPIO setup code
-In-Reply-To: <51F69D2B.6030605@wwwdotorg.org>
-References: <51F568AD.8030001@prisktech.co.nz> <51F69D2B.6030605@wwwdotorg.org>
-Message-ID: <CAOMZO5DCPvKVJNVp9cZMiMvY3bxhXdjmJs+dqNXdhxDDoSLQmQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 29 Jul 2013 18:23:27 +0100
+Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
+In-Reply-To: <20130729133625.GA2280@localhost.localdomain>
+References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
+ <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+ <20130729095400.GB32383@mudshark.cambridge.arm.com>
+ <20130729133625.GA2280@localhost.localdomain>
+Message-ID: <20130729172327.GA20592@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 1:49 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 07/28/2013 12:53 PM, Tony Prisk wrote:
->> On the Wandboard (IMX6Q SoC), there is a WiFi module connected via SDIO
->> that requires a reset procedure to enable it. This would be board
->> specific setup, but gpio_* functions can't be used in
->> arch/arm/mach-imx/imx6q.c
->>
->> What would be the correct place to perform the reset code (basically a
->> series of gpio calls) to reset the WiFi controller or should it be done
->> earlier in uboot?
->
-> The correct approach is probably to enhance the SDIO controller (or SDIO
-> core) to know how to power/reset/... the device that's attached to it.
+On Mon, Jul 29, 2013 at 02:36:30PM +0100, Dave Martin wrote:
+> On Mon, Jul 29, 2013 at 10:54:01AM +0100, Will Deacon wrote:
+> > On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
+> > > On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > > > Power aware scheduling needs the cpu topology information to improve the
+> > > > cpu scheduler decision making.
+> > > 
+> > > It's not only power aware scheduling. The scheduler already uses
+> > > topology and cache sharing when  CONFIG_SCHED_MC and/or
+> > > CONFIG_SCHED_SMT are enable. So you should also add these configs for
+> > > arm64 so the scheduler can use it
+> > 
+> > ... except that the architecture doesn't define what the AFF fields in MPIDR
+> > really represent. Using them to make key scheduling decisions relating to
+> 
+> In fact, the ARM Architecture doesn't place any requirements on MPIDRs to
+> force the aff fields to exist _at all_.  It's just a recommendation.
+> Instead, you have a 24 or 32-bit number which is unique per CPU, and which
+> is _probably_ assigned in a way resembling the aff fields.
+> 
+> > cache proximity seems pretty risky to me, especially given the track record
+> > we've seen already on AArch32 silicon. It's a convenient register if it
+> > contains the data we want it to contain, but we need to force ourselves to
+> > come to terms with reality here and simply use it as an identifier for a
+> > CPU.
+> 
+> +1
+> 
+> Also, we should align arm and arm64.  The problem is basically exactly
+> the same, and the solution needs to be the same.  struct cputopo_arm is
+> already being abused  -- for example, TC2 describes the A15 and A7
+> clusters on a single die as having different "socket_id" values, even
+> though this is obviously nonsense.  But there's no other way to describe
+> that system today.
+> 
+> > Can't we just use the device-tree to represent this topological data for
+> > arm64? Lorenzo has been working on bindings in this area.
+> 
+> This may become more important as we start to see things like asymmetric
+> topologies appearing (different numbers of nodes and different
+> interdependence characteristics in adjacent branches of the topology
+> etc.)
 
-Can't we just use the gpio reset driver proposed by Philipp Zabel?
-http://www.spinics.net/lists/arm-kernel/msg261771.html
+Will and Dave summed up the existing issues with MPIDR definition related to
+the topology description.
 
-Regards,
+FYI, a link to the current topology bindings posted on DT-discuss and LAKML:
 
-Fabio Estevam
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/031725.html
+
+I am waiting for the dust to settle on the DT bindings review discussions to
+repost them and get them finalized.
+
+Lorenzo
