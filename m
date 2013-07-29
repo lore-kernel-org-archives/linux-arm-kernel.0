@@ -1,76 +1,70 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 29 Jul 2013 16:18:06 +0200
-Subject: [PATCH v2 00/42] ARM: at91: move to common clk framework
-In-Reply-To: <51F63516.8090000@overkiz.com>
-References: <1374068069-13496-1-git-send-email-b.brezillon@overkiz.com>
- <51F28370.6050304@gmail.com> <51F2996B.6000406@overkiz.com>
- <51F2A556.8020109@overkiz.com>
- <CACQ1gAgw-v3z_sWcsk7SqFFW-ERLjS0RS5GTgAdd5Y1tj3Z1FA@mail.gmail.com>
- <51F63516.8090000@overkiz.com>
-Message-ID: <CACQ1gAi53KN=zE8zDxQO=+BY2zvQXakD=OSuzUqc0VLwWLySCA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 29 Jul 2013 15:30:50 +0100
+Subject: [PATCH 7/7] dts: calxeda: add ARM PSCI binding
+In-Reply-To: <51F66A72.7070209@gmail.com>
+References: <1375048598-15637-1-git-send-email-robherring2@gmail.com>
+ <1375048598-15637-8-git-send-email-robherring2@gmail.com>
+ <20130729102424.GA24255@e106331-lin.cambridge.arm.com>
+ <51F66A72.7070209@gmail.com>
+Message-ID: <20130729143050.GC25264@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/29 boris brezillon <b.brezillon@overkiz.com>:
-> On 29/07/2013 10:00, Richard Genoud wrote:
->>
->> 2013/7/26 boris brezillon <b.brezillon@overkiz.com>:
->>>
->>> On 26/07/2013 17:44, boris brezillon wrote:
->>> I found 2 bugs:
->>> 1) the main frequency ready test in recalc_rate function is wrong
->>> 2) the common clk framework uses the first match for dt clk registration
->>>     and main clk has this compatible property:
->>>     compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
->>>     As a result the main clk is always bound to the fixed-clock driver
->>>     which set the clock frequency to 0 if 'clock-frequency' property is
->>>     missing.
->>>
->>> These bugs will be fixed in next version.
->>> Tell me if you want need thesse patches for testing purpose.
->>
->> Hi Boris,
->>
->> I tested your patch, the clock is not at 0 anymore:
->> AT91: PIT: mck rate = 8333333
->>
->> And it's booting correctly.
->> There's a small bug I found in the at91sam9x5 dtsi file (ssc id is 28,
->> not 27). (patch attached)
->>
->> And yes, I could use your patches for some more tests !
->>
->> Thanks,
->>
->> Richard.
->
-> Hi Richard,
->
-> Thanks for the bug report.
->
-> You'll find in attachements the pre-v3 series fixing the detected bugs
-> (including the ssc clock id bug).
->
-> If you need anything else please let me know.
+On Mon, Jul 29, 2013 at 02:13:22PM +0100, Rob Herring wrote:
+> On 07/29/2013 05:24 AM, Mark Rutland wrote:
+> > On Sun, Jul 28, 2013 at 10:56:38PM +0100, Rob Herring wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> Add the PSCI binding for Calxeda SOCs. The PSCI function numbers are
+> >> different from the DT binding example because the numbering changed in
+> >> revisions of the PSCI spec and are already fixed in highbank firmware.
+> >> Since the numbering is transparent to the kernel, this difference is not
+> >> significant.
+> >>
+> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >> ---
+> >>  arch/arm/boot/dts/ecx-common.dtsi | 10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
+> >> index e8559b7..f1dfc09 100644
+> >> --- a/arch/arm/boot/dts/ecx-common.dtsi
+> >> +++ b/arch/arm/boot/dts/ecx-common.dtsi
+> >> @@ -19,6 +19,16 @@
+> >>  		bootargs = "console=ttyAMA0";
+> >>  	};
+> >>  
+> >> +	psci {
+> >> +		compatible	= "arm,psci";
+> >> +		method		= "smc";
+> >> +		cpu_suspend	= <0x84000002>;
+> >> +		cpu_off		= <0x84000004>;
+> >> +		cpu_on		= <0x84000006>;
+> >> +		system_off	= <0x84000100>;
+> >> +		system_reset	= <0x84000101>;
+> >> +	};
+> >> +
+> > 
+> > I see this is somewhat beyond the original PSCI, given the addition of
+> > SYSTEM_OFF and SYSTEM_RESET, but not quite PSCI 0.2 as you don't have
+> > PSCI_VERSION.
+> 
+> I do actually support PSCI_VERSION. Forgot to add that to the dts.
 
-Working on sam9g35ek !
-you can add my:
-Tested-by: Richard Genoud <richard.genoud@gmail.com>
+Ah, ok. Can you upgrade the compatible string to include "arm,psci-0.2"
+while you're at it?
 
+> 
+> > It would be nice it the compatible string were more specific here to
+> > deal with this and any implementation-specific power_state ID values.
+> > Something like "calxeda,highbank-psci", "arm,psci" ?
+> 
+> Is that something we always want to do? You can't really know the
+> implementation quirks up front.
 
-One remark though:
-Maybe it would be interesting to keep using the defines in the device
-tree for peripheral IDs.
-For instance, in arch/arm/boot/dts/at91sam9x5.dtsi : (patch 33)
-ssc_clk at 28 {
-	id = <28>;
-};
-May be more readable with the SSC id AT91SAM9X5_ID_SSC, as it was
-defined in arch/arm/mach-at91/at91sam9x5.c (removed with patch 20)
+While we might not know the quirks up front, it'll mean that when we
+discover one we have a greater chance of being able to find out the
+presence of the quirk from an old dts.
 
-IMHO, all AT91SAM9X5_ID_xxx in
-arch/arm/mach-at91/include/mach/at91sam9x5.h can me moved in
-include/dt-bindings/ and used in at91sam9x5.dtsi
-
-Best regards,
-Richard.
+Thanks,
+Mark.
