@@ -1,93 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 29 Jul 2013 09:47:45 +0000 (UTC)
-Subject: OMAP5912 boot broken by "gpio/omap: don't create an IRQ mapping
- for every GPIO on DT"
-In-Reply-To: <51F633AE.8090308@collabora.co.uk>
-References: <alpine.DEB.2.02.1307290604310.30864@utopia.booyaka.com>
- <CACRpkdYa8Kg_-u3gB8jrB_Ws2EpLCnXBh5UGgDvi_7tQspDP7A@mail.gmail.com>
- <51F633AE.8090308@collabora.co.uk>
-Message-ID: <alpine.DEB.2.02.1307290943000.30864@utopia.booyaka.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Jul 2013 10:54:01 +0100
+Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
+In-Reply-To: <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
+ <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+Message-ID: <20130729095400.GB32383@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, 29 Jul 2013, Javier Martinez Canillas wrote:
-
-> I've looked at this and it seems that irq_create_mapping() does not call the
-> irq_domain_ops .map function handler since OMAP1 still uses legacy domain
-> mapping. I don't have an OMAP1 platform to test but could you please see if the
-> following patch [1] makes your OMAP1 platforms to boot again?
+On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
+> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > Power aware scheduling needs the cpu topology information to improve the
+> > cpu scheduler decision making.
 > 
-> But I agree with Linus and probably we should just go and revert the whole
-> series since it is very hard to get it right. In another thread a user reported
-> that this change also broke his DTS tree.
-> 
-> I really tried to get this right without breaking anything but there are just
-> too many OMAP platforms behaving differently and most OMAP drivers are only half
-> converted to DT so this is really a can of worms.
-> 
-> Thanks a lot and sorry for the inconvenience,
-> Javier
-> 
-> [1]:
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index c57244e..f1c6da8 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1090,8 +1090,18 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
->          * are used as interrupts.
->          */
->         if (!omap_gpio_chip_boot_dt(&bank->chip))
-> -               for (j = 0; j < bank->width; j++)
-> -                       irq_create_mapping(bank->domain, j);
-> +               for (j = 0; j < bank->width; j++) {
-> +                       int irq = irq_create_mapping(bank->domain, j);
-> +                       irq_set_lockdep_class(irq, &gpio_lock_class);
-> +                       irq_set_chip_data(irq, bank);
-> +                       if (bank->is_mpuio) {
-> +                               omap_mpuio_alloc_gc(bank, irq, bank->width);
-> +                       } else {
-> +                               irq_set_chip_and_handler(irq, &gpio_irq_chip,
-> +                                                        handle_simple_irq);
-> +                               set_irq_flags(irq, IRQF_VALID);
-> +                       }
-> +               }
->         irq_set_chained_handler(bank->irq, gpio_irq_handler);
->         irq_set_handler_data(bank->irq, bank);
-> 
+> It's not only power aware scheduling. The scheduler already uses
+> topology and cache sharing when  CONFIG_SCHED_MC and/or
+> CONFIG_SCHED_SMT are enable. So you should also add these configs for
+> arm64 so the scheduler can use it
 
-For some reason this patch didn't apply cleanly on v3.11-rc3, so 
-hand-applied the following patch.  It still doesn't boot on v3.11-rc3:
+... except that the architecture doesn't define what the AFF fields in MPIDR
+really represent. Using them to make key scheduling decisions relating to
+cache proximity seems pretty risky to me, especially given the track record
+we've seen already on AArch32 silicon. It's a convenient register if it
+contains the data we want it to contain, but we need to force ourselves to
+come to terms with reality here and simply use it as an identifier for a
+CPU.
 
-http://www.pwsan.com/omap/testlogs/bisect_5912osk_boot_fail_v3.11-rc3/20130729032525/boot/5912osk/5912osk_log.txt
+Can't we just use the device-tree to represent this topological data for
+arm64? Lorenzo has been working on bindings in this area.
 
-
-- Paul
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index c57244e..23da829 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1090,8 +1090,19 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
- 	 * are used as interrupts.
- 	 */
- 	if (!omap_gpio_chip_boot_dt(&bank->chip))
--		for (j = 0; j < bank->width; j++)
--			irq_create_mapping(bank->domain, j);
-+		for (j = 0; j < bank->width; j++) {
-+			int irq = irq_create_mapping(bank->domain, j);
-+			irq_set_lockdep_class(irq, &gpio_lock_class);
-+			irq_set_chip_data(irq, bank);
-+			if (bank->is_mpuio) {
-+				omap_mpuio_alloc_gc(bank, irq, bank->width);
-+			} else {
-+				irq_set_chip_and_handler(irq, &gpio_irq_chip,
-+							 handle_simple_irq);
-+				set_irq_flags(irq, IRQF_VALID);
-+			}
-+		}
-+
- 	irq_set_chained_handler(bank->irq, gpio_irq_handler);
- 	irq_set_handler_data(bank->irq, bank);
- }
+Will
