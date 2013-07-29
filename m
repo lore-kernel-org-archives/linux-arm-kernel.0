@@ -1,46 +1,65 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 29 Jul 2013 22:43:15 +0200
-Subject: NSA310 + DT
-In-Reply-To: <20130729192112.GY29916@titan.lakedaemon.net>
-References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
- <20130729192112.GY29916@titan.lakedaemon.net>
-Message-ID: <20130729204315.GK24782@lunn.ch>
+From: jld@mozilla.com (Jed Davis)
+Date: Mon, 29 Jul 2013 14:21:40 -0700
+Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
+In-Reply-To: <20130722185234.GA14519@localhost.localdomain>
+References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+ <20130715135420.GG10000@mudshark.cambridge.arm.com>
+ <20130720044655.GC9433@mozilla.com>
+ <20130721213753.GA29879@mudshark.cambridge.arm.com>
+ <20130722185234.GA14519@localhost.localdomain>
+Message-ID: <20130729212140.GB12681@mozilla.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 03:21:12PM -0400, Jason Cooper wrote:
-> Hi Finn,
-> 
-> On Mon, Jul 29, 2013 at 07:05:32PM +0200, Finn Hoffmann wrote:
-> > Hello,
+On Mon, Jul 22, 2013 at 07:52:39PM +0100, Dave Martin wrote:
+> On Sun, Jul 21, 2013 at 10:37:53PM +0100, Will Deacon wrote:
+> > Ok, I think I'm with you now. I also think that a better solution would be
+> > to try and limit the r7/fp confusion to one place, perhaps behind something
+> > like:
 > > 
-> > I have tried to get a current Kernel running on my NSA310.
+> > void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame);
+> > 
+> > then that function can act as the bridge between pt_regs (where we leave
+> > everything as it is) and stackframe (where we assign either r7 or fp into
+> > the fp member). Then we just fix up the call sites to pass the regs they're
+> > interested in to our new function.
+> > 
+> > What do you think?
+
+I can see that being useful if we wanted to opacify struct stackframe,
+but... all uses of stackframe that I see involve passing it to
+unwind_frame, which expands it back out into an array of registers.
+(Except with CONFIG_FRAME_POINTER, but "APCS variants that require a
+frame pointer register are obsolete.")
+
+So... why not make pt_regs and stackframe the same, and avoid the
+translations entirely?
+
+> Do the ARM unwind tables guarantee not to need knowledge of any
+> virtual registers for the purpose of processing the opcodes of a single
+> function's unwind table entry, except those virtual regs that we happen
+> to initialise?  Or do we just rely on luck?
+
+Yes, for some value of "luck".  The spec documents 0x90|N, for N a core
+register number other than 13 or 15, as setting the vSP to the value of
+virtual register N.  We can get away with some omissions for kernel code
+(e.g., unwind.c doesn't handle saved floating point registers, nor adding
+constants larger than 1024 to vSP), but is this one of them?
+
+[...]
+> The purist answer seems to be: we might need all the regs in struct
+> stackframe.
 > 
-> Nice.
-> 
-> > Everything works well on Kernels before DT with the mentioned
-> > patches from https://github.com/peeter123/NSA310-320-debian .
-> > I have linux-3.10.2 running and after I changed the dts file to lm85
-> > sensors and fanconrtol work but GPIO does not.
-> > I tried https://github.com/lunn/linux/tree/v3.11-rc1-nsa310-tdc and
-> > linux-3.11.0-rc3.
-> > Both have the problem that r8169 is not working:
-> > r8169: eth0: unknown chipset (mac_version = 0).
-> > and console is spammed with
-> > r8169 0000:01:00.0 eth0: rtl_phyar_cond == 0 (loop: 20, delay: 25).
-> > until I take eth0 down.
-> > GPIO is working.
+> The pragmatic answer might be that we definitely need r7 for Thumb code,
+> but given the nimbleness of GCC to evolve we might get away with not
+> including extra registers for a long time yet.
 
-Hi Finn
+The other question to ask here might be: what does the "pragmatic
+answer" gain us over the "purist answer"?
 
-Thanks for testing my tree. I based it on the patches found in 
-https://github.com/peeter123/NSA310-320-debian.
+> A review of existing custom unwind annotations might be a good idea
+> anyway, to check whether any of them requires another register right now.
 
-The patch-3.6.9-nsa310.diff does not contain any changes to the
-ethernet driver. So you best bet is to ask on the netdev mailing
-list.
+`egrep -r '\.(setf|movs)p' arch/arm` finds nothing, for what it's worth.
 
-Once you have it solved, it would be nice if you can send a tested-by:
-signoff to my patches.
-
-	Andrew
+--Jed
