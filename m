@@ -1,65 +1,58 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 29 Jul 2013 11:45:55 -0400
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <51F168FC.9070906@wwwdotorg.org>
- <20130725182920.GA24955@e106331-lin.cambridge.arm.com>
- <20130725184834.GA8296@netboy>
- <20130725213753.GC17616@obsidianresearch.com>
- <20130726080115.GA5436@netboy>
- <1374831744.2923.42.camel@shinybook.infradead.org>
- <20130726130927.GC4219@netboy>
- <20130726141016.GF9858@sirena.org.uk>
- <CAOesGMhEr3DiFm5uSgoHPFUMY4jWu4HkeTU2UmOGj=dS75Vk+g@mail.gmail.com>
-Message-ID: <20130729154553.GK5022@ohporter.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 29 Jul 2013 08:50:16 -0700
+Subject: [PATCH v6 4/5] clk: add CLK_SET_RATE_NO_REPARENT flag
+In-Reply-To: <1375097102-28892-5-git-send-email-james.hogan@imgtec.com>
+References: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+ <1375097102-28892-5-git-send-email-james.hogan@imgtec.com>
+Message-ID: <36053e73-faf4-47c6-9ff5-3e451361ef75@CH1EHSMHS012.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 08:49:43AM -0700, Olof Johansson wrote:
-> On Fri, Jul 26, 2013 at 7:10 AM, Mark Brown <broonie@kernel.org> wrote:
-> > On Fri, Jul 26, 2013 at 03:09:29PM +0200, Richard Cochran wrote:
-> >
-> >> Unless I totally misunderstood, the thread is talking about letting
-> >> established bindings change with each new kernel version.  I am
-> >> opposed to that.
-> >
-> > No, nobody is really saying that is a particularly good idea.  There is
-> > some debate about how we work out what an established binding is but
-> > there's no serious suggestion that we don't want stable bindings.
+On Mon, Jul 29, 2013 at 12:25:01PM +0100, James Hogan wrote:
+> Add a CLK_SET_RATE_NO_REPARENT clock flag, which will prevent muxes
+> being reparented during clk_set_rate.
 > 
-> Yes, what Mark said -- _today_ all bindings are subject to change and
-> can be changed in lockstep with the kernel. This has been necessary as
-> part of development to sort out all of the various bootstrapping
-> issues across platforms.
-
-However, we still have people arguing that we can't (or should not) change
-a binding right now even to fix inconsistency issues that are discovered
-after the fact. I'm hearing a different story depending on who is
-telling it at the moment.
-
-Getting quickly to a definitive answer on the criteria for an
-"established" binding is will help end ongoing discussions as to whether
-we can fix a currently broken one or just have to leave it.
-
-> What we're talking about is to end that mode of operation, and moving
-> over to locking in bindings. Device tree contents, as mentioned
-> elsewhere, might still be changed just like code is -- bugs are fixed,
-> etc. But it's time to start locking down the bindings, in particular
-> no longer change the established ones.
+> To avoid breaking existing platforms, all callers of clk_register_mux()
+> are adjusted to pass the new flag. Platform maintainers are encouraged
+> to remove the flag if they wish to allow mux reparenting on set_rate.
 > 
-> Long term, final goal is likely to be close to what Russell is saying
-> -- nothing should go into the kernel tree unless the binding is in a
-> fully stable state. However, we have a transitional period between now
-> and then, and even when we're at the final state there will be need to
-> have some sort of sandbox for development and test of future bindings.
-> Dealing with all that, as well as the actual process for locking in
-> bindings, is what needs to be sorted out.
-> 
-> I think we're all in agreement that bindings that change over time are
-> nothing but pain, but we're arguing that in circles anyway.
+> Signed-off-by: James Hogan <james.hogan@imgtec.com>
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Chao Xie <xiechao.mail@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: "Emilio L?pez" <emilio@elopez.com.ar>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Andrew Chew <achew@nvidia.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Paul Walmsley <pwalmsley@nvidia.com>
+> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: spear-devel at list.st.com
+> Cc: linux-tegra at vger.kernel.org
+> Tested-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Acked-by: Stephen Warren <swarren@nvidia.com> [tegra]
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> [sunxi]
+ACK for Zynq.
 
-+1
+I'll have to look at the details and do some testing to see whether we
+can remove the flag later.
 
--Matt
+	S?ren
