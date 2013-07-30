@@ -1,32 +1,63 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 30 Jul 2013 10:03:56 +0200
-Subject: [PATCH 4/4] ARM: dove: add initial DT file for Globalscale D2Plug
-In-Reply-To: <20130729184520.GI24782@lunn.ch>
-References: <1375100946-28521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1375100946-28521-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130729184520.GI24782@lunn.ch>
-Message-ID: <51F7736C.5040701@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 30 Jul 2013 16:09:02 +0800
+Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
+In-Reply-To: <20130729133625.GA2280@localhost.localdomain>
+References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
+ <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+ <20130729095400.GB32383@mudshark.cambridge.arm.com>
+ <20130729133625.GA2280@localhost.localdomain>
+Message-ID: <51F7749E.1010005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 08:45 PM, Andrew Lunn wrote:
-> On Mon, Jul 29, 2013 at 02:29:06PM +0200, Sebastian Hesselbarth wrote:
->> This adds an initial DT file for the Globalscale D2Plug with Dove SoC.
->> Currently, one LED is missing and I have not been able to get SD8787 driver
->> working. Those will be taken care of later.
->
-> I took a hard look at SDIO and failed to get it working when doing
-> DMA. Polled IO does however work. I guess we need some help from
-> Marvell engineers before we get stable SDIO with DMA.
+On 2013-7-29 21:36, Dave Martin wrote:
+> On Mon, Jul 29, 2013 at 10:54:01AM +0100, Will Deacon wrote:
+>> On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
+>>> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>>> Power aware scheduling needs the cpu topology information to improve the
+>>>> cpu scheduler decision making.
+>>>
+>>> It's not only power aware scheduling. The scheduler already uses
+>>> topology and cache sharing when  CONFIG_SCHED_MC and/or
+>>> CONFIG_SCHED_SMT are enable. So you should also add these configs for
+>>> arm64 so the scheduler can use it
+>>
+>> ... except that the architecture doesn't define what the AFF fields in MPIDR
+>> really represent. Using them to make key scheduling decisions relating to
+> 
+> In fact, the ARM Architecture doesn't place any requirements on MPIDRs to
+> force the aff fields to exist _at all_.  It's just a recommendation.
+> Instead, you have a 24 or 32-bit number which is unique per CPU, and which
+> is _probably_ assigned in a way resembling the aff fields.
+> 
+>> cache proximity seems pretty risky to me, especially given the track record
+>> we've seen already on AArch32 silicon. It's a convenient register if it
+>> contains the data we want it to contain, but we need to force ourselves to
+>> come to terms with reality here and simply use it as an identifier for a
+>> CPU.
+> 
+> +1
+> 
+> Also, we should align arm and arm64.  The problem is basically exactly
+> the same, and the solution needs to be the same.  struct cputopo_arm is
+> already being abused  -- for example, TC2 describes the A15 and A7
+> clusters on a single die as having different "socket_id" values, even
+> though this is obviously nonsense.  But there's no other way to describe
+> that system today.
+> 
+>> Can't we just use the device-tree to represent this topological data for
+>> arm64? Lorenzo has been working on bindings in this area.
+> 
+> This may become more important as we start to see things like asymmetric
+> topologies appearing (different numbers of nodes and different
+> interdependence characteristics in adjacent branches of the topology
+> etc.)
 
-Andrew,
+Agreed.
+I would like to mention that the ACPI Static Resource Affinity Table (SRAT)
+stores topology information for all the processors and memory, describing
+the physical locations of the processors and memory in the system. ACPI will
+be another available solution for this.
 
-have you tried this on the Dove D2Plug or any other Marvell SoC?
-Dove is using a different SDHCI compatible SDIO controller.
-
-Anyway, I haven't had a deep look into neither SDIO/SDHCI DMA nor
-sd8787 driver.
-
-Also, the DMA issue is not holding back this patch, is it?
-
-Sebastian
+Thanks
+Hanjun
