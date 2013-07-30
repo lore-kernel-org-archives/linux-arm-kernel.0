@@ -1,25 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 30 Jul 2013 17:37:43 +0800
-Subject: [RFC 2/8] gpio: mxc: Support for initialization as submodule
-In-Reply-To: <20130730083929.GI16871@s25.your-server.de>
-References: <1374938808-27316-1-git-send-email-mpa@pengutronix.de>
- <1374938808-27316-3-git-send-email-mpa@pengutronix.de>
- <20130730034354.GF19715@S2101-09.ap.freescale.net>
- <20130730083929.GI16871@s25.your-server.de>
-Message-ID: <20130730093741.GG12382@S2101-09.ap.freescale.net>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 30 Jul 2013 11:38:53 +0200
+Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y [OT]
+In-Reply-To: <20130730092517.GB2478@localhost.localdomain>
+References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+ <20130715135420.GG10000@mudshark.cambridge.arm.com>
+ <20130720044655.GC9433@mozilla.com>
+ <20130721213753.GA29879@mudshark.cambridge.arm.com>
+ <20130722185234.GA14519@localhost.localdomain>
+ <20130729212140.GB12681@mozilla.com>
+ <20130730092517.GB2478@localhost.localdomain>
+Message-ID: <20130730113853.46cbb00a@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 10:39:29AM +0200, Markus Pargmann wrote:
-> > > +	if (pdata) {
-> > > +		port->base = pdata->base;
-> > > +		iores = NULL;
-> > 
-> > Why is this needed?
-> 
-> The memory regions used for iomux control overlap the regions used by
-> the gpio driver. So we need to share the memory with the pinctrl driver.
+On Tue, 30 Jul 2013 10:25:18 +0100
+Dave Martin <Dave.Martin@arm.com> wrote:
 
-I meant for iores = NULL;
+> The pragmatic route is less contraversial and lower overhead: even though
+> it's not correct as per the ABI, GCC is the only supported compiler for
+> building the kernel anyway.
 
-Shawn
+BTW, kernels compiled with gcc-4.8 don't work.
+
+Did anybody succeed with clang?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
