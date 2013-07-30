@@ -1,70 +1,29 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 15:29:17 -0600
-Subject: [PATCH v6 2/8] ASoC: atmel: machine driver for at91sam9x5-wm8731
- boards
-In-Reply-To: <20130730204511.GX9858@sirena.org.uk>
-References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
- <1375180329-4860-3-git-send-email-richard.genoud@gmail.com>
- <51F7FBA8.6080400@wwwdotorg.org> <20130730204511.GX9858@sirena.org.uk>
-Message-ID: <51F8302D.406@wwwdotorg.org>
+Date: Tue, 30 Jul 2013 15:40:25 -0600
+Subject: [PATCH] ARM: kexec: validate CPU hotplug support
+In-Reply-To: <51E958CC.5070906@wwwdotorg.org>
+References: <1373582931-11956-1-git-send-email-swarren@wwwdotorg.org>
+ <51E958CC.5070906@wwwdotorg.org>
+Message-ID: <51F832C9.9000900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 02:45 PM, Mark Brown wrote:
-> On Tue, Jul 30, 2013 at 11:45:12AM -0600, Stephen Warren wrote:
->> On 07/30/2013 04:32 AM, Richard Genoud wrote:
+On 07/19/2013 09:18 AM, Stephen Warren wrote:
+> On 07/11/2013 04:48 PM, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Architectures should fully validate whether kexec is possible as part of
+>> machine_kexec_prepare(), so that user-space's kexec_load() operation can
+>> report any problems. Performing validation in machine_kexec() itself is
+>> too late, since it is not allowed to return.
+>>
+>> Prior to this patch, ARM's machine_kexec() was testing after-the-fact
+>> whether machine_kexec_prepare() was able to disable all but one CPU.
+>> Instead, modify machine_kexec_prepare() to validate all conditions
+>> necessary for machine_kexec_prepare()'s to succeed. BUG if the validation
+>> succeeded, yet disabling the CPUs didn't actually work.
 > 
->>> +wm8731 pins: +cf
->>> Documentation/devicetree/bindings/sound/wm8731.txt
-> 
->> In the Tegra bindings, I deliberately put the list of CODEC pins
->> into the audio complex binding rather than the CODEC binding.
->> That's because
-> 
-> You really shouldn't do this, it's not accomplishing much.
+> Russell, does this look good to put into the ARM patch tracker?
 
-What it accomplishes is not polluting the CODEC's binding with a set
-of strings that must always be supported since DT is an ABI. The
-strings are isolated into the specific audio complex binding, which
-might possibly become deprecated and replaced with something better
-and more generic.
-
->> I'm not sure that in the long-term we want to use strings to
->> identify the CODEC pins, rather than using integers. By putting
->> the list orf CODEC pins in the audio complex binding rather than
->> the CODEC binding, I didn't lumber the CODEC binding with a list
->> of strings that it had to support forever.
-> 
-> How would you create the numbers - you can't use the pin numbers
-> since BGA type packages have alphanumeric ball identifiers?
-
-The numbering would be arbitrary, except perhaps for packages that had
-simple numeric pin IDs in which case those could be used. There would
-be a file in <dt-bindings/audio/...> that defined it, which DTs would
-include to create the properties, and CODEC/... drivers would include
-and use whenever it needed to identify the pins, e.g. in some kind of
-.of_xlate() function.
-
-> Even with numerical pin numbering ou'd need to specify some defines
-> for this not to be totally awful at which point you may as well
-> have the strings documented since you'd end up writing a table in
-> the binding document that's basically a mapping of pin names to
-> numbers,
-> 
->> One reason that strings are problematic is because they can't be
->> mixed with integers/phandles in the same property, so if we ever
->> end up with more generic audio bindings where the routing table
->> is expressed more like:
-> 
->> audio-routes = <&component_a $a_pin &component_b $b_pin>;
-> 
->> ... in order to allow completely arbitrary and fully name-spaced
->> routing specification[1], then $a_pin and $b_pin need to be
->> integers not strings.
-> 
-> The above is going to be legibility challenged without defines at
-> which point the strings end up appearing in the binding document
-> anyway.
-
-Yes, you'd certainly have to use defines not raw integers. The strings
-wouldn't appear in the binding doc so much as the numbers.
+I put this in the patch tracker since I assume that no response means no
+objection.
