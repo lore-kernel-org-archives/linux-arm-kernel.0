@@ -1,30 +1,48 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 10:46:42 -0600
-Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
-In-Reply-To: <20130730033134.GM15855@rizhao-lap>
+Date: Tue, 30 Jul 2013 10:49:05 -0600
+Subject: [PATCH 1/9] ARM: dts: add generic DMA DT binding for tegra apbdma
+In-Reply-To: <20130730025448.GI15855@rizhao-lap>
 References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
- <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
- <51F2D063.5010505@wwwdotorg.org> <20130730033134.GM15855@rizhao-lap>
-Message-ID: <51F7EDF2.60700@wwwdotorg.org>
+ <1374639002-16753-2-git-send-email-rizhao@nvidia.com>
+ <51F2CC30.5090200@wwwdotorg.org> <20130730025448.GI15855@rizhao-lap>
+Message-ID: <51F7EE81.1060105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 09:31 PM, Richard Zhao wrote:
-> On Sat, Jul 27, 2013 at 03:39:15AM +0800, Stephen Warren wrote:
->> On 07/23/2013 10:09 PM, Richard Zhao wrote:
->>> - driver: remove use of nvidia,dma-request-selector
->>> 	  use dma_request_slave_channel to request channel
->>> - update binding doc
+On 07/29/2013 08:54 PM, Richard Zhao wrote:
+> On Sat, Jul 27, 2013 at 03:21:20AM +0800, Stephen Warren wrote:
+>> (Stripping the Cc list a lot, but adding in the DT binding maintainers)
 >>
->> This patch needs to be amended so that the DMA channel is looked up
->> during probe() rather than open(), to guarantee that deferred probe
->> works. It's possible to hold off probe, but not possible AFAIK to hold
->> off opening the port.
+>> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+>>> All Tegra device drivers will soon move to generic DMA device tree bindings.
+>>> Add the required properties to the Tegra DT files to support that. The legacy
+>>> property nvidia,dma-request-selector will be removed after all drivers have
+>>> been converted, in order to maintain bisectability.
+>>>
+>>> Changes:
+>>>  - Add '#dma-cells' for apbdma nodes
+>>>  - And properties 'dmas' and 'dma-names' for apbdma client nodes
+>>>  - update apbdma DT binding doc
+>>>
+>>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+>>> ---
+>>>  .../devicetree/bindings/dma/tegra20-apbdma.txt     |  1 +
+>>>  arch/arm/boot/dts/tegra114.dtsi                    | 27 ++++++++++++++++++++++
+>>>  arch/arm/boot/dts/tegra20.dtsi                     | 27 ++++++++++++++++++++++
+>>>  arch/arm/boot/dts/tegra30.dtsi                     | 25 ++++++++++++++++++++
+>>
+>> This patch should be split differently.
+>>
+>> Patch 1 in the series should include the binding document change and the
+>> associated DMA driver change, which will support both the old and new
+>> bindings.
+>>
+>> Patch 2 should contain the *.dtsi changes.
 >
-> How about avoid return -EPROBE_DEFER at open() time? It can be in
-> another patch.
+> The reason I update apbdma binding doc here is to make it consistent
+> with the mass properties added in dtsi files.
+> apbdma has less places of changes than dtsi files.
 
-I don't really understand what you mean. -EPROBE_DEFER is something that
-only makes sense for probe() to return (or functions used by probe()).
-It doesn't make sense to return it anywhere else, since probe deferral
-is something that can only happen for probe().
+It'll still be consistent if you update the binding documentation first,
+then update the *.dtsi to conform to the new binding docs. It won't
+affect the number of changes.
