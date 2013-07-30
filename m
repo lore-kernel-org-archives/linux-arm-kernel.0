@@ -1,54 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 16:26:15 -0600
-Subject: Defining schemas for Device Tree
-In-Reply-To: <3852729.INDSeEDz7b@thinkpad>
-References: <2469263.vMN09Q7Tzi@flatron> <3852729.INDSeEDz7b@thinkpad>
-Message-ID: <51F83D87.2010707@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Jul 2013 15:35:35 -0700
+Subject: [PATCH v4 6/8] wlcore: sdio: add wilink clock providers
+In-Reply-To: <1375189476-21557-7-git-send-email-coelho@ti.com>
+References: <1375189476-21557-1-git-send-email-coelho@ti.com>
+ <1375189476-21557-7-git-send-email-coelho@ti.com>
+Message-ID: <20130730223535.5270.39864@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 04:16 PM, Tomasz Figa wrote:
-> On Monday 29 of July 2013 02:21:52 Tomasz Figa wrote:
->> Hi,
->>
->> As promised I am starting a discussion about Device Tree schema. Let's
->> first shortly introduce the problem.
->>
->> Device Tree is a text-based data structure used to describe hardware. Its
->> main point is separation from kernel code, which has a lot of benefits,
->> but, at the moment, also a huge drawback - there is no verification of
->> device tree sources against defined bindings. All the dtc compiler does
->> currently are syntax checks - no semantic analysis is performed (except
->> some really basic things). What this means is that anybody can put
->> anything in their device tree and end up with the dts compiling fine only
->> to find out that something is wrong at boot time.
->>
->> Currently, device tree bindings are described in plain text documentation
->> files, which can not be considered a formal way of binding description.
->> While such documentation provides information for developers/users that
->> need to work with particular bindings, it can not be easily used as input
->> for validation of device tree sources. This means that we need to define a
->> more formal way of binding description, in other words - Device Tree
->> schema.
->>
->> To find a solution for this problem, we must first answer several
->> questions to determine a set of requirements we have to meet.
->>
->> a) What is a device tree binding?
->>
->> For our purposes, I will define a binding as internal format of some
->> device tree node, which can be matched using of_find_matching_node(). In
->> other words, key for a binding would be node name and/or value of
->> compatible property and/or node type. Value for a binding would be a list
->> of properties with their formats and/or subnodes with their bindings.
-> 
-> Now as I think of it, there is one more thing that needs to be considered. Do 
-> we want the schemas to strictly specify available set of properties, warning 
-> about any unrecognized ones or just enforce checking of recognized properties 
-> (including presence of required ones)? Or maybe both, depending on some 
-> keyword or whatever?
+Quoting Luciano Coelho (2013-07-30 06:04:34)
+> +static const struct of_device_id wlcore_sdio_of_clk_match_table[] = {
+> +       { .compatible = "ti,wilink-clock" },
+> +};
+> +
+>  static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+>  {
+>         struct wl12xx_platform_data *pdata;
+>         struct device_node *np = dev->of_node;
+> +       struct device_node *clock_node;
+>  
+>         if (!np) {
+>                 np = of_find_matching_node(NULL, dev->driver->of_match_table);
+> @@ -241,6 +247,9 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+>                 goto out_free;
+>         }
+>  
+> +       for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
+> +               of_fixed_clk_setup(clock_node);
 
-I think one of the use-cases that having schema validation was asked to
-cover was the case of a typo in a property name leading to that property
-having no effect. This could only be caught by the validation tool if it
-warned (or worse) about unknown properties.
+Hi Luciano,
+
+Any reason for establishing your own compatible string if you just plan
+to use the fixed rate clock? You could just use "fixed-clock" compatible
+in your DTS.
+
+I will be posting patches this week which makes the fixed-rate clock a
+proper driver and matches that compatible string to instantiate those
+clocks. That means that your driver could probably remove the clock
+setup code completely.
+
+Regards,
+Mike
+
+> +
+>         goto out;
+>  
+>  out_free:
+> -- 
+> 1.8.3.2
