@@ -1,58 +1,40 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 30 Jul 2013 10:48:37 +0530
-Subject: [PATCH 3/9] ARM: edma: Add function to manually trigger an EDMA
- channel
-In-Reply-To: <1375104595-16018-4-git-send-email-joelf@ti.com>
-References: <1375104595-16018-1-git-send-email-joelf@ti.com>
- <1375104595-16018-4-git-send-email-joelf@ti.com>
-Message-ID: <51F74CAD.3040604@ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 30 Jul 2013 08:22:53 +0300
+Subject: [PATCH v2 21/22] iommu/tegra: smmu: Support Multiple ASID
+In-Reply-To: <51F6A943.8000004@wwwdotorg.org>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-22-git-send-email-hdoyu@nvidia.com>
+ <51E8535A.30605@wwwdotorg.org>
+ <20130729.133155.1836775489422797370.hdoyu@nvidia.com>
+ <51F6A943.8000004@wwwdotorg.org>
+Message-ID: <20130730082253.be35a8ddadbe757100e92c10@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
-> Manual trigger for events missed as a result of splitting a
-> scatter gather list and DMA'ing it in batches. Add a helper
-> function to trigger a channel incase any such events are missed.
+On Mon, 29 Jul 2013 19:41:23 +0200
+Stephen Warren <swarren@wwwdotorg.org> wrote:
+...
+> > I think that this belongs to the system operation policy. Which H/W
+> > should be configured to which Address Space(AS). This put all AHB
+> > clients(PPCS) into AS[1](SYSTEM_PROTECTED), and the rest into
+> > AS[0](SYSTEM_DEFAULT). AHB clients are mainly traditional H/Ws like
+> > USB and SD/MMC so that they should be kept separated from the smart
+> > IOMMU clients like host1x.
+> > 
+> > Is there any place to configure this kind of board specific policy
+> > rather than here?
 > 
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->  arch/arm/common/edma.c             |   21 +++++++++++++++++++++
->  include/linux/platform_data/edma.h |    2 ++
->  2 files changed, 23 insertions(+)
+> I'm not sure that answers the question I asked.
 > 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index 3567ba1..10995b2 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -1236,6 +1236,27 @@ void edma_resume(unsigned channel)
->  }
->  EXPORT_SYMBOL(edma_resume);
->  
-> +int edma_manual_trigger(unsigned channel)
+> I mean that the driver expects that two AS always exist;
+> SYSTEM_PROTECTED and SYSTEM_DEFAULT. However, the set of extant ASs is
+> IIRC defined by the DT content. What if the DT doesn't define two ASs?
+> Shouldn't there at least be an error-check for this case, so the driver
+> doesn't just blindly continue and access smmu_handle->map[1] when the
+> map[] array only has 1 entry?
 
-edma_trigger_channel() maybe? Brings consistency with
-edma_alloc_channel() edma_free_channel() etc.
+OK, now I got it.
 
-> +{
-> +	unsigned ctlr;
-> +	int j;
-> +	unsigned int mask;
-> +
-> +	ctlr = EDMA_CTLR(channel);
-> +	channel = EDMA_CHAN_SLOT(channel);
-> +	mask = BIT(channel & 0x1f);
-> +
-> +	j = channel >> 5;
-> +
-> +	/* EDMA channels without event association */
-
-May be actually check for no-event association before you trigger in
-software? You can do that by looking at unused channel list, no?
-
-> +	edma_shadow0_write_array(ctlr, SH_ESR, j, mask);
-
-edma_shadow0_write_array(ctlr, SH_ESR, channel >> 5, mask) is no less
-readable, but I leave it to you.
-
-Thanks,
-Sekhar
+We can create multiple maps on the same AS in theory. So the limitation
+is only for how many maps S/W creaed. This can/should be checked only
+within kernel side. No constraints from DT.
