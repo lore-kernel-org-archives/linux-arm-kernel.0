@@ -1,36 +1,58 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 30 Jul 2013 17:07:52 +0800
-Subject: [PATCH 1/2] arm: prima2: pm: enable rtc alarm0 and alarm1 as wakeup
- source
-Message-ID: <1375175273-14067-1-git-send-email-Baohua.Song@csr.com>
+Date: Tue, 30 Jul 2013 17:07:53 +0800
+Subject: [PATCH 2/2] arm: prima2: pm: drop redundant postcore_initcall
+In-Reply-To: <1375175273-14067-1-git-send-email-Baohua.Song@csr.com>
+References: <1375175273-14067-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <1375175273-14067-2-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xianglong Du <Xianglong.Du@csr.com>
+This will delete some redundant calling of sirfsoc_of_pwrc_init() and
+sirfsoc_memc_init() for non-CSR platforms if we use multi-platform.
 
-this patch also enables RTC alarm as wakeup source after system suspends
-
-Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/pm.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-prima2/pm.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-index 02cc3438..3a944ed 100644
+index 3a944ed..c4525a8 100644
 --- a/arch/arm/mach-prima2/pm.c
 +++ b/arch/arm/mach-prima2/pm.c
-@@ -34,7 +34,10 @@ static void sirfsoc_set_wakeup_source(void)
- 	pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
- 		SIRFSOC_PWRC_TRIGGER_EN);
- #define X_ON_KEY_B (1 << 0)
--	sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
-+#define RTC_ALARM0_B (1 << 2)
-+#define RTC_ALARM1_B (1 << 3)
-+	sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B |
-+		RTC_ALARM0_B | RTC_ALARM1_B,
- 		sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
- }
+@@ -88,12 +88,6 @@ static const struct platform_suspend_ops sirfsoc_pm_ops = {
+ 	.valid = suspend_valid_only_mem,
+ };
  
+-int __init sirfsoc_pm_init(void)
+-{
+-	suspend_set_ops(&sirfsoc_pm_ops);
+-	return 0;
+-}
+-
+ static const struct of_device_id pwrc_ids[] = {
+ 	{ .compatible = "sirf,prima2-pwrc" },
+ 	{}
+@@ -121,7 +115,6 @@ static int __init sirfsoc_of_pwrc_init(void)
+ 
+ 	return 0;
+ }
+-postcore_initcall(sirfsoc_of_pwrc_init);
+ 
+ static const struct of_device_id memc_ids[] = {
+ 	{ .compatible = "sirf,prima2-memc" },
+@@ -152,4 +145,11 @@ static int __init sirfsoc_memc_init(void)
+ {
+ 	return platform_driver_register(&sirfsoc_memc_driver);
+ }
+-postcore_initcall(sirfsoc_memc_init);
++
++int __init sirfsoc_pm_init(void)
++{
++	sirfsoc_of_pwrc_init();
++	sirfsoc_memc_init();
++	suspend_set_ops(&sirfsoc_pm_ops);
++	return 0;
++}
 -- 
 1.8.2.3
