@@ -1,71 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 30 Jul 2013 09:39:17 +0200
-Subject: [PATCH] gpio/mxc: add chained_irq_enter/exit() to
- mx2_gpio_irq_handler
-In-Reply-To: <CACRpkdZjsAOtm2Jt7kY-VC2ToFfMQ+UxjWQE7aUZAbsBt0ugvw@mail.gmail.com>
-References: <1374152286-12955-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdZjsAOtm2Jt7kY-VC2ToFfMQ+UxjWQE7aUZAbsBt0ugvw@mail.gmail.com>
-Message-ID: <20130730073917.GL1754@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jul 2013 08:41:34 +0100
+Subject: [PATCH] ARM64: include: asm: use 'int' instead of 'u32' for
+ variable 'target' in kvm_host.h.
+In-Reply-To: <20130730034945.GD5471@cbox>
+References: <51ECA9B6.3010808@asianux.com> <20130730034945.GD5471@cbox>
+Message-ID: <51F76E2E.9050707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Mon, Jul 29, 2013 at 05:51:17PM +0200, Linus Walleij wrote:
-> On Thu, Jul 18, 2013 at 2:58 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
+On 30/07/13 04:49, Christoffer Dall wrote:
+> On Mon, Jul 22, 2013 at 11:40:38AM +0800, Chen Gang wrote:
+>> 'target' will be set to '-1' in kvm_arch_vcpu_init(), and it need check
+>> 'target' whether less than zero or not in kvm_vcpu_initialized().
+>>
+>> So need define target as 'int' instead of 'u32', just like ARM has done.
+>>
+>>
+>> The related warning:
+>>
+>>   arch/arm64/kvm/../../../arch/arm/kvm/arm.c:497:2: warning: comparison of unsigned expression >= 0 is always true [-Wtype-limits]
+>>
+>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_host.h |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 644d739..0859a4d 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -129,7 +129,7 @@ struct kvm_vcpu_arch {
+>>  	struct kvm_mmu_memory_cache mmu_page_cache;
+>>  
+>>  	/* Target CPU and feature flags */
+>> -	u32 target;
+>> +	int target;
+>>  	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
+>>  
+>>  	/* Detect first run of a vcpu */
+>> -- 
+>> 1.7.7.6
 > 
-> > Similar to commit
-> >
-> >         0e44b6e (gpio/mxc: add chained_irq_enter/exit() to mx3_gpio_irq_handler())
-> >
-> > . It doesn't seem to be critical to make the irqs work, but still it is
-> > more correct.
-> >
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Patch is fine, but looks like this to me:
-> 
-> Content-Transfer-Encoding: base64
-> 
-> Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
-> Errors-To: linux-arm-kernel-bounces+linus.walleij=linaro.org at lists.infradead.org
-> 
-> U2ltaWxhciB0byBjb21taXQKCgkwZTQ0YjZlIChncGlvL214YzogYWRkIGNoYWluZWRfaXJxX2Vu
-> dGVyL2V4aXQoKSB0byBteDNfZ3Bpb19pcnFfaGFuZGxlcigpKQoKLiBJdCBkb2Vzbid0IHNlZW0g
-> dG8gYmUgY3JpdGljYWwgdG8gbWFrZSB0aGUgaXJxcyB3b3JrLCBidXQgc3RpbGwgaXQgaXMKbW9y
-> ZSBjb3JyZWN0LgoKU2lnbmVkLW9mZi1ieTogVXdlIEtsZWluZS1Lw7ZuaWcgPHUua2xlaW5lLWtv
-> ZW5pZ0BwZW5ndXRyb25peC5kZT4KLS0tCkhlbGxvLAoKbm90ZSB0aGlzIGlzIGNvbXBsZXRlbHkg
-> dW50ZXN0ZWQuCgpVd2UKCiBkcml2ZXJzL2dwaW8vZ3Bpby1teGMuYyB8IDQgKysrKwogMSBmaWxl
-> 
-> The encoding is what screw things up.
-That means git is unable to apply base64 encoded mail? Hmm, testing with
-git 1.8.3.2 (from Debian) I can apply the base64 encoded patch.
-Does your git have 87ab799234639c26ea10de74782fa511cb3ca606 (i.e. is
-older than 1.5.1)?
+> This looks ok to me, Marc, was there any reason to declare target a u32
+> on arm64?
 
-> Can you see if you can resend this without using base64?
-The version I got back via the kernel at pengutronix.de address has:
+No, that's simply a bug. I really wonder why my compiler doesn't scream
+at something that obvious...
 
-	Content-Type: text/plain; charset=UTF-8
-	Content-Transfer-Encoding: 8bit
+Chen: what compiler version are you using?
 
-and the content is readable just fine in an editor. My copy I got via
-the linux-arm-kernel subscription is base64 encoded, too. So a mail
-server on the way to you reencodes my mail. At gmane
-(http://article.gmane.org/gmane.linux.ports.arm.kernel/252948/raw) it's
-already base64. According to the Received: headers it can only be
-casper.infradead.org or merlin.infradead.org.
+I'll queue this fix.
 
-I found
+Thanks,
 
-	http://mail.python.org/pipermail/mailman-users/2008-September/063286.html
-
-which is really annoying. I'll bounce you the original.
-
-Best regards
-Uwe
-
+	M.
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Jazz is not dead. It just smells funny...
