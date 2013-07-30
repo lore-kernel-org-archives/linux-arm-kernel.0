@@ -1,115 +1,313 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 30 Jul 2013 15:50:21 +0800
-Subject: [PATCH 1/2] pinctrl: imx: Add exception hook for select input
-In-Reply-To: <1375152857-32177-1-git-send-email-peter.chen@freescale.com>
-References: <1375152857-32177-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130730075018.GD12382@S2101-09.ap.freescale.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 30 Jul 2013 15:49:19 +0800
+Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
+In-Reply-To: <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
+ <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
+Message-ID: <51F76FFF.6010809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 10:54:16AM +0800, Peter Chen wrote:
-> At some i.mx platforms the select input pin configuration may
-> not be at common select input register region due to IC found
-> the pin select pin configuration missing very late (Eg, ECO stage),
-> so this pin's select input register is at other register space at
-> pinctrl module. One typical example is USB OTG ID pin at i.mx6q is
-> at IOMUXC_IOMUXC_GPR1.
+On 2013-7-29 17:46, Vincent Guittot wrote:
+> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> Power aware scheduling needs the cpu topology information to improve the
+>> cpu scheduler decision making.
+> 
+> It's not only power aware scheduling. The scheduler already uses
+> topology and cache sharing when  CONFIG_SCHED_MC and/or
+> CONFIG_SCHED_SMT are enable. So you should also add these configs for
+> arm64 so the scheduler can use it
 
-Do you know any other case except this USB OTG ID pin on imx6q?  If this
-is the only case, I'm wondering if we could work it around in machine
-code mach-imx6q.c to avoid the churn of pinctrl driver?
-
-Shawn
+Yes, you are right, thanks for the advice.
 
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/pinctrl/pinctrl-imx.c   |   11 +++++++++--
->  drivers/pinctrl/pinctrl-imx.h   |    8 ++++++--
->  drivers/pinctrl/pinctrl-imx6q.c |   14 ++++++++++++++
->  3 files changed, 29 insertions(+), 4 deletions(-)
+> Vincent
 > 
-> diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-> index 57a4eb0..da75cd4 100644
-> --- a/drivers/pinctrl/pinctrl-imx.c
-> +++ b/drivers/pinctrl/pinctrl-imx.c
-> @@ -240,8 +240,15 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
->  			pin_reg->mux_reg, mux[i]);
->  
->  		/* some pins also need select input setting, set it if found */
-> -		if (input_reg[i]) {
-> -			writel(input_val[i], ipctl->base + input_reg[i]);
-> +		if (input_reg) {
-> +			if ((input_reg[i] == IMX_SELECT_INPUT_EXCEPTION) &&
-> +					info->imx_select_input_hook)
-> +				info->imx_select_input_hook(ipctl->base,
-> +					input_val[i]);
-> +			else
-> +				writel(input_val[i], ipctl->base +
-> +					input_reg[i]);
-> +
->  			dev_dbg(ipctl->dev,
->  				"==>select_input: offset 0x%x val 0x%x\n",
->  				input_reg[i], input_val[i]);
-> diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
-> index bcedd99..15e71b9 100644
-> --- a/drivers/pinctrl/pinctrl-imx.h
-> +++ b/drivers/pinctrl/pinctrl-imx.h
-> @@ -26,8 +26,9 @@ struct platform_device;
->   *	elements in .pins so we can iterate over that array
->   * @mux_mode: the mux mode for each pin in this group. The size of this
->   *	array is the same as pins.
-> - * @input_reg: select input register offset for this mux if any
-> - *	0 if no select input setting needed.
-> + * @input_reg: select input register offset for this mux,
-> + *	0 if no select input setting needed, 0xfff if select input setting
-> + *	is not at common select input register regiion.
->   * @input_val: the select input value for each pin in this group. The size of
->   *	this array is the same as pins.
->   * @configs: the config for each pin in this group. The size of this
-> @@ -75,10 +76,13 @@ struct imx_pinctrl_soc_info {
->  	struct imx_pmx_func *functions;
->  	unsigned int nfunctions;
->  	unsigned int flags;
-> +	/* Handle the exception for select input choose */
-> +	void (*imx_select_input_hook) (void __iomem *, int);
->  };
->  
->  #define ZERO_OFFSET_VALID	0x1
->  #define SHARE_MUX_CONF_REG	0x2
-> +#define IMX_SELECT_INPUT_EXCEPTION	0xfff
->  
->  #define NO_MUX		0x0
->  #define NO_PAD		0x0
-> diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
-> index 76dd9c4..61efa97 100644
-> --- a/drivers/pinctrl/pinctrl-imx6q.c
-> +++ b/drivers/pinctrl/pinctrl-imx6q.c
-> @@ -461,9 +461,23 @@ static const struct pinctrl_pin_desc imx6q_pinctrl_pads[] = {
->  	IMX_PINCTRL_PIN(MX6Q_PAD_SD2_DAT3),
->  };
->  
-> +#define IOMUXC_IOMUXC_GPR1	0x4
-> +#define IOMUXC_GPR1_USB_OTG_ID_SEL_BIT	13
-> +static void imx6q_pinctrl_select_input_hook(void __iomem *base, int val)
-> +{
-> +	u32 value;
-> +	/* Add the exceptions one by one */
-> +
-> +	/* USB ID select input configuration */
-> +	value = readl(base + IOMUXC_IOMUXC_GPR1);
-> +	writel(value | (val << IOMUXC_GPR1_USB_OTG_ID_SEL_BIT),
-> +		base + IOMUXC_IOMUXC_GPR1);
-> +}
-> +
->  static struct imx_pinctrl_soc_info imx6q_pinctrl_info = {
->  	.pins = imx6q_pinctrl_pads,
->  	.npins = ARRAY_SIZE(imx6q_pinctrl_pads),
-> +	.imx_select_input_hook = imx6q_pinctrl_select_input_hook,
->  };
->  
->  static struct of_device_id imx6q_pinctrl_of_match[] = {
-> -- 
-> 1.7.0.4
-> 
-> 
+>>
+>> For ARM64, we can get the topology from the MPIDR register which defines the
+>> the affinity of processors.
+>>
+>> This patch is mainly based on arch/arm/kernel/topology.c written by
+>> Vincent Guittot, and replaced the topology array with per cpu variable.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/Kconfig                |    9 +++
+>>  arch/arm64/include/asm/cputype.h  |   11 ++++
+>>  arch/arm64/include/asm/topology.h |   41 ++++++++++++
+>>  arch/arm64/kernel/Makefile        |    1 +
+>>  arch/arm64/kernel/smp.c           |    6 ++
+>>  arch/arm64/kernel/topology.c      |  128 +++++++++++++++++++++++++++++++++++++
+>>  6 files changed, 196 insertions(+)
+>>  create mode 100644 arch/arm64/include/asm/topology.h
+>>  create mode 100644 arch/arm64/kernel/topology.c
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 9737e97..f0ce91b 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -150,6 +150,15 @@ config SMP
+>>
+>>           If you don't know what to do here, say N.
+>>
+>> +config ARM64_CPU_TOPOLOGY
+>> +       bool "Support cpu topology definition"
+>> +       depends on SMP && ARM64
+>> +       default y
+>> +       help
+>> +         Support ARM64 cpu topology definition. The MPIDR register defines
+>> +         affinity between processors which is then used to describe the cpu
+>> +         topology of an ARM64 System.
+>> +
+>>  config NR_CPUS
+>>         int "Maximum number of CPUs (2-32)"
+>>         range 2 32
+>> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+>> index 5fe138e..68b55af 100644
+>> --- a/arch/arm64/include/asm/cputype.h
+>> +++ b/arch/arm64/include/asm/cputype.h
+>> @@ -30,6 +30,17 @@
+>>
+>>  #define MPIDR_HWID_BITMASK     0xff00ffffff
+>>
+>> +#define MPIDR_SMP_BITMASK      (0x1 << 30)
+>> +#define MPIDR_MT_BITMASK       (0x1 << 24)
+>> +
+>> +#define MPIDR_LEVEL_BITS       8
+>> +#define MPIDR_LEVEL_MASK       ((1 << MPIDR_LEVEL_BITS) - 1)
+>> +
+>> +#define MPIDR_AFFINITY_LEVEL_0(mpidr) ((mpidr) & MPIDR_LEVEL_MASK)
+>> +#define MPIDR_AFFINITY_LEVEL_1(mpidr) ((mpidr >> 8) & MPIDR_LEVEL_MASK)
+>> +#define MPIDR_AFFINITY_LEVEL_2(mpidr) ((mpidr >> 16) & MPIDR_LEVEL_MASK)
+>> +#define MPIDR_AFFINITY_LEVEL_3(mpidr) ((mpidr >> 32) & MPIDR_LEVEL_MASK)
+>> +
+>>  #define read_cpuid(reg) ({                                             \
+>>         u64 __val;                                                      \
+>>         asm("mrs        %0, " reg : "=r" (__val));                      \
+>> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+>> new file mode 100644
+>> index 0000000..8631808
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/topology.h
+>> @@ -0,0 +1,41 @@
+>> +#ifndef _ASM_ARM64_TOPOLOGY_H
+>> +#define _ASM_ARM64_TOPOLOGY_H
+>> +
+>> +#ifdef CONFIG_ARM64_CPU_TOPOLOGY
+>> +
+>> +#include <linux/cpumask.h>
+>> +
+>> +struct cputopo_arm64 {
+>> +       int thread_id;
+>> +       int core_id;
+>> +       int socket_id;
+>> +       cpumask_t thread_sibling;
+>> +       cpumask_t core_sibling;
+>> +};
+>> +
+>> +DECLARE_PER_CPU(struct cputopo_arm64, cpu_topology);
+>> +
+>> +#define cpu_topo(cpu) per_cpu(cpu_topology, cpu)
+>> +
+>> +#define topology_physical_package_id(cpu)      (cpu_topo(cpu).socket_id)
+>> +#define topology_core_id(cpu)          (cpu_topo(cpu).core_id)
+>> +#define topology_core_cpumask(cpu)     (&cpu_topo(cpu).core_sibling)
+>> +#define topology_thread_cpumask(cpu)   (&cpu_topo(cpu).thread_sibling)
+>> +
+>> +#define mc_capable()   (cpu_topo(0).socket_id != -1)
+>> +#define smt_capable()  (cpu_topo(0).thread_id != -1)
+>> +
+>> +void init_cpu_topology(void);
+>> +void store_cpu_topology(unsigned int cpuid);
+>> +const struct cpumask *cpu_coregroup_mask(int cpu);
+>> +
+>> +#else
+>> +
+>> +static inline void init_cpu_topology(void) { }
+>> +static inline void store_cpu_topology(unsigned int cpuid) { }
+>> +
+>> +#endif
+>> +
+>> +#include <asm-generic/topology.h>
+>> +
+>> +#endif /* _ASM_ARM64_TOPOLOGY_H */
+>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>> index 7b4b564..a47c359 100644
+>> --- a/arch/arm64/kernel/Makefile
+>> +++ b/arch/arm64/kernel/Makefile
+>> @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)                       += smp.o smp_spin_table.o smp_psci.o
+>>  arm64-obj-$(CONFIG_HW_PERF_EVENTS)     += perf_event.o
+>>  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+>>  arm64-obj-$(CONFIG_EARLY_PRINTK)       += early_printk.o
+>> +arm64-obj-$(CONFIG_ARM64_CPU_TOPOLOGY)  += topology.o
+>>
+>>  obj-y                                  += $(arm64-obj-y) vdso/
+>>  obj-m                                  += $(arm64-obj-m)
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index fee5cce..197b1da 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -39,6 +39,7 @@
+>>  #include <asm/atomic.h>
+>>  #include <asm/cacheflush.h>
+>>  #include <asm/cputype.h>
+>> +#include <asm/topology.h>
+>>  #include <asm/mmu_context.h>
+>>  #include <asm/pgtable.h>
+>>  #include <asm/pgalloc.h>
+>> @@ -215,6 +216,8 @@ asmlinkage void secondary_start_kernel(void)
+>>         local_irq_enable();
+>>         local_fiq_enable();
+>>
+>> +       store_cpu_topology(cpu);
+>> +
+>>         /*
+>>          * OK, it's off to the idle thread for us
+>>          */
+>> @@ -387,6 +390,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>>         int cpu, err;
+>>         unsigned int ncores = num_possible_cpus();
+>>
+>> +       init_cpu_topology();
+>> +       store_cpu_topology(smp_processor_id());
+>> +
+>>         /*
+>>          * are we trying to boot more cores than exist?
+>>          */
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> new file mode 100644
+>> index 0000000..1eb0435
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -0,0 +1,128 @@
+>> +/*
+>> + * arch/arm64/kernel/topology.c
+>> + *
+>> + * Copyright (C) 2013 Linaro Limited.
+>> + * Written by: Hanjun Guo
+>> + *
+>> + * based on arch/arm/kernel/topology.c
+>> + *
+>> + * This file is subject to the terms and conditions of the GNU General Public
+>> + * License.  See the file "COPYING" in the main directory of this archive
+>> + * for more details.
+>> + */
+>> +
+>> +#include <linux/cpu.h>
+>> +#include <linux/cpumask.h>
+>> +#include <linux/init.h>
+>> +#include <linux/percpu.h>
+>> +#include <linux/sched.h>
+>> +
+>> +#include <asm/cputype.h>
+>> +#include <asm/topology.h>
+>> +
+>> +DEFINE_PER_CPU(struct cputopo_arm64, cpu_topology);
+>> +
+>> +const struct cpumask *cpu_coregroup_mask(int cpu)
+>> +{
+>> +       return &cpu_topo(cpu).core_sibling;
+>> +}
+>> +
+>> +void update_siblings_masks(unsigned int cpuid)
+>> +{
+>> +       struct cputopo_arm64 *topo, *cpuid_topo = &cpu_topo(cpuid);
+>> +       int cpu;
+>> +
+>> +       /* update core and thread sibling masks */
+>> +       for_each_possible_cpu(cpu) {
+>> +               topo = &cpu_topo(cpu);
+>> +
+>> +               if (cpuid_topo->socket_id != topo->socket_id)
+>> +                       continue;
+>> +
+>> +               cpumask_set_cpu(cpuid, &topo->core_sibling);
+>> +               if (cpu != cpuid)
+>> +                       cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
+>> +
+>> +               if (cpuid_topo->core_id != topo->core_id)
+>> +                       continue;
+>> +
+>> +               cpumask_set_cpu(cpuid, &topo->thread_sibling);
+>> +               if (cpu != cpuid)
+>> +                       cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
+>> +       }
+>> +       smp_wmb();
+>> +}
+>> +
+>> +/*
+>> + * store_cpu_topology is called at boot when only one cpu is running
+>> + * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
+>> + * which prevents simultaneous write access to cpu_topology array
+>> + */
+>> +void store_cpu_topology(unsigned int cpuid)
+>> +{
+>> +       struct cputopo_arm64 *cpuid_topo = &cpu_topo(cpuid);
+>> +       u64 mpidr;
+>> +
+>> +       /* If the cpu topology has been already set, just return */
+>> +       if (cpuid_topo->core_id != -1)
+>> +               return;
+>> +
+>> +       mpidr = read_cpuid_mpidr();
+>> +
+>> +       /* create cpu topology mapping */
+>> +       if (!(mpidr & MPIDR_SMP_BITMASK)) {
+>> +               /*
+>> +                * This is a multiprocessor system
+>> +                * multiprocessor format & multiprocessor mode field are set
+>> +                */
+>> +
+>> +               if (mpidr & MPIDR_MT_BITMASK) {
+>> +                       /* core performance interdependency */
+>> +                       cpuid_topo->thread_id = MPIDR_AFFINITY_LEVEL_0(mpidr);
+>> +                       cpuid_topo->core_id = MPIDR_AFFINITY_LEVEL_1(mpidr);
+>> +                       cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL_2(mpidr);
+>> +               } else {
+>> +                       /* largely independent cores */
+>> +                       cpuid_topo->thread_id = -1;
+>> +                       cpuid_topo->core_id = MPIDR_AFFINITY_LEVEL_0(mpidr);
+>> +                       cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL_1(mpidr);
+>> +               }
+>> +       } else {
+>> +               /*
+>> +                * This is an uniprocessor system
+>> +                * we are in multiprocessor format but uniprocessor system
+>> +                * or in the old uniprocessor format
+>> +                */
+>> +               cpuid_topo->thread_id = -1;
+>> +               cpuid_topo->core_id = 0;
+>> +               cpuid_topo->socket_id = -1;
+>> +       }
+>> +
+>> +       update_siblings_masks(cpuid);
+>> +
+>> +       printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr 0x%llx\n",
+>> +               cpuid, cpu_topo(cpuid).thread_id,
+>> +               cpu_topo(cpuid).core_id,
+>> +               cpu_topo(cpuid).socket_id, mpidr);
+>> +}
+>> +
+>> +/*
+>> + * init_cpu_topology is called at boot when only one cpu is running
+>> + * which prevent simultaneous write access to cpu_topology array
+>> + */
+>> +void __init init_cpu_topology(void)
+>> +{
+>> +       unsigned int cpu;
+>> +
+>> +       /* init core mask */
+>> +       for_each_possible_cpu(cpu) {
+>> +               struct cputopo_arm64 *topo = &cpu_topo(cpu);
+>> +
+>> +               topo->thread_id = -1;
+>> +               topo->core_id =  -1;
+>> +               topo->socket_id = -1;
+>> +               cpumask_clear(&topo->core_sibling);
+>> +               cpumask_clear(&topo->thread_sibling);
+>> +       }
+>> +       smp_wmb();
+>> +}
+>> --
+>> 1.7.9.5
+>>
