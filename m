@@ -1,72 +1,39 @@
-From: oliver@schinagl.nl (Oliver Schinagl)
-Date: Tue, 30 Jul 2013 15:22:55 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <20130719234944.GA11498@kroah.com>
-References: <20130624214615.GA17604@kroah.com> <51CAA709.4060801@schinagl.nl>
- <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
- <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
- <20130716064107.GA10868@kroah.com> <20130717114650.GN3125@lukather>
- <20130717161758.GA9822@kroah.com> <20130719094211.GD5106@lukather>
- <20130719234944.GA11498@kroah.com>
-Message-ID: <51F7BE2F.3060004@schinagl.nl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 30 Jul 2013 06:30:52 -0700
+Subject: [GIT PULL] urgent omap5 regulator updates against v3.11-rc3
+Message-ID: <20130730133052.GK7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Greg!
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-On 20-07-13 01:49, Greg KH wrote:
-> On Fri, Jul 19, 2013 at 11:42:11AM +0200, Maxime Ripard wrote:
->> On Wed, Jul 17, 2013 at 09:17:58AM -0700, Greg KH wrote:
->>> On Wed, Jul 17, 2013 at 01:46:50PM +0200, Maxime Ripard wrote:
->>>> On Mon, Jul 15, 2013 at 11:41:07PM -0700, Greg KH wrote:
->>>>> On Mon, Jul 15, 2013 at 11:16:19PM +0200, Oliver Schinagl wrote:
->>>>>> So using these new patches for binary attributes, how can I pass data
->>>>>> between my driver and the sysfs files using a platform_driver? Or are
->>>>>> other 'hacks' needed and using the .groups attribute from
->>>>>> platform_driver->device_driver->groups is really the wrong approach.
->>>>>>
->>>>>> I did ask around and still haven't figured it out so far, so I do
->>>>>> apologize if you feel I'm wasting your precious time.
->>>>> How is the platform device not the same thing that was passed to your
->>>>> probe function?
->>>> One thing I don't get here is why it should be set in the
->>>> platform_driver structure. From my understanding of the device model,
->>>> and since what Oliver is trying to do is exposing a few bytes of memory
->>>> to sysfs, shouldn't the sysfs file be attached to the device instead?
->>> It will be created by the driver core for any device attached to the
->>> driver automatically.
->>>
->>>> I mean, here, the sysfs file will be created under something like
->>>> .../drivers/sunxi-sid/eeprom. What happens when you have several
->>>> instances of that driver loaded? I'd expect it to have several sysfs
->>>> files created, one for each instance. So to me, it should be in the
->>>> device structure, not the driver one.
->>> You can't have multiple drivers with the same name loaded (or the same
->>> module loaded multiple times.)  You can have multiple devices for a
->>> single driver, which is what we do all the time.
->> Yes, I know that, and it's actually my point.
->> With the current oliver's code he pasted earlier in this thread:
->>
->> # find /sys/ -name eeprom
->> /sys/bus/platform/drivers/sunxi-sid/eeprom
->>
->> While I'd expect the eeprom file to be located in
->> /sys/bus/platform/devices/X.eeprom/eeprom like it used to be in the v4,
->> since it's an instance-specific content.
-> Oh crap.  You are totally right.  That's why we added the new device
-> create call, to allow this to work properly.
->
-> Right now you are getting the kobject of the driver, not the device, in
-> the callback, which is not what you want (sure, if you only have once
-> instance, you can work around it, but don't it's the driver core's fault
-> for not giving you the correct api...)
->
-> Let me go look at how I can make this work "easier", give me a few days.
-Not wanting to be rude, but it has been a little more then a few days, 
-any progress? Just want to know what I have to modify my driver to so it 
-can go into the next merge window :)
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
-oliver
->
-> greg k-h
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-omap5
+
+for you to fetch changes up to bd3c5544a1e98a25d2d24c98779092e0f84373f7:
+
+  ARM: dts: omap5-uevm: update optional/unused regulator configurations (2013-07-29 23:43:20 -0700)
+
+----------------------------------------------------------------
+Fixes for omap5-uevm regulators from Nishanth Menon <nm@ti.com>:
+
+Due to wrong older revision of documentation used as reference, we
+seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
+series is based power tree on production board 750-2628-XXX platform.
+Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
+supply hardware blocks at voltages that are out of specification.
+
+There is a chance that without these fixes there can be hardware
+damage to omap5-uevm boards with the v3.11-rc series.
+
+----------------------------------------------------------------
+Nishanth Menon (3):
+      ARM: dts: omap5-uevm: document regulator signals used on the actual board
+      ARM: dts: omap5-uevm: fix regulator configurations mandatory for SoC
+      ARM: dts: omap5-uevm: update optional/unused regulator configurations
+
+ arch/arm/boot/dts/omap5-uevm.dts | 78 +++++++++++++++++++++++++---------------
+ 1 file changed, 49 insertions(+), 29 deletions(-)
