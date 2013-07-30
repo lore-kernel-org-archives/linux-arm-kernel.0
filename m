@@ -1,30 +1,126 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 30 Jul 2013 14:15:45 +0200
-Subject: [PATCH v6 8/8] ASoC: sam9x5: get codec MCLK via device tree
-In-Reply-To: <20130730120304.GU9858@sirena.org.uk>
-References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
- <1375180329-4860-9-git-send-email-richard.genoud@gmail.com>
- <20130730120304.GU9858@sirena.org.uk>
-Message-ID: <CACQ1gAj=HpEbiNTaPrGO-XxgVy9s-0Nya+pp4-nh7TzOLhxrNg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 30 Jul 2013 09:15:54 -0300
+Subject: [PATCH 1/2] ARM: mxs_defconfig: Cleanup mxs_defconfig
+Message-ID: <1375186555-4661-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/30 Mark Brown <broonie@kernel.org>:
-> On Tue, Jul 30, 2013 at 12:32:09PM +0200, Richard Genoud wrote:
->
->> --- a/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
->> +++ b/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
->> @@ -8,6 +8,8 @@ Required properties:
->>    - atmel,audio-routing: A list of the connections between audio components.
->>      Each entry is a pair of strings, the first being the connection's sink,
->>      the second being the connection's source.
->> +  - clocks: Must contain an entry for the codec master clock.
->> +  - clock-names : Must be "mclk" (clock that feeds the codec master clock)
->
-> This should be part of the CODEC binding, not part of the machine driver
-> binding.  The machine driver should currently have the code to fetch the
-> clock but since the clock physically goes to the CODEC it should be part
-> of the CODEC binding.
-That makes sense.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Thanks !
+Generate mxs_defconfig by doing:
+
+make mxs_defconfig
+make savedefconfig
+cp defconfig arch/arm/configs/mxs_defconfig
+
+No functional change. The goal here is to cleanup mxs_defconfig file to
+make easier and cleaner the addition of new entries.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/mxs_defconfig | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 1d6d8fb..4555c02 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -1,4 +1,3 @@
+-CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+@@ -27,7 +26,6 @@ CONFIG_ARCH_MXS=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+-CONFIG_AUTO_ZRELADDR=y
+ CONFIG_FPE_NWFPE=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -43,8 +41,6 @@ CONFIG_SYN_COOKIES=y
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_CAN=m
+-CONFIG_CAN_RAW=m
+-CONFIG_CAN_BCM=m
+ CONFIG_CAN_FLEXCAN=m
+ # CONFIG_WIRELESS is not set
+ CONFIG_DEVTMPFS=y
+@@ -52,7 +48,6 @@ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_M25P80=y
+@@ -67,12 +62,12 @@ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_ENC28J60=y
+-CONFIG_USB_USBNET=y
+-CONFIG_USB_NET_SMSC95XX=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_ICPLUS_PHY=y
+ CONFIG_REALTEK_PHY=y
+ CONFIG_MICREL_PHY=y
++CONFIG_USB_USBNET=y
++CONFIG_USB_NET_SMSC95XX=y
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=y
+@@ -110,7 +105,6 @@ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_FONTS=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+@@ -119,9 +113,9 @@ CONFIG_SND_MXS_SOC=y
+ CONFIG_SND_SOC_MXS_SGTL5000=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+-CONFIG_USB_STORAGE=y
+ CONFIG_USB_PHY=y
+ CONFIG_USB_MXS_PHY=y
+ CONFIG_MMC=y
+@@ -143,9 +137,9 @@ CONFIG_DMADEVICES=y
+ CONFIG_MXS_DMA=y
+ CONFIG_STAGING=y
+ CONFIG_MXS_LRADC=y
+-CONFIG_IIO_SYSFS_TRIGGER=y
+ CONFIG_COMMON_CLK_DEBUG=y
+ CONFIG_IIO=y
++CONFIG_IIO_SYSFS_TRIGGER=y
+ CONFIG_PWM=y
+ CONFIG_PWM_MXS=y
+ CONFIG_EXT2_FS=y
+@@ -173,14 +167,14 @@ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=y
+ CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_FRAME_WARN=2048
+-CONFIG_MAGIC_SYSRQ=y
+ CONFIG_UNUSED_SYMBOLS=y
++CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_LOCKUP_DETECTOR=y
+ CONFIG_TIMER_STATS=y
+ CONFIG_PROVE_LOCKING=y
+-CONFIG_DEBUG_INFO=y
+ CONFIG_BLK_DEV_IO_TRACE=y
+ CONFIG_STRICT_DEVMEM=y
+ CONFIG_DEBUG_USER=y
+@@ -188,3 +182,4 @@ CONFIG_DEBUG_USER=y
+ # CONFIG_CRYPTO_HW is not set
+ CONFIG_CRC_ITU_T=m
+ CONFIG_CRC7=m
++CONFIG_FONTS=y
+-- 
+1.8.1.2
