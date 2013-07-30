@@ -1,42 +1,45 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 30 Jul 2013 00:05:25 -0500
-Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
- resources
-In-Reply-To: <51F74688.3090702@ti.com>
-References: <1374515989-7391-1-git-send-email-joelf@ti.com>
- <51F4589E.5070108@ti.com> <51F6140B.3070600@ti.com> <51F738BF.7070808@ti.com>
- <51F74688.3090702@ti.com>
-Message-ID: <51F74995.2050202@ti.com>
+From: gururaja.hebbar@ti.com (Gururaja Hebbar)
+Date: Tue, 30 Jul 2013 10:35:52 +0530
+Subject: [Patch V2 4/4] ARM: dts: AM33XX: update rtc node compatibility
+In-Reply-To: <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
+References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <51F749B0.7020802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 11:52 PM, Sekhar Nori wrote:> On Tuesday 30 July 2013
-09:23 AM, Joel Fernandes wrote:
->> On 07/29/2013 02:04 AM, Sekhar Nori wrote:
->>> On Sunday 28 July 2013 05:02 AM, Joel Fernandes wrote:
->>>> Hi Tony or Sekhar,
->>>>
->>>> If this patch looks ok, could you pick it up for -rc cycle?
->>>>
->>>> It fixes DMA breakages after the merge window for devices for which DMA
->>>> resources are being populated in device tree instead pdev.
->>>
->>> But which DT-enabled platform in kernel is using EDMA? A grep for edma
->>> over arch/arm/boot/dts/* brings up nothing.
->>> Does this really have to go into the -rc cycle or can it wait till
->>> v3.12?
->>
->>
->> But unused channel list is also populated for private EDMA callers like
->> davinci-pcm no? IIRC, HWMOD data is also removed for McASP so EDMA for
->> those may break.
+Hi,
+
+On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
+> Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
 >
-> Yes, but which DT-enabled platform has davinci-pcm working today?
-> AFAICS, this bug affects DT-enabled platforms only.
+> Update the rtc compatible property to "ti,am3352-rtc" to enable handling
+> of this feature inside rtc-omap driver.
 
-Yes, you're right. I didn't realize nothing else is working yet. I guess
-its fine then for next kernel release.
+The other 2 rtc driver related patches have been pulled up. If you have 
+no comments, can you please pull this up.
 
-Thanks,
+Regards
+Gururaja
 
--Joel
+>
+> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> ---
+> :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
+>   arch/arm/boot/dts/am33xx.dtsi |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 77aa1b0..dde180a 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -297,7 +297,7 @@
+>   		};
+>
+>   		rtc at 44e3e000 {
+> -			compatible = "ti,da830-rtc";
+> +			compatible = "ti,am3352-rtc";
+>   			reg = <0x44e3e000 0x1000>;
+>   			interrupts = <75
+>   				      76>;
+>
