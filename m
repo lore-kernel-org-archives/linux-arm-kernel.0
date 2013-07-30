@@ -1,35 +1,52 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 30 Jul 2013 17:40:16 +0100
-Subject: [PATCH] mmc: sdhci-msm: Add support for MSM chipsets
-In-Reply-To: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com> (Georgi
- Djakov's message of "Tue, 30 Jul 2013 19:22:35 +0300")
-References: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <86y58orogf.fsf@void.printf.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Jul 2013 10:40:36 -0600
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
+ interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130730014453.GJ29970@voom.fritz.box>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
+ <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
+ <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
+ <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
+ <CACxGe6uE6jOE-vz0onW5h93Es-soGiBAcFBM7Dvxh+HvCNrHkw@mail.gmail.com>
+ <CACxGe6vw9=y5a+EgF1gO39SwGAdGofD2MYjyJ3jYu6uN3ke70A@mail.gmail.com>
+ <1374988276.1973.29.camel@dabdike> <20130730014453.GJ29970@voom.fritz.box>
+Message-ID: <51F7EC84.90005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Georgi,
+On 07/29/2013 07:44 PM, David Gibson wrote:
+...
+> So, by way of investigation, let me propose an alternative
+> expression of schemas, that I'm also not convinced we should do,
+> but is possible and expressive.  It's illustrative, because it's
+> kind of the polar opposite approach to XSD: just use C.
 
-On Tue, Jul 30 2013, Georgi Djakov wrote:
-> This platform driver adds the support of Secure Digital Host
-> Controller Interface compliant controller in MSM chipsets.
->
-> CC: Asutosh Das <asutoshd@codeaurora.org>
-> CC: Venkat Gopalakrishnan <venkatg@codeaurora.org>
-> CC: Sahitya Tummala <stummala@codeaurora.org>
-> CC: Subhash Jadavani <subhashj@codeaurora.org>
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-> ---
-> This is an initial version of the Qualcomm MSM SDHCI driver.
-> It is based on the SDHCI code from coreaurora.org with minor
-> modifications. The MMC standard DT bindings are used where
-> possible. The patch applies to v3.11-rc3.
+That actually sounds reasonable.
 
-Is the arch code that will use this driver already in mainline,
-or on its way in?
+But, I think there's a difference between a schema, which defines
+what's legal in an abstract fashion, and a validator, which defines
+that the data conforms to the schema.
 
-Thanks,
+I can see that codding a validator in C would be pretty easy, and even
+potentially quite simple/clean given a suitable set of library
+functions as you say.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+However, I'm not so convinced that expressing the schema itself as C
+would work out so well. I think the code/data-structures would end up
+being pretty stylized so they could actually be read as a schema. At
+that point, a specific schema language would probably be simpler? Of
+course, this is all somewhat conjecture; perhaps the only way to tell
+would be to prototype various ideas and see how well they work.
+
+Equally, I'm not sure I want to bind the schema definition to a
+particular language. I'd like to be able to programatically generate
+or manipulate *.dts files in arbitrary languages. Integrating a C
+interpreter into those languages in order to handle the schema would
+be annoying, whereas directly handling a special-purpose schema
+language seems like it'd be more tangible.
+
+As an aside, in the past I toyed with the idea of using Python data
+structures as a *.dts syntax, and hence allowing
+macros/auto-generation using custom Python code, and I'm sure Forth
+will come up sometime in this thread:-)
