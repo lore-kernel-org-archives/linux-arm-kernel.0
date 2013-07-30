@@ -1,59 +1,60 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 30 Jul 2013 17:40:11 -0500
-Subject: [4/4] Added device tree entries for Legerity SLIC node on
- various Freescale Platforms
-In-Reply-To: <1362655668-26721-4-git-send-email-Sandeep@freescale.com>
-References: <1362655668-26721-4-git-send-email-Sandeep@freescale.com>
-Message-ID: <20130730224011.GA15915@home.buserror.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Jul 2013 16:49:18 -0600
+Subject: [PATCH] ARM: allow DEBUG_UNCOMPRESS for omap2plus
+Message-ID: <1375224558-8170-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 04:57:48PM +0530, Sandeep Singh wrote:
-> diff --git a/arch/powerpc/boot/dts/p1024rdb.dtsi b/arch/powerpc/boot/dts/p1024rdb.dtsi
-> index b05dcb4..cec36a3 100644
-> --- a/arch/powerpc/boot/dts/p1024rdb.dtsi
-> +++ b/arch/powerpc/boot/dts/p1024rdb.dtsi
-> @@ -164,6 +164,19 @@
->  				label = "SPI JFFS2 RFS";
->  			};
->  		};
-> +
-> +                tdm_phy_0: slic at 0 {
-> +                        compatible = "zarlink,le88266", "tdm-phy-slic";
-> +			reg = <1>;
-> +			spi-max-frequency = <8000000>;
-> +		};
-> +
-> +                tdm_phy_1: slic at 1 {
-> +                        compatible = "zarlink,le88266", "tdm-phy-slic";
-> +			reg = <2>;
-> +			spi-max-frequency = <8000000>;
-> +		};
-> +
->  	};
->  
->  	i2c at 3000 {
-> @@ -173,6 +186,11 @@
->  		};
->  	};
->  
-> +        tdm at 16000 {
-> +                num-phy = <2>;
-> +                phy-handle = <&tdm_phy_0>, <&tdm_phy_1>;
-> +        };
-> +
->  	usb at 22000 {
->  		phy_type = "ulpi";
->  	};
+From: Stephen Warren <swarren@nvidia.com>
 
-Whitespace
+DEBUG_UNCOMPRESS was previously disallowed for omap2plus due to
+omap2plus.S's use of .data, which is not allowed in the decompressor.
+Solve this by placing that data into .text when building the file into
+the decompressor. This relies on .text actually being writable in the
+decompressor, which it is in practice.
 
-What is "tdm-phy-slic"?  "num-phy"?  Document these in the binding and
-use proper vendor prefixes.
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Note that I have build-tested this with omap2plus_defconfig, but not
+run-time tested it in any way.
+---
+ arch/arm/Kconfig.debug             | 2 +-
+ arch/arm/include/debug/omap2plus.S | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-Why "<&tdm_phy_0>, <&tdm_phy_1>" rather than "<&tdm_phy_0 &tdm_phy_1>"? 
-And can you just use the length of phy-handle rather than having a
-separate num-phy property?
-
--Scott
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index d8ff7f7..8eb04b1 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1046,7 +1046,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
+ config DEBUG_UNCOMPRESS
+ 	bool
+ 	depends on ARCH_MULTIPLATFORM
+-	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART
++	default y if DEBUG_LL
+ 	help
+ 	  This option influences the normal decompressor output for
+ 	  multiplatform kernels.  Normally, multiplatform kernels disable
+diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
+index 6d867ae..364ae35 100644
+--- a/arch/arm/include/debug/omap2plus.S
++++ b/arch/arm/include/debug/omap2plus.S
+@@ -58,11 +58,15 @@
  
+ #define UART_OFFSET(addr)	((addr) & 0x00ffffff)
+ 
++#if !defined(ZIMAGE)
+ 		.pushsection .data
++#endif
+ omap_uart_phys:	.word	0
+ omap_uart_virt:	.word	0
+ omap_uart_lsr:	.word	0
++#if !defined(ZIMAGE)
+ 		.popsection
++#endif
+ 
+ 		.macro	addruart, rp, rv, tmp
+ 
+-- 
+1.8.1.5
