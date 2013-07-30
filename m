@@ -1,114 +1,85 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jul 2013 11:16:04 +0200
-Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
- property
-In-Reply-To: <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
-References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
-Message-ID: <20130730111604.76fd5b6e@skate>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 30 Jul 2013 10:25:18 +0100
+Subject: [PATCH] ARM: Fix r7/r11 confusion when CONFIG_THUMB2_KERNEL=y
+In-Reply-To: <20130729212140.GB12681@mozilla.com>
+References: <1373685501-1620-1-git-send-email-jld@mozilla.com>
+ <20130715135420.GG10000@mudshark.cambridge.arm.com>
+ <20130720044655.GC9433@mozilla.com>
+ <20130721213753.GA29879@mudshark.cambridge.arm.com>
+ <20130722185234.GA14519@localhost.localdomain>
+ <20130729212140.GB12681@mozilla.com>
+Message-ID: <20130730092517.GB2478@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Rutland,
-
-On Tue, 23 Jul 2013 12:22:59 +0100, Mark Rutland wrote:
-
-> > +Some Ethernet MACs have a "fixed link", and are not connected to a
-> > +normal MDIO-managed PHY device. For those situations, a Device Tree
-> > +binding allows to describe a "fixed link".
+On Mon, Jul 29, 2013 at 02:21:40PM -0700, Jed Davis wrote:
+> On Mon, Jul 22, 2013 at 07:52:39PM +0100, Dave Martin wrote:
+> > On Sun, Jul 21, 2013 at 10:37:53PM +0100, Will Deacon wrote:
+> > > Ok, I think I'm with you now. I also think that a better solution would be
+> > > to try and limit the r7/fp confusion to one place, perhaps behind something
+> > > like:
+> > > 
+> > > void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame);
+> > > 
+> > > then that function can act as the bridge between pt_regs (where we leave
+> > > everything as it is) and stackframe (where we assign either r7 or fp into
+> > > the fp member). Then we just fix up the call sites to pass the regs they're
+> > > interested in to our new function.
+> > > 
+> > > What do you think?
 > 
-> Are partictular MACs fixed link, or can some either be either fixed link
-> or wired to an MDIO-managed PHY? i.e. can we assume a given MAC is
-> fixed-link from its compatible string?
-
-No, you can't. The case that I have is that the mvneta Ethernet MAC
-(of Marvell 370/XP SOCs) is sometimes used with a MDIO-managed PHY, and
-sometimes used with a switch that isn't manageable at all and should be
-considered as a fixed link.
-
-So no, the compatible string of the Ethernet MAC cannot be used to
-determine whether we're wired fixed link or to a classical MDIO-managed
-PHY.
-
-> > +Such a fixed link situation is described within an Ethernet device
-> > +Device Tree node using a 'fixed-link' property, composed of 5
-> > +elements:
+> I can see that being useful if we wanted to opacify struct stackframe,
+> but... all uses of stackframe that I see involve passing it to
+> unwind_frame, which expands it back out into an array of registers.
+> (Except with CONFIG_FRAME_POINTER, but "APCS variants that require a
+> frame pointer register are obsolete.")
 > 
-> I'm not sure grouping these values together is the best way of handling
-> this. It's rather opaque, and inflexible for future extension.
-
-That's the DT binding that has been used by PowerPC platforms since
-several years, and I've simply re-used it. See 'git grep fixed-link
-arch/powerpc/boot/dts'.
-
-I have nothing against creating another DT binding, but for a start, I
-thought using existing bindings would be the best idea.
-
-> > + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
-> > +    the system.
+> So... why not make pt_regs and stackframe the same, and avoid the
+> translations entirely?
 > 
-> Is there any reason this couldn't be allocated dynamically within the
-> kernel as needed? I don't see why an arbitrary unique value should be a
-> dt binding requirement; it seems like a leak of Linux implementation
-> details.
-
-As I pointed out in my reply to Grant, this value is used both as the
-PHY address on the fake fixed MDIO bus, and as the PHY identifier as
-reported by MII registers PHYS_ID1 and PHYS_ID2. If we can get assigned
-a proper PHY identifier that is used statically by the driver (it
-doesn't have to be different per fixed PHY instance), then we can
-allocate the PHY address dynamically. It requires a little bit of API
-changes but that's certainly doable. See my reply to Grant for a
-proposal about this.
-
-> > + 2. The duplex (1 for full-duplex, 0 for half-duplex)
+> > Do the ARM unwind tables guarantee not to need knowledge of any
+> > virtual registers for the purpose of processing the opcodes of a single
+> > function's unwind table entry, except those virtual regs that we happen
+> > to initialise?  Or do we just rely on luck?
 > 
-> Will this change for a given MAC?
-> 
-> Could we not have a boolean property for each of these, and require one
-> to be present?
-> 
-> Possibly fixed-link-full-duplex / fix-link-half-duplex?
-> 
-> > + 3. The speed (10, 100, 1000)
-> 
-> fixed-link-speed?
-> 
-> > + 4. The pause setting (1 for enabled, 0 for disabled)
-> > + 5. The asym pause setting (1 for enabled, 0 for disabled)
-> 
-> Boolean properties for both of these?
+> Yes, for some value of "luck".  The spec documents 0x90|N, for N a core
+> register number other than 13 or 15, as setting the vSP to the value of
+> virtual register N.  We can get away with some omissions for kernel code
+> (e.g., unwind.c doesn't handle saved floating point registers, nor adding
+> constants larger than 1024 to vSP), but is this one of them?
 
-As Florian already answered, he already proposed something like this in
-the past, and it was rejected because a fixed PHY is not a piece of
-hardware and should therefore not be represented in the Device Tree.
-However, the fact that the MAC is not connected to a MDIO-manageable
-PHY but to some fixed-link thing is a property of the MAC hardware
-layout, and can therefore be expressed as a property of the MAC
-hardware.
+I think in practice yes.  After all, even requiring r7 is sufficiently
+rare that it wasn't flagged up until now.  GCC seems to be quite rigid
+in the way it generates stackframe management code.  There's no
+guarantee that won't change in the future, of course.
 
-See the thread that starts at
-http://article.gmane.org/gmane.linux.network/275771, and specifically
-Grant answers to Florian suggestions of having DT nodes to represent
-fixed PHY: http://article.gmane.org/gmane.linux.network/276208. Grant's
-answer was:
+> [...]
+> > The purist answer seems to be: we might need all the regs in struct
+> > stackframe.
+> > 
+> > The pragmatic answer might be that we definitely need r7 for Thumb code,
+> > but given the nimbleness of GCC to evolve we might get away with not
+> > including extra registers for a long time yet.
+> 
+> The other question to ask here might be: what does the "pragmatic
+> answer" gain us over the "purist answer"?
 
-"""
-I think this discussion is going in the wrong direction. The concept
-of a dummy phy is really a Linux kernel internal detail. Creating some
-kind of dummy MDIO bus node does not describe the hardware. There is
-already support in the kernel for Ethernet MACs connected directly to
-a switch or other device. It is far better to describe how the MAC
-needs to be configured than to invent a non-existent phy. Search for
-"fixed-link" in the kernel tree to see how it is used.
-"""
+The pragmatic route is less contraversial and lower overhead: even though
+it's not correct as per the ABI, GCC is the only supported compiler for
+building the kernel anyway.
 
-Best regards,
+Tracking the whole register set might actually be useful as a debugging
+aid though, even if it's not needed for reliable backtraces.  It might
+be worth considering that as a separate enhancement.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
+> > A review of existing custom unwind annotations might be a good idea
+> > anyway, to check whether any of them requires another register right now.
+> 
+> `egrep -r '\.(setf|movs)p' arch/arm` finds nothing, for what it's worth.
+
+Good idea.  I suspected as much, since the number of custom annotations is
+fairly small.  Thanks for checking.
+
+Cheers
+---Dave
