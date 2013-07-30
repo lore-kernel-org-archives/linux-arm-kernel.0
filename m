@@ -1,148 +1,65 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 29 Jul 2013 23:05:06 -0400 (EDT)
-Subject: [PATCH] arm: update advice on kernel and FDT load address.
-In-Reply-To: <1375106635.12741.8.camel@kazak.uk.xensource.com>
-References: <1375102578-5869-1-git-send-email-ian.campbell@citrix.com>
- <20130729135000.GK32383@mudshark.cambridge.arm.com>
- <1375106635.12741.8.camel@kazak.uk.xensource.com>
-Message-ID: <alpine.LFD.2.03.1307292234040.15022@syhkavp.arg>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Tue, 30 Jul 2013 11:06:46 +0800
+Subject: [PATCH 2/9] dma: tegra20-apbdma: move to generic device tree
+ bindings
+In-Reply-To: <51F2CDBE.40802@wwwdotorg.org>
+References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
+ <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
+ <51F2CDBE.40802@wwwdotorg.org>
+Message-ID: <20130730030644.GJ15855@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Jul 2013, Ian Campbell wrote:
-
-> On Mon, 2013-07-29 at 14:50 +0100, Will Deacon wrote:
-> > Hi Ian,
+On Sat, Jul 27, 2013 at 03:27:58AM +0800, Stephen Warren wrote:
+> (Stripping the Cc list a lot)
+> 
+> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+> > Update tegra20-apbdma driver to adopt generic DMA device tree bindings.
+> > It calls of_dma_controller_register() with of_dma_simple_xlate to get
+> > the generic DMA device tree helper support. The #dma-cells for apbdma
+> > must be 1, which is slave ID.
 > > 
-> > /me plays English teacher :)
-> > 
-> > On Mon, Jul 29, 2013 at 01:56:18PM +0100, Ian Campbell wrote:
-> > > Based on the discussion in [0]:
-> > >   - Recommend that the kernel be placed under 128MiB ("for automatic RAM
-> > >     location to work", says Nico)
-> > >   - Recommend that DTB larger than ~16KiB be placed after the 128MiB boundary
-> > >     (in order to avoid conflicting with the kernel decompressor, kernel is at
-> > >     most 32MiB) and within the lowmem region. Somewhat arbitrarily recommend
-> > >     placement below the 256MiB boundary, the real lowmem limit is likely up
-> > >     around 600-800MiB but varies.
-> > > 
-> > > [0] http://article.gmane.org/gmane.linux.ports.arm.kernel/254538
-> > > 
-> > > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Dave Martin <dave.martin@linaro.org>
-> > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > ---
-> > >  Documentation/arm/Booting |   14 +++++++++++---
-> > >  1 files changed, 11 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-> > > index 0c1f475..72c035e 100644
-> > > --- a/Documentation/arm/Booting
-> > > +++ b/Documentation/arm/Booting
-> > > @@ -125,6 +125,13 @@ with the caveat that it may not be located at physical address 0 since
-> > >  the kernel interprets a value of 0 in r2 to mean neither a tagged list
-> > >  nor a dtb were passed.
-> > >  
-> > > +If the DTB is larger than ~16KiB, such that placement in the first
-> > > +16KiB would lead to a conflict with the kernel loaded at 32KiB (as
-> > > +recommended below) which uses the memory between 16KiB-32KiB itself,
-> > > +then the DTB should be placed after the first 128MiB of RAM in order
-> > > +to avoid conflicting with the kernel decompressor. The recommnded
-> > 
-> > recommended
+> > The existing nvidia,dma-request-selector still works there, and the
+> > support will be removed after all clients get converted to generic DMA
+> > device tree helper.
 > 
-> Should've pressed F5, sorry...
+> (BTW, I would like to take this series through the Tegra tree to
+> simplify dependencies. So, I'm looking for ack's on the drivers rather
+> than for them to be applied. I had hoped Richard would point this out
+> when posting the patches)
+Sorry I forgot to add maintainr-pick-up suggestions.
 > 
-> > It also looks like you're repeating part of what is said later regarding the
-> > 16k of page tables below the image.
+> > diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
 > 
-> yes, this was tricky since I wanted to justify the larger than 16KiB but
-> that was a forward reference. I went with "as recommended below".
-> Perhaps I should just omit the justification? Or perhaps "If the DTB is
-> larger than ~16KiB (see below for why this particular value
-> matters)...". Clunky :-(
-
-Why not simply:
-
-	Make sure the loaded DTB doesn't conflict with the zImage 
-	decompressor which may relocate itself.  A safe location is 
-	just above the 128MB boundary from start of RAM.
-
-> > Also, we use 20k with LPAE.
+> > +static bool tegra_dma_filter_fn(struct dma_chan *dc, void *param)
+> > +{
+> > +	if (dc->device->dev->driver == &tegra_dmac_driver.driver) {
+> > +		struct tegra_dma_channel *tdc = to_tegra_dma_chan(dc);
+> > +		unsigned req = *(unsigned *)param;
+> > +
+> > +		tdc->slave_id = req;
+> > +
+> > +		return true;
+> > +	}
+> > +	return false;
+> > +}
+> > +
+> > +static struct of_dma_filter_info tegra_dma_info = {
+> > +	.filter_fn = tegra_dma_filter_fn,
+> > +};
 > 
-> I'll fold in an update along those lines too.
-> 
-> However given that this then makes everything more complicated (e.g.
-> it's now DTB > ~12KiB in that case) perhaps we should just ditch the
-> original recommendation to use the first 16KiB and switch to a
-> recommendation of "as high as possible below 256MiB" across the board?
-> That would remove the issue with repeating stuff from the next section
-> too.
+> Why does this driver need to define a filter function? I thought the
+> dmaengine's DT support would already match DMA clients/engines based on
+> the phandle in DT? Isn't the need to pass the slave channel ID into
+> drivers something pretty fundamental to dmaengine, and hence something
+> it already supports?
+of_dma_simple_xlate only pass slave id to filter function. It needs
+change to pass dt node too. I didn't start work on the common code
+change yet. Do you think we need to hold it until common code change?
 
-Sure.
-
-> 
-> > > +placement in this case just below the 256MiB boundary.
-> > > +
-> > >  5. Calling the kernel image
-> > >  ---------------------------
-> > >  
-> > > @@ -136,9 +143,10 @@ is stored in flash, and is linked correctly to be run from flash,
-> > >  then it is legal for the boot loader to call the zImage in flash
-> > >  directly.
-> > >  
-> > > -The zImage may also be placed in system RAM (at any location) and
-> > > -called there.  Note that the kernel uses 16K of RAM below the image
-> > > -to store page tables.  The recommended placement is 32KiB into RAM.
-> > > +The zImage may also be placed in system RAM and called there.  The
-> > > +kernel should be placed in the first 128MiB of RAM. Note that the
-> > > +kernel uses 16KiB of RAM below the image to store page tables.  The
-> > > +recommended placement is 32KiB into RAM.
-> > 
-> > This is a bit clunky since you say that the zImage may be placed in system
-> > RAM, then restrict that in the next sentence.
-> 
-> How about:
-> 
->         The kernel may also be placed in the first 128MiB of system RAM
->         and called there.
-
-Not "may" but "must" if you have CONFIG_AUTO_ZRELADDR=y.
-
->	Note that the kernel uses 16KiB of RAM below
->       the image to store page tables.  The recommended placement is
->         32KiB into RAM.
-
-Well... not completely right.
-
-You may load zImage anywhere in the first 128MB of RAM if you have 
-CONFIG_AUTO_ZRELADDR=y.  If CONFIG_AUTO_ZRELADDR=n then zImage may be 
-loaded anywhere. In the former case, the zImage code will automatically 
-determine the physical start of RAM.  In the later case the start of RAM 
-is hardcoded in the zImage binary.
-
-Then, the zImage code will decompress the actual kernel image at an 
-offset of (in most cases) 32KB from start of RAM.  However, if the 
-decompressed kernel would overwrite the loaded zImage where the 
-decompressor code and data is located, then zImage will relocate itself 
-just after the end of the decompressed kernel area before proceeding to 
-the decompression.  This is where you need to be careful about 
-ramdisk/initrd and DTB load addresses.
-
-The initial page table is therefore (in most cases again) just below the 
-decompressed kernel location i.e. either Ffrom 16KB from start of RAM, 
-or from 12KB if using LPAE.
-
-You can therefore load everything (zImage, initrd, DTB) sequentially 
-from the 32MB mark in RAM and be safe.  By loading zImage that high, it 
-most certainly won't need to relocate itself (unless the decompressed 
-kernel is larger than 32MB which is very unlikely as I mentioned) and 
-that will also make the boot process slightly faster.
-
-
-
-Nicolas
+Thanks
+Richard
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
