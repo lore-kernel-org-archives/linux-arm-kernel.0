@@ -1,54 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 30 Jul 2013 18:24:13 +0100
-Subject: [PATCH 0/5] Optional regulator support
-In-Reply-To: <864nbcte4j.fsf@void.printf.net>
-References: <20130730114502.GQ9858@sirena.org.uk>
- <864nbcte4j.fsf@void.printf.net>
-Message-ID: <20130730172413.GW9858@sirena.org.uk>
+From: coelho@ti.com (Luciano Coelho)
+Date: Tue, 30 Jul 2013 20:27:24 +0300
+Subject: [PATCH 0/4] ARM: dts: add WiLink support to panda and omap4-sdp
+Message-ID: <1375205248-25708-1-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 01:40:28PM +0100, Chris Ball wrote:
-> On Tue, Jul 30 2013, Mark Brown wrote:
+Hi,
 
-> > Right now all the MMC users are converted over as-is, though it does
-> > look like drivers such as sdhci really ought to be insisting on having a
-> > regulator for VMMC in the same way that the MMC core helper does (and
-> > indeed in that case it looks like it ought to be converted over to the
-> > core code).
+These patches add the necessary DT configuration to use the WLAN part
+of WiLink on OMAP4 Pandaboard and on OMAP4-SDP (including Blaze).
 
-> I didn't follow this part -- I don't think the MMC core insists on a
-> VMMC regulator, and I don't think sdhci should either, because e.g.
-> an x86 laptop isn't going to have one.  What am I missing?
+I've tested these changes on Panda and it works fine.  But I couldn't
+test the OMAP4 SDP changes properly on 3.11-rc3 because I'm having
+problems with clocks and SDIO stuff.  So it's pretty much just
+compiled tested.  I've tried this (without the new clock definition
+stuff) on Blaze with 3.10 and it was working, though.
 
-You're missing the fact that there will be a VMMC regulator there since
-the card needs power to function, it just might not be one that software
-knows about or can control.  If it's one that software can control
-that's not mapped in properly (eg, because the driver for the regulator
-wasn't loaded) then obviously that's a serious problem and power saving
-features in the regulator API may for example turn off the supply even
-if it's on by default since they can't tell it's in use.
+Please take a look and let me know what you think.
 
-As things stand the expectation for x86 type systems is that MMC
-controllers attached via PCI or USB ought to be setting up a fixed
-regulator so that the consumer part can proceed without ignoring errors
-that might be serious on other systems.  It's probably not a bad idea to
-do this anyway though hopefully in the future this work will make it
-less needed.  For embedded systems the system integration ought to be
-doing the same thing, normally as part of the configuration of the PMIC.
+Luca.
 
-The goal of this series is to make it much easier for the regulator core
-to transparently support such systems where the regulators aren't
-visible to software by transparently stubbing out normal supplies that
-really must be present somehow for the hardware to operate without
-confusing things by also stubbing out suppies that may be missing in
-normal operation.  This is the problem for the existing stubbing support
-- it works well for normal supplies but it means that any consumer that
-wants to handle a supply that's not there can't tell it's missing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/60357bc9/attachment-0001.sig>
+
+Luciano Coelho (4):
+  ARM: dts: omap4-panda: add MMC5 (WiLink WLAN) configuration
+  arm: dts: omap4-panda-common: add WiLink6 device tree nodes
+  ARM: dts: omap4-sdp: add MMC5 (WiLink WLAN) configuration
+  arm: dts: omap4-sdp: add WiLink7 device tree node
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi | 45 +++++++++++++++++++++++++++-
+ arch/arm/boot/dts/omap4-sdp.dts           | 49 +++++++++++++++++++++++++++++++
+ 2 files changed, 93 insertions(+), 1 deletion(-)
+
+-- 
+1.8.3.2
