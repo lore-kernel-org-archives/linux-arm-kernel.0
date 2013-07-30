@@ -1,42 +1,102 @@
-From: archit@ti.com (Archit Taneja)
-Date: Tue, 30 Jul 2013 11:18:45 +0530
-Subject: [PATCH 09/21] ARM: OMAP: devkit8000: use new display drivers
-In-Reply-To: <1374822504-28949-10-git-send-email-tomi.valkeinen@ti.com>
-References: <1374822504-28949-1-git-send-email-tomi.valkeinen@ti.com>
- <1374822504-28949-10-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <51F753BD.5040509@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 30 Jul 2013 09:01:34 +0300
+Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
+ usb_bind_phy
+In-Reply-To: <51F74BC8.7020903@ti.com>
+References: <1374829418-27503-1-git-send-email-kishon@ti.com>
+ <1374829418-27503-3-git-send-email-kishon@ti.com>
+ <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
+ <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
+Message-ID: <20130730060134.GD9155@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Friday 26 July 2013 12:38 PM, Tomi Valkeinen wrote:
-> Use new display drivers for devkit8000 board.
->
-> The new OMAP display drivers were merged for 3.11, and we can now change
-> the board files to use the new ones and phase out the old ones.
->
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->   arch/arm/mach-omap2/board-devkit8000.c | 96 +++++++++++++++++++++++-----------
->   1 file changed, 65 insertions(+), 31 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-> index f1d91ba..cdc4fb9 100644
-> --- a/arch/arm/mach-omap2/board-devkit8000.c
-> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> @@ -112,50 +112,81 @@ static struct regulator_consumer_supply devkit8000_vio_supply[] = {
->   	REGULATOR_SUPPLY("vcc", "spi2.0"),
->   };
->
-> -static struct panel_generic_dpi_data lcd_panel = {
-> -	.name			= "innolux_at070tn83",
-> -	/* gpios filled in code */
-> +static const struct display_timing devkit8000_lcd_videomode = {
-> +	.pixelclock	= { 0, 40000000, 0 },
+On Tue, Jul 30, 2013 at 10:44:48AM +0530, Kishon Vijay Abraham I wrote:
+> > On Mon, Jul 29, 2013 at 08:59:26PM +0530, Kishon Vijay Abraham I wrote:
+> >>>> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
+> >>>> MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
+> >>>> device name of the controller had *.auto* in it. Since with using
+> >>>> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
+> >>>> the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
+> >>>> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
+> >>>> change is done in board file here.
+> >>>>
+> >>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>> ---
+> >>>>  arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
+> >>>>  arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
+> >>>>  arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
+> >>>>  arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
+> >>>>  arch/arm/mach-omap2/board-igep0020.c         |    2 +-
+> >>>>  arch/arm/mach-omap2/board-ldp.c              |    2 +-
+> >>>>  arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
+> >>>>  arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+> >>>>  arch/arm/mach-omap2/board-omap3logic.c       |    2 +-
+> >>>>  arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
+> >>>>  arch/arm/mach-omap2/board-omap3stalker.c     |    2 +-
+> >>>>  arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
+> >>>>  arch/arm/mach-omap2/board-overo.c            |    2 +-
+> >>>>  arch/arm/mach-omap2/board-rm680.c            |    2 +-
+> >>>>  arch/arm/mach-omap2/board-rx51.c             |    2 +-
+> >>>>  arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
+> >>>>  16 files changed, 16 insertions(+), 16 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+> >>>> index 244d8a5..17bb076 100644
+> >>>> --- a/arch/arm/mach-omap2/board-2430sdp.c
+> >>>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+> >>>> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
+> >>>>  	omap_hsmmc_init(mmc);
+> >>>>  
+> >>>>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
+> >>>> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> >>>> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
+> >>>
+> >>> how about moving usb_bind_phy() calls to omap2430.c ?
+> >>>
+> >>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+> >>> index f44e8b5..b6abc1a 100644
+> >>> --- a/drivers/usb/musb/omap2430.c
+> >>> +++ b/drivers/usb/musb/omap2430.c
+> >>> @@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
+> >>>  
+> >>>  		pdata->board_data	= data;
+> >>>  		pdata->config		= config;
+> >>> +	} else {
+> >>> +		/* bind the PHY */
+> >>> +		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
+> >>
+> >> This looks like a hack IMHO to workaround the usb phy library. otherwise it is
+> >> similar to get_phy_by_name.
+> > 
+> > actually, this is a workaround to the fact that we're not creating all
+> > platform_devices in arch/arm/mach-omap2/ :-)
+> > 
+> > If we had the musb allocation there, we could easily handle
+> > usb_bind_phy()
+> > 
+> >>> so that's temporary. It might be better than to reintroduce the IDR in
+> >>> musb_core.c.
+> >>
+> >> that?s needed for generic phy framework anyway :-s
+> > 
+> > right, but generic phy framework can handle everything just fine, the
+> > only problem is that names are changing.
+> 
+> right. But if the names change, PHY framework wouldn't be able to return the
+> reference to the PHY.
 
-This is unrelated to the work being done here, but noticed that the 
-pixel clock for this panel seems to be too high for the given timings. 
-It puts the refresh rate around 90 Hz, which is odd.
+with my suggestion they can change whenever they want since we're using
+dev_name() of the just-created musb platform_device. Right ?
 
-Archit
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/18f1bcd7/attachment-0001.sig>
