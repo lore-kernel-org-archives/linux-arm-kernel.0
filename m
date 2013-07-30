@@ -1,83 +1,78 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Wed, 31 Jul 2013 00:15:22 +0300
-Subject: [PATCH v2 3/4] ARM: dts: omap4-sdp: add MMC5 (WiLink WLAN)
- configuration
-In-Reply-To: <1375218923-29876-1-git-send-email-coelho@ti.com>
-References: <1375218923-29876-1-git-send-email-coelho@ti.com>
-Message-ID: <1375218923-29876-4-git-send-email-coelho@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Jul 2013 14:21:00 -0700
+Subject: [PATCH 08/11] clk: tegra114: add suspend/resume function for
+ tegar_cpu_car_ops
+In-Reply-To: <1372152475-18617-9-git-send-email-josephl@nvidia.com>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+ <1372152475-18617-9-git-send-email-josephl@nvidia.com>
+Message-ID: <20130730212100.5270.53947@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add regulator, pin muxing and MMC5 configuration to be used by the
-on-board WiLink6 module.
+Quoting Joseph Lo (2013-06-25 02:27:52)
+> Adding suspend/resume function for tegra_cpu_car_ops. We only save and
+> restore the setting of the clock of CoreSight. Other clocks still need
+> to be taken care by clock driver.
+> 
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 
-Signed-off-by: Luciano Coelho <coelho@ti.com>
----
- arch/arm/boot/dts/omap4-sdp.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+Change looks OK to me, besides Stephen's comments. I was waiting for a
+V2 to hit the list but I never saw it. Any plans?
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 7951b4e..3845615 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -140,6 +140,16 @@
- 			"DMic", "Digital Mic",
- 			"Digital Mic", "Digital Mic1 Bias";
- 	};
-+
-+	wilink_wl_en: fixedregulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "wilink_wl_en";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		gpio = <&gpio2 22 0>; /* gpio line 54 */
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
- };
- 
- &omap4_pmx_wkup {
-@@ -166,6 +176,7 @@
- 			&mcbsp2_pins
- 			&dss_hdmi_pins
- 			&tpd12s015_pins
-+			&wilink_pins
- 	>;
- 
- 	uart2_pins: pinmux_uart2_pins {
-@@ -295,6 +306,19 @@
- 			0xf0 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c4_sda */
- 		>;
- 	};
-+
-+	wilink_pins: pinmux_wilink_pins {
-+		pinctrl-single,pins = <
-+			0x7a 0x103      /* gpio_53  INPUT | MODE3 */
-+			0x7c 0x3	/* gpio_54  OUTPUT | MODE3 */
-+			0x148 0x118     /* clk	    INPUT PULLUP | MODE0 */
-+			0x14a 0x118     /* cmd	    INPUT PULLUP | MODE0 */
-+			0x14c 0x118     /* dat0	    INPUT PULLUP | MODE0 */
-+			0x14e 0x118     /* dat1	    INPUT PULLUP | MODE0 */
-+			0x150 0x118     /* dat2	    INPUT PULLUP | MODE0 */
-+			0x152 0x118     /* dat3	    INPUT PULLUP | MODE0 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -420,8 +444,13 @@
- };
- 
- &mmc5 {
-+	status = "okay";
-+	vmmc-supply = <&wilink_wl_en>;
- 	bus-width = <4>;
-+	cap-power-off-card;
-+	keep-power-in-suspend;
- 	ti,non-removable;
-+	ti,needs-special-hs-handling;
- };
- 
- &emif1 {
--- 
-1.8.3.2
+Regards,
+Mike
+
+> ---
+>  drivers/clk/tegra/clk-tegra114.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+> index dbd0428..cd51d75 100644
+> --- a/drivers/clk/tegra/clk-tegra114.c
+> +++ b/drivers/clk/tegra/clk-tegra114.c
+> @@ -258,6 +258,12 @@
+>  #define PMC_PLLM_WB0_OVERRIDE 0x1dc
+>  #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static struct cpu_clk_suspend_context {
+> +       u32 clk_csite_src;
+> +} tegra114_cpu_clk_sctx;
+> +#endif
+> +
+>  static int periph_clk_enb_refcnt[CLK_OUT_ENB_NUM * 32];
+>  
+>  static void __iomem *clk_base;
+> @@ -2107,9 +2113,29 @@ static void tegra114_disable_cpu_clock(u32 cpu)
+>         /* flow controller would take care in the power sequence. */
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static void tegra114_cpu_clock_suspend(void)
+> +{
+> +       /* switch coresite to clk_m, save off original source */
+> +       tegra114_cpu_clk_sctx.clk_csite_src =
+> +                               readl(clk_base + CLK_SOURCE_CSITE);
+> +       writel(3<<30, clk_base + CLK_SOURCE_CSITE);
+> +}
+> +
+> +static void tegra114_cpu_clock_resume(void)
+> +{
+> +       writel(tegra114_cpu_clk_sctx.clk_csite_src,
+> +                                       clk_base + CLK_SOURCE_CSITE);
+> +}
+> +#endif
+> +
+>  static struct tegra_cpu_car_ops tegra114_cpu_car_ops = {
+>         .wait_for_reset = tegra114_wait_cpu_in_reset,
+>         .disable_clock  = tegra114_disable_cpu_clock,
+> +#ifdef CONFIG_PM_SLEEP
+> +       .suspend        = tegra114_cpu_clock_suspend,
+> +       .resume         = tegra114_cpu_clock_resume,
+> +#endif
+>  };
+>  
+>  static const struct of_device_id pmc_match[] __initconst = {
+> -- 
+> 1.8.3.1
