@@ -1,52 +1,63 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Tue, 30 Jul 2013 20:27:28 +0300
-Subject: [PATCH 4/4] arm: dts: omap4-sdp: add WiLink7 device tree node
-In-Reply-To: <1375205248-25708-1-git-send-email-coelho@ti.com>
-References: <1375205248-25708-1-git-send-email-coelho@ti.com>
-Message-ID: <1375205248-25708-5-git-send-email-coelho@ti.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Tue, 30 Jul 2013 13:29:56 -0400
+Subject: Defining schemas for Device Tree
+In-Reply-To: <51F7F596.6020503@wwwdotorg.org>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+ <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
+ <20130730102511.GM9858@sirena.org.uk>
+ <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+ <51F7F596.6020503@wwwdotorg.org>
+Message-ID: <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add appropriate device tree node for Blaze's WiLink7 module.  It uses
-a GPIO as interrupt, so configure the gpio2 node as interrupt parent
-and assign the corresponding GPIO.  Additionally, add the clock
-frequencies used by the module.
+On Tue, Jul 30, 2013 at 1:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>
+> On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
+> > On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
+> >> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
+> >>
+> >>> This...
+> >>> tx-dma-channel = <&pdma0 7>; /* preliminary */
+> >>> rx-dma-channel = <&pdma0 6>; /* preliminary */
+> >>
+> >>> Probably should be
+> >>> dmas = <&pdma0 7>,<&pdma0 6>;
+> >>> dma-names = "tx", "rx";
+> >>
+> >> It should be - the latter is the generic DMA binding.  There's a lot of
+> >> bindings in the kernel that predate that but people are currently
+> >> working to transfer over, this is one of the examples of instability
+> >> that everyone is talking about.
+> >
+> > Is something similar to this possible in device tree syntax?
+> > dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
+>
+> I /think/ you can physically write that in *.dts, or something very
+> similar; with the strings outside the <>:
+>
+> dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+>
+> However, there's been strong push-back (i.e. doing that has not been
+> allowed at all) on attempting to mix variable-length strings and
+> fixed-length/alignment integer cells in the same property. This is
+> primarily because you then can't ensure that the integer cell data is
+> aligned in the DTB (dtc and/or the DTB format spec does/requires/allows
 
-Signed-off-by: Luciano Coelho <coelho@ti.com>
----
- arch/arm/boot/dts/omap4-sdp.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Can we turn the strings into string phandles? Then they'd be fixed sized.
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 3845615..2fecca1 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -150,6 +150,26 @@
- 		startup-delay-us = <70000>;
- 		enable-active-high;
- 	};
-+
-+	wlan {
-+		compatible = "ti,wilink7";
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
-+		clocks = <&refclock &tcxoclock>;
-+		clock-names = "refclock tcxoclock";
-+
-+		refclock: refclock {
-+			compatible = "ti,wilink-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <26000000>;
-+		};
-+
-+		tcxoclock: tcxoclock {
-+			compatible = "ti,wilink-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <26000000>;
-+		};
-+	 };
- };
- 
- &omap4_pmx_wkup {
+That might provide a way to internationalize the strings too.
+
+
+>
+> no alignment padding), and hence have to be much more careful about data
+> alignment when parsing the property.
+
+
+
+
 -- 
-1.8.3.2
+Jon Smirl
+jonsmirl at gmail.com
