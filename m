@@ -1,89 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 30 Jul 2013 10:04:30 -0500
-Subject: [PATCHv4 01/33] CLK: clkdev: add support for looking up clocks
- from DT
-In-Reply-To: <1374564028-11352-2-git-send-email-t-kristo@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-2-git-send-email-t-kristo@ti.com>
-Message-ID: <51F7D5FE.7030003@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Jul 2013 16:04:32 +0100
+Subject: [PATCH v2] ARM: v6: prevent gcc 4.5 from reordering extended
+ CP15 reads above is_smp() test
+In-Reply-To: <alpine.DEB.2.02.1307301125420.4505@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com>
+ <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com>
+ <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+ <20130727122221.GB6618@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307301125420.4505@utopia.booyaka.com>
+Message-ID: <20130730150432.GR11527@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 02:19 AM, Tero Kristo wrote:
-> clk_get_sys / clk_get can now find clocks from device-tree. If a DT clock
-> is found, an entry is added to the clk_lookup list also for subsequent
-> searches.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
+On Tue, Jul 30, 2013 at 12:32:06PM +0100, Paul Walmsley wrote:
+> 
+> Commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc ("ARM: 7757/1: mm:
+> don't flush icache in switch_mm with hardware broadcasting") breaks
+> the boot on OMAP2430SDP with omap2plus_defconfig.  Tracked to an
+> undefined instruction abort from the CP15 read in
+> cache_ops_need_broadcast().  It turns out that gcc 4.5 reorders the
+> extended CP15 read above the is_smp() test.  This breaks ARM1136 r0
+> cores, since they don't support several CP15 registers that later ARM
+> cores do.  ARM1136JF-S TRM section 3.2.1 "Register allocation" has the
+> details.
+> 
+> So mark the extended CP15 read as clobbering memory, which prevents
+> the compiler from reordering it before the is_smp() test.  Russell
+> states that the code generated from this approach is preferable to
+> marking the inline asm as volatile.  Remove the existing condition
+> code clobber as it's obsolete, per Nico's post:
+> 
+>     http://www.spinics.net/lists/arm-kernel/msg261208.html
+> 
+> This patch is a collaboration with Will Deacon and Russell King.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Tony Lindgren <tony@atomide.com>
 > ---
->   drivers/clk/clkdev.c |   32 ++++++++++++++++++++++++++++++++
->   1 file changed, 32 insertions(+)
->
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 442a313..e39f082 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -93,6 +93,18 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
->   EXPORT_SYMBOL(of_clk_get_by_name);
->   #endif
->
-> +/**
-> + * clkdev_add_nolock - add lookup entry for a clock
-> + * @cl: pointer to new clock lookup entry
-> + *
-> + * Non-locking version, used internally by clk_find() to add DT based
-> + * clock lookup entries.
-> + */
-> +static void clkdev_add_nolock(struct clk_lookup *cl)
-> +{
-> +	list_add_tail(&cl->node, &clocks);
-> +}
-> +
->   /*
->    * Find the correct struct clk for the device and connection ID.
->    * We do slightly fuzzy matching here:
-> @@ -106,6 +118,9 @@ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
->   {
->   	struct clk_lookup *p, *cl = NULL;
->   	int match, best_found = 0, best_possible = 0;
-> +	struct device_node *node;
-> +	struct clk *clk;
-> +	struct of_phandle_args clkspec;
->
->   	if (dev_id)
->   		best_possible += 2;
-> @@ -133,6 +148,23 @@ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
->   				break;
->   		}
->   	}
-> +
-> +	if (cl)
-> +		return cl;
-> +
-> +	/* If clock was not found, attempt to look-up from DT */
-> +	node = of_find_node_by_name(NULL, con_id);
-> +
-> +	clkspec.np = node;
-> +
-> +	clk = of_clk_get_from_provider(&clkspec);
-> +
-> +	if (!IS_ERR(clk)) {
-> +		/* We found a clock, add node to clkdev */
-> +		cl = clkdev_alloc(clk, con_id, dev_id);
 
-clkdev_alloc may return NULL depending on vclkdev_alloc in which case 
-clkdev_add_nolock will crash trying to dereference it.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> +		clkdev_add_nolock(cl);
-> +	}
-> +
->   	return cl;
->   }
->
->
-
-
--- 
-Regards,
-Nishanth Menon
+Will
