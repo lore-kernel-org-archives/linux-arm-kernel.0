@@ -1,67 +1,89 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Jul 2013 22:10:06 +0200
-Subject: [PATCH 08/10] ARM: sun7i: DT: Add UART muxing options to the DTSI
-In-Reply-To: <51F80EE9.30801@cogentembedded.com>
-References: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375196394-21138-9-git-send-email-maxime.ripard@free-electrons.com>
- <51F80EE9.30801@cogentembedded.com>
-Message-ID: <20130730201006.GD12562@lukather>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 30 Jul 2013 15:13:40 -0500
+Subject: [PATCHv4 22/33] CLK: OMAP: update gate clock setup for OMAP3
+In-Reply-To: <1374564028-11352-23-git-send-email-t-kristo@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-23-git-send-email-t-kristo@ti.com>
+Message-ID: <51F81E74.9070609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 07/23/2013 02:20 AM, Tero Kristo wrote:
+> OMAP3 gate clocks are handled through the clk driver now. Basic gate
+> clock can't be used as the OMAP3 gate clocks have some special features,
+> namely the idle status linkage which is on separate register.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>   drivers/clk/omap/gate.c |   27 +++++++++++++++++++++++++--
+>   1 file changed, 25 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/omap/gate.c b/drivers/clk/omap/gate.c
+> index 7186bb2..b560ff4 100644
+> --- a/drivers/clk/omap/gate.c
+> +++ b/drivers/clk/omap/gate.c
+> @@ -28,12 +28,19 @@
+>
+>   #ifdef CONFIG_OF
+>
+> -static const struct clk_ops omap_gate_clk_ops = {
+> +static const struct clk_ops omap_gate_clkdm_clk_ops = {
+>   	.init		= &omap2_init_clk_clkdm,
+>   	.enable		= &omap2_clkops_enable_clkdm,
+>   	.disable	= &omap2_clkops_disable_clkdm,
+>   };
+>
+> +static const struct clk_ops omap_gate_clk_ops = {
+> +	.init		= &omap2_init_clk_clkdm,
+> +	.enable		= &omap2_dflt_clk_enable,
+> +	.disable	= &omap2_dflt_clk_disable,
+> +	.is_enabled	= &omap2_dflt_clk_is_enabled,
+> +};
+> +
+>   void __init of_omap_gate_clk_setup(struct device_node *node)
+>   {
+>   	struct clk *clk;
+> @@ -43,6 +50,7 @@ void __init of_omap_gate_clk_setup(struct device_node *node)
+>   	int num_parents;
+>   	const char **parent_names;
+>   	int i;
+> +	u32 val;
+>
+>   	clk_hw = kzalloc(sizeof(struct clk_hw_omap), GFP_KERNEL);
+>   	if (!clk_hw) {
+> @@ -56,7 +64,22 @@ void __init of_omap_gate_clk_setup(struct device_node *node)
+>   	of_property_read_string(node, "ti,clkdm-name", &clk_hw->clkdm_name);
+>
+>   	init.name = clk_name;
+> -	init.ops = &omap_gate_clk_ops;
+> +	init.flags = 0;
+> +
+> +	if (of_property_read_u32_index(node, "reg", 0, &val)) {
+> +		/* No register, clkdm control only */
+> +		init.ops = &omap_gate_clkdm_clk_ops;
+> +	} else {
+> +		init.ops = &omap_gate_clk_ops;
+> +		clk_hw->enable_reg = of_iomap(node, 0);
+> +		of_property_read_u32(node, "ti,enable-bit", &val);
+> +		clk_hw->enable_bit = val;
+> +
+> +		if (of_property_read_bool(node, "ti,dss-clk"))
+> +			clk_hw->ops = &clkhwops_omap3430es2_dss_usbhost_wait;
 
-On Tue, Jul 30, 2013 at 11:07:21PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 07/30/2013 06:59 PM, Maxime Ripard wrote:
-> 
-> >The UARTs on the A20 can be muxed to several pins. Add a few options to
-> >the DTSI so that we can start using them in the boards' DT.
-> 
-> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >---
-> >  arch/arm/boot/dts/sun7i-a20.dtsi | 21 +++++++++++++++++++++
-> >  1 file changed, 21 insertions(+)
-> 
-> >diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> >index 704fca9..9f45e8d 100644
-> >--- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> >+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> >@@ -70,6 +70,27 @@
-> >  			#address-cells = <1>;
-> >  			#size-cells = <0>;
-> >  			#gpio-cells = <3>;
-> >+
-> >+			uart0_pins_a: uart0 at 0 {
-> 
->    Why have address part of the node name if there's not "reg" property?
+umm, it was going relatively ok so far, till i hit this :( it is 
+probably a quirk... but still..
 
-It allows to easily differentiate distinct pin groups for the same IP.
+> +		else
+> +			clk_hw->ops = &clkhwops_wait;
+> +	}
+>
+>   	num_parents = of_clk_get_parent_count(node);
+>   	if (num_parents < 1) {
+>
 
-A second group of pin that can be muxed to uart0 would be defined as
-uart0_pins_b: uart0 at 1.
-
-I could have used any other construct, like uart0-0 and uart0-1, I just
-find that it fits more in the usual DT constructs.
-
-> And the preferred node name is "serial", not "uart", according to
-> the ePAPR spec (http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf).
-
-But only for actual serial driver right? This is a pinctrl group
-declaration.
-
-Thanks,
-Maxime
+but still no usage of "ti,omap-gate-clock" makes me question the need 
+for this file.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/10421948/attachment.sig>
+Regards,
+Nishanth Menon
