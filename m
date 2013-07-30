@@ -1,75 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Jul 2013 22:31:15 +0200
-Subject: [linux-sunxi] [PATCH 04/10] pinctrl: sunxi: Wrap long compatible
- declaration lines
-In-Reply-To: <1375196953.32691.61.camel@kazak.uk.xensource.com>
-References: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375196394-21138-5-git-send-email-maxime.ripard@free-electrons.com>
- <1375196953.32691.61.camel@kazak.uk.xensource.com>
-Message-ID: <20130730203115.GE12562@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 30 Jul 2013 21:45:11 +0100
+Subject: [PATCH v6 2/8] ASoC: atmel: machine driver for at91sam9x5-wm8731
+ boards
+In-Reply-To: <51F7FBA8.6080400@wwwdotorg.org>
+References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
+ <1375180329-4860-3-git-send-email-richard.genoud@gmail.com>
+ <51F7FBA8.6080400@wwwdotorg.org>
+Message-ID: <20130730204511.GX9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+On Tue, Jul 30, 2013 at 11:45:12AM -0600, Stephen Warren wrote:
+> On 07/30/2013 04:32 AM, Richard Genoud wrote:
 
-On Tue, Jul 30, 2013 at 04:09:13PM +0100, Ian Campbell wrote:
-> On Tue, 2013-07-30 at 16:59 +0200, Maxime Ripard wrote:
-> > The compatible declaration and their associated data are exceeding the
-> > 80-characters width limit.
-> > 
-> > Split these lines to make them more readable and fit in the kernel
-> > coding guidelines.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> >  drivers/pinctrl/pinctrl-sunxi.c | 20 ++++++++++++++++----
-> >  1 file changed, 16 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-> > index 5985e60..246310b 100644
-> > --- a/drivers/pinctrl/pinctrl-sunxi.c
-> > +++ b/drivers/pinctrl/pinctrl-sunxi.c
-> > @@ -628,10 +628,22 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
-> >  }
-> >  
-> >  static struct of_device_id sunxi_pinctrl_match[] = {
-> > -	{ .compatible = "allwinner,sun4i-a10-pinctrl", .data = (void *)&sun4i_a10_pinctrl_data },
-> > -	{ .compatible = "allwinner,sun5i-a10s-pinctrl", .data = (void *)&sun5i_a10s_pinctrl_data },
-> > -	{ .compatible = "allwinner,sun5i-a13-pinctrl", .data = (void *)&sun5i_a13_pinctrl_data },
-> > -	{ .compatible = "allwinner,sun6i-a31-pinctrl", .data = (void *)&sun6i_a31_pinctrl_data },
-> > +	{
-> > +		.compatible = "allwinner,sun4i-a10-pinctrl",
-> > +		.data = (void *)&sun4i_a10_pinctrl_data,
-> > +	},
-> 
-> I'm not sure this is actually an improvement, the original reads quite
-> naturally even if it is a little long. What about a #define such that
-> you can write:
->          COMPAT("allwinner,sun4i-a10-pinctrl", sun4i_a10_pinctrl_data),
-> and thereby stay within 80-chars?
-> 
-> If you wanted to go overboard you could code the macro such that:
->         SUNXI_COMPAT(sun4i,a10),
-> expanded to what you want, that's pretty obfuscated though.
+> > +wm8731 pins:
+> > +cf Documentation/devicetree/bindings/sound/wm8731.txt
 
-To be honest, I'm not convinced by any of the constructs seen above. The
-one we had is too long, the 4-lines one is not that great either, and
-the macro only obfuscates things away.
+> In the Tegra bindings, I deliberately put the list of CODEC pins into
+> the audio complex binding rather than the CODEC binding. That's because
 
-You know what, I'll drop this patch.
+You really shouldn't do this, it's not accomplishing much.
 
-Thanks!
-Maxime
+> I'm not sure that in the long-term we want to use strings to identify
+> the CODEC pins, rather than using integers. By putting the list orf
+> CODEC pins in the audio complex binding rather than the CODEC binding, I
+> didn't lumber the CODEC binding with a list of strings that it had to
+> support forever.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+How would you create the numbers - you can't use the pin numbers since
+BGA type packages have alphanumeric ball identifiers?  Even with
+numerical pin numbering ou'd need to specify some defines for this not
+to be totally awful at which point you may as well have the strings
+documented since you'd end up writing a table in the binding document
+that's basically a mapping of pin names to numbers,
+
+> One reason that strings are problematic is because they can't be mixed
+> with integers/phandles in the same property, so if we ever end up with
+> more generic audio bindings where the routing table is expressed more like:
+
+> audio-routes = <&component_a $a_pin &component_b $b_pin>;
+
+> ... in order to allow completely arbitrary and fully name-spaced routing
+> specification[1], then $a_pin and $b_pin need to be integers not strings.
+
+The above is going to be legibility challenged without defines at which
+point the strings end up appearing in the binding document anyway.
+
+Besides, you're stuck with the names you picked anyway so you may as
+well put them in the CODEC driver binding document so that anyone else
+using the same CODEC can reuse that bit of work.
+
+> [1] and perhaps we can get rid of properties like
+> audio-codec/ssc-controller, and automatically deduce which components
+> are needed simply by finding all phandles in the audio-routes property.
+
+> Perhaps the solution here is to allow mixing phandles/integers/strings
+> in one property, but that's potentially quite a large change to the DTB
+> format; we'd need to introduce type fields into the property data, and
+> other data format changes.
+
+I really do think this is a DT failure which ought to be addressed
+there; people are working around this with things like parallel arrays
+with names and phandles which aren't awesome once the arrays get to be
+any size.
+
+One option that seems sensible is to introduce syntactic sugar which
+will do the parallel arrays trick automatically - the actual DT that
+gets output could still be two arrays with indexes that match up (so no
+impact on parsers) but the DT author would be able to write an array of
+(phandle, string) tuples or something instead of having to line up two
+arrays.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/5afa76e1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/9ad5b386/attachment-0001.sig>
