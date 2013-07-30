@@ -1,69 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Jul 2013 13:56:50 +0100
-Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <51F7B4C9.2060500@gmail.com>
-References: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
- <51F7B4C9.2060500@gmail.com>
-Message-ID: <20130730125650.GD28716@e106331-lin.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 30 Jul 2013 16:57:06 +0400
+Subject: [PATCH 5/5] ARM: shmobile: ape6evm: add SDHI interfaces
+In-Reply-To: <f79d68da510bf1b95beff4d556b78d06801f11dc.1375174556.git.horms+renesas@verge.net.au>
+References: <cover.1375174556.git.horms+renesas@verge.net.au>
+ <f79d68da510bf1b95beff4d556b78d06801f11dc.1375174556.git.horms+renesas@verge.net.au>
+Message-ID: <51F7B822.7020404@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 01:42:49PM +0100, Rob Herring wrote:
-> On 07/30/2013 04:49 AM, Mark Rutland wrote:
-> > On Mon, Jul 29, 2013 at 09:18:43PM +0100, Rob Herring wrote:
-> >> On 07/29/2013 05:13 AM, Mark Rutland wrote:
-> >>> Hi Rob,
-> >>>
-> >>> On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
-> >>>> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> [snip]
-> 
-> >>> One of the things changed in PSCI 0.2 was the SMC calling convention,
-> >>> though this isn't clear in the PSCI document. The function IDs for 32bit
-> >>> and 64bit callers may differ, and we need to support describing an
-> >>> arbitrary configuration of the two (same ID for both, different across
-> >>> 32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
-> >>>
-> >>> I'd like to ensure the binding can deal with that from the start. We
-> >>> could do this by having -32 and -64 variants of each function id (e.g.
-> >>> cpu_off-64) , if the IDs actually differ, and use the regular combined
-> >>> ID if they don't.
-> >>
-> >> Uggg. I guess I should have read the SMC calling convention doc... I was
-> >> simply documenting what is already in the PSCI doc, but obviously that
-> >> is not fully flushed out.
-> >>
-> >> How about something like this (for the complicated case of both 32 and
-> >> 64 bit):
-> >>
-> >> 	method		= "smc", "smc64";
-> >> 	psci_version	= <0x84000000 0xc4000000>;
-> >> 	cpu_suspend	= <0x84000001 0xc4000001>;
-> >> 	cpu_off		= <0x84000002 0xc4000002>;
-> >> 	cpu_on		= <0x84000003 0xc4000003>;
-> >>
-> >> "smc" is a synonym for smc32 for compatibility. The number and order of
-> >> methods determines the number and order of function IDs.
-> > 
-> > While this may be compatible with the arm implementation, it won't be
-> > compatible with the arm64 implementation, which assumes smc64 by
-> > default.
-> > 
-> > As far as I am aware, the implementations currently in use (KVM and Xen)
-> > use the same ID for both, so I think "smc" should cover an ID valid for
-> > a native register width calling convention, and "smc64" and "smc32"
-> > describing values only valid for 64-bit wide and 32-bit wide calling
-> > conventions respectively.
-> 
-> The problem is that does not work for a 32-bit kernel on 64-bit h/w as
-> native from the dts perspective is smc64. Just like the cpu bindings,
-> the binding cannot change based on 32 or 64 bit OS. I don't think we
-> really have to deal with that here. We can simply say "smc" is only for
-> "arm,psci" and deprecated for "arm,psci-0.2".
+Hello.
 
-Agreed. I'd be happy with only having "smc32" and "smc64" for
-"arm,psci-0.2".
+On 30-07-2013 13:00, Simon Horman wrote:
 
-Thanks,
-Mark.
+> From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+> Add support for SDHI0 and SDHI1 on APE6EVM in PIO mode only.
+
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/board-ape6evm.c | 50 +++++++++++++++++++++++++++++++++-
+>   1 file changed, 49 insertions(+), 1 deletion(-)
+
+> diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+> index 8c7529c..ccf8b04 100644
+> --- a/arch/arm/mach-shmobile/board-ape6evm.c
+> +++ b/arch/arm/mach-shmobile/board-ape6evm.c
+[...]
+> @@ -75,6 +82,29 @@ static struct resource mmcif0_resources[] = {
+>   	DEFINE_RES_IRQ(gic_spi(169)),
+>   };
+>
+> +/* SDHI0 */
+> +static struct sh_mobile_sdhi_info sdhi0_pdata = {
+> +	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
+> +	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ,
+> +};
+> +
+> +static struct resource sdhi0_resources[] = {
+> +	DEFINE_RES_MEM_NAMED(0xee100000, 0x100, "SDHI0"),
+> +	DEFINE_RES_IRQ(gic_spi(165)),
+> +};
+> +
+> +/* SDHI1 */
+> +static struct sh_mobile_sdhi_info sdhi1_pdata = {
+> +	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
+> +	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+> +			  MMC_CAP_NEEDS_POLL,
+> +};
+> +
+> +static struct resource sdhi1_resources[] = {
+> +	DEFINE_RES_MEM_NAMED(0xee120000, 0x100, "SDHI1"),
+> +	DEFINE_RES_IRQ(gic_spi(166)),
+> +};
+> +
+
+    All of the above are lacking '__initdata' annothation (the resources and 
+platform data will be kmemdup()'ed when registering the platform devices). Too 
+bad I've noticed this too late...
+
+> @@ -124,6 +166,12 @@ static void __init ape6evm_add_standard_devices(void)
+>   	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
+>   					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
+>   					  &mmcif0_pdata, sizeof(mmcif0_pdata));
+> +	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 0,
+> +					  sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
+> +					  &sdhi0_pdata, sizeof(sdhi0_pdata));
+> +	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 1,
+> +					  sdhi1_resources, ARRAY_SIZE(sdhi1_resources),
+> +					  &sdhi1_pdata, sizeof(sdhi1_pdata));
+>   }
+
+WBR, Sergei
