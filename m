@@ -1,52 +1,154 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 30 Jul 2013 16:09:13 +0100
-Subject: [linux-sunxi] [PATCH 04/10] pinctrl: sunxi: Wrap long
- compatible declaration lines
-In-Reply-To: <1375196394-21138-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375196394-21138-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1375196953.32691.61.camel@kazak.uk.xensource.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 30 Jul 2013 10:21:49 -0500
+Subject: [PATCHv4 02/33] clk: omap: introduce clock driver
+In-Reply-To: <1374564028-11352-3-git-send-email-t-kristo@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-3-git-send-email-t-kristo@ti.com>
+Message-ID: <51F7DA0D.7060709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-07-30 at 16:59 +0200, Maxime Ripard wrote:
-> The compatible declaration and their associated data are exceeding the
-> 80-characters width limit.
-> 
-> Split these lines to make them more readable and fit in the kernel
-> coding guidelines.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+On 07/23/2013 02:19 AM, Tero Kristo wrote:
+> Parses OMAP clock data from DT and registers those clocks with the clock
+> framework.  dt_omap_clk_init must be called early during boot for timer
+> initialization so it is exported and called from the existing clock code
+> instead of probing like a real driver. Based on initial work done by
+> Mike Turquette.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
 > ---
->  drivers/pinctrl/pinctrl-sunxi.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-> index 5985e60..246310b 100644
-> --- a/drivers/pinctrl/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/pinctrl-sunxi.c
-> @@ -628,10 +628,22 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
->  }
->  
->  static struct of_device_id sunxi_pinctrl_match[] = {
-> -	{ .compatible = "allwinner,sun4i-a10-pinctrl", .data = (void *)&sun4i_a10_pinctrl_data },
-> -	{ .compatible = "allwinner,sun5i-a10s-pinctrl", .data = (void *)&sun5i_a10s_pinctrl_data },
-> -	{ .compatible = "allwinner,sun5i-a13-pinctrl", .data = (void *)&sun5i_a13_pinctrl_data },
-> -	{ .compatible = "allwinner,sun6i-a31-pinctrl", .data = (void *)&sun6i_a31_pinctrl_data },
-> +	{
-> +		.compatible = "allwinner,sun4i-a10-pinctrl",
-> +		.data = (void *)&sun4i_a10_pinctrl_data,
-> +	},
+>   drivers/clk/Makefile      |    1 +
+>   drivers/clk/omap/Makefile |    1 +
+>   drivers/clk/omap/clk.c    |   39 +++++++++++++++++++++++++++++++++++++++
 
-I'm not sure this is actually an improvement, the original reads quite
-naturally even if it is a little long. What about a #define such that
-you can write:
-         COMPAT("allwinner,sun4i-a10-pinctrl", sun4i_a10_pinctrl_data),
-and thereby stay within 80-chars?
+Minor suggestion - should we just start drivers/clk/ti/ instead of clk/omap?
 
-If you wanted to go overboard you could code the macro such that:
-        SUNXI_COMPAT(sun4i,a10),
-expanded to what you want, that's pretty obfuscated though.
+AM335x/DRA7 are not "strictly OMAP".. might also allow for some reuse 
+for other TI platforms..
 
-Ian.
+>   include/linux/clk/omap.h  |   24 ++++++++++++++++++++++++
+>   4 files changed, 65 insertions(+)
+>   create mode 100644 drivers/clk/omap/Makefile
+>   create mode 100644 drivers/clk/omap/clk.c
+>   create mode 100644 include/linux/clk/omap.h
+>
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 4038c2b..d3c3733 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
+>   obj-$(CONFIG_ARCH_ZYNQ)		+= zynq/
+>   obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+>   obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
+> +obj-$(CONFIG_ARCH_OMAP)		+= omap/
+>
+>   obj-$(CONFIG_X86)		+= x86/
+>
+> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
+> new file mode 100644
+> index 0000000..8195931
+> --- /dev/null
+> +++ b/drivers/clk/omap/Makefile
+> @@ -0,0 +1 @@
+> +obj-y					+= clk.o
+> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
+> new file mode 100644
+> index 0000000..4bf1929
+> --- /dev/null
+> +++ b/drivers/clk/omap/clk.c
+> @@ -0,0 +1,39 @@
+> +/*
+> + * OMAP PRCM clock driver
+
+maybe then prcm-clk.c ?
+
+> + *
+> + * Copyright (C) 2013 Texas Instruments, Inc.
+> + *     Tero Kristo <t-kristo@ti.com>
+> + *     Mike Turquette <mturquette@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk/omap.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of_device.h>
+> +
+> +/* FIXME - should the OMAP PRCM clock driver match generic types? */
+
+should it? :)
+
+> +static const struct of_device_id clk_match[] = {
+> +	{.compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+drivers/clk/clk-fixed-rate.c seems to already do this with 
+CLK_OF_DECLARE, or am I mistaken? and so on?
+> +	{.compatible = "mux-clock", .data = of_mux_clk_setup, },
+> +	{.compatible = "fixed-factor-clock",
+> +		.data = of_fixed_factor_clk_setup, },
+> +	{.compatible = "divider-clock", .data = of_divider_clk_setup, },
+> +	{.compatible = "gate-clock", .data = of_gate_clk_setup, },
+> +	{},
+> +};
+> +
+> +/* FIXME - need to initialize early; skip real driver registration & probe */
+> +int __init dt_omap_clk_init(void)
+
+Might be good to have kernel doc to explain the init requirement as 
+documented in commit message.
+
+> +{
+> +	of_clk_init(clk_match);
+
+just doing of_clk_init(NULL); should do the job, no? that could even be 
+a static inline OR introduced in board_generic without additional headers?
+
+> +	return 0;
+> +}
+> diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
+> new file mode 100644
+> index 0000000..647f02f
+> --- /dev/null
+> +++ b/include/linux/clk/omap.h
+> @@ -0,0 +1,24 @@
+> +/*
+> + * Copyright (C) 2013 Texas Instruments, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+
+would you like to match licensing to that of the C file?
+
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +
+> +#ifndef __LINUX_CLK_OMAP_H_
+> +#define __LINUX_CLK_OMAP_H_
+> +
+> +int __init dt_omap_clk_init(void);
+> +
+> +#endif
+>
+
+
+-- 
+Regards,
+Nishanth Menon
