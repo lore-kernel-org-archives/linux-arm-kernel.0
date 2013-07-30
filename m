@@ -1,238 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Jul 2013 16:44:19 +0200
-Subject: [PATCH 1/4] clk: sunxi: Rename the structure to prepare the addition
- of sun6i
-In-Reply-To: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1375195462-19566-2-git-send-email-maxime.ripard@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Jul 2013 15:55:01 +0100
+Subject: [Patch V2 4/4] ARM: dts: AM33XX: update rtc node compatibility
+In-Reply-To: <51F749B0.7020802@ti.com>
+References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
+ <51F749B0.7020802@ti.com>
+Message-ID: <20130730145501.GA29859@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename all the generic-named structure to sun4i to avoid confusion when
-we will introduce the sun6i (A31) clocks.
+On Tue, Jul 30, 2013 at 06:05:52AM +0100, Gururaja Hebbar wrote:
+> Hi,
+> 
+> On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
+> > Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
+> >
+> > Update the rtc compatible property to "ti,am3352-rtc" to enable handling
+> > of this feature inside rtc-omap driver.
+> 
+> The other 2 rtc driver related patches have been pulled up. If you have 
+> no comments, can you please pull this up.
+> 
+> Regards
+> Gururaja
+> 
+> >
+> > Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> > ---
+> > :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
+> >   arch/arm/boot/dts/am33xx.dtsi |    2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> > index 77aa1b0..dde180a 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -297,7 +297,7 @@
+> >   		};
+> >
+> >   		rtc at 44e3e000 {
+> > -			compatible = "ti,da830-rtc";
+> > +			compatible = "ti,am3352-rtc";
 
-While we're at it, avoid too long lines and wrap the DT compatibles
-tables.
+Given that this is backwards compatible with the old binding, it would
+be nicer to have this as:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi/clk-sunxi.c | 108 +++++++++++++++++++++++++++++-------------
- 1 file changed, 75 insertions(+), 33 deletions(-)
+	compatible = "ti,am3352-rtc", "ti,da830-rtc";
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index fe1528e..3c91888 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -25,12 +25,12 @@
- static DEFINE_SPINLOCK(clk_lock);
- 
- /**
-- * sunxi_osc_clk_setup() - Setup function for gatable oscillator
-+ * sun4i_osc_clk_setup() - Setup function for gatable oscillator
-  */
- 
- #define SUNXI_OSC24M_GATE	0
- 
--static void __init sunxi_osc_clk_setup(struct device_node *node)
-+static void __init sun4i_osc_clk_setup(struct device_node *node)
- {
- 	struct clk *clk;
- 	struct clk_fixed_rate *fixed;
-@@ -73,13 +73,13 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
- 
- 
- /**
-- * sunxi_get_pll1_factors() - calculates n, k, m, p factors for PLL1
-+ * sun4i_get_pll1_factors() - calculates n, k, m, p factors for PLL1
-  * PLL1 rate is calculated as follows
-  * rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
-  * parent_rate is always 24Mhz
-  */
- 
--static void sunxi_get_pll1_factors(u32 *freq, u32 parent_rate,
-+static void sun4i_get_pll1_factors(u32 *freq, u32 parent_rate,
- 				   u8 *n, u8 *k, u8 *m, u8 *p)
- {
- 	u8 div;
-@@ -127,12 +127,12 @@ static void sunxi_get_pll1_factors(u32 *freq, u32 parent_rate,
- 
- 
- /**
-- * sunxi_get_apb1_factors() - calculates m, p factors for APB1
-+ * sun4i_get_apb1_factors() - calculates m, p factors for APB1
-  * APB1 rate is calculated as follows
-  * rate = (parent_rate >> p) / (m + 1);
-  */
- 
--static void sunxi_get_apb1_factors(u32 *freq, u32 parent_rate,
-+static void sun4i_get_apb1_factors(u32 *freq, u32 parent_rate,
- 				   u8 *n, u8 *k, u8 *m, u8 *p)
- {
- 	u8 calcm, calcp;
-@@ -178,7 +178,7 @@ struct factors_data {
- 	void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
- };
- 
--static struct clk_factors_config pll1_config = {
-+static struct clk_factors_config sun4i_pll1_config = {
- 	.nshift = 8,
- 	.nwidth = 5,
- 	.kshift = 4,
-@@ -189,21 +189,21 @@ static struct clk_factors_config pll1_config = {
- 	.pwidth = 2,
- };
- 
--static struct clk_factors_config apb1_config = {
-+static struct clk_factors_config sun4i_apb1_config = {
- 	.mshift = 0,
- 	.mwidth = 5,
- 	.pshift = 16,
- 	.pwidth = 2,
- };
- 
--static const __initconst struct factors_data pll1_data = {
--	.table = &pll1_config,
--	.getter = sunxi_get_pll1_factors,
-+static const __initconst struct factors_data sun4i_pll1_data = {
-+	.table = &sun4i_pll1_config,
-+	.getter = sun4i_get_pll1_factors,
- };
- 
--static const __initconst struct factors_data apb1_data = {
--	.table = &apb1_config,
--	.getter = sunxi_get_apb1_factors,
-+static const __initconst struct factors_data sun4i_apb1_data = {
-+	.table = &sun4i_apb1_config,
-+	.getter = sun4i_get_apb1_factors,
- };
- 
- static void __init sunxi_factors_clk_setup(struct device_node *node,
-@@ -239,11 +239,11 @@ struct mux_data {
- 	u8 shift;
- };
- 
--static const __initconst struct mux_data cpu_mux_data = {
-+static const __initconst struct mux_data sun4i_cpu_mux_data = {
- 	.shift = 16,
- };
- 
--static const __initconst struct mux_data apb1_mux_data = {
-+static const __initconst struct mux_data sun4i_apb1_mux_data = {
- 	.shift = 24,
- };
- 
-@@ -284,17 +284,17 @@ struct div_data {
- 	u8 pow;
- };
- 
--static const __initconst struct div_data axi_data = {
-+static const __initconst struct div_data sun4i_axi_data = {
- 	.shift = 0,
- 	.pow = 0,
- };
- 
--static const __initconst struct div_data ahb_data = {
-+static const __initconst struct div_data sun4i_ahb_data = {
- 	.shift = 4,
- 	.pow = 1,
- };
- 
--static const __initconst struct div_data apb0_data = {
-+static const __initconst struct div_data sun4i_apb0_data = {
- 	.shift = 8,
- 	.pow = 1,
- };
-@@ -413,35 +413,77 @@ CLK_OF_DECLARE(sunxi_osc, "allwinner,sun4i-osc-clk", sunxi_osc_clk_setup);
- 
- /* Matches for factors clocks */
- static const __initconst struct of_device_id clk_factors_match[] = {
--	{.compatible = "allwinner,sun4i-pll1-clk", .data = &pll1_data,},
--	{.compatible = "allwinner,sun4i-apb1-clk", .data = &apb1_data,},
-+	{
-+		.compatible = "allwinner,sun4i-pll1-clk",
-+		.data = &sun4i_pll1_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun4i-apb1-clk",
-+		.data = &sun4i_apb1_data,
-+	},
- 	{}
- };
- 
- /* Matches for divider clocks */
- static const __initconst struct of_device_id clk_div_match[] = {
--	{.compatible = "allwinner,sun4i-axi-clk", .data = &axi_data,},
--	{.compatible = "allwinner,sun4i-ahb-clk", .data = &ahb_data,},
--	{.compatible = "allwinner,sun4i-apb0-clk", .data = &apb0_data,},
-+	{
-+		.compatible = "allwinner,sun4i-axi-clk",
-+		.data = &sun4i_axi_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun4i-ahb-clk",
-+		.data = &sun4i_ahb_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun4i-apb0-clk",
-+		.data = &sun4i_apb0_data,
-+	},
- 	{}
- };
- 
- /* Matches for mux clocks */
- static const __initconst struct of_device_id clk_mux_match[] = {
--	{.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_mux_data,},
--	{.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &apb1_mux_data,},
-+	{
-+		.compatible = "allwinner,sun4i-cpu-clk",
-+		.data = &sun4i_cpu_mux_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun4i-apb1-mux-clk",
-+		.data = &sun4i_apb1_mux_data,
-+	},
- 	{}
- };
- 
- /* Matches for gate clocks */
- static const __initconst struct of_device_id clk_gates_match[] = {
--	{.compatible = "allwinner,sun4i-axi-gates-clk", .data = &sun4i_axi_gates_data,},
--	{.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
--	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
--	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
--	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
--	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
--	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
-+	{
-+		.compatible = "allwinner,sun4i-axi-gates-clk",
-+		.data = &sun4i_axi_gates_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun4i-ahb-gates-clk",
-+		.data = &sun4i_ahb_gates_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun5i-a13-ahb-gates-clk",
-+		.data = &sun5i_a13_ahb_gates_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun4i-apb0-gates-clk",
-+		.data = &sun4i_apb0_gates_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun5i-a13-apb0-gates-clk",
-+		.data = &sun5i_a13_apb0_gates_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun4i-apb1-gates-clk",
-+		.data = &sun4i_apb1_gates_data,
-+	},
-+	{
-+		.compatible = "allwinner,sun5i-a13-apb1-gates-clk",
-+		.data = &sun5i_a13_apb1_gates_data,
-+	},
- 	{}
- };
- 
--- 
-1.8.3.4
+We must get into the habit of changing dts files in a
+backwards-compatible fashion.
+
+Thanks,
+Mark.
