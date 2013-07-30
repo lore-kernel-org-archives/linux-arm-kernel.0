@@ -1,60 +1,71 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Jul 2013 10:16:11 +0300
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <51F7613C.5070803@ti.com>
-References: <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
- <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
- <20130730060134.GD9155@radagast> <51F7590B.4020705@ti.com>
- <20130730061830.GE9155@radagast> <51F75C40.4060406@ti.com>
- <20130730062844.GH9155@radagast> <51F7613C.5070803@ti.com>
-Message-ID: <20130730071611.GD16441@radagast>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Jul 2013 09:39:17 +0200
+Subject: [PATCH] gpio/mxc: add chained_irq_enter/exit() to
+ mx2_gpio_irq_handler
+In-Reply-To: <CACRpkdZjsAOtm2Jt7kY-VC2ToFfMQ+UxjWQE7aUZAbsBt0ugvw@mail.gmail.com>
+References: <1374152286-12955-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdZjsAOtm2Jt7kY-VC2ToFfMQ+UxjWQE7aUZAbsBt0ugvw@mail.gmail.com>
+Message-ID: <20130730073917.GL1754@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-On Tue, Jul 30, 2013 at 12:16:20PM +0530, Kishon Vijay Abraham I wrote:
-> >>>> the list of controller device (names) it can support (PHY framework does not
-> >>>> maintain a separate list for binding like how we had in USB PHY library). e.g.
-> >>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92817.html. In such
-> >>>
-> >>> this has nothing to do with $subject though. We talk about generic PHY
-> >>> framework once all these PHY drivers are moved there :-)
-> >>>
-> >>>> cases how do we pass the device names. Also will the MUSB core device be
-> >>>> created before twl4030-usb PHY device?
-> >>>
-> >>> and why would that be a problem ? We're telling the framework that the
-> >>> musb device will use a phy with a name of 'twl4030'. If musb calls
-> >>> usb_get_phy_dev() and doesn't find a phy, it'll return -EPROBE_DEFER and
-> >>> try again later.
-> >>
-> >> I think we are talking about different problems here ;-) I'm trying to tell
-> >> using idr in MUSB core is needed for Generic PHY Framework. So in a way, the
-> >> Generic PHY Framework series depends on this patch series or else MUSB in OMAP3
-> >> platforms wont work after Generic PHY framework gets merged.
-> > 
-> > then you just found a limitation in your framework, right ? :-) I mean,
-> > imagine if now we have to add an IDR to every single user of your
-> > framework because they could end up in systems with multiple instances
-> > of the same IP ?
+On Mon, Jul 29, 2013 at 05:51:17PM +0200, Linus Walleij wrote:
+> On Thu, Jul 18, 2013 at 2:58 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
 > 
-> I raised a similar concern in the PHY framework discussion [1] :-) And since
-> it's used everywhere else regulators, clkdev, etc.. it's agreed to be used in
-> PHY as well. Btw if PLATFORM_DEVID_AUTO is used even regulator, clk_get should
-> fail IMO.
+> > Similar to commit
+> >
+> >         0e44b6e (gpio/mxc: add chained_irq_enter/exit() to mx3_gpio_irq_handler())
+> >
+> > . It doesn't seem to be critical to make the irqs work, but still it is
+> > more correct.
+> >
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> [1] -> http://lkml.indiana.edu/hypermail/linux/kernel/1307.2/03573.html
+> Patch is fine, but looks like this to me:
+> 
+> Content-Transfer-Encoding: base64
+> 
+> Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
+> Errors-To: linux-arm-kernel-bounces+linus.walleij=linaro.org at lists.infradead.org
+> 
+> U2ltaWxhciB0byBjb21taXQKCgkwZTQ0YjZlIChncGlvL214YzogYWRkIGNoYWluZWRfaXJxX2Vu
+> dGVyL2V4aXQoKSB0byBteDNfZ3Bpb19pcnFfaGFuZGxlcigpKQoKLiBJdCBkb2Vzbid0IHNlZW0g
+> dG8gYmUgY3JpdGljYWwgdG8gbWFrZSB0aGUgaXJxcyB3b3JrLCBidXQgc3RpbGwgaXQgaXMKbW9y
+> ZSBjb3JyZWN0LgoKU2lnbmVkLW9mZi1ieTogVXdlIEtsZWluZS1Lw7ZuaWcgPHUua2xlaW5lLWtv
+> ZW5pZ0BwZW5ndXRyb25peC5kZT4KLS0tCkhlbGxvLAoKbm90ZSB0aGlzIGlzIGNvbXBsZXRlbHkg
+> dW50ZXN0ZWQuCgpVd2UKCiBkcml2ZXJzL2dwaW8vZ3Bpby1teGMuYyB8IDQgKysrKwogMSBmaWxl
+> 
+> The encoding is what screw things up.
+That means git is unable to apply base64 encoded mail? Hmm, testing with
+git 1.8.3.2 (from Debian) I can apply the base64 encoded patch.
+Does your git have 87ab799234639c26ea10de74782fa511cb3ca606 (i.e. is
+older than 1.5.1)?
 
-look at Greg's and my reply to that email.
+> Can you see if you can resend this without using base64?
+The version I got back via the kernel at pengutronix.de address has:
+
+	Content-Type: text/plain; charset=UTF-8
+	Content-Transfer-Encoding: 8bit
+
+and the content is readable just fine in an editor. My copy I got via
+the linux-arm-kernel subscription is base64 encoded, too. So a mail
+server on the way to you reencodes my mail. At gmane
+(http://article.gmane.org/gmane.linux.ports.arm.kernel/252948/raw) it's
+already base64. According to the Received: headers it can only be
+casper.infradead.org or merlin.infradead.org.
+
+I found
+
+	http://mail.python.org/pipermail/mailman-users/2008-September/063286.html
+
+which is really annoying. I'll bounce you the original.
+
+Best regards
+Uwe
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/a74b90be/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
