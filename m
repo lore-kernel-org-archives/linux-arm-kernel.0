@@ -1,134 +1,38 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 30 Jul 2013 10:27:51 -0400
-Subject: ARM CPU Hotplug breakage on mach-shmobile and KZM9D
-In-Reply-To: <20130730074939.GE7210@verge.net.au>
-References: <CANqRtoRx7voEVwJG8UNNy_Jiixo=uRJCvxTD0bZdzVohoryBUA@mail.gmail.com>
- <20130725010607.GB31464@verge.net.au> <20130730074939.GE7210@verge.net.au>
-Message-ID: <51F7CD67.6020209@windriver.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 30 Jul 2013 15:30:51 +0100
+Subject: [PATCH] arm: update advice on kernel and FDT load address.
+In-Reply-To: <20130730140451.GQ24642@n2100.arm.linux.org.uk>
+References: <1375102578-5869-1-git-send-email-ian.campbell@citrix.com>
+ <20130729135000.GK32383@mudshark.cambridge.arm.com>
+ <1375106635.12741.8.camel@kazak.uk.xensource.com>
+ <alpine.LFD.2.03.1307292234040.15022@syhkavp.arg>
+ <1375192570.32691.27.camel@kazak.uk.xensource.com>
+ <20130730140451.GQ24642@n2100.arm.linux.org.uk>
+Message-ID: <1375194651.32691.52.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-07-30 03:49 AM, Simon Horman wrote:
-> [ Cc Paul Gortmaker ]
+On Tue, 2013-07-30 at 15:04 +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 30, 2013 at 02:56:10PM +0100, Ian Campbell wrote:
+> > Actually I've just noticed that the existing text in
+> > Documentation/arm/Booting only talks about zImage and 32KiB, so perhaps
+> > not worrying about non-zImage is acceptable?
 > 
-> On Thu, Jul 25, 2013 at 10:06:07AM +0900, Simon Horman wrote:
->> On Thu, Jul 25, 2013 at 12:15:49AM +0900, Magnus Damm wrote:
->>> Hi everyone,
->>>
->>> Bad news: CPU Hotplug on KZM9D seems broken on recent kernels.
->>>
->>> On renesas-next-20130710 or earlier I can perform the following:
->>>
->>> # echo 0 > /sys/devices/system/cpu/cpu1/online
->>> CPU1: shutdown
->>> # echo 1 > /sys/devices/system/cpu/cpu1/online
->>> CPU1: Booted secondary processor
->>> #
->>>
->>> While on more recent kernels the hotplug boot fails. This may be
->>> related to the move to v3.11-rc. The tag renesas-next-20130710
->>> surprisingly seems to be the final kernel based on v3.10-rc before
->>> jumping to v3.11-rc.
->>>
->>> I wonder, do other ARM platforms have working CPU Hotplug in v3.11-rc?
->>
->> I have a snowball that I could test if you think it would be useful.
+> Straight binary kernels have tighter requirements, because they're _not_
+> entirely position independent.  Firstly, with dynamic physical offset,
+> they calculate that based on their position in physical space when
+> they're first called.
 > 
-> Unfortunately getting snowball to work turned out to be rather painful.
-> So instead I bisected the problem on the KZM9G (N.b: the D in the subject
-> seems to be incorrect :^)
-> 
-> The result is that the following patch, added in v3.11-rc1,
-> appears to be the culprit.
+> So, with a PAGE_OFFSET of 0xc0000000 and a link address of 0xc0008000,
+> a binary kernel image better be placed at 0xXXXX8000, and it _will_
+> assume that RAM starts 32KiB below itself.  And yes, the 32KiB offset
+> applies as the kernel uses TEXTADDR-16KiB to store the initial page
+> tables.
 
-Double check that you have this commit present:
- ---------------
-commit 8c69d7af12265e5be9326110b695e010b47505bd
-Author: Stephen Warren <swarren@nvidia.com>
-Date:   Fri Jul 5 22:59:42 2013 +0100
+OK, so in the non-zImage case 32KiB is a Requirement and not just a
+recommendation. I'll update things to that affect.
 
-    ARM: 7780/1: add missing linker section markup to head-common.S
- ---------------
+This is turning out to be more complicated to write down than I
+imagined!
 
-as I think you are reporting the same problem that it fixed.
-
-Thanks,
-Paul.
---
-
-> 
-> commit 22f0a27367742f65130c0fb25ef00f7297e032c1
-> Author: Paul Gortmaker <paul.gortmaker@windriver.com>
-> Date:   Mon Jun 17 18:34:14 2013 -0400
-> 
->     init.h: remove __cpuinit sections from the kernel
->     
->     The __cpuinit type of throwaway sections might have made sense
->     some time ago when RAM was more constrained, but now the savings
->     do not offset the cost and complications.  For example, the fix in
->     commit 5e427ec2d0 ("x86: Fix bit corruption at CPU resume time")
->     is a good example of the nasty type of bugs that can be created
->     with improper use of the various __init prefixes.
->     
->     After a discussion on LKML[1] it was decided that cpuinit should go
->     the way of devinit and be phased out.  Once all the users are gone,
->     we can then finally remove the macros themselves from linux/init.h.
->     
->     As an interim step, we can dummy out the macros to be no-ops, and
->     this will allow us to avoid a giant tree-wide patch, and instead
->     we can feed in smaller chunks mainly via the arch/ trees.  This
->     is in keeping with commit 78d86c213f28193082b5d8a1a424044b7ba406f1
->     ("init.h: Remove __dev* sections from the kernel")
->     
->     We don't strictly need to dummy out the macros to do this, but if
->     we don't then some harmless section mismatch warnings may temporarily
->     result.  For example, notify_cpu_starting() and cpu_up() are arch
->     independent (kernel/cpu.c) and are flagged as __cpuinit.  And hence
->     the calling functions in the arch specific code are also expected
->     to be __cpuinit -- if not, then we get the section mismatch warning.
->     
->     Two of the three __CPUINIT variants are not used whatsoever, and
->     so they are simply removed directly at this point in time.
->     
->     [1] https://lkml.org/lkml/2013/5/20/589
->     
->     Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> 
-> diff --git a/include/linux/init.h b/include/linux/init.h
-> index 8618147..e73f2b70 100644
-> --- a/include/linux/init.h
-> +++ b/include/linux/init.h
-> @@ -93,13 +93,13 @@
->  
->  #define __exit          __section(.exit.text) __exitused __cold notrace
->  
-> -/* Used for HOTPLUG_CPU */
-> -#define __cpuinit        __section(.cpuinit.text) __cold notrace
-> -#define __cpuinitdata    __section(.cpuinit.data)
-> -#define __cpuinitconst   __constsection(.cpuinit.rodata)
-> -#define __cpuexit        __section(.cpuexit.text) __exitused __cold notrace
-> -#define __cpuexitdata    __section(.cpuexit.data)
-> -#define __cpuexitconst   __constsection(.cpuexit.rodata)
-> +/* temporary, until all users are removed */
-> +#define __cpuinit
-> +#define __cpuinitdata
-> +#define __cpuinitconst
-> +#define __cpuexit
-> +#define __cpuexitdata
-> +#define __cpuexitconst
->  
->  /* Used for MEMORY_HOTPLUG */
->  #define __meminit        __section(.meminit.text) __cold notrace
-> @@ -118,9 +118,8 @@
->  #define __INITRODATA	.section	".init.rodata","a",%progbits
->  #define __FINITDATA	.previous
->  
-> -#define __CPUINIT        .section	".cpuinit.text", "ax"
-> -#define __CPUINITDATA    .section	".cpuinit.data", "aw"
-> -#define __CPUINITRODATA  .section	".cpuinit.rodata", "a"
-> +/* temporary, until all users are removed */
-> +#define __CPUINIT
->  
->  #define __MEMINIT        .section	".meminit.text", "ax"
->  #define __MEMINITDATA    .section	".meminit.data", "aw"
-> 
+Ian.
