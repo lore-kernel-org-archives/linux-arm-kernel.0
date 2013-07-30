@@ -1,135 +1,66 @@
 From: coelho@ti.com (Luciano Coelho)
-Date: Tue, 30 Jul 2013 16:04:33 +0300
-Subject: [PATCH v4 5/8] wlcore: add initial device tree support to the sdio
- module
+Date: Tue, 30 Jul 2013 16:04:34 +0300
+Subject: [PATCH v4 6/8] wlcore: sdio: add wilink clock providers
 In-Reply-To: <1375189476-21557-1-git-send-email-coelho@ti.com>
 References: <1375189476-21557-1-git-send-email-coelho@ti.com>
-Message-ID: <1375189476-21557-6-git-send-email-coelho@ti.com>
+Message-ID: <1375189476-21557-7-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If platform data is not available, try to get the required information
-from the device tree.  Register an OF match table and parse the
-appropriate device tree nodes.
+Add refclock and tcxoclock as clock providers in WiLink.  These clocks
+are not accesible outside the WiLink module, but they are registered
+in the clock framework anyway.  Only the WiLink chip consumes these
+clocks.
 
-Parse interrupt property only, for now.
+In theory, the WiLink chip could be connected to external clocks
+instead of using these internal clocks, so make the clock consumer
+code generic enough.  If external clocks are used, then the internal
+clock device tree nodes are not necessary, but the external ones must
+be specified.
 
 Signed-off-by: Luciano Coelho <coelho@ti.com>
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/net/wireless/ti/wlcore/sdio.c | 69 ++++++++++++++++++++++++++++++++---
- 1 file changed, 63 insertions(+), 6 deletions(-)
+ drivers/net/wireless/ti/wlcore/sdio.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
-index 4c7e8ac..9370d7e 100644
+index 9370d7e..980bf3d 100644
 --- a/drivers/net/wireless/ti/wlcore/sdio.c
 +++ b/drivers/net/wireless/ti/wlcore/sdio.c
-@@ -30,7 +30,7 @@
- #include <linux/mmc/sdio_ids.h>
- #include <linux/mmc/card.h>
- #include <linux/mmc/host.h>
--#include <linux/gpio.h>
-+#include <linux/of_irq.h>
+@@ -34,6 +34,7 @@
  #include <linux/wl12xx.h>
  #include <linux/pm_runtime.h>
  #include <linux/printk.h>
-@@ -214,6 +214,43 @@ static struct wl1271_if_operations sdio_ops = {
++#include <linux/clk-provider.h>
+ 
+ #include "wlcore.h"
+ #include "wl12xx_80211.h"
+@@ -214,10 +215,15 @@ static struct wl1271_if_operations sdio_ops = {
  	.set_block_size = wl1271_sdio_set_block_size,
  };
  
-+static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
-+{
-+	struct wl12xx_platform_data *pdata;
-+	struct device_node *np = dev->of_node;
++static const struct of_device_id wlcore_sdio_of_clk_match_table[] = {
++	{ .compatible = "ti,wilink-clock" },
++};
 +
-+	if (!np) {
-+		np = of_find_matching_node(NULL, dev->driver->of_match_table);
-+		if (!np) {
-+			dev_notice(dev, "device tree node not available\n");
-+			pdata = ERR_PTR(-ENODEV);
-+			goto out;
-+		}
-+	}
-+
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		dev_err(dev, "can't allocate platform data\n");
-+		pdata = ERR_PTR(-ENODEV);
-+		goto out;
-+	}
-+
-+	pdata->irq = irq_of_parse_and_map(np, 0);
-+	if (pdata->irq < 0) {
-+		dev_err(dev, "can't get interrupt gpio from the device tree\n");
-+		goto out_free;
-+	}
-+
-+	goto out;
-+
-+out_free:
-+	kfree(pdata);
-+	pdata = ERR_PTR(-ENODEV);
-+
-+out:
-+	return pdata;
-+}
-+
- static int wl1271_probe(struct sdio_func *func,
- 				  const struct sdio_device_id *id)
+ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
  {
-@@ -248,11 +285,22 @@ static int wl1271_probe(struct sdio_func *func,
- 	/* Use block mode for transferring over one block size of data */
- 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
+ 	struct wl12xx_platform_data *pdata;
+ 	struct device_node *np = dev->of_node;
++	struct device_node *clock_node;
  
-+	/* The pdata allocated here is freed when the device is freed,
-+	 * so we don't need an additional out label to free it in case
-+	 * of error further on.
-+	 */
-+
-+	/* Try to get legacy platform data from the board file */
- 	pdev_data->pdata = wl12xx_get_platform_data();
- 	if (IS_ERR(pdev_data->pdata)) {
--		ret = PTR_ERR(pdev_data->pdata);
--		dev_err(glue->dev, "missing wlan platform data: %d\n", ret);
--		goto out_free_glue;
-+		dev_info(&func->dev,
-+			 "legacy platform data not found, trying device tree\n");
-+
-+		pdev_data->pdata = wlcore_get_pdata_from_of(&func->dev);
-+		if (IS_ERR(pdev_data->pdata)) {
-+			dev_err(&func->dev, "can't get platform data\n");
-+			goto out_free_glue;
-+		}
+ 	if (!np) {
+ 		np = of_find_matching_node(NULL, dev->driver->of_match_table);
+@@ -241,6 +247,9 @@ static struct wl12xx_platform_data *wlcore_get_pdata_from_of(struct device *dev)
+ 		goto out_free;
  	}
  
- 	/* if sdio can keep power while host is suspended, enable wow */
-@@ -386,16 +434,25 @@ static const struct dev_pm_ops wl1271_sdio_pm_ops = {
- };
- #endif
- 
-+static const struct of_device_id wlcore_sdio_of_match_table[] = {
-+	{ .compatible = "ti,wilink6" },
-+	{ .compatible = "ti,wilink7" },
-+	{ .compatible = "ti,wilink8" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, wlcore_sdio_of_match_table);
++	for_each_matching_node(clock_node, wlcore_sdio_of_clk_match_table)
++		of_fixed_clk_setup(clock_node);
 +
- static struct sdio_driver wl1271_sdio_driver = {
- 	.name		= "wl1271_sdio",
- 	.id_table	= wl1271_devices,
- 	.probe		= wl1271_probe,
- 	.remove		= wl1271_remove,
--#ifdef CONFIG_PM
- 	.drv = {
-+#ifdef CONFIG_PM
- 		.pm = &wl1271_sdio_pm_ops,
--	},
- #endif
-+		.of_match_table = of_match_ptr(wlcore_sdio_of_match_table),
-+	},
- };
+ 	goto out;
  
- static int __init wl1271_init(void)
+ out_free:
 -- 
 1.8.3.2
