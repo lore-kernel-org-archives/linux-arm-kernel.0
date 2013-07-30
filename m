@@ -1,34 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 30 Jul 2013 12:46:17 +0100
-Subject: [PATCH 5/5] mmc: pxamci: Indicate that regulators may be absent
-In-Reply-To: <1375184777-25404-1-git-send-email-broonie@kernel.org>
-References: <1375184777-25404-1-git-send-email-broonie@kernel.org>
-Message-ID: <1375184777-25404-5-git-send-email-broonie@kernel.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 30 Jul 2013 13:54:04 +0200
+Subject: [PATCH 01/22] ARM: ux500: Remove '0x's from HREF v60+ DTS file
+In-Reply-To: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
+References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130730115403.GA29992@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Fri 2013-07-19 14:58:32, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Use regulator_get_optional() to tell the core that requests for regulators
-can fail in a real system.
+Why?
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/mmc/host/pxamci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+									Pavel
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 2c5a91b..1956a3d 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -83,7 +83,7 @@ struct pxamci_host {
- static inline void pxamci_init_ocr(struct pxamci_host *host)
- {
- #ifdef CONFIG_REGULATOR
--	host->vcc = regulator_get(mmc_dev(host->mmc), "vmmc");
-+	host->vcc = regulator_get_optional(mmc_dev(host->mmc), "vmmc");
- 
- 	if (IS_ERR(host->vcc))
- 		host->vcc = NULL;
+> diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+> index 3d580d6..46fd8af 100644
+> --- a/arch/arm/boot/dts/hrefv60plus.dts
+> +++ b/arch/arm/boot/dts/hrefv60plus.dts
+> @@ -26,7 +26,7 @@
+>  
+>  	soc {
+>  		i2c at 80110000 {
+> -			bu21013_tp at 0x5c {
+> +			bu21013_tp at 5c {
+>  				reset-gpio = <&gpio4 15 0x4>;
+>  			};
+>  		};
+
 -- 
-1.8.3.2
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
