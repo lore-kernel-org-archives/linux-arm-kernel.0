@@ -1,42 +1,70 @@
 From: B44344@freescale.com (Arpit Goel)
-Date: Tue, 30 Jul 2013 18:08:18 +0530
-Subject: [PATCH 0/2] Make PPC macro spin_event_timeout() architecture
- independent
-Message-ID: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+Date: Tue, 30 Jul 2013 18:08:20 +0530
+Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
+ architecture independent macro
+In-Reply-To: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+Message-ID: <1375187900-17582-3-git-send-email-B44344@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set moves USECS_PER_JIFFY to architecture timex.h from architecture
-specific C files. Patch-set further uses this to make PPC macro
-spin_event_timeout() architecture independent. This change enables drivers to
-use spin_event_timeout() even in non-PowerPC based SoC's.
+This patch ports PowerPC implementation of spin_event_timeout() for generic
+use. Architecture specific implementation can be added to asm/delay.h, which
+will override the generic linux implementation.
 
-This patchset has been compiled for ARM, PowerPC and x86.
+Signed-off-by: Arpit Goel <B44344@freescale.com>
+---
+ include/linux/delay.h | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-Patch[1/2] : Moves USECS_PER_JIFFY to architecture specific timex.h files from
-	     architecture specific C files.
-
-Patch[2/2] : Converts PPC macro spin_event_timeout() in architecture independent
-	     macro.
-
-Arpit Goel (2):
-  Make USECS_PER_JIFFY available for generic use
-  Convert PowerPC macro spin_event_timeout() to architecture independent
-        macro
-
- arch/arm/include/asm/timex.h      |  2 ++
- arch/arm/kernel/time.c            |  3 ---
- arch/m32r/include/asm/timex.h     |  2 ++
- arch/m32r/kernel/time.c           |  3 ---
- arch/m68k/hp300/time.c            |  4 +---
- arch/m68k/include/asm/timex.h     |  2 ++
- arch/s390/include/asm/timex.h     |  2 ++
- arch/s390/kernel/time.c           |  2 --
- arch/sparc/include/asm/timex_32.h |  2 ++
- arch/sparc/include/asm/timex_64.h |  2 ++
- arch/sparc/kernel/pcic.c          |  1 -
- include/linux/delay.h             | 40 +++++++++++++++++++++++++++++++++++++++
- 12 files changed, 53 insertions(+), 12 deletions(-)
-
+diff --git a/include/linux/delay.h b/include/linux/delay.h
+index a6ecb34..e975994 100644
+--- a/include/linux/delay.h
++++ b/include/linux/delay.h
+@@ -52,4 +52,44 @@ static inline void ssleep(unsigned int seconds)
+ 	msleep(seconds * 1000);
+ }
+ 
++#ifndef spin_event_timeout
++/**
++ * spin_event_timeout - spin until a condition gets true or a timeout elapses
++ * @condition: a C expression to evalate
++ * @timeout: timeout, in microseconds
++ * @delay: the number of microseconds to delay between each evaluation of
++ *         @condition
++ *
++ * The process spins until the condition evaluates to true (non-zero) or the
++ * timeout elapses.  The return value of this macro is the value of
++ * @condition when the loop terminates. This allows you to determine the cause
++ * of the loop terminates.  If the return value is zero, then you know a
++ * timeout has occurred.
++ *
++ * This primary purpose of this macro is to poll on a hardware register
++ * until a status bit changes.  The timeout ensures that the loop still
++ * terminates even if the bit never changes.  The delay is for devices that
++ * need a delay in between successive reads.
++ *
++ * gcc will optimize out the if-statement if @delay is a constant.
++ *
++ * This is copied from PowerPC based spin_event_timeout() implementation
++ * and modified for generic usecase.
++ */
++#define spin_event_timeout(condition, timeout, delay)		\
++({								\
++	typeof(condition) __ret;				\
++	unsigned long __loops = timeout/USECS_PER_JIFFY;	\
++	unsigned long __start = jiffies;			\
++	while (!(__ret = (condition)) &&			\
++		time_before(jiffies, __start + __loops + 1))	\
++		if (delay)					\
++			udelay(delay);				\
++		else						\
++			schedule();				\
++	if (!__ret)						\
++		__ret = (condition);				\
++	__ret;							\
++})
++#endif
+ #endif /* defined(_LINUX_DELAY_H) */
 -- 
 1.8.1.4
