@@ -1,44 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Jul 2013 11:00:20 +0200
-Subject: [PATCH 07/10] pinctrl: sunxi: Add Allwinner A31 pins set
-In-Reply-To: <CACRpkdZ1RhsLMC0xWDDr9Hmy78i+uU-9x0-2Y+_NvRZ-yefmVw@mail.gmail.com>
-References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
- <1374618312-19001-8-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdZ1RhsLMC0xWDDr9Hmy78i+uU-9x0-2Y+_NvRZ-yefmVw@mail.gmail.com>
-Message-ID: <20130730090020.GF1441@lukather>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 30 Jul 2013 18:00:41 +0900
+Subject: [PATCH 0/5] Renesas ARM-based SoC board updates for v3.12
+Message-ID: <cover.1375174556.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Olof, Hi Arnd,
 
-On Mon, Jul 29, 2013 at 06:20:13PM +0200, Linus Walleij wrote:
-> On Wed, Jul 24, 2013 at 12:25 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> 
-> > The Allwinner A31 SoC uses the same IP than the one found in the
-> > A10/A13, with only different pins. Add the pins and the associated
-> > functions found in the A31.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Will you carry this through ARM SoC or do you want me to merge
-> this into the pinctrl tree? It seems pretty independent.
+please consider these Renesas ARM-based SoC board updates for v3.12.
+This pull-request is based on renesas-soc-for-v3.12 which I have previously
+sent a pull-request for.
 
-I'd prefer if you could merge it through the pinctrl tree.
+The following changes since commit 81b9d5351fa96caad4accc6711bc1b9342927d4a:
 
-Thanks!
-Maxime
+  ARM: shmobile: Setup r8a7790 arch timer based on MD pins (2013-07-17 14:26:56 +0900)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/045c63a8/attachment.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
+
+for you to fetch changes up to f79d68da510bf1b95beff4d556b78d06801f11dc:
+
+  ARM: shmobile: ape6evm: add SDHI interfaces (2013-07-25 14:46:38 +0900)
+
+----------------------------------------------------------------
+Renesas ARM-based SoC board updates for v3.12
+
+* ape6evm: Add SDHI and MMCIF support
+* lager: Add MMCIF support
+* armadillo800eva: Add DMA support for MMCIF
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (4):
+      ARM: shmobile: armadillo800eva: add DMA support to MMCIF
+      ARM: shmobile: lager: add MMCIF support
+      ARM: shmobile: ape6evm: add MMCIF support
+      ARM: shmobile: ape6evm: add SDHI interfaces
+
+Kuninori Morimoto (1):
+      ARM: shmobile: select the fixed regulator driver on BockW
+
+ arch/arm/mach-shmobile/Kconfig                 |  1 +
+ arch/arm/mach-shmobile/board-ape6evm.c         | 79 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/board-armadillo800eva.c |  2 +
+ arch/arm/mach-shmobile/board-lager.c           | 31 ++++++++++
+ 4 files changed, 113 insertions(+)
