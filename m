@@ -1,133 +1,81 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 30 Jul 2013 12:32:09 +0200
-Subject: [PATCH v6 8/8] ASoC: sam9x5: get codec MCLK via device tree
-In-Reply-To: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
-References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1375180329-4860-9-git-send-email-richard.genoud@gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 30 Jul 2013 12:37:24 +0200
+Subject: [PATCH v2 00/13] Remove platform callbacks from mmc_spi,
+ sh_mmcif and sh_mobile_sdhi drivers
+Message-ID: <1375180657-23641-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having the clock rate hard coded, and thus, only compatible
-with one board, we can make it compatible with other implementations.
+Hello,
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- .../bindings/sound/atmel-sam9x5-wm8731-audio.txt     |    4 ++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi                  |    8 ++++++++
- sound/soc/atmel/sam9x5_wm8731.c                      |   18 ++++++++++++++----
- 3 files changed, 26 insertions(+), 4 deletions(-)
+This patch set replaces callbacks to board code with regulators and GPIOs in
+the mmc_spi, sh_mmcif and sh_mobile_sdhi MMC drivers.
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt b/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
-index 0720857..114a4c5 100644
---- a/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
-+++ b/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
-@@ -8,6 +8,8 @@ Required properties:
-   - atmel,audio-routing: A list of the connections between audio components.
-     Each entry is a pair of strings, the first being the connection's sink,
-     the second being the connection's source.
-+  - clocks: Must contain an entry for the codec master clock.
-+  - clock-names : Must be "mclk" (clock that feeds the codec master clock)
- 
- Available audio endpoints for the audio-routing table:
- 
-@@ -32,4 +34,6 @@ sound {
- 
- 	atmel,ssc-controller = <&ssc0>;
- 	atmel,audio-codec = <&wm8731>;
-+	clocks = <&sound_crystal 0>;
-+	clock-names = "mclk";
- };
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 9afe15b..b5ff17c 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -114,6 +114,12 @@
- 		};
- 	};
- 
-+	sound_crystal: osc at 0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency  = <12288000>;
-+	};
-+
- 	sound {
- 		compatible = "atmel,sam9x5-wm8731-audio";
- 
-@@ -127,5 +133,7 @@
- 
- 		atmel,ssc-controller = <&ssc0>;
- 		atmel,audio-codec = <&wm8731>;
-+		clocks = <&sound_crystal 0>;
-+		clock-names = "mclk";
- 	};
- };
-diff --git a/sound/soc/atmel/sam9x5_wm8731.c b/sound/soc/atmel/sam9x5_wm8731.c
-index 992ae38..f33c181 100644
---- a/sound/soc/atmel/sam9x5_wm8731.c
-+++ b/sound/soc/atmel/sam9x5_wm8731.c
-@@ -23,6 +23,8 @@
- #include <linux/mod_devicetable.h>
- #include <linux/platform_device.h>
- #include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
- 
- #include <sound/soc.h>
- #include <sound/soc-dai.h>
-@@ -31,12 +33,10 @@
- #include "../codecs/wm8731.h"
- #include "atmel_ssc_dai.h"
- 
--
--#define MCLK_RATE 12288000
--
- #define DRV_NAME "sam9x5-snd-wm8731"
- 
- struct sam9x5_drvdata {
-+	struct clk *mclk;
- 	int ssc_id;
- };
- 
-@@ -46,6 +46,7 @@ struct sam9x5_drvdata {
- static int sam9x5_wm8731_init(struct snd_soc_pcm_runtime *rtd)
- {
- 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	struct sam9x5_drvdata *priv = snd_soc_card_get_drvdata(rtd->card);
- 	struct device *dev = rtd->dev;
- 	int ret;
- 
-@@ -53,7 +54,8 @@ static int sam9x5_wm8731_init(struct snd_soc_pcm_runtime *rtd)
- 
- 	/* set the codec system clock for DAC and ADC */
- 	ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_XTAL,
--				     MCLK_RATE, SND_SOC_CLOCK_IN);
-+				     clk_get_rate(priv->mclk),
-+				     SND_SOC_CLOCK_IN);
- 	if (ret < 0) {
- 		dev_err(dev, "ASoC: Failed to set WM8731 SYSCLK: %d\n", ret);
- 		return ret;
-@@ -142,6 +144,13 @@ static int sam9x5_wm8731_driver_probe(struct platform_device *pdev)
- 
- 	priv->ssc_id = of_alias_get_id(cpu_np, "ssc");
- 
-+	priv->mclk = devm_clk_get(&pdev->dev, "mclk");
-+	if (IS_ERR(priv->mclk)) {
-+		ret = PTR_ERR(priv->mclk);
-+		dev_err(&pdev->dev, "Failed to get MCLK: %d\n", ret);
-+		goto out;
-+	}
-+
- 	ret = atmel_ssc_set_audio(priv->ssc_id);
- 	if (ret != 0) {
- 		dev_err(&pdev->dev,
-@@ -153,6 +162,7 @@ static int sam9x5_wm8731_driver_probe(struct platform_device *pdev)
- 	of_node_put(codec_np);
- 	of_node_put(cpu_np);
- 
-+	snd_soc_card_set_drvdata(card, priv);
- 	platform_set_drvdata(pdev, card);
- 
- 	ret = snd_soc_register_card(card);
+Most of the required infrastructure is in place already on the drivers side,
+except for CD debouncing support in the MMC core and CD/RO GPIOs support in
+the mmc_spi driver. The series thus starts with patches 01/13 and 02/13 that
+add those features to the MMC core and mmc_spi driver.
+
+Patches 03/13 to 06/13 remove the board callbacks from the ecovec24 and
+vision_ep9307 boards. The code has been compile-tested only as I don't have
+access to those boards.
+
+Patches 07/13 to 13/13 then proceed to remove the callbacks from the drivers
+themselves and from the platform data structures.
+
+This will be a bit messy to merge, as the series interleaves patches for
+drivers and board files. Given that the mmc_spi driver is marked as orphan in
+MAINTAINERS and that the vision_ep9307 hasn't seen any board-specific
+modification in the last couple of kernel versions one option would be to
+merge all patches (or at least patches 01/13 to 07/13) through Simon's tree if
+all involved maintainers agree.
+
+If patch 01/13 should better be merged through the MMC tree (in which case
+02/13 should go through that tree as well), the two patches should be applied
+first to the MMC tree, and a stable branch will be needed for Simon to base
+the rest of the series on.
+
+The series is based on tag renesas-devel-20130730v2 from
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+
+Laurent Pinchart (13):
+  mmc: slot-gpio: Add debouncing capability to mmc_gpio_request_cd()
+  mmc: mmc_spi: Support CD/RO GPIOs
+  ARM: ep93xx: vision_ep9307: Use MMC CD and RO GPIO
+  sh: ecovec24: Use MMC/SDHI CD and RO GPIO
+  sh: ecovec24: Remove mmcif .down_pwr() callback
+  sh: ecovec24: Remove MMCIF and SDHI .set_pwr() callbacks
+  mmc: mmc_spi: Remove platform data .get_cd() and .get_ro() callbacks
+  mmc: sh_mmcif: Remove .down_pwr() callback from platform data
+  mmc: sh_mmcif: Remove .set_pwr() callback from platform data
+  mmc: sh_mobile_sdhi: Remove .get_cd() callback from platform data
+  mmc: sh_mobile_sdhi: Remove .set_pwr() callback from platform data
+  mmc: tmio-mmc: Remove .get_cd() callback from platform data
+  mmc: tmio-mmc: Remove .set_pwr() callback from platform data
+
+ arch/arm/mach-ep93xx/vision_ep9307.c | 57 ++---------------------
+ arch/sh/boards/mach-ecovec24/setup.c | 89 ++++--------------------------------
+ drivers/mmc/core/host.c              |  2 +-
+ drivers/mmc/core/slot-gpio.c         | 14 +++++-
+ drivers/mmc/host/jz4740_mmc.c        |  2 +-
+ drivers/mmc/host/mmc_spi.c           | 49 +++++++++-----------
+ drivers/mmc/host/mvsdio.c            |  3 +-
+ drivers/mmc/host/of_mmc_spi.c        | 46 +++++--------------
+ drivers/mmc/host/sdhci-esdhc-imx.c   |  2 +-
+ drivers/mmc/host/sdhci-pxav3.c       |  3 +-
+ drivers/mmc/host/sdhci-sirf.c        |  2 +-
+ drivers/mmc/host/sh_mmcif.c          |  5 +-
+ drivers/mmc/host/sh_mobile_sdhi.c    | 18 --------
+ drivers/mmc/host/tmio_mmc.h          |  1 -
+ drivers/mmc/host/tmio_mmc_pio.c      | 25 +---------
+ include/linux/mfd/tmio.h             |  2 -
+ include/linux/mmc/sh_mmcif.h         |  2 -
+ include/linux/mmc/sh_mobile_sdhi.h   |  2 -
+ include/linux/mmc/slot-gpio.h        |  3 +-
+ include/linux/spi/mmc_spi.h          | 19 +++++---
+ 20 files changed, 86 insertions(+), 260 deletions(-)
+
 -- 
-1.7.10.4
+Regards,
+
+Laurent Pinchart
