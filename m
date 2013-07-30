@@ -1,123 +1,178 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 30 Jul 2013 18:09:20 +0900
-Subject: [PATCH v6 2/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
-References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1375175361-23027-3-git-send-email-horms+renesas@verge.net.au>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 30 Jul 2013 10:15:16 +0100
+Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value to
+ index into save array
+In-Reply-To: <alpine.LFD.2.03.1307292155040.15022@syhkavp.arg>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130729115016.GA6184@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1307292155040.15022@syhkavp.arg>
+Message-ID: <20130730091511.GA2478@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Mon, Jul 29, 2013 at 10:08:06PM -0400, Nicolas Pitre wrote:
+> On Mon, 29 Jul 2013, Lorenzo Pieralisi wrote:
+> 
+> > On Tue, Jul 23, 2013 at 04:31:17AM +0100, Nicolas Pitre wrote:
+> > > Currently we hash the MPIDR of the CPU being suspended to determine which
+> > > entry in the sleep_save_sp array to use. In some situations, such as when
+> > > we want to resume on another physical CPU, the MPIDR of another CPU should
+> > > be used instead.
+> > > 
+> > > So let's use the value of cpu_logical_map(smp_processor_id()) in place
+> > > of the MPIDR in the suspend path.  This will result in the same index
+> > > being used as with the previous code unless the caller has modified
+> > > cpu_logical_map() beforehand.
+> > 
+> > I will rely on your wisdom to rewrite the commit log in a way that
+> > does not hint at dangerous creativity, if you catch my drift :D
+> 
+> I've augmented it with some of the earlier comments from Dave Martin.  
+> I think it is fine to be clear in the commit log about what we intend 
+> this change to be used for.
+> 
+> > > The register allocation in __cpu_suspend is reworked in order to better
+> > > accommodate the additional argument.
+> > > 
+> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > ---
+> > >  arch/arm/kernel/sleep.S   | 25 +++++++++++--------------
+> > >  arch/arm/kernel/suspend.c |  8 +++++---
+> > >  2 files changed, 16 insertions(+), 17 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> > > index db1536b8b3..836d10e698 100644
+> > > --- a/arch/arm/kernel/sleep.S
+> > > +++ b/arch/arm/kernel/sleep.S
+> > > @@ -55,6 +55,7 @@
+> > >   * specific registers and some other data for resume.
+> > >   *  r0 = suspend function arg0
+> > >   *  r1 = suspend function
+> > > + *  r2 = MPIDR value used to index into sleep_save_sp
+> > 
+> > CPU's MPIDR or something like that, let's not hint at possible creative usage.
+> 
+> What about "MPIDR of the CPU to be resumed" which should normally just 
+> be the current CPU's?
+> 
+> After all, creativity is not always a bad thing given it is reviewed 
+> properly.
 
----
+OK, sounds reasonable.
 
-This patch has a run-time dependency on "sh_eth: add support for r8a7790 SoC".
+> 
+> > >   */
+> > >  ENTRY(__cpu_suspend)
+> > >  	stmfd	sp!, {r4 - r11, lr}
+> > > @@ -67,23 +68,19 @@ ENTRY(__cpu_suspend)
+> > >  	mov	r5, sp			@ current virtual SP
+> > >  	add	r4, r4, #12		@ Space for pgd, virt sp, phys resume fn
+> > >  	sub	sp, sp, r4		@ allocate CPU state on stack
+> > > -	stmfd	sp!, {r0, r1}		@ save suspend func arg and pointer
+> > > -	add	r0, sp, #8		@ save pointer to save block
+> > > -	mov	r1, r4			@ size of save block
+> > > -	mov	r2, r5			@ virtual SP
+> > >  	ldr	r3, =sleep_save_sp
+> > > +	stmfd	sp!, {r0, r1}		@ save suspend func arg and pointer
+> > >  	ldr	r3, [r3, #SLEEP_SAVE_SP_VIRT]
+> > > -	ALT_SMP(mrc p15, 0, r9, c0, c0, 5)
+> > > -        ALT_UP_B(1f)
+> > > -	ldr	r8, =mpidr_hash
+> > > -	/*
+> > > -	 * This ldmia relies on the memory layout of the mpidr_hash
+> > > -	 * struct mpidr_hash.
+> > > -	 */
+> > > -	ldmia	r8, {r4-r7}	@ r4 = mpidr mask (r5,r6,r7) = l[0,1,2] shifts
+> > > -	compute_mpidr_hash	lr, r5, r6, r7, r9, r4
+> > > -	add	r3, r3, lr, lsl #2
+> > > +	ALT_SMP(ldr r0, =mpidr_hash)
+> > > +       ALT_UP_B(1f)
+> > 
+> > Should be a tab, do not know if that's an email server issue or not.
+> 
+> Amistake on my part.
+> 
+> > > +	/* This ldmia relies on the memory layout of the mpidr_hash struct */
+> > > +	ldmia	r0, {r1, r6-r8}	@ r1 = mpidr mask (r6,r7,r8) = l[0,1,2] shifts
+> > > +	compute_mpidr_hash	r0, r6, r7, r8, r2, r1
+> > > +	add	r3, r3, r0, lsl #2
+> > >  1:
+> > > +	mov	r2, r5			@ virtual SP
+> > > +	mov	r1, r4			@ size of save block
+> > > +	add	r0, sp, #8		@ pointer to save block
+> > 
+> > It is already a bit complex to follow, code is ok, but line above was
+> > better placed closer to sp last change, not after hashing the MPIDR.
+> 
+> Well, I tend to disagree.  I think it is much clearer to set function 
+> arguments closer to the call site so that r0 doesn't have to be live 
+> with the stack location throughout this code.
 
-v6
-* Correct first argument of PIN_MAP_MUX_GROUP_DEFAULT()
-  to use "r8a7790-ether" instead of "sh-eth".
-* Remove bogus "IRQ0" comment in ether_resources[]
+Fair point, but I'm happy either way.
 
-v5
-* As suggested by Laurent Pinchart
-  - Do not use eth_magic pinmux group, that pin is not used on Lager
-* As suggested by Morimoto-san and Magnus Damm
-  - Refactor moving all setup code into boards-lager.c
+With or without, feel free to add
 
-v4
-* Remove needs_gpio_reset and reset_gpio from ether_platdata
-  as the patch that adds that feature and those fields has
-  been dropped.
-* Annotate ether_platdata as __initdata
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-v3
-* Use newly added "r8a7790-ether" instead of "sh-eth"
+Cheers
+---Dave
 
-v2
-* Do not add MSTP812, EtherAVB. It is not used.
-* As suggested by Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-  - Move Ethernet element of MSTP enum to a separate line
-  - Move declaration of r8a7790_add_ether_device() to immediately
-    after that of r8a7790_add_standard_devices()
-  - Add __initdata annotation to ether_resource.
-* As suggested by Laurent Pinchart
-  - Do not manipilate sh_eth reset GPIO directly,
-    rather, do so through newly proposed support for this in
-    the sh_eth driver.
-* A suggested by Sergei Shtylyov
-  - Move DTS portion into a separate patch
----
- arch/arm/mach-shmobile/board-lager.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 3c67b2a..ac4be4a 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -31,6 +31,7 @@
- #include <linux/platform_device.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
-+#include <linux/sh_eth.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a7790.h>
-@@ -91,6 +92,20 @@ static struct resource mmcif1_resources[] = {
- 	DEFINE_RES_IRQ(gic_spi(170)),
- };
- 
-+/* Ether */
-+static struct sh_eth_plat_data ether_pdata __initdata = {
-+	.phy			= 0x1,
-+	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-+	.register_type		= SH_ETH_REG_FAST_RCAR,
-+	.phy_interface		= PHY_INTERFACE_MODE_RMII,
-+	.ether_link_active_low	= 1,
-+};
-+
-+static struct resource ether_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xee700000, 0x400),
-+	DEFINE_RES_IRQ(gic_spi(162)),
-+};
-+
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-@@ -103,6 +118,15 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 				  "mmc1_data8", "mmc1"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.1", "pfc-r8a7790",
- 				  "mmc1_ctrl", "mmc1"),
-+	/* Ether */
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+				  "eth_link", "eth"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+				  "eth_mdio", "eth"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+				  "eth_rmii", "eth"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7790",
-+				  "intc_irq0", "intc"),
- };
- 
- static void __init lager_add_standard_devices(void)
-@@ -114,6 +138,7 @@ static void __init lager_add_standard_devices(void)
- 	r8a7790_pinmux_init();
- 
- 	r8a7790_add_standard_devices();
-+
- 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
- 				      &lager_leds_pdata,
- 				      sizeof(lager_leds_pdata));
-@@ -125,6 +150,11 @@ static void __init lager_add_standard_devices(void)
- 	platform_device_register_resndata(&platform_bus, "sh_mmcif", 1,
- 					  mmcif1_resources, ARRAY_SIZE(mmcif1_resources),
- 					  &mmcif1_pdata, sizeof(mmcif1_pdata));
-+
-+	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  &ether_pdata, sizeof(ether_pdata));
- }
- 
- static const char *lager_boards_compat_dt[] __initdata = {
--- 
-1.8.3.2
+> 
+> > >  	bl	__cpu_suspend_save
+> > >  	adr	lr, BSYM(cpu_suspend_abort)
+> > >  	ldmfd	sp!, {r0, pc}		@ call suspend fn
+> > > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> > > index 41cf3cbf75..2835d35234 100644
+> > > --- a/arch/arm/kernel/suspend.c
+> > > +++ b/arch/arm/kernel/suspend.c
+> > > @@ -10,7 +10,7 @@
+> > >  #include <asm/suspend.h>
+> > >  #include <asm/tlbflush.h>
+> > >  
+> > > -extern int __cpu_suspend(unsigned long, int (*)(unsigned long));
+> > > +extern int __cpu_suspend(unsigned long, int (*)(unsigned long), u32 cpuid);
+> > >  extern void cpu_resume_mmu(void);
+> > >  
+> > >  #ifdef CONFIG_MMU
+> > > @@ -21,6 +21,7 @@ extern void cpu_resume_mmu(void);
+> > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> > >  {
+> > >  	struct mm_struct *mm = current->active_mm;
+> > > +	u32 __mpidr = cpu_logical_map(smp_processor_id());
+> > >  	int ret;
+> > >  
+> > >  	if (!idmap_pgd)
+> > > @@ -32,7 +33,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> > >  	 * resume (indicated by a zero return code), we need to switch
+> > >  	 * back to the correct page tables.
+> > >  	 */
+> > > -	ret = __cpu_suspend(arg, fn);
+> > > +	ret = __cpu_suspend(arg, fn, __mpidr);
+> > >  	if (ret == 0) {
+> > >  		cpu_switch_mm(mm->pgd, mm);
+> > >  		local_flush_bp_all();
+> > > @@ -44,7 +45,8 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> > >  #else
+> > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> > >  {
+> > > -	return __cpu_suspend(arg, fn);
+> > > +	u32 __mpidr = cpu_logical_map(smp_processor_id());
+> > > +	return __cpu_suspend(arg, fn, __mpidr);
+> > >  }
+> > >  #define	idmap_pgd	NULL
+> > >  #endif
+> > 
+> > Apart from these nits, let's hope it is the last cpu_suspend bit we need to
+> > change, please land it on -next asap, of course if Russell is ok with that.
+> > 
+> > I tested it on TC2.
+> > 
+> > FWIW:
+> > 
+> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> Thanks.
+> 
+> 
+> Nicolas
