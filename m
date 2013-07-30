@@ -1,44 +1,42 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 30 Jul 2013 07:56:55 +0300
-Subject: [PATCH v2 03/22] ARM: tegra: Create a DT header defining
- swgroups ID
-In-Reply-To: <51F6AA2B.7050509@wwwdotorg.org>
-References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
- <1373021097-32420-4-git-send-email-hdoyu@nvidia.com>
- <51E5D220.1070708@wwwdotorg.org>
- <20130729.135336.943359637886118972.hdoyu@nvidia.com>
- <51F6AA2B.7050509@wwwdotorg.org>
-Message-ID: <20130730075655.b488047ac938342df3c90fa1@nvidia.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Tue, 30 Jul 2013 00:05:25 -0500
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <51F74688.3090702@ti.com>
+References: <1374515989-7391-1-git-send-email-joelf@ti.com>
+ <51F4589E.5070108@ti.com> <51F6140B.3070600@ti.com> <51F738BF.7070808@ti.com>
+ <51F74688.3090702@ti.com>
+Message-ID: <51F74995.2050202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Jul 2013 19:45:15 +0200
-Stephen Warren <swarren@wwwdotorg.org> wrote:
+On 07/29/2013 11:52 PM, Sekhar Nori wrote:> On Tuesday 30 July 2013
+09:23 AM, Joel Fernandes wrote:
+>> On 07/29/2013 02:04 AM, Sekhar Nori wrote:
+>>> On Sunday 28 July 2013 05:02 AM, Joel Fernandes wrote:
+>>>> Hi Tony or Sekhar,
+>>>>
+>>>> If this patch looks ok, could you pick it up for -rc cycle?
+>>>>
+>>>> It fixes DMA breakages after the merge window for devices for which DMA
+>>>> resources are being populated in device tree instead pdev.
+>>>
+>>> But which DT-enabled platform in kernel is using EDMA? A grep for edma
+>>> over arch/arm/boot/dts/* brings up nothing.
+>>> Does this really have to go into the -rc cycle or can it wait till
+>>> v3.12?
+>>
+>>
+>> But unused channel list is also populated for private EDMA callers like
+>> davinci-pcm no? IIRC, HWMOD data is also removed for McASP so EDMA for
+>> those may break.
+>
+> Yes, but which DT-enabled platform has davinci-pcm working today?
+> AFAICS, this bug affects DT-enabled platforms only.
 
-> On 07/29/2013 04:53 AM, Hiroshi Doyu wrote:
-> > Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 17 Jul 2013 01:07:12 +0200:
-> > 
-> >> On 07/05/2013 04:44 AM, Hiroshi Doyu wrote:
-> >>> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-> >>> binding. "swgroup" is a group of H/W clients in Tegra SoC from S/W POV.
-> >>>
-> >>> This will allow the same header to be used by both device tree files,
-> >>> and drivers implementing this binding, which guarantees that the two
-> >>> stay in sync. This also makes device trees more readable by using names
-> >>> instead of magic numbers.
-> >>
-> >> Why does the driver need these constants; shouldn't it simply support
-> >> 0..n SW group IDs that all work the same way? Or, is there some reason
-> >> for it to know the identities?
-> >>
-> >>> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
-> >>
-> >> s/memory/iommu/?
-> > 
-> > This info would be used in PMC code as well, which H/W belongs to
-> > which swgroup. So I use the term "memory(-client)" instead of "iommu".
-> 
-> Why does the PMC care? An explanation of exactly what SW needs to know
-> about these groups and why would be a good idea.
+Yes, you're right. I didn't realize nothing else is working yet. I guess
+its fine then for next kernel release.
 
-Joseph, can you explain a bit here?
+Thanks,
+
+-Joel
