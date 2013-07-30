@@ -1,40 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Jul 2013 11:26:44 +0100
-Subject: [PATCH] ARM: ARMv7-M: Fix name of NVIC handler function
-In-Reply-To: <20130730081507.GO1754@pengutronix.de>
-References: <1372238855-26112-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130708152917.GE29556@pengutronix.de>
- <20130730081507.GO1754@pengutronix.de>
-Message-ID: <20130730102643.GP24642@n2100.arm.linux.org.uk>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 30 Jul 2013 12:32:01 +0200
+Subject: [PATCH v6 0/8] Sound support for at91sam9x5-wm8731 based boards
+Message-ID: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 10:15:07AM +0200, Uwe Kleine-K?nig wrote:
-> Hi Russell,
-> 
-> On Mon, Jul 08, 2013 at 05:29:17PM +0200, Uwe Kleine-K?nig wrote:
-> > On Wed, Jun 26, 2013 at 11:27:35AM +0200, Uwe Kleine-K?nig wrote:
-> > > The name changed in response to review comments for the nvic irqchip
-> > > driver when the original name was already accepted into Russell King's
-> > > tree.
-> > > 
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > ---
-> > > Hello,
-> > > 
-> > > this patch was part of the irqchip patch v4, but I split it out for
-> > > being easier to merge in v5. It applies on top of Russell's devel-stable
-> > > branch.
-> > > 
-> > > Russell: I put it on top of my for-next branch (
-> > > 
-> > > 	git://git.pengutronix.de/git/ukl/linux.git for-next
-> > > 
-> > > ) that you merged into your devel-stable some time ago. So assuming
-> > > you're fine with the patch, you can just repull or I can put it into
-> > > your patch tracker if you prefer it. In the latter case please tell me.
-> > The mismatch hit Linus' tree now. How should this patch get to him?
-> Although it's not critical (as there are no in-tree users) I still think
-> this should go in before 3.11.
+Hi,
 
-Can you put it in the patch system please?
+This patchset add sound on the at91sam9x5ek board.
+It's based on Nicolas Ferre's work in the 2.6.39 atmel patch for sam9x5:
+https://github.com/linux4sam/linux-at91/commit/0aa157c9e71ccccf3abc30fa37eb5c95b392978d
+
+It needs Bo Chen's patchset on the generic dmaengine (topic/atmel branch
+on Mark's sound tree) and the SSC interrupts disabled (cf
+http://www.spinics.net/lists/arm-kernel/msg256901.html)
+
+As the at91 chips are on their way to the common clock framework, I thought
+it may be better to retrieve the codec MCLK via this framework.
+So it needs Boris Brezillon patch set "ARM: at91: move to common clk framework"
+I've separated this patch because I don't know what is better:
+ * applying the patchset with a hard coded clock, and once at91 has moved to common
+clock framework, update the code and change the DT binding.
+ * wait for the common clock framework.
+
+Outstanding issue:
+If this machine driver will support more SoCs maybe we should name it differently.
+Maybe atmel_wm8731.c ? Since it could be merged with sam9g20_wm8731.c
+when the g20 is DT only (There will be some more work though).
+
+It has been tested on at91sam9g35ek, and should work on g15, g25, x25 and x35 also.
+
+patches applies on next-20130729 + "ARM: at91: move to common clk framework"
+
+Changes from v5:
+ * Update the wm8731 DT binding documentation with available audio endpoints.
+ * Remove Uwe's signed-off since it seems to be "an integration signed-off"
+ * Remove rate constrains if freq==0 in wm8731.
+ * Allocate dynamically card, dai and private structures.
+ * Add a separate patch to set the oscillator value via DT.
+NB: this last patch needs Boris Brezillon patch set "ARM: at91: move to common clk framework"
+
+
+Changes from v4:
+ * Move the rates constraints into the codec
+ * Hard code the DAI format since it cannot be changed anyway (and
+remove the DT bindings accordingly)
+ * Add some consistency in the functions naming (sam9x5ek/at91sam9x5ek/sam9x5)
+ * Retrieve the SSC id from the SSC controller phandle
+ * Clarify the atmel-ssc.txt documentation
+ * Develop audio-routing documentation
+ * Tidy up the includes in the machine driver
+
+Changes from v3:
+ * Remove the use of macros in device tree documentation.
+
+Changes from v2:
+ * Change atmel,sam9x5-audio-wm8731 to atmel,sam9x5-wm8731-audio for
+consistency with sam9g20 machine driver.
+ * Use the snd_pcm_hw_constraint() API as suggested by Mark and Lars-Peter.
+ * Remove the unnecessary snd_soc_dapm_sync() call as Lars-Peter suggested.
+ * Add documentation for machine driver DT binding.
+ * Update atmel-ssc DT binding documentation.
+ * Add GPL license instead of just the "GPL" word (hope that's ok !)
+
+Changes from v1-RFC:
+ * drop patches on SSC since Bo Chen already did the work
+ * reorder patches to have the machine driver first
+ * drop code already handled by the ASoC framework
+ * drop unneeded SND_ATMEL_SOC_PDC config selection
+ * use static snd_soc_card and snd_soc_dai_link structures.
+
+Best regards,
+Richard.
+
+Nicolas Ferre (1):
+  ASoC: atmel: machine driver for at91sam9x5-wm8731 boards
+
+Richard Genoud (7):
+  ASoC: wm8731: add rates constraints
+  Documentation: DT: update atmel SSC with DMA binding
+  ARM: AT91: DTS: sam9x5: add SSC DMA parameters
+  ARM: AT91: DTS: sam9x5ek: add WM8731 codec
+  ARM: AT91: DTS: sam9x5ek: enable SSC
+  ARM: AT91: DTS: sam9x5ek: add sound configuration
+  ASoC: sam9x5: get codec MCLK via device tree
+
+ .../devicetree/bindings/misc/atmel-ssc.txt         |   23 ++-
+ .../bindings/sound/atmel-sam9x5-wm8731-audio.txt   |   39 ++++
+ Documentation/devicetree/bindings/sound/wm8731.txt |    9 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    3 +
+ arch/arm/boot/dts/at91sam9x5ek.dtsi                |   32 +++
+ sound/soc/atmel/Kconfig                            |   10 +
+ sound/soc/atmel/Makefile                           |    2 +
+ sound/soc/atmel/sam9x5_wm8731.c                    |  218 ++++++++++++++++++++
+ sound/soc/codecs/wm8731.c                          |   60 +++++-
+ 9 files changed, 392 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
+ create mode 100644 sound/soc/atmel/sam9x5_wm8731.c
+
+-- 
+1.7.10.4
