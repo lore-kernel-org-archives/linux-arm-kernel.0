@@ -1,45 +1,58 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 30 Jul 2013 12:05:40 -0700
-Subject: [ARM ATTEND] catching up on exploit mitigations
-Message-ID: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 30 Jul 2013 23:07:21 +0400
+Subject: [PATCH 08/10] ARM: sun7i: DT: Add UART muxing options to the DTSI
+In-Reply-To: <1375196394-21138-9-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375196394-21138-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <51F80EE9.30801@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'd like to propose the topic of catching up to x86 exploit
-mitigations and security features, and potentially identifying
-ARM-unique mitigations/features that could be implemented. Several
-years ago, with Nicolas Pitre doing all the real work, I coordinated
-getting ARM caught up on things like userspace ASLR and
-stack-protector. Recently, based on work by Will Drewry, I ported
-seccomp-bpf to ARM. I'd like to continue this kind of thing, and I
-think it's overdue to examine this area again. A lot of work has
-already been done by grsecurity in this area (see
-http://forums.grsecurity.net/viewtopic.php?f=7&t=3292), so it would be
-good to start there.
+Hello.
 
-While it may expose my current ignorance of low level ARM mechanics,
-I'd like to examine and discuss:
+On 07/30/2013 06:59 PM, Maxime Ripard wrote:
 
-- RO and W^X kernel page table protections (similar to x86's
-DEBUG_RODATA and DEBUG_SET_MODULE_RONX; it's not clear to me how much
-LPAE and PXN is already handling this, if at all)
+> The UARTs on the A20 can be muxed to several pins. Add a few options to
+> the DTSI so that we can start using them in the boards' DT.
 
-- something like x86's SMEP and SMAP (to deter kernel exploitation
-from userspace)
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/sun7i-a20.dtsi | 21 +++++++++++++++++++++
+>   1 file changed, 21 insertions(+)
 
-- vector table protections (needs to be protected like the x86_64
-vsyscall table, RO, etc)
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 704fca9..9f45e8d 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -70,6 +70,27 @@
+>   			#address-cells = <1>;
+>   			#size-cells = <0>;
+>   			#gpio-cells = <3>;
+> +
+> +			uart0_pins_a: uart0 at 0 {
 
-- kernel ASLR (I'm close to having this upstreamable for x86)
+    Why have address part of the node name if there's not "reg" property?
+And the preferred node name is "serial", not "uart", according to the ePAPR 
+spec (http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf).
 
-- fuzzing (is anyone running trinity or similar on the ARM tree?)
+> +				allwinner,pins = "PB22", "PB23";
+> +				allwinner,function = "uart0";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
+> +
+> +			uart6_pins_a: uart6 at 0 {
+> +				allwinner,pins = "PI12", "PI13";
+> +				allwinner,function = "uart6";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
+> +
+> +			uart7_pins_a: uart7 at 0 {
+> +				allwinner,pins = "PI20", "PI21";
+> +				allwinner,function = "uart7";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
 
-- any other things ... ?
-
-Thanks,
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+WBR, Sergei
