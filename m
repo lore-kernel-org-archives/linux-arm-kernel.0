@@ -1,63 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 30 Jul 2013 16:59:28 +0400
-Subject: [PATCH 4/5] ARM: shmobile: ape6evm: add MMCIF support
-In-Reply-To: <8711613252ed931037f9e9f8646935519dd8f362.1375174556.git.horms+renesas@verge.net.au>
-References: <cover.1375174556.git.horms+renesas@verge.net.au>
- <8711613252ed931037f9e9f8646935519dd8f362.1375174556.git.horms+renesas@verge.net.au>
-Message-ID: <51F7B8B0.3080201@cogentembedded.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 30 Jul 2013 18:29:30 +0530
+Subject: [PATCH v2 3/8] ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
+In-Reply-To: <51F7B850.5090803@ti.com>
+References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
+ <1375183546-12758-4-git-send-email-rnayak@ti.com> <51F7B100.2020600@ti.com>
+ <51F7B3E0.9020005@ti.com> <51F7B483.8060908@ti.com> <51F7B62C.9010407@ti.com>
+ <51F7B850.5090803@ti.com>
+Message-ID: <51F7B8B2.90006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tuesday 30 July 2013 06:27 PM, Nishanth Menon wrote:
+> On 07/30/2013 07:48 AM, Rajendra Nayak wrote:
+>> On Tuesday 30 July 2013 06:11 PM, Nishanth Menon wrote:
+>>> On 07/30/2013 07:38 AM, Rajendra Nayak wrote:
+>>>> On Tuesday 30 July 2013 05:56 PM, Nishanth Menon wrote:
+>>>>> On 07/30/2013 06:25 AM, Rajendra Nayak wrote:
+>>>>>> From: R Sricharan <r.sricharan@ti.com>
+>>>>> [...]
+>>>>>>     # Clock framework
+>>>>>>     obj-$(CONFIG_ARCH_OMAP2)        += $(clock-common) clock2xxx.o
+>>>>>> @@ -181,6 +187,8 @@ obj-$(CONFIG_SOC_AM33XX)        += $(clock-common) dpll3xxx.o
+>>>>>>     obj-$(CONFIG_SOC_AM33XX)        += cclock33xx_data.o
+>>>>>>     obj-$(CONFIG_SOC_OMAP5)            += $(clock-common)
+>>>>>>     obj-$(CONFIG_SOC_OMAP5)            += dpll3xxx.o dpll44xx.o
+>>>>>> +obj-$(CONFIG_SOC_DRA7XX)        += $(clock-common)
+>>>>>> +obj-$(CONFIG_SOC_DRA7XX)        += dpll3xxx.o dpll44xx.o
+>>>>>>
+>>>>>
+>>>>> are these in sync with DRA7 support being introduced for clock data in [1]?
+>>>>
+>>>> I don't want to have a dependency on those patches since I am not sure of them
+>>>> making it into 3.12.
+>>>
+>>> Then we have to undo these changes again in clock data support. the chip wont bootup anyways without clock data information, so why not try and keep the changes that Tero is doing independent of these changes?
+>>
+>> I still have something with clock data information which boots which I am maintaining out of tree till the clock movement to DT is sorted out.
+>> Maybe what you are suggesting is quite trivial and I am unable to understand. Are you suggesting we do no compile $(clock-common) and the
+>> dpll files for DRA7? Is that what you are worried we might have to revert?
+> 
+> yes - lets just drop that change. that allows what ever alignment we have for clock data/driver to handle it appropriately. IMHO, could also keeps your series independent from Tero's series.
 
-On 30-07-2013 13:00, Simon Horman wrote:
+I can drop those. no issues.
 
-> From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-
-> Add MMCIF support to the APE6EVM board in PIO mode only. Power supply is
-> fixed for now, eventually support for the tps80032 regulator, also
-> supplying both VDD and VccQ to the MMCIF slot should be added to APE6EVM.
-
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> Acked-by: Magnus Damm <damm@opensource.se>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm/mach-shmobile/board-ape6evm.c | 31 +++++++++++++++++++++++++++++++
->   1 file changed, 31 insertions(+)
-
-> diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-> index af6dd39..8c7529c 100644
-> --- a/arch/arm/mach-shmobile/board-ape6evm.c
-> +++ b/arch/arm/mach-shmobile/board-ape6evm.c
-[...]
-> @@ -54,6 +56,25 @@ static const struct smsc911x_platform_config lan9220_data = {
-[...]
-> +/* MMCIF */
-> +static struct sh_mmcif_plat_data mmcif0_pdata = {
-> +	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
-> +};
-> +
-> +static struct resource mmcif0_resources[] = {
-> +	DEFINE_RES_MEM_NAMED(0xee200000, 0x100, "MMCIF0"),
-> +	DEFINE_RES_IRQ(gic_spi(169)),
-> +};
-> +
-
-    The above needed '__initdata' too. And I have only noticed...
-
->   static const struct pinctrl_map ape6evm_pinctrl_map[] = {
->   	/* SCIFA0 console */
->   	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
-[...]
-> @@ -93,6 +119,11 @@ static void __init ape6evm_add_standard_devices(void)
->   	platform_device_register_resndata(&platform_bus, "smsc911x", -1,
->   					  lan9220_res, ARRAY_SIZE(lan9220_res),
->   					  &lan9220_data, sizeof(lan9220_data));
-> +	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
-> +				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
-> +	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
-> +					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
-> +					  &mmcif0_pdata, sizeof(mmcif0_pdata));
->   }
-
-WBR, Sergei
+> 
+>>>
+>>>>
+>>>>>
+>>>>>
+>>>>> [1] http://marc.info/?l=linux-omap&m=137456411706971&w=2
+>>>>>
+>>>>
+>>>
+>>>
+>>
+> 
+> 
