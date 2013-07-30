@@ -1,144 +1,53 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Jul 2013 10:11:06 +0300
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <20130721154653.GG16598@kroah.com>
-References: <20130720220006.GA7977@kroah.com> <3839600.WiC1OLF35o@flatron>
- <51EBC0F5.70601@ti.com> <9748041.Qq1fWJBg6D@flatron>
- <20130721154653.GG16598@kroah.com>
-Message-ID: <20130730071106.GC16441@radagast>
+Date: Tue, 30 Jul 2013 10:16:11 +0300
+Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
+ usb_bind_phy
+In-Reply-To: <51F7613C.5070803@ti.com>
+References: <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
+ <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
+ <20130730060134.GD9155@radagast> <51F7590B.4020705@ti.com>
+ <20130730061830.GE9155@radagast> <51F75C40.4060406@ti.com>
+ <20130730062844.GH9155@radagast> <51F7613C.5070803@ti.com>
+Message-ID: <20130730071611.GD16441@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 21, 2013 at 08:46:53AM -0700, Greg KH wrote:
-> On Sun, Jul 21, 2013 at 01:12:07PM +0200, Tomasz Figa wrote:
-> > On Sunday 21 of July 2013 16:37:33 Kishon Vijay Abraham I wrote:
-> > > Hi,
-> > > 
-> > > On Sunday 21 July 2013 04:01 PM, Tomasz Figa wrote:
-> > > > Hi,
-> > > > 
-> > > > On Saturday 20 of July 2013 19:59:10 Greg KH wrote:
-> > > >> On Sat, Jul 20, 2013 at 10:32:26PM -0400, Alan Stern wrote:
-> > > >>> On Sat, 20 Jul 2013, Greg KH wrote:
-> > > >>>>>>> That should be passed using platform data.
-> > > >>>>>> 
-> > > >>>>>> Ick, don't pass strings around, pass pointers.  If you have
-> > > >>>>>> platform
-> > > >>>>>> data you can get to, then put the pointer there, don't use a
-> > > >>>>>> "name".
-> > > >>>>> 
-> > > >>>>> I don't think I understood you here :-s We wont have phy pointer
-> > > >>>>> when we create the device for the controller no?(it'll be done in
-> > > >>>>> board file). Probably I'm missing something.
-> > > >>>> 
-> > > >>>> Why will you not have that pointer?  You can't rely on the "name"
-> > > >>>> as
-> > > >>>> the device id will not match up, so you should be able to rely on
-> > > >>>> the pointer being in the structure that the board sets up, right?
-> > > >>>> 
-> > > >>>> Don't use names, especially as ids can, and will, change, that is
-> > > >>>> going
-> > > >>>> to cause big problems.  Use pointers, this is C, we are supposed to
-> > > >>>> be
-> > > >>>> doing that :)
-> > > >>> 
-> > > >>> Kishon, I think what Greg means is this:  The name you are using
-> > > >>> must
-> > > >>> be stored somewhere in a data structure constructed by the board
-> > > >>> file,
-> > > >>> right?  Or at least, associated with some data structure somehow.
-> > > >>> Otherwise the platform code wouldn't know which PHY hardware
-> > > >>> corresponded to a particular name.
-> > > >>> 
-> > > >>> Greg's suggestion is that you store the address of that data
-> > > >>> structure
-> > > >>> in the platform data instead of storing the name string.  Have the
-> > > >>> consumer pass the data structure's address when it calls phy_create,
-> > > >>> instead of passing the name.  Then you don't have to worry about two
-> > > >>> PHYs accidentally ending up with the same name or any other similar
-> > > >>> problems.
-> > > >> 
-> > > >> Close, but the issue is that whatever returns from phy_create()
-> > > >> should
-> > > >> then be used, no need to call any "find" functions, as you can just
-> > > >> use
-> > > >> the pointer that phy_create() returns.  Much like all other class api
-> > > >> functions in the kernel work.
-> > > > 
-> > > > I think there is a confusion here about who registers the PHYs.
-> > > > 
-> > > > All platform code does is registering a platform/i2c/whatever device,
-> > > > which causes a driver (located in drivers/phy/) to be instantiated.
-> > > > Such drivers call phy_create(), usually in their probe() callbacks,
-> > > > so platform_code has no way (and should have no way, for the sake of
-> > > > layering) to get what phy_create() returns.
-> 
-> Why not put pointers in the platform data structure that can hold these
-> pointers?  I thought that is why we created those structures in the
-> first place.  If not, what are they there for?
+Hi,
 
-heh, IMO we shouldn't pass pointers of any kind through platform_data,
-we want to pass data :-)
-
-Allowing to pass pointers through that, is one of the reasons which got
-us in such a big mess in ARM land, well it was much easier for a
-board-file/driver writer to pass a function pointer then to create a
-generic framework :-)
-
-> > > > IMHO we need a lookup method for PHYs, just like for clocks,
-> > > > regulators, PWMs or even i2c busses because there are complex cases
-> > > > when passing just a name using platform data will not work. I would
-> > > > second what Stephen said [1] and define a structure doing things in a
-> > > > DT-like way.
-> > > > 
-> > > > Example;
-> > > > 
-> > > > [platform code]
-> > > > 
-> > > > static const struct phy_lookup my_phy_lookup[] = {
-> > > > 
-> > > > 	PHY_LOOKUP("s3c-hsotg.0", "otg", "samsung-usbphy.1", "phy.2"),
-> > > 
-> > > The only problem here is that if *PLATFORM_DEVID_AUTO* is used while
-> > > creating the device, the ids in the device name would change and
-> > > PHY_LOOKUP wont be useful.
+On Tue, Jul 30, 2013 at 12:16:20PM +0530, Kishon Vijay Abraham I wrote:
+> >>>> the list of controller device (names) it can support (PHY framework does not
+> >>>> maintain a separate list for binding like how we had in USB PHY library). e.g.
+> >>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92817.html. In such
+> >>>
+> >>> this has nothing to do with $subject though. We talk about generic PHY
+> >>> framework once all these PHY drivers are moved there :-)
+> >>>
+> >>>> cases how do we pass the device names. Also will the MUSB core device be
+> >>>> created before twl4030-usb PHY device?
+> >>>
+> >>> and why would that be a problem ? We're telling the framework that the
+> >>> musb device will use a phy with a name of 'twl4030'. If musb calls
+> >>> usb_get_phy_dev() and doesn't find a phy, it'll return -EPROBE_DEFER and
+> >>> try again later.
+> >>
+> >> I think we are talking about different problems here ;-) I'm trying to tell
+> >> using idr in MUSB core is needed for Generic PHY Framework. So in a way, the
+> >> Generic PHY Framework series depends on this patch series or else MUSB in OMAP3
+> >> platforms wont work after Generic PHY framework gets merged.
 > > 
-> > I don't think this is a problem. All the existing lookup methods already 
-> > use ID to identify devices (see regulators, clkdev, PWMs, i2c, ...). You 
-> > can simply add a requirement that the ID must be assigned manually, 
-> > without using PLATFORM_DEVID_AUTO to use PHY lookup.
+> > then you just found a limitation in your framework, right ? :-) I mean,
+> > imagine if now we have to add an IDR to every single user of your
+> > framework because they could end up in systems with multiple instances
+> > of the same IP ?
 > 
-> And I'm saying that this idea, of using a specific name and id, is
-> frought with fragility and will break in the future in various ways when
-> devices get added to systems, making these strings constantly have to be
-> kept up to date with different board configurations.
+> I raised a similar concern in the PHY framework discussion [1] :-) And since
+> it's used everywhere else regulators, clkdev, etc.. it's agreed to be used in
+> PHY as well. Btw if PLATFORM_DEVID_AUTO is used even regulator, clk_get should
+> fail IMO.
 > 
-> People, NEVER, hardcode something like an id.  The fact that this
-> happens today with the clock code, doesn't make it right, it makes the
-> clock code wrong.  Others have already said that this is wrong there as
-> well, as systems change and dynamic ids get used more and more.
-> 
-> Let's not repeat the same mistakes of the past just because we refuse to
-> learn from them...
-> 
-> So again, the "find a phy by a string" functions should be removed, the
-> device id should be automatically created by the phy core just to make
-> things unique in sysfs, and no driver code should _ever_ be reliant on
-> the number that is being created, and the pointer to the phy structure
-> should be used everywhere instead.
-> 
-> With those types of changes, I will consider merging this subsystem, but
-> without them, sorry, I will not.
+> [1] -> http://lkml.indiana.edu/hypermail/linux/kernel/1307.2/03573.html
 
-I'll agree with Greg here, the very fact that we see people trying to
-add a requirement of *NOT* using PLATFORM_DEVID_AUTO already points to a
-big problem in the framework.
-
-The fact is that if we don't allow PLATFORM_DEVID_AUTO we will end up
-adding similar infrastructure to the driver themselves to make sure we
-don't end up with duplicate names in sysfs in case we have multiple
-instances of the same IP in the SoC (or several of the same PCIe card).
-I really don't want to go back to that.
+look at Greg's and my reply to that email.
 
 -- 
 balbi
@@ -148,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/625b34cb/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/a74b90be/attachment.sig>
