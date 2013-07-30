@@ -1,59 +1,34 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 30 Jul 2013 16:03:24 -0700
-Subject: [PATCH RESEND] clk: export __clk_get_flags for modular clock
- providers
-In-Reply-To: <51D5DEE7.2070400@ti.com>
-References: <1366009186-32199-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <51D5DEE7.2070400@ti.com>
-Message-ID: <20130730230324.5270.4519@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 31 Jul 2013 00:03:31 +0100
+Subject: Defining schemas for Device Tree
+In-Reply-To: <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
+References: <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+ <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
+ <20130730102511.GM9858@sirena.org.uk>
+ <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+ <51F7F596.6020503@wwwdotorg.org>
+ <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
+ <20130730205716.GZ9858@sirena.org.uk>
+ <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
+Message-ID: <20130730230331.GC9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Luciano Coelho (2013-07-04 13:45:27)
-> Hi,
-> 
-> On 04/15/2013 09:59 AM, Sebastian Hesselbarth wrote:
-> > The common clock api provides some helpers for clk-providers but does
-> > not export these helpers. This hinders clk-providers to be built as modules.
-> > This patch adds __clk_get_flags() to the list of exported symbols.
-> >
-> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > ---
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >   drivers/clk/clk.c |    1 +
-> >   1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index ed87b24..3e478b8 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -450,6 +450,7 @@ unsigned long __clk_get_flags(struct clk *clk)
-> >   {
-> >       return !clk ? 0 : clk->flags;
-> >   }
-> > +EXPORT_SYMBOL_GPL(__clk_get_flags);
-> >
-> >   bool __clk_is_enabled(struct clk *clk)
-> >   {
-> >
-> 
-> I think this got merged slightly wrong.  The EXPORT_SYMBOL_GPL macro 
-> came under clk_unprepare_unused_subtree() instead of under 
-> __clk_get_flags():
-> 
-> 
-> Of course this is not that important, but it's a bit confusing when you 
-> look at the code.
+On Tue, Jul 30, 2013 at 06:19:08PM -0400, jonsmirl at gmail.com wrote:
 
-Thanks for pointing this out. I've fixed it up.
+> FDT is versioned and PowerPC docs say that multiple versions have been
+> released.  If we find enough flaws we could do a new release then use
+> the quirks scheme to read the older versions.
 
-Regards,
-Mike
-
-> 
-> --
-> Cheers,
-> Luca.
+That does involve updating everything that wants to understand FDTs in
+the new FDT format version though.  I'm not sure that's going to be
+greeted with universal enthusiasm.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/af092b57/attachment-0001.sig>
