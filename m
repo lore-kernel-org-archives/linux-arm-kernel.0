@@ -1,61 +1,51 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 30 Jul 2013 09:14:42 -0400
-Subject: Defining schemas for Device Tree
-In-Reply-To: <20130730102511.GM9858@sirena.org.uk>
-References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
- <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
- <1706112.Xn49tiCSKF@thinkpad>
- <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
- <20130730102511.GM9858@sirena.org.uk>
-Message-ID: <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 30 Jul 2013 09:17:25 -0400
+Subject: [RFC PATCH 0/2] impedance-matcher generic improvements
+In-Reply-To: <51F76FE3.1080302@gmail.com>
+References: <51F2A014.7000209@gmail.com>
+ <cover.1375131816.git.jason@lakedaemon.net>
+ <51F76FE3.1080302@gmail.com>
+Message-ID: <20130730131725.GC5882@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
->
->> This...
->> tx-dma-channel = <&pdma0 7>; /* preliminary */
->> rx-dma-channel = <&pdma0 6>; /* preliminary */
->
->> Probably should be
->> dmas = <&pdma0 7>,<&pdma0 6>;
->> dma-names = "tx", "rx";
->
-> It should be - the latter is the generic DMA binding.  There's a lot of
-> bindings in the kernel that predate that but people are currently
-> working to transfer over, this is one of the examples of instability
-> that everyone is talking about.
+On Tue, Jul 30, 2013 at 09:48:51AM +0200, Daniel Mack wrote:
+> Hi Jason,
+> 
+> On 29.07.2013 23:23, Jason Cooper wrote:
+> > Basic idea is to replace a device's stock kernel with this impedance-matcher.
+> > Load the kernel and/or the devicetree blob to desired addresses.  Add
+> > 'loadaddrs=0xXXXXXXXX,0xYYYYYYYY' to the kernel's command line.  Or, if you are
+> > appending, 'loadaddrs=appended,0xYYYYYYYY'.  First address is the location of
+> > the kernel, second is the location of the dtb.
+> 
+> Nice to see that idea implemented! For me though, changing any of the
+> U-Boot variables is out of the question, and I need the matcher just the
+> way I implemented it, including the LED blink pattern to let the user
+> know if things go wrong.
 
-Is something similar to this possible in device tree syntax?
-dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
+Understandable.  After thinking about it a bit, I think I'm going to
+rework this patch to allow appending both kernels and dtbs (as you had),
+and abstract out the led blink so that your code would become a compile
+time option.
 
-That's an example of something the quirks system could do. We can make
-a quirk for these older definitions and then map them to the new and
-improved kernel schema.   And you only need to make quirks for devices
-that have been deployed with dtb in boot loaders. There is no need to
-accept older dtbs that were appended to the kernel.
+> Hence, I won't change to your generic version on my boards, and so I
+> think it might be best if you maintain your own tree for your approach.
 
-The schema system provides the class description for the generic SPI
-controller. This generic SPI controller is only generic in the sense
-that all of the device syntax is as regular as possible. Each of the
-actual SPI controller device drivers is completely different. But now
-someone implementing a new SPI controller would have a single DT
-example to follow - the schema for the generic SPI controller.
+hrmmm, I don't like forking on general principle.  Let me do the above
+rework and see if that works for you, while adding the capabilities I
+need.
 
-I don't think the quirks system will be that bad to work with. We will
-quickly develop a list of device trees that have been deployed in
-flash and need to be handled by the quirk system They are already
-handled right now by code spread throughout the kernel. Quirks would
-just collect everything into an init time segment where it can easily
-be discarded.
+When I'm done, you should just be able to do:
 
-Also consider that someone like Microsoft might ship SurfaceRT tablets
-with a MS specific device tree format. That could be handled by a
-quirk. But it would be even better if Microsoft used the generic
-schema and followed its format. Right now that schema isn't written
-down.
+  $ make APPEND_KERNEL=input/zImage APPEND_DTBS=input/*.dtb uImage
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+And get the same result.
+
+In the meantime, would you mind adding a license to your code?  If you
+have no preference, I like GPLv2-only, but it's your code, so whatever
+you like.
+
+thx,
+
+Jason.
