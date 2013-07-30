@@ -1,132 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 30 Jul 2013 14:34:20 -0500
-Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <alpine.DEB.2.02.1307301528540.4893@kaball.uk.xensource.com>
-References: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
- <51F7B4C9.2060500@gmail.com>
- <20130730125650.GD28716@e106331-lin.cambridge.arm.com>
- <20130730134427.GE28716@e106331-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1307301528540.4893@kaball.uk.xensource.com>
-Message-ID: <51F8153C.8030503@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 30 Jul 2013 14:42:33 -0500
+Subject: [PATCHv4 10/33] ARM: OMAP4: remove old clock data and link in
+ new clock init code
+In-Reply-To: <1374564028-11352-11-git-send-email-t-kristo@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-11-git-send-email-t-kristo@ti.com>
+Message-ID: <51F81729.5010406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 09:33 AM, Stefano Stabellini wrote:
-> On Tue, 30 Jul 2013, Mark Rutland wrote:
->> On Tue, Jul 30, 2013 at 01:56:50PM +0100, Mark Rutland wrote:
->>> On Tue, Jul 30, 2013 at 01:42:49PM +0100, Rob Herring wrote:
->>>> On 07/30/2013 04:49 AM, Mark Rutland wrote:
->>>>> On Mon, Jul 29, 2013 at 09:18:43PM +0100, Rob Herring wrote:
->>>>>> On 07/29/2013 05:13 AM, Mark Rutland wrote:
->>>>>>> Hi Rob,
->>>>>>>
->>>>>>> On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
->>>>>>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> [snip]
->>>>
->>>>>>> One of the things changed in PSCI 0.2 was the SMC calling convention,
->>>>>>> though this isn't clear in the PSCI document. The function IDs for 32bit
->>>>>>> and 64bit callers may differ, and we need to support describing an
->>>>>>> arbitrary configuration of the two (same ID for both, different across
->>>>>>> 32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
->>>>>>>
->>>>>>> I'd like to ensure the binding can deal with that from the start. We
->>>>>>> could do this by having -32 and -64 variants of each function id (e.g.
->>>>>>> cpu_off-64) , if the IDs actually differ, and use the regular combined
->>>>>>> ID if they don't.
->>>>>>
->>>>>> Uggg. I guess I should have read the SMC calling convention doc... I was
->>>>>> simply documenting what is already in the PSCI doc, but obviously that
->>>>>> is not fully flushed out.
->>>>>>
->>>>>> How about something like this (for the complicated case of both 32 and
->>>>>> 64 bit):
->>>>>>
->>>>>> 	method		= "smc", "smc64";
->>>>>> 	psci_version	= <0x84000000 0xc4000000>;
->>>>>> 	cpu_suspend	= <0x84000001 0xc4000001>;
->>>>>> 	cpu_off		= <0x84000002 0xc4000002>;
->>>>>> 	cpu_on		= <0x84000003 0xc4000003>;
->>>>>>
->>>>>> "smc" is a synonym for smc32 for compatibility. The number and order of
->>>>>> methods determines the number and order of function IDs.
->>>>>
->>>>> While this may be compatible with the arm implementation, it won't be
->>>>> compatible with the arm64 implementation, which assumes smc64 by
->>>>> default.
->>>>>
->>>>> As far as I am aware, the implementations currently in use (KVM and Xen)
->>>>> use the same ID for both, so I think "smc" should cover an ID valid for
->>>>> a native register width calling convention, and "smc64" and "smc32"
->>>>> describing values only valid for 64-bit wide and 32-bit wide calling
->>>>> conventions respectively.
->>>>
->>>> The problem is that does not work for a 32-bit kernel on 64-bit h/w as
->>>> native from the dts perspective is smc64. Just like the cpu bindings,
->>>> the binding cannot change based on 32 or 64 bit OS. I don't think we
->>>> really have to deal with that here. We can simply say "smc" is only for
->>>> "arm,psci" and deprecated for "arm,psci-0.2".
->>>
->>> Agreed. I'd be happy with only having "smc32" and "smc64" for
->>> "arm,psci-0.2".
-> 
-> I would be happy with that too (Xen only uses HVC as "method").
-> 
-> 
->> Actually, from some quick discussion with Marc and Dave, I think we can
->> handle this better, in a way that leaves this backwards compatible.
->>
->> Rather than relying on the method string to tell us the calling
->> convention, I think we should rely on the function ID, as I proposed
->> earlier. The existing function ids provided in the "arm,psci" binding
->> are implicitly relying on the PSCI implementation to detect the register
->> width and act accordingly. This is trivially true on 32bit hardware, KVM
->> (where the same ID is used for 32-bit and 64-bit guests), and while I'm
->> not entirely sure about Xen I believe it's true there. We can make this
->> explicit as we extend the binding.
->>
->> Having a -64 and -32 variant of each ID (while not pretty) allows us to
->> add additional IDs for functions that might only have a 32-bit or 64-bit
->> interface implemented, in addition to functions with common IDs:
->>
->> psci {
->> 	compatible = "$VENDOR,psci-0.2", "arm,psci-0.2", "arm,psci";
->> 	cpu_off = <12345678>;
->> 	cpu_on = <01234567>;
->> 	system_reset-32 = <02222222>;
->> 	system_reset-64 = <12222222>;
->> 	affinity_info-64 = <15555555>;
->> };
->>
->> This means that hypervisors could update their PSCI implementation while
->> keeping their DTS compatible with existing kernels.
-> 
-> Are you proposing of getting rid of "method" completely and therefore
-> have 4 possible function IDs for each function:
-> 
-> system_reset-32-HVC
-> system_reset-64-SMC
-> system_reset-32-HVC
-> system_reset-64-SMC
+On 07/23/2013 02:20 AM, Tero Kristo wrote:
 
-No. you should never have a DTB with both hvc and smc. The h/w
-(firmware) to OS interface is smc. The hypervisor to guest interface is
-a separate ABI and would be hvc. They are independent of each other.
+> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+> deleted file mode 100644
+> index 88e37a4..0000000
+> --- a/arch/arm/mach-omap2/cclock44xx_data.c
+> +++ /dev/null
+[...]
+> -
+> -int __init omap4xxx_clk_init(void)
+> -{
+arch/arm/mach-omap2/clock44xx.h:int omap4xxx_clk_init(void);
+arch/arm/mach-omap2/io.c:       omap_clk_init = omap4xxx_clk_init;
+code in drivers/clk/omap/clk-44xx.c
 
-> or are you proposing of choosing just the register width via function
-> IDs?
-> 
-> Honestly I think it would be cleaner to introduce a new field called
-> "width" can that be 32 or 64 and represent the register width, rather
-> than having an explosion of function IDs.
+Seems goofy to me a little.
+entire purpose of having a clk-44xx.c is:
+a) doing a clk alias for device nodes
+b) set_parent, rate
+both of these seem to be an old style carry forward and should instead 
+be fixes with generic properties IMHO voiding the need for SoC specific 
+inits.
 
-I can think of lots of ways it would be cleaner, but that is not what
-ARM defined. There are 3 cases to handle: 32-bit only calls, 64-bit only
-calls and both 32/64-bit calls. I think hypervisors have the same issue
-as firmware. Do you know the guest is 32 or 64 bit up front and can
-provide it a dtb based on that? If not, then you can never use the
-64-bit only calls. So Xen has to use 32-bit only or provide both 32 and
-64 bit interfaces.
+instead all we should be doing is call of_clk_init(NULL); at appropriate 
+init sequence.
 
-Rob
+-- 
+Regards,
+Nishanth Menon
