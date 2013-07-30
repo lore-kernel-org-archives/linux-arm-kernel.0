@@ -1,50 +1,108 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 30 Jul 2013 07:20:47 -0700
-Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <51F7BE2F.3060004@schinagl.nl>
-References: <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
- <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
- <20130716064107.GA10868@kroah.com> <20130717114650.GN3125@lukather>
- <20130717161758.GA9822@kroah.com> <20130719094211.GD5106@lukather>
- <20130719234944.GA11498@kroah.com> <51F7BE2F.3060004@schinagl.nl>
-Message-ID: <20130730142047.GA28696@kroah.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 30 Jul 2013 16:24:37 +0200
+Subject: [PATCH/RESEND] clocksource: em_sti: Convert to devm_* managed helpers
+Message-ID: <1375194277-2850-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 03:22:55PM +0200, Oliver Schinagl wrote:
-> >Let me go look at how I can make this work "easier", give me a few days.
-> Not wanting to be rude, but it has been a little more then a few
-> days, any progress? Just want to know what I have to modify my
-> driver to so it can go into the next merge window :)
+Replace kzalloc, clk_get, ioremap and request_irq by their managed
+counterparts to simplify error paths.
 
-What?  Oh crap.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/clocksource/em_sti.c | 49 +++++++++++++-------------------------------
+ 1 file changed, 14 insertions(+), 35 deletions(-)
 
-I saw this old email in my todo box last week and for some stupid reason
-I thought I had already taken care of this, otherwise why would I have
-left it around for so long?...
+Resending with Daniel Lezcano CC'ed.
 
-Ugh, very sorry about that...
+diff --git a/drivers/clocksource/em_sti.c b/drivers/clocksource/em_sti.c
+index 4329a29..b9c81b7 100644
+--- a/drivers/clocksource/em_sti.c
++++ b/drivers/clocksource/em_sti.c
+@@ -315,68 +315,47 @@ static int em_sti_probe(struct platform_device *pdev)
+ {
+ 	struct em_sti_priv *p;
+ 	struct resource *res;
+-	int irq, ret;
++	int irq;
+ 
+-	p = kzalloc(sizeof(*p), GFP_KERNEL);
++	p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
+ 	if (p == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate driver data\n");
+-		ret = -ENOMEM;
+-		goto err0;
++		return -ENOMEM;
+ 	}
+ 
+ 	p->pdev = pdev;
+ 	platform_set_drvdata(pdev, p);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		dev_err(&pdev->dev, "failed to get I/O memory\n");
+-		ret = -EINVAL;
+-		goto err0;
+-	}
+-
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(&pdev->dev, "failed to get irq\n");
+-		ret = -EINVAL;
+-		goto err0;
++		return -EINVAL;
+ 	}
+ 
+ 	/* map memory, let base point to the STI instance */
+-	p->base = ioremap_nocache(res->start, resource_size(res));
+-	if (p->base == NULL) {
+-		dev_err(&pdev->dev, "failed to remap I/O memory\n");
+-		ret = -ENXIO;
+-		goto err0;
+-	}
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	p->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(p->base))
++		return PTR_ERR(p->base);
+ 
+ 	/* get hold of clock */
+-	p->clk = clk_get(&pdev->dev, "sclk");
++	p->clk = devm_clk_get(&pdev->dev, "sclk");
+ 	if (IS_ERR(p->clk)) {
+ 		dev_err(&pdev->dev, "cannot get clock\n");
+-		ret = PTR_ERR(p->clk);
+-		goto err1;
++		return PTR_ERR(p->clk);
+ 	}
+ 
+-	if (request_irq(irq, em_sti_interrupt,
+-			IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
+-			dev_name(&pdev->dev), p)) {
++	if (devm_request_irq(&pdev->dev, irq, em_sti_interrupt,
++			     IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
++			     dev_name(&pdev->dev), p)) {
+ 		dev_err(&pdev->dev, "failed to request low IRQ\n");
+-		ret = -ENOENT;
+-		goto err2;
++		return -ENOENT;
+ 	}
+ 
+ 	raw_spin_lock_init(&p->lock);
+ 	em_sti_register_clockevent(p);
+ 	em_sti_register_clocksource(p);
+ 	return 0;
+-
+-err2:
+-	clk_put(p->clk);
+-err1:
+-	iounmap(p->base);
+-err0:
+-	kfree(p);
+-	return ret;
+ }
+ 
+ static int em_sti_remove(struct platform_device *pdev)
+-- 
+Regards,
 
-Hm, this is a mess.  I hate platform devices...
-
-Anyway, as you want to get this into 3.12, and I'm not going to be able
-to get the core infrastructure into the platform device by then, just go
-ahead and do a sysfs_create_group() call in your device probe callback
-for now.  That will register the needed files for the device (not the
-driver, DOH that was stupid of me...) and all should be ok.
-
-Yes, you will still race with userspace, but as right now, there's no
-way that _any_ platform driver can do this "correctly", you will be in
-good company.  I'll clean up all platform drivers in a sweep of the tree
-after 3.12 or so when I get the needed infrastructure in place for the
-platform_driver code.
-
-Again, very sorry for all of this, you have helped me out a lot in
-figuring out that this is a mess, and should be fixed up better, but in
-the end, you are pretty much back at the beginning of what you
-originally wanted to do, right?
-
-I owe you a beer, at the least, my apologies...
-
-greg k-h
+Laurent Pinchart
