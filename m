@@ -1,78 +1,61 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Tue, 30 Jul 2013 18:43:04 +0530
-Subject: [PATCH v7 00/11] Add generic set_rate clk_ops for PLL35xx and
- PLL36xx for samsung SoCs
-In-Reply-To: <20130723012621.7598.46496@quantum>
-References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
- <CAKew6eUOy4=D08v_iq7CTRY5gvt37VAN7Z7WOr2Yt25znDJb2g@mail.gmail.com>
- <CAGm_ybiVZOPBJJ0bYX33wafn1So6aqSAnk7myXZ+Z+RfLBeBQw@mail.gmail.com>
- <1524664.UCV47tfIRU@flatron> <20130621163143.9136.28807@quantum>
- <51C85F8F.9050501@samsung.com> <20130624190227.20448.68120@quantum>
- <007001ce7149$1f683f40$5e38bdc0$%kim@samsung.com>
- <CAKew6eVW6dOzLRN2CG8jT3Oo1uzKrXqi1aRYkAHmUu61dBSDpA@mail.gmail.com>
- <CAGm_ybj31kv=iW2YKsHnBRJ741G2amSNAJf+Mx8Z-JMoVynZ8w@mail.gmail.com>
- <20130723012621.7598.46496@quantum>
-Message-ID: <CAGm_ybiiCHVP5GPVe01F==SF+3rCR3a0mFGbxthEVOcbTEGmtA@mail.gmail.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Tue, 30 Jul 2013 09:14:42 -0400
+Subject: Defining schemas for Device Tree
+In-Reply-To: <20130730102511.GM9858@sirena.org.uk>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+ <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
+ <20130730102511.GM9858@sirena.org.uk>
+Message-ID: <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Tue, Jul 23, 2013 at 6:56 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Vikas Sajjan (2013-07-21 23:15:27)
->> Hi Kukjin / Mike,
->>
->> Can you apply this series
+On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
 >
-> Let me apply this to see if the dependencies are taken care of now. If
-> so I'll just take it through the clk tree.
+>> This...
+>> tx-dma-channel = <&pdma0 7>; /* preliminary */
+>> rx-dma-channel = <&pdma0 6>; /* preliminary */
 >
-
-Any updates on this series.
-I could NOT see them at
-http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=shortlog;h=refs/heads/clk-next
-
-
-> Regards,
-> Mike
+>> Probably should be
+>> dmas = <&pdma0 7>,<&pdma0 6>;
+>> dma-names = "tx", "rx";
 >
->>
->> On Tue, Jul 16, 2013 at 7:10 PM, Yadwinder Singh Brar
->> <yadi.brar01@gmail.com> wrote:
->> > Hi Kukjin / Mike,
->> >
->> > On Tue, Jun 25, 2013 at 7:40 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> >> Mike Turquette wrote:
->> >>>
->> >>> Quoting Kukjin Kim (2013-06-24 08:02:39)
->> >>> > On 06/22/13 01:31, Mike Turquette wrote:
->> >>> > >
->> >>> > > Acked-by: Mike Turquette<mturquette@linaro.org>
->> >>> > >
->> >>> > > Or I can take this through the clk tree. Either way is fine.
->> >>> > >
->> >>> > Mike, please go ahead taking this series into the clk tree for 3.11.
->> >>>
->> >>> Actually it might be better for you to take it. Patch #5 relies on
->> >>> drivers/clk/samsung/clk-exynos5420.c which only exists in the samsung
->> >>> tree.  It was introduced by commit 1609027f, "clk: exynos5420: register
->> >>> clocks using common clock framework".
->> >>>
->> >> Yes, you're right. It depends on soc-exynos5420 stuff in samsung tree.
->> >>
->> >>> And these patches need to be applied with some fuzz to the clk tree due
->> >>> to other changes which are not in my tree and only present in yours.
->> >>>
->> >>> The best two options are either for you to take this series or it can be
->> >>> rebased on top of clk-next, after which I'll apply it.
->> >>>
->> >> Let me try to send this series via samsung tree for v3.11 but I'm not sure because it's a little bit late for arm-soc tree.
->> >>
->> >> Thanks for your ack, just note I will send to arm-soc tonight in my time.
->> >>
->> >
->> > Can we get this series merge now in any of trees.
->> > Please let me if its required to rebase it.
->> >
->> > Regards,
->> > Yadwinder
+> It should be - the latter is the generic DMA binding.  There's a lot of
+> bindings in the kernel that predate that but people are currently
+> working to transfer over, this is one of the examples of instability
+> that everyone is talking about.
+
+Is something similar to this possible in device tree syntax?
+dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
+
+That's an example of something the quirks system could do. We can make
+a quirk for these older definitions and then map them to the new and
+improved kernel schema.   And you only need to make quirks for devices
+that have been deployed with dtb in boot loaders. There is no need to
+accept older dtbs that were appended to the kernel.
+
+The schema system provides the class description for the generic SPI
+controller. This generic SPI controller is only generic in the sense
+that all of the device syntax is as regular as possible. Each of the
+actual SPI controller device drivers is completely different. But now
+someone implementing a new SPI controller would have a single DT
+example to follow - the schema for the generic SPI controller.
+
+I don't think the quirks system will be that bad to work with. We will
+quickly develop a list of device trees that have been deployed in
+flash and need to be handled by the quirk system They are already
+handled right now by code spread throughout the kernel. Quirks would
+just collect everything into an init time segment where it can easily
+be discarded.
+
+Also consider that someone like Microsoft might ship SurfaceRT tablets
+with a MS specific device tree format. That could be handled by a
+quirk. But it would be even better if Microsoft used the generic
+schema and followed its format. Right now that schema isn't written
+down.
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
