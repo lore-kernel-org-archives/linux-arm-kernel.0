@@ -1,137 +1,40 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 30 Jul 2013 11:26:14 +0100
-Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
- property
-In-Reply-To: <20130730111604.76fd5b6e@skate>
-References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
- <20130730111604.76fd5b6e@skate>
-Message-ID: <CAGVrzcbQSKp=UCp=6HeA1XZkuzaopUNH2wX4=xgus5BNiMaXXg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Jul 2013 11:26:44 +0100
+Subject: [PATCH] ARM: ARMv7-M: Fix name of NVIC handler function
+In-Reply-To: <20130730081507.GO1754@pengutronix.de>
+References: <1372238855-26112-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130708152917.GE29556@pengutronix.de>
+ <20130730081507.GO1754@pengutronix.de>
+Message-ID: <20130730102643.GP24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+On Tue, Jul 30, 2013 at 10:15:07AM +0200, Uwe Kleine-K?nig wrote:
+> Hi Russell,
+> 
+> On Mon, Jul 08, 2013 at 05:29:17PM +0200, Uwe Kleine-K?nig wrote:
+> > On Wed, Jun 26, 2013 at 11:27:35AM +0200, Uwe Kleine-K?nig wrote:
+> > > The name changed in response to review comments for the nvic irqchip
+> > > driver when the original name was already accepted into Russell King's
+> > > tree.
+> > > 
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > ---
+> > > Hello,
+> > > 
+> > > this patch was part of the irqchip patch v4, but I split it out for
+> > > being easier to merge in v5. It applies on top of Russell's devel-stable
+> > > branch.
+> > > 
+> > > Russell: I put it on top of my for-next branch (
+> > > 
+> > > 	git://git.pengutronix.de/git/ukl/linux.git for-next
+> > > 
+> > > ) that you merged into your devel-stable some time ago. So assuming
+> > > you're fine with the patch, you can just repull or I can put it into
+> > > your patch tracker if you prefer it. In the latter case please tell me.
+> > The mismatch hit Linus' tree now. How should this patch get to him?
+> Although it's not critical (as there are no in-tree users) I still think
+> this should go in before 3.11.
 
-2013/7/30 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>:
-> Dear Mark Rutland,
->
-> On Tue, 23 Jul 2013 12:22:59 +0100, Mark Rutland wrote:
->
->> > +Some Ethernet MACs have a "fixed link", and are not connected to a
->> > +normal MDIO-managed PHY device. For those situations, a Device Tree
->> > +binding allows to describe a "fixed link".
->>
->> Are partictular MACs fixed link, or can some either be either fixed link
->> or wired to an MDIO-managed PHY? i.e. can we assume a given MAC is
->> fixed-link from its compatible string?
->
-> No, you can't. The case that I have is that the mvneta Ethernet MAC
-> (of Marvell 370/XP SOCs) is sometimes used with a MDIO-managed PHY, and
-> sometimes used with a switch that isn't manageable at all and should be
-> considered as a fixed link.
->
-> So no, the compatible string of the Ethernet MAC cannot be used to
-> determine whether we're wired fixed link or to a classical MDIO-managed
-> PHY.
->
->> > +Such a fixed link situation is described within an Ethernet device
->> > +Device Tree node using a 'fixed-link' property, composed of 5
->> > +elements:
->>
->> I'm not sure grouping these values together is the best way of handling
->> this. It's rather opaque, and inflexible for future extension.
->
-> That's the DT binding that has been used by PowerPC platforms since
-> several years, and I've simply re-used it. See 'git grep fixed-link
-> arch/powerpc/boot/dts'.
->
-> I have nothing against creating another DT binding, but for a start, I
-> thought using existing bindings would be the best idea.
->
->> > + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
->> > +    the system.
->>
->> Is there any reason this couldn't be allocated dynamically within the
->> kernel as needed? I don't see why an arbitrary unique value should be a
->> dt binding requirement; it seems like a leak of Linux implementation
->> details.
->
-> As I pointed out in my reply to Grant, this value is used both as the
-> PHY address on the fake fixed MDIO bus, and as the PHY identifier as
-> reported by MII registers PHYS_ID1 and PHYS_ID2. If we can get assigned
-> a proper PHY identifier that is used statically by the driver (it
-> doesn't have to be different per fixed PHY instance), then we can
-> allocate the PHY address dynamically. It requires a little bit of API
-> changes but that's certainly doable. See my reply to Grant for a
-> proposal about this.
->
->> > + 2. The duplex (1 for full-duplex, 0 for half-duplex)
->>
->> Will this change for a given MAC?
->>
->> Could we not have a boolean property for each of these, and require one
->> to be present?
->>
->> Possibly fixed-link-full-duplex / fix-link-half-duplex?
->>
->> > + 3. The speed (10, 100, 1000)
->>
->> fixed-link-speed?
->>
->> > + 4. The pause setting (1 for enabled, 0 for disabled)
->> > + 5. The asym pause setting (1 for enabled, 0 for disabled)
->>
->> Boolean properties for both of these?
->
-> As Florian already answered, he already proposed something like this in
-> the past, and it was rejected because a fixed PHY is not a piece of
-> hardware and should therefore not be represented in the Device Tree.
-> However, the fact that the MAC is not connected to a MDIO-manageable
-> PHY but to some fixed-link thing is a property of the MAC hardware
-> layout, and can therefore be expressed as a property of the MAC
-> hardware.
-
-True, what I *did* not like about this "fixed-link" 5 integer property
-is that it does not present a consistent view of a PHY device and puts
-some properties in the Ethernet MAC node, while some other are in the
-Ethernet PHY node. From a hardware perspective, the Ethernet MAC and
-the Ethernet PHY are two pieces of hardware, so both should get their
-own node.
-
-That said, since "fixed PHY" devices are not connected on the MDIO
-bus, they cannot be represented as Ethernet PHY nodes as leafs of a
-parent MDIO bus node, so maybe what we could do is having the fixed
-PHY nodes child nodes of the Ethernet MAC but still make them look
-like a "relatively" conventional Ethernet PHY node?
-
->
-> See the thread that starts at
-> http://article.gmane.org/gmane.linux.network/275771, and specifically
-> Grant answers to Florian suggestions of having DT nodes to represent
-> fixed PHY: http://article.gmane.org/gmane.linux.network/276208. Grant's
-> answer was:
->
-> """
-> I think this discussion is going in the wrong direction. The concept
-> of a dummy phy is really a Linux kernel internal detail. Creating some
-> kind of dummy MDIO bus node does not describe the hardware. There is
-> already support in the kernel for Ethernet MACs connected directly to
-> a switch or other device. It is far better to describe how the MAC
-> needs to be configured than to invent a non-existent phy. Search for
-> "fixed-link" in the kernel tree to see how it is used.
-> """
->
-> Best regards,
->
-> Thomas
-> --
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
-
-
-
--- 
-Florian
+Can you put it in the patch system please?
