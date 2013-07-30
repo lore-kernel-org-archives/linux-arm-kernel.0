@@ -1,42 +1,62 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 30 Jul 2013 12:35:47 -0500
-Subject: [PATCH v2 00/13] Remove platform callbacks from mmc_spi,
- sh_mmcif and sh_mobile_sdhi drivers
-In-Reply-To: <1375180657-23641-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1375180657-23641-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0021DAC5C24E0@AUSP01VMBX24.collaborationhost.net>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Tue, 30 Jul 2013 19:39:03 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] Initial support for Allwinner's
+ Security ID fuses
+In-Reply-To: <20130730142047.GA28696@kroah.com>
+References: <20130626175144.GC2222@kroah.com> <51D674BF.9030207@schinagl.nl>
+ <20130706193646.GB9778@kroah.com> <51E466A3.4010503@schinagl.nl>
+ <20130716064107.GA10868@kroah.com> <20130717114650.GN3125@lukather>
+ <20130717161758.GA9822@kroah.com> <20130719094211.GD5106@lukather>
+ <20130719234944.GA11498@kroah.com> <51F7BE2F.3060004@schinagl.nl>
+ <20130730142047.GA28696@kroah.com>
+Message-ID: <51F7FA37.2010407@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 30, 2013 3:37 AM, Laurent Pinchart wrote:
+On 30-07-13 16:20, Greg KH wrote:
+> On Tue, Jul 30, 2013 at 03:22:55PM +0200, Oliver Schinagl wrote:
+>>> Let me go look at how I can make this work "easier", give me a few days.
+>> Not wanting to be rude, but it has been a little more then a few
+>> days, any progress? Just want to know what I have to modify my
+>> driver to so it can go into the next merge window :)
 >
-> This patch set replaces callbacks to board code with regulators and GPIOs in
-> the mmc_spi, sh_mmcif and sh_mobile_sdhi MMC drivers.
-
-Just tested this series on the vision_ep93xx board. Everything looks ok.
-
-For patches 01/13, 02/13 and 07/13 you can add:
-
-Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
-For patch 03/13:
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
-> This will be a bit messy to merge, as the series interleaves patches for
-> drivers and board files. Given that the mmc_spi driver is marked as orphan in
-> MAINTAINERS and that the vision_ep9307 hasn't seen any board-specific
-> modification in the last couple of kernel versions one option would be to
-> merge all patches (or at least patches 01/13 to 07/13) through Simon's tree if
-> all involved maintainers agree.
+> What?  Oh crap.
 >
-> If patch 01/13 should better be merged through the MMC tree (in which case
-> 02/13 should go through that tree as well), the two patches should be applied
-> first to the MMC tree, and a stable branch will be needed for Simon to base
-> the rest of the series on.
+> I saw this old email in my todo box last week and for some stupid reason
+> I thought I had already taken care of this, otherwise why would I have
+> left it around for so long?...
+>
+> Ugh, very sorry about that...
+>
+> Hm, this is a mess.  I hate platform devices...
+>
+> Anyway, as you want to get this into 3.12, and I'm not going to be able
+> to get the core infrastructure into the platform device by then, just go
+> ahead and do a sysfs_create_group() call in your device probe callback
+> for now.  That will register the needed files for the device (not the
+> driver, DOH that was stupid of me...) and all should be ok.
+>
+> Yes, you will still race with userspace, but as right now, there's no
+> way that _any_ platform driver can do this "correctly", you will be in
+> good company.  I'll clean up all platform drivers in a sweep of the tree
+> after 3.12 or so when I get the needed infrastructure in place for the
+> platform_driver code.
+>
+> Again, very sorry for all of this, you have helped me out a lot in
+> figuring out that this is a mess, and should be fixed up better, but in
+> the end, you are pretty much back at the beginning of what you
+> originally wanted to do, right?
+Alright, I'll modify it to use sysfs_create_group() and try to leave it 
+as much as it is no to ease the transition.
+>
+> I owe you a beer, at the least, my apologies...
+Pff, free booze is far better ;) I kid I kid, though Maxime helped a lot 
+there.
 
-I'm fine with whatever merge path you end up using. I don't currently have
-any changes planned to vision_ep93xx.
+Ok expect a v6 I think for review and hopefully merge tomorrow.
 
-Thanks,
-Hartley
+oliver
+
+>
+> greg k-h
+>
