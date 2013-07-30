@@ -1,45 +1,29 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 30 Jul 2013 16:33:38 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
- mitigations
-In-Reply-To: <20130730231533.GA26824@redhat.com>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <20130730221435.GA22240@redhat.com>
- <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
- <20130730231533.GA26824@redhat.com>
-Message-ID: <CAGXu5jLQxE14Gy3x20XMyFyUQKwMQ+RU9S24H742cQevEF9Aew@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 31 Jul 2013 01:48:45 +0200
+Subject: Linux Plumbers ACPI/PM, PCI Microconference
+In-Reply-To: <CAKocOOOgEb5h1dZWP_2UqBKhSK9U-kxKUbvTdzHfds=RiDzNJg@mail.gmail.com>
+References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
+ <CAKocOOOgEb5h1dZWP_2UqBKhSK9U-kxKUbvTdzHfds=RiDzNJg@mail.gmail.com>
+Message-ID: <1476124.sWE2ygoo2D@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 4:15 PM, Dave Jones <davej@redhat.com> wrote:
-> On Wed, Jul 31, 2013 at 02:11:20AM +0300, Aaro Koskinen wrote:
->  > Hi,
->  >
->  > On Tue, Jul 30, 2013 at 06:14:35PM -0400, Dave Jones wrote:
->  > > On Tue, Jul 30, 2013 at 12:05:40PM -0700, Kees Cook wrote:
->  > >  > - fuzzing (is anyone running trinity or similar on the ARM tree?)
->  > >
->  > > Someone was kind enough to send me an arm chromebook, so I tried this just
->  > > last week (albeit, on the 3.4 kernel it shipped with). The results make
->  > > me think the answer is a resounding 'no'.
->  >
->  > Shouldn't you run trinity only under QEMU or similar virtual
->  > environment? Don't know about chromebook, but on some of my ARM boards
->  > a misbehaving kernel could at least in theory brick the board...
->
-> I like to live dangerously.  Don't imitate everything you see on TV,
-> or read about on lkml.
->
-> More seriously, that's true if you're running trinity as root, which
-> yes, I usually advise people only do in qemu etc.
->
-> If you're running it as a regular user and you can brick the board,
-> you might have bigger problems.
+On Wednesday, July 17, 2013 08:31:55 AM Shuah Khan wrote:
+> Myron,
+> 
+> On Tue, Jul 16, 2013 at 8:21 PM, Myron Stowe <myron.stowe@gmail.com> wrote:
+> 
+> >
+> > Shuah - You brought up the idea about "Converting drivers from Legacy
+> > PM ops to dev_pm_ops"; would you like to present what you have
+> > done/encountered so far?
+> >
+> 
+> Awesome. Yes, I would like to present what I have done so far and I do
+> have a couple of things that could benefit from a face to face
+> discussion which would help me make progress on the rest of the work
+> that needs to get done.
 
-Exactly, and finding those problems tends to be worth the hardware hassle. :)
+Care to sumbit a formal proposal through the LPC web page?
 
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Rafael
