@@ -1,30 +1,61 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 30 Jul 2013 07:25:17 -0700
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <20130730081520.GH16441@radagast>
-References: <51F74BC8.7020903@ti.com> <20130730060134.GD9155@radagast>
- <51F7590B.4020705@ti.com> <20130730061830.GE9155@radagast>
- <51F75C40.4060406@ti.com> <20130730062844.GH9155@radagast>
- <51F7613C.5070803@ti.com> <20130730071611.GD16441@radagast>
- <51F7752B.8050804@ti.com> <20130730081520.GH16441@radagast>
-Message-ID: <20130730142517.GA29015@kroah.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 30 Jul 2013 17:23:53 +0300
+Subject: [PATCH v2 1/8] ARM: DRA7: id: Add cpu detection support for
+ DRA7xx based SoCs'
+In-Reply-To: <51F7CB2F.6070705@ti.com>
+References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
+ <1375183546-12758-2-git-send-email-rnayak@ti.com>
+ <20130730131009.GA28162@radagast> <51F7CB2F.6070705@ti.com>
+Message-ID: <20130730142353.GL28162@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 11:15:20AM +0300, Felipe Balbi wrote:
-> > > look at Greg's and my reply to that email.
-> > 
-> > but finally Greg agreed to what Tomasz proposed no?
-> 
-> that's not what I see in the thread. I see Greg agreed to regulator's
-> own IDs being sequentially created, but he mentions device names can
-> change.
+Hi,
 
-And that no one should _ever_ rely on them to be a specific "name", the
-bus is responsible for creating the id, it could be "random" and
-everything should work just fine.
+On Tue, Jul 30, 2013 at 07:48:23PM +0530, Sricharan R wrote:
+> On Tuesday 30 July 2013 06:40 PM, Felipe Balbi wrote:
+> > Hi,
+> >
+> > On Tue, Jul 30, 2013 at 04:55:39PM +0530, Rajendra Nayak wrote:
+> >> @@ -379,6 +407,13 @@ IS_OMAP_TYPE(3430, 0x3430)
+> >>  # define soc_is_omap543x()		is_omap543x()
+> >>  #endif
+> >>  
+> >> +# if defined(CONFIG_SOC_DRA7XX)
+> >> +# undef soc_is_dra7xx
+> >> +# undef soc_is_dra75x
+> >> +# define soc_is_dra7xx()		is_dra7xx()
+> >> +# define soc_is_dra75x()		is_dra75x()
+> > since this platform is DT-only, couldn't we just believe DT-data to be
+> > correct of_machine_is_compatible() ? 2/3 of this patch would be removed.
+> >
+> > I patched this for OMAP5 (compile-tested only, no boards available) and
+> > came out with the patch below (still needs to be split):
+> >
+> > diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> > index 08b7267..b3136e5 100644
+> > --- a/arch/arm/boot/dts/omap5-uevm.dts
+> > +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> > @@ -13,7 +13,7 @@
+> >  
+> >  / {
+> >  	model = "TI OMAP5 uEVM board";
+> > -	compatible = "ti,omap5-uevm", "ti,omap5";
+> > +	compatible = "ti,omap5-uevm", "ti,omap5432-es2.0", "ti,omap5";
+> >  
+>  ok, nice and simpler way.
+>  But would this make different revisions, to appear the same ?
 
-thanks,
+well omap5-uevm is omap5432 es2.0 only, right ? If a new board comes up,
+it should be treated as such, then you can pass a different string to
+that new board's compatible attribute.
 
-greg k-h
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/3cbeae19/attachment.sig>
