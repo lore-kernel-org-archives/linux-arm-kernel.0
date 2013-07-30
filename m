@@ -1,154 +1,138 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 30 Jul 2013 10:21:49 -0500
-Subject: [PATCHv4 02/33] clk: omap: introduce clock driver
-In-Reply-To: <1374564028-11352-3-git-send-email-t-kristo@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-3-git-send-email-t-kristo@ti.com>
-Message-ID: <51F7DA0D.7060709@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Jul 2013 16:28:24 +0100
+Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
+ property
+In-Reply-To: <20130730111604.76fd5b6e@skate>
+References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
+ <20130730111604.76fd5b6e@skate>
+Message-ID: <20130730152824.GB29859@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 02:19 AM, Tero Kristo wrote:
-> Parses OMAP clock data from DT and registers those clocks with the clock
-> framework.  dt_omap_clk_init must be called early during boot for timer
-> initialization so it is exported and called from the existing clock code
-> instead of probing like a real driver. Based on initial work done by
-> Mike Turquette.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
->   drivers/clk/Makefile      |    1 +
->   drivers/clk/omap/Makefile |    1 +
->   drivers/clk/omap/clk.c    |   39 +++++++++++++++++++++++++++++++++++++++
+Hi Thomas,
 
-Minor suggestion - should we just start drivers/clk/ti/ instead of clk/omap?
+On Tue, Jul 30, 2013 at 10:16:04AM +0100, Thomas Petazzoni wrote:
+> Dear Mark Rutland,
+> 
+> On Tue, 23 Jul 2013 12:22:59 +0100, Mark Rutland wrote:
+> 
+> > > +Some Ethernet MACs have a "fixed link", and are not connected to a
+> > > +normal MDIO-managed PHY device. For those situations, a Device Tree
+> > > +binding allows to describe a "fixed link".
+> > 
+> > Are partictular MACs fixed link, or can some either be either fixed link
+> > or wired to an MDIO-managed PHY? i.e. can we assume a given MAC is
+> > fixed-link from its compatible string?
+> 
+> No, you can't. The case that I have is that the mvneta Ethernet MAC
+> (of Marvell 370/XP SOCs) is sometimes used with a MDIO-managed PHY, and
+> sometimes used with a switch that isn't manageable at all and should be
+> considered as a fixed link.
+> 
+> So no, the compatible string of the Ethernet MAC cannot be used to
+> determine whether we're wired fixed link or to a classical MDIO-managed
+> PHY.
 
-AM335x/DRA7 are not "strictly OMAP".. might also allow for some reuse 
-for other TI platforms..
+Ok. Thanks for the info.
 
->   include/linux/clk/omap.h  |   24 ++++++++++++++++++++++++
->   4 files changed, 65 insertions(+)
->   create mode 100644 drivers/clk/omap/Makefile
->   create mode 100644 drivers/clk/omap/clk.c
->   create mode 100644 include/linux/clk/omap.h
->
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 4038c2b..d3c3733 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
->   obj-$(CONFIG_ARCH_ZYNQ)		+= zynq/
->   obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
->   obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
-> +obj-$(CONFIG_ARCH_OMAP)		+= omap/
->
->   obj-$(CONFIG_X86)		+= x86/
->
-> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
-> new file mode 100644
-> index 0000000..8195931
-> --- /dev/null
-> +++ b/drivers/clk/omap/Makefile
-> @@ -0,0 +1 @@
-> +obj-y					+= clk.o
-> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
-> new file mode 100644
-> index 0000000..4bf1929
-> --- /dev/null
-> +++ b/drivers/clk/omap/clk.c
-> @@ -0,0 +1,39 @@
-> +/*
-> + * OMAP PRCM clock driver
+> 
+> > > +Such a fixed link situation is described within an Ethernet device
+> > > +Device Tree node using a 'fixed-link' property, composed of 5
+> > > +elements:
+> > 
+> > I'm not sure grouping these values together is the best way of handling
+> > this. It's rather opaque, and inflexible for future extension.
+> 
+> That's the DT binding that has been used by PowerPC platforms since
+> several years, and I've simply re-used it. See 'git grep fixed-link
+> arch/powerpc/boot/dts'.
+> 
+> I have nothing against creating another DT binding, but for a start, I
+> thought using existing bindings would be the best idea.
 
-maybe then prcm-clk.c ?
+Sorry, I was not aware that was the case. I agree that reusing the
+existing binding is the right place to start.
 
-> + *
-> + * Copyright (C) 2013 Texas Instruments, Inc.
-> + *     Tero Kristo <t-kristo@ti.com>
-> + *     Mike Turquette <mturquette@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clk/omap.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of_device.h>
-> +
-> +/* FIXME - should the OMAP PRCM clock driver match generic types? */
+> 
+> > > + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
+> > > +    the system.
+> > 
+> > Is there any reason this couldn't be allocated dynamically within the
+> > kernel as needed? I don't see why an arbitrary unique value should be a
+> > dt binding requirement; it seems like a leak of Linux implementation
+> > details.
+> 
+> As I pointed out in my reply to Grant, this value is used both as the
+> PHY address on the fake fixed MDIO bus, and as the PHY identifier as
+> reported by MII registers PHYS_ID1 and PHYS_ID2. If we can get assigned
+> a proper PHY identifier that is used statically by the driver (it
+> doesn't have to be different per fixed PHY instance), then we can
+> allocate the PHY address dynamically. It requires a little bit of API
+> changes but that's certainly doable. See my reply to Grant for a
+> proposal about this.
 
-should it? :)
+Ok. I must admit to not knowing enough about ethernet hardware to fully
+understand the implications here for the MII registers, but otherwise
+your proposal makes sense.
 
-> +static const struct of_device_id clk_match[] = {
-> +	{.compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-drivers/clk/clk-fixed-rate.c seems to already do this with 
-CLK_OF_DECLARE, or am I mistaken? and so on?
-> +	{.compatible = "mux-clock", .data = of_mux_clk_setup, },
-> +	{.compatible = "fixed-factor-clock",
-> +		.data = of_fixed_factor_clk_setup, },
-> +	{.compatible = "divider-clock", .data = of_divider_clk_setup, },
-> +	{.compatible = "gate-clock", .data = of_gate_clk_setup, },
-> +	{},
-> +};
-> +
-> +/* FIXME - need to initialize early; skip real driver registration & probe */
-> +int __init dt_omap_clk_init(void)
+> 
+> > > + 2. The duplex (1 for full-duplex, 0 for half-duplex)
+> > 
+> > Will this change for a given MAC?
+> > 
+> > Could we not have a boolean property for each of these, and require one
+> > to be present?
+> > 
+> > Possibly fixed-link-full-duplex / fix-link-half-duplex?
+> > 
+> > > + 3. The speed (10, 100, 1000)
+> > 
+> > fixed-link-speed?
+> > 
+> > > + 4. The pause setting (1 for enabled, 0 for disabled)
+> > > + 5. The asym pause setting (1 for enabled, 0 for disabled)
+> > 
+> > Boolean properties for both of these?
+> 
+> As Florian already answered, he already proposed something like this in
+> the past, and it was rejected because a fixed PHY is not a piece of
+> hardware and should therefore not be represented in the Device Tree.
+> However, the fact that the MAC is not connected to a MDIO-manageable
+> PHY but to some fixed-link thing is a property of the MAC hardware
+> layout, and can therefore be expressed as a property of the MAC
+> hardware.
 
-Might be good to have kernel doc to explain the init requirement as 
-documented in commit message.
+I think it would certainly make sense to describe this as a property of
+the MAC.
 
-> +{
-> +	of_clk_init(clk_match);
+Thanks,
+Mark.
 
-just doing of_clk_init(NULL); should do the job, no? that could even be 
-a static inline OR introduced in board_generic without additional headers?
-
-> +	return 0;
-> +}
-> diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
-> new file mode 100644
-> index 0000000..647f02f
-> --- /dev/null
-> +++ b/include/linux/clk/omap.h
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright (C) 2013 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-
-would you like to match licensing to that of the C file?
-
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +
-> +#ifndef __LINUX_CLK_OMAP_H_
-> +#define __LINUX_CLK_OMAP_H_
-> +
-> +int __init dt_omap_clk_init(void);
-> +
-> +#endif
->
-
-
--- 
-Regards,
-Nishanth Menon
+> 
+> See the thread that starts at
+> http://article.gmane.org/gmane.linux.network/275771, and specifically
+> Grant answers to Florian suggestions of having DT nodes to represent
+> fixed PHY: http://article.gmane.org/gmane.linux.network/276208. Grant's
+> answer was:
+> 
+> """
+> I think this discussion is going in the wrong direction. The concept
+> of a dummy phy is really a Linux kernel internal detail. Creating some
+> kind of dummy MDIO bus node does not describe the hardware. There is
+> already support in the kernel for Ethernet MACs connected directly to
+> a switch or other device. It is far better to describe how the MAC
+> needs to be configured than to invent a non-existent phy. Search for
+> "fixed-link" in the kernel tree to see how it is used.
+> """
+> 
+> Best regards,
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+> 
