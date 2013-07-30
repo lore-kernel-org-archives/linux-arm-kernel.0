@@ -1,90 +1,46 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 30 Jul 2013 13:43:05 -0500
-Subject: [PATCH v2 1/8] ARM: DRA7: id: Add cpu detection support for DRA7xx
- based SoCs'
-In-Reply-To: <51F807EF.6020809@ti.com>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-2-git-send-email-rnayak@ti.com>
- <20130730131009.GA28162@radagast> <51F7CB2F.6070705@ti.com>
- <20130730142353.GL28162@radagast> <51F7CF6F.6050702@ti.com>
- <20130730153138.GA5978@radagast> <51F807EF.6020809@ti.com>
-Message-ID: <51F80939.7060403@ti.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 30 Jul 2013 11:50:49 -0700
+Subject: [GIT PULL] 64bit friendly generic sched_clock() base for 3.12
+Message-ID: <51F80B09.8060509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 01:37 PM, Sricharan R wrote:
-> Hi,
-> On Tuesday 30 July 2013 09:02 PM, Felipe Balbi wrote:
->> Hi,
->>
->> On Tue, Jul 30, 2013 at 08:06:31PM +0530, Sricharan R wrote:
->>> On Tuesday 30 July 2013 07:53 PM, Felipe Balbi wrote:
->>>> Hi,
->>>>
->>>> On Tue, Jul 30, 2013 at 07:48:23PM +0530, Sricharan R wrote:
->>>>> On Tuesday 30 July 2013 06:40 PM, Felipe Balbi wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On Tue, Jul 30, 2013 at 04:55:39PM +0530, Rajendra Nayak wrote:
->>>>>>> @@ -379,6 +407,13 @@ IS_OMAP_TYPE(3430, 0x3430)
->>>>>>>   # define soc_is_omap543x()		is_omap543x()
->>>>>>>   #endif
->>>>>>>
->>>>>>> +# if defined(CONFIG_SOC_DRA7XX)
->>>>>>> +# undef soc_is_dra7xx
->>>>>>> +# undef soc_is_dra75x
->>>>>>> +# define soc_is_dra7xx()		is_dra7xx()
->>>>>>> +# define soc_is_dra75x()		is_dra75x()
->>>>>> since this platform is DT-only, couldn't we just believe DT-data to be
->>>>>> correct of_machine_is_compatible() ? 2/3 of this patch would be removed.
->>>>>>
->>>>>> I patched this for OMAP5 (compile-tested only, no boards available) and
->>>>>> came out with the patch below (still needs to be split):
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
->>>>>> index 08b7267..b3136e5 100644
->>>>>> --- a/arch/arm/boot/dts/omap5-uevm.dts
->>>>>> +++ b/arch/arm/boot/dts/omap5-uevm.dts
->>>>>> @@ -13,7 +13,7 @@
->>>>>>
->>>>>>   / {
->>>>>>   	model = "TI OMAP5 uEVM board";
->>>>>> -	compatible = "ti,omap5-uevm", "ti,omap5";
->>>>>> +	compatible = "ti,omap5-uevm", "ti,omap5432-es2.0", "ti,omap5";
->>>>>>
->>>>>   ok, nice and simpler way.
->>>>>   But would this make different revisions, to appear the same ?
->>>> well omap5-uevm is omap5432 es2.0 only, right ? If a new board comes up,
->>>> it should be treated as such, then you can pass a different string to
->>>> that new board's compatible attribute.
->>>> s
->>>   Yes for OMAP5. I was thinking in general about this approach.
->>>   For example, for OMAP4 we have same board and
->>>   different revisions can be socketed there.
->>>
->>>   For OMAP5, this is good.
->> do we really production socketed boards? Well, at least Blaze has such
->> thing. But do we have too many differences that need to be trated at
->> arch/arm or should/could those be handled by reading IP's revision
->> register (e.g. usb host erratas)
->>
->   OMAP4 SDP is socketed as well.
-a) OMAP4SDP is not production device
-b) OMAP4SDP uses SOM (System On Module)
-c) Socketted SOMs were used only during initial days of SoC
-d) almost all latest OMAP4 SDP switched to using soldered in SOM
-e) we claim compatibility of OMAP4 SDP with Blaze.
+Hey Thomas, Olof,
+     Here is the common base changes in Stephen's "64bit friendly 
+generic sched_clock()" patch series. This common base will be needed so 
+that following patch series can be merged via both the tip/timers/core 
+and arm-soc trees independently.
 
-So, I dont think this is a rational argument for keeping soc checks with 
-dts.
+Please let me know if you have any issues or objections with this set.
 
->   Ya, revision checks used only in few places and as you said
->   we handle them using IP revisions, but that we have to look and clean
->   up those places, if we really intend to do this for other socs.
-
-I agree this is the right approach :).
+thanks
+-john
 
 
--- 
-Regards,
-Nishanth Menon
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+
+   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+   git://git.linaro.org/people/jstultz/linux.git 
+fortglx/3.12/sched-clock64-base
+
+for you to fetch changes up to e7e3ff1bfe9c42ee31172e9afdc0383a9e595e29:
+
+   sched_clock: Add support for >32 bit sched_clock (2013-07-30 11:24:21 
+-0700)
+
+----------------------------------------------------------------
+Stephen Boyd (4):
+       clocksource: Extract max nsec calculation into separate function
+       sched_clock: Use seqcount instead of rolling our own
+       sched_clock: Use an hrtimer instead of timer
+       sched_clock: Add support for >32 bit sched_clock
+
+  include/linux/clocksource.h |   2 +
+  include/linux/sched_clock.h |   2 +
+  kernel/time/clocksource.c   |  45 ++++++++++++------
+  kernel/time/sched_clock.c   | 111 
+++++++++++++++++++++++++--------------------
+  4 files changed, 95 insertions(+), 65 deletions(-)
