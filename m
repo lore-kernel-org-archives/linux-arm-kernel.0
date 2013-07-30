@@ -1,30 +1,17 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 29 Jul 2013 19:19:09 -0700
-Subject: [PATCH] clocksource: em_sti: Convert to devm_* managed helpers
-In-Reply-To: <20130730020640.GA27724@verge.net.au>
-References: <1374848897-18545-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20130730020640.GA27724@verge.net.au>
-Message-ID: <51F7229D.7090706@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 30 Jul 2013 10:23:30 +0800
+Subject: [PATCH] ARM: dts: imx53-qsb: Make USBH1 functional
+In-Reply-To: <1374787113-6628-1-git-send-email-fabio.estevam@freescale.com>
+References: <1374787113-6628-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130730022327.GA19715@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 07:06 PM, Simon Horman wrote:
-> [ CC John Stultz, Thomas Gleixner ]
->
-> On Fri, Jul 26, 2013 at 04:28:17PM +0200, Laurent Pinchart wrote:
->> Replace kzalloc, clk_get, ioremap and request_irq by their managed
->> counterparts to simplify error paths.
->>
->> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Hi Laurent,
->
-> I was recently asked for shmobile clocksource patches to be reviewed
-> by the clocksource maintainers. I believe that means John Stultz
-> and Thomas Gleixner who I have CCed on this email accordingly.
+On Thu, Jul 25, 2013 at 06:18:33PM -0300, Fabio Estevam wrote:
+> mx53qsb uses GPIO7_8 to turn on VBUS, so add support for it.
+> 
+> Also specify the PHY type in the device tree.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Daniel Lezcano (cc'ed) is picking up maintainership of 
-clocksource/clockevent code in drivers/clocksource, so please cc him in 
-the future.
-
-thanks
--john
+Applied, thanks.
