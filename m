@@ -1,43 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 10:59:13 -0600
-Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
-In-Reply-To: <CALicx6ugumPG__rSAsTS95SH=6fTGqhpPFsQ8bLG-u-fbk0=pQ@mail.gmail.com>
-References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
- <20130726104908.GC17886@mudshark.cambridge.arm.com>
- <51F2ACF7.9000008@wwwdotorg.org>
- <CALicx6ugumPG__rSAsTS95SH=6fTGqhpPFsQ8bLG-u-fbk0=pQ@mail.gmail.com>
-Message-ID: <51F7F0E1.5030200@wwwdotorg.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 30 Jul 2013 10:17:52 -0700
+Subject: [PATCH] mmc: sdhci-msm: Add support for MSM chipsets
+In-Reply-To: <86y58orogf.fsf@void.printf.net>
+References: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com>
+ <86y58orogf.fsf@void.printf.net>
+Message-ID: <20130730171752.GA30897@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 04:37 AM, Vijay Kilari wrote:
-> On Fri, Jul 26, 2013 at 10:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-...
->> Does a kernel that's used as the crash kernel guarantee:
->>
->> * Never to re-use the memory that was used by the previous kernel, so
->> that the spin loop code/data won't be corrupted, ever, no matter how
->> long the crash recovery kernel runs.
->>
->> * Not use SMP, so there's never a need to re-activate the non-boot CPUs,
->> which might not work if they aren't truly disabled but rather just
->> running a pin loop?
-> 
-> From cat /proc/iomem, normal kernel is executed from (0x80xxxxxx) with crash
-> kernel reserved 64M at 0xa0000000
-> 
-> 80000000-bfffffff : System RAM
->   80008000-805aeddf : Kernel code
->   805e2000-8063e427 : Kernel data
->   a0000000-a3ffffff : Crash kernel
-> 
-> crash kernel is loaded to reserved memory location and is executed from there.
-> I could confirm this from /proc/iomem when crash kernel is running
-> 
-> a0000000-a3efffff : System RAM
->   a0008000-a05aeddf : Kernel code
->   a05e2000-a063e427 : Kernel data
+On Tue, Jul 30, 2013 at 05:40:16PM +0100, Chris Ball wrote:
 
-OK, but in the crash dump kernel, is 80008000..8063e427 reserved as
-well, which would guarantee that the spin loop being executed by the
-non-crash CPUs won't be corrupted?
+>On Tue, Jul 30 2013, Georgi Djakov wrote:
+>> This platform driver adds the support of Secure Digital Host
+>> Controller Interface compliant controller in MSM chipsets.
+>>
+>> CC: Asutosh Das <asutoshd@codeaurora.org>
+>> CC: Venkat Gopalakrishnan <venkatg@codeaurora.org>
+>> CC: Sahitya Tummala <stummala@codeaurora.org>
+>> CC: Subhash Jadavani <subhashj@codeaurora.org>
+>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>> ---
+>> This is an initial version of the Qualcomm MSM SDHCI driver.
+>> It is based on the SDHCI code from coreaurora.org with minor
+>> modifications. The MMC standard DT bindings are used where
+>> possible. The patch applies to v3.11-rc3.
+>
+>Is the arch code that will use this driver already in mainline,
+>or on its way in?
+
+It is on it's way.  Once all of the necessary Acks are in place, I'll
+be pulling it in.
+
+David
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
