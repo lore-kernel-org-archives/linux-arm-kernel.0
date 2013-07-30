@@ -1,40 +1,167 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 30 Jul 2013 13:27:57 +0900
-Subject: [PATCH] ARM: SAMSUNG: fix to support for missing cpu specific map_io
-Message-ID: <190501ce8cdd$2abd6780$80383680$%kim@samsung.com>
+Date: Tue, 30 Jul 2013 13:29:04 +0900
+Subject: [PATCH] ARM: exynos5440_defconfig: add defconfig for EXYNOS5440
+Message-ID: <190601ce8cdd$52f0b1d0$f8d21570$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Since commit 7ed76e08 (ARM: EXYNOS: Fix low level debug support)
-map_io() is not needed for exynos5440 so need to fix to lookup
-cpu which using map_io(). Without this, kernel boot log complains
-'CPU EXYNOS5440 support not enabled' on exynos5440 and panic().
+Since current exynos_defconfig cannot support for EXYNOS5440 because
+of LPAE, there were discussions about that in mailing list. So this
+adds initial defconfig which is tested on SSDK5440 and SD5v1 for
+LPAE enabled EXYNOS5440. This defconfig enables ARCH_EXYNOS, ARM_LPAE,
+PCI, CPU_FREQ
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-samsung/init.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/configs/exynos5440_defconfig |  138 +++++++++++++++++++++++++++++++++
+ 1 file changed, 138 insertions(+)
+ create mode 100644 arch/arm/configs/exynos5440_defconfig
 
-diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
-index 3e5c461..50a3ea0 100644
---- a/arch/arm/plat-samsung/init.c
-+++ b/arch/arm/plat-samsung/init.c
-@@ -55,12 +55,13 @@ void __init s3c_init_cpu(unsigned long idcode,
- 
- 	printk("CPU %s (id 0x%08lx)\n", cpu->name, idcode);
- 
--	if (cpu->map_io == NULL || cpu->init == NULL) {
-+	if (cpu->init == NULL) {
- 		printk(KERN_ERR "CPU %s support not enabled\n", cpu->name);
- 		panic("Unsupported Samsung CPU");
- 	}
- 
--	cpu->map_io();
-+	if (cpu->map_io)
-+		cpu->map_io();
- }
- 
- /* s3c24xx_init_clocks
+diff --git a/arch/arm/configs/exynos5440_defconfig b/arch/arm/configs/exynos5440_defconfig
+new file mode 100644
+index 0000000..53daf04
+--- /dev/null
++++ b/arch/arm/configs/exynos5440_defconfig
+@@ -0,0 +1,138 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_PERF_EVENTS=y
++CONFIG_MODULES=y
++CONFIG_MODULE_FORCE_LOAD=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODULE_FORCE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_ARCH_EXYNOS=y
++# CONFIG_ARCH_EXYNOS4 is not set
++CONFIG_ARCH_EXYNOS5=y
++# CONFIG_SOC_EXYNOS5250 is not set
++CONFIG_ARM_LPAE=y
++CONFIG_PCI=y
++CONFIG_PCI_EXYNOS=y
++CONFIG_SMP=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_TRANSPARENT_HUGEPAGE=y
++CONFIG_CMDLINE="root=/dev/sda2 rw rootwait ignore_loglevel early_printk no_console_suspend mem=2048M at 0x80000000
+mem=6144M at 0x100000000 console=ttySAC0,115200"
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
++CONFIG_CPU_IDLE=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_PM_AUTOSLEEP=y
++CONFIG_PM_WAKELOCKS=y
++CONFIG_PM_DEBUG=y
++CONFIG_PM_ADVANCED_DEBUG=y
++CONFIG_PM_TEST_SUSPEND=y
++CONFIG_APM_EMULATION=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_NET_KEY=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_ADVANCED_ROUTER=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_IP_PNP_RARP=y
++CONFIG_IPV6=y
++CONFIG_RFKILL_REGULATOR=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=10240
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_ATA=y
++CONFIG_SATA_AHCI_PLATFORM=y
++# CONFIG_ATA_SFF is not set
++CONFIG_NETDEVICES=y
++CONFIG_SMSC911X=y
++CONFIG_STMMAC_ETH=y
++CONFIG_STMMAC_DA=y
++CONFIG_MARVELL_PHY=y
++CONFIG_FIXED_PHY=y
++CONFIG_USB_USBNET=y
++CONFIG_USB_NET_SMSC75XX=y
++CONFIG_USB_NET_SMSC95XX=y
++CONFIG_INPUT_EVDEV=y
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_SAMSUNG=y
++CONFIG_SERIAL_SAMSUNG_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_S3C2410=y
++CONFIG_SPI=y
++CONFIG_SPI_S3C64XX=y
++# CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_CPU_THERMAL=y
++CONFIG_THERMAL_EMULATION=y
++CONFIG_EXYNOS_THERMAL=y
++CONFIG_EXYNOS_THERMAL_CORE=y
++CONFIG_WATCHDOG=y
++CONFIG_S3C2410_WATCHDOG=y
++CONFIG_MFD_TPS65090=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_REGULATOR_TPS65090=y
++CONFIG_USB=y
++CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_S5P=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_EXYNOS=y
++CONFIG_USB_STORAGE=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_S3C=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_HUGETLBFS=y
++CONFIG_CRAMFS=y
++CONFIG_ROMFS_FS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_MUTEXES=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRYPTO_ANSI_CPRNG=y
++CONFIG_CRC_CCITT=y
++CONFIG_VIRTUALIZATION=y
++CONFIG_KVM=y
 -- 
 1.7.10.4
