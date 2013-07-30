@@ -1,52 +1,76 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Jul 2013 16:59:44 +0200
-Subject: [PATCH 00/10] Introduce Allwinner A20 support
-Message-ID: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 30 Jul 2013 16:59:47 +0200
+Subject: [PATCH 03/10] ARM: sun7i: Add Olimex A20-Olinuxino-Micro support
+In-Reply-To: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375196394-21138-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Everyone,
+The Olimex A20-Olinuxino is an open-hardware board based on the
+Allwinner A20 SoC, with most of the pins exported on headers, a 10/100M
+ethernet port, SATA, SD and uSD slots, etc.
 
-This patchset brings in support for the Allwinner A20 SoC.
-
-This SoC is pretty much the heir of the Allwinner A10. They both have a lot of
-IP in common, the A20 is pin-compatible with the A10, the only major difference
-being that the A20 has 2 Cortex-A7 instead of the single Cortex-A8 found in the
-A10.
-
-Just like the A31, the SMP support isn't there yet, nor do we have clock
-support or any storage device.
-
-We also have the same SMP bit issue that makes Linux run without the caches
-enabled for the time being when CONFIG_SMP isn't set.
-
-This serie comes on top of the serie "ARM: sunxi: Add support for the Allwinner
-A31 SoC" I sent previously.
-
-Thanks,
-Maxime
-
-Maxime Ripard (10):
-  ARM: sunxi: Introduce Allwinner A20 support
-  ARM: sun7i: Add Allwinner A20 DTSI
-  ARM: sun7i: Add Olimex A20-Olinuxino-Micro support
-  pinctrl: sunxi: Wrap long compatible declaration lines
-  pinctrl: sunxi: Add Allwinner A20 pins set
-  pinctrl: sunxi: Fix inconsistent indentation
-  ARM: sun7i: Add the PIO controller node to the DTSI
-  ARM: sun7i: DT: Add UART muxing options to the DTSI
-  ARM: sun7i: a20-olinuxino: Enable UARTs muxing
-  ARM: sun7i: a20-olinuxino: Enable the user LED
-
- arch/arm/boot/dts/Makefile                      |    3 +-
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |   61 ++
- arch/arm/boot/dts/sun7i-a20.dtsi                |  204 +++++
- arch/arm/mach-sunxi/sunxi.c                     |    1 +
- drivers/pinctrl/pinctrl-sunxi-pins.h            | 1028 ++++++++++++++++++++++-
- drivers/pinctrl/pinctrl-sunxi.c                 |   24 +-
- 6 files changed, 1311 insertions(+), 10 deletions(-)
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/Makefile                      |  3 ++-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 34 +++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
- create mode 100644 arch/arm/boot/dts/sun7i-a20.dtsi
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1482533..18a7374 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -211,7 +211,8 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun4i-a10-hackberry.dtb \
+ 	sun5i-a10s-olinuxino-micro.dtb \
+ 	sun5i-a13-olinuxino.dtb \
+-	sun6i-a31-colombus.dtb
++	sun6i-a31-colombus.dtb \
++	sun7i-a20-olinuxino-micro.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-iris-512.dtb \
+ 	tegra20-medcom-wide.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+new file mode 100644
+index 0000000..29edf8b
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -0,0 +1,34 @@
++/*
++ * Copyright 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++
++/ {
++	model = "Olimex A20-Olinuxino Micro";
++	compatible = "olimex,a20-olinuxino-micro", "allwinner,sun7i-a20";
++
++	soc at 01c20000 {
++		uart0: serial at 01c28000 {
++			status = "okay";
++		};
++
++		uart6: serial at 01c29800 {
++			status = "okay";
++		};
++
++		uart7: serial at 01c29c00 {
++			status = "okay";
++		};
++	};
++};
 -- 
 1.8.3.4
