@@ -1,35 +1,33 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 30 Jul 2013 11:40:35 -0400
-Subject: [PATCH] do not allow XEN_TMEM on ARM64
-In-Reply-To: <alpine.DEB.2.02.1307231745520.4893@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1307231745520.4893@kaball.uk.xensource.com>
-Message-ID: <20130730154035.GA9245@phenom.dumpdata.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Jul 2013 17:44:51 +0200
+Subject: [PATCH 2/2] ARM: mvebu: add gpio-keys and input event support in
+ defconfig
+In-Reply-To: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375199091-31215-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 05:46:58PM +0100, Stefano Stabellini wrote:
-> tmem is not supported on arm or arm64 yet.
+Some Armada 370/XP boards have GPIO buttons, so it makes sense to
+enable gpio-keys and the input event interface in mvebu_defconfig.
 
-So .. I lost track of the conversation about this. We chatted
-about this on the hyepervisor side and then there is also
-this patch.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/configs/mvebu_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-What did we decide?
-
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
-> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-> index 9e02d60..a18f350 100644
-> --- a/drivers/xen/Kconfig
-> +++ b/drivers/xen/Kconfig
-> @@ -145,7 +146,7 @@ config SWIOTLB_XEN
->  
->  config XEN_TMEM
->  	tristate
-> -	depends on !ARM
-> +	depends on !ARM && !ARM64
->  	default m if (CLEANCACHE || FRONTSWAP)
->  	help
->  	  Shim to interface in-kernel Transcendent Memory hooks
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 731814e..594d706 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -39,6 +39,8 @@ CONFIG_MVNETA=y
+ CONFIG_MARVELL_PHY=y
+ CONFIG_MWIFIEX=y
+ CONFIG_MWIFIEX_SDIO=y
++CONFIG_INPUT_EVDEV=y
++CONFIG_KEYBOARD_GPIO=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_I2C=y
+-- 
+1.8.1.2
