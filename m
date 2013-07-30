@@ -1,174 +1,166 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 30 Jul 2013 14:56:10 +0100
-Subject: [PATCH] arm: update advice on kernel and FDT load address.
-In-Reply-To: <alpine.LFD.2.03.1307292234040.15022@syhkavp.arg>
-References: <1375102578-5869-1-git-send-email-ian.campbell@citrix.com>
- <20130729135000.GK32383@mudshark.cambridge.arm.com>
- <1375106635.12741.8.camel@kazak.uk.xensource.com>
- <alpine.LFD.2.03.1307292234040.15022@syhkavp.arg>
-Message-ID: <1375192570.32691.27.camel@kazak.uk.xensource.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 30 Jul 2013 17:04:41 +0300
+Subject: Division by zero caused by CCF
+In-Reply-To: <CAPtuhTiUsLffRaC+8Gd8me2OYeMUOuFM4CqW3vnXmkkp53P_yg@mail.gmail.com>
+References: <20130716123709.GA15036@arwen.pp.htv.fi> <51E5465F.3090801@ti.com>
+ <CAPtuhTiUsLffRaC+8Gd8me2OYeMUOuFM4CqW3vnXmkkp53P_yg@mail.gmail.com>
+Message-ID: <20130730140441.GK28162@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-07-29 at 23:05 -0400, Nicolas Pitre wrote:
-> On Mon, 29 Jul 2013, Ian Campbell wrote:
+Hi,
+
+this is still broken on v3.11-rc3 and Luca got his Blaze (OMAP4) to fail
+the same way
+
+On Tue, Jul 16, 2013 at 10:45:38AM -0700, Mike Turquette wrote:
+> On Tue, Jul 16, 2013 at 6:10 AM, Eduardo Valentin
+> <eduardo.valentin@ti.com> wrote:
+> > -----BEGIN PGP SIGNED MESSAGE-----
+> > Hash: SHA256
+> >
+> >
+> > Hi,
+> >
+> > Adding Mike's correct address.
+> >
+> > On 16-07-2013 08:37, Felipe Balbi wrote:
+> >> Hi,
+> >>
+> >> trying to get USB host verified on OMAP5 uEVM with v3.11-rc1. The
+> >> clk_set_rate() call ends up in a division by zero, which is quite
+> >> interesting provided the driver will only call clk_set_rate() if the
+> >> clock is valid and clk_rate is != 0.
+> >>
+> >>
+> >> [   22.009238] Division by zero in kernel.
+> >> [   22.009250] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W    3.11.0-rc1-00081-g3310d44-dirty #118
+> >> [   22.009275] [<c001c83c>] (unwind_backtrace+0x0/0xf0) from [<c0018a1c>] (show_stack+0x10/0x14)
+> >> [   22.009289] [<c0018a1c>] (show_stack+0x10/0x14) from [<c057403c>] (dump_stack+0x70/0x8c)
+> >> [   22.009304] [<c057403c>] (dump_stack+0x70/0x8c) from [<c02e4154>] (Ldiv0+0x8/0x10)
+> >> [   22.009319] [<c02e4154>] (Ldiv0+0x8/0x10) from [<c048d460>] (clk_divider_set_rate+0x10/0xdc)
+> >> [   22.009331] [<c048d460>] (clk_divider_set_rate+0x10/0xdc) from [<c048c124>] (clk_change_rate+0x38/0xb0)
+> >> [   22.009341] [<c048c124>] (clk_change_rate+0x38/0xb0) from [<c048c20c>] (clk_set_rate+0x70/0xa8)
+> >> [   22.009354] [<c048c20c>] (clk_set_rate+0x70/0xa8) from [<c042b244>] (nop_usb_xceiv_probe+0x1fc/0x2f8)
+> >> [   22.009369] [<c042b244>] (nop_usb_xceiv_probe+0x1fc/0x2f8) from [<c036b47c>] (platform_drv_probe+0x18/0x1c)
+> >> [   22.009380] [<c036b47c>] (platform_drv_probe+0x18/0x1c) from [<c0369f44>] (really_probe+0x70/0x1f4)
+> >> [   22.009390] [<c0369f44>] (really_probe+0x70/0x1f4) from [<c036a1dc>] (driver_probe_device+0x30/0x48)
+> >> [   22.009401] [<c036a1dc>] (driver_probe_device+0x30/0x48) from [<c036a288>] (__driver_attach+0x94/0x98)
+> >> [   22.009411] [<c036a288>] (__driver_attach+0x94/0x98) from [<c0368748>] (bus_for_each_dev+0x54/0x88)
+> >> [   22.009420] [<c0368748>] (bus_for_each_dev+0x54/0x88) from [<c036972c>] (bus_add_driver+0xdc/0x29c)
+> >> [   22.009430] [<c036972c>] (bus_add_driver+0xdc/0x29c) from [<c036a760>] (driver_register+0x78/0x190)
+> >> [   22.009440] [<c036a760>] (driver_register+0x78/0x190) from [<c00087b0>] (do_one_initcall+0x34/0x164)
+> >> [   22.009453] [<c00087b0>] (do_one_initcall+0x34/0x164) from [<c07b18f4>] (do_basic_setup+0x90/0xc4)
+> >> [   22.009466] [<c07b18f4>] (do_basic_setup+0x90/0xc4) from [<c07b199c>] (kernel_init_freeable+0x74/0x110)
+> >> [   22.009478] [<c07b199c>] (kernel_init_freeable+0x74/0x110) from [<c05676c4>] (kernel_init+0x8/0xe4)
+> >> [   22.009491] [<c05676c4>] (kernel_init+0x8/0xe4) from [<c0014648>] (ret_from_fork+0x14/0x2c)
+> >>
+> >> I believe the problem is the actual division reaching
+> >> clk_divider_set_rate().
+> >>
+> >> drivers/clk/clk-divider.c::clk_divider_set_rate()
+> >>
+> >> | static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> >> |                                 unsigned long parent_rate)
+> >> | {
+> >> |         struct clk_divider *divider = to_clk_divider(hw);
+> >> |         unsigned int div, value;
+> >> |         unsigned long flags = 0;
+> >> |         u32 val;
+> >> |
+> >> |         div = parent_rate / rate;
+> >>
+> >> right here, but how come rate would zero provided driver checks for it
+> >> as below.
+> >>
+> >> drivers/usb/phy/phy-nop.c::nop_usb_xceiv_probe()
+> >>
+> >> |         if (!IS_ERR(nop->clk) && clk_rate) {
+> >> |                 err = clk_set_rate(nop->clk, clk_rate);
+> >> |                 if (err) {
+> >> |                         dev_err(&pdev->dev, "Error setting clock rate\n");
+> >> |                         return err;
+> >> |                 }
+> >> |         }
+> >>
+> >> I've added a few prints around CCF to try and track what's going on:
+> >>
+> >> [   21.592690] ====> nop_usb_xceiv_probe rate 19200000
+> >> [   21.592700] ====> clk_set_rate rate 19200000
+> >> [   21.592707] ====> clk_calc_new_rates rate 19200000
+> >> [   21.592713] ====> clk_divider_round_rate rate 19200000
+> >> [   21.592719] ====> clk_divider_bestdiv rate 19200000
+> >> [   21.592726] ====> clk_change_rate best_parent_rate 0
+> >
+> > or because we reach:
+> >         if (clk->ops->set_rate)
+> >                 clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
+> >
+> > with clk->new_rate == 0.
 > 
-> > On Mon, 2013-07-29 at 14:50 +0100, Will Deacon wrote:
-> > > Hi Ian,
-> > > 
-> > > /me plays English teacher :)
-> > > 
-> > > On Mon, Jul 29, 2013 at 01:56:18PM +0100, Ian Campbell wrote:
-> > > > Based on the discussion in [0]:
-> > > >   - Recommend that the kernel be placed under 128MiB ("for automatic RAM
-> > > >     location to work", says Nico)
-> > > >   - Recommend that DTB larger than ~16KiB be placed after the 128MiB boundary
-> > > >     (in order to avoid conflicting with the kernel decompressor, kernel is at
-> > > >     most 32MiB) and within the lowmem region. Somewhat arbitrarily recommend
-> > > >     placement below the 256MiB boundary, the real lowmem limit is likely up
-> > > >     around 600-800MiB but varies.
-> > > > 
-> > > > [0] http://article.gmane.org/gmane.linux.ports.arm.kernel/254538
-> > > > 
-> > > > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> > > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Dave Martin <dave.martin@linaro.org>
-> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > > ---
-> > > >  Documentation/arm/Booting |   14 +++++++++++---
-> > > >  1 files changed, 11 insertions(+), 3 deletions(-)
-> > > > 
-> > > > diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-> > > > index 0c1f475..72c035e 100644
-> > > > --- a/Documentation/arm/Booting
-> > > > +++ b/Documentation/arm/Booting
-> > > > @@ -125,6 +125,13 @@ with the caveat that it may not be located at physical address 0 since
-> > > >  the kernel interprets a value of 0 in r2 to mean neither a tagged list
-> > > >  nor a dtb were passed.
-> > > >  
-> > > > +If the DTB is larger than ~16KiB, such that placement in the first
-> > > > +16KiB would lead to a conflict with the kernel loaded at 32KiB (as
-> > > > +recommended below) which uses the memory between 16KiB-32KiB itself,
-> > > > +then the DTB should be placed after the first 128MiB of RAM in order
-> > > > +to avoid conflicting with the kernel decompressor. The recommnded
-> > > 
-> > > recommended
-> > 
-> > Should've pressed F5, sorry...
-> > 
-> > > It also looks like you're repeating part of what is said later regarding the
-> > > 16k of page tables below the image.
-> > 
-> > yes, this was tricky since I wanted to justify the larger than 16KiB but
-> > that was a forward reference. I went with "as recommended below".
-> > Perhaps I should just omit the justification? Or perhaps "If the DTB is
-> > larger than ~16KiB (see below for why this particular value
-> > matters)...". Clunky :-(
+> Hmm, I'll look into this. We used to have a check which would at least
+> WARN on division by zero, but looks like that was replaced by some
+> other code at some point.
 > 
-> Why not simply:
+> Also does your clock have the CLK_SET_RATE_PARENT flag set? If so then
+> you could be propagating a rate request of zero up to the next parent,
+> which would be a neat trick... however based on the dump that doesn't
+> seem to be what is happening.
 > 
-> 	Make sure the loaded DTB doesn't conflict with the zImage 
-> 	decompressor which may relocate itself.  A safe location is 
-> 	just above the 128MB boundary from start of RAM.
-
-Sounds good.
-
+> Regards,
+> Mike
 > 
-> > > Also, we use 20k with LPAE.
-> > 
-> > I'll fold in an update along those lines too.
-> > 
-> > However given that this then makes everything more complicated (e.g.
-> > it's now DTB > ~12KiB in that case) perhaps we should just ditch the
-> > original recommendation to use the first 16KiB and switch to a
-> > recommendation of "as high as possible below 256MiB" across the board?
-> > That would remove the issue with repeating stuff from the next section
-> > too.
-> 
-> Sure.
+> >
+> >
+> >> [   21.592732] ====> clk_divider_set_rate rate 0
+> >> [   21.592737] Division by zero in kernel.
+> >> [   21.592747] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W    3.11.0-rc1-00081-g3310d44-dirty #121
+> >> [   21.592773] [<c001c83c>] (unwind_backtrace+0x0/0xf0) from [<c0018a1c>] (show_stack+0x10/0x14)
+> >> [   21.592787] [<c0018a1c>] (show_stack+0x10/0x14) from [<c057400c>] (dump_stack+0x70/0x8c)
+> >> [   21.592803] [<c057400c>] (dump_stack+0x70/0x8c) from [<c02e4154>] (Ldiv0+0x8/0x10)
+> >> [   21.592819] [<c02e4154>] (Ldiv0+0x8/0x10) from [<c048d3e0>] (clk_divider_set_rate+0x2c/0x100)
+> >> [   21.592831] [<c048d3e0>] (clk_divider_set_rate+0x2c/0x100) from [<c048c050>] (clk_change_rate+0x48/0xe0)
+> >> [   21.592841] [<c048c050>] (clk_change_rate+0x48/0xe0) from [<c048c174>] (clk_set_rate+0x8c/0xc0)
+> >> [   21.592855] [<c048c174>] (clk_set_rate+0x8c/0xc0) from [<c042b254>] (nop_usb_xceiv_probe+0x20c/0x304)
+> >> [   21.592869] [<c042b254>] (nop_usb_xceiv_probe+0x20c/0x304) from [<c036b47c>] (platform_drv_probe+0x18/0x1c)
+> >> [   21.592880] [<c036b47c>] (platform_drv_probe+0x18/0x1c) from [<c0369f44>] (really_probe+0x70/0x1f4)
+> >> [   21.592891] [<c0369f44>] (really_probe+0x70/0x1f4) from [<c036a1dc>] (driver_probe_device+0x30/0x48)
+> >> [   21.592901] [<c036a1dc>] (driver_probe_device+0x30/0x48) from [<c036a288>] (__driver_attach+0x94/0x98)
+> >> [   21.592911] [<c036a288>] (__driver_attach+0x94/0x98) from [<c0368748>] (bus_for_each_dev+0x54/0x88)
+> >> [   21.592921] [<c0368748>] (bus_for_each_dev+0x54/0x88) from [<c036972c>] (bus_add_driver+0xdc/0x29c)
+> >> [   21.592930] [<c036972c>] (bus_add_driver+0xdc/0x29c) from [<c036a760>] (driver_register+0x78/0x190)
+> >> [   21.592941] [<c036a760>] (driver_register+0x78/0x190) from [<c00087b0>] (do_one_initcall+0x34/0x164)
+> >> [   21.592954] [<c00087b0>] (do_one_initcall+0x34/0x164) from [<c07b18f4>] (do_basic_setup+0x90/0xc4)
+> >> [   21.592966] [<c07b18f4>] (do_basic_setup+0x90/0xc4) from [<c07b199c>] (kernel_init_freeable+0x74/0x110)
+> >> [   21.592980] [<c07b199c>] (kernel_init_freeable+0x74/0x110) from [<c0567694>] (kernel_init+0x8/0xe4)
+> >> [   21.592992] [<c0567694>] (kernel_init+0x8/0xe4) from [<c0014648>] (ret_from_fork+0x14/0x2c)
+> >>
+> >> even though driver passed 19.2MHz, best_parent_rate ends up being zero
+> >> which triggers the division by zero above.
+> >>
+> >> cheers
+> >>
+> >
+> >
+> > - --
+> > You have got to be excited about what you are doing. (L. Lamport)
+> >
+> > Eduardo Valentin
+> > -----BEGIN PGP SIGNATURE-----
+> > Version: GnuPG v1.4.12 (GNU/Linux)
+> > Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+> >
+> > iF4EAREIAAYFAlHlRl8ACgkQCXcVR3XQvP00XQEAtQgDEJLt8OFCJiIhUj46Zq1h
+> > PvNq67RSFTRXcq/zHa8A/0IZSPitTXt1TqDfalTKof/DR6n9/W6md8/C2Ovqb59o
+> > =AKnu
+> > -----END PGP SIGNATURE-----
 
-I'll make this change.
-
-> > > > +placement in this case just below the 256MiB boundary.
-> > > > +
-> > > >  5. Calling the kernel image
-> > > >  ---------------------------
-> > > >  
-> > > > @@ -136,9 +143,10 @@ is stored in flash, and is linked correctly to be run from flash,
-> > > >  then it is legal for the boot loader to call the zImage in flash
-> > > >  directly.
-> > > >  
-> > > > -The zImage may also be placed in system RAM (at any location) and
-> > > > -called there.  Note that the kernel uses 16K of RAM below the image
-> > > > -to store page tables.  The recommended placement is 32KiB into RAM.
-> > > > +The zImage may also be placed in system RAM and called there.  The
-> > > > +kernel should be placed in the first 128MiB of RAM. Note that the
-> > > > +kernel uses 16KiB of RAM below the image to store page tables.  The
-> > > > +recommended placement is 32KiB into RAM.
-> > > 
-> > > This is a bit clunky since you say that the zImage may be placed in system
-> > > RAM, then restrict that in the next sentence.
-> > 
-> > How about:
-> > 
-> >         The kernel may also be placed in the first 128MiB of system RAM
-> >         and called there.
-> 
-> Not "may" but "must" if you have CONFIG_AUTO_ZRELADDR=y.
-
-The "may" here is an alternative to the option of being in flash. Is
-that incompatible with AUTO_ZRELADDR?
-
->From the ZRELADDR Kconfig the answer seems to be yes.
-
-> 
-> >	Note that the kernel uses 16KiB of RAM below
-> >       the image to store page tables.  The recommended placement is
-> >         32KiB into RAM.
-> 
-> Well... not completely right.
-
-To be fair this was part of the existing text ;)
-
-> You may load zImage anywhere in the first 128MB of RAM if you have 
-> CONFIG_AUTO_ZRELADDR=y.  If CONFIG_AUTO_ZRELADDR=n then zImage may be 
-> loaded anywhere. In the former case, the zImage code will automatically 
-> determine the physical start of RAM.  In the later case the start of RAM 
-> is hardcoded in the zImage binary.
-> 
-> Then, the zImage code will decompress the actual kernel image at an 
-> offset of (in most cases) 32KB from start of RAM.  However, if the 
-> decompressed kernel would overwrite the loaded zImage where the 
-> decompressor code and data is located, then zImage will relocate itself 
-> just after the end of the decompressed kernel area before proceeding to 
-> the decompression.  This is where you need to be careful about 
-> ramdisk/initrd and DTB load addresses.
-> 
-> The initial page table is therefore (in most cases again) just below the 
-> decompressed kernel location i.e. either Ffrom 16KB from start of RAM, 
-> or from 12KB if using LPAE.
-> 
-> You can therefore load everything (zImage, initrd, DTB) sequentially 
-> from the 32MB mark in RAM and be safe.  By loading zImage that high, it 
-> most certainly won't need to relocate itself (unless the decompressed 
-> kernel is larger than 32MB which is very unlikely as I mentioned) and 
-> that will also make the boot process slightly faster.
-
-OK. So it sounds like you want to change the existing recommendation of
-loading at 32KiB into RAM to instead recommend loading the kernel at
-32MiB into RAM, at least for zImage/compressed kernels. Do we care about
-any other sort, e.g. bare or uncompressed images?
-
-I think we do still care about people jumping direct to
-arch/arm/kernel/head.S rather than arch/arm/boot/compressed/head.S,
-don't we? It seems like the recommendation should remain 32KiB for
-"bare" kernels.
-
-Actually I've just noticed that the existing text in
-Documentation/arm/Booting only talks about zImage and 32KiB, so perhaps
-not worrying about non-zImage is acceptable?
-
-Ian.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/1456a858/attachment.sig>
