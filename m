@@ -1,178 +1,114 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 30 Jul 2013 10:15:16 +0100
-Subject: [PATCH 01/13] ARM: suspend: use hash of cpu_logical_map value to
- index into save array
-In-Reply-To: <alpine.LFD.2.03.1307292155040.15022@syhkavp.arg>
-References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
- <1374550289-25305-2-git-send-email-nicolas.pitre@linaro.org>
- <20130729115016.GA6184@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1307292155040.15022@syhkavp.arg>
-Message-ID: <20130730091511.GA2478@localhost.localdomain>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Jul 2013 11:16:04 +0200
+Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
+ property
+In-Reply-To: <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
+References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130723112259.GE4833@e106331-lin.cambridge.arm.com>
+Message-ID: <20130730111604.76fd5b6e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 10:08:06PM -0400, Nicolas Pitre wrote:
-> On Mon, 29 Jul 2013, Lorenzo Pieralisi wrote:
-> 
-> > On Tue, Jul 23, 2013 at 04:31:17AM +0100, Nicolas Pitre wrote:
-> > > Currently we hash the MPIDR of the CPU being suspended to determine which
-> > > entry in the sleep_save_sp array to use. In some situations, such as when
-> > > we want to resume on another physical CPU, the MPIDR of another CPU should
-> > > be used instead.
-> > > 
-> > > So let's use the value of cpu_logical_map(smp_processor_id()) in place
-> > > of the MPIDR in the suspend path.  This will result in the same index
-> > > being used as with the previous code unless the caller has modified
-> > > cpu_logical_map() beforehand.
-> > 
-> > I will rely on your wisdom to rewrite the commit log in a way that
-> > does not hint at dangerous creativity, if you catch my drift :D
-> 
-> I've augmented it with some of the earlier comments from Dave Martin.  
-> I think it is fine to be clear in the commit log about what we intend 
-> this change to be used for.
-> 
-> > > The register allocation in __cpu_suspend is reworked in order to better
-> > > accommodate the additional argument.
-> > > 
-> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > > ---
-> > >  arch/arm/kernel/sleep.S   | 25 +++++++++++--------------
-> > >  arch/arm/kernel/suspend.c |  8 +++++---
-> > >  2 files changed, 16 insertions(+), 17 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> > > index db1536b8b3..836d10e698 100644
-> > > --- a/arch/arm/kernel/sleep.S
-> > > +++ b/arch/arm/kernel/sleep.S
-> > > @@ -55,6 +55,7 @@
-> > >   * specific registers and some other data for resume.
-> > >   *  r0 = suspend function arg0
-> > >   *  r1 = suspend function
-> > > + *  r2 = MPIDR value used to index into sleep_save_sp
-> > 
-> > CPU's MPIDR or something like that, let's not hint at possible creative usage.
-> 
-> What about "MPIDR of the CPU to be resumed" which should normally just 
-> be the current CPU's?
-> 
-> After all, creativity is not always a bad thing given it is reviewed 
-> properly.
+Dear Mark Rutland,
 
-OK, sounds reasonable.
+On Tue, 23 Jul 2013 12:22:59 +0100, Mark Rutland wrote:
 
+> > +Some Ethernet MACs have a "fixed link", and are not connected to a
+> > +normal MDIO-managed PHY device. For those situations, a Device Tree
+> > +binding allows to describe a "fixed link".
 > 
-> > >   */
-> > >  ENTRY(__cpu_suspend)
-> > >  	stmfd	sp!, {r4 - r11, lr}
-> > > @@ -67,23 +68,19 @@ ENTRY(__cpu_suspend)
-> > >  	mov	r5, sp			@ current virtual SP
-> > >  	add	r4, r4, #12		@ Space for pgd, virt sp, phys resume fn
-> > >  	sub	sp, sp, r4		@ allocate CPU state on stack
-> > > -	stmfd	sp!, {r0, r1}		@ save suspend func arg and pointer
-> > > -	add	r0, sp, #8		@ save pointer to save block
-> > > -	mov	r1, r4			@ size of save block
-> > > -	mov	r2, r5			@ virtual SP
-> > >  	ldr	r3, =sleep_save_sp
-> > > +	stmfd	sp!, {r0, r1}		@ save suspend func arg and pointer
-> > >  	ldr	r3, [r3, #SLEEP_SAVE_SP_VIRT]
-> > > -	ALT_SMP(mrc p15, 0, r9, c0, c0, 5)
-> > > -        ALT_UP_B(1f)
-> > > -	ldr	r8, =mpidr_hash
-> > > -	/*
-> > > -	 * This ldmia relies on the memory layout of the mpidr_hash
-> > > -	 * struct mpidr_hash.
-> > > -	 */
-> > > -	ldmia	r8, {r4-r7}	@ r4 = mpidr mask (r5,r6,r7) = l[0,1,2] shifts
-> > > -	compute_mpidr_hash	lr, r5, r6, r7, r9, r4
-> > > -	add	r3, r3, lr, lsl #2
-> > > +	ALT_SMP(ldr r0, =mpidr_hash)
-> > > +       ALT_UP_B(1f)
-> > 
-> > Should be a tab, do not know if that's an email server issue or not.
-> 
-> Amistake on my part.
-> 
-> > > +	/* This ldmia relies on the memory layout of the mpidr_hash struct */
-> > > +	ldmia	r0, {r1, r6-r8}	@ r1 = mpidr mask (r6,r7,r8) = l[0,1,2] shifts
-> > > +	compute_mpidr_hash	r0, r6, r7, r8, r2, r1
-> > > +	add	r3, r3, r0, lsl #2
-> > >  1:
-> > > +	mov	r2, r5			@ virtual SP
-> > > +	mov	r1, r4			@ size of save block
-> > > +	add	r0, sp, #8		@ pointer to save block
-> > 
-> > It is already a bit complex to follow, code is ok, but line above was
-> > better placed closer to sp last change, not after hashing the MPIDR.
-> 
-> Well, I tend to disagree.  I think it is much clearer to set function 
-> arguments closer to the call site so that r0 doesn't have to be live 
-> with the stack location throughout this code.
+> Are partictular MACs fixed link, or can some either be either fixed link
+> or wired to an MDIO-managed PHY? i.e. can we assume a given MAC is
+> fixed-link from its compatible string?
 
-Fair point, but I'm happy either way.
+No, you can't. The case that I have is that the mvneta Ethernet MAC
+(of Marvell 370/XP SOCs) is sometimes used with a MDIO-managed PHY, and
+sometimes used with a switch that isn't manageable at all and should be
+considered as a fixed link.
 
-With or without, feel free to add
+So no, the compatible string of the Ethernet MAC cannot be used to
+determine whether we're wired fixed link or to a classical MDIO-managed
+PHY.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> > +Such a fixed link situation is described within an Ethernet device
+> > +Device Tree node using a 'fixed-link' property, composed of 5
+> > +elements:
+> 
+> I'm not sure grouping these values together is the best way of handling
+> this. It's rather opaque, and inflexible for future extension.
 
-Cheers
----Dave
+That's the DT binding that has been used by PowerPC platforms since
+several years, and I've simply re-used it. See 'git grep fixed-link
+arch/powerpc/boot/dts'.
 
+I have nothing against creating another DT binding, but for a start, I
+thought using existing bindings would be the best idea.
+
+> > + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
+> > +    the system.
 > 
-> > >  	bl	__cpu_suspend_save
-> > >  	adr	lr, BSYM(cpu_suspend_abort)
-> > >  	ldmfd	sp!, {r0, pc}		@ call suspend fn
-> > > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-> > > index 41cf3cbf75..2835d35234 100644
-> > > --- a/arch/arm/kernel/suspend.c
-> > > +++ b/arch/arm/kernel/suspend.c
-> > > @@ -10,7 +10,7 @@
-> > >  #include <asm/suspend.h>
-> > >  #include <asm/tlbflush.h>
-> > >  
-> > > -extern int __cpu_suspend(unsigned long, int (*)(unsigned long));
-> > > +extern int __cpu_suspend(unsigned long, int (*)(unsigned long), u32 cpuid);
-> > >  extern void cpu_resume_mmu(void);
-> > >  
-> > >  #ifdef CONFIG_MMU
-> > > @@ -21,6 +21,7 @@ extern void cpu_resume_mmu(void);
-> > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-> > >  {
-> > >  	struct mm_struct *mm = current->active_mm;
-> > > +	u32 __mpidr = cpu_logical_map(smp_processor_id());
-> > >  	int ret;
-> > >  
-> > >  	if (!idmap_pgd)
-> > > @@ -32,7 +33,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-> > >  	 * resume (indicated by a zero return code), we need to switch
-> > >  	 * back to the correct page tables.
-> > >  	 */
-> > > -	ret = __cpu_suspend(arg, fn);
-> > > +	ret = __cpu_suspend(arg, fn, __mpidr);
-> > >  	if (ret == 0) {
-> > >  		cpu_switch_mm(mm->pgd, mm);
-> > >  		local_flush_bp_all();
-> > > @@ -44,7 +45,8 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-> > >  #else
-> > >  int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-> > >  {
-> > > -	return __cpu_suspend(arg, fn);
-> > > +	u32 __mpidr = cpu_logical_map(smp_processor_id());
-> > > +	return __cpu_suspend(arg, fn, __mpidr);
-> > >  }
-> > >  #define	idmap_pgd	NULL
-> > >  #endif
-> > 
-> > Apart from these nits, let's hope it is the last cpu_suspend bit we need to
-> > change, please land it on -next asap, of course if Russell is ok with that.
-> > 
-> > I tested it on TC2.
-> > 
-> > FWIW:
-> > 
-> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Is there any reason this couldn't be allocated dynamically within the
+> kernel as needed? I don't see why an arbitrary unique value should be a
+> dt binding requirement; it seems like a leak of Linux implementation
+> details.
+
+As I pointed out in my reply to Grant, this value is used both as the
+PHY address on the fake fixed MDIO bus, and as the PHY identifier as
+reported by MII registers PHYS_ID1 and PHYS_ID2. If we can get assigned
+a proper PHY identifier that is used statically by the driver (it
+doesn't have to be different per fixed PHY instance), then we can
+allocate the PHY address dynamically. It requires a little bit of API
+changes but that's certainly doable. See my reply to Grant for a
+proposal about this.
+
+> > + 2. The duplex (1 for full-duplex, 0 for half-duplex)
 > 
-> Thanks.
+> Will this change for a given MAC?
 > 
+> Could we not have a boolean property for each of these, and require one
+> to be present?
 > 
-> Nicolas
+> Possibly fixed-link-full-duplex / fix-link-half-duplex?
+> 
+> > + 3. The speed (10, 100, 1000)
+> 
+> fixed-link-speed?
+> 
+> > + 4. The pause setting (1 for enabled, 0 for disabled)
+> > + 5. The asym pause setting (1 for enabled, 0 for disabled)
+> 
+> Boolean properties for both of these?
+
+As Florian already answered, he already proposed something like this in
+the past, and it was rejected because a fixed PHY is not a piece of
+hardware and should therefore not be represented in the Device Tree.
+However, the fact that the MAC is not connected to a MDIO-manageable
+PHY but to some fixed-link thing is a property of the MAC hardware
+layout, and can therefore be expressed as a property of the MAC
+hardware.
+
+See the thread that starts at
+http://article.gmane.org/gmane.linux.network/275771, and specifically
+Grant answers to Florian suggestions of having DT nodes to represent
+fixed PHY: http://article.gmane.org/gmane.linux.network/276208. Grant's
+answer was:
+
+"""
+I think this discussion is going in the wrong direction. The concept
+of a dummy phy is really a Linux kernel internal detail. Creating some
+kind of dummy MDIO bus node does not describe the hardware. There is
+already support in the kernel for Ethernet MACs connected directly to
+a switch or other device. It is far better to describe how the MAC
+needs to be configured than to invent a non-existent phy. Search for
+"fixed-link" in the kernel tree to see how it is used.
+"""
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
