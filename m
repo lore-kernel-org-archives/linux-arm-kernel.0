@@ -1,113 +1,75 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Jul 2013 09:28:44 +0300
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <51F75C40.4060406@ti.com>
-References: <1374829418-27503-1-git-send-email-kishon@ti.com>
- <1374829418-27503-3-git-send-email-kishon@ti.com>
- <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
- <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
- <20130730060134.GD9155@radagast> <51F7590B.4020705@ti.com>
- <20130730061830.GE9155@radagast> <51F75C40.4060406@ti.com>
-Message-ID: <20130730062844.GH9155@radagast>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 30 Jul 2013 08:37:05 +0200
+Subject: [PATCH v2] ARM: imx: pllv1: Fix PLL calculation for i.MX27
+In-Reply-To: <1375112243-1557-1-git-send-email-shc_work@mail.ru>
+References: <1375112243-1557-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20983.24337.582506.529947@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jul 30, 2013 at 11:55:04AM +0530, Kishon Vijay Abraham I wrote:
-> > On Tue, Jul 30, 2013 at 11:41:23AM +0530, Kishon Vijay Abraham I wrote:
-> >>>>>>>> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-> >>>>>>>> index 244d8a5..17bb076 100644
-> >>>>>>>> --- a/arch/arm/mach-omap2/board-2430sdp.c
-> >>>>>>>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
-> >>>>>>>> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
-> >>>>>>>>  	omap_hsmmc_init(mmc);
-> >>>>>>>>  
-> >>>>>>>>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
-> >>>>>>>> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> >>>>>>>> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
-> >>>>>>>
-> >>>>>>> how about moving usb_bind_phy() calls to omap2430.c ?
-> >>>>>>>
-> >>>>>>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> >>>>>>> index f44e8b5..b6abc1a 100644
-> >>>>>>> --- a/drivers/usb/musb/omap2430.c
-> >>>>>>> +++ b/drivers/usb/musb/omap2430.c
-> >>>>>>> @@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
-> >>>>>>>  
-> >>>>>>>  		pdata->board_data	= data;
-> >>>>>>>  		pdata->config		= config;
-> >>>>>>> +	} else {
-> >>>>>>> +		/* bind the PHY */
-> >>>>>>> +		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
-> >>>>>>
-> >>>>>> This looks like a hack IMHO to workaround the usb phy library. otherwise it is
-> >>>>>> similar to get_phy_by_name.
-> >>>>>
-> >>>>> actually, this is a workaround to the fact that we're not creating all
-> >>>>> platform_devices in arch/arm/mach-omap2/ :-)
-> >>>>>
-> >>>>> If we had the musb allocation there, we could easily handle
-> >>>>> usb_bind_phy()
-> >>>>>
-> >>>>>>> so that's temporary. It might be better than to reintroduce the IDR in
-> >>>>>>> musb_core.c.
-> >>>>>>
-> >>>>>> that?s needed for generic phy framework anyway :-s
-> >>>>>
-> >>>>> right, but generic phy framework can handle everything just fine, the
-> >>>>> only problem is that names are changing.
-> >>>>
-> >>>> right. But if the names change, PHY framework wouldn't be able to return the
-> >>>> reference to the PHY.
-> >>>
-> >>> with my suggestion they can change whenever they want since we're using
-> >>> dev_name() of the just-created musb platform_device. Right ?
-> >>
-> >> right. But the PHY device can be created in a different place from where the
-> >> musb devices are created. And in the PHY framework, the PHY device should have
-> > 
-> > this shouldn't be a problem. As long as the phy is created, all should
-> > be good.
-> > 
-> >> the list of controller device (names) it can support (PHY framework does not
-> >> maintain a separate list for binding like how we had in USB PHY library). e.g.
-> >> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92817.html. In such
-> > 
-> > this has nothing to do with $subject though. We talk about generic PHY
-> > framework once all these PHY drivers are moved there :-)
-> > 
-> >> cases how do we pass the device names. Also will the MUSB core device be
-> >> created before twl4030-usb PHY device?
-> > 
-> > and why would that be a problem ? We're telling the framework that the
-> > musb device will use a phy with a name of 'twl4030'. If musb calls
-> > usb_get_phy_dev() and doesn't find a phy, it'll return -EPROBE_DEFER and
-> > try again later.
+Alexander Shiyan writes:
+> MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
+> is a just sign bit. This patch makes different calculation for i.MX27.
 > 
-> I think we are talking about different problems here ;-) I'm trying to tell
-> using idr in MUSB core is needed for Generic PHY Framework. So in a way, the
-> Generic PHY Framework series depends on this patch series or else MUSB in OMAP3
-> platforms wont work after Generic PHY framework gets merged.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/clk-pllv1.c | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+> index c1eaee3..a289ccd 100644
+> --- a/arch/arm/mach-imx/clk-pllv1.c
+> +++ b/arch/arm/mach-imx/clk-pllv1.c
+> @@ -25,6 +25,11 @@ struct clk_pllv1 {
+>  
+>  #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+>  
+> +static inline bool allow_signed_mfn(void)
+> +{
+> +	return !cpu_is_mx1() && !cpu_is_mx21();
+> +}
+> +
+>  static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  		unsigned long parent_rate)
+>  {
+> @@ -59,9 +64,14 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+>  	/*
+>  	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+>  	 * 2's complements number
+> +	 * On i.MX27 the bit 9 is the sign bit.
+>  	 */
+> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+> -		mfn_abs = 0x400 - mfn;
+> +	if (allow_signed_mfn() && (mfn & 0x200)) {
+> +		if (cpu_is_mx27())
+> +			mfn_abs = mfn & 0x1ff;
+> +		else
+> +			mfn_abs = 0x400 - mfn;
+> +	}
+>  
+Please don't hardcode magic numbers. Even more when using variants of
+the same number like 0x200 and 0x1ff (0x200 - 1) in multiple places.
+If someone copies the code and wants to adapt it, they will have to
+change lots of different but related numbers in different places which
+is horribly error prone.
 
-then you just found a limitation in your framework, right ? :-) I mean,
-imagine if now we have to add an IDR to every single user of your
-framework because they could end up in systems with multiple instances
-of the same IP ?
+#define MFN_BITS 10
+#define MFN_SIGN (1 << (MFN_BITS - 1))
+#define MFN_MASK (MFN_SIGN - 1)
+With these defines you can derive all the numbers you need in a
+consistent way and need to change only ONE place to adapt the code.
 
-Now consider that you aim to have your framework be used by Network,
-USB, SATA, Graphics, etc... Have you really only considered DT
-platforms ? DT is quite easy since you can require folks to pass the
-proper phandle, but drivers will want to use PLATFORM_DEVID_AUTO and
-your framework needs to cope with that.
 
+Lothar Wa?mann
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/6d076c74/attachment.sig>
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info@karo-electronics.de
+___________________________________________________________
