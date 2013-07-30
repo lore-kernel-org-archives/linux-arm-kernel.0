@@ -1,81 +1,94 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 30 Jul 2013 14:24:12 +0900
-Subject: [PATCH 2/4] ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI
+Date: Tue, 30 Jul 2013 14:24:13 +0900
+Subject: [PATCH 3/4] ARM: shmobile: Add EMEV2 and KZM9D to ARCH_SHMOBILE_MULTI
 In-Reply-To: <cover.1375161473.git.horms+renesas@verge.net.au>
 References: <cover.1375161473.git.horms+renesas@verge.net.au>
-Message-ID: <efacfce5f8a523457e9419a25d52fe39db00b26a.1375161473.git.horms+renesas@verge.net.au>
+Message-ID: <cbc60e7c04f3c1390144d4a881f0a7b98b49da98.1375161473.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add ARCH_SHMOBILE_MULTI to mach-shmobile that can be used
-to enable ARCH_MULTIPLATFORM on selected SoCs and boards.
+Enable build of EMEV2 and KZM9D DT Reference in
+case of ARCH_MULTIPLATFORM and ARCH_SHMOBILE_MULTI.
 
-The headers stay under arch/arm/mach-shmobile/include/mach/
-for now, they can and will be migrated independently over time.
+IS_ENABLED() is leaves the clock-emev2.c file out
+in case of COMMON_CLK=y.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/Makefile               |  1 +
- arch/arm/mach-shmobile/Kconfig  | 21 +++++++++++++++++++++
- arch/arm/mach-shmobile/Makefile |  2 ++
- 3 files changed, 24 insertions(+)
+ arch/arm/boot/dts/Makefile                     |  1 +
+ arch/arm/mach-shmobile/Kconfig                 | 15 +++++++++++++++
+ arch/arm/mach-shmobile/board-kzm9d-reference.c |  3 ++-
+ arch/arm/mach-shmobile/setup-emev2.c           |  3 ++-
+ 4 files changed, 20 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c0ac0f5..d1f717c 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -190,6 +190,7 @@ machine-$(CONFIG_ARCH_EXYNOS)		+= exynos
- machine-$(CONFIG_ARCH_SA1100)		+= sa1100
- machine-$(CONFIG_ARCH_SHARK)		+= shark
- machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
-+machine-$(CONFIG_ARCH_SHMOBILE_MULTI) 	+= shmobile
- machine-$(CONFIG_ARCH_TEGRA)		+= tegra
- machine-$(CONFIG_ARCH_U300)		+= u300
- machine-$(CONFIG_ARCH_U8500)		+= ux500
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index af19e38..f3861de 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -193,6 +193,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	sh73a0-kzm9g-reference.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	sh7372-mackerel.dtb
++dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d-reference.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 7c5034a..4c54298 100644
+index 4c54298..8914c9b 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -1,3 +1,24 @@
-+config ARCH_SHMOBILE_MULTI
-+	bool "SH-Mobile Series" if ARCH_MULTI_V7
-+	depends on MMU
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_SMP
-+	select ARM_GIC
-+	select MIGHT_HAVE_CACHE_L2X0
-+	select NO_IOPORT
-+	select PINCTRL
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKDEV_LOOKUP
-+
-+if ARCH_SHMOBILE_MULTI
-+
-+comment "SH-Mobile System Type"
-+
-+endif
-+
- if ARCH_SHMOBILE
+@@ -17,6 +17,21 @@ if ARCH_SHMOBILE_MULTI
  
  comment "SH-Mobile System Type"
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 5884bea..b150c45 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -2,6 +2,8 @@
- # Makefile for the linux kernel.
- #
  
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/arch/arm/mach-shmobile/include
++config ARCH_EMEV2
++	bool "Emma Mobile EV2"
 +
- # Common objects
- obj-y				:= timer.o console.o
++comment "SH-Mobile Board Type"
++
++config MACH_KZM9D_REFERENCE
++	bool "KZM9D board - Reference Device Tree Implementation"
++	depends on ARCH_EMEV2
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++	---help---
++	   Use reference implementation of KZM9D board support
++	   which makes a greater use of device tree at the expense
++	   of not supporting a number of devices.
++
++	   This is intended to aid developers
+ endif
  
+ if ARCH_SHMOBILE
+diff --git a/arch/arm/mach-shmobile/board-kzm9d-reference.c b/arch/arm/mach-shmobile/board-kzm9d-reference.c
+index a7b28b2..8f8bb2f 100644
+--- a/arch/arm/mach-shmobile/board-kzm9d-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9d-reference.c
+@@ -26,7 +26,8 @@
+ 
+ static void __init kzm9d_add_standard_devices(void)
+ {
+-	emev2_clock_init();
++	if (!IS_ENABLED(CONFIG_COMMON_CLK))
++		emev2_clock_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index 19980be..1553af8 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -175,7 +175,8 @@ static struct resource pmu_resources[] = {
+ 
+ void __init emev2_add_standard_devices(void)
+ {
+-	emev2_clock_init();
++	if (!IS_ENABLED(CONFIG_COMMON_CLK))
++		emev2_clock_init();
+ 
+ 	emev2_register_uart(0);
+ 	emev2_register_uart(1);
 -- 
 1.8.3.2
