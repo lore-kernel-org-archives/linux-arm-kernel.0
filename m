@@ -1,73 +1,57 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 30 Jul 2013 09:50:58 +0800
-Subject: [PATCH v13 03/14] usb: chipidea: imx: add return value check
- for devm_regulator_get
-In-Reply-To: <20130729224717.GB7109@pengutronix.de>
-References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
- <1374830310-21765-4-git-send-email-peter.chen@freescale.com>
- <20130729224717.GB7109@pengutronix.de>
-Message-ID: <20130730015057.GE27709@nchen-desktop>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Tue, 30 Jul 2013 11:50:31 +1000
+Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
+In-Reply-To: <20130729172339.GT29916@titan.lakedaemon.net>
+References: <2469263.vMN09Q7Tzi@flatron>
+ <20130729150124.GS29916@titan.lakedaemon.net>
+ <20130729164905.GB2280@localhost.localdomain>
+ <20130729172339.GT29916@titan.lakedaemon.net>
+Message-ID: <20130730015031.GK29970@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 12:47:17AM +0200, Michael Grzeschik wrote:
-> On Fri, Jul 26, 2013 at 05:18:19PM +0800, Peter Chen wrote:
-> > - If devm_regulator_get returns -EPROBE_DEFER, we also return
-> > -EPROBE_DEFER to wait regulator being ready later.
-> > - If devm_regulator_get returns -ENODEV, we think there is
-> > no "vbus-supply" node at DT, it means this board doesn't need
-> > vbus control.
-> > - If devm_regulator_get returns other error values, it means
-> > there are something wrong for getting this regulator.
+On Mon, Jul 29, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
+> On Mon, Jul 29, 2013 at 05:49:05PM +0100, Dave Martin wrote:
+> > On Mon, Jul 29, 2013 at 11:01:24AM -0400, Jason Cooper wrote:
+> > > On Mon, Jul 29, 2013 at 02:21:52AM +0200, Tomasz Figa wrote:
+> 
+> > > > b) What information should be specified in schemas? What level of 
+> > > >    granularity is required?
+> > > 
+> > > One item I don't see in this list is node ordering.  There's been some
+> > > discussion lately on deferred probing (re boot times).  If we were to
+> > > intentionally declare that DT are parsed in the order written, then a
+> > > lot of deferred probes could be avoided by moving eg the pinctrl node to
+> > > near the top of the tree.
+> > > 
+> > > This doesn't impact buses as much, since the nodes needing the bus are
+> > > already children.  However, anything accessed via phandles: pins,
+> > > clocks, regulators, etc could benefit from declaring and enforcing this.
+> > > Eg having the dtc warn when a phandle is used before it's corresponding
+> > > node is declared.
+> > > 
+> > > Not critical though, just a thought.
 > > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/ci_hdrc_imx.c |   14 ++++++++++++--
-> >  1 files changed, 12 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-> > index d06355e..0ced8c1 100644
-> > --- a/drivers/usb/chipidea/ci_hdrc_imx.c
-> > +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-> > @@ -144,8 +144,18 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
-> >  
-> >  	/* Get the vbus regulator */
-> >  	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-> > -	if (IS_ERR(pdata.reg_vbus))
-> > -		pdata.reg_vbus = NULL;
-> > +	if (PTR_ERR(pdata.reg_vbus) == -EPROBE_DEFER) {
-> > +		ret = -EPROBE_DEFER;
-> > +		goto err_clk;
-> > +	} else if (PTR_ERR(pdata.reg_vbus) == -ENODEV) {
-> > +		pdata.reg_vbus = NULL; /* no vbus regualator is needed */
-> > +	} else if (IS_ERR(pdata.reg_vbus)) {
-> > +		dev_err(&pdev->dev,
-> > +				"Getting regulator error: %ld\n",
-> > +					PTR_ERR(pdata.reg_vbus));
-> > +		ret = PTR_ERR(pdata.reg_vbus);
-> > +		goto err_clk;
-> > +	}
-> >  
-> >  	if (!pdev->dev.dma_mask)
-> >  		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> > -- 
+> > I don't think that siblings have any defined order in DT.  If reading a
+> > device tree, there's no guarantee you get nodes or properties out in the
+> > same order as the original .dts file.
 > 
-> This is wrong, you should squash that into the previous patch. And
-> as already mentioned, this can probably go into core.c as well.
-> 
-> Pick up the habit *not* to change code in one series which another patch
-> of the same series introduced. This only adds *dusty* unused history in the
-> patchstack that nobody needs. A *clean* and *coherent* series with discrete
-> patches is much easier to review and will get accepted much faster.
-> 
+> That's why I raised the point.  If people think encoding initialization
+> order in the DT is a good idea, then we should change the dtc so it
+> compiles/decompiles in the same order.
 
-My rule is do ONE thing at ONE patch, is it not correct?
-
-Previous one[2/14]: Remove the vbus operation at imx glue layer.
-This one [3/14]: Fix a bug that vbus may be gotten delay (EPROBE_DEFER),
-and vbus is valid at this case.
+I'm not actually sure what you mean by this.  dtc already preserves
+order between input and output.
 
 -- 
-
-Best Regards,
-Peter Chen
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/871c21da/attachment.sig>
