@@ -1,76 +1,148 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 31 Jul 2013 00:07:35 +0530
-Subject: [PATCH v2 1/8] ARM: DRA7: id: Add cpu detection support for DRA7xx
- based SoCs'
-In-Reply-To: <20130730153138.GA5978@radagast>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-2-git-send-email-rnayak@ti.com>
- <20130730131009.GA28162@radagast> <51F7CB2F.6070705@ti.com>
- <20130730142353.GL28162@radagast> <51F7CF6F.6050702@ti.com>
- <20130730153138.GA5978@radagast>
-Message-ID: <51F807EF.6020809@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 30 Jul 2013 20:36:10 +0200
+Subject: NSA310 + DT
+In-Reply-To: <20130730191943.49f8070c@skate>
+References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
+ <20130729192112.GY29916@titan.lakedaemon.net>
+ <20130729204315.GK24782@lunn.ch> <51F78DA6.8010307@uni-bremen.de>
+ <20130730144752.GR24782@lunn.ch> <20130730172407.3aab15c6@skate>
+ <51F7EBB9.7000504@uni-bremen.de> <20130730191943.49f8070c@skate>
+Message-ID: <20130730183610.GT24782@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Tuesday 30 July 2013 09:02 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Tue, Jul 30, 2013 at 08:06:31PM +0530, Sricharan R wrote:
->> On Tuesday 30 July 2013 07:53 PM, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Tue, Jul 30, 2013 at 07:48:23PM +0530, Sricharan R wrote:
->>>> On Tuesday 30 July 2013 06:40 PM, Felipe Balbi wrote:
->>>>> Hi,
->>>>>
->>>>> On Tue, Jul 30, 2013 at 04:55:39PM +0530, Rajendra Nayak wrote:
->>>>>> @@ -379,6 +407,13 @@ IS_OMAP_TYPE(3430, 0x3430)
->>>>>>  # define soc_is_omap543x()		is_omap543x()
->>>>>>  #endif
->>>>>>  
->>>>>> +# if defined(CONFIG_SOC_DRA7XX)
->>>>>> +# undef soc_is_dra7xx
->>>>>> +# undef soc_is_dra75x
->>>>>> +# define soc_is_dra7xx()		is_dra7xx()
->>>>>> +# define soc_is_dra75x()		is_dra75x()
->>>>> since this platform is DT-only, couldn't we just believe DT-data to be
->>>>> correct of_machine_is_compatible() ? 2/3 of this patch would be removed.
->>>>>
->>>>> I patched this for OMAP5 (compile-tested only, no boards available) and
->>>>> came out with the patch below (still needs to be split):
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
->>>>> index 08b7267..b3136e5 100644
->>>>> --- a/arch/arm/boot/dts/omap5-uevm.dts
->>>>> +++ b/arch/arm/boot/dts/omap5-uevm.dts
->>>>> @@ -13,7 +13,7 @@
->>>>>  
->>>>>  / {
->>>>>  	model = "TI OMAP5 uEVM board";
->>>>> -	compatible = "ti,omap5-uevm", "ti,omap5";
->>>>> +	compatible = "ti,omap5-uevm", "ti,omap5432-es2.0", "ti,omap5";
->>>>>  
->>>>  ok, nice and simpler way.
->>>>  But would this make different revisions, to appear the same ?
->>> well omap5-uevm is omap5432 es2.0 only, right ? If a new board comes up,
->>> it should be treated as such, then you can pass a different string to
->>> that new board's compatible attribute.
->>> s
->>  Yes for OMAP5. I was thinking in general about this approach.
->>  For example, for OMAP4 we have same board and
->>  different revisions can be socketed there.
->>
->>  For OMAP5, this is good.
-> do we really production socketed boards? Well, at least Blaze has such
-> thing. But do we have too many differences that need to be trated at
-> arch/arm or should/could those be handled by reading IP's revision
-> register (e.g. usb host erratas)
->
- OMAP4 SDP is socketed as well.
- Ya, revision checks used only in few places and as you said
- we handle them using IP revisions, but that we have to look and clean
- up those places, if we really intend to do this for other socs.
+On Tue, Jul 30, 2013 at 07:19:43PM +0200, Thomas Petazzoni wrote:
+> Dear Finn Hoffmann,
+> 
+> BTW, any reason why this discussion is not taking place on LAKML ?
 
-Regards,
- Sricharan
+Ah, sorry, did not look at the CC: list. Now one list...
+
+    Andrew
+
+> 
+> On Tue, 30 Jul 2013 18:37:13 +0200, Finn Hoffmann wrote:
+> 
+> > $ lspci -v
+> > 00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (prog-if 
+> > 00 [Normal decode])
+> >          Flags: bus master, fast devsel, latency 0
+> >          Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+> >          I/O behind bridge: 00010000-00010fff
+> >          Prefetchable memory behind bridge: e0000000-e00fffff
+> 
+> Ok, so there should be one mem window from e0000000 to e0100000...
+> 
+> > # cat /sys/kernel/debug/mvebu-mbus/devices
+> > [00] 00000000e8010000 - 00000000e8020000 : pcie0.0 (remap 0000000000010000)
+> > [01] disabled
+> > [02] disabled
+> > [03] disabled
+> > [04] 00000000f4000000 - 00000000f4010000 : nand
+> > [05] 00000000f5000000 - 00000000f5010000 : sram
+> > [06] disabled
+> > [07] disabled
+> 
+> ... but there's none here.
+> 
+> Seems like your device is using a prefetchable memory window, and our
+> emulated PCI-to-PCI bridge isn't taking this into account.
+> 
+> Can you test the below (completely untested) patch? Regardless of
+> whether it works or not, I'm interested in seeing the "PCI MVEBU"
+> debug messages that I've added, as well as the output
+> of /sys/kernel/debug/mvebu-mbus/devices.
+> 
+> Thanks a lot!
+> 
+> Thomas
+> 
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 13a633b..641dd3d 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -129,6 +129,8 @@ struct mvebu_pcie_port {
+>  	struct mvebu_pcie *pcie;
+>  	phys_addr_t memwin_base;
+>  	size_t memwin_size;
+> +	phys_addr_t prefmemwin_base;
+> +	size_t prefmemwin_size;
+>  	phys_addr_t iowin_base;
+>  	size_t iowin_size;
+>  };
+> @@ -348,6 +350,39 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>  					  MVEBU_MBUS_PCI_MEM);
+>  }
+>  
+> +static void mvebu_pcie_handle_prefmembase_change(struct mvebu_pcie_port *port)
+> +{
+> +	/* Are the new membase/memlimit values invalid? */
+> +	if (port->bridge.prefmemlimit < port->bridge.prefmembase) {
+> +
+> +		/* If a window was configured, remove it */
+> +		if (port->prefmemwin_base) {
+> +			mvebu_mbus_del_window(port->prefmemwin_base,
+> +					      port->prefmemwin_size);
+> +			port->prefmemwin_base = 0;
+> +			port->prefmemwin_size = 0;
+> +		}
+> +
+> +		return;
+> +	}
+> +
+> +	/*
+> +	 * We read the PCI-to-PCI bridge emulated registers, and
+> +	 * calculate the base address and size of the address decoding
+> +	 * window to setup, according to the PCI-to-PCI bridge
+> +	 * specifications.
+> +	 */
+> +	port->prefmemwin_base  = ((port->bridge.prefmembase & 0xFFF0) << 16);
+> +	port->prefmemwin_size  =
+> +		(((port->bridge.prefmemlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> +		port->prefmemwin_base;
+> +
+> +	mvebu_mbus_add_window_remap_flags(port->name, port->prefmemwin_base,
+> +					  port->prefmemwin_size,
+> +					  MVEBU_MBUS_NO_REMAP,
+> +					  MVEBU_MBUS_PCI_MEM);
+> +}
+> +
+>  /*
+>   * Initialize the configuration space of the PCI-to-PCI bridge
+>   * associated with the given PCIe interface.
+> @@ -492,18 +527,28 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+>  		bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
+>  		bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
+>  		bridge->secondary_status = value >> 16;
+> +		pr_info("MVEBU PCI %d.%d: new io, base 0x%x, limit 0x%x\n",
+> +			port->port, port->lane,
+> +			bridge->iobase, bridge->iolimit);
+>  		mvebu_pcie_handle_iobase_change(port);
+>  		break;
+>  
+>  	case PCI_MEMORY_BASE:
+>  		bridge->membase = value & 0xffff;
+>  		bridge->memlimit = value >> 16;
+> +		pr_info("MVEBU PCI %d.%d: new mem, base 0x%x, limit 0x%x\n",
+> +			port->port, port->lane,
+> +			bridge->membase, bridge->memlimit);
+>  		mvebu_pcie_handle_membase_change(port);
+>  		break;
+>  
+>  	case PCI_PREF_MEMORY_BASE:
+>  		bridge->prefmembase = value & 0xffff;
+>  		bridge->prefmemlimit = value >> 16;
+> +		pr_info("MVEBU PCI %d.%d: new pref mem, base 0x%x, limit 0x%x\n",
+> +			port->port, port->lane,
+> +			bridge->prefmembase, bridge->prefmemlimit);
+> +		mvebu_pcie_handle_prefmembase_change(port);
+>  		break;
+>  
+>  	case PCI_PREF_BASE_UPPER32:
+> 
+> 
+> -- 
+> Thomas Petazzoni, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
