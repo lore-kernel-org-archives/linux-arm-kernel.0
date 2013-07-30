@@ -1,88 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 30 Jul 2013 18:00:50 +0900
-Subject: [PATCH 2/5] ARM: shmobile: lager: add MMCIF support
+Date: Tue, 30 Jul 2013 18:00:52 +0900
+Subject: [PATCH 4/5] ARM: shmobile: ape6evm: add MMCIF support
 In-Reply-To: <cover.1375174556.git.horms+renesas@verge.net.au>
 References: <cover.1375174556.git.horms+renesas@verge.net.au>
-Message-ID: <63d0539e5466e1c5765b9dfdffafd619d4115ba5.1375174556.git.horms+renesas@verge.net.au>
+Message-ID: <8711613252ed931037f9e9f8646935519dd8f362.1375174556.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Add support for the MMCIF1 interface on Lager.
+Add MMCIF support to the APE6EVM board in PIO mode only. Power supply is
+fixed for now, eventually support for the tps80032 regulator, also
+supplying both VDD and VccQ to the MMCIF slot should be added to APE6EVM.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 31 +++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/board-ape6evm.c | 31 +++++++++++++++++++++++++++++++
  1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index d0da052..3c67b2a 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -24,10 +24,15 @@
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index af6dd39..8c7529c 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -21,6 +21,8 @@
+ #include <linux/gpio.h>
  #include <linux/interrupt.h>
  #include <linux/kernel.h>
- #include <linux/leds.h>
 +#include <linux/mmc/host.h>
 +#include <linux/mmc/sh_mmcif.h>
  #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
  #include <linux/platform_device.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/regulator/machine.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r8a7790.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -70,6 +75,22 @@ static __initdata struct gpio_keys_platform_data lager_keys_pdata = {
- 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+ #include <linux/regulator/fixed.h>
+@@ -54,6 +56,25 @@ static const struct smsc911x_platform_config lan9220_data = {
+ 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
  };
  
-+/* Fixed 3.3V regulator to be used by MMCIF */
++/*
++ * On APE6EVM power is supplied to MMCIF by a tps80032 regulator. For now we
++ * model a VDD supply to MMCIF, using a fixed 3.3V regulator.
++ */
 +static struct regulator_consumer_supply fixed3v3_power_consumers[] =
 +{
-+	REGULATOR_SUPPLY("vmmc", "sh_mmcif.1"),
++	REGULATOR_SUPPLY("vmmc", "sh_mmcif.0"),
 +};
 +
 +/* MMCIF */
-+static struct sh_mmcif_plat_data mmcif1_pdata = {
++static struct sh_mmcif_plat_data mmcif0_pdata = {
 +	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
 +};
 +
-+static struct resource mmcif1_resources[] = {
-+	DEFINE_RES_MEM_NAMED(0xee220000, 0x80, "MMCIF1"),
-+	DEFINE_RES_IRQ(gic_spi(170)),
++static struct resource mmcif0_resources[] = {
++	DEFINE_RES_MEM_NAMED(0xee200000, 0x100, "MMCIF0"),
++	DEFINE_RES_IRQ(gic_spi(169)),
 +};
 +
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-@@ -77,6 +98,11 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* SCIF1 (CN20: DEBUG SERIAL1) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
- 				  "scif1_data", "scif1"),
-+	/* MMCIF1 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.1", "pfc-r8a7790",
-+				  "mmc1_data8", "mmc1"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.1", "pfc-r8a7790",
-+				  "mmc1_ctrl", "mmc1"),
+ static const struct pinctrl_map ape6evm_pinctrl_map[] = {
+ 	/* SCIFA0 console */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
+@@ -61,6 +82,11 @@ static const struct pinctrl_map ape6evm_pinctrl_map[] = {
+ 	/* SMSC */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-r8a73a4",
+ 				  "irqc_irq40", "irqc"),
++	/* MMCIF0 */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a73a4",
++				  "mmc0_data8", "mmc0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a73a4",
++				  "mmc0_ctrl", "mmc0"),
  };
  
- static void __init lager_add_standard_devices(void)
-@@ -94,6 +120,11 @@ static void __init lager_add_standard_devices(void)
- 	platform_device_register_data(&platform_bus, "gpio-keys", -1,
- 				      &lager_keys_pdata,
- 				      sizeof(lager_keys_pdata));
-+	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
+ static void __init ape6evm_add_standard_devices(void)
+@@ -93,6 +119,11 @@ static void __init ape6evm_add_standard_devices(void)
+ 	platform_device_register_resndata(&platform_bus, "smsc911x", -1,
+ 					  lan9220_res, ARRAY_SIZE(lan9220_res),
+ 					  &lan9220_data, sizeof(lan9220_data));
++	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
 +				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
-+	platform_device_register_resndata(&platform_bus, "sh_mmcif", 1,
-+					  mmcif1_resources, ARRAY_SIZE(mmcif1_resources),
-+					  &mmcif1_pdata, sizeof(mmcif1_pdata));
++	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
++					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
++					  &mmcif0_pdata, sizeof(mmcif0_pdata));
  }
  
- static const char *lager_boards_compat_dt[] __initdata = {
+ static const char *ape6evm_boards_compat_dt[] __initdata = {
 -- 
 1.8.3.2
