@@ -1,58 +1,69 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 30 Jul 2013 18:26:47 +0530
-Subject: [PATCH v2 8/8] ARM: DRA7: dts: Add the dts files for dra7 SoC
- and dra7-evm board
-In-Reply-To: <51F7B59D.5080607@ti.com>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-9-git-send-email-rnayak@ti.com> <51F7B1E0.4060800@ti.com>
- <51F7B477.9010701@ti.com> <51F7B59D.5080607@ti.com>
-Message-ID: <51F7B80F.8090202@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Jul 2013 13:56:50 +0100
+Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
+In-Reply-To: <51F7B4C9.2060500@gmail.com>
+References: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
+ <51F7B4C9.2060500@gmail.com>
+Message-ID: <20130730125650.GD28716@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 July 2013 06:16 PM, Nishanth Menon wrote:
-> On 07/30/2013 07:41 AM, Rajendra Nayak wrote:
->> On Tuesday 30 July 2013 06:00 PM, Nishanth Menon wrote:
->>> On 07/30/2013 06:25 AM, Rajendra Nayak wrote:
->>>> From: R Sricharan <r.sricharan@ti.com>
-> [...]
->>>> +        mcspi4: spi at 480ba000 {
->>>> +            compatible = "ti,omap4-mcspi";
->>>> +            reg = <0x480ba000 0x200>;
->>>> +            interrupts = <0 48 0x4>;
->>>> +            #address-cells = <1>;
->>>> +            #size-cells = <0>;
->>>> +            ti,hwmods = "mcspi4";
->>>> +            ti,spi-num-cs = <1>;
->>>> +            dmas = <&sdma 70>, <&sdma 71>;
->>>> +            dma-names = "tx0", "rx0";
->>>> +        };
->>>> +    };
->>>> +};
->>>>
->>> ref: [1], we discussed that we should now be able to introduce all instances of h/w blocks into the dra7.dts. Further, considering [2]
->>
->> hmm, thats a long discussion on crossbar driver that [1] points to. Do you want to summarize what you mean by 'introduce all instances of h/w blocks'
+On Tue, Jul 30, 2013 at 01:42:49PM +0100, Rob Herring wrote:
+> On 07/30/2013 04:49 AM, Mark Rutland wrote:
+> > On Mon, Jul 29, 2013 at 09:18:43PM +0100, Rob Herring wrote:
+> >> On 07/29/2013 05:13 AM, Mark Rutland wrote:
+> >>> Hi Rob,
+> >>>
+> >>> On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
+> >>>> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> I recommend reading the last few emails on the thread about how we could do this with pinctrl. unfortunately, this patch is not informative enough to indicate that not all instances of the potential IP blocks are listed here.
+> [snip]
 > 
->>
->>> would you not want to follow "status = disabled" for all modules by default and enable required modules in board file, so that we dont have to respin this yet again?
->>
->> Well, I was just following the convention of whats already followed on existing OMAPs. See [3] for some views on these.
+> >>> One of the things changed in PSCI 0.2 was the SMC calling convention,
+> >>> though this isn't clear in the PSCI document. The function IDs for 32bit
+> >>> and 64bit callers may differ, and we need to support describing an
+> >>> arbitrary configuration of the two (same ID for both, different across
+> >>> 32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
+> >>>
+> >>> I'd like to ensure the binding can deal with that from the start. We
+> >>> could do this by having -32 and -64 variants of each function id (e.g.
+> >>> cpu_off-64) , if the IDs actually differ, and use the regular combined
+> >>> ID if they don't.
+> >>
+> >> Uggg. I guess I should have read the SMC calling convention doc... I was
+> >> simply documenting what is already in the PSCI doc, but obviously that
+> >> is not fully flushed out.
+> >>
+> >> How about something like this (for the complicated case of both 32 and
+> >> 64 bit):
+> >>
+> >> 	method		= "smc", "smc64";
+> >> 	psci_version	= <0x84000000 0xc4000000>;
+> >> 	cpu_suspend	= <0x84000001 0xc4000001>;
+> >> 	cpu_off		= <0x84000002 0xc4000002>;
+> >> 	cpu_on		= <0x84000003 0xc4000003>;
+> >>
+> >> "smc" is a synonym for smc32 for compatibility. The number and order of
+> >> methods determines the number and order of function IDs.
+> > 
+> > While this may be compatible with the arm implementation, it won't be
+> > compatible with the arm64 implementation, which assumes smc64 by
+> > default.
+> > 
+> > As far as I am aware, the implementations currently in use (KVM and Xen)
+> > use the same ID for both, so I think "smc" should cover an ID valid for
+> > a native register width calling convention, and "smc64" and "smc32"
+> > describing values only valid for 64-bit wide and 32-bit wide calling
+> > conventions respectively.
 > 
-> DRA7 case, I would not think it makes sense due to the number of product variants being done, not all will use the same set. Further, rationale for DRA7 and my suggestion for Grant's option (1) is mainly because the product variants will require more dtsis rather than board files using the product variants use just the necessary modules from a common dtsi. Makes support of variants like OMAP57xx etc trivial and constrainted to board file usage, rather than spinning off new dtsis.
+> The problem is that does not work for a 32-bit kernel on 64-bit h/w as
+> native from the dts perspective is smc64. Just like the cpu bindings,
+> the binding cannot change based on 32 or 64 bit OS. I don't think we
+> really have to deal with that here. We can simply say "smc" is only for
+> "arm,psci" and deprecated for "arm,psci-0.2".
 
-Makes sense with the different product variants for DRA7, AM335x already does it this way, but the rest of OMAP3/4/5 are doing it the other way.
-I think its just too confusing to follow different conventions for different SoCs. We should stick to just one, either this way or that.
+Agreed. I'd be happy with only having "smc32" and "smc64" for
+"arm,psci-0.2".
 
-> 
->>
->>>
->>>
->>> [1] http://marc.info/?t=137416599400001&r=1&w=2
->>> [2] http://marc.info/?l=linux-omap&m=137510358229479&w=2
->> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086297.html
->>
-> 
-> 
+Thanks,
+Mark.
