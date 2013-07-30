@@ -1,78 +1,69 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 30 Jul 2013 14:21:00 -0700
-Subject: [PATCH 08/11] clk: tegra114: add suspend/resume function for
- tegar_cpu_car_ops
-In-Reply-To: <1372152475-18617-9-git-send-email-josephl@nvidia.com>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-9-git-send-email-josephl@nvidia.com>
-Message-ID: <20130730212100.5270.53947@quantum>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Jul 2013 23:23:16 +0200
+Subject: NSA310 + DT
+In-Reply-To: <51F814A0.2050403@uni-bremen.de>
+References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
+ <20130729192112.GY29916@titan.lakedaemon.net>
+ <20130729204315.GK24782@lunn.ch> <51F78DA6.8010307@uni-bremen.de>
+ <20130730144752.GR24782@lunn.ch> <20130730172407.3aab15c6@skate>
+ <51F7EBB9.7000504@uni-bremen.de> <20130730191943.49f8070c@skate>
+ <20130730183610.GT24782@lunn.ch> <51F814A0.2050403@uni-bremen.de>
+Message-ID: <20130730232316.10dc7019@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Joseph Lo (2013-06-25 02:27:52)
-> Adding suspend/resume function for tegra_cpu_car_ops. We only save and
-> restore the setting of the clock of CoreSight. Other clocks still need
-> to be taken care by clock driver.
-> 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Dear Finn Hoffmann,
 
-Change looks OK to me, besides Stephen's comments. I was waiting for a
-V2 to hit the list but I never saw it. Any plans?
+On Tue, 30 Jul 2013 21:31:44 +0200, Finn Hoffmann wrote:
+> # cat /sys/kernel/debug/mvebu-mbus/devices
+> [00] 00000000e8010000 - 00000000e8020000 : pcie0.0 (remap 0000000000010000)
+> [01] disabled
+> [02] disabled
+> [03] disabled
+> [04] 00000000f4000000 - 00000000f4010000 : nand
+> [05] 00000000f5000000 - 00000000f5010000 : sram
+> [06] 00000000fff00000 - 0000000100000000 : pcie0.0
 
-Regards,
-Mike
+Ok, now we have a memory window created, which looks better, but its
+addresses are wrong.
 
-> ---
->  drivers/clk/tegra/clk-tegra114.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-> index dbd0428..cd51d75 100644
-> --- a/drivers/clk/tegra/clk-tegra114.c
-> +++ b/drivers/clk/tegra/clk-tegra114.c
-> @@ -258,6 +258,12 @@
->  #define PMC_PLLM_WB0_OVERRIDE 0x1dc
->  #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static struct cpu_clk_suspend_context {
-> +       u32 clk_csite_src;
-> +} tegra114_cpu_clk_sctx;
-> +#endif
-> +
->  static int periph_clk_enb_refcnt[CLK_OUT_ENB_NUM * 32];
->  
->  static void __iomem *clk_base;
-> @@ -2107,9 +2113,29 @@ static void tegra114_disable_cpu_clock(u32 cpu)
->         /* flow controller would take care in the power sequence. */
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static void tegra114_cpu_clock_suspend(void)
-> +{
-> +       /* switch coresite to clk_m, save off original source */
-> +       tegra114_cpu_clk_sctx.clk_csite_src =
-> +                               readl(clk_base + CLK_SOURCE_CSITE);
-> +       writel(3<<30, clk_base + CLK_SOURCE_CSITE);
-> +}
-> +
-> +static void tegra114_cpu_clock_resume(void)
-> +{
-> +       writel(tegra114_cpu_clk_sctx.clk_csite_src,
-> +                                       clk_base + CLK_SOURCE_CSITE);
-> +}
-> +#endif
-> +
->  static struct tegra_cpu_car_ops tegra114_cpu_car_ops = {
->         .wait_for_reset = tegra114_wait_cpu_in_reset,
->         .disable_clock  = tegra114_disable_cpu_clock,
-> +#ifdef CONFIG_PM_SLEEP
-> +       .suspend        = tegra114_cpu_clock_suspend,
-> +       .resume         = tegra114_cpu_clock_resume,
-> +#endif
->  };
->  
->  static const struct of_device_id pmc_match[] __initconst = {
-> -- 
-> 1.8.3.1
+> mvebu-pcie pcie-controller.1: PCIe0.0: link up
+> mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [io 0x1000-0xfffff]
+> pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
+> pci_bus 0000:00: root bus resource [bus 00-ff]
+> PCI: bus0: Fast back to back transfers disabled
+> pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> PCI: bus1: Fast back to back transfers disabled
+> MVEBU PCI 0.0: new pref mem, base 0xfff0, limit 0xfff0
+> MVEBU PCI 0.0: new pref mem, base 0x0, limit 0x0
+> mvebu_mbus: cannot add window 'pcie0.0', conflicts with another window
+> pci 0000:00:01.0: BAR 9: assigned [mem 0xe0000000-0xe00fffff pref]
+> pci 0000:00:01.0: BAR 7: assigned [io 0x10000-0x10fff]
+> pci 0000:01:00.0: BAR 6: assigned [mem 0xe0000000-0xe000ffff pref]
+> pci 0000:01:00.0: BAR 4: assigned [mem 0xe0010000-0xe0013fff 64bit pref]
+> pci 0000:01:00.0: BAR 2: assigned [mem 0xe0014000-0xe0014fff 64bit pref]
+> pci 0000:01:00.0: BAR 0: assigned [io 0x10000-0x100ff]
+> pci 0000:00:01.0: PCI bridge to [bus 01]
+> pci 0000:00:01.0: bridge window [io 0x10000-0x10fff]
+> MVEBU PCI 0.0: new io, base 0x1, limit 0x1
+> MVEBU PCI 0.0: new mem, base 0xfff0, limit 0x0
+> pci 0000:00:01.0: bridge window [mem 0xe0000000-0xe00fffff pref]
+> MVEBU PCI 0.0: new pref mem, base 0xe000, limit 0xe000
+> mvebu_mbus: cannot add window 'pcie0.0', conflicts with another window
+
+Thanks for this log. I need a bit of time to analyze this with the
+PCI-to-PCI bridge specification, and I'll cook up a new patch,
+hopefully tomorrow.
+
+Thanks again a lot for taking the time to report this bug and test the
+patches,
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
