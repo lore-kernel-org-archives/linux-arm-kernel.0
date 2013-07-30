@@ -1,35 +1,46 @@
 From: coelho@ti.com (Luciano Coelho)
-Date: Tue, 30 Jul 2013 20:27:24 +0300
-Subject: [PATCH 0/4] ARM: dts: add WiLink support to panda and omap4-sdp
-Message-ID: <1375205248-25708-1-git-send-email-coelho@ti.com>
+Date: Tue, 30 Jul 2013 20:27:26 +0300
+Subject: [PATCH 2/4] arm: dts: omap4-panda-common: add WiLink6 device tree
+ nodes
+In-Reply-To: <1375205248-25708-1-git-send-email-coelho@ti.com>
+References: <1375205248-25708-1-git-send-email-coelho@ti.com>
+Message-ID: <1375205248-25708-3-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add the WiLink device tree nodes.  On omap4-panda, a WiLink6 module is
+connected on MMC5 and a GPIO interrupt is used.  The refclock
+frequency is 38.4MHz.
 
-These patches add the necessary DT configuration to use the WLAN part
-of WiLink on OMAP4 Pandaboard and on OMAP4-SDP (including Blaze).
+Signed-off-by: Luciano Coelho <coelho@ti.com>
+---
+ arch/arm/boot/dts/omap4-panda-common.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-I've tested these changes on Panda and it works fine.  But I couldn't
-test the OMAP4 SDP changes properly on 3.11-rc3 because I'm having
-problems with clocks and SDIO stuff.  So it's pretty much just
-compiled tested.  I've tried this (without the new clock definition
-stuff) on Blaze with 3.10 and it was working, though.
-
-Please take a look and let me know what you think.
-
-Luca.
-
-
-Luciano Coelho (4):
-  ARM: dts: omap4-panda: add MMC5 (WiLink WLAN) configuration
-  arm: dts: omap4-panda-common: add WiLink6 device tree nodes
-  ARM: dts: omap4-sdp: add MMC5 (WiLink WLAN) configuration
-  arm: dts: omap4-sdp: add WiLink7 device tree node
-
- arch/arm/boot/dts/omap4-panda-common.dtsi | 45 +++++++++++++++++++++++++++-
- arch/arm/boot/dts/omap4-sdp.dts           | 49 +++++++++++++++++++++++++++++++
- 2 files changed, 93 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index b3f6e1f..77e4a42 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -117,6 +117,20 @@
+ 		startup-delay-us = <70000>;
+ 		enable-active-high;
+ 	};
++
++	wlan {
++		compatible = "ti,wilink6";
++		interrupt-parent = <&gpio2>;
++		interrupts = <21 0x4>;	/* gpio line 53, high level triggered */
++		clocks = <&refclock>;
++		clock-names = "refclock";
++
++		refclock: refclock {
++			compatible = "ti,wilink-clock";
++			#clock-cells = <0>;
++			clock-frequency = <38400000>;
++		};
++	 };
+ };
+ 
+ &omap4_pmx_wkup {
 -- 
 1.8.3.2
