@@ -1,36 +1,31 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 30 Jul 2013 09:30:21 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
-In-Reply-To: <51F6F0BF.2030004@cogentembedded.com>
-References: <201307230218.01495.sergei.shtylyov@cogentembedded.com>
- <201307230222.04763.sergei.shtylyov@cogentembedded.com>
- <20130726001052.GA28912@verge.net.au>
- <87a9lacd6o.wl%kuninori.morimoto.gx@renesas.com>
- <51F6F0BF.2030004@cogentembedded.com>
-Message-ID: <uzjt499eq.wl%kuninori.morimoto.gx@renesas.com>
+From: david@lang.hm (David Lang)
+Date: Mon, 29 Jul 2013 17:41:11 -0700 (PDT)
+Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
+In-Reply-To: <20130729172339.GT29916@titan.lakedaemon.net>
+References: <2469263.vMN09Q7Tzi@flatron>
+ <20130729150124.GS29916@titan.lakedaemon.net>
+ <20130729164905.GB2280@localhost.localdomain>
+ <20130729172339.GT29916@titan.lakedaemon.net>
+Message-ID: <alpine.DEB.2.02.1307291739150.13736@nftneq.ynat.uz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 29 Jul 2013, Jason Cooper wrote:
 
-Hi Sergei
-
-> > Is this correct ?
-> > And what is 0x0C port ?
 > 
->     SDHI0 if you look into the table 16.7 of the R-Car M1A manual 1.00 for the 
-> channels 21 thru 23.
+>>
+>> I don't think that siblings have any defined order in DT.  If reading a
+>> device tree, there's no guarantee you get nodes or properties out in the
+>> same order as the original .dts file.
+>
+> That's why I raised the point.  If people think encoding initialization
+> order in the DT is a good idea, then we should change the dtc so it
+> compiles/decompiles in the same order.
 
-Ahh... yes, indeed
-sorry for my noise
+if you make the initializaiton order 'magicly' correct by following the order of 
+the flat representation, how do you reflect the case where initialization can be 
+overlapped for different devices?
 
-> > I want 1 line for 1 channels on hpb_dmae_channels.
-> > like this
-> 
-> > static const struct hpb_dmae_channel hpb_dmae_channels[] = {
-> > 	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch21 */
-> > 	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch22 */
-> > }
-> 
->     OK, done.
+you are just trading one side of the problem for the other.
 
-Thank you
+David Lang
