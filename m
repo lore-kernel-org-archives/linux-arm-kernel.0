@@ -1,56 +1,86 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Jul 2013 17:53:35 -0600
-Subject: [PATCH 7/8] ARM: tegra114: add LP1 suspend support
-In-Reply-To: <1374830110-30685-8-git-send-email-josephl@nvidia.com>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-8-git-send-email-josephl@nvidia.com>
-Message-ID: <51F7007F.6090200@wwwdotorg.org>
+Date: Mon, 29 Jul 2013 18:02:00 -0600
+Subject: Defining schemas for Device Tree
+In-Reply-To: <6809706.cRofzbG9CV@thinkpad>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <6809706.cRofzbG9CV@thinkpad>
+Message-ID: <51F70278.1020002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2013 03:15 AM, Joseph Lo wrote:
-> The LP1 suspend mode will power off the CPU, clock gated the PLLs and put
-> SDRAM to self-refresh mode. Any interrupt can wake up device from LP1. The
-> sequence when LP1 suspending:
+On 07/29/2013 04:20 PM, Tomasz Figa wrote:
+> On Monday 29 of July 2013 15:47:55 Stephen Warren wrote:
+>> On 07/28/2013 06:21 PM, Tomasz Figa wrote:
 
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-> index 5ae7ee5..36cadaa 100644
-> --- a/arch/arm/mach-tegra/pm.c
-> +++ b/arch/arm/mach-tegra/pm.c
-> @@ -214,6 +214,7 @@ static bool tegra_lp1_iram_hook(void)
->  		tegra20_lp1_iram_hook();
->  		break;
->  	case TEGRA30:
-> +	case TEGRA114:
->  		tegra30_lp1_iram_hook();
+...
+>> Other content restrictions might be:
+>>
+>> * List must contain (at least) these entries/values.
+>>
+>> * List can't contain any other entries/values not specified here.
+>>
+>> * List must be in this order vs. any order.
+>>
+>> * List logical length (in entries, not bytes/cells) must match the
+>> logical length of another cell (consider clocks/clock-names).
+>>
+>> * Ordering of one property must match ordering of another property
+>> (again consider clocks/clock-names), although it'd be difficult to tell
+>> whether this condition was met, perhaps we can at least document it.
+>>
+>> I'm sure there will be many more criteria to validate that we're
+>> forgetting. This is possible the most complex area?
+> 
+> Right. Still, this is about the granularity of checks we really need. Do we 
+> need to check for all those restrictions?
 
-That's in pm-tegra30.c, which is only compiled in if
-CONFIG_ARCH_TEGRA_3x_SOC is enabled. Similarly, this patch adds a lot of
-code to sleep-tegra30.S, which also isn't built/linked if
-!CONFIG_ARCH_TEGRA_3x_SOC.
+I think all/most of those bullets actually exist in various binding
+documents, and I think we want any schema to be able to represent any
+restrictions we already impose. So, yes, I do think we want to be able
+to validate all of that.
 
-Does this series built with all 7 combinations of Tegra20/30/114 support
-enabled?
+Now, that's not saying that a system which didn't validate that, but
+perhaps only validated that certain properties were present, and no
+other properties were present. However, I'd still hope that such a
+system was just a first step towards the complete system.
 
-> diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+>>> As for subnodes, I think we need to define following constraints:
+>>>  - node name (or node name format, e.g. regex),
+>>
+>> I don't think node names are supposed to convey any semantic meaning, so
+>> they probably shouldn't be restricted (much?) by schema.
+> 
+> There are bindings currently that require specific node names. Since 
+> of_match_node() can do matching by names as well, I think we should care about 
+> node names too,
 
-> @@ -96,9 +100,15 @@
->  	orreq	\rd, \rd, #(1 << 30)
->  	streq	\rd, [\r_car_base, #\pll_base]
->  	/* Enable lock detector */
-> +	.if	\pll_misc
-> +	ldr	\rd, [\r_car_base, #\pll_misc]
-> +	bic	\rd, \rd, #(1 << 18)
-> +	str	\rd, [\r_car_base, #\pll_misc]
-> +	ldr	\rd, [\r_car_base, #\pll_misc]
->  	ldr	\rd, [\r_car_base, #\pll_misc]
->  	orr	\rd, \rd, #(1 << 18)
->  	str	\rd, [\r_car_base, #\pll_misc]
-> +	.endif
+Hopefully we can discourage this through review though, since I've
+definitely been told not to semantically interpret node names.
 
-Hmm. Those last 3 lines that aren't touched by this patch already
-touched the pll_misc register even if !pll_misc. Was that a bug in a
-previous patch?
+...
+>> Equally, I'm not sure there's any difference between:
+>>
+>> prop = <&node>;
+>> prop = <0x23648689>;
+>>
+>> ... in the DTB, except that the value just *happens* to match another
+>> node's phandle value, which could end up leading to false positive
+>> matches if only applied on the raw values not the syntax?
+> 
+> This is a good point. From driver's perspective it doesn't matter how you 
+> specify value of some property, as long as it can be parsed using the same 
+> code. As a more trivial example, consider following dts code:
+> 
+> 	array-prop = <0>, <1>, <2>;
+> 	array-prop-2 = <0 1 2>;
+> 
+> Both array props contain the same data and can be parsed using the same code, 
+> but from reader's perspective they mean something slightly different - an array 
+> with 1 cell per element and a single entry of 3 cells.
 
-Is git bisect maintained for both compile and run-time across this whole
-patch series?
+I can certainly understand those two pieces of syntax being interpreted
+that way. I've always thought of the above being 100% equivalent, even
+though there may be a logical distinction. I not sure that such a
+distinction is actually present in all extant DT source files. Perhaps
+it's fine as part of the schema effort to re-write the DTs along these
+lines though.
