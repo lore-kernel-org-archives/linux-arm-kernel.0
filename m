@@ -1,45 +1,62 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 30 Jul 2013 14:00:06 -0700
-Subject: [PATCH v4 1/6] clk/exynos5250: Fix HDMI clock number in
- documentation
-In-Reply-To: <1374728857-4208-2-git-send-email-rahul.sharma@samsung.com>
+Date: Tue, 30 Jul 2013 14:08:14 -0700
+Subject: [PATCH v4 0/6] clk/exynos5250: add clocks for hdmi subsystem
+In-Reply-To: <1374728857-4208-1-git-send-email-rahul.sharma@samsung.com>
 References: <1374728857-4208-1-git-send-email-rahul.sharma@samsung.com>
- <1374728857-4208-2-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <20130730210006.5270.42195@quantum>
+Message-ID: <20130730210814.5270.44742@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rahul Sharma (2013-07-24 22:07:32)
-> From: Arun Kumar K <arun.kk@samsung.com>
+Quoting Rahul Sharma (2013-07-24 22:07:31)
+> Add clock changes for hdmi subsystem for exynos5250 SoC. These
+> include addition of new clocks like mout_hdmi and smmu_tv, associating
+> ID to clk_hdmiphy and some essential corrections.
 > 
-> This patch corrects the HDMI clock number given wrongly
-> in the documentation.
-> 
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> This set is based on kukjin's for-next branch at
+> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git.
 
-You can drop this patch as it is fixed in the clk-next branch already by
-commit "of/documentation: Fix a typo in exynos5250-clock.txt", 07c2ae9c.
+I've taken patches 2-4 into the clk-next branch. Patch #1 can be
+dropped.
 
-Regards,
+Patches 5 & 6 need to be rebased onto clk-next as the g2d clock has
+reserved mapping 345.  Also I've cc'd Cho KyongHo who is rebasing his
+system mmu clock patch[1] onto clk-next. Can the two of your coordinate
+your changes to avoid mapping conflicts in the binding? Perhaps Rahul
+can carry Cho's patch in his next version when he rebases patches 5 & 6.
+
+Thanks,
 Mike
 
-> ---
->  Documentation/devicetree/bindings/clock/exynos5250-clock.txt |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+[1] https://lkml.org/lkml/2013/7/30/51
+
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> index 781a627..1a05761 100644
-> --- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> @@ -154,7 +154,7 @@ clock which they consume.
->    dsim0                        341
->    dp                   342
->    mixer                        343
-> -  hdmi                 345
-> +  hdmi                 344
->  
->  Example 1: An example of a clock controller node is listed below.
->  
+> V4:
+> 1) Added Arun's patch hdmi clock number correction in this series.
+> 2) Corrected clock number for smmu_mixer
+> 
+> V3:
+> 1) Rebase to kgene for-next based on 3.11-rc1.
+> 2) Added Tushar's patch in the series.
+> 
+> V2:
+> 1) Dropped "clk/exynos5250: Fix HDMI clock number in documentation" as
+> it already get merged.
+> 
+> Arun Kumar K (1):
+>   clk/exynos5250: Fix HDMI clock number in documentation
+> 
+> Rahul Sharma (4):
+>   clk/exynos5250: add mout_hdmi mux clock for hdmi
+>   clk/exynos5250: add sclk_hdmiphy in the list of special clocks
+>   clk/exynos5250: add clock for mixer sysmmu
+>   clk/exynos5250: change parent to aclk200_disp1 for hdmi subsystem
+> 
+> Tushar Behera (1):
+>   Documentation: exynos5250-clock: Add div_i2s1 and div_i2s2
+> 
+>  .../devicetree/bindings/clock/exynos5250-clock.txt |   14 +++++++++++++-
+>  drivers/clk/samsung/clk-exynos5250.c               |   20 ++++++++++++++------
+>  2 files changed, 27 insertions(+), 7 deletions(-)
+> 
 > -- 
 > 1.7.10.4
