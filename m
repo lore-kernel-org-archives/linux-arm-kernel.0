@@ -1,88 +1,29 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 30 Jul 2013 15:13:40 -0500
-Subject: [PATCHv4 22/33] CLK: OMAP: update gate clock setup for OMAP3
-In-Reply-To: <1374564028-11352-23-git-send-email-t-kristo@ti.com>
+Date: Tue, 30 Jul 2013 15:19:35 -0500
+Subject: [PATCHv4 29/33] CLK: omap: add omap3 clock init file
+In-Reply-To: <1374564028-11352-30-git-send-email-t-kristo@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-23-git-send-email-t-kristo@ti.com>
-Message-ID: <51F81E74.9070609@ti.com>
+ <1374564028-11352-30-git-send-email-t-kristo@ti.com>
+Message-ID: <51F81FD7.2060707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/23/2013 02:20 AM, Tero Kristo wrote:
-> OMAP3 gate clocks are handled through the clk driver now. Basic gate
-> clock can't be used as the OMAP3 gate clocks have some special features,
-> namely the idle status linkage which is on separate register.
+> clk-3xxx.c now contains the clock init functionality for omap3, including
+> DT clock registration and adding of static clkdev entries.
+>
+> This patch also splits the OMAP3 clock registration code under mach-omap2
+> to use OMAP3 subtype specific clk init functions.
 >
 > Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->   drivers/clk/omap/gate.c |   27 +++++++++++++++++++++++++--
->   1 file changed, 25 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/omap/gate.c b/drivers/clk/omap/gate.c
-> index 7186bb2..b560ff4 100644
-> --- a/drivers/clk/omap/gate.c
-> +++ b/drivers/clk/omap/gate.c
-> @@ -28,12 +28,19 @@
->
->   #ifdef CONFIG_OF
->
-> -static const struct clk_ops omap_gate_clk_ops = {
-> +static const struct clk_ops omap_gate_clkdm_clk_ops = {
->   	.init		= &omap2_init_clk_clkdm,
->   	.enable		= &omap2_clkops_enable_clkdm,
->   	.disable	= &omap2_clkops_disable_clkdm,
->   };
->
-> +static const struct clk_ops omap_gate_clk_ops = {
-> +	.init		= &omap2_init_clk_clkdm,
-> +	.enable		= &omap2_dflt_clk_enable,
-> +	.disable	= &omap2_dflt_clk_disable,
-> +	.is_enabled	= &omap2_dflt_clk_is_enabled,
-> +};
-> +
->   void __init of_omap_gate_clk_setup(struct device_node *node)
->   {
->   	struct clk *clk;
-> @@ -43,6 +50,7 @@ void __init of_omap_gate_clk_setup(struct device_node *node)
->   	int num_parents;
->   	const char **parent_names;
->   	int i;
-> +	u32 val;
->
->   	clk_hw = kzalloc(sizeof(struct clk_hw_omap), GFP_KERNEL);
->   	if (!clk_hw) {
-> @@ -56,7 +64,22 @@ void __init of_omap_gate_clk_setup(struct device_node *node)
->   	of_property_read_string(node, "ti,clkdm-name", &clk_hw->clkdm_name);
->
->   	init.name = clk_name;
-> -	init.ops = &omap_gate_clk_ops;
-> +	init.flags = 0;
-> +
-> +	if (of_property_read_u32_index(node, "reg", 0, &val)) {
-> +		/* No register, clkdm control only */
-> +		init.ops = &omap_gate_clkdm_clk_ops;
-> +	} else {
-> +		init.ops = &omap_gate_clk_ops;
-> +		clk_hw->enable_reg = of_iomap(node, 0);
-> +		of_property_read_u32(node, "ti,enable-bit", &val);
-> +		clk_hw->enable_bit = val;
-> +
-> +		if (of_property_read_bool(node, "ti,dss-clk"))
-> +			clk_hw->ops = &clkhwops_omap3430es2_dss_usbhost_wait;
+>   arch/arm/mach-omap2/Makefile          |    2 +-
+>   arch/arm/mach-omap2/cclock3xxx_data.c | 3641 ---------------------------------
 
-umm, it was going relatively ok so far, till i hit this :( it is 
-probably a quirk... but still..
+Tony and a lot of people is not going to like removing support for 
+non-dt boot for OMAP3 before "it's time is due" ;)
 
-> +		else
-> +			clk_hw->ops = &clkhwops_wait;
-> +	}
->
->   	num_parents = of_clk_get_parent_count(node);
->   	if (num_parents < 1) {
->
 
-but still no usage of "ti,omap-gate-clock" makes me question the need 
-for this file.
 
 -- 
 Regards,
