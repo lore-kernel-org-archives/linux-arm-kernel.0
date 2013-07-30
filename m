@@ -1,95 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Jul 2013 09:18:30 +0300
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given in
- usb_bind_phy
-In-Reply-To: <51F7590B.4020705@ti.com>
-References: <1374829418-27503-1-git-send-email-kishon@ti.com>
- <1374829418-27503-3-git-send-email-kishon@ti.com>
- <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
- <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
- <20130730060134.GD9155@radagast> <51F7590B.4020705@ti.com>
-Message-ID: <20130730061830.GE9155@radagast>
+From: archit@ti.com (Archit Taneja)
+Date: Tue, 30 Jul 2013 11:51:30 +0530
+Subject: [PATCH 06/21] ARM: OMAP: overo: use new display drivers
+In-Reply-To: <1374822504-28949-7-git-send-email-tomi.valkeinen@ti.com>
+References: <1374822504-28949-1-git-send-email-tomi.valkeinen@ti.com>
+ <1374822504-28949-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <51F75B6A.6090900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jul 30, 2013 at 11:41:23AM +0530, Kishon Vijay Abraham I wrote:
-> >>>>>> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-> >>>>>> index 244d8a5..17bb076 100644
-> >>>>>> --- a/arch/arm/mach-omap2/board-2430sdp.c
-> >>>>>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
-> >>>>>> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
-> >>>>>>  	omap_hsmmc_init(mmc);
-> >>>>>>  
-> >>>>>>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
-> >>>>>> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> >>>>>> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
-> >>>>>
-> >>>>> how about moving usb_bind_phy() calls to omap2430.c ?
-> >>>>>
-> >>>>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> >>>>> index f44e8b5..b6abc1a 100644
-> >>>>> --- a/drivers/usb/musb/omap2430.c
-> >>>>> +++ b/drivers/usb/musb/omap2430.c
-> >>>>> @@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
-> >>>>>  
-> >>>>>  		pdata->board_data	= data;
-> >>>>>  		pdata->config		= config;
-> >>>>> +	} else {
-> >>>>> +		/* bind the PHY */
-> >>>>> +		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
-> >>>>
-> >>>> This looks like a hack IMHO to workaround the usb phy library. otherwise it is
-> >>>> similar to get_phy_by_name.
-> >>>
-> >>> actually, this is a workaround to the fact that we're not creating all
-> >>> platform_devices in arch/arm/mach-omap2/ :-)
-> >>>
-> >>> If we had the musb allocation there, we could easily handle
-> >>> usb_bind_phy()
-> >>>
-> >>>>> so that's temporary. It might be better than to reintroduce the IDR in
-> >>>>> musb_core.c.
-> >>>>
-> >>>> that?s needed for generic phy framework anyway :-s
-> >>>
-> >>> right, but generic phy framework can handle everything just fine, the
-> >>> only problem is that names are changing.
-> >>
-> >> right. But if the names change, PHY framework wouldn't be able to return the
-> >> reference to the PHY.
-> > 
-> > with my suggestion they can change whenever they want since we're using
-> > dev_name() of the just-created musb platform_device. Right ?
-> 
-> right. But the PHY device can be created in a different place from where the
-> musb devices are created. And in the PHY framework, the PHY device should have
+On Friday 26 July 2013 12:38 PM, Tomi Valkeinen wrote:
+> Use the new display drivers for OMAP3 Overo board.
+>
+> The new OMAP display drivers were merged for 3.11, and we can now change
+> the board files to use the new ones and phase out the old ones.
+>
+> Note that the LCD add-on boards for lcd43 and lcd35 use the same GPIOs
+> for the panels. This means that both panel devices cannot be probed at
+> the same time.
+>
+> DT will handle this correctly, i.e. the DT data will contain the panel
+> device only for the add-on board that is attached. However, for the
+> board file we need a hackish solution: We parse the kernel boot command
+> line, and see whether lcd43 or lcd35 is set as a default display, and
+> add the given one. Or, if neither is given, default to lcd43.
+>
 
-this shouldn't be a problem. As long as the phy is created, all should
-be good.
+<snip>
 
-> the list of controller device (names) it can support (PHY framework does not
-> maintain a separate list for binding like how we had in USB PHY library). e.g.
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92817.html. In such
+>   static struct omap_dss_board_info overo_dss_data = {
+> -	.num_devices	= ARRAY_SIZE(overo_dss_devices),
+> -	.devices	= overo_dss_devices,
+> -	.default_device	= &overo_dvi_device,
+> +	.default_display_name = "lcd43",
+>   };
 
-this has nothing to do with $subject though. We talk about generic PHY
-framework once all these PHY drivers are moved there :-)
+The default display previously was the dvi device, if both lcd43 and 
+lcd35 are on add-on boards, then we should probably stick to dvi itself, 
+right? The hack won't work if dvi is the default device though.
 
-> cases how do we pass the device names. Also will the MUSB core device be
-> created before twl4030-usb PHY device?
-
-and why would that be a problem ? We're telling the framework that the
-musb device will use a phy with a name of 'twl4030'. If musb calls
-usb_get_phy_dev() and doesn't find a phy, it'll return -EPROBE_DEFER and
-try again later.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/c4161e9a/attachment.sig>
+Archit
