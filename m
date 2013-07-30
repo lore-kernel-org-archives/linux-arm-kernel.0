@@ -1,9 +1,9 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 30 Jul 2013 12:46:16 +0100
-Subject: [PATCH 4/5] mmc: dw_mmc: Indicate that regulators may be absent
+Date: Tue, 30 Jul 2013 12:46:15 +0100
+Subject: [PATCH 3/5] mmc: sdhci: Indicate that regulators may be absent
 In-Reply-To: <1375184777-25404-1-git-send-email-broonie@kernel.org>
 References: <1375184777-25404-1-git-send-email-broonie@kernel.org>
-Message-ID: <1375184777-25404-4-git-send-email-broonie@kernel.org>
+Message-ID: <1375184777-25404-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,21 +14,30 @@ can fail in a real system.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- drivers/mmc/host/dw_mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/sdhci.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index ee5f167..5424073 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2231,7 +2231,7 @@ int dw_mci_probe(struct dw_mci *host)
- 		}
- 	}
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index a78bd4f..dd2c083 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2966,7 +2966,7 @@ int sdhci_add_host(struct sdhci_host *host)
+ 		mmc->caps |= MMC_CAP_NEEDS_POLL;
  
--	host->vmmc = devm_regulator_get(host->dev, "vmmc");
-+	host->vmmc = devm_regulator_get_optional(host->dev, "vmmc");
- 	if (IS_ERR(host->vmmc)) {
- 		ret = PTR_ERR(host->vmmc);
- 		if (ret == -EPROBE_DEFER)
+ 	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
+-	host->vqmmc = regulator_get(mmc_dev(mmc), "vqmmc");
++	host->vqmmc = regulator_get_optional(mmc_dev(mmc), "vqmmc");
+ 	if (IS_ERR_OR_NULL(host->vqmmc)) {
+ 		if (PTR_ERR(host->vqmmc) < 0) {
+ 			pr_info("%s: no vqmmc regulator found\n",
+@@ -3042,7 +3042,7 @@ int sdhci_add_host(struct sdhci_host *host)
+ 
+ 	ocr_avail = 0;
+ 
+-	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
++	host->vmmc = regulator_get_optional(mmc_dev(mmc), "vmmc");
+ 	if (IS_ERR_OR_NULL(host->vmmc)) {
+ 		if (PTR_ERR(host->vmmc) < 0) {
+ 			pr_info("%s: no vmmc regulator found\n",
 -- 
 1.8.3.2
