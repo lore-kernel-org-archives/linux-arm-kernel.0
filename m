@@ -1,17 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 30 Jul 2013 10:50:26 +0800
-Subject: [PATCH] ARM: i.MX5 clocks: Remove optional clock setup (CKIH1)
- from i.MX51 template
-In-Reply-To: <1374909585-2724-1-git-send-email-shc_work@mail.ru>
-References: <1374909585-2724-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130730025024.GC19715@S2101-09.ap.freescale.net>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 30 Jul 2013 10:51:47 +0800
+Subject: [PATCH] ARM(64): KVM: add signed type cast for comparation
+In-Reply-To: <51ECA4EC.3000408@asianux.com>
+References: <51ECA4EC.3000408@asianux.com>
+Message-ID: <51F72A43.5090409@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 11:19:45AM +0400, Alexander Shiyan wrote:
-> External high frequency clock CKIH1 is optional for i.MX51, so move
-> it setup into boards where it is used.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Hello Maintainers:
 
-Applied, thanks.
+Please help check the patch whether OK or not, when you have time.
+
+Thanks.
+
+On 07/22/2013 11:20 AM, Chen Gang wrote:
+> 'len' is 'unsigned long' which is never less than zero.
+> 
+> So need a related type cast for comparation.
+> 
+> The related warning (when building ARM64 with allmodconfig):
+> 
+>   arch/arm64/kvm/../../../arch/arm/kvm/mmio.c:82:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/kvm/mmio.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index b8e06b7..626dfc8 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -79,7 +79,7 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	}
+>  
+>  	len = kvm_vcpu_dabt_get_as(vcpu);
+> -	if (unlikely(len < 0))
+> +	if (unlikely((long)len < 0))
+>  		return len;
+>  
+>  	is_write = kvm_vcpu_dabt_iswrite(vcpu);
+> 
+
+
+-- 
+Chen Gang
