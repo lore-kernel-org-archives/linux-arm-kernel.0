@@ -1,75 +1,65 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 30 Jul 2013 08:37:05 +0200
-Subject: [PATCH v2] ARM: imx: pllv1: Fix PLL calculation for i.MX27
-In-Reply-To: <1375112243-1557-1-git-send-email-shc_work@mail.ru>
-References: <1375112243-1557-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20983.24337.582506.529947@ipc1.ka-ro>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 30 Jul 2013 09:39:32 +0300
+Subject: [PATCH 06/21] ARM: OMAP: overo: use new display drivers
+In-Reply-To: <51F75B6A.6090900@ti.com>
+References: <1374822504-28949-1-git-send-email-tomi.valkeinen@ti.com>
+ <1374822504-28949-7-git-send-email-tomi.valkeinen@ti.com>
+ <51F75B6A.6090900@ti.com>
+Message-ID: <51F75FA4.1050406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Alexander Shiyan writes:
-> MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
-> is a just sign bit. This patch makes different calculation for i.MX27.
+On 30/07/13 09:21, Archit Taneja wrote:
+> Hi,
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/mach-imx/clk-pllv1.c | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+> On Friday 26 July 2013 12:38 PM, Tomi Valkeinen wrote:
+>> Use the new display drivers for OMAP3 Overo board.
+>>
+>> The new OMAP display drivers were merged for 3.11, and we can now change
+>> the board files to use the new ones and phase out the old ones.
+>>
+>> Note that the LCD add-on boards for lcd43 and lcd35 use the same GPIOs
+>> for the panels. This means that both panel devices cannot be probed at
+>> the same time.
+>>
+>> DT will handle this correctly, i.e. the DT data will contain the panel
+>> device only for the add-on board that is attached. However, for the
+>> board file we need a hackish solution: We parse the kernel boot command
+>> line, and see whether lcd43 or lcd35 is set as a default display, and
+>> add the given one. Or, if neither is given, default to lcd43.
+>>
 > 
-> diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
-> index c1eaee3..a289ccd 100644
-> --- a/arch/arm/mach-imx/clk-pllv1.c
-> +++ b/arch/arm/mach-imx/clk-pllv1.c
-> @@ -25,6 +25,11 @@ struct clk_pllv1 {
->  
->  #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
->  
-> +static inline bool allow_signed_mfn(void)
-> +{
-> +	return !cpu_is_mx1() && !cpu_is_mx21();
-> +}
-> +
->  static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  		unsigned long parent_rate)
->  {
-> @@ -59,9 +64,14 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
->  	/*
->  	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
->  	 * 2's complements number
-> +	 * On i.MX27 the bit 9 is the sign bit.
->  	 */
-> -	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
-> -		mfn_abs = 0x400 - mfn;
-> +	if (allow_signed_mfn() && (mfn & 0x200)) {
-> +		if (cpu_is_mx27())
-> +			mfn_abs = mfn & 0x1ff;
-> +		else
-> +			mfn_abs = 0x400 - mfn;
-> +	}
->  
-Please don't hardcode magic numbers. Even more when using variants of
-the same number like 0x200 and 0x1ff (0x200 - 1) in multiple places.
-If someone copies the code and wants to adapt it, they will have to
-change lots of different but related numbers in different places which
-is horribly error prone.
+> <snip>
+> 
+>>   static struct omap_dss_board_info overo_dss_data = {
+>> -    .num_devices    = ARRAY_SIZE(overo_dss_devices),
+>> -    .devices    = overo_dss_devices,
+>> -    .default_device    = &overo_dvi_device,
+>> +    .default_display_name = "lcd43",
+>>   };
+> 
+> The default display previously was the dvi device, if both lcd43 and
+> lcd35 are on add-on boards, then we should probably stick to dvi itself,
+> right? The hack won't work if dvi is the default device though.
 
-#define MFN_BITS 10
-#define MFN_SIGN (1 << (MFN_BITS - 1))
-#define MFN_MASK (MFN_SIGN - 1)
-With these defines you can derive all the numbers you need in a
-consistent way and need to change only ONE place to adapt the code.
+DVI is also on an add-on board, but it doesn't conflict with lcd43 or lcd35.
+
+The hack works fine even if DVI is the default device. In that case, it
+doesn't matter if lcd43 or lcd35 is added, because the user doesn't use
+them (as long as only one of them is added, because otherwise there'll
+be an error during probe).
+
+If DVI is the default device, we could actually skip adding both lcd43
+and lcd35. I just wanted to minimize the code in this hack, so I didn't
+do that.
+
+ Tomi
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info@karo-electronics.de
-___________________________________________________________
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/7fcbb0f8/attachment.sig>
