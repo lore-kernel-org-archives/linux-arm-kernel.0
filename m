@@ -1,84 +1,50 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 30 Jul 2013 16:55:41 +0530
-Subject: [PATCH v2 3/8] ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
+Date: Tue, 30 Jul 2013 16:55:43 +0530
+Subject: [PATCH v2 5/8] ARM: DRA7: Resue the clocksource, clockevent support
 In-Reply-To: <1375183546-12758-1-git-send-email-rnayak@ti.com>
 References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
-Message-ID: <1375183546-12758-4-git-send-email-rnayak@ti.com>
+Message-ID: <1375183546-12758-6-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: R Sricharan <r.sricharan@ti.com>
 
-The PRCM and MPUSS parts of DRA7 devices are quite identical
-to OMAP5 so as to reuse all the existing infrastructure around it.
-Makefile updates to do just that.
+All of OMAP5 timer support for clocksource and clockevent is completely
+reused across DRA7.
 
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/Makefile |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-omap2/Kconfig |    2 +-
+ arch/arm/mach-omap2/timer.c |    3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index d4f6715..17fb8b7 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -23,6 +23,7 @@ obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common)
- obj-$(CONFIG_SOC_AM33XX) += irq.o $(hwmod-common)
- obj-$(CONFIG_SOC_OMAP5)	 += prm44xx.o $(hwmod-common) $(secure-common)
- obj-$(CONFIG_SOC_AM43XX) += $(hwmod-common) $(secure-common)
-+obj-$(CONFIG_SOC_DRA7XX) += prm44xx.o $(hwmod-common) $(secure-common)
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 3eed000..fc6ec23 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -132,7 +132,7 @@ config SOC_HAS_OMAP2_SDRC
  
- ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
- obj-y += mcbsp.o
-@@ -39,6 +40,7 @@ omap-4-5-common				=  omap4-common.o omap-wakeupgen.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common) $(smp-y) sleep44xx.o
- obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common) $(smp-y) sleep44xx.o
- obj-$(CONFIG_SOC_AM43XX)		+= $(omap-4-5-common)
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-4-5-common) $(smp-y)
+ config SOC_HAS_REALTIME_COUNTER
+ 	bool "Real time free running counter"
+-	depends on SOC_OMAP5
++	depends on SOC_OMAP5 || SOC_DRA7XX
+ 	default y
  
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
-@@ -87,6 +89,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
- obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
- obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= omap-mpuss-lowpower.o
- obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+ comment "OMAP Core Type"
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index b37e1fc..1e77f11 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -594,7 +594,8 @@ OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+ 		       1, "timer_sys_ck", "ti,timer-alwon");
+ #endif
  
- obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
-@@ -114,6 +117,7 @@ omap-prcm-4-5-common			=  cminst44xx.o cm44xx.o prm44xx.o \
- 					   vc44xx_data.o vp44xx_data.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-prcm-4-5-common)
- obj-$(CONFIG_SOC_OMAP5)			+= $(omap-prcm-4-5-common)
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-prcm-4-5-common)
- 
- # OMAP voltage domains
- voltagedomain-common			:= voltage.o vc.o vp.o
-@@ -143,6 +147,7 @@ obj-$(CONFIG_SOC_AM33XX)		+= powerdomains33xx_data.o
- obj-$(CONFIG_SOC_AM43XX)		+= $(powerdomain-common)
- obj-$(CONFIG_SOC_OMAP5)			+= $(powerdomain-common)
- obj-$(CONFIG_SOC_OMAP5)			+= powerdomains54xx_data.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(powerdomain-common)
- 
- # PRCM clockdomain control
- clockdomain-common			+= clockdomain.o
-@@ -160,6 +165,7 @@ obj-$(CONFIG_SOC_AM33XX)		+= clockdomains33xx_data.o
- obj-$(CONFIG_SOC_AM43XX)		+= $(clockdomain-common)
- obj-$(CONFIG_SOC_OMAP5)			+= $(clockdomain-common)
- obj-$(CONFIG_SOC_OMAP5)			+= clockdomains54xx_data.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(clockdomain-common)
- 
- # Clock framework
- obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o
-@@ -181,6 +187,8 @@ obj-$(CONFIG_SOC_AM33XX)		+= $(clock-common) dpll3xxx.o
- obj-$(CONFIG_SOC_AM33XX)		+= cclock33xx_data.o
- obj-$(CONFIG_SOC_OMAP5)			+= $(clock-common)
- obj-$(CONFIG_SOC_OMAP5)			+= dpll3xxx.o dpll44xx.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(clock-common)
-+obj-$(CONFIG_SOC_DRA7XX)		+= dpll3xxx.o dpll44xx.o
- 
- # OMAP2 clock rate set data (old "OPP" data)
- obj-$(CONFIG_SOC_OMAP2420)		+= opp2420_data.o
+-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
++#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
++	defined(CONFIG_SOC_DRA7XX)
+ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+ 			       2, "sys_clkin_ck", NULL);
+ #endif
 -- 
 1.7.9.5
