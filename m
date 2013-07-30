@@ -1,81 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Jul 2013 22:15:01 +0100
-Subject: [PATCH v2 3/9] ARM: msm: Move debug-macro.S to include/debug
-In-Reply-To: <1374699274-18388-4-git-send-email-sboyd@codeaurora.org>
-References: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
- <1374699274-18388-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130730211501.GT24642@n2100.arm.linux.org.uk>
+From: coelho@ti.com (Luciano Coelho)
+Date: Wed, 31 Jul 2013 00:15:19 +0300
+Subject: [PATCH v2 0/4] ARM: dts: add WiLink support to panda and omap4-sdp
+Message-ID: <1375218923-29876-1-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 01:54:28PM -0700, Stephen Boyd wrote:
-> One more step to allowing MSM to participate in the
-> multi-platform defconfig.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/Kconfig.debug                             |  9 +++-
->  .../mach/debug-macro.S => include/debug/msm.S}     | 32 ++++++++++-
->  arch/arm/mach-msm/include/mach/msm_iomap-8960.h    |  5 --
->  arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |  5 --
->  arch/arm/mach-msm/include/mach/msm_iomap.h         | 12 -----
->  arch/arm/mach-msm/include/mach/uncompress.h        | 63 ----------------------
->  arch/arm/mach-msm/io.c                             | 40 +++++++-------
->  7 files changed, 58 insertions(+), 108 deletions(-)
->  rename arch/arm/{mach-msm/include/mach/debug-macro.S => include/debug/msm.S} (61%)
->  delete mode 100644 arch/arm/mach-msm/include/mach/uncompress.h
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index e401a76..4a62a8d 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -777,6 +777,11 @@ config DEBUG_LL_INCLUDE
->  				 DEBUG_IMX6SL_UART
->  	default "debug/keystone.S" if DEBUG_KEYSTONE_UART0 || \
->  				      DEBUG_KEYSTONE_UART1
-> +	default "debug/msm.S" if DEBUG_MSM_UART1 || \
-> +				 DEBUG_MSM_UART2 || \
-> +				 DEBUG_MSM_UART3 || \
-> +				 DEBUG_MSM8660_UART || \
-> +				 DEBUG_MSM8960_UART
->  	default "debug/mvebu.S" if DEBUG_MVEBU_UART || \
->  				   DEBUG_MVEBU_UART_ALTERNATE
->  	default "debug/mxs.S" if DEBUG_IMX23_UART || DEBUG_IMX28_UART
-> @@ -804,13 +809,13 @@ config DEBUG_LL_INCLUDE
->  
->  config DEBUG_UNCOMPRESS
->  	bool
-> -	default y if ARCH_MULTIPLATFORM && DEBUG_LL && \
-> +	default y if (ARCH_MULTIPLATFORM || ARCH_MSM) && DEBUG_LL && \
->  		     !DEBUG_OMAP2PLUS_UART && \
->  		     !DEBUG_TEGRA_UART
->  
->  config UNCOMPRESS_INCLUDE
->  	string
-> -	default "debug/uncompress.h" if ARCH_MULTIPLATFORM
-> +	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM
->  	default "mach/uncompress.h"
+Hi,
 
-I hope the above two aren't going to grow.
+In v2: use IRQ_TYPE_LEVEL_HIGH when defining the interrupts, as
+suggested by Laurent.
 
->  	{
->  		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
->  		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS),
->  		.length =   MSM_SHARED_RAM_SIZE,
->  		.type =     MT_DEVICE,
->  	},
 
-A comment here mentioning that the below must be the last entry would
-probably be a good idea as you overwrite the virtual/pfn members of this
-last entry.
+These patches add the necessary DT configuration to use the WLAN part
+of WiLink on OMAP4 Pandaboard and on OMAP4-SDP (including Blaze).
 
-> +#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
-> +		defined(CONFIG_DEBUG_MSM_UART3)
-> +	{
-> +		/* virtual and pfn filled in by debug_ll_addr() */
-> +		.length = SZ_4K,
-> +		.type = MT_DEVICE_NONSHARED,
-> +	}
-> +#endif
+I've tested these changes on Panda and it works fine.  But I couldn't
+test the OMAP4 SDP changes properly on 3.11-rc3 because I'm having
+problems with clocks and SDIO stuff.  So it's pretty much just
+compiled tested.  I've tried this (without the new clock definition
+stuff) on Blaze with 3.10 and it was working, though.
 
-Other than that, this seems to be fine.
+Please take a look and let me know what you think.
+
+Luca.
+
+Luciano Coelho (4):
+  ARM: dts: omap4-panda: add MMC5 (WiLink WLAN) configuration
+  arm: dts: omap4-panda-common: add WiLink6 device tree nodes
+  ARM: dts: omap4-sdp: add MMC5 (WiLink WLAN) configuration
+  arm: dts: omap4-sdp: add WiLink7 device tree node
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi | 46 +++++++++++++++++++++++++++-
+ arch/arm/boot/dts/omap4-sdp.dts           | 50 +++++++++++++++++++++++++++++++
+ 2 files changed, 95 insertions(+), 1 deletion(-)
+
+-- 
+1.8.3.2
