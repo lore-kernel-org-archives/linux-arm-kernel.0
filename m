@@ -1,85 +1,114 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 30 Jul 2013 18:00:52 +0900
-Subject: [PATCH 4/5] ARM: shmobile: ape6evm: add MMCIF support
+Date: Tue, 30 Jul 2013 18:00:53 +0900
+Subject: [PATCH 5/5] ARM: shmobile: ape6evm: add SDHI interfaces
 In-Reply-To: <cover.1375174556.git.horms+renesas@verge.net.au>
 References: <cover.1375174556.git.horms+renesas@verge.net.au>
-Message-ID: <8711613252ed931037f9e9f8646935519dd8f362.1375174556.git.horms+renesas@verge.net.au>
+Message-ID: <f79d68da510bf1b95beff4d556b78d06801f11dc.1375174556.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Add MMCIF support to the APE6EVM board in PIO mode only. Power supply is
-fixed for now, eventually support for the tps80032 regulator, also
-supplying both VDD and VccQ to the MMCIF slot should be added to APE6EVM.
+Add support for SDHI0 and SDHI1 on APE6EVM in PIO mode only.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ape6evm.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/mach-shmobile/board-ape6evm.c | 50 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 49 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-index af6dd39..8c7529c 100644
+index 8c7529c..ccf8b04 100644
 --- a/arch/arm/mach-shmobile/board-ape6evm.c
 +++ b/arch/arm/mach-shmobile/board-ape6evm.c
-@@ -21,6 +21,8 @@
+@@ -21,8 +21,10 @@
  #include <linux/gpio.h>
  #include <linux/interrupt.h>
  #include <linux/kernel.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/sh_mmcif.h>
++#include <linux/mfd/tmio.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mmcif.h>
++#include <linux/mmc/sh_mobile_sdhi.h>
  #include <linux/pinctrl/machine.h>
  #include <linux/platform_device.h>
  #include <linux/regulator/fixed.h>
-@@ -54,6 +56,25 @@ static const struct smsc911x_platform_config lan9220_data = {
- 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+@@ -58,11 +60,16 @@ static const struct smsc911x_platform_config lan9220_data = {
+ 
+ /*
+  * On APE6EVM power is supplied to MMCIF by a tps80032 regulator. For now we
+- * model a VDD supply to MMCIF, using a fixed 3.3V regulator.
++ * model a VDD supply to MMCIF, using a fixed 3.3V regulator. Also use the
++ * static power supply for SDHI0 and SDHI1, whereas SDHI0's VccQ is also
++ * supplied by the same tps80032 regulator and thus can also be adjusted
++ * dynamically.
+  */
+ static struct regulator_consumer_supply fixed3v3_power_consumers[] =
+ {
+ 	REGULATOR_SUPPLY("vmmc", "sh_mmcif.0"),
++	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
++	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.1"),
  };
  
-+/*
-+ * On APE6EVM power is supplied to MMCIF by a tps80032 regulator. For now we
-+ * model a VDD supply to MMCIF, using a fixed 3.3V regulator.
-+ */
-+static struct regulator_consumer_supply fixed3v3_power_consumers[] =
-+{
-+	REGULATOR_SUPPLY("vmmc", "sh_mmcif.0"),
+ /* MMCIF */
+@@ -75,6 +82,29 @@ static struct resource mmcif0_resources[] = {
+ 	DEFINE_RES_IRQ(gic_spi(169)),
+ };
+ 
++/* SDHI0 */
++static struct sh_mobile_sdhi_info sdhi0_pdata = {
++	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
++	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ,
 +};
 +
-+/* MMCIF */
-+static struct sh_mmcif_plat_data mmcif0_pdata = {
-+	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
++static struct resource sdhi0_resources[] = {
++	DEFINE_RES_MEM_NAMED(0xee100000, 0x100, "SDHI0"),
++	DEFINE_RES_IRQ(gic_spi(165)),
 +};
 +
-+static struct resource mmcif0_resources[] = {
-+	DEFINE_RES_MEM_NAMED(0xee200000, 0x100, "MMCIF0"),
-+	DEFINE_RES_IRQ(gic_spi(169)),
++/* SDHI1 */
++static struct sh_mobile_sdhi_info sdhi1_pdata = {
++	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
++	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
++			  MMC_CAP_NEEDS_POLL,
++};
++
++static struct resource sdhi1_resources[] = {
++	DEFINE_RES_MEM_NAMED(0xee120000, 0x100, "SDHI1"),
++	DEFINE_RES_IRQ(gic_spi(166)),
 +};
 +
  static const struct pinctrl_map ape6evm_pinctrl_map[] = {
  	/* SCIFA0 console */
  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
-@@ -61,6 +82,11 @@ static const struct pinctrl_map ape6evm_pinctrl_map[] = {
- 	/* SMSC */
- 	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-r8a73a4",
- 				  "irqc_irq40", "irqc"),
-+	/* MMCIF0 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a73a4",
-+				  "mmc0_data8", "mmc0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a73a4",
-+				  "mmc0_ctrl", "mmc0"),
+@@ -87,6 +117,18 @@ static const struct pinctrl_map ape6evm_pinctrl_map[] = {
+ 				  "mmc0_data8", "mmc0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a73a4",
+ 				  "mmc0_ctrl", "mmc0"),
++	/* SDHI0: uSD: no WP */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a73a4",
++				  "sdhi0_data4", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a73a4",
++				  "sdhi0_ctrl", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a73a4",
++				  "sdhi0_cd", "sdhi0"),
++	/* SDHI1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a73a4",
++				  "sdhi1_data4", "sdhi1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a73a4",
++				  "sdhi1_ctrl", "sdhi1"),
  };
  
  static void __init ape6evm_add_standard_devices(void)
-@@ -93,6 +119,11 @@ static void __init ape6evm_add_standard_devices(void)
- 	platform_device_register_resndata(&platform_bus, "smsc911x", -1,
- 					  lan9220_res, ARRAY_SIZE(lan9220_res),
- 					  &lan9220_data, sizeof(lan9220_data));
-+	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
-+				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
-+	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
-+					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
-+					  &mmcif0_pdata, sizeof(mmcif0_pdata));
+@@ -124,6 +166,12 @@ static void __init ape6evm_add_standard_devices(void)
+ 	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
+ 					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
+ 					  &mmcif0_pdata, sizeof(mmcif0_pdata));
++	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 0,
++					  sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
++					  &sdhi0_pdata, sizeof(sdhi0_pdata));
++	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 1,
++					  sdhi1_resources, ARRAY_SIZE(sdhi1_resources),
++					  &sdhi1_pdata, sizeof(sdhi1_pdata));
  }
  
  static const char *ape6evm_boards_compat_dt[] __initdata = {
