@@ -1,34 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 10:30:45 -0600
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4OyWuF+qm2MAhbXnGg=ozzw37kpSWciLxyUy+QQzxoWdxQ@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <2007664.vYsECFSKrV@flatron> <51F39FD8.6080808@broadcom.com>
- <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
- <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
- <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
- <CACxGe6uE6jOE-vz0onW5h93Es-soGiBAcFBM7Dvxh+HvCNrHkw@mail.gmail.com>
- <CACxGe6vw9=y5a+EgF1gO39SwGAdGofD2MYjyJ3jYu6uN3ke70A@mail.gmail.com>
- <1374988276.1973.29.camel@dabdike> <20130730014453.GJ29970@voom.fritz.box>
- <CAKON4OyWuF+qm2MAhbXnGg=ozzw37kpSWciLxyUy+QQzxoWdxQ@mail.gmail.com>
-Message-ID: <51F7EA35.6070501@wwwdotorg.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 30 Jul 2013 17:40:16 +0100
+Subject: [PATCH] mmc: sdhci-msm: Add support for MSM chipsets
+In-Reply-To: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com> (Georgi
+ Djakov's message of "Tue, 30 Jul 2013 19:22:35 +0300")
+References: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <86y58orogf.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 08:15 PM, jonsmirl at gmail.com wrote:
-> On Mon, Jul 29, 2013 at 9:44 PM, David Gibson
-> <david@gibson.dropbear.id.au> wrote:
-...
->> I also think we should consider the option of having a simple and
->> straightforward schema language which handles, say, 80% of cases with
->> a fall back to C for the 20% of curly cases.  That might actually be
->> simpler to work with in practice than a schema language which can
->> express absolutely anything, at the cost of being awkward for simple
->> cases or difficult to get your head around.
-> 
-> Would C++ work? You can use operating overloading and templates to
-> change the syntax into something that doesn't even resemble C any
-> more.
+Hi Georgi,
 
->From my perspective, that's precisely why C++ should /not/ be used.
+On Tue, Jul 30 2013, Georgi Djakov wrote:
+> This platform driver adds the support of Secure Digital Host
+> Controller Interface compliant controller in MSM chipsets.
+>
+> CC: Asutosh Das <asutoshd@codeaurora.org>
+> CC: Venkat Gopalakrishnan <venkatg@codeaurora.org>
+> CC: Sahitya Tummala <stummala@codeaurora.org>
+> CC: Subhash Jadavani <subhashj@codeaurora.org>
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> ---
+> This is an initial version of the Qualcomm MSM SDHCI driver.
+> It is based on the SDHCI code from coreaurora.org with minor
+> modifications. The MMC standard DT bindings are used where
+> possible. The patch applies to v3.11-rc3.
+
+Is the arch code that will use this driver already in mainline,
+or on its way in?
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
