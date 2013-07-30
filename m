@@ -1,41 +1,21 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 30 Jul 2013 17:31:49 +0900
-Subject: [PATCH] ARM: shmobile: lager: do not annotate gpio_buttons as
- __initdata
-In-Reply-To: <CANqRtoRUc1r_5=4HHa19ZCr71r1jv5AwZQ39Jv7eFNOUomtjag@mail.gmail.com>
-References: <1374829772-10939-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoRUc1r_5=4HHa19ZCr71r1jv5AwZQ39Jv7eFNOUomtjag@mail.gmail.com>
-Message-ID: <20130730083148.GC12147@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 30 Jul 2013 16:38:05 +0800
+Subject: [PATCH 1/2] pinctrl: imx: Add exception hook for select input
+In-Reply-To: <20130730080028.GA8540@nchen-desktop>
+References: <1375152857-32177-1-git-send-email-peter.chen@freescale.com>
+ <20130730075018.GD12382@S2101-09.ap.freescale.net>
+ <20130730080028.GA8540@nchen-desktop>
+Message-ID: <20130730083803.GF12382@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 05:26:57PM +0900, Magnus Damm wrote:
-> On Fri, Jul 26, 2013 at 6:09 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > When the gpio-keys device is registered using
-> > platform_device_register_data() the platform data argument,
-> > lager_keys_pdata is duplicated and thus should be marked as __initdata
-> > to avoid wasting memory. However, this is not true of gpio_buttons,
-> > a reference to it rather than its value is duplicated when lager_keys_pdata
-> > is duplicated.
-> >
-> > This avoids accessing freed memory if gpio-key events occur
-> > after unused kernel memory is freed late in the kernel's boot.
-> >
-> > This but was added when support for gpio-keys was added to lager
-> > in c3842e4fcbb7664276443b79187b7808c2e80a35
-> > ("ARM: shmobile: lager: support GPIO switches") which was included
-> > in v3.11-rc1.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > ---
-> >
-> > * Noticed when adding gpio-keys support to ape6evm
-> > * Compile tested only
-> 
-> I just got around to test this patch on a Lager board, works well. Thanks!
-> 
-> Tested-by: Magnus Damm <damm@opensource.se>
+On Tue, Jul 30, 2013 at 04:00:29PM +0800, Peter Chen wrote:
+> I searched the RM, this is the only one. If you don't think we need
+> to consider if it will occur in the future, I am OK to move it at machine
+> code, but every mx6q board need it if it does not use default select input
+> value.
 
-Thanks, I have queued this up for v3.11 in the fixes-for-v3.11 branch.
+Yes, maybe you can put it into imx6q_usb_init() with
+if (IS_ENABLED(CONFIG_USB_OTG)) protect.
+
+Shawn
