@@ -1,182 +1,94 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 30 Jul 2013 10:42:00 +0530
-Subject: [RESEND PATCH v10 1/8] drivers: phy: add generic PHY framework
-In-Reply-To: <51F68F73.9060603@samsung.com>
-References: <1374842963-13545-1-git-send-email-kishon@ti.com>
- <1374842963-13545-2-git-send-email-kishon@ti.com>
- <51F68F73.9060603@samsung.com>
-Message-ID: <51F74B20.6070005@ti.com>
+Date: Tue, 30 Jul 2013 10:44:48 +0530
+Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given
+ in usb_bind_phy
+In-Reply-To: <20130729175413.GC4964@radagast>
+References: <1374829418-27503-1-git-send-email-kishon@ti.com>
+ <1374829418-27503-3-git-send-email-kishon@ti.com>
+ <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
+ <20130729175413.GC4964@radagast>
+Message-ID: <51F74BC8.7020903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Monday 29 July 2013 09:21 PM, Sylwester Nawrocki wrote:
-> On 07/26/2013 02:49 PM, Kishon Vijay Abraham I wrote:
->> The PHY framework provides a set of APIs for the PHY drivers to
->> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
->> PHY with or without using phandle. For dt-boot, the PHY drivers should
->> also register *PHY provider* with the framework.
+On Monday 29 July 2013 11:24 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Mon, Jul 29, 2013 at 08:59:26PM +0530, Kishon Vijay Abraham I wrote:
+>>>> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
+>>>> MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
+>>>> device name of the controller had *.auto* in it. Since with using
+>>>> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
+>>>> the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
+>>>> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
+>>>> change is done in board file here.
+>>>>
+>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> ---
+>>>>  arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
+>>>>  arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
+>>>>  arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
+>>>>  arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
+>>>>  arch/arm/mach-omap2/board-igep0020.c         |    2 +-
+>>>>  arch/arm/mach-omap2/board-ldp.c              |    2 +-
+>>>>  arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
+>>>>  arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+>>>>  arch/arm/mach-omap2/board-omap3logic.c       |    2 +-
+>>>>  arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
+>>>>  arch/arm/mach-omap2/board-omap3stalker.c     |    2 +-
+>>>>  arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
+>>>>  arch/arm/mach-omap2/board-overo.c            |    2 +-
+>>>>  arch/arm/mach-omap2/board-rm680.c            |    2 +-
+>>>>  arch/arm/mach-omap2/board-rx51.c             |    2 +-
+>>>>  arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
+>>>>  16 files changed, 16 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+>>>> index 244d8a5..17bb076 100644
+>>>> --- a/arch/arm/mach-omap2/board-2430sdp.c
+>>>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+>>>> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
+>>>>  	omap_hsmmc_init(mmc);
+>>>>  
+>>>>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
+>>>> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+>>>> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
+>>>
+>>> how about moving usb_bind_phy() calls to omap2430.c ?
+>>>
+>>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+>>> index f44e8b5..b6abc1a 100644
+>>> --- a/drivers/usb/musb/omap2430.c
+>>> +++ b/drivers/usb/musb/omap2430.c
+>>> @@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
+>>>  
+>>>  		pdata->board_data	= data;
+>>>  		pdata->config		= config;
+>>> +	} else {
+>>> +		/* bind the PHY */
+>>> +		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
 >>
->> PHY drivers should create the PHY by passing id and ops like init, exit,
->> power_on and power_off. This framework is also pm runtime enabled.
+>> This looks like a hack IMHO to workaround the usb phy library. otherwise it is
+>> similar to get_phy_by_name.
+> 
+> actually, this is a workaround to the fact that we're not creating all
+> platform_devices in arch/arm/mach-omap2/ :-)
+> 
+> If we had the musb allocation there, we could easily handle
+> usb_bind_phy()
+> 
+>>> so that's temporary. It might be better than to reintroduce the IDR in
+>>> musb_core.c.
 >>
->> The documentation for the generic PHY framework is added in
->> Documentation/phy.txt and the documentation for dt binding can be found at
->> Documentation/devicetree/bindings/phy/phy-bindings.txt
->>
->> Cc: Tomasz Figa <t.figa@samsung.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->>  .../devicetree/bindings/phy/phy-bindings.txt       |   66 ++
->>  Documentation/phy.txt                              |  166 +++++
->>  MAINTAINERS                                        |    8 +
->>  drivers/Kconfig                                    |    2 +
->>  drivers/Makefile                                   |    2 +
->>  drivers/phy/Kconfig                                |   18 +
->>  drivers/phy/Makefile                               |    5 +
->>  drivers/phy/phy-core.c                             |  714 ++++++++++++++++++++
->>  include/linux/phy/phy.h                            |  270 ++++++++
->>  9 files changed, 1251 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/phy-bindings.txt
->>  create mode 100644 Documentation/phy.txt
->>  create mode 100644 drivers/phy/Kconfig
->>  create mode 100644 drivers/phy/Makefile
->>  create mode 100644 drivers/phy/phy-core.c
->>  create mode 100644 include/linux/phy/phy.h
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt b/Documentation/devicetree/bindings/phy/phy-bindings.txt
->> new file mode 100644
->> index 0000000..8ae844f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/phy-bindings.txt
->> @@ -0,0 +1,66 @@
->> +This document explains only the device tree data binding. For general
->> +information about PHY subsystem refer to Documentation/phy.txt
-> [...]
->> @@ -0,0 +1,166 @@
->> +			    PHY SUBSYSTEM
->> +		  Kishon Vijay Abraham I <kishon@ti.com>
->> +
->> +This document explains the Generic PHY Framework along with the APIs provided,
->> +and how-to-use.
->> +
->> +1. Introduction
->> +
->> +*PHY* is the abbreviation for physical layer. It is used to connect a device
->> +to the physical medium e.g., the USB controller has a PHY to provide functions
->> +such as serialization, de-serialization, encoding, decoding and is responsible
->> +for obtaining the required data transmission rate. Note that some USB
->> +controllers have PHY functionality embedded into it and others use an external
->> +PHY. Other peripherals that use PHY include Wireless LAN, Ethernet,
->> +SATA etc.
->> +
->> +The intention of creating this framework is to bring the PHY drivers spread
->> +all over the Linux kernel to drivers/phy to increase code re-use and for
->> +better code maintainability.
->> +
->> +This framework will be of use only to devices that use external PHY (PHY
->> +functionality is not embedded within the controller).
->> +
->> +2. Registering/Unregistering the PHY provider
->> +
->> +PHY provider refers to an entity that implements one or more PHY instances.
->> +For the simple case where the PHY provider implements only a single instance of
->> +the PHY, the framework provides its own implementation of of_xlate in
->> +of_phy_simple_xlate. If the PHY provider implements multiple instances, it
->> +should provide its own implementation of of_xlate. of_xlate is used only for
->> +dt boot case.
->> +
->> +#define of_phy_provider_register(dev, xlate)    \
->> +        __of_phy_provider_register((dev), THIS_MODULE, (xlate))
->> +
->> +#define devm_of_phy_provider_register(dev, xlate)       \
->> +        __of_phy_provider_register((dev), THIS_MODULE, (xlate))
+>> that?s needed for generic phy framework anyway :-s
 > 
-> This needs to be:
-> 
-> 	__devm_of_phy_provider_register((dev), THIS_MODULE, (xlate))
-> 
-> as Kamil pointed out. We've tested it here with v9 and it makes
-> Bad Things happen. ;)
-> 
->> +of_phy_provider_register and devm_of_phy_provider_register macros can be used to
->> +register the phy_provider and it takes device and of_xlate as
->> +arguments. For the dt boot case, all PHY providers should use one of the above
->> +2 macros to register the PHY provider.
->> +
->> +void devm_of_phy_provider_unregister(struct device *dev,
->> +	struct phy_provider *phy_provider);
->> +void of_phy_provider_unregister(struct phy_provider *phy_provider);
->> +
->> +devm_of_phy_provider_unregister and of_phy_provider_unregister can be used to
->> +unregister the PHY.
->> +
-> [...]
->> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->> new file mode 100644
->> index 0000000..f1d15e5
->> --- /dev/null
->> +++ b/drivers/phy/phy-core.c
->> @@ -0,0 +1,714 @@
-> [...]
->> +static struct phy *phy_lookup(struct device *device, const char *port)
->> +{
->> +	unsigned int count;
->> +	struct phy *phy;
->> +	struct device *dev;
->> +	struct phy_consumer *consumers;
->> +	struct class_dev_iter iter;
-> 	
-> Don't you need something like
-> 
-> 	if (phy->init_data == NULL)	
-> 		return ERR_PTR(-EINVAL);
-> 
-> to ensure there is no attempt to dereference NULL platform data ?
+> right, but generic phy framework can handle everything just fine, the
+> only problem is that names are changing.
 
-hmm.. perhaps a dev_WARN too..
-> 
->> +	class_dev_iter_init(&iter, phy_class, NULL, NULL);
->> +	while ((dev = class_dev_iter_next(&iter))) {
->> +		phy = to_phy(dev);
->> +		count = phy->init_data->num_consumers;
->> +		consumers = phy->init_data->consumers;
->> +		while (count--) {
->> +			if (!strcmp(consumers->dev_name, dev_name(device)) &&
->> +					!strcmp(consumers->port, port)) {
->> +				class_dev_iter_exit(&iter);
->> +				return phy;
->> +			}
->> +			consumers++;
->> +		}
->> +	}
->> +
->> +	class_dev_iter_exit(&iter);
->> +	return ERR_PTR(-ENODEV);
->> +}
->> +
-> [...]
->> +int phy_init(struct phy *phy)
->> +{
->> +	int ret;
->> +
->> +	ret = phy_pm_runtime_get_sync(phy);
->> +	if (ret < 0 && ret != -ENOTSUPP)
->> +		return ret;
->> +
->> +	mutex_lock(&phy->mutex);
->> +	if (phy->init_count++ == 0 && phy->ops->init) {
->> +		ret = phy->ops->init(phy);
->> +		if (ret < 0) {
->> +			dev_err(&phy->dev, "phy init failed --> %d\n", ret);
->> +			goto out;
-> 
-> Is this 'goto' and similar ones below really needed ?
-That's just to signify an error path.. it doesn't affect anyways ;-)
+right. But if the names change, PHY framework wouldn't be able to return the
+reference to the PHY.
 
 Thanks
 Kishon
