@@ -1,63 +1,57 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 30 Jul 2013 16:09:02 +0800
-Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
-In-Reply-To: <20130729133625.GA2280@localhost.localdomain>
-References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
- <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
- <20130729095400.GB32383@mudshark.cambridge.arm.com>
- <20130729133625.GA2280@localhost.localdomain>
-Message-ID: <51F7749E.1010005@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 30 Jul 2013 13:41:23 +0530
+Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given
+ in usb_bind_phy
+In-Reply-To: <20130730071611.GD16441@radagast>
+References: <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
+ <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
+ <20130730060134.GD9155@radagast> <51F7590B.4020705@ti.com>
+ <20130730061830.GE9155@radagast> <51F75C40.4060406@ti.com>
+ <20130730062844.GH9155@radagast> <51F7613C.5070803@ti.com>
+ <20130730071611.GD16441@radagast>
+Message-ID: <51F7752B.8050804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-7-29 21:36, Dave Martin wrote:
-> On Mon, Jul 29, 2013 at 10:54:01AM +0100, Will Deacon wrote:
->> On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
->>> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>>> Power aware scheduling needs the cpu topology information to improve the
->>>> cpu scheduler decision making.
+On Tuesday 30 July 2013 12:46 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Jul 30, 2013 at 12:16:20PM +0530, Kishon Vijay Abraham I wrote:
+>>>>>> the list of controller device (names) it can support (PHY framework does not
+>>>>>> maintain a separate list for binding like how we had in USB PHY library). e.g.
+>>>>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92817.html. In such
+>>>>>
+>>>>> this has nothing to do with $subject though. We talk about generic PHY
+>>>>> framework once all these PHY drivers are moved there :-)
+>>>>>
+>>>>>> cases how do we pass the device names. Also will the MUSB core device be
+>>>>>> created before twl4030-usb PHY device?
+>>>>>
+>>>>> and why would that be a problem ? We're telling the framework that the
+>>>>> musb device will use a phy with a name of 'twl4030'. If musb calls
+>>>>> usb_get_phy_dev() and doesn't find a phy, it'll return -EPROBE_DEFER and
+>>>>> try again later.
+>>>>
+>>>> I think we are talking about different problems here ;-) I'm trying to tell
+>>>> using idr in MUSB core is needed for Generic PHY Framework. So in a way, the
+>>>> Generic PHY Framework series depends on this patch series or else MUSB in OMAP3
+>>>> platforms wont work after Generic PHY framework gets merged.
 >>>
->>> It's not only power aware scheduling. The scheduler already uses
->>> topology and cache sharing when  CONFIG_SCHED_MC and/or
->>> CONFIG_SCHED_SMT are enable. So you should also add these configs for
->>> arm64 so the scheduler can use it
+>>> then you just found a limitation in your framework, right ? :-) I mean,
+>>> imagine if now we have to add an IDR to every single user of your
+>>> framework because they could end up in systems with multiple instances
+>>> of the same IP ?
 >>
->> ... except that the architecture doesn't define what the AFF fields in MPIDR
->> really represent. Using them to make key scheduling decisions relating to
+>> I raised a similar concern in the PHY framework discussion [1] :-) And since
+>> it's used everywhere else regulators, clkdev, etc.. it's agreed to be used in
+>> PHY as well. Btw if PLATFORM_DEVID_AUTO is used even regulator, clk_get should
+>> fail IMO.
+>>
+>> [1] -> http://lkml.indiana.edu/hypermail/linux/kernel/1307.2/03573.html
 > 
-> In fact, the ARM Architecture doesn't place any requirements on MPIDRs to
-> force the aff fields to exist _at all_.  It's just a recommendation.
-> Instead, you have a 24 or 32-bit number which is unique per CPU, and which
-> is _probably_ assigned in a way resembling the aff fields.
-> 
->> cache proximity seems pretty risky to me, especially given the track record
->> we've seen already on AArch32 silicon. It's a convenient register if it
->> contains the data we want it to contain, but we need to force ourselves to
->> come to terms with reality here and simply use it as an identifier for a
->> CPU.
-> 
-> +1
-> 
-> Also, we should align arm and arm64.  The problem is basically exactly
-> the same, and the solution needs to be the same.  struct cputopo_arm is
-> already being abused  -- for example, TC2 describes the A15 and A7
-> clusters on a single die as having different "socket_id" values, even
-> though this is obviously nonsense.  But there's no other way to describe
-> that system today.
-> 
->> Can't we just use the device-tree to represent this topological data for
->> arm64? Lorenzo has been working on bindings in this area.
-> 
-> This may become more important as we start to see things like asymmetric
-> topologies appearing (different numbers of nodes and different
-> interdependence characteristics in adjacent branches of the topology
-> etc.)
+> look at Greg's and my reply to that email.
 
-Agreed.
-I would like to mention that the ACPI Static Resource Affinity Table (SRAT)
-stores topology information for all the processors and memory, describing
-the physical locations of the processors and memory in the system. ACPI will
-be another available solution for this.
+but finally Greg agreed to what Tomasz proposed no?
 
 Thanks
-Hanjun
+Kishon
