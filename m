@@ -1,99 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Jul 2013 14:44:53 +0200
-Subject: [PATCH 04/10] ARM: sun6i: Add restart code for the A31
-In-Reply-To: <20130729140430.GA25264@e106331-lin.cambridge.arm.com>
-References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
- <1374618312-19001-5-git-send-email-maxime.ripard@free-electrons.com>
- <20130729140430.GA25264@e106331-lin.cambridge.arm.com>
-Message-ID: <20130730124453.GA12562@lukather>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 30 Jul 2013 07:46:21 -0500
+Subject: [PATCH v2 8/8] ARM: DRA7: dts: Add the dts files for dra7 SoC
+ and dra7-evm board
+In-Reply-To: <51F7B477.9010701@ti.com>
+References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
+ <1375183546-12758-9-git-send-email-rnayak@ti.com> <51F7B1E0.4060800@ti.com>
+ <51F7B477.9010701@ti.com>
+Message-ID: <51F7B59D.5080607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 07/30/2013 07:41 AM, Rajendra Nayak wrote:
+> On Tuesday 30 July 2013 06:00 PM, Nishanth Menon wrote:
+>> On 07/30/2013 06:25 AM, Rajendra Nayak wrote:
+>>> From: R Sricharan <r.sricharan@ti.com>
+[...]
+>>> +        mcspi4: spi at 480ba000 {
+>>> +            compatible = "ti,omap4-mcspi";
+>>> +            reg = <0x480ba000 0x200>;
+>>> +            interrupts = <0 48 0x4>;
+>>> +            #address-cells = <1>;
+>>> +            #size-cells = <0>;
+>>> +            ti,hwmods = "mcspi4";
+>>> +            ti,spi-num-cs = <1>;
+>>> +            dmas = <&sdma 70>, <&sdma 71>;
+>>> +            dma-names = "tx0", "rx0";
+>>> +        };
+>>> +    };
+>>> +};
+>>>
+>> ref: [1], we discussed that we should now be able to introduce all instances of h/w blocks into the dra7.dts. Further, considering [2]
+>
+> hmm, thats a long discussion on crossbar driver that [1] points to. Do you want to summarize what you mean by 'introduce all instances of h/w blocks'
 
-On Mon, Jul 29, 2013 at 03:04:31PM +0100, Mark Rutland wrote:
-> On Tue, Jul 23, 2013 at 11:25:06PM +0100, Maxime Ripard wrote:
-> > The Allwinner A31 has a sligthly different watchdog that requires a
-> > different restart code.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/mach-sunxi/sunxi.c | 37 +++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 37 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> > index 11326d9..c18ef3a 100644
-> > --- a/arch/arm/mach-sunxi/sunxi.c
-> > +++ b/arch/arm/mach-sunxi/sunxi.c
-> > @@ -32,6 +32,15 @@
-> >  #define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
-> >  #define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
-> >  
-> > +#define SUN6I_WATCHDOG1_IRQ_REG		0x00
-> > +#define SUN6I_WATCHDOG1_CTRL_REG	0x10
-> > +#define SUN6I_WATCHDOG1_CTRL_RESTART		(1 << 0)
-> > +#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
-> > +#define SUN6I_WATCHDOG1_CONFIG_RESTART		(1 << 0)
-> > +#define SUN6I_WATCHDOG1_CONFIG_IRQ		(1 << 1)
-> > +#define SUN6I_WATCHDOG1_MODE_REG	0x18
-> > +#define SUN6I_WATCHDOG1_MODE_ENABLE		(1 << 0)
-> > +
-> >  static void __iomem *wdt_base;
-> >  
-> >  static void sun4i_restart(enum reboot_mode mode, const char *cmd)
-> > @@ -56,8 +65,36 @@ static void sun4i_restart(enum reboot_mode mode, const char *cmd)
-> >  	}
-> >  }
-> >  
-> > +static void sun6i_restart(char mode, const char *cmd)
-> > +{
-> > +	if (!wdt_base)
-> > +		return;
-> > +
-> > +	/* Disable interrupts */
-> > +	writel(0, wdt_base + SUN6I_WATCHDOG1_IRQ_REG);
-> > +
-> > +	/* We want to disable the IRQ and just reset the whole system */
-> > +	writel(SUN6I_WATCHDOG1_CONFIG_RESTART,
-> > +		wdt_base + SUN6I_WATCHDOG1_CONFIG_REG);
-> > +
-> > +	/* Enable timer. The default and lowest interval value is 0.5s */
-> > +	writel(SUN6I_WATCHDOG1_MODE_ENABLE,
-> > +		wdt_base + SUN6I_WATCHDOG1_MODE_REG);
-> > +
-> > +	/* Restart the watchdog. */
-> > +	writel(SUN6I_WATCHDOG1_CTRL_RESTART,
-> > +		wdt_base + SUN6I_WATCHDOG1_CTRL_REG);
-> > +
-> > +	while (1) {
-> > +		mdelay(5);
-> > +		writel(SUN6I_WATCHDOG1_MODE_ENABLE,
-> > +			wdt_base + SUN6I_WATCHDOG1_MODE_REG);
-> > +	}
-> > +}
-> > +
-> >  static struct of_device_id sunxi_restart_ids[] = {
-> >  	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
-> > +	{ .compatible = "allwinner,sun6i-wdt", .data = sun6i_restart },
-> 
-> Is there a corresponding binding document addition? 
-> 
-> sun4i-wdt.txt could be turned into a more general sunxi-wdt.txt.
+I recommend reading the last few emails on the thread about how we could 
+do this with pinctrl. unfortunately, this patch is not informative 
+enough to indicate that not all instances of the potential IP blocks are 
+listed here.
 
-Ah, right, thanks!
+>
+>> would you not want to follow "status = disabled" for all modules by default and enable required modules in board file, so that we dont have to respin this yet again?
+>
+> Well, I was just following the convention of whats already followed on existing OMAPs. See [3] for some views on these.
 
-I'll fix it in the v2.
+DRA7 case, I would not think it makes sense due to the number of product 
+variants being done, not all will use the same set. Further, rationale 
+for DRA7 and my suggestion for Grant's option (1) is mainly because the 
+product variants will require more dtsis rather than board files using 
+the product variants use just the necessary modules from a common dtsi. 
+Makes support of variants like OMAP57xx etc trivial and constrainted to 
+board file usage, rather than spinning off new dtsis.
 
-Maxime
+>
+>>
+>>
+>> [1] http://marc.info/?t=137416599400001&r=1&w=2
+>> [2] http://marc.info/?l=linux-omap&m=137510358229479&w=2
+> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086297.html
+>
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/11fa10a6/attachment.sig>
+Regards,
+Nishanth Menon
