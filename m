@@ -1,58 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Jul 2013 08:41:34 +0100
-Subject: [PATCH] ARM64: include: asm: use 'int' instead of 'u32' for
- variable 'target' in kvm_host.h.
-In-Reply-To: <20130730034945.GD5471@cbox>
-References: <51ECA9B6.3010808@asianux.com> <20130730034945.GD5471@cbox>
-Message-ID: <51F76E2E.9050707@arm.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 30 Jul 2013 09:48:51 +0200
+Subject: [RFC PATCH 0/2] impedance-matcher generic improvements
+In-Reply-To: <cover.1375131816.git.jason@lakedaemon.net>
+References: <51F2A014.7000209@gmail.com>
+ <cover.1375131816.git.jason@lakedaemon.net>
+Message-ID: <51F76FE3.1080302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/13 04:49, Christoffer Dall wrote:
-> On Mon, Jul 22, 2013 at 11:40:38AM +0800, Chen Gang wrote:
->> 'target' will be set to '-1' in kvm_arch_vcpu_init(), and it need check
->> 'target' whether less than zero or not in kvm_vcpu_initialized().
->>
->> So need define target as 'int' instead of 'u32', just like ARM has done.
->>
->>
->> The related warning:
->>
->>   arch/arm64/kvm/../../../arch/arm/kvm/arm.c:497:2: warning: comparison of unsigned expression >= 0 is always true [-Wtype-limits]
->>
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm64/include/asm/kvm_host.h |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 644d739..0859a4d 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -129,7 +129,7 @@ struct kvm_vcpu_arch {
->>  	struct kvm_mmu_memory_cache mmu_page_cache;
->>  
->>  	/* Target CPU and feature flags */
->> -	u32 target;
->> +	int target;
->>  	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
->>  
->>  	/* Detect first run of a vcpu */
->> -- 
->> 1.7.7.6
-> 
-> This looks ok to me, Marc, was there any reason to declare target a u32
-> on arm64?
+Hi Jason,
 
-No, that's simply a bug. I really wonder why my compiler doesn't scream
-at something that obvious...
+On 29.07.2013 23:23, Jason Cooper wrote:
+> Basic idea is to replace a device's stock kernel with this impedance-matcher.
+> Load the kernel and/or the devicetree blob to desired addresses.  Add
+> 'loadaddrs=0xXXXXXXXX,0xYYYYYYYY' to the kernel's command line.  Or, if you are
+> appending, 'loadaddrs=appended,0xYYYYYYYY'.  First address is the location of
+> the kernel, second is the location of the dtb.
 
-Chen: what compiler version are you using?
+Nice to see that idea implemented! For me though, changing any of the
+U-Boot variables is out of the question, and I need the matcher just the
+way I implemented it, including the LED blink pattern to let the user
+know if things go wrong.
 
-I'll queue this fix.
+Hence, I won't change to your generic version on my boards, and so I
+think it might be best if you maintain your own tree for your approach.
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Daniel
