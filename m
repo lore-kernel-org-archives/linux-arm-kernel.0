@@ -1,78 +1,83 @@
 From: coelho@ti.com (Luciano Coelho)
-Date: Tue, 30 Jul 2013 16:04:28 +0300
-Subject: [PATCH v4 0/8] wilink: add device tree support
-Message-ID: <1375189476-21557-1-git-send-email-coelho@ti.com>
+Date: Tue, 30 Jul 2013 16:04:31 +0300
+Subject: [PATCH v4 3/8] wlcore: remove pwr_in_suspend from platform data
+In-Reply-To: <1375189476-21557-1-git-send-email-coelho@ti.com>
+References: <1375189476-21557-1-git-send-email-coelho@ti.com>
+Message-ID: <1375189476-21557-4-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The pwr_in_suspend flag depends on the MMC settings which can be
+retrieved from the SDIO subsystem, so it doesn't need to be part of
+the platform data structure.  Move it to the platform device data that
+is passed from SDIO to wlcore.
 
-This patch series adds device tree support to the wlcore_sdio driver,
-which is used by WiLink6, WiLink7 and WiLink8.
+Signed-off-by: Luciano Coelho <coelho@ti.com>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/net/wireless/ti/wlcore/main.c     | 3 +--
+ drivers/net/wireless/ti/wlcore/sdio.c     | 2 +-
+ drivers/net/wireless/ti/wlcore/wlcore_i.h | 1 +
+ include/linux/wl12xx.h                    | 1 -
+ 4 files changed, 3 insertions(+), 4 deletions(-)
 
-The first patches do some clean-up to make the data needed in the
-wilink device tree node smaller.  The remaining patches implement the
-actual device tree node parsing in wlcore_sdio.
-
-Regarding the XTAL clock issues, for now we don't support XTAL mode
-with DT, but I have sent a proposal for a small change in the clock
-framework to support this, but it's still under discussions [1].
-
-The DTS file changes will be sent separately, since they need to go
-via different trees.
-
-A new version of the bindings documentation has been sent [2] and, if
-no more comments are given to it, I'll apply it via my tree.
-
-[1] http://news.gmane.org/find-root.php?message_id=1372971912-10877-1-git-send-email-coelho at ti.com
-[2] http://news.gmane.org/find-root.php?message_id=1375109728-5931-1-git-send-email-coelho at ti.com
-
-Changes in v4:
-
-* Rebased on top of 3.11-rc3 (eg. no more changes on the board files
-  that were removed);
-
-* Use the new irq_get_trigger_type() instead of
-  irqd_get_trigger_type() (thanks Javier);
-
-* Added some missing const's (thanks Felipe);
-
-* Reverted Tony's workaround to get WiLink to work on Panda while DT
-  was not supported yet.
-
-
-Please review.
-
-
-Luciano Coelho (8):
-  wl1251: split wl251 platform data to a separate structure
-  wlcore: set irq_flags in the board files instead of hiding behind a
-    quirk
-  wlcore: remove pwr_in_suspend from platform data
-  wl12xx: use frequency instead of enumerations for pdata clocks
-  wlcore: add initial device tree support to the sdio module
-  wlcore: sdio: add wilink clock providers
-  wlcore: sdio: get clocks from device tree
-  wlcore/wl12xx: check if we got correct clock data from DT
-
- arch/arm/mach-davinci/board-da850-evm.c        |  11 ++-
- arch/arm/mach-omap2/board-omap3evm.c           |  22 ++++-
- arch/arm/mach-omap2/board-omap3pandora.c       |   4 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c   |   2 +-
- arch/arm/mach-omap2/board-zoom-peripherals.c   |  33 +++++++-
- arch/arm/mach-omap2/devices.c                  |  39 ---------
- drivers/net/wireless/ti/wilink_platform_data.c |  37 ++++++--
- drivers/net/wireless/ti/wl1251/sdio.c          |  12 +--
- drivers/net/wireless/ti/wl1251/spi.c           |   2 +-
- drivers/net/wireless/ti/wl12xx/main.c          |  78 +++++++++++++++--
- drivers/net/wireless/ti/wl12xx/wl12xx.h        |  28 +++++++
- drivers/net/wireless/ti/wlcore/debugfs.c       |   2 +-
- drivers/net/wireless/ti/wlcore/main.c          |  20 ++---
- drivers/net/wireless/ti/wlcore/sdio.c          | 112 +++++++++++++++++++++++--
- drivers/net/wireless/ti/wlcore/wlcore.h        |   5 +-
- drivers/net/wireless/ti/wlcore/wlcore_i.h      |   1 +
- include/linux/wl12xx.h                         |  52 +++++-------
- 17 files changed, 340 insertions(+), 120 deletions(-)
-
+diff --git a/drivers/net/wireless/ti/wlcore/main.c b/drivers/net/wireless/ti/wlcore/main.c
+index 11dab9a..e771de0 100644
+--- a/drivers/net/wireless/ti/wlcore/main.c
++++ b/drivers/net/wireless/ti/wlcore/main.c
+@@ -5900,7 +5900,6 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
+ 	struct wl1271 *wl = context;
+ 	struct platform_device *pdev = wl->pdev;
+ 	struct wlcore_platdev_data *pdev_data = pdev->dev.platform_data;
+-	struct wl12xx_platform_data *pdata = pdev_data->pdata;
+ 
+ 	int ret;
+ 
+@@ -5947,7 +5946,7 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
+ 	if (!ret) {
+ 		wl->irq_wake_enabled = true;
+ 		device_init_wakeup(wl->dev, 1);
+-		if (pdata->pwr_in_suspend)
++		if (pdev_data->pwr_in_suspend)
+ 			wl->hw->wiphy->wowlan = &wlcore_wowlan_support;
+ 	}
+ #endif
+diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
+index 29ef249..4c7e8ac 100644
+--- a/drivers/net/wireless/ti/wlcore/sdio.c
++++ b/drivers/net/wireless/ti/wlcore/sdio.c
+@@ -260,7 +260,7 @@ static int wl1271_probe(struct sdio_func *func,
+ 	dev_dbg(glue->dev, "sdio PM caps = 0x%x\n", mmcflags);
+ 
+ 	if (mmcflags & MMC_PM_KEEP_POWER)
+-		pdev_data->pdata->pwr_in_suspend = true;
++		pdev_data->pwr_in_suspend = true;
+ 
+ 	sdio_set_drvdata(func, glue);
+ 
+diff --git a/drivers/net/wireless/ti/wlcore/wlcore_i.h b/drivers/net/wireless/ti/wlcore/wlcore_i.h
+index e5e1464..f2c4227 100644
+--- a/drivers/net/wireless/ti/wlcore/wlcore_i.h
++++ b/drivers/net/wireless/ti/wlcore/wlcore_i.h
+@@ -209,6 +209,7 @@ struct wl1271_if_operations {
+ struct wlcore_platdev_data {
+ 	struct wl12xx_platform_data *pdata;
+ 	struct wl1271_if_operations *if_ops;
++	bool pwr_in_suspend;
+ };
+ 
+ #define MAX_NUM_KEYS 14
+diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
+index 1bfcd19..ab90b1c 100644
+--- a/include/linux/wl12xx.h
++++ b/include/linux/wl12xx.h
+@@ -59,7 +59,6 @@ struct wl12xx_platform_data {
+ 	int irq;
+ 	int board_ref_clock;
+ 	int board_tcxo_clock;
+-	bool pwr_in_suspend;
+ };
+ 
+ #ifdef CONFIG_WILINK_PLATFORM_DATA
 -- 
 1.8.3.2
