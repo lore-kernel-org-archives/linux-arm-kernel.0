@@ -1,79 +1,99 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 30 Jul 2013 07:42:49 -0500
-Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
-References: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
-Message-ID: <51F7B4C9.2060500@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Jul 2013 14:44:53 +0200
+Subject: [PATCH 04/10] ARM: sun6i: Add restart code for the A31
+In-Reply-To: <20130729140430.GA25264@e106331-lin.cambridge.arm.com>
+References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1374618312-19001-5-git-send-email-maxime.ripard@free-electrons.com>
+ <20130729140430.GA25264@e106331-lin.cambridge.arm.com>
+Message-ID: <20130730124453.GA12562@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 04:49 AM, Mark Rutland wrote:
-> On Mon, Jul 29, 2013 at 09:18:43PM +0100, Rob Herring wrote:
->> On 07/29/2013 05:13 AM, Mark Rutland wrote:
->>> Hi Rob,
->>>
->>> On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
->>>> From: Rob Herring <rob.herring@calxeda.com>
+Hi Mark,
 
-[snip]
-
->>> One of the things changed in PSCI 0.2 was the SMC calling convention,
->>> though this isn't clear in the PSCI document. The function IDs for 32bit
->>> and 64bit callers may differ, and we need to support describing an
->>> arbitrary configuration of the two (same ID for both, different across
->>> 32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
->>>
->>> I'd like to ensure the binding can deal with that from the start. We
->>> could do this by having -32 and -64 variants of each function id (e.g.
->>> cpu_off-64) , if the IDs actually differ, and use the regular combined
->>> ID if they don't.
->>
->> Uggg. I guess I should have read the SMC calling convention doc... I was
->> simply documenting what is already in the PSCI doc, but obviously that
->> is not fully flushed out.
->>
->> How about something like this (for the complicated case of both 32 and
->> 64 bit):
->>
->> 	method		= "smc", "smc64";
->> 	psci_version	= <0x84000000 0xc4000000>;
->> 	cpu_suspend	= <0x84000001 0xc4000001>;
->> 	cpu_off		= <0x84000002 0xc4000002>;
->> 	cpu_on		= <0x84000003 0xc4000003>;
->>
->> "smc" is a synonym for smc32 for compatibility. The number and order of
->> methods determines the number and order of function IDs.
+On Mon, Jul 29, 2013 at 03:04:31PM +0100, Mark Rutland wrote:
+> On Tue, Jul 23, 2013 at 11:25:06PM +0100, Maxime Ripard wrote:
+> > The Allwinner A31 has a sligthly different watchdog that requires a
+> > different restart code.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/mach-sunxi/sunxi.c | 37 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 37 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > index 11326d9..c18ef3a 100644
+> > --- a/arch/arm/mach-sunxi/sunxi.c
+> > +++ b/arch/arm/mach-sunxi/sunxi.c
+> > @@ -32,6 +32,15 @@
+> >  #define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
+> >  #define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
+> >  
+> > +#define SUN6I_WATCHDOG1_IRQ_REG		0x00
+> > +#define SUN6I_WATCHDOG1_CTRL_REG	0x10
+> > +#define SUN6I_WATCHDOG1_CTRL_RESTART		(1 << 0)
+> > +#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
+> > +#define SUN6I_WATCHDOG1_CONFIG_RESTART		(1 << 0)
+> > +#define SUN6I_WATCHDOG1_CONFIG_IRQ		(1 << 1)
+> > +#define SUN6I_WATCHDOG1_MODE_REG	0x18
+> > +#define SUN6I_WATCHDOG1_MODE_ENABLE		(1 << 0)
+> > +
+> >  static void __iomem *wdt_base;
+> >  
+> >  static void sun4i_restart(enum reboot_mode mode, const char *cmd)
+> > @@ -56,8 +65,36 @@ static void sun4i_restart(enum reboot_mode mode, const char *cmd)
+> >  	}
+> >  }
+> >  
+> > +static void sun6i_restart(char mode, const char *cmd)
+> > +{
+> > +	if (!wdt_base)
+> > +		return;
+> > +
+> > +	/* Disable interrupts */
+> > +	writel(0, wdt_base + SUN6I_WATCHDOG1_IRQ_REG);
+> > +
+> > +	/* We want to disable the IRQ and just reset the whole system */
+> > +	writel(SUN6I_WATCHDOG1_CONFIG_RESTART,
+> > +		wdt_base + SUN6I_WATCHDOG1_CONFIG_REG);
+> > +
+> > +	/* Enable timer. The default and lowest interval value is 0.5s */
+> > +	writel(SUN6I_WATCHDOG1_MODE_ENABLE,
+> > +		wdt_base + SUN6I_WATCHDOG1_MODE_REG);
+> > +
+> > +	/* Restart the watchdog. */
+> > +	writel(SUN6I_WATCHDOG1_CTRL_RESTART,
+> > +		wdt_base + SUN6I_WATCHDOG1_CTRL_REG);
+> > +
+> > +	while (1) {
+> > +		mdelay(5);
+> > +		writel(SUN6I_WATCHDOG1_MODE_ENABLE,
+> > +			wdt_base + SUN6I_WATCHDOG1_MODE_REG);
+> > +	}
+> > +}
+> > +
+> >  static struct of_device_id sunxi_restart_ids[] = {
+> >  	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
+> > +	{ .compatible = "allwinner,sun6i-wdt", .data = sun6i_restart },
 > 
-> While this may be compatible with the arm implementation, it won't be
-> compatible with the arm64 implementation, which assumes smc64 by
-> default.
+> Is there a corresponding binding document addition? 
 > 
-> As far as I am aware, the implementations currently in use (KVM and Xen)
-> use the same ID for both, so I think "smc" should cover an ID valid for
-> a native register width calling convention, and "smc64" and "smc32"
-> describing values only valid for 64-bit wide and 32-bit wide calling
-> conventions respectively.
+> sun4i-wdt.txt could be turned into a more general sunxi-wdt.txt.
 
-The problem is that does not work for a 32-bit kernel on 64-bit h/w as
-native from the dts perspective is smc64. Just like the cpu bindings,
-the binding cannot change based on 32 or 64 bit OS. I don't think we
-really have to deal with that here. We can simply say "smc" is only for
-"arm,psci" and deprecated for "arm,psci-0.2".
+Ah, right, thanks!
 
-> I've added Christoffer, Marc, and Stefano to Cc in case they have any
-> comments.
-> 
->>
->> A variation on this would be keep method as is and add a "#psci-cells"
->> property to specify the number of function IDs. You can determine the
->> 64-bit vs. 32-bit support based on the function ID itself.
-> 
-> I don't think that's a good idea - part of the reasoning for specifying
-> the IDs is to cater for those not aligned with the ID guidelines in the
-> spec, so we can't assume their choice of ID value gives us any useful
-> information as to how they may be used.
+I'll fix it in the v2.
 
-Kind of pointless to encode information into the IDs if you cannot rely
-on that...
+Maxime
 
-Rob
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/11fa10a6/attachment.sig>
