@@ -1,61 +1,41 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 29 Jul 2013 22:35:03 -0600
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130730032926.GL29970@voom.fritz.box>
-References: <51F39FD8.6080808@broadcom.com> <2460092.aLmjrOVh1g@flatron>
- <51F3A82E.2000907@broadcom.com>
- <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
- <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
- <CACxGe6uE6jOE-vz0onW5h93Es-soGiBAcFBM7Dvxh+HvCNrHkw@mail.gmail.com>
- <CACxGe6vw9=y5a+EgF1gO39SwGAdGofD2MYjyJ3jYu6uN3ke70A@mail.gmail.com>
- <1374988276.1973.29.camel@dabdike> <20130730014453.GJ29970@voom.fritz.box>
- <CAKON4OyWuF+qm2MAhbXnGg=ozzw37kpSWciLxyUy+QQzxoWdxQ@mail.gmail.com>
- <20130730032926.GL29970@voom.fritz.box>
-Message-ID: <CACxGe6sUFmLZMT+dvCbpmPrzR3DNMjw64LbD3n=JsjXsmrM-qg@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 30 Jul 2013 10:08:26 +0530
+Subject: [PATCH] ARM: SAMSUNG: fix to support for missing cpu specific
+ map_io
+In-Reply-To: <190501ce8cdd$2abd6780$80383680$%kim@samsung.com>
+References: <190501ce8cdd$2abd6780$80383680$%kim@samsung.com>
+Message-ID: <CAK9yfHwMANp2TfQWHQVXGZ2C-t-KrwGHJOpFT+hedDFYTDng6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 1:31 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+On 30 July 2013 09:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
 >
-> On Sun, Jul 28, 2013 at 03:19:03PM +0200, Richard Cochran wrote:
->> On Sun, Jul 28, 2013 at 11:12:53AM +0200, Tomasz Figa wrote:
->>
->> > I'm not really sure what effect on users this has. Maybe you should define
->> > "users".
->>
->> ...
->>
->> > Care to explain this reasoning?
->>
->> Use Case
->> ~~~~~~~~
->>
->> User acquires a machine running ARM Linux version 3.x, with u-boot
->> and dtb in a read only flash partition. The board boots and works just
->> fine. However, for his application, the user requires a new kernel
->> feature that appeared in version 3.y where y > x. He compiles the new
->> kernel, and it also works.
+> Since commit 7ed76e08 (ARM: EXYNOS: Fix low level debug support)
+> map_io() is not needed for exynos5440 so need to fix to lookup
+> cpu which using map_io(). Without this, kernel boot log complains
+> 'CPU EXYNOS5440 support not enabled' on exynos5440 and panic().
 >
-> I'm afraid this kind of use case will never be properly supported, DT
-> stable ABI or not.
-
-Why? New kernel features should be no problem at all.
-
-New driver features /might/ not be available, but only if the new
-feature requires additional data that isn't present in the tree and
-cannot be obtained elsewhere.
-
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/plat-samsung/init.c |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 >
-> Think about this: what kernel will actually be shipped in that board?
-> Most likely, it will be a BSP kernel from the vendor. Does the vendor
-> will have made that commitment to have a stable ABI for the DT? Will it
-> use the same bindings than mainline? Do we want to support all the crazy
-> bindings every vendor will come up with?
+> diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+> index 3e5c461..50a3ea0 100644
+> --- a/arch/arm/plat-samsung/init.c
+> +++ b/arch/arm/plat-samsung/init.c
+> @@ -55,12 +55,13 @@ void __init s3c_init_cpu(unsigned long idcode,
+>
+>         printk("CPU %s (id 0x%08lx)\n", cpu->name, idcode);
+>
+> -       if (cpu->map_io == NULL || cpu->init == NULL) {
+> +       if (cpu->init == NULL) {
+>                 printk(KERN_ERR "CPU %s support not enabled\n", cpu->name);
+>                 panic("Unsupported Samsung CPU");
 
-That's not a DT issue. That an out-of-tree board/SoC support issue. DT
-doesn't make that any better or worse.
+While at it you could probably remove the printk and have that message
+printed by panic instead?
 
-g.
+-- 
+With warm regards,
+Sachin
