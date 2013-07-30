@@ -1,79 +1,43 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 30 Jul 2013 12:37:37 +0200
-Subject: [PATCH v2 13/13] mmc: tmio-mmc: Remove .set_pwr() callback from
- platform data
-In-Reply-To: <1375180657-23641-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1375180657-23641-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1375180657-23641-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Jul 2013 10:58:24 +0000 (UTC)
+Subject: [PATCH] ARM: v6: prevent gcc from reordering extended CP15 reads
+ above is_smp() test
+In-Reply-To: <20130729100243.GC32383@mudshark.cambridge.arm.com>
+References: <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com> <20130724135617.GI11072@mudshark.cambridge.arm.com>
+ <51EFE1DD.8070801@ti.com> <20130724142059.GJ11072@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
+ <20130727122221.GB6618@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
+ <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
+ <20130729100243.GC32383@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1307301056220.8953@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .set_pwr() callback isn't used anymore as all platforms register
-GPIO-controlled regulators. Remove it.
+Hi Will
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- drivers/mmc/host/tmio_mmc.h     | 1 -
- drivers/mmc/host/tmio_mmc_pio.c | 7 -------
- include/linux/mfd/tmio.h        | 1 -
- 3 files changed, 9 deletions(-)
+On Mon, 29 Jul 2013, Will Deacon wrote:
 
-diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
-index 86fd21e..39c2f45 100644
---- a/drivers/mmc/host/tmio_mmc.h
-+++ b/drivers/mmc/host/tmio_mmc.h
-@@ -68,7 +68,6 @@ struct tmio_mmc_host {
- 	enum tmio_mmc_power	power;
- 
- 	/* Callbacks for clock / power control */
--	void (*set_pwr)(struct platform_device *host, int state);
- 	void (*set_clk_div)(struct platform_device *host, int state);
- 
- 	/* pio related stuff */
-diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
-index 2a7eb5a..4675513 100644
---- a/drivers/mmc/host/tmio_mmc_pio.c
-+++ b/drivers/mmc/host/tmio_mmc_pio.c
-@@ -777,9 +777,6 @@ static void tmio_mmc_power_on(struct tmio_mmc_host *host, unsigned short vdd)
- 
- 	/* .set_ios() is returning void, so, no chance to report an error */
- 
--	if (host->set_pwr)
--		host->set_pwr(host->pdev, 1);
--
- 	if (!IS_ERR(mmc->supply.vmmc)) {
- 		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
- 		/*
-@@ -809,9 +806,6 @@ static void tmio_mmc_power_off(struct tmio_mmc_host *host)
- 
- 	if (!IS_ERR(mmc->supply.vmmc))
- 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
--
--	if (host->set_pwr)
--		host->set_pwr(host->pdev, 0);
- }
- 
- /* Set MMC clock / power.
-@@ -998,7 +992,6 @@ int tmio_mmc_host_probe(struct tmio_mmc_host **host,
- 	_host->pdev = pdev;
- 	platform_set_drvdata(pdev, mmc);
- 
--	_host->set_pwr = pdata->set_pwr;
- 	_host->set_clk_div = pdata->set_clk_div;
- 
- 	/* SD control register space size is 0x200, 0x400 for bus_shift=1 */
-diff --git a/include/linux/mfd/tmio.h b/include/linux/mfd/tmio.h
-index b22883d..baa2346 100644
---- a/include/linux/mfd/tmio.h
-+++ b/include/linux/mfd/tmio.h
-@@ -106,7 +106,6 @@ struct tmio_mmc_data {
- 	struct tmio_mmc_dma		*dma;
- 	struct device			*dev;
- 	unsigned int			cd_gpio;
--	void (*set_pwr)(struct platform_device *host, int state);
- 	void (*set_clk_div)(struct platform_device *host, int state);
- 	int (*write16_hook)(struct tmio_mmc_host *host, int addr);
- 	/* clock management callbacks */
--- 
-1.8.1.5
+> I wouldn't worry about checking for CPU_V6. Besides, we probably need this
+> to be re-evaluated across barrier() when we get CPU migration on a
+> big-little platform anyway (we should probably also drop the
+> __attribute_const__ for that).
+> 
+> So you can just replace the "cc" (now that Nico kindly explained why those
+> aren't needed the other day) with "memory".
+> 
+> An alternative is to add barrier() between is_smp() and the read_cpuid_ext()
+> in all callers, adding a fake read from the stack to the latter (like I did
+> for the per-cpu accessor). However, this relies on fixing all callers for
+> very little gain, so I don't think it's worth the hassle.
+> 
+> I can cook a patch if you're tied up with other things -- just let me know.
+
+Makes sense to me.  Have respun the patch and will post it shortly.  
+Thanks for the extra compiler research; it's been incorporated into the 
+patch description and comments.
+
+
+- Paul
