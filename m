@@ -1,55 +1,43 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 30 Jul 2013 10:46:01 +0530
-Subject: [PATCH 2/4] serial: omap: enable PM runtime only when its fully
- configured
-In-Reply-To: <51F62CEB.2090502@ti.com>
-References: <1374487277-26099-1-git-send-email-rnayak@ti.com>
- <1374487277-26099-3-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.02.1307290843090.30864@utopia.booyaka.com>
- <51F62CEB.2090502@ti.com>
-Message-ID: <51F74C11.2000306@ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 30 Jul 2013 08:18:03 +0300
+Subject: [PATCH v2 14/22] iommu/tegra: smmu: Register platform_device to
+ IOMMU dynamically
+In-Reply-To: <51F6AC41.30007@wwwdotorg.org>
+References: <1373021097-32420-1-git-send-email-hdoyu@nvidia.com>
+ <1373021097-32420-15-git-send-email-hdoyu@nvidia.com>
+ <51E84D51.2030404@wwwdotorg.org>
+ <20130729.142752.1020949402019811407.hdoyu@nvidia.com>
+ <51F6AC41.30007@wwwdotorg.org>
+Message-ID: <20130730081803.5bb0ed4665f1f6ecf5dab908@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 July 2013 02:20 PM, Rajendra Nayak wrote:
-> On Monday 29 July 2013 02:14 PM, Paul Walmsley wrote:
->> Rajendra,
->>
->> On Mon, 22 Jul 2013, Rajendra Nayak wrote:
->>
->>> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>>
->>> If earlyprintk is enabled and current UART is console port the platform
->>> code can mark it as RPM_ACTIVE to sync real IP state with PM Runtime and
->>> avoid resuming of already active device, but now, driver initialization
->>> will be performed in the wrong way:
->>
->> ...
->>
->>> CC: Tony Lindgren <tony@atomide.com>
->>> CC: Rajendra Nayak <rnayak@ti.com>
->>> CC: Felipe Balbi <balbi@ti.com>
->>> CC: Kevin Hilman <khilman@linaro.org>
->>>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> Did you intend to add your Signed-off-by: to this patch?  Since you're 
->> formally submitting it, it needs to have your Signed-off-by: for me to 
->> take it.  Let me know and I'll add it if needed -
+On Mon, 29 Jul 2013 19:54:09 +0200
+Stephen Warren <swarren@wwwdotorg.org> wrote:
+...
+> >> Why hard-code this mapping? Can't devices be assigned to ASIDs based on
+> >> a DT property? I assume there's nothing in the SMMU HW that requires
+> >> specific ASIDs to be used?
+> > 
+> > Right. Where should those policy be passed, board DT files?
 > 
-> Sorry about that Paul. I indeed missed adding my SoB for this one.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Is the HW module (== SW group?) to ASID mapping policy or is a
+> particular mapping required by HW?
 
-Paul,
+only policy.
+But swgroup can have multiple HWs, they need to be set in the same swgroup.
 
-Looks like this one is already been queued by Greg.
+> Can the ASID mapping just happen dynamically in SW rather than DT
+> dictating a particular mapping?
 
-regards,
-Rajendra
+No info about ASID in DT, at least, right now.
+If a board DT file is the place to put policy, then it can be an option.
+ 
+> I assume the mapping must be set up before any HW is used, and can't be
+> modified later, so there's no much chance of deferring any policy
+> decisions to user-space etc.?
 
-> 
->>
->> - Paul
->>
-> 
+I think that both cases are needed.
+
+Some traditional devices(MMC) can be changed later as it may have rootfs on it.
+For some smarter devices like host1x, it want to change ASID dynamically per request/context.
