@@ -1,76 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Jul 2013 18:32:58 +0300
-Subject: [PATCH v2 1/8] ARM: DRA7: id: Add cpu detection support for
- DRA7xx based SoCs'
-In-Reply-To: <51F7CF6F.6050702@ti.com>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-2-git-send-email-rnayak@ti.com>
- <20130730131009.GA28162@radagast> <51F7CB2F.6070705@ti.com>
- <20130730142353.GL28162@radagast> <51F7CF6F.6050702@ti.com>
-Message-ID: <20130730153138.GA5978@radagast>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 30 Jul 2013 11:40:35 -0400
+Subject: [PATCH] do not allow XEN_TMEM on ARM64
+In-Reply-To: <alpine.DEB.2.02.1307231745520.4893@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1307231745520.4893@kaball.uk.xensource.com>
+Message-ID: <20130730154035.GA9245@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 23, 2013 at 05:46:58PM +0100, Stefano Stabellini wrote:
+> tmem is not supported on arm or arm64 yet.
 
-On Tue, Jul 30, 2013 at 08:06:31PM +0530, Sricharan R wrote:
-> On Tuesday 30 July 2013 07:53 PM, Felipe Balbi wrote:
-> > Hi,
-> >
-> > On Tue, Jul 30, 2013 at 07:48:23PM +0530, Sricharan R wrote:
-> >> On Tuesday 30 July 2013 06:40 PM, Felipe Balbi wrote:
-> >>> Hi,
-> >>>
-> >>> On Tue, Jul 30, 2013 at 04:55:39PM +0530, Rajendra Nayak wrote:
-> >>>> @@ -379,6 +407,13 @@ IS_OMAP_TYPE(3430, 0x3430)
-> >>>>  # define soc_is_omap543x()		is_omap543x()
-> >>>>  #endif
-> >>>>  
-> >>>> +# if defined(CONFIG_SOC_DRA7XX)
-> >>>> +# undef soc_is_dra7xx
-> >>>> +# undef soc_is_dra75x
-> >>>> +# define soc_is_dra7xx()		is_dra7xx()
-> >>>> +# define soc_is_dra75x()		is_dra75x()
-> >>> since this platform is DT-only, couldn't we just believe DT-data to be
-> >>> correct of_machine_is_compatible() ? 2/3 of this patch would be removed.
-> >>>
-> >>> I patched this for OMAP5 (compile-tested only, no boards available) and
-> >>> came out with the patch below (still needs to be split):
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-> >>> index 08b7267..b3136e5 100644
-> >>> --- a/arch/arm/boot/dts/omap5-uevm.dts
-> >>> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> >>> @@ -13,7 +13,7 @@
-> >>>  
-> >>>  / {
-> >>>  	model = "TI OMAP5 uEVM board";
-> >>> -	compatible = "ti,omap5-uevm", "ti,omap5";
-> >>> +	compatible = "ti,omap5-uevm", "ti,omap5432-es2.0", "ti,omap5";
-> >>>  
-> >>  ok, nice and simpler way.
-> >>  But would this make different revisions, to appear the same ?
-> > well omap5-uevm is omap5432 es2.0 only, right ? If a new board comes up,
-> > it should be treated as such, then you can pass a different string to
-> > that new board's compatible attribute.
-> >
->  Yes for OMAP5. I was thinking in general about this approach.
->  For example, for OMAP4 we have same board and
->  different revisions can be socketed there.
+So .. I lost track of the conversation about this. We chatted
+about this on the hyepervisor side and then there is also
+this patch.
+
+
+What did we decide?
+
 > 
->  For OMAP5, this is good.
-
-do we really production socketed boards? Well, at least Blaze has such
-thing. But do we have too many differences that need to be trated at
-arch/arm or should/could those be handled by reading IP's revision
-register (e.g. usb host erratas)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/448d7591/attachment.sig>
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+> index 9e02d60..a18f350 100644
+> --- a/drivers/xen/Kconfig
+> +++ b/drivers/xen/Kconfig
+> @@ -145,7 +146,7 @@ config SWIOTLB_XEN
+>  
+>  config XEN_TMEM
+>  	tristate
+> -	depends on !ARM
+> +	depends on !ARM && !ARM64
+>  	default m if (CLEANCACHE || FRONTSWAP)
+>  	help
+>  	  Shim to interface in-kernel Transcendent Memory hooks
