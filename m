@@ -1,33 +1,42 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 30 Jul 2013 18:08:56 +0530
-Subject: [PATCH v2 3/8] ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
-In-Reply-To: <51F7B100.2020600@ti.com>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-4-git-send-email-rnayak@ti.com> <51F7B100.2020600@ti.com>
-Message-ID: <51F7B3E0.9020005@ti.com>
+From: B44344@freescale.com (Arpit Goel)
+Date: Tue, 30 Jul 2013 18:08:18 +0530
+Subject: [PATCH 0/2] Make PPC macro spin_event_timeout() architecture
+ independent
+Message-ID: <1375187900-17582-1-git-send-email-B44344@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 July 2013 05:56 PM, Nishanth Menon wrote:
-> On 07/30/2013 06:25 AM, Rajendra Nayak wrote:
->> From: R Sricharan <r.sricharan@ti.com>
-> [...]
->>   # Clock framework
->>   obj-$(CONFIG_ARCH_OMAP2)        += $(clock-common) clock2xxx.o
->> @@ -181,6 +187,8 @@ obj-$(CONFIG_SOC_AM33XX)        += $(clock-common) dpll3xxx.o
->>   obj-$(CONFIG_SOC_AM33XX)        += cclock33xx_data.o
->>   obj-$(CONFIG_SOC_OMAP5)            += $(clock-common)
->>   obj-$(CONFIG_SOC_OMAP5)            += dpll3xxx.o dpll44xx.o
->> +obj-$(CONFIG_SOC_DRA7XX)        += $(clock-common)
->> +obj-$(CONFIG_SOC_DRA7XX)        += dpll3xxx.o dpll44xx.o
->>
-> 
-> are these in sync with DRA7 support being introduced for clock data in [1]?
+This patch-set moves USECS_PER_JIFFY to architecture timex.h from architecture
+specific C files. Patch-set further uses this to make PPC macro
+spin_event_timeout() architecture independent. This change enables drivers to
+use spin_event_timeout() even in non-PowerPC based SoC's.
 
-I don't want to have a dependency on those patches since I am not sure of them
-making it into 3.12.
+This patchset has been compiled for ARM, PowerPC and x86.
 
-> 
-> 
-> [1] http://marc.info/?l=linux-omap&m=137456411706971&w=2
-> 
+Patch[1/2] : Moves USECS_PER_JIFFY to architecture specific timex.h files from
+	     architecture specific C files.
+
+Patch[2/2] : Converts PPC macro spin_event_timeout() in architecture independent
+	     macro.
+
+Arpit Goel (2):
+  Make USECS_PER_JIFFY available for generic use
+  Convert PowerPC macro spin_event_timeout() to architecture independent
+        macro
+
+ arch/arm/include/asm/timex.h      |  2 ++
+ arch/arm/kernel/time.c            |  3 ---
+ arch/m32r/include/asm/timex.h     |  2 ++
+ arch/m32r/kernel/time.c           |  3 ---
+ arch/m68k/hp300/time.c            |  4 +---
+ arch/m68k/include/asm/timex.h     |  2 ++
+ arch/s390/include/asm/timex.h     |  2 ++
+ arch/s390/kernel/time.c           |  2 --
+ arch/sparc/include/asm/timex_32.h |  2 ++
+ arch/sparc/include/asm/timex_64.h |  2 ++
+ arch/sparc/kernel/pcic.c          |  1 -
+ include/linux/delay.h             | 40 +++++++++++++++++++++++++++++++++++++++
+ 12 files changed, 53 insertions(+), 12 deletions(-)
+
+-- 
+1.8.1.4
