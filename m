@@ -1,94 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 30 Jul 2013 14:24:13 +0900
-Subject: [PATCH 3/4] ARM: shmobile: Add EMEV2 and KZM9D to ARCH_SHMOBILE_MULTI
+Date: Tue, 30 Jul 2013 14:24:11 +0900
+Subject: [PATCH 1/4] ARM: shmobile: Only build clocks when COMMON_CLK=n
 In-Reply-To: <cover.1375161473.git.horms+renesas@verge.net.au>
 References: <cover.1375161473.git.horms+renesas@verge.net.au>
-Message-ID: <cbc60e7c04f3c1390144d4a881f0a7b98b49da98.1375161473.git.horms+renesas@verge.net.au>
+Message-ID: <a360feb9e9e6cc36d61e683c03dc13974663298b.1375161473.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Enable build of EMEV2 and KZM9D DT Reference in
-case of ARCH_MULTIPLATFORM and ARCH_SHMOBILE_MULTI.
+Move shared clock.c file and per-SoC clock-xxx.c files
+to only build when CONFIG_COMMON_CLK != y.
 
-IS_ENABLED() is leaves the clock-emev2.c file out
-in case of COMMON_CLK=y.
+The regular ARCH_SHMOBILE case with legacy SH clock framework
+will build just as before with this patch applied, however
+the case when COMMON_CLK=y will exclude all the clock files.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile                     |  1 +
- arch/arm/mach-shmobile/Kconfig                 | 15 +++++++++++++++
- arch/arm/mach-shmobile/board-kzm9d-reference.c |  3 ++-
- arch/arm/mach-shmobile/setup-emev2.c           |  3 ++-
- 4 files changed, 20 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/Makefile | 31 ++++++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index af19e38..f3861de 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -193,6 +193,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	sh73a0-kzm9g-reference.dtb \
- 	r8a73a4-ape6evm.dtb \
- 	sh7372-mackerel.dtb
-+dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d-reference.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
- 	socfpga_vt.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 4c54298..8914c9b 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -17,6 +17,21 @@ if ARCH_SHMOBILE_MULTI
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index e8d0a2c..5884bea 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -3,17 +3,30 @@
+ #
  
- comment "SH-Mobile System Type"
+ # Common objects
+-obj-y				:= timer.o console.o clock.o
++obj-y				:= timer.o console.o
  
-+config ARCH_EMEV2
-+	bool "Emma Mobile EV2"
+ # CPU objects
+-obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o clock-sh7372.o intc-sh7372.o
+-obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o clock-sh73a0.o intc-sh73a0.o
+-obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o clock-r8a73a4.o
+-obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o clock-r8a7740.o intc-r8a7740.o
+-obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o clock-r8a7778.o
+-obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o clock-r8a7779.o intc-r8a7779.o
+-obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o clock-r8a7790.o
+-obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
++obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o intc-sh7372.o
++obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o intc-sh73a0.o
++obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
++obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o intc-r8a7740.o
++obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
++obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o intc-r8a7779.o
++obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
++obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
 +
-+comment "SH-Mobile Board Type"
-+
-+config MACH_KZM9D_REFERENCE
-+	bool "KZM9D board - Reference Device Tree Implementation"
-+	depends on ARCH_EMEV2
-+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-+	---help---
-+	   Use reference implementation of KZM9D board support
-+	   which makes a greater use of device tree at the expense
-+	   of not supporting a number of devices.
-+
-+	   This is intended to aid developers
- endif
++# Clock objects
++ifndef CONFIG_COMMON_CLK
++obj-y				+= clock.o
++obj-$(CONFIG_ARCH_SH7372)	+= clock-sh7372.o
++obj-$(CONFIG_ARCH_SH73A0)	+= clock-sh73a0.o
++obj-$(CONFIG_ARCH_R8A73A4)	+= clock-r8a73a4.o
++obj-$(CONFIG_ARCH_R8A7740)	+= clock-r8a7740.o
++obj-$(CONFIG_ARCH_R8A7778)	+= clock-r8a7778.o
++obj-$(CONFIG_ARCH_R8A7779)	+= clock-r8a7779.o
++obj-$(CONFIG_ARCH_R8A7790)	+= clock-r8a7790.o
++obj-$(CONFIG_ARCH_EMEV2)	+= clock-emev2.o
++endif
  
- if ARCH_SHMOBILE
-diff --git a/arch/arm/mach-shmobile/board-kzm9d-reference.c b/arch/arm/mach-shmobile/board-kzm9d-reference.c
-index a7b28b2..8f8bb2f 100644
---- a/arch/arm/mach-shmobile/board-kzm9d-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9d-reference.c
-@@ -26,7 +26,8 @@
- 
- static void __init kzm9d_add_standard_devices(void)
- {
--	emev2_clock_init();
-+	if (!IS_ENABLED(CONFIG_COMMON_CLK))
-+		emev2_clock_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 19980be..1553af8 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -175,7 +175,8 @@ static struct resource pmu_resources[] = {
- 
- void __init emev2_add_standard_devices(void)
- {
--	emev2_clock_init();
-+	if (!IS_ENABLED(CONFIG_COMMON_CLK))
-+		emev2_clock_init();
- 
- 	emev2_register_uart(0);
- 	emev2_register_uart(1);
+ # SMP objects
+ smp-y				:= platsmp.o headsmp.o
 -- 
 1.8.3.2
