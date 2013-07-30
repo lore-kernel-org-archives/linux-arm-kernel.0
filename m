@@ -1,38 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 17:01:27 -0600
-Subject: [PATCH] ARM: allow DEBUG_UNCOMPRESS for omap2plus
-In-Reply-To: <20130730225233.GF21614@n2100.arm.linux.org.uk>
-References: <1375224558-8170-1-git-send-email-swarren@wwwdotorg.org>
- <20130730225233.GF21614@n2100.arm.linux.org.uk>
-Message-ID: <51F845C7.8020106@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Jul 2013 16:03:24 -0700
+Subject: [PATCH RESEND] clk: export __clk_get_flags for modular clock
+ providers
+In-Reply-To: <51D5DEE7.2070400@ti.com>
+References: <1366009186-32199-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <51D5DEE7.2070400@ti.com>
+Message-ID: <20130730230324.5270.4519@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 04:52 PM, Russell King - ARM Linux wrote:
-> On Tue, Jul 30, 2013 at 04:49:18PM -0600, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> DEBUG_UNCOMPRESS was previously disallowed for omap2plus due to
->> omap2plus.S's use of .data, which is not allowed in the decompressor.
->> Solve this by placing that data into .text when building the file into
->> the decompressor. This relies on .text actually being writable in the
->> decompressor, which it is in practice.
+Quoting Luciano Coelho (2013-07-04 13:45:27)
+> Hi,
 > 
-> Unless you decide to use ZBOOT and flash the zImage.
+> On 04/15/2013 09:59 AM, Sebastian Hesselbarth wrote:
+> > The common clock api provides some helpers for clk-providers but does
+> > not export these helpers. This hinders clk-providers to be built as modules.
+> > This patch adds __clk_get_flags() to the list of exported symbols.
+> >
+> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > ---
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> > ---
+> >   drivers/clk/clk.c |    1 +
+> >   1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index ed87b24..3e478b8 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -450,6 +450,7 @@ unsigned long __clk_get_flags(struct clk *clk)
+> >   {
+> >       return !clk ? 0 : clk->flags;
+> >   }
+> > +EXPORT_SYMBOL_GPL(__clk_get_flags);
+> >
+> >   bool __clk_is_enabled(struct clk *clk)
+> >   {
+> >
+> 
+> I think this got merged slightly wrong.  The EXPORT_SYMBOL_GPL macro 
+> came under clk_unprepare_unused_subtree() instead of under 
+> __clk_get_flags():
+> 
+> 
+> Of course this is not that important, but it's a bit confusing when you 
+> look at the code.
 
-I knew there had to be a catch:-)
+Thanks for pointing this out. I've fixed it up.
 
-I have no idea if ZBOOT is a use-case that's relevant to OMAP?
+Regards,
+Mike
 
-On Tegra at least (the same issue applies to the other patch I just
-sent), that use-case is almost impossible; even if the boot ROM directly
-booted a kernel, the boot ROM is hard-coded to copy whatever it's
-booting to SDRAM first, although I suppose if that was a boot-loader it
-could just jump back to a ROM location. That said, NOR flash is
-extremely rare on Tegra. So, I don't know if we care about this issue.
-
-Is it reasonable to just say "If you use ZBOOT, don't enable
-DEBUG_UNCOMPRESS"? Perhaps these patches should not completely remove
-the !DEBUG_TEGRA_UART from config DEBUG_UNCOMPRESS, but instead say:
-
-default y if DEBUG_LL && (!DEBUG_TEGRA_UART || !ZBOOT)?
+> 
+> --
+> Cheers,
+> Luca.
