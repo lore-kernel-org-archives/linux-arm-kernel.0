@@ -1,220 +1,67 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 30 Jul 2013 15:08:26 -0500
-Subject: [PATCHv4 21/33] CLK: OMAP: DPLL: add omap3 dpll support
-In-Reply-To: <1374564028-11352-22-git-send-email-t-kristo@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-22-git-send-email-t-kristo@ti.com>
-Message-ID: <51F81D3A.7080007@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Jul 2013 22:10:06 +0200
+Subject: [PATCH 08/10] ARM: sun7i: DT: Add UART muxing options to the DTSI
+In-Reply-To: <51F80EE9.30801@cogentembedded.com>
+References: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375196394-21138-9-git-send-email-maxime.ripard@free-electrons.com>
+ <51F80EE9.30801@cogentembedded.com>
+Message-ID: <20130730201006.GD12562@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2013 02:20 AM, Tero Kristo wrote:
-> OMAP3 has slightly different DPLLs from those compared to OMAP4. Modified
-> code for the same.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->   drivers/clk/omap/dpll.c |   96 +++++++++++++++++++++++++++++++++++++++++------
->   1 file changed, 85 insertions(+), 11 deletions(-)
->
-:) wont repeat the binding crib again..
+Hi Sergei,
 
-> diff --git a/drivers/clk/omap/dpll.c b/drivers/clk/omap/dpll.c
-> index d8a958a..ecb1fbd 100644
-> --- a/drivers/clk/omap/dpll.c
-> +++ b/drivers/clk/omap/dpll.c
-> @@ -26,6 +26,11 @@
->   #include <linux/of_address.h>
->   #include <linux/clk/omap.h>
->
-> +enum {
-> +	SUBTYPE_OMAP3_DPLL,
-> +	SUBTYPE_OMAP4_DPLL,
-> +};
-> +
->   static const struct clk_ops dpll_m4xen_ck_ops = {
->   	.enable		= &omap3_noncore_dpll_enable,
->   	.disable	= &omap3_noncore_dpll_disable,
-> @@ -40,6 +45,13 @@ static const struct clk_ops dpll_core_ck_ops = {
->   	.get_parent	= &omap2_init_dpll_parent,
->   };
->
-> +static const struct clk_ops omap3_dpll_core_ck_ops = {
-> +	.init		= &omap2_init_clk_clkdm,
-> +	.get_parent	= &omap2_init_dpll_parent,
-> +	.recalc_rate	= &omap3_dpll_recalc,
-> +	.round_rate	= &omap2_dpll_round_rate,
-> +};
-> +
->   static const struct clk_ops dpll_ck_ops = {
->   	.enable		= &omap3_noncore_dpll_enable,
->   	.disable	= &omap3_noncore_dpll_disable,
-> @@ -50,6 +62,26 @@ static const struct clk_ops dpll_ck_ops = {
->   	.init		= &omap2_init_clk_clkdm,
->   };
->
-> +static const struct clk_ops omap3_dpll_ck_ops = {
-> +	.init		= &omap2_init_clk_clkdm,
-> +	.enable		= &omap3_noncore_dpll_enable,
-> +	.disable	= &omap3_noncore_dpll_disable,
-> +	.get_parent	= &omap2_init_dpll_parent,
-> +	.recalc_rate	= &omap3_dpll_recalc,
-> +	.set_rate	= &omap3_noncore_dpll_set_rate,
-> +	.round_rate	= &omap2_dpll_round_rate,
-> +};
-> +
-> +static const struct clk_ops omap3_dpll_per_ck_ops = {
-> +	.init		= &omap2_init_clk_clkdm,
-> +	.enable		= &omap3_noncore_dpll_enable,
-> +	.disable	= &omap3_noncore_dpll_disable,
-> +	.get_parent	= &omap2_init_dpll_parent,
-> +	.recalc_rate	= &omap3_dpll_recalc,
-> +	.set_rate	= &omap3_dpll4_set_rate,
-> +	.round_rate	= &omap2_dpll_round_rate,
-> +};
-> +
->   static const struct clk_ops dpll_x2_ck_ops = {
->   	.recalc_rate	= &omap3_clkoutx2_recalc,
->   };
-> @@ -144,7 +176,9 @@ struct clk *omap_clk_register_dpll_x2(struct device *dev, const char *name,
->    * of_omap_dpll_setup() - Setup function for OMAP DPLL clocks
->    */
->   static void __init of_omap_dpll_setup(struct device_node *node,
-> -					const struct clk_ops *ops)
-> +					const struct clk_ops *ops, u32 freqsel,
-> +					u32 modes, u8 mul_div_shift,
-> +					int subtype)
->   {
->   	struct clk *clk;
->   	const char *clk_name = node->name;
-> @@ -157,8 +191,8 @@ static void __init of_omap_dpll_setup(struct device_node *node,
->   	u32 idlest_mask = 0x1;
->   	u32 enable_mask = 0x7;
->   	u32 autoidle_mask = 0x7;
-> -	u32 mult_mask = 0x7ff << 8;
-> -	u32 div1_mask = 0x7f;
-> +	u32 mult_mask = 0x7ff << (8 + mul_div_shift);
-> +	u32 div1_mask = 0x7f << mul_div_shift;
->   	u32 max_multiplier = 2047;
->   	u32 max_divider = 128;
->   	u32 min_divider = 1;
-> @@ -193,7 +227,7 @@ static void __init of_omap_dpll_setup(struct device_node *node,
->
->   	clkspec.np = of_parse_phandle(node, "ti,clk-ref", 0);
->   	dd->clk_ref = of_clk_get_from_provider(&clkspec);
-> -	if (!dd->clk_ref) {
-> +	if (IS_ERR(dd->clk_ref)) {
+On Tue, Jul 30, 2013 at 11:07:21PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 07/30/2013 06:59 PM, Maxime Ripard wrote:
+> 
+> >The UARTs on the A20 can be muxed to several pins. Add a few options to
+> >the DTSI so that we can start using them in the boards' DT.
+> 
+> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >---
+> >  arch/arm/boot/dts/sun7i-a20.dtsi | 21 +++++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> 
+> >diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >index 704fca9..9f45e8d 100644
+> >--- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> >+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >@@ -70,6 +70,27 @@
+> >  			#address-cells = <1>;
+> >  			#size-cells = <0>;
+> >  			#gpio-cells = <3>;
+> >+
+> >+			uart0_pins_a: uart0 at 0 {
+> 
+>    Why have address part of the node name if there's not "reg" property?
 
-belongs to original patch.
+It allows to easily differentiate distinct pin groups for the same IP.
 
->   		pr_err("%s: ti,clk-ref for %s not found\n", __func__,
->   			clk_name);
->   		goto cleanup;
-> @@ -201,7 +235,7 @@ static void __init of_omap_dpll_setup(struct device_node *node,
->
->   	clkspec.np = of_parse_phandle(node, "ti,clk-bypass", 0);
->   	dd->clk_bypass = of_clk_get_from_provider(&clkspec);
-> -	if (!dd->clk_bypass) {
-> +	if (IS_ERR(dd->clk_bypass)) {
+A second group of pin that can be muxed to uart0 would be defined as
+uart0_pins_b: uart0 at 1.
 
-same
+I could have used any other construct, like uart0-0 and uart0-1, I just
+find that it fits more in the usual DT constructs.
 
->   		pr_err("%s: ti,clk-bypass for %s not found\n", __func__,
->   			clk_name);
->   		goto cleanup;
-> @@ -225,14 +259,31 @@ static void __init of_omap_dpll_setup(struct device_node *node,
->   	dd->enable_mask = enable_mask;
->   	dd->autoidle_mask = autoidle_mask;
->
-> -	dd->modes = 0xa0;
-> +	if (!of_property_read_u32(node, "ti,recal-en-bit", &val))
-> +		dd->recal_en_bit = val;
-> +
-> +	if (!of_property_read_u32(node, "ti,recal-st-bit", &val))
-> +		dd->recal_st_bit = val;
-> +
-> +	if (!of_property_read_u32(node, "ti,auto-recal-bit", &val))
-> +		dd->auto_recal_bit = val;
+> And the preferred node name is "serial", not "uart", according to
+> the ePAPR spec (http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf).
 
-now I understand what it means.
+But only for actual serial driver right? This is a pinctrl group
+declaration.
 
-> +
-> +	of_property_read_u32(node, "ti,modes", &modes);
-i see we pass in modes, and read ti,modes to &modes. it is a bit sketchy 
-without bindings documentation.
-
-> +
-> +	dd->modes = modes;
-
-Should have belonged to original patch.
-
-> +
-> +	dd->freqsel_mask = freqsel;
->
->   	if (of_property_read_bool(node, "ti,dpll-j-type")) {
->   		dd->sddiv_mask = 0xff000000;
-> -		mult_mask = 0xfff << 8;
-> -		div1_mask = 0xff;
-> +		mult_mask = 0xfff << (8 + mul_div_shift);
->   		max_multiplier = 4095;
-> -		max_divider = 256;
-> +		if (subtype == SUBTYPE_OMAP3_DPLL) {
-> +			dd->dco_mask = 0xe00000;
-> +		} else {
-> +			div1_mask = 0xff << mul_div_shift;
-> +			max_divider = 256;
-> +		}
->   	}
->
->   	if (of_property_read_bool(node, "ti,dpll-regm4xen")) {
-> @@ -281,7 +332,30 @@ static void __init of_omap_dpll_x2_setup(struct device_node *node)
->
->   __init void of_omap3_dpll_setup(struct device_node *node)
->   {
-> -	/* XXX: to be done */
-> +	const struct clk_ops *ops;
-> +	u32 freqsel = 0xf0;
-> +	u32 modes = 0xa0;
-> +	u8 mul_div_shift = 0;
-> +
-> +	ops = &omap3_dpll_ck_ops;
-> +
-> +	if (of_property_read_bool(node, "ti,dpll-core")) {
-> +		ops = &omap3_dpll_core_ck_ops;
-> +		mul_div_shift = 8;
-> +		modes = 0x0;
-> +	}
-> +
-> +	if (of_property_read_bool(node, "ti,dpll-peripheral")) {
-> +		ops = &omap3_dpll_per_ck_ops;
-> +		freqsel = 0xf00000;
-> +	}
-> +
-> +	if (of_property_read_bool(node, "ti,dpll-j-type"))
-> +		freqsel = 0x0;
-> +
-> +	of_omap_dpll_setup(node, ops, freqsel, modes, mul_div_shift,
-> +		SUBTYPE_OMAP3_DPLL);
-> +
->   }
->   EXPORT_SYMBOL_GPL(of_omap3_dpll_setup);
->   CLK_OF_DECLARE(omap3_dpll_clock, "ti,omap3-dpll-clock", of_omap3_dpll_setup);
-> @@ -306,7 +380,7 @@ __init void of_omap4_dpll_setup(struct device_node *node)
->   	if (of_property_read_bool(node, "ti,dpll-no-gate"))
->   		ops = &dpll_no_gate_ck_ops;
->
-> -	of_omap_dpll_setup(node, ops);
-> +	of_omap_dpll_setup(node, ops, 0, 0xa0, 0, SUBTYPE_OMAP4_DPLL);
-what is 0xa0?
-
->   }
->   EXPORT_SYMBOL_GPL(of_omap4_dpll_setup);
->   CLK_OF_DECLARE(omap4_dpll_clock, "ti,omap4-dpll-clock", of_omap4_dpll_setup);
->
-
-I think this should be squashed and a single dpll.c introduction to be done.
-
+Thanks,
+Maxime
 
 -- 
-Regards,
-Nishanth Menon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/10421948/attachment.sig>
