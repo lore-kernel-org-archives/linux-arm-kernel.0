@@ -1,7 +1,7 @@
 From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 30 Jul 2013 14:26:02 -0400
+Date: Tue, 30 Jul 2013 14:28:26 -0400
 Subject: Defining schemas for Device Tree
-In-Reply-To: <CAKON4OyMfNUR=NGn+OEvN3utcEzRfG6A4rPO6+h5Q4mq_tmoxw@mail.gmail.com>
+In-Reply-To: <51F80526.1020201@wwwdotorg.org>
 References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
  <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
  <1706112.Xn49tiCSKF@thinkpad>
@@ -15,111 +15,60 @@ References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
  <51F7FCA6.6010909@wwwdotorg.org>
  <CAKON4OzLgC-ahDhLnbYEYrSj7dbFRU0z7Do_D32XNqux2UhvXw@mail.gmail.com>
  <CAKON4OyMfNUR=NGn+OEvN3utcEzRfG6A4rPO6+h5Q4mq_tmoxw@mail.gmail.com>
-Message-ID: <CAKON4Oz_Suf0jjGrS8iTeLBs1K=JszuESV6Om4VRarjXqYGgpg@mail.gmail.com>
+ <51F80526.1020201@wwwdotorg.org>
+Message-ID: <CAKON4OwY3xh3UGjTxb4ypkcmrTpVYO-FZovq-ierabYMf4CDQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 2:04 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Tue, Jul 30, 2013 at 2:03 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Tue, Jul 30, 2013 at 1:49 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 07/30/2013 11:45 AM, jonsmirl at gmail.com wrote:
->>>> On Tue, Jul 30, 2013 at 1:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>> On 07/30/2013 11:29 AM, jonsmirl at gmail.com wrote:
->>>>>> On Tue, Jul 30, 2013 at 1:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>>>>
->>>>>>> On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
->>>>>>>> On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
->>>>>>>>> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
->>>>>>>>>
->>>>>>>>>> This...
->>>>>>>>>> tx-dma-channel = <&pdma0 7>; /* preliminary */
->>>>>>>>>> rx-dma-channel = <&pdma0 6>; /* preliminary */
->>>>>>>>>
->>>>>>>>>> Probably should be
->>>>>>>>>> dmas = <&pdma0 7>,<&pdma0 6>;
->>>>>>>>>> dma-names = "tx", "rx";
->>>>>>>>>
->>>>>>>>> It should be - the latter is the generic DMA binding.  There's a lot of
->>>>>>>>> bindings in the kernel that predate that but people are currently
->>>>>>>>> working to transfer over, this is one of the examples of instability
->>>>>>>>> that everyone is talking about.
->>>>>>>>
->>>>>>>> Is something similar to this possible in device tree syntax?
->>>>>>>> dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
->>>>>>>
->>>>>>> I /think/ you can physically write that in *.dts, or something very
->>>>>>> similar; with the strings outside the <>:
->>>>>>>
->>>>>>> dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
->>>>>>>
->>>>>>> However, there's been strong push-back (i.e. doing that has not been
->>>>>>> allowed at all) on attempting to mix variable-length strings and
->>>>>>> fixed-length/alignment integer cells in the same property. This is
->>>>>>> primarily because you then can't ensure that the integer cell data is
->>>>>>> aligned in the DTB (dtc and/or the DTB format spec does/requires/allows
->>>>
->>>> The PowerPC FDT doc says that strings are indirected into a string
->>>> table. So they aren't variable length in the data structures.
->>>
->>> Do you have a link to the document; I'm not sure which one you mean.
+On Tue, Jul 30, 2013 at 2:25 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/30/2013 12:04 PM, jonsmirl at gmail.com wrote:
+> ...
+>> So what does an alternating use of strings do?
 >>
->> So it looks like there is one indirection to get to the block, then
->> the strings are concatenated. The indirection must have been hidden
->> when the node structure was created.  I had thought that there was a
->> list of indirects each pointing to a string in the string block.
->>
->> https://www.power.org/documentation/epapr-version-1-1/
+>>  dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
 >
-> So what does an alternating use of strings do?
+> cat > temp.dts << ENDOFHERE
+> /dts-v1/;
 >
->  dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+> / {
+>     dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+>
+>     pdma0: dma { };
+> };
+> ENDOFHERE
+>
+> dtc -O dtb -o temp.dtb -I dts temp.dts
+>
+> hexdump -C temp.dtb
+>
+> yields:
+>
+>> 00000000  d0 0d fe ed 00 00 00 ab  00 00 00 38 00 00 00 98  |...........8....|
+>> 00000010  00 00 00 28 00 00 00 11  00 00 00 10 00 00 00 00  |...(............|
+>> 00000020  00 00 00 13 00 00 00 60  00 00 00 00 00 00 00 00  |.......`........|
+>> 00000030  00 00 00 00 00 00 00 00  00 00 00 01 00 00 00 00  |................|
+>> 00000040  00 00 00 03 00 00 00 16  00 00 00 00 74 78 00 00  |............tx..|
+>                                                  ss ss ss pp
+>> 00000050  00 00 01 00 00 00 07 72  78 00 00 00 00 01 00 00  |.......rx.......|
+>             pp pp pp ii ii ii ii ss  ss ss pp pp pp pp ii ii
+>> 00000060  00 06 00 00 00 00 00 01  64 6d 61 00 00 00 00 03  |........dma.....|
+>             ii ii
+>
+> ... where ss represents a string byte, pp a phandle byte, ii an integer
+> byte.
+>
+>> 00000070  00 00 00 04 00 00 00 05  00 00 00 01 00 00 00 03  |................|
+>> 00000080  00 00 00 04 00 00 00 0b  00 00 00 01 00 00 00 02  |................|
+>> 00000090  00 00 00 02 00 00 00 09  64 6d 61 73 00 6c 69 6e  |........dmas.lin|
+>> 000000a0  75 78 2c 70 68 61 6e 64  6c 65 00                 |ux,phandle.|
+>
+> Starting about half way through that last line is the string table.
+>
+> (the string table indirection is for property names, not property
+> values, and it looks like not for node names either)
 
-dtc compiles this string without complaint....
-
-gpios = "str1", <&gpio0 10 1>, "str2", <&gpio0 10 1>;
-
-It would a new helper function to interpret it but I this it should work.
-I've always disliked paired attributes (dmas, dma-names) is easy to
-mess them up by accident.
-
->
->
->>
->> 8.5 Strings Block
->> The strings block contains strings representing all the property names
->> used in the tree. These null-
->> terminated strings are simply concatenated together in this section,
->> and referred to from the structure
->> block by an offset into the strings block.
->> The strings block has no alignment constraints and may appear at any
->> offset from the beginning of the
->> device tree blob.
->>
->>
->>>
->>>> I was wondering how dmas = "tx", "rx" was implemented. It is two
->>>> pointers into the indirect block. So this should work, there is no
->>>> variable length data to worry about in the structure.
->>>
->>> If you look at of_property_read_string_index() in drivers/of/base.c,
->>> you'll see that it expects the strings to just be packed together inline.
->>>
->>> What you say may be correct for node and property names, just not
->>> property values.
->>
->>
->>
->> --
->> Jon Smirl
->> jonsmirl at gmail.com
->
->
->
-> --
-> Jon Smirl
-> jonsmirl at gmail.com
-
-
+Ok, so this won't work without introducing variable length data. Too
+bad, I would have liked to eliminate the paired attributes.
 
 -- 
 Jon Smirl
