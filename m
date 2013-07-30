@@ -1,53 +1,40 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 30 Jul 2013 12:07:58 +0800
-Subject: [PATCH] ARM(64): KVM: add signed type cast for comparation
-In-Reply-To: <20130730034531.GC5471@cbox>
-References: <51ECA4EC.3000408@asianux.com> <20130730034531.GC5471@cbox>
-Message-ID: <51F73C1E.2030505@asianux.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 30 Jul 2013 13:27:57 +0900
+Subject: [PATCH] ARM: SAMSUNG: fix to support for missing cpu specific map_io
+Message-ID: <190501ce8cdd$2abd6780$80383680$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 11:45 AM, Christoffer Dall wrote:
-> On Mon, Jul 22, 2013 at 11:20:12AM +0800, Chen Gang wrote:
->> 'len' is 'unsigned long' which is never less than zero.
->>
->> So need a related type cast for comparation.
->>
->> The related warning (when building ARM64 with allmodconfig):
->>
->>   arch/arm64/kvm/../../../arch/arm/kvm/mmio.c:82:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
->>
-> 
-> Hmmm, interesting, I don't get this error with my compiler.
-> 
->>
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm/kvm/mmio.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
->> index b8e06b7..626dfc8 100644
->> --- a/arch/arm/kvm/mmio.c
->> +++ b/arch/arm/kvm/mmio.c
->> @@ -79,7 +79,7 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	}
->>  
->>  	len = kvm_vcpu_dabt_get_as(vcpu);
->> -	if (unlikely(len < 0))
->> +	if (unlikely((long)len < 0))
->>  		return len;
->>  
->>  	is_write = kvm_vcpu_dabt_iswrite(vcpu);
->> -- 
->> 1.7.7.6
-> 
-> I think the proper fix is to declare len as an int instead.  I'll queue
-> that instead.
-> 
 
-Yeah, it is fine to me (better than my original fix).
+Since commit 7ed76e08 (ARM: EXYNOS: Fix low level debug support)
+map_io() is not needed for exynos5440 so need to fix to lookup
+cpu which using map_io(). Without this, kernel boot log complains
+'CPU EXYNOS5440 support not enabled' on exynos5440 and panic().
 
-Thanks.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/plat-samsung/init.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+index 3e5c461..50a3ea0 100644
+--- a/arch/arm/plat-samsung/init.c
++++ b/arch/arm/plat-samsung/init.c
+@@ -55,12 +55,13 @@ void __init s3c_init_cpu(unsigned long idcode,
+ 
+ 	printk("CPU %s (id 0x%08lx)\n", cpu->name, idcode);
+ 
+-	if (cpu->map_io == NULL || cpu->init == NULL) {
++	if (cpu->init == NULL) {
+ 		printk(KERN_ERR "CPU %s support not enabled\n", cpu->name);
+ 		panic("Unsupported Samsung CPU");
+ 	}
+ 
+-	cpu->map_io();
++	if (cpu->map_io)
++		cpu->map_io();
+ }
+ 
+ /* s3c24xx_init_clocks
 -- 
-Chen Gang
+1.7.10.4
