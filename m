@@ -1,134 +1,174 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 30 Jul 2013 18:19:08 -0400
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 31 Jul 2013 00:16:56 +0200
 Subject: Defining schemas for Device Tree
-In-Reply-To: <20130730205716.GZ9858@sirena.org.uk>
-References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
- <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
- <1706112.Xn49tiCSKF@thinkpad>
- <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
- <20130730102511.GM9858@sirena.org.uk>
- <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
- <51F7F596.6020503@wwwdotorg.org>
- <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
- <20130730205716.GZ9858@sirena.org.uk>
-Message-ID: <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
+In-Reply-To: <2469263.vMN09Q7Tzi@flatron>
+References: <2469263.vMN09Q7Tzi@flatron>
+Message-ID: <3852729.INDSeEDz7b@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 4:57 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jul 30, 2013 at 01:29:56PM -0400, jonsmirl at gmail.com wrote:
->> On Tue, Jul 30, 2013 at 1:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> > On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
->
->> > > Is something similar to this possible in device tree syntax?
->> > > dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
->
->> > I /think/ you can physically write that in *.dts, or something very
->> > similar; with the strings outside the <>:
->
->> > dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
->
->> Can we turn the strings into string phandles? Then they'd be fixed sized.
->
->> That might provide a way to internationalize the strings too.
->
-> I don't know how viable or sane this actually is but one suggestion I
-> just made elsewhere which might help is to fix this at the dtc level by
-> having syntatic sugar which will do the parallel arrays trick that
-> people are currently using to write things out.  The user writes one
-> array with multiple types of data in it and the actual output is two or
-> more matched arrays each with a single type of data.
->
-> It would help legibility and wouldn't impact the parsers.
+On Monday 29 of July 2013 02:21:52 Tomasz Figa wrote:
+> Hi,
+> 
+> As promised I am starting a discussion about Device Tree schema. Let's
+> first shortly introduce the problem.
+> 
+> Device Tree is a text-based data structure used to describe hardware. Its
+> main point is separation from kernel code, which has a lot of benefits,
+> but, at the moment, also a huge drawback - there is no verification of
+> device tree sources against defined bindings. All the dtc compiler does
+> currently are syntax checks - no semantic analysis is performed (except
+> some really basic things). What this means is that anybody can put
+> anything in their device tree and end up with the dts compiling fine only
+> to find out that something is wrong at boot time.
+> 
+> Currently, device tree bindings are described in plain text documentation
+> files, which can not be considered a formal way of binding description.
+> While such documentation provides information for developers/users that
+> need to work with particular bindings, it can not be easily used as input
+> for validation of device tree sources. This means that we need to define a
+> more formal way of binding description, in other words - Device Tree
+> schema.
+> 
+> To find a solution for this problem, we must first answer several
+> questions to determine a set of requirements we have to meet.
+> 
+> a) What is a device tree binding?
+> 
+> For our purposes, I will define a binding as internal format of some
+> device tree node, which can be matched using of_find_matching_node(). In
+> other words, key for a binding would be node name and/or value of
+> compatible property and/or node type. Value for a binding would be a list
+> of properties with their formats and/or subnodes with their bindings.
 
-FDT is versioned and PowerPC docs say that multiple versions have been
-released.  If we find enough flaws we could do a new release then use
-the quirks scheme to read the older versions.
+Now as I think of it, there is one more thing that needs to be considered. Do 
+we want the schemas to strictly specify available set of properties, warning 
+about any unrecognized ones or just enforce checking of recognized properties 
+(including presence of required ones)? Or maybe both, depending on some 
+keyword or whatever?
 
-So far the only issue I know of is that all of the strings aren't
-stored in the string table. If all of the strings were in the string
-table then we wouldn't have this variable attribute size problem.
+> b) What information should be specified in schemas? What level of
+>    granularity is required?
+> 
+> For each property we need to have at least following data specified:
+>  - property name (or property name format, e.g. regex),
+>  - whether the property is mandatory or optional,
+>  - data type of value.
+> 
+> As for now, I can think of following data types used in device trees:
+>  - boolean (i.e. without value),
+>  - array of strings (including single string),
+>  - array of u32 (including single u32),
+>  - specifier (aka phandle with args, including cases with 0 args),
+>  - variable-length cells (e.g. #address-cells of u32s).
+> 
+> Some properties might require a combination of data types to be specified
+> or even an array of combinations, like interrupt-map property, which is an
+> array of entries consisting of:
+>  - #address-cells u32s,
+>  - #interrupt-cells u32s,
+>  - specifier (phandle of interrupt controller and u32 of count defined by
+>    #interrupt-cells of the controller).
+> 
+> We probably want to define allowed range of values for given property, be
+> it contiguous or enumerated.
+> 
+> As for subnodes, I think we need to define following constraints:
+>  - node name (or node name format, e.g. regex),
+>  - optional or not,
+>  - how many nodes of this type can be present (one, limited, unlimited),
+>  - recursively define binding for such node type.
+> 
+> We probably also want human readable descriptions for all properties and
+> subnodes, so a textual documentation (like the one currently available)
+> could be generated from schemas.
+> 
+> c) What about generic bindings? (e.g. for subsystems like pinctrl or
+> regulators)
+> 
+> This is where things get more interesting. Looks like we need some kind of
+> inheritance for bindings or binding templates. Templates sound more
+> appropriate here, because most of the generic bindings do not fully
+> conform to what I defined as binding and need device-specific parameters
+> to become so.
+> 
+> Let's consider first example taken from regulator subsystem.
+> 
+> 	device {
+> 		compatible = "foo,mydevice";
+> 		/* ... */
+> 		core-supply = <&regulator_a>;
+> 		io-supply = <&regulator_b>;
+> 		/* ... */
+> 	};
+> 
+> Bindings of regulator subsystem define the way of regulator lookup to be
+> based on property matching following definition:
+> 
+> 	#define REGULATOR(name) name ## _supply = <&phandle>
+> 
+> As you can see, the binding is parametrized, i.e. part of it is defined
+> globally, but part is device-specific. Similarly for pinctrl subsystem:
+> 
+> 	device {
+> 		compatible = "foo,mydevice";
+> 		/* ... */
+> 		pinctrl-names = "state0", "state1";
+> 		pinctrl-0 = <&phandle>...;
+> 		pinctrl-1 = <&phandle>...;
+> 		/* ... */
+> 	};
+> 
+> This binding is now parametrized in a more complex way:
+> 
+> 	#define PINCTRL(name0, name1, ..., nameN) \
+> 		pinctrl-names = name0, name1, ..., nameN; \
+> 		pinctrl-0 = <&phandle>...; \
+> 		pinctrl-1 = <&phandle>...; \
+> 		... \
+> 		pinctrl-N = <&phandle>...;
+> 
+> We need to have a way to describe this kind of inheritance, if we don't
+> want to respecify generic attributes in all device bindings using them.
+> 
+> d) When should the validation happen and what should handle it?
+> 
+> In my opinion, similarly to compilation of board files, validation should
+> be happening at dts compile time, to show any warnings or errors as early
+> as possible.
+> 
+> Whether this should be integrated into dtc or rather handled by external
+> tool is another question. Since we are already processing device tree
+> sources in dtc, it might be reasonable to reuse its dts parsing
+> infrastructure and add validation there, especially that dtc is supposed
+> to already contain some infrastructure for doing checks on device tree as
+> well. Nothing stops us from running validation on already compiled dtbs,
+> though, using an extra tool.
+> 
+> e) What format should be used for Device Tree schema?
+> 
+> This is a non-trivial problem. Key criteria I can think of are as follows:
+>  - the whole set of information established above must be representable,
+>  - human-readable, easy to create and edit (extend), preferably similar to
+>    something already existing, so could be easily learnt,
+>  - something that can be integrated with dtc with reasonable amount of
+>    work or can reuse a lot (if not all) of already existing parsing code.
+> 
+> Okay, this should be enough to have some discussion. I will post a
+> follow-up with my proposal of schema format to separate general discussion
+> from discussion about the proposal, but this will happen tomorrow, as now
+> it's time to get some sleep.
 
-8.2 Header
-The layout of the header for the device tree is defined by the
-following C structure. All the header
-fields are 32-bit integers, stored in big-endian format.
-struct fdt_header {
-uint32_t magic;
-uint32_t totalsize;
-uint32_t off_dt_struct;
-uint32_t off_dt_strings;
-uint32_t off_mem_rsvmap;
-uint32_t version;
-uint32_t last_comp_version;
-uint32_t boot_cpuid_phys;
-uint32_t size_dt_strings;
-uint32_t size_dt_struct;
-};
-?
-magic
-This field shall contain the value 0xd00dfeed (big-endian).
-?
-totalsize
-This field shall contain the total size of the device tree data
-structure. This size shall
-encompass all sections of the structure: the header, the memory
-reservation block, structure
-block and strings block, as well as any free space gaps between the
-blocks or after the final
-block.
-?
-off_dt_struct
-This field shall contain the offset in bytes of the structure block
-(see 8.4) from the beginning
-of the header.
-?
-off_dt_strings
-This field shall contain the offset in bytes of the strings block (see
-8.5) from the beginning of
-the header.
-?
-off_mem_rsvmap
-This field shall contain the offset in bytes of the memory reservation
-block (see 8.3) from the
-beginning of the header.
-?
-version
-This field shall contain the version of the device tree data
-structure. The version is 17 if using
-the structure as defined in this document. An ePAPR boot program may
-provide the device
-tree of a later version, in which case this field shall contain the
-version number defined in
-whichever later document gives the details of that version.
-?
-last_comp_version
-This field shall contain the lowest version of the device tree data
-structure with which the
-version used is backwards compatible. So, for the structure as defined
-in this document
-(version 17), this field shall contain 16 because version 17 is
-backwards compatible with
-version 16, but not earlier versions. As per 8.1, an ePAPR boot
-program should provide a
-device tree in a format which is backwards compatible with version 16,
-and thus this field
-shall always contain 16.
-?
-boot_cpuid_phys
-This field shall contain the physical ID of the system?s boot CPU. It
-shall be identical to the
-physical ID given in the reg property of that CPU node within the device tree.
-?
-size_dt_strings
-This field shall contain the length in bytes of the strings block
-section of the device tree blob.
-?
-size_dt_struct
-This field shall contain the length in bytes of the structure block
-section of the device tree
-blob.
+Finally I didn't manage to post it yet, but this might be better, as there 
+have been a lot of interesting points in the discussion, which I'm now taking 
+into consideration, while writing a sample schema.
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Best regards,
+Tomasz
+
+> For now please think about the points above and feel free to correct
+> anything wrong or suggest what else should be taken into consideration
+> for DT schemas. Let the discussion start.
+> 
+> Best regards,
+> Tomasz
