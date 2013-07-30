@@ -1,86 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Jul 2013 18:02:00 -0600
-Subject: Defining schemas for Device Tree
-In-Reply-To: <6809706.cRofzbG9CV@thinkpad>
-References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
- <6809706.cRofzbG9CV@thinkpad>
-Message-ID: <51F70278.1020002@wwwdotorg.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 29 Jul 2013 17:03:15 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <51F66565.7010600@linaro.org>
+References: <20130717210417.GP13667@xsjandreislx>
+ <51E72DCA.9070500@codeaurora.org>
+ <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+ <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
+ <51F66565.7010600@linaro.org>
+Message-ID: <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2013 04:20 PM, Tomasz Figa wrote:
-> On Monday 29 of July 2013 15:47:55 Stephen Warren wrote:
->> On 07/28/2013 06:21 PM, Tomasz Figa wrote:
+Hi Daniel,
 
-...
->> Other content restrictions might be:
->>
->> * List must contain (at least) these entries/values.
->>
->> * List can't contain any other entries/values not specified here.
->>
->> * List must be in this order vs. any order.
->>
->> * List logical length (in entries, not bytes/cells) must match the
->> logical length of another cell (consider clocks/clock-names).
->>
->> * Ordering of one property must match ordering of another property
->> (again consider clocks/clock-names), although it'd be difficult to tell
->> whether this condition was met, perhaps we can at least document it.
->>
->> I'm sure there will be many more criteria to validate that we're
->> forgetting. This is possible the most complex area?
+On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+(snip)
 > 
-> Right. Still, this is about the granularity of checks we really need. Do we 
-> need to check for all those restrictions?
+> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+> timer will be stopped when entering to the idle state. In this case, the
+> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+> idle state, switching the local timer back in use.
 
-I think all/most of those bullets actually exist in various binding
-documents, and I think we want any schema to be able to represent any
-restrictions we already impose. So, yes, I do think we want to be able
-to validate all of that.
+I've been thinking about this, trying to understand how this makes my
+boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+would make the timer core switch to a broadcast device even though it
+wouldn't be necessary. But shouldn't it still work? It sounds like we do
+something useless, but nothing wrong in a sense that it should result in
+breakage. I guess I'm missing something obvious. This timer system will
+always remain a mystery to me.
 
-Now, that's not saying that a system which didn't validate that, but
-perhaps only validated that certain properties were present, and no
-other properties were present. However, I'd still hope that such a
-system was just a first step towards the complete system.
+Actually this more or less leads to the question: What is this
+'broadcast timer'. I guess that is some clockevent device which is
+common to all cores? (that would be the cadence_ttc for Zynq). Is the
+hang pointing to some issue with that driver?
 
->>> As for subnodes, I think we need to define following constraints:
->>>  - node name (or node name format, e.g. regex),
->>
->> I don't think node names are supposed to convey any semantic meaning, so
->> they probably shouldn't be restricted (much?) by schema.
-> 
-> There are bindings currently that require specific node names. Since 
-> of_match_node() can do matching by names as well, I think we should care about 
-> node names too,
-
-Hopefully we can discourage this through review though, since I've
-definitely been told not to semantically interpret node names.
-
-...
->> Equally, I'm not sure there's any difference between:
->>
->> prop = <&node>;
->> prop = <0x23648689>;
->>
->> ... in the DTB, except that the value just *happens* to match another
->> node's phandle value, which could end up leading to false positive
->> matches if only applied on the raw values not the syntax?
-> 
-> This is a good point. From driver's perspective it doesn't matter how you 
-> specify value of some property, as long as it can be parsed using the same 
-> code. As a more trivial example, consider following dts code:
-> 
-> 	array-prop = <0>, <1>, <2>;
-> 	array-prop-2 = <0 1 2>;
-> 
-> Both array props contain the same data and can be parsed using the same code, 
-> but from reader's perspective they mean something slightly different - an array 
-> with 1 cell per element and a single entry of 3 cells.
-
-I can certainly understand those two pieces of syntax being interpreted
-that way. I've always thought of the above being 100% equivalent, even
-though there may be a logical distinction. I not sure that such a
-distinction is actually present in all extant DT source files. Perhaps
-it's fine as part of the schema effort to re-write the DTs along these
-lines though.
+	Thanks,
+	S?ren
