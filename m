@@ -1,57 +1,81 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 30 Jul 2013 13:41:23 +0530
-Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given
- in usb_bind_phy
-In-Reply-To: <20130730071611.GD16441@radagast>
-References: <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
- <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
- <20130730060134.GD9155@radagast> <51F7590B.4020705@ti.com>
- <20130730061830.GE9155@radagast> <51F75C40.4060406@ti.com>
- <20130730062844.GH9155@radagast> <51F7613C.5070803@ti.com>
- <20130730071611.GD16441@radagast>
-Message-ID: <51F7752B.8050804@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 30 Jul 2013 16:11:50 +0800
+Subject: [PATCH] ARM64: include: asm: use 'int' instead of 'u32' for
+ variable 'target' in kvm_host.h.
+In-Reply-To: <51F76E2E.9050707@arm.com>
+References: <51ECA9B6.3010808@asianux.com> <20130730034945.GD5471@cbox>
+ <51F76E2E.9050707@arm.com>
+Message-ID: <51F77546.1020906@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 July 2013 12:46 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Jul 30, 2013 at 12:16:20PM +0530, Kishon Vijay Abraham I wrote:
->>>>>> the list of controller device (names) it can support (PHY framework does not
->>>>>> maintain a separate list for binding like how we had in USB PHY library). e.g.
->>>>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92817.html. In such
->>>>>
->>>>> this has nothing to do with $subject though. We talk about generic PHY
->>>>> framework once all these PHY drivers are moved there :-)
->>>>>
->>>>>> cases how do we pass the device names. Also will the MUSB core device be
->>>>>> created before twl4030-usb PHY device?
->>>>>
->>>>> and why would that be a problem ? We're telling the framework that the
->>>>> musb device will use a phy with a name of 'twl4030'. If musb calls
->>>>> usb_get_phy_dev() and doesn't find a phy, it'll return -EPROBE_DEFER and
->>>>> try again later.
->>>>
->>>> I think we are talking about different problems here ;-) I'm trying to tell
->>>> using idr in MUSB core is needed for Generic PHY Framework. So in a way, the
->>>> Generic PHY Framework series depends on this patch series or else MUSB in OMAP3
->>>> platforms wont work after Generic PHY framework gets merged.
+On 07/30/2013 03:41 PM, Marc Zyngier wrote:
+> On 30/07/13 04:49, Christoffer Dall wrote:
+>> On Mon, Jul 22, 2013 at 11:40:38AM +0800, Chen Gang wrote:
+>>> 'target' will be set to '-1' in kvm_arch_vcpu_init(), and it need check
+>>> 'target' whether less than zero or not in kvm_vcpu_initialized().
 >>>
->>> then you just found a limitation in your framework, right ? :-) I mean,
->>> imagine if now we have to add an IDR to every single user of your
->>> framework because they could end up in systems with multiple instances
->>> of the same IP ?
+>>> So need define target as 'int' instead of 'u32', just like ARM has done.
+>>>
+>>>
+>>> The related warning:
+>>>
+>>>   arch/arm64/kvm/../../../arch/arm/kvm/arm.c:497:2: warning: comparison of unsigned expression >= 0 is always true [-Wtype-limits]
+>>>
+>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>>> ---
+>>>  arch/arm64/include/asm/kvm_host.h |    2 +-
+>>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index 644d739..0859a4d 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> @@ -129,7 +129,7 @@ struct kvm_vcpu_arch {
+>>>  	struct kvm_mmu_memory_cache mmu_page_cache;
+>>>  
+>>>  	/* Target CPU and feature flags */
+>>> -	u32 target;
+>>> +	int target;
+>>>  	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
+>>>  
+>>>  	/* Detect first run of a vcpu */
+>>> -- 
+>>> 1.7.7.6
 >>
->> I raised a similar concern in the PHY framework discussion [1] :-) And since
->> it's used everywhere else regulators, clkdev, etc.. it's agreed to be used in
->> PHY as well. Btw if PLATFORM_DEVID_AUTO is used even regulator, clk_get should
->> fail IMO.
->>
->> [1] -> http://lkml.indiana.edu/hypermail/linux/kernel/1307.2/03573.html
+>> This looks ok to me, Marc, was there any reason to declare target a u32
+>> on arm64?
 > 
-> look at Greg's and my reply to that email.
+> No, that's simply a bug. I really wonder why my compiler doesn't scream
+> at something that obvious...
+> 
 
-but finally Greg agreed to what Tomasz proposed no?
+I make with "EXTRA_CFLAGS=-W", normal make will not report this
+warning.  ;-)
 
-Thanks
-Kishon
+> Chen: what compiler version are you using?
+> 
+
+[root at gchenlinux linux-next]# aarch64-linux-gnu-gcc -v
+Using built-in specs.
+COLLECT_GCC=aarch64-linux-gnu-gcc
+COLLECT_LTO_WRAPPER=/usr/bin/../libexec/gcc/aarch64-linux-gnu/4.7.3/lto-wrapper
+Target: aarch64-linux-gnu
+Configured with: /cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/src/gcc-linaro-4.7-2013.02/configure --build=i686-build_pc-linux-gnu --host=i686-build_pc-linux-gnu --target=aarch64-linux-gnu --prefix=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/install --with-sysroot=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/install/aarch64-linux-gnu/libc --enable-languages=c,c++,fortran --disable-multilib --with-pkgversion='crosstool-NG linaro-1.13.1-4.7-2013.02-01-20130221 - ARM aarch64 via Linaro' --with-bugurl=https://bugs.launchpad.net/gcc-linaro --enable-__cxa_atexit --disable-libmudflap --disable-libgomp --disable-libssp --with-gmp=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static --with-mpfr=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static --with-mpc=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linu
+ x/.build/
+aarch64-linux-gnu/build/static --with-ppl=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static --with-cloog=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static --with-libelf=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static --with-host-libstdcxx='-L/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/.build/aarch64-linux-gnu/build/static/lib -lpwl' --enable-threads=posix --disable-libstdcxx-pch --enable-linker-build-id --enable-plugin --with-local-prefix=/cbuild/slaves/oorts/crosstool-ng/builds/aarch64-linux-gnu-linux/install/aarch64-linux-gnu/libc --enable-c99 --enable-long-long
+Thread model: posix
+gcc version 4.7.3 20130205 (prerelease) (crosstool-NG linaro-1.13.1-4.7-2013.02-01-20130221 - ARM aarch64 via Linaro) 
+
+
+> I'll queue this fix.
+> 
+> Thanks,
+> 
+> 	M.
+> 
+
+Thank you too.
+
+-- 
+Chen Gang
