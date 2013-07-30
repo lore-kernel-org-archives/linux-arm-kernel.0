@@ -1,46 +1,91 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jul 2013 15:18:06 +0200
-Subject: [PATCH] arm: update advice on kernel and FDT load address.
-In-Reply-To: <20130730094118.GF11527@mudshark.cambridge.arm.com>
-References: <1375102578-5869-1-git-send-email-ian.campbell@citrix.com>
- <20130729135000.GK32383@mudshark.cambridge.arm.com>
- <1375106635.12741.8.camel@kazak.uk.xensource.com>
- <alpine.LFD.2.03.1307292234040.15022@syhkavp.arg>
- <20130730094118.GF11527@mudshark.cambridge.arm.com>
-Message-ID: <20130730151806.33ee3081@skate>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Jul 2013 15:18:28 +0200
+Subject: [PATCH 05/10] ARM: sunxi: Add Allwinner A31 DTSI
+In-Reply-To: <51F78056.6000104@arm.com>
+References: <1374618312-19001-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1374618312-19001-6-git-send-email-maxime.ripard@free-electrons.com>
+ <51F78056.6000104@arm.com>
+Message-ID: <20130730131828.GB12562@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Will Deacon,
+Hi Marc,
 
-On Tue, 30 Jul 2013 10:41:18 +0100, Will Deacon wrote:
-
-> > The initial page table is therefore (in most cases again) just below the 
-> > decompressed kernel location i.e. either Ffrom 16KB from start of RAM, 
-> > or from 12KB if using LPAE.
-> > 
-> > You can therefore load everything (zImage, initrd, DTB) sequentially 
-> > from the 32MB mark in RAM and be safe.  By loading zImage that high, it 
-> > most certainly won't need to relocate itself (unless the decompressed 
-> > kernel is larger than 32MB which is very unlikely as I mentioned) and 
-> > that will also make the boot process slightly faster.
+On Tue, Jul 30, 2013 at 09:59:02AM +0100, Marc Zyngier wrote:
+> Hi Maxime,
 > 
-> Hmm, how does that work with CONFIG_INITRAMFS_SOURCE, where the initramfs
-> is built into the zImage? Would this impose a 32MB uncompressed limit on the
-> size of the kernel + initramfs?
+> On 23/07/13 23:25, Maxime Ripard wrote:
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile       |   3 +-
+> >  arch/arm/boot/dts/sun6i-a31.dtsi | 155 +++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 157 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/boot/dts/sun6i-a31.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 641b3c9..1482533 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -210,7 +210,8 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+> >  	sun4i-a10-mini-xplus.dtb \
+> >  	sun4i-a10-hackberry.dtb \
+> >  	sun5i-a10s-olinuxino-micro.dtb \
+> > -	sun5i-a13-olinuxino.dtb
+> > +	sun5i-a13-olinuxino.dtb \
+> > +	sun6i-a31-colombus.dtb
+> >  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+> >  	tegra20-iris-512.dtb \
+> >  	tegra20-medcom-wide.dtb \
+> > diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> > new file mode 100644
+> > index 0000000..c6c19a9
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> > @@ -0,0 +1,155 @@
+> > +/*
+> > + * Copyright 2013 Maxime Ripard
+> > + *
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +/include/ "skeleton.dtsi"
+> > +
+> 
+> [...]
+> 
+> > +		gic: interrupt-controller at 01c81000 {
+> > +			compatible = "arm,cortex-a7-gic";
+> > +			reg = <0x01c81000 0x1000>, <0x01c82000 0x100>;
+> 
+> Th Cortex A7 TRM indicates that its GIC has the virtualization
+> extensions. You should reflect this in the binding (wider GICC range,
+> GICH and GICV ranges, maintenance interrupt).
+> 
+> See
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0464d/BGBJFJJA.html
+> for details.
 
-I've recently had troubles with a kernel + bundled initramfs, when the
-compressed size of both exceeds something like 6 MB or so. I haven't
-done any serious testing as compressing with XZ worked around the
-problem, but I think there's some limit somewhere, but I guess 6 MB
-compressed isn't going to expand to 32 MB uncompressed so I'm not sure
-it's the limit you're referring to that I'm seeing.
+Thanks!
 
-Best regards,
+I'll add those to the v2.
 
-Thomas
+Maxime
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/9870f9ef/attachment.sig>
