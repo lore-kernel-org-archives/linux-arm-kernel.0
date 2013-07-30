@@ -1,47 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 29 Jul 2013 23:48:00 -0700
-Subject: [PATCH 1/3] clk: exynos5250: Add G2D gate clock
-In-Reply-To: <CAK9yfHw6KtVDAns-1JhNpiS0brTeUpfiHS-v3q7H2GLWkY-Adw@mail.gmail.com>
-References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
- <20130726201800.7598.54329@quantum>
- <CAK9yfHw6KtVDAns-1JhNpiS0brTeUpfiHS-v3q7H2GLWkY-Adw@mail.gmail.com>
-Message-ID: <20130730064800.22022.14773@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Jul 2013 23:52:54 -0700
+Subject: [PATCH V2 0/3] ARM: dts: omap5-uevm: fixup wrong regulator
+ configuration
+In-Reply-To: <51F6EA23.50803@gmail.com>
+References: <51F67D7D.9070003@ti.com>
+ <1375117383-19285-1-git-send-email-nm@ti.com>
+ <51F6EA23.50803@gmail.com>
+Message-ID: <20130730065253.GE7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sachin Kamat (2013-07-27 06:29:56)
-> On 27 July 2013 01:48, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Sachin Kamat (2013-07-05 01:42:27)
-> >> Adds gate clock for G2D IP for Exynos5250 SoC.
-> >>
-> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> >> Cc: Mike Turquette <mturquette@linaro.org>
-> >
-> > I've taken patch #1 into clk-next.
+* Benoit Cousson <benoit.cousson@gmail.com> [130729 15:24]:
+> Hi Nishanth,
 > 
-> Thanks Mike.
+> Thanks for the quick update.
 > 
+> On 29/07/2013 19:03, Nishanth Menon wrote:
+> > Due to wrong older revision of documentation used as reference, we
+> > seem to have a bunch of LDOs wrongly configured on OMAP5 uEVM. This
+> > series is based power tree on production board 750-2628-XXX platform.
+> > Unfortunately, the wrong voltages may be detrimental to OMAP5 as they
+> > supply hardware blocks at voltages that are out of specification.
 > >
-> >> ---
-> >> This patch depends on the following patch:
-> >> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20581
+> > Also available at:
+> > based on v3.11-rc1 tag
+> > http link: https://github.com/nmenon/linux-2.6-playground/commits/push/omap5-palmas-fixes-v2
+> > git link: git://github.com/nmenon/linux-2.6-playground.git
+> > branch: push/omap5-palmas-fixes-v2
 > >
-> > I think I've gotten all three series you sent out, can you confirm?
+> > Changes since V1:
+> >  - squash of patches
+> >  - picked up Ack from Keerthy
+> >  - based on v3.11-rc3 tag
+> >
+> > V1: http://marc.info/?t=137407980100008&r=1&w=2
+> >
+> > Nishanth Menon (3):
+> >   ARM: dts: omap5-uevm: document regulator signals used on the actual
+> >     board
+> >   ARM: dts: omap5-uevm: fix regulator configurations mandatory for SoC
+> >   ARM: dts: omap5-uevm: update optional/unused regulator configurations
+> >
+> >  arch/arm/boot/dts/omap5-uevm.dts |   78 ++++++++++++++++++++++++--------------
+> >  1 file changed, 49 insertions(+), 29 deletions(-)
+> >
+> > Regards,
+> > Nishanth Menon
 > 
-> I haven't seen any update in your tree [1] since quite some time. The
-> last commit I see in clk-next branch is 45e3ec3784 ("clk: tegra: fix
-> ifdef for tegra_periph_reset_assert inline"). I hope I am looking at
-> the right tree?
+> For the whole series:
+> 
+> Acked-by: Benoit Cousson <benoit.cousson@gmail.com>
 
-You are, but I had not pushed to it since the merge window closed. It is
-now updated.
+Thanks, I've applied these into omap-for-v3.11/fixes-omap5
+and will send a pull request for these today as these seem
+quite urgent fixes.
 
 Regards,
-Mike
 
-> 
-> [1] git://git.linaro.org/people/mturquette/linux.git
-> 
-> -- 
-> With warm regards,
-> Sachin
+Tony
