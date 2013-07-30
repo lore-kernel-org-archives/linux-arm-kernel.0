@@ -1,46 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 11:19:18 -0600
-Subject: Defining schemas for Device Tree
-In-Reply-To: <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
-References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
- <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
- <1706112.Xn49tiCSKF@thinkpad>
- <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
- <20130730102511.GM9858@sirena.org.uk>
- <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
-Message-ID: <51F7F596.6020503@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 30 Jul 2013 18:24:13 +0100
+Subject: [PATCH 0/5] Optional regulator support
+In-Reply-To: <864nbcte4j.fsf@void.printf.net>
+References: <20130730114502.GQ9858@sirena.org.uk>
+ <864nbcte4j.fsf@void.printf.net>
+Message-ID: <20130730172413.GW9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
-> On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
->> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
->>
->>> This...
->>> tx-dma-channel = <&pdma0 7>; /* preliminary */
->>> rx-dma-channel = <&pdma0 6>; /* preliminary */
->>
->>> Probably should be
->>> dmas = <&pdma0 7>,<&pdma0 6>;
->>> dma-names = "tx", "rx";
->>
->> It should be - the latter is the generic DMA binding.  There's a lot of
->> bindings in the kernel that predate that but people are currently
->> working to transfer over, this is one of the examples of instability
->> that everyone is talking about.
-> 
-> Is something similar to this possible in device tree syntax?
-> dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
+On Tue, Jul 30, 2013 at 01:40:28PM +0100, Chris Ball wrote:
+> On Tue, Jul 30 2013, Mark Brown wrote:
 
-I /think/ you can physically write that in *.dts, or something very
-similar; with the strings outside the <>:
+> > Right now all the MMC users are converted over as-is, though it does
+> > look like drivers such as sdhci really ought to be insisting on having a
+> > regulator for VMMC in the same way that the MMC core helper does (and
+> > indeed in that case it looks like it ought to be converted over to the
+> > core code).
 
-dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+> I didn't follow this part -- I don't think the MMC core insists on a
+> VMMC regulator, and I don't think sdhci should either, because e.g.
+> an x86 laptop isn't going to have one.  What am I missing?
 
-However, there's been strong push-back (i.e. doing that has not been
-allowed at all) on attempting to mix variable-length strings and
-fixed-length/alignment integer cells in the same property. This is
-primarily because you then can't ensure that the integer cell data is
-aligned in the DTB (dtc and/or the DTB format spec does/requires/allows
-no alignment padding), and hence have to be much more careful about data
-alignment when parsing the property.
+You're missing the fact that there will be a VMMC regulator there since
+the card needs power to function, it just might not be one that software
+knows about or can control.  If it's one that software can control
+that's not mapped in properly (eg, because the driver for the regulator
+wasn't loaded) then obviously that's a serious problem and power saving
+features in the regulator API may for example turn off the supply even
+if it's on by default since they can't tell it's in use.
+
+As things stand the expectation for x86 type systems is that MMC
+controllers attached via PCI or USB ought to be setting up a fixed
+regulator so that the consumer part can proceed without ignoring errors
+that might be serious on other systems.  It's probably not a bad idea to
+do this anyway though hopefully in the future this work will make it
+less needed.  For embedded systems the system integration ought to be
+doing the same thing, normally as part of the configuration of the PMIC.
+
+The goal of this series is to make it much easier for the regulator core
+to transparently support such systems where the regulators aren't
+visible to software by transparently stubbing out normal supplies that
+really must be present somehow for the hardware to operate without
+confusing things by also stubbing out suppies that may be missing in
+normal operation.  This is the problem for the existing stubbing support
+- it works well for normal supplies but it means that any consumer that
+wants to handle a supply that's not there can't tell it's missing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/60357bc9/attachment-0001.sig>
