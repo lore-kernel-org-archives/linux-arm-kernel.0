@@ -1,52 +1,85 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Mon, 29 Jul 2013 20:49:31 -0400
-Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
-In-Reply-To: <alpine.DEB.2.02.1307291739150.13736@nftneq.ynat.uz>
-References: <2469263.vMN09Q7Tzi@flatron>
- <20130729150124.GS29916@titan.lakedaemon.net>
- <20130729164905.GB2280@localhost.localdomain>
- <20130729172339.GT29916@titan.lakedaemon.net>
- <alpine.DEB.2.02.1307291739150.13736@nftneq.ynat.uz>
-Message-ID: <CAKON4Ow2KMC_9xod3Ay51Yetg9RbfMxVcy4DH0A3baHpmxP+7A@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 30 Jul 2013 09:46:17 +0800
+Subject: [PATCH v13 02/14] usb: chipidea: imx: remove vbus regulator
+ operation
+In-Reply-To: <20130729223025.GA7109@pengutronix.de>
+References: <1374830310-21765-1-git-send-email-peter.chen@freescale.com>
+ <1374830310-21765-3-git-send-email-peter.chen@freescale.com>
+ <20130729223025.GA7109@pengutronix.de>
+Message-ID: <20130730014616.GD27709@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 8:41 PM, David Lang <david@lang.hm> wrote:
-> On Mon, 29 Jul 2013, Jason Cooper wrote:
->
->>
->>>
->>> I don't think that siblings have any defined order in DT.  If reading a
->>> device tree, there's no guarantee you get nodes or properties out in the
->>> same order as the original .dts file.
->>
->>
->> That's why I raised the point.  If people think encoding initialization
->> order in the DT is a good idea, then we should change the dtc so it
->> compiles/decompiles in the same order.
->
->
-> if you make the initializaiton order 'magicly' correct by following the
-> order of the flat representation, how do you reflect the case where
-> initialization can be overlapped for different devices?
+On Tue, Jul 30, 2013 at 12:30:25AM +0200, Michael Grzeschik wrote:
+> Hi Peter,
+> 
+> On Fri, Jul 26, 2013 at 05:18:18PM +0800, Peter Chen wrote:
+> > Since we have added vbus reguatlor operation at common
+> > host file (chipidea/host.c), the glue layer vbus operation
+> > isn't needed any more.
+> > 
+> > Tested-by: Marek Vasut <marex@denx.de>
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/chipidea/ci_hdrc_imx.c |   30 +++++++-----------------------
+> >  1 files changed, 7 insertions(+), 23 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+> > index 14362c0..d06355e 100644
+> > --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> > +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> > @@ -31,7 +31,6 @@ struct ci_hdrc_imx_data {
+> >  	struct usb_phy *phy;
+> >  	struct platform_device *ci_pdev;
+> >  	struct clk *clk;
+> > -	struct regulator *reg_vbus;
+> >  };
+> >  
+> >  static const struct usbmisc_ops *usbmisc_ops;
+> > @@ -141,22 +140,13 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+> >  		goto err_clk;
+> >  	}
+> >  
+> > -	/* we only support host now, so enable vbus here */
+> > -	data->reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+> > -	if (!IS_ERR(data->reg_vbus)) {
+> > -		ret = regulator_enable(data->reg_vbus);
+> > -		if (ret) {
+> > -			dev_err(&pdev->dev,
+> > -				"Failed to enable vbus regulator, err=%d\n",
+> > -				ret);
+> > -			goto err_clk;
+> > -		}
+> > -	} else {
+> > -		data->reg_vbus = NULL;
+> > -	}
+> > -
+> >  	pdata.phy = data->phy;
+> >  
+> > +	/* Get the vbus regulator */
+> > +	pdata.reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+> > +	if (IS_ERR(pdata.reg_vbus))
+> > +		pdata.reg_vbus = NULL;
+> > +
+> 
+> This hunk needs the reg_vbus variable from the previous patch, therefor
+> it should also be added in that patch. As the user of the variable is
+> the previous patch, it's the reason to swap their order.
+> 
 
-I agree with David, using DT to try and eliminate deferred probes
-isn't a good solution.  Overlapped probes and doing probes on multiple
-CPUs introduces a temporal angle to the problem. Best to just let the
-deferred probing code dynamically solve the problem. From what I can
-see the deferred probing solution is working out nicely.
+The [1/14] implements the vbus operation at common code (host.c)
+This one [2/14] implements how the glue layer get the vbus.
 
-Plus there isn't that much code being run in deferred probing. I
-suspect potential savings (if there even is any) are under a
-millisecond.
+I am OK to swap above two, but I still can't see obvious reason.
 
->
-> you are just trading one side of the problem for the other.
->
-> David Lang
+> Anyway, can't this be done in core.c instead? I don't see why other
+> users don't need this code.
+> 
 
-
-
+We still not implement DT support at core.c, it is a big job, this
+is the main reason, besides, Alex prefers platform things at
+glue layer.
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+
+Best Regards,
+Peter Chen
