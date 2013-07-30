@@ -1,51 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Jul 2013 16:04:32 +0100
-Subject: [PATCH v2] ARM: v6: prevent gcc 4.5 from reordering extended
- CP15 reads above is_smp() test
-In-Reply-To: <alpine.DEB.2.02.1307301125420.4505@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com>
- <20130724135617.GI11072@mudshark.cambridge.arm.com>
- <51EFE1DD.8070801@ti.com>
- <20130724142059.GJ11072@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307270405470.4546@utopia.booyaka.com>
- <20130727122221.GB6618@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1307280538460.8385@utopia.booyaka.com>
- <alpine.DEB.2.02.1307282012280.23852@utopia.booyaka.com>
- <alpine.DEB.2.02.1307301125420.4505@utopia.booyaka.com>
-Message-ID: <20130730150432.GR11527@mudshark.cambridge.arm.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Tue, 30 Jul 2013 16:09:13 +0100
+Subject: [linux-sunxi] [PATCH 04/10] pinctrl: sunxi: Wrap long
+ compatible declaration lines
+In-Reply-To: <1375196394-21138-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375196394-21138-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375196394-21138-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375196953.32691.61.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 12:32:06PM +0100, Paul Walmsley wrote:
+On Tue, 2013-07-30 at 16:59 +0200, Maxime Ripard wrote:
+> The compatible declaration and their associated data are exceeding the
+> 80-characters width limit.
 > 
-> Commit 621a0147d5c921f4cc33636ccd0602ad5d7cbfbc ("ARM: 7757/1: mm:
-> don't flush icache in switch_mm with hardware broadcasting") breaks
-> the boot on OMAP2430SDP with omap2plus_defconfig.  Tracked to an
-> undefined instruction abort from the CP15 read in
-> cache_ops_need_broadcast().  It turns out that gcc 4.5 reorders the
-> extended CP15 read above the is_smp() test.  This breaks ARM1136 r0
-> cores, since they don't support several CP15 registers that later ARM
-> cores do.  ARM1136JF-S TRM section 3.2.1 "Register allocation" has the
-> details.
+> Split these lines to make them more readable and fit in the kernel
+> coding guidelines.
 > 
-> So mark the extended CP15 read as clobbering memory, which prevents
-> the compiler from reordering it before the is_smp() test.  Russell
-> states that the code generated from this approach is preferable to
-> marking the inline asm as volatile.  Remove the existing condition
-> code clobber as it's obsolete, per Nico's post:
-> 
->     http://www.spinics.net/lists/arm-kernel/msg261208.html
-> 
-> This patch is a collaboration with Will Deacon and Russell King.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 > ---
+>  drivers/pinctrl/pinctrl-sunxi.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+> index 5985e60..246310b 100644
+> --- a/drivers/pinctrl/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/pinctrl-sunxi.c
+> @@ -628,10 +628,22 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
+>  }
+>  
+>  static struct of_device_id sunxi_pinctrl_match[] = {
+> -	{ .compatible = "allwinner,sun4i-a10-pinctrl", .data = (void *)&sun4i_a10_pinctrl_data },
+> -	{ .compatible = "allwinner,sun5i-a10s-pinctrl", .data = (void *)&sun5i_a10s_pinctrl_data },
+> -	{ .compatible = "allwinner,sun5i-a13-pinctrl", .data = (void *)&sun5i_a13_pinctrl_data },
+> -	{ .compatible = "allwinner,sun6i-a31-pinctrl", .data = (void *)&sun6i_a31_pinctrl_data },
+> +	{
+> +		.compatible = "allwinner,sun4i-a10-pinctrl",
+> +		.data = (void *)&sun4i_a10_pinctrl_data,
+> +	},
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I'm not sure this is actually an improvement, the original reads quite
+naturally even if it is a little long. What about a #define such that
+you can write:
+         COMPAT("allwinner,sun4i-a10-pinctrl", sun4i_a10_pinctrl_data),
+and thereby stay within 80-chars?
 
-Will
+If you wanted to go overboard you could code the macro such that:
+        SUNXI_COMPAT(sun4i,a10),
+expanded to what you want, that's pretty obfuscated though.
+
+Ian.
