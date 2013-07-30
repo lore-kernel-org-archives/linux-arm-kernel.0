@@ -1,126 +1,112 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 30 Jul 2013 09:15:54 -0300
-Subject: [PATCH 1/2] ARM: mxs_defconfig: Cleanup mxs_defconfig
-Message-ID: <1375186555-4661-1-git-send-email-festevam@gmail.com>
+Date: Tue, 30 Jul 2013 09:15:55 -0300
+Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
+In-Reply-To: <1375186555-4661-1-git-send-email-festevam@gmail.com>
+References: <1375186555-4661-1-git-send-email-festevam@gmail.com>
+Message-ID: <1375186555-4661-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Generate mxs_defconfig by doing:
+Generate imx_v4_v5_defconfig by doing:
 
-make mxs_defconfig
+make imx_v4_v5_defconfig
 make savedefconfig
-cp defconfig arch/arm/configs/mxs_defconfig
+cp defconfig arch/arm/configs/imx_v4_v5_defconfig
 
-No functional change. The goal here is to cleanup mxs_defconfig file to
+No functional change. The goal here is to cleanup imx_v4_v5_defconfig file to
 make easier and cleaner the addition of new entries.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/configs/mxs_defconfig | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+ arch/arm/configs/imx_v4_v5_defconfig | 19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 1d6d8fb..4555c02 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index dcd3d91..6cc94a7 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
 @@ -1,4 +1,3 @@
 -CONFIG_EXPERIMENTAL=y
+ # CONFIG_SWAP is not set
  CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-@@ -27,7 +26,6 @@ CONFIG_ARCH_MXS=y
- # CONFIG_ARM_THUMB is not set
- CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_POSIX_MQUEUE=y
+@@ -17,10 +16,11 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_MXC=y
+ CONFIG_ARCH_MULTI_V4T=y
+ CONFIG_ARCH_MULTI_V5=y
+ # CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_MXC=y
++CONFIG_MXC_IRQ_PRIOR=y
+ CONFIG_ARCH_MX1ADS=y
+ CONFIG_MACH_SCB9328=y
+ CONFIG_MACH_APF9328=y
+@@ -40,8 +40,6 @@ CONFIG_MACH_PCA100=y
+ CONFIG_MACH_MXT_TD60=y
+ CONFIG_MACH_IMX27IPCAM=y
+ CONFIG_MACH_IMX27_DT=y
+-CONFIG_MXC_IRQ_PRIOR=y
+-CONFIG_MXC_PWM=y
+ CONFIG_PREEMPT=y
  CONFIG_AEABI=y
--CONFIG_AUTO_ZRELADDR=y
- CONFIG_FPE_NWFPE=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -43,8 +41,6 @@ CONFIG_SYN_COOKIES=y
- # CONFIG_INET_DIAG is not set
- # CONFIG_IPV6 is not set
- CONFIG_CAN=m
--CONFIG_CAN_RAW=m
--CONFIG_CAN_BCM=m
- CONFIG_CAN_FLEXCAN=m
- # CONFIG_WIRELESS is not set
- CONFIG_DEVTMPFS=y
-@@ -52,7 +48,6 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_FIRMWARE_IN_KERNEL is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -68,7 +66,6 @@ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
  CONFIG_MTD=y
  CONFIG_MTD_CMDLINE_PARTS=y
 -CONFIG_MTD_CHAR=y
  CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_M25P80=y
-@@ -67,12 +62,12 @@ CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- CONFIG_ENC28J60=y
--CONFIG_USB_USBNET=y
--CONFIG_USB_NET_SMSC95XX=y
- CONFIG_SMSC_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_REALTEK_PHY=y
- CONFIG_MICREL_PHY=y
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_WLAN is not set
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
-@@ -110,7 +105,6 @@ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+@@ -124,24 +121,20 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+ CONFIG_MEDIA_SUPPORT=y
+-CONFIG_VIDEO_DEV=y
+-CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+-CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_VIDEO_MX2=y
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_CODA=y
++CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_FB=y
+ CONFIG_FB_IMX=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
  CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
+-CONFIG_BACKLIGHT_PWM=y
  CONFIG_FRAMEBUFFER_CONSOLE=y
 -CONFIG_FONTS=y
+-CONFIG_FONT_8x8=y
  CONFIG_LOGO=y
  CONFIG_SOUND=y
  CONFIG_SND=y
-@@ -119,9 +113,9 @@ CONFIG_SND_MXS_SOC=y
- CONFIG_SND_SOC_MXS_SGTL5000=y
+@@ -153,12 +146,10 @@ CONFIG_SND_SOC_MX27VIS_AIC32X4=y
+ CONFIG_SND_SOC_PHYCORE_AC97=y
+ CONFIG_SND_SOC_EUKREA_TLV320=y
+ CONFIG_SND_SOC_IMX_SGTL5000=y
+-CONFIG_SND_SOC_IMX_MC13783=y
+ CONFIG_USB_HID=m
  CONFIG_USB=y
  CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
--CONFIG_USB_STORAGE=y
- CONFIG_USB_PHY=y
- CONFIG_USB_MXS_PHY=y
+ CONFIG_USB_EHCI_MXC=y
+-CONFIG_USB_ULPI=y
  CONFIG_MMC=y
-@@ -143,9 +137,9 @@ CONFIG_DMADEVICES=y
- CONFIG_MXS_DMA=y
- CONFIG_STAGING=y
- CONFIG_MXS_LRADC=y
--CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_IIO=y
-+CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_PWM=y
- CONFIG_PWM_MXS=y
- CONFIG_EXT2_FS=y
-@@ -173,14 +167,14 @@ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+@@ -199,3 +190,5 @@ CONFIG_NLS_CODEPAGE_850=m
  CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_FRAME_WARN=2048
--CONFIG_MAGIC_SYSRQ=y
- CONFIG_UNUSED_SYMBOLS=y
-+CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_LOCKUP_DETECTOR=y
- CONFIG_TIMER_STATS=y
- CONFIG_PROVE_LOCKING=y
--CONFIG_DEBUG_INFO=y
- CONFIG_BLK_DEV_IO_TRACE=y
- CONFIG_STRICT_DEVMEM=y
- CONFIG_DEBUG_USER=y
-@@ -188,3 +182,4 @@ CONFIG_DEBUG_USER=y
- # CONFIG_CRYPTO_HW is not set
- CONFIG_CRC_ITU_T=m
- CONFIG_CRC7=m
+ CONFIG_NLS_ISO8859_15=m
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
 +CONFIG_FONTS=y
++CONFIG_FONT_8x8=y
 -- 
 1.8.1.2
