@@ -1,74 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 30 Jul 2013 15:12:31 -0700
-Subject: [PATCH v2] ARM: Fix deadlock scenario with smp_send_stop()
-In-Reply-To: <1374698170-26605-1-git-send-email-sboyd@codeaurora.org>
-References: <1374698170-26605-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51F83A4F.10800@codeaurora.org>
+From: davej@redhat.com (Dave Jones)
+Date: Tue, 30 Jul 2013 18:14:35 -0400
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
+ mitigations
+In-Reply-To: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+Message-ID: <20130730221435.GA22240@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/13 13:36, Stephen Boyd wrote:
-> If one process calls sys_reboot and that process then stops other
-> CPUs while those CPUs are within a spin_lock() region we can
-> potentially encounter a deadlock scenario like below.
->
-> CPU 0                   CPU 1
-> -----                   -----
->                         spin_lock(my_lock)
-> smp_send_stop()
->  <send IPI>             handle_IPI()
->                          disable_preemption/irqs
->                           while(1);
->  <PREEMPT>
-> spin_lock(my_lock) <--- Waits forever
->
-> We shouldn't attempt to run any other tasks after we send a stop
-> IPI to a CPU so disable preemption so that this task runs to
-> completion. We use local_irq_disable() here for cross-arch
-> consistency with x86.
->
-> Reported-by: Sundarajan Srinivasan <sundaraj@codeaurora.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+On Tue, Jul 30, 2013 at 12:05:40PM -0700, Kees Cook wrote:
+ 
+ > - fuzzing (is anyone running trinity or similar on the ARM tree?)
+ 
+Someone was kind enough to send me an arm chromebook, so I tried this just
+last week (albeit, on the 3.4 kernel it shipped with). The results make
+me think the answer is a resounding 'no'.
 
-Ok I threw this into the patch tracker because there were no more comments.
+I don't have time to build more recent kernels on it, but I wouldn't
+be surprised to find that things aren't much better (If they are, someone
+is seriously sucking at backporting stuff to stable).
 
-> Changes since v1:
->  - Use local_irq_disable() instead of preempt_disable()
->
->  arch/arm/kernel/process.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index d3ca4f6..08b47eb 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -197,6 +197,7 @@ void machine_shutdown(void)
->   */
->  void machine_halt(void)
->  {
-> +	local_irq_disable();
->  	smp_send_stop();
->  
->  	local_irq_disable();
-> @@ -211,6 +212,7 @@ void machine_halt(void)
->   */
->  void machine_power_off(void)
->  {
-> +	local_irq_disable();
->  	smp_send_stop();
->  
->  	if (pm_power_off)
-> @@ -230,6 +232,7 @@ void machine_power_off(void)
->   */
->  void machine_restart(char *cmd)
->  {
-> +	local_irq_disable();
->  	smp_send_stop();
->  
->  	arm_pm_restart(reboot_mode, cmd);
+There's no ARM64 support yet in trinity, though it'd be easy to add for
+someone with hardware. Again, wouldn't be surprised at all to learn there
+are bugs there (It's been true of every new arch ported to so far).
 
+On the subject of trinity, I've been hesitant about proposing a slot
+at k-s this year, though if there's interest I'm always happy to talk
+about it, and get feedback for new places it could go..
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+	Dave
