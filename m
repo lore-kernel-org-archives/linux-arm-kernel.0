@@ -1,112 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 30 Jul 2013 09:15:55 -0300
-Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
-In-Reply-To: <1375186555-4661-1-git-send-email-festevam@gmail.com>
-References: <1375186555-4661-1-git-send-email-festevam@gmail.com>
-Message-ID: <1375186555-4661-2-git-send-email-festevam@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 30 Jul 2013 08:17:43 -0400
+Subject: [Ksummit-2013-discuss] Defining schemas for Device Tree
+In-Reply-To: <20130730015031.GK29970@voom.fritz.box>
+References: <2469263.vMN09Q7Tzi@flatron>
+ <20130729150124.GS29916@titan.lakedaemon.net>
+ <20130729164905.GB2280@localhost.localdomain>
+ <20130729172339.GT29916@titan.lakedaemon.net>
+ <20130730015031.GK29970@voom.fritz.box>
+Message-ID: <20130730121743.GB5882@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Jul 30, 2013 at 11:50:31AM +1000, David Gibson wrote:
+> On Mon, Jul 29, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
+> > On Mon, Jul 29, 2013 at 05:49:05PM +0100, Dave Martin wrote:
+> > > On Mon, Jul 29, 2013 at 11:01:24AM -0400, Jason Cooper wrote:
+> > > > On Mon, Jul 29, 2013 at 02:21:52AM +0200, Tomasz Figa wrote:
+> > 
+> > > > > b) What information should be specified in schemas? What level of 
+> > > > >    granularity is required?
+> > > > 
+> > > > One item I don't see in this list is node ordering.  There's been some
+> > > > discussion lately on deferred probing (re boot times).  If we were to
+> > > > intentionally declare that DT are parsed in the order written, then a
+> > > > lot of deferred probes could be avoided by moving eg the pinctrl node to
+> > > > near the top of the tree.
+> > > > 
+> > > > This doesn't impact buses as much, since the nodes needing the bus are
+> > > > already children.  However, anything accessed via phandles: pins,
+> > > > clocks, regulators, etc could benefit from declaring and enforcing this.
+> > > > Eg having the dtc warn when a phandle is used before it's corresponding
+> > > > node is declared.
+> > > > 
+> > > > Not critical though, just a thought.
+> > > 
+> > > I don't think that siblings have any defined order in DT.  If reading a
+> > > device tree, there's no guarantee you get nodes or properties out in the
+> > > same order as the original .dts file.
+> > 
+> > That's why I raised the point.  If people think encoding initialization
+> > order in the DT is a good idea, then we should change the dtc so it
+> > compiles/decompiles in the same order.
+> 
+> I'm not actually sure what you mean by this.  dtc already preserves
+> order between input and output.
 
-Generate imx_v4_v5_defconfig by doing:
+This is an old comment (~ 1d, wow).  My position has evolved to seeing
+if we can allow dtc to topsort nodes it can easily tell are needed first
+as an optimization.  *Not* a requirement.  Deferred probing would still
+be a fall back.
 
-make imx_v4_v5_defconfig
-make savedefconfig
-cp defconfig arch/arm/configs/imx_v4_v5_defconfig
+thx,
 
-No functional change. The goal here is to cleanup imx_v4_v5_defconfig file to
-make easier and cleaner the addition of new entries.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v4_v5_defconfig | 19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index dcd3d91..6cc94a7 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
-@@ -17,10 +16,11 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_MXC=y
- CONFIG_ARCH_MULTI_V4T=y
- CONFIG_ARCH_MULTI_V5=y
- # CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_MXC=y
-+CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_ARCH_MX1ADS=y
- CONFIG_MACH_SCB9328=y
- CONFIG_MACH_APF9328=y
-@@ -40,8 +40,6 @@ CONFIG_MACH_PCA100=y
- CONFIG_MACH_MXT_TD60=y
- CONFIG_MACH_IMX27IPCAM=y
- CONFIG_MACH_IMX27_DT=y
--CONFIG_MXC_IRQ_PRIOR=y
--CONFIG_MXC_PWM=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -68,7 +66,6 @@ CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
-@@ -124,24 +121,20 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
--CONFIG_VIDEO_DEV=y
--CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
--CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_VIDEO_MX2=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_CODA=y
-+CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_FB=y
- CONFIG_FB_IMX=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FONTS=y
--CONFIG_FONT_8x8=y
- CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-@@ -153,12 +146,10 @@ CONFIG_SND_SOC_MX27VIS_AIC32X4=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
--CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_USB_HID=m
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
--CONFIG_USB_ULPI=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
-@@ -199,3 +190,5 @@ CONFIG_NLS_CODEPAGE_850=m
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_FONTS=y
-+CONFIG_FONT_8x8=y
--- 
-1.8.1.2
+Jason.
