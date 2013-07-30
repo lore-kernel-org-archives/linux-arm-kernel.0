@@ -1,42 +1,83 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 29 Jul 2013 17:03:15 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <51F66565.7010600@linaro.org>
-References: <20130717210417.GP13667@xsjandreislx>
- <51E72DCA.9070500@codeaurora.org>
- <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
- <51E7435B.3060605@codeaurora.org>
- <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
- <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
- <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
- <51F66565.7010600@linaro.org>
-Message-ID: <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Mon, 29 Jul 2013 20:30:29 -0400
+Subject: Defining schemas for Device Tree
+In-Reply-To: <1706112.Xn49tiCSKF@thinkpad>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+Message-ID: <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Mon, Jul 29, 2013 at 6:45 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Monday 29 of July 2013 18:23:30 jonsmirl at gmail.com wrote:
+>> The schema should enforce some kind of regularity into the description
+>> of similar devices.  Take SPI for example. I pulled these SPI
+>> controller definitions from the kernel source. Obviously all of these
+>> controllers are different, but it seems to me that their definitions
+>> could be made more regular. DMA seems like it could use a lot of help.
+>
+> Well, there is not much in common in bindings for all those SPI controllers,
+> other than general device attributes, such as compatible and reg (not even
+> interrupts - see spi-gpio).
 
-On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
-(snip)
-> 
-> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
-> timer will be stopped when entering to the idle state. In this case, the
-> cpuidle framework will call clockevents_notify(ENTER) and switches to a
-> broadcast timer and will call clockevents_notify(EXIT) when exiting the
-> idle state, switching the local timer back in use.
+I went and read a little about some of those SPI controllers. I
+suspect everyone of these controllers could be mapped into a common
+SPI controller schema.
 
-I've been thinking about this, trying to understand how this makes my
-boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
-would make the timer core switch to a broadcast device even though it
-wouldn't be necessary. But shouldn't it still work? It sounds like we do
-something useless, but nothing wrong in a sense that it should result in
-breakage. I guess I'm missing something obvious. This timer system will
-always remain a mystery to me.
+Things like:
+num-cs
+ti,spi-num-cs
 
-Actually this more or less leads to the question: What is this
-'broadcast timer'. I guess that is some clockevent device which is
-common to all cores? (that would be the cadence_ttc for Zynq). Is the
-hang pointing to some issue with that driver?
+should have the same name.
+The description of hardware SPI CS vs GPIOs being used for CS could be
+unified too.
 
-	Thanks,
-	S?ren
+This...
+tx-dma-channel = <&pdma0 7>; /* preliminary */
+rx-dma-channel = <&pdma0 6>; /* preliminary */
+
+Probably should be
+dmas = <&pdma0 7>,<&pdma0 6>;
+dma-names = "tx", "rx";
+
+With a generic schema as a guide all of these controllers can be
+described using the same syntax.
+
+>
+> There is a lot of generic binding templates (as I called this kind of bindings
+> in my first mail) involved here, though.
+>
+> Taking one of the controllers as the example:
+>> spi0: spi at f0000000 {
+>> #address-cells = <1>;
+>> #size-cells = <0>;
+>> compatible = "atmel,at91rm9200-spi";
+>> reg = <0xf0000000 0x100>;
+>> interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+>
+> /inherit/ "interrupts.dtss", 1;
+>
+>> dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(1)>,
+>>       <&dma0 1 AT91_DMA_CFG_PER_ID(2)>;
+>> dma-names = "tx", "rx";
+>
+> /inherit/ "dma.dtss", "tx", "rx";
+>
+>> pinctrl-names = "default";
+>> pinctrl-0 = <&pinctrl_spi0>;
+>
+> /inherit/ "pinctrl.dtss","default";
+>
+>> status = "disabled";
+>> };
+>
+> Best regards,
+> Tomasz
+>
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
