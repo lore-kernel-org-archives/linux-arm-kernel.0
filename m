@@ -1,54 +1,141 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Jul 2013 15:55:01 +0100
-Subject: [Patch V2 4/4] ARM: dts: AM33XX: update rtc node compatibility
-In-Reply-To: <51F749B0.7020802@ti.com>
-References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
- <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
- <51F749B0.7020802@ti.com>
-Message-ID: <20130730145501.GA29859@e106331-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Jul 2013 16:59:02 +0200
+Subject: [PATCH] ARM: mvebu: use correct #interrupt-cells instead of
+ #interrupts-cells
+Message-ID: <1375196342-30286-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 06:05:52AM +0100, Gururaja Hebbar wrote:
-> Hi,
-> 
-> On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
-> > Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
-> >
-> > Update the rtc compatible property to "ti,am3352-rtc" to enable handling
-> > of this feature inside rtc-omap driver.
-> 
-> The other 2 rtc driver related patches have been pulled up. If you have 
-> no comments, can you please pull this up.
-> 
-> Regards
-> Gururaja
-> 
-> >
-> > Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> > ---
-> > :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
-> >   arch/arm/boot/dts/am33xx.dtsi |    2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> > index 77aa1b0..dde180a 100644
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -297,7 +297,7 @@
-> >   		};
-> >
-> >   		rtc at 44e3e000 {
-> > -			compatible = "ti,da830-rtc";
-> > +			compatible = "ti,am3352-rtc";
+The Device Tree information for the GPIO banks of the Armada 370 and
+Armada XP SOCs was incorrectly using #interrupts-cells instead of
+controller when using GPIO interrupts, since the GPIO bank DT node
+wasn't recognized as a valid interrupt controller by the OF code.
 
-Given that this is backwards compatible with the old binding, it would
-be nicer to have this as:
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Note: until now, this wasn't causing any problem since no board was
+using Device Tree based GPIO interrupts.
+---
+ arch/arm/boot/dts/armada-370.dtsi        | 6 +++---
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi | 4 ++--
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 6 +++---
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 6 +++---
+ 4 files changed, 11 insertions(+), 11 deletions(-)
 
-	compatible = "ti,am3352-rtc", "ti,da830-rtc";
-
-We must get into the habit of changing dts files in a
-backwards-compatible fashion.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index fa3dfc6..e8deeab 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -78,7 +78,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
+ 			};
+ 
+@@ -89,7 +89,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
+ 			};
+ 
+@@ -100,7 +100,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <91>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index f8eaa38..ab40f96 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -63,7 +63,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
+ 			};
+ 
+@@ -74,7 +74,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 2d9335d..254bd24 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -64,7 +64,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
+ 			};
+ 
+@@ -75,7 +75,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
+ 			};
+ 
+@@ -86,7 +86,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <91>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index c7b1f4d..9bb9620 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -80,7 +80,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
+ 			};
+ 
+@@ -91,7 +91,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
+ 			};
+ 
+@@ -102,7 +102,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+-				#interrupts-cells = <2>;
++				#interrupt-cells = <2>;
+ 				interrupts = <91>;
+ 			};
+ 
+-- 
+1.8.1.2
