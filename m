@@ -1,219 +1,72 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 30 Jul 2013 12:37:26 +0200
-Subject: [PATCH v2 02/13] mmc: mmc_spi: Support CD/RO GPIOs
-In-Reply-To: <1375180657-23641-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1375180657-23641-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1375180657-23641-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Tue, 30 Jul 2013 16:07:12 +0530
+Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
+In-Reply-To: <51F2ACF7.9000008@wwwdotorg.org>
+References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
+ <20130726104908.GC17886@mudshark.cambridge.arm.com>
+ <51F2ACF7.9000008@wwwdotorg.org>
+Message-ID: <CALicx6ugumPG__rSAsTS95SH=6fTGqhpPFsQ8bLG-u-fbk0=pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for passing CD/RO GPIO numbers directly to the mmc_spi
-driver instead of relying solely on board code callbacks to retrieve the
-CD/RO signals values. The driver will enable debouncing on the card
-detect GPIO if the cd_debounce field is set to a non-zero value.
+On Fri, Jul 26, 2013 at 10:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/26/2013 04:49 AM, Will Deacon wrote:
+>> [Adding Stephen Warren since he has been working in this area]
+>>
+>> On Fri, Jul 26, 2013 at 06:41:27AM +0100, vijay.kilari at gmail.com wrote:
+>>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>>>
+>>> In case of normal kexec kernel load, all cpu's are offlined
+>>> before calling machine_kexec() under kernel_kexec() function.
+>>> But in case crash panic cpus are relaxed in
+>>> machine_crash_nonpanic_core() SMP function but not offlined.
+>>>
+>>> When crash kernel is loaded with kexec and on panic trigger
+>>> machine_kexec() checks for number of cpus online.
+>>> If more than one cpu is online machine_kexec() fails to load
+>>> with below error
+>>>
+>>> kexec: error: multiple CPUs still online
+>>>
+>>> In machine_crash_nonpanic_core() SMP function, offline CPU
+>>> before cpu_relax
+>
+>>> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+>
+>>> @@ -73,6 +73,7 @@ void machine_crash_nonpanic_core(void *unused)
+>>>      crash_save_cpu(&regs, smp_processor_id());
+>>>      flush_cache_all();
+>>>
+>>> +    set_cpu_online(smp_processor_id(), false);
+>>>      atomic_dec(&waiting_for_crash_ipi);
+>>>      while (1)
+>>>              cpu_relax();
+>>
+>> Ok, I guess this will work since the new kernel is loaded somewhere higher
+>> in memory and the crashed kernel will stick around, so the non-crashing CPUs
+>> can sit around spinning.
+>
+> Does a kernel that's used as the crash kernel guarantee:
+>
+> * Never to re-use the memory that was used by the previous kernel, so
+> that the spin loop code/data won't be corrupted, ever, no matter how
+> long the crash recovery kernel runs.
+>
+> * Not use SMP, so there's never a need to re-activate the non-boot CPUs,
+> which might not work if they aren't truly disabled but rather just
+> running a pin loop?
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/mmc/host/mmc_spi.c    | 33 ++++++++++++++++++++++---------
- drivers/mmc/host/of_mmc_spi.c | 46 +++++++++++--------------------------------
- include/linux/spi/mmc_spi.h   | 16 +++++++++++++++
- 3 files changed, 52 insertions(+), 43 deletions(-)
+>From cat /proc/iomem, normal kernel is executed from (0x80xxxxxx) with crash
+kernel reserved 64M at 0xa0000000
 
-diff --git a/drivers/mmc/host/mmc_spi.c b/drivers/mmc/host/mmc_spi.c
-index 74145d1..62fb82d 100644
---- a/drivers/mmc/host/mmc_spi.c
-+++ b/drivers/mmc/host/mmc_spi.c
-@@ -36,6 +36,7 @@
- 
- #include <linux/mmc/host.h>
- #include <linux/mmc/mmc.h>		/* for R1_SPI_* bit values */
-+#include <linux/mmc/slot-gpio.h>
- 
- #include <linux/spi/spi.h>
- #include <linux/spi/mmc_spi.h>
-@@ -1278,11 +1279,8 @@ static int mmc_spi_get_ro(struct mmc_host *mmc)
- 
- 	if (host->pdata && host->pdata->get_ro)
- 		return !!host->pdata->get_ro(mmc->parent);
--	/*
--	 * Board doesn't support read only detection; let the mmc core
--	 * decide what to do.
--	 */
--	return -ENOSYS;
-+	else
-+		return mmc_gpio_get_ro(mmc);
- }
- 
- static int mmc_spi_get_cd(struct mmc_host *mmc)
-@@ -1291,7 +1289,8 @@ static int mmc_spi_get_cd(struct mmc_host *mmc)
- 
- 	if (host->pdata && host->pdata->get_cd)
- 		return !!host->pdata->get_cd(mmc->parent);
--	return -ENOSYS;
-+	else
-+		return mmc_gpio_get_cd(mmc);
- }
- 
- static const struct mmc_host_ops mmc_spi_ops = {
-@@ -1324,6 +1323,7 @@ static int mmc_spi_probe(struct spi_device *spi)
- 	struct mmc_host		*mmc;
- 	struct mmc_spi_host	*host;
- 	int			status;
-+	bool			has_ro = false;
- 
- 	/* We rely on full duplex transfers, mostly to reduce
- 	 * per-transfer overheads (by making fewer transfers).
-@@ -1448,18 +1448,33 @@ static int mmc_spi_probe(struct spi_device *spi)
- 	}
- 
- 	/* pass platform capabilities, if any */
--	if (host->pdata)
-+	if (host->pdata) {
- 		mmc->caps |= host->pdata->caps;
-+		mmc->caps2 |= host->pdata->caps2;
-+	}
- 
- 	status = mmc_add_host(mmc);
- 	if (status != 0)
- 		goto fail_add_host;
- 
-+	if (host->pdata && host->pdata->flags & MMC_SPI_USE_CD_GPIO) {
-+		status = mmc_gpio_request_cd(mmc, host->pdata->cd_gpio,
-+					     host->pdata->cd_debounce);
-+		if (status != 0)
-+			goto fail_add_host;
-+	}
-+
-+	if (host->pdata && host->pdata->flags & MMC_SPI_USE_RO_GPIO) {
-+		has_ro = true;
-+		status = mmc_gpio_request_ro(mmc, host->pdata->ro_gpio);
-+		if (status != 0)
-+			goto fail_add_host;
-+	}
-+
- 	dev_info(&spi->dev, "SD/MMC host %s%s%s%s%s\n",
- 			dev_name(&mmc->class_dev),
- 			host->dma_dev ? "" : ", no DMA",
--			(host->pdata && host->pdata->get_ro)
--				? "" : ", no WP",
-+			has_ro ? "" : ", no WP",
- 			(host->pdata && host->pdata->setpower)
- 				? "" : ", no poweroff",
- 			(mmc->caps & MMC_CAP_NEEDS_POLL)
-diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
-index d720b5e..6e218fb 100644
---- a/drivers/mmc/host/of_mmc_spi.c
-+++ b/drivers/mmc/host/of_mmc_spi.c
-@@ -50,25 +50,6 @@ static struct of_mmc_spi *to_of_mmc_spi(struct device *dev)
- 	return container_of(dev->platform_data, struct of_mmc_spi, pdata);
- }
- 
--static int of_mmc_spi_read_gpio(struct device *dev, int gpio_num)
--{
--	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
--	bool active_low = oms->alow_gpios[gpio_num];
--	bool value = gpio_get_value(oms->gpios[gpio_num]);
--
--	return active_low ^ value;
--}
--
--static int of_mmc_spi_get_cd(struct device *dev)
--{
--	return of_mmc_spi_read_gpio(dev, CD_GPIO);
--}
--
--static int of_mmc_spi_get_ro(struct device *dev)
--{
--	return of_mmc_spi_read_gpio(dev, WP_GPIO);
--}
--
- static int of_mmc_spi_init(struct device *dev,
- 			   irqreturn_t (*irqhandler)(int, void *), void *mmc)
- {
-@@ -130,20 +111,22 @@ struct mmc_spi_platform_data *mmc_spi_get_pdata(struct spi_device *spi)
- 		if (!gpio_is_valid(oms->gpios[i]))
- 			continue;
- 
--		ret = gpio_request(oms->gpios[i], dev_name(dev));
--		if (ret < 0) {
--			oms->gpios[i] = -EINVAL;
--			continue;
--		}
--
- 		if (gpio_flags & OF_GPIO_ACTIVE_LOW)
- 			oms->alow_gpios[i] = true;
- 	}
- 
--	if (gpio_is_valid(oms->gpios[CD_GPIO]))
--		oms->pdata.get_cd = of_mmc_spi_get_cd;
--	if (gpio_is_valid(oms->gpios[WP_GPIO]))
--		oms->pdata.get_ro = of_mmc_spi_get_ro;
-+	if (gpio_is_valid(oms->gpios[CD_GPIO])) {
-+		oms->pdata.cd_gpio = oms->gpios[CD_GPIO];
-+		oms->pdata.flags |= MMC_SPI_USE_CD_GPIO;
-+		if (!oms->alow_gpios[CD_GPIO])
-+			oms->pdata.caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-+	}
-+	if (gpio_is_valid(oms->gpios[WP_GPIO])) {
-+		oms->pdata.ro_gpio = oms->gpios[WP_GPIO];
-+		oms->pdata.flags |= MMC_SPI_USE_RO_GPIO;
-+		if (!oms->alow_gpios[WP_GPIO])
-+			oms->pdata.caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
-+	}
- 
- 	oms->detect_irq = irq_of_parse_and_map(np, 0);
- 	if (oms->detect_irq != 0) {
-@@ -166,15 +149,10 @@ void mmc_spi_put_pdata(struct spi_device *spi)
- 	struct device *dev = &spi->dev;
- 	struct device_node *np = dev->of_node;
- 	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
--	int i;
- 
- 	if (!dev->platform_data || !np)
- 		return;
- 
--	for (i = 0; i < ARRAY_SIZE(oms->gpios); i++) {
--		if (gpio_is_valid(oms->gpios[i]))
--			gpio_free(oms->gpios[i]);
--	}
- 	kfree(oms);
- 	dev->platform_data = NULL;
- }
-diff --git a/include/linux/spi/mmc_spi.h b/include/linux/spi/mmc_spi.h
-index 32be8db..87cdb35 100644
---- a/include/linux/spi/mmc_spi.h
-+++ b/include/linux/spi/mmc_spi.h
-@@ -7,6 +7,11 @@
- struct device;
- struct mmc_host;
- 
-+#define MMC_SPI_USE_CD_GPIO			(1 << 0)
-+#define MMC_SPI_USE_RO_GPIO			(1 << 1)
-+#define MMC_SPI_CD_GPIO_ACTIVE_LOW		(1 << 2)
-+#define MMC_SPI_RO_GPIO_ACTIVE_LOW		(1 << 3)
-+
- /* Put this in platform_data of a device being used to manage an MMC/SD
-  * card slot.  (Modeled after PXA mmc glue; see that for usage examples.)
-  *
-@@ -30,8 +35,19 @@ struct mmc_spi_platform_data {
- 	 */
- 	int (*get_cd)(struct device *);
- 
-+	/*
-+	 * Card Detect and Read Only GPIOs. To enable debouncing on the card
-+	 * detect GPIO, set the cd_debounce to the debounce time in
-+	 * microseconds.
-+	 */
-+	unsigned int flags;
-+	unsigned int cd_gpio;
-+	unsigned int cd_debounce;
-+	unsigned int ro_gpio;
-+
- 	/* Capabilities to pass into mmc core (e.g. MMC_CAP_NEEDS_POLL). */
- 	unsigned long caps;
-+	unsigned long caps2;
- 
- 	/* how long to debounce card detect, in msecs */
- 	u16 detect_delay;
--- 
-1.8.1.5
+80000000-bfffffff : System RAM
+  80008000-805aeddf : Kernel code
+  805e2000-8063e427 : Kernel data
+  a0000000-a3ffffff : Crash kernel
+
+crash kernel is loaded to reserved memory location and is executed from there.
+I could confirm this from /proc/iomem when crash kernel is running
+
+a0000000-a3efffff : System RAM
+  a0008000-a05aeddf : Kernel code
+  a05e2000-a063e427 : Kernel data
