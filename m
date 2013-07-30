@@ -1,69 +1,83 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Jul 2013 11:45:12 -0600
-Subject: [PATCH v6 2/8] ASoC: atmel: machine driver for at91sam9x5-wm8731
- boards
-In-Reply-To: <1375180329-4860-3-git-send-email-richard.genoud@gmail.com>
-References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
- <1375180329-4860-3-git-send-email-richard.genoud@gmail.com>
-Message-ID: <51F7FBA8.6080400@wwwdotorg.org>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Tue, 30 Jul 2013 13:45:39 -0400
+Subject: Defining schemas for Device Tree
+In-Reply-To: <51F7F914.6040709@wwwdotorg.org>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+ <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
+ <20130730102511.GM9858@sirena.org.uk>
+ <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+ <51F7F596.6020503@wwwdotorg.org>
+ <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
+ <51F7F914.6040709@wwwdotorg.org>
+Message-ID: <CAKON4Oy6hL9LzHdfq4vWcurbw6TU3HCK_jq14xwweA8dvOGtdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 04:32 AM, Richard Genoud wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Description of the Asoc machine driver for an at91sam9x5 based board
-> with a wm8731 audio DAC. Wm8731 is clocked by a crystal and used as a
-> master on the SSC/I2S interface. Its connections are a headphone jack
-> and an Line input jack.
-> 
-> [Richard: this is based on an old patch from Nicolas that I forward
-> ported and reworked to use only device tree]
+On Tue, Jul 30, 2013 at 1:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/30/2013 11:29 AM, jonsmirl at gmail.com wrote:
+>> On Tue, Jul 30, 2013 at 1:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>
+>>> On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
+>>>> On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
+>>>>> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
+>>>>>
+>>>>>> This...
+>>>>>> tx-dma-channel = <&pdma0 7>; /* preliminary */
+>>>>>> rx-dma-channel = <&pdma0 6>; /* preliminary */
+>>>>>
+>>>>>> Probably should be
+>>>>>> dmas = <&pdma0 7>,<&pdma0 6>;
+>>>>>> dma-names = "tx", "rx";
+>>>>>
+>>>>> It should be - the latter is the generic DMA binding.  There's a lot of
+>>>>> bindings in the kernel that predate that but people are currently
+>>>>> working to transfer over, this is one of the examples of instability
+>>>>> that everyone is talking about.
+>>>>
+>>>> Is something similar to this possible in device tree syntax?
+>>>> dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
+>>>
+>>> I /think/ you can physically write that in *.dts, or something very
+>>> similar; with the strings outside the <>:
+>>>
+>>> dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+>>>
+>>> However, there's been strong push-back (i.e. doing that has not been
+>>> allowed at all) on attempting to mix variable-length strings and
+>>> fixed-length/alignment integer cells in the same property. This is
+>>> primarily because you then can't ensure that the integer cell data is
+>>> aligned in the DTB (dtc and/or the DTB format spec does/requires/allows
 
-> diff --git a/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt b/Documentation/devicetree/bindings/sound/atmel-sam9x5-wm8731-audio.txt
+The PowerPC FDT doc says that strings are indirected into a string
+table. So they aren't variable length in the data structures.
 
-> +* Atmel at91sam9x5ek wm8731 audio complex
-> +
-> +Required properties:
-> +  - compatible: "atmel,sam9x5-wm8731-audio"
-> +  - atmel,model: The user-visible name of this sound complex.
-> +  - atmel,ssc-controller: The phandle of the SSC controller
-> +  - atmel,audio-codec: The phandle of the WM8731 audio codec
-> +  - atmel,audio-routing: A list of the connections between audio components.
-> +    Each entry is a pair of strings, the first being the connection's sink,
-> +    the second being the connection's source.
-> +
-> +Available audio endpoints for the audio-routing table:
-> +
-> +Board connectors:
-> + * Headphone Jack
-> + * Line In Jack
-> +
-> +wm8731 pins:
-> +cf Documentation/devicetree/bindings/sound/wm8731.txt
+I was wondering how dmas = "tx", "rx" was implemented. It is two
+pointers into the indirect block. So this should work, there is no
+variable length data to worry about in the structure.
 
-In the Tegra bindings, I deliberately put the list of CODEC pins into
-the audio complex binding rather than the CODEC binding. That's because
-I'm not sure that in the long-term we want to use strings to identify
-the CODEC pins, rather than using integers. By putting the list orf
-CODEC pins in the audio complex binding rather than the CODEC binding, I
-didn't lumber the CODEC binding with a list of strings that it had to
-support forever.
+>>> dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
 
-One reason that strings are problematic is because they can't be mixed
-with integers/phandles in the same property, so if we ever end up with
-more generic audio bindings where the routing table is expressed more like:
 
-audio-routes = <&component_a $a_pin &component_b $b_pin>;
+>>
+>> Can we turn the strings into string phandles? Then they'd be fixed sized.
+>
+> I believe that phandles point at nodes not arbitrary data, so no.
+>
+> Now, could the DTB format be enhanced to allow that? Perhaps, although
+> we'd need a different string syntax to enable it, since existing
+> bindings would require the current inline-string format. That's getting
+> outside the realm of schemas and making active changes to the DT format
+> though...
+>
+>> That might provide a way to internationalize the strings too.
+>
+> I don't think internationalization is needed; DT is an interface to
+> drivers/SW, rather than something end-user-visible.
 
-... in order to allow completely arbitrary and fully name-spaced routing
-specification[1], then $a_pin and $b_pin need to be integers not strings.
 
-[1] and perhaps we can get rid of properties like
-audio-codec/ssc-controller, and automatically deduce which components
-are needed simply by finding all phandles in the audio-routes property.
 
-Perhaps the solution here is to allow mixing phandles/integers/strings
-in one property, but that's potentially quite a large change to the DTB
-format; we'd need to introduce type fields into the property data, and
-other data format changes.
+-- 
+Jon Smirl
+jonsmirl at gmail.com
