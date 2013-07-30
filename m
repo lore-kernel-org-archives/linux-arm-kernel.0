@@ -1,55 +1,40 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Tue, 30 Jul 2013 22:54:04 +0200
-Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
- BCM5301X/BCM470X SoCs with ARM CPU
-In-Reply-To: <20130730133601.GN11527@mudshark.cambridge.arm.com>
-References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
- <51F28A20.7060105@hauke-m.de>
- <20130726165311.GH17886@mudshark.cambridge.arm.com>
- <201307272149.17108.arnd@arndb.de>
- <20130730133601.GN11527@mudshark.cambridge.arm.com>
-Message-ID: <51F827EC.3090104@hauke-m.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 30 Jul 2013 13:55:32 -0700
+Subject: [PATCH v2 3/9] ARM: msm: Move debug-macro.S to include/debug
+In-Reply-To: <1374699274-18388-4-git-send-email-sboyd@codeaurora.org>
+References: <1374699274-18388-1-git-send-email-sboyd@codeaurora.org>
+ <1374699274-18388-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130730205532.GA18638@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 03:36 PM, Will Deacon wrote:
-> On Sat, Jul 27, 2013 at 08:49:16PM +0100, Arnd Bergmann wrote:
->> On Friday 26 July 2013, Will Deacon wrote:
->>>>> At least, we need a pretty good explanation of what exactly is causing
->>>>> these spurious aborts before we start ignoring them unconditionally like
->>>>> this. You're effectively masking an extremely serious error indicator with
->>>>> this change.
->>>>
->>>> This fault occurs once every boot sometime early in the boot process,
->>>> but the actual time this happens varies randomly.
->>>
->>> Well that's interesting in itself. It sounds like we don't know *for sure*
->>> whether the abort is triggered by Linux. Since the abort is imprecise, the
->>> timing will vary.
->>
->> It might be possible to find out the culprit if you just enter an endless loop
->> in the early kernel boot code. If you enter the loop before Linux does something
->> wrong, it won't crash, otherwise it will. After that, you could bisect the
->> boot process by moving the busy loop around.
->>
->> If it even crashes at the point where Linux gets entered, it's a bug in the
->> boot loader.
-> 
-> Can you give Arnd's suggestion a go please Hauke?
+On Wed, Jul 24, 2013 at 01:54:28PM -0700, Stephen Boyd wrote:
+>One more step to allowing MSM to participate in the
+>multi-platform defconfig.
 
-Hi
+Full patch: https://patchwork.kernel.org/patch/2833034/
 
-I just tried that, but it did not crash in the loop. :-(
+>Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>---
+> arch/arm/Kconfig.debug                             |  9 +++-
+> .../mach/debug-macro.S => include/debug/msm.S}     | 32 ++++++++++-
+> arch/arm/mach-msm/include/mach/msm_iomap-8960.h    |  5 --
+> arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |  5 --
+> arch/arm/mach-msm/include/mach/msm_iomap.h         | 12 -----
+> arch/arm/mach-msm/include/mach/uncompress.h        | 63 ----------------------
+> arch/arm/mach-msm/io.c                             | 40 +++++++-------
+> 7 files changed, 58 insertions(+), 108 deletions(-)
+> rename arch/arm/{mach-msm/include/mach/debug-macro.S => include/debug/msm.S} (61%)
+> delete mode 100644 arch/arm/mach-msm/include/mach/uncompress.h
 
-Now, with 3.11-rc3 it crashed reproducible after Freeing unused kernel
-memory, see this:
+Any comments on this?  This is mostly an MSM change, but I'd like to
+get an Ack from someone because of the file moving into
+arch/arm/include/debug.
 
-[    0.859198] Freeing unused kernel memory: 1124K (c0260000 - c0379000)
-[    0.866298] Unhandled fault: imprecise external abort (0x1c06) at
-0xb6f8b005
-[    0.873538] Kernel panic - not syncing: Attempted to kill init!
-exitcode=0x00000007
+Thanks,
+David
 
-Do you have some more informations about this type of error?
-
-Hauke
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
