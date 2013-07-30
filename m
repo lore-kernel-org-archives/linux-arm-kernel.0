@@ -1,231 +1,97 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Tue, 30 Jul 2013 11:55:15 +0530
-Subject: [PATCH v9 0/8] Generic PHY Framework
-In-Reply-To: <20130709173429.GE10776@arwen.pp.htv.fi>
-References: <51D3F773.9000209@ti.com> <20130703132038.GI15056@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E975D6E@DBDE04.ent.ti.com>
- <51D54694.20203@ti.com> <20130704101216.GD4830@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E9764D5@DBDE04.ent.ti.com>
- <51DAADD1.3060302@ti.com>
- <780E789C2E067A4BB8F69D0BB9EC4F253E976575@DBDE04.ent.ti.com>
- <20130709114416.GL5552@arwen.pp.htv.fi>
- <780E789C2E067A4BB8F69D0BB9EC4F253E97670D@DBDE04.ent.ti.com>
- <20130709173429.GE10776@arwen.pp.htv.fi>
-Message-ID: <CAPdUM4MoKfWRuES1QjEkYQ1=Af6MvLjjb_p6j4zdeFOAOcpDFg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 30 Jul 2013 11:55:04 +0530
+Subject: [PATCH 2/2] arm: omap: remove *.auto* from device names given
+ in usb_bind_phy
+In-Reply-To: <20130730061830.GE9155@radagast>
+References: <1374829418-27503-1-git-send-email-kishon@ti.com>
+ <1374829418-27503-3-git-send-email-kishon@ti.com>
+ <20130729150638.GD3063@radagast> <51F68A56.8060805@ti.com>
+ <20130729175413.GC4964@radagast> <51F74BC8.7020903@ti.com>
+ <20130730060134.GD9155@radagast> <51F7590B.4020705@ti.com>
+ <20130730061830.GE9155@radagast>
+Message-ID: <51F75C40.4060406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Balbi, Kishon,
+Hi,
 
-I have similar requirements for exynos hdmi phy. hdmi driver (controller)
-need to set the operating clock to hdmi phy which depends on the pixel
-clock.
-
-Phy has an internal pll to be configured as per changing resolution. It can
-be done by writing into phy registers. CCF callbacks (set/get_rate) can
-not be used unless I register phy as a clock controller. But that way
-hdmi driver loses finer power control for the phy. Phy should be ON, only
-when hdmi hotplugged.
-
-Callback: set_phy_operating_freq in phy framework, seems generic and
-addressing similar requirements for other phys. What you say on this?
-
-regards,
-Rahul Sharma.
-
-On Tue, Jul 9, 2013 at 11:04 PM, Felipe Balbi <balbi@ti.com> wrote:
->
+On Tuesday 30 July 2013 11:48 AM, Felipe Balbi wrote:
 > Hi,
->
-> On Tue, Jul 09, 2013 at 02:33:58PM +0200, Patel, Satish wrote:
-> > > > Operation:
-> > > >
-> > > > Once the card gets inserted into the slot, user application can
-> > > > initiate activate sequence anytime, it is not mandatory that
-> > > > activation has to be called Immediately. It all depends whether
-> > > other
-> > > > connections ( network, printer) are proper.  User application can do
-> > > > some checks and then dynamically activate the card
-> > >
-> > > The card or the phy ? Who actually activates ? Is the activation
-> > > handling part of the PHY or part of the smartcard controller ?
-> > >
-> >
-> > It?s a activation of smart card which is inserted into the phy slot.
-> > Smart card activation will by done phy but initiated by user application
-> > Handling of activation should be done at both the side - controller as well
-> > As phy. Phy will raise certain signals and check timeout while activation
-> > , while controller will store data coming from smart card to FIFO. Its
-> > Controller which will give command to phy to initiate activation sequence when it
-> > is ready.
-> >
-> > Which means, both controller and phy has role to play while activation.
-> > Also it is applicable while deactivation.
->
-> right, so when the smartcard device is opened, you want to powerup the
-> PHY, powerup the smartcard controller and get things going, which means
-> that all your activation logic can, and should, be hidden by
-> phy_power_on() and phy_power_off()
->
-> Perhaps you also want to delay phy_init() and phy_shutdown() to that
-> very time, which would mean that we wouldn't even need
-> phy_power_{on,off}() calls whatsoever.
->
-> > > > There are 2 sequence of activation - normal activation and warm
-> > > reset.
-> > > > If first fails then warm reset should be executed, if card does not
-> > > > response to both then deactivation will be carried out
-> > >
-> > > ret = phy_resume(phy);
-> > > if (ret == -EINVAL) { /* perhaps there's a better error code */
-> > >     ret = phy_reset(phy);
-> > >     if (ret)
-> > >             phy_suspend(phy);
-> > > }
-> > >
-> >
-> > Its not like this. There are the cases, when during normal activation
-> > card respond With some characters, but they might not be valid or
-> > error prone - This check will be done by user application as only
-> > application knows how to decode characters as per protocol.
->
-> sure, and if the characters are invalid, the application needs to tell
-> the kernel, perhaps it would be enough to send and IOCTL or, even
-> easier, close the device and reopen it.
->
-> > It there is any error in characters/timeout paratmeters, user
-> > application will ask to initiate Warm reset.
->
-> and for that we can use an IOCTL which is implemented by smart card
-> layer. I mean, I'm assuming the smartcard would be seen as a char dev by
-> userland so it would be something like this:
->
-> ret = read(fd, buf, SIZE);
-> if (ret < 0)
->         boom();
->
-> ret = process_buffer(buf, ret);
-> if (ret == -EINVAL) { /* we have received invalid characters */
->         ret = ioctl(fd, IOCTL_SMARTCARD_WARM_RESET);
->         if (ret < 0)
->                 handle_error();
-> }
->
-> in kernel space we would have an ioctl handler like so:
->
-> static int smart_card_ioctl(struct file *fd, unsigned code, usigned long v)
-> {
->         struct smart_card *sc = fd->private_data;
->         unsigned long flags;
->         int ret;
->
->         spin_lock_irqsave(&sc->lock, flags);
->         switch (v)
->         case SMART_CARD_WARM_RESET:
->                 ret = phy_shutdown(sc->phy);
->                 if (ret < 0)
->                         boom();
->
->                 ret = smart_card_reset(sc);
->                 if (ret < 0)
->                         boom();
->
->                 ret = phy_init(sc->phy);
->                 if (ret < 0)
->                         boom();
->                 break;
->         [ ... ]
->         }
->
->         spin_unlock_irqrestore(&sc->lock, flags);
->
->         return ret;
-> }
->
-> see, we don't need to add a bunch of stuff in the PHY framework, because
-> you shouldn't expose the PHY directly to userland. You *must* have an
-> abstraction to userland with an in-kernel usage of the PHY layer.
->
-> > > > - on activation card will respond with some initial characters
-> > > (ATR),
-> > > > which will be verified by application, in case of error user
-> > > > application will de-activate the card not the phy module
-> > > >
-> > > > - After activation, use application initiate normal tx/rx
-> > > >
-> > > > - Once tx/rx is done, it will initiate deactivation of card not the
-> > > > phy module.
-> > >
-> > > then that has nothing to do with the PHY framework, right ?
-> >
-> > But all such sequence will be initiated by PHY by raising certain
-> > signals and only controller can give the push when to start.
->
-> sure, that's fair. But you don't need to expose every single detail of
-> the PHY. You need to use abstractions to make accesses to the PHY easy
-> to maintain. See the example above.
->
-> > > > > > Smartcard_set_c4/c8/rst/io -> phy_set_pin
-> > > > >
-> > > > > Whats should be exactly done here? Looks to me like it should be
-> > > > > part of init. Does these pin settings need to be changed
-> > > dynamically?
-> > > >
-> > > > These are all phy pins which will be physically come in contact with
-> > > > smart card When inserted. In case of synchronous card, these pins
-> > > will
-> > > > be toggled manually by s/w bit bang algorithm
-> > >
-> > > is that a requirement or just something that everybody does ?
-> > >
-> >
-> > Its requirement for synchronous card. At present there is no open driver
-> > Which does this thing.
->
-> alright, so you need to tell the PHY in which mode it should work and
-> the PHY driver needs to be smart enough to choose proper callbacks
-> depending on the mode.
->
-> > > In any case, you can hide that under some gpio calls, or something
-> > > similar.
-> >
-> > Can't be done using GPIO as pin can be toggled only which i2c read/write
-> > to the phy.
->
-> so ? look at the numerous I2C GPIO expanders we have in the kernel ;-)
->
-> > > > > > Smartcard_get_version -> phy_get_version
-> > > > >
-> > > > > Again why? Why would the smartcard need the version of the PHY?
-> > > > >
-> > > >
-> > > > Can be omitted. This is for the test suite reference.
-> > >
-> > > if it's for testsuite, it sounds like something that should be done
-> > > through userland and, as such, should be implemented by a set of
-> > > debugfs
-> > > files which expose the necessary information. That has nothing to do
-> > > with the PHY framework.
-> > >
-> > Agree.. can be omitted.
-> >
-> >
-> > I am ok to give internal webex presentation (TI team) to brief
-> > on phy and smart card controller interface.
->
-> let's try to cut down on internal agreements and let the community help
-> defining a proper way to handle the PHY :-)
->
-> Still, if you want to point me and Kishon (privately) to some internal
-> documentation, we can certainly read through it :-)
->
-> cheers
->
-> --
-> balbi
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> 
+> On Tue, Jul 30, 2013 at 11:41:23AM +0530, Kishon Vijay Abraham I wrote:
+>>>>>>>> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+>>>>>>>> index 244d8a5..17bb076 100644
+>>>>>>>> --- a/arch/arm/mach-omap2/board-2430sdp.c
+>>>>>>>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+>>>>>>>> @@ -233,7 +233,7 @@ static void __init omap_2430sdp_init(void)
+>>>>>>>>  	omap_hsmmc_init(mmc);
+>>>>>>>>  
+>>>>>>>>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
+>>>>>>>> -	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+>>>>>>>> +	usb_bind_phy("musb-hdrc.0", 0, "twl4030_usb");
+>>>>>>>
+>>>>>>> how about moving usb_bind_phy() calls to omap2430.c ?
+>>>>>>>
+>>>>>>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+>>>>>>> index f44e8b5..b6abc1a 100644
+>>>>>>> --- a/drivers/usb/musb/omap2430.c
+>>>>>>> +++ b/drivers/usb/musb/omap2430.c
+>>>>>>> @@ -544,6 +544,9 @@ static int omap2430_probe(struct platform_device *pdev)
+>>>>>>>  
+>>>>>>>  		pdata->board_data	= data;
+>>>>>>>  		pdata->config		= config;
+>>>>>>> +	} else {
+>>>>>>> +		/* bind the PHY */
+>>>>>>> +		usb_bind_phy(dev_name(&musb->dev), 0, "twl4030_usb");
+>>>>>>
+>>>>>> This looks like a hack IMHO to workaround the usb phy library. otherwise it is
+>>>>>> similar to get_phy_by_name.
+>>>>>
+>>>>> actually, this is a workaround to the fact that we're not creating all
+>>>>> platform_devices in arch/arm/mach-omap2/ :-)
+>>>>>
+>>>>> If we had the musb allocation there, we could easily handle
+>>>>> usb_bind_phy()
+>>>>>
+>>>>>>> so that's temporary. It might be better than to reintroduce the IDR in
+>>>>>>> musb_core.c.
+>>>>>>
+>>>>>> that?s needed for generic phy framework anyway :-s
+>>>>>
+>>>>> right, but generic phy framework can handle everything just fine, the
+>>>>> only problem is that names are changing.
+>>>>
+>>>> right. But if the names change, PHY framework wouldn't be able to return the
+>>>> reference to the PHY.
+>>>
+>>> with my suggestion they can change whenever they want since we're using
+>>> dev_name() of the just-created musb platform_device. Right ?
+>>
+>> right. But the PHY device can be created in a different place from where the
+>> musb devices are created. And in the PHY framework, the PHY device should have
+> 
+> this shouldn't be a problem. As long as the phy is created, all should
+> be good.
+> 
+>> the list of controller device (names) it can support (PHY framework does not
+>> maintain a separate list for binding like how we had in USB PHY library). e.g.
+>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92817.html. In such
+> 
+> this has nothing to do with $subject though. We talk about generic PHY
+> framework once all these PHY drivers are moved there :-)
+> 
+>> cases how do we pass the device names. Also will the MUSB core device be
+>> created before twl4030-usb PHY device?
+> 
+> and why would that be a problem ? We're telling the framework that the
+> musb device will use a phy with a name of 'twl4030'. If musb calls
+> usb_get_phy_dev() and doesn't find a phy, it'll return -EPROBE_DEFER and
+> try again later.
+
+I think we are talking about different problems here ;-) I'm trying to tell
+using idr in MUSB core is needed for Generic PHY Framework. So in a way, the
+Generic PHY Framework series depends on this patch series or else MUSB in OMAP3
+platforms wont work after Generic PHY framework gets merged.
+
+Thanks
+Kishon
