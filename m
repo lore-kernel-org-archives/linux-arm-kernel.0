@@ -1,41 +1,64 @@
-From: linville@tuxdriver.com (John W. Linville)
-Date: Tue, 30 Jul 2013 13:27:19 -0400
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <51F7EA35.6070501@wwwdotorg.org>
-References: <2460092.aLmjrOVh1g@flatron> <51F3A82E.2000907@broadcom.com>
- <CACxGe6t0C7PTiDDaFkgoMZWUpBVokasxwZpV6HEtf3LaPi4qUw@mail.gmail.com>
- <CAKON4OymA55w_V=oP4BL2su84m8EnPgdhnQtyLWKaAJE-yNBkQ@mail.gmail.com>
- <CACxGe6uE6jOE-vz0onW5h93Es-soGiBAcFBM7Dvxh+HvCNrHkw@mail.gmail.com>
- <CACxGe6vw9=y5a+EgF1gO39SwGAdGofD2MYjyJ3jYu6uN3ke70A@mail.gmail.com>
- <1374988276.1973.29.camel@dabdike>
- <20130730014453.GJ29970@voom.fritz.box>
- <CAKON4OyWuF+qm2MAhbXnGg=ozzw37kpSWciLxyUy+QQzxoWdxQ@mail.gmail.com>
- <51F7EA35.6070501@wwwdotorg.org>
-Message-ID: <20130730172718.GA2509@tuxdriver.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Jul 2013 11:34:12 -0600
+Subject: Defining schemas for Device Tree
+In-Reply-To: <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+ <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
+ <20130730102511.GM9858@sirena.org.uk>
+ <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+ <51F7F596.6020503@wwwdotorg.org>
+ <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
+Message-ID: <51F7F914.6040709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 10:30:45AM -0600, Stephen Warren wrote:
-> On 07/29/2013 08:15 PM, jonsmirl at gmail.com wrote:
-> > On Mon, Jul 29, 2013 at 9:44 PM, David Gibson
-> > <david@gibson.dropbear.id.au> wrote:
-> ...
-> >> I also think we should consider the option of having a simple and
-> >> straightforward schema language which handles, say, 80% of cases with
-> >> a fall back to C for the 20% of curly cases.  That might actually be
-> >> simpler to work with in practice than a schema language which can
-> >> express absolutely anything, at the cost of being awkward for simple
-> >> cases or difficult to get your head around.
-> > 
-> > Would C++ work? You can use operating overloading and templates to
-> > change the syntax into something that doesn't even resemble C any
-> > more.
+On 07/30/2013 11:29 AM, jonsmirl at gmail.com wrote:
+> On Tue, Jul 30, 2013 at 1:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>
+>> On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
+>>> On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
+>>>> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
+>>>>
+>>>>> This...
+>>>>> tx-dma-channel = <&pdma0 7>; /* preliminary */
+>>>>> rx-dma-channel = <&pdma0 6>; /* preliminary */
+>>>>
+>>>>> Probably should be
+>>>>> dmas = <&pdma0 7>,<&pdma0 6>;
+>>>>> dma-names = "tx", "rx";
+>>>>
+>>>> It should be - the latter is the generic DMA binding.  There's a lot of
+>>>> bindings in the kernel that predate that but people are currently
+>>>> working to transfer over, this is one of the examples of instability
+>>>> that everyone is talking about.
+>>>
+>>> Is something similar to this possible in device tree syntax?
+>>> dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
+>>
+>> I /think/ you can physically write that in *.dts, or something very
+>> similar; with the strings outside the <>:
+>>
+>> dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+>>
+>> However, there's been strong push-back (i.e. doing that has not been
+>> allowed at all) on attempting to mix variable-length strings and
+>> fixed-length/alignment integer cells in the same property. This is
+>> primarily because you then can't ensure that the integer cell data is
+>> aligned in the DTB (dtc and/or the DTB format spec does/requires/allows
 > 
-> From my perspective, that's precisely why C++ should /not/ be used.
+> Can we turn the strings into string phandles? Then they'd be fixed sized.
 
-Amen.
+I believe that phandles point at nodes not arbitrary data, so no.
 
--- 
-John W. Linville		Someday the world will need a hero, and you
-linville at tuxdriver.com			might be all we have.  Be ready.
+Now, could the DTB format be enhanced to allow that? Perhaps, although
+we'd need a different string syntax to enable it, since existing
+bindings would require the current inline-string format. That's getting
+outside the realm of schemas and making active changes to the DT format
+though...
+
+> That might provide a way to internationalize the strings too.
+
+I don't think internationalization is needed; DT is an interface to
+drivers/SW, rather than something end-user-visible.
