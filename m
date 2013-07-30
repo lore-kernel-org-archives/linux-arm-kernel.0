@@ -1,39 +1,46 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 30 Jul 2013 10:17:52 -0700
-Subject: [PATCH] mmc: sdhci-msm: Add support for MSM chipsets
-In-Reply-To: <86y58orogf.fsf@void.printf.net>
-References: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com>
- <86y58orogf.fsf@void.printf.net>
-Message-ID: <20130730171752.GA30897@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Jul 2013 11:19:18 -0600
+Subject: Defining schemas for Device Tree
+In-Reply-To: <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+References: <2469263.vMN09Q7Tzi@flatron> <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+ <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
+ <20130730102511.GM9858@sirena.org.uk>
+ <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+Message-ID: <51F7F596.6020503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 05:40:16PM +0100, Chris Ball wrote:
-
->On Tue, Jul 30 2013, Georgi Djakov wrote:
->> This platform driver adds the support of Secure Digital Host
->> Controller Interface compliant controller in MSM chipsets.
+On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
+> On Tue, Jul 30, 2013 at 6:25 AM, Mark Brown <broonie@kernel.org> wrote:
+>> On Mon, Jul 29, 2013 at 08:30:29PM -0400, jonsmirl at gmail.com wrote:
 >>
->> CC: Asutosh Das <asutoshd@codeaurora.org>
->> CC: Venkat Gopalakrishnan <venkatg@codeaurora.org>
->> CC: Sahitya Tummala <stummala@codeaurora.org>
->> CC: Subhash Jadavani <subhashj@codeaurora.org>
->> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
->> ---
->> This is an initial version of the Qualcomm MSM SDHCI driver.
->> It is based on the SDHCI code from coreaurora.org with minor
->> modifications. The MMC standard DT bindings are used where
->> possible. The patch applies to v3.11-rc3.
->
->Is the arch code that will use this driver already in mainline,
->or on its way in?
+>>> This...
+>>> tx-dma-channel = <&pdma0 7>; /* preliminary */
+>>> rx-dma-channel = <&pdma0 6>; /* preliminary */
+>>
+>>> Probably should be
+>>> dmas = <&pdma0 7>,<&pdma0 6>;
+>>> dma-names = "tx", "rx";
+>>
+>> It should be - the latter is the generic DMA binding.  There's a lot of
+>> bindings in the kernel that predate that but people are currently
+>> working to transfer over, this is one of the examples of instability
+>> that everyone is talking about.
+> 
+> Is something similar to this possible in device tree syntax?
+> dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
 
-It is on it's way.  Once all of the necessary Acks are in place, I'll
-be pulling it in.
+I /think/ you can physically write that in *.dts, or something very
+similar; with the strings outside the <>:
 
-David
+dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+However, there's been strong push-back (i.e. doing that has not been
+allowed at all) on attempting to mix variable-length strings and
+fixed-length/alignment integer cells in the same property. This is
+primarily because you then can't ensure that the integer cell data is
+aligned in the DTB (dtc and/or the DTB format spec does/requires/allows
+no alignment padding), and hence have to be much more careful about data
+alignment when parsing the property.
