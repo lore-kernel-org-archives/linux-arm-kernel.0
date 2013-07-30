@@ -1,174 +1,217 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 31 Jul 2013 00:16:56 +0200
-Subject: Defining schemas for Device Tree
-In-Reply-To: <2469263.vMN09Q7Tzi@flatron>
-References: <2469263.vMN09Q7Tzi@flatron>
-Message-ID: <3852729.INDSeEDz7b@thinkpad>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 30 Jul 2013 15:23:20 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <b8d1f8ab-e9b2-4f16-9935-4af249bd5375@CH1EHSMHS041.ehs.local>
+References: <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+ <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
+ <51F66565.7010600@linaro.org>
+ <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
+ <51F77D93.4030505@linaro.org>
+ <b8d1f8ab-e9b2-4f16-9935-4af249bd5375@CH1EHSMHS041.ehs.local>
+Message-ID: <0a90a9dd-d504-4767-a601-387427feb9c1@CO1EHSMHS025.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 of July 2013 02:21:52 Tomasz Figa wrote:
-> Hi,
-> 
-> As promised I am starting a discussion about Device Tree schema. Let's
-> first shortly introduce the problem.
-> 
-> Device Tree is a text-based data structure used to describe hardware. Its
-> main point is separation from kernel code, which has a lot of benefits,
-> but, at the moment, also a huge drawback - there is no verification of
-> device tree sources against defined bindings. All the dtc compiler does
-> currently are syntax checks - no semantic analysis is performed (except
-> some really basic things). What this means is that anybody can put
-> anything in their device tree and end up with the dts compiling fine only
-> to find out that something is wrong at boot time.
-> 
-> Currently, device tree bindings are described in plain text documentation
-> files, which can not be considered a formal way of binding description.
-> While such documentation provides information for developers/users that
-> need to work with particular bindings, it can not be easily used as input
-> for validation of device tree sources. This means that we need to define a
-> more formal way of binding description, in other words - Device Tree
-> schema.
-> 
-> To find a solution for this problem, we must first answer several
-> questions to determine a set of requirements we have to meet.
-> 
-> a) What is a device tree binding?
-> 
-> For our purposes, I will define a binding as internal format of some
-> device tree node, which can be matched using of_find_matching_node(). In
-> other words, key for a binding would be node name and/or value of
-> compatible property and/or node type. Value for a binding would be a list
-> of properties with their formats and/or subnodes with their bindings.
+Forget this. It's trash. I had to migrate some stuff around due to some
+quota issues and missed to update a few scripts. Sorry, I'll rerun this
+test.
 
-Now as I think of it, there is one more thing that needs to be considered. Do 
-we want the schemas to strictly specify available set of properties, warning 
-about any unrecognized ones or just enforce checking of recognized properties 
-(including presence of required ones)? Or maybe both, depending on some 
-keyword or whatever?
+	S?ren
 
-> b) What information should be specified in schemas? What level of
->    granularity is required?
+On Tue, Jul 30, 2013 at 03:14:43PM -0700, S?ren Brinkmann wrote:
+> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+> > On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+> > > Hi Daniel,
+> > > 
+> > > On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+> > > (snip)
+> > >>
+> > >> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+> > >> timer will be stopped when entering to the idle state. In this case, the
+> > >> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+> > >> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+> > >> idle state, switching the local timer back in use.
+> > > 
+> > > I've been thinking about this, trying to understand how this makes my
+> > > boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+> > > would make the timer core switch to a broadcast device even though it
+> > > wouldn't be necessary. But shouldn't it still work? It sounds like we do
+> > > something useless, but nothing wrong in a sense that it should result in
+> > > breakage. I guess I'm missing something obvious. This timer system will
+> > > always remain a mystery to me.
+> > > 
+> > > Actually this more or less leads to the question: What is this
+> > > 'broadcast timer'. I guess that is some clockevent device which is
+> > > common to all cores? (that would be the cadence_ttc for Zynq). Is the
+> > > hang pointing to some issue with that driver?
+> > 
+> > If you look at the /proc/timer_list, which timer is used for broadcasting ?
 > 
-> For each property we need to have at least following data specified:
->  - property name (or property name format, e.g. regex),
->  - whether the property is mandatory or optional,
->  - data type of value.
+> In case of a vanilla kernel and with my patches for enabling the global
+> timer (I removed the wrongly set flag from the C2 state + adding the DT
+> fragment to use the GT), this is what I see (full output from timer_list
+> attached):
+> 	Tick Device: mode:     1
+> 	Broadcast device
+> 	Clock Event Device: xttcps_clockevent
 > 
-> As for now, I can think of following data types used in device trees:
->  - boolean (i.e. without value),
->  - array of strings (including single string),
->  - array of u32 (including single u32),
->  - specifier (aka phandle with args, including cases with 0 args),
->  - variable-length cells (e.g. #address-cells of u32s).
+> And the local timer seems to be the arm twd timer (also in both cases).
 > 
-> Some properties might require a combination of data types to be specified
-> or even an array of combinations, like interrupt-map property, which is an
-> array of entries consisting of:
->  - #address-cells u32s,
->  - #interrupt-cells u32s,
->  - specifier (phandle of interrupt controller and u32 of count defined by
->    #interrupt-cells of the controller).
+> I don't think I can gather this information for the actual broken case,
+> but AFAIK, there shouldn't be any other timer be capable of this for
+> Zynq.
 > 
-> We probably want to define allowed range of values for given property, be
-> it contiguous or enumerated.
+> 	S?ren
 > 
-> As for subnodes, I think we need to define following constraints:
->  - node name (or node name format, e.g. regex),
->  - optional or not,
->  - how many nodes of this type can be present (one, limited, unlimited),
->  - recursively define binding for such node type.
-> 
-> We probably also want human readable descriptions for all properties and
-> subnodes, so a textual documentation (like the one currently available)
-> could be generated from schemas.
-> 
-> c) What about generic bindings? (e.g. for subsystems like pinctrl or
-> regulators)
-> 
-> This is where things get more interesting. Looks like we need some kind of
-> inheritance for bindings or binding templates. Templates sound more
-> appropriate here, because most of the generic bindings do not fully
-> conform to what I defined as binding and need device-specific parameters
-> to become so.
-> 
-> Let's consider first example taken from regulator subsystem.
-> 
-> 	device {
-> 		compatible = "foo,mydevice";
-> 		/* ... */
-> 		core-supply = <&regulator_a>;
-> 		io-supply = <&regulator_b>;
-> 		/* ... */
-> 	};
-> 
-> Bindings of regulator subsystem define the way of regulator lookup to be
-> based on property matching following definition:
-> 
-> 	#define REGULATOR(name) name ## _supply = <&phandle>
-> 
-> As you can see, the binding is parametrized, i.e. part of it is defined
-> globally, but part is device-specific. Similarly for pinctrl subsystem:
-> 
-> 	device {
-> 		compatible = "foo,mydevice";
-> 		/* ... */
-> 		pinctrl-names = "state0", "state1";
-> 		pinctrl-0 = <&phandle>...;
-> 		pinctrl-1 = <&phandle>...;
-> 		/* ... */
-> 	};
-> 
-> This binding is now parametrized in a more complex way:
-> 
-> 	#define PINCTRL(name0, name1, ..., nameN) \
-> 		pinctrl-names = name0, name1, ..., nameN; \
-> 		pinctrl-0 = <&phandle>...; \
-> 		pinctrl-1 = <&phandle>...; \
-> 		... \
-> 		pinctrl-N = <&phandle>...;
-> 
-> We need to have a way to describe this kind of inheritance, if we don't
-> want to respecify generic attributes in all device bindings using them.
-> 
-> d) When should the validation happen and what should handle it?
-> 
-> In my opinion, similarly to compilation of board files, validation should
-> be happening at dts compile time, to show any warnings or errors as early
-> as possible.
-> 
-> Whether this should be integrated into dtc or rather handled by external
-> tool is another question. Since we are already processing device tree
-> sources in dtc, it might be reasonable to reuse its dts parsing
-> infrastructure and add validation there, especially that dtc is supposed
-> to already contain some infrastructure for doing checks on device tree as
-> well. Nothing stops us from running validation on already compiled dtbs,
-> though, using an extra tool.
-> 
-> e) What format should be used for Device Tree schema?
-> 
-> This is a non-trivial problem. Key criteria I can think of are as follows:
->  - the whole set of information established above must be representable,
->  - human-readable, easy to create and edit (extend), preferably similar to
->    something already existing, so could be easily learnt,
->  - something that can be integrated with dtc with reasonable amount of
->    work or can reuse a lot (if not all) of already existing parsing code.
-> 
-> Okay, this should be enough to have some discussion. I will post a
-> follow-up with my proposal of schema format to separate general discussion
-> from discussion about the proposal, but this will happen tomorrow, as now
-> it's time to get some sleep.
 
-Finally I didn't manage to post it yet, but this might be better, as there 
-have been a lot of interesting points in the discussion, which I'm now taking 
-into consideration, while writing a sample schema.
-
-Best regards,
-Tomasz
-
-> For now please think about the points above and feel free to correct
-> anything wrong or suggest what else should be taken into consideration
-> for DT schemas. Let the discussion start.
+> Timer List Version: v0.7
+> HRTIMER_MAX_CLOCK_BASES: 3
+> now at 76779317814 nsecs
 > 
-> Best regards,
-> Tomasz
+> cpu: 0
+>  clock 0:
+>   .base:       c14a0c90
+>   .index:      0
+>   .resolution: 1 nsecs
+>   .get_time:   ktime_get
+>   .offset:     0 nsecs
+> active timers:
+>  #0: <c14a2b50>, menu_hrtimer_notify, S:01, hrtimer_start, swapper/0/0
+>  # expires at 76779328789-76779328789 nsecs [in 10975 to 10975 nsecs]
+>  #1: <c14a0dd8>, tick_sched_timer, S:01, hrtimer_start, swapper/0/0
+>  # expires at 76800000000-76800000000 nsecs [in 20682186 to 20682186 nsecs]
+>  #2: <ed956e40>, timerfd_tmrproc, S:01, hrtimer_start, systemd/1
+>  # expires at 93249172026-93249172026 nsecs [in 16469854212 to 16469854212 nsecs]
+>  #3: <ed956c00>, timerfd_tmrproc, S:01, hrtimer_start, systemd/1
+>  # expires at 900000055806-900000055806 nsecs [in 823220737992 to 823220737992 nsecs]
+>  clock 1:
+>   .base:       c14a0cc8
+>   .index:      1
+>   .resolution: 1 nsecs
+>   .get_time:   ktime_get_real
+>   .offset:     975789465870609368 nsecs
+> active timers:
+>  clock 2:
+>   .base:       c14a0d00
+>   .index:      2
+>   .resolution: 1 nsecs
+>   .get_time:   ktime_get_boottime
+>   .offset:     0 nsecs
+> active timers:
+>   .expires_next   : 76779492678 nsecs
+>   .hres_active    : 1
+>   .nr_events      : 2449
+>   .nr_retries     : 66
+>   .nr_hangs       : 0
+>   .max_hang_time  : 0 nsecs
+>   .nohz_mode      : 2
+>   .last_tick      : 76780000000 nsecs
+>   .tick_stopped   : 1
+>   .idle_jiffies   : 4294944973
+>   .idle_calls     : 3114
+>   .idle_sleeps    : 981
+>   .idle_entrytime : 76779354678 nsecs
+>   .idle_waketime  : 76779336246 nsecs
+>   .idle_exittime  : 76769862116 nsecs
+>   .idle_sleeptime : 70735903990 nsecs
+>   .iowait_sleeptime: 18432 nsecs
+>   .last_jiffies   : 4294944973
+>   .next_jiffies   : 4294944976
+>   .idle_expires   : 76800000000 nsecs
+> jiffies: 4294944973
+> 
+> cpu: 1
+>  clock 0:
+>   .base:       c14a9c90
+>   .index:      0
+>   .resolution: 1 nsecs
+>   .get_time:   ktime_get
+>   .offset:     0 nsecs
+> active timers:
+>  #0: <c14a9dd8>, tick_sched_timer, S:01, hrtimer_start_range_ns, swapper/1/0
+>  # expires at 76780000000-76780000000 nsecs [in 682186 to 682186 nsecs]
+>  clock 1:
+>   .base:       c14a9cc8
+>   .index:      1
+>   .resolution: 1 nsecs
+>   .get_time:   ktime_get_real
+>   .offset:     975789465870609368 nsecs
+> active timers:
+>  clock 2:
+>   .base:       c14a9d00
+>   .index:      2
+>   .resolution: 1 nsecs
+>   .get_time:   ktime_get_boottime
+>   .offset:     0 nsecs
+> active timers:
+>   .expires_next   : 76780000000 nsecs
+>   .hres_active    : 1
+>   .nr_events      : 2257
+>   .nr_retries     : 61
+>   .nr_hangs       : 0
+>   .max_hang_time  : 0 nsecs
+>   .nohz_mode      : 2
+>   .last_tick      : 76700000000 nsecs
+>   .tick_stopped   : 0
+>   .idle_jiffies   : 4294944965
+>   .idle_calls     : 2998
+>   .idle_sleeps    : 444
+>   .idle_entrytime : 76771944950 nsecs
+>   .idle_waketime  : 76768498136 nsecs
+>   .idle_exittime  : 76768498136 nsecs
+>   .idle_sleeptime : 72124544054 nsecs
+>   .iowait_sleeptime: 4276262 nsecs
+>   .last_jiffies   : 4294944973
+>   .next_jiffies   : 4294944974
+>   .idle_expires   : 78880000000 nsecs
+> jiffies: 4294944973
+> 
+> 
+> Tick Device: mode:     1
+> Broadcast device
+> Clock Event Device: xttcps_clockevent
+>  max_delta_ns:   1207932479
+>  min_delta_ns:   18432
+>  mult:           233015
+>  shift:          32
+>  mode:           1
+>  next_event:     9223372036854775807 nsecs
+>  set_next_event: xttcps_set_next_event
+>  set_mode:       xttcps_set_mode
+>  event_handler:  tick_handle_oneshot_broadcast
+>  retries:        0
+> tick_broadcast_mask: 00000000
+> tick_broadcast_oneshot_mask: 00000000
+> 
+> 
+> Tick Device: mode:     1
+> Per CPU device: 0
+> Clock Event Device: local_timer
+>  max_delta_ns:   12884902005
+>  min_delta_ns:   1000
+>  mult:           715827876
+>  shift:          31
+>  mode:           3
+>  next_event:     76800000000 nsecs
+>  set_next_event: twd_set_next_event
+>  set_mode:       twd_set_mode
+>  event_handler:  hrtimer_interrupt
+>  retries:        0
+> 
+> Tick Device: mode:     1
+> Per CPU device: 1
+> Clock Event Device: local_timer
+>  max_delta_ns:   12884902005
+>  min_delta_ns:   1000
+>  mult:           715827876
+>  shift:          31
+>  mode:           3
+>  next_event:     76780000000 nsecs
+>  set_next_event: twd_set_next_event
+>  set_mode:       twd_set_mode
+>  event_handler:  hrtimer_interrupt
+>  retries:        0
+> 
