@@ -1,67 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 31 Jul 2013 11:35:07 +0100
-Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
- BCM5301X/BCM470X SoCs with ARM CPU
-In-Reply-To: <51F827EC.3090104@hauke-m.de>
-References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
- <51F28A20.7060105@hauke-m.de>
- <20130726165311.GH17886@mudshark.cambridge.arm.com>
- <201307272149.17108.arnd@arndb.de>
- <20130730133601.GN11527@mudshark.cambridge.arm.com>
- <51F827EC.3090104@hauke-m.de>
-Message-ID: <20130731103507.GF23681@mudshark.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 31 Jul 2013 11:36:10 +0100
+Subject: New dapm panic on beaver with next-20130730
+In-Reply-To: <51F8B045.8030303@metafoo.de>
+References: <CAOesGMig6jry1GJLoTnOqxom1KjtBTUtZz-_-SiZLpGTc3VkqA@mail.gmail.com>
+ <51F8A933.4080708@metafoo.de>
+ <CAOesGMjqyF7zPoGsW6oBRFey7Bc_umnoGob7oQ=_c3n7oevuaQ@mail.gmail.com>
+ <51F8B045.8030303@metafoo.de>
+Message-ID: <20130731103610.GH9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 09:54:04PM +0100, Hauke Mehrtens wrote:
-> On 07/30/2013 03:36 PM, Will Deacon wrote:
-> > On Sat, Jul 27, 2013 at 08:49:16PM +0100, Arnd Bergmann wrote:
-> >> On Friday 26 July 2013, Will Deacon wrote:
-> >>>>> At least, we need a pretty good explanation of what exactly is causing
-> >>>>> these spurious aborts before we start ignoring them unconditionally like
-> >>>>> this. You're effectively masking an extremely serious error indicator with
-> >>>>> this change.
-> >>>>
-> >>>> This fault occurs once every boot sometime early in the boot process,
-> >>>> but the actual time this happens varies randomly.
-> >>>
-> >>> Well that's interesting in itself. It sounds like we don't know *for sure*
-> >>> whether the abort is triggered by Linux. Since the abort is imprecise, the
-> >>> timing will vary.
-> >>
-> >> It might be possible to find out the culprit if you just enter an endless loop
-> >> in the early kernel boot code. If you enter the loop before Linux does something
-> >> wrong, it won't crash, otherwise it will. After that, you could bisect the
-> >> boot process by moving the busy loop around.
-> >>
-> >> If it even crashes at the point where Linux gets entered, it's a bug in the
-> >> boot loader.
-> > 
-> > Can you give Arnd's suggestion a go please Hauke?
-> 
-> Hi
-> 
-> I just tried that, but it did not crash in the loop. :-(
+On Wed, Jul 31, 2013 at 08:35:49AM +0200, Lars-Peter Clausen wrote:
 
-Turn that frown around -- this is a useful result! It means that the abort
-is likely caused by the kernel, rather than the boot loader (although we
-still can't rule it out, it depends where you put the loop).
+> 0x6b6b6b6b is poisoned freed memory. According to the source neither
+> the INR Mux nor the INL Mux widget should have any sinks. Can you
+> add a couple more printks:
 
-> Now, with 3.11-rc3 it crashed reproducible after Freeing unused kernel
-> memory, see this:
-> 
-> [    0.859198] Freeing unused kernel memory: 1124K (c0260000 - c0379000)
-> [    0.866298] Unhandled fault: imprecise external abort (0x1c06) at
-> 0xb6f8b005
-> [    0.873538] Kernel panic - not syncing: Attempted to kill init!
-> exitcode=0x00000007
-> 
-> Do you have some more informations about this type of error?
-
-Hmm, so that's now exploding on a user address. Is this an A9-based SoC? If
-so, can you try disabling PL310 (CONFIG_CACHE_L2X0) and see if it makes a
-different please?
-
-Cheers,
-
-Will
+Dan Carpenter sent a patch which is probably the issue - I'm trying to
+figure out how to boot my Beaver board so hopefully I can test, it'll be
+in -next tomorrow anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/62a5d1e0/attachment-0001.sig>
