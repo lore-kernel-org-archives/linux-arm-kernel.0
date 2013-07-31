@@ -1,108 +1,67 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 31 Jul 2013 12:36:07 +0200
-Subject: [PATCH v3] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <1375215668-29171-1-git-send-email-coelho@ti.com>
-References: <1375215668-29171-1-git-send-email-coelho@ti.com>
-Message-ID: <19103383.PkgSdCFM10@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 31 Jul 2013 11:35:07 +0100
+Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+In-Reply-To: <51F827EC.3090104@hauke-m.de>
+References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
+ <51F28A20.7060105@hauke-m.de>
+ <20130726165311.GH17886@mudshark.cambridge.arm.com>
+ <201307272149.17108.arnd@arndb.de>
+ <20130730133601.GN11527@mudshark.cambridge.arm.com>
+ <51F827EC.3090104@hauke-m.de>
+Message-ID: <20130731103507.GF23681@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luciano,
-
-On Tuesday 30 July 2013 23:21:08 Luciano Coelho wrote:
-> Add device tree bindings documentation for the TI WiLink modules.
-> Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
-> modules is supported.
+On Tue, Jul 30, 2013 at 09:54:04PM +0100, Hauke Mehrtens wrote:
+> On 07/30/2013 03:36 PM, Will Deacon wrote:
+> > On Sat, Jul 27, 2013 at 08:49:16PM +0100, Arnd Bergmann wrote:
+> >> On Friday 26 July 2013, Will Deacon wrote:
+> >>>>> At least, we need a pretty good explanation of what exactly is causing
+> >>>>> these spurious aborts before we start ignoring them unconditionally like
+> >>>>> this. You're effectively masking an extremely serious error indicator with
+> >>>>> this change.
+> >>>>
+> >>>> This fault occurs once every boot sometime early in the boot process,
+> >>>> but the actual time this happens varies randomly.
+> >>>
+> >>> Well that's interesting in itself. It sounds like we don't know *for sure*
+> >>> whether the abort is triggered by Linux. Since the abort is imprecise, the
+> >>> timing will vary.
+> >>
+> >> It might be possible to find out the culprit if you just enter an endless loop
+> >> in the early kernel boot code. If you enter the loop before Linux does something
+> >> wrong, it won't crash, otherwise it will. After that, you could bisect the
+> >> boot process by moving the busy loop around.
+> >>
+> >> If it even crashes at the point where Linux gets entered, it's a bug in the
+> >> boot loader.
+> > 
+> > Can you give Arnd's suggestion a go please Hauke?
 > 
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
+> Hi
 > 
-> In v3, use IRQ_TYPE_LEVEL_HIGH in the example, as suggested by Laurent.
-> 
->  .../devicetree/bindings/net/wireless/ti-wilink.txt | 68
-> ++++++++++++++++++++++ 1 file changed, 68 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt new file
-> mode 100644
-> index 0000000..aafebb1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> @@ -0,0 +1,68 @@
-> +TI WiLink Wireless Modules Device Tree Bindings
-> +===============================================
-> +
-> +The WiLink modules provide wireless connectivity, such as WLAN,
-> +Bluetooth, FM and NFC.
-> +
-> +There are several different modules available, which can be grouped by
-> +their generation: WiLink6, WiLink7 and WiLink8.  WiLink4 is not
-> +currently supported with device tree.
-> +
-> +Currently, only the WLAN portion of the modules is supported with
-> +device tree.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- compatible: should be "ti,wilink6", "ti,wilink7" or "ti,wilink8"
-> +- interrupt-parent: the interrupt controller
-> +- interrupts: out-of-band WLAN interrupt
-> +	See the interrupt controller's bindings documentation for
-> +	detailed definition.
-> +
-> +Optional properties:
-> +--------------------
-> +
-> +- clocks: list of clocks needed by the chip as follows:
-> +
-> +  refclock: the internal WLAN reference clock frequency (required for
-> +	WiLink6 and WiLink7; not used for WiLink8).
-> +
-> +  tcxoclock: the internal WLAN TCXO clock frequency (required for
-> +	WiLink7 not used for WiLink6 and WiLink8).
-> +
-> +  The clocks must be defined and named accordingly.  For example:
-> +
-> +  clocks = <&refclock>
-> +  clock-names = "refclock";
-> +
-> +  refclock: refclock {
-> +		     compatible = "ti,wilink-clock";
-> +		     #clock-cells = <0>;
-> +		     clock-frequency = <38400000>;
-> +	};
-> +
-> +  Some modules that contain the WiLink chip provide clocks in the
-> +  module itself.  In this case, we define a "ti,wilink-clock" as shown
-> +  above.  But any other clock could in theory be used, so the proper
-> +  clock definition should be used.
-> +
-> +
-> +Example:
-> +--------
-> +
-> +Example definition that can be used in OMAP4 Panda:
-> +
-> +wlan {
-> +	compatible = "ti,wilink6";
-> +	interrupt-parent = <&gpio2>;
-> +	interrupts = <21 IRQ_TYPE_LEVEL_HIGH>;	/* gpio line 53 */
-> +	clocks = <&refclock>;
-> +	clock-names = "refclock";
-> +
-> +	refclock: refclock {
-> +		compatible = "ti,wilink-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <38400000>;
-> +	};
-> +};
--- 
-Regards,
+> I just tried that, but it did not crash in the loop. :-(
 
-Laurent Pinchart
+Turn that frown around -- this is a useful result! It means that the abort
+is likely caused by the kernel, rather than the boot loader (although we
+still can't rule it out, it depends where you put the loop).
+
+> Now, with 3.11-rc3 it crashed reproducible after Freeing unused kernel
+> memory, see this:
+> 
+> [    0.859198] Freeing unused kernel memory: 1124K (c0260000 - c0379000)
+> [    0.866298] Unhandled fault: imprecise external abort (0x1c06) at
+> 0xb6f8b005
+> [    0.873538] Kernel panic - not syncing: Attempted to kill init!
+> exitcode=0x00000007
+> 
+> Do you have some more informations about this type of error?
+
+Hmm, so that's now exploding on a user address. Is this an A9-based SoC? If
+so, can you try disabling PL310 (CONFIG_CACHE_L2X0) and see if it makes a
+different please?
+
+Cheers,
+
+Will
