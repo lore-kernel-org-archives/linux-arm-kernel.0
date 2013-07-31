@@ -1,68 +1,74 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 31 Jul 2013 14:47:12 -0600
-Subject: Defining schemas for Device Tree
-In-Reply-To: <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
-References: <51F6E30B.7060106@wwwdotorg.org>
- <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
- <1706112.Xn49tiCSKF@thinkpad>
- <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
- <20130730102511.GM9858@sirena.org.uk>
- <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
- <51F7F596.6020503@wwwdotorg.org>
- <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
- <20130730205716.GZ9858@sirena.org.uk>
- <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
- <20130730230331.GC9858@sirena.org.uk>
- <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
-Message-ID: <51F977D0.7050200@wwwdotorg.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 31 Jul 2013 22:49:06 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
+References: <51E72DCA.9070500@codeaurora.org>
+ <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+ <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
+ <51F66565.7010600@linaro.org>
+ <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
+ <51F77D93.4030505@linaro.org>
+ <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
+Message-ID: <51F97842.6050200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 05:23 PM, jonsmirl at gmail.com wrote:
-> On Tue, Jul 30, 2013 at 7:03 PM, Mark Brown <broonie@kernel.org> wrote:
->> On Tue, Jul 30, 2013 at 06:19:08PM -0400, jonsmirl at gmail.com wrote:
+On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+>>> Hi Daniel,
+>>>
+>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+>>> (snip)
+>>>>
+>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+>>>> timer will be stopped when entering to the idle state. In this case, the
+>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+>>>> idle state, switching the local timer back in use.
+>>>
+>>> I've been thinking about this, trying to understand how this makes my
+>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+>>> would make the timer core switch to a broadcast device even though it
+>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+>>> something useless, but nothing wrong in a sense that it should result in
+>>> breakage. I guess I'm missing something obvious. This timer system will
+>>> always remain a mystery to me.
+>>>
+>>> Actually this more or less leads to the question: What is this
+>>> 'broadcast timer'. I guess that is some clockevent device which is
+>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+>>> hang pointing to some issue with that driver?
 >>
->>> FDT is versioned and PowerPC docs say that multiple versions have been
->>> released.  If we find enough flaws we could do a new release then use
->>> the quirks scheme to read the older versions.
->>
->> That does involve updating everything that wants to understand FDTs in
->> the new FDT format version though.  I'm not sure that's going to be
->> greeted with universal enthusiasm.
+>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
 > 
-> Shipped hardware containing FDTs would keep the version they shipped
-> with. That's the point of making this  a stable ABI. The Linux quirk
-> code would convert the older format to the new format at boot time.
+> So, the correct run results (full output attached).
 > 
-> So to change this you need to:
-> 1) change dtc to produce the new version
-> 2) adjust the kernel code to understand the new version
-> 3) adjust the quirk code to convert the known set of older firmware
-> based FDTs into the new format. For the simple string case the strings
-> would be turned into indirect pointers instead of being in-line.
+> The vanilla kernel uses the twd timers as local timers and the TTC as
+> broadcast device:
+> 	Tick Device: mode:     1                                                         
+> 	Broadcast device  
+> 	Clock Event Device: ttc_clockevent
+> 
+> When I remove the offending CPUIDLE flag and add the DT fragment to
+> enable the global timer, the twd timers are still used as local timers
+> and the broadcast device is the global timer:
+> 	Tick Device: mode:     1                                                         
+> 	Broadcast device                                                                 
+> 	Clock Event Device: arm_global_timer
+> 
+> Again, since boot hangs in the actually broken case, I don't see way to
+> obtain this information for that case.
 
-There's one issue issue with the quirk/conversion layer in the kernel.
+Can't you use the maxcpus=1 option to ensure the system to boot up ?
 
-Various combinations are supposed to work:
 
-1) The "current" kernel with the "current" DTB. I think everyone agrees
-on that much:-)
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-2) Using an old DTB with a new kernel. This could be handled by having
-stable DT bindings, and/or by having a quirk/conversion layer in the
-kernel to convert old DTBs into whatever format the new kernel expects.
-
-3) Using a new DTB with a old kernel. Rob Herring raised the point that
-a firmware update (which might include updating the DTB the firmware
-passes to the kernel) should not make the kernel you have installed in
-the filesystem fail to boot.
-
-I'm assuming that if the quirk/conversion layer you're championing were
-the solution chosen for (2), then at least some of the time, people
-would start using the new DT binding when writing new DTs, or modifying
-existing DTs. That would break point (3) above, since the new DT would
-no longer work with the old kernel.
-
-I think the only way to satisfy all three points above is to have truly
-stable backwards-compatible bindings, without relying on any in-kernel
-conversion layer.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
