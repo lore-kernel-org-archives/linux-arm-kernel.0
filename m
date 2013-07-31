@@ -1,77 +1,108 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 31 Jul 2013 11:30:25 +0100
-Subject: [PATCH 11/13] ARM: bL_switcher: veto CPU hotplug requests when
- the switcher is active
-In-Reply-To: <1374550289-25305-12-git-send-email-nicolas.pitre@linaro.org>
-References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
- <1374550289-25305-12-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130731103025.GC6583@e102568-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 31 Jul 2013 12:36:07 +0200
+Subject: [PATCH v3] Documentation: dt: bindings: TI WiLink modules
+In-Reply-To: <1375215668-29171-1-git-send-email-coelho@ti.com>
+References: <1375215668-29171-1-git-send-email-coelho@ti.com>
+Message-ID: <19103383.PkgSdCFM10@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 04:31:27AM +0100, Nicolas Pitre wrote:
-> Trying to support both the switcher and CPU hotplug at the same time
-> is quickly becoming very complex due to ambiguous semantics.  So let's
-> simply veto any hotplug requests when the switcher is active for now.
+Hi Luciano,
+
+On Tuesday 30 July 2013 23:21:08 Luciano Coelho wrote:
+> Add device tree bindings documentation for the TI WiLink modules.
+> Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
+> modules is supported.
 > 
-> This restriction might be loosened eventually.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
->  arch/arm/common/bL_switcher.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
 > 
-> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-> index 704c4b4ef3..2fe3911601 100644
-> --- a/arch/arm/common/bL_switcher.c
-> +++ b/arch/arm/common/bL_switcher.c
-> @@ -528,6 +528,25 @@ static int __init bL_switcher_sysfs_init(void)
->  
->  #endif  /* CONFIG_SYSFS */
->  
-> +/*
-> + * Veto any CPU hotplug operation while the switcher is active.
-> + * We're just not ready to deal with that given the trickery involved.
-> + */
-> +static int bL_switcher_hotplug_callback(struct notifier_block *nfb,
-> +					unsigned long action, void *hcpu)
-> +{
-> +	switch (action) {
-> +	case CPU_UP_PREPARE:
-> +	case CPU_DOWN_PREPARE:
-> +		if (bL_switcher_active)
-> +			return NOTIFY_BAD;
-
-This is a bit of a sledgehammer. It implies that S2R can't be implemented when
-the switcher is active. Are we really sure that hotplug, given MCPM HW
-CPUs awareness, is incompatible with the switcher as it stands ?
-
-What are the main issues that have to be tackled ?
-
-Thanks,
-Lorenzo
-
-> +	}
-> +	return NOTIFY_DONE;
-> +}
+> In v3, use IRQ_TYPE_LEVEL_HIGH in the example, as suggested by Laurent.
+> 
+>  .../devicetree/bindings/net/wireless/ti-wilink.txt | 68
+> ++++++++++++++++++++++ 1 file changed, 68 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt new file
+> mode 100644
+> index 0000000..aafebb1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
+> @@ -0,0 +1,68 @@
+> +TI WiLink Wireless Modules Device Tree Bindings
+> +===============================================
 > +
-> +static struct notifier_block bL_switcher_hotplug_notifier =
-> +	{ &bL_switcher_hotplug_callback, NULL, 0 };
+> +The WiLink modules provide wireless connectivity, such as WLAN,
+> +Bluetooth, FM and NFC.
 > +
->  static bool no_bL_switcher;
->  core_param(no_bL_switcher, no_bL_switcher, bool, 0644);
->  
-> @@ -540,6 +559,8 @@ static int __init bL_switcher_init(void)
->  		return -EINVAL;
->  	}
->  
-> +	register_cpu_notifier(&bL_switcher_hotplug_notifier);
+> +There are several different modules available, which can be grouped by
+> +their generation: WiLink6, WiLink7 and WiLink8.  WiLink4 is not
+> +currently supported with device tree.
 > +
->  	if (!no_bL_switcher) {
->  		ret = bL_switcher_enable();
->  		if (ret)
-> -- 
-> 1.8.1.2
-> 
-> 
-> 
+> +Currently, only the WLAN portion of the modules is supported with
+> +device tree.
+> +
+> +Required properties:
+> +--------------------
+> +
+> +- compatible: should be "ti,wilink6", "ti,wilink7" or "ti,wilink8"
+> +- interrupt-parent: the interrupt controller
+> +- interrupts: out-of-band WLAN interrupt
+> +	See the interrupt controller's bindings documentation for
+> +	detailed definition.
+> +
+> +Optional properties:
+> +--------------------
+> +
+> +- clocks: list of clocks needed by the chip as follows:
+> +
+> +  refclock: the internal WLAN reference clock frequency (required for
+> +	WiLink6 and WiLink7; not used for WiLink8).
+> +
+> +  tcxoclock: the internal WLAN TCXO clock frequency (required for
+> +	WiLink7 not used for WiLink6 and WiLink8).
+> +
+> +  The clocks must be defined and named accordingly.  For example:
+> +
+> +  clocks = <&refclock>
+> +  clock-names = "refclock";
+> +
+> +  refclock: refclock {
+> +		     compatible = "ti,wilink-clock";
+> +		     #clock-cells = <0>;
+> +		     clock-frequency = <38400000>;
+> +	};
+> +
+> +  Some modules that contain the WiLink chip provide clocks in the
+> +  module itself.  In this case, we define a "ti,wilink-clock" as shown
+> +  above.  But any other clock could in theory be used, so the proper
+> +  clock definition should be used.
+> +
+> +
+> +Example:
+> +--------
+> +
+> +Example definition that can be used in OMAP4 Panda:
+> +
+> +wlan {
+> +	compatible = "ti,wilink6";
+> +	interrupt-parent = <&gpio2>;
+> +	interrupts = <21 IRQ_TYPE_LEVEL_HIGH>;	/* gpio line 53 */
+> +	clocks = <&refclock>;
+> +	clock-names = "refclock";
+> +
+> +	refclock: refclock {
+> +		compatible = "ti,wilink-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <38400000>;
+> +	};
+> +};
+-- 
+Regards,
+
+Laurent Pinchart
