@@ -1,46 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 31 Jul 2013 10:33:50 +0900
-Subject: [PATCH 2/4] shdma: fixup sh_dmae_get_partial() calculation error
+Date: Wed, 31 Jul 2013 10:33:51 +0900
+Subject: [PATCH 3/4] ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
 In-Reply-To: <cover.1375234088.git.horms+renesas@verge.net.au>
 References: <cover.1375234088.git.horms+renesas@verge.net.au>
-Message-ID: <3c4d9276626c93477af0b0b9d46b4dcb37e2eed2.1375234088.git.horms+renesas@verge.net.au>
+Message-ID: <fa3e0cee12fbdd9e0b03470b2b8cf968f537c161.1375234088.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-sh_desc->hw.tcr is controlling real data size,
-and, register TCR is controlling data transfer count
-which was xmit_shifted value of hw.tcr.
-Current sh_dmae_get_partial() is calculating in different unit.
-This patch fixes it.
+The following message is printed on the BOCK-W kernel bootup:
 
-This bug has been present since c014906a870ce70e009def0c9d170ccabeb0be63
-("dmaengine: shdma: extend .device_terminate_all() to record partial
-transfer"), which was added in 2.6.34-rc1.
+sh-pfc pfc-r8a7778: invalid group "sdhi0" for function "sdhi0"
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+In addition, SD card cannot be detected.  The reason is apparently that commit
+ca7bb309485e4ec89a9addd47bea (ARM: shmobile: bockw: add SDHI0 support) matched
+the previous version of commit 564617d2f92473031d035deb273da5 (sh-pfc: r8a7778:
+add SDHI support).
+
+Add the missing pin groups according to the BOCK-W board schematics.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/dma/sh/shdma.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/board-bockw.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/dma/sh/shdma.c b/drivers/dma/sh/shdma.c
-index b67f45f..5039fbc 100644
---- a/drivers/dma/sh/shdma.c
-+++ b/drivers/dma/sh/shdma.c
-@@ -400,8 +400,8 @@ static size_t sh_dmae_get_partial(struct shdma_chan *schan,
- 						    shdma_chan);
- 	struct sh_dmae_desc *sh_desc = container_of(sdesc,
- 					struct sh_dmae_desc, shdma_desc);
--	return (sh_desc->hw.tcr - sh_dmae_readl(sh_chan, TCR)) <<
--		sh_chan->xmit_shift;
-+	return sh_desc->hw.tcr -
-+		(sh_dmae_readl(sh_chan, TCR) << sh_chan->xmit_shift);
- }
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index d555464..3354a85 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -167,7 +167,13 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
+ 				  "usb1", "usb1"),
+ 	/* SDHI0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
+-				  "sdhi0", "sdhi0"),
++				  "sdhi0_data4", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
++				  "sdhi0_ctrl", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
++				  "sdhi0_cd", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
++				  "sdhi0_wp", "sdhi0"),
+ };
  
- /* Called from error IRQ or NMI */
+ #define FPGA	0x18200000
 -- 
 1.8.3.2
