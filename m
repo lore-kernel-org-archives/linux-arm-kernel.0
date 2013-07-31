@@ -1,116 +1,347 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 31 Jul 2013 14:51:55 +0200
-Subject: [PATCH v4 0/4] Device Tree support for CMA (Contiguous Memory
- Allocator)
-Message-ID: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 31 Jul 2013 14:51:56 +0200
+Subject: [PATCH v4 1/4] drivers: dma-contiguous: clean source code and prepare
+ for device tree
+In-Reply-To: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
+References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1375275119-12787-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch cleans the initialization of dma contiguous framework. The
+all-in-one dma_declare_contiguous() function is now separated into
+dma_contiguous_reserve_area() which only steals the the memory from
+memblock allocator and dma_contiguous_add_device() function, which
+assigns given device to the specified reserved memory area. This improves
+the flexibility in defining contiguous memory areas and assigning device
+to them, because now it is possible to assign more than one device to
+the given contiguous memory area. Such split in initialization procedure
+is also required for upcoming device tree support.
 
-This is a fourth version of my proposal for device tree integration for
-reserved memory and Contiguous Memory Allocator. After the comments from
-Grant Likely I moved back memory region definitions back to /memory node
-(as it was in the first version of this proposal). I've also extended
-the code and made it more generic, added support for so called reserved
-dma memory (special dma memory regions created by dma_alloc_coherent()
-function, for exclusive usage for dma allocation for the given device).
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/base/dma-contiguous.c        |  147 +++++++++++++++++-----------------
+ include/asm-generic/dma-contiguous.h |    2 -
+ include/linux/dma-contiguous.h       |   49 +++++++++++-
+ 3 files changed, 119 insertions(+), 79 deletions(-)
 
-Just a few words for those who see this code for the first time:
-
-The proposed bindings allows to define contiguous memory regions of
-specified base address and size. Then, the defined regions can be
-assigned to the given device(s) by adding a property with a phanle to
-the defined contiguous memory region. From the device tree perspective
-that's all. Once the bindings are added, all the memory allocations from
-dma-mapping subsystem will be served from the defined contiguous memory
-regions.
-
-Contiguous Memory Allocator is a framework, which lets to provide a
-large contiguous memory buffers for (usually a multimedia) devices. The
-contiguous memory is reserved during early boot and then shared with
-kernel, which is allowed to allocate it for movable pages. Then, when
-device driver requests a contigouous buffer, the framework migrates
-movable pages out of contiguous region and gives it to the driver. When
-device driver frees the buffer, it is added to kernel memory pool again.
-For more information, please refer to commit c64be2bb1c6eb43c838b2c6d57
-("drivers: add Contiguous Memory Allocator") and d484864dd96e1830e76895
-(CMA merge commit).
-
-Why we need device tree bindings for CMA at all?
-
-Older ARM kernels used so called board-based initialization. Those board
-files contained a definition of all hardware blocks available on the
-target system and particular kernel and driver software configuration
-selected by the board maintainer.
-
-In the new approach the board files will be removed completely and
-Device Tree approach is used to describe all hardware blocks available
-on the target system. By definition, the bindings should be software
-independent, so at least in theory it should be possible to use those
-bindings with other operating systems than Linux kernel.
-
-Reserved memory configuration belongs to the grey area. It might depend
-on hardware restriction of the board or modules and low-level
-configuration done by bootloader. Putting reserved and contiguous memory
-regions to /memory node and having phandles to those regions in the
-device nodes however matches well with the device-tree typical style of
-linking devices with other resources like clocks, interrupts,
-regulators, power domains, etc. This is the main reason to use such
-approach instead of putting everything to /chosen node as it has been
-proposed in v2 and v3.
-
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-Changelog:
-
-v4:
-- moved back contiguous-memory bindings from /chosen/contiguous-memory
-  to /memory nodes as suggested by Grant (see 
-  http://article.gmane.org/gmane.linux.drivers.devicetree/41030
-  for more details)
-- added support for DMA reserved memory with dma_declare_coherent()
-- moved code to drivers/of/of_reserved_mem.c
-- added generic code to scan specific path in flat device tree
-
-v3: http://thread.gmane.org/gmane.linux.drivers.devicetree/40013/
-- fixed issues pointed by Laura and updated documentation
-
-v2: http://thread.gmane.org/gmane.linux.drivers.devicetree/34075
-- moved contiguous-memory bindings from /memory to /chosen/contiguous-memory/
-  node to avoid spreading Linux specific parameters over the whole device
-  tree definitions
-- added support for autoconfigured regions (use zero base)
-- fixes minor bugs
-
-v1: http://thread.gmane.org/gmane.linux.drivers.devicetree/30111/
-- initial proposal
-
-Patch summary:
-
-Marek Szyprowski (4):
-  drivers: dma-contiguous: clean source code and prepare for device
-    tree
-  drivers: of: add function to scan fdt nodes given by path
-  drivers: of: add initialization code for dma reserved memory
-  ARM: init: add support for reserved memory defined by device tree
-
- Documentation/devicetree/bindings/memory.txt |  152 ++++++++++++++++++++++
- arch/arm/mm/init.c                           |    3 +
- drivers/base/dma-contiguous.c                |  147 +++++++++++-----------
- drivers/of/Kconfig                           |    6 +
- drivers/of/Makefile                          |    1 +
- drivers/of/fdt.c                             |   76 +++++++++++
- drivers/of/of_reserved_mem.c                 |  175 ++++++++++++++++++++++++++
- include/asm-generic/dma-coherent.h           |    6 +
- include/asm-generic/dma-contiguous.h         |    2 -
- include/linux/dma-contiguous.h               |   49 +++++++-
- include/linux/of_fdt.h                       |    3 +
- 11 files changed, 541 insertions(+), 79 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory.txt
- create mode 100644 drivers/of/of_reserved_mem.c
-
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 0ca5442..2cc9c77 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -96,7 +96,7 @@ static inline __maybe_unused phys_addr_t cma_early_percent_memory(void)
+ #endif
+ 
+ /**
+- * dma_contiguous_reserve() - reserve area for contiguous memory handling
++ * dma_contiguous_reserve() - reserve area(s) for contiguous memory handling
+  * @limit: End address of the reserved memory (optional, 0 for any).
+  *
+  * This function reserves memory from early allocator. It should be
+@@ -124,22 +124,29 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
+ #endif
+ 	}
+ 
+-	if (selected_size) {
++	if (selected_size && !dma_contiguous_default_area) {
+ 		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
+ 			 (unsigned long)selected_size / SZ_1M);
+ 
+-		dma_declare_contiguous(NULL, selected_size, 0, limit);
++		dma_contiguous_reserve_area(selected_size, 0, limit,
++					    &dma_contiguous_default_area);
+ 	}
+ };
+ 
+ static DEFINE_MUTEX(cma_mutex);
+ 
+-static __init int cma_activate_area(unsigned long base_pfn, unsigned long count)
++static __init int cma_activate_area(struct cma *cma)
+ {
+-	unsigned long pfn = base_pfn;
+-	unsigned i = count >> pageblock_order;
++	int bitmap_size = BITS_TO_LONGS(cma->count) * sizeof(long);
++	unsigned long base_pfn = cma->base_pfn, pfn = base_pfn;
++	unsigned i = cma->count >> pageblock_order;
+ 	struct zone *zone;
+ 
++	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
++
++	if (!cma->bitmap)
++		return -ENOMEM;
++
+ 	WARN_ON_ONCE(!pfn_valid(pfn));
+ 	zone = page_zone(pfn_to_page(pfn));
+ 
+@@ -153,92 +160,53 @@ static __init int cma_activate_area(unsigned long base_pfn, unsigned long count)
+ 		}
+ 		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
+ 	} while (--i);
+-	return 0;
+-}
+-
+-static __init struct cma *cma_create_area(unsigned long base_pfn,
+-				     unsigned long count)
+-{
+-	int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+-	struct cma *cma;
+-	int ret = -ENOMEM;
+-
+-	pr_debug("%s(base %08lx, count %lx)\n", __func__, base_pfn, count);
+-
+-	cma = kmalloc(sizeof *cma, GFP_KERNEL);
+-	if (!cma)
+-		return ERR_PTR(-ENOMEM);
+ 
+-	cma->base_pfn = base_pfn;
+-	cma->count = count;
+-	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+-
+-	if (!cma->bitmap)
+-		goto no_mem;
+-
+-	ret = cma_activate_area(base_pfn, count);
+-	if (ret)
+-		goto error;
+-
+-	pr_debug("%s: returned %p\n", __func__, (void *)cma);
+-	return cma;
+-
+-error:
+-	kfree(cma->bitmap);
+-no_mem:
+-	kfree(cma);
+-	return ERR_PTR(ret);
++	return 0;
+ }
+ 
+-static struct cma_reserved {
+-	phys_addr_t start;
+-	unsigned long size;
+-	struct device *dev;
+-} cma_reserved[MAX_CMA_AREAS] __initdata;
+-static unsigned cma_reserved_count __initdata;
++static struct cma cma_areas[MAX_CMA_AREAS];
++static unsigned cma_area_count;
+ 
+ static int __init cma_init_reserved_areas(void)
+ {
+-	struct cma_reserved *r = cma_reserved;
+-	unsigned i = cma_reserved_count;
+-
+-	pr_debug("%s()\n", __func__);
++	int i;
+ 
+-	for (; i; --i, ++r) {
+-		struct cma *cma;
+-		cma = cma_create_area(PFN_DOWN(r->start),
+-				      r->size >> PAGE_SHIFT);
+-		if (!IS_ERR(cma))
+-			dev_set_cma_area(r->dev, cma);
++	for (i = 0; i < cma_area_count; i++) {
++		int ret = cma_activate_area(&cma_areas[i]);
++		if (ret)
++			return ret;
+ 	}
++
+ 	return 0;
+ }
+ core_initcall(cma_init_reserved_areas);
+ 
+ /**
+- * dma_declare_contiguous() - reserve area for contiguous memory handling
+- *			      for particular device
+- * @dev:   Pointer to device structure.
+- * @size:  Size of the reserved memory.
+- * @base:  Start address of the reserved memory (optional, 0 for any).
++ * dma_contiguous_reserve_area() - reserve custom contiguous area
++ * @size: Size of the reserved area (in bytes),
++ * @base: Base address of the reserved area optional, use 0 for any
+  * @limit: End address of the reserved memory (optional, 0 for any).
++ * @res_cma: Pointer to store the created cma region.
+  *
+- * This function reserves memory for specified device. It should be
+- * called by board specific code when early allocator (memblock or bootmem)
+- * is still activate.
++ * This function reserves memory from early allocator. It should be
++ * called by arch specific code once the early allocator (memblock or bootmem)
++ * has been activated and all other subsystems have already allocated/reserved
++ * memory. This function allows to create custom reserved areas for specific
++ * devices.
+  */
+-int __init dma_declare_contiguous(struct device *dev, phys_addr_t size,
+-				  phys_addr_t base, phys_addr_t limit)
++int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
++				       phys_addr_t limit, struct cma **res_cma)
+ {
+-	struct cma_reserved *r = &cma_reserved[cma_reserved_count];
++	struct cma *cma = &cma_areas[cma_area_count];
+ 	phys_addr_t alignment;
++	int ret = 0;
+ 
+ 	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
+ 		 (unsigned long)size, (unsigned long)base,
+ 		 (unsigned long)limit);
+ 
+ 	/* Sanity checks */
+-	if (cma_reserved_count == ARRAY_SIZE(cma_reserved)) {
++	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+ 		pr_err("Not enough slots for CMA reserved regions!\n");
+ 		return -ENOSPC;
+ 	}
+@@ -256,7 +224,7 @@ int __init dma_declare_contiguous(struct device *dev, phys_addr_t size,
+ 	if (base) {
+ 		if (memblock_is_region_reserved(base, size) ||
+ 		    memblock_reserve(base, size) < 0) {
+-			base = -EBUSY;
++			ret = -EBUSY;
+ 			goto err;
+ 		}
+ 	} else {
+@@ -266,7 +234,7 @@ int __init dma_declare_contiguous(struct device *dev, phys_addr_t size,
+ 		 */
+ 		phys_addr_t addr = __memblock_alloc_base(size, alignment, limit);
+ 		if (!addr) {
+-			base = -ENOMEM;
++			ret = -ENOMEM;
+ 			goto err;
+ 		} else {
+ 			base = addr;
+@@ -277,10 +245,11 @@ int __init dma_declare_contiguous(struct device *dev, phys_addr_t size,
+ 	 * Each reserved area must be initialised later, when more kernel
+ 	 * subsystems (like slab allocator) are available.
+ 	 */
+-	r->start = base;
+-	r->size = size;
+-	r->dev = dev;
+-	cma_reserved_count++;
++	cma->base_pfn = PFN_DOWN(base);
++	cma->count = size >> PAGE_SHIFT;
++	*res_cma = cma;
++	cma_area_count++;
++
+ 	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+ 		(unsigned long)base);
+ 
+@@ -289,9 +258,37 @@ int __init dma_declare_contiguous(struct device *dev, phys_addr_t size,
+ 	return 0;
+ err:
+ 	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
+-	return base;
++	return ret;
++}
++
++/**
++ * dma_contiguous_add_device() - add device to custom contiguous reserved area
++ * @dev:   Pointer to device structure.
++ * @cma:   Pointer to the cma structure for the reserved area
++ *
++ * This function assigns the given device to the contiguous memory area
++ * reserved earlier by dma_contiguous_reserve_area() function.
++ */
++int __init dma_contiguous_add_device(struct device *dev, struct cma *cma)
++{
++	dev_set_cma_area(dev, cma);
++	return 0;
++}
++
++/**
++ * dma_contiguous_set_default_area() - set global contiguous reserved area
++ * @cma:   Pointer to the cma structure for the reserved area
++ *
++ * This function sets global, device independent contiguous memory area to
++ * the area created earlier by dma_contiguous_reserve_area() function.
++ */
++int __init dma_contiguous_set_default_area(struct cma *cma)
++{
++	dma_contiguous_default_area = cma;
++	return 0;
+ }
+ 
++
+ /**
+  * dma_alloc_from_contiguous() - allocate pages from contiguous area
+  * @dev:   Pointer to device for which the allocation is performed.
+diff --git a/include/asm-generic/dma-contiguous.h b/include/asm-generic/dma-contiguous.h
+index 294b1e7..8979f86 100644
+--- a/include/asm-generic/dma-contiguous.h
++++ b/include/asm-generic/dma-contiguous.h
+@@ -18,8 +18,6 @@ static inline void dev_set_cma_area(struct device *dev, struct cma *cma)
+ {
+ 	if (dev)
+ 		dev->cma_area = cma;
+-	if (!dev && !dma_contiguous_default_area)
+-		dma_contiguous_default_area = cma;
+ }
+ 
+ #endif
+diff --git a/include/linux/dma-contiguous.h b/include/linux/dma-contiguous.h
+index 01b5c84..9c807c2 100644
+--- a/include/linux/dma-contiguous.h
++++ b/include/linux/dma-contiguous.h
+@@ -68,8 +68,37 @@ struct device;
+ extern struct cma *dma_contiguous_default_area;
+ 
+ void dma_contiguous_reserve(phys_addr_t addr_limit);
+-int dma_declare_contiguous(struct device *dev, phys_addr_t size,
+-			   phys_addr_t base, phys_addr_t limit);
++
++int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
++				       phys_addr_t limit, struct cma **res_cma);
++
++int dma_contiguous_add_device(struct device *dev, struct cma *cma);
++int dma_contiguous_set_default_area(struct cma *cma);
++
++/**
++ * dma_declare_contiguous() - reserve area for contiguous memory handling
++ *			      for particular device
++ * @dev:   Pointer to device structure.
++ * @size:  Size of the reserved memory.
++ * @base:  Start address of the reserved memory (optional, 0 for any).
++ * @limit: End address of the reserved memory (optional, 0 for any).
++ *
++ * This function reserves memory for specified device. It should be
++ * called by board specific code when early allocator (memblock or bootmem)
++ * is still activate.
++ */
++
++static inline int dma_declare_contiguous(struct device *dev, phys_addr_t size,
++					 phys_addr_t base, phys_addr_t limit)
++{
++	struct cma *cma;
++	int ret;
++	ret = dma_contiguous_reserve_area(size, base, limit, &cma);
++	if (ret == 0)
++		dma_contiguous_add_device(dev, cma);
++
++	return ret;
++}
+ 
+ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
+ 				       unsigned int order);
+@@ -82,6 +111,22 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
+ 
+ static inline void dma_contiguous_reserve(phys_addr_t limit) { }
+ 
++static inline int dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
++				       phys_addr_t limit, struct cma **res_cma) {
++	return -ENOSYS;
++}
++
++static inline int dma_contiguous_add_device(struct device *dev, struct cma *cma)
++{
++	return -ENOSYS;
++}
++
++static inline int dma_contiguous_set_default_area(struct cma *cma)
++{
++	return -ENOSYS;
++}
++
++
+ static inline
+ int dma_declare_contiguous(struct device *dev, phys_addr_t size,
+ 			   phys_addr_t base, phys_addr_t limit)
 -- 
 1.7.9.5
