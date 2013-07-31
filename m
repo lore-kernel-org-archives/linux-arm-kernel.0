@@ -1,67 +1,54 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 31 Jul 2013 13:14:47 +0200
-Subject: How to create IRQ mappings in a GPIO driver that doesn't control
- its IRQ domain ?
-In-Reply-To: <20130728050021.4370E3E0A24@localhost>
-References: <1624911.6TtmtVmU1T@avalon> <1681089.qGWOhLKTTo@avalon>
- <20130728050021.4370E3E0A24@localhost>
-Message-ID: <26968517.tbY84mICFD@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 31 Jul 2013 12:18:53 +0100
+Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
+In-Reply-To: <20130731095411.GA2810@htj.dyndns.org>
+References: <1375232669-27846-1-git-send-email-festevam@gmail.com>
+ <1375232669-27846-2-git-send-email-festevam@gmail.com>
+ <20130731073306.GZ1754@pengutronix.de>
+ <20130731082054.GF8540@nchen-desktop>
+ <20130731084645.GB1754@pengutronix.de>
+ <20130731090512.GD9858@sirena.org.uk>
+ <20130731094434.GC1754@pengutronix.de>
+ <20130731095411.GA2810@htj.dyndns.org>
+Message-ID: <20130731111853.GJ9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Wed, Jul 31, 2013 at 05:54:11AM -0400, Tejun Heo wrote:
+> On Wed, Jul 31, 2013 at 11:44:34AM +0200, Uwe Kleine-K?nig wrote:
 
-On Saturday 27 July 2013 23:00:21 Grant Likely wrote:
-> On Thu, 25 Jul 2013 15:22:29 +0200, Laurent Pinchart wrote:
-> > On Thursday 25 July 2013 14:15:56 Mark Brown wrote:
-> > > On Thu, Jul 25, 2013 at 11:45:33AM +0200, Laurent Pinchart wrote:
-> > > > The two devices are independent, so there's no real parent/child
-> > > > relationship. However, as Grant proposed, I could list all the
-> > > > interrupts associated with GPIOs in the GPIO controller DT node. I
-> > > > would then just call irq_of_parse_and_map() in the .to_irq() handler
-> > > > to magically translate the GPIO number to a mapped IRQ number.
-> > > > 
-> > > > The number of interrupts can be pretty high (up to 58 in the worst
-> > > > case so far), so an alternative would be to specify the interrupt-
-> > > > parent only, and call irq_create_of_mapping() directly. What solution
-> > > > would you prefer ?
-> > > 
-> > > Are the interrupts in a contiguous block in the controller so you can
-> > > just pass around the controller and a base number?
-> > 
-> > In two of the three SoCs I need to fix they are. I've just realized that
-> > in the last one the interrupts are in two contiguous blocks in two
-> > different parents. I will thus need at least a list of <parent-phandle
-> > base count>.
-> >
-> > Our standard interrupt bindings don't seem to support multiple parents,
->
-> You can actually do it by using a dummy node with interrupt-map and
-> interrupt-map-mask properties, but it is a pretty ugly solution in my
-> opinion.
-> 
-> > is that something that we want to fix or should I go for custom bindings ?
-> 
-> Yes, I think it is something that we want to fix. Jean-Christophe was going
-> to propose an alternative to the interrupts property which allows an array
-> of <phandle interrupt-specifier> tuples, but I've not seen anything yet. Go
-> ahead and make a proposal.
+> > > > OK, so the possible problem is that remove is called while the irq is
+> > > > still active. That means you have to assert that all resources the irq
 
-More work, great :-)
+> If your driver destruction path is running while your irq handler is
+> still running, it's a crappy / broken driver.  You need a deactivation
+> step whether you're using devm or not.  IRQs can be shared and the
+> device should be in a quiesced state before the driver detaches
+> itself.  Note that you can queue deactivation routine using devm.  For
+> an example, please take a look at
+> drivers/ata/libata-core.c::ata_host_start().
 
-A bit of bikeshedding here, as the "interrupts" property is already used, how 
-should I name the new property ?
+I'm not sure I understand how this relates the problem.  The main issue
+here is that for the shared IRQ case quiescing the device doesn't make
+any difference since one of the other users of the interrupt could cause
+the interrupt handler to be called regardless of what the hardware is
+doing.  This means that we need to guarantee that anything the interrupt
+handler relies on has not been deallocated before the interrupt handler
+is unregistered.
 
-> You could try to encode a base+count variant, but honestly I don't think it
-> would be a good idea because it only would work with a very narrow set of
-> use cases. Consider if #interrupt-cells was set to 2. Which cell gets
-> incremented in the range of interrupts specified? Better I think to merely
-> have an array of fully specified irqs. Support for that property could be
-> transparently baked into the core interrupt parsing functions.
+> irq deregistration.  Add an explicit deactivation step using
+> devres_alloc().
 
-I agree, I'll try that.
+> devm guarantees that the destruction callbacks are called in the
+> reverse order of registration.
 
--- 
-Regards,
-
-Laurent Pinchart
+OK, that's helpful.  It'd be good to document this if it's something
+the API is intending to guarantee, though - devres.txt doesn't mention
+this and it's not something I'd intuitively expect to be the case.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/e15fad37/attachment.sig>
