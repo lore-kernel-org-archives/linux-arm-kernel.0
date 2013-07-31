@@ -1,48 +1,147 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 31 Jul 2013 10:32:36 -0400 (EDT)
-Subject: [PATCH v2 26/42] USB: ohci-at91: add usb_clk for transition to
- common clk framework
-In-Reply-To: <51F8C31B.1020305@overkiz.com>
-Message-ID: <Pine.LNX.4.44L0.1307311030260.1546-100000@iolanthe.rowland.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 31 Jul 2013 09:36:57 -0500
+Subject: [PATCH RFC 2/3] clk: cpufreq helper for voltage scaling
+In-Reply-To: <1373247868-21444-3-git-send-email-mturquette@linaro.org>
+References: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
+ <1373247868-21444-3-git-send-email-mturquette@linaro.org>
+Message-ID: <51F92109.2060707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Jul 2013, boris brezillon wrote:
+On 07/07/2013 08:44 PM, Mike Turquette wrote:
+> This patch builds on "clk: notifier handler for dynamic voltage scaling"
+> by adding a CPUfreq-specific helper function for registering a clock
+> rate-change notifier to scale regulator voltage as a function of clock
+> rate.
+>
+> In particular this patch creates an instance of struct
+> cpufreq_frequency_table and also calculate the voltage scaling latency,
+> both of which are returned to the caller for use in the CPUfreq driver.
+>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> ---
+>   drivers/clk/clk-voltage-notifier.c | 71 ++++++++++++++++++++++++++++++++++++++
+>   include/linux/clk.h                |  6 ++++
+>   2 files changed, 77 insertions(+)
 
-> Hello Alan,
-> 
-> I don't know if you remember but a few days back I sent a series which
-> included this patch ("ARM: at91: prepare transition to common clk 
-> framework").
-> 
-> It was decided to move this patch out of the "prepare" series to avoid 
-> backward
-> compatility handling.
-> 
-> Things have changed a little bit.
-> 
-> I was asked to split the "ARM: at91: move to common clk framework" 
-> series into
-> several smaller series (one for each SoC).
-> This means at91 will have some SoCs supporting using common clk framework
-> (and thus will define the usb_clk) and other SoCs using the old at91 clk 
-> implementation
-> (which does not define usb_clk).
-> 
-> I was also requested to drop common clk framework support for non dt 
-> boards, which
-> means, as long as at91 keep non dt boards the at91 old clk implem will 
-> remain active.
-> 
-> For all these reasons I will have to reintroduce the backward 
-> compatibility hack.
-> 
-> Should I get this patch (and patch 27) out of the this series and back 
-> to the "prepare" series ?
+As stage 1 of the transition, I dont have any complaints, but for SoC 
+level, at least on OMAP, it is not just regulator and clock, we have 
+additional tweaks to do - like ABB, AVS etc.
 
-I don't care too much how the two patch series are organized, although
-some of the other maintainers involved in this project might.  So long
-as everything remains compatible with all the hardware variations and
-bisectable at each stage, I'll be happy.
+What would you suggest as the strategy to introduce SoC specific 
+handlers for voltage notifiers that can co-exist with this?
 
-Alan Stern
+>
+> diff --git a/drivers/clk/clk-voltage-notifier.c b/drivers/clk/clk-voltage-notifier.c
+> index cb6b85f..8e1707f 100644
+> --- a/drivers/clk/clk-voltage-notifier.c
+> +++ b/drivers/clk/clk-voltage-notifier.c
+> @@ -10,6 +10,7 @@
+>    */
+>
+>   #include <linux/clk.h>
+> +#include <linux/cpufreq.h>
+
+for example - we should not depend on cpufreq in a generic clock based 
+dvfs approach. we would like to allow devfreq also to transition to this.
+
+>   #include <linux/device.h>
+>   #include <linux/module.h>
+>   #include <linux/notifier.h>
+> @@ -133,3 +134,73 @@ void of_clk_volt_notifier_unregister(struct notifier_block *nb)
+>   	kfree(vsd);
+>   }
+>   EXPORT_SYMBOL_GPL(of_clk_volt_notifier_unregister);
+> +
+> +void of_clk_cpufreq_notifier_unregister(struct notifier_block *nb,
+> +		struct cpufreq_frequency_table *freq_table)
+> +{
+> +	struct volt_scale_data *data = to_volt_scale_data(nb);
+> +	struct device *dev = data->dev;
+> +
+> +	opp_free_cpufreq_table(dev, &freq_table);
+> +	of_clk_volt_notifier_unregister(nb);
+> +}
+> +EXPORT_SYMBOL_GPL(of_clk_cpufreq_notifier_unregister);
+> +
+> +/**
+> + * of_clk_cpufreq_notifer_register - register clock notifier to scale voltage
+> + * @dev: device that owns this scaling operation
+> + * @np: pointer to device's DT node
+> + * @clk: clock whose rate-change notifier triggers voltage scaling
+> + * @supply: regulator id string
+> + * @freq_table: pointer to uninitialized CPUfreq frequency scaling table
+> + * @voltage_latency: worst case voltage scaling latency
+> + */
+> +struct notifier_block *of_clk_cpufreq_notifier_register(struct device *dev,
+> +		struct device_node *np, struct clk *clk, const char *supply,
+> +		struct cpufreq_frequency_table **table,
+> +		unsigned int *voltage_latency)
+> +{
+> +	struct notifier_block *nb;
+> +	struct volt_scale_data *vsd;
+> +	struct opp *opp;
+> +	unsigned long min, max;
+> +	int ret, i;
+> +
+> +	nb = of_clk_volt_notifier_register(dev, np, clk, supply,
+> +			voltage_latency);
+> +	if (IS_ERR(nb))
+> +		return nb;
+> +
+> +	vsd = to_volt_scale_data(nb);
+> +
+> +	ret = opp_init_cpufreq_table(dev, table);
+> +	if (ret) {
+> +		pr_err("failed to init cpufreq table: %d\n", ret);
+> +		goto err_unregister;
+> +	}
+> +
+> +	/* find the min and max voltages and compute worst-case latency */
+> +	for (i = 0; table[0][i].frequency != CPUFREQ_TABLE_END; i++)
+> +		;
+> +
+> +	rcu_read_lock();
+> +	opp = opp_find_freq_exact(dev,
+> +			table[0][0].frequency * 1000, true);
+> +	min = opp_get_voltage(opp);
+> +	opp = opp_find_freq_exact(dev,
+> +			table[0][i-1].frequency * 1000, true);
+> +	max = opp_get_voltage(opp);
+> +	rcu_read_unlock();
+> +
+> +	*voltage_latency = regulator_set_voltage_time(vsd->reg, min, max);
+> +	if (*voltage_latency < 0)
+> +		pr_warn("%s: failed to calculate voltage latency, %d\n",
+> +				__func__, ret);
+> +
+> +	return nb;
+> +
+> +err_unregister:
+> +	of_clk_volt_notifier_unregister(nb);
+> +	return ERR_PTR(ret);
+> +}
+> +EXPORT_SYMBOL_GPL(of_clk_cpufreq_notifier_register);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 85ea520..3104883 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -86,6 +86,12 @@ struct notifier_block *of_clk_volt_notifier_register(struct device *dev,
+>   		struct device_node *np, struct clk *clk, const char *supply,
+>   		int *voltage_latency);
+>   void of_clk_volt_notifier_unregister(struct notifier_block *nb);
+> +struct notifier_block *of_clk_cpufreq_notifier_register(struct device *dev,
+> +		struct device_node *np, struct clk *clk, const char *supply,
+> +		struct cpufreq_frequency_table **table,
+> +		unsigned int *voltage_latency);
+> +void of_clk_cpufreq_notifier_unregister(struct notifier_block *nb,
+> +		struct cpufreq_frequency_table *freq_table);
+>
+>   #endif
+>
+>
+
+
+-- 
+Regards,
+Nishanth Menon
