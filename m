@@ -1,40 +1,27 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 31 Jul 2013 10:09:03 +0530
-Subject: [PATCH RFC 3/3] cpufreq: cpufreq-cpu0: clk rate-change notifiers
-In-Reply-To: <20130731014328.5270.4248@quantum>
-References: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
- <1373247868-21444-4-git-send-email-mturquette@linaro.org>
- <CAOh2x=kAM98Qta5RquVVByR8jJ3=t+6fNZ4o4WSroVCCZi+0Cg@mail.gmail.com>
- <20130731014328.5270.4248@quantum>
-Message-ID: <CAKohpom-8KXixJ0ZbQ7Poh3uqJCqo7LFyYEfYeMyp+yZx9QmHA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 31 Jul 2013 13:20:34 +0800
+Subject: [PATCH 1/2] pinctrl: imx: Add exception hook for select input
+In-Reply-To: <20130730083803.GF12382@S2101-09.ap.freescale.net>
+References: <1375152857-32177-1-git-send-email-peter.chen@freescale.com>
+ <20130730075018.GD12382@S2101-09.ap.freescale.net>
+ <20130730080028.GA8540@nchen-desktop>
+ <20130730083803.GF12382@S2101-09.ap.freescale.net>
+Message-ID: <20130731052031.GA19098@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2013 07:13, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Viresh Kumar (2013-07-07 21:10:54)
->> On Mon, Jul 8, 2013 at 7:14 AM, Mike Turquette <mturquette@linaro.org> wrote:
->> > Removes direct handling of OPP tables and voltage regulators by calling
->> > of_clk_cpufreq_notifier_handler, introduced by commit "clk: cpufreq
->> > helper for voltage scaling".
->> >
->> > In the future this can help consolidate code found across similar
->> > CPUfreq drivers.
->> >
->> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
->> > ---
->> >  drivers/cpufreq/cpufreq-cpu0.c | 125 ++++++++---------------------------------
->> >  1 file changed, 22 insertions(+), 103 deletions(-)
->>
->> Good patch, really gets lots of stuff out from cpufreq drivers.
->>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Viresh,
->
-> Thanks for the Ack. I received no comments on this series besides your
-> own, so I plan to merge it. Do you want to take patch #3, or do you want
-> me to take it, or should I give you and Rafael a stable branch instead?
+On Tue, Jul 30, 2013 at 04:38:05PM +0800, Shawn Guo wrote:
+> On Tue, Jul 30, 2013 at 04:00:29PM +0800, Peter Chen wrote:
+> > I searched the RM, this is the only one. If you don't think we need
+> > to consider if it will occur in the future, I am OK to move it at machine
+> > code, but every mx6q board need it if it does not use default select input
+> > value.
+> 
+> Yes, maybe you can put it into imx6q_usb_init() with
+> if (IS_ENABLED(CONFIG_USB_OTG)) protect.
 
-Its only related to cpufreq-cpu0 and to handle dependencies well they
-should go through a single tree.. Probably your tree is the right place for
-now. Rafael?
+I misunderstood it.  As it varies from board to board, we can not nicely
+handle it in mach-imx6q.c.  I have some other idea to solve the problem,
+and will cook up a patch to demonstrate it.
+
+Shawn
