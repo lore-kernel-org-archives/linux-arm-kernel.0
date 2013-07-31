@@ -1,44 +1,58 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Wed, 31 Jul 2013 11:45:41 +0800
-Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
-In-Reply-To: <51F7EDF2.60700@wwwdotorg.org>
-References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
- <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
- <51F2D063.5010505@wwwdotorg.org>
- <20130730033134.GM15855@rizhao-lap> <51F7EDF2.60700@wwwdotorg.org>
-Message-ID: <20130731034541.GQ15855@rizhao-lap>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 31 Jul 2013 09:18:56 +0530
+Subject: [PATCH 1/3] clk: exynos5250: Add G2D gate clock
+In-Reply-To: <20130731034235.5270.7481@quantum>
+References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
+ <20130726201800.7598.54329@quantum>
+ <CAK9yfHw6KtVDAns-1JhNpiS0brTeUpfiHS-v3q7H2GLWkY-Adw@mail.gmail.com>
+ <20130730064800.22022.14773@quantum>
+ <CAK9yfHxLjYNjQ9h-N8hNLBvqyUTxNzt=Bw10=mEA=D1kg2f9dw@mail.gmail.com>
+ <20130731034235.5270.7481@quantum>
+Message-ID: <CAK9yfHxi-4f5UtbRj1oZZ0_jMPFBfsPHnPXoO-020-rsLXEOoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 12:46:42AM +0800, Stephen Warren wrote:
-> On 07/29/2013 09:31 PM, Richard Zhao wrote:
-> > On Sat, Jul 27, 2013 at 03:39:15AM +0800, Stephen Warren wrote:
-> >> On 07/23/2013 10:09 PM, Richard Zhao wrote:
-> >>> - driver: remove use of nvidia,dma-request-selector
-> >>> 	  use dma_request_slave_channel to request channel
-> >>> - update binding doc
-> >>
-> >> This patch needs to be amended so that the DMA channel is looked up
-> >> during probe() rather than open(), to guarantee that deferred probe
-> >> works. It's possible to hold off probe, but not possible AFAIK to hold
-> >> off opening the port.
-> >
-> > How about avoid return -EPROBE_DEFER at open() time? It can be in
-> > another patch.
-> 
-> I don't really understand what you mean. -EPROBE_DEFER is something that
-> only makes sense for probe() to return (or functions used by probe()).
-> It doesn't make sense to return it anywhere else, since probe deferral
-> is something that can only happen for probe().
-What I meant is, it might not worth to move request channel to probe
-only because we need to check error and return -EPROBE_DEFER.
+On 31 July 2013 09:12, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Sachin Kamat (2013-07-29 23:55:33)
+>> On 30 July 2013 12:18, Mike Turquette <mturquette@linaro.org> wrote:
+>> > Quoting Sachin Kamat (2013-07-27 06:29:56)
+>> >> On 27 July 2013 01:48, Mike Turquette <mturquette@linaro.org> wrote:
+>> >> > Quoting Sachin Kamat (2013-07-05 01:42:27)
+>> >> >> Adds gate clock for G2D IP for Exynos5250 SoC.
+>> >> >>
+>> >> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> >> >> Cc: Mike Turquette <mturquette@linaro.org>
+>> >> >
+>> >> > I've taken patch #1 into clk-next.
+>> >>
+>> >> Thanks Mike.
+>> >>
+>> >> >
+>> >> >> ---
+>> >> >> This patch depends on the following patch:
+>> >> >> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20581
+>> >> >
+>> >> > I think I've gotten all three series you sent out, can you confirm?
+>> >>
+>> >> I haven't seen any update in your tree [1] since quite some time. The
+>> >> last commit I see in clk-next branch is 45e3ec3784 ("clk: tegra: fix
+>> >> ifdef for tegra_periph_reset_assert inline"). I hope I am looking at
+>> >> the right tree?
+>> >
+>> > You are, but I had not pushed to it since the merge window closed. It is
+>> > now updated.
+>> >
+>>
+>> Thanks Mike. I confirm that all the three patch series that you
+>> mentioned are applied in your tree.
+>> Please check the below one too.
+>>
+>> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg20598.html
+>
+> Ok, I picked that one up too.
 
-dma_request_slave_channel is better to be called as late as possible to
-make better dynamic use of dma channels.
+Thanks Mike.
 
-Actually, I searched the kernel code, most drivers don't return EPROBE_DEFER
-when dma_request_slave_channel failed. dma_request_slave_channel can
-fail in many cases, and dma device not probed is only one case.
-
-Thanks
-Richard
+-- 
+With warm regards,
+Sachin
