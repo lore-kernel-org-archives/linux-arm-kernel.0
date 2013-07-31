@@ -1,44 +1,56 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 31 Jul 2013 18:10:32 +0300
-Subject: [PATCHv4 29/33] CLK: omap: add omap3 clock init file
-In-Reply-To: <20130731063512.GP7656@atomide.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-30-git-send-email-t-kristo@ti.com>
- <51F81FD7.2060707@ti.com> <20130731063512.GP7656@atomide.com>
-Message-ID: <51F928E8.9020806@ti.com>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Wed, 31 Jul 2013 18:14:06 +0300
+Subject: [PATCH] mmc: sdhci-msm: Add support for MSM chipsets
+In-Reply-To: <CAJAp7OgOT82G=W8RpDvaogskUmAN26CWq4gKUs45RwOeU8pXvQ@mail.gmail.com>
+References: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com>
+ <CAJAp7OgOT82G=W8RpDvaogskUmAN26CWq4gKUs45RwOeU8pXvQ@mail.gmail.com>
+Message-ID: <51F929BE.1050505@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 09:35 AM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [130730 13:26]:
->> On 07/23/2013 02:20 AM, Tero Kristo wrote:
->>> clk-3xxx.c now contains the clock init functionality for omap3, including
->>> DT clock registration and adding of static clkdev entries.
->>>
->>> This patch also splits the OMAP3 clock registration code under mach-omap2
->>> to use OMAP3 subtype specific clk init functions.
->>>
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>> ---
->>>   arch/arm/mach-omap2/Makefile          |    2 +-
->>>   arch/arm/mach-omap2/cclock3xxx_data.c | 3641 ---------------------------------
+On 07/31/2013 03:19 AM, Bjorn Andersson wrote:
+> On Tue, Jul 30, 2013 at 8:22 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+>> This platform driver adds the support of Secure Digital Host
+>> Controller Interface compliant controller in MSM chipsets.
 >>
->> Tony and a lot of people is not going to like removing support for
->> non-dt boot for OMAP3 before "it's time is due" ;)
+>> [snip]
+>> +
+>> +       sdhc_1: qcom,sdhc at f9824900 {
+>> +               compatible = "qcom,sdhci-msm";
+>> +                       reg = <0xf9824900 0x11c>, <0xf9824000 0x800>;
+>> +                       reg-names = "hc_mem", "core_mem";
+>> +                       interrupts = <0 123 0>, <0 138 0>;
+>> +                       interrupt-names = "hc_irq", "pwr_irq";
+>> +
+>> +               vdd-supply = <&pm8941_l21>;
+>> +               vdd-io-supply = <&pm8941_l13>;
+>> +               qcom,vdd-voltage-level = <2950000 2950000>;
+>> +               qcom,vdd-current-level = <9000 800000>;
+>> +
+>> +               qcom,vdd-io-always-on;
+>> +               qcom,vdd-io-lpm-sup;
+>> +               qcom,vdd-io-voltage-level = <1800000 2950000>;
+>> +               qcom,vdd-io-current-level = <6 22000>;
+>> +
+>> +               bus-width = <4>;
+>> +               non-removable;
+>> +               qcom,bus-speed-mode = "HS200_1p8v", "DDR_1p8v";
+>> +
+>> +               gpios = <&msmgpio 40 0>, /* CLK */
+>> +                       <&msmgpio 39 0>, /* CMD */
+>> +                       <&msmgpio 38 0>, /* DATA0 */
+>> +                       <&msmgpio 37 0>, /* DATA1 */
+>> +                       <&msmgpio 36 0>, /* DATA2 */
+>> +                       <&msmgpio 35 0>; /* DATA3 */
+>> +               qcom,gpio-names = "CLK", "CMD", "DAT0", "DAT1", "DAT2", "DAT3";
 >
-> I think the only showstopper for that is that we need the
-> pending pinctrl changes merged first to keep off-idle working.
-> So the omap3 legacy code removal probably needs to wait until
-> v3.13 merge window. For omap4 and am33xx we can do it now.
->
-> Regards,
->
-> Tony
+> I believe these gpio references (and in the rest of the patch) should
+> be replaced by pinctrl. As far as I can see it provides what you want
+> and gives you configurability and potential sleep states of those pins
+> nicely integrated.
 >
 
-I'll modify the series in such way that OMAP3 retains the legacy clock 
-data within the kernel for now, and will use either DT or kernel data 
-based on init type. Kernel data can then be removed when time is ripe 
-for it.
+Thanks! I'll make it use the pinctrl driver that is coming too.
 
--Tero
+BR,
+Georgi
