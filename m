@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 31 Jul 2013 15:31:12 -0700
-Subject: [PATCH 13/18] ARM: u300: Switch to sched_clock_register()
+Date: Wed, 31 Jul 2013 15:31:05 -0700
+Subject: [PATCH 06/18] ARM: IXP4xx: Switch to sched_clock_register()
 In-Reply-To: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
 References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1375309877-16617-14-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1375309877-16617-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +11,35 @@ The 32 bit sched_clock interface now supports 64 bits. Upgrade to
 the 64 bit function to allow us to remove the 32 bit registration
 interface.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-u300/timer.c | 4 ++--
+ arch/arm/mach-ixp4xx/common.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
-index b5db207..d23a1f0 100644
---- a/arch/arm/mach-u300/timer.c
-+++ b/arch/arm/mach-u300/timer.c
-@@ -341,7 +341,7 @@ static struct irqaction u300_timer_irq = {
-  * stamp. (Inspired by OMAP implementation.)
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 5327dec..124631e 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -448,7 +448,7 @@ void __init ixp4xx_sys_init(void)
+ /*
+  * sched_clock()
   */
- 
--static u32 notrace u300_read_sched_clock(void)
-+static u64 notrace u300_read_sched_clock(void)
+-static u32 notrace ixp4xx_read_sched_clock(void)
++static u64 notrace ixp4xx_read_sched_clock(void)
  {
- 	return readl(u300_timer_base + U300_TIMER_APP_GPT2CC);
+ 	return *IXP4XX_OSTS;
  }
-@@ -380,7 +380,7 @@ static void __init u300_timer_init_of(struct device_node *np)
- 	clk_prepare_enable(clk);
- 	rate = clk_get_rate(clk);
+@@ -466,7 +466,7 @@ unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
+ EXPORT_SYMBOL(ixp4xx_timer_freq);
+ static void __init ixp4xx_clocksource_init(void)
+ {
+-	setup_sched_clock(ixp4xx_read_sched_clock, 32, ixp4xx_timer_freq);
++	sched_clock_register(ixp4xx_read_sched_clock, 32, ixp4xx_timer_freq);
  
--	setup_sched_clock(u300_read_sched_clock, 32, rate);
-+	sched_clock_register(u300_read_sched_clock, 32, rate);
- 
- 	u300_delay_timer.read_current_timer = &u300_read_current_timer;
- 	u300_delay_timer.freq = rate;
+ 	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
+ 			ixp4xx_clocksource_read);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
