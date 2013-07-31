@@ -1,87 +1,90 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 30 Jul 2013 21:27:33 -0300
-Subject: [PATCH 2/4] clk: sunxi: Allow to specify the divider width from
- the dividers data
-In-Reply-To: <1375195462-19566-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375195462-19566-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51F859F5.70501@elopez.com.ar>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 31 Jul 2013 09:29:44 +0900
+Subject: [PATCH 5/5] ARM: shmobile: ape6evm: add SDHI interfaces
+In-Reply-To: <51F7B822.7020404@cogentembedded.com>
+References: <cover.1375174556.git.horms+renesas@verge.net.au>
+ <f79d68da510bf1b95beff4d556b78d06801f11dc.1375174556.git.horms+renesas@verge.net.au>
+ <51F7B822.7020404@cogentembedded.com>
+Message-ID: <20130731002944.GD17209@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 30/07/13 11:44, Maxime Ripard escribi?:
-> The divider width used to be hardcoded. Some A31 dividers are no longer
-> with the hardcoded width, so we need to make it specific to each divider
-> and set it in the dividers data.
+On Tue, Jul 30, 2013 at 04:57:06PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Looks good to me,
-
-Reviewed-by: Emilio L?pez <emilio@elopez.com.ar>
-
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 24 +++++++++++++-----------
->  1 file changed, 13 insertions(+), 11 deletions(-)
+> On 30-07-2013 13:00, Simon Horman wrote:
 > 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 3c91888..6e9cbc9 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -277,26 +277,28 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
->   * sunxi_divider_clk_setup() - Setup function for simple divider clocks
->   */
->  
-> -#define SUNXI_DIVISOR_WIDTH	2
-> -
->  struct div_data {
-> -	u8 shift;
-> -	u8 pow;
-> +	u8	shift;
-> +	u8	pow;
-> +	u8	width;
->  };
->  
->  static const __initconst struct div_data sun4i_axi_data = {
-> -	.shift = 0,
-> -	.pow = 0,
-> +	.shift	= 0,
-> +	.pow	= 0,
-> +	.width	= 2,
->  };
-
-Is there a style rule governing the use of tabs/spaces on structs? Maybe
-we should do this alignment cleanup on the full file some time.
-
->  
->  static const __initconst struct div_data sun4i_ahb_data = {
-> -	.shift = 4,
-> -	.pow = 1,
-> +	.shift	= 4,
-> +	.pow	= 1,
-> +	.width	= 2,
->  };
->  
->  static const __initconst struct div_data sun4i_apb0_data = {
-> -	.shift = 8,
-> -	.pow = 1,
-> +	.shift	= 8,
-> +	.pow	= 1,
-> +	.width	= 2,
->  };
->  
->  static void __init sunxi_divider_clk_setup(struct device_node *node,
-> @@ -312,7 +314,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
->  	clk_parent = of_clk_get_parent_name(node, 0);
->  
->  	clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
-> -				   reg, data->shift, SUNXI_DIVISOR_WIDTH,
-> +				   reg, data->shift, data->width,
->  				   data->pow ? CLK_DIVIDER_POWER_OF_TWO : 0,
->  				   &clk_lock);
->  	if (clk) {
+> >From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 > 
+> >Add support for SDHI0 and SDHI1 on APE6EVM in PIO mode only.
+> 
+> >Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/mach-shmobile/board-ape6evm.c | 50 +++++++++++++++++++++++++++++++++-
+> >  1 file changed, 49 insertions(+), 1 deletion(-)
+> 
+> >diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+> >index 8c7529c..ccf8b04 100644
+> >--- a/arch/arm/mach-shmobile/board-ape6evm.c
+> >+++ b/arch/arm/mach-shmobile/board-ape6evm.c
+> [...]
+> >@@ -75,6 +82,29 @@ static struct resource mmcif0_resources[] = {
+> >  	DEFINE_RES_IRQ(gic_spi(169)),
+> >  };
+> >
+> >+/* SDHI0 */
+> >+static struct sh_mobile_sdhi_info sdhi0_pdata = {
+> >+	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
+> >+	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ,
+> >+};
+> >+
+> >+static struct resource sdhi0_resources[] = {
+> >+	DEFINE_RES_MEM_NAMED(0xee100000, 0x100, "SDHI0"),
+> >+	DEFINE_RES_IRQ(gic_spi(165)),
+> >+};
+> >+
+> >+/* SDHI1 */
+> >+static struct sh_mobile_sdhi_info sdhi1_pdata = {
+> >+	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
+> >+	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+> >+			  MMC_CAP_NEEDS_POLL,
+> >+};
+> >+
+> >+static struct resource sdhi1_resources[] = {
+> >+	DEFINE_RES_MEM_NAMED(0xee120000, 0x100, "SDHI1"),
+> >+	DEFINE_RES_IRQ(gic_spi(166)),
+> >+};
+> >+
+> 
+>    All of the above are lacking '__initdata' annothation (the
+> resources and platform data will be kmemdup()'ed when registering
+> the platform devices). Too bad I've noticed this too late...
 
-Thanks!
+Thanks Sergei.
 
-Emilio
+Guennadi,
+
+as I have already queued-up this patch could you please
+make an incremental patch that adds __initdata to the above structures?
+
+> 
+> >@@ -124,6 +166,12 @@ static void __init ape6evm_add_standard_devices(void)
+> >  	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
+> >  					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
+> >  					  &mmcif0_pdata, sizeof(mmcif0_pdata));
+> >+	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 0,
+> >+					  sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
+> >+					  &sdhi0_pdata, sizeof(sdhi0_pdata));
+> >+	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 1,
+> >+					  sdhi1_resources, ARRAY_SIZE(sdhi1_resources),
+> >+					  &sdhi1_pdata, sizeof(sdhi1_pdata));
+> >  }
+> 
+> WBR, Sergei
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
