@@ -1,60 +1,44 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 31 Jul 2013 15:32:37 -0600
-Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
-In-Reply-To: <20130731034541.GQ15855@rizhao-lap>
+Date: Wed, 31 Jul 2013 15:33:12 -0600
+Subject: [PATCH 2/9] dma: tegra20-apbdma: move to generic device tree
+ bindings
+In-Reply-To: <20130731035256.GR15855@rizhao-lap>
 References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
- <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
- <51F2D063.5010505@wwwdotorg.org> <20130730033134.GM15855@rizhao-lap>
- <51F7EDF2.60700@wwwdotorg.org> <20130731034541.GQ15855@rizhao-lap>
-Message-ID: <51F98275.6020906@wwwdotorg.org>
+ <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
+ <51F2CDBE.40802@wwwdotorg.org> <20130730030644.GJ15855@rizhao-lap>
+ <51F7ED62.4060404@wwwdotorg.org> <20130731035256.GR15855@rizhao-lap>
+Message-ID: <51F98298.7000002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 09:45 PM, Richard Zhao wrote:
-> On Wed, Jul 31, 2013 at 12:46:42AM +0800, Stephen Warren wrote:
->> On 07/29/2013 09:31 PM, Richard Zhao wrote:
->>> On Sat, Jul 27, 2013 at 03:39:15AM +0800, Stephen Warren wrote:
->>>> On 07/23/2013 10:09 PM, Richard Zhao wrote:
->>>>> - driver: remove use of nvidia,dma-request-selector
->>>>> 	  use dma_request_slave_channel to request channel
->>>>> - update binding doc
+On 07/30/2013 09:52 PM, Richard Zhao wrote:
+> On Wed, Jul 31, 2013 at 12:44:18AM +0800, Stephen Warren wrote:
+>> On 07/29/2013 09:06 PM, Richard Zhao wrote:
+>>> On Sat, Jul 27, 2013 at 03:27:58AM +0800, Stephen Warren wrote:
+>>>> (Stripping the Cc list a lot)
 >>>>
->>>> This patch needs to be amended so that the DMA channel is looked up
->>>> during probe() rather than open(), to guarantee that deferred probe
->>>> works. It's possible to hold off probe, but not possible AFAIK to hold
->>>> off opening the port.
+>>>> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+>>>>> Update tegra20-apbdma driver to adopt generic DMA device tree bindings.
+>>>>> It calls of_dma_controller_register() with of_dma_simple_xlate to get
+>>>>> the generic DMA device tree helper support. The #dma-cells for apbdma
+>>>>> must be 1, which is slave ID.
+...
+>>>> Why does this driver need to define a filter function? I thought the
+>>>> dmaengine's DT support would already match DMA clients/engines based on
+>>>> the phandle in DT? Isn't the need to pass the slave channel ID into
+>>>> drivers something pretty fundamental to dmaengine, and hence something
+>>>> it already supports?
 >>>
->>> How about avoid return -EPROBE_DEFER at open() time? It can be in
->>> another patch.
+>>> of_dma_simple_xlate only pass slave id to filter function. It needs
+>>> change to pass dt node too. I didn't start work on the common code
+>>> change yet. Do you think we need to hold it until common code change?
 >>
->> I don't really understand what you mean. -EPROBE_DEFER is something that
->> only makes sense for probe() to return (or functions used by probe()).
->> It doesn't make sense to return it anywhere else, since probe deferral
->> is something that can only happen for probe().
->
-> What I meant is, it might not worth to move request channel to probe
-> only because we need to check error and return -EPROBE_DEFER.
+>> Oh dear, I can't see how the core DT DMA support can work for anyone
+>> without the ability to limit DMA clients to the specific DMA controller
+>> that's specified in DT. If that functionality truly is missing, then it
+>> certainly needs to be added first.
+> 
+> omap-dma uses the same way. 
 
-If probe() doesn't attempt to validate that the/a DMA channel provider
-exists, then there's no guarantee that the DMA provider has probed
-before the DMA client driver either probes or executes any later code.
-So, you could quite easily end up with a situation where the serial
-driver's open fails because the DMA provider has not yet probed. This is
-exactly what deferred probe was intended to avoid. This reason alone is
-enough to make it worth fixing this.
-
-> dma_request_slave_channel is better to be called as late as possible to
-> make better dynamic use of dma channels.
-
-probe() could validate that the provider exists in a way that doesn't
-permanently hold ownership of the DMA channel. For example, request it
-then immediately release it, in the absence of a dedicated "validate my
-DMA providers exist" API.
-
-> Actually, I searched the kernel code, most drivers don't return EPROBE_DEFER
-> when dma_request_slave_channel failed. dma_request_slave_channel can
-> fail in many cases, and dma device not probed is only one case.
-
-That sounds like a bug. If a DMA channel /is/ specified, it should be
-possible to acquire it. If no DMA channel is specified, and if the
-device can do PIO, then it's reasonable to continue.
+The fact that some other driver does the same wrong thing isn't really a
+good excuse not to fix it now.
