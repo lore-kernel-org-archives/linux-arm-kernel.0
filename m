@@ -1,50 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 31 Jul 2013 10:33:51 +0900
-Subject: [PATCH 3/4] ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
+Date: Wed, 31 Jul 2013 10:33:52 +0900
+Subject: [PATCH 4/4] ARM: shmobile: lager: do not annotate gpio_buttons as
+ __initdata
 In-Reply-To: <cover.1375234088.git.horms+renesas@verge.net.au>
 References: <cover.1375234088.git.horms+renesas@verge.net.au>
-Message-ID: <fa3e0cee12fbdd9e0b03470b2b8cf968f537c161.1375234088.git.horms+renesas@verge.net.au>
+Message-ID: <a601469386b543df2a4d97ad7d524716945278a3.1375234088.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+When the gpio-keys device is registered using
+platform_device_register_data() the platform data argument,
+lager_keys_pdata is duplicated and thus should be marked as __initdata
+to avoid wasting memory. However, this is not true of gpio_buttons,
+a reference to it rather than its value is duplicated when lager_keys_pdata
+is duplicated.
 
-The following message is printed on the BOCK-W kernel bootup:
+This avoids accessing freed memory if gpio-key events occur
+after unused kernel memory is freed late in the kernel's boot.
 
-sh-pfc pfc-r8a7778: invalid group "sdhi0" for function "sdhi0"
+This but was added when support for gpio-keys was added to lager
+in c3842e4fcbb7664276443b79187b7808c2e80a35
+("ARM: shmobile: lager: support GPIO switches") which was included
+in v3.11-rc1.
 
-In addition, SD card cannot be detected.  The reason is apparently that commit
-ca7bb309485e4ec89a9addd47bea (ARM: shmobile: bockw: add SDHI0 support) matched
-the previous version of commit 564617d2f92473031d035deb273da5 (sh-pfc: r8a7778:
-add SDHI support).
-
-Add the missing pin groups according to the BOCK-W board schematics.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Tested-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-lager.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index d555464..3354a85 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -167,7 +167,13 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
- 				  "usb1", "usb1"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
--				  "sdhi0", "sdhi0"),
-+				  "sdhi0_data4", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
-+				  "sdhi0_ctrl", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
-+				  "sdhi0_cd", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
-+				  "sdhi0_wp", "sdhi0"),
- };
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index d73e21d..8d6bd5c 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -59,7 +59,7 @@ static __initdata struct gpio_led_platform_data lager_leds_pdata = {
+ #define GPIO_KEY(c, g, d, ...) \
+ 	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
  
- #define FPGA	0x18200000
+-static __initdata struct gpio_keys_button gpio_buttons[] = {
++static struct gpio_keys_button gpio_buttons[] = {
+ 	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
+ 	GPIO_KEY(KEY_3,		RCAR_GP_PIN(1, 26),	"SW2-pin3"),
+ 	GPIO_KEY(KEY_2,		RCAR_GP_PIN(1, 24),	"SW2-pin2"),
 -- 
 1.8.3.2
