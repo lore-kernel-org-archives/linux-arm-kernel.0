@@ -1,41 +1,44 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard)
-Date: Wed, 31 Jul 2013 17:49:53 +0200
-Subject: [PATCH 4/4] ARM: sun6i: Enable clock support in the DTSI
-In-Reply-To: <2013073120102496855035@gmail.com>
-References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375195462-19566-5-git-send-email-maxime.ripard@free-electrons.com>
- <51F86A2E.10505@elopez.com.ar> <20130731073724.GA24439@lukather>
- <2013073116110750016327@gmail.com> <20130731114957.GD2911@lukather>
- <2013073120102496855035@gmail.com>
-Message-ID: <20130731154953.GG2911@lukather>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 31 Jul 2013 13:15:04 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable wireless support
+Message-ID: <1375287304-3896-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
+Wandboard has a Broadcom 4329 chipset connected to SDHC, so turn on the wireless 
+related options.
 
-On Wed, Jul 31, 2013 at 08:10:32PM +0800, kevin.z.m wrote:
-> > How does one select either the internal or the external 32kHz
-> > oscillator? Is this done in software (I can't find any reference to that
-> > in the user manuals) or in hardware?
-> For A20, it should be in the Timer module, and there is a register named "LOSC_CTRL_REG".
-> For A31, it is in the RTC module, same name of "LOSC_CTRL_REG".
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Ok, just so that we're on the same page, we have two oscillators running
-at 32kHz, the internal being always there, and the external that could
-or could not be there, and it's each different hardware block that can
-be wired to one, the other or both?
-
-There's no global mux that could use either one of the two 32k to
-provide the only 32kHz source in the system, right?
-
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index d3e044a..577f054 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -61,7 +61,10 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_INET_LRO is not set
+ CONFIG_IPV6=y
+ CONFIG_NETFILTER=y
+-# CONFIG_WIRELESS is not set
++CONFIG_CFG80211=y
++CONFIG_MAC80211=y
++CONFIG_RFKILL=y
++CONFIG_RFKILL_INPUT=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+@@ -115,7 +118,7 @@ CONFIG_SMC91X=y
+ CONFIG_SMC911X=y
+ CONFIG_SMSC911X=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+-# CONFIG_WLAN is not set
++CONFIG_BRCMFMAC=m
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_INPUT_EVBUG=m
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/0bb8be73/attachment.sig>
+1.8.1.2
