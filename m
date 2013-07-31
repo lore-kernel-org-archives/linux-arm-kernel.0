@@ -1,53 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 31 Jul 2013 11:14:33 -0600
-Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
-In-Reply-To: <CALicx6tJFkGbvKO+-XZixj+8RSh1awFnXK91Pdew1+5Oa+dDqg@mail.gmail.com>
-References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
- <20130726104908.GC17886@mudshark.cambridge.arm.com>
- <51F2ACF7.9000008@wwwdotorg.org>
- <CALicx6ugumPG__rSAsTS95SH=6fTGqhpPFsQ8bLG-u-fbk0=pQ@mail.gmail.com>
- <51F7F0E1.5030200@wwwdotorg.org>
- <CALicx6tJFkGbvKO+-XZixj+8RSh1awFnXK91Pdew1+5Oa+dDqg@mail.gmail.com>
-Message-ID: <51F945F9.3050906@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Jul 2013 18:16:09 +0100
+Subject: [PATCH] arm: add .text at __CPUINIT places to prevent section
+ grandfathering
+In-Reply-To: <1375290418-1848-1-git-send-email-paul.gortmaker@windriver.com>
+References: <20130731094352.GV24642@n2100.arm.linux.org.uk>
+ <1375290418-1848-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20130731171609.GX24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 05:37 AM, Vijay Kilari wrote:
-> On Tue, Jul 30, 2013 at 10:29 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 07/30/2013 04:37 AM, Vijay Kilari wrote:
->>> On Fri, Jul 26, 2013 at 10:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> ...
->>>> Does a kernel that's used as the crash kernel guarantee:
->>>>
->>>> * Never to re-use the memory that was used by the previous kernel, so
->>>> that the spin loop code/data won't be corrupted, ever, no matter how
->>>> long the crash recovery kernel runs.
->>>>
->>>> * Not use SMP, so there's never a need to re-activate the non-boot CPUs,
->>>> which might not work if they aren't truly disabled but rather just
->>>> running a pin loop?
->>>
->>> From cat /proc/iomem, normal kernel is executed from (0x80xxxxxx) with crash
->>> kernel reserved 64M at 0xa0000000
->>>
->>> 80000000-bfffffff : System RAM
->>>   80008000-805aeddf : Kernel code
->>>   805e2000-8063e427 : Kernel data
->>>   a0000000-a3ffffff : Crash kernel
->>>
->>> crash kernel is loaded to reserved memory location and is executed from there.
->>> I could confirm this from /proc/iomem when crash kernel is running
->>>
->>> a0000000-a3efffff : System RAM
->>>   a0008000-a05aeddf : Kernel code
->>>   a05e2000-a063e427 : Kernel data
->>
->> OK, but in the crash dump kernel, is 80008000..8063e427 reserved as
->> well, which would guarantee that the spin loop being executed by the
->> non-crash CPUs won't be corrupted?
+On Wed, Jul 31, 2013 at 01:06:58PM -0400, Paul Gortmaker wrote:
+> In commit 22f0a27367742f65130c0fb25ef00f7297e032c1
+> ("init.h: remove __cpuinit sections from the kernel") the macros
+> like __CPUINIT were converted from .section commands to no-ops.
 > 
-> The crash dump kernel runs from reserved memory area (0xa0000000 - 0xa3effffff).
->  So it should not corrupt the memory area of original kernel that was running
->  at 0x80000000,where other CPU's are in spin loop.
+> This caused CPU hotplug regressions because the code following
+> the __CPUINIT lines was now grandfathered into whatever the
+> previous section happened to be.  In most files, __CPUINIT was
+> at the top of the file, so there was no previous section.
+> 
+> However in the files changed here, there was a previous section,
+> and so we'd inadvertently garbage collect CPU hotplug related
+> code.  This changeset inserts ".text" into the exact same spot
+> that the __CPUINIT section markers were found prior to commit
+> 8bd26e3a7e49af2697449bbcb7187a39dc85d672 ("arm: delete
+> __cpuinit/__CPUINIT usage from all ARM users:) in the three affected
+> files, as suggested by Russell.
+> 
+> Bisected-by: Simon Horman <horms@verge.net.au>
+> Reported-by: Magnus Damm <magnus.damm@gmail.com>
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-What about dynamic allocations?
+I already have this in my git tree as of this morning, thanks anyway.
