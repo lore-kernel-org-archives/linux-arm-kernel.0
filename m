@@ -1,131 +1,180 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 31 Jul 2013 17:49:28 +0300
-Subject: [PATCHv4 08/33] ARM: dts: omap4 clock data
-In-Reply-To: <51F813B3.7020000@ti.com>
+Date: Wed, 31 Jul 2013 17:52:58 +0300
+Subject: [PATCHv4 09/33] CLK: omap: add omap4 clock init file
+In-Reply-To: <51F81516.3050302@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-9-git-send-email-t-kristo@ti.com> <51F813B3.7020000@ti.com>
-Message-ID: <51F923F8.6080700@ti.com>
+ <1374564028-11352-10-git-send-email-t-kristo@ti.com>
+ <51F81516.3050302@ti.com>
+Message-ID: <51F924CA.6000803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 10:27 PM, Nishanth Menon wrote:
+On 07/30/2013 10:33 PM, Nishanth Menon wrote:
 > On 07/23/2013 02:20 AM, Tero Kristo wrote:
->> This patch creates a unique node for each clock in the OMAP4 power,
->> reset and clock manager (PRCM). OMAP443x and OMAP446x have slightly
->> different clock tree which is taken into account in the data.
+>> clk-44xx.c now contains the clock init functionality for omap4, including
+>> DT clock registration and adding of static clkdev entries.
 >>
 >> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 >> ---
->>   arch/arm/boot/dts/omap443x-clocks.dtsi |   17 +
->>   arch/arm/boot/dts/omap443x.dtsi        |    8 +
->>   arch/arm/boot/dts/omap4460.dtsi        |    8 +
->>   arch/arm/boot/dts/omap446x-clocks.dtsi |   27 +
->>   arch/arm/boot/dts/omap44xx-clocks.dtsi | 1654
->> ++++++++++++++++++++++++++++++++
-> arch/arm/boot/dts/omap44xx-common-clocks.dtsi ?
->>   5 files changed, 1714 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/omap443x-clocks.dtsi
->>   create mode 100644 arch/arm/boot/dts/omap446x-clocks.dtsi
->>   create mode 100644 arch/arm/boot/dts/omap44xx-clocks.dtsi
+>>   drivers/clk/omap/clk-44xx.c |  118
+>> +++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 118 insertions(+)
+>>   create mode 100644 drivers/clk/omap/clk-44xx.c
 >>
->> diff --git a/arch/arm/boot/dts/omap443x-clocks.dtsi
->> b/arch/arm/boot/dts/omap443x-clocks.dtsi
+>> diff --git a/drivers/clk/omap/clk-44xx.c b/drivers/clk/omap/clk-44xx.c
 >> new file mode 100644
->> index 0000000..2bd82b2
+>> index 0000000..cc12134
 >> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap443x-clocks.dtsi
->> @@ -0,0 +1,17 @@
+>> +++ b/drivers/clk/omap/clk-44xx.c
+>> @@ -0,0 +1,118 @@
 >> +/*
->> + * Device Tree Source for OMAP443x clock data
+>> + * OMAP4 Clock data
 >> + *
->> + * Copyright (C) 2013 Texas Instruments, Inc.
+>> + * Copyright (C) 2009-2012 Texas Instruments, Inc.
+>> + * Copyright (C) 2009-2010 Nokia Corporation
+>> + *
+>> + * Paul Walmsley (paul at pwsan.com)
+>> + * Rajendra Nayak (rnayak at ti.com)
+>> + * Benoit Cousson (b-cousson at ti.com)
+>> + * Mike Turquette (mturquette at ti.com)
 >> + *
 >> + * This program is free software; you can redistribute it and/or modify
 >> + * it under the terms of the GNU General Public License version 2 as
 >> + * published by the Free Software Foundation.
+>> + *
+>> + * XXX Some of the ES1 clocks have been removed/changed; once support
+>> + * is added for discriminating clocks by ES level, these should be
+>> added back
+>> + * in.
+>> + *
+>> + * XXX All of the remaining MODULEMODE clock nodes should be removed
+>> + * once the drivers are updated to use pm_runtime or to use the
+>> appropriate
+>> + * upstream clock node for rate/parent selection.
 >> + */
 >> +
-> Doing
-> /include/ "omap44xx-clocks.dtsi" might avoid including that header in
-> corresponding SoC dtsi,
-> OR:
->> +bandgap_fclk: bandgap_fclk at 4a307888 {
->> +    #clock-cells = <0>;
->> +    compatible = "gate-clock";
->> +    clocks = <&sys_32k_ck>;
->> +    bit-shift = <8>;
->> +    reg = <0x4a307888 0x4>;
->> +};
->
-> Since we already have omap443x.dtsi and omap446x.dtsi, do we need
-> clock.dtsi containing just a few entries?
-> instead we could define the delta clocks in the clocks section, and save
-> on two additional files, no?
-
-Yea, thats also possible. I didn't want to put clock nodes there though, 
-just for clarity. I think this is for whoever is maintaining the DTS 
-files to answer.
-
->
-> [...]
->
->> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi
->> b/arch/arm/boot/dts/omap44xx-clocks.dtsi
->> new file mode 100644
->> index 0000000..ed6bc9b
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
-> [...]
->
->> +dpll_abe_m2x2_ck: dpll_abe_m2x2_ck at 4a0041f0 {
->> +    #clock-cells = <0>;
->> +    compatible = "divider-clock";
->> +    clocks = <&dpll_abe_x2_ck>;
->> +    ti,autoidle-shift = <8>;
->> +    reg = <0x4a0041f0 0x4>;
->> +    bit-mask = <0x1f>;
->> +    index-starts-at-one;
->> +    ti,autoidle-low;
->> +};
+>> +#include <linux/kernel.h>
+>> +#include <linux/list.h>
+>> +#include <linux/clk-private.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/io.h>
+>> +#include <linux/clk/omap.h>
 >> +
->> +abe_24m_fclk: abe_24m_fclk {
->> +    #clock-cells = <0>;
->> +    compatible = "fixed-factor-clock";
->> +    clocks = <&dpll_abe_m2x2_ck>;
->> +    clock-mult = <1>;
->> +    clock-div = <8>;
->> +};
+>> +/*
+>> + * OMAP4 ABE DPLL default frequency. In OMAP4460 TRM version V, section
+>> + * "3.6.3.2.3 CM1_ABE Clock Generator" states that the "DPLL_ABE_X2_CLK
+>> + * must be set to 196.608 MHz" and hence, the DPLL locked frequency is
+>> + * half of this value.
+>> + */
+>> +#define OMAP4_DPLL_ABE_DEFFREQ                98304000
 >> +
->> +abe_clk: abe_clk at 4a004108 {
->> +    #clock-cells = <0>;
->> +    compatible = "divider-clock";
->> +    clocks = <&dpll_abe_m2x2_ck>;
->> +    reg = <0x4a004108 0x4>;
->> +    bit-mask = <0x3>;
->> +    index-power-of-two;
->> +};
+>> +/*
+>> + * OMAP4 USB DPLL default frequency. In OMAP4430 TRM version V, section
+>> + * "3.6.3.9.5 DPLL_USB Preferred Settings" shows that the preferred
+>> + * locked frequency for the USB DPLL is 960MHz.
+>> + */
+>> +#define OMAP4_DPLL_USB_DEFFREQ                960000000
 >> +
->> +aess_fclk: aess_fclk at 4a004528 {
-> is there a naming convention used here? abe_clk, fclk etc?
+>> +static struct omap_dt_clk omap44xx_clks[] = {
+>> +    DT_CLK("smp_twd",    NULL,            "mpu_periphclk"),
+>> +    DT_CLK("omapdss_dss", "ick", "dss_fck"),
+>> +    DT_CLK("usbhs_omap", "fs_fck", "usb_host_fs_fck"),
+>> +    DT_CLK("usbhs_omap", "hs_fck", "usb_host_hs_fck"),
+>> +    DT_CLK("usbhs_omap", "usbtll_ick", "usb_tll_hs_ick"),
+>> +    DT_CLK("usbhs_tll", "usbtll_ick", "usb_tll_hs_ick"),
+>> +    DT_CLK(NULL,    "timer_32k_ck",    "sys_32k_ck"),
+>> +    /* TODO: Remove "omap_timer.X" aliases once DT migration is
+>> complete */
+>> +    DT_CLK("omap_timer.1",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("omap_timer.2",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("omap_timer.3",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("omap_timer.4",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("omap_timer.9",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("omap_timer.10",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("omap_timer.11",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("omap_timer.5",    "timer_sys_ck",    "syc_clk_div_ck"),
+>> +    DT_CLK("omap_timer.6",    "timer_sys_ck",    "syc_clk_div_ck"),
+>> +    DT_CLK("omap_timer.7",    "timer_sys_ck",    "syc_clk_div_ck"),
+>> +    DT_CLK("omap_timer.8",    "timer_sys_ck",    "syc_clk_div_ck"),
+>> +    DT_CLK("4a318000.timer",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("48032000.timer",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("48034000.timer",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("48036000.timer",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("4803e000.timer",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("48086000.timer",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("48088000.timer",    "timer_sys_ck",    "sys_clkin_ck"),
+>> +    DT_CLK("40138000.timer",    "timer_sys_ck",    "syc_clk_div_ck"),
+>> +    DT_CLK("4013a000.timer",    "timer_sys_ck",    "syc_clk_div_ck"),
+>> +    DT_CLK("4013c000.timer",    "timer_sys_ck",    "syc_clk_div_ck"),
+>> +    DT_CLK("4013e000.timer",    "timer_sys_ck",    "syc_clk_div_ck"),
+>
+>> +    DT_CLK(NULL,    "cpufreq_ck",    "dpll_mpu_ck"),
+> please remove cpufreq.
 
-The clock names are directly converted from existing data, so whatever 
-currently is there, will be in the DT also.
+Hmm why?
+
+Because cpufreq is completely broken now and your current work on it? :)
 
 >
->> +    #clock-cells = <0>;
->> +    compatible = "divider-clock";
->> +    clocks = <&abe_clk>;
->> +    bit-shift = <24>;
->> +    reg = <0x4a004528 0x4>;
->> +    bit-mask = <0x1>;
 >> +};
+>> +
+>> +int __init omap4xxx_clk_init(void)
+>> +{
+>> +    int rc;
+>> +    struct clk *abe_dpll_ref, *abe_dpll, *sys_32k_ck, *usb_dpll;
+>> +
+>> +    /* FIXME register clocks from DT first */
+>> +    dt_omap_clk_init();
+>> +
+>> +    omap_dt_clocks_register(omap44xx_clks, ARRAY_SIZE(omap44xx_clks));
+>> +
+>> +    omap2_clk_disable_autoidle_all();
+>> +
+>> +    /*
+>> +     * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
+>> +     * state when turning the ABE clock domain. Workaround this by
+>> +     * locking the ABE DPLL on boot.
+>> +     * Lock the ABE DPLL in any case to avoid issues with audio.
+>> +     */
 >
-> [...]
+> But this code will be called for 4430 and 4460. if the requirement is
+> only for 4460, then we are not adhering to the spec?
+
+This is copy pasted from existing cclock44xx_data.c file init function.
+
+>
+>> +    abe_dpll_ref = clk_get_sys(NULL, "abe_dpll_refclk_mux_ck");
+>> +    sys_32k_ck = clk_get_sys(NULL, "sys_32k_ck");
+>> +    rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
+>> +    abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
+>> +    if (!rc)
+>> +        rc = clk_set_rate(abe_dpll, OMAP4_DPLL_ABE_DEFFREQ);
+>> +    if (rc)
+>> +        pr_err("%s: failed to configure ABE DPLL!\n", __func__);
+>> +
+>> +    /*
+>> +     * Lock USB DPLL on OMAP4 devices so that the L3INIT power
+>> +     * domain can transition to retention state when not in use.
+>> +     */
+>> +    usb_dpll = clk_get_sys(NULL, "dpll_usb_ck");
+>> +    rc = clk_set_rate(usb_dpll, OMAP4_DPLL_USB_DEFFREQ);
+>> +    if (rc)
+>> +        pr_err("%s: failed to configure USB DPLL!\n", __func__);
+>
+> ^^^^ why cant we have a generic property that does this "automagically"
+> from dts property to the node?
+> a) be able to select a parent
+> b) be able to set a frequency.
+> c) how do we ensure that CLK_SET_RATE_PARENT are setup for the clock
+> nodes defined by dt?
+
+This is probably for Mike to answer, currently such mechanism does not 
+exist.
+
 >
 >> +
->> +ocp2scp_usb_phy_phy_48m: ocp2scp_usb_phy_phy_48m at 4a0093e0 {
-> _ck?
->
-> [...]
+>> +    return 0;
+>> +}
+>>
 >
 >
