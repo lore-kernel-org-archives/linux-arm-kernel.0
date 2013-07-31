@@ -1,97 +1,49 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 31 Jul 2013 18:05:56 +0300
-Subject: [PATCHv4 22/33] CLK: OMAP: update gate clock setup for OMAP3
-In-Reply-To: <51F81E74.9070609@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-23-git-send-email-t-kristo@ti.com>
- <51F81E74.9070609@ti.com>
-Message-ID: <51F927D4.9080603@ti.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 31 Jul 2013 17:07:19 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <1479410.BSGDrOcRvP@thinkpad>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1441731.8CGUI1tUxh@flatron>
+ <1375267057.20042.52.camel@sakura.staff.proxad.net>
+ <1479410.BSGDrOcRvP@thinkpad>
+Message-ID: <20130731150717.GD4904@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 11:13 PM, Nishanth Menon wrote:
-> On 07/23/2013 02:20 AM, Tero Kristo wrote:
->> OMAP3 gate clocks are handled through the clk driver now. Basic gate
->> clock can't be used as the OMAP3 gate clocks have some special features,
->> namely the idle status linkage which is on separate register.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   drivers/clk/omap/gate.c |   27 +++++++++++++++++++++++++--
->>   1 file changed, 25 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/omap/gate.c b/drivers/clk/omap/gate.c
->> index 7186bb2..b560ff4 100644
->> --- a/drivers/clk/omap/gate.c
->> +++ b/drivers/clk/omap/gate.c
->> @@ -28,12 +28,19 @@
->>
->>   #ifdef CONFIG_OF
->>
->> -static const struct clk_ops omap_gate_clk_ops = {
->> +static const struct clk_ops omap_gate_clkdm_clk_ops = {
->>       .init        = &omap2_init_clk_clkdm,
->>       .enable        = &omap2_clkops_enable_clkdm,
->>       .disable    = &omap2_clkops_disable_clkdm,
->>   };
->>
->> +static const struct clk_ops omap_gate_clk_ops = {
->> +    .init        = &omap2_init_clk_clkdm,
->> +    .enable        = &omap2_dflt_clk_enable,
->> +    .disable    = &omap2_dflt_clk_disable,
->> +    .is_enabled    = &omap2_dflt_clk_is_enabled,
->> +};
->> +
->>   void __init of_omap_gate_clk_setup(struct device_node *node)
->>   {
->>       struct clk *clk;
->> @@ -43,6 +50,7 @@ void __init of_omap_gate_clk_setup(struct
->> device_node *node)
->>       int num_parents;
->>       const char **parent_names;
->>       int i;
->> +    u32 val;
->>
->>       clk_hw = kzalloc(sizeof(struct clk_hw_omap), GFP_KERNEL);
->>       if (!clk_hw) {
->> @@ -56,7 +64,22 @@ void __init of_omap_gate_clk_setup(struct
->> device_node *node)
->>       of_property_read_string(node, "ti,clkdm-name",
->> &clk_hw->clkdm_name);
->>
->>       init.name = clk_name;
->> -    init.ops = &omap_gate_clk_ops;
->> +    init.flags = 0;
->> +
->> +    if (of_property_read_u32_index(node, "reg", 0, &val)) {
->> +        /* No register, clkdm control only */
->> +        init.ops = &omap_gate_clkdm_clk_ops;
->> +    } else {
->> +        init.ops = &omap_gate_clk_ops;
->> +        clk_hw->enable_reg = of_iomap(node, 0);
->> +        of_property_read_u32(node, "ti,enable-bit", &val);
->> +        clk_hw->enable_bit = val;
->> +
->> +        if (of_property_read_bool(node, "ti,dss-clk"))
->> +            clk_hw->ops = &clkhwops_omap3430es2_dss_usbhost_wait;
->
-> umm, it was going relatively ok so far, till i hit this :( it is
-> probably a quirk... but still..
+On Wed, Jul 31, 2013 at 12:59:59PM +0200, Tomasz Figa wrote:
+> On Wednesday 31 of July 2013 12:37:37 Maxime Bizon wrote:
+> > 
+> > Board files are C code anyone has the skill to edit/understand/refactor.
+> > Moving to DT and keep them in tree tightly coupled with the kernel
+> > version just adds another layer of indirection for *no purpose*.
 
-Some of the clocks need special hwops for them to work properly it 
-seems... It looks nasty yea but the best I could think of.
++1
 
->
->> +        else
->> +            clk_hw->ops = &clkhwops_wait;
->> +    }
->>
->>       num_parents = of_clk_get_parent_count(node);
->>       if (num_parents < 1) {
->>
->
-> but still no usage of "ti,omap-gate-clock" makes me question the need
-> for this file.
->
+That is exactly what I tried to say.
 
-Yea, no ti,omap-gate-clock, but there is ti,gate-clock. Just look harder.
+> > Linus started the whole thing some years ago by refusing to pull ARM
+> > tree [1]. Reread his post, what he wants is clearly b).
+> > 
+> > Going a) does not solve any problem. You are just moving churn to
+> > somewhere else. We had board files churn, then defconfigs churn, DTS
+> > files (and associated drivers) will be next.
+
+And at this rate, we are headed for another Linus ultimatum, sooner or
+later.
+
+> > DT is self inflicted pain. It has to be for the greater good.
+> 
+> It has several benefits over board files that I mentioned above, possible 
+> without fully separating them from kernel tree.
+
+Every time a criticism is voiced about DT, the DT people stick their
+fingers in their ears and say, "NAH, NAH, NAH, I CAN'T HEAR YOU!"
+
+WRT to DT-as-platform-device, we would rather stick with the C code,
+please. Just pushing the configuration tables into an external form
+does not simplify the problem. In fact, it creates new problems by
+inviting the possibility of a bootloader/DT/kernel mismatch.
+
+Thanks,
+Richard
