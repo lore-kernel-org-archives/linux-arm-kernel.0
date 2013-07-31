@@ -1,274 +1,87 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 31 Jul 2013 18:45:31 +0100
-Subject: [PATCH RFC 7/8] swiotlb-xen: support autotranslate guests
+Date: Wed, 31 Jul 2013 18:45:29 +0100
+Subject: [PATCH RFC 5/8] xen: introduce XENMEM_get_dma_buf and xen_put_dma_buf
 In-Reply-To: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
-Message-ID: <1375292732-7627-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1375292732-7627-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support autotranslate guests in swiotlb-xen by keeping track of the
-phys-to-bus and bus-to-phys mappings of the swiotlb buffer
-(xen_io_tlb_start-xen_io_tlb_end).
-
-Use a simple direct access on a pre-allocated array for phys-to-bus
-queries. Use a red-black tree for bus-to-phys queries.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: david.vrabel at citrix.com
 ---
- drivers/xen/swiotlb-xen.c |  127 +++++++++++++++++++++++++++++++++++++++------
- 1 files changed, 111 insertions(+), 16 deletions(-)
+ include/xen/interface/memory.h |   62 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 62 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index 353f013..c79ac88 100644
---- a/drivers/xen/swiotlb-xen.c
-+++ b/drivers/xen/swiotlb-xen.c
-@@ -38,32 +38,116 @@
- #include <linux/bootmem.h>
- #include <linux/dma-mapping.h>
- #include <linux/export.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock_types.h>
-+#include <linux/rbtree.h>
- #include <xen/swiotlb-xen.h>
- #include <xen/page.h>
- #include <xen/xen-ops.h>
- #include <xen/hvc-console.h>
-+#include <xen/features.h>
- /*
-  * Used to do a quick range check in swiotlb_tbl_unmap_single and
-  * swiotlb_tbl_sync_single_*, to see if the memory was in fact allocated by this
-  * API.
-  */
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index 2ecfe4f..ffd7f4e 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -263,4 +263,66 @@ struct xen_remove_from_physmap {
+ };
+ DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
  
-+#define NR_DMA_SEGS  ((xen_io_tlb_nslabs + IO_TLB_SEGSIZE - 1) / IO_TLB_SEGSIZE)
- static char *xen_io_tlb_start, *xen_io_tlb_end;
- static unsigned long xen_io_tlb_nslabs;
- /*
-  * Quick lookup value of the bus address of the IOTLB.
-  */
- 
--static u64 start_dma_addr;
-+struct xen_dma{
-+	dma_addr_t dma_addr;
-+	phys_addr_t phys_addr;
-+	size_t size;
-+	struct rb_node rbnode;
++#define XENMEM_get_dma_buf             26
++/*
++ * This hypercall is similar to XENMEM_exchange: it exchanges the pages
++ * passed in with a new set of pages, contiguous and under 4G if so
++ * requested. The new pages are going to be "pinned": it's guaranteed
++ * that their p2m mapping won't be changed until explicitly "unpinned".
++ * If return code is zero then @out.extent_list provides the MFNs of the
++ * newly-allocated memory.  Returns zero on complete success, otherwise
++ * a negative error code.
++ * On complete success then always @nr_exchanged == @in.nr_extents.  On
++ * partial success @nr_exchanged indicates how much work was done.
++ */
++struct xen_get_dma_buf {
++    /*
++     * [IN] Details of memory extents to be exchanged (GMFN bases).
++     * Note that @in.address_bits is ignored and unused.
++     */
++    struct xen_memory_reservation in;
++
++    /*
++     * [IN/OUT] Details of new memory extents.
++     * We require that:
++     *  1. @in.domid == @out.domid
++     *  2. @in.nr_extents  << @in.extent_order == 
++     *     @out.nr_extents << @out.extent_order
++     *  3. @in.extent_start and @out.extent_start lists must not overlap
++     *  4. @out.extent_start lists GPFN bases to be populated
++     *  5. @out.extent_start is overwritten with allocated GMFN bases
++     */
++    struct xen_memory_reservation out;
++
++    /*
++     * [OUT] Number of input extents that were successfully exchanged:
++     *  1. The first @nr_exchanged input extents were successfully
++     *     deallocated.
++     *  2. The corresponding first entries in the output extent list correctly
++     *     indicate the GMFNs that were successfully exchanged.
++     *  3. All other input and output extents are untouched.
++     *  4. If not all input exents are exchanged then the return code of this
++     *     command will be non-zero.
++     *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
++     */
++    xen_ulong_t nr_exchanged;
 +};
++DEFINE_GUEST_HANDLE_STRUCT(xen_get_dma_buf);
 +
-+static struct xen_dma *xen_dma_seg;
-+static struct rb_root bus_to_phys = RB_ROOT;
-+static DEFINE_SPINLOCK(xen_dma_lock);
++#define XENMEM_put_dma_buf             27
++/*
++ * XENMEM_put_dma_buf unpins a set of pages, previously pinned by
++ * XENMEM_get_dma_buf. After this call the p2m mapping of the pages can
++ * be transparently changed by the hypervisor, as usual. The pages are
++ * still accessible from the guest.
++ */
++struct xen_put_dma_buf {
++    /*
++     * [IN] Details of memory extents to be exchanged (GMFN bases).
++     * Note that @in.address_bits is ignored and unused.
++     */
++    struct xen_memory_reservation in;
++};
++DEFINE_GUEST_HANDLE_STRUCT(xen_put_dma_buf);
 +
-+static void xen_dma_insert(struct xen_dma *entry)
-+{
-+	struct rb_node **link = &bus_to_phys.rb_node;
-+	struct rb_node *parent = NULL;
-+	struct xen_dma *e;
-+
-+	spin_lock(&xen_dma_lock);
-+
-+	while (*link) {
-+		parent = *link;
-+		e = rb_entry(parent, struct xen_dma, rbnode);
-+
-+		WARN_ON(entry->dma_addr == e->dma_addr);
-+
-+		if (entry->dma_addr < e->dma_addr)
-+			link = &(*link)->rb_left;
-+		else
-+			link = &(*link)->rb_right;
-+	}
-+	rb_link_node(&entry->rbnode, parent, link);
-+	rb_insert_color(&entry->rbnode, &bus_to_phys);
-+
-+	spin_unlock(&xen_dma_lock);
-+}
-+
-+static struct xen_dma *xen_dma_retrieve(dma_addr_t dma_addr)
-+{
-+	struct rb_node *n = bus_to_phys.rb_node;
-+	struct xen_dma *e;
-+	
-+	spin_lock(&xen_dma_lock);
-+
-+	while (n) {
-+		e = rb_entry(n, struct xen_dma, rbnode);
-+		if (e->dma_addr <= dma_addr && e->dma_addr + e->size > dma_addr) {
-+			spin_unlock(&xen_dma_lock);
-+			return e;
-+		}
-+		if (dma_addr < e->dma_addr)
-+			n = n->rb_left;
-+		else
-+			n = n->rb_right;
-+	}
-+
-+	spin_unlock(&xen_dma_lock);
-+	return NULL;
-+}
- 
- static dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
- {
--	return phys_to_machine(XPADDR(paddr)).maddr;
-+	int nr_seg;
-+	unsigned long offset;
-+	char* vaddr;
-+
-+	if (!xen_feature(XENFEAT_auto_translated_physmap))
-+		return phys_to_machine(XPADDR(paddr)).maddr;
-+
-+	vaddr = (char *) phys_to_virt(paddr);
-+	if (vaddr >= xen_io_tlb_end || vaddr < xen_io_tlb_start)
-+		return ~0;
-+
-+	offset = vaddr - xen_io_tlb_start;
-+	nr_seg = offset / (IO_TLB_SEGSIZE << IO_TLB_SHIFT);
-+
-+	return xen_dma_seg[nr_seg].dma_addr + (paddr & ((IO_TLB_SEGSIZE << IO_TLB_SHIFT) - 1));
- }
- 
- static phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
- {
--	return machine_to_phys(XMADDR(baddr)).paddr;
-+	if (xen_feature(XENFEAT_auto_translated_physmap))
-+	{
-+		struct xen_dma *dma = xen_dma_retrieve(baddr);
-+		if (dma == NULL)
-+			return ~0;
-+		else
-+			return dma->phys_addr + (baddr & ((IO_TLB_SEGSIZE << IO_TLB_SHIFT) - 1));
-+	} else
-+		return machine_to_phys(XMADDR(baddr)).paddr;
- }
- 
- static dma_addr_t xen_virt_to_bus(void *address)
-@@ -107,6 +191,9 @@ static int is_xen_swiotlb_buffer(dma_addr_t dma_addr)
- 	unsigned long pfn = mfn_to_local_pfn(mfn);
- 	phys_addr_t paddr;
- 
-+	if (xen_feature(XENFEAT_auto_translated_physmap))
-+		return 1;
-+
- 	/* If the address is outside our domain, it CAN
- 	 * have the same virtual address as another address
- 	 * in our domain. Therefore _only_ check address within our domain.
-@@ -124,13 +211,12 @@ static int max_dma_bits = 32;
- static int
- xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
- {
--	int i, rc;
-+	int i, j, rc;
- 	int dma_bits;
--	dma_addr_t dma_handle;
- 
- 	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
- 
--	i = 0;
-+	i = j = 0;
- 	do {
- 		int slabs = min(nslabs - i, (unsigned long)IO_TLB_SEGSIZE);
- 
-@@ -138,12 +224,16 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
- 			rc = xen_create_contiguous_region(
- 				(unsigned long)buf + (i << IO_TLB_SHIFT),
- 				get_order(slabs << IO_TLB_SHIFT),
--				dma_bits, &dma_handle);
-+				dma_bits, &xen_dma_seg[j].dma_addr);
-+			xen_dma_seg[j].phys_addr = virt_to_phys(buf + (i << IO_TLB_SHIFT));
-+			xen_dma_seg[j].size = slabs << IO_TLB_SHIFT;
-+			xen_dma_insert(&xen_dma_seg[j]);
- 		} while (rc && dma_bits++ < max_dma_bits);
- 		if (rc)
- 			return rc;
- 
- 		i += slabs;
-+		j++;
- 	} while (i < nslabs);
- 	return 0;
- }
-@@ -193,9 +283,10 @@ retry:
- 	/*
- 	 * Get IO TLB memory from any location.
- 	 */
--	if (early)
-+	if (early) {
- 		xen_io_tlb_start = alloc_bootmem_pages(PAGE_ALIGN(bytes));
--	else {
-+		xen_dma_seg = alloc_bootmem(sizeof(struct xen_dma) * NR_DMA_SEGS);
-+	} else {
- #define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
- #define IO_TLB_MIN_SLABS ((1<<20) >> IO_TLB_SHIFT)
- 		while ((SLABS_PER_PAGE << order) > IO_TLB_MIN_SLABS) {
-@@ -210,6 +301,7 @@ retry:
- 			xen_io_tlb_nslabs = SLABS_PER_PAGE << order;
- 			bytes = xen_io_tlb_nslabs << IO_TLB_SHIFT;
- 		}
-+		xen_dma_seg = kzalloc(sizeof(struct xen_dma) * NR_DMA_SEGS, GFP_KERNEL);
- 	}
- 	if (!xen_io_tlb_start) {
- 		m_ret = XEN_SWIOTLB_ENOMEM;
-@@ -232,7 +324,6 @@ retry:
- 		m_ret = XEN_SWIOTLB_EFIXUP;
- 		goto error;
- 	}
--	start_dma_addr = xen_virt_to_bus(xen_io_tlb_start);
- 	if (early) {
- 		if (swiotlb_init_with_tbl(xen_io_tlb_start, xen_io_tlb_nslabs,
- 			 verbose))
-@@ -290,7 +381,8 @@ xen_swiotlb_alloc_coherent(struct device *hwdev, size_t size,
- 
- 	phys = virt_to_phys(ret);
- 	dev_addr = xen_phys_to_bus(phys);
--	if (((dev_addr + size - 1 <= dma_mask)) &&
-+	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
-+	    ((dev_addr + size - 1 <= dma_mask)) &&
- 	    !range_straddles_page_boundary(phys, size))
- 		*dma_handle = dev_addr;
- 	else {
-@@ -321,8 +413,9 @@ xen_swiotlb_free_coherent(struct device *hwdev, size_t size, void *vaddr,
- 
- 	phys = virt_to_phys(vaddr);
- 
--	if (((dev_addr + size - 1 > dma_mask)) ||
--	    range_straddles_page_boundary(phys, size))
-+	if (xen_feature(XENFEAT_auto_translated_physmap) ||
-+		(((dev_addr + size - 1 > dma_mask)) ||
-+		 range_straddles_page_boundary(phys, size)))
- 		xen_destroy_contiguous_region((unsigned long)vaddr, order);
- 
- 	free_pages((unsigned long)vaddr, order);
-@@ -351,14 +444,15 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
- 	 * we can safely return the device addr and not worry about bounce
- 	 * buffering it.
- 	 */
--	if (dma_capable(dev, dev_addr, size) &&
-+	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
-+	    dma_capable(dev, dev_addr, size) &&
- 	    !range_straddles_page_boundary(phys, size) && !swiotlb_force)
- 		return dev_addr;
- 
- 	/*
- 	 * Oh well, have to allocate and map a bounce buffer.
- 	 */
--	map = swiotlb_tbl_map_single(dev, start_dma_addr, phys, size, dir);
-+	map = swiotlb_tbl_map_single(dev, xen_dma_seg[0].dma_addr, phys, size, dir);
- 	if (map == SWIOTLB_MAP_ERROR)
- 		return DMA_ERROR_CODE;
- 
-@@ -494,10 +588,11 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
- 		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
- 
- 		if (swiotlb_force ||
-+		    xen_feature(XENFEAT_auto_translated_physmap) ||
- 		    !dma_capable(hwdev, dev_addr, sg->length) ||
- 		    range_straddles_page_boundary(paddr, sg->length)) {
- 			phys_addr_t map = swiotlb_tbl_map_single(hwdev,
--								 start_dma_addr,
-+								 xen_dma_seg[0].dma_addr,
- 								 sg_phys(sg),
- 								 sg->length,
- 								 dir);
+ #endif /* __XEN_PUBLIC_MEMORY_H__ */
 -- 
 1.7.2.5
