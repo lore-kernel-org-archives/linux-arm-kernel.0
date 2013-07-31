@@ -1,26 +1,42 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 30 Jul 2013 17:01:37 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
- mitigations
-In-Reply-To: <CAGXu5jLQxE14Gy3x20XMyFyUQKwMQ+RU9S24H742cQevEF9Aew@mail.gmail.com>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <20130730221435.GA22240@redhat.com>
- <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
- <20130730231533.GA26824@redhat.com>
- <CAGXu5jLQxE14Gy3x20XMyFyUQKwMQ+RU9S24H742cQevEF9Aew@mail.gmail.com>
-Message-ID: <51F853E1.2080808@zytor.com>
+From: shuah.kh@samsung.com (Shuah Khan)
+Date: Wed, 31 Jul 2013 00:02:46 +0000
+Subject: Linux Plumbers ACPI/PM, PCI Microconference
+References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
+ <CAKocOOOgEb5h1dZWP_2UqBKhSK9U-kxKUbvTdzHfds=RiDzNJg@mail.gmail.com>
+ <1476124.sWE2ygoo2D@vostro.rjw.lan>
+Message-ID: <B8EFE96D1287C24090BAD9D858E15E6174F0B5@sisaex01sj>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 04:33 PM, Kees Cook wrote:
+On 07/30/2013 05:38 PM, Rafael J. Wysocki wrote:
+> On Wednesday, July 17, 2013 08:31:55 AM Shuah Khan wrote:
+>> Myron,
 >>
->> If you're running it as a regular user and you can brick the board,
->> you might have bigger problems.
-> 
-> Exactly, and finding those problems tends to be worth the hardware hassle. :)
-> 
+>> On Tue, Jul 16, 2013 at 8:21 PM, Myron Stowe <myron.stowe@gmail.com> wrote:
+>>
+>>>
+>>> Shuah - You brought up the idea about "Converting drivers from Legacy
+>>> PM ops to dev_pm_ops"; would you like to present what you have
+>>> done/encountered so far?
+>>>
+>>
+>> Awesome. Yes, I would like to present what I have done so far and I do
+>> have a couple of things that could benefit from a face to face
+>> discussion which would help me make progress on the rest of the work
+>> that needs to get done.
+>
+> Care to sumbit a formal proposal through the LPC web page?
+>
+> Rafael
+>
+>
 
-Even as root the number of things allowed to brick the hardware is quite
-small.  Call it destructive testing.
+Rafael,
 
-	-hpa
+I did submit a formal talk proposal to LinuxCon/LPC and it was rejected. 
+Submission is closed now as far as I know.
+
+-- Shuah
+
+Shuah Khan, Linux Kernel Developer - Open Source Group Samsung Research 
+America (Silicon Valley) shuah.kh at samsung.com | (970) 672-0658
