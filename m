@@ -1,89 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 31 Jul 2013 12:28:53 +0200
-Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
-In-Reply-To: <20130731095411.GA2810@htj.dyndns.org>
-References: <1375232669-27846-1-git-send-email-festevam@gmail.com>
- <1375232669-27846-2-git-send-email-festevam@gmail.com>
- <20130731073306.GZ1754@pengutronix.de>
- <20130731082054.GF8540@nchen-desktop>
- <20130731084645.GB1754@pengutronix.de>
- <20130731090512.GD9858@sirena.org.uk>
- <20130731094434.GC1754@pengutronix.de>
- <20130731095411.GA2810@htj.dyndns.org>
-Message-ID: <20130731102853.GD1754@pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 31 Jul 2013 11:30:25 +0100
+Subject: [PATCH 11/13] ARM: bL_switcher: veto CPU hotplug requests when
+ the switcher is active
+In-Reply-To: <1374550289-25305-12-git-send-email-nicolas.pitre@linaro.org>
+References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
+ <1374550289-25305-12-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130731103025.GC6583@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 05:54:11AM -0400, Tejun Heo wrote:
-> Hello,
+On Tue, Jul 23, 2013 at 04:31:27AM +0100, Nicolas Pitre wrote:
+> Trying to support both the switcher and CPU hotplug at the same time
+> is quickly becoming very complex due to ambiguous semantics.  So let's
+> simply veto any hotplug requests when the switcher is active for now.
 > 
-> On Wed, Jul 31, 2013 at 11:44:34AM +0200, Uwe Kleine-K?nig wrote:
-> > > > OK, so the possible problem is that remove is called while the irq is
-> > > > still active. That means you have to assert that all resources the irq
+> This restriction might be loosened eventually.
 > 
-> If your driver destruction path is running while your irq handler is
-> still running, it's a crappy / broken driver.  You need a deactivation
-Well, you cannot avoid assuming that the irq is still active when your
-driver's remove callback is called. But I agree about crappyness at the
-end of the destruction path. The problem is that crap is as easy as:
-
-	probe(..)
-	{
-		clk = devm_get_clk(...);
-		clk_prepare_enable(clk);
-		writel(1, base + IRQENABLE);
-		devm_request_irq(...);
-	}
-
-	remove(..)
-	{
-		writel(0, base + IRQENABLE);
-		clk_disable_unprepare(clk);
-	}
-
-and I think there are more and more drivers doing that.
-
-> step whether you're using devm or not.  IRQs can be shared and the
-> device should be in a quiesced state before the driver detaches
-> itself.  Note that you can queue deactivation routine using devm.  For
-> an example, please take a look at
-> drivers/ata/libata-core.c::ata_host_start().
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/common/bL_switcher.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
 > 
-> > > > handler is using (e.g. ioremap, clk_prepare_enable) are only freed
-> > > > *after* the irq is done. For ioremap that means it must be done using
-> > > > devm_ioremap_resource. For a clock it's not that easy because the irq
-> > > > handler has to assert that a used clk is kept prepared which can only be
-> > > > done using clk_prepare which in turn is not allowed in an irq handler.
-> > > 
-> > > > Hmm. So the only possible fixes are
-> > > > 	- devm* can be told to also care about clk_disable_unprepare
-> > > > 	- after disabling irqs in the remove callback wait for all
-> > > > 	  active irqs to be done. (i.e. call synchronize_irq(irq))
-> > > > 	- don't use devm_request_irq
-> 
-> Again, the right thing to do is having a proper deactivation step.
-> This is nothing devm can do automatically.  There's no way for it to
-> find out that the device is actually quiesced.  Let's say it waits for
-> the current instance of irq handler to finish.  How would it know that
-> it won't start again between the flushing of the current instance and
-> irq deregistration.  Add an explicit deactivation step using
-> devres_alloc().
-> 
-> > > I'm not sure that devm_ guarantees any ordering in the cleanups it does
-> > > so I'd not like to rely on the first option either, if there were some
-> > > guarantee of that it'd help.  The nice thing about explicitly freeing
-> > > the IRQ is that you can tell that all this stuff is safe by inspection.
-> > devm_* at least uses list_for_each_entry_reverse
-> > (drivers/base/devres.c:release_nodes()). Without this guarantee devm_
-> > would not make much sense IMHO.
-> 
-> devm guarantees that the destruction callbacks are called in the
-> reverse order of registration.
-That's fine.
+> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+> index 704c4b4ef3..2fe3911601 100644
+> --- a/arch/arm/common/bL_switcher.c
+> +++ b/arch/arm/common/bL_switcher.c
+> @@ -528,6 +528,25 @@ static int __init bL_switcher_sysfs_init(void)
+>  
+>  #endif  /* CONFIG_SYSFS */
+>  
+> +/*
+> + * Veto any CPU hotplug operation while the switcher is active.
+> + * We're just not ready to deal with that given the trickery involved.
+> + */
+> +static int bL_switcher_hotplug_callback(struct notifier_block *nfb,
+> +					unsigned long action, void *hcpu)
+> +{
+> +	switch (action) {
+> +	case CPU_UP_PREPARE:
+> +	case CPU_DOWN_PREPARE:
+> +		if (bL_switcher_active)
+> +			return NOTIFY_BAD;
 
-Best regards
-Uwe
+This is a bit of a sledgehammer. It implies that S2R can't be implemented when
+the switcher is active. Are we really sure that hotplug, given MCPM HW
+CPUs awareness, is incompatible with the switcher as it stands ?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+What are the main issues that have to be tackled ?
+
+Thanks,
+Lorenzo
+
+> +	}
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block bL_switcher_hotplug_notifier =
+> +	{ &bL_switcher_hotplug_callback, NULL, 0 };
+> +
+>  static bool no_bL_switcher;
+>  core_param(no_bL_switcher, no_bL_switcher, bool, 0644);
+>  
+> @@ -540,6 +559,8 @@ static int __init bL_switcher_init(void)
+>  		return -EINVAL;
+>  	}
+>  
+> +	register_cpu_notifier(&bL_switcher_hotplug_notifier);
+> +
+>  	if (!no_bL_switcher) {
+>  		ret = bL_switcher_enable();
+>  		if (ret)
+> -- 
+> 1.8.1.2
+> 
+> 
+> 
