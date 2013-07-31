@@ -1,53 +1,68 @@
-From: htejun@gmail.com (Tejun Heo)
-Date: Wed, 31 Jul 2013 06:41:25 -0400
-Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
-In-Reply-To: <20130731102853.GD1754@pengutronix.de>
-References: <1375232669-27846-1-git-send-email-festevam@gmail.com>
- <1375232669-27846-2-git-send-email-festevam@gmail.com>
- <20130731073306.GZ1754@pengutronix.de>
- <20130731082054.GF8540@nchen-desktop>
- <20130731084645.GB1754@pengutronix.de>
- <20130731090512.GD9858@sirena.org.uk>
- <20130731094434.GC1754@pengutronix.de>
- <20130731095411.GA2810@htj.dyndns.org>
- <20130731102853.GD1754@pengutronix.de>
-Message-ID: <20130731104125.GF2810@htj.dyndns.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Jul 2013 11:56:43 +0100
+Subject: [RFC/RFT PATCH 4/5] ARM: mm: change max*pfn to include the
+ physical offset of memory
+In-Reply-To: <1373665694-7580-5-git-send-email-santosh.shilimkar@ti.com>
+References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
+ <1373665694-7580-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130731105643.GW24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 12:28:53PM +0200, Uwe Kleine-K?nig wrote:
-> Well, you cannot avoid assuming that the irq is still active when your
-> driver's remove callback is called. But I agree about crappyness at the
-> end of the destruction path. The problem is that crap is as easy as:
-> 
-> 	probe(..)
-> 	{
-> 		clk = devm_get_clk(...);
-> 		clk_prepare_enable(clk);
-> 		writel(1, base + IRQENABLE);
-> 		devm_request_irq(...);
-> 	}
-> 
-> 	remove(..)
-> 	{
-> 		writel(0, base + IRQENABLE);
-> 		clk_disable_unprepare(clk);
-> 	}
-> 
-> and I think there are more and more drivers doing that.
+On Fri, Jul 12, 2013 at 05:48:13PM -0400, Santosh Shilimkar wrote:
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 5b579b9..b2d5937 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -47,12 +47,12 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+>  #ifndef __arch_pfn_to_dma
+>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>  {
+> -	return (dma_addr_t)__pfn_to_bus(pfn);
+> +	return (dma_addr_t)__pfn_to_bus(pfn + PHYS_PFN_OFFSET);
+>  }
+>  
+>  static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+>  {
+> -	return __bus_to_pfn(addr);
+> +	return __bus_to_pfn(addr) - PHYS_PFN_OFFSET;
+>  }
+>  
+>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+> @@ -64,15 +64,16 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  {
+>  	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+>  }
+> +
+>  #else
+>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>  {
+> -	return __arch_pfn_to_dma(dev, pfn);
+> +	return __arch_pfn_to_dma(dev, pfn + PHYS_PFN_OFFSET);
+>  }
+>  
+>  static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+>  {
+> -	return __arch_dma_to_pfn(dev, addr);
+> +	return __arch_dma_to_pfn(dev, addr) - PHYS_PFN_OFFSET;
+>  }
+>  
+>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+> @@ -86,6 +87,13 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  }
+>  #endif
 
-Oh, so, the problem is that the driver is mixing devm and non-devm
-resource management and ending up messing the order of shutdown?
-Well, the obvious solution is using devm for clk too.  devm does
-provide constructs to build custom destruction sequence so that such
-calls can be mixed but it's a bit of hassle and mostly meant for
-driver midlayers (libata, firewire, usb and so on) so that they can
-provide nicely wrapped init/exit helpers for low level drivers.
+Note that I don't think the above are correct - the 'pfn' argument to the
+above functions already includes the PFN offset of physical memory -
+they're all physical_address >> PAGE_SHIFT values.
 
-In general, partial devm conversion can easily lead to subtle shutdown
-order problems and it's best to go all the way.
+> +/* The ARM override for dma_max_pfn() */
+> +static inline unsigned long dma_max_pfn(struct device *dev)
+> +{
+> +	return dma_to_pfn(dev, *dev->dma_mask);
+> +}
+> +#define dma_max_pfn(dev) dma_max_pfn(dev)
 
-Thanks.
+So I'd suggest this becomes:
 
--- 
-tejun
+	return PHYS_PFN_OFFSET + dma_to_pfn(dev, *dev->dma_mask);
