@@ -1,35 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 31 Jul 2013 12:34:01 +0100
-Subject: Defining schemas for Device Tree
-In-Reply-To: <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
-References: <1706112.Xn49tiCSKF@thinkpad>
- <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
- <20130730102511.GM9858@sirena.org.uk>
- <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
- <51F7F596.6020503@wwwdotorg.org>
- <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
- <20130730205716.GZ9858@sirena.org.uk>
- <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
- <20130730230331.GC9858@sirena.org.uk>
- <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
-Message-ID: <20130731113401.GM9858@sirena.org.uk>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Wed, 31 Jul 2013 17:07:22 +0530
+Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
+In-Reply-To: <51F7F0E1.5030200@wwwdotorg.org>
+References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
+ <20130726104908.GC17886@mudshark.cambridge.arm.com>
+ <51F2ACF7.9000008@wwwdotorg.org>
+ <CALicx6ugumPG__rSAsTS95SH=6fTGqhpPFsQ8bLG-u-fbk0=pQ@mail.gmail.com>
+ <51F7F0E1.5030200@wwwdotorg.org>
+Message-ID: <CALicx6tJFkGbvKO+-XZixj+8RSh1awFnXK91Pdew1+5Oa+dDqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 07:23:36PM -0400, jonsmirl at gmail.com wrote:
+On Tue, Jul 30, 2013 at 10:29 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/30/2013 04:37 AM, Vijay Kilari wrote:
+>> On Fri, Jul 26, 2013 at 10:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> ...
+>>> Does a kernel that's used as the crash kernel guarantee:
+>>>
+>>> * Never to re-use the memory that was used by the previous kernel, so
+>>> that the spin loop code/data won't be corrupted, ever, no matter how
+>>> long the crash recovery kernel runs.
+>>>
+>>> * Not use SMP, so there's never a need to re-activate the non-boot CPUs,
+>>> which might not work if they aren't truly disabled but rather just
+>>> running a pin loop?
+>>
+>> From cat /proc/iomem, normal kernel is executed from (0x80xxxxxx) with crash
+>> kernel reserved 64M at 0xa0000000
+>>
+>> 80000000-bfffffff : System RAM
+>>   80008000-805aeddf : Kernel code
+>>   805e2000-8063e427 : Kernel data
+>>   a0000000-a3ffffff : Crash kernel
+>>
+>> crash kernel is loaded to reserved memory location and is executed from there.
+>> I could confirm this from /proc/iomem when crash kernel is running
+>>
+>> a0000000-a3efffff : System RAM
+>>   a0008000-a05aeddf : Kernel code
+>>   a05e2000-a063e427 : Kernel data
+>
+> OK, but in the crash dump kernel, is 80008000..8063e427 reserved as
+> well, which would guarantee that the spin loop being executed by the
+> non-crash CPUs won't be corrupted?
 
-> Uboot could be an issue but I don't think they are actually doing
-> anything with FDTs yet, they are just talking about doing it.
-
-Right, plus any other bootloaders that handle the DT in some way.  Those
-that just copy the file through without looking at it aren't an issue
-but I thought people were doing things like adding in properties for
-serial numbers but perhaps that's less widespread than I'd thought and
-it's not an issue.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/85b18fa2/attachment.sig>
+The crash dump kernel runs from reserved memory area (0xa0000000 - 0xa3effffff).
+ So it should not corrupt the memory area of original kernel that was running
+ at 0x80000000,where other CPU's are in spin loop.
