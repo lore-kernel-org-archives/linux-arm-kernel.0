@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 31 Jul 2013 15:31:09 -0700
-Subject: [PATCH 10/18] ARM: OMAP2+: Switch to sched_clock_register()
+Date: Wed, 31 Jul 2013 15:31:07 -0700
+Subject: [PATCH 08/18] ARM: msm: Switch to sched_clock_register()
 In-Reply-To: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
 References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1375309877-16617-11-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1375309877-16617-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +11,34 @@ The 32 bit sched_clock interface now supports 64 bits. Upgrade to
 the 64 bit function to allow us to remove the 32 bit registration
 interface.
 
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: David Brown <davidb@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-omap2/timer.c | 4 ++--
+ arch/arm/mach-msm/timer.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index b37e1fc..54b3cbe 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -369,7 +369,7 @@ static struct clocksource clocksource_gpt = {
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index b6418fd..3c9b4da 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -170,7 +170,7 @@ static struct local_timer_ops msm_local_timer_ops __cpuinitdata = {
  };
+ #endif /* CONFIG_LOCAL_TIMERS */
  
--static u32 notrace dmtimer_read_sched_clock(void)
-+static u64 notrace dmtimer_read_sched_clock(void)
+-static notrace u32 msm_sched_clock_read(void)
++static u64 notrace msm_sched_clock_read(void)
  {
- 	if (clksrc.reserved)
- 		return __omap_dm_timer_read_counter(&clksrc,
-@@ -461,7 +461,7 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
- 	__omap_dm_timer_load_start(&clksrc,
- 				   OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0,
- 				   OMAP_TIMER_NONPOSTED);
--	setup_sched_clock(dmtimer_read_sched_clock, 32, clksrc.rate);
-+	sched_clock_register(dmtimer_read_sched_clock, 32, clksrc.rate);
+ 	return msm_clocksource.read(&msm_clocksource);
+ }
+@@ -215,7 +215,7 @@ err:
+ 	res = clocksource_register_hz(cs, dgt_hz);
+ 	if (res)
+ 		pr_err("clocksource_register failed\n");
+-	setup_sched_clock(msm_sched_clock_read, sched_bits, dgt_hz);
++	sched_clock_register(msm_sched_clock_read, sched_bits, dgt_hz);
+ }
  
- 	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
- 		pr_err("Could not register clocksource %s\n",
+ #ifdef CONFIG_OF
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
