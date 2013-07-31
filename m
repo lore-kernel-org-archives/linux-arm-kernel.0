@@ -1,51 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 31 Jul 2013 11:51:08 +0200
-Subject: NSA310 + DT
-In-Reply-To: <51F8DC3A.6010007@uni-bremen.de>
-References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
- <20130729192112.GY29916@titan.lakedaemon.net>
- <20130729204315.GK24782@lunn.ch> <51F78DA6.8010307@uni-bremen.de>
- <20130730144752.GR24782@lunn.ch> <20130730172407.3aab15c6@skate>
- <51F7EBB9.7000504@uni-bremen.de> <20130730191943.49f8070c@skate>
- <20130730183610.GT24782@lunn.ch> <51F814A0.2050403@uni-bremen.de>
- <20130730232316.10dc7019@skate> <20130731111414.47e7670b@skate>
- <51F8DC3A.6010007@uni-bremen.de>
-Message-ID: <20130731115108.21c043fd@skate>
+From: htejun@gmail.com (Tejun Heo)
+Date: Wed, 31 Jul 2013 05:54:11 -0400
+Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
+In-Reply-To: <20130731094434.GC1754@pengutronix.de>
+References: <1375232669-27846-1-git-send-email-festevam@gmail.com>
+ <1375232669-27846-2-git-send-email-festevam@gmail.com>
+ <20130731073306.GZ1754@pengutronix.de>
+ <20130731082054.GF8540@nchen-desktop>
+ <20130731084645.GB1754@pengutronix.de>
+ <20130731090512.GD9858@sirena.org.uk>
+ <20130731094434.GC1754@pengutronix.de>
+Message-ID: <20130731095411.GA2810@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Finn Hoffmann,
+Hello,
 
-On Wed, 31 Jul 2013 11:43:22 +0200, Finn Hoffmann wrote:
+On Wed, Jul 31, 2013 at 11:44:34AM +0200, Uwe Kleine-K?nig wrote:
+> > > OK, so the possible problem is that remove is called while the irq is
+> > > still active. That means you have to assert that all resources the irq
 
-> Hi Thomas,
-> here you are.
-> Network is working.
+If your driver destruction path is running while your irq handler is
+still running, it's a crappy / broken driver.  You need a deactivation
+step whether you're using devm or not.  IRQs can be shared and the
+device should be in a quiesced state before the driver detaches
+itself.  Note that you can queue deactivation routine using devm.  For
+an example, please take a look at
+drivers/ata/libata-core.c::ata_host_start().
 
-Excellent, thanks!
+> > > handler is using (e.g. ioremap, clk_prepare_enable) are only freed
+> > > *after* the irq is done. For ioremap that means it must be done using
+> > > devm_ioremap_resource. For a clock it's not that easy because the irq
+> > > handler has to assert that a used clk is kept prepared which can only be
+> > > done using clk_prepare which in turn is not allowed in an irq handler.
+> > 
+> > > Hmm. So the only possible fixes are
+> > > 	- devm* can be told to also care about clk_disable_unprepare
+> > > 	- after disabling irqs in the remove callback wait for all
+> > > 	  active irqs to be done. (i.e. call synchronize_irq(irq))
+> > > 	- don't use devm_request_irq
 
-> # cat /sys/kernel/debug/mvebu-mbus/devices
-> [00] 00000000e8010000 - 00000000e8020000 : pcie0.0 (remap
-> 0000000000010000) [01] disabled
-> [02] disabled
-> [03] disabled
-> [04] 00000000f4000000 - 00000000f4010000 : nand
-> [05] 00000000f5000000 - 00000000f5010000 : sram
-> [06] 00000000e0000000 - 00000000e0100000 : pcie0.0
-> [07] disabled
+Again, the right thing to do is having a proper deactivation step.
+This is nothing devm can do automatically.  There's no way for it to
+find out that the device is actually quiesced.  Let's say it waits for
+the current instance of irq handler to finish.  How would it know that
+it won't start again between the flushing of the current instance and
+irq deregistration.  Add an explicit deactivation step using
+devres_alloc().
 
-Now this looks good, we have both the PCIe memory and PCIe I/O windows
-created.
+> > I'm not sure that devm_ guarantees any ordering in the cleanups it does
+> > so I'd not like to rely on the first option either, if there were some
+> > guarantee of that it'd help.  The nice thing about explicitly freeing
+> > the IRQ is that you can tell that all this stuff is safe by inspection.
+> devm_* at least uses list_for_each_entry_reverse
+> (drivers/base/devres.c:release_nodes()). Without this guarantee devm_
+> would not make much sense IMHO.
 
-I'll clean up the patch and send it, hopefully for the final 3.11.
+devm guarantees that the destruction callbacks are called in the
+reverse order of registration.
 
-Thanks again for all your testing!
+Thanks.
 
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+tejun
