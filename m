@@ -1,73 +1,78 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 31 Jul 2013 17:59:10 +0100
-Subject: Defining schemas for Device Tree
-In-Reply-To: <20130731113401.GM9858@sirena.org.uk>
-References: <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
- <20130730102511.GM9858@sirena.org.uk>
- <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
- <51F7F596.6020503@wwwdotorg.org>
- <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
- <20130730205716.GZ9858@sirena.org.uk>
- <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
- <20130730230331.GC9858@sirena.org.uk>
- <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
- <20130731113401.GM9858@sirena.org.uk>
-Message-ID: <20130731165902.GA3329@localhost.localdomain>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 31 Jul 2013 13:06:58 -0400
+Subject: [PATCH] arm: add .text at __CPUINIT places to prevent section
+ grandfathering
+In-Reply-To: <20130731094352.GV24642@n2100.arm.linux.org.uk>
+References: <20130731094352.GV24642@n2100.arm.linux.org.uk>
+Message-ID: <1375290418-1848-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 09:57:16PM +0100, Mark Brown wrote:
-> On Tue, Jul 30, 2013 at 01:29:56PM -0400, jonsmirl at gmail.com wrote:
-> > On Tue, Jul 30, 2013 at 1:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > > On 07/30/2013 07:14 AM, jonsmirl at gmail.com wrote:
-> 
-> > > > Is something similar to this possible in device tree syntax?
-> > > > dmas =  <"tx" &pdma0 7>,  <"rx"  &pdma0 6>;
-> 
-> > > I /think/ you can physically write that in *.dts, or something very
-> > > similar; with the strings outside the <>:
-> 
-> > > dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
-> 
-> > Can we turn the strings into string phandles? Then they'd be fixed sized.
-> 
-> > That might provide a way to internationalize the strings too.
-> 
-> I don't know how viable or sane this actually is but one suggestion I
-> just made elsewhere which might help is to fix this at the dtc level by
-> having syntatic sugar which will do the parallel arrays trick that
-> people are currently using to write things out.  The user writes one
-> array with multiple types of data in it and the actual output is two or
-> more matched arrays each with a single type of data.
-> 
-> It would help legibility and wouldn't impact the parsers.
+In commit 22f0a27367742f65130c0fb25ef00f7297e032c1
+("init.h: remove __cpuinit sections from the kernel") the macros
+like __CPUINIT were converted from .section commands to no-ops.
 
-There may often be a conflict between making _good_ bindings, and making
-bindings which are convenient for maintainers to edit in .dts syntax.
+This caused CPU hotplug regressions because the code following
+the __CPUINIT lines was now grandfathered into whatever the
+previous section happened to be.  In most files, __CPUINIT was
+at the top of the file, so there was no previous section.
 
-I think good bindings (in the sense of good ABI) must take precedence:
-good bindings need to interoperate well over a long period of time, and
-should be robust against future evolution of hardware platforms OSes.  If
-they look nice in the .dts file, that's a bonus -- but I don't think it
-should be viewed as a requirement.
+However in the files changed here, there was a previous section,
+and so we'd inadvertently garbage collect CPU hotplug related
+code.  This changeset inserts ".text" into the exact same spot
+that the __CPUINIT section markers were found prior to commit
+8bd26e3a7e49af2697449bbcb7187a39dc85d672 ("arm: delete
+__cpuinit/__CPUINIT usage from all ARM users:) in the three affected
+files, as suggested by Russell.
 
-A pair of properties like dma-names/dmas may be a bit cumbersome, but
-it can be precise, unambiguous, and simple and easy to parse and check.
-The semantics can be extended in the future if necessary, by adding
-additional companion properties.  From my perspective, this can work as
-a template for good bindings.
+Bisected-by: Simon Horman <horms@verge.net.au>
+Reported-by: Magnus Damm <magnus.damm@gmail.com>
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
 
+[NB: Untested - I've not got an SMP ARM handy at the moment]
 
-We could add syntactic sugar to make those property pairs easier to
-maintain... but I worry that haphazard extensions to dtc may leave us
-with an unmanageable syntax which we will regret later.   This seems to
-be a common failure mode of domain-specific languages.
+ arch/arm/kernel/head-common.S | 1 +
+ arch/arm/kernel/head-nommu.S  | 1 +
+ arch/arm/kernel/head.S        | 1 +
+ 3 files changed, 3 insertions(+)
 
-Someone trying to maintain a complex .dts can always make their own life
-easier with a bit of scripting.  After all, in a future of stable
-bindings, a DT really shouldn't be changing much once it is complete.
-I don't see a clear reason why these issues must be solved by dtc
-itself.
-
-Cheers
----Dave
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 47cd974..def853e 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -149,6 +149,7 @@ ENDPROC(lookup_processor_type)
+  *	r5 = proc_info pointer in physical address space
+  *	r9 = cpuid (preserved)
+  */
++	.text
+ __lookup_processor_type:
+ 	adr	r3, __lookup_processor_type_data
+ 	ldmia	r3, {r4 - r6}
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index b361de1..14235ba 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -87,6 +87,7 @@ ENTRY(stext)
+ ENDPROC(stext)
+ 
+ #ifdef CONFIG_SMP
++	.text
+ ENTRY(secondary_startup)
+ 	/*
+ 	 * Common entry point for secondary CPUs.
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 9cf6063..2c7cc1e 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -343,6 +343,7 @@ __turn_mmu_on_loc:
+ 	.long	__turn_mmu_on_end
+ 
+ #if defined(CONFIG_SMP)
++	.text
+ ENTRY(secondary_startup)
+ 	/*
+ 	 * Common entry point for secondary CPUs.
+-- 
+1.8.1.2
