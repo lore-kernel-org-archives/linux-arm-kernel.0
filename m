@@ -1,276 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Jul 2013 12:14:33 +0200
-Subject: [PATCH 3/4] clk: sunxi: Add A31 clocks support
-In-Reply-To: <51F861E5.7010909@elopez.com.ar>
-References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375195462-19566-4-git-send-email-maxime.ripard@free-electrons.com>
- <51F861E5.7010909@elopez.com.ar>
-Message-ID: <20130731101433.GC2911@lukather>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 31 Jul 2013 12:30:45 +0200
+Subject: [PATCH RFC 3/3] cpufreq: cpufreq-cpu0: clk rate-change notifiers
+In-Reply-To: <CAKohpom-8KXixJ0ZbQ7Poh3uqJCqo7LFyYEfYeMyp+yZx9QmHA@mail.gmail.com>
+References: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
+ <20130731014328.5270.4248@quantum>
+ <CAKohpom-8KXixJ0ZbQ7Poh3uqJCqo7LFyYEfYeMyp+yZx9QmHA@mail.gmail.com>
+Message-ID: <2244883.xRIZhTlqYe@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
-
-On Tue, Jul 30, 2013 at 10:01:25PM -0300, Emilio L?pez wrote:
-> Hi Maxime,
+On Wednesday, July 31, 2013 10:09:03 AM Viresh Kumar wrote:
+> On 31 July 2013 07:13, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Viresh Kumar (2013-07-07 21:10:54)
+> >> On Mon, Jul 8, 2013 at 7:14 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> >> > Removes direct handling of OPP tables and voltage regulators by calling
+> >> > of_clk_cpufreq_notifier_handler, introduced by commit "clk: cpufreq
+> >> > helper for voltage scaling".
+> >> >
+> >> > In the future this can help consolidate code found across similar
+> >> > CPUfreq drivers.
+> >> >
+> >> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> >> > ---
+> >> >  drivers/cpufreq/cpufreq-cpu0.c | 125 ++++++++---------------------------------
+> >> >  1 file changed, 22 insertions(+), 103 deletions(-)
+> >>
+> >> Good patch, really gets lots of stuff out from cpufreq drivers.
+> >>
+> >> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >
+> > Viresh,
+> >
+> > Thanks for the Ack. I received no comments on this series besides your
+> > own, so I plan to merge it. Do you want to take patch #3, or do you want
+> > me to take it, or should I give you and Rafael a stable branch instead?
 > 
-> El 30/07/13 11:44, Maxime Ripard escribi?:
-> > The A31 has a mostly different clock set compared to the other older
-> > SoCs currently supported in the Allwinner clock driver.
-> > 
-> > Add support for the basic useful clocks. The other ones will come in
-> > eventually.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/clk/sunxi/clk-sunxi.c | 120 ++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 120 insertions(+)
-> > 
-> > diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> > index 6e9cbc9..8cd69e6 100644
-> > --- a/drivers/clk/sunxi/clk-sunxi.c
-> > +++ b/drivers/clk/sunxi/clk-sunxi.c
-> > @@ -124,7 +124,67 @@ static void sun4i_get_pll1_factors(u32 *freq, u32 parent_rate,
-> >  	*n = div / 4;
-> >  }
-> >  
-> > +/**
-> > + * sun6i_get_pll1_factors() - calculates n, k and m factors for PLL1
-> > + * PLL1 rate is calculated as follows
-> > + * rate = parent_rate * (n + 1) * (k + 1) / (m + 1);
-> > + * parent_rate should always be 24MHz
-> > + */
-> > +static void sun6i_get_pll1_factors(u32 *freq, u32 parent_rate,
-> > +				   u8 *n, u8 *k, u8 *m, u8 *p)
-> > +{
-> > +	/*
-> > +	 * We can operate only on MHz, this will make our life easier
-> > +	 * later.
-> > +	 */
-> > +	u32 freq_mhz = *freq / 1000000;
-> > +	u32 parent_freq_mhz = parent_rate / 1000000;
-> > +
-> > +	/* If the frequency is a multiple of 32 MHz, k is always 3 */
-> > +	if (!(freq_mhz % 32))
-> > +		*k = 3;
-> > +	/* If the frequency is a multiple of 9 MHz, k is always 2 */
-> > +	else if (!(freq_mhz % 9))
-> > +		*k = 2;
-> > +	/* If the frequency is a multiple of 8 MHz, k is always 1 */
-> > +	else if (!(freq_mhz % 8))
-> > +		*k = 1;
-> > +	/* Otherwise, we don't use the k factor */
-> > +	else
-> > +		*k = 0;
-> >  
-> > +	/*
-> > +	 * If the frequency is a multiple of 2 but not a multiple of
-> > +	 * 3, m is 3. This is the first time we use 6 here, yet we
-> > +	 * will use it on several other places.
-> > +	 * We use this number because it's the lowest frequency we can
-> > +	 * generate (with n = 0, k = 0, m = 3), so every other frequency
-> > +	 * somehow relates to this frequency.
-> > +	 */
-> > +	if ((freq_mhz % 6) == 2 || (freq_mhz % 6) == 4)
-> > +		*m = 2;
-> > +	/*
-> > +	 * If the frequency is a multiple of 6MHz, but the factor is
-> > +	 * odd, m will be 3
-> > +	 */
-> > +	else if ((freq_mhz / 6) & 1)
-> > +		*m = 3;
-> > +	/* Otherwise, we end up with m = 1 */
-> > +	else
-> > +		*m = 1;
-> > +
-> > +	/* Calculate n thanks to the above factors we already got */
-> > +	*n = freq_mhz * (*m + 1) / ((*k + 1) * parent_freq_mhz) - 1;
-> > +
-> > +	/*
-> > +	 * If n end up being outbound, and that we can still decrease
-> > +	 * m, do it.
-> > +	 */
-> > +	if ((*n + 1) > 31 && (*m + 1) > 1) {
-> > +		*n = (*n + 1) / 2 - 1;
-> > +		*m = (*m + 1) / 2 - 1;
-> > +	}
-> > +}
-> 
-> Nice! My rate-to-factors functions pale in comparison :) Remember that
-> n/k/m/p may be NULL when the caller just wants you to round freq to an
-> achievable value (see clk_factors_round_rate(...) in clk-factors.c).
+> Its only related to cpufreq-cpu0 and to handle dependencies well they
+> should go through a single tree.. Probably your tree is the right place for
+> now. Rafael?
 
-Ah, right, I forgot that usecase.
+Yes, the entire series should go through the Mike's tree I think.
 
-> >  /**
-> >   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
-> > @@ -189,6 +249,15 @@ static struct clk_factors_config sun4i_pll1_config = {
-> >  	.pwidth = 2,
-> >  };
-> >  
-> > +static struct clk_factors_config sun6i_pll1_config = {
-> > +	.nshift	= 8,
-> > +	.nwidth = 5,
-> > +	.kshift = 4,
-> > +	.kwidth = 2,
-> > +	.mshift = 0,
-> > +	.mwidth = 2,
-> > +};
-> > +
-> >  static struct clk_factors_config sun4i_apb1_config = {
-> >  	.mshift = 0,
-> >  	.mwidth = 5,
-> > @@ -201,6 +270,11 @@ static const __initconst struct factors_data sun4i_pll1_data = {
-> >  	.getter = sun4i_get_pll1_factors,
-> >  };
-> >  
-> > +static const __initconst struct factors_data sun6i_pll1_data = {
-> > +	.table = &sun6i_pll1_config,
-> > +	.getter = sun6i_get_pll1_factors,
-> > +};
-> > +
-> >  static const __initconst struct factors_data sun4i_apb1_data = {
-> >  	.table = &sun4i_apb1_config,
-> >  	.getter = sun4i_get_apb1_factors,
-> > @@ -243,6 +317,10 @@ static const __initconst struct mux_data sun4i_cpu_mux_data = {
-> >  	.shift = 16,
-> >  };
-> >  
-> > +static const __initconst struct mux_data sun6i_ahb1_mux_data = {
-> > +	.shift = 12,
-> > +};
-> > +
-> >  static const __initconst struct mux_data sun4i_apb1_mux_data = {
-> >  	.shift = 24,
-> >  };
-> > @@ -301,6 +379,12 @@ static const __initconst struct div_data sun4i_apb0_data = {
-> >  	.width	= 2,
-> >  };
-> >  
-> > +static const __initconst struct div_data sun6i_apb2_div_data = {
-> > +	.shift	= 0,
-> > +	.pow	= 0,
-> > +	.width	= 4,
-> > +};
-> > +
-> >  static void __init sunxi_divider_clk_setup(struct device_node *node,
-> >  					   struct div_data *data)
-> >  {
-> > @@ -347,6 +431,10 @@ static const __initconst struct gates_data sun5i_a13_ahb_gates_data = {
-> >  	.mask = {0x107067e7, 0x185111},
-> >  };
-> >  
-> > +static const __initconst struct gates_data sun6i_a31_ahb1_gates_data = {
-> > +	.mask = { 0xedfe7f62, 0x794f931 },
-> > +};
-> > +
-> >  static const __initconst struct gates_data sun4i_apb0_gates_data = {
-> >  	.mask = {0x4EF},
-> >  };
-> > @@ -363,6 +451,14 @@ static const __initconst struct gates_data sun5i_a13_apb1_gates_data = {
-> >  	.mask = {0xa0007},
-> >  };
-> >  
-> > +static const __initconst struct gates_data sun6i_a31_apb1_gates_data = {
-> > +	.mask = { 0x3031 },
-> > +};
-> > +
-> > +static const __initconst struct gates_data sun6i_a31_apb2_gates_data = {
-> > +	.mask = { 0x3f000f },
-> > +};
-> > +
-> 
-> We should decide on a style here and use it across the board, so far we
-> have definitions with and without spaces between constants and braces,
-> and constants both with upper and lower case A-F. Personally I don't
-> feel strongly about the spacing and prefer upper-case constants, but if
-> the style guide suggests otherwise, I can live with it (as long as we
-> use it consistently, that is)
-
-Hmmm, like you probably noticed, I prefer the { 0xdeadbeef } way, and
-that's what is used everywhere else for sunxi I believe. There's no
-strong convention on this one, but it's true that we have to remain
-consistent.
-
-I'll stick with your convention already in use in the clocks driver for
-the time being, and we'll see later to unify the drivers on this
-convention later on.
-
-> >  static void __init sunxi_gates_clk_setup(struct device_node *node,
-> >  					 struct gates_data *data)
-> >  {
-> > @@ -420,6 +516,10 @@ static const __initconst struct of_device_id clk_factors_match[] = {
-> >  		.data = &sun4i_pll1_data,
-> >  	},
-> >  	{
-> > +		.compatible = "allwinner,sun6i-pll1-clk",
-> > +		.data = &sun6i_pll1_data,
-> > +	},
-> > +	{
-> >  		.compatible = "allwinner,sun4i-apb1-clk",
-> >  		.data = &sun4i_apb1_data,
-> >  	},
-> > @@ -440,6 +540,10 @@ static const __initconst struct of_device_id clk_div_match[] = {
-> >  		.compatible = "allwinner,sun4i-apb0-clk",
-> >  		.data = &sun4i_apb0_data,
-> >  	},
-> > +	{
-> > +		.compatible = "allwinner,sun6i-apb2-div-clk",
-> > +		.data = &sun6i_apb2_div_data,
-> > +	},
-> >  	{}
-> >  };
-> >  
-> > @@ -453,6 +557,10 @@ static const __initconst struct of_device_id clk_mux_match[] = {
-> >  		.compatible = "allwinner,sun4i-apb1-mux-clk",
-> >  		.data = &sun4i_apb1_mux_data,
-> >  	},
-> > +	{
-> > +		.compatible = "allwinner,sun6i-ahb1-mux-clk",
-> > +		.data = &sun6i_ahb1_mux_data,
-> > +	},
-> >  	{}
-> >  };
-> >  
-> > @@ -471,6 +579,10 @@ static const __initconst struct of_device_id clk_gates_match[] = {
-> >  		.data = &sun5i_a13_ahb_gates_data,
-> >  	},
-> >  	{
-> > +		.compatible = "allwinner,sun6i-a31-ahb1-gates-clk",
-> > +		.data = &sun6i_a31_ahb1_gates_data,
-> > +	},
-> > +	{
-> >  		.compatible = "allwinner,sun4i-apb0-gates-clk",
-> >  		.data = &sun4i_apb0_gates_data,
-> >  	},
-> > @@ -486,6 +598,14 @@ static const __initconst struct of_device_id clk_gates_match[] = {
-> >  		.compatible = "allwinner,sun5i-a13-apb1-gates-clk",
-> >  		.data = &sun5i_a13_apb1_gates_data,
-> >  	},
-> > +	{
-> > +		.compatible = "allwinner,sun6i-a31-apb1-gates-clk",
-> > +		.data = &sun6i_a31_apb1_gates_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun6i-a31-apb2-gates-clk",
-> > +		.data = &sun6i_a31_apb2_gates_data,
-> > +	},
-> 
-> Please see my comments on the first patch regarding these.
-
-Yes, that will be fixed.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/cb5c4e75/attachment-0001.sig>
+Thanks,
+Rafael
