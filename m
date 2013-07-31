@@ -1,34 +1,83 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 31 Jul 2013 09:18:23 -0700
-Subject: [PATCH v2 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <003f01ce8154$2f5ea1d0$8e1be570$%jun@samsung.com>
-References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
- <1373411961-23812-1-git-send-email-dianders@chromium.org>
- <1373411961-23812-4-git-send-email-dianders@chromium.org>
- <002a01ce7d7d$6bd9e870$438db950$%jun@samsung.com>
- <CAD=FV=UtX0Z1ABdi5h270ks8Py2o1iPK4DonOHJH3N0Q1YShTQ@mail.gmail.com>
- <003f01ce8154$2f5ea1d0$8e1be570$%jun@samsung.com>
-Message-ID: <CAD=FV=XZcf8xWWxrCoe9KqjnQs4p4y7ENnuUYsVKU+yrE09GeQ@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 31 Jul 2013 09:26:55 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <51F8BC5D.80605@linaro.org>
+References: <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+ <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
+ <51F66565.7010600@linaro.org>
+ <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
+ <51F77D93.4030505@linaro.org> <51F8BC5D.80605@linaro.org>
+Message-ID: <2ebbb5cd-2755-4082-b434-d276e7225de5@CO1EHSMHS024.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon,
+On Wed, Jul 31, 2013 at 09:27:25AM +0200, Daniel Lezcano wrote:
+> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+> > On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+> >> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+> >>> Hi Daniel,
+> >>>
+> >>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+> >>> (snip)
+> >>>>
+> >>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+> >>>> timer will be stopped when entering to the idle state. In this case, the
+> >>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+> >>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+> >>>> idle state, switching the local timer back in use.
+> >>>
+> >>> I've been thinking about this, trying to understand how this makes my
+> >>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+> >>> would make the timer core switch to a broadcast device even though it
+> >>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+> >>> something useless, but nothing wrong in a sense that it should result in
+> >>> breakage. I guess I'm missing something obvious. This timer system will
+> >>> always remain a mystery to me.
+> >>>
+> >>> Actually this more or less leads to the question: What is this
+> >>> 'broadcast timer'. I guess that is some clockevent device which is
+> >>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+> >>> hang pointing to some issue with that driver?
+> >>
+> >> If you look at the /proc/timer_list, which timer is used for broadcasting ?
+> > 
+> > So, the correct run results (full output attached).
+> > 
+> > The vanilla kernel uses the twd timers as local timers and the TTC as
+> > broadcast device:
+> > 	Tick Device: mode:     1                                                         
+> > 	Broadcast device  
+> > 	Clock Event Device: ttc_clockevent
+> > 
+> > When I remove the offending CPUIDLE flag and add the DT fragment to
+> > enable the global timer, the twd timers are still used as local timers
+> > and the broadcast device is the global timer:
+> > 	Tick Device: mode:     1                                                         
+> > 	Broadcast device                                                                 
+> > 	Clock Event Device: arm_global_timer
+> > 
+> > Again, since boot hangs in the actually broken case, I don't see way to
+> > obtain this information for that case.
+> 
+> Hmm, interesting. Can you give the ouput of /proc/interrupts also with
+> the global timer ?
+Sure:
 
-On Mon, Jul 15, 2013 at 5:09 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> Sorry for late response.
-> Yes, it's not clear.
-> If you get the confirmation, could you share this problem?
-> Possibly, auto-clear may not be implemented.
-> Then, manual should be correct.
+	# cat /proc/interrupts 
+	           CPU0       CPU1       
+	 27:         14          1       GIC  27  gt
+	 29:        841        843       GIC  29  twd
+	 43:          0          0       GIC  43  ttc_clockevent
+	 82:        563          0       GIC  82  xuartps
+	IPI0:          0          0  CPU wakeup interrupts
+	IPI1:          0          0  Timer broadcast interrupts
+	IPI2:       1266       1330  Rescheduling interrupts
+	IPI3:          0          0  Function call interrupts
+	IPI4:         34         59  Single function call interrupts
+	IPI5:          0          0  CPU stop interrupts
+	Err:          0
 
-I just got an update from my contacts.  They confirm that bit 11 is
-not automatically cleared and that writing to it will clear it.
-Hopefully this information will make it into the next version of any
-documentation that you receive as well.
-
-It is still unclear exactly why the WAKEUP_INT was being asserted on
-our board despite the fact that all of the wakeup control signals
-(bits 10:8) were 0.  That is still being investigated.
-
--Doug
+	S?ren
