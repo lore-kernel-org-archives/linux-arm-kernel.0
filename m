@@ -1,78 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 31 Jul 2013 09:30:32 +0900
-Subject: [PATCH 4/5] ARM: shmobile: ape6evm: add MMCIF support
-In-Reply-To: <51F7B8B0.3080201@cogentembedded.com>
-References: <cover.1375174556.git.horms+renesas@verge.net.au>
- <8711613252ed931037f9e9f8646935519dd8f362.1375174556.git.horms+renesas@verge.net.au>
- <51F7B8B0.3080201@cogentembedded.com>
-Message-ID: <20130731003032.GE17209@verge.net.au>
+From: panetta.mike@gmail.com (Mike Panetta)
+Date: Tue, 30 Jul 2013 20:36:07 -0400
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-wandboard: add gpio lines to
+ wandboard shared dtsi.
+In-Reply-To: <CAJB6Qec_bTt_+Sj07J3Jh0e=XQni=R59Fb-KD=tbVw6vhApHww@mail.gmail.com>
+References: <CAJB6Qec_bTt_+Sj07J3Jh0e=XQni=R59Fb-KD=tbVw6vhApHww@mail.gmail.com>
+Message-ID: <CAJB6Qed=jZ2Egdd6RjoAm4Qeb2Fgn6T6502iC37D4=cz+VAuFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 04:59:28PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 30-07-2013 13:00, Simon Horman wrote:
-> 
-> >From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> 
-> >Add MMCIF support to the APE6EVM board in PIO mode only. Power supply is
-> >fixed for now, eventually support for the tps80032 regulator, also
-> >supplying both VDD and VccQ to the MMCIF slot should be added to APE6EVM.
-> 
-> >Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> >Acked-by: Magnus Damm <damm@opensource.se>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/board-ape6evm.c | 31 +++++++++++++++++++++++++++++++
-> >  1 file changed, 31 insertions(+)
-> 
-> >diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-> >index af6dd39..8c7529c 100644
-> >--- a/arch/arm/mach-shmobile/board-ape6evm.c
-> >+++ b/arch/arm/mach-shmobile/board-ape6evm.c
-> [...]
-> >@@ -54,6 +56,25 @@ static const struct smsc911x_platform_config lan9220_data = {
-> [...]
-> >+/* MMCIF */
-> >+static struct sh_mmcif_plat_data mmcif0_pdata = {
-> >+	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
-> >+};
-> >+
-> >+static struct resource mmcif0_resources[] = {
-> >+	DEFINE_RES_MEM_NAMED(0xee200000, 0x100, "MMCIF0"),
-> >+	DEFINE_RES_IRQ(gic_spi(169)),
-> >+};
-> >+
-> 
->    The above needed '__initdata' too. And I have only noticed...
+Ok, trying again. Sorry for the HTML.
 
-Thanks again Sergei.
-
-Guennadi,
-
-as I have already queued-up this patch could you please
-make an incremental patch that adds __initdata to the above structures?
-
-> >  static const struct pinctrl_map ape6evm_pinctrl_map[] = {
-> >  	/* SCIFA0 console */
-> >  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
-> [...]
-> >@@ -93,6 +119,11 @@ static void __init ape6evm_add_standard_devices(void)
-> >  	platform_device_register_resndata(&platform_bus, "smsc911x", -1,
-> >  					  lan9220_res, ARRAY_SIZE(lan9220_res),
-> >  					  &lan9220_data, sizeof(lan9220_data));
-> >+	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
-> >+				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
-> >+	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
-> >+					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
-> >+					  &mmcif0_pdata, sizeof(mmcif0_pdata));
-> >  }
-> 
-> WBR, Sergei
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+On Tue, Jul 30, 2013 at 8:33 PM, Mike Panetta <panetta.mike@gmail.com> wrote:
+> Hello, I'm not yet subscribed to the list, so I hope this makes it.  I am
+> working on adding some extra IO to the wandboard, this is the first patch in
+> the series, it adds the pin configs for the 10 available GPIO pins on the
+> wandboard EDM module.
+>
+> Signed-off-by: Mike Panetta <panetta.mike@gmail.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-add-wandboard-gpio-dts.patch
+Type: application/octet-stream
+Size: 1115 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/45966b0d/attachment-0001.obj>
