@@ -1,46 +1,52 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 31 Jul 2013 14:52:21 +0900
-Subject: [PATCH 3/3] ARM: EXYNOS: Add G2D support to exynos5250
-In-Reply-To: <1373013749-14530-3-git-send-email-sachin.kamat@linaro.org>
-References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
- <1373013749-14530-3-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1bb701ce8db2$1f96e180$5ec4a480$@org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 31 Jul 2013 14:58:07 +0900
+Subject: [PATCH] ARM: Fix memblock_reserve() to include stext
+Message-ID: <20130731055807.14054.70106.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
-> 
-> Adds G2D node to exynos5250 DT file.
-> 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> index ef57277..6f356ce 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -163,6 +163,14 @@
->  		clock-names = "watchdog";
->  	};
-> 
-> +	g2d at 10850000 {
-> +		compatible = "samsung,exynos5250-g2d";
-> +		reg = <0x10850000 0x1000>;
-> +		interrupts = <0 91 0>;
-> +		clocks = <&clock 345>;
-> +		clock-names = "fimg2d";
-> +	};
-> +
->  	codec at 11000000 {
->  		compatible = "samsung,mfc-v6";
->  		reg = <0x11000000 0x10000>;
-> --
-> 1.7.9.5
+From: Magnus Damm <damm@opensource.se>
 
-Looks ok to me, applied.
+This fix for the ARM architecture will include stext
+in the memblock_reserve() call to make sure that the
+following symbols are not overwritten (from System.map):
 
-Thanks,
-Kukjin
+c0008000 T _text
+c0008000 T stext
+...
+c0008138 T secondary_startup
+...
+c0009000 T _stext
+
+With this patch applied CPU Hotplug starts working
+again. Without this patch code in secondary_startup
+never gets reached as expected.
+
+This issue started triggering on kernels later than
+v3.10 - perhaps a side effect of the CPU Hotplug init
+section rework - so this is a fix for v3.11-rc.
+
+Tested on the sh73a0 KZM9G board with CPU Hotplug:
+
+ # echo 0 > /sys/devices/system/cpu/cpu1/online
+ CPU1: shutdown
+ # echo 1 > /sys/devices/system/cpu/cpu1/online
+ CPU1: Booted secondary processor
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ arch/arm/mm/init.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- 0001/arch/arm/mm/init.c
++++ work/arch/arm/mm/init.c	2013-07-31 14:17:49.000000000 +0900
+@@ -346,7 +346,7 @@ void __init arm_memblock_init(struct mem
+ #ifdef CONFIG_XIP_KERNEL
+ 	memblock_reserve(__pa(_sdata), _end - _sdata);
+ #else
+-	memblock_reserve(__pa(_stext), _end - _stext);
++	memblock_reserve(__pa(_text), _end - _text);
+ #endif
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 	if (phys_initrd_size &&
