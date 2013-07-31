@@ -1,97 +1,98 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 31 Jul 2013 16:07:49 +0900
-Subject: [PATCH 05/07] ARM: shmobile: Add shared SCU CPU Hotplug code
+Date: Wed, 31 Jul 2013 16:07:59 +0900
+Subject: [PATCH 06/07] ARM: shmobile: Use shared SCU CPU Hotplug code on sh73a0
 In-Reply-To: <20130731070702.14444.64961.sendpatchset@w520>
 References: <20130731070702.14444.64961.sendpatchset@w520>
-Message-ID: <20130731070749.14444.18254.sendpatchset@w520>
+Message-ID: <20130731070759.14444.7805.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add CPU Hotplug functions for SCU equipped mach-shmobile SoCs.
-
-The functions shmobile_smp_scu_cpu_die() together with
-shmobile_smp_scu_cpu_kill() perform basic shutdown and
-allows checking of shutdown status. These are written
-to work together with SMP boot code in  headsmp-scu.S.
+Update the sh73a0 specific CPU Hotplug code to make use of
+the recently introduced shared SCU functions. The sh73a0
+power control hardware relies on SCU_PM_POWEROFF with WFI
+so the shared SCU code will as-is power down the hardware
+as expected.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/include/mach/common.h |    2 +
- arch/arm/mach-shmobile/platsmp-scu.c         |   45 ++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
+ arch/arm/mach-shmobile/smp-sh73a0.c |   41 ++---------------------------------
+ 1 file changed, 3 insertions(+), 38 deletions(-)
 
---- 0004/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-07-29 16:59:06.000000000 +0900
-@@ -14,6 +14,8 @@ extern void shmobile_boot_scu(void);
- extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
- extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
- 					   struct task_struct *idle);
-+extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
-+extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
- struct clk;
- extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
---- 0004/arch/arm/mach-shmobile/platsmp-scu.c
-+++ work/arch/arm/mach-shmobile/platsmp-scu.c	2013-07-29 16:58:43.000000000 +0900
-@@ -7,9 +7,11 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/delay.h>
+--- 0005/arch/arm/mach-shmobile/smp-sh73a0.c
++++ work/arch/arm/mach-shmobile/smp-sh73a0.c	2013-07-29 21:48:41.000000000 +0900
+@@ -20,14 +20,11 @@
+ #include <linux/kernel.h>
  #include <linux/init.h>
- #include <linux/io.h>
  #include <linux/smp.h>
-+#include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
+-#include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
  #include <mach/common.h>
-@@ -29,3 +31,46 @@ int shmobile_smp_scu_boot_secondary(unsi
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu_logical_map(cpu)));
- 	return 0;
+-#include <asm/cacheflush.h>
+-#include <asm/smp_plat.h>
+ #include <mach/sh73a0.h>
+-#include <asm/smp_scu.h>
++#include <asm/smp_plat.h>
+ #include <asm/smp_twd.h>
+ 
+ #define WUPCR		IOMEM(0xe6151010)
+@@ -36,8 +33,6 @@
+ #define SBAR		IOMEM(0xe6180020)
+ #define APARMBAREA	IOMEM(0xe6f10020)
+ 
+-#define PSTR_SHUTDOWN_MODE	3
+-
+ #define SH73A0_SCU_BASE 0xf0000000
+ 
+ #ifdef CONFIG_HAVE_ARM_TWD
+@@ -77,36 +72,6 @@ static void __init sh73a0_smp_prepare_cp
  }
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+void shmobile_smp_scu_cpu_die(unsigned int cpu)
-+{
-+	dsb();
-+	flush_cache_all();
-+
-+	/* disable cache coherency */
-+	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
-+
-+	/* Endless loop until reset */
-+	while (1)
-+		cpu_do_idle();
-+}
-+
-+static int shmobile_smp_scu_psr_core_disabled(int cpu)
-+{
-+	unsigned long mask = SCU_PM_POWEROFF << (cpu * 8);
-+
-+	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+int shmobile_smp_scu_cpu_kill(unsigned int cpu)
-+{
-+	int k;
-+
-+	/* this function is running on another CPU than the offline target,
-+	 * here we need wait for shutdown code in platform_cpu_die() to
-+	 * finish before asking SoC-specific code to power off the CPU core.
-+	 */
-+	for (k = 0; k < 1000; k++) {
-+		if (shmobile_smp_scu_psr_core_disabled(cpu))
-+			return 1;
-+
-+		mdelay(1);
-+	}
-+
-+	return 0;
-+}
-+#endif
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-static int sh73a0_cpu_kill(unsigned int cpu)
+-{
+-
+-	int k;
+-	u32 pstr;
+-
+-	/*
+-	 * wait until the power status register confirms the shutdown of the
+-	 * offline target
+-	 */
+-	for (k = 0; k < 1000; k++) {
+-		pstr = (__raw_readl(PSTR) >> (4 * cpu)) & 3;
+-		if (pstr == PSTR_SHUTDOWN_MODE)
+-			return 1;
+-
+-		mdelay(1);
+-	}
+-
+-	return 0;
+-}
+-
+-static void sh73a0_cpu_die(unsigned int cpu)
+-{
+-	/* Set power off mode. This takes the CPU out of the MP cluster */
+-	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
+-
+-	/* Enter shutdown mode */
+-	cpu_do_idle();
+-}
+-
+ static int sh73a0_cpu_disable(unsigned int cpu)
+ {
+ 	return 0; /* CPU0 and CPU1 supported */
+@@ -117,8 +82,8 @@ struct smp_operations sh73a0_smp_ops __i
+ 	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
+ 	.smp_boot_secondary	= sh73a0_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_kill		= sh73a0_cpu_kill,
+-	.cpu_die		= sh73a0_cpu_die,
+ 	.cpu_disable		= sh73a0_cpu_disable,
++	.cpu_die		= shmobile_smp_scu_cpu_die,
++	.cpu_kill		= shmobile_smp_scu_cpu_kill,
+ #endif
+ };
