@@ -1,55 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 31 Jul 2013 13:45:47 -0700
-Subject: [PATCH] clocksource: em_sti: Adjust clock event rating to fix
- SMP broadcast
-In-Reply-To: <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
-References: <1375251940-7809-1-git-send-email-horms+renesas@verge.net.au>
- <51F94A35.2020907@codeaurora.org>
- <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
-Message-ID: <51F9777B.2080500@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Jul 2013 14:47:12 -0600
+Subject: Defining schemas for Device Tree
+In-Reply-To: <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
+References: <51F6E30B.7060106@wwwdotorg.org>
+ <CAKON4Oy6+7ZpAG5emAm_c62t=o_LXM7PcbK-z5YL_qx=r0AKqQ@mail.gmail.com>
+ <1706112.Xn49tiCSKF@thinkpad>
+ <CAKON4OwNrhmvnznyeD-igtZ5nsm7atUZoa0RJttN5kmwKubaDg@mail.gmail.com>
+ <20130730102511.GM9858@sirena.org.uk>
+ <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+ <51F7F596.6020503@wwwdotorg.org>
+ <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
+ <20130730205716.GZ9858@sirena.org.uk>
+ <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
+ <20130730230331.GC9858@sirena.org.uk>
+ <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
+Message-ID: <51F977D0.7050200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/13 12:17, Magnus Damm wrote:
-> Hi Stephen,
->
-> On Thu, Aug 1, 2013 at 2:32 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 07/30/13 23:25, Simon Horman wrote:
->>> From: Magnus Damm <damm@opensource.se>
->>>
->>> Update the STI rating from 200 to 80 to fix SMP operation with
->>> the ARM broadcast timer. This breakage was introduced by:
->>>
->>> f7db706 ARM: 7674/1: smp: Avoid dummy clockevent being preferred over real hardware clock-event
->>>
->>> Without this fix SMP operation is broken on EMEV2 since no
->>> broadcast timer interrupts trigger on the secondary CPU cores.
->>>
->>> Signed-off-by: Magnus Damm <damm@opensource.se>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>> ---
->> This looks suspicious. Are you're purposefully deflating the rating so
->> that the STI timer fills in the broadcast position? Why not make the STI
->> cpumask be all possible CPUs? Presumably the interrupt can target all
->> CPUs since it isn't a per-cpu interrupt and doing this would cause the
->> STI to fill in the broadcast slot, leaving the per-cpu dummys in the
->> tick position.
-> While letting the timer broadcast to all CPUs sounds interesting the
-> STI driver has so far only been used to drive a single CPU core. This
-> used to work well for us but has since some time unfortunately been
-> broken. I agree that it may be suboptimal with a single timer like STI
-> and using IPI for broadcast, but for more efficient SMP we already
-> have TWD or arch timer.
+On 07/30/2013 05:23 PM, jonsmirl at gmail.com wrote:
+> On Tue, Jul 30, 2013 at 7:03 PM, Mark Brown <broonie@kernel.org> wrote:
+>> On Tue, Jul 30, 2013 at 06:19:08PM -0400, jonsmirl at gmail.com wrote:
+>>
+>>> FDT is versioned and PowerPC docs say that multiple versions have been
+>>> released.  If we find enough flaws we could do a new release then use
+>>> the quirks scheme to read the older versions.
+>>
+>> That does involve updating everything that wants to understand FDTs in
+>> the new FDT format version though.  I'm not sure that's going to be
+>> greeted with universal enthusiasm.
+> 
+> Shipped hardware containing FDTs would keep the version they shipped
+> with. That's the point of making this  a stable ABI. The Linux quirk
+> code would convert the older format to the new format at boot time.
+> 
+> So to change this you need to:
+> 1) change dtc to produce the new version
+> 2) adjust the kernel code to understand the new version
+> 3) adjust the quirk code to convert the known set of older firmware
+> based FDTs into the new format. For the simple string case the strings
+> would be turned into indirect pointers instead of being in-line.
 
-I think there is some confusion. The mask field says what CPUs the timer
-can possibly interrupt and for non-percpu interrupts this should be all
-possible CPUs (unless we're talking clusters, etc. but I don't think we
-are). Can you please give the output of /proc/timer_list or confirm that
-the STI is your broadcast source? If so you should probably be marking
-the cpumask for all possible CPUs so that the clockevent core knows to
-prefer this clockevent for the broadcast source and not a per-cpu
-source. Then you can leave the rating as is.
+There's one issue issue with the quirk/conversion layer in the kernel.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Various combinations are supposed to work:
+
+1) The "current" kernel with the "current" DTB. I think everyone agrees
+on that much:-)
+
+2) Using an old DTB with a new kernel. This could be handled by having
+stable DT bindings, and/or by having a quirk/conversion layer in the
+kernel to convert old DTBs into whatever format the new kernel expects.
+
+3) Using a new DTB with a old kernel. Rob Herring raised the point that
+a firmware update (which might include updating the DTB the firmware
+passes to the kernel) should not make the kernel you have installed in
+the filesystem fail to boot.
+
+I'm assuming that if the quirk/conversion layer you're championing were
+the solution chosen for (2), then at least some of the time, people
+would start using the new DT binding when writing new DTs, or modifying
+existing DTs. That would break point (3) above, since the new DT would
+no longer work with the old kernel.
+
+I think the only way to satisfy all three points above is to have truly
+stable backwards-compatible bindings, without relying on any in-kernel
+conversion layer.
