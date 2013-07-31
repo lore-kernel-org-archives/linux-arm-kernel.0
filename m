@@ -1,63 +1,99 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Wed, 31 Jul 2013 11:52:56 +0800
-Subject: [PATCH 2/9] dma: tegra20-apbdma: move to generic device tree
- bindings
-In-Reply-To: <51F7ED62.4060404@wwwdotorg.org>
-References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
- <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
- <51F2CDBE.40802@wwwdotorg.org> <20130730030644.GJ15855@rizhao-lap>
- <51F7ED62.4060404@wwwdotorg.org>
-Message-ID: <20130731035256.GR15855@rizhao-lap>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Jul 2013 21:00:56 -0700
+Subject: [PATCH Resend 1/1] clk: exynos4: Add clock entries for TMU
+In-Reply-To: <0eb201ce8866$212e3080$638a9180$@org>
+References: <1374660555-17429-1-git-send-email-sachin.kamat@linaro.org>
+ <0eb201ce8866$212e3080$638a9180$@org>
+Message-ID: <20130731040056.24490.65774@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 12:44:18AM +0800, Stephen Warren wrote:
-> On 07/29/2013 09:06 PM, Richard Zhao wrote:
-> > On Sat, Jul 27, 2013 at 03:27:58AM +0800, Stephen Warren wrote:
-> >> (Stripping the Cc list a lot)
-> >>
-> >> On 07/23/2013 10:09 PM, Richard Zhao wrote:
-> >>> Update tegra20-apbdma driver to adopt generic DMA device tree bindings.
-> >>> It calls of_dma_controller_register() with of_dma_simple_xlate to get
-> >>> the generic DMA device tree helper support. The #dma-cells for apbdma
-> >>> must be 1, which is slave ID.
-> >>>
-> >>> The existing nvidia,dma-request-selector still works there, and the
-> >>> support will be removed after all clients get converted to generic DMA
-> >>> device tree helper.
+Quoting Kukjin Kim (2013-07-24 05:05:46)
+> Sachin Kamat wrote:
+> > 
+> > Added clock entries for thermal management unit (TMU) for
+> > Exynos4 SoCs.
+> > 
+> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 > 
-> >>> diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
-> >>
-> >>> +static bool tegra_dma_filter_fn(struct dma_chan *dc, void *param)
-> >>> +{
-> >>> +	if (dc->device->dev->driver == &tegra_dmac_driver.driver) {
-> >>> +		struct tegra_dma_channel *tdc = to_tegra_dma_chan(dc);
-> >>> +		unsigned req = *(unsigned *)param;
-> >>> +
-> >>> +		tdc->slave_id = req;
-> >>> +
-> >>> +		return true;
-> >>> +	}
-> >>> +	return false;
-> >>> +}
-> >>> +
-> >>> +static struct of_dma_filter_info tegra_dma_info = {
-> >>> +	.filter_fn = tegra_dma_filter_fn,
-> >>> +};
-> >>
-> >> Why does this driver need to define a filter function? I thought the
-> >> dmaengine's DT support would already match DMA clients/engines based on
-> >> the phandle in DT? Isn't the need to pass the slave channel ID into
-> >> drivers something pretty fundamental to dmaengine, and hence something
-> >> it already supports?
-> >
-> > of_dma_simple_xlate only pass slave id to filter function. It needs
-> > change to pass dt node too. I didn't start work on the common code
-> > change yet. Do you think we need to hold it until common code change?
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 > 
-> Oh dear, I can't see how the core DT DMA support can work for anyone
-> without the ability to limit DMA clients to the specific DMA controller
-> that's specified in DT. If that functionality truly is missing, then it
-> certainly needs to be added first.
+> Mike, I remember you're ok this for v3.12 so if you do not apply this in
+> clk-next yet, please go ahead :)
 
-omap-dma uses the same way. 
+You remember correctly. I've pulled this into clk-next.
+
+Regards,
+Mike
+
+> 
+> Thanks,
+> Kukjin
+> 
+> > ---
+> > Resending this (after rebasing) based on the below discussion:
+> > http://comments.gmane.org/gmane.linux.kernel.samsung-soc/19933
+> > 
+> > Previous version:
+> > http://comments.gmane.org/gmane.linux.kernel.samsung-soc/18081
+> > ---
+> >  .../devicetree/bindings/clock/exynos4-clock.txt    |    1 +
+> >  drivers/clk/samsung/clk-exynos4.c                  |    4 +++-
+> >  2 files changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> > b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> > index 14d5c2a..c6bf8a6 100644
+> > --- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> > +++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> > @@ -236,6 +236,7 @@ Exynos4 SoC and this is specified where applicable.
+> >    spi0_isp_sclk       380     Exynos4x12
+> >    spi1_isp_sclk       381     Exynos4x12
+> >    uart_isp_sclk       382     Exynos4x12
+> > +  tmu_apbif           383
+> > 
+> >               [Mux Clocks]
+> > 
+> > diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-
+> > exynos4.c
+> > index 75635eb..cee297d 100644
+> > --- a/drivers/clk/samsung/clk-exynos4.c
+> > +++ b/drivers/clk/samsung/clk-exynos4.c
+> > @@ -169,7 +169,7 @@ enum exynos4_clks {
+> >       gicisp, smmu_isp, smmu_drc, smmu_fd, smmu_lite0, smmu_lite1,
+> > mcuctl_isp,
+> >       mpwm_isp, i2c0_isp, i2c1_isp, mtcadc_isp, pwm_isp, wdt_isp,
+> > uart_isp,
+> >       asyncaxim, smmu_ispcx, spi0_isp, spi1_isp, pwm_isp_sclk,
+> > spi0_isp_sclk,
+> > -     spi1_isp_sclk, uart_isp_sclk,
+> > +     spi1_isp_sclk, uart_isp_sclk, tmu_apbif,
+> > 
+> >       /* mux clocks */
+> >       mout_fimc0 = 384, mout_fimc1, mout_fimc2, mout_fimc3, mout_cam0,
+> > @@ -814,6 +814,7 @@ static struct samsung_gate_clock
+> exynos4210_gate_clks[]
+> > __initdata = {
+> >       GATE_A(keyif, "keyif", "aclk100", E4210_GATE_IP_PERIR, 16, 0, 0,
+> > "keypad"),
+> >       GATE_DA(sclk_fimd1, "exynos4-fb.1", "sclk_fimd1", "div_fimd1",
+> >                       E4210_SRC_MASK_LCD1, 0, CLK_SET_RATE_PARENT, 0,
+> > "sclk_fimd"),
+> > +     GATE(tmu_apbif, "tmu_apbif", "aclk100", E4210_GATE_IP_PERIR, 17, 0,
+> > 0),
+> >  };
+> > 
+> >  /* list of gate clocks supported in exynos4x12 soc */
+> > @@ -915,6 +916,7 @@ static struct samsung_gate_clock
+> exynos4x12_gate_clks[]
+> > __initdata = {
+> >       GATE(spi1_isp, "spi1_isp", "aclk200", E4X12_GATE_ISP1, 13,
+> >                       CLK_IGNORE_UNUSED, 0),
+> >       GATE(g2d, "g2d", "aclk200", GATE_IP_DMC, 23, 0, 0),
+> > +     GATE(tmu_apbif, "tmu_apbif", "aclk100", E4X12_GATE_IP_PERIR, 17, 0,
+> > 0),
+> >  };
+> > 
+> >  /*
+> > --
+> > 1.7.9.5
