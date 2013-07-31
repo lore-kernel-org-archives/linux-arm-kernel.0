@@ -1,52 +1,22 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 31 Jul 2013 15:05:24 +0530
-Subject: [PATCH 7/9] ARM: edma: Don't clear EMR of channel in edma_stop
-In-Reply-To: <51F89B0B.4080803@ti.com>
-References: <1375104595-16018-1-git-send-email-joelf@ti.com>
- <1375104595-16018-8-git-send-email-joelf@ti.com> <51F77982.7030601@ti.com>
- <51F89B0B.4080803@ti.com>
-Message-ID: <51F8DA5C.9060503@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Jul 2013 10:40:12 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
+ mitigations
+In-Reply-To: <20130731000444.GC1281@redhat.com>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+ <20130730221435.GA22240@redhat.com>
+ <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
+ <20130730231533.GA26824@redhat.com>
+ <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
+ <20130731000444.GC1281@redhat.com>
+Message-ID: <20130731094012.GU24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 July 2013 10:35 AM, Joel Fernandes wrote:
-> On 07/30/2013 03:29 AM, Sekhar Nori wrote:
->> On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
->>> We certainly don't want error conditions to be cleared anywhere
->>
->> 'anywhere' is a really loaded term.
->>
->>> as this will make us 'forget' about missed events. We depend on
->>> knowing which events were missed in order to be able to reissue them.
->>
->>> This fixes a race condition where the EMR was being cleared
->>> by the transfer completion interrupt handler.
->>>
->>> Basically, what was happening was:
->>>
->>>             Missed event
->>>              |
->>>              |
->>>              V
->>> SG1-SG2-SG3-Null
->>>          \
->>>           \__TC Interrupt (Almost same time as ARM is executing
->>> TC interrupt handler, an event got missed and also forgotten
->>> by clearing the EMR).
->>
->> Sorry, but I dont see how edma_stop() is coming into picture in the race
->> you describe?
-> 
-> In edma_callback function, for the case of DMA_COMPLETE (Transfer
-> completion interrupt), edma_stop() is called when all sets have been
-> processed. This had the effect of clearing the EMR.
+On Tue, Jul 30, 2013 at 08:04:44PM -0400, Dave Jones wrote:
+> To use ARM as an example, the bugs I've seen have mostly been in arch specific
+> code that does things like page-table manipulation.  The chromebook bugs I
+> was hitting for eg were various kinds of PTE corruption warnings. 
 
-Ah, thanks. I was missing the fact that the race comes into picture only
-when using the DMA engine driver. I guess that should be mentioned
-somewhere since it is not immediately obvious.
-
-The patch looks good to me. So if you respin just this one with some
-updated explanation based on what you wrote below, I will take it.
-
-Thanks,
-Sekhar
+Hmm, really?  Did you reported these bugs?  I'm not aware of mainline
+having any changes related to bug reports on PTEs on ARM.
