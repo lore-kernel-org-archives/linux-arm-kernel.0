@@ -1,37 +1,72 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 31 Jul 2013 16:07:02 +0900
-Subject: [PATCH 00/07] ARM: shmobile: sh73a0, r8a7779 and emev2 SMP SCU rework
-Message-ID: <20130731070702.14444.64961.sendpatchset@w520>
+Date: Wed, 31 Jul 2013 16:07:12 +0900
+Subject: [PATCH 01/07] ARM: shmobile: Introduce shared SCU SMP boot code
+In-Reply-To: <20130731070702.14444.64961.sendpatchset@w520>
+References: <20130731070702.14444.64961.sendpatchset@w520>
+Message-ID: <20130731070712.14444.49956.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: sh73a0, r8a7779 and emev2 SMP SCU rework
+From: Magnus Damm <damm@opensource.se>
 
-[PATCH 01/07] ARM: shmobile: Introduce shared SCU SMP boot code
-[PATCH 02/07] ARM: shmobile: Use shared SCU SMP boot code on sh73a0
-[PATCH 03/07] ARM: shmobile: Use shared SCU SMP boot code on r8a7779
-[PATCH 04/07] ARM: shmobile: Use shared SCU SMP boot code on emev2
-[PATCH 05/07] ARM: shmobile: Add shared SCU CPU Hotplug code
-[PATCH 06/07] ARM: shmobile: Use shared SCU CPU Hotplug code on sh73a0
-[PATCH 07/07] ARM: shmobile: Use shared SCU CPU Hotplug code on r8a7779
+Add SMP boot functions for SCU equipped mach-shmobile SoCs.
 
-This series consolidates mach-shmobile SMP code into SCU specific code
-for SMP boot and CPU Hotplug. The shared SCU code will in the future hook
-into some low level assembly code that provides SMP boot and sleep
-functionality, so this is is also preparations for future work.
+At this point shmobile_smp_scu_prepare_cpus() controls the SCU and
+installs boot fn and arg, while shmobile_smp_scu_boot_secondary()
+currently does nothing. In the future the boot function and arg
+install code will be reworked, so the empty function is ground
+work for that.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Written against renesas.git renesas-devel-20130731
- 
- Requires "[PATCH] ARM: Fix memblock_reserve() to include stext" during
- run time to allow test of CPU Hotplug with v3.11-rc kernels.
+ arch/arm/mach-shmobile/include/mach/common.h |    3 ++
+ arch/arm/mach-shmobile/platsmp-scu.c         |   31 ++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
 
- arch/arm/mach-shmobile/Makefile              |    6 +-
- arch/arm/mach-shmobile/include/mach/common.h |    5 +
- arch/arm/mach-shmobile/platsmp-scu.c         |   76 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/smp-emev2.c           |   19 +++---
- arch/arm/mach-shmobile/smp-r8a7779.c         |   64 +++++----------------
- arch/arm/mach-shmobile/smp-sh73a0.c          |   67 +++++-----------------
- 6 files changed, 126 insertions(+), 111 deletions(-)
+--- 0001/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-07-29 16:50:17.000000000 +0900
+@@ -11,6 +11,9 @@ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
+ extern void shmobile_boot_scu(void);
++extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
++extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
++					   struct task_struct *idle);
+ struct clk;
+ extern int shmobile_clk_init(void);
+ extern void shmobile_handle_irq_intc(struct pt_regs *);
+--- /dev/null
++++ work/arch/arm/mach-shmobile/platsmp-scu.c	2013-07-29 21:39:30.000000000 +0900
+@@ -0,0 +1,31 @@
++/*
++ * SMP support for SoCs with SCU covered by mach-shmobile
++ *
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/smp.h>
++#include <asm/smp_plat.h>
++#include <asm/smp_scu.h>
++#include <mach/common.h>
++
++void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
++{
++	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
++	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
++
++	/* enable SCU and cache coherency on booting CPU */
++	scu_enable(shmobile_scu_base);
++	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
++}
++
++int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	/* do nothing for now */
++	return 0;
++}
