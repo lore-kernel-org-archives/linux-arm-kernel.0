@@ -1,23 +1,51 @@
-From: panetta.mike@gmail.com (Mike Panetta)
-Date: Tue, 30 Jul 2013 20:41:50 -0400
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-wandboard: add debug led for headless
- bringup to wandboard shared dtsi.
-Message-ID: <CAJB6QefCYSBYxAuAiYAxNRhuRcO35OV_zuHKkiaS-+U5guppvQ@mail.gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 30 Jul 2013 16:19:44 -0800
+Subject: [PATCH] mmc: sdhci-msm: Add support for MSM chipsets
+In-Reply-To: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com>
+References: <1375201355-26906-1-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <CAJAp7OgOT82G=W8RpDvaogskUmAN26CWq4gKUs45RwOeU8pXvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch is the second in the series, it adds a debug led
-to the system so that someone can know immediately if the kernel is up
-on the wandboard.
+On Tue, Jul 30, 2013 at 8:22 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+> This platform driver adds the support of Secure Digital Host
+> Controller Interface compliant controller in MSM chipsets.
+>
+> [snip]
+> +
+> +       sdhc_1: qcom,sdhc at f9824900 {
+> +               compatible = "qcom,sdhci-msm";
+> +                       reg = <0xf9824900 0x11c>, <0xf9824000 0x800>;
+> +                       reg-names = "hc_mem", "core_mem";
+> +                       interrupts = <0 123 0>, <0 138 0>;
+> +                       interrupt-names = "hc_irq", "pwr_irq";
+> +
+> +               vdd-supply = <&pm8941_l21>;
+> +               vdd-io-supply = <&pm8941_l13>;
+> +               qcom,vdd-voltage-level = <2950000 2950000>;
+> +               qcom,vdd-current-level = <9000 800000>;
+> +
+> +               qcom,vdd-io-always-on;
+> +               qcom,vdd-io-lpm-sup;
+> +               qcom,vdd-io-voltage-level = <1800000 2950000>;
+> +               qcom,vdd-io-current-level = <6 22000>;
+> +
+> +               bus-width = <4>;
+> +               non-removable;
+> +               qcom,bus-speed-mode = "HS200_1p8v", "DDR_1p8v";
+> +
+> +               gpios = <&msmgpio 40 0>, /* CLK */
+> +                       <&msmgpio 39 0>, /* CMD */
+> +                       <&msmgpio 38 0>, /* DATA0 */
+> +                       <&msmgpio 37 0>, /* DATA1 */
+> +                       <&msmgpio 36 0>, /* DATA2 */
+> +                       <&msmgpio 35 0>; /* DATA3 */
+> +               qcom,gpio-names = "CLK", "CMD", "DAT0", "DAT1", "DAT2", "DAT3";
 
-Signed-off-by: Mike Panetta <panetta.mike@gmail.com>
+I believe these gpio references (and in the rest of the patch) should
+be replaced by pinctrl. As far as I can see it provides what you want
+and gives you configurability and potential sleep states of those pins
+nicely integrated.
 
-Thanks,
-Mike
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-add-wandboard-leds-dts.patch
-Type: application/octet-stream
-Size: 504 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130730/616950b6/attachment.obj>
+Regards,
+Bjorn
