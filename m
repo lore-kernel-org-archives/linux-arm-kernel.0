@@ -1,90 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 31 Jul 2013 14:07:16 +0100
-Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <1375195354.32691.55.camel@kazak.uk.xensource.com>
-References: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
- <51F7B4C9.2060500@gmail.com>
- <20130730125650.GD28716@e106331-lin.cambridge.arm.com>
- <20130730134427.GE28716@e106331-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1307301528540.4893@kaball.uk.xensource.com>
- <1375195354.32691.55.camel@kazak.uk.xensource.com>
-Message-ID: <20130731130716.GM29859@e106331-lin.cambridge.arm.com>
+From: balajitk@ti.com (Balaji T K)
+Date: Wed, 31 Jul 2013 18:38:42 +0530
+Subject: [PATCH v2 1/4] ARM: dts: omap4-panda: add MMC5 (WiLink WLAN)
+ configuration
+In-Reply-To: <1375218923-29876-2-git-send-email-coelho@ti.com>
+References: <1375218923-29876-1-git-send-email-coelho@ti.com>
+ <1375218923-29876-2-git-send-email-coelho@ti.com>
+Message-ID: <51F90C5A.2000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 03:42:34PM +0100, Ian Campbell wrote:
-> On Tue, 2013-07-30 at 15:33 +0100, Stefano Stabellini wrote:
-> > On Tue, 30 Jul 2013, Mark Rutland wrote:
-> > > On Tue, Jul 30, 2013 at 01:56:50PM +0100, Mark Rutland wrote:
-> > > > On Tue, Jul 30, 2013 at 01:42:49PM +0100, Rob Herring wrote:
-> > > > > On 07/30/2013 04:49 AM, Mark Rutland wrote:
-> > > > > > On Mon, Jul 29, 2013 at 09:18:43PM +0100, Rob Herring wrote:
-> > > > > >> On 07/29/2013 05:13 AM, Mark Rutland wrote:
-> > > > > >>> Hi Rob,
-> > > > > >>>
-> > > > > >>> On Sun, Jul 28, 2013 at 10:56:32PM +0100, Rob Herring wrote:
-> > > > > >>>> From: Rob Herring <rob.herring@calxeda.com>
-> > > > > 
-> > > > > [snip]
-> > > > > 
-> > > > > >>> One of the things changed in PSCI 0.2 was the SMC calling convention,
-> > > > > >>> though this isn't clear in the PSCI document. The function IDs for 32bit
-> > > > > >>> and 64bit callers may differ, and we need to support describing an
-> > > > > >>> arbitrary configuration of the two (same ID for both, different across
-> > > > > >>> 32-bit/64-bit, only supported for 64-bit, only supported for 32-bit).
-> > > > > >>>
-> > > > > >>> I'd like to ensure the binding can deal with that from the start. We
-> > > > > >>> could do this by having -32 and -64 variants of each function id (e.g.
-> > > > > >>> cpu_off-64) , if the IDs actually differ, and use the regular combined
-> > > > > >>> ID if they don't.
-> > > > > >>
-> > > > > >> Uggg. I guess I should have read the SMC calling convention doc... I was
-> > > > > >> simply documenting what is already in the PSCI doc, but obviously that
-> > > > > >> is not fully flushed out.
-> > > > > >>
-> > > > > >> How about something like this (for the complicated case of both 32 and
-> > > > > >> 64 bit):
-> > > > > >>
-> > > > > >> 	method		= "smc", "smc64";
-> > > > > >> 	psci_version	= <0x84000000 0xc4000000>;
-> > > > > >> 	cpu_suspend	= <0x84000001 0xc4000001>;
-> > > > > >> 	cpu_off		= <0x84000002 0xc4000002>;
-> > > > > >> 	cpu_on		= <0x84000003 0xc4000003>;
-> > > > > >>
-> > > > > >> "smc" is a synonym for smc32 for compatibility. The number and order of
-> > > > > >> methods determines the number and order of function IDs.
-> > > > > > 
-> > > > > > While this may be compatible with the arm implementation, it won't be
-> > > > > > compatible with the arm64 implementation, which assumes smc64 by
-> > > > > > default.
-> > > > > > 
-> > > > > > As far as I am aware, the implementations currently in use (KVM and Xen)
-> > > > > > use the same ID for both, so I think "smc" should cover an ID valid for
-> > > > > > a native register width calling convention, and "smc64" and "smc32"
-> > > > > > describing values only valid for 64-bit wide and 32-bit wide calling
-> > > > > > conventions respectively.
-> > > > > 
-> > > > > The problem is that does not work for a 32-bit kernel on 64-bit h/w as
-> > > > > native from the dts perspective is smc64. Just like the cpu bindings,
-> > > > > the binding cannot change based on 32 or 64 bit OS. I don't think we
-> > > > > really have to deal with that here. We can simply say "smc" is only for
-> > > > > "arm,psci" and deprecated for "arm,psci-0.2".
-> > > > 
-> > > > Agreed. I'd be happy with only having "smc32" and "smc64" for
-> > > > "arm,psci-0.2".
-> > 
-> > I would be happy with that too (Xen only uses HVC as "method").
-> 
-> Presumably we have the same issues with hvc vs hvc32 vs hvc64 though?
+On Wednesday 31 July 2013 02:45 AM, Luciano Coelho wrote:
+> Add regulator, pin muxing and MMC5 configuration to be used by the
+> on-board WiLink6 module.
+>
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
+> ---
+>   arch/arm/boot/dts/omap4-panda-common.dtsi | 31 ++++++++++++++++++++++++++++++-
+>   1 file changed, 30 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index faa95b5..b3f6e1f 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -107,6 +107,16 @@
+>   	 */
+>   		clock-frequency = <19200000>;
+>   	};
+> +
+> +	wilink_wl_en: fixedregulator at 1 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "wilink_wl_en";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		gpio = <&gpio2 11 0>; /* gpio line 43 */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+>   };
+>
+>   &omap4_pmx_wkup {
+> @@ -132,6 +142,7 @@
+>   			&dss_hdmi_pins
+>   			&tpd12s015_pins
+>   			&hsusbb1_pins
+> +			&wilink_pins
+>   	>;
+>
+>   	twl6030_pins: pinmux_twl6030_pins {
+> @@ -235,6 +246,19 @@
+>   			0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 */
+>   		>;
+>   	};
+> +
+> +	wilink_pins: pinmux_wilink_pins {
+> +		pinctrl-single,pins = <
+> +			0x7a 0x103      /* gpio_53  INPUT | MODE3 */
+> +			0x66 0x3	/* gpio_43  OUTPUT | MODE3 */
+> +			0x148 0x118     /* clk	    INPUT PULLUP | MODE0 */
+> +			0x14a 0x118     /* cmd	    INPUT PULLUP | MODE0 */
+> +			0x14c 0x118     /* dat0	    INPUT PULLUP | MODE0 */
+> +			0x14e 0x118     /* dat1	    INPUT PULLUP | MODE0 */
+> +			0x150 0x118     /* dat2	    INPUT PULLUP | MODE0 */
+> +			0x152 0x118     /* dat3	    INPUT PULLUP | MODE0 */
+Hi,
 
-Yes. I'd not considered this with my original reply, but we have the
-exact same issue for hvc.
-
-> 
-> And does smcX imply hvcX or does that also need to be documented here?
-
-The two are mutually exclusive, neither implies the other (KVM will barf
-if you use an SMC iirc).
-
-Thanks,
-Mark.
+Since the base for omap4_pmx_core is 0x4a100040, you need to offset 0x40 from
+pad address :-)
+and can you please use INPUT_EN / PIN_INPUT_PULLUP / MUX_MODEx macros
+(from dt-bindings/pinctrl/omap.h)
