@@ -1,286 +1,276 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 31 Jul 2013 13:13:57 +0300
-Subject: [PATCHv4 06/33] CLK: omap: add autoidle support
-In-Reply-To: <51F80C77.9020109@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-7-git-send-email-t-kristo@ti.com> <51F80C77.9020109@ti.com>
-Message-ID: <51F8E365.8080604@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 Jul 2013 12:14:33 +0200
+Subject: [PATCH 3/4] clk: sunxi: Add A31 clocks support
+In-Reply-To: <51F861E5.7010909@elopez.com.ar>
+References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375195462-19566-4-git-send-email-maxime.ripard@free-electrons.com>
+ <51F861E5.7010909@elopez.com.ar>
+Message-ID: <20130731101433.GC2911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 09:56 PM, Nishanth Menon wrote:
-> On 07/23/2013 02:20 AM, Tero Kristo wrote:
->> OMAP clk driver now routes some of the basic clocks through own
->> registration routine to allow autoidle support. This routine just
->> checks a couple of device node properties and adds autoidle support
->> if required, and just passes the registration forward to basic clocks.
->
-> why not extend standard framework to support autoidle capable clocks OR
-> introduce our own clk node which depends on basic clocks?
+Hi Emilio,
 
-Was kind of easier this way.
+On Tue, Jul 30, 2013 at 10:01:25PM -0300, Emilio L?pez wrote:
+> Hi Maxime,
+> 
+> El 30/07/13 11:44, Maxime Ripard escribi?:
+> > The A31 has a mostly different clock set compared to the other older
+> > SoCs currently supported in the Allwinner clock driver.
+> > 
+> > Add support for the basic useful clocks. The other ones will come in
+> > eventually.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi/clk-sunxi.c | 120 ++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 120 insertions(+)
+> > 
+> > diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> > index 6e9cbc9..8cd69e6 100644
+> > --- a/drivers/clk/sunxi/clk-sunxi.c
+> > +++ b/drivers/clk/sunxi/clk-sunxi.c
+> > @@ -124,7 +124,67 @@ static void sun4i_get_pll1_factors(u32 *freq, u32 parent_rate,
+> >  	*n = div / 4;
+> >  }
+> >  
+> > +/**
+> > + * sun6i_get_pll1_factors() - calculates n, k and m factors for PLL1
+> > + * PLL1 rate is calculated as follows
+> > + * rate = parent_rate * (n + 1) * (k + 1) / (m + 1);
+> > + * parent_rate should always be 24MHz
+> > + */
+> > +static void sun6i_get_pll1_factors(u32 *freq, u32 parent_rate,
+> > +				   u8 *n, u8 *k, u8 *m, u8 *p)
+> > +{
+> > +	/*
+> > +	 * We can operate only on MHz, this will make our life easier
+> > +	 * later.
+> > +	 */
+> > +	u32 freq_mhz = *freq / 1000000;
+> > +	u32 parent_freq_mhz = parent_rate / 1000000;
+> > +
+> > +	/* If the frequency is a multiple of 32 MHz, k is always 3 */
+> > +	if (!(freq_mhz % 32))
+> > +		*k = 3;
+> > +	/* If the frequency is a multiple of 9 MHz, k is always 2 */
+> > +	else if (!(freq_mhz % 9))
+> > +		*k = 2;
+> > +	/* If the frequency is a multiple of 8 MHz, k is always 1 */
+> > +	else if (!(freq_mhz % 8))
+> > +		*k = 1;
+> > +	/* Otherwise, we don't use the k factor */
+> > +	else
+> > +		*k = 0;
+> >  
+> > +	/*
+> > +	 * If the frequency is a multiple of 2 but not a multiple of
+> > +	 * 3, m is 3. This is the first time we use 6 here, yet we
+> > +	 * will use it on several other places.
+> > +	 * We use this number because it's the lowest frequency we can
+> > +	 * generate (with n = 0, k = 0, m = 3), so every other frequency
+> > +	 * somehow relates to this frequency.
+> > +	 */
+> > +	if ((freq_mhz % 6) == 2 || (freq_mhz % 6) == 4)
+> > +		*m = 2;
+> > +	/*
+> > +	 * If the frequency is a multiple of 6MHz, but the factor is
+> > +	 * odd, m will be 3
+> > +	 */
+> > +	else if ((freq_mhz / 6) & 1)
+> > +		*m = 3;
+> > +	/* Otherwise, we end up with m = 1 */
+> > +	else
+> > +		*m = 1;
+> > +
+> > +	/* Calculate n thanks to the above factors we already got */
+> > +	*n = freq_mhz * (*m + 1) / ((*k + 1) * parent_freq_mhz) - 1;
+> > +
+> > +	/*
+> > +	 * If n end up being outbound, and that we can still decrease
+> > +	 * m, do it.
+> > +	 */
+> > +	if ((*n + 1) > 31 && (*m + 1) > 1) {
+> > +		*n = (*n + 1) / 2 - 1;
+> > +		*m = (*m + 1) / 2 - 1;
+> > +	}
+> > +}
+> 
+> Nice! My rate-to-factors functions pale in comparison :) Remember that
+> n/k/m/p may be NULL when the caller just wants you to round freq to an
+> achievable value (see clk_factors_round_rate(...) in clk-factors.c).
 
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   arch/arm/mach-omap2/clock.c |    6 ++
->>   drivers/clk/omap/Makefile   |    2 +-
->>   drivers/clk/omap/autoidle.c |  130
->> +++++++++++++++++++++++++++++++++++++++++++
->>   drivers/clk/omap/clk.c      |    4 +-
->>   include/linux/clk/omap.h    |    4 ++
->>   5 files changed, 143 insertions(+), 3 deletions(-)
->>   create mode 100644 drivers/clk/omap/autoidle.c
->
-> I know it is getting a little stale, but anyways, device tree binding
-> missing.
->
->>
->> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
->> index 0c38ca9..669d4c4 100644
->> --- a/arch/arm/mach-omap2/clock.c
->> +++ b/arch/arm/mach-omap2/clock.c
-> Not sure why, at this point in time we are going to calling drivers/clk
-> code.
->
->> @@ -520,6 +520,9 @@ int omap2_clk_enable_autoidle_all(void)
->>       list_for_each_entry(c, &clk_hw_omap_clocks, node)
->>           if (c->ops && c->ops->allow_idle)
->>               c->ops->allow_idle(c);
->> +
->> +    of_omap_clk_allow_autoidle_all();
->> +
->>       return 0;
->>   }
->>
->> @@ -539,6 +542,9 @@ int omap2_clk_disable_autoidle_all(void)
->>       list_for_each_entry(c, &clk_hw_omap_clocks, node)
->>           if (c->ops && c->ops->deny_idle)
->>               c->ops->deny_idle(c);
->> +
->> +    of_omap_clk_deny_autoidle_all();
->> +
->
-> these are defined for CONFIG_OF.. anyways, without dt nodes (OMAP3 is
-> supposed to support non-DT boot even now), this would not work, would it?
+Ah, right, I forgot that usecase.
 
-The lists are empty so the funcs do nothing. However, dropping CONFIG_OF 
-would break these of course. Will figure out a fix for this.
+> >  /**
+> >   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
+> > @@ -189,6 +249,15 @@ static struct clk_factors_config sun4i_pll1_config = {
+> >  	.pwidth = 2,
+> >  };
+> >  
+> > +static struct clk_factors_config sun6i_pll1_config = {
+> > +	.nshift	= 8,
+> > +	.nwidth = 5,
+> > +	.kshift = 4,
+> > +	.kwidth = 2,
+> > +	.mshift = 0,
+> > +	.mwidth = 2,
+> > +};
+> > +
+> >  static struct clk_factors_config sun4i_apb1_config = {
+> >  	.mshift = 0,
+> >  	.mwidth = 5,
+> > @@ -201,6 +270,11 @@ static const __initconst struct factors_data sun4i_pll1_data = {
+> >  	.getter = sun4i_get_pll1_factors,
+> >  };
+> >  
+> > +static const __initconst struct factors_data sun6i_pll1_data = {
+> > +	.table = &sun6i_pll1_config,
+> > +	.getter = sun6i_get_pll1_factors,
+> > +};
+> > +
+> >  static const __initconst struct factors_data sun4i_apb1_data = {
+> >  	.table = &sun4i_apb1_config,
+> >  	.getter = sun4i_get_apb1_factors,
+> > @@ -243,6 +317,10 @@ static const __initconst struct mux_data sun4i_cpu_mux_data = {
+> >  	.shift = 16,
+> >  };
+> >  
+> > +static const __initconst struct mux_data sun6i_ahb1_mux_data = {
+> > +	.shift = 12,
+> > +};
+> > +
+> >  static const __initconst struct mux_data sun4i_apb1_mux_data = {
+> >  	.shift = 24,
+> >  };
+> > @@ -301,6 +379,12 @@ static const __initconst struct div_data sun4i_apb0_data = {
+> >  	.width	= 2,
+> >  };
+> >  
+> > +static const __initconst struct div_data sun6i_apb2_div_data = {
+> > +	.shift	= 0,
+> > +	.pow	= 0,
+> > +	.width	= 4,
+> > +};
+> > +
+> >  static void __init sunxi_divider_clk_setup(struct device_node *node,
+> >  					   struct div_data *data)
+> >  {
+> > @@ -347,6 +431,10 @@ static const __initconst struct gates_data sun5i_a13_ahb_gates_data = {
+> >  	.mask = {0x107067e7, 0x185111},
+> >  };
+> >  
+> > +static const __initconst struct gates_data sun6i_a31_ahb1_gates_data = {
+> > +	.mask = { 0xedfe7f62, 0x794f931 },
+> > +};
+> > +
+> >  static const __initconst struct gates_data sun4i_apb0_gates_data = {
+> >  	.mask = {0x4EF},
+> >  };
+> > @@ -363,6 +451,14 @@ static const __initconst struct gates_data sun5i_a13_apb1_gates_data = {
+> >  	.mask = {0xa0007},
+> >  };
+> >  
+> > +static const __initconst struct gates_data sun6i_a31_apb1_gates_data = {
+> > +	.mask = { 0x3031 },
+> > +};
+> > +
+> > +static const __initconst struct gates_data sun6i_a31_apb2_gates_data = {
+> > +	.mask = { 0x3f000f },
+> > +};
+> > +
+> 
+> We should decide on a style here and use it across the board, so far we
+> have definitions with and without spaces between constants and braces,
+> and constants both with upper and lower case A-F. Personally I don't
+> feel strongly about the spacing and prefer upper-case constants, but if
+> the style guide suggests otherwise, I can live with it (as long as we
+> use it consistently, that is)
 
-The calls are needed for the transition phase until we can move more clk 
-stuff from mach-omap2 to drivers.
+Hmmm, like you probably noticed, I prefer the { 0xdeadbeef } way, and
+that's what is used everywhere else for sunxi I believe. There's no
+strong convention on this one, but it's true that we have to remain
+consistent.
 
->
->
->>       return 0;
->>   }
->>
->> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
->> index 4cad480..ca56700 100644
->> --- a/drivers/clk/omap/Makefile
->> +++ b/drivers/clk/omap/Makefile
->> @@ -1 +1 @@
->> -obj-y                    += clk.o dpll.o
->> +obj-y                    += clk.o dpll.o autoidle.o
->> diff --git a/drivers/clk/omap/autoidle.c b/drivers/clk/omap/autoidle.c
->> new file mode 100644
->> index 0000000..6424cb2
->> --- /dev/null
->> +++ b/drivers/clk/omap/autoidle.c
->> @@ -0,0 +1,130 @@
->> +/*
->> + * OMAP clock autoidle support
->> + *
->> + * Copyright (C) 2013 Texas Instruments, Inc.
->> + *
->> + * Tero Kristo <t-kristo@ti.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/module.h>
->> +#include <linux/slab.h>
->> +#include <linux/io.h>
->> +#include <linux/err.h>
->> +#include <linux/string.h>
->> +#include <linux/log2.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
-> at all of these required?
+I'll stick with your convention already in use in the clocks driver for
+the time being, and we'll see later to unify the drivers on this
+convention later on.
 
-I'll double check.
+> >  static void __init sunxi_gates_clk_setup(struct device_node *node,
+> >  					 struct gates_data *data)
+> >  {
+> > @@ -420,6 +516,10 @@ static const __initconst struct of_device_id clk_factors_match[] = {
+> >  		.data = &sun4i_pll1_data,
+> >  	},
+> >  	{
+> > +		.compatible = "allwinner,sun6i-pll1-clk",
+> > +		.data = &sun6i_pll1_data,
+> > +	},
+> > +	{
+> >  		.compatible = "allwinner,sun4i-apb1-clk",
+> >  		.data = &sun4i_apb1_data,
+> >  	},
+> > @@ -440,6 +540,10 @@ static const __initconst struct of_device_id clk_div_match[] = {
+> >  		.compatible = "allwinner,sun4i-apb0-clk",
+> >  		.data = &sun4i_apb0_data,
+> >  	},
+> > +	{
+> > +		.compatible = "allwinner,sun6i-apb2-div-clk",
+> > +		.data = &sun6i_apb2_div_data,
+> > +	},
+> >  	{}
+> >  };
+> >  
+> > @@ -453,6 +557,10 @@ static const __initconst struct of_device_id clk_mux_match[] = {
+> >  		.compatible = "allwinner,sun4i-apb1-mux-clk",
+> >  		.data = &sun4i_apb1_mux_data,
+> >  	},
+> > +	{
+> > +		.compatible = "allwinner,sun6i-ahb1-mux-clk",
+> > +		.data = &sun6i_ahb1_mux_data,
+> > +	},
+> >  	{}
+> >  };
+> >  
+> > @@ -471,6 +579,10 @@ static const __initconst struct of_device_id clk_gates_match[] = {
+> >  		.data = &sun5i_a13_ahb_gates_data,
+> >  	},
+> >  	{
+> > +		.compatible = "allwinner,sun6i-a31-ahb1-gates-clk",
+> > +		.data = &sun6i_a31_ahb1_gates_data,
+> > +	},
+> > +	{
+> >  		.compatible = "allwinner,sun4i-apb0-gates-clk",
+> >  		.data = &sun4i_apb0_gates_data,
+> >  	},
+> > @@ -486,6 +598,14 @@ static const __initconst struct of_device_id clk_gates_match[] = {
+> >  		.compatible = "allwinner,sun5i-a13-apb1-gates-clk",
+> >  		.data = &sun5i_a13_apb1_gates_data,
+> >  	},
+> > +	{
+> > +		.compatible = "allwinner,sun6i-a31-apb1-gates-clk",
+> > +		.data = &sun6i_a31_apb1_gates_data,
+> > +	},
+> > +	{
+> > +		.compatible = "allwinner,sun6i-a31-apb2-gates-clk",
+> > +		.data = &sun6i_a31_apb2_gates_data,
+> > +	},
+> 
+> Please see my comments on the first patch regarding these.
 
->
->> +
->> +#ifdef CONFIG_OF
->> +struct clk_omap_autoidle {
->> +    void __iomem        *reg;
->> +    u8            shift;
->> +    u8            flags;
->> +    const char        *name;
->> +    struct list_head    node;
->> +};
->> +
->> +#define AUTOIDLE_LOW        0x1
->> +
->> +static LIST_HEAD(autoidle_clks);
->> +
->> +static void omap_allow_autoidle(struct clk_omap_autoidle *clk)
->> +{
->> +    u32 val;
->> +
->> +    val = readl(clk->reg);
->> +
->> +    if (clk->flags & AUTOIDLE_LOW)
->> +        val &= ~(1 << clk->shift);
->> +    else
->> +        val |= (1 << clk->shift);
->> +
->> +    writel(val, clk->reg);
->> +}
->> +
->> +static void omap_deny_autoidle(struct clk_omap_autoidle *clk)
->> +{
->> +    u32 val;
->> +
->> +    val = readl(clk->reg);
->> +
->> +    if (clk->flags & AUTOIDLE_LOW)
->> +        val |= (1 << clk->shift);
->> +    else
->> +        val &= ~(1 << clk->shift);
->> +
->> +    writel(val, clk->reg);
->> +}
->> +
->> +void of_omap_clk_allow_autoidle_all(void)
->> +{
->> +    struct clk_omap_autoidle *c;
->> +
->> +    list_for_each_entry(c, &autoidle_clks, node)
->> +        omap_allow_autoidle(c);
->> +}
->> +
->> +void of_omap_clk_deny_autoidle_all(void)
->> +{
->> +    struct clk_omap_autoidle *c;
->> +
->> +    list_for_each_entry(c, &autoidle_clks, node)
->> +        omap_deny_autoidle(c);
->> +}
->> +
->> +static __init void of_omap_autoidle_setup(struct device_node *node)
->> +{
->> +    u32 shift;
->> +    void __iomem *reg;
->> +    struct clk_omap_autoidle *clk;
->> +
->> +    if (of_property_read_u32(node, "ti,autoidle-shift", &shift))
->> +        return;
->> +
->> +    reg = of_iomap(node, 0);
->> +
->> +    clk = kzalloc(sizeof(struct clk_omap_autoidle), GFP_KERNEL);
->> +
->> +    if (!clk) {
->> +        pr_err("%s: kzalloc failed\n", __func__);
->> +        return;
->> +    }
->> +
->> +    clk->shift = shift;
->> +    clk->name = node->name;
->> +    clk->reg = reg;
->> +
->> +    if (of_property_read_bool(node, "ti,autoidle-low"))
->> +        clk->flags |= AUTOIDLE_LOW;
->> +
->> +    list_add(&clk->node, &autoidle_clks);
->> +}
->> +
->> +void __init of_omap_divider_setup(struct device_node *node)
->> +{
->> +    of_divider_clk_setup(node);
->> +    of_omap_autoidle_setup(node);
->> +}
->> +EXPORT_SYMBOL_GPL(of_omap_divider_setup);
->> +CLK_OF_DECLARE(omap_autoidle_clock, "divider-clock",
->> of_omap_divider_setup);
->
-> This is overriding drivers/clk/clk-divider.c ?
+Yes, that will be fixed.
 
-Yea, this declaration here should be removed.
+Thanks!
+Maxime
 
->> +
->> +void __init of_omap_fixed_factor_setup(struct device_node *node)
->> +{
->> +    of_fixed_factor_clk_setup(node);
->> +    of_omap_autoidle_setup(node);
->> +}
->> +EXPORT_SYMBOL_GPL(of_omap_fixed_factor_setup);
->> +CLK_OF_DECLARE(omap_fixed_factor_clock, "fixed-factor-clock",
->> +    of_omap_fixed_factor_setup);
->
-> This is overriding drivers/clk/clk-fixed-factor.c ?
-
-Ditto.
-
->> +
->> +#endif
->> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
->> index cd31a81..c149097 100644
->> --- a/drivers/clk/omap/clk.c
->> +++ b/drivers/clk/omap/clk.c
->> @@ -25,8 +25,8 @@ static const struct of_device_id clk_match[] = {
->>       {.compatible = "fixed-clock", .data = of_fixed_clk_setup, },
->>       {.compatible = "mux-clock", .data = of_mux_clk_setup, },
->>       {.compatible = "fixed-factor-clock",
->> -        .data = of_fixed_factor_clk_setup, },
->> -    {.compatible = "divider-clock", .data = of_divider_clk_setup, },
->> +        .data = of_omap_fixed_factor_setup, },
->> +    {.compatible = "divider-clock", .data = of_omap_divider_setup, },
-
-These should be enough for registration.
-
->>       {.compatible = "gate-clock", .data = of_gate_clk_setup, },
->>       {.compatible = "ti,omap4-dpll-clock", .data =
->> of_omap4_dpll_setup, },
->>       {},
->> diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
->> index c39e775..904bdad 100644
->> --- a/include/linux/clk/omap.h
->> +++ b/include/linux/clk/omap.h
->> @@ -192,5 +192,9 @@ extern const struct clk_hw_omap_ops
->> clkhwops_omap4_dpllmx;
->>   int dt_omap_clk_init(void);
->>   extern void omap_dt_clocks_register(struct omap_dt_clk *oclks, int
->> cnt);
->>   void of_omap4_dpll_setup(struct device_node *node);
->> +void of_omap_fixed_factor_setup(struct device_node *node);
->> +void of_omap_divider_setup(struct device_node *node);
->> +void of_omap_clk_allow_autoidle_all(void);
->> +void of_omap_clk_deny_autoidle_all(void);
->>
->>   #endif
->>
->
-> I personally dont prefer the fact that divider-clock and
-> fixed-rate-clock now has double meaning - building a multi-arch kernel
-> for example, this can wreak havoc. standard definitions should not be
-> monkeyed around with thus if avoidable, and in this case, very much
-> avoidable.
->
-> just my 2 cents.
-
-Yea, as described before, I'll change the code not to make a global 
-override, instead, just make omap specific override which parses the 
-extra params. That sound better or still see some issues with that?
-
--Tero
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/cb5c4e75/attachment-0001.sig>
