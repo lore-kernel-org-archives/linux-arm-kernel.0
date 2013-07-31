@@ -1,44 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 31 Jul 2013 13:15:04 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable wireless support
-Message-ID: <1375287304-3896-1-git-send-email-festevam@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 31 Jul 2013 09:18:23 -0700
+Subject: [PATCH v2 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
+ clear WAKEUP_INT
+In-Reply-To: <003f01ce8154$2f5ea1d0$8e1be570$%jun@samsung.com>
+References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
+ <1373411961-23812-1-git-send-email-dianders@chromium.org>
+ <1373411961-23812-4-git-send-email-dianders@chromium.org>
+ <002a01ce7d7d$6bd9e870$438db950$%jun@samsung.com>
+ <CAD=FV=UtX0Z1ABdi5h270ks8Py2o1iPK4DonOHJH3N0Q1YShTQ@mail.gmail.com>
+ <003f01ce8154$2f5ea1d0$8e1be570$%jun@samsung.com>
+Message-ID: <CAD=FV=XZcf8xWWxrCoe9KqjnQs4p4y7ENnuUYsVKU+yrE09GeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Seungwon,
 
-Wandboard has a Broadcom 4329 chipset connected to SDHC, so turn on the wireless 
-related options.
+On Mon, Jul 15, 2013 at 5:09 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> Sorry for late response.
+> Yes, it's not clear.
+> If you get the confirmation, could you share this problem?
+> Possibly, auto-clear may not be implemented.
+> Then, manual should be correct.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+I just got an update from my contacts.  They confirm that bit 11 is
+not automatically cleared and that writing to it will clear it.
+Hopefully this information will make it into the next version of any
+documentation that you receive as well.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index d3e044a..577f054 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -61,7 +61,10 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_INET_LRO is not set
- CONFIG_IPV6=y
- CONFIG_NETFILTER=y
--# CONFIG_WIRELESS is not set
-+CONFIG_CFG80211=y
-+CONFIG_MAC80211=y
-+CONFIG_RFKILL=y
-+CONFIG_RFKILL_INPUT=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
-@@ -115,7 +118,7 @@ CONFIG_SMC91X=y
- CONFIG_SMC911X=y
- CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_WLAN is not set
-+CONFIG_BRCMFMAC=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
- CONFIG_INPUT_EVBUG=m
--- 
-1.8.1.2
+It is still unclear exactly why the WAKEUP_INT was being asserted on
+our board despite the fact that all of the wakeup control signals
+(bits 10:8) were 0.  That is still being investigated.
+
+-Doug
