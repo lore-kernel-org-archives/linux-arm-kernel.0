@@ -1,54 +1,116 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 31 Jul 2013 12:18:53 +0100
-Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
-In-Reply-To: <20130731095411.GA2810@htj.dyndns.org>
-References: <1375232669-27846-1-git-send-email-festevam@gmail.com>
- <1375232669-27846-2-git-send-email-festevam@gmail.com>
- <20130731073306.GZ1754@pengutronix.de>
- <20130731082054.GF8540@nchen-desktop>
- <20130731084645.GB1754@pengutronix.de>
- <20130731090512.GD9858@sirena.org.uk>
- <20130731094434.GC1754@pengutronix.de>
- <20130731095411.GA2810@htj.dyndns.org>
-Message-ID: <20130731111853.GJ9858@sirena.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 31 Jul 2013 13:29:26 +0200
+Subject: How to create IRQ mappings in a GPIO driver that doesn't control
+ its IRQ domain ?
+In-Reply-To: <2175074.sF1r3oKahE@avalon>
+References: <1624911.6TtmtVmU1T@avalon> <12170068.F0utKQgh5l@flatron>
+ <2175074.sF1r3oKahE@avalon>
+Message-ID: <18585358.29goqe5cyM@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 05:54:11AM -0400, Tejun Heo wrote:
-> On Wed, Jul 31, 2013 at 11:44:34AM +0200, Uwe Kleine-K?nig wrote:
+On Wednesday 31 of July 2013 13:11:33 Laurent Pinchart wrote:
+> Hi Tomasz,
+> 
+> On Sunday 28 July 2013 12:07:48 Tomasz Figa wrote:
+> > On Wednesday 24 of July 2013 01:21:44 Laurent Pinchart wrote:
+> > > Hello,
+> > > 
+> > > I'm running into an issue on several Renesas SoC with IRQ domains and
+> > > GPIOs.
+> > > 
+> > > On sh73a0, r8a73a4 and r8a7740, GPIOs and external interrupts are
+> > > handled by two separate IP cores, namely the PFC (Pin Function
+> > > Controller) and INTC (Interrupt Controller). The former is handled by
+> > > the sh-pfc driver (drivers/pinctrl/sh-pfc) and the later by the
+> > > irq-renesas-intc-irqpin driver (drivers/irqchip), referred to below as
+> > > the irqpin driver.
+> > 
+> > Is the INTC used for anything more than just external interrupts on GPIO
+> > lines?
+> 
+> Yes, it also handles other interrupt sources (NMI and peripherals), but
+> those are not implemented now. The peripheral interrupts are also handled
+> by the GIC, which is preferred over INTC.
 
-> > > > OK, so the possible problem is that remove is called while the irq is
-> > > > still active. That means you have to assert that all resources the irq
+OK, this is much more clear now.
 
-> If your driver destruction path is running while your irq handler is
-> still running, it's a crappy / broken driver.  You need a deactivation
-> step whether you're using devm or not.  IRQs can be shared and the
-> device should be in a quiesced state before the driver detaches
-> itself.  Note that you can queue deactivation routine using devm.  For
-> an example, please take a look at
-> drivers/ata/libata-core.c::ata_host_start().
+> > > The sh73a0, for instance, has 32 external interrupt lines that are
+> > > multiplexed on pins usable as GPIOs. Both the GPIO and external
+> > > interrupt functions are usable at the same time, which allows reading
+> > > the state of the interrupt lines.
+> > > 
+> > > These external interrupts are for MMC/SD support, among other devices.
+> > > In this specific case the MMC/SD Card Detect signal is wired to one of
+> > > the external interrupt signals, and the corresponding GPIO is passed to
+> > > the MMC/SD controller driver. Depending on other configuration
+> > > parameters the driver can then either poll the Card Detect signal, or
+> > > register an interrupt handler to detect changes in the signal state.
+> > > This features is implemented by the MMC/SD core, which call
+> > > gpio_to_irq() on the GPIO to retrieve the corresponding IRQ number.
+> > > 
+> > > On non-DT systems the external IRQs are statically mapped at a known
+> > > offset. The sh-pfc driver, to implement the gpio_to_irq() function
+> > > (through its gpiochip .to_irq() handler), simply searches a
+> > > SoC-specific lookup table for the fixed IRQ number associated with a
+> > > given GPIO.
+> > > 
+> > > However, on DT systems, IRQs are mapped dynamically on demand. The
+> > > irqpin driver registers a simple IRQ domain, and the
+> > > irq_create_mapping() function can then be used to map a given IRQ,
+> > > specified as an offset in the domain. This is where the problem
+> > > appears, as the irqchip .to_irq() function is implemented in the sh-pfc
+> > 
+> > I assume it should be s/irqchip/gpiochip/ in the line above, shouldn't it?
+> 
+> Yes, my bad.
 
-I'm not sure I understand how this relates the problem.  The main issue
-here is that for the shared IRQ case quiescing the device doesn't make
-any difference since one of the other users of the interrupt could cause
-the interrupt handler to be called regardless of what the hardware is
-doing.  This means that we need to guarantee that anything the interrupt
-handler relies on has not been deallocated before the interrupt handler
-is unregistered.
+No problem.
 
-> irq deregistration.  Add an explicit deactivation step using
-> devres_alloc().
+> > > driver, which doesn't have access to the IRQ domain registered by the
+> > > irqpin driver.
+> > > 
+> > > I could hack around this by exporting a function in the irqpin driver
+> > > that would map an IRQ, and call that function from the sh-pfc driver.
+> > > I'd rather avoid that solution as it would add a direct dependency
+> > > between the two drivers.
+> > 
+> > If you could just get the IRQ domain registered by irqpin driver and use
+> > it in sh-pfc, then I guess it would solve your problem, as you could
+> > simply call irq_create_mapping() with the domain and hwirq as args in your
+> > gpiochip .to_irq() callback.
+> > 
+> > I'm not sure if it's not a hack, but you could add a property to the node
+> > of your pin controller that would contain a phandle to your interrupt
+> > controller. Then you could use of_parse_phandle() to get to device node of
+> > the INTC and then irq_find_host() to retrieve irq domain associated with
+> > it.
+> 
+> That was my initial idea. However, one on of the SoCs, the GPIO interrupts
+> are divided in two separate blocks, handled by two different interrupt
+> controller instances. I could thus have a list of phandle + range, but that
+> becomes pretty hackish. Specifying the interrupts explicitly would be more
+> extensible.
 
-> devm guarantees that the destruction callbacks are called in the
-> reverse order of registration.
+Yes, in this case passing the domain alone makes little sense and domain + 
+range would be a bit hackish indeed.
 
-OK, that's helpful.  It'd be good to document this if it's something
-the API is intending to guarantee, though - devres.txt doesn't mention
-this and it's not something I'd intuitively expect to be the case.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/e15fad37/attachment.sig>
+> > > Has anyone run into a similar issue ? My gut feeling is that the
+> > > architecture isn't right somewhere, but I can't really pinpoint where.
+> > > As the external IRQs are handled by an IP core separate from the PFC
+> > 
+> > Well, the fact that it's separate doesn't mean anything yet. Here my
+> > question whether it's used exclusively for GPIO interrupts or not becomes
+> > significant. If yes, maybe it could be simply moved to the pinctrl driver?
+> 
+> Depending on the SoC, I have two different IRQ controllers used for GPIO
+> interrupts. They're called INTC and IRQC. INTC has other purposes (although
+> not implemented at the moment). The IRQC instances used for GPIO interrupts
+> are (at the moment) dedicated to GPIO interrupts, but other instances of the
+> same IP core are used for other interrupts, so a separate driver makes
+> sense in my opinion.
+
+OK. So you need a bit smarter solution then.
+
+Best regards,
+Tomasz
