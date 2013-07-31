@@ -1,38 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 31 Jul 2013 17:52:43 +0100
-Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
-In-Reply-To: <20130731152932.GV2810@htj.dyndns.org>
-References: <20130731111853.GJ9858@sirena.org.uk>
- <20130731113244.GI2810@htj.dyndns.org>
- <20130731115027.GN9858@sirena.org.uk>
- <20130731115527.GR2810@htj.dyndns.org>
- <20130731132708.GQ9858@sirena.org.uk>
- <20130731134215.GS2810@htj.dyndns.org>
- <20130731135751.GT9858@sirena.org.uk>
- <20130731140758.GT2810@htj.dyndns.org>
- <20130731152523.GW9858@sirena.org.uk>
- <20130731152932.GV2810@htj.dyndns.org>
-Message-ID: <20130731165243.GX9858@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Jul 2013 10:57:36 -0600
+Subject: [PATCH] ARM: allow DEBUG_UNCOMPRESS for omap2plus
+In-Reply-To: <20130731064634.GR7656@atomide.com>
+References: <1375224558-8170-1-git-send-email-swarren@wwwdotorg.org>
+ <20130730225233.GF21614@n2100.arm.linux.org.uk>
+ <51F845C7.8020106@wwwdotorg.org> <20130731064634.GR7656@atomide.com>
+Message-ID: <51F94200.2060202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 11:29:32AM -0400, Tejun Heo wrote:
+On 07/31/2013 12:46 AM, Tony Lindgren wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [130730 16:08]:
+>> On 07/30/2013 04:52 PM, Russell King - ARM Linux wrote:
+>>> On Tue, Jul 30, 2013 at 04:49:18PM -0600, Stephen Warren wrote:
+>>>> From: Stephen Warren <swarren@nvidia.com>
+>>>>
+>>>> DEBUG_UNCOMPRESS was previously disallowed for omap2plus due to
+>>>> omap2plus.S's use of .data, which is not allowed in the decompressor.
+>>>> Solve this by placing that data into .text when building the file into
+>>>> the decompressor. This relies on .text actually being writable in the
+>>>> decompressor, which it is in practice.
+>>>
+>>> Unless you decide to use ZBOOT and flash the zImage.
+>>
+>> I knew there had to be a catch:-)
+>>
+>> I have no idea if ZBOOT is a use-case that's relevant to OMAP?
+>>
+>> On Tegra at least (the same issue applies to the other patch I just
+>> sent), that use-case is almost impossible; even if the boot ROM directly
+>> booted a kernel, the boot ROM is hard-coded to copy whatever it's
+>> booting to SDRAM first, although I suppose if that was a boot-loader it
+>> could just jump back to a ROM location. That said, NOR flash is
+>> extremely rare on Tegra. So, I don't know if we care about this issue.
+>>
+>> Is it reasonable to just say "If you use ZBOOT, don't enable
+>> DEBUG_UNCOMPRESS"? Perhaps these patches should not completely remove
+>> the !DEBUG_TEGRA_UART from config DEBUG_UNCOMPRESS, but instead say:
+>>
+>> default y if DEBUG_LL && (!DEBUG_TEGRA_UART || !ZBOOT)?
+> 
+> I think we're best off removing the remaining uncompress code
+> configured port detection features as the port properties are now
+> defined in kconfig anyways. That simplifies the code quite a bit.
 
-> Yeah, sure, thank you very much for your input.  It is of course
-> strictly ordered and the documentation needs to be updated.
+If you want to do that with OMAP, I'm happy to drop this patch.
 
-While I note the way you're saying this given the widespread adoption I
-think there's a bit more effort needed on making sure people are aware
-of this model and that it's possible to do it - most of the APIs with
-devres support really ought to have things like a devm_clk_get_enable()
-(an example discussed further up the thread) added to them.
-
-devres has been quite widely adopted but not in a way that supports this
-usage model.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/7ff5a400/attachment-0001.sig>
+For Tegra, automatic determination of the DEBUG_LL UART is rather
+useful, so I'm not going to give that up:-)
