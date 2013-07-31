@@ -1,28 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 31 Jul 2013 10:03:59 +0200
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <51DD88A4.1030506@keymile.com>
-References: <51DD88A4.1030506@keymile.com>
-Message-ID: <20130731100359.3e789236@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 31 Jul 2013 01:15:53 -0700
+Subject: [GIT PULL] ARM: OMAP2+: PRCM: drop macros not currently in use
+In-Reply-To: <alpine.DEB.2.02.1307220454470.4804@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307220454470.4804@utopia.booyaka.com>
+Message-ID: <20130731081552.GU7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
+* Paul Walmsley <paul@pwsan.com> [130721 22:02]:
+> Hi Tony,
+> 
+> Sorry for the delay on this - wanted to make sure it passed the local
+> testbed before sending it upstream.
+> 
+> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+> 
+>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.11-rc/omap-fixes-a
+> 
+> for you to fetch changes up to 11dab344053f726fe17ede95aa52c1eea1258a66:
+> 
+>   ARM: OMAP5: PRM/CM: Cleanup unused header (2013-07-21 22:10:25 -0600)
+> 
+> ----------------------------------------------------------------
+> This series removes the currently-unused PRCM macros from
+> arch/arm/mach-omap2.
 
-On Wed, 10 Jul 2013 18:15:32 +0200, Gerlando Falauto wrote:
+Thanks & sorry for the delay on my part too, I was offline last week.
+I'll pull these into omap-for-v3.12/cleanup.
 
-> I am trying to use the pci-mvebu driver on one of our km_kirkwood 
-> boards. The board is based on Marvell's 98dx4122, which should 
-> essentially be 6281 compatible.
+Regards,
 
-In the end, did you manage to get the pci-mvebu driver to work on your
-platform?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
