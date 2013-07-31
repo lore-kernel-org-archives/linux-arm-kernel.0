@@ -1,72 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 31 Jul 2013 00:16:30 -0700
-Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
- architecture independent macro
-In-Reply-To: <1375187900-17582-3-git-send-email-B44344@freescale.com>
-References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
- <1375187900-17582-3-git-send-email-B44344@freescale.com>
-Message-ID: <20130731071630.GI8868@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 31 Jul 2013 09:27:25 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
+References: <51E72DCA.9070500@codeaurora.org>
+ <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+ <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
+ <51F66565.7010600@linaro.org>
+ <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
+ <51F77D93.4030505@linaro.org>
+ <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
+Message-ID: <51F8BC5D.80605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30, Arpit Goel wrote:
-> This patch ports PowerPC implementation of spin_event_timeout() for generic
-> use. Architecture specific implementation can be added to asm/delay.h, which
-> will override the generic linux implementation.
+On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+>>> Hi Daniel,
+>>>
+>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+>>> (snip)
+>>>>
+>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+>>>> timer will be stopped when entering to the idle state. In this case, the
+>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+>>>> idle state, switching the local timer back in use.
+>>>
+>>> I've been thinking about this, trying to understand how this makes my
+>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+>>> would make the timer core switch to a broadcast device even though it
+>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+>>> something useless, but nothing wrong in a sense that it should result in
+>>> breakage. I guess I'm missing something obvious. This timer system will
+>>> always remain a mystery to me.
+>>>
+>>> Actually this more or less leads to the question: What is this
+>>> 'broadcast timer'. I guess that is some clockevent device which is
+>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+>>> hang pointing to some issue with that driver?
+>>
+>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
 > 
-> Signed-off-by: Arpit Goel <B44344@freescale.com>
-> ---
+> So, the correct run results (full output attached).
+> 
+> The vanilla kernel uses the twd timers as local timers and the TTC as
+> broadcast device:
+> 	Tick Device: mode:     1                                                         
+> 	Broadcast device  
+> 	Clock Event Device: ttc_clockevent
+> 
+> When I remove the offending CPUIDLE flag and add the DT fragment to
+> enable the global timer, the twd timers are still used as local timers
+> and the broadcast device is the global timer:
+> 	Tick Device: mode:     1                                                         
+> 	Broadcast device                                                                 
+> 	Clock Event Device: arm_global_timer
+> 
+> Again, since boot hangs in the actually broken case, I don't see way to
+> obtain this information for that case.
 
-We use something similar internally but it's tied specifically to
-readl.
+Hmm, interesting. Can you give the ouput of /proc/interrupts also with
+the global timer ?
 
->  
-> +#ifndef spin_event_timeout
-> +/**
-> + * spin_event_timeout - spin until a condition gets true or a timeout elapses
-> + * @condition: a C expression to evalate
-> + * @timeout: timeout, in microseconds
-> + * @delay: the number of microseconds to delay between each evaluation of
-> + *         @condition
-> + *
-> + * The process spins until the condition evaluates to true (non-zero) or the
-> + * timeout elapses.  The return value of this macro is the value of
-> + * @condition when the loop terminates. This allows you to determine the cause
-> + * of the loop terminates.  If the return value is zero, then you know a
-> + * timeout has occurred.
-> + *
-> + * This primary purpose of this macro is to poll on a hardware register
-> + * until a status bit changes.  The timeout ensures that the loop still
-> + * terminates even if the bit never changes.  The delay is for devices that
-> + * need a delay in between successive reads.
-> + *
-> + * gcc will optimize out the if-statement if @delay is a constant.
-> + *
-> + * This is copied from PowerPC based spin_event_timeout() implementation
-> + * and modified for generic usecase.
-> + */
-> +#define spin_event_timeout(condition, timeout, delay)		\
-> +({								\
-> +	typeof(condition) __ret;				\
-> +	unsigned long __loops = timeout/USECS_PER_JIFFY;	\
-> +	unsigned long __start = jiffies;			\
-> +	while (!(__ret = (condition)) &&			\
-> +		time_before(jiffies, __start + __loops + 1))	\
-> +		if (delay)					\
-> +			udelay(delay);				\
-> +		else						\
-> +			schedule();				\
-> +	if (!__ret)						\
-> +		__ret = (condition);				\
-> +	__ret;							\
-> +})
-
-What do you do here if jiffies aren't incrementing (i.e
-interrupts are disabled). The time_before() check won't work
-there and it would be nice if we were able to use this in such
-situations. I think powerpc gets around this by reading the
-hardware timer directly?
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
