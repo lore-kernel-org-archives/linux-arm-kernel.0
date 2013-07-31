@@ -1,72 +1,77 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 31 Jul 2013 16:07:12 +0900
-Subject: [PATCH 01/07] ARM: shmobile: Introduce shared SCU SMP boot code
+Date: Wed, 31 Jul 2013 16:07:21 +0900
+Subject: [PATCH 02/07] ARM: shmobile: Use shared SCU SMP boot code on sh73a0
 In-Reply-To: <20130731070702.14444.64961.sendpatchset@w520>
 References: <20130731070702.14444.64961.sendpatchset@w520>
-Message-ID: <20130731070712.14444.49956.sendpatchset@w520>
+Message-ID: <20130731070721.14444.80422.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add SMP boot functions for SCU equipped mach-shmobile SoCs.
-
-At this point shmobile_smp_scu_prepare_cpus() controls the SCU and
-installs boot fn and arg, while shmobile_smp_scu_boot_secondary()
-currently does nothing. In the future the boot function and arg
-install code will be reworked, so the empty function is ground
-work for that.
+Use shared SCU code on sh73a0 for SMP boot.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/include/mach/common.h |    3 ++
- arch/arm/mach-shmobile/platsmp-scu.c         |   31 ++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
+ arch/arm/mach-shmobile/Makefile     |    2 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c |   26 +++++++++++++-------------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-07-29 16:50:17.000000000 +0900
-@@ -11,6 +11,9 @@ extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
- extern void shmobile_boot_scu(void);
-+extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
-+extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
-+					   struct task_struct *idle);
- struct clk;
- extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
---- /dev/null
-+++ work/arch/arm/mach-shmobile/platsmp-scu.c	2013-07-29 21:39:30.000000000 +0900
-@@ -0,0 +1,31 @@
-+/*
-+ * SMP support for SoCs with SCU covered by mach-shmobile
-+ *
-+ * Copyright (C) 2013  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/smp.h>
-+#include <asm/smp_plat.h>
-+#include <asm/smp_scu.h>
-+#include <mach/common.h>
+--- 0001/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-07-29 21:40:18.000000000 +0900
+@@ -17,7 +17,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.
+ 
+ # SMP objects
+ smp-y				:= platsmp.o headsmp.o
+-smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
++smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
+ 
+--- 0002/arch/arm/mach-shmobile/smp-sh73a0.c
++++ work/arch/arm/mach-shmobile/smp-sh73a0.c	2013-07-29 21:41:27.000000000 +0900
+@@ -50,30 +50,30 @@ void __init sh73a0_register_twd(void)
+ 
+ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	cpu = cpu_logical_map(cpu);
++	unsigned int lcpu = cpu_logical_map(cpu);
++	int ret;
+ 
+-	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
+-		__raw_writel(1 << cpu, WUPCR);	/* wake up */
++	ret = shmobile_smp_scu_boot_secondary(cpu, idle);
++	if (ret)
++		return ret;
 +
-+void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
-+{
-+	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
-+	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
-+
-+	/* enable SCU and cache coherency on booting CPU */
-+	scu_enable(shmobile_scu_base);
-+	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
-+}
-+
-+int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	/* do nothing for now */
-+	return 0;
-+}
++	if (((__raw_readl(PSTR) >> (4 * lcpu)) & 3) == 3)
++		__raw_writel(1 << lcpu, WUPCR);	/* wake up */
+ 	else
+-		__raw_writel(1 << cpu, SRESCR);	/* reset */
++		__raw_writel(1 << lcpu, SRESCR);	/* reset */
+ 
+ 	return 0;
+ }
+ 
+ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	/* setup sh73a0 specific SCU base */
+-	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
+-	scu_enable(shmobile_scu_base);
+-
+-	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
++	/* Map the reset vector (in headsmp.S) */
+ 	__raw_writel(0, APARMBAREA);      /* 4k */
+ 	__raw_writel(__pa(shmobile_boot_vector), SBAR);
+-	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
+-	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
+ 
+-	/* enable cache coherency on booting CPU */
+-	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
++	/* setup sh73a0 specific SCU bits */
++	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
++	shmobile_smp_scu_prepare_cpus(max_cpus);
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
