@@ -1,44 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 31 Jul 2013 10:33:49 +0900
-Subject: [PATCH 1/4] ARM: shmobile: armadillo800eva: Don't request GPIO 166 in
- board code
-In-Reply-To: <cover.1375234088.git.horms+renesas@verge.net.au>
-References: <cover.1375234088.git.horms+renesas@verge.net.au>
-Message-ID: <16b551dd22cc7edacb952f7a2e175f36c3aa4bdb.1375234088.git.horms+renesas@verge.net.au>
+Date: Wed, 31 Jul 2013 10:33:44 +0900
+Subject: [GIT 0/4] Second round of Renesas ARM based SoC fixes for v3.11
+Message-ID: <cover.1375234088.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-89ae7b5bbd3e65bc6ab7a577ca5ec18569589c8c
-(ARM: shmobile: armadillo800eva: Register pinctrl mapping for INTC)
-mistakenly requests GPIO 166 in board code,
-most probably due to a wrong merge conflict resolution.
-As the GPIO is passed to the st1232 driver through platform
-data and requested by the driver,
-there's no need to request it in board code. Fix it.
+please consider the following Renesas ARM based SoC fixes for v3.11.
 
-Tested by: Cao Minh Hiep <cm-hiep@jinso.co.jp>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v3.11
+
+for you to fetch changes up to a601469386b543df2a4d97ad7d524716945278a3:
+
+  ARM: shmobile: lager: do not annotate gpio_buttons as __initdata (2013-07-31 10:11:17 +0900)
+
+----------------------------------------------------------------
+Second round of Renesas ARM based SoC fixes for v3.11
+
+* Lager board: do not annotate gpio_buttons as __initdata
+  - This avoids accessing uninitialised memory if keys are pressed
+    after kernel initialisation completes.
+  - Bug introduced in gpio-keys were enabled in v3.11-rc1
+
+* Bock-W board: fix SDHI0 PFC settings
+  - Allow detection of SD card
+  - Bug introduced in SDHI support was added in v3.11-rc1
+
+* shdma: fixup sh_dmae_get_partial() calculation error
+  - Bug introduced in 2.6.34-rc1.
+
+* armadillo800eva board: Don't request GPIO 166 in board code
+  - Allow use of touchscreen
+  - Bug introduced in v3.11-rc1
+
+----------------------------------------------------------------
+Kuninori Morimoto (2):
+      ARM: shmobile: armadillo800eva: Don't request GPIO 166 in board code
+      shdma: fixup sh_dmae_get_partial() calculation error
+
+Sergei Shtylyov (1):
+      ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
+
+Simon Horman (1):
+      ARM: shmobile: lager: do not annotate gpio_buttons as __initdata
+
  arch/arm/mach-shmobile/board-armadillo800eva.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index e115f67..c5be60d 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1162,9 +1162,6 @@ static void __init eva_init(void)
- 	gpio_request_one(61, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
- 	gpio_request_one(202, GPIOF_OUT_INIT_LOW, NULL); /* LCD0_LED_CONT */
- 
--	/* Touchscreen */
--	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
--
- 	/* GETHER */
- 	gpio_request_one(18, GPIOF_OUT_INIT_HIGH, NULL); /* PHY_RST */
- 
--- 
-1.8.3.2
+ arch/arm/mach-shmobile/board-bockw.c           | 8 +++++++-
+ arch/arm/mach-shmobile/board-lager.c           | 2 +-
+ drivers/dma/sh/shdma.c                         | 4 ++--
+ 4 files changed, 10 insertions(+), 7 deletions(-)
