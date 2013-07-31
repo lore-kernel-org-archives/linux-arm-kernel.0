@@ -1,52 +1,141 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 31 Jul 2013 23:17:36 +0200
-Subject: [Announcement] Linux Plumbers ACPI/PM, PCI Microconference
-In-Reply-To: <CAKocOOPOqqS80D23z6xTVSNYYYWZ7ACg9MtSMz_hTqVA3Duo0w@mail.gmail.com>
-References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
- <1755363.sGc8nLIQOW@vostro.rjw.lan>
- <CAKocOOPOqqS80D23z6xTVSNYYYWZ7ACg9MtSMz_hTqVA3Duo0w@mail.gmail.com>
-Message-ID: <7183196.Ov6Qetq3lO@vostro.rjw.lan>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 31 Jul 2013 23:08:51 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
+References: <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+ <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
+ <51F66565.7010600@linaro.org>
+ <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
+ <51F77D93.4030505@linaro.org> <51F97842.6050200@linaro.org>
+ <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
+Message-ID: <51F97CE3.9030306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 31, 2013 10:35:05 AM Shuah Khan wrote:
-> On Wed, Jul 31, 2013 at 5:40 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > Hi All,
-> >
-> > The original announcement didn't go to linux-pm, so again:
-> >
-> > On Tuesday, July 16, 2013 08:21:26 PM Myron Stowe wrote:
-> >> Linux Plumbers has approved an ACPI/PM, PCI microconference. The
-> >> overview page is here:
-> >>
-> >> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
-> >>
-> >> We would like to start receiving volunteers for presenting topics of
-> >> interest.  There is a lot of activity in these subsystems so please
-> >> respond by submitting presentation or discussion proposals that you
-> >> would be willing to cover for consideration.  You should also feel
-> >> free to submit ideas as proposals that others could cover.  The
-> >> instructions for submitting ideas should be at:
-> >>
-> >> http://www.linuxplumbersconf.org/2013/submitting-topic/
-> >
-> > If anyone who's going to attend the Linux Plumbers Conf this year is interested
-> > in any particular topic for discussion during the ACPI/PM+PCI uconf, please
-> > submit a formal topic proposal at:
-> >
-> > http://www.linuxplumbersconf.org/2013/ocw/events/LPC2013/proposals/new
-> >
-> > If you submit a topic, that doesn't mean you'll be expected to present anything
-> > (if accepted).  In fact, we are mostly interested in discussion topics and we'd
-> > like to know what is important to people.
-> >
-> > That said if you have a (short) presentation to make, please submit it too.
-> >
-> > We'll appreciate all submissions very much.
-> >
+On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
+> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
+>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+>>>>> Hi Daniel,
+>>>>>
+>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+>>>>> (snip)
+>>>>>>
+>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+>>>>>> timer will be stopped when entering to the idle state. In this case, the
+>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+>>>>>> idle state, switching the local timer back in use.
+>>>>>
+>>>>> I've been thinking about this, trying to understand how this makes my
+>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+>>>>> would make the timer core switch to a broadcast device even though it
+>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+>>>>> something useless, but nothing wrong in a sense that it should result in
+>>>>> breakage. I guess I'm missing something obvious. This timer system will
+>>>>> always remain a mystery to me.
+>>>>>
+>>>>> Actually this more or less leads to the question: What is this
+>>>>> 'broadcast timer'. I guess that is some clockevent device which is
+>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+>>>>> hang pointing to some issue with that driver?
+>>>>
+>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
+>>>
+>>> So, the correct run results (full output attached).
+>>>
+>>> The vanilla kernel uses the twd timers as local timers and the TTC as
+>>> broadcast device:
+>>> 	Tick Device: mode:     1                                                         
+>>> 	Broadcast device  
+>>> 	Clock Event Device: ttc_clockevent
+>>>
+>>> When I remove the offending CPUIDLE flag and add the DT fragment to
+>>> enable the global timer, the twd timers are still used as local timers
+>>> and the broadcast device is the global timer:
+>>> 	Tick Device: mode:     1                                                         
+>>> 	Broadcast device                                                                 
+>>> 	Clock Event Device: arm_global_timer
+>>>
+>>> Again, since boot hangs in the actually broken case, I don't see way to
+>>> obtain this information for that case.
+>>
+>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
 > 
-> What I have mind is a discussion topic for the Mini-conference, which
-> in-line with what you are asking for.
-> I will add it to the web.
+> Right, that works. I forgot about that option after you mentioned, that
+> it is most likely not that useful.
+> 
+> Anyway, this are those sysfs files with an unmodified cpuidle driver and
+> the gt enabled and having maxcpus=1 set.
+> 
+> /proc/timer_list:
+> 	Tick Device: mode:     1
+> 	Broadcast device
+> 	Clock Event Device: arm_global_timer
+> 	 max_delta_ns:   12884902005
+> 	 min_delta_ns:   1000
+> 	 mult:           715827876
+> 	 shift:          31
+> 	 mode:           3
 
-Thank you!
+Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
+
+The previous timer_list output you gave me when removing the offending
+cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
+
+Is it possible you try to get this output again right after onlining the
+cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
+
+> 	 next_event:     108080000000 nsecs
+> 	 set_next_event: gt_clockevent_set_next_event
+> 	 set_mode:       gt_clockevent_set_mode
+> 	 event_handler:  tick_handle_oneshot_broadcast
+> 	 retries:        0
+> 	
+> 	tick_broadcast_mask: 00000001
+> 	tick_broadcast_oneshot_mask: 00000000
+> 	
+> 	Tick Device: mode:     1
+> 	Per CPU device: 0
+> 	Clock Event Device: local_timer
+> 	 max_delta_ns:   12884902005
+> 	 min_delta_ns:   1000
+> 	 mult:           715827876
+> 	 shift:          31
+> 	 mode:           3
+> 	 next_event:     106900000000 nsecs
+> 	 set_next_event: twd_set_next_event
+> 	 set_mode:       twd_set_mode
+> 	 event_handler:  hrtimer_interrupt
+> 	 retries:        0
+> 
+> # cat /proc/interrupts 
+> 	           CPU0       
+> 	 27:        252       GIC  27  gt
+> 	 29:        626       GIC  29  twd
+> 	 43:          0       GIC  43  ttc_clockevent
+> 	 82:        410       GIC  82  xuartps
+> 	IPI0:          0  CPU wakeup interrupts
+> 	IPI1:          0  Timer broadcast interrupts
+> 	IPI2:          0  Rescheduling interrupts
+> 	IPI3:          0  Function call interrupts
+> 	IPI4:          0  Single function call interrupts
+> 	IPI5:          0  CPU stop interrupts
+> 	Err:          0
+> 
+> 
+> 	S?ren
+> 
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
