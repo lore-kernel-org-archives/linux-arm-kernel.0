@@ -1,31 +1,41 @@
-From: htejun@gmail.com (Tejun Heo)
-Date: Wed, 31 Jul 2013 11:29:32 -0400
-Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
-In-Reply-To: <20130731152523.GW9858@sirena.org.uk>
-References: <20130731095411.GA2810@htj.dyndns.org>
- <20130731111853.GJ9858@sirena.org.uk>
- <20130731113244.GI2810@htj.dyndns.org>
- <20130731115027.GN9858@sirena.org.uk>
- <20130731115527.GR2810@htj.dyndns.org>
- <20130731132708.GQ9858@sirena.org.uk>
- <20130731134215.GS2810@htj.dyndns.org>
- <20130731135751.GT9858@sirena.org.uk>
- <20130731140758.GT2810@htj.dyndns.org>
- <20130731152523.GW9858@sirena.org.uk>
-Message-ID: <20130731152932.GV2810@htj.dyndns.org>
+From: maxime.ripard@free-electrons.com (maxime.ripard)
+Date: Wed, 31 Jul 2013 17:49:53 +0200
+Subject: [PATCH 4/4] ARM: sun6i: Enable clock support in the DTSI
+In-Reply-To: <2013073120102496855035@gmail.com>
+References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375195462-19566-5-git-send-email-maxime.ripard@free-electrons.com>
+ <51F86A2E.10505@elopez.com.ar> <20130731073724.GA24439@lukather>
+ <2013073116110750016327@gmail.com> <20130731114957.GD2911@lukather>
+ <2013073120102496855035@gmail.com>
+Message-ID: <20130731154953.GG2911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 04:25:23PM +0100, Mark Brown wrote:
-> What I'm saying is that in essentially all the users I've seen devm is
-> only being used for things like kfree() or clk_put() which aren't really
-> connected in any way and can happen in any order.  This (coupled with
-> the lack of documentation that this is supported) is why people are
-> nervous about anything that relies on ordering with this stuff - aside
-> from ATA everything is just using this for straight frees.
 
-Yeah, sure, thank you very much for your input.  It is of course
-strictly ordered and the documentation needs to be updated.
+
+On Wed, Jul 31, 2013 at 08:10:32PM +0800, kevin.z.m wrote:
+> > How does one select either the internal or the external 32kHz
+> > oscillator? Is this done in software (I can't find any reference to that
+> > in the user manuals) or in hardware?
+> For A20, it should be in the Timer module, and there is a register named "LOSC_CTRL_REG".
+> For A31, it is in the RTC module, same name of "LOSC_CTRL_REG".
+
+Ok, just so that we're on the same page, we have two oscillators running
+at 32kHz, the internal being always there, and the external that could
+or could not be there, and it's each different hardware block that can
+be wired to one, the other or both?
+
+There's no global mux that could use either one of the two 32k to
+provide the only 32kHz source in the system, right?
 
 -- 
-tejun
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/0bb8be73/attachment.sig>
