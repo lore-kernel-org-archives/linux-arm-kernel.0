@@ -1,65 +1,186 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Jul 2013 12:49:20 -0500
-Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <CAHCPf3svo2q3oCJFzGvU_EKrtvUgAzEgObaXc6aZw7AhuumePg@mail.gmail.com>
-References: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
- <51F7B4C9.2060500@gmail.com>
- <20130730125650.GD28716@e106331-lin.cambridge.arm.com>
- <20130730134427.GE28716@e106331-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1307301528540.4893@kaball.uk.xensource.com>
- <1375195354.32691.55.camel@kazak.uk.xensource.com>
- <CAHCPf3vUA1bD+1xPch-KZX6fdDzxsWjnVpUD39AKC=ds+EKeHQ@mail.gmail.com>
- <20130731134917.GN29859@e106331-lin.cambridge.arm.com>
- <CAHCPf3svo2q3oCJFzGvU_EKrtvUgAzEgObaXc6aZw7AhuumePg@mail.gmail.com>
-Message-ID: <51F94E20.7020904@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 31 Jul 2013 11:08:02 -0700
+Subject: [PATCH RFC 2/3] clk: cpufreq helper for voltage scaling
+In-Reply-To: <51F92109.2060707@ti.com>
+References: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
+ <1373247868-21444-3-git-send-email-mturquette@linaro.org>
+ <51F92109.2060707@ti.com>
+Message-ID: <20130731180802.6450.96509@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 12:24 PM, Matt Sealey wrote:
-> On Wed, Jul 31, 2013 at 8:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-
-[snip]
-
->>> * An AArch64 guest under an AArch64 hypervisor/sm would use the 64-bit
->>> convention or the 32-bit convention depending on how the sm is
->>> written, but it doesn't matter which is used if both can be
->>> supported.. but you'd only want to use one of them.
->>
->> Not all implementation will implement both, so there needs to be a way
->> to describe that. Which is actually used is up to the OS.
+Quoting Nishanth Menon (2013-07-31 07:36:57)
+> On 07/07/2013 08:44 PM, Mike Turquette wrote:
+> > This patch builds on "clk: notifier handler for dynamic voltage scaling"
+> > by adding a CPUfreq-specific helper function for registering a clock
+> > rate-change notifier to scale regulator voltage as a function of clock
+> > rate.
+> >
+> > In particular this patch creates an instance of struct
+> > cpufreq_frequency_table and also calculate the voltage scaling latency,
+> > both of which are returned to the caller for use in the CPUfreq driver.
+> >
+> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> > ---
+> >   drivers/clk/clk-voltage-notifier.c | 71 ++++++++++++++++++++++++++++++++++++++
+> >   include/linux/clk.h                |  6 ++++
+> >   2 files changed, 77 insertions(+)
 > 
-> Okay but putting both ways in a single node, and describing two
-> function ids (per property or with two properties) is what I was
-> getting at.. for the one case where you can use both at once, the
-> device tree description is king here.
+> As stage 1 of the transition, I dont have any complaints, but for SoC 
+> level, at least on OMAP, it is not just regulator and clock, we have 
+> additional tweaks to do - like ABB, AVS etc.
 > 
-> I am a little concerned that the support for this is going down the
-> route of telling the OS all possible ways to do the same thing instead
-> of trying to get into using a single, preferred way in the common
-> cases.
+> What would you suggest as the strategy to introduce SoC specific 
+> handlers for voltage notifiers that can co-exist with this?
+
+I would suggest to use the clock rate-change notifier handlers. Every
+version of these "helper" functions that I have posted are simply that:
+helper functions.
+
+There is nothing stopping you today from using the rate-change notifiers
+that were merged back in v3.4 and scaling multiple regulators in a
+specific order.
+
+This patch is solving the simple case of one clock, one regulator. You
+may construct your own notifier handler as needed and I have said this
+many times in the past.
+
+I would also point out that if a DT binding existed to properly express
+operating points as tuples of clock/clock-rate and support for multiple
+regulator/voltage pairs then I would have implemented that in this
+patch. As it stands the OPP library today doesn't go into that
+complexity nor does the operating-points DT binding. This patch chooses
+the path of least resistance.
+
 > 
-> Putting both call methods in the same node, doubling the function id
-> property lengths, or suffixing function id properties to do it seems
-> like putting information in the tree purely for the sake of it. In
-> what cases would it (uncommon cases only being existing, pre-PCSI
-> pre-SMC-conventions potentially for other things). In the case of PSCI
-> there's an opportunity to be strict about it.. why would it be sane to
-> allow a mixed implementation? Dictate that either support all the
-> 64-bit versions or all the 32-bit versions or both? And if both are
-> supported, dictate in the device tree which the OS should be using.
+> >
+> > diff --git a/drivers/clk/clk-voltage-notifier.c b/drivers/clk/clk-voltage-notifier.c
+> > index cb6b85f..8e1707f 100644
+> > --- a/drivers/clk/clk-voltage-notifier.c
+> > +++ b/drivers/clk/clk-voltage-notifier.c
+> > @@ -10,6 +10,7 @@
+> >    */
+> >
+> >   #include <linux/clk.h>
+> > +#include <linux/cpufreq.h>
 > 
-> What about having two nodes? There is nothing in device trees that
-> says you can't have two psci { compatible="arm,psci-0.2" } nodes, one
-> with method=smc and one with method=smc64 or hvc64 or what have you.
-> Parsing and setup of the PSCI code can be quit early if it's not the
-> "desirable" method for the OS (i.e. 64-bit on a 32-bit kernel). Then
-> each node follows the exact same definition, and the differentiator is
-> the call method and not the property names or complicating their
-> contents.
+> for example - we should not depend on cpufreq in a generic clock based 
+> dvfs approach. we would like to allow devfreq also to transition to this.
 
-+1
+See patch #1 in this series.
 
-This would certainly be easier for things like a hypervisor to parse and
-update.
+Patch #2 builds on patch #1 to handle the very common case of CPUfreq.
+It is purely a helper and the goal is to reduce the duplicated
+boilerplate that would go into every CPUfreq driver if this patch did
+not exist.
 
-Rob
+I would also like to see devfreq drivers use this mechanism and they can
+do exactly that with the stuff made available in patch #1.
+
+There is clearly no dependency on CPUfreq for you to scale voltage from
+a clock rate-change notifier.
+
+Regards,
+Mike
+
+> 
+> >   #include <linux/device.h>
+> >   #include <linux/module.h>
+> >   #include <linux/notifier.h>
+> > @@ -133,3 +134,73 @@ void of_clk_volt_notifier_unregister(struct notifier_block *nb)
+> >       kfree(vsd);
+> >   }
+> >   EXPORT_SYMBOL_GPL(of_clk_volt_notifier_unregister);
+> > +
+> > +void of_clk_cpufreq_notifier_unregister(struct notifier_block *nb,
+> > +             struct cpufreq_frequency_table *freq_table)
+> > +{
+> > +     struct volt_scale_data *data = to_volt_scale_data(nb);
+> > +     struct device *dev = data->dev;
+> > +
+> > +     opp_free_cpufreq_table(dev, &freq_table);
+> > +     of_clk_volt_notifier_unregister(nb);
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_clk_cpufreq_notifier_unregister);
+> > +
+> > +/**
+> > + * of_clk_cpufreq_notifer_register - register clock notifier to scale voltage
+> > + * @dev: device that owns this scaling operation
+> > + * @np: pointer to device's DT node
+> > + * @clk: clock whose rate-change notifier triggers voltage scaling
+> > + * @supply: regulator id string
+> > + * @freq_table: pointer to uninitialized CPUfreq frequency scaling table
+> > + * @voltage_latency: worst case voltage scaling latency
+> > + */
+> > +struct notifier_block *of_clk_cpufreq_notifier_register(struct device *dev,
+> > +             struct device_node *np, struct clk *clk, const char *supply,
+> > +             struct cpufreq_frequency_table **table,
+> > +             unsigned int *voltage_latency)
+> > +{
+> > +     struct notifier_block *nb;
+> > +     struct volt_scale_data *vsd;
+> > +     struct opp *opp;
+> > +     unsigned long min, max;
+> > +     int ret, i;
+> > +
+> > +     nb = of_clk_volt_notifier_register(dev, np, clk, supply,
+> > +                     voltage_latency);
+> > +     if (IS_ERR(nb))
+> > +             return nb;
+> > +
+> > +     vsd = to_volt_scale_data(nb);
+> > +
+> > +     ret = opp_init_cpufreq_table(dev, table);
+> > +     if (ret) {
+> > +             pr_err("failed to init cpufreq table: %d\n", ret);
+> > +             goto err_unregister;
+> > +     }
+> > +
+> > +     /* find the min and max voltages and compute worst-case latency */
+> > +     for (i = 0; table[0][i].frequency != CPUFREQ_TABLE_END; i++)
+> > +             ;
+> > +
+> > +     rcu_read_lock();
+> > +     opp = opp_find_freq_exact(dev,
+> > +                     table[0][0].frequency * 1000, true);
+> > +     min = opp_get_voltage(opp);
+> > +     opp = opp_find_freq_exact(dev,
+> > +                     table[0][i-1].frequency * 1000, true);
+> > +     max = opp_get_voltage(opp);
+> > +     rcu_read_unlock();
+> > +
+> > +     *voltage_latency = regulator_set_voltage_time(vsd->reg, min, max);
+> > +     if (*voltage_latency < 0)
+> > +             pr_warn("%s: failed to calculate voltage latency, %d\n",
+> > +                             __func__, ret);
+> > +
+> > +     return nb;
+> > +
+> > +err_unregister:
+> > +     of_clk_volt_notifier_unregister(nb);
+> > +     return ERR_PTR(ret);
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_clk_cpufreq_notifier_register);
+> > diff --git a/include/linux/clk.h b/include/linux/clk.h
+> > index 85ea520..3104883 100644
+> > --- a/include/linux/clk.h
+> > +++ b/include/linux/clk.h
+> > @@ -86,6 +86,12 @@ struct notifier_block *of_clk_volt_notifier_register(struct device *dev,
+> >               struct device_node *np, struct clk *clk, const char *supply,
+> >               int *voltage_latency);
+> >   void of_clk_volt_notifier_unregister(struct notifier_block *nb);
+> > +struct notifier_block *of_clk_cpufreq_notifier_register(struct device *dev,
+> > +             struct device_node *np, struct clk *clk, const char *supply,
+> > +             struct cpufreq_frequency_table **table,
+> > +             unsigned int *voltage_latency);
+> > +void of_clk_cpufreq_notifier_unregister(struct notifier_block *nb,
+> > +             struct cpufreq_frequency_table *freq_table);
+> >
+> >   #endif
+> >
+> >
+> 
+> 
+> -- 
+> Regards,
+> Nishanth Menon
