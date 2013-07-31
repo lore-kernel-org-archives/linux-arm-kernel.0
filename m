@@ -1,58 +1,55 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 31 Jul 2013 16:44:43 -0400 (EDT)
-Subject: [PATCH v2 6/8] usb: host: ohci-s3c2410 Use
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <6370497.apKG6kIlfT@flatron>
-Message-ID: <Pine.LNX.4.44L0.1307311643110.1546-100000@iolanthe.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 31 Jul 2013 13:45:47 -0700
+Subject: [PATCH] clocksource: em_sti: Adjust clock event rating to fix
+ SMP broadcast
+In-Reply-To: <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
+References: <1375251940-7809-1-git-send-email-horms+renesas@verge.net.au>
+ <51F94A35.2020907@codeaurora.org>
+ <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
+Message-ID: <51F9777B.2080500@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Jul 2013, Tomasz Figa wrote:
+On 07/31/13 12:17, Magnus Damm wrote:
+> Hi Stephen,
+>
+> On Thu, Aug 1, 2013 at 2:32 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> On 07/30/13 23:25, Simon Horman wrote:
+>>> From: Magnus Damm <damm@opensource.se>
+>>>
+>>> Update the STI rating from 200 to 80 to fix SMP operation with
+>>> the ARM broadcast timer. This breakage was introduced by:
+>>>
+>>> f7db706 ARM: 7674/1: smp: Avoid dummy clockevent being preferred over real hardware clock-event
+>>>
+>>> Without this fix SMP operation is broken on EMEV2 since no
+>>> broadcast timer interrupts trigger on the secondary CPU cores.
+>>>
+>>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>> This looks suspicious. Are you're purposefully deflating the rating so
+>> that the STI timer fills in the broadcast position? Why not make the STI
+>> cpumask be all possible CPUs? Presumably the interrupt can target all
+>> CPUs since it isn't a per-cpu interrupt and doing this would cause the
+>> STI to fill in the broadcast slot, leaving the per-cpu dummys in the
+>> tick position.
+> While letting the timer broadcast to all CPUs sounds interesting the
+> STI driver has so far only been used to drive a single CPU core. This
+> used to work well for us but has since some time unfortunately been
+> broken. I agree that it may be suboptimal with a single timer like STI
+> and using IPI for broadcast, but for more efficient SMP we already
+> have TWD or arch timer.
 
-> Alan, Greg,
-> 
-> On Tuesday 23 of July 2013 01:49:23 Tomasz Figa wrote:
-> > This patch modifies the ohci-s3c2410 driver to prepare and unprepare
-> > clocks in addition to enabling and disabling, since it is required
-> > by common clock framework.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > ---
-> >  drivers/usb/host/ohci-s3c2410.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/usb/host/ohci-s3c2410.c
-> > b/drivers/usb/host/ohci-s3c2410.c index e125770..db096bf 100644
-> > --- a/drivers/usb/host/ohci-s3c2410.c
-> > +++ b/drivers/usb/host/ohci-s3c2410.c
-> > @@ -47,10 +47,10 @@ static void s3c2410_start_hc(struct platform_device
-> > *dev, struct usb_hcd *hcd)
-> > 
-> >  	dev_dbg(&dev->dev, "s3c2410_start_hc:\n");
-> > 
-> > -	clk_enable(usb_clk);
-> > +	clk_prepare_enable(usb_clk);
-> >  	mdelay(2);			/* let the bus clock stabilise */
-> > 
-> > -	clk_enable(clk);
-> > +	clk_prepare_enable(clk);
-> > 
-> >  	if (info != NULL) {
-> >  		info->hcd	= hcd;
-> > @@ -75,8 +75,8 @@ static void s3c2410_stop_hc(struct platform_device
-> > *dev) (info->enable_oc)(info, 0);
-> >  	}
-> > 
-> > -	clk_disable(clk);
-> > -	clk_disable(usb_clk);
-> > +	clk_disable_unprepare(clk);
-> > +	clk_disable_unprepare(usb_clk);
-> >  }
-> > 
-> >  /* ohci_s3c2410_hub_status_data
-> 
-> Any chance to get your ack on this?
+I think there is some confusion. The mask field says what CPUs the timer
+can possibly interrupt and for non-percpu interrupts this should be all
+possible CPUs (unless we're talking clusters, etc. but I don't think we
+are). Can you please give the output of /proc/timer_list or confirm that
+the STI is your broadcast source? If so you should probably be marking
+the cpumask for all possible CPUs so that the clockevent core knows to
+prefer this clockevent for the broadcast source and not a per-cpu
+source. Then you can leave the rating as is.
 
-Sorry, this must have slipped past.  It's fine with me.
-
-Alan Stern
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
