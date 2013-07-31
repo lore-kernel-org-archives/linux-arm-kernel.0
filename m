@@ -1,63 +1,55 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 1 Aug 2013 04:17:39 +0900
-Subject: [PATCH] clocksource: em_sti: Adjust clock event rating to fix SMP
- broadcast
-In-Reply-To: <51F94A35.2020907@codeaurora.org>
-References: <1375251940-7809-1-git-send-email-horms+renesas@verge.net.au>
- <51F94A35.2020907@codeaurora.org>
-Message-ID: <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
+Date: Thu, 1 Aug 2013 04:34:03 +0900
+Subject: [PATCH] ARM: Fix memblock_reserve() to include stext
+In-Reply-To: <20130731094352.GV24642@n2100.arm.linux.org.uk>
+References: <20130731055807.14054.70106.sendpatchset@w520>
+ <20130731094352.GV24642@n2100.arm.linux.org.uk>
+Message-ID: <CANqRtoR5j2VyRwf0suABfVLxzU30pZndEcCj7uZ2sSrzfGmx_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Thu, Aug 1, 2013 at 2:32 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 07/30/13 23:25, Simon Horman wrote:
+On Wed, Jul 31, 2013 at 6:43 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 31, 2013 at 02:58:07PM +0900, Magnus Damm wrote:
 >> From: Magnus Damm <damm@opensource.se>
 >>
->> Update the STI rating from 200 to 80 to fix SMP operation with
->> the ARM broadcast timer. This breakage was introduced by:
+>> This fix for the ARM architecture will include stext
+>> in the memblock_reserve() call to make sure that the
+>> following symbols are not overwritten (from System.map):
 >>
->> f7db706 ARM: 7674/1: smp: Avoid dummy clockevent being preferred over real hardware clock-event
+>> c0008000 T _text
+>> c0008000 T stext
+>> ...
+>> c0008138 T secondary_startup
+>> ...
+>> c0009000 T _stext
 >>
->> Without this fix SMP operation is broken on EMEV2 since no
->> broadcast timer interrupts trigger on the secondary CPU cores.
+>> With this patch applied CPU Hotplug starts working
+>> again. Without this patch code in secondary_startup
+>> never gets reached as expected.
 >>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> ---
+>> This issue started triggering on kernels later than
+>> v3.10 - perhaps a side effect of the CPU Hotplug init
+>> section rework - so this is a fix for v3.11-rc.
 >
-> This looks suspicious. Are you're purposefully deflating the rating so
-> that the STI timer fills in the broadcast position? Why not make the STI
-> cpumask be all possible CPUs? Presumably the interrupt can target all
-> CPUs since it isn't a per-cpu interrupt and doing this would cause the
-> STI to fill in the broadcast slot, leaving the per-cpu dummys in the
-> tick position.
+> This is not the right fix.  The commit you previously pointed out (removal
+> of CPU hotplug) probably means there's a missing annotation somewhere in
+> the code.
+>
+> And yes - the __CPUINIT just before ENTRY(secondary_startup) was removed
+> rather than being replaced with a .text (in both head.S and head-nommu.S).
+> Same goes for ENTRY(lookup_processor_type) in head-common.S.  All these
+> need to be replaced with .text to stop them falling into the head section.
 
-While letting the timer broadcast to all CPUs sounds interesting the
-STI driver has so far only been used to drive a single CPU core. This
-used to work well for us but has since some time unfortunately been
-broken. I agree that it may be suboptimal with a single timer like STI
-and using IPI for broadcast, but for more efficient SMP we already
-have TWD or arch timer.
+Thanks for your guidance, Russell. The right way to fix this now seems
+pretty clear to me.
 
-This particular patch just does what should have been done during
-development of the following commit:
+Are you aware of any existing fix for this or anyone working on
+solving this issue? If not then I don't mind stepping up. I can
+however think of quite a few other things to do if this has been
+solved already though, so please let me know if you think I should
+focus on fixing this.
 
-f7db706 ARM: 7674/1: smp: Avoid dummy clockevent being preferred over
-real hardware clock-event
-
-Basically, the f7db706 commit changes the dummy clockevent rating from
-400 to 100. Our timers in drivers/clocksource all had a rating higher
-than 100 so the commit basically broke everything. I can understand
-that the CMT, TMU and MTU2 timers were overlooked due to clock event
-rating in platform data, but a simple grep would have saved this
-driver..
-
-Anyway, this patch adjusts the STI rating from 200 down to 80 so we
-now once again are below the dummy clock event rating. So now SMP is
-working again, yay!
-
-Thanks for your comments!
+Cheers,
 
 / magnus
