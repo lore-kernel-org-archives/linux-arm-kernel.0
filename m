@@ -1,37 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 01 Aug 2013 00:21:08 +0400
-Subject: [PATCH 1/10] ARM: dts: mxs: move 'compatible' property to
- beginning of node and do some whitespace cleanups
-In-Reply-To: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
-References: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <51F971B4.1050605@cogentembedded.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 01 Aug 2013 00:49:14 +0200
+Subject: [PATCH v4 0/5] Memory mapped architected timers
+In-Reply-To: <20130731223833.GJ8868@codeaurora.org>
+References: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
+ <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
+ <20130724203253.GE27761@codeaurora.org>
+ <20130731223833.GJ8868@codeaurora.org>
+Message-ID: <51F9946A.50107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 08/01/2013 12:38 AM, Stephen Boyd wrote:
+> On 07/24, Stephen Boyd wrote:
+>> On 07/22, Mark Rutland wrote:
+>>> Hi Stephen,
+>>>
+>>> On Fri, Jul 19, 2013 at 12:59:27AM +0100, Stephen Boyd wrote:
+>>>> This patchset adds support for memory mapped architected timers. We
+>>>> don't have any other global broadcast timer in our system, so we use the
+>>>> mmio timer during low power modes. The first patch changes the register
+>>>> accessor to an enum per Thomas' request. The second patch is the binding.
+>>>> The next two patches lay some groundwork so that the last patch is simpler.
+>>>> The final patch adds support for mmio timers.
+>>>>
+>>>> Patches are based on v3.11-rc1.
+>>>
+>>> Be aware that as of v3.11-rc2 this doesn't cleanly apply, as the
+>>> __cpuinit removal broke the final patch's context in a couple of places.
+>>> It would be nice to get rid of the new cpuinit additions too...
+>>>
+>>> With that cleaned up locally, I've gave this a spin on tc2 and a
+>>> Foundation model to test the cp15/system timers, hotplugging CPUs and
+>>> running a basic test (`time sleep 5`). That all seems to work.
+>>>
+>>> Unfortunately I have no way of testing the memory-mapped timer support,
+>>> but I trust you've tested that locally.
+>>>
+>>> For the series:
+>>>
+>>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>>>
+>>
+>> Thanks Mark.
+>>
+>> Daniel, can you pick up these patches please?
+>>
+> 
+> Ping Daniel?
 
-On 07/31/2013 06:37 PM, Lothar Wa?mann wrote:
+Yes, thanks for the head up.
 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->   arch/arm/boot/dts/imx28.dtsi |    5 ++---
->   1 files changed, 2 insertions(+), 3 deletions(-)
+I will look at them and pick the patches.
 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 47fc5ef..0360acc 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -731,9 +731,9 @@
->   			};
->
->   			dcp at 80028000 {
-> +				compatible = "fsl-dcp";
+  -- Daniel
 
-    Hm, why not the usual "fsl,dcp", where "fsl" is Freescale's stock ticker?
 
->   				reg = <0x80028000 0x2000>;
->   				interrupts = <52 53 54>;
-> -				compatible = "fsl-dcp";
->   			};
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-WBR, Sergei
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
