@@ -1,27 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 31 Jul 2013 13:20:34 +0800
-Subject: [PATCH 1/2] pinctrl: imx: Add exception hook for select input
-In-Reply-To: <20130730083803.GF12382@S2101-09.ap.freescale.net>
-References: <1375152857-32177-1-git-send-email-peter.chen@freescale.com>
- <20130730075018.GD12382@S2101-09.ap.freescale.net>
- <20130730080028.GA8540@nchen-desktop>
- <20130730083803.GF12382@S2101-09.ap.freescale.net>
-Message-ID: <20130731052031.GA19098@S2101-09.ap.freescale.net>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 31 Jul 2013 00:06:33 -0500
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <51F7E9D0.1080107@ti.com>
+References: <1374515989-7391-1-git-send-email-joelf@ti.com>
+ <51F61359.1090309@ti.com> <51F73738.6080901@ti.com> <51F7E9D0.1080107@ti.com>
+Message-ID: <51F89B59.6010708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 04:38:05PM +0800, Shawn Guo wrote:
-> On Tue, Jul 30, 2013 at 04:00:29PM +0800, Peter Chen wrote:
-> > I searched the RM, this is the only one. If you don't think we need
-> > to consider if it will occur in the future, I am OK to move it at machine
-> > code, but every mx6q board need it if it does not use default select input
-> > value.
+On 07/30/2013 11:29 AM, Sekhar Nori wrote:
+> On 7/30/2013 9:17 AM, Joel Fernandes wrote:
 > 
-> Yes, maybe you can put it into imx6q_usb_init() with
-> if (IS_ENABLED(CONFIG_USB_OTG)) protect.
+>>>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>>>> index a432e6c..765d578 100644
+>>>> --- a/arch/arm/common/edma.c
+>>>> +++ b/arch/arm/common/edma.c
+> 
+>>>> +	} else {
+>>>> +		for (; i < pdev->num_resources; i++) {
+>>>> +			if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+>>>> +			    (int)pdev->resource[i].start >= 0) {
+>>>> +				ctlr = EDMA_CTLR(pdev->resource[i].start);
+>>>> +				clear_bit(EDMA_CHAN_SLOT(
+>>>> +					  pdev->resource[i].start),
+>>>> +					  edma_cc[ctlr]->edma_unused);
+>>>> +			}
+>>>
+>>> So there is very little in common between OF and non-OF versions of this
+>>> function. Why not have two different versions of this function for the
+>>> two cases? The OF version can reside under the CONFIG_OF conditional
+>>> already in use in the file. This will also save you the ugly line breaks
+>>> you had to resort to due to too deep indentation.
+>>
+>> Actually those line breaks are not necessary and wouldn't result in
+>> compilation errors. I was planning to drop them. I'll go ahead and split
+>> it out anyway, now that also the OF version of the function is going to
+>> be bit longer if we use the of_parse functions.
+>>
+>> Thanks for your review,
+> 
+> It turns out, I gave a bad idea. What I suggested will break the case of
+> non-DT boot with CONFIG_OF enabled. So what you had was fine. May be
+> just return from "if (dev->of_node)" so you don't need to have an else
+> block and can save on the indentation.>
 
-I misunderstood it.  As it varies from board to board, we can not nicely
-handle it in mach-imx6q.c.  I have some other idea to solve the problem,
-and will cook up a patch to demonstrate it.
+Ok, sure. I will go ahead and return from the if block.
 
-Shawn
+Thanks,
+
+-Joel
