@@ -1,65 +1,47 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 31 Jul 2013 17:23:35 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130731150717.GD4904@netboy>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1479410.BSGDrOcRvP@thinkpad> <20130731150717.GD4904@netboy>
-Message-ID: <1999586.84BnWE5EUh@thinkpad>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 31 Jul 2013 16:25:23 +0100
+Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
+In-Reply-To: <20130731140758.GT2810@htj.dyndns.org>
+References: <20130731094434.GC1754@pengutronix.de>
+ <20130731095411.GA2810@htj.dyndns.org>
+ <20130731111853.GJ9858@sirena.org.uk>
+ <20130731113244.GI2810@htj.dyndns.org>
+ <20130731115027.GN9858@sirena.org.uk>
+ <20130731115527.GR2810@htj.dyndns.org>
+ <20130731132708.GQ9858@sirena.org.uk>
+ <20130731134215.GS2810@htj.dyndns.org>
+ <20130731135751.GT9858@sirena.org.uk>
+ <20130731140758.GT2810@htj.dyndns.org>
+Message-ID: <20130731152523.GW9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 of July 2013 17:07:19 Richard Cochran wrote:
-> On Wed, Jul 31, 2013 at 12:59:59PM +0200, Tomasz Figa wrote:
-> > On Wednesday 31 of July 2013 12:37:37 Maxime Bizon wrote:
-> > > Board files are C code anyone has the skill to edit/understand/refactor.
-> > > Moving to DT and keep them in tree tightly coupled with the kernel
-> > > version just adds another layer of indirection for *no purpose*.
-> 
-> +1
-> 
-> That is exactly what I tried to say.
+On Wed, Jul 31, 2013 at 10:07:58AM -0400, Tejun Heo wrote:
+> On Wed, Jul 31, 2013 at 02:57:51PM +0100, Mark Brown wrote:
 
-I agree with you to some extent. Don't be so extreme though. As I already 
-said, this is not entirely "no purpose", as there are more benefits of having 
-device tree than just separation from kernel tree.
+> > That's the only API I've ever heard of doing that.  Everything else is
+> > just using it to do deallocation.
 
-> > > Linus started the whole thing some years ago by refusing to pull ARM
-> > > tree [1]. Reread his post, what he wants is clearly b).
-> > > 
-> > > Going a) does not solve any problem. You are just moving churn to
-> > > somewhere else. We had board files churn, then defconfigs churn, DTS
-> > > files (and associated drivers) will be next.
-> 
-> And at this rate, we are headed for another Linus ultimatum, sooner or
-> later.
+> I'm not sure why or what you're trying to argue here but take a look
+> at devm_pwm_release() for example.  It calls back into low level
+> driver free routine.  Are you arguing that it'd be a good idea to
 
-(see end of the message)
+That the callback is into the driver providing the PWM, not into the
+driver that's using the PWM and is releasing it.
 
-> > > DT is self inflicted pain. It has to be for the greater good.
-> > 
-> > It has several benefits over board files that I mentioned above, possible
-> > without fully separating them from kernel tree.
-> 
-> Every time a criticism is voiced about DT, the DT people stick their
-> fingers in their ears and say, "NAH, NAH, NAH, I CAN'T HEAR YOU!"
+> release pci regions before this is complete?  It's just stupid to do
+> any differently.  There's nothing to argue about.
 
-I won't comment this...
-
-> WRT to DT-as-platform-device, we would rather stick with the C code,
-> please. Just pushing the configuration tables into an external form
-> does not simplify the problem. In fact, it creates new problems by
-> inviting the possibility of a bootloader/DT/kernel mismatch.
-
-Care to stop ignoring my points other than those defending ideas (nowhere 
-stated as good or bad) from extreme opinions?
-
-I said it many, many times, that a) and b) I proposed are just two extremes. 
-It is unlikely that an extreme solution will be the best option to choose. I 
-am strongly for something in the middle, just like I wrote in several of my 
-previous replies.
-
-This is something that should be commented, not those extreme options.
-
-Best regards,
-Tomasz
+What I'm saying is that in essentially all the users I've seen devm is
+only being used for things like kfree() or clk_put() which aren't really
+connected in any way and can happen in any order.  This (coupled with
+the lack of documentation that this is supported) is why people are
+nervous about anything that relies on ordering with this stuff - aside
+from ATA everything is just using this for straight frees.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/5bc05f02/attachment.sig>
