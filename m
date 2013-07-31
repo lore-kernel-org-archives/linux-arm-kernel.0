@@ -1,87 +1,60 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 31 Jul 2013 12:59:59 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <1375267057.20042.52.camel@sakura.staff.proxad.net>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1441731.8CGUI1tUxh@flatron>
- <1375267057.20042.52.camel@sakura.staff.proxad.net>
-Message-ID: <1479410.BSGDrOcRvP@thinkpad>
+From: B44344@freescale.com (Goel Arpit-B44344)
+Date: Wed, 31 Jul 2013 11:09:29 +0000
+Subject: [PATCH 0/2] Make PPC macro spin_event_timeout() architecture
+ independent
+In-Reply-To: <CAMuHMdXP3-uKbftP-2UeZdE6X_iTi1podNDh0aVF3bJwDYssdg@mail.gmail.com>
+References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+ <CAMuHMdXP3-uKbftP-2UeZdE6X_iTi1podNDh0aVF3bJwDYssdg@mail.gmail.com>
+Message-ID: <0DFB48290CDB0C4680160EBE62E8F9A809E9A13C@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 of July 2013 12:37:37 Maxime Bizon wrote:
-> On Sat, 2013-07-27 at 11:51 -0700, Tomasz Figa wrote:
-> > Well, it depends on how we use the DT. There are (at least) two possible
-> > 
-> > usage scenarios:
-> >  a) using DT as direct replacement for board files - this means that you
-> >  
-> >     are free to say that DTSes are strictly coupled with kernel version
-> >     and you are free to modify the bindings - see the analogy to board
-> >     files, where you could modify the platform data structures and could
-> >     not directly copy board file from one kernel version to another,
-> 
-> I'm shocked to see this as a possible option.
-> 
-> Board files are C code anyone has the skill to edit/understand/refactor.
-> Moving to DT and keep them in tree tightly coupled with the kernel
-> version just adds another layer of indirection for *no purpose*.
+On Tue, Jul 30, 2013 at 2:38 PM, Arpit Goel <B44344@freescale.com> wrote:
+> This patch-set moves USECS_PER_JIFFY to architecture timex.h from 
+> architecture specific C files. Patch-set further uses this to make PPC 
+> macro
+> spin_event_timeout() architecture independent. This change enables 
+> drivers to use spin_event_timeout() even in non-PowerPC based SoC's.
+>
+> This patchset has been compiled for ARM, PowerPC and x86.
+>
+> Patch[1/2] : Moves USECS_PER_JIFFY to architecture specific timex.h files from
+>              architecture specific C files.
 
-Well, I agree that it's not the most fortunate scenario, but it is not that 
-bad as it might seem. It still has the benefit of separating hardware data 
-(including board-specific data) from kernel code and has all the benefits of DT, 
-e.g. easy way to specify relations between devices (phandles), no need to 
-manually register any resources, platform data or platform devices, in other 
-words, when describing hardware you just care about the hardware, not how the 
-kernel works.
+>  arch/arm/include/asm/timex.h      |  2 ++
+>  arch/arm/kernel/time.c            |  3 ---
+>  arch/m32r/include/asm/timex.h     |  2 ++
+>  arch/m32r/kernel/time.c           |  3 ---
+>  arch/m68k/hp300/time.c            |  4 +---
+>  arch/m68k/include/asm/timex.h     |  2 ++
+>  arch/s390/include/asm/timex.h     |  2 ++
+>  arch/s390/kernel/time.c           |  2 --
+>  arch/sparc/include/asm/timex_32.h |  2 ++  
+> arch/sparc/include/asm/timex_64.h |  2 ++
+>  arch/sparc/kernel/pcic.c          |  1 -
 
-> The fact that we loose compiler syntax/type checking (as highlighted
-> somewhere else in this thread) even looks like a regression.
+As the definition is the same on all architectures, why not move it to <linux/delay.h>?
 
-Syntax checking is already there. We don't have semantic checking yet, but we 
-are working on this.
+[Arpit] I will add USECS_PER_JIFFY definition to <linux/timex.h> and will keep 
+        definitions in <arch/timex.h> as it is. So that USECS_PER_JIFFY is available 
+	  for generic use and architecture specific implementation can override it.	
 
-> >  b) using DT as an ABI - this is the original way, i.e. define stable
-> >  
-> >     bindings and make sure that anu DTB built for older kernel will
-> > 
-> > work, with equal or greater set of functionality on newer kernels.
-> 
-> Linus started the whole thing some years ago by refusing to pull ARM
-> tree [1]. Reread his post, what he wants is clearly b).
-> 
-> Going a) does not solve any problem. You are just moving churn to
-> somewhere else. We had board files churn, then defconfigs churn, DTS
-> files (and associated drivers) will be next.
-> 
-> DT is self inflicted pain. It has to be for the greater good.
+> Patch[2/2] : Converts PPC macro spin_event_timeout() in architecture independent
+>              macro.
 
-It has several benefits over board files that I mentioned above, possible 
-without fully separating them from kernel tree.
+>  include/linux/delay.h             | 40 +++++++++++++++++++++++++++++++++++++++
 
-> Going b) *might* allow what some people here dream about, a kernel free
-> of hardware knowledge. A new board could boot a kernel compiled before
-> it was even designed.
-
-This is very unlikely to happen. You can already see problems with defining 
-bindings for existing hardware and what to say about hardware that is not even 
-designed yet? Unless all the board uses is a set of already supported 
-components, that have bindings defined and drivers merged, you would still need 
-to provide remaining drivers and bindings for them.
-
-> Now since I do "embedded" stuff everyday, I don't think b) can apply to
-> the whole ARM world. There is just to much hardware peculiarity.
-
-That's why I think we need a hybrid solution. Staging bindings could use a) 
-and those stable one would use b). Staging bindings would be fixed over time if 
-needed and if they turn out to be fine, they can be stabilized and move to b).
-
-So basically, you can get all the stable functionality with one DTB on any 
-kernel released after the functionality got stable, but during development of 
-some functionality you might need to change the DTB to test the development.
-
-Best regards,
-Tomasz
+After your first patch, USECS_PER_JIFFY is still available only on arm/m32r/m68k/s390/sparc. What about other architectures?
+If anyone uses spin_event_timeout() on e.g. x86, it will fail to compile.
  
-> [1] https://lkml.org/lkml/2011/3/30/525
+[Arpit] After adding USEC_PER_JIFFY to <linux/timex.h>, this issue can be addressed as well.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
