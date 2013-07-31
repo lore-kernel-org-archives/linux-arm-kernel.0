@@ -1,40 +1,44 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 30 Jul 2013 20:37:21 -0700
-Subject: [PATCH 08/11] clk: tegra114: add suspend/resume function for
- tegar_cpu_car_ops
-In-Reply-To: <1375237637.1231.1.camel@jlo-ubuntu-64.nvidia.com>
-References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
- <1372152475-18617-9-git-send-email-josephl@nvidia.com>
- <20130730212100.5270.53947@quantum>
- <1375237637.1231.1.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <CAPtuhTgsU0mr0ARK1WT=670ct5R158B5eAz3TwWkM-hL+X-hVQ@mail.gmail.com>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Wed, 31 Jul 2013 11:45:41 +0800
+Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
+In-Reply-To: <51F7EDF2.60700@wwwdotorg.org>
+References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
+ <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
+ <51F2D063.5010505@wwwdotorg.org>
+ <20130730033134.GM15855@rizhao-lap> <51F7EDF2.60700@wwwdotorg.org>
+Message-ID: <20130731034541.GQ15855@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 7:27 PM, Joseph Lo <josephl@nvidia.com> wrote:
-> On Wed, 2013-07-31 at 05:21 +0800, Mike Turquette wrote:
->> Quoting Joseph Lo (2013-06-25 02:27:52)
->> > Adding suspend/resume function for tegra_cpu_car_ops. We only save and
->> > restore the setting of the clock of CoreSight. Other clocks still need
->> > to be taken care by clock driver.
->> >
->> > Cc: Mike Turquette <mturquette@linaro.org>
->> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
->>
->> Change looks OK to me, besides Stephen's comments. I was waiting for a
->> V2 to hit the list but I never saw it. Any plans?
->>
-> Hi Mike,
->
-> The V2 was sent on 2013/7/3.
+On Wed, Jul 31, 2013 at 12:46:42AM +0800, Stephen Warren wrote:
+> On 07/29/2013 09:31 PM, Richard Zhao wrote:
+> > On Sat, Jul 27, 2013 at 03:39:15AM +0800, Stephen Warren wrote:
+> >> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+> >>> - driver: remove use of nvidia,dma-request-selector
+> >>> 	  use dma_request_slave_channel to request channel
+> >>> - update binding doc
+> >>
+> >> This patch needs to be amended so that the DMA channel is looked up
+> >> during probe() rather than open(), to guarantee that deferred probe
+> >> works. It's possible to hold off probe, but not possible AFAIK to hold
+> >> off opening the port.
+> >
+> > How about avoid return -EPROBE_DEFER at open() time? It can be in
+> > another patch.
+> 
+> I don't really understand what you mean. -EPROBE_DEFER is something that
+> only makes sense for probe() to return (or functions used by probe()).
+> It doesn't make sense to return it anywhere else, since probe deferral
+> is something that can only happen for probe().
+What I meant is, it might not worth to move request channel to probe
+only because we need to check error and return -EPROBE_DEFER.
 
-Ok, looks like Stephen took it into his branch.
+dma_request_slave_channel is better to be called as late as possible to
+make better dynamic use of dma channels.
 
-Thanks,
-Mike
+Actually, I searched the kernel code, most drivers don't return EPROBE_DEFER
+when dma_request_slave_channel failed. dma_request_slave_channel can
+fail in many cases, and dma device not probed is only one case.
 
->
-> Thanks,
-> Joseph
->
->
+Thanks
+Richard
