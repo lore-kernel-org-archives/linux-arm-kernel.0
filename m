@@ -1,86 +1,52 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 31 Jul 2013 11:34:48 +0200
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
-References: <51E72DCA.9070500@codeaurora.org>
- <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
- <51E7435B.3060605@codeaurora.org>
- <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
- <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
- <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
- <51F66565.7010600@linaro.org>
- <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
- <51F77D93.4030505@linaro.org>
- <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
-Message-ID: <51F8DA38.2060508@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 31 Jul 2013 15:05:24 +0530
+Subject: [PATCH 7/9] ARM: edma: Don't clear EMR of channel in edma_stop
+In-Reply-To: <51F89B0B.4080803@ti.com>
+References: <1375104595-16018-1-git-send-email-joelf@ti.com>
+ <1375104595-16018-8-git-send-email-joelf@ti.com> <51F77982.7030601@ti.com>
+ <51F89B0B.4080803@ti.com>
+Message-ID: <51F8DA5C.9060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
-> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
->> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
->>> Hi Daniel,
->>>
->>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
->>> (snip)
->>>>
->>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
->>>> timer will be stopped when entering to the idle state. In this case, the
->>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
->>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
->>>> idle state, switching the local timer back in use.
->>>
->>> I've been thinking about this, trying to understand how this makes my
->>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
->>> would make the timer core switch to a broadcast device even though it
->>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
->>> something useless, but nothing wrong in a sense that it should result in
->>> breakage. I guess I'm missing something obvious. This timer system will
->>> always remain a mystery to me.
->>>
->>> Actually this more or less leads to the question: What is this
->>> 'broadcast timer'. I guess that is some clockevent device which is
->>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
->>> hang pointing to some issue with that driver?
+On Wednesday 31 July 2013 10:35 AM, Joel Fernandes wrote:
+> On 07/30/2013 03:29 AM, Sekhar Nori wrote:
+>> On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
+>>> We certainly don't want error conditions to be cleared anywhere
 >>
->> If you look at the /proc/timer_list, which timer is used for broadcasting ?
+>> 'anywhere' is a really loaded term.
+>>
+>>> as this will make us 'forget' about missed events. We depend on
+>>> knowing which events were missed in order to be able to reissue them.
+>>
+>>> This fixes a race condition where the EMR was being cleared
+>>> by the transfer completion interrupt handler.
+>>>
+>>> Basically, what was happening was:
+>>>
+>>>             Missed event
+>>>              |
+>>>              |
+>>>              V
+>>> SG1-SG2-SG3-Null
+>>>          \
+>>>           \__TC Interrupt (Almost same time as ARM is executing
+>>> TC interrupt handler, an event got missed and also forgotten
+>>> by clearing the EMR).
+>>
+>> Sorry, but I dont see how edma_stop() is coming into picture in the race
+>> you describe?
 > 
-> So, the correct run results (full output attached).
-> 
-> The vanilla kernel uses the twd timers as local timers and the TTC as
-> broadcast device:
-> 	Tick Device: mode:     1                                                         
-> 	Broadcast device  
-> 	Clock Event Device: ttc_clockevent
-> 
-> When I remove the offending CPUIDLE flag and add the DT fragment to
-> enable the global timer, the twd timers are still used as local timers
-> and the broadcast device is the global timer:
-> 	Tick Device: mode:     1                                                         
-> 	Broadcast device                                                                 
-> 	Clock Event Device: arm_global_timer
-> 
-> Again, since boot hangs in the actually broken case, I don't see way to
-> obtain this information for that case.
+> In edma_callback function, for the case of DMA_COMPLETE (Transfer
+> completion interrupt), edma_stop() is called when all sets have been
+> processed. This had the effect of clearing the EMR.
 
-Is it possible the global timer driver simply does not work ? So when
-the cpuidle driver switches to it, the system stays stuck with no interrupt.
+Ah, thanks. I was missing the fact that the race comes into picture only
+when using the DMA engine driver. I guess that should be mentioned
+somewhere since it is not immediately obvious.
 
-Removing the CPUIDLE_FLAG_TIMER_STOP prevents to use the broadcast timer
-(aka arm global timer), so the problem does not appear.
+The patch looks good to me. So if you respin just this one with some
+updated explanation based on what you wrote below, I will take it.
 
-And when the C3STOP feature flag is added to the global timer, this one
-can't be a broadcast timer, so another clock is selected for that (I
-guess cadence_ttc). So again the problem does not appear.
-
-I am more and more convinced the problem is not coming from the cpuidle
-driver. The cpuidle flag has just spotted a problem somewhere else and I
-suspect the arm_global_timer is not working for zynq.
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks,
+Sekhar
