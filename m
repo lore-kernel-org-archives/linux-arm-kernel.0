@@ -1,248 +1,152 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 30 Jul 2013 22:01:25 -0300
-Subject: [PATCH 3/4] clk: sunxi: Add A31 clocks support
-In-Reply-To: <1375195462-19566-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375195462-19566-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51F861E5.7010909@elopez.com.ar>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 31 Jul 2013 10:04:04 +0900
+Subject: ARM CPU Hotplug breakage on mach-shmobile and KZM9D
+In-Reply-To: <51F7CD67.6020209@windriver.com>
+References: <CANqRtoRx7voEVwJG8UNNy_Jiixo=uRJCvxTD0bZdzVohoryBUA@mail.gmail.com>
+ <20130725010607.GB31464@verge.net.au>
+ <20130730074939.GE7210@verge.net.au>
+ <51F7CD67.6020209@windriver.com>
+Message-ID: <20130731010404.GJ17209@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-El 30/07/13 11:44, Maxime Ripard escribi?:
-> The A31 has a mostly different clock set compared to the other older
-> SoCs currently supported in the Allwinner clock driver.
+On Tue, Jul 30, 2013 at 10:27:51AM -0400, Paul Gortmaker wrote:
+> On 13-07-30 03:49 AM, Simon Horman wrote:
+> > [ Cc Paul Gortmaker ]
+> > 
+> > On Thu, Jul 25, 2013 at 10:06:07AM +0900, Simon Horman wrote:
+> >> On Thu, Jul 25, 2013 at 12:15:49AM +0900, Magnus Damm wrote:
+> >>> Hi everyone,
+> >>>
+> >>> Bad news: CPU Hotplug on KZM9D seems broken on recent kernels.
+> >>>
+> >>> On renesas-next-20130710 or earlier I can perform the following:
+> >>>
+> >>> # echo 0 > /sys/devices/system/cpu/cpu1/online
+> >>> CPU1: shutdown
+> >>> # echo 1 > /sys/devices/system/cpu/cpu1/online
+> >>> CPU1: Booted secondary processor
+> >>> #
+> >>>
+> >>> While on more recent kernels the hotplug boot fails. This may be
+> >>> related to the move to v3.11-rc. The tag renesas-next-20130710
+> >>> surprisingly seems to be the final kernel based on v3.10-rc before
+> >>> jumping to v3.11-rc.
+> >>>
+> >>> I wonder, do other ARM platforms have working CPU Hotplug in v3.11-rc?
+> >>
+> >> I have a snowball that I could test if you think it would be useful.
+> > 
+> > Unfortunately getting snowball to work turned out to be rather painful.
+> > So instead I bisected the problem on the KZM9G (N.b: the D in the subject
+> > seems to be incorrect :^)
+> > 
+> > The result is that the following patch, added in v3.11-rc1,
+> > appears to be the culprit.
 > 
-> Add support for the basic useful clocks. The other ones will come in
-> eventually.
+> Double check that you have this commit present:
+>  ---------------
+> commit 8c69d7af12265e5be9326110b695e010b47505bd
+> Author: Stephen Warren <swarren@nvidia.com>
+> Date:   Fri Jul 5 22:59:42 2013 +0100
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 120 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 120 insertions(+)
+>     ARM: 7780/1: add missing linker section markup to head-common.S
+>  ---------------
 > 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 6e9cbc9..8cd69e6 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -124,7 +124,67 @@ static void sun4i_get_pll1_factors(u32 *freq, u32 parent_rate,
->  	*n = div / 4;
->  }
->  
-> +/**
-> + * sun6i_get_pll1_factors() - calculates n, k and m factors for PLL1
-> + * PLL1 rate is calculated as follows
-> + * rate = parent_rate * (n + 1) * (k + 1) / (m + 1);
-> + * parent_rate should always be 24MHz
-> + */
-> +static void sun6i_get_pll1_factors(u32 *freq, u32 parent_rate,
-> +				   u8 *n, u8 *k, u8 *m, u8 *p)
-> +{
-> +	/*
-> +	 * We can operate only on MHz, this will make our life easier
-> +	 * later.
-> +	 */
-> +	u32 freq_mhz = *freq / 1000000;
-> +	u32 parent_freq_mhz = parent_rate / 1000000;
-> +
-> +	/* If the frequency is a multiple of 32 MHz, k is always 3 */
-> +	if (!(freq_mhz % 32))
-> +		*k = 3;
-> +	/* If the frequency is a multiple of 9 MHz, k is always 2 */
-> +	else if (!(freq_mhz % 9))
-> +		*k = 2;
-> +	/* If the frequency is a multiple of 8 MHz, k is always 1 */
-> +	else if (!(freq_mhz % 8))
-> +		*k = 1;
-> +	/* Otherwise, we don't use the k factor */
-> +	else
-> +		*k = 0;
->  
-> +	/*
-> +	 * If the frequency is a multiple of 2 but not a multiple of
-> +	 * 3, m is 3. This is the first time we use 6 here, yet we
-> +	 * will use it on several other places.
-> +	 * We use this number because it's the lowest frequency we can
-> +	 * generate (with n = 0, k = 0, m = 3), so every other frequency
-> +	 * somehow relates to this frequency.
-> +	 */
-> +	if ((freq_mhz % 6) == 2 || (freq_mhz % 6) == 4)
-> +		*m = 2;
-> +	/*
-> +	 * If the frequency is a multiple of 6MHz, but the factor is
-> +	 * odd, m will be 3
-> +	 */
-> +	else if ((freq_mhz / 6) & 1)
-> +		*m = 3;
-> +	/* Otherwise, we end up with m = 1 */
-> +	else
-> +		*m = 1;
-> +
-> +	/* Calculate n thanks to the above factors we already got */
-> +	*n = freq_mhz * (*m + 1) / ((*k + 1) * parent_freq_mhz) - 1;
-> +
-> +	/*
-> +	 * If n end up being outbound, and that we can still decrease
-> +	 * m, do it.
-> +	 */
-> +	if ((*n + 1) > 31 && (*m + 1) > 1) {
-> +		*n = (*n + 1) / 2 - 1;
-> +		*m = (*m + 1) / 2 - 1;
-> +	}
-> +}
+> as I think you are reporting the same problem that it fixed.
 
-Nice! My rate-to-factors functions pale in comparison :) Remember that
-n/k/m/p may be NULL when the caller just wants you to round freq to an
-achievable value (see clk_factors_round_rate(...) in clk-factors.c).
+Unfortunately that does not seem to resolve the problem that I am seeing.
+I have tried both v3.11-rc3 and 22f0a27367742f65130c0fb25ef00f7297e032c1
+with 8c69d7af12265e5be9326110b695e010b47505bd cherry picked on top and
+in both cases I see:
 
->  /**
->   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
-> @@ -189,6 +249,15 @@ static struct clk_factors_config sun4i_pll1_config = {
->  	.pwidth = 2,
->  };
->  
-> +static struct clk_factors_config sun6i_pll1_config = {
-> +	.nshift	= 8,
-> +	.nwidth = 5,
-> +	.kshift = 4,
-> +	.kwidth = 2,
-> +	.mshift = 0,
-> +	.mwidth = 2,
-> +};
-> +
->  static struct clk_factors_config sun4i_apb1_config = {
->  	.mshift = 0,
->  	.mwidth = 5,
-> @@ -201,6 +270,11 @@ static const __initconst struct factors_data sun4i_pll1_data = {
->  	.getter = sun4i_get_pll1_factors,
->  };
->  
-> +static const __initconst struct factors_data sun6i_pll1_data = {
-> +	.table = &sun6i_pll1_config,
-> +	.getter = sun6i_get_pll1_factors,
-> +};
-> +
->  static const __initconst struct factors_data sun4i_apb1_data = {
->  	.table = &sun4i_apb1_config,
->  	.getter = sun4i_get_apb1_factors,
-> @@ -243,6 +317,10 @@ static const __initconst struct mux_data sun4i_cpu_mux_data = {
->  	.shift = 16,
->  };
->  
-> +static const __initconst struct mux_data sun6i_ahb1_mux_data = {
-> +	.shift = 12,
-> +};
-> +
->  static const __initconst struct mux_data sun4i_apb1_mux_data = {
->  	.shift = 24,
->  };
-> @@ -301,6 +379,12 @@ static const __initconst struct div_data sun4i_apb0_data = {
->  	.width	= 2,
->  };
->  
-> +static const __initconst struct div_data sun6i_apb2_div_data = {
-> +	.shift	= 0,
-> +	.pow	= 0,
-> +	.width	= 4,
-> +};
-> +
->  static void __init sunxi_divider_clk_setup(struct device_node *node,
->  					   struct div_data *data)
->  {
-> @@ -347,6 +431,10 @@ static const __initconst struct gates_data sun5i_a13_ahb_gates_data = {
->  	.mask = {0x107067e7, 0x185111},
->  };
->  
-> +static const __initconst struct gates_data sun6i_a31_ahb1_gates_data = {
-> +	.mask = { 0xedfe7f62, 0x794f931 },
-> +};
-> +
->  static const __initconst struct gates_data sun4i_apb0_gates_data = {
->  	.mask = {0x4EF},
->  };
-> @@ -363,6 +451,14 @@ static const __initconst struct gates_data sun5i_a13_apb1_gates_data = {
->  	.mask = {0xa0007},
->  };
->  
-> +static const __initconst struct gates_data sun6i_a31_apb1_gates_data = {
-> +	.mask = { 0x3031 },
-> +};
-> +
-> +static const __initconst struct gates_data sun6i_a31_apb2_gates_data = {
-> +	.mask = { 0x3f000f },
-> +};
-> +
+# echo 0 > /sys/devices/system/cpu/cpu1/online
+CPU1: shutdown
+# echo 1 > /sys/devices/system/cpu/cpu1/online
+CPU1: failed to come online
 
-We should decide on a style here and use it across the board, so far we
-have definitions with and without spaces between constants and braces,
-and constants both with upper and lower case A-F. Personally I don't
-feel strongly about the spacing and prefer upper-case constants, but if
-the style guide suggests otherwise, I can live with it (as long as we
-use it consistently, that is)
-
->  static void __init sunxi_gates_clk_setup(struct device_node *node,
->  					 struct gates_data *data)
->  {
-> @@ -420,6 +516,10 @@ static const __initconst struct of_device_id clk_factors_match[] = {
->  		.data = &sun4i_pll1_data,
->  	},
->  	{
-> +		.compatible = "allwinner,sun6i-pll1-clk",
-> +		.data = &sun6i_pll1_data,
-> +	},
-> +	{
->  		.compatible = "allwinner,sun4i-apb1-clk",
->  		.data = &sun4i_apb1_data,
->  	},
-> @@ -440,6 +540,10 @@ static const __initconst struct of_device_id clk_div_match[] = {
->  		.compatible = "allwinner,sun4i-apb0-clk",
->  		.data = &sun4i_apb0_data,
->  	},
-> +	{
-> +		.compatible = "allwinner,sun6i-apb2-div-clk",
-> +		.data = &sun6i_apb2_div_data,
-> +	},
->  	{}
->  };
->  
-> @@ -453,6 +557,10 @@ static const __initconst struct of_device_id clk_mux_match[] = {
->  		.compatible = "allwinner,sun4i-apb1-mux-clk",
->  		.data = &sun4i_apb1_mux_data,
->  	},
-> +	{
-> +		.compatible = "allwinner,sun6i-ahb1-mux-clk",
-> +		.data = &sun6i_ahb1_mux_data,
-> +	},
->  	{}
->  };
->  
-> @@ -471,6 +579,10 @@ static const __initconst struct of_device_id clk_gates_match[] = {
->  		.data = &sun5i_a13_ahb_gates_data,
->  	},
->  	{
-> +		.compatible = "allwinner,sun6i-a31-ahb1-gates-clk",
-> +		.data = &sun6i_a31_ahb1_gates_data,
-> +	},
-> +	{
->  		.compatible = "allwinner,sun4i-apb0-gates-clk",
->  		.data = &sun4i_apb0_gates_data,
->  	},
-> @@ -486,6 +598,14 @@ static const __initconst struct of_device_id clk_gates_match[] = {
->  		.compatible = "allwinner,sun5i-a13-apb1-gates-clk",
->  		.data = &sun5i_a13_apb1_gates_data,
->  	},
-> +	{
-> +		.compatible = "allwinner,sun6i-a31-apb1-gates-clk",
-> +		.data = &sun6i_a31_apb1_gates_data,
-> +	},
-> +	{
-> +		.compatible = "allwinner,sun6i-a31-apb2-gates-clk",
-> +		.data = &sun6i_a31_apb2_gates_data,
-> +	},
-
-Please see my comments on the first patch regarding these.
-
-Thanks!
-
-Emilio
+> Thanks,
+> Paul.
+> --
+> 
+> > 
+> > commit 22f0a27367742f65130c0fb25ef00f7297e032c1
+> > Author: Paul Gortmaker <paul.gortmaker@windriver.com>
+> > Date:   Mon Jun 17 18:34:14 2013 -0400
+> > 
+> >     init.h: remove __cpuinit sections from the kernel
+> >     
+> >     The __cpuinit type of throwaway sections might have made sense
+> >     some time ago when RAM was more constrained, but now the savings
+> >     do not offset the cost and complications.  For example, the fix in
+> >     commit 5e427ec2d0 ("x86: Fix bit corruption at CPU resume time")
+> >     is a good example of the nasty type of bugs that can be created
+> >     with improper use of the various __init prefixes.
+> >     
+> >     After a discussion on LKML[1] it was decided that cpuinit should go
+> >     the way of devinit and be phased out.  Once all the users are gone,
+> >     we can then finally remove the macros themselves from linux/init.h.
+> >     
+> >     As an interim step, we can dummy out the macros to be no-ops, and
+> >     this will allow us to avoid a giant tree-wide patch, and instead
+> >     we can feed in smaller chunks mainly via the arch/ trees.  This
+> >     is in keeping with commit 78d86c213f28193082b5d8a1a424044b7ba406f1
+> >     ("init.h: Remove __dev* sections from the kernel")
+> >     
+> >     We don't strictly need to dummy out the macros to do this, but if
+> >     we don't then some harmless section mismatch warnings may temporarily
+> >     result.  For example, notify_cpu_starting() and cpu_up() are arch
+> >     independent (kernel/cpu.c) and are flagged as __cpuinit.  And hence
+> >     the calling functions in the arch specific code are also expected
+> >     to be __cpuinit -- if not, then we get the section mismatch warning.
+> >     
+> >     Two of the three __CPUINIT variants are not used whatsoever, and
+> >     so they are simply removed directly at this point in time.
+> >     
+> >     [1] https://lkml.org/lkml/2013/5/20/589
+> >     
+> >     Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> > 
+> > diff --git a/include/linux/init.h b/include/linux/init.h
+> > index 8618147..e73f2b70 100644
+> > --- a/include/linux/init.h
+> > +++ b/include/linux/init.h
+> > @@ -93,13 +93,13 @@
+> >  
+> >  #define __exit          __section(.exit.text) __exitused __cold notrace
+> >  
+> > -/* Used for HOTPLUG_CPU */
+> > -#define __cpuinit        __section(.cpuinit.text) __cold notrace
+> > -#define __cpuinitdata    __section(.cpuinit.data)
+> > -#define __cpuinitconst   __constsection(.cpuinit.rodata)
+> > -#define __cpuexit        __section(.cpuexit.text) __exitused __cold notrace
+> > -#define __cpuexitdata    __section(.cpuexit.data)
+> > -#define __cpuexitconst   __constsection(.cpuexit.rodata)
+> > +/* temporary, until all users are removed */
+> > +#define __cpuinit
+> > +#define __cpuinitdata
+> > +#define __cpuinitconst
+> > +#define __cpuexit
+> > +#define __cpuexitdata
+> > +#define __cpuexitconst
+> >  
+> >  /* Used for MEMORY_HOTPLUG */
+> >  #define __meminit        __section(.meminit.text) __cold notrace
+> > @@ -118,9 +118,8 @@
+> >  #define __INITRODATA	.section	".init.rodata","a",%progbits
+> >  #define __FINITDATA	.previous
+> >  
+> > -#define __CPUINIT        .section	".cpuinit.text", "ax"
+> > -#define __CPUINITDATA    .section	".cpuinit.data", "aw"
+> > -#define __CPUINITRODATA  .section	".cpuinit.rodata", "a"
+> > +/* temporary, until all users are removed */
+> > +#define __CPUINIT
+> >  
+> >  #define __MEMINIT        .section	".meminit.text", "ax"
+> >  #define __MEMINITDATA    .section	".meminit.data", "aw"
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
