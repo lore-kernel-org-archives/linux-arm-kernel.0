@@ -1,56 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Jul 2013 21:48:18 +0100
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
- <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
- <20130731201457.GA24642@n2100.arm.linux.org.uk>
- <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
-Message-ID: <20130731204817.GC24642@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 31 Jul 2013 14:50:34 -0600
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20130731110045.2dc84981@skate>
+References: <51DD88A4.1030506@keymile.com> <20130731100359.3e789236@skate>
+ <51F8CA44.4080802@keymile.com> <20130731110045.2dc84981@skate>
+Message-ID: <20130731205034.GA17615@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 04:37:36PM -0400, jonsmirl at gmail.com wrote:
-> On Wed, Jul 31, 2013 at 4:14 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > However, if we go back to the idea that DT is supposed to describe the
-> > hardware, _and_ that the way to describe that hardware is well defined
-> > and _stable_ (as it should be) then there should be no reason what so
-> > ever that your old DT blob should not continue working in later kernels.
-> > If it doesn't, then the contract that DT promised when we first moved
-> > over to using DT has been _broken_.
+On Wed, Jul 31, 2013 at 11:00:45AM +0200, Thomas Petazzoni wrote:
+
+> > Actually, the main reason for trying to use this driver was because I 
+> > wanted to model a PCIe *device* within the device tree, so to expose its 
+> > GPIOs and IRQs to be referenced (through phandles) from other device 
+> > tree nodes. The way I understand it, turns out this is not the way to 
+> > go, as PCI/PCIe are essentially enumerated busses, so you're not 
+> > supposed to -and it's not a trivial task to- put any information about 
+> > real devices within the device tree.
+> > Do you have any suggestion about that?
 > 
-> Suppose your DT predates PINCTRL and the CPU needs the pins set to
-> function.  But setting the pins up is a board specific function. How
-> is this going to get implemented in a generic kernel that doesn't have
-> any board specific code in it?
+> Indeed, PCI/PCIe devices are enumerated dynamically, so they are not
+> listed in the Device Tree, so there's no way to "attach" more
+> information to them.
 > 
-> I would propose that we only need to worry about DTs that got put into
-> boot loaders and not worry about ones that were only used when
-> appended to a kernel.
+> Device Tree people, any suggestion about the above question?
 
-That is - again - our mistake.  We should have made it clear from the
-start that the use of an _appended_ DT, or a DT provided with the kernel
-being booted was more or less mandatory for the time being.  We actually
-did exactly the opposite - we advertised the appended DT as a stop-gap
-measure just to allow a DT kernel to be booted with a boot loader which
-didn't support DT.
+No, that isn't true.
 
-That in itself _encouraged_ boot loader support for DT on ARM (which in
-itself is not a bad thing) but also leads people down the path of
-potentially separating the DT from the kernel.
+Device tree can include the discovered PCI devices, you have to use
+the special reg encoding and all that weirdness, but it does work. The
+of_node will be attached to the struct pci device automatically.
 
-Had we encouraged the use of an appended DT instead, but still encouraged
-boot loaders to update, and also made a clear statement that DT is
-unstable (which everyone can see - for example by making our DT stuff
-depend on CONFIG_EXPERIMENTAL when it existed) then everyone would have
-been clear about its status.
+On server/etc DT platforms the firmware will do PCI discovery and
+resource assignment then dump all those results into DT for the OS to
+reference.
 
-The fact that we did not - the fact that we ignored this process means
-that it is _our_ problem that people like Richard are blowing up such a
-storm over this.  We need to admit that we got it wrong, and commit to
-doing it the right way in future.  What that means is starting off today
-with a commitment to keep as much of the stuff which works today working
-_tomorrow_, and the day after, and so forth.
+This is a major reason why we wanted to see the standard PCI DT be
+used for Marvell/etc, the existing infrastructure for this is
+valuable.
+
+AFAIK, Thierry has tested this on tegra, and I am doing it on Kirkwood
+(though not yet with the new driver).
+
+It is useful for exactly the reason stated - you can describe GPIOs,
+I2C busses, etc, etc in DT and then upon load of the PCI driver engage
+the DT code to populate and connect all that downstream
+infrastructure.
+
+I understand someday DT overlays might be a better alternative for
+this, but AFAIK today in mainline this is what we have..
+
+That said, the guideline to not include discoverable information in DT
+is a good guideline for upstream DTs..
+
+Jason
