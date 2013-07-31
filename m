@@ -1,105 +1,96 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 31 Jul 2013 10:41:28 +0100
-Subject: [PATCH 12/13] ARM: bL_switcher: remove assumptions between
- logical and physical CPUs
-In-Reply-To: <alpine.LFD.2.03.1307301502120.15022@syhkavp.arg>
-References: <1374550289-25305-1-git-send-email-nicolas.pitre@linaro.org>
- <1374550289-25305-13-git-send-email-nicolas.pitre@linaro.org>
- <20130730163010.GA8921@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1307301502120.15022@syhkavp.arg>
-Message-ID: <20130731094127.GB6583@e102568-lin.cambridge.arm.com>
+From: finn@uni-bremen.de (Finn Hoffmann)
+Date: Wed, 31 Jul 2013 11:43:22 +0200
+Subject: NSA310 + DT
+In-Reply-To: <20130731111414.47e7670b@skate>
+References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
+ <20130729192112.GY29916@titan.lakedaemon.net>
+ <20130729204315.GK24782@lunn.ch> <51F78DA6.8010307@uni-bremen.de>
+ <20130730144752.GR24782@lunn.ch> <20130730172407.3aab15c6@skate>
+ <51F7EBB9.7000504@uni-bremen.de> <20130730191943.49f8070c@skate>
+ <20130730183610.GT24782@lunn.ch> <51F814A0.2050403@uni-bremen.de>
+ <20130730232316.10dc7019@skate> <20130731111414.47e7670b@skate>
+Message-ID: <51F8DC3A.6010007@uni-bremen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 08:15:02PM +0100, Nicolas Pitre wrote:
-> On Tue, 30 Jul 2013, Lorenzo Pieralisi wrote:
-> 
-> > On Tue, Jul 23, 2013 at 04:31:28AM +0100, Nicolas Pitre wrote:
-> > > Up to now, the logical CPU was somehow tied to the physical CPU number
-> > > within a cluster.  This causes problems when forcing the boot CPU to be
-> > > different from the first enumerated CPU in the device tree creating a
-> > > discrepancy between logical and physical CPU numbers.
-> > > 
-> > > Let's make the pairing completely independent from physical CPU numbers.
-> > > 
-> > > Let's keep only those logical CPUs with same initial CPU cluster to create
-> > > a uniform scheduler profile without having to modify any of the probed
-> > > topology and compute capacity data.  This has the potential to create
-> > > a non contiguous CPU numbering space when the switcher is active with
-> > > potential impact on buggy user space tools.  It is however better to fix
-> > > those tools rather than making the switcher code more intrusive.
-> > 
-> > Nico, I am not following you here. Is this not the same problem we
-> > have in a system where we hotplug out some of the CPUs in the logical map ?
-> 
-> Yes, it is.  Although with the switcher, user space does initialize with 
-> holes in the logical CPU map since some CPUs have been hotplugged out 
-> before the boot completed which is something some tools are not 
-> expecting.  And it did cause problems with Android for example, although 
-> that has been fixed now.
 
-Well, fixing them is a good thing to do, as you mentioned, so it is not
-your problem.
+Am 31.07.2013 11:14, schrieb Thomas Petazzoni:
+> Hello Finn,
+>
+> On Tue, 30 Jul 2013 23:23:16 +0200, Thomas Petazzoni wrote:
+>
+>> Thanks for this log. I need a bit of time to analyze this with the
+>> PCI-to-PCI bridge specification, and I'll cook up a new patch,
+>> hopefully tomorrow.
+>>
+>> Thanks again a lot for taking the time to report this bug and test the
+>> patches,
+> Ok, here is another patch that completely disables prefetchable
+> support, which hopefully should make the PCI stuff fallback on normal
+> memory. Could you try this one, and again report lspci -v + the
+> contents of the debugfs file that lists the mbus windows?
+>
+> I've worked more on the prefetchable support, but doing it right with
+> the PCI-to-PCI bridge emulation is a bit complex.
+>
+> Thanks!
+>
+> Thomas
+>
+Hi Thomas,
+here you are.
+Network is working.
+Thanks
+Finn
 
-> > [...]
-> > 
-> > >  static void bL_switcher_restore_cpus(void)
-> > > @@ -319,52 +322,86 @@ static void bL_switcher_restore_cpus(void)
-> > >  
-> > >  static int bL_switcher_halve_cpus(void)
-> > >  {
-> > > -	int cpu, cluster, i, ret;
-> > > -	cpumask_t cluster_mask[2], common_mask;
-> > > -
-> > > -	cpumask_clear(&bL_switcher_removed_logical_cpus);
-> > > -	cpumask_clear(&cluster_mask[0]);
-> > > -	cpumask_clear(&cluster_mask[1]);
-> > > +	int i, j, cluster_0, gic_id, ret;
-> > > +	unsigned int cpu, cluster, mask;
-> > > +	cpumask_t available_cpus;
-> > >  
-> > > +	/* First pass to validate what we have */
-> > > +	mask = 0;
-> > >  	for_each_online_cpu(i) {
-> > > -		cpu = cpu_logical_map(i) & 0xff;
-> > > -		cluster = (cpu_logical_map(i) >> 8) & 0xff;
-> > > +		cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(i), 0);
-> > > +		cluster = MPIDR_AFFINITY_LEVEL(cpu_logical_map(i), 1);
-> > >  		if (cluster >= 2) {
-> > >  			pr_err("%s: only dual cluster systems are supported\n", __func__);
-> > >  			return -EINVAL;
-> > >  		}
-> > > -		cpumask_set_cpu(cpu, &cluster_mask[cluster]);
-> > > +		if (WARN_ON(cpu >= MAX_CPUS_PER_CLUSTER))
-> > 
-> > pr_warn ?
-> 
-> I dunno.  What's the policy for choosing between those two?
-> Obviously this is a "shouldn't happen" case.
 
-For sure we have to bail out of there if that's hit, whether you need a
-stack dump or not, I do not know, probably we don't, but that's arguable.
+$ lspci -v
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (prog-if 
+00 [Normal decode])
+         Flags: bus master, fast devsel, latency 0
+         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+         I/O behind bridge: 00010000-00010fff
+         Memory behind bridge: e0000000-e00fffff
+         Prefetchable memory behind bridge: 00000000-000fffff
 
-> > > +			return -EINVAL;
-> > > +		mask |= (1 << cluster);
-> > >  	}
-> > > -
-> > > -	if (!cpumask_and(&common_mask, &cluster_mask[0], &cluster_mask[1])) {
-> > > -		pr_err("%s: no common set of CPUs\n", __func__);
-> > > +	if (mask != 3) {
-> > 
-> > Technically, you might have two clusters with eg MPIDR[15:8] = {0,2}
-> > this would break this code. Just saying, I know for now we can live with that.
-> > Given that's the only usage of mask you might use a counter, just as well.
-> 
-> Well, there are assumptions about the cluster encoding all over the 
-> place, so this is a stop gap to trap anything which is not following the 
-> 0,1 enumeration.
-> 
-> This assumption could be fixed eventually if it turns to e false on some 
-> hardware.
+01:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. 
+RTL8111/8168B PCI Express Gigabit Ethernet controller (rev)
+         Subsystem: Realtek Semiconductor Co., Ltd. TEG-ECTX Gigabit 
+PCI-E Adapter [Trendnet]
+         Flags: bus master, fast devsel, latency 0, IRQ 9
+         I/O ports at 10000 [size=256]
+         Memory at e0014000 (64-bit, prefetchable) [size=4K]
+         Memory at e0010000 (64-bit, prefetchable) [size=16K]
+         [virtual] Expansion ROM at e0000000 [disabled] [size=64K]
+         Capabilities: <access denied>
+         Kernel driver in use: r8169
 
-Yes, you are absolutely right, for now as I mentioned let's live with this
-restriction.
+# cat /sys/kernel/debug/mvebu-mbus/devices
+[00] 00000000e8010000 - 00000000e8020000 : pcie0.0 (remap 0000000000010000)
+[01] disabled
+[02] disabled
+[03] disabled
+[04] 00000000f4000000 - 00000000f4010000 : nand
+[05] 00000000f5000000 - 00000000f5010000 : sram
+[06] 00000000e0000000 - 00000000e0100000 : pcie0.0
+[07] disabled
 
-Lorenzo
+bootlog excerpt:
+mvebu-pcie pcie-controller.1: PCIe0.0: link up
+mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
+pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
+pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
+pci_bus 0000:00: root bus resource [bus 00-ff]
+PCI: bus0: Fast back to back transfers disabled
+pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+PCI: bus1: Fast back to back transfers disabled
+pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xe00fffff]
+pci 0000:00:01.0: BAR 7: assigned [io  0x10000-0x10fff]
+pci 0000:01:00.0: BAR 6: assigned [mem 0xe0000000-0xe000ffff pref]
+pci 0000:01:00.0: BAR 4: assigned [mem 0xe0010000-0xe0013fff 64bit pref]
+pci 0000:01:00.0: BAR 2: assigned [mem 0xe0014000-0xe0014fff 64bit pref]
+pci 0000:01:00.0: BAR 0: assigned [io  0x10000-0x100ff]
+pci 0000:00:01.0: PCI bridge to [bus 01]
+pci 0000:00:01.0:   bridge window [io  0x10000-0x10fff]
+pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xe00fffff]
+PCI: enabling device 0000:00:01.0 (0140 -> 0143)
