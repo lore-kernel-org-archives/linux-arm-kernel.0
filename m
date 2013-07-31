@@ -1,79 +1,31 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 31 Jul 2013 22:00:17 +0200
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <1409617.9untvfnOTJ@flatron>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
- <1409617.9untvfnOTJ@flatron>
-Message-ID: <20130731200017.GC8027@netboy>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Jul 2013 21:01:35 +0100
+Subject: [PATCH v2 RFC 2/8] arm: introduce a global dma_ops pointer
+In-Reply-To: <1375300452-12545-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1307312048511.4893@kaball.uk.xensource.com>
+ <1375300452-12545-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130731200135.GZ24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 09:29:35PM +0200, Tomasz Figa wrote:
+On Wed, Jul 31, 2013 at 08:54:06PM +0100, Stefano Stabellini wrote:
+> Initially set dma_ops to arm_dma_ops.
+> Use dma_ops instead of arm_dma_ops in dmabounce.
 > 
-> I showed you two example solutions that could handle this use case without 
-> stable binding ABI, just to prove that b) is not the only option (even if 
-> it's the best one, which I continue to agree on, don't get me wrong).
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: will.deacon at arm.com
+> CC: linux at arm.linux.org.uk
 
-You only showed *one* solution (b) that satisfies the use case. The
-use case was:
+If you're using swiotlb, there's little point in converting dmabounce
+to be able to use it, because it's basically providing the same
+functionality - dmabounce is there to do software buffer bouncing within
+the DMA to move streaming buffers from DMA-inaccessible memory into
+DMA-accessible memory.
 
-   User acquires a machine running ARM Linux version 3.x, with u-boot
-   and dtb in a read only flash partition. The board boots and works just
-                ^^^^^^^^^^^^^^^^^^^^^^^^^
-   fine. However, for his application, the user requires a new kernel
-   feature that appeared in version 3.y where y > x. He compiles the new
-   kernel, and it also works.
-
-But you suggested:
-
- a) using DT as direct replacement for board files - this means that you
-    are free to say that DTSes are strictly coupled with kernel version
-    and you are free to modify the bindings - see the analogy to board
-    files, where you could modify the platform data structures and could
-    not directly copy board file from one kernel version to another,
-
-In the use case, the kernel is upgraded, but not the DTB. So this
-solution makes no sense.
-
-> I also added that the use case is not fully valid,
-
-The use case *is* valid.  I am not inventing this just to be a pain.
-There are plenty of people unable or unwilling to upgrade their boot
-loader or DTB.  You can say that you won't support it, but it is a use
-case from actual real life.
-
-> because you can't 
-> magically define bindings for all future hardware, which means you can't 
-> support the hardware using a DTB made before stable bindings for that 
-> hardware have ever been introduced.
-
-Surely it is possible to develop and release a stable kernel and DT
-ABI for a given hardware? Once this is present, it is reasonable for
-users to expect forward compatibility from the DT system.
- 
-> With all of this, I agreed that a DTB made for kernel 3.x, when used with 
-> kernel 3.y (y > x) should provide the same or greater feature set than 
-> used with kernel 3.x, in other words, this should cause no regressions. 
-> Still, for new features, you will likely need to update the DTB.
-
-Yes, that is the idea.
-
-> So, again, to summarize, my view on this is as follows:
->  - there is a list of best practices for binding design and existing 
->    stable bindings that can be used to help for designing new bindings,
->  - new bindings go through review process,
->  - after positive review, such bindings gets staging status, i.e. they are 
->    marked as something that could change,
->  - after some period of time (we need to define this precisely) they get 
->    frozen and can't be changed in a way that breaks compatibility any
->    more. In other words, they become ABI.
-> 
-> What do you think?
-
-Sounds okay to me, but why bother with this marking business? Why not
-just have staging or development trees like every other subsystem?
-
-Thanks,
-Richard
+It's original use is with older SoCs with buggy DMA (eg, those which
+can only address alternate 1MB chunks of memory for example) but also
+got used in situations where alternative solutions would've been better
+(like using swiotlb.)  I've been discouraging its use as it's suffered
+from memory exhaustion problems (there's a number of threads and bug
+reports which were never solved about IXP4xx(?) platforms suffering
+this due to this bouncing.)
