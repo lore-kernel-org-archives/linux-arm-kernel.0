@@ -1,148 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 31 Jul 2013 19:21:28 +0100
-Subject: [PATCH 4/4] iommu: arm smmu: simplify VMID and ASID allocation
-In-Reply-To: <1375294888-10826-1-git-send-email-will.deacon@arm.com>
-References: <1375294888-10826-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1375294888-10826-5-git-send-email-will.deacon@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 31 Jul 2013 11:56:38 -0700
+Subject: [PATCH v3] net: Add MOXA ART SoCs ethernet driver
+In-Reply-To: <1375280401-5564-1-git-send-email-jonas.jensen@gmail.com>
+References: <1374842890-20735-1-git-send-email-jonas.jensen@gmail.com>
+ <1375280401-5564-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1375296998.5729.8.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only use ASIDs and VMIDs to identify individual stage-1 and stage-2
-context-banks respectively, so rather than allocate these separately
-from the context-banks, just calculate them based on the context bank
-index.
+On Wed, 2013-07-31 at 16:20 +0200, Jonas Jensen wrote:
+> The MOXA UC-711X hardware(s) has an ethernet controller that seem to be
+> developed internally. The IC used is "RTL8201CP".
 
-Note that VMIDs are offset by 1, since VMID 0 is reserved for stage-1.
-This doesn't cause us any issues with the numberspaces, since the
-maximum number of context banks is half the minimum number of VMIDs.
+Just some simple comments...
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu.c | 33 +++++++++++----------------------
- 1 file changed, 11 insertions(+), 22 deletions(-)
+> diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+[]
+> +static int moxart_rx_poll(struct napi_struct *napi, int budget)
+[]
+> +	while (1) {
+[]
+> +		if (ui & (RX_ERR | CRC_ERR | FTL | RUNT | RX_ODD_NB)) {
+> +			netdev_err(ndev, "packet error\n");
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 07a0308..f417e89 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -56,9 +56,6 @@
- /* Maximum number of mapping groups per SMMU */
- #define ARM_SMMU_MAX_SMRS		128
- 
--/* Number of VMIDs per SMMU */
--#define ARM_SMMU_NUM_VMIDS		256
--
- /* SMMU global address space */
- #define ARM_SMMU_GR0(smmu)		((smmu)->base)
- #define ARM_SMMU_GR1(smmu)		((smmu)->base + (smmu)->pagesize)
-@@ -369,21 +366,21 @@ struct arm_smmu_device {
- 	u32				num_context_irqs;
- 	unsigned int			*irqs;
- 
--	DECLARE_BITMAP(vmid_map, ARM_SMMU_NUM_VMIDS);
--
- 	struct list_head		list;
- 	struct rb_root			masters;
- };
- 
- struct arm_smmu_cfg {
- 	struct arm_smmu_device		*smmu;
--	u8				vmid;
- 	u8				cbndx;
- 	u8				irptndx;
- 	u32				cbar;
- 	pgd_t				*pgd;
- };
- 
-+#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
-+#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-+
- struct arm_smmu_domain {
- 	/*
- 	 * A domain can span across multiple, chained SMMUs and requires
-@@ -545,10 +542,12 @@ static void arm_smmu_tlb_inv_context(struct arm_smmu_cfg *cfg)
- 
- 	if (stage1) {
- 		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
--		writel_relaxed(cfg->vmid, base + ARM_SMMU_CB_S1_TLBIASID);
-+		writel_relaxed(ARM_SMMU_CB_ASID(cfg),
-+			       base + ARM_SMMU_CB_S1_TLBIASID);
- 	} else {
- 		base = ARM_SMMU_GR0(smmu);
--		writel_relaxed(cfg->vmid, base + ARM_SMMU_GR0_TLBIVMID);
-+		writel_relaxed(ARM_SMMU_CB_VMID(cfg),
-+			       base + ARM_SMMU_GR0_TLBIVMID);
- 	}
- 
- 	arm_smmu_tlb_sync(smmu);
-@@ -650,7 +649,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 	if (stage1)
- 		reg |= (CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
- 	else
--		reg |= root_cfg->vmid << CBAR_VMID_SHIFT;
-+		reg |= ARM_SMMU_CB_VMID(root_cfg) << CBAR_VMID_SHIFT;
- 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(root_cfg->cbndx));
- 
- 	if (smmu->version > 1) {
-@@ -715,7 +714,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
- 	reg = (phys_addr_t)__pa(root_cfg->pgd) >> 32;
- 	if (stage1)
--		reg |= root_cfg->vmid << TTBRn_HI_ASID_SHIFT;
-+		reg |= ARM_SMMU_CB_ASID(root_cfg) << TTBRn_HI_ASID_SHIFT;
- 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
- 
- 	/*
-@@ -807,12 +806,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 		return -ENODEV;
- 	}
- 
--	/* VMID zero is reserved for stage-1 mappings */
--	ret = __arm_smmu_alloc_bitmap(smmu->vmid_map, 1, ARM_SMMU_NUM_VMIDS);
--	if (IS_ERR_VALUE(ret))
--		return ret;
--
--	root_cfg->vmid = ret;
- 	if (smmu->features & ARM_SMMU_FEAT_TRANS_NESTED) {
- 		/*
- 		 * We will likely want to change this if/when KVM gets
-@@ -831,10 +824,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	ret = __arm_smmu_alloc_bitmap(smmu->context_map, start,
- 				      smmu->num_context_banks);
- 	if (IS_ERR_VALUE(ret))
--		goto out_free_vmid;
-+		return ret;
- 
- 	root_cfg->cbndx = ret;
--
- 	if (smmu->version == 1) {
- 		root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
- 		root_cfg->irptndx %= smmu->num_context_irqs;
-@@ -858,8 +850,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 
- out_free_context:
- 	__arm_smmu_free_bitmap(smmu->context_map, root_cfg->cbndx);
--out_free_vmid:
--	__arm_smmu_free_bitmap(smmu->vmid_map, root_cfg->vmid);
- 	return ret;
- }
- 
-@@ -884,7 +874,6 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 		free_irq(irq, domain);
- 	}
- 
--	__arm_smmu_free_bitmap(smmu->vmid_map, root_cfg->vmid);
- 	__arm_smmu_free_bitmap(smmu->context_map, root_cfg->cbndx);
- }
- 
-@@ -1936,7 +1925,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 		of_node_put(master->of_node);
- 	}
- 
--	if (!bitmap_empty(smmu->vmid_map, ARM_SMMU_NUM_VMIDS))
-+	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
- 		dev_err(dev, "removing device with active domains!\n");
- 
- 	for (i = 0; i < smmu->num_global_irqs; ++i)
--- 
-1.8.2.2
+This is generally a bad idea as it can flood
+the log.  It's probably better to remove it.
+If you really want logging, then at least use
+net_ratelimit().  Generally, the stats are
+enough.
+
+> +			priv->stats.rx_dropped++;
+> +			priv->stats.rx_errors++;
+[]
+> +static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+[]
+> +	if (txdesc->txdes0.ubit.tx_dma_own) {
+> +		netdev_err(ndev, "no TX space for packet\n");
+> +		priv->stats.tx_dropped++;
+
+here too.
+
+> +static int moxart_mac_probe(struct platform_device *pdev)
+[]
+> +	priv->tx_buf_base = kmalloc(priv->tx_buf_size * TX_DESC_NUM,
+> +				    GFP_ATOMIC);
+> +	if (!priv->tx_buf_base) {
+> +		netdev_err(ndev, "TX buffer alloc failed\n");
+> +		goto init_fail;
+> +	}
+> +
+> +	priv->rx_buf_base = kmalloc(priv->rx_buf_size * RX_DESC_NUM,
+> +				    GFP_ATOMIC);
+> +	if (!priv->rx_buf_base) {
+> +		netdev_err(ndev, "RX buffer alloc failed\n");
+> +		goto init_fail;
+> +	}
+
+Extra OOM messages aren't useful, there's a generic
+OOM and a dump_stack from the kernel.
+
+> +	netdev_dbg(ndev, "%s: IRQ=%d address=%02x:%02x:%02x:%02x:%02x:%02x\n",
+> +		   __func__, ndev->irq,
+> +		   ndev->dev_addr[0], ndev->dev_addr[1], ndev->dev_addr[2],
+> +		   ndev->dev_addr[3], ndev->dev_addr[4], ndev->dev_addr[5]);
+
+There's a mac address helper you can use:
+
+	netdev_dbg(ndev, "%s: IRQ=%d address=%pM\n"
+		   __func__, ndev->irq, ndev->dev_addr);
