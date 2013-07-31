@@ -1,34 +1,40 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 31 Jul 2013 12:29:27 +0900
-Subject: [PATCH 4/5] mmc: dw_mmc: Indicate that regulators may be absent
-In-Reply-To: <003901ce8d29$610ab3f0$23201bd0$%jun@samsung.com>
-References: <1375184777-25404-1-git-send-email-broonie@kernel.org>
- <1375184777-25404-4-git-send-email-broonie@kernel.org>
- <003901ce8d29$610ab3f0$23201bd0$%jun@samsung.com>
-Message-ID: <51F88497.5020909@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Jul 2013 20:37:21 -0700
+Subject: [PATCH 08/11] clk: tegra114: add suspend/resume function for
+ tegar_cpu_car_ops
+In-Reply-To: <1375237637.1231.1.camel@jlo-ubuntu-64.nvidia.com>
+References: <1372152475-18617-1-git-send-email-josephl@nvidia.com>
+ <1372152475-18617-9-git-send-email-josephl@nvidia.com>
+ <20130730212100.5270.53947@quantum>
+ <1375237637.1231.1.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <CAPtuhTgsU0mr0ARK1WT=670ct5R158B5eAz3TwWkM-hL+X-hVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-
-Best Regards,
-Jaehoon Chung
-
-On 07/30/2013 10:33 PM, Seungwon Jeon wrote:
-> On Tue, July 30, 2013, Mark Brown wrote:
->> From: Mark Brown <broonie@linaro.org>
+On Tue, Jul 30, 2013 at 7:27 PM, Joseph Lo <josephl@nvidia.com> wrote:
+> On Wed, 2013-07-31 at 05:21 +0800, Mike Turquette wrote:
+>> Quoting Joseph Lo (2013-06-25 02:27:52)
+>> > Adding suspend/resume function for tegra_cpu_car_ops. We only save and
+>> > restore the setting of the clock of CoreSight. Other clocks still need
+>> > to be taken care by clock driver.
+>> >
+>> > Cc: Mike Turquette <mturquette@linaro.org>
+>> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
 >>
->> Use regulator_get_optional() to tell the core that requests for regulators
->> can fail in a real system.
+>> Change looks OK to me, besides Stephen's comments. I was waiting for a
+>> V2 to hit the list but I never saw it. Any plans?
 >>
->> Signed-off-by: Mark Brown <broonie@linaro.org>
-> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
-> 
+> Hi Mike,
+>
+> The V2 was sent on 2013/7/3.
+
+Ok, looks like Stephen took it into his branch.
+
+Thanks,
+Mike
+
+>
 > Thanks,
-> Seungwon Jeon
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Joseph
+>
+>
