@@ -1,147 +1,37 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 31 Jul 2013 09:36:57 -0500
-Subject: [PATCH RFC 2/3] clk: cpufreq helper for voltage scaling
-In-Reply-To: <1373247868-21444-3-git-send-email-mturquette@linaro.org>
-References: <1373247868-21444-1-git-send-email-mturquette@linaro.org>
- <1373247868-21444-3-git-send-email-mturquette@linaro.org>
-Message-ID: <51F92109.2060707@ti.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed, 31 Jul 2013 16:37:58 +0200
+Subject: [PATCH 8/10] ARM: dts: mxs: add 'phy_type' property to usbphy nodes
+In-Reply-To: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
+References: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1375281480-25775-8-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2013 08:44 PM, Mike Turquette wrote:
-> This patch builds on "clk: notifier handler for dynamic voltage scaling"
-> by adding a CPUfreq-specific helper function for registering a clock
-> rate-change notifier to scale regulator voltage as a function of clock
-> rate.
->
-> In particular this patch creates an instance of struct
-> cpufreq_frequency_table and also calculate the voltage scaling latency,
-> both of which are returned to the caller for use in the CPUfreq driver.
->
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
->   drivers/clk/clk-voltage-notifier.c | 71 ++++++++++++++++++++++++++++++++++++++
->   include/linux/clk.h                |  6 ++++
->   2 files changed, 77 insertions(+)
 
-As stage 1 of the transition, I dont have any complaints, but for SoC 
-level, at least on OMAP, it is not just regulator and clock, we have 
-additional tweaks to do - like ABB, AVS etc.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx28.dtsi |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-What would you suggest as the strategy to introduce SoC specific 
-handlers for voltage notifiers that can co-exist with this?
-
->
-> diff --git a/drivers/clk/clk-voltage-notifier.c b/drivers/clk/clk-voltage-notifier.c
-> index cb6b85f..8e1707f 100644
-> --- a/drivers/clk/clk-voltage-notifier.c
-> +++ b/drivers/clk/clk-voltage-notifier.c
-> @@ -10,6 +10,7 @@
->    */
->
->   #include <linux/clk.h>
-> +#include <linux/cpufreq.h>
-
-for example - we should not depend on cpufreq in a generic clock based 
-dvfs approach. we would like to allow devfreq also to transition to this.
-
->   #include <linux/device.h>
->   #include <linux/module.h>
->   #include <linux/notifier.h>
-> @@ -133,3 +134,73 @@ void of_clk_volt_notifier_unregister(struct notifier_block *nb)
->   	kfree(vsd);
->   }
->   EXPORT_SYMBOL_GPL(of_clk_volt_notifier_unregister);
-> +
-> +void of_clk_cpufreq_notifier_unregister(struct notifier_block *nb,
-> +		struct cpufreq_frequency_table *freq_table)
-> +{
-> +	struct volt_scale_data *data = to_volt_scale_data(nb);
-> +	struct device *dev = data->dev;
-> +
-> +	opp_free_cpufreq_table(dev, &freq_table);
-> +	of_clk_volt_notifier_unregister(nb);
-> +}
-> +EXPORT_SYMBOL_GPL(of_clk_cpufreq_notifier_unregister);
-> +
-> +/**
-> + * of_clk_cpufreq_notifer_register - register clock notifier to scale voltage
-> + * @dev: device that owns this scaling operation
-> + * @np: pointer to device's DT node
-> + * @clk: clock whose rate-change notifier triggers voltage scaling
-> + * @supply: regulator id string
-> + * @freq_table: pointer to uninitialized CPUfreq frequency scaling table
-> + * @voltage_latency: worst case voltage scaling latency
-> + */
-> +struct notifier_block *of_clk_cpufreq_notifier_register(struct device *dev,
-> +		struct device_node *np, struct clk *clk, const char *supply,
-> +		struct cpufreq_frequency_table **table,
-> +		unsigned int *voltage_latency)
-> +{
-> +	struct notifier_block *nb;
-> +	struct volt_scale_data *vsd;
-> +	struct opp *opp;
-> +	unsigned long min, max;
-> +	int ret, i;
-> +
-> +	nb = of_clk_volt_notifier_register(dev, np, clk, supply,
-> +			voltage_latency);
-> +	if (IS_ERR(nb))
-> +		return nb;
-> +
-> +	vsd = to_volt_scale_data(nb);
-> +
-> +	ret = opp_init_cpufreq_table(dev, table);
-> +	if (ret) {
-> +		pr_err("failed to init cpufreq table: %d\n", ret);
-> +		goto err_unregister;
-> +	}
-> +
-> +	/* find the min and max voltages and compute worst-case latency */
-> +	for (i = 0; table[0][i].frequency != CPUFREQ_TABLE_END; i++)
-> +		;
-> +
-> +	rcu_read_lock();
-> +	opp = opp_find_freq_exact(dev,
-> +			table[0][0].frequency * 1000, true);
-> +	min = opp_get_voltage(opp);
-> +	opp = opp_find_freq_exact(dev,
-> +			table[0][i-1].frequency * 1000, true);
-> +	max = opp_get_voltage(opp);
-> +	rcu_read_unlock();
-> +
-> +	*voltage_latency = regulator_set_voltage_time(vsd->reg, min, max);
-> +	if (*voltage_latency < 0)
-> +		pr_warn("%s: failed to calculate voltage latency, %d\n",
-> +				__func__, ret);
-> +
-> +	return nb;
-> +
-> +err_unregister:
-> +	of_clk_volt_notifier_unregister(nb);
-> +	return ERR_PTR(ret);
-> +}
-> +EXPORT_SYMBOL_GPL(of_clk_cpufreq_notifier_register);
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 85ea520..3104883 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -86,6 +86,12 @@ struct notifier_block *of_clk_volt_notifier_register(struct device *dev,
->   		struct device_node *np, struct clk *clk, const char *supply,
->   		int *voltage_latency);
->   void of_clk_volt_notifier_unregister(struct notifier_block *nb);
-> +struct notifier_block *of_clk_cpufreq_notifier_register(struct device *dev,
-> +		struct device_node *np, struct clk *clk, const char *supply,
-> +		struct cpufreq_frequency_table **table,
-> +		unsigned int *voltage_latency);
-> +void of_clk_cpufreq_notifier_unregister(struct notifier_block *nb,
-> +		struct cpufreq_frequency_table *freq_table);
->
->   #endif
->
->
-
-
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 2387d46..d9bf387 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -1044,6 +1044,7 @@
+ 				compatible = "fsl,imx28-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x8007c000 0x2000>;
+ 				clocks = <&clks 62>;
++				phy_type = "utmi";
+ 				status = "disabled";
+ 			};
+ 
+@@ -1051,6 +1052,7 @@
+ 				compatible = "fsl,imx28-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x8007e000 0x2000>;
+ 				clocks = <&clks 63>;
++				phy_type = "utmi";
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
-Regards,
-Nishanth Menon
+1.7.2.5
