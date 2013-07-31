@@ -1,82 +1,50 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 31 Jul 2013 12:44:41 -0400
-Subject: [PATCH v2 1/6] ARM: mm: LPAE: use phys_addr_t appropriately in p2v
- and v2p conversions
-In-Reply-To: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1375289086-5315-2-git-send-email-santosh.shilimkar@ti.com>
+Date: Wed, 31 Jul 2013 12:44:40 -0400
+Subject: [PATCH v2 0/6] ARM: mm: Extend the runtime patch stub for PAE systems
+Message-ID: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix remainder types used when converting back and forth between
-physical and virtual addresses.
+This is version 2 of the series which addresses the comments/suggestions
+we received on earlier version. The series trying to extend the existing
+v2p runtime patching for LPAE machines which can have physical memory
+beyond 4 GB. Keystone is one such ARM machine.
 
-Cc: Will Deacon <will.deacon@arm.com>
+In testing various modes(LPAE/non-LPAE, ARM/THMUB), we found an issue
+with the patching code for THUMB2 build. So there is a patch added in
+the series to address it. I was planning to squash it in the parent
+64 bit patch but thought of keeping it separate for ease of review.
+We can squash it while merging the patches. 
+
+Special thanks to Nicolas for his valuable feedback on the earlier
+version.
+
+Cc: Nicolas Pitre <nico@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/memory.h |   22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+Santosh Shilimkar (4):
+  ARM: mm: LPAE: use phys_addr_t appropriately in p2v and v2p
+    conversions
+  ARM: mm: Introduce virt_to_idmap() with an arch hook
+  ARM: mm: Move the idmap print to appropriate place in the code
+  ARM: mm: Recreate kernel mappings in early_paging_init()
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index e750a93..c133bd9 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -185,22 +185,32 @@ extern unsigned long __pv_phys_offset;
- 	: "=r" (to)					\
- 	: "r" (from), "I" (type))
- 
--static inline unsigned long __virt_to_phys(unsigned long x)
-+static inline phys_addr_t __virt_to_phys(unsigned long x)
- {
- 	unsigned long t;
- 	__pv_stub(x, t, "add", __PV_BITS_31_24);
- 	return t;
- }
- 
--static inline unsigned long __phys_to_virt(unsigned long x)
-+static inline unsigned long __phys_to_virt(phys_addr_t x)
- {
- 	unsigned long t;
- 	__pv_stub(x, t, "sub", __PV_BITS_31_24);
- 	return t;
- }
-+
- #else
--#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
--#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-+
-+static inline phys_addr_t __virt_to_phys(unsigned long x)
-+{
-+	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-+}
-+
-+static inline unsigned long __phys_to_virt(phys_addr_t x)
-+{
-+	return x - PHYS_OFFSET + PAGE_OFFSET;
-+}
-+
- #endif
- #endif
- #endif /* __ASSEMBLY__ */
-@@ -238,14 +248,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
- 
- static inline void *phys_to_virt(phys_addr_t x)
- {
--	return (void *)(__phys_to_virt((unsigned long)(x)));
-+	return (void *)__phys_to_virt(x);
- }
- 
- /*
-  * Drivers should NOT use these either.
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
--#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-+#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- 
- /*
+Sricharan R (2):
+  ARM: mm: LPAE: Correct virt_to_phys patching for 64 bit physical
+    addresses
+  ARM: mm: Update runtime patching code to THUMB2 mode
+
+ arch/arm/include/asm/mach/arch.h |    1 +
+ arch/arm/include/asm/memory.h    |   73 +++++++++++++++++++++---
+ arch/arm/kernel/armksyms.c       |    1 +
+ arch/arm/kernel/head.S           |  115 +++++++++++++++++++++++++++-----------
+ arch/arm/kernel/setup.c          |    3 +
+ arch/arm/kernel/smp.c            |    2 +-
+ arch/arm/mm/idmap.c              |    8 +--
+ arch/arm/mm/mmu.c                |   82 +++++++++++++++++++++++++++
+ 8 files changed, 237 insertions(+), 48 deletions(-)
+
 -- 
 1.7.9.5
