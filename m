@@ -1,49 +1,66 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Wed, 31 Jul 2013 17:07:22 +0530
-Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
-In-Reply-To: <51F7F0E1.5030200@wwwdotorg.org>
-References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
- <20130726104908.GC17886@mudshark.cambridge.arm.com>
- <51F2ACF7.9000008@wwwdotorg.org>
- <CALicx6ugumPG__rSAsTS95SH=6fTGqhpPFsQ8bLG-u-fbk0=pQ@mail.gmail.com>
- <51F7F0E1.5030200@wwwdotorg.org>
-Message-ID: <CALicx6tJFkGbvKO+-XZixj+8RSh1awFnXK91Pdew1+5Oa+dDqg@mail.gmail.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 31 Jul 2013 08:37:51 -0300
+Subject: [PATCH 4/4] ARM: sun6i: Enable clock support in the DTSI
+In-Reply-To: <2013073116110750016327@gmail.com>
+References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375195462-19566-5-git-send-email-maxime.ripard@free-electrons.com>
+ <51F86A2E.10505@elopez.com.ar>,
+ <20130731073724.GA24439@lukather> <2013073116110750016327@gmail.com>
+Message-ID: <51F8F70F.70208@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 10:29 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 07/30/2013 04:37 AM, Vijay Kilari wrote:
->> On Fri, Jul 26, 2013 at 10:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> ...
->>> Does a kernel that's used as the crash kernel guarantee:
->>>
->>> * Never to re-use the memory that was used by the previous kernel, so
->>> that the spin loop code/data won't be corrupted, ever, no matter how
->>> long the crash recovery kernel runs.
->>>
->>> * Not use SMP, so there's never a need to re-activate the non-boot CPUs,
->>> which might not work if they aren't truly disabled but rather just
->>> running a pin loop?
->>
->> From cat /proc/iomem, normal kernel is executed from (0x80xxxxxx) with crash
->> kernel reserved 64M at 0xa0000000
->>
->> 80000000-bfffffff : System RAM
->>   80008000-805aeddf : Kernel code
->>   805e2000-8063e427 : Kernel data
->>   a0000000-a3ffffff : Crash kernel
->>
->> crash kernel is loaded to reserved memory location and is executed from there.
->> I could confirm this from /proc/iomem when crash kernel is running
->>
->> a0000000-a3efffff : System RAM
->>   a0008000-a05aeddf : Kernel code
->>   a05e2000-a063e427 : Kernel data
->
-> OK, but in the crash dump kernel, is 80008000..8063e427 reserved as
-> well, which would guarantee that the spin loop being executed by the
-> non-crash CPUs won't be corrupted?
+Hi,
 
-The crash dump kernel runs from reserved memory area (0xa0000000 - 0xa3effffff).
- So it should not corrupt the memory area of original kernel that was running
- at 0x80000000,where other CPU's are in spin loop.
+El 31/07/13 05:11, kevin.z.m escribi?:
+> Hi, Maxime,
+>  
+>> The problem is a bit more complex than that.
+>  
+>> On the A31, the losc clock is actually a mux between an external
+>> oscillator running at 32kHz, and the internal oscillator running at
+>> 667MHz, that would be scaled down.
+>  
+>> Support for this mux is not quite there yet, since I've not seen any
+>> documentation for it, but this would allow to just rearrange losc
+>> parents and compatible when we will had such support.
+>  
+> I think there is some misunderstanding. All allwinner's platforms have
+> 2 losc clock source. One is the external 32KHz oscillator, and the other
+> is internal 32kHz R/C circuit. The internal 32k R/C circuit can't provide
+> a very exact clock on 32KHz. The mux is just for select external osc or
+> internal
+> 32KHz R/C. If there is no external 32kHz oscillator, we can replace it with
+> internal 32kHz R/C for some low speed but not exact clock requirement.
+
+Thanks for the clarification :)
+
+(snip)
+
+>> > + ahb1_mux: ahb1_mux at 01c20054 {
+>> > + #clock-cells = <0>;
+>> > + compatible = "allwinner,sun6i-ahb1-mux-clk";
+>> > + reg = <0x01c20054 0x4>;
+>> > + clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+>> > + };
+>> > +
+>> > + ahb1: ahb1 at 01c20054 {
+>> > + #clock-cells = <0>;
+>> > + compatible = "allwinner,sun4i-ahb-clk";
+>> > + reg = <0x01c20054 0x4>;
+>> > + clocks = <&ahb1_mux>;
+>> > + };
+>> 
+>> Depending on when this lands, I believe these two above could be merged
+>> into one with the refactoring introduced on my patchset.
+>  
+> Since your patchset is still in RFC and we had no comments from Mike so
+> far, while this one looks pretty similar to the one we had before, I
+> guess the safest thing to do would be to rebase your patches on top of
+> this ones.
+
+Ok, I'll do that.
+
+Cheers,
+
+Emilio
