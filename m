@@ -1,40 +1,88 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 31 Jul 2013 21:05:16 +0100
-Subject: [repost] ARM big-endian support
-In-Reply-To: <20130729152637.204c2622@skate>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <51EFFB53.5060003@codethink.co.uk> <20130729152637.204c2622@skate>
-Message-ID: <51F96DFC.9090309@codethink.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Jul 2013 21:14:57 +0100
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <20130731200017.GC8027@netboy>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
+ <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
+Message-ID: <20130731201457.GA24642@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/13 14:26, Thomas Petazzoni wrote:
-> Dear Ben Dooks,
->
-> On Wed, 24 Jul 2013 17:05:39 +0100, Ben Dooks wrote:
->> On 24/07/13 11:27, Ben Dooks wrote:
->>> A repost (as requested) of the current big-endian core work for review.
->>
->> New branches at git.baserock.org/delta/linux.git
->> 	311/be/atags-v4
->>    	311/be/core-v4
->
-> Thanks. Can you post a patch set based on top of 3.11-rc, so that it
-> can hopefully be merged? Posting something based on 3.10 has no chance
-> of being merged. Again, if you need any help on this, do not hesitate
-> to ask.
->
-> Also, would it be possible to get cover letters that include a proper
-> changelog, as well as version number for each posting of the patch
-> series?
+On Wed, Jul 31, 2013 at 10:00:17PM +0200, Richard Cochran wrote:
+> On Wed, Jul 31, 2013 at 09:29:35PM +0200, Tomasz Figa wrote:
+> > 
+> > I showed you two example solutions that could handle this use case without 
+> > stable binding ABI, just to prove that b) is not the only option (even if 
+> > it's the best one, which I continue to agree on, don't get me wrong).
+> 
+> You only showed *one* solution (b) that satisfies the use case. The
+> use case was:
+> 
+>    User acquires a machine running ARM Linux version 3.x, with u-boot
+>    and dtb in a read only flash partition. The board boots and works just
+>                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+>    fine. However, for his application, the user requires a new kernel
+>    feature that appeared in version 3.y where y > x. He compiles the new
+>    kernel, and it also works.
+> 
+> But you suggested:
+> 
+>  a) using DT as direct replacement for board files - this means that you
+>     are free to say that DTSes are strictly coupled with kernel version
+>     and you are free to modify the bindings - see the analogy to board
+>     files, where you could modify the platform data structures and could
+>     not directly copy board file from one kernel version to another,
+> 
+> In the use case, the kernel is upgraded, but not the DTB. So this
+> solution makes no sense.
 
-I've lost quite a bit of the change information, so sorry about that.
+That's also crap for another reason.  DT on the whole is _supposed_ to
+describe what the hardware is, and how it is wired up in a WELL DEFINED
+and STABLE manner.  Unfortunately, there's a *BIG* mistake that was made
+- having this /chosen node in DT which gets used for "software"
+configuration - eg, the command line and so forth.
 
-The 3.11-rc series I will try and get done as soon as I've gone through
-and sorted out the last round of review comments. Unfortunately I am
-not in the office for the next three weeks.
+That was a mistake because it means that the DT isn't purely a
+description of the hardware.  Such stuff should have been left in ATAGs,
+and DT should have been placed into its own ATAG entry.  There would
+not have been any conflict between ATAGs and DT, because ATAGs generally
+don't deal with hardware configuration - the only real bit of hardware
+configuration conveyed via ATAGs is the location of memory and size of
+memory.
 
+However, if we go back to the idea that DT is supposed to describe the
+hardware, _and_ that the way to describe that hardware is well defined
+and _stable_ (as it should be) then there should be no reason what so
+ever that your old DT blob should not continue working in later kernels.
+If it doesn't, then the contract that DT promised when we first moved
+over to using DT has been _broken_.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Quite frankly, the fact that this discussion has gone on soo far, and
+everyone is saying that the existing DT descriptions to date (for what,
+two years) are all unstable is really extremely sad.
+
+I've stated in my previous postings what I think very clearly - and it
+comes down to the fact that every DT binding which is in existence in
+a released kernel _is_ by that very nature a stable binding.  If it
+wasn't a stable binding, it should have been clearly marked as such
+and been subject to CONFIG_EXPERIMENTAL (when it existed) or
+CONFIG_STAGING or similar.
+
+We even went as far as creating documentation for the bindings - directly
+along side the documentation for PPC bindings, with no distinction.
+
+Given all that, it's down right insulting to those who have been using
+ARM kernels to now start off a discussion about making these things
+stable.  Those people who think that these bindings are not stable need
+to wake up to reality - we have USERS of this stuff over the last two
+years.  It's found its way into products.  If we're going to keep this
+stuff "unstable" then we are actively _hurting_ our users.
+
+I'll say it again: if a binding has been in a final kernel, it is by
+definition a *stable* binding, and compatibility with that binding
+*must* be maintained.
+
+If we're not going to do that, then we owe all the users of the ARM
+kernel a VERY BIG apology.
