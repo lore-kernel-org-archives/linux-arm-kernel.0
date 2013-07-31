@@ -1,9 +1,8 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 31 Jul 2013 14:27:08 +0100
+From: htejun@gmail.com (Tejun Heo)
+Date: Wed, 31 Jul 2013 09:42:15 -0400
 Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
-In-Reply-To: <20130731115527.GR2810@htj.dyndns.org>
-References: <20130731073306.GZ1754@pengutronix.de>
- <20130731082054.GF8540@nchen-desktop>
+In-Reply-To: <20130731132708.GQ9858@sirena.org.uk>
+References: <20130731082054.GF8540@nchen-desktop>
  <20130731084645.GB1754@pengutronix.de>
  <20130731090512.GD9858@sirena.org.uk>
  <20130731094434.GC1754@pengutronix.de>
@@ -12,25 +11,27 @@ References: <20130731073306.GZ1754@pengutronix.de>
  <20130731113244.GI2810@htj.dyndns.org>
  <20130731115027.GN9858@sirena.org.uk>
  <20130731115527.GR2810@htj.dyndns.org>
-Message-ID: <20130731132708.GQ9858@sirena.org.uk>
+ <20130731132708.GQ9858@sirena.org.uk>
+Message-ID: <20130731134215.GS2810@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 07:55:27AM -0400, Tejun Heo wrote:
+Hello,
 
-> If you have DMA / IRQ / command engine deactivations in devm path
-> which often is the case with full conversions, freeing any resources
-> including DMA areas and host private data in the wrong order is a
-> horrible idea.  It's worse as it won't really be noticeable in most
-> cases.
+On Wed, Jul 31, 2013 at 02:27:08PM +0100, Mark Brown wrote:
+> It's really only interrupts that affect most devices - if there's DMA or
+> anything going on after the remove() then as you said earlier the driver
+> is probably doing something wrong.
 
-It's really only interrupts that affect most devices - if there's DMA or
-anything going on after the remove() then as you said earlier the driver
-is probably doing something wrong.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/cd025781/attachment.sig>
+Hmmm... it depends on the specific driver is converted but if the
+deactivation sequence - shutting down of command engine - is also
+handled by devm as in libata and if you have non-devres resource free
+in the exit path, you have the same problem.  Again, in general,
+tearing things down in the order which isn't the reverse of allocation
+is a bad idea.  Adhering to the order isn't that hard and will result
+in far less craziness in the long term.
+
+Thanks.
+
+-- 
+tejun
