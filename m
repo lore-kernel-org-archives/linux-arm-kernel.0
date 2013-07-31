@@ -1,86 +1,72 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 31 Jul 2013 16:08:09 +0900
-Subject: [PATCH 07/07] ARM: shmobile: Use shared SCU CPU Hotplug code on
- r8a7779
-In-Reply-To: <20130731070702.14444.64961.sendpatchset@w520>
-References: <20130731070702.14444.64961.sendpatchset@w520>
-Message-ID: <20130731070809.14444.98907.sendpatchset@w520>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 31 Jul 2013 00:16:30 -0700
+Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
+ architecture independent macro
+In-Reply-To: <1375187900-17582-3-git-send-email-B44344@freescale.com>
+References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+ <1375187900-17582-3-git-send-email-B44344@freescale.com>
+Message-ID: <20130731071630.GI8868@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 07/30, Arpit Goel wrote:
+> This patch ports PowerPC implementation of spin_event_timeout() for generic
+> use. Architecture specific implementation can be added to asm/delay.h, which
+> will override the generic linux implementation.
+> 
+> Signed-off-by: Arpit Goel <B44344@freescale.com>
+> ---
 
-Update the r8a7779 specific CPU Hotplug code to make use of
-the recently introduced shared SCU functions. The r8a7779
-power domain hardware requires special power down handling
-at ->kill() time.
+We use something similar internally but it's tied specifically to
+readl.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+>  
+> +#ifndef spin_event_timeout
+> +/**
+> + * spin_event_timeout - spin until a condition gets true or a timeout elapses
+> + * @condition: a C expression to evalate
+> + * @timeout: timeout, in microseconds
+> + * @delay: the number of microseconds to delay between each evaluation of
+> + *         @condition
+> + *
+> + * The process spins until the condition evaluates to true (non-zero) or the
+> + * timeout elapses.  The return value of this macro is the value of
+> + * @condition when the loop terminates. This allows you to determine the cause
+> + * of the loop terminates.  If the return value is zero, then you know a
+> + * timeout has occurred.
+> + *
+> + * This primary purpose of this macro is to poll on a hardware register
+> + * until a status bit changes.  The timeout ensures that the loop still
+> + * terminates even if the bit never changes.  The delay is for devices that
+> + * need a delay in between successive reads.
+> + *
+> + * gcc will optimize out the if-statement if @delay is a constant.
+> + *
+> + * This is copied from PowerPC based spin_event_timeout() implementation
+> + * and modified for generic usecase.
+> + */
+> +#define spin_event_timeout(condition, timeout, delay)		\
+> +({								\
+> +	typeof(condition) __ret;				\
+> +	unsigned long __loops = timeout/USECS_PER_JIFFY;	\
+> +	unsigned long __start = jiffies;			\
+> +	while (!(__ret = (condition)) &&			\
+> +		time_before(jiffies, __start + __loops + 1))	\
+> +		if (delay)					\
+> +			udelay(delay);				\
+> +		else						\
+> +			schedule();				\
+> +	if (!__ret)						\
+> +		__ret = (condition);				\
+> +	__ret;							\
+> +})
 
- arch/arm/mach-shmobile/smp-r8a7779.c |   41 +++-------------------------------
- 1 file changed, 4 insertions(+), 37 deletions(-)
+What do you do here if jiffies aren't incrementing (i.e
+interrupts are disabled). The time_before() check won't work
+there and it would be nice if we were able to use this in such
+situations. I think powerpc gets around this by reading the
+hardware timer directly?
 
---- 0004/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ work/arch/arm/mach-shmobile/smp-r8a7779.c	2013-07-31 12:12:26.000000000 +0900
-@@ -122,47 +122,14 @@ static void __init r8a7779_smp_prepare_c
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
--static int r8a7779_scu_psr_core_disabled(int cpu)
--{
--	unsigned long mask = 3 << (cpu * 8);
--
--	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
--		return 1;
--
--	return 0;
--}
--
- static int r8a7779_cpu_kill(unsigned int cpu)
- {
--	int k;
--
--	/* this function is running on another CPU than the offline target,
--	 * here we need wait for shutdown code in platform_cpu_die() to
--	 * finish before asking SoC-specific code to power off the CPU core.
--	 */
--	for (k = 0; k < 1000; k++) {
--		if (r8a7779_scu_psr_core_disabled(cpu))
--			return r8a7779_platform_cpu_kill(cpu);
--
--		mdelay(1);
--	}
-+	if (shmobile_smp_scu_cpu_kill(cpu))
-+		return r8a7779_platform_cpu_kill(cpu);
- 
- 	return 0;
- }
- 
--static void r8a7779_cpu_die(unsigned int cpu)
--{
--	dsb();
--	flush_cache_all();
--
--	/* disable cache coherency */
--	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
--
--	/* Endless loop until power off from r8a7779_cpu_kill() */
--	while (1)
--		cpu_do_idle();
--}
--
- static int r8a7779_cpu_disable(unsigned int cpu)
- {
- 	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
-@@ -174,8 +141,8 @@ struct smp_operations r8a7779_smp_ops  _
- 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
- 	.smp_boot_secondary	= r8a7779_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
--	.cpu_kill		= r8a7779_cpu_kill,
--	.cpu_die		= r8a7779_cpu_die,
- 	.cpu_disable		= r8a7779_cpu_disable,
-+	.cpu_die		= shmobile_smp_scu_cpu_die,
-+	.cpu_kill		= r8a7779_cpu_kill,
- #endif
- };
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
