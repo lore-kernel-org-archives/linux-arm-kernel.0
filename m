@@ -1,75 +1,152 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 31 Jul 2013 09:27:25 +0200
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
-References: <51E72DCA.9070500@codeaurora.org>
- <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
- <51E7435B.3060605@codeaurora.org>
- <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
- <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
- <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
- <51F66565.7010600@linaro.org>
- <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
- <51F77D93.4030505@linaro.org>
- <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
-Message-ID: <51F8BC5D.80605@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 Jul 2013 09:37:24 +0200
+Subject: [PATCH 4/4] ARM: sun6i: Enable clock support in the DTSI
+In-Reply-To: <51F86A2E.10505@elopez.com.ar>
+References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375195462-19566-5-git-send-email-maxime.ripard@free-electrons.com>
+ <51F86A2E.10505@elopez.com.ar>
+Message-ID: <20130731073724.GA24439@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
-> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
->> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
->>> Hi Daniel,
->>>
->>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
->>> (snip)
->>>>
->>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
->>>> timer will be stopped when entering to the idle state. In this case, the
->>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
->>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
->>>> idle state, switching the local timer back in use.
->>>
->>> I've been thinking about this, trying to understand how this makes my
->>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
->>> would make the timer core switch to a broadcast device even though it
->>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
->>> something useless, but nothing wrong in a sense that it should result in
->>> breakage. I guess I'm missing something obvious. This timer system will
->>> always remain a mystery to me.
->>>
->>> Actually this more or less leads to the question: What is this
->>> 'broadcast timer'. I guess that is some clockevent device which is
->>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
->>> hang pointing to some issue with that driver?
->>
->> If you look at the /proc/timer_list, which timer is used for broadcasting ?
-> 
-> So, the correct run results (full output attached).
-> 
-> The vanilla kernel uses the twd timers as local timers and the TTC as
-> broadcast device:
-> 	Tick Device: mode:     1                                                         
-> 	Broadcast device  
-> 	Clock Event Device: ttc_clockevent
-> 
-> When I remove the offending CPUIDLE flag and add the DT fragment to
-> enable the global timer, the twd timers are still used as local timers
-> and the broadcast device is the global timer:
-> 	Tick Device: mode:     1                                                         
-> 	Broadcast device                                                                 
-> 	Clock Event Device: arm_global_timer
-> 
-> Again, since boot hangs in the actually broken case, I don't see way to
-> obtain this information for that case.
+Hi Emilio,
 
-Hmm, interesting. Can you give the ouput of /proc/interrupts also with
-the global timer ?
+On Tue, Jul 30, 2013 at 10:36:46PM -0300, Emilio L?pez wrote:
+> Hi Maxime,
+> 
+> Overall this looks good to me, but I have some small comments:
+> 
+> El 30/07/13 11:44, Maxime Ripard escribi?:
+> > Now that the clock driver has support for the A31 clocks, we can add
+> > them to the DTSI and start using them in the relevant hardware blocks.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun6i-a31.dtsi | 137 ++++++++++++++++++++++++++++++++++++---
+> >  1 file changed, 127 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> > index 0d13dc6..c6a3a91 100644
+> > --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> > +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> > @@ -51,13 +51,130 @@
+> >  
+> >  	clocks {
+> >  		#address-cells = <1>;
+> > -		#size-cells = <0>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> >  
+> > -		osc: oscillator {
+> > +		osc24M: hosc {
+> 
+> Please use osc24M and osc32k instead of hosc and losc, respectively.
 
+The problem is a bit more complex than that.
+
+On the A31, the losc clock is actually a mux between an external
+oscillator running at 32kHz, and the internal oscillator running at
+667MHz, that would be scaled down.
+
+Support for this mux is not quite there yet, since I've not seen any
+documentation for it, but this would allow to just rearrange losc
+parents and compatible when we will had such support.
+
+Hence why I chose these names.
+
+> >  			#clock-cells = <0>;
+> >  			compatible = "fixed-clock";
+> >  			clock-frequency = <24000000>;
+> 
+> Is osc24M not gatable on A31?
+
+Nope.
+
+> >  		};
+> > +
+> > +		osc32k: losc {
+> > +			#clock-cells = <0>;
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <32768>;
+> > +		};
+> > +
+> > +		pll1: pll1 at 01c20000 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "allwinner,sun6i-pll1-clk";
+> > +			reg = <0x01c20000 0x4>;
+> > +			clocks = <&osc24M>;
+> > +		};
+> > +
+> > +		/*
+> > +		 * This is a dummy clock, to be used as placeholder on
+> > +		 * other mux clocks when a specific parent clock is not
+> > +		 * yet implemented. It should be dropped when the driver
+> > +		 * is complete.
+> > +		 */
+> > +		pll6: pll6 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <0>;
+> > +		};
+> > +
+> > +		cpu: cpu at 01c20050 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "allwinner,sun4i-cpu-clk";
+> > +			reg = <0x01c20050 0x4>;
+> > +			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll1>;
+> 
+> Listing pll1 twice doesn't sound correct, but vendor code seems to
+> indicate so. A comment to clarify it's not a typo would be good I think.
+
+Yes, I suspect an error in the datasheet, but until proven otherwise,
+it's that way.
+
+I'll add a comment.
+
+> > +		};
+> > +
+> > +		axi: axi at 01c20050 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "allwinner,sun4i-axi-clk";
+> > +			reg = <0x01c20050 0x4>;
+> > +			clocks = <&cpu>;
+> > +		};
+> > +
+> > +		ahb1_mux: ahb1_mux at 01c20054 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "allwinner,sun6i-ahb1-mux-clk";
+> > +			reg = <0x01c20054 0x4>;
+> > +			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+> > +		};
+> > +
+> > +		ahb1: ahb1 at 01c20054 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "allwinner,sun4i-ahb-clk";
+> > +			reg = <0x01c20054 0x4>;
+> > +			clocks = <&ahb1_mux>;
+> > +		};
+> 
+> Depending on when this lands, I believe these two above could be merged
+> into one with the refactoring introduced on my patchset.
+
+Since your patchset is still in RFC and we had no comments from Mike so
+far, while this one looks pretty similar to the one we had before, I
+guess the safest thing to do would be to rebase your patches on top of
+this ones.
+
+But it's right those clocks (AHB1 and APB2) will benefit from your work
+as well :)
+
+Maxime
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/458dcc5f/attachment-0001.sig>
