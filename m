@@ -1,50 +1,85 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 31 Jul 2013 12:19:22 +0530
-Subject: [PATCH v2 1/8] ARM: DRA7: id: Add cpu detection support for DRA7xx
- based SoCs'
-In-Reply-To: <20130731064201.GQ7656@atomide.com>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-2-git-send-email-rnayak@ti.com>
- <20130730131009.GA28162@radagast> <51F7CB2F.6070705@ti.com>
- <20130730142353.GL28162@radagast> <51F7CF6F.6050702@ti.com>
- <20130730153138.GA5978@radagast> <51F807EF.6020809@ti.com>
- <51F80939.7060403@ti.com> <51F8A87A.9080002@ti.com>
- <20130731064201.GQ7656@atomide.com>
-Message-ID: <51F8B372.2000309@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 31 Jul 2013 00:01:09 -0700
+Subject: Defining schemas for Device Tree
+In-Reply-To: <CAKON4OwY3xh3UGjTxb4ypkcmrTpVYO-FZovq-ierabYMf4CDQA@mail.gmail.com>
+References: <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
+ <51F7F596.6020503@wwwdotorg.org>
+ <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
+ <51F7F914.6040709@wwwdotorg.org>
+ <CAKON4Oy6hL9LzHdfq4vWcurbw6TU3HCK_jq14xwweA8dvOGtdw@mail.gmail.com>
+ <51F7FCA6.6010909@wwwdotorg.org>
+ <CAKON4OzLgC-ahDhLnbYEYrSj7dbFRU0z7Do_D32XNqux2UhvXw@mail.gmail.com>
+ <CAKON4OyMfNUR=NGn+OEvN3utcEzRfG6A4rPO6+h5Q4mq_tmoxw@mail.gmail.com>
+ <51F80526.1020201@wwwdotorg.org>
+ <CAKON4OwY3xh3UGjTxb4ypkcmrTpVYO-FZovq-ierabYMf4CDQA@mail.gmail.com>
+Message-ID: <20130731070108.GS7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 July 2013 12:12 PM, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130730 23:09]:
->>
->> Tony, what do you suggest we do for this series? Since we have just an es1.0 and one board
->> at this point for dra7xx, things would be fine even if we do a dt based parsing to identify
->> the device, and I am fine with it if thats what we feel is the right way forward.
->> For the rest of the DT only platforms (omap4/5/am335x) anyway getting rid of these rev checks
->> from the kernel and depending on DT parsing needs to be a separate series anyway and I dont
->> plan to address those as part of this series.
+* jonsmirl at gmail.com <jonsmirl@gmail.com> [130730 11:36]:
+> On Tue, Jul 30, 2013 at 2:25 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > On 07/30/2013 12:04 PM, jonsmirl at gmail.com wrote:
+> > ...
+> >> So what does an alternating use of strings do?
+> >>
+> >>  dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+> >
+> > cat > temp.dts << ENDOFHERE
+> > /dts-v1/;
+> >
+> > / {
+> >     dmas = "tx", <&pdma0 7>, "rx", <&pdma0 6>;
+> >
+> >     pdma0: dma { };
+> > };
+> > ENDOFHERE
+> >
+> > dtc -O dtb -o temp.dtb -I dts temp.dts
+> >
+> > hexdump -C temp.dtb
+> >
+> > yields:
+> >
+> >> 00000000  d0 0d fe ed 00 00 00 ab  00 00 00 38 00 00 00 98  |...........8....|
+> >> 00000010  00 00 00 28 00 00 00 11  00 00 00 10 00 00 00 00  |...(............|
+> >> 00000020  00 00 00 13 00 00 00 60  00 00 00 00 00 00 00 00  |.......`........|
+> >> 00000030  00 00 00 00 00 00 00 00  00 00 00 01 00 00 00 00  |................|
+> >> 00000040  00 00 00 03 00 00 00 16  00 00 00 00 74 78 00 00  |............tx..|
+> >                                                  ss ss ss pp
+> >> 00000050  00 00 01 00 00 00 07 72  78 00 00 00 00 01 00 00  |.......rx.......|
+> >             pp pp pp ii ii ii ii ss  ss ss pp pp pp pp ii ii
+> >> 00000060  00 06 00 00 00 00 00 01  64 6d 61 00 00 00 00 03  |........dma.....|
+> >             ii ii
+> >
+> > ... where ss represents a string byte, pp a phandle byte, ii an integer
+> > byte.
+> >
+> >> 00000070  00 00 00 04 00 00 00 05  00 00 00 01 00 00 00 03  |................|
+> >> 00000080  00 00 00 04 00 00 00 0b  00 00 00 01 00 00 00 02  |................|
+> >> 00000090  00 00 00 02 00 00 00 09  64 6d 61 73 00 6c 69 6e  |........dmas.lin|
+> >> 000000a0  75 78 2c 70 68 61 6e 64  6c 65 00                 |ux,phandle.|
+> >
+> > Starting about half way through that last line is the string table.
+> >
+> > (the string table indirection is for property names, not property
+> > values, and it looks like not for node names either)
 > 
-> Well I'd say there's no need to drop the hardware revision checks
-> at this point at least for existing hardware. That's a very minimal
-> piece of code and there are way bigger issues to tackle.
+> Ok, so this won't work without introducing variable length data. Too
+> bad, I would have liked to eliminate the paired attributes.
 
-right, makes sense.
+Yup that's my experience too. But then again, using string values
+in .dts should not be done in general as it bloats things and makes
+the parsing slow.
 
-> 
-> For new SoCs, we could do it based on the compatible flag. If it
-> helps booting newer hardware with older kernels, then that's a good
-> reason to do it.
+These kind of names for something is usually something that should
+be implemented as user space debug tools, and the kernel really does
+not need to know names for something coming from DT.
 
-Sure, we can have dra7xx use the compatible flag and not add all the rev checks.
-That said, I would be glad if the latest kernels at least boot on newer hardware
-let alone older kernels :) But I guess we have bigger issues to tackle before
-even that happens. Thanks for the quick response.
+Of course without using string names there's the issue how to know
+what is rx dma and what is tx dma in the binding :) Probably what
+we've done with interrupt numbers is the way to go with DT to avoid
+string names.
 
-regards,
-Rajendra
+Regards,
 
-> 
-> Regards,
-> 
-> Tony
-> 
+Tony
