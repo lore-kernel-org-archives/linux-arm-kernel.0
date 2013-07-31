@@ -1,31 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Jul 2013 21:01:35 +0100
-Subject: [PATCH v2 RFC 2/8] arm: introduce a global dma_ops pointer
-In-Reply-To: <1375300452-12545-2-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1307312048511.4893@kaball.uk.xensource.com>
- <1375300452-12545-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130731200135.GZ24642@n2100.arm.linux.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 31 Jul 2013 21:05:16 +0100
+Subject: [repost] ARM big-endian support
+In-Reply-To: <20130729152637.204c2622@skate>
+References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
+ <51EFFB53.5060003@codethink.co.uk> <20130729152637.204c2622@skate>
+Message-ID: <51F96DFC.9090309@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 08:54:06PM +0100, Stefano Stabellini wrote:
-> Initially set dma_ops to arm_dma_ops.
-> Use dma_ops instead of arm_dma_ops in dmabounce.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: will.deacon at arm.com
-> CC: linux at arm.linux.org.uk
+On 29/07/13 14:26, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
+>
+> On Wed, 24 Jul 2013 17:05:39 +0100, Ben Dooks wrote:
+>> On 24/07/13 11:27, Ben Dooks wrote:
+>>> A repost (as requested) of the current big-endian core work for review.
+>>
+>> New branches at git.baserock.org/delta/linux.git
+>> 	311/be/atags-v4
+>>    	311/be/core-v4
+>
+> Thanks. Can you post a patch set based on top of 3.11-rc, so that it
+> can hopefully be merged? Posting something based on 3.10 has no chance
+> of being merged. Again, if you need any help on this, do not hesitate
+> to ask.
+>
+> Also, would it be possible to get cover letters that include a proper
+> changelog, as well as version number for each posting of the patch
+> series?
 
-If you're using swiotlb, there's little point in converting dmabounce
-to be able to use it, because it's basically providing the same
-functionality - dmabounce is there to do software buffer bouncing within
-the DMA to move streaming buffers from DMA-inaccessible memory into
-DMA-accessible memory.
+I've lost quite a bit of the change information, so sorry about that.
 
-It's original use is with older SoCs with buggy DMA (eg, those which
-can only address alternate 1MB chunks of memory for example) but also
-got used in situations where alternative solutions would've been better
-(like using swiotlb.)  I've been discouraging its use as it's suffered
-from memory exhaustion problems (there's a number of threads and bug
-reports which were never solved about IXP4xx(?) platforms suffering
-this due to this bouncing.)
+The 3.11-rc series I will try and get done as soon as I've gone through
+and sorted out the last round of review comments. Unfortunately I am
+not in the office for the next three weeks.
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
