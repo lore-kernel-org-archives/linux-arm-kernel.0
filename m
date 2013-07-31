@@ -1,39 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 31 Jul 2013 11:21:00 +0100
-Subject: [PATCH 01/22] ARM: ux500: Remove '0x's from HREF v60+ DTS file
-In-Reply-To: <20130730115403.GA29992@amd.pavel.ucw.cz>
-References: <1374242333-6852-1-git-send-email-lee.jones@linaro.org>
- <20130730115403.GA29992@amd.pavel.ucw.cz>
-Message-ID: <20130731102100.GD13298@lee--X1>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 31 Jul 2013 12:28:53 +0200
+Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
+In-Reply-To: <20130731095411.GA2810@htj.dyndns.org>
+References: <1375232669-27846-1-git-send-email-festevam@gmail.com>
+ <1375232669-27846-2-git-send-email-festevam@gmail.com>
+ <20130731073306.GZ1754@pengutronix.de>
+ <20130731082054.GF8540@nchen-desktop>
+ <20130731084645.GB1754@pengutronix.de>
+ <20130731090512.GD9858@sirena.org.uk>
+ <20130731094434.GC1754@pengutronix.de>
+ <20130731095411.GA2810@htj.dyndns.org>
+Message-ID: <20130731102853.GD1754@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Jul 2013, Pavel Machek wrote:
-
-> On Fri 2013-07-19 14:58:32, Lee Jones wrote:
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Jul 31, 2013 at 05:54:11AM -0400, Tejun Heo wrote:
+> Hello,
 > 
-> Why?
-
-Convention.
-
-> > diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-> > index 3d580d6..46fd8af 100644
-> > --- a/arch/arm/boot/dts/hrefv60plus.dts
-> > +++ b/arch/arm/boot/dts/hrefv60plus.dts
-> > @@ -26,7 +26,7 @@
-> >  
-> >  	soc {
-> >  		i2c at 80110000 {
-> > -			bu21013_tp at 0x5c {
-> > +			bu21013_tp at 5c {
-> >  				reset-gpio = <&gpio4 15 0x4>;
-> >  			};
-> >  		};
+> On Wed, Jul 31, 2013 at 11:44:34AM +0200, Uwe Kleine-K?nig wrote:
+> > > > OK, so the possible problem is that remove is called while the irq is
+> > > > still active. That means you have to assert that all resources the irq
 > 
+> If your driver destruction path is running while your irq handler is
+> still running, it's a crappy / broken driver.  You need a deactivation
+Well, you cannot avoid assuming that the irq is still active when your
+driver's remove callback is called. But I agree about crappyness at the
+end of the destruction path. The problem is that crap is as easy as:
+
+	probe(..)
+	{
+		clk = devm_get_clk(...);
+		clk_prepare_enable(clk);
+		writel(1, base + IRQENABLE);
+		devm_request_irq(...);
+	}
+
+	remove(..)
+	{
+		writel(0, base + IRQENABLE);
+		clk_disable_unprepare(clk);
+	}
+
+and I think there are more and more drivers doing that.
+
+> step whether you're using devm or not.  IRQs can be shared and the
+> device should be in a quiesced state before the driver detaches
+> itself.  Note that you can queue deactivation routine using devm.  For
+> an example, please take a look at
+> drivers/ata/libata-core.c::ata_host_start().
+> 
+> > > > handler is using (e.g. ioremap, clk_prepare_enable) are only freed
+> > > > *after* the irq is done. For ioremap that means it must be done using
+> > > > devm_ioremap_resource. For a clock it's not that easy because the irq
+> > > > handler has to assert that a used clk is kept prepared which can only be
+> > > > done using clk_prepare which in turn is not allowed in an irq handler.
+> > > 
+> > > > Hmm. So the only possible fixes are
+> > > > 	- devm* can be told to also care about clk_disable_unprepare
+> > > > 	- after disabling irqs in the remove callback wait for all
+> > > > 	  active irqs to be done. (i.e. call synchronize_irq(irq))
+> > > > 	- don't use devm_request_irq
+> 
+> Again, the right thing to do is having a proper deactivation step.
+> This is nothing devm can do automatically.  There's no way for it to
+> find out that the device is actually quiesced.  Let's say it waits for
+> the current instance of irq handler to finish.  How would it know that
+> it won't start again between the flushing of the current instance and
+> irq deregistration.  Add an explicit deactivation step using
+> devres_alloc().
+> 
+> > > I'm not sure that devm_ guarantees any ordering in the cleanups it does
+> > > so I'd not like to rely on the first option either, if there were some
+> > > guarantee of that it'd help.  The nice thing about explicitly freeing
+> > > the IRQ is that you can tell that all this stuff is safe by inspection.
+> > devm_* at least uses list_for_each_entry_reverse
+> > (drivers/base/devres.c:release_nodes()). Without this guarantee devm_
+> > would not make much sense IMHO.
+> 
+> devm guarantees that the destruction callbacks are called in the
+> reverse order of registration.
+That's fine.
+
+Best regards
+Uwe
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
