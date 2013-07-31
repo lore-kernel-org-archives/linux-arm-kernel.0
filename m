@@ -1,85 +1,60 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 31 Jul 2013 17:26:47 -0400
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <20130731204817.GC24642@n2100.arm.linux.org.uk>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
- <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
- <20130731201457.GA24642@n2100.arm.linux.org.uk>
- <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
- <20130731204817.GC24642@n2100.arm.linux.org.uk>
-Message-ID: <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Jul 2013 15:32:37 -0600
+Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
+In-Reply-To: <20130731034541.GQ15855@rizhao-lap>
+References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
+ <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
+ <51F2D063.5010505@wwwdotorg.org> <20130730033134.GM15855@rizhao-lap>
+ <51F7EDF2.60700@wwwdotorg.org> <20130731034541.GQ15855@rizhao-lap>
+Message-ID: <51F98275.6020906@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 4:48 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 31, 2013 at 04:37:36PM -0400, jonsmirl at gmail.com wrote:
->> On Wed, Jul 31, 2013 at 4:14 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > However, if we go back to the idea that DT is supposed to describe the
->> > hardware, _and_ that the way to describe that hardware is well defined
->> > and _stable_ (as it should be) then there should be no reason what so
->> > ever that your old DT blob should not continue working in later kernels.
->> > If it doesn't, then the contract that DT promised when we first moved
->> > over to using DT has been _broken_.
+On 07/30/2013 09:45 PM, Richard Zhao wrote:
+> On Wed, Jul 31, 2013 at 12:46:42AM +0800, Stephen Warren wrote:
+>> On 07/29/2013 09:31 PM, Richard Zhao wrote:
+>>> On Sat, Jul 27, 2013 at 03:39:15AM +0800, Stephen Warren wrote:
+>>>> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+>>>>> - driver: remove use of nvidia,dma-request-selector
+>>>>> 	  use dma_request_slave_channel to request channel
+>>>>> - update binding doc
+>>>>
+>>>> This patch needs to be amended so that the DMA channel is looked up
+>>>> during probe() rather than open(), to guarantee that deferred probe
+>>>> works. It's possible to hold off probe, but not possible AFAIK to hold
+>>>> off opening the port.
+>>>
+>>> How about avoid return -EPROBE_DEFER at open() time? It can be in
+>>> another patch.
 >>
->> Suppose your DT predates PINCTRL and the CPU needs the pins set to
->> function.  But setting the pins up is a board specific function. How
->> is this going to get implemented in a generic kernel that doesn't have
->> any board specific code in it?
->>
->> I would propose that we only need to worry about DTs that got put into
->> boot loaders and not worry about ones that were only used when
->> appended to a kernel.
+>> I don't really understand what you mean. -EPROBE_DEFER is something that
+>> only makes sense for probe() to return (or functions used by probe()).
+>> It doesn't make sense to return it anywhere else, since probe deferral
+>> is something that can only happen for probe().
 >
-> That is - again - our mistake.  We should have made it clear from the
-> start that the use of an _appended_ DT, or a DT provided with the kernel
-> being booted was more or less mandatory for the time being.  We actually
-> did exactly the opposite - we advertised the appended DT as a stop-gap
-> measure just to allow a DT kernel to be booted with a boot loader which
-> didn't support DT.
->
-> That in itself _encouraged_ boot loader support for DT on ARM (which in
-> itself is not a bad thing) but also leads people down the path of
-> potentially separating the DT from the kernel.
->
-> Had we encouraged the use of an appended DT instead, but still encouraged
-> boot loaders to update, and also made a clear statement that DT is
-> unstable (which everyone can see - for example by making our DT stuff
-> depend on CONFIG_EXPERIMENTAL when it existed) then everyone would have
-> been clear about its status.
->
-> The fact that we did not - the fact that we ignored this process means
-> that it is _our_ problem that people like Richard are blowing up such a
-> storm over this.  We need to admit that we got it wrong, and commit to
-> doing it the right way in future.  What that means is starting off today
-> with a commitment to keep as much of the stuff which works today working
-> _tomorrow_, and the day after, and so forth.
+> What I meant is, it might not worth to move request channel to probe
+> only because we need to check error and return -EPROBE_DEFER.
 
-What do you think about using a quirk layer to decouple deployed DTs
-from whatever is implemented in the kernel? I still think there is
-going to be volatility in the the kernel DT usage simply because we
-haven't figured out all of the issues with it yet.  For example
-defining a global schema system is going to expose a lot of irregular
-DT syntax when you line up all of the platform DTs in a system where
-it is easy to compare them. One the plus side the kernel is certainly
-evolving to a point where this volatility will stop in the future, we
-just aren't there yet.  If we don't use a quirk fixup system, then
-board specific code is going to continue to exist scattered around in
-the arch directories.
+If probe() doesn't attempt to validate that the/a DMA channel provider
+exists, then there's no guarantee that the DMA provider has probed
+before the DMA client driver either probes or executes any later code.
+So, you could quite easily end up with a situation where the serial
+driver's open fails because the DMA provider has not yet probed. This is
+exactly what deferred probe was intended to avoid. This reason alone is
+enough to make it worth fixing this.
 
-My preference would be to contain the board specific DT fixup code
-inside a quirk system and have the goal of making the arch directories
-free of board specific code. Any new board would have a good enough DT
-that they don't need any board specific DT fixup code. Of course
-there's quite a ways to go before reaching that goal.
+> dma_request_slave_channel is better to be called as late as possible to
+> make better dynamic use of dma channels.
 
-Alternatively you may be of the belief that it is impossible to get
-rid of the board specific code. But x86 doesn't have any of it, why
-should ARM?
+probe() could validate that the provider exists in a way that doesn't
+permanently hold ownership of the DMA channel. For example, request it
+then immediately release it, in the absence of a dedicated "validate my
+DMA providers exist" API.
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+> Actually, I searched the kernel code, most drivers don't return EPROBE_DEFER
+> when dma_request_slave_channel failed. dma_request_slave_channel can
+> fail in many cases, and dma device not probed is only one case.
+
+That sounds like a bug. If a DMA channel /is/ specified, it should be
+possible to acquire it. If no DMA channel is specified, and if the
+device can do PIO, then it's reasonable to continue.
