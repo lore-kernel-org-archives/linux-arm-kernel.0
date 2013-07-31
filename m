@@ -1,273 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Jul 2013 11:20:43 +0200
-Subject: [PATCH 1/4] clk: sunxi: Rename the structure to prepare the
- addition of sun6i
-In-Reply-To: <51F856D6.2050504@elopez.com.ar>
-References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375195462-19566-2-git-send-email-maxime.ripard@free-electrons.com>
- <51F856D6.2050504@elopez.com.ar>
-Message-ID: <20130731092043.GA2911@lukather>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 31 Jul 2013 11:34:48 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
+References: <51E72DCA.9070500@codeaurora.org>
+ <f5b76049-7e5b-4dd0-9863-19cfd1d599b9@TX2EHSMHS006.ehs.local>
+ <51E7435B.3060605@codeaurora.org>
+ <ff4d40be-7177-4a55-ab2f-dff11fa18642@DB9EHSMHS009.ehs.local>
+ <51ED8DF2.60600@codeaurora.org> <20130722201348.GI453@xsjandreislx>
+ <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
+ <51F66565.7010600@linaro.org>
+ <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
+ <51F77D93.4030505@linaro.org>
+ <829dbb20-0f14-4a3b-8da9-1f7b1b5b8b59@DB8EHSMHS005.ehs.local>
+Message-ID: <51F8DA38.2060508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+>>> Hi Daniel,
+>>>
+>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+>>> (snip)
+>>>>
+>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+>>>> timer will be stopped when entering to the idle state. In this case, the
+>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+>>>> idle state, switching the local timer back in use.
+>>>
+>>> I've been thinking about this, trying to understand how this makes my
+>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+>>> would make the timer core switch to a broadcast device even though it
+>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+>>> something useless, but nothing wrong in a sense that it should result in
+>>> breakage. I guess I'm missing something obvious. This timer system will
+>>> always remain a mystery to me.
+>>>
+>>> Actually this more or less leads to the question: What is this
+>>> 'broadcast timer'. I guess that is some clockevent device which is
+>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+>>> hang pointing to some issue with that driver?
+>>
+>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
+> 
+> So, the correct run results (full output attached).
+> 
+> The vanilla kernel uses the twd timers as local timers and the TTC as
+> broadcast device:
+> 	Tick Device: mode:     1                                                         
+> 	Broadcast device  
+> 	Clock Event Device: ttc_clockevent
+> 
+> When I remove the offending CPUIDLE flag and add the DT fragment to
+> enable the global timer, the twd timers are still used as local timers
+> and the broadcast device is the global timer:
+> 	Tick Device: mode:     1                                                         
+> 	Broadcast device                                                                 
+> 	Clock Event Device: arm_global_timer
+> 
+> Again, since boot hangs in the actually broken case, I don't see way to
+> obtain this information for that case.
 
-On Tue, Jul 30, 2013 at 09:14:14PM -0300, Emilio L?pez wrote:
-> Hi Maxime,
-> 
-> El 30/07/13 11:44, Maxime Ripard escribi?:
-> > Rename all the generic-named structure to sun4i to avoid confusion when
-> > we will introduce the sun6i (A31) clocks.
-> > 
-> > While we're at it, avoid too long lines and wrap the DT compatibles
-> > tables.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Overall the patch looks good :)
-> 
-> > ---
-> >  drivers/clk/sunxi/clk-sunxi.c | 108 +++++++++++++++++++++++++++++-------------
-> >  1 file changed, 75 insertions(+), 33 deletions(-)
-> > 
-> > diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> > index fe1528e..3c91888 100644
-> > --- a/drivers/clk/sunxi/clk-sunxi.c
-> > +++ b/drivers/clk/sunxi/clk-sunxi.c
-> > @@ -25,12 +25,12 @@
-> >  static DEFINE_SPINLOCK(clk_lock);
-> >  
-> >  /**
-> > - * sunxi_osc_clk_setup() - Setup function for gatable oscillator
-> > + * sun4i_osc_clk_setup() - Setup function for gatable oscillator
-> >   */
-> >  
-> >  #define SUNXI_OSC24M_GATE	0
-> >  
-> > -static void __init sunxi_osc_clk_setup(struct device_node *node)
-> > +static void __init sun4i_osc_clk_setup(struct device_node *node)
-> >  {
-> >  	struct clk *clk;
-> >  	struct clk_fixed_rate *fixed;
-> > @@ -73,13 +73,13 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
-> >  
-> >  
-> >  /**
-> > - * sunxi_get_pll1_factors() - calculates n, k, m, p factors for PLL1
-> > + * sun4i_get_pll1_factors() - calculates n, k, m, p factors for PLL1
-> >   * PLL1 rate is calculated as follows
-> >   * rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
-> >   * parent_rate is always 24Mhz
-> >   */
-> >  
-> > -static void sunxi_get_pll1_factors(u32 *freq, u32 parent_rate,
-> > +static void sun4i_get_pll1_factors(u32 *freq, u32 parent_rate,
-> >  				   u8 *n, u8 *k, u8 *m, u8 *p)
-> >  {
-> >  	u8 div;
-> > @@ -127,12 +127,12 @@ static void sunxi_get_pll1_factors(u32 *freq, u32 parent_rate,
-> >  
-> >  
-> >  /**
-> > - * sunxi_get_apb1_factors() - calculates m, p factors for APB1
-> > + * sun4i_get_apb1_factors() - calculates m, p factors for APB1
-> >   * APB1 rate is calculated as follows
-> >   * rate = (parent_rate >> p) / (m + 1);
-> >   */
-> >  
-> > -static void sunxi_get_apb1_factors(u32 *freq, u32 parent_rate,
-> > +static void sun4i_get_apb1_factors(u32 *freq, u32 parent_rate,
-> >  				   u8 *n, u8 *k, u8 *m, u8 *p)
-> >  {
-> >  	u8 calcm, calcp;
-> > @@ -178,7 +178,7 @@ struct factors_data {
-> >  	void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
-> >  };
-> >  
-> > -static struct clk_factors_config pll1_config = {
-> > +static struct clk_factors_config sun4i_pll1_config = {
-> >  	.nshift = 8,
-> >  	.nwidth = 5,
-> >  	.kshift = 4,
-> > @@ -189,21 +189,21 @@ static struct clk_factors_config pll1_config = {
-> >  	.pwidth = 2,
-> >  };
-> >  
-> > -static struct clk_factors_config apb1_config = {
-> > +static struct clk_factors_config sun4i_apb1_config = {
-> >  	.mshift = 0,
-> >  	.mwidth = 5,
-> >  	.pshift = 16,
-> >  	.pwidth = 2,
-> >  };
-> >  
-> > -static const __initconst struct factors_data pll1_data = {
-> > -	.table = &pll1_config,
-> > -	.getter = sunxi_get_pll1_factors,
-> > +static const __initconst struct factors_data sun4i_pll1_data = {
-> > +	.table = &sun4i_pll1_config,
-> > +	.getter = sun4i_get_pll1_factors,
-> >  };
-> >  
-> > -static const __initconst struct factors_data apb1_data = {
-> > -	.table = &apb1_config,
-> > -	.getter = sunxi_get_apb1_factors,
-> > +static const __initconst struct factors_data sun4i_apb1_data = {
-> > +	.table = &sun4i_apb1_config,
-> > +	.getter = sun4i_get_apb1_factors,
-> >  };
-> >  
-> >  static void __init sunxi_factors_clk_setup(struct device_node *node,
-> > @@ -239,11 +239,11 @@ struct mux_data {
-> >  	u8 shift;
-> >  };
-> >  
-> > -static const __initconst struct mux_data cpu_mux_data = {
-> > +static const __initconst struct mux_data sun4i_cpu_mux_data = {
-> >  	.shift = 16,
-> >  };
-> >  
-> > -static const __initconst struct mux_data apb1_mux_data = {
-> > +static const __initconst struct mux_data sun4i_apb1_mux_data = {
-> >  	.shift = 24,
-> >  };
-> >  
-> > @@ -284,17 +284,17 @@ struct div_data {
-> >  	u8 pow;
-> >  };
-> >  
-> > -static const __initconst struct div_data axi_data = {
-> > +static const __initconst struct div_data sun4i_axi_data = {
-> >  	.shift = 0,
-> >  	.pow = 0,
-> >  };
-> >  
-> > -static const __initconst struct div_data ahb_data = {
-> > +static const __initconst struct div_data sun4i_ahb_data = {
-> >  	.shift = 4,
-> >  	.pow = 1,
-> >  };
-> >  
-> > -static const __initconst struct div_data apb0_data = {
-> > +static const __initconst struct div_data sun4i_apb0_data = {
-> >  	.shift = 8,
-> >  	.pow = 1,
-> >  };
-> > @@ -413,35 +413,77 @@ CLK_OF_DECLARE(sunxi_osc, "allwinner,sun4i-osc-clk", sunxi_osc_clk_setup);
-> >  
-> >  /* Matches for factors clocks */
-> >  static const __initconst struct of_device_id clk_factors_match[] = {
-> > -	{.compatible = "allwinner,sun4i-pll1-clk", .data = &pll1_data,},
-> > -	{.compatible = "allwinner,sun4i-apb1-clk", .data = &apb1_data,},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-pll1-clk",
-> > +		.data = &sun4i_pll1_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-apb1-clk",
-> > +		.data = &sun4i_apb1_data,
-> > +	},
-> >  	{}
-> >  };
-> >  
-> >  /* Matches for divider clocks */
-> >  static const __initconst struct of_device_id clk_div_match[] = {
-> > -	{.compatible = "allwinner,sun4i-axi-clk", .data = &axi_data,},
-> > -	{.compatible = "allwinner,sun4i-ahb-clk", .data = &ahb_data,},
-> > -	{.compatible = "allwinner,sun4i-apb0-clk", .data = &apb0_data,},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-axi-clk",
-> > +		.data = &sun4i_axi_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-ahb-clk",
-> > +		.data = &sun4i_ahb_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-apb0-clk",
-> > +		.data = &sun4i_apb0_data,
-> > +	},
-> >  	{}
-> >  };
-> >  
-> >  /* Matches for mux clocks */
-> >  static const __initconst struct of_device_id clk_mux_match[] = {
-> > -	{.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_mux_data,},
-> > -	{.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &apb1_mux_data,},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-cpu-clk",
-> > +		.data = &sun4i_cpu_mux_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-apb1-mux-clk",
-> > +		.data = &sun4i_apb1_mux_data,
-> > +	},
-> >  	{}
-> >  };
-> >  
-> >  /* Matches for gate clocks */
-> >  static const __initconst struct of_device_id clk_gates_match[] = {
-> > -	{.compatible = "allwinner,sun4i-axi-gates-clk", .data = &sun4i_axi_gates_data,},
-> > -	{.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
-> > -	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
-> > -	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
-> > -	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
-> > -	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
-> > -	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-axi-gates-clk",
-> > +		.data = &sun4i_axi_gates_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-ahb-gates-clk",
-> > +		.data = &sun4i_ahb_gates_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun5i-a13-ahb-gates-clk",
-> > +		.data = &sun5i_a13_ahb_gates_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-apb0-gates-clk",
-> > +		.data = &sun4i_apb0_gates_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun5i-a13-apb0-gates-clk",
-> > +		.data = &sun5i_a13_apb0_gates_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun4i-apb1-gates-clk",
-> > +		.data = &sun4i_apb1_gates_data,
-> > +	},
-> > +	{
-> > +		.compatible = "allwinner,sun5i-a13-apb1-gates-clk",
-> > +		.data = &sun5i_a13_apb1_gates_data,
-> > +	},
-> >  	{}
-> >  };
-> >  
-> 
-> I'm not particularly a fan of this though; in my opinion it hurts
-> readability a bit and it uses 4x the lines. It looks like a highly
-> probable source of git conflicts too if not handled appropriately :)
+Is it possible the global timer driver simply does not work ? So when
+the cpuidle driver switches to it, the system stays stuck with no interrupt.
 
-Yeah, I'll drop it just like for pinctrl then.
+Removing the CPUIDLE_FLAG_TIMER_STOP prevents to use the broadcast timer
+(aka arm global timer), so the problem does not appear.
 
-> 
-> Other than that,
-> 
-> Reviewed-by: Emilio L?pez <emilio@elopez.com.ar>
+And when the C3STOP feature flag is added to the global timer, this one
+can't be a broadcast timer, so another clock is selected for that (I
+guess cadence_ttc). So again the problem does not appear.
 
-Thanks!
-Maxime
+I am more and more convinced the problem is not coming from the cpuidle
+driver. The cpuidle flag has just spotted a problem somewhere else and I
+suspect the arm_global_timer is not working for zynq.
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130731/a9a2f6a8/attachment-0001.sig>
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
