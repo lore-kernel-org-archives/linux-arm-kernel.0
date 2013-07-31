@@ -1,84 +1,72 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 31 Jul 2013 09:29:44 +0900
-Subject: [PATCH 5/5] ARM: shmobile: ape6evm: add SDHI interfaces
-In-Reply-To: <51F7B822.7020404@cogentembedded.com>
+Date: Wed, 31 Jul 2013 09:30:32 +0900
+Subject: [PATCH 4/5] ARM: shmobile: ape6evm: add MMCIF support
+In-Reply-To: <51F7B8B0.3080201@cogentembedded.com>
 References: <cover.1375174556.git.horms+renesas@verge.net.au>
- <f79d68da510bf1b95beff4d556b78d06801f11dc.1375174556.git.horms+renesas@verge.net.au>
- <51F7B822.7020404@cogentembedded.com>
-Message-ID: <20130731002944.GD17209@verge.net.au>
+ <8711613252ed931037f9e9f8646935519dd8f362.1375174556.git.horms+renesas@verge.net.au>
+ <51F7B8B0.3080201@cogentembedded.com>
+Message-ID: <20130731003032.GE17209@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 04:57:06PM +0400, Sergei Shtylyov wrote:
+On Tue, Jul 30, 2013 at 04:59:28PM +0400, Sergei Shtylyov wrote:
 > Hello.
 > 
 > On 30-07-2013 13:00, Simon Horman wrote:
 > 
 > >From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 > 
-> >Add support for SDHI0 and SDHI1 on APE6EVM in PIO mode only.
+> >Add MMCIF support to the APE6EVM board in PIO mode only. Power supply is
+> >fixed for now, eventually support for the tps80032 regulator, also
+> >supplying both VDD and VccQ to the MMCIF slot should be added to APE6EVM.
 > 
 > >Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> >Acked-by: Magnus Damm <damm@opensource.se>
 > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > >---
-> >  arch/arm/mach-shmobile/board-ape6evm.c | 50 +++++++++++++++++++++++++++++++++-
-> >  1 file changed, 49 insertions(+), 1 deletion(-)
+> >  arch/arm/mach-shmobile/board-ape6evm.c | 31 +++++++++++++++++++++++++++++++
+> >  1 file changed, 31 insertions(+)
 > 
 > >diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-> >index 8c7529c..ccf8b04 100644
+> >index af6dd39..8c7529c 100644
 > >--- a/arch/arm/mach-shmobile/board-ape6evm.c
 > >+++ b/arch/arm/mach-shmobile/board-ape6evm.c
 > [...]
-> >@@ -75,6 +82,29 @@ static struct resource mmcif0_resources[] = {
-> >  	DEFINE_RES_IRQ(gic_spi(169)),
-> >  };
-> >
-> >+/* SDHI0 */
-> >+static struct sh_mobile_sdhi_info sdhi0_pdata = {
-> >+	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
-> >+	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ,
+> >@@ -54,6 +56,25 @@ static const struct smsc911x_platform_config lan9220_data = {
+> [...]
+> >+/* MMCIF */
+> >+static struct sh_mmcif_plat_data mmcif0_pdata = {
+> >+	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
 > >+};
 > >+
-> >+static struct resource sdhi0_resources[] = {
-> >+	DEFINE_RES_MEM_NAMED(0xee100000, 0x100, "SDHI0"),
-> >+	DEFINE_RES_IRQ(gic_spi(165)),
-> >+};
-> >+
-> >+/* SDHI1 */
-> >+static struct sh_mobile_sdhi_info sdhi1_pdata = {
-> >+	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_WRPROTECT_DISABLE,
-> >+	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
-> >+			  MMC_CAP_NEEDS_POLL,
-> >+};
-> >+
-> >+static struct resource sdhi1_resources[] = {
-> >+	DEFINE_RES_MEM_NAMED(0xee120000, 0x100, "SDHI1"),
-> >+	DEFINE_RES_IRQ(gic_spi(166)),
+> >+static struct resource mmcif0_resources[] = {
+> >+	DEFINE_RES_MEM_NAMED(0xee200000, 0x100, "MMCIF0"),
+> >+	DEFINE_RES_IRQ(gic_spi(169)),
 > >+};
 > >+
 > 
->    All of the above are lacking '__initdata' annothation (the
-> resources and platform data will be kmemdup()'ed when registering
-> the platform devices). Too bad I've noticed this too late...
+>    The above needed '__initdata' too. And I have only noticed...
 
-Thanks Sergei.
+Thanks again Sergei.
 
 Guennadi,
 
 as I have already queued-up this patch could you please
 make an incremental patch that adds __initdata to the above structures?
 
-> 
-> >@@ -124,6 +166,12 @@ static void __init ape6evm_add_standard_devices(void)
-> >  	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
-> >  					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
-> >  					  &mmcif0_pdata, sizeof(mmcif0_pdata));
-> >+	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 0,
-> >+					  sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
-> >+					  &sdhi0_pdata, sizeof(sdhi0_pdata));
-> >+	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 1,
-> >+					  sdhi1_resources, ARRAY_SIZE(sdhi1_resources),
-> >+					  &sdhi1_pdata, sizeof(sdhi1_pdata));
+> >  static const struct pinctrl_map ape6evm_pinctrl_map[] = {
+> >  	/* SCIFA0 console */
+> >  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
+> [...]
+> >@@ -93,6 +119,11 @@ static void __init ape6evm_add_standard_devices(void)
+> >  	platform_device_register_resndata(&platform_bus, "smsc911x", -1,
+> >  					  lan9220_res, ARRAY_SIZE(lan9220_res),
+> >  					  &lan9220_data, sizeof(lan9220_data));
+> >+	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
+> >+				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
+> >+	platform_device_register_resndata(&platform_bus, "sh_mmcif", 0,
+> >+					  mmcif0_resources, ARRAY_SIZE(mmcif0_resources),
+> >+					  &mmcif0_pdata, sizeof(mmcif0_pdata));
 > >  }
 > 
 > WBR, Sergei
