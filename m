@@ -1,45 +1,51 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 31 Jul 2013 15:31:16 -0700
-Subject: [PATCH 17/18] ARM: SAMSUNG: Switch to sched_clock_register()
-In-Reply-To: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
-References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1375309877-16617-18-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 31 Jul 2013 15:38:33 -0700
+Subject: [PATCH v4 0/5] Memory mapped architected timers
+In-Reply-To: <20130724203253.GE27761@codeaurora.org>
+References: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
+ <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
+ <20130724203253.GE27761@codeaurora.org>
+Message-ID: <20130731223833.GJ8868@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32 bit sched_clock interface now supports 64 bits. Upgrade to
-the 64 bit function to allow us to remove the 32 bit registration
-interface.
+On 07/24, Stephen Boyd wrote:
+> On 07/22, Mark Rutland wrote:
+> > Hi Stephen,
+> > 
+> > On Fri, Jul 19, 2013 at 12:59:27AM +0100, Stephen Boyd wrote:
+> > > This patchset adds support for memory mapped architected timers. We
+> > > don't have any other global broadcast timer in our system, so we use the
+> > > mmio timer during low power modes. The first patch changes the register
+> > > accessor to an enum per Thomas' request. The second patch is the binding.
+> > > The next two patches lay some groundwork so that the last patch is simpler.
+> > > The final patch adds support for mmio timers.
+> > > 
+> > > Patches are based on v3.11-rc1.
+> > 
+> > Be aware that as of v3.11-rc2 this doesn't cleanly apply, as the
+> > __cpuinit removal broke the final patch's context in a couple of places.
+> > It would be nice to get rid of the new cpuinit additions too...
+> > 
+> > With that cleaned up locally, I've gave this a spin on tc2 and a
+> > Foundation model to test the cp15/system timers, hotplugging CPUs and
+> > running a basic test (`time sleep 5`). That all seems to work.
+> > 
+> > Unfortunately I have no way of testing the memory-mapped timer support,
+> > but I trust you've tested that locally.
+> > 
+> > For the series:
+> > 
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > 
+> 
+> Thanks Mark.
+> 
+> Daniel, can you pick up these patches please?
+> 
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/plat-samsung/samsung-time.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Ping Daniel?
 
-diff --git a/arch/arm/plat-samsung/samsung-time.c b/arch/arm/plat-samsung/samsung-time.c
-index 2957075..1e2119b 100644
---- a/arch/arm/plat-samsung/samsung-time.c
-+++ b/arch/arm/plat-samsung/samsung-time.c
-@@ -312,7 +312,7 @@ static void __iomem *samsung_timer_reg(void)
-  * this wraps around for now, since it is just a relative time
-  * stamp. (Inspired by U300 implementation.)
-  */
--static u32 notrace samsung_read_sched_clock(void)
-+static u64 notrace samsung_read_sched_clock(void)
- {
- 	void __iomem *reg = samsung_timer_reg();
- 
-@@ -337,7 +337,7 @@ static void __init samsung_clocksource_init(void)
- 	samsung_time_setup(timer_source.source_id, TCNT_MAX);
- 	samsung_time_start(timer_source.source_id, PERIODIC);
- 
--	setup_sched_clock(samsung_read_sched_clock, TSIZE, clock_rate);
-+	sched_clock_register(samsung_read_sched_clock, TSIZE, clock_rate);
- 
- 	if (clocksource_mmio_init(samsung_timer_reg(), "samsung_clocksource_timer",
- 			clock_rate, 250, TSIZE, clocksource_mmio_readl_down))
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
