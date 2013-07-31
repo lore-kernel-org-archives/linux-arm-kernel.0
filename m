@@ -1,28 +1,48 @@
-From: davej@redhat.com (Dave Jones)
-Date: Wed, 31 Jul 2013 10:24:30 -0400
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
- mitigations
-In-Reply-To: <20130731094012.GU24642@n2100.arm.linux.org.uk>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <20130730221435.GA22240@redhat.com>
- <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
- <20130730231533.GA26824@redhat.com>
- <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
- <20130731000444.GC1281@redhat.com>
- <20130731094012.GU24642@n2100.arm.linux.org.uk>
-Message-ID: <20130731142430.GA4545@redhat.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 31 Jul 2013 10:32:36 -0400 (EDT)
+Subject: [PATCH v2 26/42] USB: ohci-at91: add usb_clk for transition to
+ common clk framework
+In-Reply-To: <51F8C31B.1020305@overkiz.com>
+Message-ID: <Pine.LNX.4.44L0.1307311030260.1546-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 10:40:12AM +0100, Russell King - ARM Linux wrote:
- > On Tue, Jul 30, 2013 at 08:04:44PM -0400, Dave Jones wrote:
- > > To use ARM as an example, the bugs I've seen have mostly been in arch specific
- > > code that does things like page-table manipulation.  The chromebook bugs I
- > > was hitting for eg were various kinds of PTE corruption warnings. 
- > 
- > Hmm, really?  Did you reported these bugs?  I'm not aware of mainline
- > having any changes related to bug reports on PTEs on ARM.
+On Wed, 31 Jul 2013, boris brezillon wrote:
 
-I wasn't sure if it was a googleism, or happens on mainline, so no.
+> Hello Alan,
+> 
+> I don't know if you remember but a few days back I sent a series which
+> included this patch ("ARM: at91: prepare transition to common clk 
+> framework").
+> 
+> It was decided to move this patch out of the "prepare" series to avoid 
+> backward
+> compatility handling.
+> 
+> Things have changed a little bit.
+> 
+> I was asked to split the "ARM: at91: move to common clk framework" 
+> series into
+> several smaller series (one for each SoC).
+> This means at91 will have some SoCs supporting using common clk framework
+> (and thus will define the usb_clk) and other SoCs using the old at91 clk 
+> implementation
+> (which does not define usb_clk).
+> 
+> I was also requested to drop common clk framework support for non dt 
+> boards, which
+> means, as long as at91 keep non dt boards the at91 old clk implem will 
+> remain active.
+> 
+> For all these reasons I will have to reintroduce the backward 
+> compatibility hack.
+> 
+> Should I get this patch (and patch 27) out of the this series and back 
+> to the "prepare" series ?
 
-	Dave
+I don't care too much how the two patch series are organized, although
+some of the other maintainers involved in this project might.  So long
+as everything remains compatible with all the hardware variations and
+bisectable at each stage, I'll be happy.
+
+Alan Stern
