@@ -1,58 +1,63 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 30 Jul 2013 20:42:35 -0700
-Subject: [PATCH 1/3] clk: exynos5250: Add G2D gate clock
-In-Reply-To: <CAK9yfHxLjYNjQ9h-N8hNLBvqyUTxNzt=Bw10=mEA=D1kg2f9dw@mail.gmail.com>
-References: <1373013749-14530-1-git-send-email-sachin.kamat@linaro.org>
- <20130726201800.7598.54329@quantum>
- <CAK9yfHw6KtVDAns-1JhNpiS0brTeUpfiHS-v3q7H2GLWkY-Adw@mail.gmail.com>
- <20130730064800.22022.14773@quantum>
- <CAK9yfHxLjYNjQ9h-N8hNLBvqyUTxNzt=Bw10=mEA=D1kg2f9dw@mail.gmail.com>
-Message-ID: <20130731034235.5270.7481@quantum>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Wed, 31 Jul 2013 11:52:56 +0800
+Subject: [PATCH 2/9] dma: tegra20-apbdma: move to generic device tree
+ bindings
+In-Reply-To: <51F7ED62.4060404@wwwdotorg.org>
+References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
+ <1374639002-16753-3-git-send-email-rizhao@nvidia.com>
+ <51F2CDBE.40802@wwwdotorg.org> <20130730030644.GJ15855@rizhao-lap>
+ <51F7ED62.4060404@wwwdotorg.org>
+Message-ID: <20130731035256.GR15855@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sachin Kamat (2013-07-29 23:55:33)
-> On 30 July 2013 12:18, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Sachin Kamat (2013-07-27 06:29:56)
-> >> On 27 July 2013 01:48, Mike Turquette <mturquette@linaro.org> wrote:
-> >> > Quoting Sachin Kamat (2013-07-05 01:42:27)
-> >> >> Adds gate clock for G2D IP for Exynos5250 SoC.
-> >> >>
-> >> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> >> >> Cc: Mike Turquette <mturquette@linaro.org>
-> >> >
-> >> > I've taken patch #1 into clk-next.
+On Wed, Jul 31, 2013 at 12:44:18AM +0800, Stephen Warren wrote:
+> On 07/29/2013 09:06 PM, Richard Zhao wrote:
+> > On Sat, Jul 27, 2013 at 03:27:58AM +0800, Stephen Warren wrote:
+> >> (Stripping the Cc list a lot)
 > >>
-> >> Thanks Mike.
+> >> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+> >>> Update tegra20-apbdma driver to adopt generic DMA device tree bindings.
+> >>> It calls of_dma_controller_register() with of_dma_simple_xlate to get
+> >>> the generic DMA device tree helper support. The #dma-cells for apbdma
+> >>> must be 1, which is slave ID.
+> >>>
+> >>> The existing nvidia,dma-request-selector still works there, and the
+> >>> support will be removed after all clients get converted to generic DMA
+> >>> device tree helper.
+> 
+> >>> diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
 > >>
-> >> >
-> >> >> ---
-> >> >> This patch depends on the following patch:
-> >> >> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20581
-> >> >
-> >> > I think I've gotten all three series you sent out, can you confirm?
+> >>> +static bool tegra_dma_filter_fn(struct dma_chan *dc, void *param)
+> >>> +{
+> >>> +	if (dc->device->dev->driver == &tegra_dmac_driver.driver) {
+> >>> +		struct tegra_dma_channel *tdc = to_tegra_dma_chan(dc);
+> >>> +		unsigned req = *(unsigned *)param;
+> >>> +
+> >>> +		tdc->slave_id = req;
+> >>> +
+> >>> +		return true;
+> >>> +	}
+> >>> +	return false;
+> >>> +}
+> >>> +
+> >>> +static struct of_dma_filter_info tegra_dma_info = {
+> >>> +	.filter_fn = tegra_dma_filter_fn,
+> >>> +};
 > >>
-> >> I haven't seen any update in your tree [1] since quite some time. The
-> >> last commit I see in clk-next branch is 45e3ec3784 ("clk: tegra: fix
-> >> ifdef for tegra_periph_reset_assert inline"). I hope I am looking at
-> >> the right tree?
+> >> Why does this driver need to define a filter function? I thought the
+> >> dmaengine's DT support would already match DMA clients/engines based on
+> >> the phandle in DT? Isn't the need to pass the slave channel ID into
+> >> drivers something pretty fundamental to dmaengine, and hence something
+> >> it already supports?
 > >
-> > You are, but I had not pushed to it since the merge window closed. It is
-> > now updated.
-> >
+> > of_dma_simple_xlate only pass slave id to filter function. It needs
+> > change to pass dt node too. I didn't start work on the common code
+> > change yet. Do you think we need to hold it until common code change?
 > 
-> Thanks Mike. I confirm that all the three patch series that you
-> mentioned are applied in your tree.
-> Please check the below one too.
-> 
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg20598.html
+> Oh dear, I can't see how the core DT DMA support can work for anyone
+> without the ability to limit DMA clients to the specific DMA controller
+> that's specified in DT. If that functionality truly is missing, then it
+> certainly needs to be added first.
 
-Ok, I picked that one up too.
-
-Regards,
-Mike
-
-> 
-> -- 
-> With warm regards,
-> Sachin
+omap-dma uses the same way. 
