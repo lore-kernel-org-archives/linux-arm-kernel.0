@@ -1,72 +1,93 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 31 Jul 2013 18:45:25 +0100
-Subject: [PATCH RFC 1/8] arm: make SWIOTLB available
+Date: Wed, 31 Jul 2013 18:45:30 +0100
+Subject: [PATCH RFC 6/8] xen: make xen_create_contiguous_region return the dma
+ address
 In-Reply-To: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
-Message-ID: <1375292732-7627-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1375292732-7627-6-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: will.deacon at arm.com
-CC: linux at arm.linux.org.uk
----
- arch/arm/Kconfig                   |    7 +++++++
- arch/arm/include/asm/dma-mapping.h |   24 ++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 0 deletions(-)
+Modify xen_create_contiguous_region to return the dma address of the
+newly contiguous buffer.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..05125ab 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1832,6 +1832,13 @@ config CC_STACKPROTECTOR
- 	  neutralized via a kernel panic.
- 	  This feature requires gcc version 4.2 or above.
- 
-+config SWIOTLB
-+	def_bool y
-+	select NEED_SG_DMA_LENGTH
-+
-+config IOMMU_HELPER
-+	def_bool SWIOTLB
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5b579b9..ad89e0f 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -86,6 +86,30 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: david.vrabel at citrix.com
+---
+ arch/x86/xen/mmu.c        |    4 +++-
+ drivers/xen/swiotlb-xen.c |    6 +++---
+ include/xen/xen-ops.h     |    3 ++-
+ 3 files changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/arch/x86/xen/mmu.c b/arch/x86/xen/mmu.c
+index fdc3ba2..df9ab44 100644
+--- a/arch/x86/xen/mmu.c
++++ b/arch/x86/xen/mmu.c
+@@ -2329,7 +2329,8 @@ static int xen_exchange_memory(unsigned long extents_in, unsigned int order_in,
  }
- #endif
  
-+static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-+{
-+	unsigned int offset = paddr & ~PAGE_MASK;
-+	return pfn_to_dma(dev, paddr >> PAGE_SHIFT) + offset;
-+}
-+
-+static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-+{
-+	unsigned int offset = dev_addr & ~PAGE_MASK;
-+	return (dma_to_pfn(dev, dev_addr) << PAGE_SHIFT) + offset;
-+}
-+
-+static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-+{
-+	if (!dev->dma_mask)
-+		return 0;
-+
-+	return addr + size - 1 <= *dev->dma_mask;
-+}
-+
-+static inline void dma_mark_clean(void *addr, size_t size)
-+{
-+}
-+
- /*
-  * DMA errors are defined by all-bits-set in the DMA address.
-  */
+ int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
+-				 unsigned int address_bits)
++				 unsigned int address_bits,
++				 dma_addr_t *dma_handle)
+ {
+ 	unsigned long *in_frames = discontig_frames, out_frame;
+ 	unsigned long  flags;
+@@ -2368,6 +2369,7 @@ int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
+ 
+ 	spin_unlock_irqrestore(&xen_reservation_lock, flags);
+ 
++	*dma_handle = xen_virt_to_bus(vstart);
+ 	return success ? 0 : -ENOMEM;
+ }
+ EXPORT_SYMBOL_GPL(xen_create_contiguous_region);
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index aadffcf..353f013 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -126,6 +126,7 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
+ {
+ 	int i, rc;
+ 	int dma_bits;
++	dma_addr_t dma_handle;
+ 
+ 	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
+ 
+@@ -137,7 +138,7 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
+ 			rc = xen_create_contiguous_region(
+ 				(unsigned long)buf + (i << IO_TLB_SHIFT),
+ 				get_order(slabs << IO_TLB_SHIFT),
+-				dma_bits);
++				dma_bits, &dma_handle);
+ 		} while (rc && dma_bits++ < max_dma_bits);
+ 		if (rc)
+ 			return rc;
+@@ -294,11 +295,10 @@ xen_swiotlb_alloc_coherent(struct device *hwdev, size_t size,
+ 		*dma_handle = dev_addr;
+ 	else {
+ 		if (xen_create_contiguous_region(vstart, order,
+-						 fls64(dma_mask)) != 0) {
++						 fls64(dma_mask), dma_handle) != 0) {
+ 			free_pages(vstart, order);
+ 			return NULL;
+ 		}
+-		*dma_handle = virt_to_machine(ret).maddr;
+ 	}
+ 	memset(ret, 0, size);
+ 	return ret;
+diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+index d6fe062..9ef704d 100644
+--- a/include/xen/xen-ops.h
++++ b/include/xen/xen-ops.h
+@@ -20,7 +20,8 @@ int xen_setup_shutdown_event(void);
+ 
+ extern unsigned long *xen_contiguous_bitmap;
+ int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
+-				unsigned int address_bits);
++				unsigned int address_bits,
++				dma_addr_t *dma_handle);
+ 
+ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
+ 
 -- 
 1.7.2.5
