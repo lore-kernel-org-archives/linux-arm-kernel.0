@@ -1,39 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Jul 2013 10:43:53 +0100
-Subject: [PATCH] ARM: Fix memblock_reserve() to include stext
-In-Reply-To: <20130731055807.14054.70106.sendpatchset@w520>
-References: <20130731055807.14054.70106.sendpatchset@w520>
-Message-ID: <20130731094352.GV24642@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 31 Jul 2013 11:44:34 +0200
+Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
+In-Reply-To: <20130731090512.GD9858@sirena.org.uk>
+References: <1375232669-27846-1-git-send-email-festevam@gmail.com>
+ <1375232669-27846-2-git-send-email-festevam@gmail.com>
+ <20130731073306.GZ1754@pengutronix.de>
+ <20130731082054.GF8540@nchen-desktop>
+ <20130731084645.GB1754@pengutronix.de>
+ <20130731090512.GD9858@sirena.org.uk>
+Message-ID: <20130731094434.GC1754@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 02:58:07PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> This fix for the ARM architecture will include stext
-> in the memblock_reserve() call to make sure that the
-> following symbols are not overwritten (from System.map):
-> 
-> c0008000 T _text
-> c0008000 T stext
-> ...
-> c0008138 T secondary_startup
-> ...
-> c0009000 T _stext
-> 
-> With this patch applied CPU Hotplug starts working
-> again. Without this patch code in secondary_startup
-> never gets reached as expected.
-> 
-> This issue started triggering on kernels later than
-> v3.10 - perhaps a side effect of the CPU Hotplug init
-> section rework - so this is a fix for v3.11-rc.
+[Expanded Cc: a bit]
 
-This is not the right fix.  The commit you previously pointed out (removal
-of CPU hotplug) probably means there's a missing annotation somewhere in
-the code.
+Hello,
 
-And yes - the __CPUINIT just before ENTRY(secondary_startup) was removed
-rather than being replaced with a .text (in both head.S and head-nommu.S).
-Same goes for ENTRY(lookup_processor_type) in head-common.S.  All these
-need to be replaced with .text to stop them falling into the head section.
+On Wed, Jul 31, 2013 at 10:05:12AM +0100, Mark Brown wrote:
+> On Wed, Jul 31, 2013 at 10:46:45AM +0200, Uwe Kleine-K?nig wrote:
+We're discussing about devm_request_irq and wonder what happens at
+remove time when the irq is still active.
+
+> > OK, so the possible problem is that remove is called while the irq is
+> > still active. That means you have to assert that all resources the irq
+> > handler is using (e.g. ioremap, clk_prepare_enable) are only freed
+> > *after* the irq is done. For ioremap that means it must be done using
+> > devm_ioremap_resource. For a clock it's not that easy because the irq
+> > handler has to assert that a used clk is kept prepared which can only be
+> > done using clk_prepare which in turn is not allowed in an irq handler.
+> 
+> > Hmm. So the only possible fixes are
+> > 	- devm* can be told to also care about clk_disable_unprepare
+> > 	- after disabling irqs in the remove callback wait for all
+> > 	  active irqs to be done. (i.e. call synchronize_irq(irq))
+> > 	- don't use devm_request_irq
+> 
+> I'm not sure that devm_ guarantees any ordering in the cleanups it does
+> so I'd not like to rely on the first option either, if there were some
+> guarantee of that it'd help.  The nice thing about explicitly freeing
+> the IRQ is that you can tell that all this stuff is safe by inspection.
+devm_* at least uses list_for_each_entry_reverse
+(drivers/base/devres.c:release_nodes()). Without this guarantee devm_
+would not make much sense IMHO.
+
+To also manage clks, we'd need something like:
+
+	devm_clk_prepare(&dev, some_clk);
+
+that makes devm_clk_release also call clk_unprepare the right number of
+times. Maybe also the same for devm_clk_enable? Does this make sense?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
