@@ -1,144 +1,91 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 1 Aug 2013 09:04:54 -0500
-Subject: [PATCHv4 04/33] CLK: omap: move part of the machine specific
- clock header contents to driver
-In-Reply-To: <51F8E00E.7070506@ti.com>
+Date: Thu, 1 Aug 2013 09:11:40 -0500
+Subject: [PATCHv4 06/33] CLK: omap: add autoidle support
+In-Reply-To: <51F8E365.8080604@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-5-git-send-email-t-kristo@ti.com> <51F8045C.6020603@ti.com>
- <51F8E00E.7070506@ti.com>
-Message-ID: <51FA6B06.3000904@ti.com>
+ <1374564028-11352-7-git-send-email-t-kristo@ti.com> <51F80C77.9020109@ti.com>
+ <51F8E365.8080604@ti.com>
+Message-ID: <51FA6C9C.7030800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 04:59 AM, Tero Kristo wrote:
-> On 07/30/2013 09:22 PM, Nishanth Menon wrote:
->> this patch should be 3/33 to allow dpll.c to build.
+On 07/31/2013 05:13 AM, Tero Kristo wrote:
+> On 07/30/2013 09:56 PM, Nishanth Menon wrote:
+>> On 07/23/2013 02:20 AM, Tero Kristo wrote:
+>>> OMAP clk driver now routes some of the basic clocks through own
+>>> registration routine to allow autoidle support. This routine just
+>>> checks a couple of device node properties and adds autoidle support
+>>> if required, and just passes the registration forward to basic clocks.
 >>
->> On 07/23/2013 02:19 AM, Tero Kristo wrote:
->>> Some of the clock.h contents are needed by the new OMAP clock driver,
->>> including dpll_data and clk_hw_omap. Thus, move these to the generic
->>> omap header file which can be accessed by the driver.
+>> why not extend standard framework to support autoidle capable clocks OR
+>> introduce our own clk node which depends on basic clocks?
+>
+> Was kind of easier this way.
+
+We never liked taking the easy road :) if we can extend standard 
+drivers, that will be the first preference - else we will need to 
+explain precisely why it cant be extended.
+
+>>> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+>>> index 0c38ca9..669d4c4 100644
+>>> --- a/arch/arm/mach-omap2/clock.c
+>>> +++ b/arch/arm/mach-omap2/clock.c
+>> Not sure why, at this point in time we are going to calling drivers/clk
+>> code.
+>>
+>>> @@ -520,6 +520,9 @@ int omap2_clk_enable_autoidle_all(void)
+>>>       list_for_each_entry(c, &clk_hw_omap_clocks, node)
+>>>           if (c->ops && c->ops->allow_idle)
+>>>               c->ops->allow_idle(c);
+>>> +
+>>> +    of_omap_clk_allow_autoidle_all();
+>>> +
+>>>       return 0;
+>>>   }
 >>>
->> Looking at the change, I wonder what the rules are for the movement?
->> commit message was not clear.
->
-> This is kind of a merge of almost everything that is needed by clock
-> drivers at some point. I can move the changes along to the patches that
-> actually need the exports for clarity and to keep compilation clean.
-
-I think it is better to do in stages (while ensuring compilation is 
-clean) - it is a bit hard to understand need and context of movement 
-when a singular movement is done :(
-[..]
->>> @@ -356,28 +230,13 @@ unsigned long omap_fixed_divisor_recalc(struct
->>> clk_hw *hw,
->>>   /* DPLL Type and DCO Selection Flags */
->>>   #define DPLL_J_TYPE        0x1
->>>
->>> -long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long
->>> target_rate,
->>> -            unsigned long *parent_rate);
->>> -unsigned long omap3_dpll_recalc(struct clk_hw *hw, unsigned long
->>> parent_rate);
->>> -int omap3_noncore_dpll_enable(struct clk_hw *hw);
->>> -void omap3_noncore_dpll_disable(struct clk_hw *hw);
->>> -int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
->>> -                unsigned long parent_rate);
+>>> @@ -539,6 +542,9 @@ int omap2_clk_disable_autoidle_all(void)
+>>>       list_for_each_entry(c, &clk_hw_omap_clocks, node)
+>>>           if (c->ops && c->ops->deny_idle)
+>>>               c->ops->deny_idle(c);
+>>> +
+>>> +    of_omap_clk_deny_autoidle_all();
+>>> +
 >>
->> Why are these being moved to generic?
+>> these are defined for CONFIG_OF.. anyways, without dt nodes (OMAP3 is
+>> supposed to support non-DT boot even now), this would not work, would it?
 >
-> These are used from the dpll.c by the ops.
-
-The ops should probably move as well from mach-omap2. No reason to keep 
-it around in mach-omap2 then.
-[...]
-
->>> diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
->>> index 647f02f..cba892a 100644
->>> --- a/include/linux/clk/omap.h
->>> +++ b/include/linux/clk/omap.h
->>> @@ -19,6 +19,161 @@
->>>   #ifndef __LINUX_CLK_OMAP_H_
->>>   #define __LINUX_CLK_OMAP_H_
->>>
->>> -int __init dt_omap_clk_init(void);
->>> +/**
->>> + * struct dpll_data - DPLL registers and integration data
->>> + * @mult_div1_reg: register containing the DPLL M and N bitfields
->>> + * @mult_mask: mask of the DPLL M bitfield in @mult_div1_reg
->>> + * @div1_mask: mask of the DPLL N bitfield in @mult_div1_reg
->>> + * @clk_bypass: struct clk pointer to the clock's bypass clock input
->>> + * @clk_ref: struct clk pointer to the clock's reference clock input
->>> + * @control_reg: register containing the DPLL mode bitfield
->>> + * @enable_mask: mask of the DPLL mode bitfield in @control_reg
->>> + * @last_rounded_rate: cache of the last rate result of
->>> omap2_dpll_round_rate()
->>> + * @last_rounded_m: cache of the last M result of
->>> omap2_dpll_round_rate()
->>> + * @last_rounded_m4xen: cache of the last M4X result of
->>> + *                     omap4_dpll_regm4xen_round_rate()
->>> + * @last_rounded_lpmode: cache of the last lpmode result of
->>> + *                      omap4_dpll_lpmode_recalc()
->>> + * @max_multiplier: maximum valid non-bypass multiplier value (actual)
->>> + * @last_rounded_n: cache of the last N result of
->>> omap2_dpll_round_rate()
->>> + * @min_divider: minimum valid non-bypass divider value (actual)
->>> + * @max_divider: maximum valid non-bypass divider value (actual)
->>> + * @modes: possible values of @enable_mask
->>> + * @autoidle_reg: register containing the DPLL autoidle mode bitfield
->>> + * @idlest_reg: register containing the DPLL idle status bitfield
->>> + * @autoidle_mask: mask of the DPLL autoidle mode bitfield in
->>> @autoidle_reg
->>> + * @freqsel_mask: mask of the DPLL jitter correction bitfield in
->>> @control_reg
->>> + * @idlest_mask: mask of the DPLL idle status bitfield in @idlest_reg
->>> + * @lpmode_mask: mask of the DPLL low-power mode bitfield in
->>> @control_reg
->>> + * @m4xen_mask: mask of the DPLL M4X multiplier bitfield in
->>> @control_reg
->>> + * @auto_recal_bit: bitshift of the driftguard enable bit in
->>> @control_reg
->>> + * @recal_en_bit: bitshift of the PRM_IRQENABLE_* bit for
->>> recalibration IRQs
->>> + * @recal_st_bit: bitshift of the PRM_IRQSTATUS_* bit for
->>> recalibration IRQs
->>> + * @flags: DPLL type/features (see below)
->>> + *
->>> + * Possible values for @flags:
->>> + * DPLL_J_TYPE: "J-type DPLL" (only some 36xx, 4xxx DPLLs)
->> but the flag is in arch/arm/mach-omap2/clock.h ?
+> The lists are empty so the funcs do nothing. However, dropping CONFIG_OF
+> would break these of course. Will figure out a fix for this.
 >
-> I'll look at this and probably move the flag also.
->
->>
->>> + *
->>> + * @freqsel_mask is only used on the OMAP34xx family and AM35xx.
->>> + *
->>> + * XXX Some DPLLs have multiple bypass inputs, so it's not technically
->>> + * correct to only have one @clk_bypass pointer.
->>> + *
->>> + * XXX The runtime-variable fields (@last_rounded_rate,
->>> @last_rounded_m,
->>> + * @last_rounded_n) should be separated from the runtime-fixed fields
->>> + * and placed into a different structure, so that the runtime-fixed
->>> data
->>> + * can be placed into read-only space.
->>> + */
->>> +struct dpll_data {
->>
->> is it necessary to export this? usage is limited to dpll.c and could be
->> made private to it alone, no?
->
-> No, unfortunately dpll_data is used both by the dpll.c and the support
-> code under mach-omap2. This is some sort of intermediate solution, so
-> get DT clocks working first, then move the support code also under
-> drivers/clk/omap.
+> The calls are needed for the transition phase until we can move more clk
+> stuff from mach-omap2 to drivers.
 
-looks like a case for omap_dpll.h instead of a single mega header with 
-everything in it?
-
+yes please. for ones like these, we can try to maintain a rule of 
+mach-omap2 calling drivers/clk rather than drivers/clk -> mach-omap2. 
+This will allow us to move out of mach-omap2 eventually by just deleting 
+call points in mach-omap2.
 
 [...]
+>>>
+>>>   #endif
+>>>
+>>
+>> I personally dont prefer the fact that divider-clock and
+>> fixed-rate-clock now has double meaning - building a multi-arch kernel
+>> for example, this can wreak havoc. standard definitions should not be
+>> monkeyed around with thus if avoidable, and in this case, very much
+>> avoidable.
+>>
+>> just my 2 cents.
+>
+> Yea, as described before, I'll change the code not to make a global
+> override, instead, just make omap specific override which parses the
+> extra params. That sound better or still see some issues with that?
+
+I think described above - if we can introduce these into standard 
+drivers, it is the best, else introduce it with ti, prefix to indicate a 
+TI variant. keeps everyone happy.
+
 
 -- 
 Regards,
