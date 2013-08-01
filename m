@@ -1,26 +1,31 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 1 Aug 2013 13:59:49 +0530
-Subject: [PATCHv4 03/33] CLK: OMAP4: Add DPLL clock support
-In-Reply-To: <1374564028-11352-4-git-send-email-t-kristo@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-4-git-send-email-t-kristo@ti.com>
-Message-ID: <51FA1C7D.5060403@ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 1 Aug 2013 16:32:23 +0800
+Subject: [PATCH 1/2] pinctrl: imx: work around select input quirk
+In-Reply-To: <CAAQ0ZWQajP49jM_0wqvqmuv19ZcSQ_1QUzgxfsBYzKU_5w0bMA@mail.gmail.com>
+References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
+ <20130801065147.GM8540@nchen-desktop>
+ <CAAQ0ZWQajP49jM_0wqvqmuv19ZcSQ_1QUzgxfsBYzKU_5w0bMA@mail.gmail.com>
+Message-ID: <20130801083221.GA32696@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero,
+On Thu, Aug 01, 2013 at 03:08:06PM +0800, Shawn Guo wrote:
+> On 1 August 2013 14:51, Peter Chen <peter.chen@freescale.com> wrote:
+> > Shawn, input_reg[i] may be 0 if the fixed one at first register of IOMUXC
+> 
+> Ah, yes.  Now select input register at offset 0 becomes possible.  I
+> will try to fix it.
+> 
+> Regardless of this, does the series work for you?
+> 
+Yes, it works, you can add : Tested-by: Peter Chen <peter.chen@freescale.com>
 
-On Tuesday 23 July 2013 12:49 PM, Tero Kristo wrote:
-> +	dd->control_reg = of_iomap(node, 0);
-> +	dd->idlest_reg = of_iomap(node, 1);
-> +	dd->autoidle_reg = of_iomap(node, 2);
-> +	dd->mult_div1_reg = of_iomap(node, 3);
-> +
-[]...
-> +	reg = of_iomap(node, 0);
+I changed the second patch manually, have you changed the pin prefix
+at arch/arm/boot/dts/imx6q-pinfunc.h?  At 3.10, it is MX6Q_XXX.
 
-Doing an of_iomap() for every single clock register seems like an overkill
-and might have performance penalties at boot.
+Besides, please add comments for u16 *input_reg at struct imx_pin_group.
 
-regards,
-Rajendra
+-- 
+
+Best Regards,
+Peter Chen
