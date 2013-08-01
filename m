@@ -1,191 +1,70 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 15:25:08 +0200
-Subject: [PATCHv6 05/13] irqdomain: refactor __irq_domain_add()
+Date: Thu,  1 Aug 2013 15:25:11 +0200
+Subject: [PATCHv6 08/13] irqchip: armada-370-xp: properly request resources
 In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375363516-2620-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375363516-2620-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the __irq_domain_add() function does both the irq_domain
-allocation *and* registration. This is a problem for
-irq_domain_add_*() helpers that need to do something between the
-allocation and the registration, such as for example setting a
-d->msi_chip pointer in the irq_domain structure before this structure
-is made globally visible by being registered.
+Instead of using of_iomap(), we now use of_address_to_resource(),
+request_mem_region() and ioremap(). This allows the corresponding I/O
+regions to be properly requested and visible in /proc/iomem.
 
-Moreover, the comment in __irq_domain_add() also suggests that an
-irq_domain_register() function should exist.
+The main motivation for this change is that the introduction of the
+MSI support requires us to get the physical address of the main
+interrupt controller registers, so we will need the corresponding
+'struct resource' anyway.
 
-Therefore, this commit:
-
- * Splits __irq_domain_add() into __irq_domain_alloc() (allocation and
-   initialization of the irq_domain) and __irq_domain_register()
-   (registration of the irq_domain to the global list)
-
- * Modifies the existing users of __irq_domain_add() to use those two
-   functions.
-
-A next commit will make another use of it when introducing support for
-msi_chip in the irqdomain code.
+We also take this opportunity to change a panic() to BUG_ON(), in
+order to be consistent with the rest of the driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- include/linux/irqdomain.h | 21 +++++++++++++++++----
- kernel/irq/irqdomain.c    | 40 +++++++++++++++++++++++++++-------------
- 2 files changed, 44 insertions(+), 17 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 1ffa336..7113941 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -111,10 +111,11 @@ struct irq_domain {
- };
- 
- #ifdef CONFIG_IRQ_DOMAIN
--struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
-+struct irq_domain *__irq_domain_alloc(struct device_node *of_node, int size,
- 				    irq_hw_number_t hwirq_max, int direct_max,
- 				    const struct irq_domain_ops *ops,
- 				    void *host_data);
-+void __irq_domain_register(struct irq_domain *domain);
- struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
- 					 unsigned int size,
- 					 unsigned int first_irq,
-@@ -141,14 +142,22 @@ static inline struct irq_domain *irq_domain_add_linear(struct device_node *of_no
- 					 const struct irq_domain_ops *ops,
- 					 void *host_data)
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index bb328a3..26adc74 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -248,12 +248,25 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 					     struct device_node *parent)
  {
--	return __irq_domain_add(of_node, size, size, 0, ops, host_data);
-+	struct irq_domain *d;
-+	d = __irq_domain_alloc(of_node, size, size, 0, ops, host_data);
-+	if (d)
-+		__irq_domain_register(d);
-+	return d;
- }
- static inline struct irq_domain *irq_domain_add_nomap(struct device_node *of_node,
- 					 unsigned int max_irq,
- 					 const struct irq_domain_ops *ops,
- 					 void *host_data)
- {
--	return __irq_domain_add(of_node, 0, max_irq, max_irq, ops, host_data);
-+	struct irq_domain *d;
-+	d = __irq_domain_alloc(of_node, 0, max_irq, max_irq, ops, host_data);
-+	if (d)
-+		__irq_domain_register(d);
-+	return d;
- }
- static inline struct irq_domain *irq_domain_add_legacy_isa(
- 				struct device_node *of_node,
-@@ -162,7 +171,11 @@ static inline struct irq_domain *irq_domain_add_tree(struct device_node *of_node
- 					 const struct irq_domain_ops *ops,
- 					 void *host_data)
- {
--	return __irq_domain_add(of_node, 0, ~0, 0, ops, host_data);
-+	struct irq_domain *d;
-+	d = __irq_domain_alloc(of_node, 0, ~0, 0, ops, host_data);
-+	if (d)
-+		__irq_domain_register(d);
-+	return d;
- }
++	struct resource main_int_res, per_cpu_int_res;
+ 	u32 control;
  
- extern void irq_domain_remove(struct irq_domain *host);
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 034bbac..8d02af7 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -23,7 +23,7 @@ static DEFINE_MUTEX(revmap_trees_mutex);
- static struct irq_domain *irq_default_domain;
+-	main_int_base = of_iomap(node, 0);
+-	per_cpu_int_base = of_iomap(node, 1);
++	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
++	BUG_ON(of_address_to_resource(node, 1, &per_cpu_int_res));
  
- /**
-- * __irq_domain_add() - Allocate a new irq_domain data structure
-+ * __irq_domain_alloc() - Allocate a new irq_domain data structure
-  * @of_node: optional device-tree node of the interrupt controller
-  * @size: Size of linear map; 0 for radix mapping only
-  * @direct_max: Maximum value of direct maps; Use ~0 for no limit; 0 for no
-@@ -31,14 +31,15 @@ static struct irq_domain *irq_default_domain;
-  * @ops: map/unmap domain callbacks
-  * @host_data: Controller private data pointer
-  *
-- * Allocates and initialize and irq_domain structure.  Caller is expected to
-- * register allocated irq_domain with irq_domain_register().  Returns pointer
-- * to IRQ domain, or NULL on failure.
-+ * Allocates and initializes an irq_domain structure.  Caller is
-+ * expected to register the allocated irq_domain with
-+ * __irq_domain_register().  Returns pointer to IRQ domain, or NULL on
-+ * failure.
-  */
--struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
--				    irq_hw_number_t hwirq_max, int direct_max,
--				    const struct irq_domain_ops *ops,
--				    void *host_data)
-+struct irq_domain *__irq_domain_alloc(struct device_node *of_node, int size,
-+				      irq_hw_number_t hwirq_max, int direct_max,
-+				      const struct irq_domain_ops *ops,
-+				      void *host_data)
- {
- 	struct irq_domain *domain;
- 
-@@ -56,14 +57,24 @@ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
- 	domain->revmap_size = size;
- 	domain->revmap_direct_max_irq = direct_max;
- 
-+	return domain;
-+}
-+EXPORT_SYMBOL_GPL(__irq_domain_alloc);
++	BUG_ON(!request_mem_region(main_int_res.start,
++				   resource_size(&main_int_res),
++				   node->full_name));
++	BUG_ON(!request_mem_region(per_cpu_int_res.start,
++				   resource_size(&per_cpu_int_res),
++				   node->full_name));
 +
-+/**
-+ * __irq_domain_register() - Register a new irq_domain that has been
-+ * previously allocated with __irq_domain_alloc().
-+ * @domain: irq_domain to registers
-+ */
-+void __irq_domain_register(struct irq_domain *domain)
-+{
- 	mutex_lock(&irq_domain_mutex);
- 	list_add(&domain->link, &irq_domain_list);
- 	mutex_unlock(&irq_domain_mutex);
- 
- 	pr_debug("Added domain %s\n", domain->name);
--	return domain;
- }
--EXPORT_SYMBOL_GPL(__irq_domain_add);
-+EXPORT_SYMBOL_GPL(__irq_domain_register);
- 
- /**
-  * irq_domain_remove() - Remove an irq domain.
-@@ -127,7 +138,7 @@ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
- {
- 	struct irq_domain *domain;
- 
--	domain = __irq_domain_add(of_node, size, size, 0, ops, host_data);
-+	domain = __irq_domain_alloc(of_node, size, size, 0, ops, host_data);
- 	if (!domain)
- 		return NULL;
- 
-@@ -143,6 +154,8 @@ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
- 		irq_domain_associate_many(domain, first_irq, 0, size);
- 	}
- 
-+	__irq_domain_register(domain);
++	main_int_base = ioremap(main_int_res.start,
++				resource_size(&main_int_res));
+ 	BUG_ON(!main_int_base);
 +
- 	return domain;
- }
- EXPORT_SYMBOL_GPL(irq_domain_add_simple);
-@@ -171,12 +184,13 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- {
- 	struct irq_domain *domain;
++	per_cpu_int_base = ioremap(per_cpu_int_res.start,
++				   resource_size(&per_cpu_int_res));
+ 	BUG_ON(!per_cpu_int_base);
  
--	domain = __irq_domain_add(of_node, first_hwirq + size,
--				  first_hwirq + size, 0, ops, host_data);
-+	domain = __irq_domain_alloc(of_node, first_hwirq + size,
-+				    first_hwirq + size, 0, ops, host_data);
- 	if (!domain)
- 		return NULL;
+ 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
+@@ -262,8 +275,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
+ 				&armada_370_xp_mpic_irq_ops, NULL);
  
- 	irq_domain_associate_many(domain, first_irq, first_hwirq, size);
-+	__irq_domain_register(domain);
+-	if (!armada_370_xp_mpic_domain)
+-		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
++	BUG_ON(!armada_370_xp_mpic_domain);
  
- 	return domain;
- }
+ 	irq_set_default_host(armada_370_xp_mpic_domain);
+ 
 -- 
 1.8.1.2
