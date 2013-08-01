@@ -1,92 +1,79 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 1 Aug 2013 18:51:12 +0100
-Subject: [PATCH 1/7] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <51F94E20.7020904@gmail.com>
-References: <20130730094920.GC28716@e106331-lin.cambridge.arm.com>
- <51F7B4C9.2060500@gmail.com>
- <20130730125650.GD28716@e106331-lin.cambridge.arm.com>
- <20130730134427.GE28716@e106331-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1307301528540.4893@kaball.uk.xensource.com>
- <1375195354.32691.55.camel@kazak.uk.xensource.com>
- <CAHCPf3vUA1bD+1xPch-KZX6fdDzxsWjnVpUD39AKC=ds+EKeHQ@mail.gmail.com>
- <20130731134917.GN29859@e106331-lin.cambridge.arm.com>
- <CAHCPf3svo2q3oCJFzGvU_EKrtvUgAzEgObaXc6aZw7AhuumePg@mail.gmail.com>
- <51F94E20.7020904@gmail.com>
-Message-ID: <20130801175106.GA19325@localhost.localdomain>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  1 Aug 2013 11:51:11 -0600
+Subject: [PATCH V2] ARM: allow DEBUG_UNCOMPRESS for Tegra
+Message-ID: <1375379471-15615-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 12:49:20PM -0500, Rob Herring wrote:
-> On 07/31/2013 12:24 PM, Matt Sealey wrote:
-> > On Wed, Jul 31, 2013 at 8:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> [snip]
-> 
-> >>> * An AArch64 guest under an AArch64 hypervisor/sm would use the 64-bit
-> >>> convention or the 32-bit convention depending on how the sm is
-> >>> written, but it doesn't matter which is used if both can be
-> >>> supported.. but you'd only want to use one of them.
-> >>
-> >> Not all implementation will implement both, so there needs to be a way
-> >> to describe that. Which is actually used is up to the OS.
-> > 
-> > Okay but putting both ways in a single node, and describing two
-> > function ids (per property or with two properties) is what I was
-> > getting at.. for the one case where you can use both at once, the
-> > device tree description is king here.
-> > 
-> > I am a little concerned that the support for this is going down the
-> > route of telling the OS all possible ways to do the same thing instead
-> > of trying to get into using a single, preferred way in the common
-> > cases.
-> > 
-> > Putting both call methods in the same node, doubling the function id
-> > property lengths, or suffixing function id properties to do it seems
-> > like putting information in the tree purely for the sake of it. In
-> > what cases would it (uncommon cases only being existing, pre-PCSI
-> > pre-SMC-conventions potentially for other things). In the case of PSCI
-> > there's an opportunity to be strict about it.. why would it be sane to
-> > allow a mixed implementation? Dictate that either support all the
-> > 64-bit versions or all the 32-bit versions or both? And if both are
-> > supported, dictate in the device tree which the OS should be using.
+From: Stephen Warren <swarren@nvidia.com>
 
-The DT is about description, not policy.  If multiple usable flavours of
-the PSCI interface exist, then they exist, and there's no special reason
-to hide one of them from the DT that I can see.
+DEBUG_UNCOMPRESS was previously disallowed for Tegra due to tegra.S's
+use of global data that was not linked into the decompressor. Solve this
+by declaring this symbol in tegra.S when it is being built into the
+decompressor. For the kernel proper, leave the declaration in
+mach-tegra/common.c as explained in the comment.
 
-I take the point that we shouldn't describe useless or redundant
-information for no good reason, though.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2: Don't select DEBUG_UNCOMPRESS with DEBUG_TEGRA_UART unless
+    !ZBOOT_ROM. Add notes on ZBOOT_ROM to comment.
 
-> > What about having two nodes? There is nothing in device trees that
-> > says you can't have two psci { compatible="arm,psci-0.2" } nodes, one
-> > with method=smc and one with method=smc64 or hvc64 or what have you.
-> > Parsing and setup of the PSCI code can be quit early if it's not the
-> > "desirable" method for the OS (i.e. 64-bit on a 32-bit kernel). Then
-> > each node follows the exact same definition, and the differentiator is
-> > the call method and not the property names or complicating their
-> > contents.
-> 
-> +1
-> 
-> This would certainly be easier for things like a hypervisor to parse and
-> update.
+Russell, I assume this should go in through the ARM patch tracker. Or,
+do you want me to take it through the Tegra tree?
 
-Can you elaborate on that?
+ arch/arm/Kconfig.debug         |  2 +-
+ arch/arm/include/debug/tegra.S | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
 
-Wouldn't a hypervisor always rip out and replace PSCI node(s) with
-its own?  Allowing the firmware's PSCI interface to "show through" to a
-guest VM sounds unwise.
-
-I'm not sure why having multiple nodes makes this easier.
-
-Having two nodes just moves information around.  Does it really simplify
-anything?
-
-
-With the multiple nodes approach, you might actually need 3 nodes if
-you are providing backwards compatible support for psci-0.1 callers: one
-for psci-0.2 32-bit, one for psci-0.2 64-bit, and one for psci-0.1.
-Maybe not though ... I'd have to think about it a bit more.
-
-CHeers
----Dave
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index af5d084..7f92c84 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1052,7 +1052,7 @@ config DEBUG_UNCOMPRESS
+ 	bool
+ 	depends on ARCH_MULTIPLATFORM || ARCH_MSM
+ 	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
+-		     !DEBUG_TEGRA_UART
++		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
+ 	help
+ 	  This option influences the normal decompressor output for
+ 	  multiplatform kernels.  Normally, multiplatform kernels disable
+diff --git a/arch/arm/include/debug/tegra.S b/arch/arm/include/debug/tegra.S
+index 883d7c2..be6a720 100644
+--- a/arch/arm/include/debug/tegra.S
++++ b/arch/arm/include/debug/tegra.S
+@@ -221,3 +221,32 @@
+ 1002:
+ #endif
+ 		.endm
++
++/*
++ * Storage for the state maintained by the macros above.
++ *
++ * In the kernel proper, this data is located in arch/arm/mach-tegra/common.c.
++ * That's because this header is included from multiple files, and we only
++ * want a single copy of the data. In particular, the UART probing code above
++ * assumes it's running using physical addresses. This is true when this file
++ * is included from head.o, but not when included from debug.o. So we need
++ * to share the probe results between the two copies, rather than having
++ * to re-run the probing again later.
++ *
++ * In the decompressor, we put the symbol/storage right here, since common.c
++ * isn't included in the decompressor build. This symbol gets put in .text
++ * even though it's really data, since .data is discarded from the
++ * decompressor. Luckily, .text is writeable in the decompressor, unless
++ * CONFIG_ZBOOT_ROM. That dependency is handled in arch/arm/Kconfig.debug.
++ */
++#if defined(ZIMAGE)
++tegra_uart_config:
++	/* Debug UART initialization required */
++	.word 1
++	/* Debug UART physical address */
++	.word 0
++	/* Debug UART virtual address */
++	.word 0
++	/* Scratch space for debug macro */
++	.word 0
++#endif
+-- 
+1.8.1.5
