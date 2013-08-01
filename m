@@ -1,51 +1,61 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 1 Aug 2013 12:22:04 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6q: add quirky select input for USB_OTG_ID
-In-Reply-To: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
-References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1375330924-27384-2-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 1 Aug 2013 12:22:03 +0800
+Subject: [PATCH 1/2] pinctrl: imx: work around select input quirk
+Message-ID: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some reason, the select input of pin function USB_OTG_ID is not
-implemented via a regular select input register but using the bit
-USB_OTG_ID_ SEL (shift 13) of IOMUXC_GPR1 register (offset 0x4).
+The select input for some pin may not be implemented using the regular
+select input register but the general purpose register.  A real example
+is that imx6q designers found the select input for USB OTG ID pin is
+missing at the very late stage, and can not add a new select input
+register but have to use a general purpose register bit to implement it.
 
-As per the workaround for such quirk implemented in pinctrl driver,
-we need to compose the input_val cell as below.
-
-	31     23      15      7        0
-	| 0xff | shift | width | select |
-
-Thus, we have 0xff0d0100 for MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID and
-0xff0d0101 for MX6QDL_PAD_GPIO_1__USB_OTG_ID in input_val cell.
+The patch adds a workaround for such select input quirk by interpreting
+the input_val cell of pin function ID in a different way, so that all
+the info that needed for setting up select input bits in general purpose
+register could be decoded from there.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx6q-pinfunc.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/pinctrl/pinctrl-imx.c |   25 ++++++++++++++++++++++++-
+ 1 files changed, 24 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
-index c0e38a4..44507a3 100644
---- a/arch/arm/boot/dts/imx6q-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6q-pinfunc.h
-@@ -536,7 +536,7 @@
- #define MX6QDL_PAD_ENET_REF_CLK__ESAI_RX_FS         0x1d4 0x4e8 0x85c 0x2 0x0
- #define MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23         0x1d4 0x4e8 0x000 0x5 0x0
- #define MX6QDL_PAD_ENET_REF_CLK__SPDIF_SR_CLK       0x1d4 0x4e8 0x000 0x6 0x0
--#define MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID           0x1d8 0x4ec 0x000 0x0 0x0
-+#define MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID           0x1d8 0x4ec 0x004 0x0 0xff0d0100
- #define MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER           0x1d8 0x4ec 0x000 0x1 0x0
- #define MX6QDL_PAD_ENET_RX_ER__ESAI_RX_HF_CLK       0x1d8 0x4ec 0x864 0x2 0x0
- #define MX6QDL_PAD_ENET_RX_ER__SPDIF_IN             0x1d8 0x4ec 0x914 0x3 0x1
-@@ -654,7 +654,7 @@
- #define MX6QDL_PAD_GPIO_1__ESAI_RX_CLK              0x224 0x5f4 0x86c 0x0 0x1
- #define MX6QDL_PAD_GPIO_1__WDOG2_B                  0x224 0x5f4 0x000 0x1 0x0
- #define MX6QDL_PAD_GPIO_1__KEY_ROW5                 0x224 0x5f4 0x8f4 0x2 0x0
--#define MX6QDL_PAD_GPIO_1__USB_OTG_ID               0x224 0x5f4 0x000 0x3 0x0
-+#define MX6QDL_PAD_GPIO_1__USB_OTG_ID               0x224 0x5f4 0x004 0x3 0xff0d0101
- #define MX6QDL_PAD_GPIO_1__PWM2_OUT                 0x224 0x5f4 0x000 0x4 0x0
- #define MX6QDL_PAD_GPIO_1__GPIO1_IO01               0x224 0x5f4 0x000 0x5 0x0
- #define MX6QDL_PAD_GPIO_1__SD1_CD_B                 0x224 0x5f4 0x000 0x6 0x0
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index 57a4eb0..6ebe2e9 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -241,7 +241,30 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 
+ 		/* some pins also need select input setting, set it if found */
+ 		if (input_reg[i]) {
+-			writel(input_val[i], ipctl->base + input_reg[i]);
++			u32 val = input_val[i];
++			/*
++			 * If the select input value begins with 0xff, the value
++			 * will be interpreted as below.
++			 *     31     23      15      7        0
++			 *     | 0xff | shift | width | select |
++			 * It's used to work around the problem that the select
++			 * input for some pin is not implemented in the select
++			 * input register but in some general purpose register.
++			 * We encode the select input value, width and shift of
++			 * the bit field into input_val cell of pin function ID
++			 * in device tree, and then decode them here for setting
++			 * up the select input bits in general purpose register.
++			 */
++			if (val >> 24 == 0xff) {
++				u8 select = val & 0xff;
++				u8 width = (val >> 8) & 0xff;
++				u8 shift = (val >> 16) & 0xff;
++				u32 mask = ((1 << width) - 1) << shift;
++				val = readl(ipctl->base + input_reg[i]);
++				val &= ~mask;
++				val |= select << shift;
++			}
++			writel(val, ipctl->base + input_reg[i]);
+ 			dev_dbg(ipctl->dev,
+ 				"==>select_input: offset 0x%x val 0x%x\n",
+ 				input_reg[i], input_val[i]);
 -- 
 1.7.1
