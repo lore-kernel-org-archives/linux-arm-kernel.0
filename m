@@ -1,34 +1,45 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 1 Aug 2013 15:12:42 +0300
-Subject: [RFC/PATCH 0/3] arm: omap: patches from -rt
-Message-ID: <1375359165-8411-1-git-send-email-balbi@ti.com>
+Date: Thu, 1 Aug 2013 15:12:43 +0300
+Subject: [RFC/PATCH 1/3] i2c/omap: drop the lock hard irq context
+In-Reply-To: <1375359165-8411-1-git-send-email-balbi@ti.com>
+References: <1375359165-8411-1-git-send-email-balbi@ti.com>
+Message-ID: <1375359165-8411-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-the next three patches were taken from v3.10.4-rt1 patchset.
+The lock is taken while reading two registers. On RT the first lock is
+taken in hard irq where it might sleep and in the threaded irq.
+The threaded irq runs in oneshot mode so the hard irq does not run until
+the thread the completes so there is no reason to grab the lock.
 
-I don't have any boards available to test them, so I'd suggest
-testing in as many platforms as possible before pushing
-upstream.
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-By pushing these patches upstream, we help decrease the amount
-of out-of-tree changes rt folks need to carry.
-
-Frank Rowand (1):
-  arm: omap: convert omap boot_lock to raw
-
-Sebastian Andrzej Siewior (1):
-  i2c/omap: drop the lock hard irq context
-
-Thomas Gleixner (1):
-  serial: omap: fix omap lock crap
-
- arch/arm/mach-omap2/omap-smp.c   | 10 +++++-----
- drivers/i2c/busses/i2c-omap.c    |  5 +----
- drivers/tty/serial/omap-serial.c | 12 ++++--------
- 3 files changed, 10 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 142b694d..8ceb98a 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -884,15 +884,12 @@ omap_i2c_isr(int irq, void *dev_id)
+ 	u16 mask;
+ 	u16 stat;
+ 
+-	spin_lock(&dev->lock);
+-	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+ 	stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
++	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+ 
+ 	if (stat & mask)
+ 		ret = IRQ_WAKE_THREAD;
+ 
+-	spin_unlock(&dev->lock);
+-
+ 	return ret;
+ }
+ 
 -- 
 1.8.3.4.840.g6a90778
