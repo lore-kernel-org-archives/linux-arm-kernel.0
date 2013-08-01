@@ -1,50 +1,35 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 10:45:35 +0200
-Subject: [PATCH 6/9] ARM: kirkwood: convert the mv88f6281gtw_ge board to DT
+Date: Thu,  1 Aug 2013 10:45:36 +0200
+Subject: [PATCH 7/9] ARM: kirkwood: convert LaCie Net{2,
+ 5}Big v2 platforms to DT
 In-Reply-To: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375346738-21596-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375346738-21596-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 125 ++++++++++++++++++
- arch/arm/mach-kirkwood/Kconfig                 |  13 +-
- arch/arm/mach-kirkwood/Makefile                |   2 +-
- arch/arm/mach-kirkwood/board-dt.c              |   4 +
- arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c |  50 +++++++
- arch/arm/mach-kirkwood/common.h                |   6 +
- arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c | 172 -------------------------
- 8 files changed, 194 insertions(+), 179 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
- create mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
- delete mode 100644 arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+ arch/arm/boot/dts/kirkwood-net2big-v2.dts          | 204 ++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-net5big-v2.dts          | 238 +++++++++++++++++++++
+ arch/arm/mach-kirkwood/Kconfig                     |  24 +--
+ arch/arm/mach-kirkwood/Makefile                    |   4 +-
+ .../{netxbig_v2-setup.c => board-netxbig_v2.c}     | 213 +-----------------
+ 5 files changed, 459 insertions(+), 224 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-net2big-v2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-net5big-v2.dts
+ rename arch/arm/mach-kirkwood/{netxbig_v2-setup.c => board-netxbig_v2.c} (53%)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 641b3c9..8e7fec4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -83,6 +83,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- 	kirkwood-lschlv2.dtb \
- 	kirkwood-lsxhl.dtb \
- 	kirkwood-mplcec4.dtb \
-+	kirkwood-mv88f6281gtw-ge.dtb \
- 	kirkwood-netgear_readynas_duo_v2.dtb \
- 	kirkwood-ns2.dtb \
- 	kirkwood-ns2lite.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+diff --git a/arch/arm/boot/dts/kirkwood-net2big-v2.dts b/arch/arm/boot/dts/kirkwood-net2big-v2.dts
 new file mode 100644
-index 0000000..13e3576
+index 0000000..06beca9
 --- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -0,0 +1,125 @@
++++ b/arch/arm/boot/dts/kirkwood-net2big-v2.dts
+@@ -0,0 +1,204 @@
 +/*
-+ * Marvell 88F6281 GTW GE Board
++ * LaCie 2Big Network v2
 + *
-+ * Lennert Buytenhek <buytenh@marvell.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ * Simon Guinot <sguinot@lacie.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2.  This program is licensed "as is" without any
@@ -54,14 +39,12 @@ index 0000000..13e3576
 + * and 6282 variants of the Marvell Kirkwood Development Board.
 + */
 +
-+/dts-v1/;
-+
 +/include/ "kirkwood.dtsi"
 +/include/ "kirkwood-6281.dtsi"
 +
 +/ {
-+	model = "Marvell 88F6281 GTW GE Board";
-+	compatible = "marvell,mv88f6281gtw-ge", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++	model = "LaCie 2Big Network v2";
++	compatible = "lacie,net2big-v2", "marvell,kirkwood-88f6281", "marvell,kirkwood";
 +
 +	memory {
 +		device_type = "memory";
@@ -74,34 +57,92 @@ index 0000000..13e3576
 +
 +	ocp at f1000000 {
 +		pinctrl at 10000 {
-+			pmx_usb_led: pmx-usb-led {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpo";
-+			};
++			pinctrl-0 = <&pmx_misc &pmx_sysrst>;
++			pinctrl-names = "default";
 +
-+			pmx_leds: pmx-leds {
-+				marvell,pins = "mpp20", "mpp21";
++			pmx_keys: pmx-keys {
++				marvell,pins = "mpp13", "mpp15", "mpp34";
 +				marvell,function = "gpio";
 +			};
 +
-+			pmx_keys: pmx-keys {
-+				marvell,pins = "mpp46", "mpp47";
++			pmx_sata_power: pmx-sata-power {
++				marvell,pins = "mpp16", "mpp17";
++				marvell,function = "gpio";
++			};
++
++			pmx_sata1: pmx-sata1 {
++				marvell,pins = "mpp20";
++				marvell,function = "sata1";
++			};
++
++			pmx_sata0: pmx-sata0 {
++				marvell,pins = "mpp21";
++				marvell,function = "sata0";
++			};
++
++			pmx_poweroff: pmx-poweroff {
++				marvell,pins = "mpp7";
++				marvell,function = "gpo";
++			};
++
++			pmx_sysrst: pmx-sysrst {
++				marvell,pins = "mpp6";
++				marvell,function = "sysrst";
++			};
++
++			/*
++			 * MPP14: USB fuse alarm
++			 * MPP24: USB mode select
++			 * MPP26: USB device vbus
++			 * MPP28: USB enable host vbus
++			 * MPP35: inhibit switch power-off
++			 * MPP36: SATA HDD1 presence
++			 * MPP37: SATA HDD2 presence
++			 * MPP40: eSATA presence
++			 * MPP44: GPIO extension (data 0)
++			 * MPP45: GPIO extension (data 1)
++			 * MPP46: GPIO extension (data 2)
++			 * MPP47: GPIO extension (addr 0)
++			 * MPP48: GPIO extension (addr 1)
++			 * MPP49: GPIO extension (addr 2)
++			 */
++			pmx_misc: pmx-misc {
++				marvell,pins = "mpp14", "mpp24", "mpp26", "mpp28", "mpp29",
++					       "mpp35", "mpp36", "mpp37", "mpp40", "mpp44",
++					       "mpp45", "mpp46", "mpp47", "mpp48", "mpp49";
 +				marvell,function = "gpio";
 +			};
 +		};
 +
 +		spi at 10600 {
++			status = "okay";
 +			pinctrl-0 = <&pmx_spi>;
 +			pinctrl-names = "default";
-+			status = "okay";
 +
 +			flash at 0 {
 +				#address-cells = <1>;
 +				#size-cells = <1>;
-+				compatible = "mx25l12805d";
++				compatible = "mx25l4005a";
 +				reg = <0>;
-+				spi-max-frequency = <50000000>;
++				spi-max-frequency = <20000000>;
 +				mode = <0>;
++
++				partition at 0 {
++					reg = <0x0 0x80000>;
++					label = "u-boot";
++				};
++			};
++		};
++
++		i2c at 11000 {
++			status = "okay";
++			pinctrl-0 = <&pmx_i2c>;
++			pinctrl-names = "default";
++
++			eeprom at 50 {
++				compatible = "at,24c04";
++				pagesize = <16>;
++				reg = <0x50>;
 +			};
 +		};
 +
@@ -116,35 +157,20 @@ index 0000000..13e3576
 +			status = "okay";
 +		};
 +
-+		pcie-controller {
++		sata at 80000 {
++			pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
++			pinctrl-names = "default";
 +			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
++			nr-ports = <2>;
 +		};
 +	};
 +
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_leds &pmx_usb_led>;
++        gpio_poweroff {
++		compatible = "gpio-poweroff";
++		pinctrl-0 = <&pmx_poweroff>;
 +		pinctrl-names = "default";
-+
-+		green-status {
-+			label = "gtw:green:Status";
-+			gpios = <&gpio0 20 0>;
-+		};
-+
-+		red-status {
-+			label = "gtw:red:Status";
-+			gpios = <&gpio0 21 0>;
-+		};
-+
-+		green-usb {
-+			label = "gtw:green:USB";
-+			gpios = <&gpio0 12 0>;
-+		};
-+	};
++		gpios = <&gpio0 7 0>;
++        };
 +
 +	gpio_keys {
 +		compatible = "gpio-keys";
@@ -154,339 +180,614 @@ index 0000000..13e3576
 +		pinctrl-names = "default";
 +
 +		button at 1 {
-+			label = "SWR Button";
-+			linux,code = <0x198>; /* KEY_RESTART */
-+			gpios = <&gpio1 15 1>;
++			label = "Back power switch (on|auto)";
++			linux,code = <0x1>;
++			linux,input-type = <5>; /* EV_SW */
++			gpios = <&gpio0 13 1>;
 +		};
-+		button at 2 {
-+			label = "WPS Button";
-+			linux,code = <0x211>; /* KEY_WPS_BUTTON */
-+			gpios = <&gpio1 14 1>;
++		button at 1 {
++			label = "Back power switch (auto|off)";
++			linux,code = <0x2>;
++			linux,input-type = <5>; /* EV_SW */
++			gpios = <&gpio0 15 1>;
++		};
++		button at 1 {
++			label = "Function button";
++			linux,code = <0x165>; /* KEY_OPTION */
++			gpios = <&gpio1 3 1>;
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		pinctrl-0 = <&pmx_sata_power>;
++		pinctrl-names = "default";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		sata0_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA0 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 16 0>;
++		};
++
++		sata1_power: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA1 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 17 0>;
 +		};
 +	};
 +};
+diff --git a/arch/arm/boot/dts/kirkwood-net5big-v2.dts b/arch/arm/boot/dts/kirkwood-net5big-v2.dts
+new file mode 100644
+index 0000000..61dea84
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-net5big-v2.dts
+@@ -0,0 +1,238 @@
++/*
++ * LaCie 5Big Network v2
++ *
++ * Simon Guinot <sguinot@lacie.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * This file contains the definitions that are common between the 6281
++ * and 6282 variants of the Marvell Kirkwood Development Board.
++ */
++
++/include/ "kirkwood.dtsi"
++/include/ "kirkwood-6281.dtsi"
++
++/ {
++	model = "LaCie 5Big Network v2";
++	compatible = "lacie,net5big-v2", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x20000000>; /* 512 MB */
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlyprintk";
++	};
++
++	ocp at f1000000 {
++		pinctrl at 10000 {
++			pinctrl-0 = <&pmx_misc &pmx_sysrst>;
++			pinctrl-names = "default";
++
++			pmx_keys: pmx-keys {
++				marvell,pins = "mpp13", "mpp15", "mpp34";
++				marvell,function = "gpio";
++			};
++
++			pmx_sata_power: pmx-sata-power {
++				marvell,pins = "mpp16", "mpp17", "mpp41", "mpp42", "mpp43";
++				marvell,function = "gpio";
++			};
++
++			pmx_poweroff: pmx-poweroff {
++				marvell,pins = "mpp7";
++				marvell,function = "gpo";
++			};
++
++			pmx_sysrst: pmx-sysrst {
++				marvell,pins = "mpp6";
++				marvell,function = "sysrst";
++			};
++
++			/*
++			 * MPP14: USB fuse alarm
++			 * MPP28: USB enable host vbus
++			 * MPP29: GPIO extension ALE
++			 * MPP35: inhibit switch power-off
++			 * MPP36: SATA HDD1 presence
++			 * MPP37: SATA HDD2 presence
++			 * MPP38: SATA HDD3 presence
++			 * MPP39: SATA HDD4 presence
++			 * MPP40: SATA HDD5 presence
++			 * MPP44: GPIO extension (data 0)
++			 * MPP45: GPIO extension (data 1)
++			 * MPP46: GPIO extension (data 2)
++			 * MPP47: GPIO extension (addr 0)
++			 * MPP48: GPIO extension (addr 1)
++			 * MPP49: GPIO extension (addr 2)
++			 */
++			pmx_misc: pmx-misc {
++				marvell,pins = "mpp14", "mpp28", "mpp29", "mpp35", "mpp36",
++					       "mpp37", "mpp38", "mpp39", "mpp40", "mpp44",
++					       "mpp45", "mpp46", "mpp47", "mpp48", "mpp49";
++				marvell,function = "gpio";
++			};
++
++			pmx_ge1: pmx-ge1 {
++				marvell,pins = "mpp20", "mpp21", "mpp22", "mpp23", "mpp24",
++					       "mpp25", "mpp26", "mpp27", "mpp30", "mpp31",
++					       "mpp32", "mpp33";
++				marvell,function = "ge1";
++			};
++		};
++
++		spi at 10600 {
++			status = "okay";
++			pinctrl-0 = <&pmx_spi>;
++			pinctrl-names = "default";
++
++			flash at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "mx25l4005a";
++				reg = <0>;
++				spi-max-frequency = <20000000>;
++				mode = <0>;
++
++				partition at 0 {
++					reg = <0x0 0x80000>;
++					label = "u-boot";
++				};
++			};
++		};
++
++		i2c at 11000 {
++			status = "okay";
++			pinctrl-0 = <&pmx_i2c>;
++			pinctrl-names = "default";
++
++			eeprom at 50 {
++				compatible = "at,24c04";
++				pagesize = <16>;
++				reg = <0x50>;
++			};
++		};
++
++		serial at 12000 {
++			pinctrl-0 = <&pmx_uart0>;
++			pinctrl-names = "default";
++			clock-frequency = <200000000>;
++			status = "ok";
++		};
++
++		ehci at 50000 {
++			status = "okay";
++		};
++
++		sata at 80000 {
++			pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
++			pinctrl-names = "default";
++			status = "okay";
++			nr-ports = <2>;
++		};
++	};
++
++        gpio_poweroff {
++		compatible = "gpio-poweroff";
++		pinctrl-0 = <&pmx_poweroff>;
++		pinctrl-names = "default";
++		gpios = <&gpio0 7 0>;
++        };
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_keys>;
++		pinctrl-names = "default";
++
++		button at 1 {
++			label = "Back power switch (on|auto)";
++			linux,code = <0x1>;
++			linux,input-type = <5>; /* EV_SW */
++			gpios = <&gpio0 13 1>;
++		};
++		button at 1 {
++			label = "Back power switch (auto|off)";
++			linux,code = <0x2>;
++			linux,input-type = <5>; /* EV_SW */
++			gpios = <&gpio0 15 1>;
++		};
++		button at 1 {
++			label = "Function button";
++			linux,code = <0x165>; /* KEY_OPTION */
++			gpios = <&gpio1 3 1>;
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		pinctrl-0 = <&pmx_sata_power>;
++		pinctrl-names = "default";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		sata0_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA0 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 16 0>;
++		};
++
++		sata1_power: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA1 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 17 0>;
++		};
++
++		sata2_power: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA2 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio1 9 0>;
++		};
++
++		sata3_power: regulator at 4 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA3 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio1 10 0>;
++		};
++
++		sata4_power: regulator at 5 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA4 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio1 11 0>;
++                };
++        };
++};
 diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 530d273..5c207a8 100644
+index 5c207a8..0f2cafb 100644
 --- a/arch/arm/mach-kirkwood/Kconfig
 +++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -2,12 +2,6 @@ if ARCH_KIRKWOOD
+@@ -2,18 +2,6 @@ if ARCH_KIRKWOOD
  
  menu "Marvell Kirkwood Implementations"
  
--config MACH_MV88F6281GTW_GE
--	bool "Marvell 88F6281 GTW GE Board"
+-config MACH_NET2BIG_V2
+-	bool "LaCie 2Big Network v2 NAS Board"
 -	help
 -	  Say 'Y' here if you want your kernel to support the
--	  Marvell 88F6281 GTW GE Board.
+-	  LaCie 2Big Network v2 NAS.
 -
- config MACH_NET2BIG_V2
- 	bool "LaCie 2Big Network v2 NAS Board"
- 	help
-@@ -199,6 +193,13 @@ config MACH_MPLCEC4_DT
- 	  Say 'Y' here if you want your kernel to support the
- 	  MPL CEC4 (Flattened Device Tree).
+-config MACH_NET5BIG_V2
+-	bool "LaCie 5Big Network v2 NAS Board"
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  LaCie 5Big Network v2 NAS.
+-
+ config MACH_OPENRD
+         bool
  
-+config MACH_MV88F6281GTW_GE_DT
-+	bool "Marvell 88F6281 GTW GE Board (Flattened Device Tree)"
-+	select ARCH_KIRKWOOD_DT
+@@ -200,6 +188,18 @@ config MACH_MV88F6281GTW_GE_DT
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell 88F6281 GTW GE Board (Flattened Device Tree).
+ 
++config MACH_NET2BIG_V2_DT
++	bool "LaCie 2Big Network v2 NAS Board (Flattened Device Tree)"
 +	help
 +	  Say 'Y' here if you want your kernel to support the
-+	  Marvell 88F6281 GTW GE Board (Flattened Device Tree).
++	  LaCie 2Big Network v2 NAS  (Flattened Device Tree).
++
++config MACH_NET5BIG_V2_DT
++	bool "LaCie 5Big Network v2 NAS Board (Flattened Device Tree)"
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  LaCie 5Big Network v2 NAS  (Flattened Device Tree).
 +
  config MACH_NETSPACE_LITE_V2_DT
  	bool "LaCie Network Space Lite v2 NAS (Flattened Device Tree)"
  	select ARCH_KIRKWOOD_DT
 diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 6c52299..d0bd566 100644
+index d0bd566..a2ec379 100644
 --- a/arch/arm/mach-kirkwood/Makefile
 +++ b/arch/arm/mach-kirkwood/Makefile
-@@ -1,6 +1,5 @@
+@@ -1,7 +1,5 @@
  obj-y				+= common.o irq.o pcie.o mpp.o
  
--obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
- obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
- obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+-obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+-obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
  obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
-@@ -26,6 +25,7 @@ obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
- obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
+ obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
+ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+@@ -26,6 +24,8 @@ obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
  obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
  obj-$(CONFIG_MACH_MPLCEC4_DT)		+= board-mplcec4.o
-+obj-$(CONFIG_MACH_MV88F6281GTW_GE_DT)	+= board-mv88f6281gtw_ge.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE_DT)	+= board-mv88f6281gtw_ge.o
++obj-$(CONFIG_MACH_NET2BIG_V2)		+= board-netxbig_v2.o
++obj-$(CONFIG_MACH_NET5BIG_V2)		+= board-netxbig_v2.o
  obj-$(CONFIG_MACH_NETSPACE_LITE_V2_DT)	+= board-ns2.o
  obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
  obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 5b410a5..ea77425 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -153,6 +153,9 @@ static void __init kirkwood_dt_init(void)
- 	    of_machine_is_compatible("marvell,db-88f6282-bp"))
- 		db88f628x_init();
- 
-+	if (of_machine_is_compatible("marvell,mv88f6281gtw-ge"))
-+		mv88f6281gtw_ge_init();
-+
- 	if (of_machine_is_compatible("mpl,cec4"))
- 		mplcec4_init();
- 
-@@ -190,6 +193,7 @@ static const char * const kirkwood_dt_board_compat[] = {
- 	"lacie,netspace_v2",
- 	"marvell,db-88f6281-bp",
- 	"marvell,db-88f6282-bp",
-+	"marvell,mv88f6281gtw-ge",
- 	"mpl,cec4",
- 	"netgear,readynas-duo-v2",
- 	"plathome,openblocks-a6",
-diff --git a/arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c b/arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
-new file mode 100644
-index 0000000..f7c952c
---- /dev/null
-+++ b/arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
-@@ -0,0 +1,50 @@
-+/*
-+ * arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
-+ *
-+ * Marvell 88F6281 GTW GE Board Setup
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/irq.h>
-+#include <linux/timer.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/ethtool.h>
-+#include <linux/gpio.h>
-+#include <net/dsa.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/pci.h>
-+#include <mach/kirkwood.h>
-+#include "common.h"
-+
-+static struct mv643xx_eth_platform_data mv88f6281gtw_ge_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_NONE,
-+	.speed		= SPEED_1000,
-+	.duplex		= DUPLEX_FULL,
-+};
-+
-+static struct dsa_chip_data mv88f6281gtw_ge_switch_chip_data = {
-+	.port_names[0]	= "lan1",
-+	.port_names[1]	= "lan2",
-+	.port_names[2]	= "lan3",
-+	.port_names[3]	= "lan4",
-+	.port_names[4]	= "wan",
-+	.port_names[5]	= "cpu",
-+};
-+
-+static struct dsa_platform_data mv88f6281gtw_ge_switch_plat_data = {
-+	.nr_chips	= 1,
-+	.chip		= &mv88f6281gtw_ge_switch_chip_data,
-+};
-+
-+void __init mv88f6281gtw_ge_init(void)
-+{
-+	kirkwood_ge00_init(&mv88f6281gtw_ge_ge00_data);
-+	kirkwood_ge00_switch_init(&mv88f6281gtw_ge_switch_plat_data, NO_IRQ);
-+}
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index c306ca3..44faaa2 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -156,6 +156,12 @@ void ns2_init(void);
- static inline void ns2_init(void) {};
- #endif
- 
-+#ifdef CONFIG_MACH_MV88F6281GTW_GE_DT
-+void mv88f6281gtw_ge_init(void);
-+#else
-+static inline void mv88f6281gtw_ge_init(void) {};
-+#endif
-+
- #ifdef CONFIG_MACH_OPENBLOCKS_A6_DT
- void openblocks_a6_init(void);
- #else
-diff --git a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
-deleted file mode 100644
-index ba384b9..0000000
---- a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
-+++ /dev/null
-@@ -1,172 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
-- *
-- * Marvell 88F6281 GTW GE Board Setup
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/pci.h>
--#include <linux/irq.h>
--#include <linux/mtd/physmap.h>
--#include <linux/timer.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/ethtool.h>
--#include <linux/gpio.h>
--#include <linux/leds.h>
+diff --git a/arch/arm/mach-kirkwood/netxbig_v2-setup.c b/arch/arm/mach-kirkwood/board-netxbig_v2.c
+similarity index 53%
+rename from arch/arm/mach-kirkwood/netxbig_v2-setup.c
+rename to arch/arm/mach-kirkwood/board-netxbig_v2.c
+index 913d032..7d71981 100644
+--- a/arch/arm/mach-kirkwood/netxbig_v2-setup.c
++++ b/arch/arm/mach-kirkwood/board-netxbig_v2.c
+@@ -23,19 +23,14 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+-#include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
 -#include <linux/input.h>
+ #include <linux/gpio.h>
 -#include <linux/gpio_keys.h>
--#include <linux/spi/flash.h>
--#include <linux/spi/spi.h>
--#include <net/dsa.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/pci.h>
--#include <mach/kirkwood.h>
--#include "common.h"
+ #include <linux/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+ #include <linux/platform_data/leds-kirkwood-netxbig.h>
+ #include "common.h"
 -#include "mpp.h"
+-#include "lacie_v2-common.h"
+ 
+ /*****************************************************************************
+  * Ethernet
+@@ -50,61 +45,6 @@ static struct mv643xx_eth_platform_data netxbig_v2_ge01_data = {
+ };
+ 
+ /*****************************************************************************
+- * SATA
+- ****************************************************************************/
 -
--static struct mv643xx_eth_platform_data mv88f6281gtw_ge_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_NONE,
--	.speed		= SPEED_1000,
--	.duplex		= DUPLEX_FULL,
+-static struct mv_sata_platform_data netxbig_v2_sata_data = {
+-	.n_ports	= 2,
 -};
 -
--static struct dsa_chip_data mv88f6281gtw_ge_switch_chip_data = {
--	.port_names[0]	= "lan1",
--	.port_names[1]	= "lan2",
--	.port_names[2]	= "lan3",
--	.port_names[3]	= "lan4",
--	.port_names[4]	= "wan",
--	.port_names[5]	= "cpu",
--};
+-/*****************************************************************************
+- * GPIO keys
+- ****************************************************************************/
 -
--static struct dsa_platform_data mv88f6281gtw_ge_switch_plat_data = {
--	.nr_chips	= 1,
--	.chip		= &mv88f6281gtw_ge_switch_chip_data,
--};
+-#define NETXBIG_V2_GPIO_SWITCH_POWER_ON		13
+-#define NETXBIG_V2_GPIO_SWITCH_POWER_OFF	15
+-#define NETXBIG_V2_GPIO_FUNC_BUTTON		34
 -
--static const struct flash_platform_data mv88f6281gtw_ge_spi_slave_data = {
--	.type		= "mx25l12805d",
--};
+-#define NETXBIG_V2_SWITCH_POWER_ON		0x1
+-#define NETXBIG_V2_SWITCH_POWER_OFF		0x2
 -
--static struct spi_board_info __initdata mv88f6281gtw_ge_spi_slave_info[] = {
--	{
--		.modalias	= "m25p80",
--		.platform_data	= &mv88f6281gtw_ge_spi_slave_data,
--		.irq		= -1,
--		.max_speed_hz	= 50000000,
--		.bus_num	= 0,
--		.chip_select	= 0,
+-static struct gpio_keys_button netxbig_v2_buttons[] = {
+-	[0] = {
+-		.type           = EV_SW,
+-		.code           = NETXBIG_V2_SWITCH_POWER_ON,
+-		.gpio           = NETXBIG_V2_GPIO_SWITCH_POWER_ON,
+-		.desc           = "Back power switch (on|auto)",
+-		.active_low     = 1,
+-	},
+-	[1] = {
+-		.type           = EV_SW,
+-		.code           = NETXBIG_V2_SWITCH_POWER_OFF,
+-		.gpio           = NETXBIG_V2_GPIO_SWITCH_POWER_OFF,
+-		.desc           = "Back power switch (auto|off)",
+-		.active_low     = 1,
+-	},
+-	[2] = {
+-		.code		= KEY_OPTION,
+-		.gpio		= NETXBIG_V2_GPIO_FUNC_BUTTON,
+-		.desc		= "Function button",
+-		.active_low	= 1,
 -	},
 -};
 -
--static struct gpio_keys_button mv88f6281gtw_ge_button_pins[] = {
--	{
--		.code		= KEY_RESTART,
--		.gpio		= 47,
--		.desc		= "SWR Button",
--		.active_low	= 1,
--	}, {
--		.code		= KEY_WPS_BUTTON,
--		.gpio		= 46,
--		.desc		= "WPS Button",
--		.active_low	= 1,
--	},
+-static struct gpio_keys_platform_data netxbig_v2_button_data = {
+-	.buttons	= netxbig_v2_buttons,
+-	.nbuttons	= ARRAY_SIZE(netxbig_v2_buttons),
 -};
 -
--static struct gpio_keys_platform_data mv88f6281gtw_ge_button_data = {
--	.buttons	= mv88f6281gtw_ge_button_pins,
--	.nbuttons	= ARRAY_SIZE(mv88f6281gtw_ge_button_pins),
--};
--
--static struct platform_device mv88f6281gtw_ge_buttons = {
+-static struct platform_device netxbig_v2_gpio_buttons = {
 -	.name		= "gpio-keys",
 -	.id		= -1,
--	.num_resources	= 0,
 -	.dev		= {
--		.platform_data	= &mv88f6281gtw_ge_button_data,
+-		.platform_data	= &netxbig_v2_button_data,
 -	},
 -};
 -
--static struct gpio_led mv88f6281gtw_ge_led_pins[] = {
--	{
--		.name		= "gtw:green:Status",
--		.gpio		= 20,
--		.active_low	= 0,
--	}, {
--		.name		= "gtw:red:Status",
--		.gpio		= 21,
--		.active_low	= 0,
--	}, {
--		.name		= "gtw:green:USB",
--		.gpio		= 12,
--		.active_low	= 0,
--	},
--};
+-/*****************************************************************************
+  * GPIO extension LEDs
+  ****************************************************************************/
+ 
+@@ -264,159 +204,12 @@ static struct platform_device netxbig_v2_leds = {
+ 	},
+ };
+ 
+-/*****************************************************************************
+- * General Setup
+- ****************************************************************************/
 -
--static struct gpio_led_platform_data mv88f6281gtw_ge_led_data = {
--	.leds		= mv88f6281gtw_ge_led_pins,
--	.num_leds	= ARRAY_SIZE(mv88f6281gtw_ge_led_pins),
--};
--
--static struct platform_device mv88f6281gtw_ge_leds = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data	= &mv88f6281gtw_ge_led_data,
--	},
--};
--
--static unsigned int mv88f6281gtw_ge_mpp_config[] __initdata = {
--	MPP12_GPO,	/* Status#_USB pin  */
--	MPP20_GPIO,	/* Status#_GLED pin */
--	MPP21_GPIO,	/* Status#_RLED pin */
--	MPP46_GPIO,	/* WPS_Switch pin   */
--	MPP47_GPIO,	/* SW_Init pin      */
+-static unsigned int net2big_v2_mpp_config[] __initdata = {
+-	MPP0_SPI_SCn,
+-	MPP1_SPI_MOSI,
+-	MPP2_SPI_SCK,
+-	MPP3_SPI_MISO,
+-	MPP6_SYSRST_OUTn,
+-	MPP7_GPO,		/* Request power-off */
+-	MPP8_TW0_SDA,
+-	MPP9_TW0_SCK,
+-	MPP10_UART0_TXD,
+-	MPP11_UART0_RXD,
+-	MPP13_GPIO,		/* Rear power switch (on|auto) */
+-	MPP14_GPIO,		/* USB fuse alarm */
+-	MPP15_GPIO,		/* Rear power switch (auto|off) */
+-	MPP16_GPIO,		/* SATA HDD1 power */
+-	MPP17_GPIO,		/* SATA HDD2 power */
+-	MPP20_SATA1_ACTn,
+-	MPP21_SATA0_ACTn,
+-	MPP24_GPIO,		/* USB mode select */
+-	MPP26_GPIO,		/* USB device vbus */
+-	MPP28_GPIO,		/* USB enable host vbus */
+-	MPP29_GPIO,		/* GPIO extension ALE */
+-	MPP34_GPIO,		/* Rear Push button */
+-	MPP35_GPIO,		/* Inhibit switch power-off */
+-	MPP36_GPIO,		/* SATA HDD1 presence */
+-	MPP37_GPIO,		/* SATA HDD2 presence */
+-	MPP40_GPIO,		/* eSATA presence */
+-	MPP44_GPIO,		/* GPIO extension (data 0) */
+-	MPP45_GPIO,		/* GPIO extension (data 1) */
+-	MPP46_GPIO,		/* GPIO extension (data 2) */
+-	MPP47_GPIO,		/* GPIO extension (addr 0) */
+-	MPP48_GPIO,		/* GPIO extension (addr 1) */
+-	MPP49_GPIO,		/* GPIO extension (addr 2) */
 -	0
 -};
 -
--static void __init mv88f6281gtw_ge_init(void)
+-static unsigned int net5big_v2_mpp_config[] __initdata = {
+-	MPP0_SPI_SCn,
+-	MPP1_SPI_MOSI,
+-	MPP2_SPI_SCK,
+-	MPP3_SPI_MISO,
+-	MPP6_SYSRST_OUTn,
+-	MPP7_GPO,		/* Request power-off */
+-	MPP8_TW0_SDA,
+-	MPP9_TW0_SCK,
+-	MPP10_UART0_TXD,
+-	MPP11_UART0_RXD,
+-	MPP13_GPIO,		/* Rear power switch (on|auto) */
+-	MPP14_GPIO,		/* USB fuse alarm */
+-	MPP15_GPIO,		/* Rear power switch (auto|off) */
+-	MPP16_GPIO,		/* SATA HDD1 power */
+-	MPP17_GPIO,		/* SATA HDD2 power */
+-	MPP20_GE1_TXD0,
+-	MPP21_GE1_TXD1,
+-	MPP22_GE1_TXD2,
+-	MPP23_GE1_TXD3,
+-	MPP24_GE1_RXD0,
+-	MPP25_GE1_RXD1,
+-	MPP26_GE1_RXD2,
+-	MPP27_GE1_RXD3,
+-	MPP28_GPIO,		/* USB enable host vbus */
+-	MPP29_GPIO,		/* GPIO extension ALE */
+-	MPP30_GE1_RXCTL,
+-	MPP31_GE1_RXCLK,
+-	MPP32_GE1_TCLKOUT,
+-	MPP33_GE1_TXCTL,
+-	MPP34_GPIO,		/* Rear Push button */
+-	MPP35_GPIO,		/* Inhibit switch power-off */
+-	MPP36_GPIO,		/* SATA HDD1 presence */
+-	MPP37_GPIO,		/* SATA HDD2 presence */
+-	MPP38_GPIO,		/* SATA HDD3 presence */
+-	MPP39_GPIO,		/* SATA HDD4 presence */
+-	MPP40_GPIO,		/* SATA HDD5 presence */
+-	MPP41_GPIO,		/* SATA HDD3 power */
+-	MPP42_GPIO,		/* SATA HDD4 power */
+-	MPP43_GPIO,		/* SATA HDD5 power */
+-	MPP44_GPIO,		/* GPIO extension (data 0) */
+-	MPP45_GPIO,		/* GPIO extension (data 1) */
+-	MPP46_GPIO,		/* GPIO extension (data 2) */
+-	MPP47_GPIO,		/* GPIO extension (addr 0) */
+-	MPP48_GPIO,		/* GPIO extension (addr 1) */
+-	MPP49_GPIO,		/* GPIO extension (addr 2) */
+-	0
+-};
+-
+-#define NETXBIG_V2_GPIO_POWER_OFF		7
+-
+-static void netxbig_v2_power_off(void)
++void __init netxbig_v2_init(void)
+ {
+-	gpio_set_value(NETXBIG_V2_GPIO_POWER_OFF, 1);
+-}
+-
+-static void __init netxbig_v2_init(void)
 -{
 -	/*
 -	 * Basic setup. Needs to be called early.
 -	 */
 -	kirkwood_init();
--	kirkwood_mpp_conf(mv88f6281gtw_ge_mpp_config);
+-	if (machine_is_net2big_v2())
+-		kirkwood_mpp_conf(net2big_v2_mpp_config);
+-	else
+-		kirkwood_mpp_conf(net5big_v2_mpp_config);
+-
+-	if (machine_is_net2big_v2())
+-		lacie_v2_hdd_power_init(2);
+-	else
+-		lacie_v2_hdd_power_init(5);
 -
 -	kirkwood_ehci_init();
--	kirkwood_ge00_init(&mv88f6281gtw_ge_ge00_data);
--	kirkwood_ge00_switch_init(&mv88f6281gtw_ge_switch_plat_data, NO_IRQ);
--	spi_register_board_info(mv88f6281gtw_ge_spi_slave_info,
--				ARRAY_SIZE(mv88f6281gtw_ge_spi_slave_info));
--	kirkwood_spi_init();
+ 	kirkwood_ge00_init(&netxbig_v2_ge00_data);
+-	if (machine_is_net5big_v2())
++	if (of_machine_is_compatible("lacie,net5big-v2")) {
+ 		kirkwood_ge01_init(&netxbig_v2_ge01_data);
+-	kirkwood_sata_init(&netxbig_v2_sata_data);
 -	kirkwood_uart0_init();
--	platform_device_register(&mv88f6281gtw_ge_leds);
--	platform_device_register(&mv88f6281gtw_ge_buttons);
--}
+-	lacie_v2_register_flash();
+-	lacie_v2_register_i2c_devices();
 -
--static int __init mv88f6281gtw_ge_pci_init(void)
--{
--	if (machine_is_mv88f6281gtw_ge())
--		kirkwood_pcie_init(KW_PCIE0);
+-	if (machine_is_net5big_v2())
+ 		netxbig_v2_leds.dev.platform_data = &net5big_v2_leds_data;
++	}
+ 	platform_device_register(&netxbig_v2_leds);
+-	platform_device_register(&netxbig_v2_gpio_buttons);
 -
--	return 0;
--}
--subsys_initcall(mv88f6281gtw_ge_pci_init);
+-	if (gpio_request(NETXBIG_V2_GPIO_POWER_OFF, "power-off") == 0 &&
+-	    gpio_direction_output(NETXBIG_V2_GPIO_POWER_OFF, 0) == 0)
+-		pm_power_off = netxbig_v2_power_off;
+-	else
+-		pr_err("netxbig_v2: failed to configure power-off GPIO\n");
+ }
 -
--MACHINE_START(MV88F6281GTW_GE, "Marvell 88F6281 GTW GE Board")
--	/* Maintainer: Lennert Buytenhek <buytenh@marvell.com> */
+-#ifdef CONFIG_MACH_NET2BIG_V2
+-MACHINE_START(NET2BIG_V2, "LaCie 2Big Network v2")
 -	.atag_offset	= 0x100,
--	.init_machine	= mv88f6281gtw_ge_init,
+-	.init_machine	= netxbig_v2_init,
 -	.map_io		= kirkwood_map_io,
 -	.init_early	= kirkwood_init_early,
 -	.init_irq	= kirkwood_init_irq,
 -	.init_time	= kirkwood_timer_init,
 -	.restart	= kirkwood_restart,
 -MACHINE_END
+-#endif
+-
+-#ifdef CONFIG_MACH_NET5BIG_V2
+-MACHINE_START(NET5BIG_V2, "LaCie 5Big Network v2")
+-	.atag_offset	= 0x100,
+-	.init_machine	= netxbig_v2_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= kirkwood_init_irq,
+-	.init_time	= kirkwood_timer_init,
+-	.restart	= kirkwood_restart,
+-MACHINE_END
+-#endif
 -- 
 1.8.1.2
