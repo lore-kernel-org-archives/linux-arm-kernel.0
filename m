@@ -1,55 +1,62 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Thu, 1 Aug 2013 21:26:24 +0200 (CEST)
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
- mitigations
-In-Reply-To: <20130801191649.GB5102@mwanda>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <20130801091322.GA5302@mwanda> <20130801190556.GA1495@redhat.com>
- <20130801191649.GB5102@mwanda>
-Message-ID: <alpine.DEB.2.02.1308012122480.2009@localhost6.localdomain6>
+From: shuah.kh@samsung.com (Shuah Khan)
+Date: Thu, 01 Aug 2013 19:45:35 +0000
+Subject: [Announcement] Linux Plumbers ACPI/PM, PCI Microconference
+References: <CAL-B5D03ki8NHsM6EuESTH2K-Eh+XyFHNXPDYwgDq+oagDjtMQ@mail.gmail.com>
+ <1755363.sGc8nLIQOW@vostro.rjw.lan>
+ <CAKocOOPOqqS80D23z6xTVSNYYYWZ7ACg9MtSMz_hTqVA3Duo0w@mail.gmail.com>
+ <7183196.Ov6Qetq3lO@vostro.rjw.lan>
+Message-ID: <B8EFE96D1287C24090BAD9D858E15E617505EB@sisaex01sj>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Aug 2013, Dan Carpenter wrote:
+On 07/31/2013 03:07 PM, Rafael J. Wysocki wrote:
+> On Wednesday, July 31, 2013 10:35:05 AM Shuah Khan wrote:
+>> On Wed, Jul 31, 2013 at 5:40 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+>>> Hi All,
+>>>
+>>> The original announcement didn't go to linux-pm, so again:
+>>>
+>>> On Tuesday, July 16, 2013 08:21:26 PM Myron Stowe wrote:
+>>>> Linux Plumbers has approved an ACPI/PM, PCI microconference. The
+>>>> overview page is here:
+>>>>
+>>>> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+>>>>
+>>>> We would like to start receiving volunteers for presenting topics of
+>>>> interest.  There is a lot of activity in these subsystems so please
+>>>> respond by submitting presentation or discussion proposals that you
+>>>> would be willing to cover for consideration.  You should also feel
+>>>> free to submit ideas as proposals that others could cover.  The
+>>>> instructions for submitting ideas should be at:
+>>>>
+>>>> http://www.linuxplumbersconf.org/2013/submitting-topic/
+>>>
+>>> If anyone who's going to attend the Linux Plumbers Conf this year is interested
+>>> in any particular topic for discussion during the ACPI/PM+PCI uconf, please
+>>> submit a formal topic proposal at:
+>>>
+>>> http://www.linuxplumbersconf.org/2013/ocw/events/LPC2013/proposals/new
+>>>
+>>> If you submit a topic, that doesn't mean you'll be expected to present anything
+>>> (if accepted).  In fact, we are mostly interested in discussion topics and we'd
+>>> like to know what is important to people.
+>>>
+>>> That said if you have a (short) presentation to make, please submit it too.
+>>>
+>>> We'll appreciate all submissions very much.
+>>>
+>>
+>> What I have mind is a discussion topic for the Mini-conference, which
+>> in-line with what you are asking for.
+>> I will add it to the web.
+>
+> Thank you!
 
-> On Thu, Aug 01, 2013 at 03:05:56PM -0400, Dave Jones wrote:
-> > On Thu, Aug 01, 2013 at 12:13:22PM +0300, Dan Carpenter wrote:
-> >  > I was just reading http://faultlinux.lip6.fr/ which says that in
-> >  > 2011 the static checker fault rate in arch/ and fs/ was worse than
-> >  > in drivers/
-> > 
-> > I've been working on getting more regular builds in coverity, so we can
-> > get more meaningful statistics on things like "what area is getting worse".
-> > 
-> > Of the current bugs I've categorised so far, here's the breakdown for 3.11-rc3
-> > in terms of highest bug counts.
-> > 
-> > Drivers/net/wireless: 659 
-> > Drivers/ [1] : 600
-> > Drivers/staging: 449
-> > Drivers/scsi: 409
-> > Drivers/net: 350
-> > Net/[2] : 297
-> > Drivers/media: 286
-> > Sound: 220
-> > Drivers/GPU: 217
-> > 
-> > That's the top categories for the whole kernel.
-> > 
-> > That wireless was top of the list was the least shocking thing to me,
-> > based on what we get reported to Fedora bugzilla.  That it found more
-> > bugs there than in staging was amusing though. The good news is that
-> > wireless also takes the top slot for 'resolved' issues.
-> > 
-> > The paper above talks about 'arch' but doesn't indicate if it's counting
-> > all arches, or just the one they run the tests on. (Coverity only covers x86,
-> > so arch/ shows up in 10th place there).
-> 
-> It's Coccinelle, so my guess is they ran it on all the .c files.
+Rafael,
 
-Coccinelle runs on all C files.  The rates in the paper are relative to 
-what are referred to as notes, ie the number of potential bug sites.  
-For example, code that does not use kmalloc is not likely to contain 
-missing kfrees.
+Done. I submitted a topic for discussion.
 
-julia
+-- Shuah
+
+Shuah Khan, Linux Kernel Developer - Open Source Group Samsung Research 
+America (Silicon Valley) shuah.kh at samsung.com | (970) 672-0658
