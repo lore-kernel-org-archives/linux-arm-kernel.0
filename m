@@ -1,36 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 1 Aug 2013 18:04:14 +0200
-Subject: NSA310 + DT
-In-Reply-To: <51FA15F3.7050708@uni-bremen.de>
-References: <20130730191943.49f8070c@skate> <20130730183610.GT24782@lunn.ch>
- <51F814A0.2050403@uni-bremen.de> <20130730232316.10dc7019@skate>
- <20130731111414.47e7670b@skate> <51F8DC3A.6010007@uni-bremen.de>
- <20130731115108.21c043fd@skate> <51F8F7E3.9090404@uni-bremen.de>
- <20130731164512.GB19725@lunn.ch> <51FA15F3.7050708@uni-bremen.de>
-Message-ID: <20130801160414.GI19725@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 01 Aug 2013 10:08:14 -0600
+Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <51FA87EE.60601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The LED's on after kernel is loaded, while starting up does not work.
->            pmx_led_sys_green: pmx-led-sys-green {
->                 marvell,pins = "mpp28";
->                 marvell,function = "gpio";
->                 linux,default-trigger = "heartbeat";
->                 brightness = <255>;
->             };
-> I first tried default-trigger, then I added brightness additionally
-> but LED's wont turn on.
+On 08/01/2013 07:25 AM, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This set of patches introduces Message Signaled Interrupt support in
+> the Marvell EBU PCIe driver. It has been successfully tested on the
+> Armada XP GP platform with an Intel e1000e PCIe network card that
+> supports MSI.
+> 
+> This patch set is intended for merging in 3.12, so the respective
+> maintainers of the different areas are invited to review/ack the
+> patches, see below for the details. Note that several of those patches
+> are also needed for the Tegra PCIe driver.
+> 
+> There are still missing ACKs from Grant Likely (5, 6, 7), Thomas
+> Gleixner (8, 9) and Bjorn Helgaas (2, 12).
 
-Can you manually turn the LED on, using /sys/class/led/.../brightness?
-It could be we have the wrong GPIO line for the led. It would be good
-if you could test them all, not just this one led.
-
-> There is no sata hdd trigger and nand-disk does not trigger on sata
-> hdd activity.
-
-They are out of tree patches. There was some discussion about SATA led
-activity maybe 6 to 9 months ago. Maybe you can see why the suggested
-patches got rejected. If i remember correctly, it was because they are
-in the hot path.
-
-   Andrew
+Recall that Grant gave up most/all of his maintainerships, so you
+probably want someone else to approve patches 5/6/7. It looks like
+Benjamin Herrenschmidt <benh@kernel.crashing.org> is listed in
+MAINTAINERS for those patches.
