@@ -1,171 +1,132 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 17:07:28 +0200
-Subject: [PATCHv2 2/9] ARM: kirkwood: remove support for legacy booting of
- Dockstar
-In-Reply-To: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375369655-1310-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu,  1 Aug 2013 17:07:26 +0200
+Subject: [PATCHv2 0/9] ARM: kirkwood: convert a few more boards to DT
+Message-ID: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kirkwood Dockstar platform has already been converted to the
-Device Tree, so we can remove the legacy booting option for this
-platform.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-kirkwood/Kconfig          |   7 --
- arch/arm/mach-kirkwood/Makefile         |   1 -
- arch/arm/mach-kirkwood/dockstar-setup.c | 111 --------------------------------
- 3 files changed, 119 deletions(-)
+Here is a set of patches that converts a few additional Kirkwood
+boards to use the Device Tree. I intend to continue this effort with
+the remaining Kirkwood boards. It is based on the mvebu/boards branch
+of linux-mvebu.git, which allows to use the Ethernet DT bindings.
+
+Note that I don't have access to any of the platforms that are being
+converted in this patch series, so this means that:
+
+ - A careful review would be useful
+
+ - Testing from owners of the boards would be appreciated. The DT
+   conversion of Kirkwood boards is a process that has now been
+   started a while ago, and we would like to finalize it. If board
+   owners don't react by testing the proposed patches, then the
+   support for those boards might be broken.
+
+To ease testing, the branch containing those changes has been pushed
+to:
+
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/kirkwood-dt-conversion-step1-v2
+
+and kernel images for the affected boards have been uploaded to the
+following locations. They contain the correct appended DTB, and a
+small initramfs to ease testing:
+
+  http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-d2net-v2
+  http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-mv88f6281gtw-ge
+  http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-net2big-v2
+  http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-net5big-v2
+
+In detail:
+
+ * Patch 1 converts the d2net_v2 board completely to DT.
+
+ * Patches 2, 3, 4 and 5 remove support for boards that have already
+   been converted to the Deice Tree, but for which the legacy board
+   file was not removed.
+
+ * Patch 6 converts the mv88f6281gtw_ge board to DT.
+
+   The remaining devices probed in a legacy way are the mv643xx_eth
+   driver, and the DSA switch (note that I have an Armada 370 platform
+   with a DSA switch, so I'll have to look at how to make this appear
+   in the DT). I've left the Ethernet device not converted to DT
+   because the interaction with the DSA switch is a bit special.
+
+ * Patch 7 converts the LaCie Net{2,5}Big v2 platforms to DT
+
+   The remaining device probed is the one managed by the leds-netxbig
+   driver. For Ethernet, see above. For leds-netxbig, Simon Guinot is
+   currently working on this (see the LAKML thread "Location for a
+   kind of GPIO bus driver").
+
+ * Patch 8 removes some common code for LaCie boards that has become
+   useless after the DT conversions.
+
+ * Patch 9 adjusts kirkwood_defconfig after the DT conversions.
+
+Changes since v1:
+
+ * Rebased on top of linux-mvebu.git/mvebu/boards
+ * Use the Ethernet DT binding where possible and do the corresponding
+   simplication.
+ * Use the lacie,ns2-leds driver DT binding where possible, as
+   suggested by Simon Guinot
+ * Fix the LaCie Net{2,5}Big conversion, where the function doing the
+   legacy registration of devices was not being called for board-dt.c.
+ * Ensure DTB files are produced for all boards.
+ * Fixed various mistakes in the .dts files.
+
+Thomas
+
+Thomas Petazzoni (9):
+  ARM: kirkwood: convert d2net_v2 to DT
+  ARM: kirkwood: remove support for legacy booting of Dockstar
+  ARM: kirkwood: remove support for legacy booting of Guruplug
+  ARM: kirkwood: remove support for legacy booting of Sheevaplug
+  ARM: kirkwood: remove LaCie boards that are supported through DT
+  ARM: kirkwood: convert the mv88f6281gtw_ge board to DT
+  ARM: kirkwood: convert LaCie Net{2,5}Big v2 platforms to DT
+  ARM: kirkwood: remove unused common code for LaCie platforms
+  ARM: kirkwood: update defconfig after DT conversions
+
+ arch/arm/boot/dts/Makefile                     |   4 +
+ arch/arm/boot/dts/kirkwood-d2net-v2.dts        | 231 ++++++++++++++
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 125 ++++++++
+ arch/arm/boot/dts/kirkwood-net2big-v2.dts      | 219 +++++++++++++
+ arch/arm/boot/dts/kirkwood-net5big-v2.dts      | 265 ++++++++++++++++
+ arch/arm/configs/kirkwood_defconfig            |  15 +-
+ arch/arm/mach-kirkwood/Kconfig                 |  96 ++----
+ arch/arm/mach-kirkwood/Makefile                |  15 +-
+ arch/arm/mach-kirkwood/board-dt.c              |   7 +
+ arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c |  50 +++
+ arch/arm/mach-kirkwood/board-netxbig_v2.c      | 199 ++++++++++++
+ arch/arm/mach-kirkwood/common.h                |  12 +
+ arch/arm/mach-kirkwood/d2net_v2-setup.c        | 231 --------------
+ arch/arm/mach-kirkwood/dockstar-setup.c        | 111 -------
+ arch/arm/mach-kirkwood/guruplug-setup.c        | 133 --------
+ arch/arm/mach-kirkwood/lacie_v2-common.c       | 114 -------
+ arch/arm/mach-kirkwood/lacie_v2-common.h       |  16 -
+ arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c | 172 ----------
+ arch/arm/mach-kirkwood/netspace_v2-setup.c     | 293 -----------------
+ arch/arm/mach-kirkwood/netxbig_v2-setup.c      | 422 -------------------------
+ arch/arm/mach-kirkwood/sheevaplug-setup.c      | 161 ----------
+ 21 files changed, 1139 insertions(+), 1752 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-d2net-v2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-net2big-v2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-net5big-v2.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
+ create mode 100644 arch/arm/mach-kirkwood/board-netxbig_v2.c
+ delete mode 100644 arch/arm/mach-kirkwood/d2net_v2-setup.c
  delete mode 100644 arch/arm/mach-kirkwood/dockstar-setup.c
+ delete mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
+ delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
+ delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
+ delete mode 100644 arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+ delete mode 100644 arch/arm/mach-kirkwood/netspace_v2-setup.c
+ delete mode 100644 arch/arm/mach-kirkwood/netxbig_v2-setup.c
+ delete mode 100644 arch/arm/mach-kirkwood/sheevaplug-setup.c
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 8bcd659..cf6c938 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -5,13 +5,6 @@ menu "Marvell Kirkwood Implementations"
- config KIRKWOOD_LEGACY
- 	bool
- 
--config MACH_DOCKSTAR
--	bool "Seagate FreeAgent DockStar"
--	select KIRKWOOD_LEGACY
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Seagate FreeAgent DockStar.
--
- config MACH_ESATA_SHEEVAPLUG
- 	bool "Marvell eSATA SheevaPlug Reference Board"
- 	select KIRKWOOD_LEGACY
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 805028a..5edba89 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -1,7 +1,6 @@
- obj-y				+= common.o pcie.o
- obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
- 
--obj-$(CONFIG_MACH_DOCKSTAR)		+= dockstar-setup.o
- obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
- obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
- obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
-diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
-deleted file mode 100644
-index 060ccf9..0000000
---- a/arch/arm/mach-kirkwood/dockstar-setup.c
-+++ /dev/null
-@@ -1,111 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/dockstar-setup.c
-- *
-- * Seagate FreeAgent DockStar Setup
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/ata_platform.h>
--#include <linux/mtd/partitions.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/gpio.h>
--#include <linux/leds.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <mach/kirkwood.h>
--#include "common.h"
--#include "mpp.h"
--
--static struct mtd_partition dockstar_nand_parts[] = {
--	{
--		.name = "u-boot",
--		.offset = 0,
--		.size = SZ_1M
--	}, {
--		.name = "uImage",
--		.offset = MTDPART_OFS_NXTBLK,
--		.size = SZ_4M
--	}, {
--		.name = "root",
--		.offset = MTDPART_OFS_NXTBLK,
--		.size = MTDPART_SIZ_FULL
--	},
--};
--
--static struct mv643xx_eth_platform_data dockstar_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--static struct gpio_led dockstar_led_pins[] = {
--	{
--		.name			= "dockstar:green:health",
--		.default_trigger	= "default-on",
--		.gpio			= 46,
--		.active_low		= 1,
--	},
--	{
--		.name			= "dockstar:orange:misc",
--		.default_trigger	= "none",
--		.gpio			= 47,
--		.active_low		= 1,
--	},
--};
--
--static struct gpio_led_platform_data dockstar_led_data = {
--	.leds		= dockstar_led_pins,
--	.num_leds	= ARRAY_SIZE(dockstar_led_pins),
--};
--
--static struct platform_device dockstar_leds = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data	= &dockstar_led_data,
--	}
--};
--
--static unsigned int dockstar_mpp_config[] __initdata = {
--	MPP29_GPIO,	/* USB Power Enable */
--	MPP46_GPIO,	/* LED green */
--	MPP47_GPIO,	/* LED orange */
--	0
--};
--
--static void __init dockstar_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_init();
--
--	/* setup gpio pin select */
--	kirkwood_mpp_conf(dockstar_mpp_config);
--
--	kirkwood_uart0_init();
--	kirkwood_nand_init(ARRAY_AND_SIZE(dockstar_nand_parts), 25);
--
--	if (gpio_request(29, "USB Power Enable") != 0 ||
--	    gpio_direction_output(29, 1) != 0)
--		pr_err("can't set up GPIO 29 (USB Power Enable)\n");
--	kirkwood_ehci_init();
--
--	kirkwood_ge00_init(&dockstar_ge00_data);
--
--	platform_device_register(&dockstar_leds);
--}
--
--MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
--	.atag_offset	= 0x100,
--	.init_machine	= dockstar_init,
--	.map_io		= kirkwood_map_io,
--	.init_early	= kirkwood_init_early,
--	.init_irq	= kirkwood_init_irq,
--	.init_time	= kirkwood_timer_init,
--	.restart	= kirkwood_restart,
--MACHINE_END
 -- 
 1.8.1.2
