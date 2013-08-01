@@ -1,41 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 1 Aug 2013 19:58:56 +0200
-Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <CAErSpo67t2D=bLMq3fxU6Hj9FX+MBAbaLNbF42-uufWug-x8Tg@mail.gmail.com>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo67t2D=bLMq3fxU6Hj9FX+MBAbaLNbF42-uufWug-x8Tg@mail.gmail.com>
-Message-ID: <20130801195856.00f78934@skate>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 01 Aug 2013 21:30:08 +0400
+Subject: [PATCH] USB: ohci-at91: add usb_clk for transition to common
+ clk framework
+In-Reply-To: <Pine.LNX.4.44L0.1308011153180.1534-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1308011153180.1534-100000@iolanthe.rowland.org>
+Message-ID: <51FA9B20.3080304@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+Hello.
 
-On Thu, 1 Aug 2013 10:50:25 -0600, Bjorn Helgaas wrote:
-> On Thu, Aug 1, 2013 at 7:25 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > Hello,
-> >
-> > This set of patches introduces Message Signaled Interrupt support in
-> > the Marvell EBU PCIe driver. It has been successfully tested on the
-> > Armada XP GP platform with an Intel e1000e PCIe network card that
-> > supports MSI.
-> >
-> > This patch set is intended for merging in 3.12, so the respective
-> > maintainers of the different areas are invited to review/ack the
-> > patches, see below for the details. Note that several of those patches
-> > are also needed for the Tegra PCIe driver.
-> >
-> > There are still missing ACKs from Grant Likely (5, 6, 7), Thomas
-> > Gleixner (8, 9) and Bjorn Helgaas (2, 12).
-> 
-> I just acked 2, and my ack is already on 12.  Let me know if you need
-> anything else from me.
+On 08/01/2013 07:56 PM, Alan Stern wrote:
 
-That's good, thanks a lot!
+>>> What happens if uclk isn't found but it is needed?
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>> It will not fail but I guess the usb host won't work as the clock won't
+>> be correctly
+>> configured.
+
+>> I agree with you: this is not a good solution.
+
+>> Another option is to keep the previous version of this patch and put
+>> uclk handling
+>> in "#ifdef CONFIG_COMMON_CLK #endif" sections.
+
+>> Would this be acceptable ?
+
+> Yes.  However, a more elegant approach is to protect the relevant
+> statements with: if (defined(CONFIG_COMMON_CLK)).  This preprocessor
+
+    You probably meant IS_ENABLED() or IS_BUIILTIN()? Or is there something I 
+don't know about gcc preprocessor?
+
+> evaluates this to a 0 or 1, so the compiler will not generate output
+> for the protected source code if the symbol isn't defined.
+
+> Alan Stern
+
+WBR, Sergei
