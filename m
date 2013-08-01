@@ -1,100 +1,89 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 15:44:19 +0200
-Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support in
- PCI-to-PCI bridge
-Message-ID: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 1 Aug 2013 08:44:30 -0500
+Subject: [PATCHv4 02/33] clk: omap: introduce clock driver
+In-Reply-To: <51F8D1E3.2@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-3-git-send-email-t-kristo@ti.com> <51F7DA0D.7060709@ti.com>
+ <51F8D1E3.2@ti.com>
+Message-ID: <51FA663E.3070109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell PCIe driver uses an emulated PCI-to-PCI bridge to be able
-to dynamically set up MBus address decoding windows for PCI I/O and
-memory regions depending on the PCI devices enumerated by Linux.
+On 07/31/2013 03:59 AM, Tero Kristo wrote:
+> On 07/30/2013 06:21 PM, Nishanth Menon wrote:
+>> On 07/23/2013 02:19 AM, Tero Kristo wrote:
+>>> Parses OMAP clock data from DT and registers those clocks with the clock
+>>> framework.  dt_omap_clk_init must be called early during boot for timer
+>>> initialization so it is exported and called from the existing clock code
+>>> instead of probing like a real driver. Based on initial work done by
+>>> Mike Turquette.
+>>>
+>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>> Cc: Mike Turquette <mturquette@linaro.org>
+>>> ---
+>>>   drivers/clk/Makefile      |    1 +
+>>>   drivers/clk/omap/Makefile |    1 +
+>>>   drivers/clk/omap/clk.c    |   39
+>>> +++++++++++++++++++++++++++++++++++++++
+>>
+>> Minor suggestion - should we just start drivers/clk/ti/ instead of
+>> clk/omap?
+>>
+>> AM335x/DRA7 are not "strictly OMAP".. might also allow for some reuse
+>> for other TI platforms..
+>
+> Not sure, this idea has been bounced around a bit. samsung has its own
+> directory under drivers/clk/ so maybe. I can change this if there is a
+> strong wish for this.
 
-However, this emulated PCI-to-PCI bridge logic makes the Linux PCI
-core believe that prefetchable memory regions are supported (because
-the registers are read/write), while in fact no adress decoding window
-is ever created for such regions. Since the Marvell MBus address
-decoding windows do not distinguish memory regions and prefetchable
-memory regions, this patch takes a simple approach: change the
-PCI-to-PCI bridge emulation to let the Linux PCI core know that we
-don't support prefetchable memory regions.
+just my 2 cents - if we use drivers/clk/ti, we can then move required 
+stuff from arch/arm/mach-davinci or arch/arm/mach-keystone to a ti 
+generic location allowing us to reuse things as needed.
 
-To achieve this, we simply make the prefetchable memory base a
-read-only register that always returns 0. Reading/writing all the
-other prefetchable memory related registers has no effect.
+>
+>>
+>>>   include/linux/clk/omap.h  |   24 ++++++++++++++++++++++++
+>>>   4 files changed, 65 insertions(+)
+>>>   create mode 100644 drivers/clk/omap/Makefile
+>>>   create mode 100644 drivers/clk/omap/clk.c
+>>>   create mode 100644 include/linux/clk/omap.h
+>>>
+>>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>>> index 4038c2b..d3c3733 100644
+>>> --- a/drivers/clk/Makefile
+>>> +++ b/drivers/clk/Makefile
+>>> @@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_VT8500)    += clk-vt8500.o
+>>>   obj-$(CONFIG_ARCH_ZYNQ)        += zynq/
+>>>   obj-$(CONFIG_ARCH_TEGRA)    += tegra/
+>>>   obj-$(CONFIG_PLAT_SAMSUNG)    += samsung/
+>>> +obj-$(CONFIG_ARCH_OMAP)        += omap/
+>>>
+>>>   obj-$(CONFIG_X86)        += x86/
+>>>
+>>> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
+>>> new file mode 100644
+>>> index 0000000..8195931
+>>> --- /dev/null
+>>> +++ b/drivers/clk/omap/Makefile
+>>> @@ -0,0 +1 @@
+>>> +obj-y                    += clk.o
+>>> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
+>>> new file mode 100644
+>>> index 0000000..4bf1929
+>>> --- /dev/null
+>>> +++ b/drivers/clk/omap/clk.c
+>>> @@ -0,0 +1,39 @@
+>>> +/*
+>>> + * OMAP PRCM clock driver
+>>
+>> maybe then prcm-clk.c ?
+>
+> Maybe remove the PRCM part. We have some clocks behind i2c for example,
+> and we might want to add support for them here.
 
-This problem was originally reported by Finn Hoffmann
-<finn@uni-bremen.de>, who couldn't get a RTL8111/8168B PCI NIC working
-on the NSA310 Kirkwood platform after updating to 3.11-rc. The problem
-was that the PCI-to-PCI bridge emulation was making the Linux PCI core
-believe that we support prefetchable memory, so the Linux PCI core was
-only filling the prefetchable memory base and limit registers, which
-does not lead to a MBus window being created. The below patch has been
-confirmed by Finn Hoffmann to fix his problem on Kirkwood, and has
-otherwise been successfully tested on the Armada XP GP platform with a
-e1000e PCIe NIC and a Marvell SATA PCIe card.
+I think we can actually drop this file in it's entirety if we stick with 
+of_clk_init(NULL) and depend solely of CLK_OF_DECLARE from relevant drivers.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reported-by: Finn Hoffmann <finn@uni-bremen.de>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-This patch fixes a regression introduced in 3.11-rc, so it should be
-applied to 3.11.
----
- drivers/pci/host/pci-mvebu.c | 27 +--------------------------
- 1 file changed, 1 insertion(+), 26 deletions(-)
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13a633b..7bf3926 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -86,10 +86,6 @@ struct mvebu_sw_pci_bridge {
- 	u16 secondary_status;
- 	u16 membase;
- 	u16 memlimit;
--	u16 prefmembase;
--	u16 prefmemlimit;
--	u32 prefbaseupper;
--	u32 preflimitupper;
- 	u16 iobaseupper;
- 	u16 iolimitupper;
- 	u8 cappointer;
-@@ -419,15 +415,7 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
- 		break;
- 
- 	case PCI_PREF_MEMORY_BASE:
--		*value = (bridge->prefmemlimit << 16 | bridge->prefmembase);
--		break;
--
--	case PCI_PREF_BASE_UPPER32:
--		*value = bridge->prefbaseupper;
--		break;
--
--	case PCI_PREF_LIMIT_UPPER32:
--		*value = bridge->preflimitupper;
-+		*value = 0;
- 		break;
- 
- 	case PCI_IO_BASE_UPPER16:
-@@ -501,19 +489,6 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
- 		mvebu_pcie_handle_membase_change(port);
- 		break;
- 
--	case PCI_PREF_MEMORY_BASE:
--		bridge->prefmembase = value & 0xffff;
--		bridge->prefmemlimit = value >> 16;
--		break;
--
--	case PCI_PREF_BASE_UPPER32:
--		bridge->prefbaseupper = value;
--		break;
--
--	case PCI_PREF_LIMIT_UPPER32:
--		bridge->preflimitupper = value;
--		break;
--
- 	case PCI_IO_BASE_UPPER16:
- 		bridge->iobaseupper = value & 0xffff;
- 		bridge->iolimitupper = value >> 16;
 -- 
-1.8.1.2
+Regards,
+Nishanth Menon
