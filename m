@@ -1,24 +1,63 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 1 Aug 2013 16:26:30 -0600
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130801183531.GB29831@mudshark.cambridge.arm.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
-Message-ID: <CAErSpo7yUDMsaVSR6kcy4Jeb0naVpPPfpzFZQ2MP0NLDH1aAFg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Aug 2013 23:37:32 +0100
+Subject: [PATCH RFC 47/51] ARM: 7794/1: block: Rename parameter
+ dma_mask to max_addr for blk_queue_bounce_limit()
+In-Reply-To: <E1V51FC-0006uT-GG@rmk-PC.arm.linux.org.uk>
+References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
+ <E1V51FC-0006uT-GG@rmk-PC.arm.linux.org.uk>
+Message-ID: <20130801223732.GM23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 12:35 PM, Will Deacon <will.deacon@arm.com> wrote:
+Sorry, these last patches were of course sent my me and not Santosh.
 
-> ... For example, interfacing
-> a PCIe device with an SMMU requires knowledge of both the requester id
-> associated with the device and how that maps to incoming stream ids
-> (based off the AXI bus id) on the SMMU.
-
-Tangent: We're trying to hash out a way for IOMMU drivers to use a PCI
-interface to discover the requester IDs associated with a device.  We
-currently only have one users (intel-iommu.c), and it would be awesome
-to have another user to help make things generic.  Please chime in if
-you have opinions.
-
-https://lkml.kernel.org/r/20130711210326.1701.56478.stgit at bling.home
+On Thu, Aug 01, 2013 at 11:21:14PM +0100, Santosh Shilimkar wrote:
+> The blk_queue_bounce_limit() API parameter 'dma_mask' is actually the
+> maximum address the device can handle rather than a dma_mask. Rename
+> it accordingly to avoid it being interpreted as dma_mask.
+> 
+> No functional change.
+> 
+> The idea is to fix the bad assumptions about dma_mask wherever it could
+> be miss-interpreted.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  block/blk-settings.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/block/blk-settings.c b/block/blk-settings.c
+> index c50ecf0..026c151 100644
+> --- a/block/blk-settings.c
+> +++ b/block/blk-settings.c
+> @@ -195,17 +195,17 @@ EXPORT_SYMBOL(blk_queue_make_request);
+>  /**
+>   * blk_queue_bounce_limit - set bounce buffer limit for queue
+>   * @q: the request queue for the device
+> - * @dma_mask: the maximum address the device can handle
+> + * @max_addr: the maximum address the device can handle
+>   *
+>   * Description:
+>   *    Different hardware can have different requirements as to what pages
+>   *    it can do I/O directly to. A low level driver can call
+>   *    blk_queue_bounce_limit to have lower memory pages allocated as bounce
+> - *    buffers for doing I/O to pages residing above @dma_mask.
+> + *    buffers for doing I/O to pages residing above @max_addr.
+>   **/
+> -void blk_queue_bounce_limit(struct request_queue *q, u64 dma_mask)
+> +void blk_queue_bounce_limit(struct request_queue *q, u64 max_addr)
+>  {
+> -	unsigned long b_pfn = dma_mask >> PAGE_SHIFT;
+> +	unsigned long b_pfn = max_addr >> PAGE_SHIFT;
+>  	int dma = 0;
+>  
+>  	q->bounce_gfp = GFP_NOIO;
+> -- 
+> 1.7.4.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
