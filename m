@@ -1,48 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  1 Aug 2013 17:26:54 +0900
-Subject: [PATCH 12/14] ARM: shmobile: No need to use INTC header on r8a7779
+Date: Thu,  1 Aug 2013 17:26:56 +0900
+Subject: [PATCH 14/14] ARM: shmobile: r8a7779: Remove '0x's from R8A7779 DTS
+ file
 In-Reply-To: <cover.1375344714.git.horms+renesas@verge.net.au>
 References: <cover.1375344714.git.horms+renesas@verge.net.au>
-Message-ID: <d2ef0b9a5192e921490d2f66f4467f26235412bd.1375344714.git.horms+renesas@verge.net.au>
+Message-ID: <98724b7ec9d34d875fc193660c87d6dd0d17ceb7.1375344714.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Lee Jones <lee.jones@linaro.org>
 
-Now when the intc-irqpin driver is used for external
-IRQ pins on r8a7779 it possible to get rid of unused
-INTC headers mach/intc.h and linux/sh_intc.h.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/intc-r8a7779.c  | 1 -
- arch/arm/mach-shmobile/setup-r8a7779.c | 1 -
- 2 files changed, 2 deletions(-)
+ arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/intc-r8a7779.c b/arch/arm/mach-shmobile/intc-r8a7779.c
-index b86dc89..5f9e5dc 100644
---- a/arch/arm/mach-shmobile/intc-r8a7779.c
-+++ b/arch/arm/mach-shmobile/intc-r8a7779.c
-@@ -27,7 +27,6 @@
- #include <linux/platform_data/irq-renesas-intc-irqpin.h>
- #include <linux/irqchip.h>
- #include <mach/common.h>
--#include <mach/intc.h>
- #include <mach/irqs.h>
- #include <mach/r8a7779.h>
- #include <asm/mach-types.h>
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 6ab7405..bb8b967 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -29,7 +29,6 @@
- #include <linux/input.h>
- #include <linux/io.h>
- #include <linux/serial_sci.h>
--#include <linux/sh_intc.h>
- #include <linux/sh_timer.h>
- #include <linux/dma-mapping.h>
- #include <linux/usb/otg.h>
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 7f146c6..86bd487 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -65,7 +65,7 @@
+ 		sense-bitfield-width = <2>;
+ 	};
+ 
+-	i2c0: i2c at 0xffc70000 {
++	i2c0: i2c at ffc70000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -74,7 +74,7 @@
+ 		interrupts = <0 79 0x4>;
+ 	};
+ 
+-	i2c1: i2c at 0xffc71000 {
++	i2c1: i2c at ffc71000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -83,7 +83,7 @@
+ 		interrupts = <0 82 0x4>;
+ 	};
+ 
+-	i2c2: i2c at 0xffc72000 {
++	i2c2: i2c at ffc72000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -92,7 +92,7 @@
+ 		interrupts = <0 80 0x4>;
+ 	};
+ 
+-	i2c3: i2c at 0xffc73000 {
++	i2c3: i2c at ffc73000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
 -- 
 1.8.3.2
