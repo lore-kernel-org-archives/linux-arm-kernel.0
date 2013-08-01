@@ -1,45 +1,108 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 01 Aug 2013 17:14:50 +0200
-Subject: [PATCH] USB: ohci-at91: add usb_clk for transition to common
- clk framework
-In-Reply-To: <Pine.LNX.4.44L0.1308011038380.1534-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1308011038380.1534-100000@iolanthe.rowland.org>
-Message-ID: <51FA7B6A.80106@overkiz.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 1 Aug 2013 18:18:17 +0300
+Subject: [PATCHv4 05/33] CLK: omap: add DT duplicate clock registration
+ mechanism
+In-Reply-To: <51FA6FCA.3050900@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-6-git-send-email-t-kristo@ti.com> <51F808A8.6000503@ti.com>
+ <51F8E1F5.20706@ti.com> <51FA6FCA.3050900@ti.com>
+Message-ID: <51FA7C39.8090100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2013 16:39, Alan Stern wrote:
-> On Thu, 1 Aug 2013, Boris BREZILLON wrote:
->
->> The AT91 PMC (Power Management Controller) provides an USB clock used by
->> USB Full Speed host (ohci) and USB Full Speed device (udc).
->> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
->> This configuration was formely done in mach-at91/clock.c, but this
->> implementation will be removed when moving to common clk framework.
+On 08/01/2013 05:25 PM, Nishanth Menon wrote:
+> On 07/31/2013 05:07 AM, Tero Kristo wrote:
+>> On 07/30/2013 09:40 PM, Nishanth Menon wrote:
+>>> On 07/23/2013 02:20 AM, Tero Kristo wrote:
+>>>> Some devices require their clocks to be available with a specific
+>>>> dev-id con-id mapping. With DT, the clocks can be found by default
+>>>> only with their name, or alternatively through the device node of
+>>>> the consumer. With drivers, that don't support DT fully yet, add
+>>>> mechanism to register specific clock names.
+>>>>
+>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>
+>>> with this, should it not be enough to add clocks=<&phandle>
 >>
->> This patch adds support for usb clock retrieval and configuration, and is
->> backward compatible with the current at91 clk implementation (if usb clk
->> is not found, it does not configure/enable it).
+>> Don't know, I am not an expert on DT. :)
+>
+> That is the usage -
+> Documentation/devicetree/bindings/clock/clock-bindings.txt
+>
 >>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> @@ -163,6 +169,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->>   		goto err5;
->>   	}
->>   
->> +	uclk = clk_get(&pdev->dev, "usb_clk");
-> What happens if uclk isn't found but it is needed?
-It will not fail but I guess the usb host won't work as the clock won't 
-be correctly
-configured.
+>>>
+>>> I am not sure I understand what specific drivers should need to carry
+>>> this "old hack" forward. More importantly, why is it preferable to carry
+>>> the hack forward rather than fixing the drivers.
+>>
+>> At least the GP timer seems to need this, and I don't want to touch /
+>> verify all the potential drivers touched by this so it is easier to
+>> provide a (semi) temporary tweak.
+>
+> I see that GP timer nodes seem to be already device tree converted, at
+> least I see the nodes in SoC.dtsi
 
-I agree with you: this is not a good solution.
-
-Another option is to keep the previous version of this patch and put 
-uclk handling
-in "#ifdef CONFIG_COMMON_CLK #endif" sections.
-
-Would this be acceptable ?
+Even if those exist, they don't seem to work. The kernel crashes without 
+the alias nodes as of now.
 
 >
-> Alan Stern
+> Do we know what is going on for these that need these temporary devices?
+> can we do a special node property for these?
 >
+> I think the entire problem is coz of
+> timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh)); in case of
+> even of_populated.
+
+I guess so, clk_get tries to look for improper clk which does not exist. 
+Might be a bug with hwmod data.
+
+>
+> if we can get rid of usage of omap_hwmod_get_main_clk by catching them
+> with [1], then we can force the drivers to pick up based on device node
+> clocks= property.
+>
+> It might be easier to fix 1 driver - timer, rather than introduce am33x,
+> omap4, omap5 dra7 specific "SoC clk driver".
+>
+> with that this entire patch becomes redundant.
+
+It is not that simple. Looking at the architectures this set supports, I 
+see clock alias nodes at least for following drivers:
+
+- GPT timer
+- USB
+- DCAN
+- EMAC
+- VPFE
+- UART
+- SSI
+- DSS
+- security
+- MMC
+- MCBSP
+- MCSPI
+
+I am _not_ going to fix all of these during the initial phase. :P
+
+But yes, eventually these should go away.
+
+>
+>
+> [1]
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
+> b/arch/arm/mach-omap2/omap_hwmod.c
+> index da26659..2e90ab4 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -4153,5 +4153,10 @@ const char *omap_hwmod_get_main_clk(struct
+> omap_hwmod *oh)
+>       if (!oh)
+>           return NULL;
+>
+> +    if (!of_have_populated_dt()) {
+> +        WARN(1, "%s hwmod clk node read with OF?:FIXME!\n",
+> +             oh->name);
+> +    }
+> +
+>       return oh->main_clk;
+>   }
