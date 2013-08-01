@@ -1,32 +1,72 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 1 Aug 2013 10:39:40 -0400 (EDT)
-Subject: [PATCH] USB: ohci-at91: add usb_clk for transition to common
- clk framework
-In-Reply-To: <1375337800-2605-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <Pine.LNX.4.44L0.1308011038380.1534-100000@iolanthe.rowland.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 1 Aug 2013 09:40:01 -0500
+Subject: [PATCHv4 09/33] CLK: omap: add omap4 clock init file
+In-Reply-To: <51F924CA.6000803@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-10-git-send-email-t-kristo@ti.com>
+ <51F81516.3050302@ti.com> <51F924CA.6000803@ti.com>
+Message-ID: <51FA7341.7040303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Aug 2013, Boris BREZILLON wrote:
+On 07/31/2013 09:52 AM, Tero Kristo wrote:
+> On 07/30/2013 10:33 PM, Nishanth Menon wrote:
+[...]
 
-> The AT91 PMC (Power Management Controller) provides an USB clock used by
-> USB Full Speed host (ohci) and USB Full Speed device (udc).
-> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
-> This configuration was formely done in mach-at91/clock.c, but this
-> implementation will be removed when moving to common clk framework.
-> 
-> This patch adds support for usb clock retrieval and configuration, and is
-> backward compatible with the current at91 clk implementation (if usb clk
-> is not found, it does not configure/enable it).
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>>
+>>> +    DT_CLK(NULL,    "cpufreq_ck",    "dpll_mpu_ck"),
+>> please remove cpufreq.
+>
+> Hmm why?
+>
+> Because cpufreq is completely broken now and your current work on it? :)
 
-> @@ -163,6 +169,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->  		goto err5;
->  	}
->  
-> +	uclk = clk_get(&pdev->dev, "usb_clk");
+cpufreq fixing can be done separately and has abillity to pick up clock 
+nodes by describing clocks=<&dpll_mpu_ck> in cpu0 node. absolutely no 
+need to carry on this hack - See my comment on [1]
 
-What happens if uclk isn't found but it is needed?
+yes, I know I will have to redo my cpufreq series, but thanks to your 
+work, it is a 10 min job to enable them back online :) dont worry about 
+the broken cpufreq, we will fix it properly and it is not even needed 
+for basic boot to shell (example omap2plus_defconfig does not even 
+enable CONFIG_CPU_FREQ).
 
-Alan Stern
+
+>>
+>>> +    abe_dpll_ref = clk_get_sys(NULL, "abe_dpll_refclk_mux_ck");
+>>> +    sys_32k_ck = clk_get_sys(NULL, "sys_32k_ck");
+>>> +    rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
+>>> +    abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
+>>> +    if (!rc)
+>>> +        rc = clk_set_rate(abe_dpll, OMAP4_DPLL_ABE_DEFFREQ);
+>>> +    if (rc)
+>>> +        pr_err("%s: failed to configure ABE DPLL!\n", __func__);
+>>> +
+>>> +    /*
+>>> +     * Lock USB DPLL on OMAP4 devices so that the L3INIT power
+>>> +     * domain can transition to retention state when not in use.
+>>> +     */
+>>> +    usb_dpll = clk_get_sys(NULL, "dpll_usb_ck");
+>>> +    rc = clk_set_rate(usb_dpll, OMAP4_DPLL_USB_DEFFREQ);
+>>> +    if (rc)
+>>> +        pr_err("%s: failed to configure USB DPLL!\n", __func__);
+>>
+>> ^^^^ why cant we have a generic property that does this "automagically"
+>> from dts property to the node?
+>> a) be able to select a parent
+>> b) be able to set a frequency.
+>> c) how do we ensure that CLK_SET_RATE_PARENT are setup for the clock
+>> nodes defined by dt?
+>
+> This is probably for Mike to answer, currently such mechanism does not
+> exist.
+
+I think you already dealt with (c). in the same vein, we can do (a) and 
+(b). Dont think anyone else has gone about this to the extent we are 
+attempting to do till date, so as pioneers, we might as well suggest 
+with a patch :D ?
+
+[1] http://marc.info/?l=linux-omap&m=137536714605620&w=2
+-- 
+Regards,
+Nishanth Menon
