@@ -1,58 +1,68 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 01 Aug 2013 14:41:49 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130801183531.GB29831@mudshark.cambridge.arm.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
-Message-ID: <1375393309.2070.12.camel@dabdike>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 01 Aug 2013 22:42:04 +0100
+Subject: [PATCH RFC 08/51] DMA-API: net: intel/ixgbevf: fix 32-bit DMA mask
+ handling
+In-Reply-To: <20130801213420.GL23006@n2100.arm.linux.org.uk>
+References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
+Message-ID: <E1V50dI-0006qA-3v@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-01 at 19:35 +0100, Will Deacon wrote:
-> Hello,
-> 
-> Whilst Linux implements a bunch of different bus types (many of which
-> are in fact virtual), devices sitting on non-probable, memory mapped
-> buses inside SoCs typically live on either the platform_bus or the
-> amba_bus. So far, this has worked out alright; the buses haven't needed
-> to be visible to software and no additional software control is really
-> required from the OS. However, as I/O coherency and hardware
-> virtualisation capabilities start to creep into ARM-based SoCs, Linux
-> needs to know the topology of the system on which it is running.
-> 
-> Naturally, this would need to be described as a device-tree binding and
-> communicate:
-> 
->   - Buses which can be configured as coherent, including which devices
->     on those buses can be made coherent.
+The fallback to 32-bit DMA mask is rather odd:
+	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) &&
+	    !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+		pci_using_dac = 1;
+	} else {
+		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+		if (err) {
+			err = dma_set_coherent_mask(&pdev->dev,
+						    DMA_BIT_MASK(32));
+			if (err) {
+				dev_err(&pdev->dev, "No usable DMA "
+					"configuration, aborting\n");
+				goto err_dma;
+			}
+		}
+		pci_using_dac = 0;
+	}
+This means we only set the coherent DMA mask in the fallback path if
+the DMA mask set failed, which is silly.  This fixes it to set the
+coherent DMA mask only if dma_set_mask() succeeded, and to error out
+if either fails.
 
-I don't think coherency is a good bus property:  we have PCI systems
-which are incoherent by virtue of the CPU they're attached to rather
-than because of any fundamental bus property.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c |   15 +++++----------
+ 1 files changed, 5 insertions(+), 10 deletions(-)
 
->   - How IOMMUs sit on the bus and interact with masters on that bus (the
->     current one-IOMMU-driver-per-bus may not work well for the
->     platform_bus).
-
-That's really not a good model.  On most parisc system, we have a split
-IOMMU model (we mostly have two iommus and the topology determines which
-one you have to use), but our two upper iommus are exposed as parisc
-devices sitting at the root of the device tree.  When we program the
-device for DMA we walk up the bus until we find the correct iommu to
-program.
-
->   - QoS and PM constraints. This isn't really in my area, but we do have
->     buses that have these features and expect software to control them.
-> 
->   - The system topology and linkages between buses and devices.
-
-Actually, topology isn't really about linkages between busses and
-devices.  Topology is about linkages between devices and devices.  A bus
-type is a grouping of a set of devices which share common properties so
-if you look at parisc for example, which is closest to ARM, our bus
-topology at the top is usually two iommus connected to a set of end
-points connected to several parisc specific things, all of which are bus
-type parisc.  PCI is the same since PCI bridges are also PCI devices,
-you can get device topologies nesting quite deep.
-
-James
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+index 1f5166a..cf1e939 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+@@ -3326,19 +3326,14 @@ static int ixgbevf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	if (err)
+ 		return err;
+ 
+-	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) &&
+-	    !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
++	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
+ 		pci_using_dac = 1;
+ 	} else {
+-		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
++		err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+ 		if (err) {
+-			err = dma_set_coherent_mask(&pdev->dev,
+-						    DMA_BIT_MASK(32));
+-			if (err) {
+-				dev_err(&pdev->dev, "No usable DMA "
+-					"configuration, aborting\n");
+-				goto err_dma;
+-			}
++			dev_err(&pdev->dev, "No usable DMA "
++				"configuration, aborting\n");
++			goto err_dma;
+ 		}
+ 		pci_using_dac = 0;
+ 	}
+-- 
+1.7.4.4
