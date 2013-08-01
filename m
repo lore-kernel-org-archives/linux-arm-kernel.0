@@ -1,31 +1,45 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 1 Aug 2013 16:32:23 +0800
-Subject: [PATCH 1/2] pinctrl: imx: work around select input quirk
-In-Reply-To: <CAAQ0ZWQajP49jM_0wqvqmuv19ZcSQ_1QUzgxfsBYzKU_5w0bMA@mail.gmail.com>
-References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
- <20130801065147.GM8540@nchen-desktop>
- <CAAQ0ZWQajP49jM_0wqvqmuv19ZcSQ_1QUzgxfsBYzKU_5w0bMA@mail.gmail.com>
-Message-ID: <20130801083221.GA32696@nchen-desktop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  1 Aug 2013 10:40:34 +0200
+Subject: [PATCHv3 0/3] Few ignored framebuffer fixes/additions
+Message-ID: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 03:08:06PM +0800, Shawn Guo wrote:
-> On 1 August 2013 14:51, Peter Chen <peter.chen@freescale.com> wrote:
-> > Shawn, input_reg[i] may be 0 if the fixed one at first register of IOMUXC
-> 
-> Ah, yes.  Now select input register at offset 0 becomes possible.  I
-> will try to fix it.
-> 
-> Regardless of this, does the series work for you?
-> 
-Yes, it works, you can add : Tested-by: Peter Chen <peter.chen@freescale.com>
+Hi,
 
-I changed the second patch manually, have you changed the pin prefix
-at arch/arm/boot/dts/imx6q-pinfunc.h?  At 3.10, it is MX6Q_XXX.
+This is the v2 of a set of patches that got forgotten.
 
-Besides, please add comments for u16 *input_reg at struct imx_pin_group.
+These have been around for a while without any functionnal comments recently,
+so I guess we should be pretty close to merge them.
+
+It would be great if we could have comments from the maintainer on these
+patches though (three patches iterations and 41 days since last sign of life of
+the maintainer).
+
+Thanks,
+Maxime
+
+Changes from v2:
+  - Few minor coding style fixes
+  - Removed the useless msleep(100) in the hx8369 init function
+
+Changes from v1:
+  - Fix line wrapping in patch 2
+  - Added some comments on the msleep in patch 3
+
+
+Alexandre Belloni (1):
+  fb: backlight: HX8357: Add HX8369 support
+
+Hector Palacios (1):
+  video: mxsfb: fix color settings for 18bit data bus and 32bpp
+
+Maxime Ripard (1):
+  video: hx8357: Make IM pins optional
+
+ drivers/video/backlight/hx8357.c | 269 ++++++++++++++++++++++++++++++++++-----
+ drivers/video/mxsfb.c            |  26 ----
+ 2 files changed, 234 insertions(+), 61 deletions(-)
 
 -- 
-
-Best Regards,
-Peter Chen
+1.8.3.4
