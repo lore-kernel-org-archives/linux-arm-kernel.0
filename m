@@ -1,62 +1,37 @@
 From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 1 Aug 2013 16:15:59 +0200
+Date: Thu, 1 Aug 2013 16:18:58 +0200
 Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
  arch/arm/mach-bcm
-In-Reply-To: <CAGVrzcbvHbWp2_P2_tHGbKMm6wyZ3cBSZRibEQNcAjiaB4NjZA@mail.gmail.com>
+In-Reply-To: <201307271638.16289.arnd@arndb.de>
 References: <20130726145639.116237136@gmail.com>
- <20130726151223.045835540@gmail.com>
- <20130726152918.GL29916@titan.lakedaemon.net>
- <20130726215859.GA19469@glitch>
- <CAGVrzcbvHbWp2_P2_tHGbKMm6wyZ3cBSZRibEQNcAjiaB4NjZA@mail.gmail.com>
-Message-ID: <20130801141559.GA1904@glitch>
+ <20130726231108.GA10812@obsidianresearch.com>
+ <20130726234237.GB24642@n2100.arm.linux.org.uk>
+ <201307271638.16289.arnd@arndb.de>
+Message-ID: <20130801141858.GB1904@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 10:23:48AM +0100, Florian Fainelli wrote:
-> Hello,
+On Sat, Jul 27, 2013 at 04:38:16PM +0200, Arnd Bergmann wrote:
+> On Saturday 27 July 2013, Russell King - ARM Linux wrote:
+> > On Fri, Jul 26, 2013 at 05:11:08PM -0600, Jason Gunthorpe wrote:
+> > > On Fri, Jul 26, 2013 at 11:59:00PM +0200, Domenico Andreoli wrote:
+> >
+> > Anyway, there's a simpler solutions to this:
+> > 
+> > machdirs := $(patsubst %,arch/arm/mach-%/,$(sort $(machine-y)))
+> > platdirs := $(patsubst %,arch/arm/plat-%/,$(Sort $(plat-y)))
+> > 
+> > which will remove all duplicates.
 > 
-> 2013/7/26 Domenico Andreoli <cavokz@gmail.com>:
-> > On Fri, Jul 26, 2013 at 11:29:18AM -0400, Jason Cooper wrote:
-> >> On Fri, Jul 26, 2013 at 04:56:40PM +0200, Domenico Andreoli wrote:
-> >> > From: Domenico Andreoli <domenico.andreoli@linux.com>
-> >> >
-> >> > arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
-> >> > separately. As a matter of flexibility and maintenance, it needs to be
-> >> > always included in the build.
-> >>
-> >> So if I'm building mach-kirkwood, I _have_ to build Broadcom?  What is
-> >> the *specific* problem you're encountering that this solves?
-> >
-> > In mach-bcm we (or I, it's not very clear to me) want to have support for
-> > multiple SoCs.
-> >
-> > In trying the approach
-> >
-> > machine-$(CONFIG_ARCH_BCM)              += bcm
-> > machine-$(CONFIG_ARCH_BCM4760)          += bcm
-> >
-> > I got linker complains about multiple symbol definitiion in case both the
-> > config options are selected.
-> >
-> > The first thought was to use a common option which purpose was only to
-> > include the subdir but then, given my allergy to the tons of config options
-> > with usually not straghtforward purpose, I opted for something more simple.
-> 
-> I do not understand why are you trying so hard to put your SoC support
-> in mach-bcm. I was one of the only people to complain that mach-bcm
-> was both confusing and not generic enough to cover all Broadcom SoCs.
-> I still think it should have been specified to mach-bcmmobile or
-> something like mach-bcm28xxx. Back in the days where ARM drivers were
-> mostly living in arch/arm/*, it *might* have made some sense but now,
-> I really think that you should go with your own mach-bcm470x
-> directory.
-> 
-> BCM47060, BCM53xx and BCM28xx all have both different CPU backends and
-> different on-chip peripherals, which are even connected differently,
-> put clearly, they share very little but the ARM architecture.
+> This does sound like the easiest solution, although I still think
+> Olof's suggestion of making ARCH_BCM a silent Kconfig symbol would be
+> just as good if we just have this one instance.
 
-I've already explained my point elsewhere in this thread. It's not technical,
-it's social. I don't see any technical disproportion to go either way.
+I know that time is always tight and there is also this DT ABI discussion
+ongoing but do I have any chance to get any ack on this series?
 
-thanks,
+Should I post a new set? It would be only to fix again the build of mach-bcm,
+I've nothing else pending.
+
+Thanks,
 Domenico
