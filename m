@@ -1,10 +1,10 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 01 Aug 2013 22:49:05 +0100
-Subject: [PATCH RFC 15/51] DMA-API: net: b43legacy: replace
+Date: Thu, 01 Aug 2013 22:50:06 +0100
+Subject: [PATCH RFC 16/51] DMA-API: ppc: vio.c: replace
  dma_set_mask()+dma_set_coherent_mask() with new helper
 In-Reply-To: <20130801213420.GL23006@n2100.arm.linux.org.uk>
 References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
-Message-ID: <E1V50k5-0006qu-Nv@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1V50l4-0006r0-7D@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,28 +17,22 @@ with a call to the new helper dma_set_mask_and_coherent().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/wireless/b43legacy/dma.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
+ arch/powerpc/kernel/vio.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/wireless/b43legacy/dma.c b/drivers/net/wireless/b43legacy/dma.c
-index faeafe2..3952d15 100644
---- a/drivers/net/wireless/b43legacy/dma.c
-+++ b/drivers/net/wireless/b43legacy/dma.c
-@@ -807,12 +807,9 @@ static int b43legacy_dma_set_mask(struct b43legacy_wldev *dev, u64 mask)
- 	/* Try to set the DMA mask. If it fails, try falling back to a
- 	 * lower mask, as we can always also support a lower one. */
- 	while (1) {
--		err = dma_set_mask(dev->dev->dma_dev, mask);
--		if (!err) {
--			err = dma_set_coherent_mask(dev->dev->dma_dev, mask);
--			if (!err)
--				break;
--		}
-+		err = dma_set_mask_and_coherent(dev->dev->dma_dev, mask);
-+		if (!err)
-+			break;
- 		if (mask == DMA_BIT_MASK(64)) {
- 			mask = DMA_BIT_MASK(32);
- 			fallback = true;
+diff --git a/arch/powerpc/kernel/vio.c b/arch/powerpc/kernel/vio.c
+index 536016d..045f026 100644
+--- a/arch/powerpc/kernel/vio.c
++++ b/arch/powerpc/kernel/vio.c
+@@ -1412,8 +1412,7 @@ struct vio_dev *vio_register_device_node(struct device_node *of_node)
+ 
+ 		/* needed to ensure proper operation of coherent allocations
+ 		 * later, in case driver doesn't set it explicitly */
+-		dma_set_mask(&viodev->dev, DMA_BIT_MASK(64));
+-		dma_set_coherent_mask(&viodev->dev, DMA_BIT_MASK(64));
++		dma_set_mask_and_coherent(&viodev->dev, DMA_BIT_MASK(64));
+ 	}
+ 
+ 	/* register with generic device framework */
 -- 
 1.7.4.4
