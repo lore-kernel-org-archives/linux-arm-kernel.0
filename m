@@ -1,47 +1,45 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 1 Aug 2013 16:13:31 +0100
-Subject: [PATCH RFC 5/8] xen: introduce XENMEM_get_dma_buf and
- xen_put_dma_buf
-In-Reply-To: <22032fc7-81f5-4271-81b6-cd2bee277fb5@email.android.com>
-References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
- <1375292732-7627-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <22032fc7-81f5-4271-81b6-cd2bee277fb5@email.android.com>
-Message-ID: <alpine.DEB.2.02.1308011608330.4893@kaball.uk.xensource.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Thu, 01 Aug 2013 17:14:50 +0200
+Subject: [PATCH] USB: ohci-at91: add usb_clk for transition to common
+ clk framework
+In-Reply-To: <Pine.LNX.4.44L0.1308011038380.1534-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1308011038380.1534-100000@iolanthe.rowland.org>
+Message-ID: <51FA7B6A.80106@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Jul 2013, Konrad Rzeszutek Wilk wrote:
-> Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> >Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >---
-> >include/xen/interface/memory.h |   62
-> >++++++++++++++++++++++++++++++++++++++++
-> > 1 files changed, 62 insertions(+), 0 deletions(-)
-> >
-> >diff --git a/include/xen/interface/memory.h
-> >b/include/xen/interface/memory.h
-> >index 2ecfe4f..ffd7f4e 100644
-> >--- a/include/xen/interface/memory.h
-> >+++ b/include/xen/interface/memory.h
-> >@@ -263,4 +263,66 @@ struct xen_remove_from_physmap {
-> > };
-> > DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
-> > 
-> >+#define XENMEM_get_dma_buf             26
-> >+/*
-> >+ * This hypercall is similar to XENMEM_exchange: it exchanges the
-> >pages
-> 
-> Could you elaborate why the existing hyper call won't work? 
+On 01/08/2013 16:39, Alan Stern wrote:
+> On Thu, 1 Aug 2013, Boris BREZILLON wrote:
+>
+>> The AT91 PMC (Power Management Controller) provides an USB clock used by
+>> USB Full Speed host (ohci) and USB Full Speed device (udc).
+>> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+>> This configuration was formely done in mach-at91/clock.c, but this
+>> implementation will be removed when moving to common clk framework.
+>>
+>> This patch adds support for usb clock retrieval and configuration, and is
+>> backward compatible with the current at91 clk implementation (if usb clk
+>> is not found, it does not configure/enable it).
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> @@ -163,6 +169,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>>   		goto err5;
+>>   	}
+>>   
+>> +	uclk = clk_get(&pdev->dev, "usb_clk");
+> What happens if uclk isn't found but it is needed?
+It will not fail but I guess the usb host won't work as the clock won't 
+be correctly
+configured.
 
-Two reasons:
+I agree with you: this is not a good solution.
 
-- the existing XENMEM_exchange hypercall does not copy back the mfns
-into the out field for autotranslate guests;
+Another option is to keep the previous version of this patch and put 
+uclk handling
+in "#ifdef CONFIG_COMMON_CLK #endif" sections.
 
-- the existing XENMEM_exchange hypercall does not guarantee that the
-hypervisor won't change the p2m mappings for the exchanged pages while
-the guest is using them. Keep in mind that Xen never promises to keep
-the p2m mapping stable for autotranslate guests in general.
-In practice it won't happen unless you use uncommon features like memory
-sharing or paging.
+Would this be acceptable ?
+
+>
+> Alan Stern
+>
