@@ -1,46 +1,50 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 01 Aug 2013 17:53:35 +1200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable wireless support
-In-Reply-To: <1375287304-3896-1-git-send-email-festevam@gmail.com>
-References: <1375287304-3896-1-git-send-email-festevam@gmail.com>
-Message-ID: <51F9F7DF.1030205@prisktech.co.nz>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 1 Aug 2013 07:57:56 +0200
+Subject: [PATCH 1/10] ARM: dts: mxs: move 'compatible' property to
+ beginning of node and do some whitespace cleanups
+In-Reply-To: <51F971B4.1050605@cogentembedded.com>
+References: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
+ <51F971B4.1050605@cogentembedded.com>
+Message-ID: <20985.63716.320416.93668@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/13 04:15, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Wandboard has a Broadcom 4329 chipset connected to SDHC, so turn on the wireless
-> related options.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->   arch/arm/configs/imx_v6_v7_defconfig | 7 +++++--
->   1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index d3e044a..577f054 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -61,7 +61,10 @@ CONFIG_IP_PNP_DHCP=y
->   # CONFIG_INET_LRO is not set
->   CONFIG_IPV6=y
->   CONFIG_NETFILTER=y
-> -# CONFIG_WIRELESS is not set
-> +CONFIG_CFG80211=y
-> +CONFIG_MAC80211=y
-> +CONFIG_RFKILL=y
-> +CONFIG_RFKILL_INPUT=y
->   CONFIG_DEVTMPFS=y
->   CONFIG_DEVTMPFS_MOUNT=y
->   # CONFIG_STANDALONE is not set
-> @@ -115,7 +118,7 @@ CONFIG_SMC91X=y
->   CONFIG_SMC911X=y
->   CONFIG_SMSC911X=y
->   # CONFIG_NET_VENDOR_STMICRO is not set
-> -# CONFIG_WLAN is not set
-> +CONFIG_BRCMFMAC=m
->   # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
->   CONFIG_INPUT_EVDEV=y
->   CONFIG_INPUT_EVBUG=m
-Tested-by: Tony Prisk <linux@prisktech.co.nz>
+Hi,
+
+Sergei Shtylyov writes:
+> Hello.
+> 
+> On 07/31/2013 06:37 PM, Lothar Wa?mann wrote:
+> 
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >   arch/arm/boot/dts/imx28.dtsi |    5 ++---
+> >   1 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> > index 47fc5ef..0360acc 100644
+> > --- a/arch/arm/boot/dts/imx28.dtsi
+> > +++ b/arch/arm/boot/dts/imx28.dtsi
+> > @@ -731,9 +731,9 @@
+> >   			};
+> >
+> >   			dcp at 80028000 {
+> > +				compatible = "fsl-dcp";
+> 
+>     Hm, why not the usual "fsl,dcp", where "fsl" is Freescale's stock ticker?
+> 
+Don't ask me, but the author of the patch that introduced this
+(CC'ed), or the maintainer who accepted this in the first place.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
