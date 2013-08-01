@@ -1,65 +1,17 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 1 Aug 2013 14:17:13 -0400
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1 CPU
- devices
-Message-ID: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 01 Aug 2013 12:17:57 -0600
+Subject: [PATCH V3] ARM: dts: tegra114: dalmore: fix the irq trigger type
+ of Palmas MFD device
+In-Reply-To: <1375349865-29816-1-git-send-email-josephl@nvidia.com>
+References: <1375349865-29816-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51FAA655.7090409@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+On 08/01/2013 03:37 AM, Joseph Lo wrote:
+> The IRQ trigger type of Palmas MFD device (tps65913) is designed as
+> low-level sensitive on Dalmore. The wrong configuration would cause an
+> interrupt storm when booting the system. Fixing it in DT with appropriate
+> interrupt type.
 
-The generic code is well equipped to differentiate between
-SMP and UP configurations.However, there are some devices which
-use Cortex-A9 MP core IP with 1 CPU as configuration. To let
-these SOCs to co-exist in a CONFIG_SMP=y build by leveraging
-the SMP_ON_UP support, we need to additionally check the
-number the cores in Cortex-A9 MPCore configuration. Without
-such a check in place, the startup code tries to execute
-ALT_SMP() set of instructions which lead to CPU faults.
-
-The issue was spotted on TI's Aegis device and this patch
-makes now the device work with omap2plus_defconfig which
-enables SMP by default. The change is kept limited to only
-Cortex-A9 MPCore detection code.
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-
-Acked-by: Sricharan R <r.sricharan@ti.com>
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/kernel/head.S |   18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 9cf6063..4924b11 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -486,7 +486,23 @@ __fixup_smp:
- 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
- 	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
- 	teq	r0, #0x80000000		@ not part of a uniprocessor system?
--	moveq	pc, lr			@ yes, assume SMP
-+	bne    __fixup_smp_on_up	@ no, assume UP
-+
-+	@ Core indicates it is SMP.  Check for Aegis SOC where a single
-+	@ Cortex-A9 CPU is present but SMP operations fault.
-+	mov	r4, #0x41000000
-+	orr	r4, r4, #0x0000c000
-+	orr	r4, r4, #0x00000090
-+	teq	r3, r4			@ Check for ARM Cortex-A9
-+	movne	pc, lr			@ Not ARM Cortex-A9,
-+
-+	mrc	p15, 4, r0, c15, c0	@ get SCU base address
-+	teq	r0, #0x0		@ '0' on actual UP A9 hardware
-+	beq	__fixup_smp_on_up	@ So its an A9 UP
-+	ldr	r0, [r0, #4]		@ read SCU Config
-+	and	r0, r0, #0x3		@ number of CPUs
-+	teq	r0, #0x0		@ is 1?
-+	movne	pc, lr
- 
- __fixup_smp_on_up:
- 	adr	r0, 1f
--- 
-1.7.9.5
+I have applied this to Tegra's for-3.12/dt branch.
