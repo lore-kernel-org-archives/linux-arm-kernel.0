@@ -1,124 +1,79 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 15:25:15 +0200
-Subject: [PATCHv6 12/13] PCI: mvebu: add support for MSI
-In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375363516-2620-13-git-send-email-thomas.petazzoni@free-electrons.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 1 Aug 2013 09:34:10 -0400
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
+ interested in device tree janitoring / cleanup?]
+In-Reply-To: <1375352315.22084.138.camel@shinybook.infradead.org>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
+ <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
+ <20130731201457.GA24642@n2100.arm.linux.org.uk>
+ <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
+ <20130731204817.GC24642@n2100.arm.linux.org.uk>
+ <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
+ <1375352315.22084.138.camel@shinybook.infradead.org>
+Message-ID: <CAKON4OyhF+_Q8dWNBDjag=A=v=J2NE0h8+1mms2uvUMS8+45eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for Message Signaled Interrupts in the
-Marvell PCIe host controller. The work is very simple: it simply gets
-a reference to the msi_chip associated to the PCIe controller thanks
-to the msi-parent DT property, and stores this reference in the
-pci_bus structure. This is enough to let the Linux PCI core use the
-functions of msi_chip to setup and teardown MSIs.
+On Thu, Aug 1, 2013 at 6:18 AM, David Woodhouse <dwmw2@infradead.org> wrote:
+> On Wed, 2013-07-31 at 17:26 -0400, jonsmirl at gmail.com wrote:
+>> Alternatively you may be of the belief that it is impossible to get
+>> rid of the board specific code. But x86 doesn't have any of it, why
+>> should ARM?
+>
+> The reason x86 doesn't have it is because it carries three decades worth
+> of legacy baggage so that it can still look like a 1980s IBM PC when
+> necessary.
+>
+> There *have* been some x86 platforms which abandon that legacy crap, and
+> for those we *do* have board-specific code. (Is James still maintaining
+> Voyager support? It feels very strange to talk about Voyager with it
+> *not* being the 'legacy crap' in question...)
+>
+> We've even seen *recent* attempts to abandon the legacy crap in the
+> embedded x86 space, which backtracked and added it all back again ? in
+> part because x86 lacked any sane way to describe the hardware if it
+> wasn't pretending to be a PC. ACPI doesn't cut it, and DT "wasn't
+> invented here"...
+>
+> Unless you want the ARM world to settle on a strategy of "all the world
+> is an Assabet", I'd be careful what you wish for...
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
----
- .../devicetree/bindings/pci/mvebu-pci.txt          |  3 +++
- drivers/pci/host/pci-mvebu.c                       | 31 ++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
+So there should be shades for gray in this area. Try to eliminate all
+of the board specific code you can, and then only if that fails add
+board specific support to the kernel.
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index f8d4058..77e0ffe 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -12,6 +12,8 @@ Mandatory properties:
- - device_type, set to "pci"
- - ranges: ranges for the PCI memory and I/O regions, as well as the
-   MMIO registers to control the PCIe interfaces.
-+- msi-parent: Link to the hardware entity that serves as the Message
-+  Signaled Interrupt controller for this PCI controller.
- 
- In addition, the Device Tree node must have sub-nodes describing each
- PCIe interface, having the following mandatory properties:
-@@ -46,6 +48,7 @@ pcie-controller {
- 	#size-cells = <2>;
- 
- 	bus-range = <0x00 0xff>;
-+	msi-parent = <&mpic>;
- 
- 	ranges = <0x82000000 0 0xd0040000 0xd0040000 0 0x00002000   /* Port 0.0 registers */
- 		  0x82000000 0 0xd0042000 0xd0042000 0 0x00002000   /* Port 2.0 registers */
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13a633b..884cf82 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -11,6 +11,7 @@
- #include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/mbus.h>
-+#include <linux/msi.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
-@@ -107,6 +108,7 @@ struct mvebu_pcie_port;
- struct mvebu_pcie {
- 	struct platform_device *pdev;
- 	struct mvebu_pcie_port *ports;
-+	struct msi_chip *msi;
- 	struct resource io;
- 	struct resource realio;
- 	struct resource mem;
-@@ -695,6 +697,12 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 	return bus;
- }
- 
-+void mvebu_pcie_add_bus(struct pci_bus *bus)
-+{
-+	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
-+	bus->msi = pcie->msi;
-+}
-+
- resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 					  const struct resource *res,
- 					  resource_size_t start,
-@@ -731,6 +739,7 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.map_irq        = mvebu_pcie_map_irq;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
-+	hw.add_bus        = mvebu_pcie_add_bus;
- 
- 	pci_common_init(&hw);
- }
-@@ -755,6 +764,26 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
- 	return devm_request_and_ioremap(&pdev->dev, &regs);
- }
- 
-+static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
-+{
-+	struct device_node *msi_node;
-+	struct irq_domain *msi_domain;
-+
-+	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
-+				    "msi-parent", 0);
-+	if (!msi_node)
-+		return;
-+
-+	msi_domain = irq_find_msi_host(msi_node);
-+	if (!msi_domain)
-+		return;
-+
-+	pcie->msi = msi_domain->msi_chip;
-+
-+	if (pcie->msi)
-+		pcie->msi->dev = &pcie->pdev->dev;
-+}
-+
- static int __init mvebu_pcie_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pcie *pcie;
-@@ -879,6 +908,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 		i++;
- 	}
- 
-+	mvebu_pcie_msi_enable(pcie);
-+
- 	mvebu_pcie_enable(pcie);
- 
- 	return 0;
+But you take device trees pretty far. I believe Grant has even used
+one to describe an FPGA that he can dynamically load code into and
+change its function.  Not sure how he did it, I wasn't paying too
+close of attention when he was talking about it.
+
+I do believe a great deal of this simple plumbing can be eliminated.
+Like how to hook up GPIO, I2C, SPI, etc. We're pretty far down that
+road.
+
+A path like this seems like it would be beneficial...
+1) Implement DT schemas. Use those to enforce as much regularity as
+possible into the device tree descriptions for common classes of
+things (controllers especially - DMA, I2C, I2S, SPI, Uarts, etc)..
+Form a group to review any changes to the common schema.
+2) Cleaning up the controller classes is going to cause some DT churn.
+Hide backward compatibility in a quirks layer.
+3) Continue the process of removing all possible board specific code
+that can be reasonably covered in device trees.
+4) There will be some board specific code left at the end of this
+process. But anyone who looks at should agree that the functions
+handled by the code are something that is unreasonable to address in
+the DT system.
+
+
+>
+> --
+> dwmw2
+>
+
+
+
 -- 
-1.8.1.2
+Jon Smirl
+jonsmirl at gmail.com
