@@ -1,39 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 31 Jul 2013 17:04:14 -0700
-Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
- architecture independent macro
-In-Reply-To: <CAOZdJXVvNBR-qf7LXNOHZVstH_Rebxwn-wAkSaBS53Wn55mYCw@mail.gmail.com>
-References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
- <1375187900-17582-3-git-send-email-B44344@freescale.com>
- <20130731071630.GI8868@codeaurora.org>
- <CAOZdJXVvNBR-qf7LXNOHZVstH_Rebxwn-wAkSaBS53Wn55mYCw@mail.gmail.com>
-Message-ID: <51F9A5FE.8030608@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 31 Jul 2013 17:04:46 -0700 (PDT)
+Subject: [PATCH v3] net: Add MOXA ART SoCs ethernet driver
+In-Reply-To: <1375296998.5729.8.camel@joe-AO722>
+References: <1374842890-20735-1-git-send-email-jonas.jensen@gmail.com>
+ <1375280401-5564-1-git-send-email-jonas.jensen@gmail.com>
+ <1375296998.5729.8.camel@joe-AO722>
+Message-ID: <20130731.170446.1534643901297918794.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/13 16:44, Timur Tabi wrote:
-> On Wed, Jul 31, 2013 at 2:16 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> What do you do here if jiffies aren't incrementing (i.e
->> interrupts are disabled). The time_before() check won't work
->> there and it would be nice if we were able to use this in such
->> situations. I think powerpc gets around this by reading the
->> hardware timer directly?
-> I believe that jiffies is always a global variable.  It should behave
-> the same on PowerPC as on other architectures.
+From: Joe Perches <joe@perches.com>
+Date: Wed, 31 Jul 2013 11:56:38 -0700
 
-Yes it's global but it doesn't increment while interrupts are off.
+>> +		if (ui & (RX_ERR | CRC_ERR | FTL | RUNT | RX_ODD_NB)) {
+>> +			netdev_err(ndev, "packet error\n");
+> 
+> This is generally a bad idea as it can flood
+> the log.  It's probably better to remove it.
+> If you really want logging, then at least use
+> net_ratelimit().  Generally, the stats are
+> enough.
+ ...
+>> +			priv->stats.rx_dropped++;
+>> +			priv->stats.rx_errors++;
+> []
+>> +static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+> []
+>> +	if (txdesc->txdes0.ubit.tx_dma_own) {
+>> +		netdev_err(ndev, "no TX space for packet\n");
+>> +		priv->stats.tx_dropped++;
+> 
+> here too.
 
->
-> The answer to your question is that you should not use
-> spin_event_timeout() in interrupt context, because it yields.
->
-
-If it yields why are we using udelay? Why not usleep_range()? It would
-be useful to have a variant that worked in interrupt context and it
-looked like that was almost possible.
-
-BTW, couldn't we skip the first patch and just use usecs_to_jiffies()?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Agreed, these should not be logged, the statistics are sufficient.
