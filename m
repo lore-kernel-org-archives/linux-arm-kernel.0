@@ -1,32 +1,39 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 1 Aug 2013 09:37:39 +0200
-Subject: [PATCH 0/8] ARM: at91/dt: make use of periph id macros
-In-Reply-To: <1375339733-3488-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375339733-3488-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <CACQ1gAj_KCJUnBGzv0bnGaUwMgWq-7Noe280YdLGPxK8Ofp3Bw@mail.gmail.com>
+From: tobiasrauter@gmail.com (Tobias Rauter)
+Date: Thu, 01 Aug 2013 09:40:48 +0200
+Subject: [PATCH 1/10] ARM: dts: mxs: move 'compatible' property to
+ beginning of node and do some whitespace cleanups
+In-Reply-To: <20985.63716.320416.93668@ipc1.ka-ro>
+References: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
+ <51F971B4.1050605@cogentembedded.com> <20985.63716.320416.93668@ipc1.ka-ro>
+Message-ID: <51FA1100.2040303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/1 Boris BREZILLON <b.brezillon@overkiz.com>:
-> Hello,
+On 01.08.2013 07:57, Lothar Wa?mann wrote:
+> Hi,
 >
-> This patch series move at91 SoCs peripheral id definitions from machine
-> specific include dir to dt-bindings include dir.
-> These macros are used to reference interrupts instead of peripheral numbers.
->
-> This makes dt definitions cleaner and easier to debug (one can easily tell if
-> the peripheral macro used to reference an interrupt line is not the good one).
->
-> These macros will be used for clk definitions and references too.
->
-> I am not sure 'include/dt-bindings/at91/xxx' is the best place to put these
-> definitions as there are no soc specific directories in dt-bindings include
-> dir right now. Maybe something like 'include/dt-bindings/soc/at91/xxx' or
-> 'include/dt-bindings/peripherals/at91/xxx' would be better.
-> What do you think ?
-Well, I'd rather use "atmel" than "at91" because, AFAIK, this prefix
-has been dropped for new atmel SoCs (sama5 for instance).
+> Sergei Shtylyov writes:
+>> Hello.
+>>
+>> On 07/31/2013 06:37 PM, Lothar Wa?mann wrote:
+>>> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+>>> index 47fc5ef..0360acc 100644
+>>> --- a/arch/arm/boot/dts/imx28.dtsi
+>>> +++ b/arch/arm/boot/dts/imx28.dtsi
+>>> @@ -731,9 +731,9 @@
+>>>    			};
+>>>
+>>>    			dcp at 80028000 {
+>>> +				compatible = "fsl-dcp";
+>>      Hm, why not the usual "fsl,dcp", where "fsl" is Freescale's stock ticker?
+>>
+> Don't ask me, but the author of the patch that introduced this
+> (CC'ed), or the maintainer who accepted this in the first place.
 
-my 2 cents...
+Hi!
 
-Richard.
+The simple reason is that I didn't know it better when I wrote this.
+I think I can send a patch until Monday.
+But feel free to change it yourself if you want.
+
+Tobias
