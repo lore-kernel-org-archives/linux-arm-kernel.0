@@ -1,39 +1,24 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 1 Aug 2013 08:21:40 +0200
-Subject: [repost] ARM big-endian support
-In-Reply-To: <51F96DFC.9090309@codethink.co.uk>
-References: <1374661682-9349-1-git-send-email-ben.dooks@codethink.co.uk>
- <51EFFB53.5060003@codethink.co.uk> <20130729152637.204c2622@skate>
- <51F96DFC.9090309@codethink.co.uk>
-Message-ID: <20130801082140.3eaa3950@skate>
+From: B34330@freescale.com (Srivastava Rajan-B34330)
+Date: Thu, 1 Aug 2013 06:27:36 +0000
+Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
+ architecture independent macro
+In-Reply-To: <51F9A5FE.8030608@codeaurora.org>
+References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+ <1375187900-17582-3-git-send-email-B44344@freescale.com>
+ <20130731071630.GI8868@codeaurora.org>
+ <CAOZdJXVvNBR-qf7LXNOHZVstH_Rebxwn-wAkSaBS53Wn55mYCw@mail.gmail.com>
+ <51F9A5FE.8030608@codeaurora.org>
+Message-ID: <0BFD9FDDD35AA74E9F8151ECAEC49CB139CBE1@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+-----Original Message-----
+From: linux-kernel-owner@vger.kernel.org [mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of Stephen Boyd
+Sent: Thursday, August 01, 2013 5:34 AM
 
-On Wed, 31 Jul 2013 21:05:16 +0100, Ben Dooks wrote:
+>> The answer to your question is that you should not use
+>> spin_event_timeout() in interrupt context, because it yields.
 
-> > Also, would it be possible to get cover letters that include a proper
-> > changelog, as well as version number for each posting of the patch
-> > series?
-> 
-> I've lost quite a bit of the change information, so sorry about that.
+> If it yields why are we using udelay? Why not usleep_range()? It would be useful to have a variant that worked in interrupt context and it looked like > that was almost possible.
 
-Ok. I guess for the next version, it'd be great to have the list of
-changes compared to the current one.
-
-> The 3.11-rc series I will try and get done as soon as I've gone through
-> and sorted out the last round of review comments. Unfortunately I am
-> not in the office for the next three weeks.
-
-Is there anything I can do to help? I'd really like to see this in
-3.12, and I think your patch set is pretty close.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Looks like the macro yields when 'delay', the third arg to the macro, is zero; otherwise the macro performs one or more udelays. If this is correct, can usleep_range() help?
