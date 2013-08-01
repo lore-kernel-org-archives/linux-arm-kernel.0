@@ -1,30 +1,84 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 1 Aug 2013 10:13:56 -0500
-Subject: [PATCHv4 03/33] CLK: OMAP4: Add DPLL clock support
-In-Reply-To: <51FA79E0.2070605@ti.com>
+Date: Thu, 1 Aug 2013 10:21:34 -0500
+Subject: [PATCHv4 04/33] CLK: omap: move part of the machine specific
+ clock header contents to driver
+In-Reply-To: <51FA7AD0.8010000@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-4-git-send-email-t-kristo@ti.com>
- <51F7E883.7000000@ti.com> <51F8DCF8.2040309@ti.com>
- <51FA69E8.8000000@ti.com> <51FA79E0.2070605@ti.com>
-Message-ID: <CAGo_u6oSUMN0LRCg+6MGpWQQKQ7qBPGkgZuffadH5wHmw-H-Cw@mail.gmail.com>
+ <1374564028-11352-5-git-send-email-t-kristo@ti.com> <51F8045C.6020603@ti.com>
+ <51F8E00E.7070506@ti.com> <51FA6B06.3000904@ti.com> <51FA7AD0.8010000@ti.com>
+Message-ID: <51FA7CFE.8050507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 10:08 AM, Tero Kristo <t-kristo@ti.com> wrote:
->> We should move the functions to this file instead and empty out
->> mach-omap2 gradually, omap_dpll.h should be exported and used by
->> mach-omap2, rather than the other way around.
+On 08/01/2013 10:12 AM, Tero Kristo wrote:
+> On 08/01/2013 05:04 PM, Nishanth Menon wrote:
+>> On 07/31/2013 04:59 AM, Tero Kristo wrote:
+>>> On 07/30/2013 09:22 PM, Nishanth Menon wrote:
+>>>> this patch should be 3/33 to allow dpll.c to build.
+>>>>
+>>>> On 07/23/2013 02:19 AM, Tero Kristo wrote:
+>>>>> Some of the clock.h contents are needed by the new OMAP clock driver,
+>>>>> including dpll_data and clk_hw_omap. Thus, move these to the generic
+>>>>> omap header file which can be accessed by the driver.
+>>>>>
+>>>> Looking at the change, I wonder what the rules are for the movement?
+>>>> commit message was not clear.
+>>>
+>>> This is kind of a merge of almost everything that is needed by clock
+>>> drivers at some point. I can move the changes along to the patches that
+>>> actually need the exports for clarity and to keep compilation clean.
+>>
+>> I think it is better to do in stages (while ensuring compilation is
+>> clean) - it is a bit hard to understand need and context of movement
+>> when a singular movement is done :(
 >
+> Yep, will do the change for this.
 >
-> Yeah, the clock stuff should evolve and move here. I just need to start from
-> somewhere.
+>> [..]
+>>>>> @@ -356,28 +230,13 @@ unsigned long omap_fixed_divisor_recalc(struct
+>>>>> clk_hw *hw,
+>>>>>   /* DPLL Type and DCO Selection Flags */
+>>>>>   #define DPLL_J_TYPE        0x1
+>>>>>
+>>>>> -long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long
+>>>>> target_rate,
+>>>>> -            unsigned long *parent_rate);
+>>>>> -unsigned long omap3_dpll_recalc(struct clk_hw *hw, unsigned long
+>>>>> parent_rate);
+>>>>> -int omap3_noncore_dpll_enable(struct clk_hw *hw);
+>>>>> -void omap3_noncore_dpll_disable(struct clk_hw *hw);
+>>>>> -int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long
+>>>>> rate,
+>>>>> -                unsigned long parent_rate);
+>>>>
+>>>> Why are these being moved to generic?
+>>>
+>>> These are used from the dpll.c by the ops.
+>>
+>> The ops should probably move as well from mach-omap2. No reason to keep
+>> it around in mach-omap2 then.
+>
+> There is reason.... I don't want to move _everything_ from mach-omap2 in
+> the first phase. But after initial support is in, yes, they can be moved.
 
-yep, this step is good and as part of this step, moving the used
-functions from mach-omap2 to dpll.c is indeed the right step for us to
-do proper cleanup.
+I will re-iterate my suggestion again - DPLL enable/disable stuff is 
+going to be a series of steps, which would not change if we do DT or 
+non-DT. currently those steps reside inside mach-omap2. having a driver 
+call into mach-omap2 is counter-intutive, at least to me. if we want to 
+have a cleanup in the future, mach-omap2 should depend on drivers/clk 
+rather than the other way around. This is the reason of requesting files 
+in drivers/clk to be as isolated as possible - dpll operations (the 
+actual steps) of doing dpll configuration does sound isolated enough to 
+move into drivers/clk and not have reverse dependencies.
 
-it is a question of what we bring into drivers/clk and ensuring what
-we bring in is clean as well.
+Any reverse dependencies should be clearly mentioned with reasoning why 
+it cannot be moved in the respective patches, it was a little hard for 
+me to indicate precisely which functions make absolutely no sense and 
+which not.
 
+I am not saying this is an easy step to do, but for our future cleanups, 
+it does sound reasonable to expect from this series.
+
+-- 
 Regards,
 Nishanth Menon
