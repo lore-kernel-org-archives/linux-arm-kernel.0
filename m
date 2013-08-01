@@ -1,21 +1,59 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 1 Aug 2013 11:47:41 +1000
-Subject: [PATCH 0/4] crypto: omap-sham: Add support for SHA384/SHA512 for
- OMAP5/AM43xx Soc's
-In-Reply-To: <1374821957-30141-1-git-send-email-lokeshvutla@ti.com>
-References: <1374821957-30141-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20130801014741.GE24286@gondor.apana.org.au>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Thu, 1 Aug 2013 10:49:29 +0800
+Subject: [PATCH 1/9] ARM: dts: add generic DMA DT binding for tegra apbdma
+In-Reply-To: <51F7EE81.1060105@wwwdotorg.org>
+References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
+ <1374639002-16753-2-git-send-email-rizhao@nvidia.com>
+ <51F2CC30.5090200@wwwdotorg.org>
+ <20130730025448.GI15855@rizhao-lap>
+ <51F7EE81.1060105@wwwdotorg.org>
+Message-ID: <20130801024929.GA31469@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 12:29:13PM +0530, Lokesh Vutla wrote:
-> This patch series adds support for SHA348 and SHA512 in addition to MD5,
-> SHA1, SHA224 SHA256 that the omap sha module supports. Also adding the pdata
-> for OMAP5 and AM43xx Soc's.
-> And using devm_* calls to make cleanup paths simpler.
+On Wed, Jul 31, 2013 at 12:49:05AM +0800, Stephen Warren wrote:
+> On 07/29/2013 08:54 PM, Richard Zhao wrote:
+> > On Sat, Jul 27, 2013 at 03:21:20AM +0800, Stephen Warren wrote:
+> >> (Stripping the Cc list a lot, but adding in the DT binding maintainers)
+> >>
+> >> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+> >>> All Tegra device drivers will soon move to generic DMA device tree bindings.
+> >>> Add the required properties to the Tegra DT files to support that. The legacy
+> >>> property nvidia,dma-request-selector will be removed after all drivers have
+> >>> been converted, in order to maintain bisectability.
+> >>>
+> >>> Changes:
+> >>>  - Add '#dma-cells' for apbdma nodes
+> >>>  - And properties 'dmas' and 'dma-names' for apbdma client nodes
+> >>>  - update apbdma DT binding doc
+> >>>
+> >>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+> >>> ---
+> >>>  .../devicetree/bindings/dma/tegra20-apbdma.txt     |  1 +
+> >>>  arch/arm/boot/dts/tegra114.dtsi                    | 27 ++++++++++++++++++++++
+> >>>  arch/arm/boot/dts/tegra20.dtsi                     | 27 ++++++++++++++++++++++
+> >>>  arch/arm/boot/dts/tegra30.dtsi                     | 25 ++++++++++++++++++++
+> >>
+> >> This patch should be split differently.
+> >>
+> >> Patch 1 in the series should include the binding document change and the
+> >> associated DMA driver change, which will support both the old and new
+> >> bindings.
 
-All applied.  Thanks!
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Binding doc is used to define the way dts describe hw. I still think it
+is better to squash into this patch. But it's not such a big deal. I'll
+move it to dma patch  since you like it.
+
+Thanks
+Richard
+
+> >>
+> >> Patch 2 should contain the *.dtsi changes.
+> >
+> > The reason I update apbdma binding doc here is to make it consistent
+> > with the mass properties added in dtsi files.
+> > apbdma has less places of changes than dtsi files.
+> 
+> It'll still be consistent if you update the binding documentation first,
+> then update the *.dtsi to conform to the new binding docs. It won't
+> affect the number of changes.
