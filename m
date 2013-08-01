@@ -1,31 +1,35 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 1 Aug 2013 16:34:44 +0900
-Subject: [PATCH] ARM: Fix memblock_reserve() to include stext
-In-Reply-To: <20130731193930.GY24642@n2100.arm.linux.org.uk>
-References: <20130731055807.14054.70106.sendpatchset@w520>
- <20130731094352.GV24642@n2100.arm.linux.org.uk>
- <CANqRtoR5j2VyRwf0suABfVLxzU30pZndEcCj7uZ2sSrzfGmx_A@mail.gmail.com>
- <20130731193930.GY24642@n2100.arm.linux.org.uk>
-Message-ID: <20130801073443.GB15265@verge.net.au>
+Date: Thu, 1 Aug 2013 16:34:53 +0900
+Subject: [PATCH 00/07] ARM: shmobile: sh73a0, r8a7779 and emev2 SMP SCU
+ rework
+In-Reply-To: <20130731070702.14444.64961.sendpatchset@w520>
+References: <20130731070702.14444.64961.sendpatchset@w520>
+Message-ID: <20130801073452.GD26015@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 08:39:30PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 01, 2013 at 04:34:03AM +0900, Magnus Damm wrote:
-> > Are you aware of any existing fix for this or anyone working on
-> > solving this issue? If not then I don't mind stepping up. I can
-> > however think of quite a few other things to do if this has been
-> > solved already though, so please let me know if you think I should
-> > focus on fixing this.
+On Wed, Jul 31, 2013 at 04:07:02PM +0900, Magnus Damm wrote:
+> ARM: shmobile: sh73a0, r8a7779 and emev2 SMP SCU rework
 > 
-> I committed a fix for it this morning, so it should be in linux-next by
-> tomorrow.
+> [PATCH 01/07] ARM: shmobile: Introduce shared SCU SMP boot code
+> [PATCH 02/07] ARM: shmobile: Use shared SCU SMP boot code on sh73a0
+> [PATCH 03/07] ARM: shmobile: Use shared SCU SMP boot code on r8a7779
+> [PATCH 04/07] ARM: shmobile: Use shared SCU SMP boot code on emev2
+> [PATCH 05/07] ARM: shmobile: Add shared SCU CPU Hotplug code
+> [PATCH 06/07] ARM: shmobile: Use shared SCU CPU Hotplug code on sh73a0
+> [PATCH 07/07] ARM: shmobile: Use shared SCU CPU Hotplug code on r8a7779
+> 
+> This series consolidates mach-shmobile SMP code into SCU specific code
+> for SMP boot and CPU Hotplug. The shared SCU code will in the future hook
+> into some low level assembly code that provides SMP boot and sleep
+> functionality, so this is is also preparations for future work.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written against renesas.git renesas-devel-20130731
+>  
+>  Requires "[PATCH] ARM: Fix memblock_reserve() to include stext" during
+>  run time to allow test of CPU Hotplug with v3.11-rc kernels.
 
-Hi Russell,
-
-Magnus has some outstanding patches for Renesas SoC boards which I believe
-depend on this problem being resolved.  Could you indicate when you expect
-this patch to be in a stable branch which I could use as a base for a
-branch that will subsequently be pulled into arm-soc.
-
-Thanks.
+I guess we need to wait for Russell's alternate fix to hit a stable branch.
