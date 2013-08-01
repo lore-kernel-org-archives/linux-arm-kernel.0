@@ -1,51 +1,52 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 2 Aug 2013 04:15:39 +0800
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130801193936.GD23006@n2100.arm.linux.org.uk>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130801193936.GD23006@n2100.arm.linux.org.uk>
-Message-ID: <20130801201539.GA12291@kroah.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu,  1 Aug 2013 13:14:34 -0700
+Subject: [PATCH V2 0/3] networking: Use ETH_ALEN where appropriate
+Message-ID: <cover.1375387593.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 08:39:36PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 02, 2013 at 03:27:30AM +0800, Greg KH wrote:
-> > Hm, sounds like an ACPI tree is what you need to be using :)
-> > 
-> > Seriously, why not use ACPI for stuff like this?  You already are
-> > starting to do that for ARM-based systems, why not just make it the
-> > standard?
-> 
-> Is this in the same spirit as "you should be using DT, DT can describe
-> everything you need to do.  It's made to describe bindings between
-> devices!" and here we are, two years down the line, and we apparantly
-> don't even have stable DT bindings for the ARM architecture because a
-> lot of the subsystems which SoCs need have taken that long to get
-> sorted.
+Convert the uses mac addresses to ETH_ALEN so
+it's easier to find and verify where mac addresses
+need to be __aligned(2)
 
-No, it's in the same spirit of, "others have already done this before,
-why are you thinking you need to reinvent the wheel?"
+Change from initial submission:
+- Remove include/acpi/actbl2.h conversion
+  It's a file copied from outside ACPI sources
 
-> The amount of work this has taken so far has been tremendous, and we're
-> still working out lots of the details.  For instance, in the last six
-> months, there's been an effort to try and work out how to sanely
-> describe how a DMA controller is connected to a peripheral in DT.
+Joe Perches (3):
+  uapi: Convert some uses of 6 to ETH_ALEN
+  include: Convert ethernet mac address declarations to use ETH_ALEN
+  ethernet: Convert mac address uses of 6 to ETH_ALEN
 
-But if people think that DT should only be used for the "platform_bus",
-then they need to change their minds.  That's what I am referring to
-here.
+ drivers/net/ethernet/8390/ax88796.c                |  4 +-
+ drivers/net/ethernet/amd/pcnet32.c                 |  6 +--
+ drivers/net/ethernet/broadcom/cnic_if.h            |  6 +--
+ drivers/net/ethernet/dec/tulip/tulip_core.c        |  8 +--
+ drivers/net/ethernet/i825xx/sun3_82586.h           |  4 +-
+ drivers/net/ethernet/myricom/myri10ge/myri10ge.c   |  2 +-
+ drivers/net/ethernet/nuvoton/w90p910_ether.c       |  4 +-
+ drivers/net/ethernet/pasemi/pasemi_mac.c           | 13 ++---
+ drivers/net/ethernet/pasemi/pasemi_mac.h           |  4 +-
+ drivers/net/ethernet/qlogic/netxen/netxen_nic_hw.c |  4 +-
+ drivers/net/ethernet/qlogic/qlge/qlge.h            |  2 +-
+ include/linux/dm9000.h                             |  4 +-
+ include/linux/fs_enet_pd.h                         |  3 +-
+ include/linux/ieee80211.h                          | 59 +++++++++++-----------
+ include/linux/mlx4/device.h                        | 11 ++--
+ include/linux/mlx4/qp.h                            |  5 +-
+ include/linux/mv643xx_eth.h                        |  3 +-
+ include/linux/sh_eth.h                             |  3 +-
+ include/linux/smsc911x.h                           |  3 +-
+ include/linux/uwb/spec.h                           |  5 +-
+ include/media/tveeprom.h                           |  4 +-
+ include/net/irda/irlan_common.h                    |  3 +-
+ include/uapi/linux/dn.h                            |  3 +-
+ include/uapi/linux/if_bridge.h                     |  3 +-
+ include/uapi/linux/netfilter_bridge/ebt_802_3.h    |  5 +-
+ include/uapi/linux/netfilter_ipv4/ipt_CLUSTERIP.h  |  3 +-
+ include/uapi/linux/virtio_net.h                    |  2 +-
+ include/uapi/linux/wimax/i2400m.h                  |  4 +-
+ 28 files changed, 100 insertions(+), 80 deletions(-)
 
-The platform bus was created for all of those little "we know where this
-device is" devices.  Now that DT is being used to dynamically create
-devices and their interconnections, it should not be used, as it starts
-to fall apart as Will points out.
-
-I'm not saying move away from DT at all, if it can be used to describe
-stuff like this, wonderful.  Just please don't use platform_bus anymore
-than you have to.
-
-thanks,
-
-greg k-h
+-- 
+1.8.1.2.459.gbcd45b4.dirty
