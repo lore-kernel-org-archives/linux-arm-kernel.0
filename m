@@ -1,67 +1,65 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 1 Aug 2013 15:48:57 -0500
-Subject: [PATCH 4/9] dma: edma: Find missed events and issue them
-In-Reply-To: <51FAC50A.2020507@ti.com>
-References: <1375104595-16018-1-git-send-email-joelf@ti.com>
- <1375104595-16018-5-git-send-email-joelf@ti.com> <51F7659E.3040302@ti.com>
- <51F89763.1010102@ti.com> <51F8D667.2040406@ti.com> <51F9C793.2000001@ti.com>
- <51F9FC87.3020706@ti.com> <51FAC50A.2020507@ti.com>
-Message-ID: <51FAC9B9.3050903@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 1 Aug 2013 14:51:10 -0600
+Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support
+ in PCI-to-PCI bridge
+In-Reply-To: <20130801195948.7ecb4ac8@skate>
+References: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo7Y+OE8_NT3npC1DCQz3PrOT9Nz=6MavY+zS63pGN3x9g@mail.gmail.com>
+ <20130801195948.7ecb4ac8@skate>
+Message-ID: <CAErSpo7vpeyNP82g1Ea=wWj2nTo05DC5NDEynuzyyw2g7BdYYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just some corrections here..
-
-On 08/01/2013 03:28 PM, Joel Fernandes wrote:
-
->>> 2. If the interrupt handler for some reason doesn't complete or get
->>> service in time, we will end up DMA'ing incorrect data as events
->>> wouldn't stop coming in even if interrupt is not yet handled (in your
->>> example linked sets P1 or P2 would be old ones being repeated). Where as
->>> with my method, we are not doing any DMA once we finish the current
->>> MAX_NR_SG set even if events continue to come.
+On Thu, Aug 1, 2013 at 11:59 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Bjorn Helgaas,
+>
+> On Thu, 1 Aug 2013 10:53:07 -0600, Bjorn Helgaas wrote:
+>> On Thu, Aug 1, 2013 at 7:44 AM, Thomas Petazzoni
+>> <thomas.petazzoni@free-electrons.com> wrote:
+>> > The Marvell PCIe driver uses an emulated PCI-to-PCI bridge to be able
+>> > to dynamically set up MBus address decoding windows for PCI I/O and
+>> > memory regions depending on the PCI devices enumerated by Linux.
+>> >
+>> > However, this emulated PCI-to-PCI bridge logic makes the Linux PCI
+>> > core believe that prefetchable memory regions are supported (because
+>> > the registers are read/write), while in fact no adress decoding window
+>> > is ever created for such regions. Since the Marvell MBus address
+>> > decoding windows do not distinguish memory regions and prefetchable
+>> > memory regions, this patch takes a simple approach: change the
+>> > PCI-to-PCI bridge emulation to let the Linux PCI core know that we
+>> > don't support prefetchable memory regions.
+>> >
+>> > To achieve this, we simply make the prefetchable memory base a
+>> > read-only register that always returns 0. Reading/writing all the
+>> > other prefetchable memory related registers has no effect.
+>> >
+>> > This problem was originally reported by Finn Hoffmann
+>> > <finn@uni-bremen.de>, who couldn't get a RTL8111/8168B PCI NIC working
+>> > on the NSA310 Kirkwood platform after updating to 3.11-rc. The problem
+>> > was that the PCI-to-PCI bridge emulation was making the Linux PCI core
+>> > believe that we support prefetchable memory, so the Linux PCI core was
+>> > only filling the prefetchable memory base and limit registers, which
+>> > does not lead to a MBus window being created. The below patch has been
+>> > confirmed by Finn Hoffmann to fix his problem on Kirkwood, and has
+>> > otherwise been successfully tested on the Armada XP GP platform with a
+>> > e1000e PCIe NIC and a Marvell SATA PCIe card.
+>> >
+>> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> > Reported-by: Finn Hoffmann <finn@uni-bremen.de>
+>> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 >>
->> Where is repetition and possibility of wrong data being transferred? We
->> have a linear list of PaRAM sets - not a loop. You would link the end to
->> PaRAM set chain to dummy PaRAM set which BTW will not cause missed
->> events. The more number of PaRAM sets you add to the chain, the more
-> 
-> There would have to be a loop, how else would you ensure continuity and
-> uninterrupted DMA?
-> 
-> Consider if you have 2 sets of linked sets:
-> L1 is the first set of Linked sets and L2 is the second.
-> 
-> When L1 is done, EDMA continues with L2 (due to the link) while
-> interrupt handler prepares L1. The continuity depends on L1 being linked
-> to L2. Only the absolute last break up of the MAX_NR_SG linked set will
-> be linked to Dummy.
-> 
-> So consider MAX_NR_SG=10, and sg_len = 35
-> 
-> L1 - L2 - L1 - L1 - Dummy
+>> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+>>
+>> Please merge along with your other pci-mvebu.c changes.
+>
+> I don't think we have other pci-mvebu.c lined up for 3.11. All the MSI
+> stuff, mvebu-mbus DT stuff and so on is for 3.12.
+>
+> So I guess you could take that one through your pci tree. Jason, can
+> you confirm?
 
-Should be,
-L1 - L2 - L1 - L2 - Dummy
+Oh, I missed the fact that this was for v3.11.  I put it in my
+for-linus branch.  Thanks!
 
-> 
-> The split would be in number of slots,
-> 10 - 10 - 10 -  5 - Dummy
-> 
->> time CPU gets to intervene before DMA eventually stalls. This is a
->> tradeoff system designers can manage.
-> 
-> Consider what happens in the case where MAX_SG_NR=1 or 2. In that case,
-> there's a change we might not get enough time for the interrupt handler
-> to setup next series of linked set.
-> 
-> Some how this limitation has to be overcome by advising in comments than
-> MAX_SG_NR should always be greater than a certain number to ensure
-> proper operation.
-
-s/than/that/
-
-
-Thanks,
-
--Joel
+Bjorn
