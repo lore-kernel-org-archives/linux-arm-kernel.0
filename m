@@ -1,8 +1,8 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 31 Jul 2013 19:47:30 -0700
+From: davej@redhat.com (Dave Jones)
+Date: Wed, 31 Jul 2013 22:59:11 -0400
 Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
  mitigations
-In-Reply-To: <20130731142430.GA4545@redhat.com>
+In-Reply-To: <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
 References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
  <20130730221435.GA22240@redhat.com>
  <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
@@ -11,38 +11,42 @@ References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
  <20130731000444.GC1281@redhat.com>
  <20130731094012.GU24642@n2100.arm.linux.org.uk>
  <20130731142430.GA4545@redhat.com>
-Message-ID: <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
+ <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
+Message-ID: <20130801025911.GA20166@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 7:24 AM, Dave Jones <davej@redhat.com> wrote:
-> On Wed, Jul 31, 2013 at 10:40:12AM +0100, Russell King - ARM Linux wrote:
->  > On Tue, Jul 30, 2013 at 08:04:44PM -0400, Dave Jones wrote:
->  > > To use ARM as an example, the bugs I've seen have mostly been in arch specific
->  > > code that does things like page-table manipulation.  The chromebook bugs I
->  > > was hitting for eg were various kinds of PTE corruption warnings.
->  >
->  > Hmm, really?  Did you reported these bugs?  I'm not aware of mainline
->  > having any changes related to bug reports on PTEs on ARM.
->
-> I wasn't sure if it was a googleism, or happens on mainline, so no.
+On Wed, Jul 31, 2013 at 07:47:30PM -0700, Olof Johansson wrote:
 
-We'd definitely be interested in hearing about what you've found. The
-3.4 kernel has a lot of out-of-tree code for exynos, we've reduced it
-quite a bit on the upcoming 3.8 one but it needs a bit more baking.
+ > >  > Hmm, really?  Did you reported these bugs?  I'm not aware of mainline
+ > >  > having any changes related to bug reports on PTEs on ARM.
+ > >
+ > > I wasn't sure if it was a googleism, or happens on mainline, so no.
+ > 
+ > As of 3.10, it's not actually hard to run a mainline kernel on the
+ > chromebook, but you have limited functionality (no wifi, no USB3, no
+ > accellerated graphics). Easiest is to do it by booting from SD card.
+ > See instructions at
+ > http://www.chromium.org/chromium-os/u-boot-porting-guide/using-nv-u-boot-on-the-samsung-arm-chromebook.
+ 
+Yeah, that's how I got Fedora running on it (I think the people who did the
+Fedora spin for the chromebook chose the google kernel for exactly
+the reasons you mention above).  It felt a little sluggish for a native
+kernel build though, and I'm not setup for cross-building so I stuck with
+the 3.4 build.
+ 
+ > How long would a useful run of trinity take?
 
-As of 3.10, it's not actually hard to run a mainline kernel on the
-chromebook, but you have limited functionality (no wifi, no USB3, no
-accellerated graphics). Easiest is to do it by booting from SD card.
-See instructions at
-http://www.chromium.org/chromium-os/u-boot-porting-guide/using-nv-u-boot-on-the-samsung-arm-chromebook.
+It blew up in a minute or so of runtime when I tried last week.
 
+ > I've got an autobuilder/autobooter setup here with a cross-section of current ARM
+ > hardware (7 platforms and counting) that I mostly do boot testing on,
+ > and I should add a smallish suite of testcases to the same. Trinity
+ > would be a good candidate for that.
 
-How long would a useful run of trinity take? I've got an
-autobuilder/autobooter setup here with a cross-section of current ARM
-hardware (7 platforms and counting) that I mostly do boot testing on,
-and I should add a smallish suite of testcases to the same. Trinity
-would be a good candidate for that.
+Feel free to mail me off-list if I can do anything to help out, though
+hopefully things should build & run 'out of the box'.  You shouldn't
+need any special command line args (though you might get inspiration
+for ideas from the scripts/test-* harnesses)
 
-
--Olof
+	Dave
