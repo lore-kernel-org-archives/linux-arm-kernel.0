@@ -1,131 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 1 Aug 2013 09:33:38 -0500
-Subject: [PATCHv4 07/33] CLK: omap: add support for OMAP gate clock
-In-Reply-To: <51F9230D.4020708@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-8-git-send-email-t-kristo@ti.com> <51F81148.4080203@ti.com>
- <51F9230D.4020708@ti.com>
-Message-ID: <51FA71C2.8090806@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 1 Aug 2013 10:39:40 -0400 (EDT)
+Subject: [PATCH] USB: ohci-at91: add usb_clk for transition to common
+ clk framework
+In-Reply-To: <1375337800-2605-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <Pine.LNX.4.44L0.1308011038380.1534-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 09:45 AM, Tero Kristo wrote:
-> On 07/30/2013 10:17 PM, Nishanth Menon wrote:
->> On 07/23/2013 02:20 AM, Tero Kristo wrote:
->>> This node adds support for a clock node which allows control to the
->>> clockdomain enable / disable.
->>
->> Dont we have clkdm_enable/disable for the same? should we model
->> clockdomain as a clock node?
->
-> There was some discussion about having clockdomain code under
-> drivers/clk while back, but Mike turned this idea down.
+On Thu, 1 Aug 2013, Boris BREZILLON wrote:
 
-then why are we doing this?
+> The AT91 PMC (Power Management Controller) provides an USB clock used by
+> USB Full Speed host (ohci) and USB Full Speed device (udc).
+> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+> This configuration was formely done in mach-at91/clock.c, but this
+> implementation will be removed when moving to common clk framework.
+> 
+> This patch adds support for usb clock retrieval and configuration, and is
+> backward compatible with the current at91 clk implementation (if usb clk
+> is not found, it does not configure/enable it).
+> 
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
- >>> +    .init        = &omap2_init_clk_clkdm,
- >>> +    .enable        = &omap2_clkops_enable_clkdm,
- >>> +    .disable    = &omap2_clkops_disable_clkdm,
+> @@ -163,6 +169,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>  		goto err5;
+>  	}
+>  
+> +	uclk = clk_get(&pdev->dev, "usb_clk");
 
-is practically doing this in a round about way, no? If Mike no likey 
-clkdm going in here, introducing a "pseudo" clk node has no chance of 
-going in either.. dont you think so? should we not just try to have our 
-clocks first available before we try low power scenarios as next stage?
+What happens if uclk isn't found but it is needed?
 
-
->
->>
->>>
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>> ---
->>>   drivers/clk/omap/Makefile |    2 +-
->>>   drivers/clk/omap/clk.c    |    1 +
->>>   drivers/clk/omap/gate.c   |   88
->>> +++++++++++++++++++++++++++++++++++++++++++++
->>>   include/linux/clk/omap.h  |    1 +
->>>   4 files changed, 91 insertions(+), 1 deletion(-)
->>>   create mode 100644 drivers/clk/omap/gate.c
->>>
->>
->> my usual crib: device tree binding documentation is missing
->>
->>> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
->>> index ca56700..3d3ca30f 100644
->>> --- a/drivers/clk/omap/Makefile
->>> +++ b/drivers/clk/omap/Makefile
->>> @@ -1 +1 @@
->>> -obj-y                    += clk.o dpll.o autoidle.o
->>> +obj-y                    += clk.o dpll.o autoidle.o gate.o
->>> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
->>> index c149097..8c89714 100644
->>> --- a/drivers/clk/omap/clk.c
->>> +++ b/drivers/clk/omap/clk.c
->>> @@ -29,6 +29,7 @@ static const struct of_device_id clk_match[] = {
->>>       {.compatible = "divider-clock", .data = of_omap_divider_setup, },
->>>       {.compatible = "gate-clock", .data = of_gate_clk_setup, },
->>>       {.compatible = "ti,omap4-dpll-clock", .data =
->>> of_omap4_dpll_setup, },
->>> +    {.compatible = "ti,gate-clock", .data = of_omap_gate_clk_setup, },
->>
->> I am a little lost - is there any SoC dts that actually uses this? at
->> least this series does not seem to introduce any node that uses this
->> compatibility as per git grep :(
->
-> There is, see patch 08/33 or 28/33.
-
-yes indeed, my bad, looks like my eyesight is no longer what it used to 
-be :P.. time for those binocular glasses and a hammer on top of my head 
-to remind myself :D
-
-
->>> +    of_property_read_string(node, "clock-output-names", &clk_name);
->>> +    of_property_read_string(node, "ti,clkdm-name",
->>> &clk_hw->clkdm_name);
->>> +
->>> +    init.name = clk_name;
->>> +    init.ops = &omap_gate_clk_ops;
->>> +
->>> +    num_parents = of_clk_get_parent_count(node);
->>> +    if (num_parents < 1) {
->>> +        pr_err("%s: omap trace_clk %s must have parent(s)\n",
->>> +            __func__, node->name);
->> CHECK: Alignment should match open parenthesis
->
-> I still wonder which version of checkpatch you are using.
-
-hehe, makes me look hawkeyed :P.. no magic here obviously ;)
-
-./scripts/checkpatch.pl --strict
-
-revision: git describe
-v3.11-rc3-47-g72195e0
-(with all the patches applied).
-
-[...]
->>> +    kfree(clk_hw);
->>> +}
->>> +EXPORT_SYMBOL(of_omap_gate_clk_setup);
->>> +CLK_OF_DECLARE(omap_gate_clk, "ti,omap-gate-clock",
->>> of_omap_gate_clk_setup);
->>> +#endif
->>> diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
->>> index 904bdad..58ebb80 100644
->>> --- a/include/linux/clk/omap.h
->>> +++ b/include/linux/clk/omap.h
->>> @@ -194,6 +194,7 @@ extern void omap_dt_clocks_register(struct
->>> omap_dt_clk *oclks, int cnt);
->>>   void of_omap4_dpll_setup(struct device_node *node);
->>>   void of_omap_fixed_factor_setup(struct device_node *node);
->>>   void of_omap_divider_setup(struct device_node *node);
->>> +void of_omap_gate_clk_setup(struct device_node *node);
->> dont need to export I think if we use strategy mentioned previously.
->
-> So, we actually had an offline chat with Nishanth, and I will modify the
-> init setup like previously suggested by him.
->
-yes, thanks.
-
-
--- 
-Regards,
-Nishanth Menon
+Alan Stern
