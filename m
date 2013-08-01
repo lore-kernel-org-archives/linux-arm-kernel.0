@@ -1,67 +1,41 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 1 Aug 2013 22:40:47 +0200
-Subject: [PATCH] ARM: dma-mapping: highbank: Restrict DMA to 32-bit addresses
-Message-ID: <20130801204047.GY20842@alberich>
+From: finn@uni-bremen.de (Finn Hoffmann)
+Date: Thu, 01 Aug 2013 22:43:48 +0200
+Subject: NSA310 + DT
+In-Reply-To: <20130801160414.GI19725@lunn.ch>
+References: <20130730191943.49f8070c@skate> <20130730183610.GT24782@lunn.ch>
+ <51F814A0.2050403@uni-bremen.de> <20130730232316.10dc7019@skate>
+ <20130731111414.47e7670b@skate> <51F8DC3A.6010007@uni-bremen.de>
+ <20130731115108.21c043fd@skate> <51F8F7E3.9090404@uni-bremen.de>
+ <20130731164512.GB19725@lunn.ch> <51FA15F3.7050708@uni-bremen.de>
+ <20130801160414.GI19725@lunn.ch>
+Message-ID: <51FAC884.2070805@uni-bremen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Some devices on Calxeda ECX-2000 are restricted to 32-bit DMA. Thus
-the platform needs to set dma_zone_size, otherwise dma-mapping code is
-complaining, e.g.
+Am 01.08.2013 18:04, schrieb Andrew Lunn:
+>> The LED's on after kernel is loaded, while starting up does not work.
+>>             pmx_led_sys_green: pmx-led-sys-green {
+>>                  marvell,pins = "mpp28";
+>>                  marvell,function = "gpio";
+>>                  linux,default-trigger = "heartbeat";
+>>                  brightness = <255>;
+>>              };
+>> I first tried default-trigger, then I added brightness additionally
+>> but LED's wont turn on.
+> Can you manually turn the LED on, using /sys/class/led/.../brightness?
+> It could be we have the wrong GPIO line for the led. It would be good
+> if you could test them all, not just this one led.
+>
+All LED's work via brightness and trigger default-on.
+>> There is no sata hdd trigger and nand-disk does not trigger on sata
+>> hdd activity.
+> They are out of tree patches. There was some discussion about SATA led
+> activity maybe 6 to 9 months ago. Maybe you can see why the suggested
+> patches got rejected. If i remember correctly, it was because they are
+> in the hot path.
+>
+>     Andrew
+On a quick look I have not found it but it is not that important for me.
 
-  calxedaxgmac fff50000.ethernet: coherent DMA mask 0xffffffff is smaller than system
-    GFP_DMA mask 0xffffffffffffffff
-
-Same is true for sata_highbank. For the latter dma_coherent_mask could
-be increased but due to the lack of DMA32 zone we need to adapt
-arm_dma_limit in general.
-
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- arch/arm/mach-highbank/Kconfig    |    1 +
- arch/arm/mach-highbank/highbank.c |    3 +++
- arch/arm/mm/dma-mapping.c         |    4 ++++
- 3 files changed, 8 insertions(+)
-
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index cd9fcb1..efe4961 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -18,3 +18,4 @@ config ARCH_HIGHBANK
- 	select PL320_MBOX
- 	select SPARSE_IRQ
- 	select USE_OF
-+	select ZONE_DMA if ARM_LPAE
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 8881579..31b26de 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -176,6 +176,9 @@ static const char *highbank_match[] __initconst = {
- };
- 
- DT_MACHINE_START(HIGHBANK, "Highbank")
-+#ifdef CONFIG_ZONE_DMA
-+	.dma_zone_size	= DMA_BIT_MASK(32),
-+#endif
- 	.smp		= smp_ops(highbank_smp_ops),
- 	.init_irq	= highbank_init_irq,
- 	.init_time	= highbank_timer_init,
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7f9b179..f404dfc 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -651,7 +651,11 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 	if (!mask)
- 		return NULL;
- 
-+#ifdef CONFIG_ARM_LPAE
-+	if (mask <= 0xffffffffULL)
-+#else
- 	if (mask < 0xffffffffULL)
-+#endif
- 		gfp |= GFP_DMA;
- 
- 	/*
--- 
-1.7.9.5
+Finn
