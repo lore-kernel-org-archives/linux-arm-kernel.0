@@ -1,120 +1,26 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 01 Aug 2013 10:54:44 +0100
-Subject: [PATCH v3 05/16] ARM: mvebu: remove device tree parsing for cpu
- nodes
-In-Reply-To: <1374492747-13879-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <51FA3064.9080502@arm.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Thu, 1 Aug 2013 11:57:43 +0200
+Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
+ people interested in device tree janitoring / cleanup?]
+In-Reply-To: <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
+References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
+ <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
+ <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
+ <20130731201457.GA24642@n2100.arm.linux.org.uk>
+ <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
+ <20130731204817.GC24642@n2100.arm.linux.org.uk>
+ <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
+Message-ID: <51FA3117.1080905@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/13 12:32, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> Currently set_secondary_cpus_clock assume the CPU logical ordering
-> and the MPDIR in DT are same, which is incorrect.
-> 
-> Since the CPU device nodes can be retrieved in the logical ordering
-> using the DT helper, we can remove the devices tree parsing.
-> 
-> This patch removes DT parsing by making use of of_get_cpu_node.
-> 
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On 07/31/2013 11:26 PM, jonsmirl at gmail.com wrote:
+> Alternatively you may be of the belief that it is impossible to get
+> rid of the board specific code. But x86 doesn't have any of it, why
+> should ARM?
 
-Hi Gregory/Andrew/Jason,
-
-Does this change look fine for mvebu?
-If yes, can I have your ACKs ?
+Well, I am curious whether that will stay that way once x86 is truly 
+moving into the embedded arena (if ever).
 
 Regards,
-Sudeep
-> ---
->  arch/arm/mach-mvebu/platsmp.c | 52 ++++++++++++++++++++-----------------------
->  1 file changed, 24 insertions(+), 28 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> index ce81d30..001dd42 100644
-> --- a/arch/arm/mach-mvebu/platsmp.c
-> +++ b/arch/arm/mach-mvebu/platsmp.c
-> @@ -23,51 +23,47 @@
->  #include <linux/of.h>
->  #include <linux/mbus.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/prom.h>
->  #include <asm/smp_plat.h>
->  #include "common.h"
->  #include "armada-370-xp.h"
->  #include "pmsu.h"
->  #include "coherency.h"
->  
-> +static struct clk *__init get_cpu_clk(int cpu)
-> +{
-> +	struct clk *cpu_clk;
-> +	struct device_node *np = of_get_cpu_node(cpu);
-> +
-> +	if (WARN(!np, "missing cpu node\n"))
-> +		return NULL;
-> +	cpu_clk = of_clk_get(np, 0);
-> +	if (WARN_ON(IS_ERR(cpu_clk)))
-> +		return NULL;
-> +	return cpu_clk;
-> +}
-> +
->  void __init set_secondary_cpus_clock(void)
->  {
-> -	int thiscpu;
-> +	int thiscpu, cpu;
->  	unsigned long rate;
-> -	struct clk *cpu_clk = NULL;
-> -	struct device_node *np = NULL;
-> +	struct clk *cpu_clk;
->  
->  	thiscpu = smp_processor_id();
-> -	for_each_node_by_type(np, "cpu") {
-> -		int err;
-> -		int cpu;
-> -
-> -		err = of_property_read_u32(np, "reg", &cpu);
-> -		if (WARN_ON(err))
-> -			return;
-> -
-> -		if (cpu == thiscpu) {
-> -			cpu_clk = of_clk_get(np, 0);
-> -			break;
-> -		}
-> -	}
-> -	if (WARN_ON(IS_ERR(cpu_clk)))
-> +	cpu_clk = get_cpu_clk(thiscpu);
-> +	if (!cpu_clk)
->  		return;
->  	clk_prepare_enable(cpu_clk);
->  	rate = clk_get_rate(cpu_clk);
->  
->  	/* set all the other CPU clk to the same rate than the boot CPU */
-> -	for_each_node_by_type(np, "cpu") {
-> -		int err;
-> -		int cpu;
-> -
-> -		err = of_property_read_u32(np, "reg", &cpu);
-> -		if (WARN_ON(err))
-> +	for_each_possible_cpu(cpu) {
-> +		if (cpu == thiscpu)
-> +			continue;
-> +		cpu_clk = get_cpu_clk(cpu);
-> +		if (!cpu_clk)
->  			return;
-> -
-> -		if (cpu != thiscpu) {
-> -			cpu_clk = of_clk_get(np, 0);
-> -			clk_set_rate(cpu_clk, rate);
-> -		}
-> +		clk_set_rate(cpu_clk, rate);
->  	}
->  }
->  
-> 
+Arend
