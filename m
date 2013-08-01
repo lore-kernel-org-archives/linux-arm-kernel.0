@@ -1,36 +1,27 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 01 Aug 2013 00:46:44 -0700 (PDT)
-Subject: [PATCH v6 3/3] ARM: shmobile: lager: enable nfsroot in DTS
-In-Reply-To: <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
-References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
- <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 1 Aug 2013 17:01:32 +0900
+Subject: [PATCH 0/4] ARM: shmobile: ape6evm: support GPIO switches and LEDs
+In-Reply-To: <1375149543-27564-1-git-send-email-horms+renesas@verge.net.au>
+References: <1375149543-27564-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130801080132.GA2157@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Simon
-
-> Now that Ether support has been added to the lager board
-> it is possible to use nfsroot. This configuration is
-> in line with that of other shmobile boards.
+On Tue, Jul 30, 2013 at 10:58:59AM +0900, Simon Horman wrote:
+> This short series adds support for GPIO swtiches and LEDS to
+> the ape6evm board.
 > 
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-(snip)
->  	chosen {
-> -		bootargs = "console=ttySC6,115200 ignore_loglevel";
-> +		bootargs = "console=ttySC6,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
+> Applies on top of renesas-devel-20130726.
+> 
+> Simon Horman (4):
+>   ARM: shmobile: ape6evm: support GPIO switches
+>   ARM: shmobile: ape6evm: Enable gpio-keys in defconfig
+>   ARM: shmobile: ape6evm: Add GPIO LEDs
+>   ARM: shmobile: ape6evm: Enable gpio-leds in defconfig
+> 
+>  arch/arm/configs/ape6evm_defconfig     |  6 +++-
+>  arch/arm/mach-shmobile/board-ape6evm.c | 60 ++++++++++++++++++++++++++++++++++
 
-Could you please add why this "rsize/wsize" settings
-are needed on bootargs ?
-(other shmobile board's dts file doesn't have these)
+Hi Magnus, Hi All,
 
-And, I guess r8a7790-lager.dts/r8a7790.dts doesn't have
-"sh-eth" driver DT settings, (or I'm missing ?)
-but you added network/nfsroot settings on bootargs.
-It is OK for me, but for what ?
-
-Best regards
----
-Kuninori Morimoto
+could I get a review of this, and if appropriate an Ack.
