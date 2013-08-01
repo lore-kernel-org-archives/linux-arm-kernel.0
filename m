@@ -1,27 +1,80 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 31 Jul 2013 20:31:05 -0400
-Subject: [PATCH 16/18] ARM: orion: Switch to sched_clock_register()
-In-Reply-To: <1375309877-16617-17-git-send-email-sboyd@codeaurora.org>
-References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
- <1375309877-16617-17-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130801003105.GU5882@titan.lakedaemon.net>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 31 Jul 2013 20:32:54 -0400
+Subject: [PATCH RFC 1/8] arm: make SWIOTLB available
+In-Reply-To: <1375292732-7627-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
+ <1375292732-7627-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <334c4fe7-e40c-489c-84db-9bb58c705d44@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 03:31:15PM -0700, Stephen Boyd wrote:
-> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
-> the 64 bit function to allow us to remove the 32 bit registration
-> interface.
+Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+>Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>CC: will.deacon at arm.com
+>CC: linux at arm.linux.org.uk
+>---
+> arch/arm/Kconfig                   |    7 +++++++
+> arch/arm/include/asm/dma-mapping.h |   24 ++++++++++++++++++++++++
+> 2 files changed, 31 insertions(+), 0 deletions(-)
+>
+>diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>index ba412e0..05125ab 100644
+>--- a/arch/arm/Kconfig
+>+++ b/arch/arm/Kconfig
+>@@ -1832,6 +1832,13 @@ config CC_STACKPROTECTOR
+> 	  neutralized via a kernel panic.
+> 	  This feature requires gcc version 4.2 or above.
 > 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/plat-orion/time.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>+config SWIOTLB
+>+	def_bool y
+>+	select NEED_SG_DMA_LENGTH
+>+
+>+config IOMMU_HELPER
+>+	def_bool SWIOTLB
+>+
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Could you explain the purpose of these two a bit more please? 
 
-thx,
-
-Jason.
+> config XEN_DOM0
+> 	def_bool y
+> 	depends on XEN
+>diff --git a/arch/arm/include/asm/dma-mapping.h
+>b/arch/arm/include/asm/dma-mapping.h
+>index 5b579b9..ad89e0f 100644
+>--- a/arch/arm/include/asm/dma-mapping.h
+>+++ b/arch/arm/include/asm/dma-mapping.h
+>@@ -86,6 +86,30 @@ static inline dma_addr_t virt_to_dma(struct device
+>*dev, void *addr)
+> }
+> #endif
+> 
+>+static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t
+>paddr)
+>+{
+>+	unsigned int offset = paddr & ~PAGE_MASK;
+>+	return pfn_to_dma(dev, paddr >> PAGE_SHIFT) + offset;
+>+}
+>+
+>+static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t
+>dev_addr)
+>+{
+>+	unsigned int offset = dev_addr & ~PAGE_MASK;
+>+	return (dma_to_pfn(dev, dev_addr) << PAGE_SHIFT) + offset;
+>+}
+>+
+>+static inline bool dma_capable(struct device *dev, dma_addr_t addr,
+>size_t size)
+>+{
+>+	if (!dev->dma_mask)
+>+		return 0;
+>+
+>+	return addr + size - 1 <= *dev->dma_mask;
+>+}
+>+
+>+static inline void dma_mark_clean(void *addr, size_t size)
+>+{
+>+}
+>+
+> /*
+>  * DMA errors are defined by all-bits-set in the DMA address.
+>  */
