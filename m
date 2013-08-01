@@ -1,37 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  1 Aug 2013 17:27:15 +0900
-Subject: [GIT] Second Round of Renesas ARM based SoC fixes for v3.12
-Message-ID: <cover.1375345067.git.horms+renesas@verge.net.au>
+Date: Thu,  1 Aug 2013 17:26:54 +0900
+Subject: [PATCH 12/14] ARM: shmobile: No need to use INTC header on r8a7779
+In-Reply-To: <cover.1375344714.git.horms+renesas@verge.net.au>
+References: <cover.1375344714.git.horms+renesas@verge.net.au>
+Message-ID: <d2ef0b9a5192e921490d2f66f4467f26235412bd.1375344714.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Magnus Damm <damm@opensource.se>
 
-please consider this second round of Renesas ARM based SoC fixes for v3.12.
+Now when the intc-irqpin driver is used for external
+IRQ pins on r8a7779 it possible to get rid of unused
+INTC headers mach/intc.h and linux/sh_intc.h.
 
-It is based on the first round of Renesas ARM based SoC fixes for v3.12,
-/renesas-fixes-for-v3.12, which I have already send a pull-request for.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/intc-r8a7779.c  | 1 -
+ arch/arm/mach-shmobile/setup-r8a7779.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-The following changes since commit 93d8a6fbe69a629a7bb37bb546699a5c49963dc5:
-
-  ARM: shmobile: r8a7740: Fix TPU clock name (2013-07-19 11:12:35 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v3.12
-
-for you to fetch changes up to ab40900b70dc31a64f23b1b4dbb0917afb039775:
-
-  ARM: shmobile: armadillo800eva-reference: fix compiler warning (2013-07-23 10:35:33 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM based SoC fixes for v3.12
-
-* Fix compiler warning in armadillo800eva board code
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (1):
-      ARM: shmobile: armadillo800eva-reference: fix compiler warning
-
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/mach-shmobile/intc-r8a7779.c b/arch/arm/mach-shmobile/intc-r8a7779.c
+index b86dc89..5f9e5dc 100644
+--- a/arch/arm/mach-shmobile/intc-r8a7779.c
++++ b/arch/arm/mach-shmobile/intc-r8a7779.c
+@@ -27,7 +27,6 @@
+ #include <linux/platform_data/irq-renesas-intc-irqpin.h>
+ #include <linux/irqchip.h>
+ #include <mach/common.h>
+-#include <mach/intc.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7779.h>
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 6ab7405..bb8b967 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -29,7 +29,6 @@
+ #include <linux/input.h>
+ #include <linux/io.h>
+ #include <linux/serial_sci.h>
+-#include <linux/sh_intc.h>
+ #include <linux/sh_timer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/usb/otg.h>
+-- 
+1.8.3.2
