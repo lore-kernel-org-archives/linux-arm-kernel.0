@@ -1,52 +1,76 @@
-From: davej@redhat.com (Dave Jones)
-Date: Wed, 31 Jul 2013 22:59:11 -0400
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
- mitigations
-In-Reply-To: <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <20130730221435.GA22240@redhat.com>
- <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
- <20130730231533.GA26824@redhat.com>
- <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
- <20130731000444.GC1281@redhat.com>
- <20130731094012.GU24642@n2100.arm.linux.org.uk>
- <20130731142430.GA4545@redhat.com>
- <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
-Message-ID: <20130801025911.GA20166@redhat.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 31 Jul 2013 22:43:09 -0500
+Subject: [PATCH 4/9] dma: edma: Find missed events and issue them
+In-Reply-To: <51F9C793.2000001@ti.com>
+References: <1375104595-16018-1-git-send-email-joelf@ti.com>
+ <1375104595-16018-5-git-send-email-joelf@ti.com> <51F7659E.3040302@ti.com>
+ <51F89763.1010102@ti.com> <51F8D667.2040406@ti.com> <51F9C793.2000001@ti.com>
+Message-ID: <51F9D94D.5060702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 07:47:30PM -0700, Olof Johansson wrote:
+On 07/31/2013 09:27 PM, Joel Fernandes wrote:
+> On 07/31/2013 04:18 AM, Sekhar Nori wrote:
+>> On Wednesday 31 July 2013 10:19 AM, Joel Fernandes wrote:
+>>> Hi Sekhar,
+>>>
+>>> On 07/30/2013 02:05 AM, Sekhar Nori wrote:
+>>>> On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
+>>>>> In an effort to move to using Scatter gather lists of any size with
+>>>>> EDMA as discussed at [1] instead of placing limitations on the driver,
+>>>>> we work through the limitations of the EDMAC hardware to find missed
+>>>>> events and issue them.
+>>>>>
+>>>>> The sequence of events that require this are:
+>>>>>
+>>>>> For the scenario where MAX slots for an EDMA channel is 3:
+>>>>>
+>>>>> SG1 -> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> Null
+>>>>>
+>>>>> The above SG list will have to be DMA'd in 2 sets:
+>>>>>
+>>>>> (1) SG1 -> SG2 -> SG3 -> Null
+>>>>> (2) SG4 -> SG5 -> SG6 -> Null
+>>>>>
+>>>>> After (1) is succesfully transferred, the events from the MMC controller
+>>>>> donot stop coming and are missed by the time we have setup the transfer
+>>>>> for (2). So here, we catch the events missed as an error condition and
+>>>>> issue them manually.
+>>>>
+>>>> Are you sure there wont be any effect of these missed events on the
+>>>> peripheral side. For example, wont McASP get into an underrun condition
+>>>> when it encounters a null PaRAM set? Even UART has to transmit to a
+>>>
+>>> But it will not encounter null PaRAM set because McASP uses contiguous
+>>> buffers for transfer which are not scattered across physical memory.
+>>> This can be accomplished with an SG of size 1. For such SGs, this patch
+>>> series leaves it linked Dummy and does not link to Null set. Null set is
+>>> only used for SG lists that are > MAX_NR_SG in size such as those
+>>> created for example by MMC and Crypto.
+>>>
+>>>> particular baud so I guess it cannot wait like the way MMC/SD can.
+>>>
+>>> Existing driver have to wait anyway if they hit MAX SG limit today. If
+>>> they don't want to wait, they would have allocated a contiguous block of
+>>> memory and DMA that in one stretch so they don't lose any events, and in
+>>> such cases we are not linking to Null.
+>>
+>> As long as DMA driver can advertize its MAX SG limit, peripherals can
+>> always work around that by limiting the number of sync events they
+>> generate so as to not having any of the events getting missed. With this
+>> series, I am worried that EDMA drivers is advertizing that it can handle
+>> any length SG list while not taking care of missing any events while
+>> doing so. This will break the assumptions that driver writers make.
 
- > >  > Hmm, really?  Did you reported these bugs?  I'm not aware of mainline
- > >  > having any changes related to bug reports on PTEs on ARM.
- > >
- > > I wasn't sure if it was a googleism, or happens on mainline, so no.
- > 
- > As of 3.10, it's not actually hard to run a mainline kernel on the
- > chromebook, but you have limited functionality (no wifi, no USB3, no
- > accellerated graphics). Easiest is to do it by booting from SD card.
- > See instructions at
- > http://www.chromium.org/chromium-os/u-boot-porting-guide/using-nv-u-boot-on-the-samsung-arm-chromebook.
- 
-Yeah, that's how I got Fedora running on it (I think the people who did the
-Fedora spin for the chromebook chose the google kernel for exactly
-the reasons you mention above).  It felt a little sluggish for a native
-kernel build though, and I'm not setup for cross-building so I stuck with
-the 3.4 build.
- 
- > How long would a useful run of trinity take?
+Sorry, just forgot to respond to "not taking care of missing any events
+while doing so". Can you clarify this? DMA engine driver is taking care
+of missed events.
 
-It blew up in a minute or so of runtime when I tried last week.
+Also- missing of events doesn't result in feedback to the peripheral.
+Peripheral sends even to DMA controller, event is missed. Peripheral
+doesn't know anything about what happened and is waiting for transfer
+from the DMA controller.
 
- > I've got an autobuilder/autobooter setup here with a cross-section of current ARM
- > hardware (7 platforms and counting) that I mostly do boot testing on,
- > and I should add a smallish suite of testcases to the same. Trinity
- > would be a good candidate for that.
+Thanks,
 
-Feel free to mail me off-list if I can do anything to help out, though
-hopefully things should build & run 'out of the box'.  You shouldn't
-need any special command line args (though you might get inspiration
-for ideas from the scripts/test-* harnesses)
-
-	Dave
+-Joel
