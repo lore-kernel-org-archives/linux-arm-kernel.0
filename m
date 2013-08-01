@@ -1,59 +1,81 @@
 From: rizhao@nvidia.com (Richard Zhao)
-Date: Thu, 1 Aug 2013 10:49:29 +0800
-Subject: [PATCH 1/9] ARM: dts: add generic DMA DT binding for tegra apbdma
-In-Reply-To: <51F7EE81.1060105@wwwdotorg.org>
+Date: Thu, 1 Aug 2013 11:30:33 +0800
+Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
+In-Reply-To: <51F98275.6020906@wwwdotorg.org>
 References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
- <1374639002-16753-2-git-send-email-rizhao@nvidia.com>
- <51F2CC30.5090200@wwwdotorg.org>
- <20130730025448.GI15855@rizhao-lap>
- <51F7EE81.1060105@wwwdotorg.org>
-Message-ID: <20130801024929.GA31469@rizhao-lap>
+ <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
+ <51F2D063.5010505@wwwdotorg.org>
+ <20130730033134.GM15855@rizhao-lap> <51F7EDF2.60700@wwwdotorg.org>
+ <20130731034541.GQ15855@rizhao-lap>
+ <51F98275.6020906@wwwdotorg.org>
+Message-ID: <20130801033033.GB31469@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 12:49:05AM +0800, Stephen Warren wrote:
-> On 07/29/2013 08:54 PM, Richard Zhao wrote:
-> > On Sat, Jul 27, 2013 at 03:21:20AM +0800, Stephen Warren wrote:
-> >> (Stripping the Cc list a lot, but adding in the DT binding maintainers)
-> >>
-> >> On 07/23/2013 10:09 PM, Richard Zhao wrote:
-> >>> All Tegra device drivers will soon move to generic DMA device tree bindings.
-> >>> Add the required properties to the Tegra DT files to support that. The legacy
-> >>> property nvidia,dma-request-selector will be removed after all drivers have
-> >>> been converted, in order to maintain bisectability.
+On Thu, Aug 01, 2013 at 05:32:37AM +0800, Stephen Warren wrote:
+> On 07/30/2013 09:45 PM, Richard Zhao wrote:
+> > On Wed, Jul 31, 2013 at 12:46:42AM +0800, Stephen Warren wrote:
+> >> On 07/29/2013 09:31 PM, Richard Zhao wrote:
+> >>> On Sat, Jul 27, 2013 at 03:39:15AM +0800, Stephen Warren wrote:
+> >>>> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+> >>>>> - driver: remove use of nvidia,dma-request-selector
+> >>>>> 	  use dma_request_slave_channel to request channel
+> >>>>> - update binding doc
+> >>>>
+> >>>> This patch needs to be amended so that the DMA channel is looked up
+> >>>> during probe() rather than open(), to guarantee that deferred probe
+> >>>> works. It's possible to hold off probe, but not possible AFAIK to hold
+> >>>> off opening the port.
 > >>>
-> >>> Changes:
-> >>>  - Add '#dma-cells' for apbdma nodes
-> >>>  - And properties 'dmas' and 'dma-names' for apbdma client nodes
-> >>>  - update apbdma DT binding doc
-> >>>
-> >>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
-> >>> ---
-> >>>  .../devicetree/bindings/dma/tegra20-apbdma.txt     |  1 +
-> >>>  arch/arm/boot/dts/tegra114.dtsi                    | 27 ++++++++++++++++++++++
-> >>>  arch/arm/boot/dts/tegra20.dtsi                     | 27 ++++++++++++++++++++++
-> >>>  arch/arm/boot/dts/tegra30.dtsi                     | 25 ++++++++++++++++++++
+> >>> How about avoid return -EPROBE_DEFER at open() time? It can be in
+> >>> another patch.
 > >>
-> >> This patch should be split differently.
-> >>
-> >> Patch 1 in the series should include the binding document change and the
-> >> associated DMA driver change, which will support both the old and new
-> >> bindings.
+> >> I don't really understand what you mean. -EPROBE_DEFER is something that
+> >> only makes sense for probe() to return (or functions used by probe()).
+> >> It doesn't make sense to return it anywhere else, since probe deferral
+> >> is something that can only happen for probe().
+> >
+> > What I meant is, it might not worth to move request channel to probe
+> > only because we need to check error and return -EPROBE_DEFER.
+> 
+> If probe() doesn't attempt to validate that the/a DMA channel provider
+> exists, then there's no guarantee that the DMA provider has probed
+> before the DMA client driver either probes or executes any later code.
 
-Binding doc is used to define the way dts describe hw. I still think it
-is better to squash into this patch. But it's not such a big deal. I'll
-move it to dma patch  since you like it.
+I'm not against defer probe, but dma_request_slave_channel might not be
+the right function. Ideally dma channels are allocated at open() time
+and dma controller loaded checking is at probe() time. So there's
+better some function called check_dma_controller_loaded(), or we could
+also use initcalls to let dma driver probe earlier.
+
+This patch intend to be simple to only change the binding.
+
+> So, you could quite easily end up with a situation where the serial
+> driver's open fails because the DMA provider has not yet probed. This is
+> exactly what deferred probe was intended to avoid. This reason alone is
+> enough to make it worth fixing this.
+> 
+> > dma_request_slave_channel is better to be called as late as possible to
+> > make better dynamic use of dma channels.
+> 
+> probe() could validate that the provider exists in a way that doesn't
+> permanently hold ownership of the DMA channel. For example, request it
+> then immediately release it, in the absence of a dedicated "validate my
+> DMA providers exist" API.
+
+It's ugly but may work. The current driver didn't check dma controller
+loaded at probe time. Let's leave the task to another patch?
+
+> 
+> > Actually, I searched the kernel code, most drivers don't return EPROBE_DEFER
+> > when dma_request_slave_channel failed. dma_request_slave_channel can
+> > fail in many cases, and dma device not probed is only one case.
+> 
+> That sounds like a bug. If a DMA channel /is/ specified, it should be
+> possible to acquire it. If no DMA channel is specified, and if the
+> device can do PIO, then it's reasonable to continue.
+Idealy when dma_request_slave_channel failed at open time, it can also
+move to PIO.
 
 Thanks
 Richard
-
-> >>
-> >> Patch 2 should contain the *.dtsi changes.
-> >
-> > The reason I update apbdma binding doc here is to make it consistent
-> > with the mass properties added in dtsi files.
-> > apbdma has less places of changes than dtsi files.
-> 
-> It'll still be consistent if you update the binding documentation first,
-> then update the *.dtsi to conform to the new binding docs. It won't
-> affect the number of changes.
