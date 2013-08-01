@@ -1,51 +1,25 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 01 Aug 2013 22:14:03 +0900
-Subject: [PATCH v8 07/12] iommu/exynos: support for device tree
-In-Reply-To: <1743111.Ek7FldnHal@flatron>
-References: <003d01ce89f3$44ec2cf0$cec486d0$@samsung.com>
- <1743111.Ek7FldnHal@flatron>
-Message-ID: <003a01ce8eb8$fe946db0$fbbd4910$@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Aug 2013 15:20:40 +0200
+Subject: [RFC 4/8] pinctrl: imx: Support imx21 register format
+In-Reply-To: <20130728102215.GH16871@s25.your-server.de>
+References: <1374938808-27316-1-git-send-email-mpa@pengutronix.de>
+ <1374938808-27316-5-git-send-email-mpa@pengutronix.de>
+ <20130728083436.GI2737@pengutronix.de>
+ <20130728102215.GH16871@s25.your-server.de>
+Message-ID: <CACRpkdbeYo86u07EWeSVt8SYKL-eqQf3vpX5rRXQx4hNh0EbvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tomasz Figa [mailto:tomasz.figa at gmail.com]
-> Sent: Saturday, July 27, 2013 11:07 PM
-> 
-> Hi,
-> 
-> On Friday 26 of July 2013 20:28:36 Cho KyongHo wrote:
-> > This commit adds device tree support for System MMU.
-> > This also include the following changes and enhancements:
-> >
-> > * use managed device helper functions.
-> > Simplyfies System MMU device driver.
-> >
-> > * use only a single clock descriptor.
-> > System MMU device descriptor is seperate if it is imposible to make
-> > a single clock descriptor to make a device descriptor for a group of
-> > System MMUs.
-> >
-> > * removed dbgname member from sysmmu_drvdata structure.
-> > debugging kernel message for a System MMU is distinguisheable with the
-> > name of device descroptors.
-> >
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > ---
-> >  drivers/iommu/Kconfig        |    5 +-
-> >  drivers/iommu/exynos-iommu.c |  182
-> > ++++++++++++++++-------------------------- 2 files changed, 70
-> > insertions(+), 117 deletions(-)
-> 
-> Whenever you introduce or modify (extend) a device tree binding please
-> don't forget about reflecting that in documentation
-> (Documentation/devicetree/bindings) and CCing devicetree mailing list
-> (devicetree at vger.kernel.org). Both of these steps are necessary to get any
-> device tree stuff merged.
-> 
+On Sun, Jul 28, 2013 at 12:22 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-Oh I see.
-Thank you for advice.
+>> Is it really worth sharing the i.MX1/21/27 support with the imx driver?
+>> It seems most of the code is rewritten. I just tried and removed all
+>> lines from pinctrl-imx.c you don't use. There's not much left to share.
+>
+> Yes it's really not that much to share. I will move it to a seperate
+> file for imx1/21/27.
 
-> Best regards,
-> Tomasz
+OK I'll wait for a v2 version of this patch set before reviewing.
+
+Yours,
+Linus Walleij
