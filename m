@@ -1,7 +1,7 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 1 Aug 2013 10:43:58 -0700
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 01 Aug 2013 19:48:04 +0200
 Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <51FA9AE8.1060004@linaro.org>
+In-Reply-To: <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
 References: <51F66565.7010600@linaro.org>
  <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
  <51F77D93.4030505@linaro.org> <51F97842.6050200@linaro.org>
@@ -11,133 +11,148 @@ References: <51F66565.7010600@linaro.org>
  <51F99747.4060901@linaro.org>
  <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
  <51FA9AE8.1060004@linaro.org>
-Message-ID: <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+Message-ID: <51FA9F54.3060704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 07:29:12PM +0200, Daniel Lezcano wrote:
-> On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
-> > On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
-> >> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
-> >>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
-> >>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
-> >>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
-> >>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
-> >>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
-> >>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
-> >>>>>>>>> Hi Daniel,
-> >>>>>>>>>
-> >>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
-> >>>>>>>>> (snip)
-> >>>>>>>>>>
-> >>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
-> >>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
-> >>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
-> >>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
-> >>>>>>>>>> idle state, switching the local timer back in use.
-> >>>>>>>>>
-> >>>>>>>>> I've been thinking about this, trying to understand how this makes my
-> >>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
-> >>>>>>>>> would make the timer core switch to a broadcast device even though it
-> >>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
-> >>>>>>>>> something useless, but nothing wrong in a sense that it should result in
-> >>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
-> >>>>>>>>> always remain a mystery to me.
-> >>>>>>>>>
-> >>>>>>>>> Actually this more or less leads to the question: What is this
-> >>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
-> >>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
-> >>>>>>>>> hang pointing to some issue with that driver?
-> >>>>>>>>
-> >>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
-> >>>>>>>
-> >>>>>>> So, the correct run results (full output attached).
-> >>>>>>>
-> >>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
-> >>>>>>> broadcast device:
-> >>>>>>> 	Tick Device: mode:     1                                                         
-> >>>>>>> 	Broadcast device  
-> >>>>>>> 	Clock Event Device: ttc_clockevent
-> >>>>>>>
-> >>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
-> >>>>>>> enable the global timer, the twd timers are still used as local timers
-> >>>>>>> and the broadcast device is the global timer:
-> >>>>>>> 	Tick Device: mode:     1                                                         
-> >>>>>>> 	Broadcast device                                                                 
-> >>>>>>> 	Clock Event Device: arm_global_timer
-> >>>>>>>
-> >>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
-> >>>>>>> obtain this information for that case.
-> >>>>>>
-> >>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
-> >>>>>
-> >>>>> Right, that works. I forgot about that option after you mentioned, that
-> >>>>> it is most likely not that useful.
-> >>>>>
-> >>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
-> >>>>> the gt enabled and having maxcpus=1 set.
-> >>>>>
-> >>>>> /proc/timer_list:
-> >>>>> 	Tick Device: mode:     1
-> >>>>> 	Broadcast device
-> >>>>> 	Clock Event Device: arm_global_timer
-> >>>>> 	 max_delta_ns:   12884902005
-> >>>>> 	 min_delta_ns:   1000
-> >>>>> 	 mult:           715827876
-> >>>>> 	 shift:          31
-> >>>>> 	 mode:           3
-> >>>>
-> >>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
-> >>>>
-> >>>> The previous timer_list output you gave me when removing the offending
-> >>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
-> >>>>
-> >>>> Is it possible you try to get this output again right after onlining the
-> >>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
-> >>>
-> >>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
-> >>> and that didn't end well:
-> >>> 	# echo 1 > online && cat /proc/timer_list 
-> >>
-> >> Hmm, I was hoping to have a small delay before the kernel hangs but
-> >> apparently this is not the case... :(
-> >>
-> >> I suspect the global timer is shutdown at one moment but I don't
-> >> understand why and when.
-> >>
-> >> Can you add a stack trace in the "clockevents_shutdown" function with
-> >> the clockevent device name ? Perhaps, we may see at boot time an
-> >> interesting trace when it hangs.
-> > 
-> > I did this change:
-> > 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-> > 	index 38959c8..3ab11c1 100644
-> > 	--- a/kernel/time/clockevents.c
-> > 	+++ b/kernel/time/clockevents.c
-> > 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
-> > 	  */
-> > 	 void clockevents_shutdown(struct clock_event_device *dev)
-> > 	 {
-> > 	+       pr_info("ce->name:%s\n", dev->name);
-> > 	+       dump_stack();
-> > 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
-> > 	        dev->next_event.tv64 = KTIME_MAX;
-> > 	 }
-> > 
-> > It is hit a few times during boot, so I attach a full boot log. I really
-> > don't know what to look for, but I hope you can spot something in it. I
-> > really appreciate you taking the time.
+On 08/01/2013 07:43 PM, S?ren Brinkmann wrote:
+> On Thu, Aug 01, 2013 at 07:29:12PM +0200, Daniel Lezcano wrote:
+>> On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
+>>> On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
+>>>> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
+>>>>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
+>>>>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
+>>>>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
+>>>>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+>>>>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+>>>>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+>>>>>>>>>>> Hi Daniel,
+>>>>>>>>>>>
+>>>>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+>>>>>>>>>>> (snip)
+>>>>>>>>>>>>
+>>>>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+>>>>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
+>>>>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+>>>>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+>>>>>>>>>>>> idle state, switching the local timer back in use.
+>>>>>>>>>>>
+>>>>>>>>>>> I've been thinking about this, trying to understand how this makes my
+>>>>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+>>>>>>>>>>> would make the timer core switch to a broadcast device even though it
+>>>>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+>>>>>>>>>>> something useless, but nothing wrong in a sense that it should result in
+>>>>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
+>>>>>>>>>>> always remain a mystery to me.
+>>>>>>>>>>>
+>>>>>>>>>>> Actually this more or less leads to the question: What is this
+>>>>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
+>>>>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+>>>>>>>>>>> hang pointing to some issue with that driver?
+>>>>>>>>>>
+>>>>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
+>>>>>>>>>
+>>>>>>>>> So, the correct run results (full output attached).
+>>>>>>>>>
+>>>>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
+>>>>>>>>> broadcast device:
+>>>>>>>>> 	Tick Device: mode:     1                                                         
+>>>>>>>>> 	Broadcast device  
+>>>>>>>>> 	Clock Event Device: ttc_clockevent
+>>>>>>>>>
+>>>>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
+>>>>>>>>> enable the global timer, the twd timers are still used as local timers
+>>>>>>>>> and the broadcast device is the global timer:
+>>>>>>>>> 	Tick Device: mode:     1                                                         
+>>>>>>>>> 	Broadcast device                                                                 
+>>>>>>>>> 	Clock Event Device: arm_global_timer
+>>>>>>>>>
+>>>>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
+>>>>>>>>> obtain this information for that case.
+>>>>>>>>
+>>>>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
+>>>>>>>
+>>>>>>> Right, that works. I forgot about that option after you mentioned, that
+>>>>>>> it is most likely not that useful.
+>>>>>>>
+>>>>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
+>>>>>>> the gt enabled and having maxcpus=1 set.
+>>>>>>>
+>>>>>>> /proc/timer_list:
+>>>>>>> 	Tick Device: mode:     1
+>>>>>>> 	Broadcast device
+>>>>>>> 	Clock Event Device: arm_global_timer
+>>>>>>> 	 max_delta_ns:   12884902005
+>>>>>>> 	 min_delta_ns:   1000
+>>>>>>> 	 mult:           715827876
+>>>>>>> 	 shift:          31
+>>>>>>> 	 mode:           3
+>>>>>>
+>>>>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
+>>>>>>
+>>>>>> The previous timer_list output you gave me when removing the offending
+>>>>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
+>>>>>>
+>>>>>> Is it possible you try to get this output again right after onlining the
+>>>>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
+>>>>>
+>>>>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
+>>>>> and that didn't end well:
+>>>>> 	# echo 1 > online && cat /proc/timer_list 
+>>>>
+>>>> Hmm, I was hoping to have a small delay before the kernel hangs but
+>>>> apparently this is not the case... :(
+>>>>
+>>>> I suspect the global timer is shutdown at one moment but I don't
+>>>> understand why and when.
+>>>>
+>>>> Can you add a stack trace in the "clockevents_shutdown" function with
+>>>> the clockevent device name ? Perhaps, we may see at boot time an
+>>>> interesting trace when it hangs.
+>>>
+>>> I did this change:
+>>> 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+>>> 	index 38959c8..3ab11c1 100644
+>>> 	--- a/kernel/time/clockevents.c
+>>> 	+++ b/kernel/time/clockevents.c
+>>> 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
+>>> 	  */
+>>> 	 void clockevents_shutdown(struct clock_event_device *dev)
+>>> 	 {
+>>> 	+       pr_info("ce->name:%s\n", dev->name);
+>>> 	+       dump_stack();
+>>> 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
+>>> 	        dev->next_event.tv64 = KTIME_MAX;
+>>> 	 }
+>>>
+>>> It is hit a few times during boot, so I attach a full boot log. I really
+>>> don't know what to look for, but I hope you can spot something in it. I
+>>> really appreciate you taking the time.
+>>
+>> Thanks for the traces.
 > 
-> Thanks for the traces.
-
-Sure.
-
+> Sure.
 > 
-> If you try without the ttc_clockevent configured in the kernel (but with
-> twd and gt), does it boot ?
+>>
+>> If you try without the ttc_clockevent configured in the kernel (but with
+>> twd and gt), does it boot ?
+> 
+> Absence of the TTC doesn't seem to make any difference. It hangs at the
+> same location.
 
-Absence of the TTC doesn't seem to make any difference. It hangs at the
-same location.
+Ok, IMO there is a problem with the broadcast device registration (may
+be vs twd).
 
-	Thanks,
-	S?ren
+I will check later (kid duty) :)
+
+Thanks
+  -- Daniel
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
