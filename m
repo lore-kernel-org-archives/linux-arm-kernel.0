@@ -1,25 +1,18 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 1 Aug 2013 16:28:28 +0900
-Subject: [PATCH/RESEND] clocksource: em_sti: Convert to devm_* managed
- helpers
-In-Reply-To: <51F8D467.1030400@linaro.org>
-References: <1375194277-2850-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <51F8D467.1030400@linaro.org>
-Message-ID: <20130801072828.GB26015@verge.net.au>
+Date: Thu, 1 Aug 2013 16:30:27 +0900
+Subject: [PATCH v4] ARM: shmobile: Add lager defconfig
+In-Reply-To: <1375252165-9019-1-git-send-email-horms+renesas@verge.net.au>
+References: <1375252165-9019-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130801073027.GC26015@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 11:09:59AM +0200, Daniel Lezcano wrote:
-> On 07/30/2013 04:24 PM, Laurent Pinchart wrote:
-> > Replace kzalloc, clk_get, ioremap and request_irq by their managed
-> > counterparts to simplify error paths.
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
+On Wed, Jul 31, 2013 at 03:29:25PM +0900, Simon Horman wrote:
+> This is intended to be used until multi-arch is able to be
+> used for the lager board at which time a more generic configuration
+> will be used in place of this one.
 > 
-> Sounds good.
-> 
-> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Acked-by: Magnus Damm <magnus.damm@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks, I have queued this up for v3.12 in the clocksource branch
-of my renesas tree on kernel.org.
+I have queued this up for v3.12 in the defconfig branch.
