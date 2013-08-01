@@ -1,36 +1,36 @@
-From: vince@deater.net (Vince Weaver)
-Date: Thu, 1 Aug 2013 12:02:06 -0400 (EDT)
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
- mitigations
-In-Reply-To: <20130801025911.GA20166@redhat.com>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <20130730221435.GA22240@redhat.com>
- <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
- <20130730231533.GA26824@redhat.com>
- <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
- <20130731000444.GC1281@redhat.com>
- <20130731094012.GU24642@n2100.arm.linux.org.uk>
- <20130731142430.GA4545@redhat.com>
- <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
- <20130801025911.GA20166@redhat.com>
-Message-ID: <alpine.DEB.2.02.1308011158360.11550@pianoman.cluster.toy>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 1 Aug 2013 18:04:14 +0200
+Subject: NSA310 + DT
+In-Reply-To: <51FA15F3.7050708@uni-bremen.de>
+References: <20130730191943.49f8070c@skate> <20130730183610.GT24782@lunn.ch>
+ <51F814A0.2050403@uni-bremen.de> <20130730232316.10dc7019@skate>
+ <20130731111414.47e7670b@skate> <51F8DC3A.6010007@uni-bremen.de>
+ <20130731115108.21c043fd@skate> <51F8F7E3.9090404@uni-bremen.de>
+ <20130731164512.GB19725@lunn.ch> <51FA15F3.7050708@uni-bremen.de>
+Message-ID: <20130801160414.GI19725@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Jul 2013, Dave Jones wrote:
+> The LED's on after kernel is loaded, while starting up does not work.
+>            pmx_led_sys_green: pmx-led-sys-green {
+>                 marvell,pins = "mpp28";
+>                 marvell,function = "gpio";
+>                 linux,default-trigger = "heartbeat";
+>                 brightness = <255>;
+>             };
+> I first tried default-trigger, then I added brightness additionally
+> but LED's wont turn on.
 
-> On Wed, Jul 31, 2013 at 07:47:30PM -0700, Olof Johansson wrote:
->  > How long would a useful run of trinity take?
-> 
-> It blew up in a minute or so of runtime when I tried last week.
+Can you manually turn the LED on, using /sys/class/led/.../brightness?
+It could be we have the wrong GPIO line for the led. It would be good
+if you could test them all, not just this one led.
 
-I also have a chromebook running 3.4 and it is trivially easy to crash it 
-with some simple perf_event tests I have (not the fuzzer, but just the 
-regular validation tests that test counter overflow).
+> There is no sata hdd trigger and nand-disk does not trigger on sata
+> hdd activity.
 
-Like Dave, I didn't bother reporting the problem because I figured 3.4 was 
-too old for anyone to care about and it was a struggle getting any 
-distro/kernel installed at all on the system let alone trying to boot 
-something close to current mainline on it.
+They are out of tree patches. There was some discussion about SATA led
+activity maybe 6 to 9 months ago. Maybe you can see why the suggested
+patches got rejected. If i remember correctly, it was because they are
+in the hot path.
 
-Vince
+   Andrew
