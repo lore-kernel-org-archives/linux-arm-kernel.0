@@ -1,40 +1,66 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 01 Aug 2013 21:30:08 +0400
-Subject: [PATCH] USB: ohci-at91: add usb_clk for transition to common
- clk framework
-In-Reply-To: <Pine.LNX.4.44L0.1308011153180.1534-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1308011153180.1534-100000@iolanthe.rowland.org>
-Message-ID: <51FA9B20.3080304@cogentembedded.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 1 Aug 2013 19:59:48 +0200
+Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support
+ in PCI-to-PCI bridge
+In-Reply-To: <CAErSpo7Y+OE8_NT3npC1DCQz3PrOT9Nz=6MavY+zS63pGN3x9g@mail.gmail.com>
+References: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo7Y+OE8_NT3npC1DCQz3PrOT9Nz=6MavY+zS63pGN3x9g@mail.gmail.com>
+Message-ID: <20130801195948.7ecb4ac8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Dear Bjorn Helgaas,
 
-On 08/01/2013 07:56 PM, Alan Stern wrote:
+On Thu, 1 Aug 2013 10:53:07 -0600, Bjorn Helgaas wrote:
+> On Thu, Aug 1, 2013 at 7:44 AM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+> > The Marvell PCIe driver uses an emulated PCI-to-PCI bridge to be able
+> > to dynamically set up MBus address decoding windows for PCI I/O and
+> > memory regions depending on the PCI devices enumerated by Linux.
+> >
+> > However, this emulated PCI-to-PCI bridge logic makes the Linux PCI
+> > core believe that prefetchable memory regions are supported (because
+> > the registers are read/write), while in fact no adress decoding window
+> > is ever created for such regions. Since the Marvell MBus address
+> > decoding windows do not distinguish memory regions and prefetchable
+> > memory regions, this patch takes a simple approach: change the
+> > PCI-to-PCI bridge emulation to let the Linux PCI core know that we
+> > don't support prefetchable memory regions.
+> >
+> > To achieve this, we simply make the prefetchable memory base a
+> > read-only register that always returns 0. Reading/writing all the
+> > other prefetchable memory related registers has no effect.
+> >
+> > This problem was originally reported by Finn Hoffmann
+> > <finn@uni-bremen.de>, who couldn't get a RTL8111/8168B PCI NIC working
+> > on the NSA310 Kirkwood platform after updating to 3.11-rc. The problem
+> > was that the PCI-to-PCI bridge emulation was making the Linux PCI core
+> > believe that we support prefetchable memory, so the Linux PCI core was
+> > only filling the prefetchable memory base and limit registers, which
+> > does not lead to a MBus window being created. The below patch has been
+> > confirmed by Finn Hoffmann to fix his problem on Kirkwood, and has
+> > otherwise been successfully tested on the Armada XP GP platform with a
+> > e1000e PCIe NIC and a Marvell SATA PCIe card.
+> >
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Reported-by: Finn Hoffmann <finn@uni-bremen.de>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> 
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> Please merge along with your other pci-mvebu.c changes.
 
->>> What happens if uclk isn't found but it is needed?
+I don't think we have other pci-mvebu.c lined up for 3.11. All the MSI
+stuff, mvebu-mbus DT stuff and so on is for 3.12.
 
->> It will not fail but I guess the usb host won't work as the clock won't
->> be correctly
->> configured.
+So I guess you could take that one through your pci tree. Jason, can
+you confirm?
 
->> I agree with you: this is not a good solution.
+Thanks!
 
->> Another option is to keep the previous version of this patch and put
->> uclk handling
->> in "#ifdef CONFIG_COMMON_CLK #endif" sections.
-
->> Would this be acceptable ?
-
-> Yes.  However, a more elegant approach is to protect the relevant
-> statements with: if (defined(CONFIG_COMMON_CLK)).  This preprocessor
-
-    You probably meant IS_ENABLED() or IS_BUIILTIN()? Or is there something I 
-don't know about gcc preprocessor?
-
-> evaluates this to a 0 or 1, so the compiler will not generate output
-> for the protected source code if the symbol isn't defined.
-
-> Alan Stern
-
-WBR, Sergei
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
