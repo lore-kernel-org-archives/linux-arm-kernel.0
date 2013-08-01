@@ -1,38 +1,55 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 1 Aug 2013 11:17:25 +0200
-Subject: [PATCH 8/9] ARM: kirkwood: remove unused common code for LaCie
- platforms
-In-Reply-To: <1375346738-21596-9-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375346738-21596-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130801091725.GV9916@kw.sim.vm.gnt>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 1 Aug 2013 10:23:48 +0100
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <20130726215859.GA19469@glitch>
+References: <20130726145639.116237136@gmail.com>
+ <20130726151223.045835540@gmail.com>
+ <20130726152918.GL29916@titan.lakedaemon.net> <20130726215859.GA19469@glitch>
+Message-ID: <CAGVrzcbvHbWp2_P2_tHGbKMm6wyZ3cBSZRibEQNcAjiaB4NjZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 10:45:37AM +0200, Thomas Petazzoni wrote:
-> Now that all LaCie platforms have been converted to use the Device
-> Tree, we can get rid of the lacie_v2-common.{c,h} files.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-kirkwood/lacie_v2-common.c | 114 -------------------------------
->  arch/arm/mach-kirkwood/lacie_v2-common.h |  16 -----
->  2 files changed, 130 deletions(-)
->  delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
->  delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
+Hello,
 
-Please take care...
+2013/7/26 Domenico Andreoli <cavokz@gmail.com>:
+> On Fri, Jul 26, 2013 at 11:29:18AM -0400, Jason Cooper wrote:
+>> On Fri, Jul 26, 2013 at 04:56:40PM +0200, Domenico Andreoli wrote:
+>> > From: Domenico Andreoli <domenico.andreoli@linux.com>
+>> >
+>> > arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
+>> > separately. As a matter of flexibility and maintenance, it needs to be
+>> > always included in the build.
+>>
+>> So if I'm building mach-kirkwood, I _have_ to build Broadcom?  What is
+>> the *specific* problem you're encountering that this solves?
+>
+> In mach-bcm we (or I, it's not very clear to me) want to have support for
+> multiple SoCs.
+>
+> In trying the approach
+>
+> machine-$(CONFIG_ARCH_BCM)              += bcm
+> machine-$(CONFIG_ARCH_BCM4760)          += bcm
+>
+> I got linker complains about multiple symbol definitiion in case both the
+> config options are selected.
+>
+> The first thought was to use a common option which purpose was only to
+> include the subdir but then, given my allergy to the tons of config options
+> with usually not straghtforward purpose, I opted for something more simple.
 
-You can't remove this files. A lot of functions are still used by
-netxbig_v2-setup.c. The LaCie "Big" boards are not converted to DT.
-Note that I am currently working on the leds-netxbig driver conversion,
-which is needed by the "Big" boards.
+I do not understand why are you trying so hard to put your SoC support
+in mach-bcm. I was one of the only people to complain that mach-bcm
+was both confusing and not generic enough to cover all Broadcom SoCs.
+I still think it should have been specified to mach-bcmmobile or
+something like mach-bcm28xxx. Back in the days where ARM drivers were
+mostly living in arch/arm/*, it *might* have made some sense but now,
+I really think that you should go with your own mach-bcm470x
+directory.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130801/b2b73ecb/attachment-0001.sig>
+BCM47060, BCM53xx and BCM28xx all have both different CPU backends and
+different on-chip peripherals, which are even connected differently,
+put clearly, they share very little but the ARM architecture.
+-- 
+Florian
