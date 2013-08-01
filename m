@@ -1,35 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 31 Jul 2013 17:04:46 -0700 (PDT)
-Subject: [PATCH v3] net: Add MOXA ART SoCs ethernet driver
-In-Reply-To: <1375296998.5729.8.camel@joe-AO722>
-References: <1374842890-20735-1-git-send-email-jonas.jensen@gmail.com>
- <1375280401-5564-1-git-send-email-jonas.jensen@gmail.com>
- <1375296998.5729.8.camel@joe-AO722>
-Message-ID: <20130731.170446.1534643901297918794.davem@davemloft.net>
+From: timur@tabi.org (Timur Tabi)
+Date: Wed, 31 Jul 2013 19:13:02 -0500
+Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
+ architecture independent macro
+In-Reply-To: <51F9A5FE.8030608@codeaurora.org>
+References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+ <1375187900-17582-3-git-send-email-B44344@freescale.com>
+ <20130731071630.GI8868@codeaurora.org>
+ <CAOZdJXVvNBR-qf7LXNOHZVstH_Rebxwn-wAkSaBS53Wn55mYCw@mail.gmail.com>
+ <51F9A5FE.8030608@codeaurora.org>
+Message-ID: <51F9A80E.5010307@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joe Perches <joe@perches.com>
-Date: Wed, 31 Jul 2013 11:56:38 -0700
+On 07/31/2013 07:04 PM, Stephen Boyd wrote:
+> If it yields why are we using udelay? Why not usleep_range()? It would
+> be useful to have a variant that worked in interrupt context and it
+> looked like that was almost possible.
 
->> +		if (ui & (RX_ERR | CRC_ERR | FTL | RUNT | RX_ODD_NB)) {
->> +			netdev_err(ndev, "packet error\n");
-> 
-> This is generally a bad idea as it can flood
-> the log.  It's probably better to remove it.
-> If you really want logging, then at least use
-> net_ratelimit().  Generally, the stats are
-> enough.
- ...
->> +			priv->stats.rx_dropped++;
->> +			priv->stats.rx_errors++;
-> []
->> +static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-> []
->> +	if (txdesc->txdes0.ubit.tx_dma_own) {
->> +		netdev_err(ndev, "no TX space for packet\n");
->> +		priv->stats.tx_dropped++;
-> 
-> here too.
+I've never heard of usleep_range() before, so I don't know if it
+applies.  Apparently, udelay() includes its own call to cpu_relax().  Is
+it possible that cpu_relax() is a "lightweight" yield, compared to sleeping?
 
-Agreed, these should not be logged, the statistics are sufficient.
+FYI, you might want to look at the code reviews for spin_event_timeout()
+on the linuxppc-dev mailing list, back in March 2009.
+
+-- 
+-- 
+Timur Tabi
