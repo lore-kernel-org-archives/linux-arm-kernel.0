@@ -1,13 +1,13 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  1 Aug 2013 17:26:23 +0900
-Subject: [PATCH 01/14] ARCH: ARM: shmobile: Remove kota2 board support
+Date: Thu,  1 Aug 2013 17:26:24 +0900
+Subject: [PATCH 02/14] ARCH: ARM: shmobile: Remove ag5evm board support
 In-Reply-To: <cover.1375344714.git.horms+renesas@verge.net.au>
 References: <cover.1375344714.git.horms+renesas@verge.net.au>
-Message-ID: <5fa6d27612635f4b3e6c19d763c0a65275933898.1375344714.git.horms+renesas@verge.net.au>
+Message-ID: <c0bb9b3027690e10cf8f20a027039db3c7a50d98.1375344714.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove support for the sh73a0 based kota2 board.
+Remove support for the sh73a0 based ag5evm board.
 
 The sh73a0 SoC is continued to be supported using
 the kzm9g board.
@@ -15,194 +15,154 @@ the kzm9g board.
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/kota2_defconfig     | 121 --------
- arch/arm/mach-shmobile/Kconfig       |   6 -
- arch/arm/mach-shmobile/Makefile      |   1 -
- arch/arm/mach-shmobile/Makefile.boot |   1 -
- arch/arm/mach-shmobile/board-kota2.c | 550 -----------------------------------
- 5 files changed, 679 deletions(-)
- delete mode 100644 arch/arm/configs/kota2_defconfig
- delete mode 100644 arch/arm/mach-shmobile/board-kota2.c
+ arch/arm/configs/ag5evm_defconfig     |  83 -----
+ arch/arm/mach-shmobile/Kconfig        |   7 -
+ arch/arm/mach-shmobile/Makefile       |   1 -
+ arch/arm/mach-shmobile/Makefile.boot  |   1 -
+ arch/arm/mach-shmobile/board-ag5evm.c | 639 ----------------------------------
+ 5 files changed, 731 deletions(-)
+ delete mode 100644 arch/arm/configs/ag5evm_defconfig
+ delete mode 100644 arch/arm/mach-shmobile/board-ag5evm.c
 
-diff --git a/arch/arm/configs/kota2_defconfig b/arch/arm/configs/kota2_defconfig
+diff --git a/arch/arm/configs/ag5evm_defconfig b/arch/arm/configs/ag5evm_defconfig
 deleted file mode 100644
-index 57ad3d4..0000000
---- a/arch/arm/configs/kota2_defconfig
+index 212ead3..0000000
+--- a/arch/arm/configs/ag5evm_defconfig
 +++ /dev/null
-@@ -1,121 +0,0 @@
--# CONFIG_ARM_PATCH_PHYS_VIRT is not set
+@@ -1,83 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
 -CONFIG_SYSVIPC=y
 -CONFIG_IKCONFIG=y
 -CONFIG_IKCONFIG_PROC=y
 -CONFIG_LOG_BUF_SHIFT=16
--CONFIG_CGROUPS=y
--CONFIG_CPUSETS=y
 -CONFIG_NAMESPACES=y
 -# CONFIG_UTS_NS is not set
 -# CONFIG_IPC_NS is not set
 -# CONFIG_USER_NS is not set
 -# CONFIG_PID_NS is not set
--CONFIG_SYSCTL_SYSCALL=y
--CONFIG_EMBEDDED=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_INITRAMFS_SOURCE=""
+-CONFIG_EXPERT=y
 -CONFIG_SLAB=y
 -# CONFIG_BLK_DEV_BSG is not set
 -# CONFIG_IOSCHED_DEADLINE is not set
 -# CONFIG_IOSCHED_CFQ is not set
 -CONFIG_ARCH_SHMOBILE=y
--CONFIG_KEYBOARD_GPIO_POLLED=y
 -CONFIG_ARCH_SH73A0=y
--CONFIG_MACH_KOTA2=y
--CONFIG_MEMORY_SIZE=0x1e000000
--# CONFIG_SH_TIMER_TMU is not set
--# CONFIG_SWP_EMULATE is not set
+-CONFIG_MACH_AG5EVM=y
+-CONFIG_MEMORY_SIZE=0x10000000
 -CONFIG_CPU_BPREDICT_DISABLE=y
--CONFIG_ARM_ERRATA_460075=y
--CONFIG_ARM_ERRATA_742230=y
--CONFIG_ARM_ERRATA_742231=y
--CONFIG_PL310_ERRATA_588369=y
--CONFIG_ARM_ERRATA_720789=y
--CONFIG_PL310_ERRATA_727915=y
--CONFIG_ARM_ERRATA_743622=y
--CONFIG_ARM_ERRATA_751472=y
--CONFIG_PL310_ERRATA_753970=y
--CONFIG_ARM_ERRATA_754322=y
--CONFIG_PL310_ERRATA_769419=y
+-CONFIG_ARM_ERRATA_430973=y
+-CONFIG_ARM_ERRATA_458693=y
 -CONFIG_NO_HZ=y
--CONFIG_SMP=y
 -CONFIG_AEABI=y
 -# CONFIG_OABI_COMPAT is not set
 -CONFIG_HIGHMEM=y
 -CONFIG_ZBOOT_ROM_TEXT=0x0
 -CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel"
+-CONFIG_CMDLINE="console=tty0 console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel"
 -CONFIG_CMDLINE_FORCE=y
 -CONFIG_KEXEC=y
--CONFIG_CPU_IDLE=y
 -# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM=y
+-# CONFIG_SUSPEND is not set
 -CONFIG_PM_RUNTIME=y
 -CONFIG_NET=y
 -CONFIG_PACKET=y
 -CONFIG_UNIX=y
 -CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
 -# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
 -# CONFIG_INET_XFRM_MODE_TUNNEL is not set
 -# CONFIG_INET_XFRM_MODE_BEET is not set
 -# CONFIG_INET_LRO is not set
 -# CONFIG_INET_DIAG is not set
 -# CONFIG_IPV6 is not set
--CONFIG_CFG80211=y
--CONFIG_WIRELESS_EXT_SYSFS=y
--CONFIG_MAC80211=y
+-# CONFIG_WIRELESS is not set
 -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
 -# CONFIG_BLK_DEV is not set
 -CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
--# CONFIG_NET_VENDOR_SEEQ is not set
+-CONFIG_NET_ETHERNET=y
 -CONFIG_SMSC911X=y
--# CONFIG_NET_VENDOR_STMICRO is not set
--CONFIG_B43=y
--CONFIG_B43_PHY_N=y
--CONFIG_B43_DEBUG=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+-# CONFIG_WLAN is not set
 -CONFIG_INPUT_SPARSEKMAP=y
 -# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
 -CONFIG_INPUT_EVDEV=y
--# CONFIG_KEYBOARD_ATKBD is not set
--CONFIG_KEYBOARD_GPIO=y
--CONFIG_KEYBOARD_SH_KEYSC=y
+-# CONFIG_INPUT_KEYBOARD is not set
 -# CONFIG_INPUT_MOUSE is not set
--# CONFIG_LEGACY_PTYS is not set
 -CONFIG_SERIAL_SH_SCI=y
 -CONFIG_SERIAL_SH_SCI_NR_UARTS=9
 -CONFIG_SERIAL_SH_SCI_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
 -# CONFIG_HW_RANDOM is not set
+-CONFIG_I2C=y
 -CONFIG_I2C_SH_MOBILE=y
 -# CONFIG_HWMON is not set
--CONFIG_BCMA=y
--CONFIG_BCMA_DEBUG=y
+-# CONFIG_MFD_SUPPORT is not set
 -CONFIG_FB=y
 -CONFIG_FB_SH_MOBILE_LCDC=y
--CONFIG_LCD_PLATFORM=y
 -CONFIG_FRAMEBUFFER_CONSOLE=y
 -CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
 -# CONFIG_HID_SUPPORT is not set
 -# CONFIG_USB_SUPPORT is not set
--CONFIG_MMC=y
--CONFIG_MMC_SDHI=y
--CONFIG_MMC_SH_MMCIF=y
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_RENESAS_TPU=y
--CONFIG_LEDS_TRIGGERS=y
 -# CONFIG_DNOTIFY is not set
+-# CONFIG_INOTIFY_USER is not set
 -CONFIG_TMPFS=y
 -# CONFIG_MISC_FILESYSTEMS is not set
 -CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_INFO_REDUCED=y
+-CONFIG_DEBUG_KERNEL=y
 -# CONFIG_FTRACE is not set
--CONFIG_DEBUG_USER=y
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index dd80f21..c536cca 100644
+index c536cca..e4ad408 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -91,12 +91,6 @@ config MACH_MACKEREL
- 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
- 	select USE_OF
+@@ -71,13 +71,6 @@ config ARCH_EMEV2
  
--config MACH_KOTA2
--	bool "KOTA2 board"
+ comment "SH-Mobile Board Type"
+ 
+-config MACH_AG5EVM
+-	bool "AG5EVM board"
 -	depends on ARCH_SH73A0
 -	select ARCH_REQUIRE_GPIOLIB
 -	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select SH_LCD_MIPI_DSI
 -
- config MACH_ARMADILLO800EVA
- 	bool "Armadillo-800 EVA board"
- 	depends on ARCH_R8A7740
+ config MACH_APE6EVM
+ 	bool "APE6EVM board"
+ 	depends on ARCH_R8A73A4
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index e8d0a2c..857a09d 100644
+index 857a09d..62574c1 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -38,7 +38,6 @@ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
- obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
+@@ -35,7 +35,6 @@ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+ 
+ # Board objects
+-obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
  obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
  obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
--obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
  obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
 diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 7785c52..9156c56 100644
+index 9156c56..b8c1a21 100644
 --- a/arch/arm/mach-shmobile/Makefile.boot
 +++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -5,7 +5,6 @@ loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
+@@ -1,6 +1,5 @@
+ # per-board load address for uImage
+ loadaddr-y	:=
+-loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
+ loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
  loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
  loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
- loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
--loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
- loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
-diff --git a/arch/arm/mach-shmobile/board-kota2.c b/arch/arm/mach-shmobile/board-kota2.c
+diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
 deleted file mode 100644
-index 6af20d9..0000000
---- a/arch/arm/mach-shmobile/board-kota2.c
+index f6d6449..0000000
+--- a/arch/arm/mach-shmobile/board-ag5evm.c
 +++ /dev/null
-@@ -1,550 +0,0 @@
+@@ -1,639 +0,0 @@
 -/*
-- * kota2 board support
+- * arch/arm/mach-shmobile/board-ag5evm.c
 - *
-- * Copyright (C) 2011  Renesas Solutions Corp.
-- * Copyright (C) 2011  Magnus Damm
 - * Copyright (C) 2010  Takashi Yoshii <yoshii.takashi.zj@renesas.com>
 - * Copyright (C) 2009  Yoshihiro Shimoda <shimoda.yoshihiro@renesas.com>
 - *
@@ -218,6 +178,7 @@ index 6af20d9..0000000
 - * You should have received a copy of the GNU General Public License
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+- *
 - */
 -
 -#include <linux/kernel.h>
@@ -226,31 +187,34 @@ index 6af20d9..0000000
 -#include <linux/irq.h>
 -#include <linux/pinctrl/machine.h>
 -#include <linux/pinctrl/pinconf-generic.h>
--#include <linux/platform_data/pwm-renesas-tpu.h>
 -#include <linux/platform_device.h>
 -#include <linux/delay.h>
 -#include <linux/io.h>
+-#include <linux/dma-mapping.h>
 -#include <linux/regulator/fixed.h>
 -#include <linux/regulator/machine.h>
+-#include <linux/serial_sci.h>
 -#include <linux/smsc911x.h>
 -#include <linux/gpio.h>
+-#include <linux/videodev2.h>
 -#include <linux/input.h>
 -#include <linux/input/sh_keysc.h>
--#include <linux/gpio_keys.h>
--#include <linux/leds.h>
--#include <linux/leds_pwm.h>
--#include <linux/irqchip/arm-gic.h>
 -#include <linux/mmc/host.h>
 -#include <linux/mmc/sh_mmcif.h>
--#include <linux/mfd/tmio.h>
 -#include <linux/mmc/sh_mobile_sdhi.h>
+-#include <linux/mfd/tmio.h>
+-#include <linux/platform_data/bd6107.h>
+-#include <linux/sh_clk.h>
+-#include <linux/irqchip/arm-gic.h>
+-#include <video/sh_mobile_lcdc.h>
+-#include <video/sh_mipi_dsi.h>
+-#include <sound/sh_fsi.h>
 -#include <mach/hardware.h>
 -#include <mach/irqs.h>
 -#include <mach/sh73a0.h>
 -#include <mach/common.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
 -#include <asm/hardware/cache-l2x0.h>
 -#include <asm/traps.h>
 -
@@ -260,11 +224,10 @@ index 6af20d9..0000000
 -	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
 -};
 -
--/* SMSC 9220 */
 -static struct resource smsc9220_resources[] = {
 -	[0] = {
--		.start		= 0x14000000, /* CS5A */
--		.end		= 0x140000ff, /* A1->A7 */
+-		.start		= 0x14000000,
+-		.end		= 0x14000000 + SZ_64K - 1,
 -		.flags		= IORESOURCE_MEM,
 -	},
 -	[1] = {
@@ -274,7 +237,7 @@ index 6af20d9..0000000
 -};
 -
 -static struct smsc911x_platform_config smsc9220_platdata = {
--	.flags		= SMSC911X_USE_32BIT, /* 32-bit SW on 16-bit HW bus */
+-	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
 -	.phy_interface	= PHY_INTERFACE_MODE_MII,
 -	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
 -	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
@@ -290,24 +253,20 @@ index 6af20d9..0000000
 -	.num_resources	= ARRAY_SIZE(smsc9220_resources),
 -};
 -
--/* KEYSC */
 -static struct sh_keysc_info keysc_platdata = {
 -	.mode		= SH_KEYSC_MODE_6,
 -	.scan_timing	= 3,
 -	.delay		= 100,
 -	.keycodes	= {
--		KEY_NUMERIC_STAR, KEY_NUMERIC_0, KEY_NUMERIC_POUND,
--		0, 0, 0, 0, 0,
--		KEY_NUMERIC_7, KEY_NUMERIC_8, KEY_NUMERIC_9,
--		0, KEY_DOWN, 0, 0, 0,
--		KEY_NUMERIC_4, KEY_NUMERIC_5, KEY_NUMERIC_6,
--		KEY_LEFT, KEY_ENTER, KEY_RIGHT, 0, 0,
--		KEY_NUMERIC_1, KEY_NUMERIC_2, KEY_NUMERIC_3,
--		0, KEY_UP, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0,
+-		KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G,
+-		KEY_H, KEY_I, KEY_J, KEY_K, KEY_L, KEY_M, KEY_N,
+-		KEY_O, KEY_P, KEY_Q, KEY_R, KEY_S, KEY_T, KEY_U,
+-		KEY_V, KEY_W, KEY_X, KEY_Y, KEY_Z, KEY_HOME, KEY_SLEEP,
+-		KEY_SPACE, KEY_9, KEY_6, KEY_3, KEY_WAKEUP, KEY_RIGHT, \
+-		KEY_COFFEE,
+-		KEY_0, KEY_8, KEY_5, KEY_2, KEY_DOWN, KEY_ENTER, KEY_UP,
+-		KEY_KPASTERISK, KEY_7, KEY_4, KEY_1, KEY_STOP, KEY_LEFT, \
+-		KEY_COMPUTER,
 -	},
 -};
 -
@@ -334,153 +293,25 @@ index 6af20d9..0000000
 -	},
 -};
 -
--/* GPIO KEY */
--#define GPIO_KEY(c, g, d) { .code = c, .gpio = g, .desc = d, .active_low = 1 }
--
--static struct gpio_keys_button gpio_buttons[] = {
--	GPIO_KEY(KEY_VOLUMEUP, 56, "+"), /* S2: VOL+ [IRQ9] */
--	GPIO_KEY(KEY_VOLUMEDOWN, 54, "-"), /* S3: VOL- [IRQ10] */
--	GPIO_KEY(KEY_MENU, 27, "Menu"), /* S4: MENU [IRQ30] */
--	GPIO_KEY(KEY_HOMEPAGE, 26, "Home"), /* S5: HOME [IRQ31] */
--	GPIO_KEY(KEY_BACK, 11, "Back"), /* S6: BACK [IRQ0] */
--	GPIO_KEY(KEY_PHONE, 238, "Tel"), /* S7: TEL [IRQ11] */
--	GPIO_KEY(KEY_POWER, 239, "C1"), /* S8: CAM [IRQ13] */
--	GPIO_KEY(KEY_MAIL, 224, "Mail"), /* S9: MAIL [IRQ3] */
--	/* Omitted button "C3?": 223 - S10: CUST [IRQ8] */
--	GPIO_KEY(KEY_CAMERA, 164, "C2"), /* S11: CAM_HALF [IRQ25] */
--	/* Omitted button "?": 152 - S12: CAM_FULL [No IRQ] */
--};
--
--static struct gpio_keys_platform_data gpio_key_info = {
--	.buttons        = gpio_buttons,
--	.nbuttons       = ARRAY_SIZE(gpio_buttons),
--};
--
--static struct platform_device gpio_keys_device = {
--	.name   = "gpio-keys",
--	.id     = -1,
--	.dev    = {
--		.platform_data  = &gpio_key_info,
--	},
--};
--
--/* GPIO LED */
--#define GPIO_LED(n, g) { .name = n, .gpio = g }
--
--static struct gpio_led gpio_leds[] = {
--	GPIO_LED("G", 20), /* PORT20 [GPO0] -> LED7 -> "G" */
--	GPIO_LED("H", 21), /* PORT21 [GPO1] -> LED8 -> "H" */
--	GPIO_LED("J", 22), /* PORT22 [GPO2] -> LED9 -> "J" */
--};
--
--static struct gpio_led_platform_data gpio_leds_info = {
--	.leds		= gpio_leds,
--	.num_leds	= ARRAY_SIZE(gpio_leds),
--};
--
--static struct platform_device gpio_leds_device = {
--	.name   = "leds-gpio",
--	.id     = -1,
--	.dev    = {
--		.platform_data  = &gpio_leds_info,
--	},
--};
--
--/* TPU LED */
--static struct resource tpu1_pwm_resources[] = {
+-/* FSI A */
+-static struct resource fsi_resources[] = {
 -	[0] = {
--		.start	= 0xe6610000,
--		.end	= 0xe66100ff,
+-		.name	= "FSI",
+-		.start	= 0xEC230000,
+-		.end	= 0xEC230400 - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
--};
--
--static struct platform_device tpu1_pwm_device = {
--	.name = "renesas-tpu-pwm",
--	.id = 1,
--	.num_resources	= ARRAY_SIZE(tpu1_pwm_resources),
--	.resource	= tpu1_pwm_resources,
--};
--
--static struct resource tpu2_pwm_resources[] = {
--	[0] = {
--		.start	= 0xe6620000,
--		.end	= 0xe66200ff,
--		.flags	= IORESOURCE_MEM,
+-	[1] = {
+-		.start  = gic_spi(146),
+-		.flags  = IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device tpu2_pwm_device = {
--	.name = "renesas-tpu-pwm",
--	.id = 2,
--	.num_resources	= ARRAY_SIZE(tpu2_pwm_resources),
--	.resource	= tpu2_pwm_resources,
--};
--
--static struct resource tpu3_pwm_resources[] = {
--	[0] = {
--		.start	= 0xe6630000,
--		.end	= 0xe66300ff,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device tpu3_pwm_device = {
--	.name = "renesas-tpu-pwm",
--	.id = 3,
--	.num_resources	= ARRAY_SIZE(tpu3_pwm_resources),
--	.resource	= tpu3_pwm_resources,
--};
--
--static struct resource tpu4_pwm_resources[] = {
--	[0] = {
--		.start	= 0xe6640000,
--		.end	= 0xe66400ff,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device tpu4_pwm_device = {
--	.name = "renesas-tpu-pwm",
--	.id = 4,
--	.num_resources	= ARRAY_SIZE(tpu4_pwm_resources),
--	.resource	= tpu4_pwm_resources,
--};
--
--static struct pwm_lookup pwm_lookup[] = {
--	PWM_LOOKUP("renesas-tpu-pwm.1", 2, "leds-pwm.0", "V2513"),
--	PWM_LOOKUP("renesas-tpu-pwm.2", 1, "leds-pwm.0", "V2515"),
--	PWM_LOOKUP("renesas-tpu-pwm.3", 0, "leds-pwm.0", "KEYLED"),
--	PWM_LOOKUP("renesas-tpu-pwm.4", 1, "leds-pwm.0", "V2514"),
--};
--
--static struct led_pwm tpu_pwm_leds[] = {
--	{
--		.name		= "V2513",
--		.max_brightness	= 1000,
--	}, {
--		.name		= "V2515",
--		.max_brightness	= 1000,
--	}, {
--		.name		= "KEYLED",
--		.max_brightness	= 1000,
--	}, {
--		.name		= "V2514",
--		.max_brightness	= 1000,
--	},
--};
--
--static struct led_pwm_platform_data leds_pwm_pdata = {
--	.num_leds = ARRAY_SIZE(tpu_pwm_leds),
--	.leds = tpu_pwm_leds,
--};
--
--static struct platform_device leds_pwm_device = {
--	.name = "leds-pwm",
--	.id = 0,
--	.dev = {
--		.platform_data = &leds_pwm_pdata,
--	},
+-static struct platform_device fsi_device = {
+-	.name		= "sh_fsi2",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(fsi_resources),
+-	.resource	= fsi_resources,
 -};
 -
 -/* Fixed 1.8V regulator to be used by MMCIF */
@@ -490,133 +321,362 @@ index 6af20d9..0000000
 -	REGULATOR_SUPPLY("vqmmc", "sh_mmcif.0"),
 -};
 -
--/* MMCIF */
--static struct resource mmcif_resources[] = {
+-static struct resource sh_mmcif_resources[] = {
 -	[0] = {
--		.name   = "MMCIF",
--		.start  = 0xe6bd0000,
--		.end    = 0xe6bd00ff,
+-		.name	= "MMCIF",
+-		.start	= 0xe6bd0000,
+-		.end	= 0xe6bd00ff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= gic_spi(141),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
+-		.start	= gic_spi(140),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct sh_mmcif_plat_data sh_mmcif_platdata = {
+-	.sup_pclk	= 0,
+-	.ocr		= MMC_VDD_165_195,
+-	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
+-	.slave_id_tx	= SHDMA_SLAVE_MMCIF_TX,
+-	.slave_id_rx	= SHDMA_SLAVE_MMCIF_RX,
+-};
+-
+-static struct platform_device mmc_device = {
+-	.name		= "sh_mmcif",
+-	.id		= 0,
+-	.dev		= {
+-		.dma_mask		= NULL,
+-		.coherent_dma_mask	= 0xffffffff,
+-		.platform_data		= &sh_mmcif_platdata,
+-	},
+-	.num_resources	= ARRAY_SIZE(sh_mmcif_resources),
+-	.resource	= sh_mmcif_resources,
+-};
+-
+-/* IrDA */
+-static struct resource irda_resources[] = {
+-	[0] = {
+-		.start	= 0xE6D00000,
+-		.end	= 0xE6D01FD4 - 1,
 -		.flags  = IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start  = gic_spi(140),
--		.flags  = IORESOURCE_IRQ,
--	},
--	[2] = {
--		.start  = gic_spi(141),
+-		.start	= gic_spi(95),
 -		.flags  = IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct sh_mmcif_plat_data mmcif_info = {
--	.ocr            = MMC_VDD_165_195,
--	.caps           = MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
+-static struct platform_device irda_device = {
+-	.name           = "sh_irda",
+-	.id		= 0,
+-	.resource       = irda_resources,
+-	.num_resources  = ARRAY_SIZE(irda_resources),
 -};
 -
--static struct platform_device mmcif_device = {
--	.name           = "sh_mmcif",
+-/* MIPI-DSI */
+-static struct resource mipidsi0_resources[] = {
+-	[0] = {
+-		.name	= "DSI0",
+-		.start  = 0xfeab0000,
+-		.end    = 0xfeab3fff,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.name	= "DSI0",
+-		.start  = 0xfeab4000,
+-		.end    = 0xfeab7fff,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-};
+-
+-static int sh_mipi_set_dot_clock(struct platform_device *pdev,
+-				 void __iomem *base,
+-				 int enable)
+-{
+-	struct clk *pck, *phy;
+-	int ret;
+-
+-	pck = clk_get(&pdev->dev, "dsip_clk");
+-	if (IS_ERR(pck)) {
+-		ret = PTR_ERR(pck);
+-		goto sh_mipi_set_dot_clock_pck_err;
+-	}
+-
+-	phy = clk_get(&pdev->dev, "dsiphy_clk");
+-	if (IS_ERR(phy)) {
+-		ret = PTR_ERR(phy);
+-		goto sh_mipi_set_dot_clock_phy_err;
+-	}
+-
+-	if (enable) {
+-		clk_set_rate(pck, clk_round_rate(pck,  24000000));
+-		clk_set_rate(phy, clk_round_rate(pck, 510000000));
+-		clk_enable(pck);
+-		clk_enable(phy);
+-	} else {
+-		clk_disable(pck);
+-		clk_disable(phy);
+-	}
+-
+-	ret = 0;
+-
+-	clk_put(phy);
+-sh_mipi_set_dot_clock_phy_err:
+-	clk_put(pck);
+-sh_mipi_set_dot_clock_pck_err:
+-	return ret;
+-}
+-
+-static struct sh_mipi_dsi_info mipidsi0_info = {
+-	.data_format	= MIPI_RGB888,
+-	.channel	= LCDC_CHAN_MAINLCD,
+-	.lane		= 2,
+-	.vsynw_offset	= 20,
+-	.clksrc		= 1,
+-	.flags		= SH_MIPI_DSI_HSABM		|
+-			  SH_MIPI_DSI_SYNC_PULSES_MODE	|
+-			  SH_MIPI_DSI_HSbyteCLK,
+-	.set_dot_clock	= sh_mipi_set_dot_clock,
+-};
+-
+-static struct platform_device mipidsi0_device = {
+-	.name           = "sh-mipi-dsi",
+-	.num_resources  = ARRAY_SIZE(mipidsi0_resources),
+-	.resource       = mipidsi0_resources,
 -	.id             = 0,
--	.dev            = {
--		.platform_data          = &mmcif_info,
+-	.dev	= {
+-		.platform_data	= &mipidsi0_info,
 -	},
--	.num_resources  = ARRAY_SIZE(mmcif_resources),
--	.resource       = mmcif_resources,
 -};
 -
--/* Fixed 3.3V regulator to be used by SDHI0 and SDHI1 */
--static struct regulator_consumer_supply fixed3v3_power_consumers[] =
+-/* LCDC0 and backlight */
+-static const struct fb_videomode lcdc0_modes[] = {
+-	{
+-		.name		= "R63302(QHD)",
+-		.xres		= 544,
+-		.yres		= 961,
+-		.left_margin	= 72,
+-		.right_margin	= 600,
+-		.hsync_len	= 16,
+-		.upper_margin	= 8,
+-		.lower_margin	= 8,
+-		.vsync_len	= 2,
+-		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT,
+-	},
+-};
+-
+-static struct sh_mobile_lcdc_info lcdc0_info = {
+-	.clock_source = LCDC_CLK_PERIPHERAL,
+-	.ch[0] = {
+-		.chan = LCDC_CHAN_MAINLCD,
+-		.interface_type = RGB24,
+-		.clock_divider = 1,
+-		.flags = LCDC_FLAGS_DWPOL,
+-		.fourcc = V4L2_PIX_FMT_RGB565,
+-		.lcd_modes = lcdc0_modes,
+-		.num_modes = ARRAY_SIZE(lcdc0_modes),
+-		.panel_cfg = {
+-			.width = 44,
+-			.height = 79,
+-		},
+-		.tx_dev = &mipidsi0_device,
+-	}
+-};
+-
+-static struct resource lcdc0_resources[] = {
+-	[0] = {
+-		.name	= "LCDC0",
+-		.start	= 0xfe940000, /* P4-only space */
+-		.end	= 0xfe943fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= intcs_evt2irq(0x580),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device lcdc0_device = {
+-	.name		= "sh_mobile_lcdc_fb",
+-	.num_resources	= ARRAY_SIZE(lcdc0_resources),
+-	.resource	= lcdc0_resources,
+-	.id             = 0,
+-	.dev	= {
+-		.platform_data	= &lcdc0_info,
+-		.coherent_dma_mask = ~0,
+-	},
+-};
+-
+-static struct bd6107_platform_data backlight_data = {
+-	.fbdev = &lcdc0_device.dev,
+-	.reset = 235,
+-	.def_value = 0,
+-};
+-
+-static struct i2c_board_info backlight_board_info = {
+-	I2C_BOARD_INFO("bd6107", 0x6d),
+-	.platform_data = &backlight_data,
+-};
+-
+-/* Fixed 2.8V regulators to be used by SDHI0 */
+-static struct regulator_consumer_supply fixed2v8_power_consumers[] =
 -{
 -	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
 -	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.0"),
--	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.1"),
--	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.1"),
 -};
 -
 -/* SDHI0 */
 -static struct sh_mobile_sdhi_info sdhi0_info = {
--	.tmio_caps      = MMC_CAP_SD_HIGHSPEED,
--	.tmio_flags     = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
+-	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
+-	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
+-	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_USE_GPIO_CD,
+-	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
+-	.tmio_ocr_mask	= MMC_VDD_27_28 | MMC_VDD_28_29,
+-	.cd_gpio	= 251,
 -};
 -
 -static struct resource sdhi0_resources[] = {
 -	[0] = {
--		.name   = "SDHI0",
--		.start  = 0xee100000,
--		.end    = 0xee1000ff,
--		.flags  = IORESOURCE_MEM,
+-		.name	= "SDHI0",
+-		.start	= 0xee100000,
+-		.end	= 0xee1000ff,
+-		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start  = gic_spi(83),
--		.flags  = IORESOURCE_IRQ,
+-		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
+-		.start	= gic_spi(83),
+-		.flags	= IORESOURCE_IRQ,
 -	},
 -	[2] = {
--		.start  = gic_spi(84),
--		.flags  = IORESOURCE_IRQ,
+-		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+-		.start	= gic_spi(84),
+-		.flags	= IORESOURCE_IRQ,
 -	},
 -	[3] = {
+-		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
 -		.start	= gic_spi(85),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
 -static struct platform_device sdhi0_device = {
--	.name           = "sh_mobile_sdhi",
--	.id             = 0,
--	.num_resources  = ARRAY_SIZE(sdhi0_resources),
--	.resource       = sdhi0_resources,
--	.dev    = {
--		.platform_data  = &sdhi0_info,
+-	.name		= "sh_mobile_sdhi",
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(sdhi0_resources),
+-	.resource	= sdhi0_resources,
+-	.dev	= {
+-		.platform_data	= &sdhi0_info,
 -	},
 -};
 -
--/* SDHI1 */
--static struct sh_mobile_sdhi_info sdhi1_info = {
--	.tmio_caps      = MMC_CAP_NONREMOVABLE | MMC_CAP_SDIO_IRQ,
--	.tmio_flags     = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
+-/* Fixed 3.3V regulator to be used by SDHI1 */
+-static struct regulator_consumer_supply cn4_power_consumers[] =
+-{
+-	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.1"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.1"),
+-};
+-
+-static struct regulator_init_data cn4_power_init_data = {
+-	.constraints = {
+-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies  = ARRAY_SIZE(cn4_power_consumers),
+-	.consumer_supplies      = cn4_power_consumers,
+-};
+-
+-static struct fixed_voltage_config cn4_power_info = {
+-	.supply_name = "CN4 SD/MMC Vdd",
+-	.microvolts = 3300000,
+-	.gpio = 114,
+-	.enable_high = 1,
+-	.init_data = &cn4_power_init_data,
+-};
+-
+-static struct platform_device cn4_power = {
+-	.name = "reg-fixed-voltage",
+-	.id   = 2,
+-	.dev  = {
+-		.platform_data = &cn4_power_info,
+-	},
+-};
+-
+-static void ag5evm_sdhi1_set_pwr(struct platform_device *pdev, int state)
+-{
+-	static int power_gpio = -EINVAL;
+-
+-	if (power_gpio < 0) {
+-		int ret = gpio_request_one(114, GPIOF_OUT_INIT_LOW,
+-					   "sdhi1_power");
+-		if (!ret)
+-			power_gpio = 114;
+-	}
+-
+-	/*
+-	 * If requesting the GPIO above failed, it means, that the regulator got
+-	 * probed and grabbed the GPIO, but we don't know, whether the sdhi
+-	 * driver already uses the regulator. If it doesn't, we have to toggle
+-	 * the GPIO ourselves, even though it is now owned by the fixed
+-	 * regulator driver. We have to live with the race in case the driver
+-	 * gets unloaded and the GPIO freed between these two steps.
+-	 */
+-	gpio_set_value(114, state);
+-}
+-
+-static struct sh_mobile_sdhi_info sh_sdhi1_info = {
+-	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
+-	.tmio_caps	= MMC_CAP_NONREMOVABLE | MMC_CAP_SDIO_IRQ,
+-	.tmio_ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34,
+-	.set_pwr	= ag5evm_sdhi1_set_pwr,
 -};
 -
 -static struct resource sdhi1_resources[] = {
 -	[0] = {
--		.name   = "SDHI1",
--		.start  = 0xee120000,
--		.end    = 0xee1200ff,
--		.flags  = IORESOURCE_MEM,
+-		.name	= "SDHI1",
+-		.start	= 0xee120000,
+-		.end	= 0xee1200ff,
+-		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start  = gic_spi(87),
--		.flags  = IORESOURCE_IRQ,
+-		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
+-		.start	= gic_spi(87),
+-		.flags	= IORESOURCE_IRQ,
 -	},
 -	[2] = {
--		.start  = gic_spi(88),
--		.flags  = IORESOURCE_IRQ,
+-		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+-		.start	= gic_spi(88),
+-		.flags	= IORESOURCE_IRQ,
 -	},
 -	[3] = {
+-		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
 -		.start	= gic_spi(89),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
 -static struct platform_device sdhi1_device = {
--	.name           = "sh_mobile_sdhi",
--	.id             = 1,
--	.num_resources  = ARRAY_SIZE(sdhi1_resources),
--	.resource       = sdhi1_resources,
--	.dev    = {
--		.platform_data  = &sdhi1_info,
+-	.name		= "sh_mobile_sdhi",
+-	.id		= 1,
+-	.dev		= {
+-		.platform_data	= &sh_sdhi1_info,
 -	},
+-	.num_resources	= ARRAY_SIZE(sdhi1_resources),
+-	.resource	= sdhi1_resources,
 -};
 -
--static struct platform_device *kota2_devices[] __initdata = {
+-static struct platform_device *ag5evm_devices[] __initdata = {
+-	&cn4_power,
 -	&eth_device,
 -	&keysc_device,
--	&gpio_keys_device,
--	&gpio_leds_device,
--	&tpu1_pwm_device,
--	&tpu2_pwm_device,
--	&tpu3_pwm_device,
--	&tpu4_pwm_device,
--	&leds_pwm_device,
--	&mmcif_device,
+-	&fsi_device,
+-	&mmc_device,
+-	&irda_device,
+-	&mipidsi0_device,
+-	&lcdc0_device,
 -	&sdhi0_device,
 -	&sdhi1_device,
 -};
@@ -625,7 +685,24 @@ index 6af20d9..0000000
 -	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
 -};
 -
--static const struct pinctrl_map kota2_pinctrl_map[] = {
+-static const struct pinctrl_map ag5evm_pinctrl_map[] = {
+-	/* FSIA */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
+-				  "fsia_mclk_in", "fsia"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
+-				  "fsia_sclk_in", "fsia"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
+-				  "fsia_data_in", "fsia"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
+-				  "fsia_data_out", "fsia"),
+-	/* I2C2 & I2C3 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.2", "pfc-sh73a0",
+-				  "i2c2_0", "i2c2"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
+-				  "i2c3_0", "i2c3"),
+-	/* IrDA */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_irda.0", "pfc-sh73a0",
+-				  "irda_0", "irda"),
 -	/* KEYSC */
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc.0", "pfc-sh73a0",
 -				  "keysc_in8", "keysc"),
@@ -639,6 +716,8 @@ index 6af20d9..0000000
 -				  "keysc_out7_0", "keysc"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc.0", "pfc-sh73a0",
 -				  "keysc_out8_0", "keysc"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc.0", "pfc-sh73a0",
+-				  "keysc_out9_2", "keysc"),
 -	PIN_MAP_CONFIGS_GROUP_DEFAULT("sh_keysc.0", "pfc-sh73a0",
 -				      "keysc_in8", pin_pullup_conf),
 -	/* MMCIF */
@@ -650,37 +729,19 @@ index 6af20d9..0000000
 -				    "PORT279", pin_pullup_conf),
 -	PIN_MAP_CONFIGS_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
 -				      "mmc0_data8_0", pin_pullup_conf),
--	/* SCIFA2 (UART2) */
+-	/* SCIFA2 */
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "pfc-sh73a0",
 -				  "scifa2_data_0", "scifa2"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "pfc-sh73a0",
 -				  "scifa2_ctrl_0", "scifa2"),
--	/* SCIFA4 (UART1) */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
--				  "scifa4_data", "scifa4"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
--				  "scifa4_ctrl", "scifa4"),
--	/* SCIFB (BT) */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.8", "pfc-sh73a0",
--				  "scifb_data_0", "scifb"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.8", "pfc-sh73a0",
--				  "scifb_clk_0", "scifb"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.8", "pfc-sh73a0",
--				  "scifb_ctrl_0", "scifb"),
--	/* SDHI0 (microSD) */
+-	/* SDHI0 (CN15 [SD I/F]) */
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
 -				  "sdhi0_data4", "sdhi0"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
 -				  "sdhi0_ctrl", "sdhi0"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
--				  "sdhi0_cd", "sdhi0"),
--	PIN_MAP_CONFIGS_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
--				      "sdhi0_data4", pin_pullup_conf),
--	PIN_MAP_CONFIGS_PIN_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
--				    "PORT256", pin_pullup_conf),
--	PIN_MAP_CONFIGS_PIN_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
--				    "PORT251", pin_pullup_conf),
--	/* SDHI1 (BCM4330) */
+-				  "sdhi0_wp", "sdhi0"),
+-	/* SDHI1 (CN4 [WLAN I/F]) */
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-sh73a0",
 -				  "sdhi1_data4", "sdhi1"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-sh73a0",
@@ -689,62 +750,52 @@ index 6af20d9..0000000
 -				      "sdhi1_data4", pin_pullup_conf),
 -	PIN_MAP_CONFIGS_PIN_DEFAULT("sh_mobile_sdhi.1", "pfc-sh73a0",
 -				    "PORT263", pin_pullup_conf),
--	/* SMSC911X */
--	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
--				  "bsc_data_0_7", "bsc"),
--	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
--				  "bsc_data_8_15", "bsc"),
--	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
--				  "bsc_cs5_a", "bsc"),
--	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
--				  "bsc_we0", "bsc"),
--	/* TPU */
--	PIN_MAP_MUX_GROUP_DEFAULT("renesas-tpu-pwm.1", "pfc-sh73a0",
--				  "tpu1_to2", "tpu1"),
--	PIN_MAP_MUX_GROUP_DEFAULT("renesas-tpu-pwm.2", "pfc-sh73a0",
--				  "tpu2_to1", "tpu2"),
--	PIN_MAP_MUX_GROUP_DEFAULT("renesas-tpu-pwm.3", "pfc-sh73a0",
--				  "tpu3_to0", "tpu3"),
--	PIN_MAP_MUX_GROUP_DEFAULT("renesas-tpu-pwm.4", "pfc-sh73a0",
--				  "tpu4_to1", "tpu4"),
 -};
 -
--static void __init kota2_init(void)
+-static void __init ag5evm_init(void)
 -{
 -	regulator_register_always_on(0, "fixed-1.8V", fixed1v8_power_consumers,
 -				     ARRAY_SIZE(fixed1v8_power_consumers), 1800000);
--	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
--				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
--	regulator_register_fixed(2, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+-	regulator_register_always_on(1, "fixed-2.8V", fixed2v8_power_consumers,
+-				     ARRAY_SIZE(fixed2v8_power_consumers), 3300000);
+-	regulator_register_fixed(3, dummy_supplies, ARRAY_SIZE(dummy_supplies));
 -
--	pinctrl_register_mappings(kota2_pinctrl_map,
--				  ARRAY_SIZE(kota2_pinctrl_map));
--	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
--
+-	pinctrl_register_mappings(ag5evm_pinctrl_map,
+-				  ARRAY_SIZE(ag5evm_pinctrl_map));
 -	sh73a0_pinmux_init();
 -
--	/* SMSC911X */
+-	/* enable MMCIF */
+-	gpio_request_one(208, GPIOF_OUT_INIT_HIGH, NULL); /* Reset */
+-
+-	/* enable SMSC911X */
 -	gpio_request_one(144, GPIOF_IN, NULL); /* PINTA2 */
 -	gpio_request_one(145, GPIOF_OUT_INIT_HIGH, NULL); /* RESET */
 -
--	/* MMCIF */
--	gpio_request_one(208, GPIOF_OUT_INIT_HIGH, NULL); /* Reset */
+-	/* LCD panel */
+-	gpio_request_one(217, GPIOF_OUT_INIT_LOW, NULL); /* RESET */
+-	mdelay(1);
+-	gpio_set_value(217, 1);
+-	mdelay(100);
+-
 -
 -#ifdef CONFIG_CACHE_L2X0
--	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
--	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
+-	/* Shared attribute override enable, 64K*8way */
+-	l2x0_init(IOMEM(0xf0100000), 0x00460000, 0xc2000fff);
 -#endif
 -	sh73a0_add_standard_devices();
--	platform_add_devices(kota2_devices, ARRAY_SIZE(kota2_devices));
+-
+-	i2c_register_board_info(1, &backlight_board_info, 1);
+-
+-	platform_add_devices(ag5evm_devices, ARRAY_SIZE(ag5evm_devices));
 -}
 -
--MACHINE_START(KOTA2, "kota2")
+-MACHINE_START(AG5EVM, "ag5evm")
 -	.smp		= smp_ops(sh73a0_smp_ops),
 -	.map_io		= sh73a0_map_io,
 -	.init_early	= sh73a0_add_early_devices,
 -	.nr_irqs	= NR_IRQS_LEGACY,
 -	.init_irq	= sh73a0_init_irq,
--	.init_machine	= kota2_init,
+-	.init_machine	= ag5evm_init,
 -	.init_late	= shmobile_init_late,
 -	.init_time	= sh73a0_earlytimer_init,
 -MACHINE_END
