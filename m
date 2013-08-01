@@ -1,33 +1,25 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 1 Aug 2013 16:23:18 +0900
-Subject: [PATCH v6 0/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
-References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130801072318.GA26015@verge.net.au>
+Date: Thu, 1 Aug 2013 16:28:28 +0900
+Subject: [PATCH/RESEND] clocksource: em_sti: Convert to devm_* managed
+ helpers
+In-Reply-To: <51F8D467.1030400@linaro.org>
+References: <1375194277-2850-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <51F8D467.1030400@linaro.org>
+Message-ID: <20130801072828.GB26015@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 06:09:18PM +0900, Simon Horman wrote:
-> this short series enables the on-board ethernet
-> of the r8a7790 SoC for on lager board.
+On Wed, Jul 31, 2013 at 11:09:59AM +0200, Daniel Lezcano wrote:
+> On 07/30/2013 04:24 PM, Laurent Pinchart wrote:
+> > Replace kzalloc, clk_get, ioremap and request_irq by their managed
+> > counterparts to simplify error paths.
+> > 
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
 > 
-> It has a run-time dependency on
-> "sh_eth: add support for r8a7790 SoC"
+> Sounds good.
 > 
-> It has been built on top of renesas-next-20130726.
-> 
-> Changes noted in changelogs of individual patches.
-> 
-> Simon Horman (3):
->   ARM: shmobile: r8a7790: clocks for Ether support
->   ARM: shmobile: lager: enable Ether
->   ARM: shmobile: lager: enable nfsroot in DTS
-> 
->  arch/arm/boot/dts/r8a7790-lager.dts    |  2 +-
->  arch/arm/mach-shmobile/board-lager.c   | 30 ++++++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
->  3 files changed, 35 insertions(+), 1 deletion(-)
+> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Hi Magnus, Hi all,
-
-I would appreciate some review of this, and if appropriate an Ack.
+Thanks, I have queued this up for v3.12 in the clocksource branch
+of my renesas tree on kernel.org.
