@@ -1,87 +1,32 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 17:07:30 +0200
-Subject: [PATCHv2 4/9] ARM: kirkwood: remove support for legacy booting of
- Sheevaplug
+Date: Thu,  1 Aug 2013 17:07:34 +0200
+Subject: [PATCHv2 8/9] ARM: kirkwood: remove unused common code for LaCie
+ platforms
 In-Reply-To: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375369655-1310-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375369655-1310-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kirkwood Sheevaplug platform has already been converted to the
-Device Tree, so we can remove the legacy booting option for this
-platform.
+Now that all LaCie platforms have been converted to use the Device
+Tree, we can get rid of the lacie_v2-common.{c,h} files.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-kirkwood/Kconfig            |  14 ---
- arch/arm/mach-kirkwood/Makefile           |   2 -
- arch/arm/mach-kirkwood/sheevaplug-setup.c | 161 ------------------------------
- 3 files changed, 177 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/sheevaplug-setup.c
+ arch/arm/mach-kirkwood/lacie_v2-common.c | 114 -------------------------------
+ arch/arm/mach-kirkwood/lacie_v2-common.h |  16 -----
+ 2 files changed, 130 deletions(-)
+ delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
+ delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 1d100f6..cb4688e 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -5,13 +5,6 @@ menu "Marvell Kirkwood Implementations"
- config KIRKWOOD_LEGACY
- 	bool
- 
--config MACH_ESATA_SHEEVAPLUG
--	bool "Marvell eSATA SheevaPlug Reference Board"
--	select KIRKWOOD_LEGACY
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Marvell eSATA SheevaPlug Reference Board.
--
- config MACH_INETSPACE_V2
- 	bool "LaCie Internet Space v2 NAS Board"
- 	select KIRKWOOD_LEGACY
-@@ -93,13 +86,6 @@ config MACH_RD88F6281
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell RD-88F6281 Reference Board.
- 
--config MACH_SHEEVAPLUG
--	bool "Marvell SheevaPlug Reference Board"
--	select KIRKWOOD_LEGACY
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Marvell SheevaPlug Reference Board.
--
- config MACH_T5325
- 	bool "HP t5325 Thin Client"
- 	select KIRKWOOD_LEGACY
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 157be02..2d1eb52 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -1,7 +1,6 @@
- obj-y				+= common.o pcie.o
- obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
- 
--obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
- obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
- obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
- obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
-@@ -11,7 +10,6 @@ obj-$(CONFIG_MACH_NETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
- obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
- obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
- obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
--obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
- obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
- obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o tsx1x-common.o
- obj-$(CONFIG_MACH_TS41X)		+= ts41x-setup.o tsx1x-common.o
-diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.c b/arch/arm/mach-kirkwood/lacie_v2-common.c
 deleted file mode 100644
-index 55b68fa..0000000
---- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index 4894959..0000000
+--- a/arch/arm/mach-kirkwood/lacie_v2-common.c
 +++ /dev/null
-@@ -1,161 +0,0 @@
+@@ -1,114 +0,0 @@
 -/*
-- * arch/arm/mach-kirkwood/sheevaplug-setup.c
-- *
-- * Marvell SheevaPlug Reference Board Setup
+- * arch/arm/mach-kirkwood/lacie_v2-common.c
 - *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -90,154 +35,131 @@ index 55b68fa..0000000
 -
 -#include <linux/kernel.h>
 -#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/ata_platform.h>
--#include <linux/mtd/partitions.h>
--#include <linux/mv643xx_eth.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/spi/flash.h>
+-#include <linux/spi/spi.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c/at24.h>
 -#include <linux/gpio.h>
--#include <linux/leds.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
 -#include <mach/kirkwood.h>
--#include <linux/platform_data/mmc-mvsdio.h>
+-#include <mach/irqs.h>
+-#include <plat/time.h>
 -#include "common.h"
--#include "mpp.h"
+-#include "lacie_v2-common.h"
 -
--static struct mtd_partition sheevaplug_nand_parts[] = {
+-/*****************************************************************************
+- * 512KB SPI Flash on Boot Device (MACRONIX MX25L4005)
+- ****************************************************************************/
+-
+-static struct mtd_partition lacie_v2_flash_parts[] = {
 -	{
 -		.name = "u-boot",
+-		.size = MTDPART_SIZ_FULL,
 -		.offset = 0,
--		.size = SZ_1M
--	}, {
--		.name = "uImage",
--		.offset = MTDPART_OFS_NXTBLK,
--		.size = SZ_4M
--	}, {
--		.name = "root",
--		.offset = MTDPART_OFS_NXTBLK,
--		.size = MTDPART_SIZ_FULL
+-		.mask_flags = MTD_WRITEABLE, /* force read-only */
 -	},
 -};
 -
--static struct mv643xx_eth_platform_data sheevaplug_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+-static const struct flash_platform_data lacie_v2_flash = {
+-	.type		= "mx25l4005a",
+-	.name		= "spi_flash",
+-	.parts		= lacie_v2_flash_parts,
+-	.nr_parts	= ARRAY_SIZE(lacie_v2_flash_parts),
 -};
 -
--static struct mv_sata_platform_data sheeva_esata_sata_data = {
--	.n_ports	= 2,
--};
--
--static struct mvsdio_platform_data sheevaplug_mvsdio_data = {
--	/* unfortunately the CD signal has not been connected */
--};
--
--static struct mvsdio_platform_data sheeva_esata_mvsdio_data = {
--	.gpio_write_protect = 44, /* MPP44 used as SD write protect */
--	.gpio_card_detect = 47,	  /* MPP47 used as SD card detect */
--};
--
--static struct gpio_led sheevaplug_led_pins[] = {
+-static struct spi_board_info __initdata lacie_v2_spi_slave_info[] = {
 -	{
--		.name			= "plug:red:misc",
--		.default_trigger	= "none",
--		.gpio			= 46,
--		.active_low		= 1,
+-		.modalias	= "m25p80",
+-		.platform_data	= &lacie_v2_flash,
+-		.irq		= -1,
+-		.max_speed_hz	= 20000000,
+-		.bus_num	= 0,
+-		.chip_select	= 0,
 -	},
+-};
+-
+-void __init lacie_v2_register_flash(void)
+-{
+-	spi_register_board_info(lacie_v2_spi_slave_info,
+-				ARRAY_SIZE(lacie_v2_spi_slave_info));
+-	kirkwood_spi_init();
+-}
+-
+-/*****************************************************************************
+- * I2C devices
+- ****************************************************************************/
+-
+-static struct at24_platform_data at24c04 = {
+-	.byte_len	= SZ_4K / 8,
+-	.page_size	= 16,
+-};
+-
+-/*
+- * i2c addr | chip         | description
+- * 0x50     | HT24LC04     | eeprom (512B)
+- */
+-
+-static struct i2c_board_info __initdata lacie_v2_i2c_info[] = {
 -	{
--		.name			= "plug:green:health",
--		.default_trigger	= "default-on",
--		.gpio			= 49,
--		.active_low		= 1,
--	},
--};
--
--static struct gpio_led_platform_data sheevaplug_led_data = {
--	.leds		= sheevaplug_led_pins,
--	.num_leds	= ARRAY_SIZE(sheevaplug_led_pins),
--};
--
--static struct platform_device sheevaplug_leds = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data	= &sheevaplug_led_data,
+-		I2C_BOARD_INFO("24c04", 0x50),
+-		.platform_data  = &at24c04,
 -	}
 -};
 -
--static unsigned int sheevaplug_mpp_config[] __initdata = {
--	MPP29_GPIO,	/* USB Power Enable */
--	MPP46_GPIO,	/* LED Red */
--	MPP49_GPIO,	/* LED */
--	0
--};
--
--static unsigned int sheeva_esata_mpp_config[] __initdata = {
--	MPP29_GPIO,	/* USB Power Enable */
--	MPP44_GPIO,	/* SD Write Protect */
--	MPP47_GPIO,	/* SD Card Detect */
--	MPP49_GPIO,	/* LED Green */
--	0
--};
--
--static void __init sheevaplug_init(void)
+-void __init lacie_v2_register_i2c_devices(void)
 -{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_init();
--
--	/* setup gpio pin select */
--	if (machine_is_esata_sheevaplug())
--		kirkwood_mpp_conf(sheeva_esata_mpp_config);
--	else
--		kirkwood_mpp_conf(sheevaplug_mpp_config);
--
--	kirkwood_uart0_init();
--	kirkwood_nand_init(ARRAY_AND_SIZE(sheevaplug_nand_parts), 25);
--
--	if (gpio_request(29, "USB Power Enable") != 0 ||
--	    gpio_direction_output(29, 1) != 0)
--		pr_err("can't set up GPIO 29 (USB Power Enable)\n");
--	kirkwood_ehci_init();
--
--	kirkwood_ge00_init(&sheevaplug_ge00_data);
--
--	/* honor lower power consumption for plugs with out eSATA */
--	if (machine_is_esata_sheevaplug())
--		kirkwood_sata_init(&sheeva_esata_sata_data);
--
--	/* enable sd wp and sd cd on plugs with esata */
--	if (machine_is_esata_sheevaplug())
--		kirkwood_sdio_init(&sheeva_esata_mvsdio_data);
--	else
--		kirkwood_sdio_init(&sheevaplug_mvsdio_data);
--
--	platform_device_register(&sheevaplug_leds);
+-	kirkwood_i2c_init();
+-	i2c_register_board_info(0, lacie_v2_i2c_info,
+-				ARRAY_SIZE(lacie_v2_i2c_info));
 -}
 -
--#ifdef CONFIG_MACH_SHEEVAPLUG
--MACHINE_START(SHEEVAPLUG, "Marvell SheevaPlug Reference Board")
--	/* Maintainer: shadi Ammouri <shadi@marvell.com> */
--	.atag_offset	= 0x100,
--	.init_machine	= sheevaplug_init,
--	.map_io		= kirkwood_map_io,
--	.init_early	= kirkwood_init_early,
--	.init_irq	= kirkwood_init_irq,
--	.init_time	= kirkwood_timer_init,
--	.restart	= kirkwood_restart,
--MACHINE_END
--#endif
+-/*****************************************************************************
+- * Hard Disk power
+- ****************************************************************************/
 -
--#ifdef CONFIG_MACH_ESATA_SHEEVAPLUG
--MACHINE_START(ESATA_SHEEVAPLUG, "Marvell eSATA SheevaPlug Reference Board")
--	.atag_offset	= 0x100,
--	.init_machine	= sheevaplug_init,
--	.map_io		= kirkwood_map_io,
--	.init_early	= kirkwood_init_early,
--	.init_irq	= kirkwood_init_irq,
--	.init_time	= kirkwood_timer_init,
--	.restart	= kirkwood_restart,
--MACHINE_END
+-static int __initdata lacie_v2_gpio_hdd_power[] = { 16, 17, 41, 42, 43 };
+-
+-void __init lacie_v2_hdd_power_init(int hdd_num)
+-{
+-	int i;
+-	int err;
+-
+-	/* Power up all hard disks. */
+-	for (i = 0; i < hdd_num; i++) {
+-		err = gpio_request(lacie_v2_gpio_hdd_power[i], NULL);
+-		if (err == 0) {
+-			err = gpio_direction_output(
+-					lacie_v2_gpio_hdd_power[i], 1);
+-			/* Free the HDD power GPIOs. This allow user-space to
+-			 * configure them via the gpiolib sysfs interface. */
+-			gpio_free(lacie_v2_gpio_hdd_power[i]);
+-		}
+-		if (err)
+-			pr_err("Failed to power up HDD%d\n", i + 1);
+-	}
+-}
+diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.h b/arch/arm/mach-kirkwood/lacie_v2-common.h
+deleted file mode 100644
+index fc64f57..0000000
+--- a/arch/arm/mach-kirkwood/lacie_v2-common.h
++++ /dev/null
+@@ -1,16 +0,0 @@
+-/*
+- * arch/arm/mach-kirkwood/lacie_v2-common.h
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __ARCH_KIRKWOOD_LACIE_V2_COMMON_H
+-#define __ARCH_KIRKWOOD_LACIE_V2_COMMON_H
+-
+-void lacie_v2_register_flash(void);
+-void lacie_v2_register_i2c_devices(void);
+-void lacie_v2_hdd_power_init(int hdd_num);
+-
 -#endif
 -- 
 1.8.1.2
