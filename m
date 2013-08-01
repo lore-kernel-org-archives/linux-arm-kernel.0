@@ -1,165 +1,379 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 17:07:34 +0200
-Subject: [PATCHv2 8/9] ARM: kirkwood: remove unused common code for LaCie
- platforms
+Date: Thu,  1 Aug 2013 17:07:31 +0200
+Subject: [PATCHv2 5/9] ARM: kirkwood: remove LaCie boards that are supported
+ through DT
 In-Reply-To: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375369655-1310-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375369655-1310-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all LaCie platforms have been converted to use the Device
-Tree, we can get rid of the lacie_v2-common.{c,h} files.
+The "LaCie Internet Space v2 NAS Board", "LaCie Network Space Max v2
+NAS Board" and "LaCie Network Space v2 NAS Board" boards are all
+supported through the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-kirkwood/lacie_v2-common.c | 114 -------------------------------
- arch/arm/mach-kirkwood/lacie_v2-common.h |  16 -----
- 2 files changed, 130 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
- delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
+ arch/arm/mach-kirkwood/Kconfig             |  21 ---
+ arch/arm/mach-kirkwood/Makefile            |   3 -
+ arch/arm/mach-kirkwood/netspace_v2-setup.c | 293 -----------------------------
+ 3 files changed, 317 deletions(-)
+ delete mode 100644 arch/arm/mach-kirkwood/netspace_v2-setup.c
 
-diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.c b/arch/arm/mach-kirkwood/lacie_v2-common.c
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index cb4688e..48c61ad 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -5,13 +5,6 @@ menu "Marvell Kirkwood Implementations"
+ config KIRKWOOD_LEGACY
+ 	bool
+ 
+-config MACH_INETSPACE_V2
+-	bool "LaCie Internet Space v2 NAS Board"
+-	select KIRKWOOD_LEGACY
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  LaCie Internet Space v2 NAS.
+-
+ config MACH_MV88F6281GTW_GE
+ 	bool "Marvell 88F6281 GTW GE Board"
+ 	select KIRKWOOD_LEGACY
+@@ -33,20 +26,6 @@ config MACH_NET5BIG_V2
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  LaCie 5Big Network v2 NAS.
+ 
+-config MACH_NETSPACE_MAX_V2
+-	bool "LaCie Network Space Max v2 NAS Board"
+-	select KIRKWOOD_LEGACY
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  LaCie Network Space Max v2 NAS.
+-
+-config MACH_NETSPACE_V2
+-	bool "LaCie Network Space v2 NAS Board"
+-	select KIRKWOOD_LEGACY
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  LaCie Network Space v2 NAS.
+-
+ config MACH_OPENRD
+ 	select KIRKWOOD_LEGACY
+         bool
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 2d1eb52..c58723d 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -1,12 +1,9 @@
+ obj-y				+= common.o pcie.o
+ obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
+ 
+-obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+ obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+-obj-$(CONFIG_MACH_NETSPACE_MAX_V2)	+= netspace_v2-setup.o lacie_v2-common.o
+-obj-$(CONFIG_MACH_NETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
+ obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
+ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
 deleted file mode 100644
-index 4894959..0000000
---- a/arch/arm/mach-kirkwood/lacie_v2-common.c
+index 3b70661..0000000
+--- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
 +++ /dev/null
-@@ -1,114 +0,0 @@
+@@ -1,293 +0,0 @@
 -/*
-- * arch/arm/mach-kirkwood/lacie_v2-common.c
+- * arch/arm/mach-kirkwood/netspace_v2-setup.c
 - *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+- * LaCie Network Space v2 board setup
+- *
+- * Copyright (C) 2009 Simon Guinot <sguinot@lacie.com>
+- * Copyright (C) 2009 Beno??t Canet <benoit.canet@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
 -#include <linux/kernel.h>
 -#include <linux/init.h>
--#include <linux/mtd/physmap.h>
--#include <linux/spi/flash.h>
--#include <linux/spi/spi.h>
--#include <linux/i2c.h>
--#include <linux/i2c/at24.h>
+-#include <linux/platform_device.h>
+-#include <linux/ata_platform.h>
+-#include <linux/mv643xx_eth.h>
+-#include <linux/input.h>
 -#include <linux/gpio.h>
--#include <asm/mach/time.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/leds.h>
+-#include <linux/gpio-fan.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
 -#include <mach/kirkwood.h>
--#include <mach/irqs.h>
--#include <plat/time.h>
+-#include <linux/platform_data/leds-kirkwood-ns2.h>
 -#include "common.h"
+-#include "mpp.h"
 -#include "lacie_v2-common.h"
 -
 -/*****************************************************************************
-- * 512KB SPI Flash on Boot Device (MACRONIX MX25L4005)
+- * Ethernet
 - ****************************************************************************/
 -
--static struct mtd_partition lacie_v2_flash_parts[] = {
--	{
--		.name = "u-boot",
--		.size = MTDPART_SIZ_FULL,
--		.offset = 0,
--		.mask_flags = MTD_WRITEABLE, /* force read-only */
+-static struct mv643xx_eth_platform_data netspace_v2_ge00_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+-};
+-
+-/*****************************************************************************
+- * SATA
+- ****************************************************************************/
+-
+-static struct mv_sata_platform_data netspace_v2_sata_data = {
+-	.n_ports	= 2,
+-};
+-
+-/*****************************************************************************
+- * GPIO keys
+- ****************************************************************************/
+-
+-#define NETSPACE_V2_PUSH_BUTTON		32
+-
+-static struct gpio_keys_button netspace_v2_buttons[] = {
+-	[0] = {
+-		.code		= KEY_POWER,
+-		.gpio		= NETSPACE_V2_PUSH_BUTTON,
+-		.desc		= "Power push button",
+-		.active_low	= 0,
 -	},
 -};
 -
--static const struct flash_platform_data lacie_v2_flash = {
--	.type		= "mx25l4005a",
--	.name		= "spi_flash",
--	.parts		= lacie_v2_flash_parts,
--	.nr_parts	= ARRAY_SIZE(lacie_v2_flash_parts),
+-static struct gpio_keys_platform_data netspace_v2_button_data = {
+-	.buttons	= netspace_v2_buttons,
+-	.nbuttons	= ARRAY_SIZE(netspace_v2_buttons),
 -};
 -
--static struct spi_board_info __initdata lacie_v2_spi_slave_info[] = {
--	{
--		.modalias	= "m25p80",
--		.platform_data	= &lacie_v2_flash,
--		.irq		= -1,
--		.max_speed_hz	= 20000000,
--		.bus_num	= 0,
--		.chip_select	= 0,
+-static struct platform_device netspace_v2_gpio_buttons = {
+-	.name		= "gpio-keys",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &netspace_v2_button_data,
 -	},
 -};
 -
--void __init lacie_v2_register_flash(void)
--{
--	spi_register_board_info(lacie_v2_spi_slave_info,
--				ARRAY_SIZE(lacie_v2_spi_slave_info));
--	kirkwood_spi_init();
--}
--
 -/*****************************************************************************
-- * I2C devices
+- * GPIO LEDs
 - ****************************************************************************/
 -
--static struct at24_platform_data at24c04 = {
--	.byte_len	= SZ_4K / 8,
--	.page_size	= 16,
--};
+-#define NETSPACE_V2_GPIO_RED_LED	12
 -
--/*
-- * i2c addr | chip         | description
-- * 0x50     | HT24LC04     | eeprom (512B)
-- */
--
--static struct i2c_board_info __initdata lacie_v2_i2c_info[] = {
+-static struct gpio_led netspace_v2_gpio_led_pins[] = {
 -	{
--		I2C_BOARD_INFO("24c04", 0x50),
--		.platform_data  = &at24c04,
--	}
+-		.name	= "ns_v2:red:fail",
+-		.gpio	= NETSPACE_V2_GPIO_RED_LED,
+-	},
 -};
 -
--void __init lacie_v2_register_i2c_devices(void)
--{
--	kirkwood_i2c_init();
--	i2c_register_board_info(0, lacie_v2_i2c_info,
--				ARRAY_SIZE(lacie_v2_i2c_info));
--}
+-static struct gpio_led_platform_data netspace_v2_gpio_leds_data = {
+-	.num_leds	= ARRAY_SIZE(netspace_v2_gpio_led_pins),
+-	.leds		= netspace_v2_gpio_led_pins,
+-};
+-
+-static struct platform_device netspace_v2_gpio_leds = {
+-	.name		= "leds-gpio",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &netspace_v2_gpio_leds_data,
+-	},
+-};
 -
 -/*****************************************************************************
-- * Hard Disk power
+- * Dual-GPIO CPLD LEDs
 - ****************************************************************************/
 -
--static int __initdata lacie_v2_gpio_hdd_power[] = { 16, 17, 41, 42, 43 };
+-#define NETSPACE_V2_GPIO_BLUE_LED_SLOW	29
+-#define NETSPACE_V2_GPIO_BLUE_LED_CMD	30
 -
--void __init lacie_v2_hdd_power_init(int hdd_num)
+-static struct ns2_led netspace_v2_led_pins[] = {
+-	{
+-		.name	= "ns_v2:blue:sata",
+-		.cmd	= NETSPACE_V2_GPIO_BLUE_LED_CMD,
+-		.slow	= NETSPACE_V2_GPIO_BLUE_LED_SLOW,
+-	},
+-};
+-
+-static struct ns2_led_platform_data netspace_v2_leds_data = {
+-	.num_leds	= ARRAY_SIZE(netspace_v2_led_pins),
+-	.leds		= netspace_v2_led_pins,
+-};
+-
+-static struct platform_device netspace_v2_leds = {
+-	.name		= "leds-ns2",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &netspace_v2_leds_data,
+-	},
+-};
+-
+-/*****************************************************************************
+- * GPIO fan
+- ****************************************************************************/
+-
+-/* Designed for fan 40x40x16: ADDA AD0412LB-D50 6000rpm at 12v */
+-static struct gpio_fan_speed netspace_max_v2_fan_speed[] = {
+-	{    0,  0 },
+-	{ 1500,	15 },
+-	{ 1700,	14 },
+-	{ 1800,	13 },
+-	{ 2100,	12 },
+-	{ 3100,	11 },
+-	{ 3300,	10 },
+-	{ 4300,	 9 },
+-	{ 5500,	 8 },
+-};
+-
+-static unsigned netspace_max_v2_fan_ctrl[] = { 22, 7, 33, 23 };
+-
+-static struct gpio_fan_alarm netspace_max_v2_fan_alarm = {
+-	.gpio		= 25,
+-	.active_low	= 1,
+-};
+-
+-static struct gpio_fan_platform_data netspace_max_v2_fan_data = {
+-	.num_ctrl	= ARRAY_SIZE(netspace_max_v2_fan_ctrl),
+-	.ctrl		= netspace_max_v2_fan_ctrl,
+-	.alarm		= &netspace_max_v2_fan_alarm,
+-	.num_speed	= ARRAY_SIZE(netspace_max_v2_fan_speed),
+-	.speed		= netspace_max_v2_fan_speed,
+-};
+-
+-static struct platform_device netspace_max_v2_gpio_fan = {
+-	.name	= "gpio-fan",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data	= &netspace_max_v2_fan_data,
+-	},
+-};
+-
+-/*****************************************************************************
+- * General Setup
+- ****************************************************************************/
+-
+-static unsigned int netspace_v2_mpp_config[] __initdata = {
+-	MPP0_SPI_SCn,
+-	MPP1_SPI_MOSI,
+-	MPP2_SPI_SCK,
+-	MPP3_SPI_MISO,
+-	MPP4_NF_IO6,
+-	MPP5_NF_IO7,
+-	MPP6_SYSRST_OUTn,
+-	MPP7_GPO,		/* Fan speed (bit 1) */
+-	MPP8_TW0_SDA,
+-	MPP9_TW0_SCK,
+-	MPP10_UART0_TXD,
+-	MPP11_UART0_RXD,
+-	MPP12_GPO,		/* Red led */
+-	MPP14_GPIO,		/* USB fuse */
+-	MPP16_GPIO,		/* SATA 0 power */
+-	MPP17_GPIO,		/* SATA 1 power */
+-	MPP18_NF_IO0,
+-	MPP19_NF_IO1,
+-	MPP20_SATA1_ACTn,
+-	MPP21_SATA0_ACTn,
+-	MPP22_GPIO,		/* Fan speed (bit 0) */
+-	MPP23_GPIO,		/* Fan power */
+-	MPP24_GPIO,		/* USB mode select */
+-	MPP25_GPIO,		/* Fan rotation fail */
+-	MPP26_GPIO,		/* USB device vbus */
+-	MPP28_GPIO,		/* USB enable host vbus */
+-	MPP29_GPIO,		/* Blue led (slow register) */
+-	MPP30_GPIO,		/* Blue led (command register) */
+-	MPP31_GPIO,		/* Board power off */
+-	MPP32_GPIO,		/* Power button (0 = Released, 1 = Pushed) */
+-	MPP33_GPO,		/* Fan speed (bit 2) */
+-	0
+-};
+-
+-#define NETSPACE_V2_GPIO_POWER_OFF	31
+-
+-static void netspace_v2_power_off(void)
 -{
--	int i;
--	int err;
--
--	/* Power up all hard disks. */
--	for (i = 0; i < hdd_num; i++) {
--		err = gpio_request(lacie_v2_gpio_hdd_power[i], NULL);
--		if (err == 0) {
--			err = gpio_direction_output(
--					lacie_v2_gpio_hdd_power[i], 1);
--			/* Free the HDD power GPIOs. This allow user-space to
--			 * configure them via the gpiolib sysfs interface. */
--			gpio_free(lacie_v2_gpio_hdd_power[i]);
--		}
--		if (err)
--			pr_err("Failed to power up HDD%d\n", i + 1);
--	}
+-	gpio_set_value(NETSPACE_V2_GPIO_POWER_OFF, 1);
 -}
-diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.h b/arch/arm/mach-kirkwood/lacie_v2-common.h
-deleted file mode 100644
-index fc64f57..0000000
---- a/arch/arm/mach-kirkwood/lacie_v2-common.h
-+++ /dev/null
-@@ -1,16 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/lacie_v2-common.h
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
 -
--#ifndef __ARCH_KIRKWOOD_LACIE_V2_COMMON_H
--#define __ARCH_KIRKWOOD_LACIE_V2_COMMON_H
+-static void __init netspace_v2_init(void)
+-{
+-	/*
+-	 * Basic setup. Needs to be called early.
+-	 */
+-	kirkwood_init();
+-	kirkwood_mpp_conf(netspace_v2_mpp_config);
 -
--void lacie_v2_register_flash(void);
--void lacie_v2_register_i2c_devices(void);
--void lacie_v2_hdd_power_init(int hdd_num);
+-	if (machine_is_netspace_max_v2())
+-		lacie_v2_hdd_power_init(2);
+-	else
+-		lacie_v2_hdd_power_init(1);
 -
+-	kirkwood_ehci_init();
+-	kirkwood_ge00_init(&netspace_v2_ge00_data);
+-	kirkwood_sata_init(&netspace_v2_sata_data);
+-	kirkwood_uart0_init();
+-	lacie_v2_register_flash();
+-	lacie_v2_register_i2c_devices();
+-
+-	platform_device_register(&netspace_v2_leds);
+-	platform_device_register(&netspace_v2_gpio_leds);
+-	platform_device_register(&netspace_v2_gpio_buttons);
+-	if (machine_is_netspace_max_v2())
+-		platform_device_register(&netspace_max_v2_gpio_fan);
+-
+-	if (gpio_request(NETSPACE_V2_GPIO_POWER_OFF, "power-off") == 0 &&
+-	    gpio_direction_output(NETSPACE_V2_GPIO_POWER_OFF, 0) == 0)
+-		pm_power_off = netspace_v2_power_off;
+-	else
+-		pr_err("netspace_v2: failed to configure power-off GPIO\n");
+-}
+-
+-#ifdef CONFIG_MACH_NETSPACE_V2
+-MACHINE_START(NETSPACE_V2, "LaCie Network Space v2")
+-	.atag_offset	= 0x100,
+-	.init_machine	= netspace_v2_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= kirkwood_init_irq,
+-	.init_time	= kirkwood_timer_init,
+-	.restart	= kirkwood_restart,
+-MACHINE_END
+-#endif
+-
+-#ifdef CONFIG_MACH_INETSPACE_V2
+-MACHINE_START(INETSPACE_V2, "LaCie Internet Space v2")
+-	.atag_offset	= 0x100,
+-	.init_machine	= netspace_v2_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= kirkwood_init_irq,
+-	.init_time	= kirkwood_timer_init,
+-	.restart	= kirkwood_restart,
+-MACHINE_END
+-#endif
+-
+-#ifdef CONFIG_MACH_NETSPACE_MAX_V2
+-MACHINE_START(NETSPACE_MAX_V2, "LaCie Network Space Max v2")
+-	.atag_offset	= 0x100,
+-	.init_machine	= netspace_v2_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= kirkwood_init_irq,
+-	.init_time	= kirkwood_timer_init,
+-	.restart	= kirkwood_restart,
+-MACHINE_END
 -#endif
 -- 
 1.8.1.2
