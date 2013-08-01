@@ -1,49 +1,344 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 01 Aug 2013 08:48:19 -0500
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <1375352315.22084.138.camel@shinybook.infradead.org>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
- <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
- <20130731201457.GA24642@n2100.arm.linux.org.uk>
- <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
- <20130731204817.GC24642@n2100.arm.linux.org.uk>
- <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
- <1375352315.22084.138.camel@shinybook.infradead.org>
-Message-ID: <51FA6723.9010608@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 1 Aug 2013 16:48:18 +0300
+Subject: [RFC/PATCH v2] arm: convert arm boot_lock to raw
+In-Reply-To: <20130801133737.GG21614@n2100.arm.linux.org.uk>
+References: <20130801133737.GG21614@n2100.arm.linux.org.uk>
+Message-ID: <1375364898-8699-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2013 05:18 AM, David Woodhouse wrote:
-> On Wed, 2013-07-31 at 17:26 -0400, jonsmirl at gmail.com wrote:
->> Alternatively you may be of the belief that it is impossible to get
->> rid of the board specific code. But x86 doesn't have any of it, why
->> should ARM?
-> 
-> The reason x86 doesn't have it is because it carries three decades worth
-> of legacy baggage so that it can still look like a 1980s IBM PC when
-> necessary.
-> 
-> There *have* been some x86 platforms which abandon that legacy crap, and
-> for those we *do* have board-specific code. (Is James still maintaining
-> Voyager support? It feels very strange to talk about Voyager with it
-> *not* being the 'legacy crap' in question...)
-> 
-> We've even seen *recent* attempts to abandon the legacy crap in the
-> embedded x86 space, which backtracked and added it all back again ? in
-> part because x86 lacked any sane way to describe the hardware if it
-> wasn't pretending to be a PC. ACPI doesn't cut it, and DT "wasn't
-> invented here"...
->
-> Unless you want the ARM world to settle on a strategy of "all the world
-> is an Assabet", I'd be careful what you wish for...
+From: Frank Rowand <frank.rowand@am.sony.com>
 
-There is some level of belief that ACPI will enable running this years
-OS on next years h/w. This idea is completely flawed as long as ARM
-vendors don't design for compatibility, spin the Si for compatibility
-issues, and have some mechanism to emulate legacy h/w. All the
-discussions and issues around DT bindings and processes will apply to
-ACPI bindings as well.
+The arm boot_lock is used by the secondary processor startup code.  The locking
+task is the idle thread, which has idle->sched_class == &idle_sched_class.
+idle_sched_class->enqueue_task == NULL, so if the idle task blocks on the
+lock, the attempt to wake it when the lock becomes available will fail:
 
-Rob
+try_to_wake_up()
+   ...
+      activate_task()
+         enqueue_task()
+            p->sched_class->enqueue_task(rq, p, flags)
+
+Fix by converting boot_lock to a raw spin lock.
+
+[ balbi at ti.com : fixes raw_spinlock_t definition for mach-spear ]
+
+Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/mach-exynos/platsmp.c    | 12 ++++++------
+ arch/arm/mach-msm/platsmp.c       | 10 +++++-----
+ arch/arm/mach-omap2/omap-smp.c    | 10 +++++-----
+ arch/arm/mach-prima2/platsmp.c    | 10 +++++-----
+ arch/arm/mach-spear/platsmp.c     | 10 +++++-----
+ arch/arm/mach-ux500/platsmp.c     | 10 +++++-----
+ arch/arm/plat-versatile/platsmp.c | 10 +++++-----
+ 7 files changed, 36 insertions(+), 36 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 58b43e6..f56f767 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -73,7 +73,7 @@ static void __iomem *scu_base_addr(void)
+ 	return (void __iomem *)(S5P_VA_SCU);
+ }
+ 
+-static DEFINE_SPINLOCK(boot_lock);
++static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ static void exynos_secondary_init(unsigned int cpu)
+ {
+@@ -86,8 +86,8 @@ static void exynos_secondary_init(unsigned int cpu)
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
++	raw_spin_lock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ }
+ 
+ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -99,7 +99,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * Set synchronisation state between this boot processor
+ 	 * and the secondary one
+ 	 */
+-	spin_lock(&boot_lock);
++	raw_spin_lock(&boot_lock);
+ 
+ 	/*
+ 	 * The secondary processor is waiting to be released from
+@@ -128,7 +128,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 		if (timeout == 0) {
+ 			printk(KERN_ERR "cpu1 power enable failed");
+-			spin_unlock(&boot_lock);
++			raw_spin_unlock(&boot_lock);
+ 			return -ETIMEDOUT;
+ 		}
+ 	}
+@@ -167,7 +167,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+ 	 */
+-	spin_unlock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ 
+ 	return pen_release != -1 ? -ENOSYS : 0;
+ }
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 3f06edc..fc09a04 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -30,7 +30,7 @@
+ 
+ extern void msm_secondary_startup(void);
+ 
+-static DEFINE_SPINLOCK(boot_lock);
++static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ static inline int get_core_count(void)
+ {
+@@ -50,8 +50,8 @@ static void msm_secondary_init(unsigned int cpu)
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
++	raw_spin_lock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ }
+ 
+ static void prepare_cold_cpu(unsigned int cpu)
+@@ -88,7 +88,7 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * set synchronisation state between this boot processor
+ 	 * and the secondary one
+ 	 */
+-	spin_lock(&boot_lock);
++	raw_spin_lock(&boot_lock);
+ 
+ 	/*
+ 	 * The secondary processor is waiting to be released from
+@@ -122,7 +122,7 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+ 	 */
+-	spin_unlock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ 
+ 	return pen_release != -1 ? -ENOSYS : 0;
+ }
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 8708b2a..c4caa18 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -44,7 +44,7 @@ u16 pm44xx_errata;
+ /* SCU base address */
+ static void __iomem *scu_base;
+ 
+-static DEFINE_SPINLOCK(boot_lock);
++static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ void __iomem *omap4_get_scu_base(void)
+ {
+@@ -68,8 +68,8 @@ static void omap4_secondary_init(unsigned int cpu)
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
++	raw_spin_lock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ }
+ 
+ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -83,7 +83,7 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * Set synchronisation state between this boot processor
+ 	 * and the secondary one
+ 	 */
+-	spin_lock(&boot_lock);
++	raw_spin_lock(&boot_lock);
+ 
+ 	/*
+ 	 * Update the AuxCoreBoot0 with boot state for secondary core.
+@@ -160,7 +160,7 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * Now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+ 	 */
+-	spin_unlock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-prima2/platsmp.c b/arch/arm/mach-prima2/platsmp.c
+index 3dbcb1a..42837dc4 100644
+--- a/arch/arm/mach-prima2/platsmp.c
++++ b/arch/arm/mach-prima2/platsmp.c
+@@ -23,7 +23,7 @@
+ static void __iomem *scu_base;
+ static void __iomem *rsc_base;
+ 
+-static DEFINE_SPINLOCK(boot_lock);
++static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ static struct map_desc scu_io_desc __initdata = {
+ 	.length		= SZ_4K,
+@@ -56,8 +56,8 @@ static void sirfsoc_secondary_init(unsigned int cpu)
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
++	raw_spin_lock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ }
+ 
+ static struct of_device_id rsc_ids[]  = {
+@@ -95,7 +95,7 @@ static int sirfsoc_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	/* make sure write buffer is drained */
+ 	mb();
+ 
+-	spin_lock(&boot_lock);
++	raw_spin_lock(&boot_lock);
+ 
+ 	/*
+ 	 * The secondary processor is waiting to be released from
+@@ -128,7 +128,7 @@ static int sirfsoc_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+ 	 */
+-	spin_unlock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ 
+ 	return pen_release != -1 ? -ENOSYS : 0;
+ }
+diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
+index 5c4a198..33dc270 100644
+--- a/arch/arm/mach-spear/platsmp.c
++++ b/arch/arm/mach-spear/platsmp.c
+@@ -20,7 +20,7 @@
+ #include <mach/spear.h>
+ #include "generic.h"
+ 
+-static DEFINE_SPINLOCK(boot_lock);
++static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ static void __iomem *scu_base = IOMEM(VA_SCU_BASE);
+ 
+@@ -36,8 +36,8 @@ static void spear13xx_secondary_init(unsigned int cpu)
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
++	raw_spin_lock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ }
+ 
+ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -48,7 +48,7 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * set synchronisation state between this boot processor
+ 	 * and the secondary one
+ 	 */
+-	spin_lock(&boot_lock);
++	raw_spin_lock(&boot_lock);
+ 
+ 	/*
+ 	 * The secondary processor is waiting to be released from
+@@ -75,7 +75,7 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+ 	 */
+-	spin_unlock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ 
+ 	return pen_release != -1 ? -ENOSYS : 0;
+ }
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 1f296e7..eeb5916 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -52,7 +52,7 @@ static void __iomem *scu_base_addr(void)
+ 	return NULL;
+ }
+ 
+-static DEFINE_SPINLOCK(boot_lock);
++static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ static void ux500_secondary_init(unsigned int cpu)
+ {
+@@ -65,8 +65,8 @@ static void ux500_secondary_init(unsigned int cpu)
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
++	raw_spin_lock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ }
+ 
+ static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -77,7 +77,7 @@ static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * set synchronisation state between this boot processor
+ 	 * and the secondary one
+ 	 */
+-	spin_lock(&boot_lock);
++	raw_spin_lock(&boot_lock);
+ 
+ 	/*
+ 	 * The secondary processor is waiting to be released from
+@@ -98,7 +98,7 @@ static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+ 	 */
+-	spin_unlock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ 
+ 	return pen_release != -1 ? -ENOSYS : 0;
+ }
+diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
+index 39895d8..b2e0858 100644
+--- a/arch/arm/plat-versatile/platsmp.c
++++ b/arch/arm/plat-versatile/platsmp.c
+@@ -31,7 +31,7 @@ static void write_pen_release(int val)
+ 	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+ }
+ 
+-static DEFINE_SPINLOCK(boot_lock);
++static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ void versatile_secondary_init(unsigned int cpu)
+ {
+@@ -44,8 +44,8 @@ void versatile_secondary_init(unsigned int cpu)
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
++	raw_spin_lock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ }
+ 
+ int versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -56,7 +56,7 @@ int versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * Set synchronisation state between this boot processor
+ 	 * and the secondary one
+ 	 */
+-	spin_lock(&boot_lock);
++	raw_spin_lock(&boot_lock);
+ 
+ 	/*
+ 	 * This is really belt and braces; we hold unintended secondary
+@@ -86,7 +86,7 @@ int versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+ 	 */
+-	spin_unlock(&boot_lock);
++	raw_spin_unlock(&boot_lock);
+ 
+ 	return pen_release != -1 ? -ENOSYS : 0;
+ }
+-- 
+1.8.3.4.840.g6a90778
