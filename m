@@ -1,31 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 2 Aug 2013 00:16:36 +0100
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <1375393730.2070.16.camel@dabdike>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130801193936.GD23006@n2100.arm.linux.org.uk>
- <20130801201539.GA12291@kroah.com>
- <20130801201823.GF23006@n2100.arm.linux.org.uk>
- <20130801203631.GA12802@kroah.com>
- <1375393730.2070.16.camel@dabdike>
-Message-ID: <20130801231636.GF9858@sirena.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Thu,  1 Aug 2013 16:17:46 -0700
+Subject: [PATCH V3 0/3] networking: Use ETH_ALEN where appropriate
+In-Reply-To: <20130801.143137.331385226409040561.davem@davemloft.net>
+References: <20130801.143137.331385226409040561.davem@davemloft.net>
+Message-ID: <cover.1375398692.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 02:48:50PM -0700, James Bottomley wrote:
+Convert the uses mac addresses to ETH_ALEN so
+it's easier to find and verify where mac addresses
+need to be __aligned(2)
 
-> but no-one ever came to us in parisc and told us to stop using our own
-> internal bus type.
+Change in V2:
+- Remove include/acpi/actbl2.h conversion
+  It's a file copied from outside ACPI sources
 
-As far as I recall the times I've seen the discussion it's been in the
-form "this bus implementation is just a sed of the platform bus code,
-just the platform bus" which is sensible enough.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/38da708f/attachment.sig>
+Changes in V3:
+- Don't move the pasemi_mac.h mac address to be aligned(2)
+  Just note that it's unaligned.
+
+Joe Perches (3):
+  uapi: Convert some uses of 6 to ETH_ALEN
+  include: Convert ethernet mac address declarations to use ETH_ALEN
+  ethernet: Convert mac address uses of 6 to ETH_ALEN
+
+ drivers/net/ethernet/8390/ax88796.c                |  4 +-
+ drivers/net/ethernet/amd/pcnet32.c                 |  6 +--
+ drivers/net/ethernet/broadcom/cnic_if.h            |  6 +--
+ drivers/net/ethernet/dec/tulip/tulip_core.c        |  8 +--
+ drivers/net/ethernet/i825xx/sun3_82586.h           |  4 +-
+ drivers/net/ethernet/myricom/myri10ge/myri10ge.c   |  2 +-
+ drivers/net/ethernet/nuvoton/w90p910_ether.c       |  4 +-
+ drivers/net/ethernet/pasemi/pasemi_mac.c           | 13 ++---
+ drivers/net/ethernet/pasemi/pasemi_mac.h           |  2 +-
+ drivers/net/ethernet/qlogic/netxen/netxen_nic_hw.c |  4 +-
+ drivers/net/ethernet/qlogic/qlge/qlge.h            |  2 +-
+ include/linux/dm9000.h                             |  4 +-
+ include/linux/fs_enet_pd.h                         |  3 +-
+ include/linux/ieee80211.h                          | 59 +++++++++++-----------
+ include/linux/mlx4/device.h                        | 11 ++--
+ include/linux/mlx4/qp.h                            |  5 +-
+ include/linux/mv643xx_eth.h                        |  3 +-
+ include/linux/sh_eth.h                             |  3 +-
+ include/linux/smsc911x.h                           |  3 +-
+ include/linux/uwb/spec.h                           |  5 +-
+ include/media/tveeprom.h                           |  4 +-
+ include/net/irda/irlan_common.h                    |  3 +-
+ include/uapi/linux/dn.h                            |  3 +-
+ include/uapi/linux/if_bridge.h                     |  3 +-
+ include/uapi/linux/netfilter_bridge/ebt_802_3.h    |  5 +-
+ include/uapi/linux/netfilter_ipv4/ipt_CLUSTERIP.h  |  3 +-
+ include/uapi/linux/virtio_net.h                    |  2 +-
+ include/uapi/linux/wimax/i2400m.h                  |  4 +-
+ 28 files changed, 99 insertions(+), 79 deletions(-)
+
+-- 
+1.8.1.2.459.gbcd45b4.dirty
