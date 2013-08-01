@@ -1,65 +1,46 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 1 Aug 2013 14:51:10 -0600
-Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support
- in PCI-to-PCI bridge
-In-Reply-To: <20130801195948.7ecb4ac8@skate>
-References: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo7Y+OE8_NT3npC1DCQz3PrOT9Nz=6MavY+zS63pGN3x9g@mail.gmail.com>
- <20130801195948.7ecb4ac8@skate>
-Message-ID: <CAErSpo7vpeyNP82g1Ea=wWj2nTo05DC5NDEynuzyyw2g7BdYYw@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 01 Aug 2013 13:55:28 -0700
+Subject: [PATCH V2 3/3] ethernet: Convert mac address uses of 6 to ETH_ALEN
+In-Reply-To: <20130801203343.GG23006@n2100.arm.linux.org.uk>
+References: <cover.1375387593.git.joe@perches.com>
+ <4170130535e4ea14c66f8510042577be21941f4d.1375387593.git.joe@perches.com>
+ <CAOesGMhmxJTDjcPeD4b1FvRsbP8df369F01SQBK6dk4nXmRGjA@mail.gmail.com>
+ <20130801203343.GG23006@n2100.arm.linux.org.uk>
+Message-ID: <1375390528.2034.77.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 11:59 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Bjorn Helgaas,
->
-> On Thu, 1 Aug 2013 10:53:07 -0600, Bjorn Helgaas wrote:
->> On Thu, Aug 1, 2013 at 7:44 AM, Thomas Petazzoni
->> <thomas.petazzoni@free-electrons.com> wrote:
->> > The Marvell PCIe driver uses an emulated PCI-to-PCI bridge to be able
->> > to dynamically set up MBus address decoding windows for PCI I/O and
->> > memory regions depending on the PCI devices enumerated by Linux.
->> >
->> > However, this emulated PCI-to-PCI bridge logic makes the Linux PCI
->> > core believe that prefetchable memory regions are supported (because
->> > the registers are read/write), while in fact no adress decoding window
->> > is ever created for such regions. Since the Marvell MBus address
->> > decoding windows do not distinguish memory regions and prefetchable
->> > memory regions, this patch takes a simple approach: change the
->> > PCI-to-PCI bridge emulation to let the Linux PCI core know that we
->> > don't support prefetchable memory regions.
->> >
->> > To achieve this, we simply make the prefetchable memory base a
->> > read-only register that always returns 0. Reading/writing all the
->> > other prefetchable memory related registers has no effect.
->> >
->> > This problem was originally reported by Finn Hoffmann
->> > <finn@uni-bremen.de>, who couldn't get a RTL8111/8168B PCI NIC working
->> > on the NSA310 Kirkwood platform after updating to 3.11-rc. The problem
->> > was that the PCI-to-PCI bridge emulation was making the Linux PCI core
->> > believe that we support prefetchable memory, so the Linux PCI core was
->> > only filling the prefetchable memory base and limit registers, which
->> > does not lead to a MBus window being created. The below patch has been
->> > confirmed by Finn Hoffmann to fix his problem on Kirkwood, and has
->> > otherwise been successfully tested on the Armada XP GP platform with a
->> > e1000e PCIe NIC and a Marvell SATA PCIe card.
->> >
->> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> > Reported-by: Finn Hoffmann <finn@uni-bremen.de>
->> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>
->> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
->>
->> Please merge along with your other pci-mvebu.c changes.
->
-> I don't think we have other pci-mvebu.c lined up for 3.11. All the MSI
-> stuff, mvebu-mbus DT stuff and so on is for 3.12.
->
-> So I guess you could take that one through your pci tree. Jason, can
-> you confirm?
+On Thu, 2013-08-01 at 21:33 +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 01, 2013 at 01:31:09PM -0700, Olof Johansson wrote:
+> > Hi,
 
-Oh, I missed the fact that this was for v3.11.  I put it in my
-for-linus branch.  Thanks!
+Hi all.
 
-Bjorn
+> > On Thu, Aug 1, 2013 at 1:14 PM, Joe Perches <joe@perches.com> wrote:
+> > > diff --git a/drivers/net/ethernet/pasemi/pasemi_mac.h b/drivers/net/ethernet/pasemi/pasemi_mac.h
+[]
+> > > @@ -79,11 +79,11 @@ struct pasemi_mac {
+> > >         int             last_cs;
+> > >         int             num_cs;
+> > >         u32             dma_if;
+> > > -       u8              type;
+> > >  #define MAC_TYPE_GMAC  1
+> > >  #define MAC_TYPE_XAUI  2
+> > >
+> > > -       u8              mac_addr[6];
+> > > +       u8              mac_addr[ETH_ALEN];
+> > > +       u8              type;
+> > 
+> > Just promote 'type' to u32 instead, saves you from moving the #defines
+> > down, etc, etc.
+
+type is already u8, why change it?
+That would also change struct size.
+
+> There's a more fundamental question which has to be asked: what is the
+> point of moving that in the first place?
+
+Some is_<foo>_ether_addr tests assume __aligned(2)
+by a casting char * to u16/be16 * and dereferencing.
+
+see patch 0/3 and include/linux/etherdevice.h
