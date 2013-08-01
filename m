@@ -1,62 +1,38 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 2 Aug 2013 03:27:30 +0800
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Aug 2013 20:39:36 +0100
 Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
  non-probable system topologies
-In-Reply-To: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+In-Reply-To: <20130801192730.GC9174@kroah.com>
 References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
-Message-ID: <20130801192730.GC9174@kroah.com>
+ <20130801192730.GC9174@kroah.com>
+Message-ID: <20130801193936.GD23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
-> Hello,
+On Fri, Aug 02, 2013 at 03:27:30AM +0800, Greg KH wrote:
+> Hm, sounds like an ACPI tree is what you need to be using :)
 > 
-> Whilst Linux implements a bunch of different bus types (many of which
-> are in fact virtual), devices sitting on non-probable, memory mapped
-> buses inside SoCs typically live on either the platform_bus or the
-> amba_bus. So far, this has worked out alright; the buses haven't needed
-> to be visible to software and no additional software control is really
-> required from the OS. However, as I/O coherency and hardware
-> virtualisation capabilities start to creep into ARM-based SoCs, Linux
-> needs to know the topology of the system on which it is running.
-> 
-> Naturally, this would need to be described as a device-tree binding and
-> communicate:
-> 
->   - Buses which can be configured as coherent, including which devices
->     on those buses can be made coherent.
-> 
->   - How IOMMUs sit on the bus and interact with masters on that bus (the
->     current one-IOMMU-driver-per-bus may not work well for the
->     platform_bus).
+> Seriously, why not use ACPI for stuff like this?  You already are
+> starting to do that for ARM-based systems, why not just make it the
+> standard?
 
-I've been waiting for people to finally run into this one, and realize
-that they shouldn't be using "platform_bus" :)
+Is this in the same spirit as "you should be using DT, DT can describe
+everything you need to do.  It's made to describe bindings between
+devices!" and here we are, two years down the line, and we apparantly
+don't even have stable DT bindings for the ARM architecture because a
+lot of the subsystems which SoCs need have taken that long to get
+sorted.
 
->   - QoS and PM constraints. This isn't really in my area, but we do have
->     buses that have these features and expect software to control them.
-> 
->   - The system topology and linkages between buses and devices.
+The amount of work this has taken so far has been tremendous, and we're
+still working out lots of the details.  For instance, in the last six
+months, there's been an effort to try and work out how to sanely
+describe how a DMA controller is connected to a peripheral in DT.
 
-The driver core handles this really well, you just have to create new
-busses, and don't rely on the "catch-all" platform_bus.
+Maybe some of those experiences can be applied to ACPI - I doubt that
+ACPI has the ability to describe everything that we need to with ARM
+SoCs, just like DT was missing a whole bunch of established ways to
+describe ARM SoCs when we started looking at it.
 
-> The last point is increasingly important as various blocks of ARM system
-> IP start to require knowledge of masters and how things like memory
-> traffic, DVM messages, interrupts (think MSI) etc are routed between
-> them in order to configure the system correctly. For example, interfacing
-> a PCIe device with an SMMU requires knowledge of both the requester id
-> associated with the device and how that maps to incoming stream ids
-> (based off the AXI bus id) on the SMMU. Even worse, this mapping is
-> likely generated dynamically by the host controller, which would need to
-> know about downstream buses and their SMMUs.
-
-Hm, sounds like an ACPI tree is what you need to be using :)
-
-Seriously, why not use ACPI for stuff like this?  You already are
-starting to do that for ARM-based systems, why not just make it the
-standard?
-
-thanks,
-
-greg k-h
+One advantage we will have though is having gone through the DT pain,
+we're now that much more experienced with describing stuff in firmware,
+so hopefully we can avoid some of the DT mistakes with ACPI.
