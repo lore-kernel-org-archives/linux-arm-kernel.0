@@ -1,50 +1,70 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 31 Jul 2013 18:36:13 -0700
-Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
- architecture independent macro
-In-Reply-To: <51F9A9CD.1040804@tabi.org>
-References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
- <1375187900-17582-3-git-send-email-B44344@freescale.com>
- <20130731071630.GI8868@codeaurora.org>
- <CAOZdJXVvNBR-qf7LXNOHZVstH_Rebxwn-wAkSaBS53Wn55mYCw@mail.gmail.com>
- <51F9A5FE.8030608@codeaurora.org> <51F9A80E.5010307@tabi.org>
- <51F9A8F1.9020704@codeaurora.org> <51F9A9CD.1040804@tabi.org>
-Message-ID: <51F9BB8D.6060907@codeaurora.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 31 Jul 2013 20:59:27 -0500
+Subject: [PATCH 7/9] ARM: edma: Don't clear EMR of channel in edma_stop
+In-Reply-To: <51F8DA5C.9060503@ti.com>
+References: <1375104595-16018-1-git-send-email-joelf@ti.com>
+ <1375104595-16018-8-git-send-email-joelf@ti.com> <51F77982.7030601@ti.com>
+ <51F89B0B.4080803@ti.com> <51F8DA5C.9060503@ti.com>
+Message-ID: <51F9C0FF.7030703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/13 17:20, Timur Tabi wrote:
-> On 07/31/2013 07:16 PM, Stephen Boyd wrote:
->> cpu_relax() is usually just a compiler barrier or an instruction hint to
->> the cpu that it should cool down because we're spinning in a tight loop.
->> It certainly shouldn't be calling into the  scheduler.
-> Ah yes, I remember now.  So it does seem that if we can fix the problem
-> of non-incrementing 'jiffies', then this macro can be used in interrupts.
-
-That's encouraging. It looks like you introduced it to use in interrupt
-context but then it got shot down[1]? I lost track in all the versions.
-
->
-> Of course, that assumes that spinning in interrupt context is a good
-> idea to begin with.  Maybe we shouldn't be encouraging it?
-
-I read through the v5 discussion and it seems I'm about to walk through
-some tall grass on the way to Cerulean City.
-
-Andrew Morton, I choose you! Use your mind-power move to convince
-everyone that having a macro for spinning on a register in interrupt
-context is a good thing. At least it will be more obvious.
-
->
->>>> FYI, you might want to look at the code reviews for spin_event_timeout()
->>>> on the linuxppc-dev mailing list, back in March 2009.
+On 07/31/2013 04:35 AM, Sekhar Nori wrote:
+> On Wednesday 31 July 2013 10:35 AM, Joel Fernandes wrote:
+>> On 07/30/2013 03:29 AM, Sekhar Nori wrote:
+>>> On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
+>>>> We certainly don't want error conditions to be cleared anywhere
+>>>
+>>> 'anywhere' is a really loaded term.
+>>>
+>>>> as this will make us 'forget' about missed events. We depend on
+>>>> knowing which events were missed in order to be able to reissue them.
+>>>
+>>>> This fixes a race condition where the EMR was being cleared
+>>>> by the transfer completion interrupt handler.
 >>>>
->> Sure. Any pointers? Otherwise I'll go digging around the archives.
-> https://lists.ozlabs.org/pipermail/linuxppc-dev/2009-March/thread.html
->
+>>>> Basically, what was happening was:
+>>>>
+>>>>             Missed event
+>>>>              |
+>>>>              |
+>>>>              V
+>>>> SG1-SG2-SG3-Null
+>>>>          \
+>>>>           \__TC Interrupt (Almost same time as ARM is executing
+>>>> TC interrupt handler, an event got missed and also forgotten
+>>>> by clearing the EMR).
+>>>
+>>> Sorry, but I dont see how edma_stop() is coming into picture in the race
+>>> you describe?
+>>
+>> In edma_callback function, for the case of DMA_COMPLETE (Transfer
+>> completion interrupt), edma_stop() is called when all sets have been
+>> processed. This had the effect of clearing the EMR.
+> 
+> Ah, thanks. I was missing the fact that the race comes into picture only
+> when using the DMA engine driver. I guess that should be mentioned
+> somewhere since it is not immediately obvious.
+> 
+> The patch looks good to me. So if you respin just this one with some
+> updated explanation based on what you wrote below, I will take it.
 
-[1] https://lists.ozlabs.org/pipermail/linuxppc-dev/2009-May/072521.html
+Sure I'll do that. Also the trigger_channel patch, will you be taking
+that one too? I can send these 2 in a series as they touch
+arch/arm/common/edma.c
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks,
+
+-Joel
+
+
+
+> 
+> Thanks,
+> Sekhar
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
