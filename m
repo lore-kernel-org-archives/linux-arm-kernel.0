@@ -1,9 +1,9 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 01 Aug 2013 23:12:12 +0100
-Subject: [PATCH RFC 38/51] DMA-API: staging: use dma_set_coherent_mask()
+Date: Thu, 01 Aug 2013 23:13:12 +0100
+Subject: [PATCH RFC 39/51] DMA-API: others: use dma_set_coherent_mask()
 In-Reply-To: <20130801213420.GL23006@n2100.arm.linux.org.uk>
 References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
-Message-ID: <E1V516S-0006tP-0m@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1V517Q-0006tV-4z@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,67 +16,67 @@ Convert all direct write accesses to using the correct API.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/dwc2/platform.c        |    5 +++--
- drivers/staging/imx-drm/imx-drm-core.c |    8 ++++++--
- drivers/staging/imx-drm/ipuv3-crtc.c   |    4 +++-
- 3 files changed, 12 insertions(+), 5 deletions(-)
+ drivers/ata/pata_ixp4xx_cf.c             |    5 ++++-
+ drivers/gpu/drm/exynos/exynos_drm_drv.c  |    7 ++++++-
+ drivers/gpu/drm/omapdrm/omap_dmm_tiler.c |    5 +++--
+ 3 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/dwc2/platform.c b/drivers/staging/dwc2/platform.c
-index 44cce2f..7a14f02 100644
---- a/drivers/staging/dwc2/platform.c
-+++ b/drivers/staging/dwc2/platform.c
-@@ -100,8 +100,9 @@ static int dwc2_driver_probe(struct platform_device *dev)
- 	 */
- 	if (!dev->dev.dma_mask)
- 		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
--	if (!dev->dev.coherent_dma_mask)
--		dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	retval = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	if (retval)
-+		return retval;
+diff --git a/drivers/ata/pata_ixp4xx_cf.c b/drivers/ata/pata_ixp4xx_cf.c
+index dcc6b24..ad5ecf2 100644
+--- a/drivers/ata/pata_ixp4xx_cf.c
++++ b/drivers/ata/pata_ixp4xx_cf.c
+@@ -144,6 +144,7 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
+ 	struct ata_host *host;
+ 	struct ata_port *ap;
+ 	struct ixp4xx_pata_data *data = pdev->dev.platform_data;
++	int ret;
  
- 	irq = platform_get_irq(dev, 0);
- 	if (irq < 0) {
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 9854a1d..81b7234 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -815,6 +815,12 @@ static struct drm_driver imx_drm_driver = {
+ 	cs0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	cs1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+@@ -157,7 +158,9 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- static int imx_drm_platform_probe(struct platform_device *pdev)
+ 	/* acquire resources and fill host */
+-	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
++	if (ret)
++		return ret;
+ 
+ 	data->cs0 = devm_ioremap(&pdev->dev, cs0->start, 0x1000);
+ 	data->cs1 = devm_ioremap(&pdev->dev, cs1->start, 0x1000);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+index ca2729a..e9fb6c8 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+@@ -287,7 +287,12 @@ static struct drm_driver exynos_drm_driver = {
+ 
+ static int exynos_drm_platform_probe(struct platform_device *pdev)
  {
+-	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 +	int ret;
 +
 +	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
 +	if (ret)
 +		return ret;
 +
- 	imx_drm_device->dev = &pdev->dev;
+ 	exynos_drm_driver.num_ioctls = DRM_ARRAY_SIZE(exynos_ioctls);
  
- 	return drm_platform_init(&imx_drm_driver, pdev);
-@@ -857,8 +863,6 @@ static int __init imx_drm_init(void)
- 		goto err_pdev;
+ 	return drm_platform_init(&exynos_drm_driver, pdev);
+diff --git a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
+index 9b794c9..ce837ae 100644
+--- a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
++++ b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
+@@ -664,8 +664,9 @@ static int omap_dmm_probe(struct platform_device *dev)
  	}
  
--	imx_drm_pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32),
--
- 	ret = platform_driver_register(&imx_drm_pdrv);
- 	if (ret)
- 		goto err_pdrv;
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index 9176a81..4e66f67 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -522,7 +522,9 @@ static int ipu_drm_probe(struct platform_device *pdev)
- 	if (!pdata)
- 		return -EINVAL;
- 
--	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+ 	/* set dma mask for device */
+-	/* NOTE: this is a workaround for the hwmod not initializing properly */
+-	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++	ret = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
 +	if (ret)
-+		return ret;
++		goto fail;
  
- 	ipu_crtc = devm_kzalloc(&pdev->dev, sizeof(*ipu_crtc), GFP_KERNEL);
- 	if (!ipu_crtc)
+ 	omap_dmm->dummy_pa = page_to_phys(omap_dmm->dummy_page);
+ 
 -- 
 1.7.4.4
