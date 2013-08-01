@@ -1,70 +1,65 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 31 Jul 2013 20:59:27 -0500
-Subject: [PATCH 7/9] ARM: edma: Don't clear EMR of channel in edma_stop
-In-Reply-To: <51F8DA5C.9060503@ti.com>
-References: <1375104595-16018-1-git-send-email-joelf@ti.com>
- <1375104595-16018-8-git-send-email-joelf@ti.com> <51F77982.7030601@ti.com>
- <51F89B0B.4080803@ti.com> <51F8DA5C.9060503@ti.com>
-Message-ID: <51F9C0FF.7030703@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 31 Jul 2013 22:14:41 -0400
+Subject: [RFC/RFT PATCH 4/5] ARM: mm: change max*pfn to include the
+ physical offset of memory
+In-Reply-To: <20130731105643.GW24642@n2100.arm.linux.org.uk>
+References: <1373665694-7580-1-git-send-email-santosh.shilimkar@ti.com>
+ <1373665694-7580-5-git-send-email-santosh.shilimkar@ti.com>
+ <20130731105643.GW24642@n2100.arm.linux.org.uk>
+Message-ID: <51F9C491.8070808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 04:35 AM, Sekhar Nori wrote:
-> On Wednesday 31 July 2013 10:35 AM, Joel Fernandes wrote:
->> On 07/30/2013 03:29 AM, Sekhar Nori wrote:
->>> On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
->>>> We certainly don't want error conditions to be cleared anywhere
->>>
->>> 'anywhere' is a really loaded term.
->>>
->>>> as this will make us 'forget' about missed events. We depend on
->>>> knowing which events were missed in order to be able to reissue them.
->>>
->>>> This fixes a race condition where the EMR was being cleared
->>>> by the transfer completion interrupt handler.
->>>>
->>>> Basically, what was happening was:
->>>>
->>>>             Missed event
->>>>              |
->>>>              |
->>>>              V
->>>> SG1-SG2-SG3-Null
->>>>          \
->>>>           \__TC Interrupt (Almost same time as ARM is executing
->>>> TC interrupt handler, an event got missed and also forgotten
->>>> by clearing the EMR).
->>>
->>> Sorry, but I dont see how edma_stop() is coming into picture in the race
->>> you describe?
->>
->> In edma_callback function, for the case of DMA_COMPLETE (Transfer
->> completion interrupt), edma_stop() is called when all sets have been
->> processed. This had the effect of clearing the EMR.
+On Wednesday 31 July 2013 06:56 AM, Russell King - ARM Linux wrote:
+> On Fri, Jul 12, 2013 at 05:48:13PM -0400, Santosh Shilimkar wrote:
+>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+>> index 5b579b9..b2d5937 100644
+>> --- a/arch/arm/include/asm/dma-mapping.h
+>> +++ b/arch/arm/include/asm/dma-mapping.h
+>> @@ -47,12 +47,12 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+>>  #ifndef __arch_pfn_to_dma
+>>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>>  {
+>> -	return (dma_addr_t)__pfn_to_bus(pfn);
+>> +	return (dma_addr_t)__pfn_to_bus(pfn + PHYS_PFN_OFFSET);
+>>  }
+>>  
+>>  static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+>>  {
+>> -	return __bus_to_pfn(addr);
+>> +	return __bus_to_pfn(addr) - PHYS_PFN_OFFSET;
+>>  }
+>>  
+>>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+>> @@ -64,15 +64,16 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>>  {
+>>  	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+>>  }
+>> +
+>>  #else
+>>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>>  {
+>> -	return __arch_pfn_to_dma(dev, pfn);
+>> +	return __arch_pfn_to_dma(dev, pfn + PHYS_PFN_OFFSET);
+>>  }
+>>  
+>>  static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+>>  {
+>> -	return __arch_dma_to_pfn(dev, addr);
+>> +	return __arch_dma_to_pfn(dev, addr) - PHYS_PFN_OFFSET;
+>>  }
+>>  
+>>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+>> @@ -86,6 +87,13 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>>  }
+>>  #endif
 > 
-> Ah, thanks. I was missing the fact that the race comes into picture only
-> when using the DMA engine driver. I guess that should be mentioned
-> somewhere since it is not immediately obvious.
+> Note that I don't think the above are correct - the 'pfn' argument to the
+> above functions already includes the PFN offset of physical memory -
+> they're all physical_address >> PAGE_SHIFT values.
 > 
-> The patch looks good to me. So if you respin just this one with some
-> updated explanation based on what you wrote below, I will take it.
+Right.
+Updated patch pushed into the patch system. (patch 7805/1)
 
-Sure I'll do that. Also the trigger_channel patch, will you be taking
-that one too? I can send these 2 in a series as they touch
-arch/arm/common/edma.c
-
-Thanks,
-
--Joel
-
-
-
-> 
-> Thanks,
-> Sekhar
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Regards,
+Santosh
