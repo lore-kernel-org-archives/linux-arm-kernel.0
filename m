@@ -1,102 +1,30 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 31 Jul 2013 20:36:03 -0400
-Subject: [PATCH RFC 5/8] xen: introduce XENMEM_get_dma_buf and
- xen_put_dma_buf
-In-Reply-To: <1375292732-7627-5-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
- <1375292732-7627-5-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <22032fc7-81f5-4271-81b6-cd2bee277fb5@email.android.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 31 Jul 2013 17:42:17 -0700
+Subject: [ARM ATTEND] DT binding and support and general SOC
+Message-ID: <20130801004217.GA12730@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
->Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->---
->include/xen/interface/memory.h |   62
->++++++++++++++++++++++++++++++++++++++++
-> 1 files changed, 62 insertions(+), 0 deletions(-)
->
->diff --git a/include/xen/interface/memory.h
->b/include/xen/interface/memory.h
->index 2ecfe4f..ffd7f4e 100644
->--- a/include/xen/interface/memory.h
->+++ b/include/xen/interface/memory.h
->@@ -263,4 +263,66 @@ struct xen_remove_from_physmap {
-> };
-> DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
-> 
->+#define XENMEM_get_dma_buf             26
->+/*
->+ * This hypercall is similar to XENMEM_exchange: it exchanges the
->pages
+Qualcomm is starting to ramp up actually contributing support for MSM
+to the mainline kernel.  There are at least a couple of areas where I
+see direct discussion involvement would be useful:
 
-Could you elaborate why the existing hyper call won't work? 
+  - DT binding.  The Qualcomm out-of-tree code has roughly 37k lines
+    of dts/dtsi files.  There has been a lot of effort here to try an
+    manage/organize these bindings, but for the most part, this work
+    has happened entirely internally.  As more MSM code is
+    contributed, there will be a lot more bindings coming in.  I can
+    bring experience with what we've done/learned with our current
+    internal bindings, as well as bring feedback to more align our
+    work with how the ARM bindings in general are moving.
 
->+ * passed in with a new set of pages, contiguous and under 4G if so
->+ * requested. The new pages are going to be "pinned": it's guaranteed
->+ * that their p2m mapping won't be changed until explicitly
->"unpinned".
->+ * If return code is zero then @out.extent_list provides the MFNs of
->the
->+ * newly-allocated memory.  Returns zero on complete success,
->otherwise
->+ * a negative error code.
->+ * On complete success then always @nr_exchanged == @in.nr_extents. 
->On
->+ * partial success @nr_exchanged indicates how much work was done.
->+ */
->+struct xen_get_dma_buf {
->+    /*
->+     * [IN] Details of memory extents to be exchanged (GMFN bases).
->+     * Note that @in.address_bits is ignored and unused.
->+     */
->+    struct xen_memory_reservation in;
->+
->+    /*
->+     * [IN/OUT] Details of new memory extents.
->+     * We require that:
->+     *  1. @in.domid == @out.domid
->+     *  2. @in.nr_extents  << @in.extent_order == 
->+     *     @out.nr_extents << @out.extent_order
->+     *  3. @in.extent_start and @out.extent_start lists must not
->overlap
->+     *  4. @out.extent_start lists GPFN bases to be populated
->+     *  5. @out.extent_start is overwritten with allocated GMFN bases
->+     */
->+    struct xen_memory_reservation out;
->+
->+    /*
->+     * [OUT] Number of input extents that were successfully exchanged:
->+     *  1. The first @nr_exchanged input extents were successfully
->+     *     deallocated.
->+     *  2. The corresponding first entries in the output extent list
->correctly
->+     *     indicate the GMFNs that were successfully exchanged.
->+     *  3. All other input and output extents are untouched.
->+     *  4. If not all input exents are exchanged then the return code
->of this
->+     *     command will be non-zero.
->+     *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
->+     */
->+    xen_ulong_t nr_exchanged;
->+};
->+DEFINE_GUEST_HANDLE_STRUCT(xen_get_dma_buf);
->+
->+#define XENMEM_put_dma_buf             27
->+/*
->+ * XENMEM_put_dma_buf unpins a set of pages, previously pinned by
->+ * XENMEM_get_dma_buf. After this call the p2m mapping of the pages
->can
->+ * be transparently changed by the hypervisor, as usual. The pages are
->+ * still accessible from the guest.
->+ */
->+struct xen_put_dma_buf {
->+    /*
->+     * [IN] Details of memory extents to be exchanged (GMFN bases).
->+     * Note that @in.address_bits is ignored and unused.
->+     */
->+    struct xen_memory_reservation in;
->+};
->+DEFINE_GUEST_HANDLE_STRUCT(xen_put_dma_buf);
->+
-> #endif /* __XEN_PUBLIC_MEMORY_H__ */
+  - SoC code structure and layout.  As ARM increases in variants (new
+    CPU types, lots of SoCs, 64-bit etc), I think we should have some
+    discussion of how to best organize the code.
+
+David Brown
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
