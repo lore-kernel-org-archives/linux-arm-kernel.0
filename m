@@ -1,61 +1,36 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 1 Aug 2013 15:45:54 +0800
-Subject: [PATCH v2 6/8] usb: host: ohci-s3c2410 Use
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <Pine.LNX.4.44L0.1307311643110.1546-100000@iolanthe.rowland.org>
-References: <6370497.apKG6kIlfT@flatron>
- <Pine.LNX.4.44L0.1307311643110.1546-100000@iolanthe.rowland.org>
-Message-ID: <20130801074554.GA7519@kroah.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 01 Aug 2013 00:46:44 -0700 (PDT)
+Subject: [PATCH v6 3/3] ARM: shmobile: lager: enable nfsroot in DTS
+In-Reply-To: <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
+References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
+ <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 04:44:43PM -0400, Alan Stern wrote:
-> On Wed, 31 Jul 2013, Tomasz Figa wrote:
-> 
-> > Alan, Greg,
-> > 
-> > On Tuesday 23 of July 2013 01:49:23 Tomasz Figa wrote:
-> > > This patch modifies the ohci-s3c2410 driver to prepare and unprepare
-> > > clocks in addition to enabling and disabling, since it is required
-> > > by common clock framework.
-> > > 
-> > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > > ---
-> > >  drivers/usb/host/ohci-s3c2410.c | 8 ++++----
-> > >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/host/ohci-s3c2410.c
-> > > b/drivers/usb/host/ohci-s3c2410.c index e125770..db096bf 100644
-> > > --- a/drivers/usb/host/ohci-s3c2410.c
-> > > +++ b/drivers/usb/host/ohci-s3c2410.c
-> > > @@ -47,10 +47,10 @@ static void s3c2410_start_hc(struct platform_device
-> > > *dev, struct usb_hcd *hcd)
-> > > 
-> > >  	dev_dbg(&dev->dev, "s3c2410_start_hc:\n");
-> > > 
-> > > -	clk_enable(usb_clk);
-> > > +	clk_prepare_enable(usb_clk);
-> > >  	mdelay(2);			/* let the bus clock stabilise */
-> > > 
-> > > -	clk_enable(clk);
-> > > +	clk_prepare_enable(clk);
-> > > 
-> > >  	if (info != NULL) {
-> > >  		info->hcd	= hcd;
-> > > @@ -75,8 +75,8 @@ static void s3c2410_stop_hc(struct platform_device
-> > > *dev) (info->enable_oc)(info, 0);
-> > >  	}
-> > > 
-> > > -	clk_disable(clk);
-> > > -	clk_disable(usb_clk);
-> > > +	clk_disable_unprepare(clk);
-> > > +	clk_disable_unprepare(usb_clk);
-> > >  }
-> > > 
-> > >  /* ohci_s3c2410_hub_status_data
-> > 
-> > Any chance to get your ack on this?
-> 
-> Sorry, this must have slipped past.  It's fine with me.
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Hi Simon
+
+> Now that Ether support has been added to the lager board
+> it is possible to use nfsroot. This configuration is
+> in line with that of other shmobile boards.
+> 
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+(snip)
+>  	chosen {
+> -		bootargs = "console=ttySC6,115200 ignore_loglevel";
+> +		bootargs = "console=ttySC6,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
+
+Could you please add why this "rsize/wsize" settings
+are needed on bootargs ?
+(other shmobile board's dts file doesn't have these)
+
+And, I guess r8a7790-lager.dts/r8a7790.dts doesn't have
+"sh-eth" driver DT settings, (or I'm missing ?)
+but you added network/nfsroot settings on bootargs.
+It is OK for me, but for what ?
+
+Best regards
+---
+Kuninori Morimoto
