@@ -1,110 +1,192 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 10:45:29 +0200
-Subject: [PATCH 0/9] ARM: kirkwood: convert a few more boards to DT
-Message-ID: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu,  1 Aug 2013 10:45:32 +0200
+Subject: [PATCH 3/9] ARM: kirkwood: remove support for legacy booting of
+ Guruplug
+In-Reply-To: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375346738-21596-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The Kirkwood Guruplug platform has already been converted to the
+Device Tree, so we can remove the legacy booting option for this
+platform.
 
-Here is a set of patches that converts a few additional Kirkwood
-boards to use the Device Tree. I intend to continue this effort with
-the remaining Kirkwood boards.
-
-Note that I don't have access to any of the platforms that are being
-converted in this patch series, so this means that:
-
- - A careful review would be useful
-
- - Testing from owners of the boards would be appreciated. The DT
-   conversion of Kirkwood boards is a process that has now been
-   started a while ago, and we would like to finalize it. If board
-   owners don't react by testing the proposed patches, then the
-   support for those boards might be broken.
-
-In detail:
-
- * Patch 1 converts the d2net_v2 board to DT.
-
-   The remaining board file is needed for the Ethernet device and the
-   leds-ns2 device. A DT for the mv643xx_eth driver (by Sebastian
-   Hesselbarth) is being merged, but I wanted to avoid the dependency
-   on a different patch series for now. Ethernet can be moved to DT as
-   a followup patch.
-
- * Patches 2, 3, 4 and 5 remove support for boards that have already
-   been converted to the Deice Tree, but for which the legacy board
-   file was not removed.
-
- * Patch 6 converts the mv88f6281gtw_ge board to DT.
-
-   The remaining devices probed in a legacy way are the mv643xx_eth
-   driver (same discussion as above), and the DSA switch (note that I
-   have an Armada 370 platform with a DSA switch, so I'll have to look
-   at how to make this appear in the DT).
-
- * Patch 7 converts the LaCie Net{2,5}Big v2 platforms to DT
-
-   The remaining devices probed in a legacy way are the Ethernet
-   devices, and the leds-netxbig driver. For Ethernet, see above. For
-   leds-netxbig, Simon Guinot is currently working on this (see the
-   LAKML thread "Location for a kind of GPIO bus driver").
-
- * Patch 8 removes some common code for LaCie boards that has become
-   useless after the DT conversions.
-
- * Patch 9 adjusts kirkwood_defconfig after the DT conversions.
-
-Thomas
-
-Thomas Petazzoni (9):
-  ARM: kirkwood: convert d2net_v2 to DT
-  ARM: kirkwood: remove support for legacy booting of Dockstar
-  ARM: kirkwood: remove support for legacy booting of Guruplug
-  ARM: kirkwood: remove support for legacy booting of Sheevaplug
-  ARM: kirkwood: remove LaCie boards that are supported through DT
-  ARM: kirkwood: convert the mv88f6281gtw_ge board to DT
-  ARM: kirkwood: convert LaCie Net{2,5}Big v2 platforms to DT
-  ARM: kirkwood: remove unused common code for LaCie platforms
-  ARM: kirkwood: update defconfig after DT conversions
-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-d2net-v2.dts            | 204 ++++++++++++++
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     | 125 +++++++++
- arch/arm/boot/dts/kirkwood-net2big-v2.dts          | 204 ++++++++++++++
- arch/arm/boot/dts/kirkwood-net5big-v2.dts          | 238 +++++++++++++++++
- arch/arm/configs/kirkwood_defconfig                |  15 +-
- arch/arm/mach-kirkwood/Kconfig                     |  92 ++-----
- arch/arm/mach-kirkwood/Makefile                    |  15 +-
- arch/arm/mach-kirkwood/board-d2net_v2.c            |  72 +++++
- arch/arm/mach-kirkwood/board-dt.c                  |   7 +
- arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c     |  50 ++++
- .../{netxbig_v2-setup.c => board-netxbig_v2.c}     | 213 +--------------
- arch/arm/mach-kirkwood/common.h                    |  12 +
- arch/arm/mach-kirkwood/d2net_v2-setup.c            | 231 ----------------
- arch/arm/mach-kirkwood/dockstar-setup.c            | 111 --------
- arch/arm/mach-kirkwood/guruplug-setup.c            | 133 ----------
- arch/arm/mach-kirkwood/lacie_v2-common.c           | 114 --------
- arch/arm/mach-kirkwood/lacie_v2-common.h           |  16 --
- arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c     | 172 ------------
- arch/arm/mach-kirkwood/netspace_v2-setup.c         | 293 ---------------------
- arch/arm/mach-kirkwood/sheevaplug-setup.c          | 161 -----------
- 21 files changed, 950 insertions(+), 1529 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-d2net-v2.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-net2big-v2.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-net5big-v2.dts
- create mode 100644 arch/arm/mach-kirkwood/board-d2net_v2.c
- create mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
- rename arch/arm/mach-kirkwood/{netxbig_v2-setup.c => board-netxbig_v2.c} (53%)
- delete mode 100644 arch/arm/mach-kirkwood/d2net_v2-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/dockstar-setup.c
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-kirkwood/Kconfig          |   6 --
+ arch/arm/mach-kirkwood/Makefile         |   1 -
+ arch/arm/mach-kirkwood/guruplug-setup.c | 133 --------------------------------
+ 3 files changed, 140 deletions(-)
  delete mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
- delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
- delete mode 100644 arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/netspace_v2-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/sheevaplug-setup.c
 
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 9d056cd..9aad378 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -8,12 +8,6 @@ config MACH_ESATA_SHEEVAPLUG
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell eSATA SheevaPlug Reference Board.
+ 
+-config MACH_GURUPLUG
+-	bool "Marvell GuruPlug Reference Board"
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  Marvell GuruPlug Reference Board.
+-
+ config MACH_INETSPACE_V2
+ 	bool "LaCie Internet Space v2 NAS Board"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 13f7ab1..c3ccbf7 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -1,7 +1,6 @@
+ obj-y				+= common.o irq.o pcie.o mpp.o
+ 
+ obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
+-obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
+ obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+ obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+deleted file mode 100644
+index 08dd739..0000000
+--- a/arch/arm/mach-kirkwood/guruplug-setup.c
++++ /dev/null
+@@ -1,133 +0,0 @@
+-/*
+- * arch/arm/mach-kirkwood/guruplug-setup.c
+- *
+- * Marvell GuruPlug Reference Board Setup
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/ata_platform.h>
+-#include <linux/mv643xx_eth.h>
+-#include <linux/gpio.h>
+-#include <linux/leds.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <mach/kirkwood.h>
+-#include <linux/platform_data/mmc-mvsdio.h>
+-#include "common.h"
+-#include "mpp.h"
+-
+-static struct mtd_partition guruplug_nand_parts[] = {
+-	{
+-		.name = "u-boot",
+-		.offset = 0,
+-		.size = SZ_1M
+-	}, {
+-		.name = "uImage",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = SZ_4M
+-	}, {
+-		.name = "root",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = MTDPART_SIZ_FULL
+-	},
+-};
+-
+-static struct mv643xx_eth_platform_data guruplug_ge00_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+-};
+-
+-static struct mv643xx_eth_platform_data guruplug_ge01_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
+-};
+-
+-static struct mv_sata_platform_data guruplug_sata_data = {
+-	.n_ports	= 1,
+-};
+-
+-static struct mvsdio_platform_data guruplug_mvsdio_data = {
+-	/* unfortunately the CD signal has not been connected */
+-	.gpio_card_detect = -1,
+-	.gpio_write_protect = -1,
+-};
+-
+-static struct gpio_led guruplug_led_pins[] = {
+-	{
+-		.name			= "guruplug:red:health",
+-		.gpio			= 46,
+-		.active_low		= 1,
+-	},
+-	{
+-		.name			= "guruplug:green:health",
+-		.gpio			= 47,
+-		.active_low		= 1,
+-	},
+-	{
+-		.name			= "guruplug:red:wmode",
+-		.gpio			= 48,
+-		.active_low		= 1,
+-	},
+-	{
+-		.name			= "guruplug:green:wmode",
+-		.gpio			= 49,
+-		.active_low		= 1,
+-	},
+-};
+-
+-static struct gpio_led_platform_data guruplug_led_data = {
+-	.leds		= guruplug_led_pins,
+-	.num_leds	= ARRAY_SIZE(guruplug_led_pins),
+-};
+-
+-static struct platform_device guruplug_leds = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data	= &guruplug_led_data,
+-	}
+-};
+-
+-static unsigned int guruplug_mpp_config[] __initdata = {
+-	MPP46_GPIO,	/* M_RLED */
+-	MPP47_GPIO,	/* M_GLED */
+-	MPP48_GPIO,	/* B_RLED */
+-	MPP49_GPIO,	/* B_GLED */
+-	0
+-};
+-
+-static void __init guruplug_init(void)
+-{
+-	/*
+-	 * Basic setup. Needs to be called early.
+-	 */
+-	kirkwood_init();
+-	kirkwood_mpp_conf(guruplug_mpp_config);
+-
+-	kirkwood_uart0_init();
+-	kirkwood_nand_init(ARRAY_AND_SIZE(guruplug_nand_parts), 25);
+-
+-	kirkwood_ehci_init();
+-	kirkwood_ge00_init(&guruplug_ge00_data);
+-	kirkwood_ge01_init(&guruplug_ge01_data);
+-	kirkwood_sata_init(&guruplug_sata_data);
+-	kirkwood_sdio_init(&guruplug_mvsdio_data);
+-
+-	platform_device_register(&guruplug_leds);
+-}
+-
+-MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
+-	/* Maintainer: Siddarth Gore <gores@marvell.com> */
+-	.atag_offset	= 0x100,
+-	.init_machine	= guruplug_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= kirkwood_init_irq,
+-	.init_time	= kirkwood_timer_init,
+-	.restart	= kirkwood_restart,
+-MACHINE_END
 -- 
 1.8.1.2
