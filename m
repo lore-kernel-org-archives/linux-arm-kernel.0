@@ -1,100 +1,100 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 1 Aug 2013 09:43:52 -0400
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4OyhF+_Q8dWNBDjag=A=v=J2NE0h8+1mms2uvUMS8+45eA@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
- <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
- <20130731201457.GA24642@n2100.arm.linux.org.uk>
- <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
- <20130731204817.GC24642@n2100.arm.linux.org.uk>
- <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
- <1375352315.22084.138.camel@shinybook.infradead.org>
- <CAKON4OyhF+_Q8dWNBDjag=A=v=J2NE0h8+1mms2uvUMS8+45eA@mail.gmail.com>
-Message-ID: <CAKON4OwptvjZkOBKaJD27Ra6FsYzBaTqRb6dLaxtRpD_iCh-sQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu,  1 Aug 2013 15:44:19 +0200
+Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support in
+ PCI-to-PCI bridge
+Message-ID: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 9:34 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Thu, Aug 1, 2013 at 6:18 AM, David Woodhouse <dwmw2@infradead.org> wrote:
->> On Wed, 2013-07-31 at 17:26 -0400, jonsmirl at gmail.com wrote:
->>> Alternatively you may be of the belief that it is impossible to get
->>> rid of the board specific code. But x86 doesn't have any of it, why
->>> should ARM?
->>
->> The reason x86 doesn't have it is because it carries three decades worth
->> of legacy baggage so that it can still look like a 1980s IBM PC when
->> necessary.
->>
->> There *have* been some x86 platforms which abandon that legacy crap, and
->> for those we *do* have board-specific code. (Is James still maintaining
->> Voyager support? It feels very strange to talk about Voyager with it
->> *not* being the 'legacy crap' in question...)
->>
->> We've even seen *recent* attempts to abandon the legacy crap in the
->> embedded x86 space, which backtracked and added it all back again ? in
->> part because x86 lacked any sane way to describe the hardware if it
->> wasn't pretending to be a PC. ACPI doesn't cut it, and DT "wasn't
->> invented here"...
->>
->> Unless you want the ARM world to settle on a strategy of "all the world
->> is an Assabet", I'd be careful what you wish for...
->
-> So there should be shades for gray in this area. Try to eliminate all
-> of the board specific code you can, and then only if that fails add
-> board specific support to the kernel.
->
-> But you take device trees pretty far. I believe Grant has even used
-> one to describe an FPGA that he can dynamically load code into and
-> change its function.  Not sure how he did it, I wasn't paying too
-> close of attention when he was talking about it.
->
-> I do believe a great deal of this simple plumbing can be eliminated.
-> Like how to hook up GPIO, I2C, SPI, etc. We're pretty far down that
-> road.
->
-> A path like this seems like it would be beneficial...
-> 1) Implement DT schemas. Use those to enforce as much regularity as
-> possible into the device tree descriptions for common classes of
-> things (controllers especially - DMA, I2C, I2S, SPI, Uarts, etc)..
-> Form a group to review any changes to the common schema.
-> 2) Cleaning up the controller classes is going to cause some DT churn.
-> Hide backward compatibility in a quirks layer.
-> 3) Continue the process of removing all possible board specific code
-> that can be reasonably covered in device trees.
-> 4) There will be some board specific code left at the end of this
-> process. But anyone who looks at should agree that the functions
-> handled by the code are something that is unreasonable to address in
-> the DT system.
+The Marvell PCIe driver uses an emulated PCI-to-PCI bridge to be able
+to dynamically set up MBus address decoding windows for PCI I/O and
+memory regions depending on the PCI devices enumerated by Linux.
 
-5) this scheme supports future improvements in the DT schema. Lets say
-initially we had punted power management to board specific code.
-Then in a later kernel version implemented it using device trees. The
-quirk system lets you delete the board specific code and replace it
-with a DT quirk. That DT quirk will see your deployed DTs at boot time
-and add in the new, fancy power management DT attributes.  The new
-generic DT based power power management code will see these attributes
-added by the quirk and do the right thing. This gives us a way to
-slowly remove move board specific code if we choose to.
+However, this emulated PCI-to-PCI bridge logic makes the Linux PCI
+core believe that prefetchable memory regions are supported (because
+the registers are read/write), while in fact no adress decoding window
+is ever created for such regions. Since the Marvell MBus address
+decoding windows do not distinguish memory regions and prefetchable
+memory regions, this patch takes a simple approach: change the
+PCI-to-PCI bridge emulation to let the Linux PCI core know that we
+don't support prefetchable memory regions.
 
+To achieve this, we simply make the prefetchable memory base a
+read-only register that always returns 0. Reading/writing all the
+other prefetchable memory related registers has no effect.
 
+This problem was originally reported by Finn Hoffmann
+<finn@uni-bremen.de>, who couldn't get a RTL8111/8168B PCI NIC working
+on the NSA310 Kirkwood platform after updating to 3.11-rc. The problem
+was that the PCI-to-PCI bridge emulation was making the Linux PCI core
+believe that we support prefetchable memory, so the Linux PCI core was
+only filling the prefetchable memory base and limit registers, which
+does not lead to a MBus window being created. The below patch has been
+confirmed by Finn Hoffmann to fix his problem on Kirkwood, and has
+otherwise been successfully tested on the Armada XP GP platform with a
+e1000e PCIe NIC and a Marvell SATA PCIe card.
 
->
->
->>
->> --
->> dwmw2
->>
->
->
->
-> --
-> Jon Smirl
-> jonsmirl at gmail.com
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reported-by: Finn Hoffmann <finn@uni-bremen.de>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+This patch fixes a regression introduced in 3.11-rc, so it should be
+applied to 3.11.
+---
+ drivers/pci/host/pci-mvebu.c | 27 +--------------------------
+ 1 file changed, 1 insertion(+), 26 deletions(-)
 
-
-
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 13a633b..7bf3926 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -86,10 +86,6 @@ struct mvebu_sw_pci_bridge {
+ 	u16 secondary_status;
+ 	u16 membase;
+ 	u16 memlimit;
+-	u16 prefmembase;
+-	u16 prefmemlimit;
+-	u32 prefbaseupper;
+-	u32 preflimitupper;
+ 	u16 iobaseupper;
+ 	u16 iolimitupper;
+ 	u8 cappointer;
+@@ -419,15 +415,7 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		break;
+ 
+ 	case PCI_PREF_MEMORY_BASE:
+-		*value = (bridge->prefmemlimit << 16 | bridge->prefmembase);
+-		break;
+-
+-	case PCI_PREF_BASE_UPPER32:
+-		*value = bridge->prefbaseupper;
+-		break;
+-
+-	case PCI_PREF_LIMIT_UPPER32:
+-		*value = bridge->preflimitupper;
++		*value = 0;
+ 		break;
+ 
+ 	case PCI_IO_BASE_UPPER16:
+@@ -501,19 +489,6 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 		mvebu_pcie_handle_membase_change(port);
+ 		break;
+ 
+-	case PCI_PREF_MEMORY_BASE:
+-		bridge->prefmembase = value & 0xffff;
+-		bridge->prefmemlimit = value >> 16;
+-		break;
+-
+-	case PCI_PREF_BASE_UPPER32:
+-		bridge->prefbaseupper = value;
+-		break;
+-
+-	case PCI_PREF_LIMIT_UPPER32:
+-		bridge->preflimitupper = value;
+-		break;
+-
+ 	case PCI_IO_BASE_UPPER16:
+ 		bridge->iobaseupper = value & 0xffff;
+ 		bridge->iolimitupper = value >> 16;
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+1.8.1.2
