@@ -1,44 +1,37 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 01 Aug 2013 22:59:09 +0100
-Subject: [PATCH RFC 25/51] DMA-API: video: clcd: add
- dma_set_mask_and_coherent() call
+Date: Thu, 01 Aug 2013 23:00:09 +0100
+Subject: [PATCH RFC 26/51] DMA-API: usb: ohci-sa1111: add a note about DMA
+ masks
 In-Reply-To: <20130801213420.GL23006@n2100.arm.linux.org.uk>
 References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
-Message-ID: <E1V50tp-0006ru-6B@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1V50un-0006ry-AB@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA API requires drivers to call the appropriate dma_set_mask()
-functions before doing any DMA mapping.  Add this required call to
-the AMBA PL08x driver.
+Add a comment to explain why this driver doesn't call any of the DMA
+API dma_set_mask() functions.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/video/amba-clcd.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/usb/host/ohci-sa1111.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
-index 0a2cce7..afe4702 100644
---- a/drivers/video/amba-clcd.c
-+++ b/drivers/video/amba-clcd.c
-@@ -10,6 +10,7 @@
-  *
-  *  ARM PrimeCell PL110 Color LCD Controller
-  */
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/errno.h>
-@@ -551,6 +552,10 @@ static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (!board)
- 		return -EINVAL;
+diff --git a/drivers/usb/host/ohci-sa1111.c b/drivers/usb/host/ohci-sa1111.c
+index 17b2a7d..aa9e127 100644
+--- a/drivers/usb/host/ohci-sa1111.c
++++ b/drivers/usb/host/ohci-sa1111.c
+@@ -185,6 +185,12 @@ static int ohci_hcd_sa1111_probe(struct sa1111_dev *dev)
+ 	if (usb_disabled())
+ 		return -ENODEV;
  
-+	ret = dma_set_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		goto out;
++	/*
++	 * We don't call dma_set_mask_and_coherent() here because the
++	 * DMA mask has already been appropraitely setup by the core
++	 * SA-1111 bus code (which includes bug workarounds.)
++	 */
 +
- 	ret = amba_request_regions(dev, NULL);
- 	if (ret) {
- 		printk(KERN_ERR "CLCD: unable to reserve regs region\n");
+ 	hcd = usb_create_hcd(&ohci_sa1111_hc_driver, &dev->dev, "sa1111");
+ 	if (!hcd)
+ 		return -ENOMEM;
 -- 
 1.7.4.4
