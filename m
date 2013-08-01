@@ -1,76 +1,51 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 01 Aug 2013 22:12:14 +0900
-Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of Exynos
- SoCs
-In-Reply-To: <CAK9yfHyeOQZzf_3Nv-fmuYdZtL8dzZequdx2ZddnUyXDn66bOg@mail.gmail.com>
-References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
- <CAK9yfHy2btp1W+5-GiVQnkffDnJ-CgqXuAjGktkiKYyf7kKQbQ@mail.gmail.com>
- <003e01ce8c31$41d0c450$c5724cf0$@samsung.com>
- <CAK9yfHyeOQZzf_3Nv-fmuYdZtL8dzZequdx2ZddnUyXDn66bOg@mail.gmail.com>
-Message-ID: <003901ce8eb8$bdd877d0$39896770$@samsung.com>
+Date: Thu, 01 Aug 2013 22:14:03 +0900
+Subject: [PATCH v8 07/12] iommu/exynos: support for device tree
+In-Reply-To: <1743111.Ek7FldnHal@flatron>
+References: <003d01ce89f3$44ec2cf0$cec486d0$@samsung.com>
+ <1743111.Ek7FldnHal@flatron>
+Message-ID: <003a01ce8eb8$fe946db0$fbbd4910$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Sachin Kamat [mailto:sachin.kamat at linaro.org]
-> Sent: Monday, July 29, 2013 5:05 PM
+> From: Tomasz Figa [mailto:tomasz.figa at gmail.com]
+> Sent: Saturday, July 27, 2013 11:07 PM
 > 
-> On 29 July 2013 13:27, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> >> -----Original Message-----
-> >> From: Cho KyongHo [mailto:pullip.cho at samsung.com]
-> >> Sent: Monday, July 29, 2013 4:20 PM
-> >>
-> >> > -----Original Message-----
-> >> > From: Sachin Kamat [mailto:sachin.kamat at linaro.org]
-> >> > Sent: Monday, July 29, 2013 3:38 PM
-> >> >
-> >> > Hi KyongHo,
-> >> >
-> >> > On 26 July 2013 16:58, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> >> > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> >> > > ---
-> >> > >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
-> >> > >  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
-> >> > >  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
-> >> > >  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
-> >> > >  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
-> >> > >  5 files changed, 617 insertions(+), 0 deletions(-)
-> >> > >  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> >> >
-> >> > This patch does not apply on the mainline Linus' tree (3.11-rc2). Please rebase.
-> >> >
-> >>
-> >> OK. I will rebase the next patches on that.
+> Hi,
+> 
+> On Friday 26 of July 2013 20:28:36 Cho KyongHo wrote:
+> > This commit adds device tree support for System MMU.
+> > This also include the following changes and enhancements:
 > >
-> > I don't get any conflict both on the latest of Linus's tree (3.11-rc3)
-> > and for-next branch  of Samsung git.
-> > Can you show me the diff?
+> > * use managed device helper functions.
+> > Simplyfies System MMU device driver.
 > >
+> > * use only a single clock descriptor.
+> > System MMU device descriptor is seperate if it is imposible to make
+> > a single clock descriptor to make a device descriptor for a group of
+> > System MMUs.
+> >
+> > * removed dbgname member from sysmmu_drvdata structure.
+> > debugging kernel message for a System MMU is distinguisheable with the
+> > name of device descroptors.
+> >
+> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > ---
+> >  drivers/iommu/Kconfig        |    5 +-
+> >  drivers/iommu/exynos-iommu.c |  182
+> > ++++++++++++++++-------------------------- 2 files changed, 70
+> > insertions(+), 117 deletions(-)
 > 
-> I get the following error when I do git am on this patch (linus' tree
-> 3.11-rc3). Other patches apply fine.
-> 
-> Applying: ARM: dts: Add description of System MMU of Exynos SoCs
-> <local_path>/linux/.git/rebase-apply/patch:120: new blank line at EOF.
-> +
-> error: patch failed: arch/arm/boot/dts/exynos4.dtsi:161
-> error: arch/arm/boot/dts/exynos4.dtsi: patch does not apply
-> error: patch failed: arch/arm/boot/dts/exynos4210.dtsi:119
-> error: arch/arm/boot/dts/exynos4210.dtsi: patch does not apply
-> error: patch failed: arch/arm/boot/dts/exynos4x12.dtsi:79
-> error: arch/arm/boot/dts/exynos4x12.dtsi: patch does not apply
-> error: patch failed: arch/arm/boot/dts/exynos5250.dtsi:614
-> error: arch/arm/boot/dts/exynos5250.dtsi: patch does not apply
-> Patch failed at 0001 ARM: dts: Add description of System MMU of Exynos SoCs
-> When you have resolved this problem run "git am --resolved".
-> If you would prefer to skip this patch, instead run "git am --skip".
-> To restore the original branch and stop patching run "git am --abort".
+> Whenever you introduce or modify (extend) a device tree binding please
+> don't forget about reflecting that in documentation
+> (Documentation/devicetree/bindings) and CCing devicetree mailing list
+> (devicetree at vger.kernel.org). Both of these steps are necessary to get any
+> device tree stuff merged.
 > 
 
-I wonder why you get the errors.
-The error message shows the patch has extra blank line after the mark of EOF.
-Or, maybe the patch I posted omitted some format information...
+Oh I see.
+Thank you for advice.
 
-> --
-> With warm regards,
-> Sachin
+> Best regards,
+> Tomasz
