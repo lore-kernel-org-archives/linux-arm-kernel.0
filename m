@@ -1,30 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 1 Aug 2013 11:56:09 -0400 (EDT)
-Subject: [PATCH] USB: ohci-at91: add usb_clk for transition to common
- clk framework
-In-Reply-To: <51FA7B6A.80106@overkiz.com>
-Message-ID: <Pine.LNX.4.44L0.1308011153180.1534-100000@iolanthe.rowland.org>
+From: vince@deater.net (Vince Weaver)
+Date: Thu, 1 Aug 2013 12:02:06 -0400 (EDT)
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
+ mitigations
+In-Reply-To: <20130801025911.GA20166@redhat.com>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+ <20130730221435.GA22240@redhat.com>
+ <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
+ <20130730231533.GA26824@redhat.com>
+ <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
+ <20130731000444.GC1281@redhat.com>
+ <20130731094012.GU24642@n2100.arm.linux.org.uk>
+ <20130731142430.GA4545@redhat.com>
+ <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
+ <20130801025911.GA20166@redhat.com>
+Message-ID: <alpine.DEB.2.02.1308011158360.11550@pianoman.cluster.toy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Aug 2013, boris brezillon wrote:
+On Wed, 31 Jul 2013, Dave Jones wrote:
 
-> > What happens if uclk isn't found but it is needed?
-> It will not fail but I guess the usb host won't work as the clock won't 
-> be correctly
-> configured.
+> On Wed, Jul 31, 2013 at 07:47:30PM -0700, Olof Johansson wrote:
+>  > How long would a useful run of trinity take?
 > 
-> I agree with you: this is not a good solution.
-> 
-> Another option is to keep the previous version of this patch and put 
-> uclk handling
-> in "#ifdef CONFIG_COMMON_CLK #endif" sections.
-> 
-> Would this be acceptable ?
+> It blew up in a minute or so of runtime when I tried last week.
 
-Yes.  However, a more elegant approach is to protect the relevant 
-statements with: if (defined(CONFIG_COMMON_CLK)).  This preprocessor 
-evaluates this to a 0 or 1, so the compiler will not generate output 
-for the protected source code if the symbol isn't defined.
+I also have a chromebook running 3.4 and it is trivially easy to crash it 
+with some simple perf_event tests I have (not the fuzzer, but just the 
+regular validation tests that test counter overflow).
 
-Alan Stern
+Like Dave, I didn't bother reporting the problem because I figured 3.4 was 
+too old for anyone to care about and it was a struggle getting any 
+distro/kernel installed at all on the system let alone trying to boot 
+something close to current mainline on it.
+
+Vince
