@@ -1,83 +1,72 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 15:25:07 +0200
-Subject: [PATCHv6 04/13] irqdomain: add irq_alloc_mapping() function
+Date: Thu,  1 Aug 2013 15:25:09 +0200
+Subject: [PATCHv6 06/13] irqdomain: add support to associate an irq_domain
+ with a msi_chip
 In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375363516-2620-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375363516-2620-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extends the irqdomain subsystem with an
-irq_alloc_mapping() function which allows to let the irqdomain code
-find an available hwirq number in the range [ 0 ; domain size ] for
-the given domain, and create a virq mapping for it.
+Message Signaled Interrupts are a PCI-specific mechanism that allows
+PCI devices to notify interrupts to the CPU using in-band
+messages. The PCI subsystem represents an MSI-capable interrupt
+controller as an msi_chip structure, and this patch improves the
+irqdomain subsystem with a new pointer associating an irq_domain with
+the corresponding msi_chip.
+
+The irq_domain structure gains a pointer to a msi_chip structure, and
+a new helper function irq_domain_add_msi() is added to help in
+allocating, initializing and registering an irq_domain for a MSI-type
+interrupt controller.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- include/linux/irqdomain.h |  2 ++
- kernel/irq/irqdomain.c    | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+ include/linux/irqdomain.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index c983ed1..1ffa336 100644
+index 7113941..b0504ff 100644
 --- a/include/linux/irqdomain.h
 +++ b/include/linux/irqdomain.h
-@@ -195,6 +195,8 @@ static inline unsigned int irq_linear_revmap(struct irq_domain *domain,
- extern unsigned int irq_find_mapping(struct irq_domain *host,
- 				     irq_hw_number_t hwirq);
- extern unsigned int irq_create_direct_mapping(struct irq_domain *host);
-+extern unsigned int irq_alloc_mapping(struct irq_domain *host,
-+				      irq_hw_number_t *hwirq);
- extern int irq_create_strict_mappings(struct irq_domain *domain,
- 				      unsigned int irq_base,
- 				      irq_hw_number_t hwirq_base, int count);
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 706724e..034bbac 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -375,6 +375,42 @@ unsigned int irq_create_direct_mapping(struct irq_domain *domain)
- EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
+@@ -38,6 +38,7 @@
+ struct device_node;
+ struct irq_domain;
+ struct of_device_id;
++struct msi_chip;
  
- /**
-+ * irq_alloc_mapping() - Allocate an irq for mapping
-+ * @domain: domain to allocate the irq for or NULL for default domain
-+ * @hwirq:  reference to the returned hwirq
-+ *
-+ * This routine are used for irq controllers which can choose the
-+ * hardware interrupt number from a range [ 0 ; domain size ], such as
-+ * is often the case with PCI MSI controllers. The function will
-+ * returned the allocated hwirq number in the hwirq pointer, and the
-+ * corresponding virq number as the return value.
-+ */
-+unsigned int irq_alloc_mapping(struct irq_domain *domain,
-+			       irq_hw_number_t *out_hwirq)
+ /* Number of irqs reserved for a legacy isa controller */
+ #define NUM_ISA_INTERRUPTS	16
+@@ -101,6 +102,7 @@ struct irq_domain {
+ 	/* Optional data */
+ 	struct device_node *of_node;
+ 	struct irq_domain_chip_generic *gc;
++	struct msi_chip *msi_chip;
+ 
+ 	/* reverse map data. The linear map gets appended to the irq_domain */
+ 	irq_hw_number_t hwirq_max;
+@@ -177,6 +179,22 @@ static inline struct irq_domain *irq_domain_add_tree(struct device_node *of_node
+ 		__irq_domain_register(d);
+ 	return d;
+ }
++static inline struct irq_domain *irq_domain_add_msi(struct device_node *of_node,
++						    unsigned int size,
++						    const struct irq_domain_ops *ops,
++						    struct msi_chip *msi_chip,
++						    void *host_data)
 +{
-+	irq_hw_number_t hwirq;
-+	int rc;
-+
-+	pr_debug("irq_alloc_mapping(0x%p)\n", domain);
-+
-+	for (hwirq = 0; hwirq < domain->revmap_size; hwirq++)
-+		if (domain->linear_revmap[hwirq] == 0)
-+			break;
-+
-+	if (hwirq == domain->hwirq_max) {
-+		pr_debug("-> no available hwirq found\n");
-+		return 0;
++	struct irq_domain *d;
++	d = __irq_domain_alloc(of_node, size, size, 0, ops, host_data);
++	if (d) {
++		d->msi_chip = msi_chip;
++		__irq_domain_register(d);
 +	}
 +
-+	rc = irq_create_mapping(domain, hwirq);
-+	if (rc)
-+		*out_hwirq = hwirq;
-+
-+	return rc;
++	return d;
 +}
-+EXPORT_SYMBOL_GPL(irq_alloc_mapping);
 +
-+/**
-  * irq_create_mapping() - Map a hardware interrupt into linux irq space
-  * @domain: domain owning this hardware interrupt or NULL for default domain
-  * @hwirq: hardware irq number in that domain space
+ 
+ extern void irq_domain_remove(struct irq_domain *host);
+ 
 -- 
 1.8.1.2
