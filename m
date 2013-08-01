@@ -1,37 +1,81 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 1 Aug 2013 16:18:58 +0200
-Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
- arch/arm/mach-bcm
-In-Reply-To: <201307271638.16289.arnd@arndb.de>
-References: <20130726145639.116237136@gmail.com>
- <20130726231108.GA10812@obsidianresearch.com>
- <20130726234237.GB24642@n2100.arm.linux.org.uk>
- <201307271638.16289.arnd@arndb.de>
-Message-ID: <20130801141858.GB1904@glitch>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 1 Aug 2013 09:25:14 -0500
+Subject: [PATCHv4 05/33] CLK: omap: add DT duplicate clock registration
+ mechanism
+In-Reply-To: <51F8E1F5.20706@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-6-git-send-email-t-kristo@ti.com> <51F808A8.6000503@ti.com>
+ <51F8E1F5.20706@ti.com>
+Message-ID: <51FA6FCA.3050900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 04:38:16PM +0200, Arnd Bergmann wrote:
-> On Saturday 27 July 2013, Russell King - ARM Linux wrote:
-> > On Fri, Jul 26, 2013 at 05:11:08PM -0600, Jason Gunthorpe wrote:
-> > > On Fri, Jul 26, 2013 at 11:59:00PM +0200, Domenico Andreoli wrote:
-> >
-> > Anyway, there's a simpler solutions to this:
-> > 
-> > machdirs := $(patsubst %,arch/arm/mach-%/,$(sort $(machine-y)))
-> > platdirs := $(patsubst %,arch/arm/plat-%/,$(Sort $(plat-y)))
-> > 
-> > which will remove all duplicates.
-> 
-> This does sound like the easiest solution, although I still think
-> Olof's suggestion of making ARCH_BCM a silent Kconfig symbol would be
-> just as good if we just have this one instance.
+On 07/31/2013 05:07 AM, Tero Kristo wrote:
+> On 07/30/2013 09:40 PM, Nishanth Menon wrote:
+>> On 07/23/2013 02:20 AM, Tero Kristo wrote:
+>>> Some devices require their clocks to be available with a specific
+>>> dev-id con-id mapping. With DT, the clocks can be found by default
+>>> only with their name, or alternatively through the device node of
+>>> the consumer. With drivers, that don't support DT fully yet, add
+>>> mechanism to register specific clock names.
+>>>
+>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>
+>> with this, should it not be enough to add clocks=<&phandle>
+>
+> Don't know, I am not an expert on DT. :)
 
-I know that time is always tight and there is also this DT ABI discussion
-ongoing but do I have any chance to get any ack on this series?
+That is the usage - 
+Documentation/devicetree/bindings/clock/clock-bindings.txt
 
-Should I post a new set? It would be only to fix again the build of mach-bcm,
-I've nothing else pending.
+>
+>>
+>> I am not sure I understand what specific drivers should need to carry
+>> this "old hack" forward. More importantly, why is it preferable to carry
+>> the hack forward rather than fixing the drivers.
+>
+> At least the GP timer seems to need this, and I don't want to touch /
+> verify all the potential drivers touched by this so it is easier to
+> provide a (semi) temporary tweak.
 
-Thanks,
-Domenico
+I see that GP timer nodes seem to be already device tree converted, at 
+least I see the nodes in SoC.dtsi
+
+Do we know what is going on for these that need these temporary devices? 
+can we do a special node property for these?
+
+I think the entire problem is coz of
+timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh)); in case of 
+even of_populated.
+
+if we can get rid of usage of omap_hwmod_get_main_clk by catching them 
+with [1], then we can force the drivers to pick up based on device node 
+clocks= property.
+
+It might be easier to fix 1 driver - timer, rather than introduce am33x, 
+omap4, omap5 dra7 specific "SoC clk driver".
+
+with that this entire patch becomes redundant.
+
+
+[1]
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c 
+b/arch/arm/mach-omap2/omap_hwmod.c
+index da26659..2e90ab4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -4153,5 +4153,10 @@ const char *omap_hwmod_get_main_clk(struct 
+omap_hwmod *oh)
+  	if (!oh)
+  		return NULL;
+
++	if (!of_have_populated_dt()) {
++		WARN(1, "%s hwmod clk node read with OF?:FIXME!\n",
++		     oh->name);
++	}
++
+  	return oh->main_clk;
+  }
+-- 
+Regards,
+Nishanth Menon
