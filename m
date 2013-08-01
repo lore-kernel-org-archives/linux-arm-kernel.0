@@ -1,23 +1,50 @@
-From: B44344@freescale.com (Goel Arpit-B44344)
-Date: Thu, 1 Aug 2013 04:38:34 +0000
-Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
- architecture independent macro
-In-Reply-To: <CAOZdJXW8uF_e2nQr3gAiMf4E5pvsH_S-ztAXvx9R7-nXyaZGag@mail.gmail.com>
-References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
- <1375187900-17582-3-git-send-email-B44344@freescale.com>
- <CAOZdJXW8uF_e2nQr3gAiMf4E5pvsH_S-ztAXvx9R7-nXyaZGag@mail.gmail.com>
-Message-ID: <0DFB48290CDB0C4680160EBE62E8F9A809E9A2E0@039-SN2MPN1-023.039d.mgd.msft.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 1 Aug 2013 11:16:14 +0530
+Subject: [PATCH 03/18] ARM: davinci: Switch to sched_clock_register()
+In-Reply-To: <1375309877-16617-4-git-send-email-sboyd@codeaurora.org>
+References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
+ <1375309877-16617-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51F9F626.80306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 7:38 AM, Arpit Goel <B44344@freescale.com> wrote:
->
-> +#ifndef spin_event_timeout
-> +/**
+On Thursday 01 August 2013 04:01 AM, Stephen Boyd wrote:
+> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
+> the 64 bit function to allow us to remove the 32 bit registration
+> interface.
+> 
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/mach-davinci/time.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+> index 7a55b5c..6d5440a 100644
+> --- a/arch/arm/mach-davinci/time.c
+> +++ b/arch/arm/mach-davinci/time.c
+> @@ -285,7 +285,7 @@ static struct clocksource clocksource_davinci = {
+>  /*
+>   * Overwrite weak default sched_clock with something more precise
+>   */
+> -static u32 notrace davinci_read_sched_clock(void)
+> +static u64 notrace davinci_read_sched_clock(void)
+>  {
+>  	return timer32_read(&timers[TID_CLOCKSOURCE]);
+>  }
+> @@ -392,7 +392,7 @@ void __init davinci_timer_init(void)
+>  				    davinci_clock_tick_rate))
+>  		printk(err, clocksource_davinci.name);
+>  
+> -	setup_sched_clock(davinci_read_sched_clock, 32,
+> +	sched_clock_register(davinci_read_sched_clock, 32,
+>  			  davinci_clock_tick_rate);
 
-On Thursday, August 01, 2013 5:32 AM Timur Tabi [mailto:timur at tabi.org] wrote:
-> Why don't you make PowerPC also use this generic version?  It seems silly to have two virtually identical implementations of this macro?
+Please fix the line break to align with open parens. Otherwise looks
+good. I tested it on DA850 EVM as well. With above fixed:
 
-PowerPC uses hardware timer registers provided by PowerPC architecture to implement spin_event_timeout(). These registers make
-PowerPC implementation of spin_event_timeout() more granular in comparison to ones using generic USECS_PER_JIFFY framework. This
-would handle those cases more granularly in which evaluation of "condition" is taking time or fails.    
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
