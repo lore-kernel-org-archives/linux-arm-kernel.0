@@ -1,35 +1,120 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 1 Aug 2013 10:53:38 +0100
-Subject: [PATCH v6 2/8] ASoC: atmel: machine driver for at91sam9x5-wm8731
- boards
-In-Reply-To: <51F98CBC.6000302@wwwdotorg.org>
-References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
- <1375180329-4860-3-git-send-email-richard.genoud@gmail.com>
- <51F7FBA8.6080400@wwwdotorg.org>
- <20130730204511.GX9858@sirena.org.uk> <51F8302D.406@wwwdotorg.org>
- <20130730225845.GB9858@sirena.org.uk>
- <51F98CBC.6000302@wwwdotorg.org>
-Message-ID: <20130801095338.GK9858@sirena.org.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 01 Aug 2013 10:54:44 +0100
+Subject: [PATCH v3 05/16] ARM: mvebu: remove device tree parsing for cpu
+ nodes
+In-Reply-To: <1374492747-13879-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492747-13879-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <51FA3064.9080502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 04:16:28PM -0600, Stephen Warren wrote:
-> On 07/30/2013 04:58 PM, Mark Brown wrote:
+On 22/07/13 12:32, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Currently set_secondary_cpus_clock assume the CPU logical ordering
+> and the MPDIR in DT are same, which is incorrect.
+> 
+> Since the CPU device nodes can be retrieved in the logical ordering
+> using the DT helper, we can remove the devices tree parsing.
+> 
+> This patch removes DT parsing by making use of of_get_cpu_node.
+> 
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-> > You seem to be assuming that the strings are a bad thing.  I'm not
-> > sure that this is the case modulo the tooling issues...
+Hi Gregory/Andrew/Jason,
 
-> I do tend to think that using strings is pretty evil...
+Does this change look fine for mvebu?
+If yes, can I have your ACKs ?
 
-Well, they do avoid the legibility issues that tend to plague device
-tree - I don't really mind if they're in the property names (as with
-regulator supply properties) or in the data but having something that is
-directly legible is a substantial win.  Constants deal with this in the
-source but they make runtime debugging more painful which isn't ideal.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130801/2aa3d0b4/attachment.sig>
+Regards,
+Sudeep
+> ---
+>  arch/arm/mach-mvebu/platsmp.c | 52 ++++++++++++++++++++-----------------------
+>  1 file changed, 24 insertions(+), 28 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+> index ce81d30..001dd42 100644
+> --- a/arch/arm/mach-mvebu/platsmp.c
+> +++ b/arch/arm/mach-mvebu/platsmp.c
+> @@ -23,51 +23,47 @@
+>  #include <linux/of.h>
+>  #include <linux/mbus.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/prom.h>
+>  #include <asm/smp_plat.h>
+>  #include "common.h"
+>  #include "armada-370-xp.h"
+>  #include "pmsu.h"
+>  #include "coherency.h"
+>  
+> +static struct clk *__init get_cpu_clk(int cpu)
+> +{
+> +	struct clk *cpu_clk;
+> +	struct device_node *np = of_get_cpu_node(cpu);
+> +
+> +	if (WARN(!np, "missing cpu node\n"))
+> +		return NULL;
+> +	cpu_clk = of_clk_get(np, 0);
+> +	if (WARN_ON(IS_ERR(cpu_clk)))
+> +		return NULL;
+> +	return cpu_clk;
+> +}
+> +
+>  void __init set_secondary_cpus_clock(void)
+>  {
+> -	int thiscpu;
+> +	int thiscpu, cpu;
+>  	unsigned long rate;
+> -	struct clk *cpu_clk = NULL;
+> -	struct device_node *np = NULL;
+> +	struct clk *cpu_clk;
+>  
+>  	thiscpu = smp_processor_id();
+> -	for_each_node_by_type(np, "cpu") {
+> -		int err;
+> -		int cpu;
+> -
+> -		err = of_property_read_u32(np, "reg", &cpu);
+> -		if (WARN_ON(err))
+> -			return;
+> -
+> -		if (cpu == thiscpu) {
+> -			cpu_clk = of_clk_get(np, 0);
+> -			break;
+> -		}
+> -	}
+> -	if (WARN_ON(IS_ERR(cpu_clk)))
+> +	cpu_clk = get_cpu_clk(thiscpu);
+> +	if (!cpu_clk)
+>  		return;
+>  	clk_prepare_enable(cpu_clk);
+>  	rate = clk_get_rate(cpu_clk);
+>  
+>  	/* set all the other CPU clk to the same rate than the boot CPU */
+> -	for_each_node_by_type(np, "cpu") {
+> -		int err;
+> -		int cpu;
+> -
+> -		err = of_property_read_u32(np, "reg", &cpu);
+> -		if (WARN_ON(err))
+> +	for_each_possible_cpu(cpu) {
+> +		if (cpu == thiscpu)
+> +			continue;
+> +		cpu_clk = get_cpu_clk(cpu);
+> +		if (!cpu_clk)
+>  			return;
+> -
+> -		if (cpu != thiscpu) {
+> -			cpu_clk = of_clk_get(np, 0);
+> -			clk_set_rate(cpu_clk, rate);
+> -		}
+> +		clk_set_rate(cpu_clk, rate);
+>  	}
+>  }
+>  
+> 
