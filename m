@@ -1,88 +1,103 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  1 Aug 2013 10:40:35 +0200
-Subject: [PATCHv3 1/3] video: mxsfb: fix color settings for 18bit data bus and
- 32bpp
+Date: Thu,  1 Aug 2013 10:40:36 +0200
+Subject: [PATCHv3 2/3] video: hx8357: Make IM pins optional
 In-Reply-To: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1375346437-18991-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375346437-18991-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hector Palacios <hector.palacios@digi.com>
+The IM pins of the HX8357 controller are used to define the interface
+used to feed pixel stream to the LCD panel.
 
-For a combination of 18bit LCD data bus width and a color
-mode of 32bpp, the driver was setting the color mapping to
-rgb666, which is wrong, as the color in memory realy has an
-rgb888 layout.
+Most of the time, these pins are directly routed to either the ground or
+the VCC to set their values.
 
-This patch also removes the setting of flag CTRL_DF24 that
-makes the driver dimiss the upper 2 bits when handling 32/24bpp
-colors in a diplay with 18bit data bus width. This flag made
-true color images display wrong in such configurations.
+Remove the need to assign GPIOs to these pins when we are in such a case.
 
-Finally, the color mapping rgb666 has also been removed as nobody
-is using it and high level applications like Qt5 cannot work
-with it either.
-
-Reference: https://lkml.org/lkml/2013/5/23/220
-Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-Acked-by: Juergen Beisert <jbe@pengutronix.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 ---
- drivers/video/mxsfb.c | 26 --------------------------
- 1 file changed, 26 deletions(-)
+ drivers/video/backlight/hx8357.c | 52 ++++++++++++++++++++++++----------------
+ 1 file changed, 31 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 3ba3771..dc09ebe 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -239,24 +239,6 @@ static const struct fb_bitfield def_rgb565[] = {
- 	}
+diff --git a/drivers/video/backlight/hx8357.c b/drivers/video/backlight/hx8357.c
+index a0482b5..47237fa 100644
+--- a/drivers/video/backlight/hx8357.c
++++ b/drivers/video/backlight/hx8357.c
+@@ -76,6 +76,7 @@ struct hx8357_data {
+ 	unsigned		reset;
+ 	struct spi_device	*spi;
+ 	int			state;
++	bool			use_im_pins;
  };
  
--static const struct fb_bitfield def_rgb666[] = {
--	[RED] = {
--		.offset = 16,
--		.length = 6,
--	},
--	[GREEN] = {
--		.offset = 8,
--		.length = 6,
--	},
--	[BLUE] = {
--		.offset = 0,
--		.length = 6,
--	},
--	[TRANSP] = {	/* no support for transparency */
--		.length = 0,
--	}
--};
+ static u8 hx8357_seq_power[] = {
+@@ -250,9 +251,11 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
+ 	 * Set the interface selection pins to SPI mode, with three
+ 	 * wires
+ 	 */
+-	gpio_set_value_cansleep(lcd->im_pins[0], 1);
+-	gpio_set_value_cansleep(lcd->im_pins[1], 0);
+-	gpio_set_value_cansleep(lcd->im_pins[2], 1);
++	if (lcd->use_im_pins) {
++		gpio_set_value_cansleep(lcd->im_pins[0], 1);
++		gpio_set_value_cansleep(lcd->im_pins[1], 0);
++		gpio_set_value_cansleep(lcd->im_pins[2], 1);
++	}
+ 
+ 	/* Reset the screen */
+ 	gpio_set_value(lcd->reset, 1);
+@@ -424,25 +427,32 @@ static int hx8357_probe(struct spi_device *spi)
+ 		return -EINVAL;
+ 	}
+ 
+-	for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
+-		lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
+-						"im-gpios", i);
+-		if (lcd->im_pins[i] == -EPROBE_DEFER) {
+-			dev_info(&spi->dev, "GPIO requested is not here yet, deferring the probe\n");
+-			return -EPROBE_DEFER;
+-		}
+-		if (!gpio_is_valid(lcd->im_pins[i])) {
+-			dev_err(&spi->dev, "Missing dt property: im-gpios\n");
+-			return -EINVAL;
+-		}
 -
- static const struct fb_bitfield def_rgb888[] = {
- 	[RED] = {
- 		.offset = 16,
-@@ -309,9 +291,6 @@ static int mxsfb_check_var(struct fb_var_screeninfo *var,
- 			break;
- 		case STMLCDIF_16BIT:
- 		case STMLCDIF_18BIT:
--			/* 24 bit to 18 bit mapping */
--			rgb = def_rgb666;
--			break;
- 		case STMLCDIF_24BIT:
- 			/* real 24 bit */
- 			rgb = def_rgb888;
-@@ -453,11 +432,6 @@ static int mxsfb_set_par(struct fb_info *fb_info)
- 			return -EINVAL;
- 		case STMLCDIF_16BIT:
- 		case STMLCDIF_18BIT:
--			/* 24 bit to 18 bit mapping */
--			ctrl |= CTRL_DF24; /* ignore the upper 2 bits in
--					    *  each colour component
--					    */
--			break;
- 		case STMLCDIF_24BIT:
- 			/* real 24 bit */
- 			break;
+-		ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
+-					GPIOF_OUT_INIT_LOW, "im_pins");
+-		if (ret) {
+-			dev_err(&spi->dev, "failed to request gpio %d: %d\n",
+-				lcd->im_pins[i], ret);
+-			return -EINVAL;
++	if (of_find_property(spi->dev.of_node, "im-gpios", NULL)) {
++		lcd->use_im_pins = 1;
++
++		for (i = 0; i < HX8357_NUM_IM_PINS; i++) {
++			lcd->im_pins[i] = of_get_named_gpio(spi->dev.of_node,
++							    "im-gpios", i);
++			if (lcd->im_pins[i] == -EPROBE_DEFER) {
++				dev_info(&spi->dev, "GPIO requested is not here yet, deferring the probe\n");
++				return -EPROBE_DEFER;
++			}
++			if (!gpio_is_valid(lcd->im_pins[i])) {
++				dev_err(&spi->dev, "Missing dt property: im-gpios\n");
++				return -EINVAL;
++			}
++
++			ret = devm_gpio_request_one(&spi->dev, lcd->im_pins[i],
++						    GPIOF_OUT_INIT_LOW,
++						    "im_pins");
++			if (ret) {
++				dev_err(&spi->dev, "failed to request gpio %d: %d\n",
++					lcd->im_pins[i], ret);
++				return -EINVAL;
++			}
+ 		}
++	} else {
++		lcd->use_im_pins = 0;
+ 	}
+ 
+ 	lcdev = lcd_device_register("mxsfb", &spi->dev, lcd, &hx8357_ops);
 -- 
 1.8.3.4
