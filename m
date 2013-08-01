@@ -1,41 +1,65 @@
-From: finn@uni-bremen.de (Finn Hoffmann)
-Date: Thu, 01 Aug 2013 22:43:48 +0200
-Subject: NSA310 + DT
-In-Reply-To: <20130801160414.GI19725@lunn.ch>
-References: <20130730191943.49f8070c@skate> <20130730183610.GT24782@lunn.ch>
- <51F814A0.2050403@uni-bremen.de> <20130730232316.10dc7019@skate>
- <20130731111414.47e7670b@skate> <51F8DC3A.6010007@uni-bremen.de>
- <20130731115108.21c043fd@skate> <51F8F7E3.9090404@uni-bremen.de>
- <20130731164512.GB19725@lunn.ch> <51FA15F3.7050708@uni-bremen.de>
- <20130801160414.GI19725@lunn.ch>
-Message-ID: <51FAC884.2070805@uni-bremen.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Aug 2013 21:45:06 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130801203631.GA12802@kroah.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130801193936.GD23006@n2100.arm.linux.org.uk>
+ <20130801201539.GA12291@kroah.com>
+ <20130801201823.GF23006@n2100.arm.linux.org.uk>
+ <20130801203631.GA12802@kroah.com>
+Message-ID: <20130801204506.GH23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 02, 2013 at 04:36:31AM +0800, Greg KH wrote:
+> On Thu, Aug 01, 2013 at 09:18:23PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Aug 02, 2013 at 04:15:39AM +0800, Greg KH wrote:
+> > > I'm not saying move away from DT at all, if it can be used to describe
+> > > stuff like this, wonderful.  Just please don't use platform_bus anymore
+> > > than you have to.
+> > 
+> > As far as that sentiment goes, it would have been nice if that was made
+> > more vocally ten years ago, because at that time I was the one trying to
+> > encourage people to think about creating appropriate bus types, and what
+> > I was being told was that no, bus types are something which are deprecated
+> > and platform bus is what should be used.
+> 
+> Was that me that said that?
 
-Am 01.08.2013 18:04, schrieb Andrew Lunn:
->> The LED's on after kernel is loaded, while starting up does not work.
->>             pmx_led_sys_green: pmx-led-sys-green {
->>                  marvell,pins = "mpp28";
->>                  marvell,function = "gpio";
->>                  linux,default-trigger = "heartbeat";
->>                  brightness = <255>;
->>              };
->> I first tried default-trigger, then I added brightness additionally
->> but LED's wont turn on.
-> Can you manually turn the LED on, using /sys/class/led/.../brightness?
-> It could be we have the wrong GPIO line for the led. It would be good
-> if you could test them all, not just this one led.
->
-All LED's work via brightness and trigger default-on.
->> There is no sata hdd trigger and nand-disk does not trigger on sata
->> hdd activity.
-> They are out of tree patches. There was some discussion about SATA led
-> activity maybe 6 to 9 months ago. Maybe you can see why the suggested
-> patches got rejected. If i remember correctly, it was because they are
-> in the hot path.
->
->     Andrew
-On a quick look I have not found it but it is not that important for me.
+I don't remember...
 
-Finn
+> I don't recall it at all, and if I did, I
+> was flat out wrong.  I've always said that platform_bus is a hack, and
+> should only be used as a "last resort".  Others have grabbed onto it as
+> the "only" way to do devices for embedded things because that is what
+> they were used to.
+
+Well, I have three bus types to my name: the amba bus type, the ecard
+bus type, and the sa1111 companion chip bus type.
+
+I've been under pressure a number of times to convert the amba_bus
+implementation to be a platform_bus, and of course I've refused to do
+that because I don't see that platform buses provide what's required
+there.  Not only that, but people keep using platform devices/driver
+when they create a new driver which should be using the amba bus stuff.
+
+Unfortunately, the message that platform devices should be used is soo
+ingrained today that it's going to be really difficult to fight it
+without basically refusing everything that comes along.
+
+We also have the new problem (as of the adoption of DT on ARM) that it's
+also embedded into the DT representation now, because the platform bus
+is the "simple-bus" type in DT, and that's where everyone in ARM land
+is placing their on-SoC devices.  That happened because DT already had
+a way to create platform devices, and as they were already being used
+on ARM, it gave a way to have DT create the platform devices without
+any additional effort.
+
+Yes, we can change the kernel code, but that now means that rather than
+just changing the entirety of ARM, there's also the impact on PowerPC
+to think about too with such a change.
+
+Or we have to rip up our existing DT files and start with a different
+approach...
