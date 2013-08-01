@@ -1,108 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 1 Aug 2013 11:17:02 +0200
-Subject: [PATCHv5 05/11] of: pci: add registry of MSI chips
-In-Reply-To: <20130729125826.GH23152@manwe>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <51E41F7A.4010502@gmail.com> <20130728043310.6CF1D3E08FE@localhost>
- <20130728162711.32a9a21e@skate> <20130729065431.GA1115@manwe>
- <20130729142600.63eeab50@skate> <20130729125826.GH23152@manwe>
-Message-ID: <20130801111702.5f85dc91@skate>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 1 Aug 2013 11:17:25 +0200
+Subject: [PATCH 8/9] ARM: kirkwood: remove unused common code for LaCie
+ platforms
+In-Reply-To: <1375346738-21596-9-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375346738-21596-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130801091725.GV9916@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
-
-On Mon, 29 Jul 2013 14:58:27 +0200, Thierry Reding wrote:
-
-> > +static inline struct irq_domain *irq_domain_add_msi(struct device_node *of_node,
-> > +						    unsigned int size,
-> > +						    const struct irq_domain_ops *ops,
-> > +						    struct msi_chip *msi_chip,
-> > +						    void *host_data)
-> > +{
-> > +	return __irq_domain_add(of_node, size, size, 0, ops,
-> > +				msi_chip, host_data);
-> >  }
+On Thu, Aug 01, 2013 at 10:45:37AM +0200, Thomas Petazzoni wrote:
+> Now that all LaCie platforms have been converted to use the Device
+> Tree, we can get rid of the lacie_v2-common.{c,h} files.
 > 
-> Given that the majority of interrupt controllers probably don't have any
-> MSI functionality, I wonder if perhaps this should be done in a more
-> helper-oriented way, see below...
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-kirkwood/lacie_v2-common.c | 114 -------------------------------
+>  arch/arm/mach-kirkwood/lacie_v2-common.h |  16 -----
+>  2 files changed, 130 deletions(-)
+>  delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
+>  delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
 
-I'm not sure I get the relation between this comment on this specific
-part of the code and the match helpers suggestion that you did below.
-Could you explain?
+Please take care...
 
+You can't remove this files. A lot of functions are still used by
+netxbig_v2-setup.c. The LaCie "Big" boards are not converted to DT.
+Note that I am currently working on the leds-netxbig driver conversion,
+which is needed by the "Big" boards.
 
-> > +struct irq_domain *irq_find_msi(struct device_node *node)
-> > +{
-> > +	struct irq_domain *h, *found = NULL;
-> > +
-> > +	mutex_lock(&irq_domain_mutex);
-> > +	list_for_each_entry(h, &irq_domain_list, link) {
-> > +		if (!h->msi_chip)
-> > +			continue;
-> > +		if (h->of_node && h->of_node == node) {
-> > +			found = h;
-> > +			break;
-> > +		}
-> > +	}
-> > +	mutex_unlock(&irq_domain_mutex);
-> > +	return found;
-> > +}
-> > +EXPORT_SYMBOL_GPL(irq_find_msi);
-> 
-> This doesn't quite copy what irq_find_host() does, since it ignores the
-> associated ops->match().
-> 
-> But given that ops->match() already provides a way to hook into the
-> lookup, perhaps we could add a function such as this:
-> 
-> 	int irq_domain_supports_msi(struct irq_domain *d, struct device_node *node)
-> 	{
-> 		if ((d->of_node == NULL) || (d->of_node != node))
-> 			return 0;
-> 
-> 		return d->msi_chip != NULL;
-> 	}
-> 
-> Then use that in drivers that expose MSI functionality via an IRQ domain
-> like this:
-> 
-> 	static const struct irq_domain_ops foo_irq_domain_ops = {
-> 		...
-> 		.match = irq_domain_supports_msi,
-> 		...
-> 	};
-> 
-> One problem with this is that it doesn't solve your problem where two
-> different IRQ domains are exposed by the same device, because the
-> irq_find_host() will still match the MSI IRQ domain for the non-MSI
-> device node as well. This could be solved by adding another match
-> function...
-
-I've given this some thought, and I don't see how ->match() functions
-can solve the problem. The irq_find_host() is simply given as input a
-DT node, and is asked to find the irqdomain attached to this DT node.
-To do so, for each irqdomain in the system, it calls the ->match()
-operation, or does some default DT node equality checking. However,
-nor the irq_find_host() function, nor a custom ->match() function has a
-way of knowing whether what you're looking for is the "normal" IRQ
-controller, or the MSI controller.
-
-> This goes in hand with the helper-style API that I mentioned above. But
-> it's really up to Grant to decide which way he wants this to go.
-
-Again, I am not sure what you meant with "helper-style API". I do
-understand the idea of providing a helper irq_domain_supports_msi()
-that can be used as the ->match() operation in irq_domain_ops, but I
-fail to see how this solves the problem.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130801/b2b73ecb/attachment-0001.sig>
