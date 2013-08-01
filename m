@@ -1,62 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 1 Aug 2013 15:09:51 -0500
-Subject: [PATCH v2] ARM: Do not run dummy_flush_tlb_a15_erratum() on
- non-Cortex-A15
-In-Reply-To: <20130801105824.GE24642@n2100.arm.linux.org.uk>
-References: <1374581199-8277-1-git-send-email-festevam@gmail.com>
- <CAL_JsqLY5_biGDFFJpP_a_=WwAnVZT2CxiKvgw7=1mjBvp6znA@mail.gmail.com>
- <20130801105824.GE24642@n2100.arm.linux.org.uk>
-Message-ID: <CAL_Jsq+Zgb5Uti3HKDAs4q8bpCp8i=3XHeK+9EWPZW+ZKAA+ZQ@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 2 Aug 2013 04:15:39 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130801193936.GD23006@n2100.arm.linux.org.uk>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130801193936.GD23006@n2100.arm.linux.org.uk>
+Message-ID: <20130801201539.GA12291@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 5:58 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 31, 2013 at 11:03:46PM -0500, Rob Herring wrote:
->> I just submitted my patch for 798181 ECO fix handling to the patch
->> system today. Then I noticed this patch in your fixes branch. This is
->> going to cause some churn as my patch needs to move the core version
->> check back to a .c file.
->>
->> I don't know if you are okay with rebasing your fixes branch or not.
->> If my patch is applied first, then this issue can be handled by just
->> replacing dummy_flush_tlb_a15_erratum call in context.c a call to
->> erratum_a15_798181.
->
-> Well, firstly, are you sure your patch is correct?
+On Thu, Aug 01, 2013 at 08:39:36PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 02, 2013 at 03:27:30AM +0800, Greg KH wrote:
+> > Hm, sounds like an ACPI tree is what you need to be using :)
+> > 
+> > Seriously, why not use ACPI for stuff like this?  You already are
+> > starting to do that for ARM-based systems, why not just make it the
+> > standard?
+> 
+> Is this in the same spirit as "you should be using DT, DT can describe
+> everything you need to do.  It's made to describe bindings between
+> devices!" and here we are, two years down the line, and we apparantly
+> don't even have stable DT bindings for the ARM architecture because a
+> lot of the subsystems which SoCs need have taken that long to get
+> sorted.
 
-Yes.
+No, it's in the same spirit of, "others have already done this before,
+why are you thinking you need to reinvent the wheel?"
 
-> You're removing the call to dummy_flush_tlb_a15_erratum() before the
-> smp_call_function() - smp_call_function() does _not_ call the function
-> for the local CPU.  So, what this means is we don't end up doing any
-> of the workaround for the local CPU.
+> The amount of work this has taken so far has been tremendous, and we're
+> still working out lots of the details.  For instance, in the last six
+> months, there's been an effort to try and work out how to sanely
+> describe how a DMA controller is connected to a peripheral in DT.
 
-No,  dummy_flush_tlb_a15_erratum() is now called from within
-erratum_a15_798181 if errata_fix_needed is non-zero. The return value
-only means do the IPI or not.
+But if people think that DT should only be used for the "platform_bus",
+then they need to change their minds.  That's what I am referring to
+here.
 
-> Secondly, doesn't the check in your case reduce down to:
->
->         unsigned int midr = read_cpuid_id();
->
->         /* Cortex-A15 r0p0..r3p2 affected */
->         if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
->             /* ECO not fully fixed */
->             !(read_cpuid(CPUID_REVIDR) & 0x010))
->                 return 0;
->         return 1;
->
-> because, assuming midr is not satisfied:
->
-> revidr  errata_fix_needed       function return
-> 000     2                       1
-> 010     1                       0
-> 200     2                       1
-> 210     0                       0
->
-> I think that the above version is still cheap enough to be inline.
+The platform bus was created for all of those little "we know where this
+device is" devices.  Now that DT is being used to dynamically create
+devices and their interconnections, it should not be used, as it starts
+to fall apart as Will points out.
 
-Only because it is incomplete. :)
+I'm not saying move away from DT at all, if it can be used to describe
+stuff like this, wonderful.  Just please don't use platform_bus anymore
+than you have to.
 
-Rob
+thanks,
+
+greg k-h
