@@ -1,29 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 01 Aug 2013 10:08:14 -0600
-Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <51FA87EE.60601@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 1 Aug 2013 11:10:55 -0500
+Subject: [PATCHv4 09/33] CLK: omap: add omap4 clock init file
+In-Reply-To: <51FA7FFB.8000309@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-10-git-send-email-t-kristo@ti.com>
+ <51F81516.3050302@ti.com> <51F924CA.6000803@ti.com>
+ <51FA7341.7040303@ti.com> <51FA7FFB.8000309@ti.com>
+Message-ID: <CAGo_u6qze7SaCdTrqhby0guKu03DcRVchkV-qmT4uz2PgJMYHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2013 07:25 AM, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This set of patches introduces Message Signaled Interrupt support in
-> the Marvell EBU PCIe driver. It has been successfully tested on the
-> Armada XP GP platform with an Intel e1000e PCIe network card that
-> supports MSI.
-> 
-> This patch set is intended for merging in 3.12, so the respective
-> maintainers of the different areas are invited to review/ack the
-> patches, see below for the details. Note that several of those patches
-> are also needed for the Tegra PCIe driver.
-> 
-> There are still missing ACKs from Grant Likely (5, 6, 7), Thomas
-> Gleixner (8, 9) and Bjorn Helgaas (2, 12).
-
-Recall that Grant gave up most/all of his maintainerships, so you
-probably want someone else to approve patches 5/6/7. It looks like
-Benjamin Herrenschmidt <benh@kernel.crashing.org> is listed in
-MAINTAINERS for those patches.
+On Thu, Aug 1, 2013 at 10:34 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>>
+>> I think you already dealt with (c). in the same vein, we can do (a) and
+>> (b). Dont think anyone else has gone about this to the extent we are
+>> attempting to do till date, so as pioneers, we might as well suggest
+>> with a patch :D ?
+>
+>
+> Yea, for c I have a patch as that is clearly required. For a/b, we can
+> currently workaround. Again, I don't want to implement everything in this
+> set at once, as the result would be a huge behemoth (this is complicated
+> enough as is imo.)
+this series will be smaller if you do it, not larger. you would just
+need to introduce those parameters and not have to deal with SoC
+specific "hacky drivers".
+Regards,
+NM
