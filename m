@@ -1,194 +1,48 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 31 Jul 2013 21:27:31 -0500
-Subject: [PATCH 4/9] dma: edma: Find missed events and issue them
-In-Reply-To: <51F8D667.2040406@ti.com>
-References: <1375104595-16018-1-git-send-email-joelf@ti.com>
- <1375104595-16018-5-git-send-email-joelf@ti.com> <51F7659E.3040302@ti.com>
- <51F89763.1010102@ti.com> <51F8D667.2040406@ti.com>
-Message-ID: <51F9C793.2000001@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 31 Jul 2013 19:47:30 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
+ mitigations
+In-Reply-To: <20130731142430.GA4545@redhat.com>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+ <20130730221435.GA22240@redhat.com>
+ <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
+ <20130730231533.GA26824@redhat.com>
+ <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
+ <20130731000444.GC1281@redhat.com>
+ <20130731094012.GU24642@n2100.arm.linux.org.uk>
+ <20130731142430.GA4545@redhat.com>
+Message-ID: <CAOesGMiBa7fT+HZquNrwV=3P=Z-F9c8L7YQr7=D2BO_6pJXQ0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 04:18 AM, Sekhar Nori wrote:
-> On Wednesday 31 July 2013 10:19 AM, Joel Fernandes wrote:
->> Hi Sekhar,
->>
->> On 07/30/2013 02:05 AM, Sekhar Nori wrote:
->>> On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
->>>> In an effort to move to using Scatter gather lists of any size with
->>>> EDMA as discussed at [1] instead of placing limitations on the driver,
->>>> we work through the limitations of the EDMAC hardware to find missed
->>>> events and issue them.
->>>>
->>>> The sequence of events that require this are:
->>>>
->>>> For the scenario where MAX slots for an EDMA channel is 3:
->>>>
->>>> SG1 -> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> Null
->>>>
->>>> The above SG list will have to be DMA'd in 2 sets:
->>>>
->>>> (1) SG1 -> SG2 -> SG3 -> Null
->>>> (2) SG4 -> SG5 -> SG6 -> Null
->>>>
->>>> After (1) is succesfully transferred, the events from the MMC controller
->>>> donot stop coming and are missed by the time we have setup the transfer
->>>> for (2). So here, we catch the events missed as an error condition and
->>>> issue them manually.
->>>
->>> Are you sure there wont be any effect of these missed events on the
->>> peripheral side. For example, wont McASP get into an underrun condition
->>> when it encounters a null PaRAM set? Even UART has to transmit to a
->>
->> But it will not encounter null PaRAM set because McASP uses contiguous
->> buffers for transfer which are not scattered across physical memory.
->> This can be accomplished with an SG of size 1. For such SGs, this patch
->> series leaves it linked Dummy and does not link to Null set. Null set is
->> only used for SG lists that are > MAX_NR_SG in size such as those
->> created for example by MMC and Crypto.
->>
->>> particular baud so I guess it cannot wait like the way MMC/SD can.
->>
->> Existing driver have to wait anyway if they hit MAX SG limit today. If
->> they don't want to wait, they would have allocated a contiguous block of
->> memory and DMA that in one stretch so they don't lose any events, and in
->> such cases we are not linking to Null.
-> 
-> As long as DMA driver can advertize its MAX SG limit, peripherals can
-> always work around that by limiting the number of sync events they
-> generate so as to not having any of the events getting missed. With this
-> series, I am worried that EDMA drivers is advertizing that it can handle
-> any length SG list while not taking care of missing any events while
-> doing so. This will break the assumptions that driver writers make.
+On Wed, Jul 31, 2013 at 7:24 AM, Dave Jones <davej@redhat.com> wrote:
+> On Wed, Jul 31, 2013 at 10:40:12AM +0100, Russell King - ARM Linux wrote:
+>  > On Tue, Jul 30, 2013 at 08:04:44PM -0400, Dave Jones wrote:
+>  > > To use ARM as an example, the bugs I've seen have mostly been in arch specific
+>  > > code that does things like page-table manipulation.  The chromebook bugs I
+>  > > was hitting for eg were various kinds of PTE corruption warnings.
+>  >
+>  > Hmm, really?  Did you reported these bugs?  I'm not aware of mainline
+>  > having any changes related to bug reports on PTEs on ARM.
+>
+> I wasn't sure if it was a googleism, or happens on mainline, so no.
 
-This is already being done by some other DMA engine drivers ;). We can
-advertise more than we can handle at a time, that's the basis of this
-whole idea.
+We'd definitely be interested in hearing about what you've found. The
+3.4 kernel has a lot of out-of-tree code for exynos, we've reduced it
+quite a bit on the upcoming 3.8 one but it needs a bit more baking.
 
-I understand what you're saying but events are not something that have
-be serviced immediately, they can be queued etc and the actually
-transfer from the DMA controller can be delayed. As long as we don't
-miss the event we are fine which my series takes care off.
+As of 3.10, it's not actually hard to run a mainline kernel on the
+chromebook, but you have limited functionality (no wifi, no USB3, no
+accellerated graphics). Easiest is to do it by booting from SD card.
+See instructions at
+http://www.chromium.org/chromium-os/u-boot-porting-guide/using-nv-u-boot-on-the-samsung-arm-chromebook.
 
-So far I have tested this series on following modules in various
-configurations and have seen no issues:
-- Crypto AES
-- MMC/SD
-- SPI (128x160 display)
 
->>> Also, wont this lead to under-utilization of the peripheral bandwith?
->>> Meaning, MMC/SD is ready with data but cannot transfer because the DMA
->>> is waiting to be set-up.
->>
->> But it is waiting anyway even today. Currently based on MAX segs, MMC
->> driver/subsystem will make SG list of size max_segs. Between these
->> sessions of creating such smaller SG-lists, if for some reason the MMC
->> controller is sending events, these will be lost anyway.
-> 
-> But if MMC/SD driver knows how many events it should generate if it
-> knows the MAX SG limit. So there should not be any missed events in
-> current code. And I am not claiming that your solution is making matters
-> worse. But its not making it much better as well.
+How long would a useful run of trinity take? I've got an
+autobuilder/autobooter setup here with a cross-section of current ARM
+hardware (7 platforms and counting) that I mostly do boot testing on,
+and I should add a smallish suite of testcases to the same. Trinity
+would be a good candidate for that.
 
-This is not true for crypto, the events are not deasserted and crypto
-continues to send events. This is what led to the "don't trigger in
-Null" patch where I'm setting the missed flag to avoid recursion.
 
->> This can be used only for buffers that are contiguous in memory, not
->> those that are scattered across memory.
-> 
-> I was hinting at using the linking facility of EDMA to achieve this.
-> Each PaRAM set has full 32-bit source and destination pointers so I see
-> no reason why non-contiguous case cannot be handled.
-> 
-> Lets say you need to transfer SG[0..6] on channel C. Now, PaRAM sets are
-> typically 4 times the number of channels. In this case we use one DMA
-> PaRAM set and two Link PaRAM sets per channel. P0 is the DMA PaRAM set
-> and P1 and P2 are the Link sets.
-> 
-> Initial setup:
-> 
-> SG0 -> SG1 -> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> NULL
->  ^      ^      ^
->  |      |      |
-> P0  -> P1  -> P2  -> NULL
-> 
-> P[0..2].TCINTEN = 1, so get an interrupt after each SG element
-> completion. On each completion interrupt, hardware automatically copies
-> the linked PaRAM set into the DMA PaRAM set so after SG0 is transferred
-> out, the state of hardware is:
-> 
-> SG1  -> SG2 -> SG3 -> SG3 -> SG6 -> NULL
->  ^       ^
->  |       |
-> P0,1    P2  -> NULL
->  |       ^
->  |       |
->  ---------
-> 
-> SG1 transfer has already started by the time the TC interrupt is
-> handled. As you can see P1 is now redundant and ready to be recycled. So
-> in the interrupt handler, software recycles P1. Thus:
-> 
-> SG1 -> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> NULL
->  ^      ^      ^
->  |      |      |
-> P0  -> P2  -> P1  -> NULL
-> 
-> Now, on next interrupt, P2 gets copied and thus can get recycled.
-> Hardware state:
-> 
-> SG2  -> SG3 -> SG4 -> SG5 -> SG6 -> NULL
->  ^       ^
->  |       |
-> P0,2    P1  -> NULL
->  |       ^
->  |       |
->  ---------
-> 
-> As part of TC completion interrupt handling:
-> 
-> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> NULL
->  ^      ^      ^
->  |      |      |
-> P0  -> P1  -> P2  -> NULL
-> 
-> This goes on until the SG list in exhausted. If you use more PaRAM sets,
-> interrupt handler gets more time to recycle the PaRAM set. At no point
-> we touch P0 as it is always under active transfer. Thus the peripheral
-> is always kept busy.
-> 
-> Do you see any reason why such a mechanism cannot be implemented?
-
-This is possible and looks like another way to do it, but there are 2
-problems I can see with it.
-
-1. Its inefficient because of too many interrupts:
-
-Imagine case where we have an SG list of size 30 and MAX_NR_SG size is
-10. This method will trigger 30 interrupts always, where as with my
-patch series, you'd get only 3 interrupts. If you increase MAX_SG_NR ,
-you'd get even fewer interrupts.
-
-2. If the interrupt handler for some reason doesn't complete or get
-service in time, we will end up DMA'ing incorrect data as events
-wouldn't stop coming in even if interrupt is not yet handled (in your
-example linked sets P1 or P2 would be old ones being repeated). Where as
-with my method, we are not doing any DMA once we finish the current
-MAX_NR_SG set even if events continue to come.
-
-I feel my patch series efficient, has less LOC because of code reuse and
-has passed all possible tests I've performed on it.
-
-Thanks,
-
--Joel
-
-> 
-> Thanks,
-> Sekhar
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-Olof
