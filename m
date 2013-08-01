@@ -1,66 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 1 Aug 2013 19:59:48 +0200
-Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support
- in PCI-to-PCI bridge
-In-Reply-To: <CAErSpo7Y+OE8_NT3npC1DCQz3PrOT9Nz=6MavY+zS63pGN3x9g@mail.gmail.com>
-References: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo7Y+OE8_NT3npC1DCQz3PrOT9Nz=6MavY+zS63pGN3x9g@mail.gmail.com>
-Message-ID: <20130801195948.7ecb4ac8@skate>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 1 Aug 2013 14:11:18 -0400
+Subject: [FAILURE] omap4430-sdp allnoconfig
+In-Reply-To: <20130801175214.GA23053@n2100.arm.linux.org.uk>
+References: <20130801175214.GA23053@n2100.arm.linux.org.uk>
+Message-ID: <51FAA4C6.10203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
-
-On Thu, 1 Aug 2013 10:53:07 -0600, Bjorn Helgaas wrote:
-> On Thu, Aug 1, 2013 at 7:44 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > The Marvell PCIe driver uses an emulated PCI-to-PCI bridge to be able
-> > to dynamically set up MBus address decoding windows for PCI I/O and
-> > memory regions depending on the PCI devices enumerated by Linux.
-> >
-> > However, this emulated PCI-to-PCI bridge logic makes the Linux PCI
-> > core believe that prefetchable memory regions are supported (because
-> > the registers are read/write), while in fact no adress decoding window
-> > is ever created for such regions. Since the Marvell MBus address
-> > decoding windows do not distinguish memory regions and prefetchable
-> > memory regions, this patch takes a simple approach: change the
-> > PCI-to-PCI bridge emulation to let the Linux PCI core know that we
-> > don't support prefetchable memory regions.
-> >
-> > To achieve this, we simply make the prefetchable memory base a
-> > read-only register that always returns 0. Reading/writing all the
-> > other prefetchable memory related registers has no effect.
-> >
-> > This problem was originally reported by Finn Hoffmann
-> > <finn@uni-bremen.de>, who couldn't get a RTL8111/8168B PCI NIC working
-> > on the NSA310 Kirkwood platform after updating to 3.11-rc. The problem
-> > was that the PCI-to-PCI bridge emulation was making the Linux PCI core
-> > believe that we support prefetchable memory, so the Linux PCI core was
-> > only filling the prefetchable memory base and limit registers, which
-> > does not lead to a MBus window being created. The below patch has been
-> > confirmed by Finn Hoffmann to fix his problem on Kirkwood, and has
-> > otherwise been successfully tested on the Armada XP GP platform with a
-> > e1000e PCIe NIC and a Marvell SATA PCIe card.
-> >
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Reported-by: Finn Hoffmann <finn@uni-bremen.de>
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Thursday 01 August 2013 01:52 PM, Russell King - ARM Linux wrote:
+> My allnoconfig fails with this error:
 > 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> arch/arm/mach-omap2/built-in.o: In function `omap4_local_timer_init':
+> dss-common.c:(.init.text+0x1d90): undefined reference to `twd_local_timer_register'
 > 
-> Please merge along with your other pci-mvebu.c changes.
+> Might be worth looking into whatever's missing?
 
-I don't think we have other pci-mvebu.c lined up for 3.11. All the MSI
-stuff, mvebu-mbus DT stuff and so on is for 3.12.
+Looks like coming from below snippet but am just wondering how ?
 
-So I guess you could take that one through your pci tree. Jason, can
-you confirm?
+#ifdef CONFIG_ARCH_OMAP4
+#ifdef CONFIG_LOCAL_TIMERS
+static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+void __init omap4_local_timer_init(void)
+{
+	omap4_sync32k_timer_init();
+	/* Local timers are not supprted on OMAP4430 ES1.0 */
+	if (omap_rev() != OMAP4430_REV_ES1_0) {
+		int err;
 
-Thanks!
+		if (of_have_populated_dt()) {
+			clocksource_of_init();
+			return;
+		}
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+		err = twd_local_timer_register(&twd_local_timer);
+		if (err)
+			pr_err("twd_local_timer_register failed %d\n", err);
+	}
+}
+#else /* CONFIG_LOCAL_TIMERS */
+void __init omap4_local_timer_init(void)
+{
+	omap4_sync32k_timer_init();
+}
+#endif /* CONFIG_LOCAL_TIMERS */
+#endif /* CONFIG_ARCH_OMAP4 */
