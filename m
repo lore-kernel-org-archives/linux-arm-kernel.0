@@ -1,92 +1,62 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 1 Aug 2013 09:11:40 -0500
-Subject: [PATCHv4 06/33] CLK: omap: add autoidle support
-In-Reply-To: <51F8E365.8080604@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-7-git-send-email-t-kristo@ti.com> <51F80C77.9020109@ti.com>
- <51F8E365.8080604@ti.com>
-Message-ID: <51FA6C9C.7030800@ti.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Thu, 1 Aug 2013 16:15:59 +0200
+Subject: [PATCH v2 1/5] ARM: Broadcom: Unconditionally build
+ arch/arm/mach-bcm
+In-Reply-To: <CAGVrzcbvHbWp2_P2_tHGbKMm6wyZ3cBSZRibEQNcAjiaB4NjZA@mail.gmail.com>
+References: <20130726145639.116237136@gmail.com>
+ <20130726151223.045835540@gmail.com>
+ <20130726152918.GL29916@titan.lakedaemon.net>
+ <20130726215859.GA19469@glitch>
+ <CAGVrzcbvHbWp2_P2_tHGbKMm6wyZ3cBSZRibEQNcAjiaB4NjZA@mail.gmail.com>
+Message-ID: <20130801141559.GA1904@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 05:13 AM, Tero Kristo wrote:
-> On 07/30/2013 09:56 PM, Nishanth Menon wrote:
->> On 07/23/2013 02:20 AM, Tero Kristo wrote:
->>> OMAP clk driver now routes some of the basic clocks through own
->>> registration routine to allow autoidle support. This routine just
->>> checks a couple of device node properties and adds autoidle support
->>> if required, and just passes the registration forward to basic clocks.
->>
->> why not extend standard framework to support autoidle capable clocks OR
->> introduce our own clk node which depends on basic clocks?
->
-> Was kind of easier this way.
+On Thu, Aug 01, 2013 at 10:23:48AM +0100, Florian Fainelli wrote:
+> Hello,
+> 
+> 2013/7/26 Domenico Andreoli <cavokz@gmail.com>:
+> > On Fri, Jul 26, 2013 at 11:29:18AM -0400, Jason Cooper wrote:
+> >> On Fri, Jul 26, 2013 at 04:56:40PM +0200, Domenico Andreoli wrote:
+> >> > From: Domenico Andreoli <domenico.andreoli@linux.com>
+> >> >
+> >> > arch/arm/mach-bcm contains a plurality of Broadcom SoCs, each configured
+> >> > separately. As a matter of flexibility and maintenance, it needs to be
+> >> > always included in the build.
+> >>
+> >> So if I'm building mach-kirkwood, I _have_ to build Broadcom?  What is
+> >> the *specific* problem you're encountering that this solves?
+> >
+> > In mach-bcm we (or I, it's not very clear to me) want to have support for
+> > multiple SoCs.
+> >
+> > In trying the approach
+> >
+> > machine-$(CONFIG_ARCH_BCM)              += bcm
+> > machine-$(CONFIG_ARCH_BCM4760)          += bcm
+> >
+> > I got linker complains about multiple symbol definitiion in case both the
+> > config options are selected.
+> >
+> > The first thought was to use a common option which purpose was only to
+> > include the subdir but then, given my allergy to the tons of config options
+> > with usually not straghtforward purpose, I opted for something more simple.
+> 
+> I do not understand why are you trying so hard to put your SoC support
+> in mach-bcm. I was one of the only people to complain that mach-bcm
+> was both confusing and not generic enough to cover all Broadcom SoCs.
+> I still think it should have been specified to mach-bcmmobile or
+> something like mach-bcm28xxx. Back in the days where ARM drivers were
+> mostly living in arch/arm/*, it *might* have made some sense but now,
+> I really think that you should go with your own mach-bcm470x
+> directory.
+> 
+> BCM47060, BCM53xx and BCM28xx all have both different CPU backends and
+> different on-chip peripherals, which are even connected differently,
+> put clearly, they share very little but the ARM architecture.
 
-We never liked taking the easy road :) if we can extend standard 
-drivers, that will be the first preference - else we will need to 
-explain precisely why it cant be extended.
+I've already explained my point elsewhere in this thread. It's not technical,
+it's social. I don't see any technical disproportion to go either way.
 
->>> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
->>> index 0c38ca9..669d4c4 100644
->>> --- a/arch/arm/mach-omap2/clock.c
->>> +++ b/arch/arm/mach-omap2/clock.c
->> Not sure why, at this point in time we are going to calling drivers/clk
->> code.
->>
->>> @@ -520,6 +520,9 @@ int omap2_clk_enable_autoidle_all(void)
->>>       list_for_each_entry(c, &clk_hw_omap_clocks, node)
->>>           if (c->ops && c->ops->allow_idle)
->>>               c->ops->allow_idle(c);
->>> +
->>> +    of_omap_clk_allow_autoidle_all();
->>> +
->>>       return 0;
->>>   }
->>>
->>> @@ -539,6 +542,9 @@ int omap2_clk_disable_autoidle_all(void)
->>>       list_for_each_entry(c, &clk_hw_omap_clocks, node)
->>>           if (c->ops && c->ops->deny_idle)
->>>               c->ops->deny_idle(c);
->>> +
->>> +    of_omap_clk_deny_autoidle_all();
->>> +
->>
->> these are defined for CONFIG_OF.. anyways, without dt nodes (OMAP3 is
->> supposed to support non-DT boot even now), this would not work, would it?
->
-> The lists are empty so the funcs do nothing. However, dropping CONFIG_OF
-> would break these of course. Will figure out a fix for this.
->
-> The calls are needed for the transition phase until we can move more clk
-> stuff from mach-omap2 to drivers.
-
-yes please. for ones like these, we can try to maintain a rule of 
-mach-omap2 calling drivers/clk rather than drivers/clk -> mach-omap2. 
-This will allow us to move out of mach-omap2 eventually by just deleting 
-call points in mach-omap2.
-
-[...]
->>>
->>>   #endif
->>>
->>
->> I personally dont prefer the fact that divider-clock and
->> fixed-rate-clock now has double meaning - building a multi-arch kernel
->> for example, this can wreak havoc. standard definitions should not be
->> monkeyed around with thus if avoidable, and in this case, very much
->> avoidable.
->>
->> just my 2 cents.
->
-> Yea, as described before, I'll change the code not to make a global
-> override, instead, just make omap specific override which parses the
-> extra params. That sound better or still see some issues with that?
-
-I think described above - if we can introduce these into standard 
-drivers, it is the best, else introduce it with ti, prefix to indicate a 
-TI variant. keeps everyone happy.
-
-
--- 
-Regards,
-Nishanth Menon
+thanks,
+Domenico
