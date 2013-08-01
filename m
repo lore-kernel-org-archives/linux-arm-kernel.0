@@ -1,76 +1,71 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 31 Jul 2013 22:43:09 -0500
-Subject: [PATCH 4/9] dma: edma: Find missed events and issue them
-In-Reply-To: <51F9C793.2000001@ti.com>
-References: <1375104595-16018-1-git-send-email-joelf@ti.com>
- <1375104595-16018-5-git-send-email-joelf@ti.com> <51F7659E.3040302@ti.com>
- <51F89763.1010102@ti.com> <51F8D667.2040406@ti.com> <51F9C793.2000001@ti.com>
-Message-ID: <51F9D94D.5060702@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Jul 2013 21:45:01 -0600
+Subject: [PATCH 6/9] serial: tegra: move to generic dma DT binding
+In-Reply-To: <20130801033033.GB31469@rizhao-lap>
+References: <1374639002-16753-1-git-send-email-rizhao@nvidia.com>
+ <1374639002-16753-7-git-send-email-rizhao@nvidia.com>
+ <51F2D063.5010505@wwwdotorg.org> <20130730033134.GM15855@rizhao-lap>
+ <51F7EDF2.60700@wwwdotorg.org> <20130731034541.GQ15855@rizhao-lap>
+ <51F98275.6020906@wwwdotorg.org> <20130801033033.GB31469@rizhao-lap>
+Message-ID: <51F9D9BD.4080901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 09:27 PM, Joel Fernandes wrote:
-> On 07/31/2013 04:18 AM, Sekhar Nori wrote:
->> On Wednesday 31 July 2013 10:19 AM, Joel Fernandes wrote:
->>> Hi Sekhar,
->>>
->>> On 07/30/2013 02:05 AM, Sekhar Nori wrote:
->>>> On Monday 29 July 2013 06:59 PM, Joel Fernandes wrote:
->>>>> In an effort to move to using Scatter gather lists of any size with
->>>>> EDMA as discussed at [1] instead of placing limitations on the driver,
->>>>> we work through the limitations of the EDMAC hardware to find missed
->>>>> events and issue them.
+On 07/31/2013 09:30 PM, Richard Zhao wrote:
+> On Thu, Aug 01, 2013 at 05:32:37AM +0800, Stephen Warren wrote:
+>> On 07/30/2013 09:45 PM, Richard Zhao wrote:
+>>> On Wed, Jul 31, 2013 at 12:46:42AM +0800, Stephen Warren wrote:
+>>>> On 07/29/2013 09:31 PM, Richard Zhao wrote:
+>>>>> On Sat, Jul 27, 2013 at 03:39:15AM +0800, Stephen Warren wrote:
+>>>>>> On 07/23/2013 10:09 PM, Richard Zhao wrote:
+>>>>>>> - driver: remove use of nvidia,dma-request-selector
+>>>>>>> 	  use dma_request_slave_channel to request channel
+>>>>>>> - update binding doc
+>>>>>>
+>>>>>> This patch needs to be amended so that the DMA channel is looked up
+>>>>>> during probe() rather than open(), to guarantee that deferred probe
+>>>>>> works. It's possible to hold off probe, but not possible AFAIK to hold
+>>>>>> off opening the port.
 >>>>>
->>>>> The sequence of events that require this are:
->>>>>
->>>>> For the scenario where MAX slots for an EDMA channel is 3:
->>>>>
->>>>> SG1 -> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> Null
->>>>>
->>>>> The above SG list will have to be DMA'd in 2 sets:
->>>>>
->>>>> (1) SG1 -> SG2 -> SG3 -> Null
->>>>> (2) SG4 -> SG5 -> SG6 -> Null
->>>>>
->>>>> After (1) is succesfully transferred, the events from the MMC controller
->>>>> donot stop coming and are missed by the time we have setup the transfer
->>>>> for (2). So here, we catch the events missed as an error condition and
->>>>> issue them manually.
+>>>>> How about avoid return -EPROBE_DEFER at open() time? It can be in
+>>>>> another patch.
 >>>>
->>>> Are you sure there wont be any effect of these missed events on the
->>>> peripheral side. For example, wont McASP get into an underrun condition
->>>> when it encounters a null PaRAM set? Even UART has to transmit to a
+>>>> I don't really understand what you mean. -EPROBE_DEFER is something that
+>>>> only makes sense for probe() to return (or functions used by probe()).
+>>>> It doesn't make sense to return it anywhere else, since probe deferral
+>>>> is something that can only happen for probe().
 >>>
->>> But it will not encounter null PaRAM set because McASP uses contiguous
->>> buffers for transfer which are not scattered across physical memory.
->>> This can be accomplished with an SG of size 1. For such SGs, this patch
->>> series leaves it linked Dummy and does not link to Null set. Null set is
->>> only used for SG lists that are > MAX_NR_SG in size such as those
->>> created for example by MMC and Crypto.
->>>
->>>> particular baud so I guess it cannot wait like the way MMC/SD can.
->>>
->>> Existing driver have to wait anyway if they hit MAX SG limit today. If
->>> they don't want to wait, they would have allocated a contiguous block of
->>> memory and DMA that in one stretch so they don't lose any events, and in
->>> such cases we are not linking to Null.
+>>> What I meant is, it might not worth to move request channel to probe
+>>> only because we need to check error and return -EPROBE_DEFER.
 >>
->> As long as DMA driver can advertize its MAX SG limit, peripherals can
->> always work around that by limiting the number of sync events they
->> generate so as to not having any of the events getting missed. With this
->> series, I am worried that EDMA drivers is advertizing that it can handle
->> any length SG list while not taking care of missing any events while
->> doing so. This will break the assumptions that driver writers make.
+>> If probe() doesn't attempt to validate that the/a DMA channel provider
+>> exists, then there's no guarantee that the DMA provider has probed
+>> before the DMA client driver either probes or executes any later code.
+> 
+> I'm not against defer probe, but dma_request_slave_channel might not be
+> the right function. Ideally dma channels are allocated at open() time
+> and dma controller loaded checking is at probe() time. So there's
+> better some function called check_dma_controller_loaded(), or we could
+> also use initcalls to let dma driver probe earlier.
+> 
+> This patch intend to be simple to only change the binding.
+> 
+>> So, you could quite easily end up with a situation where the serial
+>> driver's open fails because the DMA provider has not yet probed. This is
+>> exactly what deferred probe was intended to avoid. This reason alone is
+>> enough to make it worth fixing this.
+>>
+>>> dma_request_slave_channel is better to be called as late as possible to
+>>> make better dynamic use of dma channels.
+>>
+>> probe() could validate that the provider exists in a way that doesn't
+>> permanently hold ownership of the DMA channel. For example, request it
+>> then immediately release it, in the absence of a dedicated "validate my
+>> DMA providers exist" API.
+> 
+> It's ugly but may work. The current driver didn't check dma controller
+> loaded at probe time. Let's leave the task to another patch?
 
-Sorry, just forgot to respond to "not taking care of missing any events
-while doing so". Can you clarify this? DMA engine driver is taking care
-of missed events.
-
-Also- missing of events doesn't result in feedback to the peripheral.
-Peripheral sends even to DMA controller, event is missed. Peripheral
-doesn't know anything about what happened and is waiting for transfer
-from the DMA controller.
-
-Thanks,
-
--Joel
+I suppose it's fine to solve this later, although it seems quite
+dangerous. You'd need to undo all the changes that alter where the DMA
+channels are acquired in order to satisfy your argument though.
