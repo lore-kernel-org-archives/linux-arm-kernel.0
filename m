@@ -1,31 +1,23 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 01 Jul 2013 12:48:28 +0930
-Subject: [PATCH v2] mm: module_alloc: check if size is 0
-In-Reply-To: <1372373188.2060.32.camel@joe-AO722>
-References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
- <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
- <20130627093917.GQ7171@linux-mips.org>
- <20130627152335.c3a4c9f4c647cf4a2b263479@linux-foundation.org>
- <1372373188.2060.32.camel@joe-AO722>
-Message-ID: <87sizzrmrf.fsf@rustcorp.com.au>
+From: B44344@freescale.com (Goel Arpit-B44344)
+Date: Thu, 1 Aug 2013 04:38:34 +0000
+Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
+ architecture independent macro
+In-Reply-To: <CAOZdJXW8uF_e2nQr3gAiMf4E5pvsH_S-ztAXvx9R7-nXyaZGag@mail.gmail.com>
+References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+ <1375187900-17582-3-git-send-email-B44344@freescale.com>
+ <CAOZdJXW8uF_e2nQr3gAiMf4E5pvsH_S-ztAXvx9R7-nXyaZGag@mail.gmail.com>
+Message-ID: <0DFB48290CDB0C4680160EBE62E8F9A809E9A2E0@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joe Perches <joe@perches.com> writes:
-> On Thu, 2013-06-27 at 15:23 -0700, Andrew Morton wrote:
->> On Thu, 27 Jun 2013 11:39:17 +0200 Ralf Baechle <ralf@linux-mips.org> wrote:
-> []
->> Veli-Pekka's original patch would be neater if we were to add a new
->> 
->> void *__vmalloc_node_range_zero_size_ok(<args>)
->> {
->> 	if (size == 0)
->> 		return NULL;
+On Tue, Jul 30, 2013 at 7:38 AM, Arpit Goel <B44344@freescale.com> wrote:
 >
-> I believe you mean
-> 		return ZERO_SIZE_PTR;
+> +#ifndef spin_event_timeout
+> +/**
 
-Yes, this is the Right Fix.
+On Thursday, August 01, 2013 5:32 AM Timur Tabi [mailto:timur at tabi.org] wrote:
+> Why don't you make PowerPC also use this generic version?  It seems silly to have two virtually identical implementations of this macro?
 
-Thanks,
-Rusty.
+PowerPC uses hardware timer registers provided by PowerPC architecture to implement spin_event_timeout(). These registers make
+PowerPC implementation of spin_event_timeout() more granular in comparison to ones using generic USECS_PER_JIFFY framework. This
+would handle those cases more granularly in which evaluation of "condition" is taking time or fails.    
