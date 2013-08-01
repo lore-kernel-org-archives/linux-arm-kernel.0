@@ -1,83 +1,131 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 1 Aug 2013 15:29:20 +0100
-Subject: Defining schemas for Device Tree
-In-Reply-To: <20130731185947.GB9858@sirena.org.uk>
-References: <CAKON4OxSr13VPJkwkvuF91BwFXfQ6fkAuVeEsiA=JK3cuzmavQ@mail.gmail.com>
- <51F7F596.6020503@wwwdotorg.org>
- <CAKON4OykPqYA8+ZGxjiX00Ut+iM9hqiXr5D9KEZF3PVxoqiM1g@mail.gmail.com>
- <20130730205716.GZ9858@sirena.org.uk>
- <CAKON4Ox7-6Jf0ce64Wqr5E49KS+9E135mqc_iG-PWQ7r8bzWHA@mail.gmail.com>
- <20130730230331.GC9858@sirena.org.uk>
- <CAKON4OzFdZhX0Kzu_6KiimD=KxDr6EM13zUH3GGE=hHaYx=m=Q@mail.gmail.com>
- <20130731113401.GM9858@sirena.org.uk>
- <20130731165902.GA3329@localhost.localdomain>
- <20130731185947.GB9858@sirena.org.uk>
-Message-ID: <20130801142915.GA3006@localhost.localdomain>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 1 Aug 2013 09:33:38 -0500
+Subject: [PATCHv4 07/33] CLK: omap: add support for OMAP gate clock
+In-Reply-To: <51F9230D.4020708@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-8-git-send-email-t-kristo@ti.com> <51F81148.4080203@ti.com>
+ <51F9230D.4020708@ti.com>
+Message-ID: <51FA71C2.8090806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 07:59:47PM +0100, Mark Brown wrote:
-> On Wed, Jul 31, 2013 at 05:59:10PM +0100, Dave Martin wrote:
-> 
-> > There may often be a conflict between making _good_ bindings, and making
-> > bindings which are convenient for maintainers to edit in .dts syntax.
-> 
-> > I think good bindings (in the sense of good ABI) must take precedence:
-> > good bindings need to interoperate well over a long period of time, and
-> > should be robust against future evolution of hardware platforms OSes.  If
-> > they look nice in the .dts file, that's a bonus -- but I don't think it
-> > should be viewed as a requirement.
-> 
-> While I take your point that we need to have a sane ABI I think you're
-> understating the importance of the human factors here - the harder it is
-> to reliably understand and edit the device trees the more likely it is
-> that people will end up shipping mistakes which undermines the work on
-> defining stable ABIs.
-> 
-> > A pair of properties like dma-names/dmas may be a bit cumbersome, but
-> > it can be precise, unambiguous, and simple and easy to parse and check.
-> > The semantics can be extended in the future if necessary, by adding
-> > additional companion properties.  From my perspective, this can work as
-> > a template for good bindings.
-> 
-> I think this is fine for bindings but it's just not really legible for
-> humans once the lists start growing.  We need a human interaction format
-> which is suitable for humans to work with, it's not good when people
-> start finding that it's a set backwards in terms of their ability to
-> work with their systems.
-> 
-> > Someone trying to maintain a complex .dts can always make their own life
-> > easier with a bit of scripting.  After all, in a future of stable
-> > bindings, a DT really shouldn't be changing much once it is complete.
-> > I don't see a clear reason why these issues must be solved by dtc
-> > itself.
-> 
-> I don't think it's terribly important if they're solved in dtc itself so
-> long as it's part of the standard tooling that everyone has access to.
-> There's a reasonable number of new SoCs get made which tend to be the
-> things that suffer most.
+On 07/31/2013 09:45 AM, Tero Kristo wrote:
+> On 07/30/2013 10:17 PM, Nishanth Menon wrote:
+>> On 07/23/2013 02:20 AM, Tero Kristo wrote:
+>>> This node adds support for a clock node which allows control to the
+>>> clockdomain enable / disable.
+>>
+>> Dont we have clkdm_enable/disable for the same? should we model
+>> clockdomain as a clock node?
+>
+> There was some discussion about having clockdomain code under
+> drivers/clk while back, but Mike turned this idea down.
 
-I agree with your points -- I just wanted to make the point that extensions
-to .dts must be considered carefully, focusing on a few key features
-that really are useful to everyone -- and with a commitment to support
-and use those features.
- 
-If we start making ad-hoc extensions, I worry that there is a risk of
-dtc forking -- has this issue been discussed?  How do we avoid that
-situation?
+then why are we doing this?
+
+ >>> +    .init        = &omap2_init_clk_clkdm,
+ >>> +    .enable        = &omap2_clkops_enable_clkdm,
+ >>> +    .disable    = &omap2_clkops_disable_clkdm,
+
+is practically doing this in a round about way, no? If Mike no likey 
+clkdm going in here, introducing a "pseudo" clk node has no chance of 
+going in either.. dont you think so? should we not just try to have our 
+clocks first available before we try low power scenarios as next stage?
 
 
-A fork in dtc and .dts might not be so bad a problem as a fork in the
-FDT format or DT bindings themselves, but it still sounds best avoided.
-A Linux- or ARM-specific dtc would be just as bad as vanilla dtc plus an
-obscure preprocessing framework that only the Linux (or ARM) folks use.
+>
+>>
+>>>
+>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>> ---
+>>>   drivers/clk/omap/Makefile |    2 +-
+>>>   drivers/clk/omap/clk.c    |    1 +
+>>>   drivers/clk/omap/gate.c   |   88
+>>> +++++++++++++++++++++++++++++++++++++++++++++
+>>>   include/linux/clk/omap.h  |    1 +
+>>>   4 files changed, 91 insertions(+), 1 deletion(-)
+>>>   create mode 100644 drivers/clk/omap/gate.c
+>>>
+>>
+>> my usual crib: device tree binding documentation is missing
+>>
+>>> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
+>>> index ca56700..3d3ca30f 100644
+>>> --- a/drivers/clk/omap/Makefile
+>>> +++ b/drivers/clk/omap/Makefile
+>>> @@ -1 +1 @@
+>>> -obj-y                    += clk.o dpll.o autoidle.o
+>>> +obj-y                    += clk.o dpll.o autoidle.o gate.o
+>>> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
+>>> index c149097..8c89714 100644
+>>> --- a/drivers/clk/omap/clk.c
+>>> +++ b/drivers/clk/omap/clk.c
+>>> @@ -29,6 +29,7 @@ static const struct of_device_id clk_match[] = {
+>>>       {.compatible = "divider-clock", .data = of_omap_divider_setup, },
+>>>       {.compatible = "gate-clock", .data = of_gate_clk_setup, },
+>>>       {.compatible = "ti,omap4-dpll-clock", .data =
+>>> of_omap4_dpll_setup, },
+>>> +    {.compatible = "ti,gate-clock", .data = of_omap_gate_clk_setup, },
+>>
+>> I am a little lost - is there any SoC dts that actually uses this? at
+>> least this series does not seem to introduce any node that uses this
+>> compatibility as per git grep :(
+>
+> There is, see patch 08/33 or 28/33.
+
+yes indeed, my bad, looks like my eyesight is no longer what it used to 
+be :P.. time for those binocular glasses and a hammer on top of my head 
+to remind myself :D
 
 
-If we agree that the only acceptable form for "object-like" properties is
-the paired-property model and enforce/strongly encourage this policy
-when reviewing new bindings, then it may be worth adding dedicated
-syntax to dtc.  We just shouldn't allow this tool to morph into dt-c++
-unless we have a relly good reason.
+>>> +    of_property_read_string(node, "clock-output-names", &clk_name);
+>>> +    of_property_read_string(node, "ti,clkdm-name",
+>>> &clk_hw->clkdm_name);
+>>> +
+>>> +    init.name = clk_name;
+>>> +    init.ops = &omap_gate_clk_ops;
+>>> +
+>>> +    num_parents = of_clk_get_parent_count(node);
+>>> +    if (num_parents < 1) {
+>>> +        pr_err("%s: omap trace_clk %s must have parent(s)\n",
+>>> +            __func__, node->name);
+>> CHECK: Alignment should match open parenthesis
+>
+> I still wonder which version of checkpatch you are using.
 
-Cheers
----Dave
+hehe, makes me look hawkeyed :P.. no magic here obviously ;)
+
+./scripts/checkpatch.pl --strict
+
+revision: git describe
+v3.11-rc3-47-g72195e0
+(with all the patches applied).
+
+[...]
+>>> +    kfree(clk_hw);
+>>> +}
+>>> +EXPORT_SYMBOL(of_omap_gate_clk_setup);
+>>> +CLK_OF_DECLARE(omap_gate_clk, "ti,omap-gate-clock",
+>>> of_omap_gate_clk_setup);
+>>> +#endif
+>>> diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
+>>> index 904bdad..58ebb80 100644
+>>> --- a/include/linux/clk/omap.h
+>>> +++ b/include/linux/clk/omap.h
+>>> @@ -194,6 +194,7 @@ extern void omap_dt_clocks_register(struct
+>>> omap_dt_clk *oclks, int cnt);
+>>>   void of_omap4_dpll_setup(struct device_node *node);
+>>>   void of_omap_fixed_factor_setup(struct device_node *node);
+>>>   void of_omap_divider_setup(struct device_node *node);
+>>> +void of_omap_gate_clk_setup(struct device_node *node);
+>> dont need to export I think if we use strategy mentioned previously.
+>
+> So, we actually had an offline chat with Nishanth, and I will modify the
+> init setup like previously suggested by him.
+>
+yes, thanks.
+
+
+-- 
+Regards,
+Nishanth Menon
