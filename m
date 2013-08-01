@@ -1,51 +1,104 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Thu, 1 Aug 2013 22:37:51 +0530
-Subject: [RFC/PATCH 0/3] arm: omap: patches from -rt
-In-Reply-To: <1375359165-8411-1-git-send-email-balbi@ti.com>
-References: <1375359165-8411-1-git-send-email-balbi@ti.com>
-Message-ID: <51FA95E7.6040602@ti.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  1 Aug 2013 19:07:50 +0200
+Subject: [PATCH v2] usb: gadget: at91_udc: add usb_clk for transition to
+ common clk framework
+Message-ID: <1375376870-22747-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 August 2013 05:42 PM, Felipe Balbi wrote:
-> Hi,
->
-> the next three patches were taken from v3.10.4-rt1 patchset.
->
-> I don't have any boards available to test them, so I'd suggest
-> testing in as many platforms as possible before pushing
-> upstream.
->
-> By pushing these patches upstream, we help decrease the amount
-> of out-of-tree changes rt folks need to carry.
->
-> Frank Rowand (1):
->    arm: omap: convert omap boot_lock to raw
->
-> Sebastian Andrzej Siewior (1):
->    i2c/omap: drop the lock hard irq context
->
-> Thomas Gleixner (1):
->    serial: omap: fix omap lock crap
->
->   arch/arm/mach-omap2/omap-smp.c   | 10 +++++-----
->   drivers/i2c/busses/i2c-omap.c    |  5 +----
->   drivers/tty/serial/omap-serial.c | 12 ++++--------
->   3 files changed, 10 insertions(+), 17 deletions(-)
->
-Tested this series on
+The AT91 PMC (Power Management Controller) provides an USB clock used by
+USB Full Speed host (ohci) and USB Full Speed device (udc).
+The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+This configuration was formely done in mach-at91/clock.c, but this
+implementation will be removed when moving to common clk framework.
 
-omap4-sdp:
-  - Boot tested .
-  - run i2c dump on buses where devices were present.
-  - check wakeup from suspend.
+This patch adds support for usb clock retrieval and configuration, and is
+backward compatible with the current at91 clk implementation (if usb clk
+is not found, it does not configure/enable it).
 
-omap5-uevm:
-- Boot tested.
-- Tested this series on buses where devices are present.
+Changes since v1:
+ - use IS_ENABLED(CONFIG_COMMON_CLK) to isolate new at91 clk support
 
-dra7-evm:
-  - Boot tested.
-  - run i2c dump on buses where devices are present.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/usb/gadget/at91_udc.c |   21 +++++++++++++++++++--
+ drivers/usb/gadget/at91_udc.h |    2 +-
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
-Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index fce8e4e..5c7c8bb 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -870,6 +870,11 @@ static void clk_on(struct at91_udc *udc)
+ 	if (udc->clocked)
+ 		return;
+ 	udc->clocked = 1;
++
++	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
++		clk_set_rate(udc->uclk, 48000000);
++		clk_prepare_enable(udc->uclk);
++	}
+ 	clk_prepare_enable(udc->iclk);
+ 	clk_prepare_enable(udc->fclk);
+ }
+@@ -882,6 +887,8 @@ static void clk_off(struct at91_udc *udc)
+ 	udc->gadget.speed = USB_SPEED_UNKNOWN;
+ 	clk_disable_unprepare(udc->fclk);
+ 	clk_disable_unprepare(udc->iclk);
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		clk_disable_unprepare(udc->uclk);
+ }
+ 
+ /*
+@@ -1774,10 +1781,12 @@ static int at91udc_probe(struct platform_device *pdev)
+ 	/* get interface and function clocks */
+ 	udc->iclk = clk_get(dev, "udc_clk");
+ 	udc->fclk = clk_get(dev, "udpck");
+-	if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk)) {
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		udc->uclk = clk_get(dev, "usb_clk");
++	if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk) ||
++	    (IS_ENABLED(CONFIG_COMMON_CLK) && IS_ERR(udc->uclk))) {
+ 		DBG("clocks missing\n");
+ 		retval = -ENODEV;
+-		/* NOTE: we "know" here that refcounts on these are NOPs */
+ 		goto fail1;
+ 	}
+ 
+@@ -1851,6 +1860,12 @@ fail3:
+ fail2:
+ 	free_irq(udc->udp_irq, udc);
+ fail1:
++	if (IS_ENABLED(CONFIG_COMMON_CLK) && !IS_ERR(udc->uclk))
++		clk_put(udc->uclk);
++	if (!IS_ERR(udc->fclk))
++		clk_put(udc->fclk);
++	if (!IS_ERR(udc->iclk))
++		clk_put(udc->iclk);
+ 	iounmap(udc->udp_baseaddr);
+ fail0a:
+ 	if (cpu_is_at91rm9200())
+@@ -1894,6 +1909,8 @@ static int __exit at91udc_remove(struct platform_device *pdev)
+ 
+ 	clk_put(udc->iclk);
+ 	clk_put(udc->fclk);
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		clk_put(udc->uclk);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/usb/gadget/at91_udc.h b/drivers/usb/gadget/at91_udc.h
+index e647d1c..0175246 100644
+--- a/drivers/usb/gadget/at91_udc.h
++++ b/drivers/usb/gadget/at91_udc.h
+@@ -126,7 +126,7 @@ struct at91_udc {
+ 	unsigned			active_suspend:1;
+ 	u8				addr;
+ 	struct at91_udc_data		board;
+-	struct clk			*iclk, *fclk;
++	struct clk			*iclk, *fclk, *uclk;
+ 	struct platform_device		*pdev;
+ 	struct proc_dir_entry		*pde;
+ 	void __iomem			*udp_baseaddr;
+-- 
+1.7.9.5
