@@ -1,58 +1,94 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 1 Aug 2013 09:50:38 -0500
-Subject: [PATCHv4 23/33] CLK: OMAP: add interface clock support for OMAP3
-In-Reply-To: <51F92898.3090206@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 1 Aug 2013 17:59:46 +0300
+Subject: [PATCHv4 02/33] clk: omap: introduce clock driver
+In-Reply-To: <51FA663E.3070109@ti.com>
 References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-24-git-send-email-t-kristo@ti.com>
- <51F820DF.1080306@ti.com> <51F92898.3090206@ti.com>
-Message-ID: <51FA75BE.3080802@ti.com>
+ <1374564028-11352-3-git-send-email-t-kristo@ti.com> <51F7DA0D.7060709@ti.com>
+ <51F8D1E3.2@ti.com> <51FA663E.3070109@ti.com>
+Message-ID: <51FA77E2.60104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 10:09 AM, Tero Kristo wrote:
-> On 07/30/2013 11:23 PM, Nishanth Menon wrote:
->> On 07/23/2013 02:20 AM, Tero Kristo wrote:
->>> OMAP3 has interface clocks in addition to functional clocks, which
->> is it just OMAP3?
->
-> Yea, only omap3 is using this code. Basically because there is control
-> for the module specific interface clocks which is absent from omap4+.
-> Personally I think modelling the interface clocks in the first place in
-> kernel side was a bad idea, and should have just enabled all of them and
-> enable autoidles for them at the same point.
-
-Not all autoidles work unfortunately, which is why they got modelled :D 
-some even have the weird tendency to hang up L3/L4 interconnect when the 
-OCP statemachines required inside the IP block for the autoidle PRCM 
-handshake has been, umm... "not well implemented" ;) forcing us to use 
-S/w supervised mode of operations.
-
-
->
+On 08/01/2013 04:44 PM, Nishanth Menon wrote:
+> On 07/31/2013 03:59 AM, Tero Kristo wrote:
+>> On 07/30/2013 06:21 PM, Nishanth Menon wrote:
+>>> On 07/23/2013 02:19 AM, Tero Kristo wrote:
+>>>> Parses OMAP clock data from DT and registers those clocks with the
+>>>> clock
+>>>> framework.  dt_omap_clk_init must be called early during boot for timer
+>>>> initialization so it is exported and called from the existing clock
+>>>> code
+>>>> instead of probing like a real driver. Based on initial work done by
+>>>> Mike Turquette.
+>>>>
+>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>> Cc: Mike Turquette <mturquette@linaro.org>
+>>>> ---
+>>>>   drivers/clk/Makefile      |    1 +
+>>>>   drivers/clk/omap/Makefile |    1 +
+>>>>   drivers/clk/omap/clk.c    |   39
+>>>> +++++++++++++++++++++++++++++++++++++++
+>>>
+>>> Minor suggestion - should we just start drivers/clk/ti/ instead of
+>>> clk/omap?
+>>>
+>>> AM335x/DRA7 are not "strictly OMAP".. might also allow for some reuse
+>>> for other TI platforms..
 >>
->>> require special handling for the autoidle and idle status register
->>> offsets mainly.
+>> Not sure, this idea has been bounced around a bit. samsung has its own
+>> directory under drivers/clk/ so maybe. I can change this if there is a
+>> strong wish for this.
+>
+> just my 2 cents - if we use drivers/clk/ti, we can then move required
+> stuff from arch/arm/mach-davinci or arch/arm/mach-keystone to a ti
+> generic location allowing us to reuse things as needed.
+
+Ok, I'll rename the dir.
+
+>
 >>
 >>>
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>> ---
->>>   drivers/clk/omap/Makefile    |    2 +-
->>>   drivers/clk/omap/clk.c       |    3 ++
->>>   drivers/clk/omap/interface.c |  110
->>> ++++++++++++++++++++++++++++++++++++++++++
->> should this be isolated off for omap3?
+>>>>   include/linux/clk/omap.h  |   24 ++++++++++++++++++++++++
+>>>>   4 files changed, 65 insertions(+)
+>>>>   create mode 100644 drivers/clk/omap/Makefile
+>>>>   create mode 100644 drivers/clk/omap/clk.c
+>>>>   create mode 100644 include/linux/clk/omap.h
+>>>>
+>>>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>>>> index 4038c2b..d3c3733 100644
+>>>> --- a/drivers/clk/Makefile
+>>>> +++ b/drivers/clk/Makefile
+>>>> @@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_VT8500)    += clk-vt8500.o
+>>>>   obj-$(CONFIG_ARCH_ZYNQ)        += zynq/
+>>>>   obj-$(CONFIG_ARCH_TEGRA)    += tegra/
+>>>>   obj-$(CONFIG_PLAT_SAMSUNG)    += samsung/
+>>>> +obj-$(CONFIG_ARCH_OMAP)        += omap/
+>>>>
+>>>>   obj-$(CONFIG_X86)        += x86/
+>>>>
+>>>> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
+>>>> new file mode 100644
+>>>> index 0000000..8195931
+>>>> --- /dev/null
+>>>> +++ b/drivers/clk/omap/Makefile
+>>>> @@ -0,0 +1 @@
+>>>> +obj-y                    += clk.o
+>>>> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
+>>>> new file mode 100644
+>>>> index 0000000..4bf1929
+>>>> --- /dev/null
+>>>> +++ b/drivers/clk/omap/clk.c
+>>>> @@ -0,0 +1,39 @@
+>>>> +/*
+>>>> + * OMAP PRCM clock driver
+>>>
+>>> maybe then prcm-clk.c ?
+>>
+>> Maybe remove the PRCM part. We have some clocks behind i2c for example,
+>> and we might want to add support for them here.
 >
-> You mean within makefile or?
+> I think we can actually drop this file in it's entirety if we stick with
+> of_clk_init(NULL) and depend solely of CLK_OF_DECLARE from relevant
+> drivers.
 
-omap3-interface-clock.c or something more sensible and Makefile? I dont 
-really have any strong opinions on this anyways.. interface.c is fine 
-with me as well as the nodes are not probed unless compatible flags are 
-set..
-
-just trying to save a few bits in code space by building only if OMAP3 
-is present.. /me shrugs..
-
-
--- 
-Regards,
-Nishanth Menon
+Yeah, I'll do this and drop the file.
