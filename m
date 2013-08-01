@@ -1,35 +1,27 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Wed, 31 Jul 2013 19:20:29 -0500
-Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
- architecture independent macro
-In-Reply-To: <51F9A8F1.9020704@codeaurora.org>
-References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
- <1375187900-17582-3-git-send-email-B44344@freescale.com>
- <20130731071630.GI8868@codeaurora.org>
- <CAOZdJXVvNBR-qf7LXNOHZVstH_Rebxwn-wAkSaBS53Wn55mYCw@mail.gmail.com>
- <51F9A5FE.8030608@codeaurora.org> <51F9A80E.5010307@tabi.org>
- <51F9A8F1.9020704@codeaurora.org>
-Message-ID: <51F9A9CD.1040804@tabi.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 31 Jul 2013 20:31:05 -0400
+Subject: [PATCH 16/18] ARM: orion: Switch to sched_clock_register()
+In-Reply-To: <1375309877-16617-17-git-send-email-sboyd@codeaurora.org>
+References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
+ <1375309877-16617-17-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130801003105.GU5882@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 07:16 PM, Stephen Boyd wrote:
-> cpu_relax() is usually just a compiler barrier or an instruction hint to
-> the cpu that it should cool down because we're spinning in a tight loop.
-> It certainly shouldn't be calling into the  scheduler.
+On Wed, Jul 31, 2013 at 03:31:15PM -0700, Stephen Boyd wrote:
+> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
+> the 64 bit function to allow us to remove the 32 bit registration
+> interface.
+> 
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/plat-orion/time.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Ah yes, I remember now.  So it does seem that if we can fix the problem
-of non-incrementing 'jiffies', then this macro can be used in interrupts.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Of course, that assumes that spinning in interrupt context is a good
-idea to begin with.  Maybe we shouldn't be encouraging it?
+thx,
 
->> > FYI, you might want to look at the code reviews for spin_event_timeout()
->> > on the linuxppc-dev mailing list, back in March 2009.
->> >
-> Sure. Any pointers? Otherwise I'll go digging around the archives.
-
-https://lists.ozlabs.org/pipermail/linuxppc-dev/2009-March/thread.html
-
--- 
-Timur Tabi
+Jason.
