@@ -1,42 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  1 Aug 2013 17:26:52 +0900
-Subject: [PATCH 10/14] ARM: shmobile: Use pm-rmobile on sh7372 and r8a7740 only
+Date: Thu,  1 Aug 2013 17:26:31 +0900
+Subject: [PATCH 09/14] ARM: shmobile: r8a73a4: Remove ->init_machine() special
+ case
 In-Reply-To: <cover.1375344714.git.horms+renesas@verge.net.au>
 References: <cover.1375344714.git.horms+renesas@verge.net.au>
-Message-ID: <0173a741e19e072ae34fda4a32d004e52c9da8e7.1375344714.git.horms+renesas@verge.net.au>
+Message-ID: <67fde41ea4251f722b4466597c479fb42fccac2c.1375344714.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-The functions in pm-rmobile.c are only used on sh7372 and
-r8a7740, so adjust the Makefile to only link in that file
-in case those SoCs are selected.
+No need to special case r8a73a4 ->init_machine(),
+so get rid of undesired cpufreq platform device
+from the generic long term r8a73a4 DT support code.
+
+For short term support on APE6EVM the DT reference
+implementation already adds a "cpufreq-cpu0" platform
+device so that can be used for development.
+
+Regarding more long term cpufreq support, perhaps
+it makes sense to adjust the cpufreq driver to check
+for DT information directly instead of using a
+platform device for software configuration and DT
+for hardware parameters.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a73a4.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 62574c1..3c56de8 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -28,11 +28,10 @@ obj-$(CONFIG_ARCH_R8A7740)	+= entry-intc.o
- # PM objects
- obj-$(CONFIG_SUSPEND)		+= suspend.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
--obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
--obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
--obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
--obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
-+obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o pm-rmobile.o
- obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
-+obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o pm-rmobile.o
-+obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index d533bd2..11c0f63 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -210,11 +210,6 @@ void __init r8a73a4_init_delay(void)
+ }
  
- # Board objects
- obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
+ #ifdef CONFIG_USE_OF
+-void __init r8a73a4_add_standard_devices_dt(void)
+-{
+-	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+ 
+ static const char *r8a73a4_boards_compat_dt[] __initdata = {
+ 	"renesas,r8a73a4",
+@@ -223,7 +218,6 @@ static const char *r8a73a4_boards_compat_dt[] __initdata = {
+ 
+ DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
+ 	.init_early	= r8a73a4_init_delay,
+-	.init_machine	= r8a73a4_add_standard_devices_dt,
+ 	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= r8a73a4_boards_compat_dt,
+ MACHINE_END
 -- 
 1.8.3.2
