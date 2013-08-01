@@ -1,94 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 1 Aug 2013 17:59:46 +0300
-Subject: [PATCHv4 02/33] clk: omap: introduce clock driver
-In-Reply-To: <51FA663E.3070109@ti.com>
-References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
- <1374564028-11352-3-git-send-email-t-kristo@ti.com> <51F7DA0D.7060709@ti.com>
- <51F8D1E3.2@ti.com> <51FA663E.3070109@ti.com>
-Message-ID: <51FA77E2.60104@ti.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  1 Aug 2013 16:59:24 +0200
+Subject: [RFC PATCH 0/2] clk: add clk accuracy support
+Message-ID: <1375369164-27901-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2013 04:44 PM, Nishanth Menon wrote:
-> On 07/31/2013 03:59 AM, Tero Kristo wrote:
->> On 07/30/2013 06:21 PM, Nishanth Menon wrote:
->>> On 07/23/2013 02:19 AM, Tero Kristo wrote:
->>>> Parses OMAP clock data from DT and registers those clocks with the
->>>> clock
->>>> framework.  dt_omap_clk_init must be called early during boot for timer
->>>> initialization so it is exported and called from the existing clock
->>>> code
->>>> instead of probing like a real driver. Based on initial work done by
->>>> Mike Turquette.
->>>>
->>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>> Cc: Mike Turquette <mturquette@linaro.org>
->>>> ---
->>>>   drivers/clk/Makefile      |    1 +
->>>>   drivers/clk/omap/Makefile |    1 +
->>>>   drivers/clk/omap/clk.c    |   39
->>>> +++++++++++++++++++++++++++++++++++++++
->>>
->>> Minor suggestion - should we just start drivers/clk/ti/ instead of
->>> clk/omap?
->>>
->>> AM335x/DRA7 are not "strictly OMAP".. might also allow for some reuse
->>> for other TI platforms..
->>
->> Not sure, this idea has been bounced around a bit. samsung has its own
->> directory under drivers/clk/ so maybe. I can change this if there is a
->> strong wish for this.
->
-> just my 2 cents - if we use drivers/clk/ti, we can then move required
-> stuff from arch/arm/mach-davinci or arch/arm/mach-keystone to a ti
-> generic location allowing us to reuse things as needed.
+Hello,
 
-Ok, I'll rename the dir.
+This patch series is a proposal to add clock accuracy retrieval support to the
+common clk framework.
 
->
->>
->>>
->>>>   include/linux/clk/omap.h  |   24 ++++++++++++++++++++++++
->>>>   4 files changed, 65 insertions(+)
->>>>   create mode 100644 drivers/clk/omap/Makefile
->>>>   create mode 100644 drivers/clk/omap/clk.c
->>>>   create mode 100644 include/linux/clk/omap.h
->>>>
->>>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->>>> index 4038c2b..d3c3733 100644
->>>> --- a/drivers/clk/Makefile
->>>> +++ b/drivers/clk/Makefile
->>>> @@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_VT8500)    += clk-vt8500.o
->>>>   obj-$(CONFIG_ARCH_ZYNQ)        += zynq/
->>>>   obj-$(CONFIG_ARCH_TEGRA)    += tegra/
->>>>   obj-$(CONFIG_PLAT_SAMSUNG)    += samsung/
->>>> +obj-$(CONFIG_ARCH_OMAP)        += omap/
->>>>
->>>>   obj-$(CONFIG_X86)        += x86/
->>>>
->>>> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
->>>> new file mode 100644
->>>> index 0000000..8195931
->>>> --- /dev/null
->>>> +++ b/drivers/clk/omap/Makefile
->>>> @@ -0,0 +1 @@
->>>> +obj-y                    += clk.o
->>>> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
->>>> new file mode 100644
->>>> index 0000000..4bf1929
->>>> --- /dev/null
->>>> +++ b/drivers/clk/omap/clk.c
->>>> @@ -0,0 +1,39 @@
->>>> +/*
->>>> + * OMAP PRCM clock driver
->>>
->>> maybe then prcm-clk.c ?
->>
->> Maybe remove the PRCM part. We have some clocks behind i2c for example,
->> and we might want to add support for them here.
->
-> I think we can actually drop this file in it's entirety if we stick with
-> of_clk_init(NULL) and depend solely of CLK_OF_DECLARE from relevant
-> drivers.
+The support of accuracy retrieval may benefit to the at91 platform (I explain
+why in the following paragraphs).
 
-Yeah, I'll do this and drop the file.
+I don't know if other platforms may benefit from this accuracy support. This
+series is here to get feedbacks from other developpers/maintainers, and see if
+this can be integrated in the clk framework.
+
+Here is why at91 platform may need the clk accuracy informations:
+
+AT91 SoCs provide a slow clock (32 KHz clock) which can be used as a clock
+source for some peripherals (USART, TC blocks, ...).
+
+This slow clock can be generated from 2 sources:
+- a 32KHz internal RC with a poor accuracy (50000 ppm)
+- a 32KHz external crystal oscillator
+
+Most of the supported at91 boards (if not all) use the external 32KHz crystal
+source except for the kizbox (the board I'm working with :)).
+Most of you will say this is a bad hardware design and the hardware team
+should have connected a crystal oscillator to the SoC instead of relying
+on the unaccurate internal RC (and they are probably right).
+But I can't change the hardware as it is already widely deployed.
+
+What I'm proposing is to give clock users the ability to retrieve clocks
+accuracies in order to choose the most accurate source (or at least discard
+clocks with poor accuracy).
+
+Could you tell me if this approach is right, and if other platforms/boards have
+similar issues and would be interrested by this series ?
+
+Best Regards,
+
+Boris
+
+Boris BREZILLON (2):
+  clk: add clk accuracy retrieval support
+  clk: add accuracy support for fixed clock
+
+ Documentation/clk.txt                              |    4 +
+ .../devicetree/bindings/clock/fixed-clock.txt      |    3 +
+ drivers/clk/Kconfig                                |    4 +
+ drivers/clk/clk-fixed-rate.c                       |   41 +++++++--
+ drivers/clk/clk.c                                  |   91 +++++++++++++++++++-
+ include/linux/clk-private.h                        |    1 +
+ include/linux/clk-provider.h                       |   14 +++
+ include/linux/clk.h                                |   17 ++++
+ 8 files changed, 166 insertions(+), 9 deletions(-)
+
+-- 
+1.7.9.5
