@@ -1,5 +1,5 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 1 Aug 2013 15:01:09 -0400
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Aug 2013 20:02:27 +0100
 Subject: [FAILURE] omap4430-sdp allnoconfig
 In-Reply-To: <20130801185956.GK8868@codeaurora.org>
 References: <20130801175214.GA23053@n2100.arm.linux.org.uk>
@@ -7,16 +7,16 @@ References: <20130801175214.GA23053@n2100.arm.linux.org.uk>
  <51FAA985.3000809@ti.com> <51FAAA31.6020903@codeaurora.org>
  <51FAAAFD.6000706@codeaurora.org> <51FAAD73.3030103@ti.com>
  <20130801185956.GK8868@codeaurora.org>
-Message-ID: <51FAB075.4020807@ti.com>
+Message-ID: <20130801190227.GC23053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 August 2013 02:59 PM, Stephen Boyd wrote:
+On Thu, Aug 01, 2013 at 11:59:56AM -0700, Stephen Boyd wrote:
 > On 08/01, Santosh Shilimkar wrote:
->> This one looks fine for me. Can you send above in
->> a proper patch ? Let me know if you want me to
->> send it.
->>
+> > This one looks fine for me. Can you send above in
+> > a proper patch ? Let me know if you want me to
+> > send it.
+> > 
 > 
 > Here's a proper patch. Olof, can you please apply this on top of
 > the merge (and maybe you can fix the merge again to handle the
@@ -36,8 +36,9 @@ On Thursday 01 August 2013 02:59 PM, Stephen Boyd wrote:
 > `twd_local_timer_register'
 > 
 > Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-Thanks Stephen
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Please change this to be:
+
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Thanks.
