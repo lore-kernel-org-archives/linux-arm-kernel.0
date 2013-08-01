@@ -1,110 +1,77 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 1 Aug 2013 10:53:07 -0600
-Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support
- in PCI-to-PCI bridge
-In-Reply-To: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAErSpo7Y+OE8_NT3npC1DCQz3PrOT9Nz=6MavY+zS63pGN3x9g@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 1 Aug 2013 18:05:37 +0100
+Subject: [Patch V2 4/4] ARM: dts: AM33XX: update rtc node compatibility
+In-Reply-To: <51F7E7FA.3080702@ti.com>
+References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
+ <51F749B0.7020802@ti.com>
+ <20130730145501.GA29859@e106331-lin.cambridge.arm.com>
+ <51F7E7FA.3080702@ti.com>
+Message-ID: <20130801170537.GF8095@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 7:44 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> The Marvell PCIe driver uses an emulated PCI-to-PCI bridge to be able
-> to dynamically set up MBus address decoding windows for PCI I/O and
-> memory regions depending on the PCI devices enumerated by Linux.
->
-> However, this emulated PCI-to-PCI bridge logic makes the Linux PCI
-> core believe that prefetchable memory regions are supported (because
-> the registers are read/write), while in fact no adress decoding window
-> is ever created for such regions. Since the Marvell MBus address
-> decoding windows do not distinguish memory regions and prefetchable
-> memory regions, this patch takes a simple approach: change the
-> PCI-to-PCI bridge emulation to let the Linux PCI core know that we
-> don't support prefetchable memory regions.
->
-> To achieve this, we simply make the prefetchable memory base a
-> read-only register that always returns 0. Reading/writing all the
-> other prefetchable memory related registers has no effect.
->
-> This problem was originally reported by Finn Hoffmann
-> <finn@uni-bremen.de>, who couldn't get a RTL8111/8168B PCI NIC working
-> on the NSA310 Kirkwood platform after updating to 3.11-rc. The problem
-> was that the PCI-to-PCI bridge emulation was making the Linux PCI core
-> believe that we support prefetchable memory, so the Linux PCI core was
-> only filling the prefetchable memory base and limit registers, which
-> does not lead to a MBus window being created. The below patch has been
-> confirmed by Finn Hoffmann to fix his problem on Kirkwood, and has
-> otherwise been successfully tested on the Armada XP GP platform with a
-> e1000e PCIe NIC and a Marvell SATA PCIe card.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reported-by: Finn Hoffmann <finn@uni-bremen.de>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Tue, Jul 30, 2013 at 05:21:14PM +0100, Sekhar Nori wrote:
+> On 7/30/2013 8:25 PM, Mark Rutland wrote:
+> > On Tue, Jul 30, 2013 at 06:05:52AM +0100, Gururaja Hebbar wrote:
+> >> Hi,
+> >>
+> >> On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
+> >>> Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
+> >>>
+> >>> Update the rtc compatible property to "ti,am3352-rtc" to enable handling
+> >>> of this feature inside rtc-omap driver.
+> >>
+> >> The other 2 rtc driver related patches have been pulled up. If you have 
+> >> no comments, can you please pull this up.
+> >>
+> >> Regards
+> >> Gururaja
+> >>
+> >>>
+> >>> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> >>> ---
+> >>> :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
+> >>>   arch/arm/boot/dts/am33xx.dtsi |    2 +-
+> >>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> >>> index 77aa1b0..dde180a 100644
+> >>> --- a/arch/arm/boot/dts/am33xx.dtsi
+> >>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> >>> @@ -297,7 +297,7 @@
+> >>>   		};
+> >>>
+> >>>   		rtc at 44e3e000 {
+> >>> -			compatible = "ti,da830-rtc";
+> >>> +			compatible = "ti,am3352-rtc";
+> > 
+> > Given that this is backwards compatible with the old binding, it would
+> > be nicer to have this as:
+> > 
+> > 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
+> > 
+> > We must get into the habit of changing dts files in a
+> > backwards-compatible fashion.
+> 
+> Right, I suggested this when v1 was posted. It turns out the current
+> kernel does not handle the compatilble list correctly and the string
+> selected actually depends on the order in which it appears in match
+> table in driver instead.
+> 
+> I saw there were patches being discussed to fix this issue, but until
+> that is fixed, we cannot really use what you (and I before) suggested.
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+A temporary solution would be to list the "ti,am3352-rtc" first in the
+of_match_table kernel-side. That way you can keep the old compatible
+string in the dts compatible list, and maintain backwards compatibilty
+with older kernels.
 
-Please merge along with your other pci-mvebu.c changes.
+Later if the way Linux matches compatible strings is changed, this
+shouldn't break the probe order, and the of_match_table order could be
+changed.
 
-> ---
-> This patch fixes a regression introduced in 3.11-rc, so it should be
-> applied to 3.11.
-> ---
->  drivers/pci/host/pci-mvebu.c | 27 +--------------------------
->  1 file changed, 1 insertion(+), 26 deletions(-)
->
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 13a633b..7bf3926 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -86,10 +86,6 @@ struct mvebu_sw_pci_bridge {
->         u16 secondary_status;
->         u16 membase;
->         u16 memlimit;
-> -       u16 prefmembase;
-> -       u16 prefmemlimit;
-> -       u32 prefbaseupper;
-> -       u32 preflimitupper;
->         u16 iobaseupper;
->         u16 iolimitupper;
->         u8 cappointer;
-> @@ -419,15 +415,7 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
->                 break;
->
->         case PCI_PREF_MEMORY_BASE:
-> -               *value = (bridge->prefmemlimit << 16 | bridge->prefmembase);
-> -               break;
-> -
-> -       case PCI_PREF_BASE_UPPER32:
-> -               *value = bridge->prefbaseupper;
-> -               break;
-> -
-> -       case PCI_PREF_LIMIT_UPPER32:
-> -               *value = bridge->preflimitupper;
-> +               *value = 0;
->                 break;
->
->         case PCI_IO_BASE_UPPER16:
-> @@ -501,19 +489,6 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
->                 mvebu_pcie_handle_membase_change(port);
->                 break;
->
-> -       case PCI_PREF_MEMORY_BASE:
-> -               bridge->prefmembase = value & 0xffff;
-> -               bridge->prefmemlimit = value >> 16;
-> -               break;
-> -
-> -       case PCI_PREF_BASE_UPPER32:
-> -               bridge->prefbaseupper = value;
-> -               break;
-> -
-> -       case PCI_PREF_LIMIT_UPPER32:
-> -               bridge->preflimitupper = value;
-> -               break;
-> -
->         case PCI_IO_BASE_UPPER16:
->                 bridge->iobaseupper = value & 0xffff;
->                 bridge->iolimitupper = value >> 16;
-> --
-> 1.8.1.2
->
+Have I missed something?
+
+Thanks,
+Mark.
