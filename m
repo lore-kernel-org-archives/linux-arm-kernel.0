@@ -1,94 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 01 Aug 2013 11:34:25 -0700
-Subject: [FAILURE] omap4430-sdp allnoconfig
-In-Reply-To: <51FAA985.3000809@ti.com>
-References: <20130801175214.GA23053@n2100.arm.linux.org.uk>
- <51FAA4C6.10203@ti.com> <20130801182707.GB23053@n2100.arm.linux.org.uk>
- <51FAA985.3000809@ti.com>
-Message-ID: <51FAAA31.6020903@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Aug 2013 19:35:31 +0100
+Subject: [ARM ATTEND] Describing complex, non-probable system topologies
+Message-ID: <20130801183531.GB29831@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/13 11:31, Santosh Shilimkar wrote:
-> On Thursday 01 August 2013 02:27 PM, Russell King - ARM Linux wrote:
->> On Thu, Aug 01, 2013 at 02:11:18PM -0400, Santosh Shilimkar wrote:
->>> On Thursday 01 August 2013 01:52 PM, Russell King - ARM Linux wrote:
->>>> My allnoconfig fails with this error:
->>>>
->>>> arch/arm/mach-omap2/built-in.o: In function `omap4_local_timer_init':
->>>> dss-common.c:(.init.text+0x1d90): undefined reference to `twd_local_timer_register'
->>>>
->>>> Might be worth looking into whatever's missing?
->>> Looks like coming from below snippet but am just wondering how ?
->> Well, looking at the config allnoconfig generated, it doesn't have SMP
->> and therefore it doesn't have local timers.
->>
->> The build tree has this in it:
->>
->> #ifdef CONFIG_ARCH_OMAP4
->> static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
->> void __init omap4_local_timer_init(void)
->> {
->>         omap4_sync32k_timer_init();
->>         /* Local timers are not supprted on OMAP4430 ES1.0 */
->>         if (omap_rev() != OMAP4430_REV_ES1_0) {
->>                 int err;
->>
->>                 if (of_have_populated_dt()) {
->>                         clocksource_of_init();
->>                         return;
->>                 }
->>
->>                 err = twd_local_timer_register(&twd_local_timer);
->>                 if (err)
->>                         pr_err("twd_local_timer_register failed %d\n", err);
->>         }
->> }
->> #endif /* CONFIG_ARCH_OMAP4 */
->>
-> Now it make sense.
->
->> which is changed from your version thanks to this commit:
->>
->> commit ef3160cd2f0a400751f2cf6fd2811225fee1d5a7
->> Author: Stephen Boyd <sboyd@codeaurora.org>
->> Date:   Mon Mar 4 19:24:35 2013 -0800
->>
->>     ARM: OMAP2+: Divorce from local timer API
->>     
->>     Now that the TWD doesn't rely on the local timer API, OMAP can
->>     stop selecting it in Kconfig and relying on the config option to
->>     decide if it should call smp_twd functions.
->>     
->>     Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>     Acked-by: Tony Lindgren <tony@atomide.com>
->>     Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>     Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>
->> So it seems LOCAL_TIMER is still actually required...
->>
-> yep. Lets see what Stephen has to say.
+Hello,
 
-Hmm.. Looks like you can either wrap this up in a CONFIG_HAVE_ARM_TWD
-check or just compile in TWD all the time on omap4. The latter is
-simpler but not a direct conversion.
+Whilst Linux implements a bunch of different bus types (many of which
+are in fact virtual), devices sitting on non-probable, memory mapped
+buses inside SoCs typically live on either the platform_bus or the
+amba_bus. So far, this has worked out alright; the buses haven't needed
+to be visible to software and no additional software control is really
+required from the OS. However, as I/O coherency and hardware
+virtualisation capabilities start to creep into ARM-based SoCs, Linux
+needs to know the topology of the system on which it is running.
 
----8<----
+Naturally, this would need to be described as a device-tree binding and
+communicate:
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 4e0049a..c9e9b2c 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -90,7 +90,7 @@ config ARCH_OMAP4
-        select CACHE_L2X0
-        select CPU_V7
-        select HAVE_ARM_SCU if SMP
--       select HAVE_ARM_TWD if SMP
-+       select HAVE_ARM_TWD
-        select HAVE_SMP
-        select OMAP_INTERCONNECT
-        select PL310_ERRATA_588369
+  - Buses which can be configured as coherent, including which devices
+    on those buses can be made coherent.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+  - How IOMMUs sit on the bus and interact with masters on that bus (the
+    current one-IOMMU-driver-per-bus may not work well for the
+    platform_bus).
+
+  - QoS and PM constraints. This isn't really in my area, but we do have
+    buses that have these features and expect software to control them.
+
+  - The system topology and linkages between buses and devices.
+
+The last point is increasingly important as various blocks of ARM system
+IP start to require knowledge of masters and how things like memory
+traffic, DVM messages, interrupts (think MSI) etc are routed between
+them in order to configure the system correctly. For example, interfacing
+a PCIe device with an SMMU requires knowledge of both the requester id
+associated with the device and how that maps to incoming stream ids
+(based off the AXI bus id) on the SMMU. Even worse, this mapping is
+likely generated dynamically by the host controller, which would need to
+know about downstream buses and their SMMUs.
+
+Other than that, I'd be interested in attending since I'm fairly active
+on the architectural side of things and keen to follow any discussions
+that may impact core architectural code. Previous ARM mini-summits have been
+a great success, so I'm really looking forward to this one.
+
+Cheers,
+
+Will
