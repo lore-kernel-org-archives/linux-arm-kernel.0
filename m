@@ -1,62 +1,53 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 01 Aug 2013 01:16:36 +0200
-Subject: [PATCH v4 0/5] Memory mapped architected timers
-In-Reply-To: <20130731223833.GJ8868@codeaurora.org>
-References: <1374191972-18015-1-git-send-email-sboyd@codeaurora.org>
- <20130722170817.GB4833@e106331-lin.cambridge.arm.com>
- <20130724203253.GE27761@codeaurora.org>
- <20130731223833.GJ8868@codeaurora.org>
-Message-ID: <51F99AD4.1070009@linaro.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 1 Aug 2013 09:33:12 +0800
+Subject: [PATCH 2/2] chipidea: Use devm_request_irq()
+In-Reply-To: <20130731141512.GU2810@htj.dyndns.org>
+References: <20130731090512.GD9858@sirena.org.uk>
+ <20130731094434.GC1754@pengutronix.de>
+ <20130731095411.GA2810@htj.dyndns.org>
+ <20130731111853.GJ9858@sirena.org.uk>
+ <20130731113244.GI2810@htj.dyndns.org>
+ <20130731115027.GN9858@sirena.org.uk>
+ <20130731115527.GR2810@htj.dyndns.org>
+ <20130731132708.GQ9858@sirena.org.uk>
+ <CAL411-qQm9vgDHswEM6PEvFKAaqd=e3qm-zViUbNztv0tJYa8Q@mail.gmail.com>
+ <20130731141512.GU2810@htj.dyndns.org>
+Message-ID: <20130801013311.GH8540@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2013 12:38 AM, Stephen Boyd wrote:
-> On 07/24, Stephen Boyd wrote:
->> On 07/22, Mark Rutland wrote:
->>> Hi Stephen,
->>>
->>> On Fri, Jul 19, 2013 at 12:59:27AM +0100, Stephen Boyd wrote:
->>>> This patchset adds support for memory mapped architected timers. We
->>>> don't have any other global broadcast timer in our system, so we use the
->>>> mmio timer during low power modes. The first patch changes the register
->>>> accessor to an enum per Thomas' request. The second patch is the binding.
->>>> The next two patches lay some groundwork so that the last patch is simpler.
->>>> The final patch adds support for mmio timers.
->>>>
->>>> Patches are based on v3.11-rc1.
->>>
->>> Be aware that as of v3.11-rc2 this doesn't cleanly apply, as the
->>> __cpuinit removal broke the final patch's context in a couple of places.
->>> It would be nice to get rid of the new cpuinit additions too...
->>>
->>> With that cleaned up locally, I've gave this a spin on tc2 and a
->>> Foundation model to test the cp15/system timers, hotplugging CPUs and
->>> running a basic test (`time sleep 5`). That all seems to work.
->>>
->>> Unfortunately I have no way of testing the memory-mapped timer support,
->>> but I trust you've tested that locally.
->>>
->>> For the series:
->>>
->>> Acked-by: Mark Rutland <mark.rutland@arm.com>
->>>
->>
->> Thanks Mark.
->>
->> Daniel, can you pick up these patches please?
->>
+On Wed, Jul 31, 2013 at 10:15:12AM -0400, Tejun Heo wrote:
+> hello,
 > 
-> Ping Daniel?
+> On Wed, Jul 31, 2013 at 09:55:26PM +0800, Peter Chen wrote:
+> > I think the main point is we should allocate managed resource which is used
+> > at interrupt handler before devm_request_irq, and all resources used
+> > at interrupt
+> > handler should be managed.
+> > 
+> > If we use non-managed resource at interrupt handler, but using managed interrupt
+> > handler, things still will go wrong if there is an odd (unexpected)
+> > interrupt after
+> > we finish deactivation at removal.
+> 
+> In general, applying devm partially isn't a good idea.  It's very easy
+> to get into trouble thanks to release order dependency which isn't
+> immediately noticeable and there have been actual bugs caused by that.
+> The strategies which seem to work are either
+> 
+> * Convert everything over to devm by wrapping deactivation in a devres
+>   callback too.  As long as your init sequence is sane (ie. irq
+>   shouldn't be request before things used by irq are ready).
+> 
+> * Allocate all resources using devres but shut down the execution
+>   engine in the remove_one().  Again, as all releases are controlled
+>   by devres, you won't have to worry about messing up the release
+>   sequencing.
+> 
 
-Applied to my tree as 3.12 material
-
-Thanks
-  -- Daniel
-
-
+thanks, Tejun. So, Alex and Fabio, this patch may not be suitable currently,
+since many resources at both EHCI and device side are non-managed.
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best Regards,
+Peter Chen
