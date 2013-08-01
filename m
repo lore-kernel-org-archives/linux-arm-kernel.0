@@ -1,25 +1,28 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 1 Aug 2013 13:19:46 +0100
-Subject: [PATCH v2 RFC 7/8] swiotlb-xen: support autotranslate guests
-In-Reply-To: <1375300452-12545-7-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1307312048511.4893@kaball.uk.xensource.com>
- <1375300452-12545-7-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <51FA5262.6090604@citrix.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Thu,  1 Aug 2013 13:12:11 +0100
+Subject: [PATCH 0/2] ARM: STi: SMP related fixes.
+Message-ID: <1375359131-21693-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/13 20:54, Stefano Stabellini wrote:
-> Support autotranslate guests in swiotlb-xen by keeping track of the
-> phys-to-bus and bus-to-phys mappings of the swiotlb buffer
-> (xen_io_tlb_start-xen_io_tlb_end).
-> 
-> Use a simple direct access on a pre-allocated array for phys-to-bus
-> queries. Use a red-black tree for bus-to-phys queries.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-It would be nice if the dma_map_page() etc. returned a unique handle in
-addition to the dma_addr_t so the lookup on unmap could be cheaper, but
-in the absence of this.
+Hi Anrd/Olof,
+These two patches fix a critical SMP issue with STi SOCs. Without this patches
+STi SoCs will boot only single core and crashes after freeing the init.
 
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Can you please consider these patches.
 
-David
+Thanks,
+srini
+
+Srinivas Kandagatla (2):
+  ARM: STi: Fix cpu nodes with correct device_type.
+  ARM: STi: remove sti_secondary_start from INIT section.
+
+ arch/arm/boot/dts/stih41x.dtsi |    2 ++
+ arch/arm/mach-sti/headsmp.S    |    2 --
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+-- 
+1.7.6.5
