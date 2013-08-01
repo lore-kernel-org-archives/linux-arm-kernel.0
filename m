@@ -1,70 +1,88 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 15:25:11 +0200
-Subject: [PATCHv6 08/13] irqchip: armada-370-xp: properly request resources
+Date: Thu,  1 Aug 2013 15:25:13 +0200
+Subject: [PATCHv6 10/13] ARM: pci: add ->add_bus() and ->remove_bus() hooks to
+ hw_pci
 In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375363516-2620-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375363516-2620-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using of_iomap(), we now use of_address_to_resource(),
-request_mem_region() and ioremap(). This allows the corresponding I/O
-regions to be properly requested and visible in /proc/iomem.
+Some PCI drivers may need to adjust the pci_bus structure after it has
+been allocated by the Linux PCI core. The PCI core allows
+architectures to implement the pcibios_add_bus() and
+pcibios_remove_bus() for this purpose. This commit therefore extends
+the hw_pci and pci_sys_data structures of the ARM PCI core to allow
+PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
+which will get called when a bus is added or removed from the system.
 
-The main motivation for this change is that the introduction of the
-MSI support requires us to get the physical address of the main
-interrupt controller registers, so we will need the corresponding
-'struct resource' anyway.
-
-We also take this opportunity to change a panic() to BUG_ON(), in
-order to be consistent with the rest of the driver.
+This will be used for example by the Marvell PCIe driver to connect a
+particular PCI bus with its corresponding MSI chip to handle Message
+Signaled Interrupts.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/mach/pci.h |  4 ++++
+ arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index bb328a3..26adc74 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -248,12 +248,25 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
- static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
- {
-+	struct resource main_int_res, per_cpu_int_res;
- 	u32 control;
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index a1c90d7..487155c 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -36,6 +36,8 @@ struct hw_pci {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
++	void            (*add_bus)(struct pci_bus *bus);
++	void            (*remove_bus)(struct pci_bus *bus);
+ };
  
--	main_int_base = of_iomap(node, 0);
--	per_cpu_int_base = of_iomap(node, 1);
-+	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
-+	BUG_ON(of_address_to_resource(node, 1, &per_cpu_int_res));
+ /*
+@@ -63,6 +65,8 @@ struct pci_sys_data {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
++	void            (*add_bus)(struct pci_bus *bus);
++	void            (*remove_bus)(struct pci_bus *bus);
+ 	void		*private_data;	/* platform controller private data	*/
+ };
  
-+	BUG_ON(!request_mem_region(main_int_res.start,
-+				   resource_size(&main_int_res),
-+				   node->full_name));
-+	BUG_ON(!request_mem_region(per_cpu_int_res.start,
-+				   resource_size(&per_cpu_int_res),
-+				   node->full_name));
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 261fcc8..530e59d 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -363,6 +363,20 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
++void pcibios_add_bus(struct pci_bus *bus)
++{
++	struct pci_sys_data *sys = bus->sysdata;
++	if (sys->add_bus)
++		sys->add_bus(bus);
++}
 +
-+	main_int_base = ioremap(main_int_res.start,
-+				resource_size(&main_int_res));
- 	BUG_ON(!main_int_base);
++void pcibios_remove_bus(struct pci_bus *bus)
++{
++	struct pci_sys_data *sys = bus->sysdata;
++	if (sys->remove_bus)
++		sys->remove_bus(bus);
++}
 +
-+	per_cpu_int_base = ioremap(per_cpu_int_res.start,
-+				   resource_size(&per_cpu_int_res));
- 	BUG_ON(!per_cpu_int_base);
+ /*
+  * Swizzle the device pin each time we cross a bridge.  If a platform does
+  * not provide a swizzle function, we perform the standard PCI swizzling.
+@@ -464,6 +478,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+ 		sys->align_resource = hw->align_resource;
++		sys->add_bus        = hw->add_bus;
++		sys->remove_bus     = hw->remove_bus;
+ 		INIT_LIST_HEAD(&sys->resources);
  
- 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
-@@ -262,8 +275,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
- 				&armada_370_xp_mpic_irq_ops, NULL);
- 
--	if (!armada_370_xp_mpic_domain)
--		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
-+	BUG_ON(!armada_370_xp_mpic_domain);
- 
- 	irq_set_default_host(armada_370_xp_mpic_domain);
- 
+ 		if (hw->private_data)
 -- 
 1.8.1.2
