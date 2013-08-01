@@ -1,67 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Aug 2013 21:15:15 +0100
-Subject: [PATCH v2] ARM: Do not run dummy_flush_tlb_a15_erratum() on
- non-Cortex-A15
-In-Reply-To: <CAL_Jsq+Zgb5Uti3HKDAs4q8bpCp8i=3XHeK+9EWPZW+ZKAA+ZQ@mail.gmail.com>
-References: <1374581199-8277-1-git-send-email-festevam@gmail.com>
- <CAL_JsqLY5_biGDFFJpP_a_=WwAnVZT2CxiKvgw7=1mjBvp6znA@mail.gmail.com>
- <20130801105824.GE24642@n2100.arm.linux.org.uk>
- <CAL_Jsq+Zgb5Uti3HKDAs4q8bpCp8i=3XHeK+9EWPZW+ZKAA+ZQ@mail.gmail.com>
-Message-ID: <20130801201515.GE23006@n2100.arm.linux.org.uk>
+Date: Thu, 1 Aug 2013 21:18:23 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130801201539.GA12291@kroah.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130801193936.GD23006@n2100.arm.linux.org.uk>
+ <20130801201539.GA12291@kroah.com>
+Message-ID: <20130801201823.GF23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 03:09:51PM -0500, Rob Herring wrote:
-> On Thu, Aug 1, 2013 at 5:58 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Jul 31, 2013 at 11:03:46PM -0500, Rob Herring wrote:
-> >> I just submitted my patch for 798181 ECO fix handling to the patch
-> >> system today. Then I noticed this patch in your fixes branch. This is
-> >> going to cause some churn as my patch needs to move the core version
-> >> check back to a .c file.
-> >>
-> >> I don't know if you are okay with rebasing your fixes branch or not.
-> >> If my patch is applied first, then this issue can be handled by just
-> >> replacing dummy_flush_tlb_a15_erratum call in context.c a call to
-> >> erratum_a15_798181.
-> >
-> > Well, firstly, are you sure your patch is correct?
-> 
-> Yes.
-> 
-> > You're removing the call to dummy_flush_tlb_a15_erratum() before the
-> > smp_call_function() - smp_call_function() does _not_ call the function
-> > for the local CPU.  So, what this means is we don't end up doing any
-> > of the workaround for the local CPU.
-> 
-> No,  dummy_flush_tlb_a15_erratum() is now called from within
-> erratum_a15_798181 if errata_fix_needed is non-zero. The return value
-> only means do the IPI or not.
-> 
-> > Secondly, doesn't the check in your case reduce down to:
-> >
-> >         unsigned int midr = read_cpuid_id();
-> >
-> >         /* Cortex-A15 r0p0..r3p2 affected */
-> >         if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
-> >             /* ECO not fully fixed */
-> >             !(read_cpuid(CPUID_REVIDR) & 0x010))
-> >                 return 0;
-> >         return 1;
-> >
-> > because, assuming midr is not satisfied:
-> >
-> > revidr  errata_fix_needed       function return
-> > 000     2                       1
-> > 010     1                       0
-> > 200     2                       1
-> > 210     0                       0
-> >
-> > I think that the above version is still cheap enough to be inline.
-> 
-> Only because it is incomplete. :)
+On Fri, Aug 02, 2013 at 04:15:39AM +0800, Greg KH wrote:
+> I'm not saying move away from DT at all, if it can be used to describe
+> stuff like this, wonderful.  Just please don't use platform_bus anymore
+> than you have to.
 
-Your timing is very bad.  I just sent the entire fixes branch (and some
-other stuff - which was scheduled for a long time to be sent tonight)
-off to Linus having waited all day.  It was either that or sit on the
-fixes branch even longer.
+As far as that sentiment goes, it would have been nice if that was made
+more vocally ten years ago, because at that time I was the one trying to
+encourage people to think about creating appropriate bus types, and what
+I was being told was that no, bus types are something which are deprecated
+and platform bus is what should be used.
+
+I get sick and tired of being told "this is what you should do" only to
+find out years later that the people saying what should be done have
+completely changed their minds - or the maintainers have changed and
+they have completely the reverse decision.
+
+We are here with platform_bus precisely becuase that's the way people
+working on the ARM architecture were told to do.
