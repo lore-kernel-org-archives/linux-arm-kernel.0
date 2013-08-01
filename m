@@ -1,142 +1,114 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 01 Aug 2013 19:29:12 +0200
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
-References: <20130722201348.GI453@xsjandreislx>
- <0735ab8c-0f80-4b64-b2b2-8d4553482c2a@CO9EHSMHS013.ehs.local>
- <51F66565.7010600@linaro.org>
- <8d56935e-2a20-46c7-b80a-f779572dd839@CO1EHSMHS014.ehs.local>
- <51F77D93.4030505@linaro.org> <51F97842.6050200@linaro.org>
- <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
- <51F97CE3.9030306@linaro.org>
- <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
- <51F99747.4060901@linaro.org>
- <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
-Message-ID: <51FA9AE8.1060004@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  1 Aug 2013 11:31:54 -0600
+Subject: [PATCH V2] ARM: kexec: validate CPU hotplug support
+Message-ID: <1375378314-26372-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
-> On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
->> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
->>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
->>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
->>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
->>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
->>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
->>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
->>>>>>>>> Hi Daniel,
->>>>>>>>>
->>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
->>>>>>>>> (snip)
->>>>>>>>>>
->>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
->>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
->>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
->>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
->>>>>>>>>> idle state, switching the local timer back in use.
->>>>>>>>>
->>>>>>>>> I've been thinking about this, trying to understand how this makes my
->>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
->>>>>>>>> would make the timer core switch to a broadcast device even though it
->>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
->>>>>>>>> something useless, but nothing wrong in a sense that it should result in
->>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
->>>>>>>>> always remain a mystery to me.
->>>>>>>>>
->>>>>>>>> Actually this more or less leads to the question: What is this
->>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
->>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
->>>>>>>>> hang pointing to some issue with that driver?
->>>>>>>>
->>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
->>>>>>>
->>>>>>> So, the correct run results (full output attached).
->>>>>>>
->>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
->>>>>>> broadcast device:
->>>>>>> 	Tick Device: mode:     1                                                         
->>>>>>> 	Broadcast device  
->>>>>>> 	Clock Event Device: ttc_clockevent
->>>>>>>
->>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
->>>>>>> enable the global timer, the twd timers are still used as local timers
->>>>>>> and the broadcast device is the global timer:
->>>>>>> 	Tick Device: mode:     1                                                         
->>>>>>> 	Broadcast device                                                                 
->>>>>>> 	Clock Event Device: arm_global_timer
->>>>>>>
->>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
->>>>>>> obtain this information for that case.
->>>>>>
->>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
->>>>>
->>>>> Right, that works. I forgot about that option after you mentioned, that
->>>>> it is most likely not that useful.
->>>>>
->>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
->>>>> the gt enabled and having maxcpus=1 set.
->>>>>
->>>>> /proc/timer_list:
->>>>> 	Tick Device: mode:     1
->>>>> 	Broadcast device
->>>>> 	Clock Event Device: arm_global_timer
->>>>> 	 max_delta_ns:   12884902005
->>>>> 	 min_delta_ns:   1000
->>>>> 	 mult:           715827876
->>>>> 	 shift:          31
->>>>> 	 mode:           3
->>>>
->>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
->>>>
->>>> The previous timer_list output you gave me when removing the offending
->>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
->>>>
->>>> Is it possible you try to get this output again right after onlining the
->>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
->>>
->>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
->>> and that didn't end well:
->>> 	# echo 1 > online && cat /proc/timer_list 
->>
->> Hmm, I was hoping to have a small delay before the kernel hangs but
->> apparently this is not the case... :(
->>
->> I suspect the global timer is shutdown at one moment but I don't
->> understand why and when.
->>
->> Can you add a stack trace in the "clockevents_shutdown" function with
->> the clockevent device name ? Perhaps, we may see at boot time an
->> interesting trace when it hangs.
-> 
-> I did this change:
-> 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-> 	index 38959c8..3ab11c1 100644
-> 	--- a/kernel/time/clockevents.c
-> 	+++ b/kernel/time/clockevents.c
-> 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
-> 	  */
-> 	 void clockevents_shutdown(struct clock_event_device *dev)
-> 	 {
-> 	+       pr_info("ce->name:%s\n", dev->name);
-> 	+       dump_stack();
-> 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
-> 	        dev->next_event.tv64 = KTIME_MAX;
-> 	 }
-> 
-> It is hit a few times during boot, so I attach a full boot log. I really
-> don't know what to look for, but I hope you can spot something in it. I
-> really appreciate you taking the time.
+From: Stephen Warren <swarren@nvidia.com>
 
-Thanks for the traces.
+Architectures should fully validate whether kexec is possible as part of
+machine_kexec_prepare(), so that user-space's kexec_load() operation can
+report any problems. Performing validation in machine_kexec() itself is
+too late, since it is not allowed to return.
 
-If you try without the ttc_clockevent configured in the kernel (but with
-twd and gt), does it boot ?
+Prior to this patch, ARM's machine_kexec() was testing after-the-fact
+whether machine_kexec_prepare() was able to disable all but one CPU.
+Instead, modify machine_kexec_prepare() to validate all conditions
+necessary for machine_kexec_prepare()'s to succeed. BUG if the validation
+succeeded, yet disabling the CPUs didn't actually work.
 
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+---
+v2: Fix compilation issue when !CONFIG_HOTPLUG_CPU
 
+I assume I should add this to the ARM patch tracker immediately, since
+it's basically been OK'd except for the compilation issue which this
+version fixes.
+---
+ arch/arm/include/asm/smp_plat.h |  3 +++
+ arch/arm/kernel/machine_kexec.c | 20 ++++++++++++++++----
+ arch/arm/kernel/smp.c           | 10 ++++++++++
+ 3 files changed, 29 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 6462a72..a252c0b 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -88,4 +88,7 @@ static inline u32 mpidr_hash_size(void)
+ {
+ 	return 1 << mpidr_hash.bits;
+ }
++
++extern int platform_can_cpu_hotplug(void);
++
+ #endif
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 4fb074c..d7c82df 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -15,6 +15,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/cacheflush.h>
+ #include <asm/mach-types.h>
++#include <asm/smp_plat.h>
+ #include <asm/system_misc.h>
+ 
+ extern const unsigned char relocate_new_kernel[];
+@@ -39,6 +40,14 @@ int machine_kexec_prepare(struct kimage *image)
+ 	int i, err;
+ 
+ 	/*
++	 * Validate that if the current HW supports SMP, then the SW supports
++	 * and implements CPU hotplug for the current HW. If not, we won't be
++	 * able to kexec reliably, so fail the prepare operation.
++	 */
++	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
++		return -EINVAL;
++
++	/*
+ 	 * No segment at default ATAGs address. try to locate
+ 	 * a dtb using magic.
+ 	 */
+@@ -134,10 +143,13 @@ void machine_kexec(struct kimage *image)
+ 	unsigned long reboot_code_buffer_phys;
+ 	void *reboot_code_buffer;
+ 
+-	if (num_online_cpus() > 1) {
+-		pr_err("kexec: error: multiple CPUs still online\n");
+-		return;
+-	}
++	/*
++	 * This can only happen if machine_shutdown() failed to disable some
++	 * CPU, and that can only happen if the checks in
++	 * machine_kexec_prepare() were not correct. If this fails, we can't
++	 * reliably kexec anyway, so BUG_ON is appropriate.
++	 */
++	BUG_ON(num_online_cpus() > 1);
+ 
+ 	page_list = image->head & PAGE_MASK;
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 3a98192..bd1b9e6 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -144,6 +144,16 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return -ENOSYS;
+ }
+ 
++int platform_can_cpu_hotplug(void)
++{
++#ifdef CONFIG_HOTPLUG_CPU
++	if (smp_ops.cpu_kill)
++		return 1;
++#endif
++
++	return 0;
++}
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ static int platform_cpu_kill(unsigned int cpu)
+ {
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.1.5
