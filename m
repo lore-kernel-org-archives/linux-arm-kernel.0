@@ -1,79 +1,40 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 1 Aug 2013 09:34:10 -0400
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have people
- interested in device tree janitoring / cleanup?]
-In-Reply-To: <1375352315.22084.138.camel@shinybook.infradead.org>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
- <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
- <20130731201457.GA24642@n2100.arm.linux.org.uk>
- <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
- <20130731204817.GC24642@n2100.arm.linux.org.uk>
- <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
- <1375352315.22084.138.camel@shinybook.infradead.org>
-Message-ID: <CAKON4OyhF+_Q8dWNBDjag=A=v=J2NE0h8+1mms2uvUMS8+45eA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Aug 2013 14:37:37 +0100
+Subject: [RFC/PATCH 3/3] arm: omap: convert omap boot_lock to raw
+In-Reply-To: <1375359165-8411-4-git-send-email-balbi@ti.com>
+References: <1375359165-8411-1-git-send-email-balbi@ti.com>
+ <1375359165-8411-4-git-send-email-balbi@ti.com>
+Message-ID: <20130801133737.GG21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 6:18 AM, David Woodhouse <dwmw2@infradead.org> wrote:
-> On Wed, 2013-07-31 at 17:26 -0400, jonsmirl at gmail.com wrote:
->> Alternatively you may be of the belief that it is impossible to get
->> rid of the board specific code. But x86 doesn't have any of it, why
->> should ARM?
->
-> The reason x86 doesn't have it is because it carries three decades worth
-> of legacy baggage so that it can still look like a 1980s IBM PC when
-> necessary.
->
-> There *have* been some x86 platforms which abandon that legacy crap, and
-> for those we *do* have board-specific code. (Is James still maintaining
-> Voyager support? It feels very strange to talk about Voyager with it
-> *not* being the 'legacy crap' in question...)
->
-> We've even seen *recent* attempts to abandon the legacy crap in the
-> embedded x86 space, which backtracked and added it all back again ? in
-> part because x86 lacked any sane way to describe the hardware if it
-> wasn't pretending to be a PC. ACPI doesn't cut it, and DT "wasn't
-> invented here"...
->
-> Unless you want the ARM world to settle on a strategy of "all the world
-> is an Assabet", I'd be careful what you wish for...
+On Thu, Aug 01, 2013 at 03:12:45PM +0300, Felipe Balbi wrote:
+> From: Frank Rowand <frank.rowand@am.sony.com>
+> 
+> The omap boot_lock is used by the secondary processor startup code.  The locking
+> task is the idle thread, which has idle->sched_class == &idle_sched_class.
+> idle_sched_class->enqueue_task == NULL, so if the idle task blocks on the
+> lock, the attempt to wake it when the lock becomes available will fail:
+> 
+> try_to_wake_up()
+>    ...
+>       activate_task()
+>          enqueue_task()
+>             p->sched_class->enqueue_task(rq, p, flags)
+> 
+> Fix by converting boot_lock to a raw spin lock.
+> 
+> [ balbi at ti.com: taken from RT v3.10.4-rt1 patchset ]
+> 
+> Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 
-So there should be shades for gray in this area. Try to eliminate all
-of the board specific code you can, and then only if that fails add
-board specific support to the kernel.
+There's a whole bunch of these, OMAP is not the only one.  If someone's
+going to fix one case, the rest should also be fixed.  See:
 
-But you take device trees pretty far. I believe Grant has even used
-one to describe an FPGA that he can dynamically load code into and
-change its function.  Not sure how he did it, I wasn't paying too
-close of attention when he was talking about it.
-
-I do believe a great deal of this simple plumbing can be eliminated.
-Like how to hook up GPIO, I2C, SPI, etc. We're pretty far down that
-road.
-
-A path like this seems like it would be beneficial...
-1) Implement DT schemas. Use those to enforce as much regularity as
-possible into the device tree descriptions for common classes of
-things (controllers especially - DMA, I2C, I2S, SPI, Uarts, etc)..
-Form a group to review any changes to the common schema.
-2) Cleaning up the controller classes is going to cause some DT churn.
-Hide backward compatibility in a quirks layer.
-3) Continue the process of removing all possible board specific code
-that can be reasonably covered in device trees.
-4) There will be some board specific code left at the end of this
-process. But anyone who looks at should agree that the functions
-handled by the code are something that is unreasonable to address in
-the DT system.
-
-
->
-> --
-> dwmw2
->
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+arch/arm/mach-exynos/platsmp.c
+arch/arm/mach-msm/platsmp.c
+arch/arm/mach-prima2/platsmp.c
+arch/arm/mach-spear/platsmp.c
+arch/arm/mach-sti/platsmp.c
+arch/arm/mach-ux500/platsmp.c
