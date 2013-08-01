@@ -1,35 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 1 Aug 2013 16:34:53 +0900
-Subject: [PATCH 00/07] ARM: shmobile: sh73a0, r8a7779 and emev2 SMP SCU
- rework
-In-Reply-To: <20130731070702.14444.64961.sendpatchset@w520>
-References: <20130731070702.14444.64961.sendpatchset@w520>
-Message-ID: <20130801073452.GD26015@verge.net.au>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 1 Aug 2013 09:37:39 +0200
+Subject: [PATCH 0/8] ARM: at91/dt: make use of periph id macros
+In-Reply-To: <1375339733-3488-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375339733-3488-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <CACQ1gAj_KCJUnBGzv0bnGaUwMgWq-7Noe280YdLGPxK8Ofp3Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 04:07:02PM +0900, Magnus Damm wrote:
-> ARM: shmobile: sh73a0, r8a7779 and emev2 SMP SCU rework
-> 
-> [PATCH 01/07] ARM: shmobile: Introduce shared SCU SMP boot code
-> [PATCH 02/07] ARM: shmobile: Use shared SCU SMP boot code on sh73a0
-> [PATCH 03/07] ARM: shmobile: Use shared SCU SMP boot code on r8a7779
-> [PATCH 04/07] ARM: shmobile: Use shared SCU SMP boot code on emev2
-> [PATCH 05/07] ARM: shmobile: Add shared SCU CPU Hotplug code
-> [PATCH 06/07] ARM: shmobile: Use shared SCU CPU Hotplug code on sh73a0
-> [PATCH 07/07] ARM: shmobile: Use shared SCU CPU Hotplug code on r8a7779
-> 
-> This series consolidates mach-shmobile SMP code into SCU specific code
-> for SMP boot and CPU Hotplug. The shared SCU code will in the future hook
-> into some low level assembly code that provides SMP boot and sleep
-> functionality, so this is is also preparations for future work.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written against renesas.git renesas-devel-20130731
->  
->  Requires "[PATCH] ARM: Fix memblock_reserve() to include stext" during
->  run time to allow test of CPU Hotplug with v3.11-rc kernels.
+2013/8/1 Boris BREZILLON <b.brezillon@overkiz.com>:
+> Hello,
+>
+> This patch series move at91 SoCs peripheral id definitions from machine
+> specific include dir to dt-bindings include dir.
+> These macros are used to reference interrupts instead of peripheral numbers.
+>
+> This makes dt definitions cleaner and easier to debug (one can easily tell if
+> the peripheral macro used to reference an interrupt line is not the good one).
+>
+> These macros will be used for clk definitions and references too.
+>
+> I am not sure 'include/dt-bindings/at91/xxx' is the best place to put these
+> definitions as there are no soc specific directories in dt-bindings include
+> dir right now. Maybe something like 'include/dt-bindings/soc/at91/xxx' or
+> 'include/dt-bindings/peripherals/at91/xxx' would be better.
+> What do you think ?
+Well, I'd rather use "atmel" than "at91" because, AFAIK, this prefix
+has been dropped for new atmel SoCs (sama5 for instance).
 
-I guess we need to wait for Russell's alternate fix to hit a stable branch.
+my 2 cents...
+
+Richard.
