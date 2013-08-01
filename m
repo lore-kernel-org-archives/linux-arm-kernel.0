@@ -1,63 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 01 Aug 2013 10:25:55 -0600
-Subject: [PATCH] ARM: kexec: offline non panic CPUs on Kdump panic
-In-Reply-To: <CALicx6u5tkf_wvX8ZcVwbhUOkt3=Zz7214yR9pVce0TJ82Vt4A@mail.gmail.com>
-References: <1374817287-27952-1-git-send-email-vijay.kilari@gmail.com>
- <20130726104908.GC17886@mudshark.cambridge.arm.com>
- <51F2ACF7.9000008@wwwdotorg.org>
- <CALicx6ugumPG__rSAsTS95SH=6fTGqhpPFsQ8bLG-u-fbk0=pQ@mail.gmail.com>
- <51F7F0E1.5030200@wwwdotorg.org>
- <CALicx6tJFkGbvKO+-XZixj+8RSh1awFnXK91Pdew1+5Oa+dDqg@mail.gmail.com>
- <51F945F9.3050906@wwwdotorg.org>
- <CALicx6u5tkf_wvX8ZcVwbhUOkt3=Zz7214yR9pVce0TJ82Vt4A@mail.gmail.com>
-Message-ID: <51FA8C13.2060807@wwwdotorg.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 1 Aug 2013 18:35:21 +0200
+Subject: [PATCH v4 2/6] misc: sram: add ability to mark sram sections as
+ reserved
+In-Reply-To: <CAHCPf3vSQHtRkk-_cs3monHfrF-hVx3vTDt1ctcax_bspXDmsg@mail.gmail.com>
+References: <201307291510.31679.heiko@sntech.de>
+ <1375106520.4223.24.camel@pizza.hi.pengutronix.de>
+ <CAHCPf3vSQHtRkk-_cs3monHfrF-hVx3vTDt1ctcax_bspXDmsg@mail.gmail.com>
+Message-ID: <201308011835.22186.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2013 07:49 AM, Vijay Kilari wrote:
-> On Wed, Jul 31, 2013 at 10:44 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 07/31/2013 05:37 AM, Vijay Kilari wrote:
->>> On Tue, Jul 30, 2013 at 10:29 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> On 07/30/2013 04:37 AM, Vijay Kilari wrote:
->>>>> On Fri, Jul 26, 2013 at 10:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> ...
->>>>>> Does a kernel that's used as the crash kernel guarantee:
->>>>>>
->>>>>> * Never to re-use the memory that was used by the previous kernel, so
->>>>>> that the spin loop code/data won't be corrupted, ever, no matter how
->>>>>> long the crash recovery kernel runs.
->>>>>>
->>>>>> * Not use SMP, so there's never a need to re-activate the non-boot CPUs,
->>>>>> which might not work if they aren't truly disabled but rather just
->>>>>> running a pin loop?
->>>>>
->>>>> From cat /proc/iomem, normal kernel is executed from (0x80xxxxxx) with crash
->>>>> kernel reserved 64M at 0xa0000000
->>>>>
->>>>> 80000000-bfffffff : System RAM
->>>>>   80008000-805aeddf : Kernel code
->>>>>   805e2000-8063e427 : Kernel data
->>>>>   a0000000-a3ffffff : Crash kernel
->>>>>
->>>>> crash kernel is loaded to reserved memory location and is executed from there.
->>>>> I could confirm this from /proc/iomem when crash kernel is running
->>>>>
->>>>> a0000000-a3efffff : System RAM
->>>>>   a0008000-a05aeddf : Kernel code
->>>>>   a05e2000-a063e427 : Kernel data
->>>>
->>>> OK, but in the crash dump kernel, is 80008000..8063e427 reserved as
->>>> well, which would guarantee that the spin loop being executed by the
->>>> non-crash CPUs won't be corrupted?
->>>
->>> The crash dump kernel runs from reserved memory area (0xa0000000 - 0xa3effffff).
->>>  So it should not corrupt the memory area of original kernel that was running
->>>  at 0x80000000,where other CPU's are in spin loop.
->>
->> What about dynamic allocations?
->
-> IMHO, it is the kdump functionality to ensure that it won't corrupt
-> original kernel's dynamic allocations
+Am Montag, 29. Juli 2013, 23:39:45 schrieb Matt Sealey:
+> On Mon, Jul 29, 2013 at 9:02 AM, Philipp Zabel <p.zabel@pengutronix.de> 
+wrote:
+> > Hi Heiko,
+> > 
+> > Am Montag, den 29.07.2013, 15:12 +0200 schrieb Heiko St?bner:
+> >> Some SoCs need parts of their sram for special purposes. So while being
+> >> part of the peripheral, it should not be part of the genpool
+> >> controlling the sram.
+> >> 
+> >> Therefore add an option mmio-sram-reserved to keep arbitrary portions of
+> >> the sram from being part of the pool.
+> >> 
+> >> Suggested-by: Rob Herring <robherring2@gmail.com>
+> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> >> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+> >> ---
+> >> Philipp: I didn't carry the ack, because the loop changed significantly
+> >> again. So if it looks ok, could you re-ack it please?
+> > 
+> > I'd prefer the first loop to contain the magic and produce a list of
+> > useable chunks, instead of a list of reserved blocks. The second loop
+> > could then iterate over the array and just call gen_pool_add_virt
+> > repeatedly.
+> > 
+> > regards
+> > Philipp
+> 
+> Agreed, however specifying chunks of memory should probably match the
+> format of the standard memory@ node "available" property - mostly
+> because it would be the same syntax and definition as defining any
+> other chunk of memory, as OpenFirmware and device trees have been
+> doing since the dark ages. In this case, why not re-use the
+> "available" property name instead of creating a new one? Standard OF
+> memory parsing code is then free for you to use to pull the chunks
+> out.
 
-OK, if there are explicit measure to assure this already, then there's
-no issue.
+Sound interesting, but could you give me a pointer to some sort of docs about 
+this "available" property in memory nodes?
+
+Documentation/devicetree/booting-without-of.txt seems to be the only file 
+describing the memory node at all but only required properties, and not any 
+"available" property.
+
+I've found a document  on power.org describing the memory node, but also not 
+mentioning any "available" property.
+
+And devicetree.org does not seem to handle the memory node at all.
+
+
+Thanks for any hints
+Heiko
