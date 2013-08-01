@@ -1,30 +1,50 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 31 Jul 2013 17:55:05 -0700 (PDT)
-Subject: [PATCH 00/13] ARM: shmobile: Rework ->init_time() /
- shmobile_timer_init()
-In-Reply-To: <20130731190110.31796.96552.sendpatchset@w520>
-References: <20130731190110.31796.96552.sendpatchset@w520>
-Message-ID: <87hafa2psq.wl%kuninori.morimoto.gx@renesas.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 31 Jul 2013 18:36:13 -0700
+Subject: [PATCH 2/2] Convert PowerPC macro spin_event_timeout() to
+ architecture independent macro
+In-Reply-To: <51F9A9CD.1040804@tabi.org>
+References: <1375187900-17582-1-git-send-email-B44344@freescale.com>
+ <1375187900-17582-3-git-send-email-B44344@freescale.com>
+ <20130731071630.GI8868@codeaurora.org>
+ <CAOZdJXVvNBR-qf7LXNOHZVstH_Rebxwn-wAkSaBS53Wn55mYCw@mail.gmail.com>
+ <51F9A5FE.8030608@codeaurora.org> <51F9A80E.5010307@tabi.org>
+ <51F9A8F1.9020704@codeaurora.org> <51F9A9CD.1040804@tabi.org>
+Message-ID: <51F9BB8D.6060907@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/31/13 17:20, Timur Tabi wrote:
+> On 07/31/2013 07:16 PM, Stephen Boyd wrote:
+>> cpu_relax() is usually just a compiler barrier or an instruction hint to
+>> the cpu that it should cool down because we're spinning in a tight loop.
+>> It certainly shouldn't be calling into the  scheduler.
+> Ah yes, I remember now.  So it does seem that if we can fix the problem
+> of non-incrementing 'jiffies', then this macro can be used in interrupts.
 
-Hi
+That's encouraging. It looks like you introduced it to use in interrupt
+context but then it got shot down[1]? I lost track in all the versions.
 
-> [PATCH 01/13] ARM: shmobile: Use default ->init_time() on r8a73a4
-> [PATCH 02/13] ARM: shmobile: Use default ->init_time() on r8a7740
-> [PATCH 03/13] ARM: shmobile: Use default ->init_time() on r8a7778
-> [PATCH 04/13] ARM: shmobile: Use default ->init_time() on r8a7779
-> [PATCH 05/13] ARM: shmobile: Use default ->init_time() on Bockw
-> [PATCH 06/13] ARM: shmobile: Use default ->init_time() on Bockw DT ref
-> [PATCH 07/13] ARM: shmobile: Use default ->init_time() on Armadillo DT ref
-> [PATCH 08/13] ARM: shmobile: Use default ->init_time() on APE6EVM
-> [PATCH 09/13] ARM: shmobile: Use default ->init_time() on APE6EVM DT ref
-> [PATCH 10/13] ARM: shmobile: Use default ->init_time() on Marzen DT ref
-> [PATCH 11/13] ARM: shmobile: Use default ->init_time() on KZM9G DT ref
-> [PATCH 12/13] ARM: shmobile: Use clocksource_of_init() on r8a7790
-> [PATCH 13/13] ARM: shmobile: Remove unused shmobile_init_time()
+>
+> Of course, that assumes that spinning in interrupt context is a good
+> idea to begin with.  Maybe we shouldn't be encouraging it?
 
-For all patches
+I read through the v5 discussion and it seems I'm about to walk through
+some tall grass on the way to Cerulean City.
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Andrew Morton, I choose you! Use your mind-power move to convince
+everyone that having a macro for spinning on a register in interrupt
+context is a good thing. At least it will be more obvious.
+
+>
+>>>> FYI, you might want to look at the code reviews for spin_event_timeout()
+>>>> on the linuxppc-dev mailing list, back in March 2009.
+>>>>
+>> Sure. Any pointers? Otherwise I'll go digging around the archives.
+> https://lists.ozlabs.org/pipermail/linuxppc-dev/2009-March/thread.html
+>
+
+[1] https://lists.ozlabs.org/pipermail/linuxppc-dev/2009-May/072521.html
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
