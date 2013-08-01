@@ -1,334 +1,169 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  1 Aug 2013 10:40:37 +0200
-Subject: [PATCHv3 3/3] fb: backlight: HX8357: Add HX8369 support
-In-Reply-To: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1375346437-18991-4-git-send-email-maxime.ripard@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu,  1 Aug 2013 10:45:31 +0200
+Subject: [PATCH 2/9] ARM: kirkwood: remove support for legacy booting of
+ Dockstar
+In-Reply-To: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375346738-21596-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375346738-21596-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+The Kirkwood Dockstar platform has already been converted to the
+Device Tree, so we can remove the legacy booting option for this
+platform.
 
-Add support for the Himax HX8369 controller as it is quite similar to the
-hx8357.
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/video/backlight/hx8357.c | 219 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 204 insertions(+), 15 deletions(-)
+ arch/arm/mach-kirkwood/Kconfig          |   6 --
+ arch/arm/mach-kirkwood/Makefile         |   1 -
+ arch/arm/mach-kirkwood/dockstar-setup.c | 111 --------------------------------
+ 3 files changed, 118 deletions(-)
+ delete mode 100644 arch/arm/mach-kirkwood/dockstar-setup.c
 
-diff --git a/drivers/video/backlight/hx8357.c b/drivers/video/backlight/hx8357.c
-index 47237fa..c7af8c4 100644
---- a/drivers/video/backlight/hx8357.c
-+++ b/drivers/video/backlight/hx8357.c
-@@ -71,6 +71,18 @@
- #define HX8357_SET_POWER_NORMAL		0xd2
- #define HX8357_SET_PANEL_RELATED	0xe9
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index cb0c197..9d056cd 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -2,12 +2,6 @@ if ARCH_KIRKWOOD
  
-+#define HX8369_SET_DISPLAY_BRIGHTNESS		0x51
-+#define HX8369_WRITE_CABC_DISPLAY_VALUE		0x53
-+#define HX8369_WRITE_CABC_BRIGHT_CTRL		0x55
-+#define HX8369_WRITE_CABC_MIN_BRIGHTNESS	0x5e
-+#define HX8369_SET_POWER			0xb1
-+#define HX8369_SET_DISPLAY_MODE			0xb2
-+#define HX8369_SET_DISPLAY_WAVEFORM_CYC		0xb4
-+#define HX8369_SET_VCOM				0xb6
-+#define HX8369_SET_EXTENSION_COMMAND		0xb9
-+#define HX8369_SET_GIP				0xd5
-+#define HX8369_SET_GAMMA_CURVE_RELATED		0xe0
-+
- struct hx8357_data {
- 	unsigned		im_pins[HX8357_NUM_IM_PINS];
- 	unsigned		reset;
-@@ -144,6 +156,61 @@ static u8 hx8357_seq_display_mode[] = {
- 	HX8357_SET_DISPLAY_MODE_RGB_INTERFACE,
- };
+ menu "Marvell Kirkwood Implementations"
  
-+static u8 hx8369_seq_write_CABC_min_brightness[] = {
-+	HX8369_WRITE_CABC_MIN_BRIGHTNESS, 0x00,
-+};
-+
-+static u8 hx8369_seq_write_CABC_control[] = {
-+	HX8369_WRITE_CABC_DISPLAY_VALUE, 0x24,
-+};
-+
-+static u8 hx8369_seq_set_display_brightness[] = {
-+	HX8369_SET_DISPLAY_BRIGHTNESS, 0xFF,
-+};
-+
-+static u8 hx8369_seq_write_CABC_control_setting[] = {
-+	HX8369_WRITE_CABC_BRIGHT_CTRL, 0x02,
-+};
-+
-+static u8 hx8369_seq_extension_command[] = {
-+	HX8369_SET_EXTENSION_COMMAND, 0xff, 0x83, 0x69,
-+};
-+
-+static u8 hx8369_seq_display_related[] = {
-+	HX8369_SET_DISPLAY_MODE, 0x00, 0x2b, 0x03, 0x03, 0x70, 0x00,
-+	0xff, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x00,	0x01,
-+};
-+
-+static u8 hx8369_seq_panel_waveform_cycle[] = {
-+	HX8369_SET_DISPLAY_WAVEFORM_CYC, 0x0a, 0x1d, 0x80, 0x06, 0x02,
-+};
-+
-+static u8 hx8369_seq_set_address_mode[] = {
-+	HX8357_SET_ADDRESS_MODE, 0x00,
-+};
-+
-+static u8 hx8369_seq_vcom[] = {
-+	HX8369_SET_VCOM, 0x3e, 0x3e,
-+};
-+
-+static u8 hx8369_seq_gip[] = {
-+	HX8369_SET_GIP, 0x00, 0x01, 0x03, 0x25, 0x01, 0x02, 0x28, 0x70,
-+	0x11, 0x13, 0x00, 0x00, 0x40, 0x26, 0x51, 0x37, 0x00, 0x00, 0x71,
-+	0x35, 0x60, 0x24, 0x07, 0x0f, 0x04, 0x04,
-+};
-+
-+static u8 hx8369_seq_power[] = {
-+	HX8369_SET_POWER, 0x01, 0x00, 0x34, 0x03, 0x00, 0x11, 0x11, 0x32,
-+	0x2f, 0x3f, 0x3f, 0x01, 0x3a, 0x01, 0xe6, 0xe6, 0xe6, 0xe6, 0xe6,
-+};
-+
-+static u8 hx8369_seq_gamma_curve_related[] = {
-+	HX8369_SET_GAMMA_CURVE_RELATED, 0x00, 0x0d, 0x19, 0x2f, 0x3b, 0x3d,
-+	0x2e, 0x4a, 0x08, 0x0e, 0x0f, 0x14, 0x16, 0x14, 0x14, 0x14, 0x1e,
-+	0x00, 0x0d, 0x19, 0x2f, 0x3b, 0x3d, 0x2e, 0x4a, 0x08, 0x0e, 0x0f,
-+	0x14, 0x16, 0x14, 0x14, 0x14, 0x1e,
-+};
-+
- static int hx8357_spi_write_then_read(struct lcd_device *lcdev,
- 				u8 *txbuf, u16 txlen,
- 				u8 *rxbuf, u16 rxlen)
-@@ -220,6 +287,10 @@ static int hx8357_enter_standby(struct lcd_device *lcdev)
- 	if (ret < 0)
- 		return ret;
- 
-+	/*
-+	 * The controller needs 120ms when entering in sleep mode before we can
-+	 * send the command to go off sleep mode
-+	 */
- 	msleep(120);
- 
- 	return 0;
-@@ -233,6 +304,10 @@ static int hx8357_exit_standby(struct lcd_device *lcdev)
- 	if (ret < 0)
- 		return ret;
- 
-+	/*
-+	 * The controller needs 120ms when exiting from sleep mode before we
-+	 * can send the command to enter in sleep mode
-+	 */
- 	msleep(120);
- 
- 	ret = hx8357_spi_write_byte(lcdev, HX8357_SET_DISPLAY_ON);
-@@ -242,6 +317,21 @@ static int hx8357_exit_standby(struct lcd_device *lcdev)
- 	return 0;
- }
- 
-+static void hx8357_lcd_reset(struct lcd_device *lcdev)
-+{
-+	struct hx8357_data *lcd = lcd_get_data(lcdev);
-+
-+	/* Reset the screen */
-+	gpio_set_value(lcd->reset, 1);
-+	usleep_range(10000, 12000);
-+	gpio_set_value(lcd->reset, 0);
-+	usleep_range(10000, 12000);
-+	gpio_set_value(lcd->reset, 1);
-+
-+	/* The controller needs 120ms to recover from reset */
-+	msleep(120);
-+}
-+
- static int hx8357_lcd_init(struct lcd_device *lcdev)
- {
- 	struct hx8357_data *lcd = lcd_get_data(lcdev);
-@@ -257,14 +347,6 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
- 		gpio_set_value_cansleep(lcd->im_pins[2], 1);
- 	}
- 
--	/* Reset the screen */
--	gpio_set_value(lcd->reset, 1);
--	usleep_range(10000, 12000);
--	gpio_set_value(lcd->reset, 0);
--	usleep_range(10000, 12000);
--	gpio_set_value(lcd->reset, 1);
--	msleep(120);
+-config MACH_DOCKSTAR
+-	bool "Seagate FreeAgent DockStar"
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  Seagate FreeAgent DockStar.
 -
- 	ret = hx8357_spi_write_array(lcdev, hx8357_seq_power,
- 				ARRAY_SIZE(hx8357_seq_power));
- 	if (ret < 0)
-@@ -344,6 +426,9 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
- 	if (ret < 0)
- 		return ret;
+ config MACH_ESATA_SHEEVAPLUG
+ 	bool "Marvell eSATA SheevaPlug Reference Board"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index d204380..13f7ab1 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -1,6 +1,5 @@
+ obj-y				+= common.o irq.o pcie.o mpp.o
  
-+	/*
-+	 * The controller needs 120ms to fully recover from exiting sleep mode
-+	 */
- 	msleep(120);
- 
- 	ret = hx8357_spi_write_byte(lcdev, HX8357_SET_DISPLAY_ON);
-@@ -359,6 +444,96 @@ static int hx8357_lcd_init(struct lcd_device *lcdev)
- 	return 0;
- }
- 
-+static int hx8369_lcd_init(struct lcd_device *lcdev)
-+{
-+	int ret;
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_extension_command,
-+				ARRAY_SIZE(hx8369_seq_extension_command));
-+	if (ret < 0)
-+		return ret;
-+	usleep_range(10000, 12000);
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_display_related,
-+				ARRAY_SIZE(hx8369_seq_display_related));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_panel_waveform_cycle,
-+				ARRAY_SIZE(hx8369_seq_panel_waveform_cycle));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_set_address_mode,
-+				ARRAY_SIZE(hx8369_seq_set_address_mode));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_vcom,
-+				ARRAY_SIZE(hx8369_seq_vcom));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_gip,
-+				ARRAY_SIZE(hx8369_seq_gip));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_power,
-+				ARRAY_SIZE(hx8369_seq_power));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_byte(lcdev, HX8357_EXIT_SLEEP_MODE);
-+	if (ret < 0)
-+		return ret;
-+
-+	/*
-+	 * The controller needs 120ms to fully recover from exiting sleep mode
-+	 */
-+	msleep(120);
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_gamma_curve_related,
-+				ARRAY_SIZE(hx8369_seq_gamma_curve_related));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_byte(lcdev, HX8357_EXIT_SLEEP_MODE);
-+	if (ret < 0)
-+		return ret;
-+	usleep_range(1000, 1200);
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_write_CABC_control,
-+				ARRAY_SIZE(hx8369_seq_write_CABC_control));
-+	if (ret < 0)
-+		return ret;
-+	usleep_range(10000, 12000);
-+
-+	ret = hx8357_spi_write_array(lcdev,
-+			hx8369_seq_write_CABC_control_setting,
-+			ARRAY_SIZE(hx8369_seq_write_CABC_control_setting));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_array(lcdev,
-+			hx8369_seq_write_CABC_min_brightness,
-+			ARRAY_SIZE(hx8369_seq_write_CABC_min_brightness));
-+	if (ret < 0)
-+		return ret;
-+	usleep_range(10000, 12000);
-+
-+	ret = hx8357_spi_write_array(lcdev, hx8369_seq_set_display_brightness,
-+				ARRAY_SIZE(hx8369_seq_set_display_brightness));
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = hx8357_spi_write_byte(lcdev, HX8357_SET_DISPLAY_ON);
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-+
- #define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
- 
- static int hx8357_set_power(struct lcd_device *lcdev, int power)
-@@ -391,10 +566,24 @@ static struct lcd_ops hx8357_ops = {
- 	.get_power	= hx8357_get_power,
- };
- 
-+static const struct of_device_id hx8357_dt_ids[] = {
-+	{
-+		.compatible = "himax,hx8357",
-+		.data = hx8357_lcd_init,
-+	},
-+	{
-+		.compatible = "himax,hx8369",
-+		.data = hx8369_lcd_init,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, hx8357_dt_ids);
-+
- static int hx8357_probe(struct spi_device *spi)
- {
- 	struct lcd_device *lcdev;
- 	struct hx8357_data *lcd;
-+	const struct of_device_id *match;
- 	int i, ret;
- 
- 	lcd = devm_kzalloc(&spi->dev, sizeof(*lcd), GFP_KERNEL);
-@@ -411,6 +600,10 @@ static int hx8357_probe(struct spi_device *spi)
- 
- 	lcd->spi = spi;
- 
-+	match = of_match_device(hx8357_dt_ids, &spi->dev);
-+	if (!match || !match->data)
-+		return -EINVAL;
-+
- 	lcd->reset = of_get_named_gpio(spi->dev.of_node, "gpios-reset", 0);
- 	if (!gpio_is_valid(lcd->reset)) {
- 		dev_err(&spi->dev, "Missing dt property: gpios-reset\n");
-@@ -462,7 +655,9 @@ static int hx8357_probe(struct spi_device *spi)
- 	}
- 	spi_set_drvdata(spi, lcdev);
- 
--	ret = hx8357_lcd_init(lcdev);
-+	hx8357_lcd_reset(lcdev);
-+
-+	ret = ((int (*)(struct lcd_device *))match->data)(lcdev);
- 	if (ret) {
- 		dev_err(&spi->dev, "Couldn't initialize panel\n");
- 		goto init_error;
-@@ -485,12 +680,6 @@ static int hx8357_remove(struct spi_device *spi)
- 	return 0;
- }
- 
--static const struct of_device_id hx8357_dt_ids[] = {
--	{ .compatible = "himax,hx8357" },
--	{},
+-obj-$(CONFIG_MACH_DOCKSTAR)		+= dockstar-setup.o
+ obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
+ obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
+ obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
+diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
+deleted file mode 100644
+index 060ccf9..0000000
+--- a/arch/arm/mach-kirkwood/dockstar-setup.c
++++ /dev/null
+@@ -1,111 +0,0 @@
+-/*
+- * arch/arm/mach-kirkwood/dockstar-setup.c
+- *
+- * Seagate FreeAgent DockStar Setup
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/ata_platform.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/mv643xx_eth.h>
+-#include <linux/gpio.h>
+-#include <linux/leds.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <mach/kirkwood.h>
+-#include "common.h"
+-#include "mpp.h"
+-
+-static struct mtd_partition dockstar_nand_parts[] = {
+-	{
+-		.name = "u-boot",
+-		.offset = 0,
+-		.size = SZ_1M
+-	}, {
+-		.name = "uImage",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = SZ_4M
+-	}, {
+-		.name = "root",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = MTDPART_SIZ_FULL
+-	},
 -};
--MODULE_DEVICE_TABLE(of, hx8357_dt_ids);
 -
- static struct spi_driver hx8357_driver = {
- 	.probe  = hx8357_probe,
- 	.remove = hx8357_remove,
+-static struct mv643xx_eth_platform_data dockstar_ge00_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+-};
+-
+-static struct gpio_led dockstar_led_pins[] = {
+-	{
+-		.name			= "dockstar:green:health",
+-		.default_trigger	= "default-on",
+-		.gpio			= 46,
+-		.active_low		= 1,
+-	},
+-	{
+-		.name			= "dockstar:orange:misc",
+-		.default_trigger	= "none",
+-		.gpio			= 47,
+-		.active_low		= 1,
+-	},
+-};
+-
+-static struct gpio_led_platform_data dockstar_led_data = {
+-	.leds		= dockstar_led_pins,
+-	.num_leds	= ARRAY_SIZE(dockstar_led_pins),
+-};
+-
+-static struct platform_device dockstar_leds = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data	= &dockstar_led_data,
+-	}
+-};
+-
+-static unsigned int dockstar_mpp_config[] __initdata = {
+-	MPP29_GPIO,	/* USB Power Enable */
+-	MPP46_GPIO,	/* LED green */
+-	MPP47_GPIO,	/* LED orange */
+-	0
+-};
+-
+-static void __init dockstar_init(void)
+-{
+-	/*
+-	 * Basic setup. Needs to be called early.
+-	 */
+-	kirkwood_init();
+-
+-	/* setup gpio pin select */
+-	kirkwood_mpp_conf(dockstar_mpp_config);
+-
+-	kirkwood_uart0_init();
+-	kirkwood_nand_init(ARRAY_AND_SIZE(dockstar_nand_parts), 25);
+-
+-	if (gpio_request(29, "USB Power Enable") != 0 ||
+-	    gpio_direction_output(29, 1) != 0)
+-		pr_err("can't set up GPIO 29 (USB Power Enable)\n");
+-	kirkwood_ehci_init();
+-
+-	kirkwood_ge00_init(&dockstar_ge00_data);
+-
+-	platform_device_register(&dockstar_leds);
+-}
+-
+-MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
+-	.atag_offset	= 0x100,
+-	.init_machine	= dockstar_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= kirkwood_init_irq,
+-	.init_time	= kirkwood_timer_init,
+-	.restart	= kirkwood_restart,
+-MACHINE_END
 -- 
-1.8.3.4
+1.8.1.2
