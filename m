@@ -1,65 +1,87 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Aug 2013 17:07:29 +0200
-Subject: [PATCHv2 3/9] ARM: kirkwood: remove support for legacy booting of
- Guruplug
+Date: Thu,  1 Aug 2013 17:07:30 +0200
+Subject: [PATCHv2 4/9] ARM: kirkwood: remove support for legacy booting of
+ Sheevaplug
 In-Reply-To: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375369655-1310-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375369655-1310-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kirkwood Guruplug platform has already been converted to the
+The Kirkwood Sheevaplug platform has already been converted to the
 Device Tree, so we can remove the legacy booting option for this
 platform.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-kirkwood/Kconfig          |   7 --
- arch/arm/mach-kirkwood/Makefile         |   1 -
- arch/arm/mach-kirkwood/guruplug-setup.c | 133 --------------------------------
- 3 files changed, 141 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
+ arch/arm/mach-kirkwood/Kconfig            |  14 ---
+ arch/arm/mach-kirkwood/Makefile           |   2 -
+ arch/arm/mach-kirkwood/sheevaplug-setup.c | 161 ------------------------------
+ 3 files changed, 177 deletions(-)
+ delete mode 100644 arch/arm/mach-kirkwood/sheevaplug-setup.c
 
 diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index cf6c938..1d100f6 100644
+index 1d100f6..cb4688e 100644
 --- a/arch/arm/mach-kirkwood/Kconfig
 +++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -12,13 +12,6 @@ config MACH_ESATA_SHEEVAPLUG
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell eSATA SheevaPlug Reference Board.
+@@ -5,13 +5,6 @@ menu "Marvell Kirkwood Implementations"
+ config KIRKWOOD_LEGACY
+ 	bool
  
--config MACH_GURUPLUG
--	bool "Marvell GuruPlug Reference Board"
+-config MACH_ESATA_SHEEVAPLUG
+-	bool "Marvell eSATA SheevaPlug Reference Board"
 -	select KIRKWOOD_LEGACY
 -	help
 -	  Say 'Y' here if you want your kernel to support the
--	  Marvell GuruPlug Reference Board.
+-	  Marvell eSATA SheevaPlug Reference Board.
 -
  config MACH_INETSPACE_V2
  	bool "LaCie Internet Space v2 NAS Board"
  	select KIRKWOOD_LEGACY
+@@ -93,13 +86,6 @@ config MACH_RD88F6281
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell RD-88F6281 Reference Board.
+ 
+-config MACH_SHEEVAPLUG
+-	bool "Marvell SheevaPlug Reference Board"
+-	select KIRKWOOD_LEGACY
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  Marvell SheevaPlug Reference Board.
+-
+ config MACH_T5325
+ 	bool "HP t5325 Thin Client"
+ 	select KIRKWOOD_LEGACY
 diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 5edba89..157be02 100644
+index 157be02..2d1eb52 100644
 --- a/arch/arm/mach-kirkwood/Makefile
 +++ b/arch/arm/mach-kirkwood/Makefile
-@@ -2,7 +2,6 @@ obj-y				+= common.o pcie.o
+@@ -1,7 +1,6 @@
+ obj-y				+= common.o pcie.o
  obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
  
- obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
--obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
+-obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
  obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
  obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
  obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
-diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+@@ -11,7 +10,6 @@ obj-$(CONFIG_MACH_NETSPACE_V2)		+= netspace_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
+ obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
+ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+-obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
+ obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
+ obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o tsx1x-common.o
+ obj-$(CONFIG_MACH_TS41X)		+= ts41x-setup.o tsx1x-common.o
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
 deleted file mode 100644
-index 08dd739..0000000
---- a/arch/arm/mach-kirkwood/guruplug-setup.c
+index 55b68fa..0000000
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
 +++ /dev/null
-@@ -1,133 +0,0 @@
+@@ -1,161 +0,0 @@
 -/*
-- * arch/arm/mach-kirkwood/guruplug-setup.c
+- * arch/arm/mach-kirkwood/sheevaplug-setup.c
 - *
-- * Marvell GuruPlug Reference Board Setup
+- * Marvell SheevaPlug Reference Board Setup
 - *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -69,8 +91,8 @@ index 08dd739..0000000
 -#include <linux/kernel.h>
 -#include <linux/init.h>
 -#include <linux/platform_device.h>
--#include <linux/mtd/partitions.h>
 -#include <linux/ata_platform.h>
+-#include <linux/mtd/partitions.h>
 -#include <linux/mv643xx_eth.h>
 -#include <linux/gpio.h>
 -#include <linux/leds.h>
@@ -81,7 +103,7 @@ index 08dd739..0000000
 -#include "common.h"
 -#include "mpp.h"
 -
--static struct mtd_partition guruplug_nand_parts[] = {
+-static struct mtd_partition sheevaplug_nand_parts[] = {
 -	{
 -		.name = "u-boot",
 -		.offset = 0,
@@ -97,97 +119,125 @@ index 08dd739..0000000
 -	},
 -};
 -
--static struct mv643xx_eth_platform_data guruplug_ge00_data = {
+-static struct mv643xx_eth_platform_data sheevaplug_ge00_data = {
 -	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
 -};
 -
--static struct mv643xx_eth_platform_data guruplug_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
+-static struct mv_sata_platform_data sheeva_esata_sata_data = {
+-	.n_ports	= 2,
 -};
 -
--static struct mv_sata_platform_data guruplug_sata_data = {
--	.n_ports	= 1,
--};
--
--static struct mvsdio_platform_data guruplug_mvsdio_data = {
+-static struct mvsdio_platform_data sheevaplug_mvsdio_data = {
 -	/* unfortunately the CD signal has not been connected */
--	.gpio_card_detect = -1,
--	.gpio_write_protect = -1,
 -};
 -
--static struct gpio_led guruplug_led_pins[] = {
+-static struct mvsdio_platform_data sheeva_esata_mvsdio_data = {
+-	.gpio_write_protect = 44, /* MPP44 used as SD write protect */
+-	.gpio_card_detect = 47,	  /* MPP47 used as SD card detect */
+-};
+-
+-static struct gpio_led sheevaplug_led_pins[] = {
 -	{
--		.name			= "guruplug:red:health",
+-		.name			= "plug:red:misc",
+-		.default_trigger	= "none",
 -		.gpio			= 46,
 -		.active_low		= 1,
 -	},
 -	{
--		.name			= "guruplug:green:health",
--		.gpio			= 47,
--		.active_low		= 1,
--	},
--	{
--		.name			= "guruplug:red:wmode",
--		.gpio			= 48,
--		.active_low		= 1,
--	},
--	{
--		.name			= "guruplug:green:wmode",
+-		.name			= "plug:green:health",
+-		.default_trigger	= "default-on",
 -		.gpio			= 49,
 -		.active_low		= 1,
 -	},
 -};
 -
--static struct gpio_led_platform_data guruplug_led_data = {
--	.leds		= guruplug_led_pins,
--	.num_leds	= ARRAY_SIZE(guruplug_led_pins),
+-static struct gpio_led_platform_data sheevaplug_led_data = {
+-	.leds		= sheevaplug_led_pins,
+-	.num_leds	= ARRAY_SIZE(sheevaplug_led_pins),
 -};
 -
--static struct platform_device guruplug_leds = {
+-static struct platform_device sheevaplug_leds = {
 -	.name	= "leds-gpio",
 -	.id	= -1,
 -	.dev	= {
--		.platform_data	= &guruplug_led_data,
+-		.platform_data	= &sheevaplug_led_data,
 -	}
 -};
 -
--static unsigned int guruplug_mpp_config[] __initdata = {
--	MPP46_GPIO,	/* M_RLED */
--	MPP47_GPIO,	/* M_GLED */
--	MPP48_GPIO,	/* B_RLED */
--	MPP49_GPIO,	/* B_GLED */
+-static unsigned int sheevaplug_mpp_config[] __initdata = {
+-	MPP29_GPIO,	/* USB Power Enable */
+-	MPP46_GPIO,	/* LED Red */
+-	MPP49_GPIO,	/* LED */
 -	0
 -};
 -
--static void __init guruplug_init(void)
+-static unsigned int sheeva_esata_mpp_config[] __initdata = {
+-	MPP29_GPIO,	/* USB Power Enable */
+-	MPP44_GPIO,	/* SD Write Protect */
+-	MPP47_GPIO,	/* SD Card Detect */
+-	MPP49_GPIO,	/* LED Green */
+-	0
+-};
+-
+-static void __init sheevaplug_init(void)
 -{
 -	/*
 -	 * Basic setup. Needs to be called early.
 -	 */
 -	kirkwood_init();
--	kirkwood_mpp_conf(guruplug_mpp_config);
+-
+-	/* setup gpio pin select */
+-	if (machine_is_esata_sheevaplug())
+-		kirkwood_mpp_conf(sheeva_esata_mpp_config);
+-	else
+-		kirkwood_mpp_conf(sheevaplug_mpp_config);
 -
 -	kirkwood_uart0_init();
--	kirkwood_nand_init(ARRAY_AND_SIZE(guruplug_nand_parts), 25);
+-	kirkwood_nand_init(ARRAY_AND_SIZE(sheevaplug_nand_parts), 25);
 -
+-	if (gpio_request(29, "USB Power Enable") != 0 ||
+-	    gpio_direction_output(29, 1) != 0)
+-		pr_err("can't set up GPIO 29 (USB Power Enable)\n");
 -	kirkwood_ehci_init();
--	kirkwood_ge00_init(&guruplug_ge00_data);
--	kirkwood_ge01_init(&guruplug_ge01_data);
--	kirkwood_sata_init(&guruplug_sata_data);
--	kirkwood_sdio_init(&guruplug_mvsdio_data);
 -
--	platform_device_register(&guruplug_leds);
+-	kirkwood_ge00_init(&sheevaplug_ge00_data);
+-
+-	/* honor lower power consumption for plugs with out eSATA */
+-	if (machine_is_esata_sheevaplug())
+-		kirkwood_sata_init(&sheeva_esata_sata_data);
+-
+-	/* enable sd wp and sd cd on plugs with esata */
+-	if (machine_is_esata_sheevaplug())
+-		kirkwood_sdio_init(&sheeva_esata_mvsdio_data);
+-	else
+-		kirkwood_sdio_init(&sheevaplug_mvsdio_data);
+-
+-	platform_device_register(&sheevaplug_leds);
 -}
 -
--MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
--	/* Maintainer: Siddarth Gore <gores@marvell.com> */
+-#ifdef CONFIG_MACH_SHEEVAPLUG
+-MACHINE_START(SHEEVAPLUG, "Marvell SheevaPlug Reference Board")
+-	/* Maintainer: shadi Ammouri <shadi@marvell.com> */
 -	.atag_offset	= 0x100,
--	.init_machine	= guruplug_init,
+-	.init_machine	= sheevaplug_init,
 -	.map_io		= kirkwood_map_io,
 -	.init_early	= kirkwood_init_early,
 -	.init_irq	= kirkwood_init_irq,
 -	.init_time	= kirkwood_timer_init,
 -	.restart	= kirkwood_restart,
 -MACHINE_END
+-#endif
+-
+-#ifdef CONFIG_MACH_ESATA_SHEEVAPLUG
+-MACHINE_START(ESATA_SHEEVAPLUG, "Marvell eSATA SheevaPlug Reference Board")
+-	.atag_offset	= 0x100,
+-	.init_machine	= sheevaplug_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= kirkwood_init_irq,
+-	.init_time	= kirkwood_timer_init,
+-	.restart	= kirkwood_restart,
+-MACHINE_END
+-#endif
 -- 
 1.8.1.2
