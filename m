@@ -1,10 +1,10 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 01 Aug 2013 22:57:08 +0100
-Subject: [PATCH RFC 23/51] DMA-API: dma: pl08x: add
+Date: Thu, 01 Aug 2013 22:58:09 +0100
+Subject: [PATCH RFC 24/51] DMA-API: dma: pl330: add
  dma_set_mask_and_coherent() call
 In-Reply-To: <20130801213420.GL23006@n2100.arm.linux.org.uk>
 References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
-Message-ID: <E1V50rs-0006rf-UM@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1V50sr-0006ro-22@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +14,23 @@ the AMBA PL08x driver.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/dma/pl330.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 06fe45c..c23f876 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1853,6 +1853,11 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (ret)
- 		return ret;
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 593827b..9d30c53 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2869,6 +2869,10 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
  
-+	/* Ensure that we can do DMA */
+ 	pdat = adev->dev.platform_data;
+ 
 +	ret = dma_set_mask_and_coherent(&adev->dev, DMA_BIT_MASK(32));
 +	if (ret)
-+		goto out_no_pl08x;
++		return ret;
 +
- 	/* Create the driver state holder */
- 	pl08x = kzalloc(sizeof(*pl08x), GFP_KERNEL);
- 	if (!pl08x) {
+ 	/* Allocate a new DMAC and its Channels */
+ 	pdmac = devm_kzalloc(&adev->dev, sizeof(*pdmac), GFP_KERNEL);
+ 	if (!pdmac) {
 -- 
 1.7.4.4
