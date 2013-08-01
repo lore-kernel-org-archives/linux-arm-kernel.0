@@ -1,45 +1,50 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 1 Aug 2013 15:12:43 +0300
-Subject: [RFC/PATCH 1/3] i2c/omap: drop the lock hard irq context
+Date: Thu, 1 Aug 2013 15:12:44 +0300
+Subject: [RFC/PATCH 2/3] serial: omap: fix omap lock crap
 In-Reply-To: <1375359165-8411-1-git-send-email-balbi@ti.com>
 References: <1375359165-8411-1-git-send-email-balbi@ti.com>
-Message-ID: <1375359165-8411-2-git-send-email-balbi@ti.com>
+Message-ID: <1375359165-8411-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+From: Thomas Gleixner <tglx@linutronix.de>
 
-The lock is taken while reading two registers. On RT the first lock is
-taken in hard irq where it might sleep and in the threaded irq.
-The threaded irq runs in oneshot mode so the hard irq does not run until
-the thread the completes so there is no reason to grab the lock.
-
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/tty/serial/omap-serial.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 142b694d..8ceb98a 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -884,15 +884,12 @@ omap_i2c_isr(int irq, void *dev_id)
- 	u16 mask;
- 	u16 stat;
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index b6d1728..7882d25 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1170,13 +1170,10 @@ serial_omap_console_write(struct console *co, const char *s,
  
--	spin_lock(&dev->lock);
--	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
- 	stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
-+	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+ 	pm_runtime_get_sync(up->dev);
  
- 	if (stat & mask)
- 		ret = IRQ_WAKE_THREAD;
+-	local_irq_save(flags);
+-	if (up->port.sysrq)
+-		locked = 0;
+-	else if (oops_in_progress)
+-		locked = spin_trylock(&up->port.lock);
++	if (up->port.sysrq || oops_in_progress)
++		locked = spin_trylock_irqsave(&up->port.lock, flags);
+ 	else
+-		spin_lock(&up->port.lock);
++		spin_lock_irqsave(&up->port.lock, flags);
  
--	spin_unlock(&dev->lock);
--
- 	return ret;
+ 	/*
+ 	 * First save the IER then disable the interrupts
+@@ -1205,8 +1202,7 @@ serial_omap_console_write(struct console *co, const char *s,
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
+ 	if (locked)
+-		spin_unlock(&up->port.lock);
+-	local_irq_restore(flags);
++		spin_unlock_irqrestore(&up->port.lock, flags);
  }
  
+ static int __init
 -- 
 1.8.3.4.840.g6a90778
