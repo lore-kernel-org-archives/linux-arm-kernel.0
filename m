@@ -1,53 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Aug 2013 21:58:18 +0100
-Subject: [PATCH V2 3/3] ethernet: Convert mac address uses of 6 to ETH_ALEN
-In-Reply-To: <1375390528.2034.77.camel@joe-AO722>
-References: <cover.1375387593.git.joe@perches.com>
- <4170130535e4ea14c66f8510042577be21941f4d.1375387593.git.joe@perches.com>
- <CAOesGMhmxJTDjcPeD4b1FvRsbP8df369F01SQBK6dk4nXmRGjA@mail.gmail.com>
- <20130801203343.GG23006@n2100.arm.linux.org.uk>
- <1375390528.2034.77.camel@joe-AO722>
-Message-ID: <20130801205817.GJ23006@n2100.arm.linux.org.uk>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 2 Aug 2013 05:04:19 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130801204506.GH23006@n2100.arm.linux.org.uk>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130801193936.GD23006@n2100.arm.linux.org.uk>
+ <20130801201539.GA12291@kroah.com>
+ <20130801201823.GF23006@n2100.arm.linux.org.uk>
+ <20130801203631.GA12802@kroah.com>
+ <20130801204506.GH23006@n2100.arm.linux.org.uk>
+Message-ID: <20130801210419.GA13871@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 01:55:28PM -0700, Joe Perches wrote:
-> On Thu, 2013-08-01 at 21:33 +0100, Russell King - ARM Linux wrote:
-> > On Thu, Aug 01, 2013 at 01:31:09PM -0700, Olof Johansson wrote:
-> > > Hi,
-> 
-> Hi all.
-> 
-> > > On Thu, Aug 1, 2013 at 1:14 PM, Joe Perches <joe@perches.com> wrote:
-> > > > diff --git a/drivers/net/ethernet/pasemi/pasemi_mac.h b/drivers/net/ethernet/pasemi/pasemi_mac.h
-> []
-> > > > @@ -79,11 +79,11 @@ struct pasemi_mac {
-> > > >         int             last_cs;
-> > > >         int             num_cs;
-> > > >         u32             dma_if;
-> > > > -       u8              type;
-> > > >  #define MAC_TYPE_GMAC  1
-> > > >  #define MAC_TYPE_XAUI  2
-> > > >
-> > > > -       u8              mac_addr[6];
-> > > > +       u8              mac_addr[ETH_ALEN];
-> > > > +       u8              type;
+On Thu, Aug 01, 2013 at 09:45:06PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 02, 2013 at 04:36:31AM +0800, Greg KH wrote:
+> > On Thu, Aug 01, 2013 at 09:18:23PM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Aug 02, 2013 at 04:15:39AM +0800, Greg KH wrote:
+> > > > I'm not saying move away from DT at all, if it can be used to describe
+> > > > stuff like this, wonderful.  Just please don't use platform_bus anymore
+> > > > than you have to.
 > > > 
-> > > Just promote 'type' to u32 instead, saves you from moving the #defines
-> > > down, etc, etc.
+> > > As far as that sentiment goes, it would have been nice if that was made
+> > > more vocally ten years ago, because at that time I was the one trying to
+> > > encourage people to think about creating appropriate bus types, and what
+> > > I was being told was that no, bus types are something which are deprecated
+> > > and platform bus is what should be used.
+> > 
+> > Was that me that said that?
 > 
-> type is already u8, why change it?
-> That would also change struct size.
+> I don't remember...
 > 
-> > There's a more fundamental question which has to be asked: what is the
-> > point of moving that in the first place?
+> > I don't recall it at all, and if I did, I
+> > was flat out wrong.  I've always said that platform_bus is a hack, and
+> > should only be used as a "last resort".  Others have grabbed onto it as
+> > the "only" way to do devices for embedded things because that is what
+> > they were used to.
 > 
-> Some is_<foo>_ether_addr tests assume __aligned(2)
-> by a casting char * to u16/be16 * and dereferencing.
+> Well, I have three bus types to my name: the amba bus type, the ecard
+> bus type, and the sa1111 companion chip bus type.
 > 
-> see patch 0/3 and include/linux/etherdevice.h
+> I've been under pressure a number of times to convert the amba_bus
+> implementation to be a platform_bus, and of course I've refused to do
+> that because I don't see that platform buses provide what's required
+> there.  Not only that, but people keep using platform devices/driver
+> when they create a new driver which should be using the amba bus stuff.
 
-This seems rather obscure - I mean, it's not obvious to driver authors
-that should be the case.  Would it not be better to make this a little
-more obvious somehow?  Maybe __aligned(2) against mac_addr?  Or
-maybe have a debugging check for it?
+You are correct, you shouldn't be converting amba_bus, it is fine as-is.
+
+> Unfortunately, the message that platform devices should be used is soo
+> ingrained today that it's going to be really difficult to fight it
+> without basically refusing everything that comes along.
+
+So, what can I do to combat this?  I have no objection to refusing any
+new stuff at all, we do it all the time quite successfully :)
+
+> We also have the new problem (as of the adoption of DT on ARM) that it's
+> also embedded into the DT representation now, because the platform bus
+> is the "simple-bus" type in DT, and that's where everyone in ARM land
+> is placing their on-SoC devices.  That happened because DT already had
+> a way to create platform devices, and as they were already being used
+> on ARM, it gave a way to have DT create the platform devices without
+> any additional effort.
+> 
+> Yes, we can change the kernel code, but that now means that rather than
+> just changing the entirety of ARM, there's also the impact on PowerPC
+> to think about too with such a change.
+
+Creating a "DT" bus would place us back at the same spot that the
+platform_bus code has today.
+
+And the thing is, DT, just like ACPI, doesn't want to be a bus either.
+ACPI is having a bunch of rework done in its driver/bus representation
+because of mistakes like this that were done in the past.
+
+There is no reason that any devices represented by DT needs to be on the
+platform_bus, just like ACPI, so the two should be totally separate.
+It's just that new drivers/subsystems that are added, should NOT
+abuse the platform_bus code, when they should be creating their own
+busses.
+
+> Or we have to rip up our existing DT files and start with a different
+> approach...
+
+No, not at all, this shouldn't be needed.
+
+thanks,
+
+greg k-h
