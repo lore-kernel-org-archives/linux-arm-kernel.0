@@ -1,31 +1,20 @@
-From: baozich@gmail.com (Chen Baozi)
-Date: Thu,  1 Aug 2013 19:27:54 +0800
-Subject: [PATCH] ARM: fix wrong address when loading
- PRM_FRAC_INCREMENTOR_DENUMERATOR_RELOAD
-Message-ID: <1375356474-24203-1-git-send-email-baozich@gmail.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 1 Aug 2013 12:34:04 +0100
+Subject: [PATCH RFC 6/8] xen: make xen_create_contiguous_region return
+ the dma address
+In-Reply-To: <1375292732-7627-6-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
+ <1375292732-7627-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <51FA47AC.2020507@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The denominator should be load from INCREMENTOR_DENUMERATOR_RELOAD_OFFSET
-rather than INCREMENTER_NUMERATOR_OFFSET.
+On 31/07/13 18:45, Stefano Stabellini wrote:
+> Modify xen_create_contiguous_region to return the dma address of the
+> newly contiguous buffer.
 
-Signed-off-by: Chen Baozi <baozich@gmail.com>
----
- arch/arm/mach-omap2/timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Seems sensible.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index b37e1fc..9265e03 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -537,7 +537,7 @@ static void __init realtime_counter_init(void)
- 	reg |= num;
- 	__raw_writel(reg, base + INCREMENTER_NUMERATOR_OFFSET);
- 
--	reg = __raw_readl(base + INCREMENTER_NUMERATOR_OFFSET) &
-+	reg = __raw_readl(base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET) &
- 			NUMERATOR_DENUMERATOR_MASK;
- 	reg |= den;
- 	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
--- 
-1.8.1.4
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+
+David
