@@ -1,44 +1,45 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 2 Aug 2013 14:58:19 +0300
-Subject: [PATCH 0/2] OMAP: Panda DVI fix and a cleanup
-In-Reply-To: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <51FB9EDB.8010600@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 2 Aug 2013 12:59:00 +0100
+Subject: [PATCH RFC 1/8] arm: make SWIOTLB available
+In-Reply-To: <334c4fe7-e40c-489c-84db-9bb58c705d44@email.android.com>
+References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
+ <1375292732-7627-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <334c4fe7-e40c-489c-84db-9bb58c705d44@email.android.com>
+Message-ID: <alpine.DEB.2.02.1308021250050.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/07/13 12:06, Tomi Valkeinen wrote:
-> Hi Tony,
+On Wed, 31 Jul 2013, Konrad Rzeszutek Wilk wrote:
+> Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+> >Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >CC: will.deacon at arm.com
+> >CC: linux at arm.linux.org.uk
+> >---
+> > arch/arm/Kconfig                   |    7 +++++++
+> > arch/arm/include/asm/dma-mapping.h |   24 ++++++++++++++++++++++++
+> > 2 files changed, 31 insertions(+), 0 deletions(-)
+> >
+> >diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >index ba412e0..05125ab 100644
+> >--- a/arch/arm/Kconfig
+> >+++ b/arch/arm/Kconfig
+> >@@ -1832,6 +1832,13 @@ config CC_STACKPROTECTOR
+> > 	  neutralized via a kernel panic.
+> > 	  This feature requires gcc version 4.2 or above.
+> > 
+> >+config SWIOTLB
+> >+	def_bool y
+> >+	select NEED_SG_DMA_LENGTH
+> >+
+> >+config IOMMU_HELPER
+> >+	def_bool SWIOTLB
+> >+
 > 
-> Here's a fix for 3.11 that makes EDID read for DVI work again.
-> 
-> I also included a cleanup patch that removes the non-DT support functions that
-> are no longer called from anywhere. It's not a fix, but as we're in quite early
-> rcs, I thought it would be nice to remove the dead code.
-> 
-> Up to you if you want to include that one for 3.11 or not. If not, I'll include
-> it in a board file series for 3.12 that I'll send soon.
-> 
->  Tomi
-> 
-> Tomi Valkeinen (2):
->   ARM: OMAP: dss-common: fix Panda's DVI DDC channel
->   ARM: OMAP2+: Remove legacy DSS initialization for omap4
-> 
->  arch/arm/mach-omap2/dss-common.c | 49 +---------------------------------------
->  arch/arm/mach-omap2/dss-common.h |  2 --
->  2 files changed, 1 insertion(+), 50 deletions(-)
-> 
+> Could you explain the purpose of these two a bit more please? 
 
-Ping.
+SWIOTLB is not available on arm at the moment.
+We need to make it available, otherwise SWIOTLB_XEN won't be able to
+select it.
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/bb450053/attachment-0001.sig>
+Similarly, IOMMU_HELPER is another lib Kconfig symbol needed by SWIOTLB
+to compile.
