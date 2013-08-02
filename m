@@ -1,90 +1,117 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri,  2 Aug 2013 15:51:07 +0000
-Subject: [RFC PATCH V2 0/9] impedance-matcher generic improvements
-In-Reply-To: <51F2A014.7000209@gmail.com>
-References: <51F2A014.7000209@gmail.com>
-Message-ID: <cover.1375457714.git.jason@lakedaemon.net>
+Date: Fri,  2 Aug 2013 15:51:11 +0000
+Subject: [RFC PATCH V2 4/9] s/.name/.compatible/
+In-Reply-To: <cover.1375457714.git.jason@lakedaemon.net>
+References: <cover.1375457714.git.jason@lakedaemon.net>
+Message-ID: <1e66851fa0a7c137afbb39a27c77d5a585b466f6.1375457714.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ board-raumfeld.c | 18 +++++++++---------
+ board.h          |  2 +-
+ main.c           |  2 +-
+ 3 files changed, 11 insertions(+), 11 deletions(-)
 
-Here's a new version of my attempt to make this code generically useful.  I've
-tested this on my dreamplug both using the commandline
-'loadaddrs=appended,0x0700000' and appending all kirkwood*.dtb's.
-
-It's still hacky and can't update the dtb yet.  But it definitely works.
-
-To make it work for the Raumfeld boards, you'll need to change board-raumfeld.c
-to use the proper compatible strings for the boards.  Then, in the Makefile,
-change your uart address and MFG.
-
-For folks interested in testing:
-
-  git://git.infradead.org/users/jcooper/impedance-matcher.git generic
-
-btw - this is the first time I've needed to tinker with linker scripts, so if
-it looks wrong, please let me know!
-
-thx,
-
-Jason.
-
-Jason Cooper (9):
-  add cscope Makefile target
-  separate common functions from board specific
-  rename board.c to board-raumfeld.c
-  s/.name/.compatible/
-  directly include needed headers
-  serial: split out 8250 code, configurable reg addr
-  add generic board code
-  make appending images/dtbs optional
-  appended dtbs works!
-
- .gitignore        |   2 +-
- Makefile          |  59 +++++++++++++--------
- append_dtbs.sh    |   8 +++
- atags.h           |  10 ++++
- board-dreamplug.c |  28 ++++++++++
- board-generic.c   |  39 ++++++++++++++
- board-raumfeld.c  | 150 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
- board.c           |  88 --------------------------------
- board.h           |  10 ++--
- dtbs.c            |  36 +++++++++++++
- dtbs.h            |   6 +++
- endian.h          |  12 +++++
- fdt.h             |  64 +++++++++++++++++++++++
- led.c             |  54 --------------------
- led.h             |   6 ---
- main.c            |  47 ++++++++---------
- matcher.lds       |   8 ++-
- print.c           |   8 +--
- print.h           |   2 +
- register.c        |  11 ++++
- register.h        |   9 ++++
- serial-8250.c     |  21 ++++++++
- serial.h          |  10 ++++
- string.c          |  99 +++++++++++++++++++++++++++++++++++
- string.h          |   9 ++++
- types.h           |   1 +
- 26 files changed, 590 insertions(+), 207 deletions(-)
- create mode 100755 append_dtbs.sh
- create mode 100644 board-dreamplug.c
- create mode 100644 board-generic.c
- create mode 100644 board-raumfeld.c
- delete mode 100644 board.c
- create mode 100644 dtbs.c
- create mode 100644 dtbs.h
- create mode 100644 endian.h
- create mode 100644 fdt.h
- delete mode 100644 led.c
- delete mode 100644 led.h
- create mode 100644 register.c
- create mode 100644 register.h
- create mode 100644 serial-8250.c
- create mode 100644 serial.h
- create mode 100644 string.c
- create mode 100644 string.h
-
+diff --git a/board-raumfeld.c b/board-raumfeld.c
+index fe51bcb..e5d4702 100644
+--- a/board-raumfeld.c
++++ b/board-raumfeld.c
+@@ -21,19 +21,19 @@ static struct board boards[] = {
+ 		.machid		= 2413,
+ 		.system_rev	= 0,
+ 		.dtb		= &_binary_input_raumfeld_controller_0_dtb_start,
+-		.name		= "Raumfeld Controller, revision 0",
++		.compatible	= "Raumfeld Controller, revision 0",
+ 	},
+ 	{
+ 		.machid		= 2413,
+ 		.system_rev	= 1,
+ 		.dtb		= &_binary_input_raumfeld_controller_1_dtb_start,
+-		.name		= "Raumfeld Controller, revision 1",
++		.compatible	= "Raumfeld Controller, revision 1",
+ 	},
+ 	{
+ 		.machid		= 2413,
+ 		.system_rev	= 2,
+ 		.dtb		= &_binary_input_raumfeld_controller_2_dtb_start,
+-		.name		= "Raumfeld Controller, revision 2",
++		.compatible	= "Raumfeld Controller, revision 2",
+ 	},
+ 
+ 	/* Controller */
+@@ -41,19 +41,19 @@ static struct board boards[] = {
+ 		.machid		= 2414,
+ 		.system_rev	= 0,
+ 		.dtb		= &_binary_input_raumfeld_connector_0_dtb_start,
+-		.name		= "Raumfeld Connector, revision 0",
++		.compatible	= "Raumfeld Connector, revision 0",
+ 	},
+ 	{
+ 		.machid		= 2414,
+ 		.system_rev	= 1,
+ 		.dtb		= &_binary_input_raumfeld_connector_1_dtb_start,
+-		.name		= "Raumfeld Connector, revision 1",
++		.compatible	= "Raumfeld Connector, revision 1",
+ 	},
+ 	{
+ 		.machid		= 2414,
+ 		.system_rev	= 2,
+ 		.dtb		= &_binary_input_raumfeld_connector_2_dtb_start,
+-		.name		= "Raumfeld Connector, revision 2",
++		.compatible	= "Raumfeld Connector, revision 2",
+ 	},
+ 
+ 	/* Speaker */
+@@ -61,19 +61,19 @@ static struct board boards[] = {
+ 		.machid		= 2415,
+ 		.system_rev	= 0,
+ 		.dtb		= &_binary_input_raumfeld_speaker_0_dtb_start,
+-		.name		= "Raumfeld Speaker, revision 0",
++		.compatible	= "Raumfeld Speaker, revision 0",
+ 	},
+ 	{
+ 		.machid		= 2415,
+ 		.system_rev	= 1,
+ 		.dtb		= &_binary_input_raumfeld_speaker_1_dtb_start,
+-		.name		= "Raumfeld Speaker, revision 1",
++		.compatible	= "Raumfeld Speaker, revision 1",
+ 	},
+ 	{
+ 		.machid		= 2415,
+ 		.system_rev	= 2,
+ 		.dtb		= &_binary_input_raumfeld_speaker_2_dtb_start,
+-		.name		= "Raumfeld Speaker, revision 2",
++		.compatible	= "Raumfeld Speaker, revision 2",
+ 	},
+ 	{ 0, 0, NULL, NULL }	/* sentinel */
+ };
+diff --git a/board.h b/board.h
+index ec2b79e..5146db0 100644
+--- a/board.h
++++ b/board.h
+@@ -5,7 +5,7 @@ struct board {
+ 	__u32		machid;
+ 	__u32		system_rev;
+ 	void		*dtb;
+-	const char	*name;
++	const char	*compatible;
+ };
+ 
+ struct board *match_board(__u32 machid, const struct tag *);
+diff --git a/main.c b/main.c
+index 65ec9a7..8673703 100644
+--- a/main.c
++++ b/main.c
+@@ -20,7 +20,7 @@ void main(__u32 dummy, __u32 machid, const struct tag *tags)
+ 	board = match_board(machid, tags);
+ 
+ 	putstr("Detected board: ");
+-	putstr(board->name);
++	putstr(board->compatible);
+ 	putstr("\n");
+ 
+ 	putstr("Booting into Linux kernel ...\n");
 -- 
 1.8.3.2
