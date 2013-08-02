@@ -1,122 +1,37 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Fri, 02 Aug 2013 01:13:34 -0700
-Subject: [PATCH trivial] include: uapi: standard all files' macro prefix
- and suffix, excluding "linux/" sub-directory
-In-Reply-To: <51FB634F.5070401@asianux.com> (Chen Gang's message of "Fri, 02
- Aug 2013 15:44:15 +0800")
-References: <51FB6216.6010008@asianux.com> <51FB634F.5070401@asianux.com>
-Message-ID: <87iozoqzm9.fsf@tw-ebiederman.twitter.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 2 Aug 2013 10:16:13 +0200
+Subject: [RFC 2/8] gpio: mxc: Support for initialization as submodule
+In-Reply-To: <20130730093741.GG12382@S2101-09.ap.freescale.net>
+References: <1374938808-27316-1-git-send-email-mpa@pengutronix.de>
+ <1374938808-27316-3-git-send-email-mpa@pengutronix.de>
+ <20130730034354.GF19715@S2101-09.ap.freescale.net>
+ <20130730083929.GI16871@s25.your-server.de>
+ <20130730093741.GG12382@S2101-09.ap.freescale.net>
+Message-ID: <20130802081613.GT16871@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chen Gang <gang.chen@asianux.com> writes:
+On Tue, Jul 30, 2013 at 05:37:43PM +0800, Shawn Guo wrote:
+> On Tue, Jul 30, 2013 at 10:39:29AM +0200, Markus Pargmann wrote:
+> > > > +	if (pdata) {
+> > > > +		port->base = pdata->base;
+> > > > +		iores = NULL;
+> > > 
+> > > Why is this needed?
+> > 
+> > The memory regions used for iomux control overlap the regions used by
+> > the gpio driver. So we need to share the memory with the pinctrl driver.
+> 
+> I meant for iores = NULL;
 
-> It is a trivial patch for "include/uapi", exclude "linux" sub-directory.
->
-> If it is useful, I will send another patch for "linux" sub-directory.
->
-> BTW: it is really big mail addresses from
-> "./scripts/get_maintainers.pl"
+Not necessary, I removed it.
 
-What is the point?  Is there a bug that this fixes?
+Thanks,
 
-These files are not used with api in their path in userspace so I
-suspect your change just makes things strange and confusing.
+Markus
 
-Eric
-
-> Thanks.
->
-> On 08/02/2013 03:39 PM, Chen Gang wrote:
->> For "include/uapi/*", excluding "linux/" sub-directory, let all files'
->> macro prefix match the standard format, and give related stand comments
->> for their macro suffix.
->> 
->> The related standard format is:
->> 
->>   "_SUBDIRNAME_SUBDIRNAME[_SUBDIRNAME]_FILENAME" (1st _SUBDIRNAME is _UAPI), and use '_' instead of '.' and '-'.
->> 
->> 
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  include/uapi/asm-generic/auxvec.h      |    6 +++---
->>  include/uapi/asm-generic/bitsperlong.h |    6 +++---
->>  include/uapi/asm-generic/errno-base.h  |    6 +++---
->>  include/uapi/asm-generic/errno.h       |    6 +++---
->>  include/uapi/asm-generic/fcntl.h       |    6 +++---
->>  include/uapi/asm-generic/ioctls.h      |    6 +++---
->>  include/uapi/asm-generic/ipcbuf.h      |    6 +++---
->>  include/uapi/asm-generic/kvm_para.h    |    5 +++++
->>  include/uapi/asm-generic/mman-common.h |    6 +++---
->>  include/uapi/asm-generic/mman.h        |    6 +++---
->>  include/uapi/asm-generic/msgbuf.h      |    6 +++---
->>  include/uapi/asm-generic/param.h       |    6 +++---
->>  include/uapi/asm-generic/poll.h        |    6 +++---
->>  include/uapi/asm-generic/posix_types.h |    6 +++---
->>  include/uapi/asm-generic/sembuf.h      |    6 +++---
->>  include/uapi/asm-generic/setup.h       |    6 +++---
->>  include/uapi/asm-generic/shmbuf.h      |    6 +++---
->>  include/uapi/asm-generic/shmparam.h    |    6 +++---
->>  include/uapi/asm-generic/signal-defs.h |    6 +++---
->>  include/uapi/asm-generic/signal.h      |    6 +++---
->>  include/uapi/asm-generic/socket.h      |    6 +++---
->>  include/uapi/asm-generic/sockios.h     |    6 +++---
->>  include/uapi/asm-generic/stat.h        |    6 +++---
->>  include/uapi/asm-generic/statfs.h      |    6 +++---
->>  include/uapi/asm-generic/swab.h        |    6 +++---
->>  include/uapi/asm-generic/termbits.h    |    6 +++---
->>  include/uapi/asm-generic/types.h       |    6 +++---
->>  include/uapi/asm-generic/ucontext.h    |    6 +++---
->>  include/uapi/asm-generic/unistd.h      |    5 +++++
->>  include/uapi/drm/drm.h                 |    6 +++---
->>  include/uapi/drm/drm_fourcc.h          |    6 +++---
->>  include/uapi/drm/drm_mode.h            |    6 +++---
->>  include/uapi/drm/drm_sarea.h           |    6 +++---
->>  include/uapi/drm/exynos_drm.h          |    6 +++---
->>  include/uapi/drm/i810_drm.h            |    6 +++---
->>  include/uapi/drm/i915_drm.h            |    6 +++---
->>  include/uapi/drm/mga_drm.h             |    6 +++---
->>  include/uapi/drm/nouveau_drm.h         |    6 +++---
->>  include/uapi/drm/omap_drm.h            |    6 +++---
->>  include/uapi/drm/qxl_drm.h             |    6 +++---
->>  include/uapi/drm/r128_drm.h            |    6 +++---
->>  include/uapi/drm/radeon_drm.h          |    6 +++---
->>  include/uapi/drm/savage_drm.h          |    6 +++---
->>  include/uapi/drm/sis_drm.h             |    6 +++---
->>  include/uapi/drm/tegra_drm.h           |    6 +++---
->>  include/uapi/drm/via_drm.h             |    6 +++---
->>  include/uapi/drm/vmwgfx_drm.h          |    6 +++---
->>  include/uapi/mtd/inftl-user.h          |    6 +++---
->>  include/uapi/mtd/mtd-abi.h             |    6 +++---
->>  include/uapi/mtd/mtd-user.h            |    6 +++---
->>  include/uapi/mtd/nftl-user.h           |    6 +++---
->>  include/uapi/mtd/ubi-user.h            |    6 +++---
->>  include/uapi/rdma/ib_user_cm.h         |    6 +++---
->>  include/uapi/rdma/ib_user_mad.h        |    6 +++---
->>  include/uapi/rdma/ib_user_sa.h         |    6 +++---
->>  include/uapi/rdma/ib_user_verbs.h      |    6 +++---
->>  include/uapi/rdma/rdma_netlink.h       |    6 +++---
->>  include/uapi/rdma/rdma_user_cm.h       |    6 +++---
->>  include/uapi/scsi/fc/fc_els.h          |    6 +++---
->>  include/uapi/scsi/fc/fc_fs.h           |    6 +++---
->>  include/uapi/scsi/fc/fc_gs.h           |    6 +++---
->>  include/uapi/scsi/fc/fc_ns.h           |    6 +++---
->>  include/uapi/scsi/scsi_bsg_fc.h        |    7 +++----
->>  include/uapi/scsi/scsi_netlink.h       |    7 +++----
->>  include/uapi/scsi/scsi_netlink_fc.h    |    7 +++----
->>  include/uapi/sound/asequencer.h        |    6 +++---
->>  include/uapi/sound/asound.h            |    6 +++---
->>  include/uapi/sound/asound_fm.h         |    6 +++---
->>  include/uapi/sound/compress_offload.h  |    6 +++---
->>  include/uapi/sound/compress_params.h   |    6 +++---
->>  include/uapi/sound/emu10k1.h           |    6 +++---
->>  include/uapi/sound/hdsp.h              |    6 +++---
->>  include/uapi/sound/hdspm.h             |    6 +++---
->>  include/uapi/sound/sb16_csp.h          |    6 +++---
->>  include/uapi/sound/sfnt_info.h         |    6 +++---
->>  include/uapi/video/edid.h              |    6 +++---
->>  include/uapi/video/sisfb.h             |    6 +++---
->>  include/uapi/video/uvesafb.h           |    6 +++---
->>  include/uapi/xen/evtchn.h              |    6 +++---
->>  include/uapi/xen/privcmd.h             |    6 +++---
->>  80 files changed, 244 insertions(+), 237 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
