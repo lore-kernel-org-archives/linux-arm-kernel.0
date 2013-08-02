@@ -1,57 +1,54 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 2 Aug 2013 15:48:59 +0800
-Subject: [PATCH 2/8] ARM: tegra: config the polarity of the request of
- sys clock
-In-Reply-To: <51F6F109.8010102@wwwdotorg.org>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-3-git-send-email-josephl@nvidia.com>
- <51F6F109.8010102@wwwdotorg.org>
-Message-ID: <1375429739.6761.31.camel@jlo-ubuntu-64.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Aug 2013 00:53:53 -0700
+Subject: [Ksummit-2013-discuss] [ATTEND] [ARM ATTEND] kernel data bloat
+ and how to avoid it
+In-Reply-To: <20130731123351.GA30474@kroah.com>
+References: <20130731073802.GT7656@atomide.com>
+ <20130731123351.GA30474@kroah.com>
+Message-ID: <20130802075352.GY7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-07-30 at 06:47 +0800, Stephen Warren wrote:
-> On 07/26/2013 03:15 AM, Joseph Lo wrote:
-> > When suspending to LP1 mode, the SYSCLK will be clock gated. And different
-> > board may have different polarity of the request of SYSCLK, this patch
-> > configure the polarity from the DT for the board.
+* Greg KH <greg@kroah.com> [130731 05:39]:
+> On Wed, Jul 31, 2013 at 12:38:03AM -0700, Tony Lindgren wrote:
+> > Hi all,
+> > 
+> > Probably the biggest kernel data bloat issue is in the ARM land, but
+> > it also seems that it's becoming a Linux generic issue too, so I
+> > guess it could be discussed in either context.
 > 
-> > diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-> 
-> > @@ -238,6 +240,20 @@ void tegra_pmc_suspend_init(void)
-> >  	reg = tegra_pmc_readl(PMC_CTRL);
-> >  	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
-> >  	tegra_pmc_writel(reg, PMC_CTRL);
-> > +
-> > +	reg = tegra_pmc_readl(PMC_CTRL);
-> > +
-> > +	if (!pmc_pm_data.sysclkreq_high)
-> > +		reg |= TEGRA_POWER_SYSCLK_POLARITY;
-> > +	else
-> > +		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
-> > +
-> > +	/* configure the output inverts while the request is tristated */
-> > +	tegra_pmc_writel(reg, PMC_CTRL);
-> 
-> I think s/inverts/polarity/ in that comment would make a lot more sense.
-> 
-Yes, thanks.
+> Why is it specific to ARM?  What is so unique to ARM that causes it to
+> "bloat"?
 
-> Must _OE be disabled for the code to work correctly? If so, should the
-> code explicitly clear _OE first, since who knows what state it was
-> originally in? Can't we just set the new polarity and enable _OE in a
-> single register write?
-> 
-The SYSCLK is super clock that was connected to COP subsystem. It can't
-be disabled when system is running. The boot loader had initialized it
-and brought it to kernel. We follow the HW description in DT of the
-polarity of SCLK to re-configure and re-init again. Then the PMC can
-clock gate it when system go into suspend state.
+I think it has so far showed up on ARM because of no discoverable busses,
+but chances are it will be more of a generic problem.
 
-And it can't be set it up by a single register write. It's a HW control
-sequence. (Actually lots of PMC code have similar sequence.)
+> And what exactly do you mean by "bloat"?
 
-> > +	/* now enable the request */
-> > +	reg |= TEGRA_POWER_SYSCLK_OE;
-> > +	tegra_pmc_writel(reg, PMC_CTRL);
+Stuffing data to kernel that should not be in the kernel at all. Or
+if the data is needed by kernel, there should be only one set of the
+data defined rather than multiple copies of the data built into the
+kernel for each SoC or driver variant.
+
+> > Basically the data bloat issue is there for the arch code and drivers
+> > and may not show up initially until things have headed the wrong way for
+> > too long.
 > 
+> What do you mean by this?  You seem to be very vague here.
+
+People are unnecessarily defining registers in kernel for similar devices
+over and over again for each new SoC at the arch level and now more and
+more at the driver level.
+
+One example of that are device tree based drivers that don't describe
+the actual hardware, but instead have a binding that points to an index
+of defined registers in the driver.
+
+One way to avoid these kind of bloat issues is to allow drivers to load
+data at multiple points: Only abtolutely minimal set of data should be
+static, some should only come from the bootloader as a device tree or
+ACPI tables, and some is best to be loaded after booting from /lib/firmware.
+
+Regards,
+
+Tony
