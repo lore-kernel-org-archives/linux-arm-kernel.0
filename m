@@ -1,80 +1,144 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 2 Aug 2013 10:28:56 +0200
-Subject: [PATCHv3 3/3] fb: backlight: HX8357: Add HX8369 support
-In-Reply-To: <51FA56FF.8090308@ti.com>
-References: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375346437-18991-4-git-send-email-maxime.ripard@free-electrons.com>
- <51FA56FF.8090308@ti.com>
-Message-ID: <20130802082856.GQ2911@lukather>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 02 Aug 2013 16:31:59 +0800
+Subject: [PATCH trivial] include: uapi: standard all files' macro prefix
+ and suffix, excluding "linux/" sub-directory
+In-Reply-To: <87iozoqzm9.fsf@tw-ebiederman.twitter.com>
+References: <51FB6216.6010008@asianux.com> <51FB634F.5070401@asianux.com>
+ <87iozoqzm9.fsf@tw-ebiederman.twitter.com>
+Message-ID: <51FB6E7F.2050506@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
-
-On Thu, Aug 01, 2013 at 03:39:27PM +0300, Tomi Valkeinen wrote:
-> Hi,
+On 08/02/2013 04:13 PM, Eric W. Biederman wrote:
+> Chen Gang <gang.chen@asianux.com> writes:
 > 
-> On 01/08/13 11:40, Maxime Ripard wrote:
-> > From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > 
-> > Add support for the Himax HX8369 controller as it is quite similar to the
-> > hx8357.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Acked-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  drivers/video/backlight/hx8357.c | 219 ++++++++++++++++++++++++++++++++++++---
-> >  1 file changed, 204 insertions(+), 15 deletions(-)
+>> It is a trivial patch for "include/uapi", exclude "linux" sub-directory.
+>>
+>> If it is useful, I will send another patch for "linux" sub-directory.
+>>
+>> BTW: it is really big mail addresses from
+>> "./scripts/get_maintainers.pl"
 > 
-> I don't have comments about this patch as such, but hx8357.c in general:
+> What is the point?  Is there a bug that this fixes?
 > 
-> - The commands used look like MIPI DCS commands. We have defined those
-> in include/video/mipi_display.h.
 
-Aaah, yes indeed. Thanks for pointing that out.
+It is a trivial patch, it is not for bug fix.
 
-> - The command arrays could be const
-
-True.
-
-> - I don't like command arrays. Rather than having array for
-> "HX8357_SET_COLUMN_ADDRESS, 0x00, 0x00, 0x01, 0x3f,", I'd much more like
-> a function hx8357_set_column_address(int x1, int x2) or such.
-
-Hmm, Ok.
-
-> - Looking at the driver makes me think it resembles very much the panel
-> driver(s) we have for OMAP. If only CDF was ready... ;)
+> These files are not used with api in their path in userspace so I
+> suspect your change just makes things strange and confusing.
 > 
-> Those said, I don't see a problem with applying this. We could clean up
-> later those things mentioned above, but maybe it's better to do that
-> when moving to CDF.
 
-Yes, CDF would be really great for this :)
+Hmm... they are in "include/uapi" which means they may be shared with
+user space, is it correct ? (or Universal API ? ... excuse me, I don't
+know the definition of "include/uapi").
 
-Alexandre and I will try to find some time to do the cleanups you
-requested.
+If some of them are really never shared with user space (or not
+'Universal' enough to multiple OS), I recommend to move them from
+"include/uapi/" to another more suitable places.
 
-> For this and the two other patches:
+
+Thanks.
+
+> Eric
 > 
-> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>> Thanks.
+>>
+>> On 08/02/2013 03:39 PM, Chen Gang wrote:
+>>> For "include/uapi/*", excluding "linux/" sub-directory, let all files'
+>>> macro prefix match the standard format, and give related stand comments
+>>> for their macro suffix.
+>>>
+>>> The related standard format is:
+>>>
+>>>   "_SUBDIRNAME_SUBDIRNAME[_SUBDIRNAME]_FILENAME" (1st _SUBDIRNAME is _UAPI), and use '_' instead of '.' and '-'.
+>>>
+>>>
+>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>>> ---
+>>>  include/uapi/asm-generic/auxvec.h      |    6 +++---
+>>>  include/uapi/asm-generic/bitsperlong.h |    6 +++---
+>>>  include/uapi/asm-generic/errno-base.h  |    6 +++---
+>>>  include/uapi/asm-generic/errno.h       |    6 +++---
+>>>  include/uapi/asm-generic/fcntl.h       |    6 +++---
+>>>  include/uapi/asm-generic/ioctls.h      |    6 +++---
+>>>  include/uapi/asm-generic/ipcbuf.h      |    6 +++---
+>>>  include/uapi/asm-generic/kvm_para.h    |    5 +++++
+>>>  include/uapi/asm-generic/mman-common.h |    6 +++---
+>>>  include/uapi/asm-generic/mman.h        |    6 +++---
+>>>  include/uapi/asm-generic/msgbuf.h      |    6 +++---
+>>>  include/uapi/asm-generic/param.h       |    6 +++---
+>>>  include/uapi/asm-generic/poll.h        |    6 +++---
+>>>  include/uapi/asm-generic/posix_types.h |    6 +++---
+>>>  include/uapi/asm-generic/sembuf.h      |    6 +++---
+>>>  include/uapi/asm-generic/setup.h       |    6 +++---
+>>>  include/uapi/asm-generic/shmbuf.h      |    6 +++---
+>>>  include/uapi/asm-generic/shmparam.h    |    6 +++---
+>>>  include/uapi/asm-generic/signal-defs.h |    6 +++---
+>>>  include/uapi/asm-generic/signal.h      |    6 +++---
+>>>  include/uapi/asm-generic/socket.h      |    6 +++---
+>>>  include/uapi/asm-generic/sockios.h     |    6 +++---
+>>>  include/uapi/asm-generic/stat.h        |    6 +++---
+>>>  include/uapi/asm-generic/statfs.h      |    6 +++---
+>>>  include/uapi/asm-generic/swab.h        |    6 +++---
+>>>  include/uapi/asm-generic/termbits.h    |    6 +++---
+>>>  include/uapi/asm-generic/types.h       |    6 +++---
+>>>  include/uapi/asm-generic/ucontext.h    |    6 +++---
+>>>  include/uapi/asm-generic/unistd.h      |    5 +++++
+>>>  include/uapi/drm/drm.h                 |    6 +++---
+>>>  include/uapi/drm/drm_fourcc.h          |    6 +++---
+>>>  include/uapi/drm/drm_mode.h            |    6 +++---
+>>>  include/uapi/drm/drm_sarea.h           |    6 +++---
+>>>  include/uapi/drm/exynos_drm.h          |    6 +++---
+>>>  include/uapi/drm/i810_drm.h            |    6 +++---
+>>>  include/uapi/drm/i915_drm.h            |    6 +++---
+>>>  include/uapi/drm/mga_drm.h             |    6 +++---
+>>>  include/uapi/drm/nouveau_drm.h         |    6 +++---
+>>>  include/uapi/drm/omap_drm.h            |    6 +++---
+>>>  include/uapi/drm/qxl_drm.h             |    6 +++---
+>>>  include/uapi/drm/r128_drm.h            |    6 +++---
+>>>  include/uapi/drm/radeon_drm.h          |    6 +++---
+>>>  include/uapi/drm/savage_drm.h          |    6 +++---
+>>>  include/uapi/drm/sis_drm.h             |    6 +++---
+>>>  include/uapi/drm/tegra_drm.h           |    6 +++---
+>>>  include/uapi/drm/via_drm.h             |    6 +++---
+>>>  include/uapi/drm/vmwgfx_drm.h          |    6 +++---
+>>>  include/uapi/mtd/inftl-user.h          |    6 +++---
+>>>  include/uapi/mtd/mtd-abi.h             |    6 +++---
+>>>  include/uapi/mtd/mtd-user.h            |    6 +++---
+>>>  include/uapi/mtd/nftl-user.h           |    6 +++---
+>>>  include/uapi/mtd/ubi-user.h            |    6 +++---
+>>>  include/uapi/rdma/ib_user_cm.h         |    6 +++---
+>>>  include/uapi/rdma/ib_user_mad.h        |    6 +++---
+>>>  include/uapi/rdma/ib_user_sa.h         |    6 +++---
+>>>  include/uapi/rdma/ib_user_verbs.h      |    6 +++---
+>>>  include/uapi/rdma/rdma_netlink.h       |    6 +++---
+>>>  include/uapi/rdma/rdma_user_cm.h       |    6 +++---
+>>>  include/uapi/scsi/fc/fc_els.h          |    6 +++---
+>>>  include/uapi/scsi/fc/fc_fs.h           |    6 +++---
+>>>  include/uapi/scsi/fc/fc_gs.h           |    6 +++---
+>>>  include/uapi/scsi/fc/fc_ns.h           |    6 +++---
+>>>  include/uapi/scsi/scsi_bsg_fc.h        |    7 +++----
+>>>  include/uapi/scsi/scsi_netlink.h       |    7 +++----
+>>>  include/uapi/scsi/scsi_netlink_fc.h    |    7 +++----
+>>>  include/uapi/sound/asequencer.h        |    6 +++---
+>>>  include/uapi/sound/asound.h            |    6 +++---
+>>>  include/uapi/sound/asound_fm.h         |    6 +++---
+>>>  include/uapi/sound/compress_offload.h  |    6 +++---
+>>>  include/uapi/sound/compress_params.h   |    6 +++---
+>>>  include/uapi/sound/emu10k1.h           |    6 +++---
+>>>  include/uapi/sound/hdsp.h              |    6 +++---
+>>>  include/uapi/sound/hdspm.h             |    6 +++---
+>>>  include/uapi/sound/sb16_csp.h          |    6 +++---
+>>>  include/uapi/sound/sfnt_info.h         |    6 +++---
+>>>  include/uapi/video/edid.h              |    6 +++---
+>>>  include/uapi/video/sisfb.h             |    6 +++---
+>>>  include/uapi/video/uvesafb.h           |    6 +++---
+>>>  include/uapi/xen/evtchn.h              |    6 +++---
+>>>  include/uapi/xen/privcmd.h             |    6 +++---
+>>>  80 files changed, 244 insertions(+), 237 deletions(-)
 > 
-> I can apply these to my 3.12-fbdev branch some day soon, if
-> Jean-Christophe hasn't come back yet (I'd normally rather deal only with
-> trivial patches, and leave the rest to Jean-Christophe).
+> 
 
-Great, thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/cc613e15/attachment.sig>
+Chen Gang
