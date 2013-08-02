@@ -1,181 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 02 Aug 2013 15:01:52 -0600
-Subject: [PATCH] ARM: EXYNOS: add power domains support for EXYNOS5440
-In-Reply-To: <2729097.X0eAsuYF97@amdc1032>
-References: <2729097.X0eAsuYF97@amdc1032>
-Message-ID: <51FC1E40.7030807@wwwdotorg.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 2 Aug 2013 17:06:02 -0400
+Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
+In-Reply-To: <20130726030812.GB30195@mtj.dyndns.org>
+References: <20130629152959.GB31339@mtj.dyndns.org>
+ <20130629172123.GA3353@n2100.arm.linux.org.uk>
+ <20130629175743.GA382@mtj.dyndns.org>
+ <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
+ <20130629195549.GE3353@n2100.arm.linux.org.uk>
+ <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
+ <51D18DBA.6090608@ti.com> <51F1A7AA.8080700@ti.com>
+ <20130725223658.GJ26107@mtj.dyndns.org> <51F1B17F.30902@ti.com>
+ <20130726030812.GB30195@mtj.dyndns.org>
+Message-ID: <51FC1F3A.8090201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(CCing the other DT maintainers, hence quoting binding in full)
+Tejun,
 
-On 08/02/2013 07:23 AM, Bartlomiej Zolnierkiewicz wrote:
-> On EXYNOS5440 power domains are handled in a different way than on
-> the previous EXYNOS SoCs. Add support for them to EXYNOS pm_domains
-> driver. Then add device tree nodes for PCIe (controlling power for
-> PCIe host controller) and Conn2 (controlling power for Ethernet,
-> SATA and USB controllers) power domains to exynos5440.dtsi.
+On Thursday 25 July 2013 11:08 PM, Tejun Heo wrote:
+> Hello,
 > 
-> Currently if runtime Power Management is enabled and the driver
-> for devices under power domain is disabled then the power domain
-> will be disabled by EXYNOS pm_domains driver. To make more active
-> use of power domains (dynamically enable and disabled them as
-> needed) it is required to add runtime PM support to pci-exynos,
-> stmmac, ahci_platform, ohci-exynos and ehci-s5p drivers (to be
-> done later).
+> On Thu, Jul 25, 2013 at 07:15:11PM -0400, Santosh Shilimkar wrote:
+>> Sorry if I wasn't clear before, but I need help to at least have new
+>> memblock API support since I am not familiar with memblock code. 
+>> I could help in adaptation to the new API for ARM arch and
+>> core kernel code.
+>>
+>> Let me know your thoughts.
 > 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Myungjoo Ham <myungjoo.ham@samsung.com>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> ---
->  Documentation/devicetree/bindings/arm/exynos/power_domain.txt |   33 ++
->  arch/arm/boot/dts/exynos5440.dtsi                             |   23 +
->  arch/arm/mach-exynos/Kconfig                                  |    1 
->  arch/arm/mach-exynos/common.c                                 |    4 
->  arch/arm/mach-exynos/pm_domains.c                             |  138 +++++++++-
->  5 files changed, 190 insertions(+), 9 deletions(-)
+> Unfortunately, I'm currently a bit too occupied to work on it myself.
+> Any volunteers?
 > 
-> Index: b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> ===================================================================
-> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:45:53.551392396 +0200
-> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:46:29.799391845 +0200
-> @@ -5,20 +5,47 @@ to gate power to one or more peripherals
->  
->  Required Properties:
->  - compatible: should be one of the following.
-> -    * samsung,exynos4210-pd - for exynos4210 type power domain.
-> +    * samsung,exynos4210-pd - for Exynos4210 type power domain.
-> +    * samsung,exynos5440-pd - for Exynos5440 type power domain.
->  - reg: physical base address of the controller and length of memory mapped
-> -    region.
-> +    region (Exynos4210 type power domain) or bit offset in the control
-> +    register (Exynos5440 type power domain).
-> +
-> +Additional parent node must be created for Exynos5440 power domains with
-> +the following required properties:
-> +- compatible: samsung,exynos5440-power-domains, simple-bus
-> +- reg: physical base address of the XMU controller and length of memory
-> +    mapped region
+Looking at the situation, how about proceeding with patch updating
+the bootmem API signatures to use phys_addr_t  which can unblock me
+to get my machine working.
 
-It's a little odd to describe the child nodes first. Given the 4210 and
-5440 bindings work so differently, I'd suggest making separate binding
-files for the two; samsung,exynos4210-pd.txt and samsung,exynos5440-pd.txt.
+Introduction of new API, conversions of core kernel code and then
+arches moving away from bootmem is going to take significant time
+anyways. I will continue my effort to get ARM port moved to no-bootmem
+and get that merged.
 
-The node being describe here clearly is not a simple-bus; the child
-nodes appear to have a specific need that their parent be compatible =
-"samsung,exynos5440-power-domains", hence they aren't the independent
-devices that simple-bus would usually contain.
+Let me know how to make progress here. Appreciate your help on the subject.
 
-Note that I only briefly reviewed the low-level structural aspects of
-the binding that I mentioned above; I haven't thought about the binding
-at a higher level of e.g. "does this binding conceptually make sense".
-
->  Node of a device using power domains must have a samsung,power-domain property
->  defined with a phandle to respective power domain.
->  
-> -Example:
-> +Example for Exynos4210 compatible power domain:
->  
->  	lcd0: power-domain-lcd0 {
->  		compatible = "samsung,exynos4210-pd";
->  		reg = <0x10023C00 0x10>;
->  	};
->  
-> +Example for Exynos5440 compatible power domains:
-> +
-> +	power-domains at 00160000 {
-> +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
-> +		reg = <0x00160000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		pd_pcie: pcie-power-domain at 6 {
-> +			compatible = "samsung,exynos5440-pd";
-> +			reg = <6>;
-> +		};
-> +
-> +		pd_conn2: conn2-power-domain at 7 {
-> +			compatible = "samsung,exynos5440-pd";
-> +			reg = <7>;
-> +		};
-> +	};
-> +
->  Example of the node using power domain:
->  
->  	node {
-> Index: b/arch/arm/boot/dts/exynos5440.dtsi
-> ===================================================================
-> --- a/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:45:53.599392397 +0200
-> +++ b/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:46:29.815391842 +0200
-> @@ -29,6 +29,23 @@
->  		#clock-cells = <1>;
->  	};
->  
-> +	power-domains at 00160000 {
-> +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
-> +		reg = <0x00160000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		pd_pcie: pcie-power-domain at 6 {
-> +			compatible = "samsung,exynos5440-pd";
-> +			reg = <6>;
-> +		};
-> +
-> +		pd_conn2: conn2-power-domain at 7 {
-> +			compatible = "samsung,exynos5440-pd";
-> +			reg = <7>;
-> +		};
-> +	};
-> +
->  	gic:interrupt-controller at 2E0000 {
->  		compatible = "arm,cortex-a15-gic";
->  		#interrupt-cells = <3>;
-> @@ -192,6 +209,7 @@
->  		phy-mode = "sgmii";
->  		clocks = <&clock 25>;
->  		clock-names = "stmmaceth";
-> +		samsung,power-domain = <&pd_conn2>;
->  	};
->  
->  	amba {
-> @@ -240,6 +258,7 @@
->  		interrupts = <0 30 0>;
->  		clocks = <&clock 23>;
->  		clock-names = "sata";
-> +		samsung,power-domain = <&pd_conn2>;
->  	};
->  
->  	ohci at 220000 {
-> @@ -248,6 +267,7 @@
->  		interrupts = <0 29 0>;
->  		clocks = <&clock 24>;
->  		clock-names = "usbhost";
-> +		samsung,power-domain = <&pd_conn2>;
->  	};
->  
->  	ehci at 221000 {
-> @@ -256,6 +276,7 @@
->  		interrupts = <0 29 0>;
->  		clocks = <&clock 24>;
->  		clock-names = "usbhost";
-> +		samsung,power-domain = <&pd_conn2>;
->  	};
->  
->  	pcie at 290000 {
-> @@ -275,6 +296,7 @@
->  		#interrupt-cells = <1>;
->  		interrupt-map-mask = <0 0 0 0>;
->  		interrupt-map = <0x0 0 &gic 53>;
-> +		samsung,power-domain = <&pd_pcie>;
->  	};
->  
->  	pcie at 2a0000 {
-> @@ -294,5 +316,6 @@
->  		#interrupt-cells = <1>;
->  		interrupt-map-mask = <0 0 0 0>;
->  		interrupt-map = <0x0 0 &gic 56>;
-> +		samsung,power-domain = <&pd_pcie>;
->  	};
->  };
+Regards,
+Santosh
