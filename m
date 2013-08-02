@@ -1,78 +1,130 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 2 Aug 2013 22:14:49 +0800
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130802123445.GG7656@atomide.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802090355.GF7656@atomide.com>
- <20130802093222.GA8982@kroah.com>
- <20130802123445.GG7656@atomide.com>
-Message-ID: <20130802141449.GA7533@kroah.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Aug 2013 15:14:21 +0100
+Subject: [PATCHv2 2/5] arm64: factor out spin-table boot method
+In-Reply-To: <51EE9E79.6080005@ti.com>
+References: <1374507454-4573-1-git-send-email-mark.rutland@arm.com>
+ <1374507454-4573-3-git-send-email-mark.rutland@arm.com>
+ <51EE9E79.6080005@ti.com>
+Message-ID: <20130802141421.GQ2884@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 05:34:45AM -0700, Tony Lindgren wrote:
-> * Greg KH <greg@kroah.com> [130802 02:37]:
-> > On Fri, Aug 02, 2013 at 02:03:55AM -0700, Tony Lindgren wrote:
-> > > * Greg KH <greg@kroah.com> [130801 12:33]:
-> > > > On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
-> > > > > Hello,
-> > > > > 
-> > > > > Whilst Linux implements a bunch of different bus types (many of which
-> > > > > are in fact virtual), devices sitting on non-probable, memory mapped
-> > > > > buses inside SoCs typically live on either the platform_bus or the
-> > > > > amba_bus. So far, this has worked out alright; the buses haven't needed
-> > > > > to be visible to software and no additional software control is really
-> > > > > required from the OS. However, as I/O coherency and hardware
-> > > > > virtualisation capabilities start to creep into ARM-based SoCs, Linux
-> > > > > needs to know the topology of the system on which it is running.
-> > > > > 
-> > > > > Naturally, this would need to be described as a device-tree binding and
-> > > > > communicate:
-> > > > > 
-> > > > >   - Buses which can be configured as coherent, including which devices
-> > > > >     on those buses can be made coherent.
-> > > > > 
-> > > > >   - How IOMMUs sit on the bus and interact with masters on that bus (the
-> > > > >     current one-IOMMU-driver-per-bus may not work well for the
-> > > > >     platform_bus).
-> > > > 
-> > > > I've been waiting for people to finally run into this one, and realize
-> > > > that they shouldn't be using "platform_bus" :)
-> > > > 
-> > > > >   - QoS and PM constraints. This isn't really in my area, but we do have
-> > > > >     buses that have these features and expect software to control them.
-> > > > > 
-> > > > >   - The system topology and linkages between buses and devices.
-> > > > 
-> > > > The driver core handles this really well, you just have to create new
-> > > > busses, and don't rely on the "catch-all" platform_bus.
-> > > 
-> > > Hmm do you have some example of a device driver that is generic and
-> > > is supported on platform_bus and some other bus?
+On Tue, Jul 23, 2013 at 04:17:13PM +0100, Santosh Shilimkar wrote:
+> On Monday 22 July 2013 11:37 AM, Mark Rutland wrote:
+> > The arm64 kernel has an internal holding pen, which is necessary for
+> > some systems where we can't bring CPUs online individually and must hold
+> > multiple CPUs in a safe area until the kernel is able to handle them.
+> > The current SMP infrastructure for arm64 is closely coupled to this
+> > holding pen, and alternative boot methods must launch CPUs into the pen,
+> > from whence they are launched into the kernel proper.
+> >
+> s/whence/where
+
+Will fix up.
+
+>  
+> > With PSCI (and possibly other future boot methods), we can bring CPUs
+> > online individually, and need not perform the secondary_holding_pen
+> > dance. Instead, this patch factors the holding pen management code out
+> > to the spin-table boot method code, as it is the only boot method
+> > requiring the pen.
 > > 
-> > Take a look at drivers/usb/host/ohci* for one example that I know of,
-> > there are others all through the kernel as well.
+> > A new entry point for secondaries, secondary_entry is added for other
+> > boot methods to use, which bypasses the holding pen and its associated
+> > overhead when bringing CPUs online. The smp.pen.text section is also
+> > removed, as the pen can live in head.text without problem.
+> > 
+> > The smp_operations structure is extended with two new functions,
+> > cpu_boot and cpu_postboot, for bringing a cpu into the kernel and
+> > performing any post-boot cleanup required by a bootmethod (e.g.
+> > resetting the secondary_holding_pen_release to INVALID_HWID).
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  arch/arm64/include/asm/smp.h       | 17 ++++++++-
+> >  arch/arm64/kernel/head.S           | 12 +++++-
+> >  arch/arm64/kernel/smp.c            | 67 +++-------------------------------
+> >  arch/arm64/kernel/smp_psci.c       | 16 ++++----
+> >  arch/arm64/kernel/smp_spin_table.c | 75 ++++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/kernel/vmlinux.lds.S    |  1 -
+> >  6 files changed, 115 insertions(+), 73 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+> > index 90626b6..af39644 100644
+> > --- a/arch/arm64/include/asm/smp.h
+> > +++ b/arch/arm64/include/asm/smp.h
+> > @@ -60,8 +60,7 @@ struct secondary_data {
+> >  	void *stack;
+> >  };
+> >  extern struct secondary_data secondary_data;
+> > -extern void secondary_holding_pen(void);
+> > -extern volatile unsigned long secondary_holding_pen_release;
+> > +extern void secondary_entry(void);
+> >  
+> >  extern void arch_send_call_function_single_ipi(int cpu);
+> >  extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+> > @@ -70,8 +69,22 @@ struct device_node;
+> >  
+> >  struct smp_operations {
+> >  	const char	*name;
+> > +	/*
+> > +	 * Check devicetree data for cpu
+> > +	 */
+> All these comments can go above the struct as mentioned
+> in kerneldoc.
+
+Ok, I'll take a look at the kerneldoc documentation.
+
 > 
-> Uhh OK so I guess the answer is that the bus glue still needs to
-> be implemented separately for each driver and there's no generic
-> way of supporting multiple busses?
+> >  	int		(*cpu_init)(struct device_node *, unsigned int);
+> > +	/*
+> > +	 * Test if cpu is present and bootable
+> > +	 */
+> >  	int		(*cpu_prepare)(unsigned int);
+> > +	/*
+> > +	 * Boot cpu into the kernel
+> > +	 */
+> > +	int		(*cpu_boot)(unsigned int);
+> > +	/*
+> > +	 * Performs post-boot cleanup
+> > +	 */
+> > +	void		(*cpu_postboot)(void);
+> >  };
+> >  
+> >  extern const struct smp_operations smp_spin_table_ops;
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > index 53dcae4..3532ca6 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -217,7 +217,6 @@ ENTRY(__boot_cpu_mode)
+> >  	.quad	PAGE_OFFSET
+> >  
+> >  #ifdef CONFIG_SMP
+> > -	.pushsection    .smp.pen.text, "ax"
+> >  	.align	3
+> >  1:	.quad	.
+> >  	.quad	secondary_holding_pen_release
+> > @@ -242,7 +241,16 @@ pen:	ldr	x4, [x3]
+> >  	wfe
+> >  	b	pen
+> >  ENDPROC(secondary_holding_pen)
+> > -	.popsection
+> > +
+> > +	/*
+> > +	 * Secondary entry point that jumps straight into the kernel. Only to
+> > +	 * be used where CPUs are brought online dynamically by the kernel.
+> > +	 */
+> > +ENTRY(secondary_entry)
+> > +	bl	__calc_phys_offset		// x2=phys offset
+> > +	bl	el2_setup			// Drop to EL1
+> > +	b	secondary_startup
+> > +ENDPROC(secondary_entry)
+> >  
+> >  ENTRY(secondary_startup)
+> >  	/*
+> Other than that, rest of the patch looks fine too me.
 
-Different busses implies that there are different ways to physically
-talk to the device hardware, so of course there is no generic way to
-support that.
+Great!
 
-Unless your subsystem wants to do what we did for USB, and define a
-generic way to talk to the hardware in a very abstract way, allowing for
-totally different types of physical layers to handle lots of different
-logical layer drivers.  But odds are, you don't want to do that.
-
-It should be easy to just abstract out your "this is how I write a byte
-to the hardware" logic to handle the different bus types, if you really
-are using the same chip/core.  Lots of drivers do this today just fine,
-it isn't a big deal.
-
-thanks,
-
-greg k-h
+Thanks,
+Mark.
