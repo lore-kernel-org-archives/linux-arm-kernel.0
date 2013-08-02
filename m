@@ -1,175 +1,48 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Thu,  1 Aug 2013 18:23:38 -0700
-Subject: [RESEND PATCH 1/2] ARM: msm: Add support for MSM8974
-Message-ID: <1375406619-14618-1-git-send-email-rvaswani@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 2 Aug 2013 10:32:49 +0900
+Subject: [PATCH] ARM: Fix memblock_reserve() to include stext
+In-Reply-To: <51FA5B76.6030107@windriver.com>
+References: <20130731055807.14054.70106.sendpatchset@w520>
+ <20130731094352.GV24642@n2100.arm.linux.org.uk>
+ <CANqRtoR5j2VyRwf0suABfVLxzU30pZndEcCj7uZ2sSrzfGmx_A@mail.gmail.com>
+ <20130731193930.GY24642@n2100.arm.linux.org.uk>
+ <20130801073443.GB15265@verge.net.au>
+ <51FA5B76.6030107@windriver.com>
+Message-ID: <20130802013249.GB30121@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic board support for MSM8974 which
-belongs to the Snapdragon 800 family.
-For now, just support a basic machine with device tree.
+On Thu, Aug 01, 2013 at 08:58:30AM -0400, Paul Gortmaker wrote:
+> On 13-08-01 03:34 AM, Simon Horman wrote:
+> > On Wed, Jul 31, 2013 at 08:39:30PM +0100, Russell King - ARM Linux wrote:
+> >> On Thu, Aug 01, 2013 at 04:34:03AM +0900, Magnus Damm wrote:
+> >>> Are you aware of any existing fix for this or anyone working on
+> >>> solving this issue? If not then I don't mind stepping up. I can
+> >>> however think of quite a few other things to do if this has been
+> >>> solved already though, so please let me know if you think I should
+> >>> focus on fixing this.
+> >>
+> >> I committed a fix for it this morning, so it should be in linux-next by
+> >> tomorrow.
+> > 
+> > Hi Russell,
+> > 
+> > Magnus has some outstanding patches for Renesas SoC boards which I believe
+> > depend on this problem being resolved.  Could you indicate when you expect
+> > this patch to be in a stable branch which I could use as a base for a
+> > branch that will subsequently be pulled into arm-soc.
+> 
+> It will never be in a stable release, since the cpuinit removal was
+> added in the 3.11-rc1 merge window content, and the fix will be in
+> before 3.11 final hits the streets.  If you want stable stuff, you
+> should be using v3.10 at this point in time.
 
-Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
----
- arch/arm/boot/dts/Makefile        |  3 ++-
- arch/arm/boot/dts/msm8974.dts     | 26 ++++++++++++++++++++++++++
- arch/arm/mach-msm/Kconfig         | 21 ++++++++++++++++++---
- arch/arm/mach-msm/Makefile        |  1 +
- arch/arm/mach-msm/board-dt-8974.c | 23 +++++++++++++++++++++++
- 5 files changed, 70 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/msm8974.dts
- create mode 100644 arch/arm/mach-msm/board-dt-8974.c
+Sorry for my loose use of the word stable.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 641b3c9a..916827c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -97,7 +97,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- 	kirkwood-openblocks_a6.dtb
- dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
- dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
--	msm8960-cdp.dtb
-+	msm8960-cdp.dtb \
-+	msm8974.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-mirabox.dtb \
- 	armada-370-rd.dtb \
-diff --git a/arch/arm/boot/dts/msm8974.dts b/arch/arm/boot/dts/msm8974.dts
-new file mode 100644
-index 0000000..c31c097
---- /dev/null
-+++ b/arch/arm/boot/dts/msm8974.dts
-@@ -0,0 +1,26 @@
-+/dts-v1/;
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Qualcomm MSM8974";
-+	compatible = "qcom,msm8974";
-+	interrupt-parent = <&intc>;
-+
-+	intc: interrupt-controller at f9000000 {
-+		compatible = "qcom,msm-qgic2";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = < 0xf9000000 0x1000 >,
-+		      < 0xf9002000 0x1000 >;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 2 0xf08>,
-+			     <1 3 0xf08>,
-+			     <1 4 0xf08>,
-+			     <1 1 0xf08>;
-+		clock-frequency = <19200000>;
-+	};
-+};
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 614e41e..343675b 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -1,12 +1,12 @@
- if ARCH_MSM
- 
- comment "Qualcomm MSM SoC Type"
--	depends on (ARCH_MSM8X60 || ARCH_MSM8960)
-+	depends on ARCH_MSM_DT
- 
- choice
- 	prompt "Qualcomm MSM SoC Type"
- 	default ARCH_MSM7X00A
--	depends on !(ARCH_MSM8X60 || ARCH_MSM8960)
-+	depends on !ARCH_MSM_DT
- 
- config ARCH_MSM7X00A
- 	bool "MSM7x00A / MSM7x01A"
-@@ -60,6 +60,19 @@ config ARCH_MSM8960
- 	select MSM_SCM if SMP
- 	select USE_OF
- 
-+config ARCH_MSM8974
-+	bool "MSM8974"
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_ARM_ARCH_TIMER
-+	select HAVE_SMP
-+	select MSM_SCM if SMP
-+	select USE_OF
-+
-+config ARCH_MSM_DT
-+	def_bool y
-+	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
-+
- config MSM_HAS_DEBUG_UART_HS
- 	bool
- 
-@@ -68,6 +81,7 @@ config MSM_SOC_REV_A
- 
- config  ARCH_MSM_ARM11
- 	bool
-+
- config  ARCH_MSM_SCORPION
- 	bool
- 
-@@ -75,6 +89,7 @@ config  MSM_VIC
- 	bool
- 
- menu "Qualcomm MSM Board Type"
-+	depends on !ARCH_MSM_DT
- 
- config MACH_HALIBUT
- 	depends on ARCH_MSM
-@@ -121,7 +136,7 @@ config MSM_SMD
- 	bool
- 
- config MSM_GPIOMUX
--	depends on !(ARCH_MSM8X60 || ARCH_MSM8960)
-+	depends on !ARCH_MSM_DT
- 	bool "MSM V1 TLMM GPIOMUX architecture"
- 	help
- 	  Support for MSM V1 TLMM GPIOMUX architecture.
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index d257ff4..80e3b15 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -29,5 +29,6 @@ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
- obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
- obj-$(CONFIG_ARCH_MSM8X60) += board-dt-8660.o
- obj-$(CONFIG_ARCH_MSM8960) += board-dt-8960.o
-+obj-$(CONFIG_ARCH_MSM8974) += board-dt-8974.o
- obj-$(CONFIG_MSM_GPIOMUX) += gpiomux.o
- obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o
-diff --git a/arch/arm/mach-msm/board-dt-8974.c b/arch/arm/mach-msm/board-dt-8974.c
-new file mode 100644
-index 0000000..d7f84f2
---- /dev/null
-+++ b/arch/arm/mach-msm/board-dt-8974.c
-@@ -0,0 +1,23 @@
-+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+
-+static const char * const msm8974_dt_match[] __initconst = {
-+	"qcom,msm8974",
-+	NULL
-+};
-+
-+DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM (Flattened Device Tree)")
-+	.dt_compat = msm8974_dt_match,
-+MACHINE_END
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+I meant a branch that will be incorporated into a future mainline release.
+>From your response above I assume that I can use v3.11-rcX for some values
+of X.
+
+Can I confirm that the commit I should be looking for is
+cd717a2a3db96af1e308d5bdb76c9d5f8154b4bd
+("ARM: Add .text annotations where required after __CPUINIT removal")?
