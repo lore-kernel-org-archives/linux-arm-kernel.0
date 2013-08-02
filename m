@@ -1,39 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Aug 2013 10:55:46 +0100
-Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
- BCM5301X/BCM470X SoCs with ARM CPU
-In-Reply-To: <51FAD84A.4070701@hauke-m.de>
-References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
- <51F28A20.7060105@hauke-m.de>
- <20130726165311.GH17886@mudshark.cambridge.arm.com>
- <201307272149.17108.arnd@arndb.de>
- <20130730133601.GN11527@mudshark.cambridge.arm.com>
- <51F827EC.3090104@hauke-m.de>
- <20130731103507.GF23681@mudshark.cambridge.arm.com>
- <51FAD84A.4070701@hauke-m.de>
-Message-ID: <20130802095546.GJ2465@mudshark.cambridge.arm.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Fri, 02 Aug 2013 11:57:38 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <51F8CC35.1070704@collabora.co.uk>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
+ <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+ <51F8CC35.1070704@collabora.co.uk>
+Message-ID: <51FB8292.9090000@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 10:51:06PM +0100, Hauke Mehrtens wrote:
-> On 07/31/2013 12:35 PM, Will Deacon wrote:
-> > Hmm, so that's now exploding on a user address. Is this an A9-based SoC? If
-> > so, can you try disabling PL310 (CONFIG_CACHE_L2X0) and see if it makes a
-> > different please?
-> 
-> This is a A9-based SoC.
-> 
-> I already had PL310 disabled, now I tried to activate it, but I do not
-> see any difference.
-> 
-> [    1.049381] Freeing unused kernel memory: 1128K (c0261000 - c037b000)
-> [    1.056501] Unhandled fault: imprecise external abort (0x1c06) at
-> 0xb6f34005
-> [    1.063738] Kernel panic - not syncing: Attempted to kill init!
-> exitcode=0x00000007
+Am 31.07.2013 10:35, schrieb Javier Martinez Canillas:
 
-Ok, in which case I think you need to try Arnd's other suggestion of moving
-the loop around in order to try and bisect where the fault is being
-generated.
+>
+> The problem is that board files and drivers that has not not been completed
+> migrated to DT assumes (at least for OMAP) that *every* GPIO line is mapped as
+> an IRQ and they just do:
+>
+> gpio_request(gpio,...);
+> gpio_direction_input()
+> request[_threaded]_irq(gpio_to_irq(gpio), ...);
+>
+> My patch-set changed the gpio-omap driver to not map all GPIO lines but only the
+> ones that were really used as an IRQ and let the DT core to do the mapping from
+> irq_create_of_mapping(). The first problem reported with the OMAP patch was that
+> a driver was using the above sequence and that the GPIO had not been mapped.
+> This user was booting with DT and so this showed a bug in the driver and a DT
+> that did not conform with the standard schema used in mainline but this shows a
+> potential issue.
 
-Will
+There must have been a bug in the patch too. I've also added that 
+iinterrupt-parent stuff (with the same flags as used by the driver) and 
+just have let the driver call
+
+request_threaded_irq(gpio_to_irq(gpio), flags);
+
+without the gpio_request()/input() before. And request_threaded_irq() 
+returned -EBUSY. I'm pretty sure nothing else did use that gpio, but I 
+haven't looked at why request_threaded_irq() returned -EBUSY. I assume 
+the new mapping stuff did reserve the irq in such a way, that the driver 
+couldn't request the IRQ.
+
+Otherwise I wouldn't have had a problem by just adding the necessary 
+entries to the DT.
+
+But I have to say I didn't like the syntax too, and it wasn't obvious 
+how the syntax is and how to conclude from a gpio number to an 
+irq-number and the patch didn't really include some documentation or 
+useful example.
+
+Regards,
+
+Alexander Holler
