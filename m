@@ -1,110 +1,68 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Fri, 2 Aug 2013 19:55:52 +0400
-Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <20130802105754.GF2884@e106331-lin.cambridge.arm.com>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-8-git-send-email-shc_work@mail.ru>
- <20130802105754.GF2884@e106331-lin.cambridge.arm.com>
-Message-ID: <20130802195552.2f95c855fc20d6b3a205e40f@mail.ru>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Aug 2013 17:09:32 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130802142010.GC7533@kroah.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802115334.GN2465@mudshark.cambridge.arm.com>
+ <20130802142010.GC7533@kroah.com>
+Message-ID: <20130802160932.GG5292@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Aug 2013 11:57:54 +0100
-Mark Rutland <mark.rutland@arm.com> wrote:
-
-> On Thu, Jul 18, 2013 at 07:34:58PM +0100, Alexander Shiyan wrote:
-> > This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
-> > Designed primarily for migration CLPS711X subarch for multiplatform & DT,
-> > for this as the "OF" and "not-OF" calls implemented.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  .../interrupt-controller/cirrus,clps711x-intc.txt  |  42 ++++
-> >  arch/arm/Kconfig                                   |   2 -
-> >  drivers/irqchip/Kconfig                            |   6 +
-> >  drivers/irqchip/Makefile                           |   1 +
-> >  drivers/irqchip/irq-clps711x.c                     | 277 +++++++++++++++++++++
-> >  5 files changed, 326 insertions(+), 2 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-> >  create mode 100644 drivers/irqchip/irq-clps711x.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-> > new file mode 100644
-> > index 0000000..26f8983
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-> > @@ -0,0 +1,42 @@
-> > +Cirrus Logic CLPS711X Interrupt Controller
-> > +
-> > +Required properties:
-> > +
-> > +- compatible: Should be "cirrus,clps711x-intc"
-> > +- reg: Specifies base physical address of the registers set
-> > +- interrupt-controller: Identifies the node as an interrupt controller
-> > +- #interrupt-cells: Specifies the number of cells needed to encode an
-> > +  interrupt source. The value shall be 1.
-> > +
-> > +The interrupt sources are as follows:
-> > +ID     Name    Description
-> > +---------------------------
-> > +1:     BLINT   Battery low (FIQ)
-> > +3:     MCINT   Media changed (FIQ)
-> > +4:     CSINT   CODEC sound
-> > +5:     EINT1   External 1
-> > +6:     EINT2   External 2
-> > +7:     EINT3   External 3
-> > +8:     TC1OI   TC1 under flow
-> > +9:     TC2OI   TC2 under flow
-> > +10:    RTCMI   RTC compare match
-> > +11:    TINT    64Hz tick
-> > +12:    UTXINT1 UART1 transmit FIFO half empty
-> > +13:    URXINT1 UART1 receive FIFO half full
-> > +14:    UMSINT  UART1 modem status changed
-> > +15:    SSEOTI  SSI1 end of transfer
-> > +16:    KBDINT  Keyboard
-> > +17:    SS2RX   SSI2 receive FIFO half or greater full
-> > +18:    SS2TX   SSI2 transmit FIFO less than half empty
-> > +28:    UTXINT2 UART2 transmit FIFO half empty
-> > +29:    URXINT2 UART2 receive FIFO half full
-> > +32:    DAIINT  DAI interface (FIQ)
+On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
+> On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
+> > We can change the mindset by yelling, but if you're writing a new
+> > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
+> > because you get a bunch of device-tree parsing code for free (see
+> > drivers/of/platform.c).
 > 
-> Surely that's specific to the SoC the interrupt controller is used in,
-> not the interrupt controller IP itself?
-
-[...]
-> > +static const struct {
-> > +#define CLPS711X_FLAG_EN       (1 << 0)
-> > +#define CLPS711X_FLAG_FIQ      (1 << 1)
-> > +       unsigned int    flags;
-> > +       phys_addr_t     phys_eoi;
-> > +} clps711x_irqs[] __initconst = {
-> > +       [1]     = { CLPS711X_FLAG_FIQ, CLPS711X_BLEOI, },
-> > +       [3]     = { CLPS711X_FLAG_FIQ, CLPS711X_MCEOI, },
-> > +       [4]     = { CLPS711X_FLAG_EN, CLPS711X_COEOI, },
-> > +       [5]     = { CLPS711X_FLAG_EN, },
-> > +       [6]     = { CLPS711X_FLAG_EN, },
-> > +       [7]     = { CLPS711X_FLAG_EN, },
-> > +       [8]     = { CLPS711X_FLAG_EN, CLPS711X_TC1EOI, },
-> > +       [9]     = { CLPS711X_FLAG_EN, CLPS711X_TC2EOI, },
-> > +       [10]    = { CLPS711X_FLAG_EN, CLPS711X_RTCEOI, },
-> > +       [11]    = { CLPS711X_FLAG_EN, CLPS711X_TEOI, },
-> > +       [12]    = { CLPS711X_FLAG_EN, },
-> > +       [13]    = { CLPS711X_FLAG_EN, },
-> > +       [14]    = { CLPS711X_FLAG_EN, CLPS711X_UMSEOI, },
-> > +       [15]    = { CLPS711X_FLAG_EN, CLPS711X_SRXEOF, },
-> > +       [16]    = { CLPS711X_FLAG_EN, CLPS711X_KBDEOI, },
-> > +       [17]    = { CLPS711X_FLAG_EN, },
-> > +       [18]    = { CLPS711X_FLAG_EN, },
-> > +       [28]    = { CLPS711X_FLAG_EN, },
-> > +       [29]    = { CLPS711X_FLAG_EN, },
-> > +       [32]    = { CLPS711X_FLAG_FIQ, },
-> > +};
+> I know :(
 > 
-> Isn't that SoC specific?
+> So, who do I "yell at", and what do I do to make things easier for you
+> from the driver-core perspective?
 
-I absolutely do not understand the last two comments.
-You are not difficult to describe them in other words?
-Thanks.
+I would anticipate most of these drivers going through the arm-soc tree, so
+Olof and Kevin would be doing the yelling. You could join in the chorus too!
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+We basically need reviewers to adopt the position that a new bus should be
+considered and dismissed before using the platform_bus, then you can yell
+transitively through them.
+
+> > Agreed, it's time that we started to describe these non-probable buses as
+> > separate bus_types, with controller logic for configuring the bus itself
+> > (there are weird-and-wonderful ring-based designs on the horizon which can
+> > require a fair amount of setup).
+> 
+> I've heard rumors of those for a while now, I'll believe it when I see
+> them :)
+
+Oh, they're coming. I'm trying to understand the programmer's model for one
+as we speak :) On the plus side, you also get a whole bunch of debug and PMU
+data on these things, which is interesting from a kernel perspective.
+
+> > So, like a good proportion of the ARM community, ACPI isn't something I'm
+> > well-versed in. Yes, it's coming, but at the same time it's not going to be
+> > everywhere and we need to continue to support new SoCs using device-tree.
+> > Whilst it might even become a de-factor standard for servers, mobile devices
+> > will likely continue with the bootloaders they currently have. Furthermore,
+> > the mobile space is really the wild-west when it comes to system topology --
+> > exynos SoCs tend to have one IOMMU per device, for example:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181922.html
+> > 
+> > On the back of that, how does ACPI describe these relationships? It would
+> > certainly be a good idea to see what's already being done so we don't
+> > reinvent everything again for device-tree.
+> 
+> I don't recall the specifics of how it does this, but the spec is open
+> (and bad to read, sorry), and the linux-acpi mailing list is very
+> welcoming, so I suggest you start there if you have questions.
+
+Understandable, I'll make an effort to RTFM, although I don't think that
+mitigates the need for discussion in this area.
+
+Cheers,
+
+Will
