@@ -1,35 +1,39 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Fri, 02 Aug 2013 10:55:07 +0100
-Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
-In-Reply-To: <51FB8081.6040501@linaro.org>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51FB7CB8.6080103@arm.com> <51FB8081.6040501@linaro.org>
-Message-ID: <51FB81FB.3060709@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Aug 2013 10:55:46 +0100
+Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+In-Reply-To: <51FAD84A.4070701@hauke-m.de>
+References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
+ <51F28A20.7060105@hauke-m.de>
+ <20130726165311.GH17886@mudshark.cambridge.arm.com>
+ <201307272149.17108.arnd@arndb.de>
+ <20130730133601.GN11527@mudshark.cambridge.arm.com>
+ <51F827EC.3090104@hauke-m.de>
+ <20130731103507.GF23681@mudshark.cambridge.arm.com>
+ <51FAD84A.4070701@hauke-m.de>
+Message-ID: <20130802095546.GJ2465@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/13 10:48, Daniel Lezcano wrote:
-> On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
->> Hi Daniel,
->>
->> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
->>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>
->>> This patch series adds support to configure the rate and enable the event
->>> stream for architected timer. Since the timer control register is reset to
->>> zero on warm boot, CPU PM notifier is added to re-initialse it.
->>>
->> This series is required to support TC2 cpuidle.
->> It will be good if you can review and get this in for v3.12
+On Thu, Aug 01, 2013 at 10:51:06PM +0100, Hauke Mehrtens wrote:
+> On 07/31/2013 12:35 PM, Will Deacon wrote:
+> > Hmm, so that's now exploding on a user address. Is this an A9-based SoC? If
+> > so, can you try disabling PL310 (CONFIG_CACHE_L2X0) and see if it makes a
+> > different please?
 > 
-> So do you want me to take the series through my tree ?
+> This is a A9-based SoC.
 > 
-Yes I believe it has to go through your(ARM specific clocksource?) tree,
-but currently there's a conflict with another bug fix(that should come
-from rmk as -rc fix)
-(Commit ab8d46c0 "ARM: 7788/1: elf: fix lpae hwcap feature reporting in
-proc/cpuinfo" in rmk -fixes)
+> I already had PL310 disabled, now I tried to activate it, but I do not
+> see any difference.
+> 
+> [    1.049381] Freeing unused kernel memory: 1128K (c0261000 - c037b000)
+> [    1.056501] Unhandled fault: imprecise external abort (0x1c06) at
+> 0xb6f34005
+> [    1.063738] Kernel panic - not syncing: Attempted to kill init!
+> exitcode=0x00000007
 
-Regards,
-Sudeep
+Ok, in which case I think you need to try Arnd's other suggestion of moving
+the loop around in order to try and bisect where the fault is being
+generated.
+
+Will
