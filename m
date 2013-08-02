@@ -1,137 +1,159 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri,  2 Aug 2013 15:51:13 +0000
-Subject: [RFC PATCH V2 6/9] serial: split out 8250 code, configurable reg addr
+Date: Fri,  2 Aug 2013 15:51:15 +0000
+Subject: [RFC PATCH V2 8/9] make appending images/dtbs optional
 In-Reply-To: <cover.1375457714.git.jason@lakedaemon.net>
 References: <cover.1375457714.git.jason@lakedaemon.net>
-Message-ID: <30c8a8fcb81ea8ed3854e1b8af879a4ebb3f7e5e.1375457714.git.jason@lakedaemon.net>
+Message-ID: <4c634732b7e4cda4b56b57039b365af0e3ba4102.1375457714.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- Makefile      |  9 +++++++--
- matcher.lds   |  2 +-
- print.c       |  8 +-------
- serial-8250.c | 21 +++++++++++++++++++++
- serial.h      | 10 ++++++++++
- 5 files changed, 40 insertions(+), 10 deletions(-)
- create mode 100644 serial-8250.c
- create mode 100644 serial.h
+ .gitignore     |  1 -
+ Makefile       | 35 ++++++++++++++++-------------------
+ append_dtbs.sh |  8 ++++++++
+ main.c         | 15 +++++++++++++--
+ matcher.lds    |  8 ++++++--
+ 5 files changed, 43 insertions(+), 24 deletions(-)
+ create mode 100755 append_dtbs.sh
 
+diff --git a/.gitignore b/.gitignore
+index ac4198c..e0ebf62 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,3 @@
+-*.sh
+ *.o
+ *.bin
+ cscope.*
 diff --git a/Makefile b/Makefile
-index bb3a154..c799012 100644
+index 65e9f3b..c9b2381 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -3,12 +3,17 @@ LDFLAGS=-static -nostdlib
+@@ -1,4 +1,13 @@
+-CFLAGS=-Wall -ffreestanding
++ifneq ($(origin APPEND_KERNEL), undefined)
++INPUT_OBJS=zimage.o
++CFLAGS+=-DAPPEND_KERNEL="$(APPEND_KERNEL)"
++endif
++
++ifneq ($(origin APPEND_DTBS), undefined)
++CFLAGS+=-DAPPEND_DTBS="$(APPEND_DTBS)"
++endif
++
++CFLAGS+=-Wall -ffreestanding
+ LDFLAGS=-static -nostdlib
  GCC=$(CROSS_COMPILE)gcc
  OBJCOPY=$(CROSS_COMPILE)objcopy
- LD=$(CROSS_COMPILE)ld
--LOADADDR=0xa0008000
-+LOADADDR=0x10008000
- BINFMT=elf32-littlearm
+@@ -21,34 +30,22 @@ COMMON_OBJS = \
+ 	register.o \
+ 	string.o
  
- MFG=raumfeld
-+UART=8250
-+UART_BASE=0xf1012000
-+
-+CFLAGS+=-DUART_BASE=$(UART_BASE)
+-INPUT_OBJS = \
+-	zimage.o		\
+-	dtb-raumfeld-controller-0.o	\
+-	dtb-raumfeld-controller-1.o	\
+-	dtb-raumfeld-controller-2.o	\
+-	dtb-raumfeld-connector-0.o	\
+-	dtb-raumfeld-connector-1.o	\
+-	dtb-raumfeld-connector-2.o	\
+-	dtb-raumfeld-speaker-0.o	\
+-	dtb-raumfeld-speaker-1.o	\
+-	dtb-raumfeld-speaker-2.o
+-
+ all: uImage
  
- BOARD_OBJ = board-$(MFG).o
-+UART_OBJ = serial-$(UART).o
+-dtb-%.o: input/%.dtb
+-	$(OBJCOPY) -I binary -O $(BINFMT) -B arm $^ $@
+-
+-zimage.o: input/zImage
++zimage.o: $(APPEND_KERNEL)
+ 	$(OBJCOPY) -I binary -O $(BINFMT) -B arm $^ $@
  
- COMMON_OBJS = \
- 	main.o \
-@@ -38,7 +43,7 @@ zimage.o: input/zImage
  %.o: %.c
  	$(GCC) $(CFLAGS) -c $^
  
--matcher: $(COMMON_OBJS) $(BOARD_OBJ) $(INPUT_OBJS)
-+matcher: $(COMMON_OBJS) $(BOARD_OBJ) $(UART_OBJ) $(INPUT_OBJS)
- 	$(LD) $(LDFLAGS) -T matcher.lds -o $@ $^
+ matcher: $(COMMON_OBJS) $(BOARD_OBJ) $(UART_OBJ) $(INPUT_OBJS)
+-	$(LD) $(LDFLAGS) -T matcher.lds -o $@ $^
++	$(LD) $(LDFLAGS) -T matcher.lds -Ttext $(LOADADDR) -o $@ $^
  
  matcher.bin: matcher
+-	$(OBJCOPY) -O binary $^ $@
++	$(OBJCOPY) -O binary --set-section-flags .bss=alloc,load,contents $^ $@
++ifneq ($(origin APPEND_DTBS), undefined)
++	./append_dtbs.sh $@ $(APPEND_DTBS)
++endif
+ 
+ uImage: matcher.bin
+ 	mkimage -A arm -O linux -C none -T kernel \
+diff --git a/append_dtbs.sh b/append_dtbs.sh
+new file mode 100755
+index 0000000..82bb463
+--- /dev/null
++++ b/append_dtbs.sh
+@@ -0,0 +1,8 @@
++#!/bin/sh
++
++OUT="$1"
++shift
++DTBS="$*"
++
++cat $DTBS >>$OUT
++dd if=/dev/zero of=$OUT oflag=append conv=notrunc bs=1 count=8 #sentinel
+diff --git a/main.c b/main.c
+index ed25842..c64a083 100644
+--- a/main.c
++++ b/main.c
+@@ -3,13 +3,21 @@
+ #include "print.h"
+ #include "board.h"
+ 
++#ifdef APPEND_KERNEL
+ extern __u32 _binary_input_zImage_start;
++#endif
++
++void main(__u32 dummy, __u32 machid, const struct tag *tags)
++	__attribute__((section(".text_main")));
+ 
+ void main(__u32 dummy, __u32 machid, const struct tag *tags)
+ {
+ 	struct board *board;
+-	void (*start_kernel)(__u32 dummy, __u32 machid, void *dtb) =
+-		(void *) &_binary_input_zImage_start;
++	void (*start_kernel)(__u32 dummy, __u32 machid, void *dtb);
++
++#ifdef APPEND_KERNEL
++	start_kernel = (void *) &_binary_input_zImage_start;
++#endif
+ 
+ 	putstr("++ Impedance Matcher (3rd stage loader) ++\n");
+ 
+@@ -26,6 +34,9 @@ void main(__u32 dummy, __u32 machid, const struct tag *tags)
+ 		putstr("Not given.");
+ 	putstr("\n");
+ 
++	if (board->kernel)
++		start_kernel = board->kernel;
++
+ 	putstr("Booting into Linux kernel ...\n");
+ 	start_kernel(0, 0xffffffff, board->dtb);
+ }
 diff --git a/matcher.lds b/matcher.lds
-index f73ed1d..96eb16a 100644
+index 96eb16a..7b85010 100644
 --- a/matcher.lds
 +++ b/matcher.lds
-@@ -1,5 +1,5 @@
+@@ -1,6 +1,10 @@
  SECTIONS {
--	. = 0xa0008000;
-+	. = 0x10008000;
- 	.text : { * (.text); }
+-	. = 0x10008000;
+-	.text : { * (.text); }
++	.text : { * (.text_main); * (.text); }
  	.data : { * (.data); }
  	.rodata : { * (.rodata); }
-diff --git a/print.c b/print.c
-index c799380..9dbc7b6 100644
---- a/print.c
-+++ b/print.c
-@@ -1,5 +1,6 @@
- #include "types.h"
- #include "print.h"
-+#include "serial.h"
- 
- static inline void nop(int n)
- {
-@@ -7,12 +8,6 @@ static inline void nop(int n)
- 		asm("nop");
++	.bss :
++	{
++		* (.bss);
++	}
++	PROVIDE (__end_of_image = .) ;
  }
- 
--static void __putch(char c)
--{
--	*(volatile __u32 *) 0x40100000 = c;
--	nop(100);
--}
--
- void putch(char c)
- {
- 	__putch(c);
-@@ -39,4 +34,3 @@ void putstr(const char *s)
- 	while (*s)
- 		putch(*s++);
- }
--
-diff --git a/serial-8250.c b/serial-8250.c
-new file mode 100644
-index 0000000..0d5d35e
---- /dev/null
-+++ b/serial-8250.c
-@@ -0,0 +1,21 @@
-+#include "types.h"
-+#include "register.h"
-+#include "serial.h"
-+
-+/*
-+ * Whole heartedly copied from barebox's mach-mvebu debug code.  Thanks to
-+ * Thomas Petazzoni for the original code.
-+ */
-+void __putch(char c)
-+{
-+	/* Wait until there is space in the FIFO */
-+	while (!(readl(UART_BASE + UART_LSR) & LSR_THRE))
-+		;
-+
-+	/* Send the character */
-+	writel(c, UART_BASE + UART_THR);
-+
-+	/* Wait to make sure it hits the line */
-+	while (!(readl(UART_BASE + UART_LSR) & LSR_THRE))
-+		;
-+}
-diff --git a/serial.h b/serial.h
-new file mode 100644
-index 0000000..c5e4581
---- /dev/null
-+++ b/serial.h
-@@ -0,0 +1,10 @@
-+#ifndef _SERIAL_H
-+#define _SERIAL_H
-+
-+#define BIT(nr)         (1UL << (nr))
-+#define UART_THR	0x00
-+#define UART_LSR	0x14
-+#define   LSR_THRE	BIT(5)
-+
-+void __putch(char);
-+#endif
 -- 
 1.8.3.2
