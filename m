@@ -1,39 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Aug 2013 11:11:52 +0100
-Subject: AArch64 arch_spin_unlock not signaling global event?
-In-Reply-To: <CANz0V+5qHD-xX7LyAd5nVWsdP00Rys5MzasKrnSzbMhmC=mskw@mail.gmail.com>
-References: <CANz0V+6-yk9jWZ1y9zidKFJAhDof9qQR1uAHzsvhwswApMbxUA@mail.gmail.com>
- <20130801084835.GA12077@mudshark.cambridge.arm.com>
- <CANz0V+5qHD-xX7LyAd5nVWsdP00Rys5MzasKrnSzbMhmC=mskw@mail.gmail.com>
-Message-ID: <20130802101151.GK2465@mudshark.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Aug 2013 12:12:25 +0200
+Subject: [PATCH] pinctrl: sunxi: Fix gpio_set behaviour
+In-Reply-To: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130802101225.GU2911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 11:23:55AM +0100, Andrei E. Warkentin wrote:
-> 2013/8/1 Will Deacon <will.deacon@arm.com>:
-> > On Wed, Jul 31, 2013 at 09:19:13PM +0100, Andrei E. Warkentin wrote:
-> >> Shouldn't that be followed by a 'sev'?
-> >
-> > No. In ARMv8, When the exclusive is cleared for a processor, an event is
-> > generated.
-> >
+Hi Linus,
+
+On Thu, Jul 25, 2013 at 12:41:16PM +0200, Maxime Ripard wrote:
+> The current gpio_set function is ignoring the previous value set in the
+> GPIO value register, which leads in erasing the values already set for
+> the other GPIOs in the same bank when setting the value of a given GPIO.
 > 
-> But 'stlr' doesn't appear to be an exclusive instruction. It's filed
-> under 5.2.8.1 - Non-exclusive load-acquire/store-release in the ISA
-> doc.
+> Add the usual read/mask/write pattern to fix this brown paper bag bug.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-That doesn't matter -- any write will clear the monitor state for that
-location.
+This should probably go in 3.11. I'll send a patch adding locking like
+Thomas suggested, could you queue up this patch for 3.11?
 
-`Any successful write to the tagged address by any other observer in the
- shareability domain of the memory location is guaranteed to clear the tag.'
+Thanks,
+Maxime
 
-Please read section 3.4. "Synchronization and semaphores" of the ARM ARM.
-
-> The Foundation_v8 sim behavior seems to confirm that as well.
-
-If that's true, please can you report a bug against the model?
-
-Cheers,
-
-Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/1279d13b/attachment.sig>
