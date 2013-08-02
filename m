@@ -1,144 +1,37 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 02 Aug 2013 16:31:59 +0800
-Subject: [PATCH trivial] include: uapi: standard all files' macro prefix
- and suffix, excluding "linux/" sub-directory
-In-Reply-To: <87iozoqzm9.fsf@tw-ebiederman.twitter.com>
-References: <51FB6216.6010008@asianux.com> <51FB634F.5070401@asianux.com>
- <87iozoqzm9.fsf@tw-ebiederman.twitter.com>
-Message-ID: <51FB6E7F.2050506@asianux.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  2 Aug 2013 10:33:28 +0200
+Subject: [PATCH v3 0/2] usb: gadget: at91_udc: add usb_clk for transition to
+ common clk framework
+Message-ID: <1375432408-28371-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2013 04:13 PM, Eric W. Biederman wrote:
-> Chen Gang <gang.chen@asianux.com> writes:
-> 
->> It is a trivial patch for "include/uapi", exclude "linux" sub-directory.
->>
->> If it is useful, I will send another patch for "linux" sub-directory.
->>
->> BTW: it is really big mail addresses from
->> "./scripts/get_maintainers.pl"
-> 
-> What is the point?  Is there a bug that this fixes?
-> 
+Hello,
 
-It is a trivial patch, it is not for bug fix.
+This patch series prepare the at91 SoCs transition to common clk framework.
+This is done by adding a new clock (called usb clock or uclk) to at91_udc
+driver. This clock will be used to configure the usb port clock rate.
 
-> These files are not used with api in their path in userspace so I
-> suspect your change just makes things strange and confusing.
-> 
+Best Regards,
 
-Hmm... they are in "include/uapi" which means they may be shared with
-user space, is it correct ? (or Universal API ? ... excuse me, I don't
-know the definition of "include/uapi").
+Boris
 
-If some of them are really never shared with user space (or not
-'Universal' enough to multiple OS), I recommend to move them from
-"include/uapi/" to another more suitable places.
+Changes since v2:
+- split the patch in 2 parts:
+    * add missing clk_put for existing clk (fclk and uclk)
+    * add usb clock (uclk) support
 
+Changes since v1:
+- use IS_ENABLED(CONFIG_COMMON_CLK) to isolate new at91 clk support  
 
-Thanks.
+Boris BREZILLON (2):
+  usb: gadget: at91_udc: add missing clk_put on fclk and iclk
+  usb: gadget: at91_udc: add usb_clk for transition to common clk
+    framework
 
-> Eric
-> 
->> Thanks.
->>
->> On 08/02/2013 03:39 PM, Chen Gang wrote:
->>> For "include/uapi/*", excluding "linux/" sub-directory, let all files'
->>> macro prefix match the standard format, and give related stand comments
->>> for their macro suffix.
->>>
->>> The related standard format is:
->>>
->>>   "_SUBDIRNAME_SUBDIRNAME[_SUBDIRNAME]_FILENAME" (1st _SUBDIRNAME is _UAPI), and use '_' instead of '.' and '-'.
->>>
->>>
->>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>> ---
->>>  include/uapi/asm-generic/auxvec.h      |    6 +++---
->>>  include/uapi/asm-generic/bitsperlong.h |    6 +++---
->>>  include/uapi/asm-generic/errno-base.h  |    6 +++---
->>>  include/uapi/asm-generic/errno.h       |    6 +++---
->>>  include/uapi/asm-generic/fcntl.h       |    6 +++---
->>>  include/uapi/asm-generic/ioctls.h      |    6 +++---
->>>  include/uapi/asm-generic/ipcbuf.h      |    6 +++---
->>>  include/uapi/asm-generic/kvm_para.h    |    5 +++++
->>>  include/uapi/asm-generic/mman-common.h |    6 +++---
->>>  include/uapi/asm-generic/mman.h        |    6 +++---
->>>  include/uapi/asm-generic/msgbuf.h      |    6 +++---
->>>  include/uapi/asm-generic/param.h       |    6 +++---
->>>  include/uapi/asm-generic/poll.h        |    6 +++---
->>>  include/uapi/asm-generic/posix_types.h |    6 +++---
->>>  include/uapi/asm-generic/sembuf.h      |    6 +++---
->>>  include/uapi/asm-generic/setup.h       |    6 +++---
->>>  include/uapi/asm-generic/shmbuf.h      |    6 +++---
->>>  include/uapi/asm-generic/shmparam.h    |    6 +++---
->>>  include/uapi/asm-generic/signal-defs.h |    6 +++---
->>>  include/uapi/asm-generic/signal.h      |    6 +++---
->>>  include/uapi/asm-generic/socket.h      |    6 +++---
->>>  include/uapi/asm-generic/sockios.h     |    6 +++---
->>>  include/uapi/asm-generic/stat.h        |    6 +++---
->>>  include/uapi/asm-generic/statfs.h      |    6 +++---
->>>  include/uapi/asm-generic/swab.h        |    6 +++---
->>>  include/uapi/asm-generic/termbits.h    |    6 +++---
->>>  include/uapi/asm-generic/types.h       |    6 +++---
->>>  include/uapi/asm-generic/ucontext.h    |    6 +++---
->>>  include/uapi/asm-generic/unistd.h      |    5 +++++
->>>  include/uapi/drm/drm.h                 |    6 +++---
->>>  include/uapi/drm/drm_fourcc.h          |    6 +++---
->>>  include/uapi/drm/drm_mode.h            |    6 +++---
->>>  include/uapi/drm/drm_sarea.h           |    6 +++---
->>>  include/uapi/drm/exynos_drm.h          |    6 +++---
->>>  include/uapi/drm/i810_drm.h            |    6 +++---
->>>  include/uapi/drm/i915_drm.h            |    6 +++---
->>>  include/uapi/drm/mga_drm.h             |    6 +++---
->>>  include/uapi/drm/nouveau_drm.h         |    6 +++---
->>>  include/uapi/drm/omap_drm.h            |    6 +++---
->>>  include/uapi/drm/qxl_drm.h             |    6 +++---
->>>  include/uapi/drm/r128_drm.h            |    6 +++---
->>>  include/uapi/drm/radeon_drm.h          |    6 +++---
->>>  include/uapi/drm/savage_drm.h          |    6 +++---
->>>  include/uapi/drm/sis_drm.h             |    6 +++---
->>>  include/uapi/drm/tegra_drm.h           |    6 +++---
->>>  include/uapi/drm/via_drm.h             |    6 +++---
->>>  include/uapi/drm/vmwgfx_drm.h          |    6 +++---
->>>  include/uapi/mtd/inftl-user.h          |    6 +++---
->>>  include/uapi/mtd/mtd-abi.h             |    6 +++---
->>>  include/uapi/mtd/mtd-user.h            |    6 +++---
->>>  include/uapi/mtd/nftl-user.h           |    6 +++---
->>>  include/uapi/mtd/ubi-user.h            |    6 +++---
->>>  include/uapi/rdma/ib_user_cm.h         |    6 +++---
->>>  include/uapi/rdma/ib_user_mad.h        |    6 +++---
->>>  include/uapi/rdma/ib_user_sa.h         |    6 +++---
->>>  include/uapi/rdma/ib_user_verbs.h      |    6 +++---
->>>  include/uapi/rdma/rdma_netlink.h       |    6 +++---
->>>  include/uapi/rdma/rdma_user_cm.h       |    6 +++---
->>>  include/uapi/scsi/fc/fc_els.h          |    6 +++---
->>>  include/uapi/scsi/fc/fc_fs.h           |    6 +++---
->>>  include/uapi/scsi/fc/fc_gs.h           |    6 +++---
->>>  include/uapi/scsi/fc/fc_ns.h           |    6 +++---
->>>  include/uapi/scsi/scsi_bsg_fc.h        |    7 +++----
->>>  include/uapi/scsi/scsi_netlink.h       |    7 +++----
->>>  include/uapi/scsi/scsi_netlink_fc.h    |    7 +++----
->>>  include/uapi/sound/asequencer.h        |    6 +++---
->>>  include/uapi/sound/asound.h            |    6 +++---
->>>  include/uapi/sound/asound_fm.h         |    6 +++---
->>>  include/uapi/sound/compress_offload.h  |    6 +++---
->>>  include/uapi/sound/compress_params.h   |    6 +++---
->>>  include/uapi/sound/emu10k1.h           |    6 +++---
->>>  include/uapi/sound/hdsp.h              |    6 +++---
->>>  include/uapi/sound/hdspm.h             |    6 +++---
->>>  include/uapi/sound/sb16_csp.h          |    6 +++---
->>>  include/uapi/sound/sfnt_info.h         |    6 +++---
->>>  include/uapi/video/edid.h              |    6 +++---
->>>  include/uapi/video/sisfb.h             |    6 +++---
->>>  include/uapi/video/uvesafb.h           |    6 +++---
->>>  include/uapi/xen/evtchn.h              |    6 +++---
->>>  include/uapi/xen/privcmd.h             |    6 +++---
->>>  80 files changed, 244 insertions(+), 237 deletions(-)
-> 
-> 
-
+ drivers/usb/gadget/at91_udc.c |   21 +++++++++++++++++++--
+ drivers/usb/gadget/at91_udc.h |    2 +-
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
 -- 
-Chen Gang
+1.7.9.5
