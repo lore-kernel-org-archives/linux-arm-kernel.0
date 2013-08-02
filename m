@@ -1,39 +1,27 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 2 Aug 2013 12:24:17 +0900
-Subject: [PATCH] ARM: Fix memblock_reserve() to include stext
-In-Reply-To: <20130731193930.GY24642@n2100.arm.linux.org.uk>
-References: <20130731055807.14054.70106.sendpatchset@w520>
- <20130731094352.GV24642@n2100.arm.linux.org.uk>
- <CANqRtoR5j2VyRwf0suABfVLxzU30pZndEcCj7uZ2sSrzfGmx_A@mail.gmail.com>
- <20130731193930.GY24642@n2100.arm.linux.org.uk>
-Message-ID: <CANqRtoQkfDcCNYdYJMpf4zc3P0=kuV-LJFva33vSmio6YAOBrQ@mail.gmail.com>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Thu, 01 Aug 2013 20:36:38 -0700
+Subject: [RESEND PATCH 1/2] ARM: msm: Add support for MSM8974
+In-Reply-To: <51FB1987.3060806@wwwdotorg.org>
+References: <1375406619-14618-1-git-send-email-rvaswani@codeaurora.org>
+ <51FB1987.3060806@wwwdotorg.org>
+Message-ID: <51FB2946.2050503@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 4:39 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Aug 01, 2013 at 04:34:03AM +0900, Magnus Damm wrote:
->> Are you aware of any existing fix for this or anyone working on
->> solving this issue? If not then I don't mind stepping up. I can
->> however think of quite a few other things to do if this has been
->> solved already though, so please let me know if you think I should
->> focus on fixing this.
->
-> I committed a fix for it this morning, so it should be in linux-next by
-> tomorrow.
+On 8/1/2013 7:29 PM, Stephen Warren wrote:
+> On 08/01/2013 07:23 PM, Rohit Vaswani wrote:
+>> This patch adds basic board support for MSM8974 which
+>> belongs to the Snapdragon 800 family.
+>> For now, just support a basic machine with device tree.
+>>   arch/arm/boot/dts/msm8974.dts     | 26 ++++++++++++++++++++++++++
+> That's odd. If this is support for an SoC, why not a *.dtsi file rather
+> than *.dts?
 
-Thanks for writing a fix, Russell. I cherry picked the following
-commit from linux-arm:
+I am not sure why I would need a dtsi if I am just adding the 1 file for 
+the SoC support ?
 
-cd717a2 ARM: Add .text annotations where required after __CPUINIT removal
+Thanks,
+Rohit Vaswani
 
-Applying it on top of kernel.org renesas git tag
-renesas-devel-20130801v2 (v3.11-rc3 + v3.12 material) solves the
-problem for me. I just tested this on KZM9G hardware without and with
-the patch, so I can confirm that CPU Hotplug is now working again.
-
-Tested-by: Magnus Damm <damm@opensource.se>
-
-Cheers,
-
-/ magnus
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
