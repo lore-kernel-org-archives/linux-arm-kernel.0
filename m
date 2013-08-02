@@ -1,124 +1,66 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  2 Aug 2013 12:38:24 +0200
-Subject: [PATCH 4/7] pinctrl: imx27: imx27 pincontrol driver
+Date: Fri,  2 Aug 2013 12:38:23 +0200
+Subject: [PATCH 3/7] pinctrl: imx1 core driver
 In-Reply-To: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
 References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1375439907-10462-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1375439907-10462-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  53 +++
- drivers/pinctrl/Kconfig                            |   8 +
- drivers/pinctrl/Makefile                           |   1 +
- drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
- 4 files changed, 539 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
- create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+ drivers/pinctrl/Kconfig             |   5 +
+ drivers/pinctrl/Makefile            |   1 +
+ drivers/pinctrl/pinctrl-imx1-core.c | 667 ++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-imx1.h      |  23 ++
+ 4 files changed, 696 insertions(+)
+ create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx1.h
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-new file mode 100644
-index 0000000..3352d94
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-@@ -0,0 +1,53 @@
-+* Freescale IMX27 IOMUX Controller
-+
-+Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
-+and usage.
-+
-+The iomuxc driver node can have pin configuration and gpio subnodes. gpio
-+nodes defined as childs will share the registers with the iomuxc driver.
-+Please have a look into
-+Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt for information about
-+the gpio properties.
-+
-+Required properties:
-+- compatible: "fsl,imx27-iomuxc"
-+
-+Required properties for pin configuration node:
-+- fsl,pins: three integers array, represents a group of pins mux and config
-+  setting. The format is fsl,pins = <PIN MUX_ID CONFIG>. PIN and MUX_ID are
-+  defined as macros in arch/arm/boot/dts/imx27-pinfunc.h. CONFIG can be 0 or
-+  1, meaning Pullup disable/enable.
-+
-+Example:
-+
-+iomuxc: iomuxc at 10015000 {
-+	compatible = "fsl,imx27-iomuxc";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	reg = <0x10015000 0x600>;
-+
-+	gpio1: gpio at 10015000 {
-+		compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-+		reg = <0x10015000>;
-+		interrupts = <8>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	...
-+
-+	uart {
-+		pinctrl_uart1: uart-1 {
-+			fsl,pins = <
-+				MX27_PAD_UART1_TXD__UART1_TXD 0x0
-+				MX27_PAD_UART1_RXD__UART1_RXD 0x0
-+				MX27_PAD_UART1_CTS__UART1_CTS 0x0
-+				MX27_PAD_UART1_RTS__UART1_RTS 0x0
-+			>;
-+		};
-+
-+		...
-+	};
-+};
 diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 266a206..53fab24 100644
+index bc830af..266a206 100644
 --- a/drivers/pinctrl/Kconfig
 +++ b/drivers/pinctrl/Kconfig
-@@ -85,6 +85,14 @@ config PINCTRL_IMX1_CORE
+@@ -80,6 +80,11 @@ config PINCTRL_IMX
  	select PINMUX
  	select PINCONF
  
-+config PINCTRL_IMX27
-+	bool "IMX27 pinctrl driver"
-+	depends on OF
-+	depends on SOC_IMX27
-+	select PINCTRL_IMX1_CORE
-+	help
-+	  Say Y here to enable the imx27 pinctrl driver
++config PINCTRL_IMX1_CORE
++	bool
++	select PINMUX
++	select PINCONF
 +
  config PINCTRL_IMX35
  	bool "IMX35 pinctrl driver"
  	depends on OF
 diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 43bb05e..d08bf87 100644
+index d64563bf..43bb05e 100644
 --- a/drivers/pinctrl/Makefile
 +++ b/drivers/pinctrl/Makefile
-@@ -19,6 +19,7 @@ obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+@@ -18,6 +18,7 @@ obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
+ obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
  obj-$(CONFIG_PINCTRL_BAYTRAIL)	+= pinctrl-baytrail.o
  obj-$(CONFIG_PINCTRL_IMX)	+= pinctrl-imx.o
- obj-$(CONFIG_PINCTRL_IMX1_CORE)	+= pinctrl-imx1-core.o
-+obj-$(CONFIG_PINCTRL_IMX27)	+= pinctrl-imx27.o
++obj-$(CONFIG_PINCTRL_IMX1_CORE)	+= pinctrl-imx1-core.o
  obj-$(CONFIG_PINCTRL_IMX35)	+= pinctrl-imx35.o
  obj-$(CONFIG_PINCTRL_IMX51)	+= pinctrl-imx51.o
  obj-$(CONFIG_PINCTRL_IMX53)	+= pinctrl-imx53.o
-diff --git a/drivers/pinctrl/pinctrl-imx27.c b/drivers/pinctrl/pinctrl-imx27.c
+diff --git a/drivers/pinctrl/pinctrl-imx1-core.c b/drivers/pinctrl/pinctrl-imx1-core.c
 new file mode 100644
-index 0000000..aede821
+index 0000000..318b976
 --- /dev/null
-+++ b/drivers/pinctrl/pinctrl-imx27.c
-@@ -0,0 +1,477 @@
++++ b/drivers/pinctrl/pinctrl-imx1-core.c
+@@ -0,0 +1,667 @@
 +/*
-+ * imx27 pinctrl driver based on imx pinmux core
++ * Core driver for the imx pin controller in imx1/21/27
 + *
 + * Copyright (C) 2013 Pengutronix
-+ *
 + * Author: Markus Pargmann <mpa@pengutronix.de>
++ *
++ * Based on pinctrl-imx.c:
++ *	Author: Dong Aisheng <dong.aisheng@linaro.org>
++ *	Copyright (C) 2012 Freescale Semiconductor, Inc.
++ *	Copyright (C) 2012 Linaro Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -132,463 +74,678 @@ index 0000000..aede821
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/of_device.h>
++#include <linux/pinctrl/machine.h>
++#include <linux/pinctrl/pinconf.h>
 +#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/platform_data/gpio-mxc.h>
++#include <linux/slab.h>
 +
++#include "core.h"
 +#include "pinctrl-imx1.h"
 +
-+#define PAD_ID(port, pin) (port*32 + pin)
-+#define PA 0
-+#define PB 1
-+#define PC 2
-+#define PD 3
-+#define PE 4
-+#define PF 5
++struct imx1_pinctrl {
++	struct device *dev;
++	struct pinctrl_dev *pctl;
++	void __iomem *base;
++	const struct imx_pinctrl_soc_info *info;
 +
-+enum imx27_pads {
-+	MX27_PAD_USBH2_CLK = PAD_ID(PA, 0),
-+	MX27_PAD_USBH2_DIR = PAD_ID(PA, 1),
-+	MX27_PAD_USBH2_DATA7 = PAD_ID(PA, 2),
-+	MX27_PAD_USBH2_NXT = PAD_ID(PA, 3),
-+	MX27_PAD_USBH2_STP = PAD_ID(PA, 4),
-+	MX27_PAD_LSCLK = PAD_ID(PA, 5),
-+	MX27_PAD_LD0 = PAD_ID(PA, 6),
-+	MX27_PAD_LD1 = PAD_ID(PA, 7),
-+	MX27_PAD_LD2 = PAD_ID(PA, 8),
-+	MX27_PAD_LD3 = PAD_ID(PA, 9),
-+	MX27_PAD_LD4 = PAD_ID(PA, 10),
-+	MX27_PAD_LD5 = PAD_ID(PA, 11),
-+	MX27_PAD_LD6 = PAD_ID(PA, 12),
-+	MX27_PAD_LD7 = PAD_ID(PA, 13),
-+	MX27_PAD_LD8 = PAD_ID(PA, 14),
-+	MX27_PAD_LD9 = PAD_ID(PA, 15),
-+	MX27_PAD_LD10 = PAD_ID(PA, 16),
-+	MX27_PAD_LD11 = PAD_ID(PA, 17),
-+	MX27_PAD_LD12 = PAD_ID(PA, 18),
-+	MX27_PAD_LD13 = PAD_ID(PA, 19),
-+	MX27_PAD_LD14 = PAD_ID(PA, 20),
-+	MX27_PAD_LD15 = PAD_ID(PA, 21),
-+	MX27_PAD_LD16 = PAD_ID(PA, 22),
-+	MX27_PAD_LD17 = PAD_ID(PA, 23),
-+	MX27_PAD_REV = PAD_ID(PA, 24),
-+	MX27_PAD_CLS = PAD_ID(PA, 25),
-+	MX27_PAD_PS = PAD_ID(PA, 26),
-+	MX27_PAD_SPL_SPR = PAD_ID(PA, 27),
-+	MX27_PAD_HSYNC = PAD_ID(PA, 28),
-+	MX27_PAD_VSYNC = PAD_ID(PA, 29),
-+	MX27_PAD_CONTRAST = PAD_ID(PA, 30),
-+	MX27_PAD_OE_ACD = PAD_ID(PA, 31),
-+
-+	MX27_PAD_UNUSED0 = PAD_ID(PB, 0),
-+	MX27_PAD_UNUSED1 = PAD_ID(PB, 1),
-+	MX27_PAD_UNUSED2 = PAD_ID(PB, 2),
-+	MX27_PAD_UNUSED3 = PAD_ID(PB, 3),
-+	MX27_PAD_SD2_D0 = PAD_ID(PB, 4),
-+	MX27_PAD_SD2_D1 = PAD_ID(PB, 5),
-+	MX27_PAD_SD2_D2 = PAD_ID(PB, 6),
-+	MX27_PAD_SD2_D3 = PAD_ID(PB, 7),
-+	MX27_PAD_SD2_CMD = PAD_ID(PB, 8),
-+	MX27_PAD_SD2_CLK = PAD_ID(PB, 9),
-+	MX27_PAD_CSI_D0 = PAD_ID(PB, 10),
-+	MX27_PAD_CSI_D1 = PAD_ID(PB, 11),
-+	MX27_PAD_CSI_D2 = PAD_ID(PB, 12),
-+	MX27_PAD_CSI_D3 = PAD_ID(PB, 13),
-+	MX27_PAD_CSI_D4 = PAD_ID(PB, 14),
-+	MX27_PAD_CSI_MCLK = PAD_ID(PB, 15),
-+	MX27_PAD_CSI_PIXCLK = PAD_ID(PB, 16),
-+	MX27_PAD_CSI_D5 = PAD_ID(PB, 17),
-+	MX27_PAD_CSI_D6 = PAD_ID(PB, 18),
-+	MX27_PAD_CSI_D7 = PAD_ID(PB, 19),
-+	MX27_PAD_CSI_VSYNC = PAD_ID(PB, 20),
-+	MX27_PAD_CSI_HSYNC = PAD_ID(PB, 21),
-+	MX27_PAD_USBH1_SUSP = PAD_ID(PB, 22),
-+	MX27_PAD_USB_PWR = PAD_ID(PB, 23),
-+	MX27_PAD_USB_OC_B = PAD_ID(PB, 24),
-+	MX27_PAD_USBH1_RCV = PAD_ID(PB, 25),
-+	MX27_PAD_USBH1_FS = PAD_ID(PB, 26),
-+	MX27_PAD_USBH1_OE_B = PAD_ID(PB, 27),
-+	MX27_PAD_USBH1_TXDM = PAD_ID(PB, 28),
-+	MX27_PAD_USBH1_TXDP = PAD_ID(PB, 29),
-+	MX27_PAD_USBH1_RXDM = PAD_ID(PB, 30),
-+	MX27_PAD_USBH1_RXDP = PAD_ID(PB, 31),
-+
-+	MX27_PAD_UNUSED4 = PAD_ID(PC, 0),
-+	MX27_PAD_UNUSED5 = PAD_ID(PC, 1),
-+	MX27_PAD_UNUSED6 = PAD_ID(PC, 2),
-+	MX27_PAD_UNUSED7 = PAD_ID(PC, 3),
-+	MX27_PAD_UNUSED8 = PAD_ID(PC, 4),
-+	MX27_PAD_I2C2_SDA = PAD_ID(PC, 5),
-+	MX27_PAD_I2C2_SCL = PAD_ID(PC, 6),
-+	MX27_PAD_USBOTG_DATA5 = PAD_ID(PC, 7),
-+	MX27_PAD_USBOTG_DATA6 = PAD_ID(PC, 8),
-+	MX27_PAD_USBOTG_DATA0 = PAD_ID(PC, 9),
-+	MX27_PAD_USBOTG_DATA2 = PAD_ID(PC, 10),
-+	MX27_PAD_USBOTG_DATA1 = PAD_ID(PC, 11),
-+	MX27_PAD_USBOTG_DATA4 = PAD_ID(PC, 12),
-+	MX27_PAD_USBOTG_DATA3 = PAD_ID(PC, 13),
-+	MX27_PAD_TOUT = PAD_ID(PC, 14),
-+	MX27_PAD_TIN = PAD_ID(PC, 15),
-+	MX27_PAD_SSI4_FS = PAD_ID(PC, 16),
-+	MX27_PAD_SSI4_RXDAT = PAD_ID(PC, 17),
-+	MX27_PAD_SSI4_TXDAT = PAD_ID(PC, 18),
-+	MX27_PAD_SSI4_CLK = PAD_ID(PC, 19),
-+	MX27_PAD_SSI1_FS = PAD_ID(PC, 20),
-+	MX27_PAD_SSI1_RXDAT = PAD_ID(PC, 21),
-+	MX27_PAD_SSI1_TXDAT = PAD_ID(PC, 22),
-+	MX27_PAD_SSI1_CLK = PAD_ID(PC, 23),
-+	MX27_PAD_SSI2_FS = PAD_ID(PC, 24),
-+	MX27_PAD_SSI2_RXDAT = PAD_ID(PC, 25),
-+	MX27_PAD_SSI2_TXDAT = PAD_ID(PC, 26),
-+	MX27_PAD_SSI2_CLK = PAD_ID(PC, 27),
-+	MX27_PAD_SSI3_FS = PAD_ID(PC, 28),
-+	MX27_PAD_SSI3_RXDAT = PAD_ID(PC, 29),
-+	MX27_PAD_SSI3_TXDAT = PAD_ID(PC, 30),
-+	MX27_PAD_SSI3_CLK = PAD_ID(PC, 31),
-+
-+	MX27_PAD_SD3_CMD = PAD_ID(PD, 0),
-+	MX27_PAD_SD3_CLK = PAD_ID(PD, 1),
-+	MX27_PAD_ATA_DATA0 = PAD_ID(PD, 2),
-+	MX27_PAD_ATA_DATA1 = PAD_ID(PD, 3),
-+	MX27_PAD_ATA_DATA2 = PAD_ID(PD, 4),
-+	MX27_PAD_ATA_DATA3 = PAD_ID(PD, 5),
-+	MX27_PAD_ATA_DATA4 = PAD_ID(PD, 6),
-+	MX27_PAD_ATA_DATA5 = PAD_ID(PD, 7),
-+	MX27_PAD_ATA_DATA6 = PAD_ID(PD, 8),
-+	MX27_PAD_ATA_DATA7 = PAD_ID(PD, 9),
-+	MX27_PAD_ATA_DATA8 = PAD_ID(PD, 10),
-+	MX27_PAD_ATA_DATA9 = PAD_ID(PD, 11),
-+	MX27_PAD_ATA_DATA10 = PAD_ID(PD, 12),
-+	MX27_PAD_ATA_DATA11 = PAD_ID(PD, 13),
-+	MX27_PAD_ATA_DATA12 = PAD_ID(PD, 14),
-+	MX27_PAD_ATA_DATA13 = PAD_ID(PD, 15),
-+	MX27_PAD_ATA_DATA14 = PAD_ID(PD, 16),
-+	MX27_PAD_I2C_DATA = PAD_ID(PD, 17),
-+	MX27_PAD_I2C_CLK = PAD_ID(PD, 18),
-+	MX27_PAD_CSPI2_SS2 = PAD_ID(PD, 19),
-+	MX27_PAD_CSPI2_SS1 = PAD_ID(PD, 20),
-+	MX27_PAD_CSPI2_SS0 = PAD_ID(PD, 21),
-+	MX27_PAD_CSPI2_SCLK = PAD_ID(PD, 22),
-+	MX27_PAD_CSPI2_MISO = PAD_ID(PD, 23),
-+	MX27_PAD_CSPI2_MOSI = PAD_ID(PD, 24),
-+	MX27_PAD_CSPI1_RDY = PAD_ID(PD, 25),
-+	MX27_PAD_CSPI1_SS2 = PAD_ID(PD, 26),
-+	MX27_PAD_CSPI1_SS1 = PAD_ID(PD, 27),
-+	MX27_PAD_CSPI1_SS0 = PAD_ID(PD, 28),
-+	MX27_PAD_CSPI1_SCLK = PAD_ID(PD, 29),
-+	MX27_PAD_CSPI1_MISO = PAD_ID(PD, 30),
-+	MX27_PAD_CSPI1_MOSI = PAD_ID(PD, 31),
-+
-+	MX27_PAD_USBOTG_NXT = PAD_ID(PE, 0),
-+	MX27_PAD_USBOTG_STP = PAD_ID(PE, 1),
-+	MX27_PAD_USBOTG_DIR = PAD_ID(PE, 2),
-+	MX27_PAD_UART2_CTS = PAD_ID(PE, 3),
-+	MX27_PAD_UART2_RTS = PAD_ID(PE, 4),
-+	MX27_PAD_PWMO = PAD_ID(PE, 5),
-+	MX27_PAD_UART2_TXD = PAD_ID(PE, 6),
-+	MX27_PAD_UART2_RXD = PAD_ID(PE, 7),
-+	MX27_PAD_UART3_TXD = PAD_ID(PE, 8),
-+	MX27_PAD_UART3_RXD = PAD_ID(PE, 9),
-+	MX27_PAD_UART3_CTS = PAD_ID(PE, 10),
-+	MX27_PAD_UART3_RTS = PAD_ID(PE, 11),
-+	MX27_PAD_UART1_TXD = PAD_ID(PE, 12),
-+	MX27_PAD_UART1_RXD = PAD_ID(PE, 13),
-+	MX27_PAD_UART1_CTS = PAD_ID(PE, 14),
-+	MX27_PAD_UART1_RTS = PAD_ID(PE, 15),
-+	MX27_PAD_RTCK = PAD_ID(PE, 16),
-+	MX27_PAD_RESET_OUT_B = PAD_ID(PE, 17),
-+	MX27_PAD_SD1_D0 = PAD_ID(PE, 18),
-+	MX27_PAD_SD1_D1 = PAD_ID(PE, 19),
-+	MX27_PAD_SD1_D2 = PAD_ID(PE, 20),
-+	MX27_PAD_SD1_D3 = PAD_ID(PE, 21),
-+	MX27_PAD_SD1_CMD = PAD_ID(PE, 22),
-+	MX27_PAD_SD1_CLK = PAD_ID(PE, 23),
-+	MX27_PAD_USBOTG_CLK = PAD_ID(PE, 24),
-+	MX27_PAD_USBOTG_DATA7 = PAD_ID(PE, 25),
-+	MX27_PAD_UNUSED9 = PAD_ID(PE, 26),
-+	MX27_PAD_UNUSED10 = PAD_ID(PE, 27),
-+	MX27_PAD_UNUSED11 = PAD_ID(PE, 28),
-+	MX27_PAD_UNUSED12 = PAD_ID(PE, 29),
-+	MX27_PAD_UNUSED13 = PAD_ID(PE, 30),
-+	MX27_PAD_UNUSED14 = PAD_ID(PE, 31),
-+
-+	MX27_PAD_NFRB = PAD_ID(PF, 0),
-+	MX27_PAD_NFCLE = PAD_ID(PF, 1),
-+	MX27_PAD_NFWP_B = PAD_ID(PF, 2),
-+	MX27_PAD_NFCE_B = PAD_ID(PF, 3),
-+	MX27_PAD_NFALE = PAD_ID(PF, 4),
-+	MX27_PAD_NFRE_B = PAD_ID(PF, 5),
-+	MX27_PAD_NFWE_B = PAD_ID(PF, 6),
-+	MX27_PAD_PC_POE = PAD_ID(PF, 7),
-+	MX27_PAD_PC_RW_B = PAD_ID(PF, 8),
-+	MX27_PAD_IOIS16 = PAD_ID(PF, 9),
-+	MX27_PAD_PC_RST = PAD_ID(PF, 10),
-+	MX27_PAD_PC_BVD2 = PAD_ID(PF, 11),
-+	MX27_PAD_PC_BVD1 = PAD_ID(PF, 12),
-+	MX27_PAD_PC_VS2 = PAD_ID(PF, 13),
-+	MX27_PAD_PC_VS1 = PAD_ID(PF, 14),
-+	MX27_PAD_CLKO = PAD_ID(PF, 15),
-+	MX27_PAD_PC_PWRON = PAD_ID(PF, 16),
-+	MX27_PAD_PC_READY = PAD_ID(PF, 17),
-+	MX27_PAD_PC_WAIT_B = PAD_ID(PF, 18),
-+	MX27_PAD_PC_CD2_B = PAD_ID(PF, 19),
-+	MX27_PAD_PC_CD1_B = PAD_ID(PF, 20),
-+	MX27_PAD_CS4_B = PAD_ID(PF, 21),
-+	MX27_PAD_CS5_B = PAD_ID(PF, 22),
-+	MX27_PAD_ATA_DATA15 = PAD_ID(PF, 23),
-+	MX27_PAD_UNUSED15 = PAD_ID(PF, 24),
-+	MX27_PAD_UNUSED16 = PAD_ID(PF, 25),
-+	MX27_PAD_UNUSED17 = PAD_ID(PF, 26),
-+	MX27_PAD_UNUSED18 = PAD_ID(PF, 27),
-+	MX27_PAD_UNUSED19 = PAD_ID(PF, 28),
-+	MX27_PAD_UNUSED20 = PAD_ID(PF, 29),
-+	MX27_PAD_UNUSED21 = PAD_ID(PF, 30),
-+	MX27_PAD_UNUSED22 = PAD_ID(PF, 31),
-+};
-+
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx27_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH2_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH2_DIR),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH2_DATA7),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH2_NXT),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH2_STP),
-+	IMX_PINCTRL_PIN(MX27_PAD_LSCLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD0),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD1),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD2),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD3),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD4),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD5),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD6),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD7),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD8),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD9),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD10),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD11),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD12),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD13),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD14),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD15),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD16),
-+	IMX_PINCTRL_PIN(MX27_PAD_LD17),
-+	IMX_PINCTRL_PIN(MX27_PAD_REV),
-+	IMX_PINCTRL_PIN(MX27_PAD_CLS),
-+	IMX_PINCTRL_PIN(MX27_PAD_PS),
-+	IMX_PINCTRL_PIN(MX27_PAD_SPL_SPR),
-+	IMX_PINCTRL_PIN(MX27_PAD_HSYNC),
-+	IMX_PINCTRL_PIN(MX27_PAD_VSYNC),
-+	IMX_PINCTRL_PIN(MX27_PAD_CONTRAST),
-+	IMX_PINCTRL_PIN(MX27_PAD_OE_ACD),
-+
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED0),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED1),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED2),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED3),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD2_D0),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD2_D1),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD2_D2),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD2_D3),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD2_CMD),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD2_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D0),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D1),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D2),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D3),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D4),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_MCLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_PIXCLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D5),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D6),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_D7),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_VSYNC),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSI_HSYNC),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_SUSP),
-+	IMX_PINCTRL_PIN(MX27_PAD_USB_PWR),
-+	IMX_PINCTRL_PIN(MX27_PAD_USB_OC_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RCV),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_FS),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_OE_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_TXDM),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_TXDP),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RXDM),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RXDP),
-+
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED4),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED5),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED6),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED7),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED8),
-+	IMX_PINCTRL_PIN(MX27_PAD_I2C2_SDA),
-+	IMX_PINCTRL_PIN(MX27_PAD_I2C2_SCL),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA5),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA6),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA0),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA2),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA1),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA4),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA3),
-+	IMX_PINCTRL_PIN(MX27_PAD_TOUT),
-+	IMX_PINCTRL_PIN(MX27_PAD_TIN),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI4_FS),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI4_RXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI4_TXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI4_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI1_FS),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI1_RXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI1_TXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI1_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI2_FS),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI2_RXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI2_TXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI2_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI3_FS),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI3_RXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI3_TXDAT),
-+	IMX_PINCTRL_PIN(MX27_PAD_SSI3_CLK),
-+
-+	IMX_PINCTRL_PIN(MX27_PAD_SD3_CMD),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD3_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA0),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA1),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA2),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA3),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA4),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA5),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA6),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA7),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA8),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA9),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA10),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA11),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA12),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA13),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA14),
-+	IMX_PINCTRL_PIN(MX27_PAD_I2C_DATA),
-+	IMX_PINCTRL_PIN(MX27_PAD_I2C_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS2),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS1),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS0),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SCLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_MISO),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_MOSI),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_RDY),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS2),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS1),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS0),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SCLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_MISO),
-+	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_MOSI),
-+
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_NXT),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_STP),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DIR),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART2_CTS),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART2_RTS),
-+	IMX_PINCTRL_PIN(MX27_PAD_PWMO),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART2_TXD),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART2_RXD),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART3_TXD),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART3_RXD),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART3_CTS),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART3_RTS),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART1_TXD),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART1_RXD),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART1_CTS),
-+	IMX_PINCTRL_PIN(MX27_PAD_UART1_RTS),
-+	IMX_PINCTRL_PIN(MX27_PAD_RTCK),
-+	IMX_PINCTRL_PIN(MX27_PAD_RESET_OUT_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD1_D0),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD1_D1),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD1_D2),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD1_D3),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD1_CMD),
-+	IMX_PINCTRL_PIN(MX27_PAD_SD1_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_CLK),
-+	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA7),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED9),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED10),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED11),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED12),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED13),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED14),
-+
-+	IMX_PINCTRL_PIN(MX27_PAD_NFRB),
-+	IMX_PINCTRL_PIN(MX27_PAD_NFCLE),
-+	IMX_PINCTRL_PIN(MX27_PAD_NFWP_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_NFCE_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_NFALE),
-+	IMX_PINCTRL_PIN(MX27_PAD_NFRE_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_NFWE_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_POE),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_RW_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_IOIS16),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_RST),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_BVD2),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_BVD1),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_VS2),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_VS1),
-+	IMX_PINCTRL_PIN(MX27_PAD_CLKO),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_PWRON),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_READY),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_WAIT_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_CD2_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_PC_CD1_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_CS4_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_CS5_B),
-+	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA15),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED15),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED16),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED17),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED18),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED19),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED20),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED21),
-+	IMX_PINCTRL_PIN(MX27_PAD_UNUSED22),
-+};
-+
-+static struct imx_pinctrl_soc_info imx27_pinctrl_info = {
-+	.pins = imx27_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx27_pinctrl_pads),
-+};
-+
-+static struct of_device_id imx27_pinctrl_of_match[] = {
-+	{ .compatible = "fsl,imx27-iomuxc", },
-+	{ /* sentinel */ }
-+};
-+
-+struct imx27_pinctrl_private {
 +	int num_gpio_childs;
 +	struct platform_device **gpio_dev;
 +	struct mxc_gpio_platform_data *gpio_pdata;
 +};
 +
-+static int imx27_pinctrl_probe(struct platform_device *pdev)
++
++/*
++ * MX1 register offsets
++ */
++
++#define MX1_DDIR 0x00
++#define MX1_OCR 0x04
++#define MX1_ICONFA 0x0c
++#define MX1_ICONFB 0x10
++#define MX1_GIUS 0x20
++#define MX1_GPR 0x38
++#define MX1_PUEN 0x40
++
++/*
++ * Calculates the register offset from a pin_id
++ */
++static void __iomem *imx1_mem(struct imx1_pinctrl *ipctl, unsigned int pin_id)
 +{
-+	return imx1_pinctrl_core_probe(pdev, &imx27_pinctrl_info);
++	unsigned int port = pin_id / 32;
++	return ipctl->base + port * 0x100;
 +}
 +
-+static struct platform_driver imx27_pinctrl_driver = {
-+	.driver = {
-+		.name = "imx27-pinctrl",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(imx27_pinctrl_of_match),
-+	},
-+	.probe = imx27_pinctrl_probe,
-+	.remove = imx1_pinctrl_core_remove,
++/*
++ * Write to a register with 2 bits per pin. The function will automatically
++ * use the next register if the pin is managed in the second register.
++ */
++static void imx1_write_2bit(struct imx1_pinctrl *ipctl, unsigned int pin_id,
++		u32 value, u32 reg_offset)
++{
++	void __iomem *reg = imx1_mem(ipctl, pin_id) + reg_offset;
++	int shift = (pin_id % 16) * 2;
++	int mask = ~(0x3 << shift);
++	u32 old_value;
++
++	dev_dbg(ipctl->dev, "write: register 0x%p shift %d value 0x%x\n",
++			reg, shift, value);
++
++	if (pin_id % 32 >= 16)
++		reg += 0x04;
++
++	value = (value & 0x11) << shift;
++	old_value = readl(reg) & mask;
++	writel(value | old_value, reg);
++}
++
++static void imx1_write_bit(struct imx1_pinctrl *ipctl, unsigned int pin_id,
++		u32 value, u32 reg_offset)
++{
++	void __iomem *reg = imx1_mem(ipctl, pin_id) + reg_offset;
++	int shift = pin_id % 32;
++	int mask = ~(0x1 << shift);
++	u32 old_value;
++
++	dev_dbg(ipctl->dev, "write: register 0x%p shift %d value 0x%x\n",
++			reg, shift, value);
++
++	value = (value & 0x1) << shift;
++	old_value = readl(reg) & mask;
++	writel(value | old_value, reg);
++}
++
++static int imx1_read_bit(struct imx1_pinctrl *ipctl, unsigned int pin_id,
++		u32 reg_offset)
++{
++	void __iomem *reg = imx1_mem(ipctl, pin_id) + reg_offset;
++	int shift = pin_id % 32;
++
++	return (readl(reg) >> shift) & 0x1;
++}
++
++static const inline struct imx_pin_group *imx1_pinctrl_find_group_by_name(
++				const struct imx_pinctrl_soc_info *info,
++				const char *name)
++{
++	const struct imx_pin_group *grp = NULL;
++	int i;
++
++	for (i = 0; i < info->ngroups; i++) {
++		if (!strcmp(info->groups[i].name, name)) {
++			grp = &info->groups[i];
++			break;
++		}
++	}
++
++	return grp;
++}
++
++static int imx1_get_groups_count(struct pinctrl_dev *pctldev)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++
++	return info->ngroups;
++}
++
++static const char *imx1_get_group_name(struct pinctrl_dev *pctldev,
++				       unsigned selector)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++
++	return info->groups[selector].name;
++}
++
++static int imx1_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
++			       const unsigned **pins,
++			       unsigned *npins)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++
++	if (selector >= info->ngroups)
++		return -EINVAL;
++
++	*pins = info->groups[selector].pins;
++	*npins = info->groups[selector].npins;
++
++	return 0;
++}
++
++static void imx1_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
++		   unsigned offset)
++{
++	seq_printf(s, "%s", dev_name(pctldev->dev));
++}
++
++static int imx1_dt_node_to_map(struct pinctrl_dev *pctldev,
++			struct device_node *np,
++			struct pinctrl_map **map, unsigned *num_maps)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++	const struct imx_pin_group *grp;
++	struct pinctrl_map *new_map;
++	struct device_node *parent;
++	int map_num = 1;
++	int i, j;
++
++	/*
++	 * first find the group of this node and check if we need create
++	 * config maps for pins
++	 */
++	grp = imx1_pinctrl_find_group_by_name(info, np->name);
++	if (!grp) {
++		dev_err(info->dev, "unable to find group for node %s\n",
++			np->name);
++		return -EINVAL;
++	}
++
++	for (i = 0; i < grp->npins; i++)
++		map_num++;
++
++	new_map = kmalloc(sizeof(struct pinctrl_map) * map_num, GFP_KERNEL);
++	if (!new_map)
++		return -ENOMEM;
++
++	*map = new_map;
++	*num_maps = map_num;
++
++	/* create mux map */
++	parent = of_get_parent(np);
++	if (!parent) {
++		kfree(new_map);
++		return -EINVAL;
++	}
++	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
++	new_map[0].data.mux.function = parent->name;
++	new_map[0].data.mux.group = np->name;
++	of_node_put(parent);
++
++	/* create config map */
++	new_map++;
++	for (i = j = 0; i < grp->npins; i++) {
++		new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
++		new_map[j].data.configs.group_or_pin =
++				pin_get_name(pctldev, grp->pins[i]);
++		new_map[j].data.configs.configs = &grp->configs[i];
++		new_map[j].data.configs.num_configs = 1;
++		j++;
++	}
++
++	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
++		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
++
++	return 0;
++}
++
++static void imx1_dt_free_map(struct pinctrl_dev *pctldev,
++				struct pinctrl_map *map, unsigned num_maps)
++{
++	kfree(map);
++}
++
++static const struct pinctrl_ops imx1_pctrl_ops = {
++	.get_groups_count = imx1_get_groups_count,
++	.get_group_name = imx1_get_group_name,
++	.get_group_pins = imx1_get_group_pins,
++	.pin_dbg_show = imx1_pin_dbg_show,
++	.dt_node_to_map = imx1_dt_node_to_map,
++	.dt_free_map = imx1_dt_free_map,
++
 +};
 +
-+static int __init imx27_pinctrl_init(void)
++static int imx1_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
++			   unsigned group)
 +{
-+	return platform_driver_register(&imx27_pinctrl_driver);
-+}
-+arch_initcall(imx27_pinctrl_init);
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++	const unsigned *pins, *mux;
++	unsigned int npins;
++	int i;
 +
-+static void __exit imx27_pinctrl_exit(void)
-+{
-+	platform_driver_unregister(&imx27_pinctrl_driver);
++	/*
++	 * Configure the mux mode for each pin in the group for a specific
++	 * function.
++	 */
++	pins = info->groups[group].pins;
++	npins = info->groups[group].npins;
++	mux = info->groups[group].mux_mode;
++
++	WARN_ON(!pins || !npins || !mux);
++
++	dev_dbg(ipctl->dev, "enable function %s group %s\n",
++		info->functions[selector].name, info->groups[group].name);
++
++	for (i = 0; i < npins; i++) {
++		unsigned int pin_id = pins[i];
++		unsigned int afunction = 0x001 & mux[i];
++		unsigned int gpio_in_use = (0x002 & mux[i]) >> 1;
++		unsigned int direction = (0x004 & mux[i]) >> 2;
++		unsigned int gpio_oconf = (0x030 & mux[i]) >> 4;
++		unsigned int gpio_iconfa = (0x300 & mux[i]) >> 8;
++		unsigned int gpio_iconfb = (0xc00 & mux[i]) >> 10;
++
++		dev_dbg(pctldev->dev, "%s, pin 0x%x, function %d, gpio %d, direction %d, oconf %d, iconfa %d, iconfb %d\n",
++				__func__, pin_id, afunction, gpio_in_use,
++				direction, gpio_oconf, gpio_iconfa,
++				gpio_iconfb);
++
++		imx1_write_bit(ipctl, pin_id, gpio_in_use, MX1_GIUS);
++		imx1_write_bit(ipctl, pin_id, direction, MX1_DDIR);
++
++		if (gpio_in_use) {
++			imx1_write_2bit(ipctl, pin_id, gpio_oconf, MX1_OCR);
++			imx1_write_2bit(ipctl, pin_id, gpio_iconfa,
++					MX1_ICONFA);
++			imx1_write_2bit(ipctl, pin_id, gpio_iconfb,
++					MX1_ICONFB);
++		} else {
++			imx1_write_bit(ipctl, pin_id, afunction, MX1_GPR);
++		}
++	}
++
++	return 0;
 +}
-+module_exit(imx27_pinctrl_exit);
-+MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
-+MODULE_DESCRIPTION("Freescale IMX27 pinctrl driver");
-+MODULE_LICENSE("GPL v2");
++
++static int imx1_pmx_get_funcs_count(struct pinctrl_dev *pctldev)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++
++	return info->nfunctions;
++}
++
++static const char *imx1_pmx_get_func_name(struct pinctrl_dev *pctldev,
++					  unsigned selector)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++
++	return info->functions[selector].name;
++}
++
++static int imx1_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
++			       const char * const **groups,
++			       unsigned * const num_groups)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++
++	*groups = info->functions[selector].groups;
++	*num_groups = info->functions[selector].num_groups;
++
++	return 0;
++}
++
++static const struct pinmux_ops imx1_pmx_ops = {
++	.get_functions_count = imx1_pmx_get_funcs_count,
++	.get_function_name = imx1_pmx_get_func_name,
++	.get_function_groups = imx1_pmx_get_groups,
++	.enable = imx1_pmx_enable,
++};
++
++static int imx1_pinconf_get(struct pinctrl_dev *pctldev,
++			     unsigned pin_id, unsigned long *config)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++
++	*config = imx1_read_bit(ipctl, pin_id, MX1_PUEN);
++
++	return 0;
++}
++
++static int imx1_pinconf_set(struct pinctrl_dev *pctldev,
++			     unsigned pin_id, unsigned long config)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++
++	imx1_write_bit(ipctl, pin_id, config & 0x01, MX1_PUEN);
++
++	dev_dbg(ipctl->dev, "pinconf set pullup pin %s\n",
++		info->pins[pin_id].name);
++
++	return 0;
++}
++
++static void imx1_pinconf_dbg_show(struct pinctrl_dev *pctldev,
++				   struct seq_file *s, unsigned pin_id)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
++	unsigned long config;
++
++	if (!pin_reg || !pin_reg->conf_reg) {
++		seq_puts(s, "N/A");
++		return;
++	}
++
++	config = readl(ipctl->base + pin_reg->conf_reg);
++	seq_printf(s, "0x%lx", config);
++}
++
++static void imx1_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
++					 struct seq_file *s, unsigned group)
++{
++	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++	struct imx_pin_group *grp;
++	unsigned long config;
++	const char *name;
++	int i, ret;
++
++	if (group > info->ngroups)
++		return;
++
++	seq_puts(s, "\n");
++	grp = &info->groups[group];
++	for (i = 0; i < grp->npins; i++) {
++		name = pin_get_name(pctldev, grp->pins[i]);
++		ret = imx1_pinconf_get(pctldev, grp->pins[i], &config);
++		if (ret)
++			return;
++		seq_printf(s, "%s: 0x%lx", name, config);
++	}
++}
++
++static const struct pinconf_ops imx1_pinconf_ops = {
++	.pin_config_get = imx1_pinconf_get,
++	.pin_config_set = imx1_pinconf_set,
++	.pin_config_dbg_show = imx1_pinconf_dbg_show,
++	.pin_config_group_dbg_show = imx1_pinconf_group_dbg_show,
++};
++
++static struct pinctrl_desc imx1_pinctrl_desc = {
++	.pctlops = &imx1_pctrl_ops,
++	.pmxops = &imx1_pmx_ops,
++	.confops = &imx1_pinconf_ops,
++	.owner = THIS_MODULE,
++};
++
++static int imx1_pinctrl_parse_groups(struct device_node *np,
++				    struct imx_pin_group *grp,
++				    struct imx_pinctrl_soc_info *info,
++				    u32 index)
++{
++	int size;
++	const __be32 *list;
++	int i;
++	u32 config;
++
++	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
++
++	/* Initialise group */
++	grp->name = np->name;
++
++	/*
++	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
++	 * do sanity check and calculate pins number
++	 */
++	list = of_get_property(np, "fsl,pins", &size);
++	/* we do not check return since it's safe node passed down */
++	if (!size || size % 12) {
++		dev_notice(info->dev, "Not a valid fsl,pins property (%s)\n",
++				np->name);
++		return -EINVAL;
++	}
++
++	grp->npins = size / 12;
++	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
++				GFP_KERNEL);
++	grp->mux_mode = devm_kzalloc(info->dev,
++				grp->npins * sizeof(unsigned int), GFP_KERNEL);
++	grp->configs = devm_kzalloc(info->dev,
++				grp->npins * sizeof(unsigned long), GFP_KERNEL);
++	for (i = 0; i < grp->npins; i++) {
++		grp->pins[i] = be32_to_cpu(*list++);
++		grp->mux_mode[i] = be32_to_cpu(*list++);
++
++		config = be32_to_cpu(*list++);
++		grp->configs[i] = config;
++	}
++
++	return 0;
++}
++
++static int imx1_pinctrl_parse_functions(struct device_node *np,
++				       struct imx_pinctrl_soc_info *info,
++				       u32 index)
++{
++	struct device_node *child;
++	struct imx_pmx_func *func;
++	struct imx_pin_group *grp;
++	int ret;
++	static u32 grp_index;
++	u32 i = 0;
++
++	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
++
++	func = &info->functions[index];
++
++	/* Initialise function */
++	func->name = np->name;
++	func->num_groups = of_get_child_count(np);
++	if (func->num_groups <= 0)
++		return -EINVAL;
++
++	func->groups = devm_kzalloc(info->dev,
++			func->num_groups * sizeof(char *), GFP_KERNEL);
++
++	for_each_child_of_node(np, child) {
++		func->groups[i] = child->name;
++		grp = &info->groups[grp_index++];
++		ret = imx1_pinctrl_parse_groups(child, grp, info, i++);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++static int imx1_pinctrl_parse_gpio(struct platform_device *pdev,
++		struct imx1_pinctrl *pctl, struct device_node *np, int i,
++		u32 base)
++{
++	int ret;
++	u32 memoffset;
++
++	ret = of_property_read_u32(np, "reg", &memoffset);
++	if (ret)
++		return ret;
++
++	memoffset -= base;
++	pctl->gpio_pdata[i].base = pctl->base + memoffset;
++
++	pctl->gpio_dev[i] = of_device_alloc(np, NULL, &pdev->dev);
++	pctl->gpio_dev[i]->dev.platform_data = &pctl->gpio_pdata[i];
++	pctl->gpio_dev[i]->dev.bus = &platform_bus_type;
++
++	ret = of_device_add(pctl->gpio_dev[i]);
++	if (ret) {
++		dev_err(&pdev->dev,
++				"Failed to add child gpio device\n");
++		return ret;
++	}
++	return 0;
++}
++
++static int imx1_pinctrl_parse_dt(struct platform_device *pdev,
++		struct imx1_pinctrl *pctl, struct imx_pinctrl_soc_info *info)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *child;
++	int ret;
++	u32 nfuncs = 0;
++	u32 ngpios = 0;
++	u32 ngroups = 0;
++	u32 ifunc = 0;
++	u32 igpio = 0;
++	u32 base_addr;
++
++	if (!np)
++		return -ENODEV;
++
++	ret = of_property_read_u32(np, "reg", &base_addr);
++	if (ret)
++		return ret;
++
++	for_each_child_of_node(np, child) {
++		if (!of_device_is_compatible(child, "fsl,imx21-gpio") &&
++				!of_device_is_compatible(child, "fsl,imx1-gpio")) {
++			++nfuncs;
++			ngroups += of_get_child_count(child);
++		} else if (of_device_is_available(child)) {
++			++ngpios;
++		}
++	}
++
++	if (!nfuncs && !ngpios) {
++		dev_err(&pdev->dev, "No pin functions or gpio subdevices defined\n");
++		return -EINVAL;
++	}
++
++	info->nfunctions = nfuncs;
++	info->functions = devm_kzalloc(&pdev->dev,
++			nfuncs * sizeof(struct imx_pmx_func), GFP_KERNEL);
++
++	info->ngroups = ngroups;
++	info->groups = devm_kzalloc(&pdev->dev,
++			ngroups * sizeof(struct imx_pin_group), GFP_KERNEL);
++
++	pctl->num_gpio_childs = ngpios;
++	pctl->gpio_dev = devm_kzalloc(&pdev->dev,
++			sizeof(*pctl->gpio_dev) * ngpios, GFP_KERNEL);
++	pctl->gpio_pdata = devm_kzalloc(&pdev->dev,
++			sizeof(*pctl->gpio_pdata) * ngpios, GFP_KERNEL);
++
++	if (!info->functions || !info->groups || !pctl->gpio_dev ||
++			!pctl->gpio_pdata)
++		return -ENOMEM;
++
++	for_each_child_of_node(np, child) {
++		if (!of_device_is_compatible(child, "fsl,imx21-gpio") &&
++				!of_device_is_compatible(child, "fsl,imx1-gpio")) {
++			ret = imx1_pinctrl_parse_functions(child, info,
++					ifunc++);
++			if (ret)
++				goto child_err;
++		} else if (of_device_is_available(child)) {
++			ret = imx1_pinctrl_parse_gpio(pdev, pctl, child,
++					igpio++, base_addr);
++			if (ret)
++				goto child_err;
++		}
++	}
++
++	return 0;
++child_err:
++	while (igpio--)
++		put_device(&pctl->gpio_dev[igpio]->dev);
++	return ret;
++}
++
++int imx1_pinctrl_core_probe(struct platform_device *pdev,
++		      struct imx_pinctrl_soc_info *info)
++{
++	struct imx1_pinctrl *ipctl;
++	struct resource *res;
++	struct pinctrl_desc *pctl_desc;
++	int ret;
++
++	if (!info || !info->pins || !info->npins) {
++		dev_err(&pdev->dev, "wrong pinctrl info\n");
++		return -EINVAL;
++	}
++	info->dev = &pdev->dev;
++
++	/* Create state holders etc for this driver */
++	ipctl = devm_kzalloc(&pdev->dev, sizeof(*ipctl), GFP_KERNEL);
++	if (!ipctl)
++		return -ENOMEM;
++
++	info->pin_regs = devm_kzalloc(&pdev->dev, sizeof(*info->pin_regs) *
++				      info->npins, GFP_KERNEL);
++	if (!info->pin_regs)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENOENT;
++
++	ipctl->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(ipctl->base))
++		return PTR_ERR(ipctl->base);
++
++	pctl_desc = &imx1_pinctrl_desc;
++	pctl_desc->name = dev_name(&pdev->dev);
++	pctl_desc->pins = info->pins;
++	pctl_desc->npins = info->npins;
++
++	ret = imx1_pinctrl_parse_dt(pdev, ipctl, info);
++	if (ret) {
++		dev_err(&pdev->dev, "fail to probe dt properties\n");
++		return ret;
++	}
++
++	ipctl->info = info;
++	ipctl->dev = info->dev;
++	platform_set_drvdata(pdev, ipctl);
++	ipctl->pctl = pinctrl_register(pctl_desc, &pdev->dev, ipctl);
++	if (!ipctl->pctl) {
++		dev_err(&pdev->dev, "could not register IMX pinctrl driver\n");
++		return -EINVAL;
++	}
++
++	dev_info(&pdev->dev, "initialized IMX pinctrl driver\n");
++
++	return 0;
++}
++
++int imx1_pinctrl_core_remove(struct platform_device *pdev)
++{
++	struct imx1_pinctrl *ipctl = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i != ipctl->num_gpio_childs; ++i)
++		put_device(&ipctl->gpio_dev[i]->dev);
++
++	pinctrl_unregister(ipctl->pctl);
++
++	return 0;
++}
+diff --git a/drivers/pinctrl/pinctrl-imx1.h b/drivers/pinctrl/pinctrl-imx1.h
+new file mode 100644
+index 0000000..63161f1
+--- /dev/null
++++ b/drivers/pinctrl/pinctrl-imx1.h
+@@ -0,0 +1,23 @@
++/*
++ * IMX pinmux core definitions
++ *
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ * Copyright (C) 2012 Linaro Ltd.
++ *
++ * Author: Dong Aisheng <dong.aisheng@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __DRIVERS_PINCTRL_IMX1_H
++#define __DRIVERS_PINCTRL_IMX1_H
++
++#include "pinctrl-imx.h"
++
++int imx1_pinctrl_core_probe(struct platform_device *pdev,
++			struct imx_pinctrl_soc_info *info);
++int imx1_pinctrl_core_remove(struct platform_device *pdev);
++#endif /* __DRIVERS_PINCTRL_IMX1_H */
 -- 
 1.8.3.2
