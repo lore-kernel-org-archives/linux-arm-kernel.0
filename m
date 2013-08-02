@@ -1,55 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Aug 2013 02:03:55 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130801192730.GC9174@kroah.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
-Message-ID: <20130802090355.GF7656@atomide.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 02 Aug 2013 11:04:52 +0200
+Subject: [PATCH 0/8] ARM: at91/dt: make use of periph id macros
+In-Reply-To: <CACQ1gAj_KCJUnBGzv0bnGaUwMgWq-7Noe280YdLGPxK8Ofp3Bw@mail.gmail.com>
+References: <1375339733-3488-1-git-send-email-b.brezillon@overkiz.com>
+ <CACQ1gAj_KCJUnBGzv0bnGaUwMgWq-7Noe280YdLGPxK8Ofp3Bw@mail.gmail.com>
+Message-ID: <51FB7634.3080302@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Greg KH <greg@kroah.com> [130801 12:33]:
-> On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
-> > Hello,
-> > 
-> > Whilst Linux implements a bunch of different bus types (many of which
-> > are in fact virtual), devices sitting on non-probable, memory mapped
-> > buses inside SoCs typically live on either the platform_bus or the
-> > amba_bus. So far, this has worked out alright; the buses haven't needed
-> > to be visible to software and no additional software control is really
-> > required from the OS. However, as I/O coherency and hardware
-> > virtualisation capabilities start to creep into ARM-based SoCs, Linux
-> > needs to know the topology of the system on which it is running.
-> > 
-> > Naturally, this would need to be described as a device-tree binding and
-> > communicate:
-> > 
-> >   - Buses which can be configured as coherent, including which devices
-> >     on those buses can be made coherent.
-> > 
-> >   - How IOMMUs sit on the bus and interact with masters on that bus (the
-> >     current one-IOMMU-driver-per-bus may not work well for the
-> >     platform_bus).
-> 
-> I've been waiting for people to finally run into this one, and realize
-> that they shouldn't be using "platform_bus" :)
-> 
-> >   - QoS and PM constraints. This isn't really in my area, but we do have
-> >     buses that have these features and expect software to control them.
-> > 
-> >   - The system topology and linkages between buses and devices.
-> 
-> The driver core handles this really well, you just have to create new
-> busses, and don't rely on the "catch-all" platform_bus.
+Hello Richard,
 
-Hmm do you have some example of a device driver that is generic and
-is supported on platform_bus and some other bus?
+On 01/08/2013 09:37, Richard Genoud wrote:
+> 2013/8/1 Boris BREZILLON <b.brezillon@overkiz.com>:
+>> Hello,
+>>
+>> This patch series move at91 SoCs peripheral id definitions from machine
+>> specific include dir to dt-bindings include dir.
+>> These macros are used to reference interrupts instead of peripheral numbers.
+>>
+>> This makes dt definitions cleaner and easier to debug (one can easily tell if
+>> the peripheral macro used to reference an interrupt line is not the good one).
+>>
+>> These macros will be used for clk definitions and references too.
+>>
+>> I am not sure 'include/dt-bindings/at91/xxx' is the best place to put these
+>> definitions as there are no soc specific directories in dt-bindings include
+>> dir right now. Maybe something like 'include/dt-bindings/soc/at91/xxx' or
+>> 'include/dt-bindings/peripherals/at91/xxx' would be better.
+>> What do you think ?
+> Well, I'd rather use "atmel" than "at91" because, AFAIK, this prefix
+> has been dropped for new atmel SoCs (sama5 for instance).
 
-For example, we have a need for a custom bus to do bus specific reset
-and idling of devices for example but all the device drivers are
-dt/platform devices.
+Should I do the same for at91 clk series (replace drivers/clk/at91 directory
+by drivers/clk/atmel and include/linux/clk/at91_pmc.h by
+include/linux/clk/atmel_pmc.h) ?
 
-Regards,
+>
+> my 2 cents...
+>
+> Richard.
 
-Tony
+Best Regards,
+
+Boris
