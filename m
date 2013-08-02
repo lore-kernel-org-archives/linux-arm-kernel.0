@@ -1,169 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Aug 2013 12:34:40 +0100
-Subject: [PATCH v4] gpio: Add MOXA ART GPIO driver
-In-Reply-To: <1375103161-12460-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374053693-6166-1-git-send-email-jonas.jensen@gmail.com>
- <1375103161-12460-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130802113440.GJ2884@e106331-lin.cambridge.arm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 02 Aug 2013 13:37:35 +0200
+Subject: [PATCH] arm: zynq: dt: Set correct L2 ram latencies
+In-Reply-To: <1375313099-8402-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1375313099-8402-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <51FB99FF.9080003@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 02:06:01PM +0100, Jonas Jensen wrote:
-> Add GPIO driver for MOXA ART SoCs.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+On 08/01/2013 01:24 AM, Soren Brinkmann wrote:
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Notes:
->     Changes since v3:
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 6f54a64..e32b92b 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -41,8 +41,8 @@
+>  		L2: cache-controller {
+>  			compatible = "arm,pl310-cache";
+>  			reg = <0xF8F02000 0x1000>;
+> -			arm,data-latency = <2 3 2>;
+> -			arm,tag-latency = <2 3 2>;
+> +			arm,data-latency = <3 2 2>;
+> +			arm,tag-latency = <2 2 2>;
+>  			cache-unified;
+>  			cache-level = <2>;
+>  		};
 > 
->     1. use local struct device *dev pointer, replace "&pdev->dev" with "dev"
-> 
->     device tree bindings document:
->     2. describe compatible variable "Must be" instead of "Should be".
-> 
->     Applies to next-20130729
-> 
->  .../devicetree/bindings/gpio/moxa,moxart-gpio.txt  |  23 +++
->  drivers/gpio/Kconfig                               |   7 +
->  drivers/gpio/Makefile                              |   1 +
->  drivers/gpio/gpio-moxart.c                         | 189 +++++++++++++++++++++
->  4 files changed, 220 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
->  create mode 100644 drivers/gpio/gpio-moxart.c
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt b/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
-> new file mode 100644
-> index 0000000..795afab
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
-> @@ -0,0 +1,23 @@
-> +MOXA ART GPIO Controller
-> +
-> +Required properties:
-> +
-> +- #gpio-cells : Should be 2
 
-Could you elaborate on what those cells represent?
+Applied to zynq/dt.
 
-> +- compatible : Must be "moxa,moxart-gpio"
-> +- reg : Should contain registers location and length
-> +       index 0 : input, output, and direction control
-> +       index 1 : enable/disable individual pins, pin 0-31
+Thanks,
+Michal
 
-These seem rather fine-grained. Are they not part of a larger bank of
-registers? The example seems to indicate otherwise, but I don't trust
-examples :)
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-> +- gpio-ready-led : ready LED gpio, with zero flags
-> +- gpio-reset-switch : reset switch gpio, with zero flags
 
-I'm not sure about these. It feels odd for the gpio node to refer to
-itself in this way. Why is the use of these gpios a concern of the gpio
-controller. Surely an external user described elsewhere in dt will be
-assigned these (even if it's general platform code rather than a
-specific hardware driver)?
-
-I thought there were some conventions for gpio-driven LEDs...
-
-Also, I believe the convention is to have ${NAME}-gpios, or just gpios.
-
-[...]
-
-> +static int moxart_gpio_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct resource *res;
-> +       int ret, gpio_ready_led, gpio_reset_switch;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       moxart_gpio_base = devm_ioremap_resource(dev, res);
-> +       if (IS_ERR(moxart_gpio_base)) {
-> +               dev_err(dev, "%s: devm_ioremap_resource res_gpio failed\n",
-> +                       dev->of_node->full_name);
-> +               return PTR_ERR(moxart_gpio_base);
-> +       }
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +       moxart_pincontrol_base = devm_ioremap_resource(dev, res);
-> +       if (IS_ERR(moxart_pincontrol_base)) {
-> +               dev_err(dev, "%s: devm_ioremap_resource res_pmu failed\n",
-> +                       dev->of_node->full_name);
-> +               return PTR_ERR(moxart_pincontrol_base);
-> +       }
-> +
-> +       moxart_gpio_chip.dev = dev;
-> +
-> +       ret = gpiochip_add(&moxart_gpio_chip);
-> +       if (ret)
-> +               dev_err(dev, "%s: gpiochip_add failed\n",
-> +                       dev->of_node->full_name);
-> +
-> +
-> +       gpio_ready_led = of_get_named_gpio(dev->of_node,
-> +                                          "gpio-ready-led", 0);
-> +       if (!gpio_is_valid(gpio_ready_led)) {
-> +               dev_err(dev, "invalid gpio (gpio-ready-led): %d\n",
-> +                       gpio_ready_led);
-> +               return gpio_ready_led;
-> +       }
-> +
-> +       gpio_reset_switch = of_get_named_gpio(dev->of_node,
-> +                                             "gpio-reset-switch", 0);
-> +       if (!gpio_is_valid(gpio_reset_switch)) {
-> +               dev_err(dev, "invalid gpio (gpio-reset-switch): %d\n",
-> +                       gpio_reset_switch);
-> +               return gpio_reset_switch;
-> +       }
-> +
-> +       moxart_gpio_enable(gpio_ready_led | gpio_reset_switch);
-> +
-> +       moxart_gpio_direction_input(&moxart_gpio_chip, gpio_reset_switch);
-
-We never seem to do anything else with the reset switch. Is it used
-elsewhere? Surely the "real" user should call in to initialise this.
-
-> +
-> +       /*
-> +        * gpio_ready_led=0 ready LED on
-> +        * gpio_ready_led=1 ready LED off
-> +        */
-> +       moxart_gpio_direction_output(&moxart_gpio_chip, gpio_ready_led, 0);
-> +       moxart_gpio_set(&moxart_gpio_chip, gpio_ready_led, 0);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id moxart_gpio_match[] = {
-> +       { .compatible = "moxa,moxart-gpio" },
-> +       { }
-> +};
-> +
-> +static struct platform_driver moxart_gpio_driver = {
-> +       .driver = {
-> +               .name           = "moxart-gpio",
-> +               .owner          = THIS_MODULE,
-> +               .of_match_table = moxart_gpio_match,
-> +       },
-> +       .probe  = moxart_gpio_probe,
-> +};
-> +
-> +static int __init moxart_gpio_init(void)
-> +{
-> +       return platform_driver_register(&moxart_gpio_driver);
-> +}
-> +
-> +postcore_initcall(moxart_gpio_init);
-> +
-> +MODULE_DESCRIPTION("MOXART GPIO chip driver");
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
-> --
-> 1.8.2.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/495f5ce3/attachment-0001.sig>
