@@ -1,107 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Aug 2013 10:28:23 +0100
-Subject: [PATCH v10] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
-References: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130802092823.GA2884@e106331-lin.cambridge.arm.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 2 Aug 2013 17:32:23 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130802090355.GF7656@atomide.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802090355.GF7656@atomide.com>
+Message-ID: <20130802093222.GA8982@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 10:26:26AM +0100, Philipp Zabel wrote:
-> This driver implements a reset controller device that toggle a gpio
-> connected to a reset pin of a peripheral IC. The delay between assertion
-> and de-assertion of the reset signal can be configured via device tree.
+On Fri, Aug 02, 2013 at 02:03:55AM -0700, Tony Lindgren wrote:
+> * Greg KH <greg@kroah.com> [130801 12:33]:
+> > On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
+> > > Hello,
+> > > 
+> > > Whilst Linux implements a bunch of different bus types (many of which
+> > > are in fact virtual), devices sitting on non-probable, memory mapped
+> > > buses inside SoCs typically live on either the platform_bus or the
+> > > amba_bus. So far, this has worked out alright; the buses haven't needed
+> > > to be visible to software and no additional software control is really
+> > > required from the OS. However, as I/O coherency and hardware
+> > > virtualisation capabilities start to creep into ARM-based SoCs, Linux
+> > > needs to know the topology of the system on which it is running.
+> > > 
+> > > Naturally, this would need to be described as a device-tree binding and
+> > > communicate:
+> > > 
+> > >   - Buses which can be configured as coherent, including which devices
+> > >     on those buses can be made coherent.
+> > > 
+> > >   - How IOMMUs sit on the bus and interact with masters on that bus (the
+> > >     current one-IOMMU-driver-per-bus may not work well for the
+> > >     platform_bus).
+> > 
+> > I've been waiting for people to finally run into this one, and realize
+> > that they shouldn't be using "platform_bus" :)
+> > 
+> > >   - QoS and PM constraints. This isn't really in my area, but we do have
+> > >     buses that have these features and expect software to control them.
+> > > 
+> > >   - The system topology and linkages between buses and devices.
+> > 
+> > The driver core handles this really well, you just have to create new
+> > busses, and don't rely on the "catch-all" platform_bus.
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Changes since v9:
->  - Use gpio_set_value_cansleep unconditionally. reset_controller_assert/deassert
->    should not be called from atomic context.
-> ---
->  .../devicetree/bindings/reset/gpio-reset.txt       |  35 ++++
->  drivers/reset/Kconfig                              |  11 ++
->  drivers/reset/Makefile                             |   1 +
->  drivers/reset/gpio-reset.c                         | 184 +++++++++++++++++++++
->  4 files changed, 231 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/gpio-reset.txt
->  create mode 100644 drivers/reset/gpio-reset.c
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/gpio-reset.txt b/Documentation/devicetree/bindings/reset/gpio-reset.txt
-> new file mode 100644
-> index 0000000..bca5348
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/gpio-reset.txt
-> @@ -0,0 +1,35 @@
-> +GPIO reset controller
-> +=====================
-> +
-> +A GPIO reset controller controls a single GPIO that is connected to the reset
-> +pin of a peripheral IC. Please also refer to reset.txt in this directory for
-> +common reset controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be "gpio-reset"
-> +- reset-gpios: A gpio used as reset line. The gpio specifier for this property
-> +               depends on the gpio controller that provides the gpio.
-> +- #reset-cells: 0, see below
-> +
-> +Optional properties:
-> +- reset-delay-us: delay in microseconds. The gpio reset line will be asserted for
-> +                  this duration to reset.
-> +- initially-in-reset: boolean. If not set, the initial state should be a
-> +                      deasserted reset line. If this property exists, the
-> +                      reset line should be kept in reset.
-> +
-> +example:
-> +
-> +sii902x_reset: gpio-reset {
-> +	compatible = "gpio-reset";
-> +	reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-> +	reset-delay-us = <10000>;
-> +	initially-in-reset;
-> +	#reset-cells = <0>;
-> +};
-> +
-> +/* Device with nRESET pin connected to GPIO5_0 */
-> +sii902x at 39 {
-> +	/* ... */
-> +	resets = <&sii902x_reset>; /* active-low GPIO5_0, 10 ms delay */
-> +};
+> Hmm do you have some example of a device driver that is generic and
+> is supported on platform_bus and some other bus?
 
-I don't like the approach here. The reset GPIO line is not a device in
-itself, and surely the way in which it must be toggled to reset a device
-is a property of that device, not the GPIO. We're leaking a Linux
-internal abstraction rather than describing teh hardware.
+Take a look at drivers/usb/host/ohci* for one example that I know of,
+there are others all through the kernel as well.
 
-I think thie linkage of the gpio would be better described on the node
-for the device with the reset input, in a binding-specific property for
-the device (e.g. names for the specific input line on the device):
-
-I'd imagine the delay required would be fixed for a device (or possibly
-influenced by clock inputs), and can either be knwon by the driver
-without dt information, or discovered elsewhere (e.g. dervied from the
-rates of clock inputs). We shuold be able to derive that from the
-compatible string in most cases.
-
-I think this should look more like the below:
-
-/* Device with nRESET pin connected to GPIO5_0 */
-sii902x at 39 {
-	/* named for the actual input line */
-	nreset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-	/* 
-	 * If there's some configurable property relating to the reset
-	 * line, we can describe it
-	 */
-	vendor,some-optional-reset-gpio-property;
-	...
-};
-
-If we want a separate device in the Linux driver model to abstract this,
-that's fine, but it should not be described in the dt. The device driver
-can call some generic helpers to handle creating said reset device in
-the driver model.
-
-Thanks,
-Mark.
+greg k-h
