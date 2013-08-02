@@ -1,58 +1,63 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 02 Aug 2013 14:24:25 -0600
-Subject: [PATCH 2/8] ARM: tegra: config the polarity of the request of
- sys clock
-In-Reply-To: <1375429739.6761.31.camel@jlo-ubuntu-64.nvidia.com>
+Date: Fri, 02 Aug 2013 14:32:17 -0600
+Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
+In-Reply-To: <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
 References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-3-git-send-email-josephl@nvidia.com>
- <51F6F109.8010102@wwwdotorg.org>
- <1375429739.6761.31.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <51FC1579.50100@wwwdotorg.org>
+ <1374830110-30685-4-git-send-email-josephl@nvidia.com>
+ <51F6F209.2090309@wwwdotorg.org>
+ <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <51FC1751.9010401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2013 01:48 AM, Joseph Lo wrote:
-> On Tue, 2013-07-30 at 06:47 +0800, Stephen Warren wrote:
+On 08/02/2013 02:09 AM, Joseph Lo wrote:
+> On Tue, 2013-07-30 at 06:51 +0800, Stephen Warren wrote:
 >> On 07/26/2013 03:15 AM, Joseph Lo wrote:
->>> When suspending to LP1 mode, the SYSCLK will be clock gated. And different
->>> board may have different polarity of the request of SYSCLK, this patch
->>> configure the polarity from the DT for the board.
+>>> When the system suspends to LP1, the clock of the CPU would be switched to
+>>> CLK_M (12MHz Oscillator) during suspend/resume flow. The clock driver
+>>> needs to restore the clock of CPU after LP1 resume.
 >>
->>> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+>> It's unclear to me how the code change implements "restore the clock of
+>> the CPU". A register name of CCLKG_BURST_POLICY doesn't sound like it's
+>> anything to do with enabled/disabling the CPU clock, nor configuring its
+>> rate. What exactly does this register do, and hence what does this new
+>> code actually restore?
 >>
->>> @@ -238,6 +240,20 @@ void tegra_pmc_suspend_init(void)
->>>  	reg = tegra_pmc_readl(PMC_CTRL);
->>>  	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
->>>  	tegra_pmc_writel(reg, PMC_CTRL);
->>> +
->>> +	reg = tegra_pmc_readl(PMC_CTRL);
->>> +
->>> +	if (!pmc_pm_data.sysclkreq_high)
->>> +		reg |= TEGRA_POWER_SYSCLK_POLARITY;
->>> +	else
->>> +		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
->>> +
->>> +	/* configure the output inverts while the request is tristated */
->>> +	tegra_pmc_writel(reg, PMC_CTRL);
->>
->> I think s/inverts/polarity/ in that comment would make a lot more sense.
->>
-> Yes, thanks.
+> When system suspend to LP1, most of the PLLs was clock gated. Because we
+> didn't cut off the core power, the settings of PLL still keep there. But
+> we switch the clock source of CPU to CLK_M before shut off PLLs by
+> CCLKG_BURSY_POLICY register. So we need to resume it back to original
+> clock source by CCLKG_BURST_POLICY register. Or it would be keep in low
+> rate (CLK_M) after resume.
+
+OK, I guess the register name was badly chosen by HW. I'd like to see
+part of your description above in the patch description. How about
+replacing the patch description with:
+
+----------
+When the system suspends to LP1, the CPU clock source is switched to
+CLK_M (12MHz Oscillator) during suspend/resume flow[1]. The CPU clock
+source is controlled by the CCLKG_BURST_POLICY register, and hence this
+register must be restored during LP1 resume.
+----------
+
+[1] Question: where does this happen? This patch doesn't make that
+change. I wonder why the suspend path can't save this register, rather
+than implementing a separate suspend syscore op in the clock driver.
+Does the HW auto-switch the value in the register itself?
+
+>> Why don't Tegra20/30 need a similar change?
+>
+> For Tegra20/30, the same code had been implemented in the suspend/resume
+> function of tegra_cpu_car_ops. It restores the CPU clock ASAP when CPU
+> resume from a suspend state to get quick performance I believe.
 > 
->> Must _OE be disabled for the code to work correctly? If so, should the
->> code explicitly clear _OE first, since who knows what state it was
->> originally in? Can't we just set the new polarity and enable _OE in a
->> single register write?
->>
-> The SYSCLK is super clock that was connected to COP subsystem. It can't
-> be disabled when system is running. The boot loader had initialized it
-> and brought it to kernel. We follow the HW description in DT of the
-> polarity of SCLK to re-configure and re-init again. Then the PMC can
-> clock gate it when system go into suspend state.
+> For Tegra114, the resume performance is cool (although we can't see it
+> in upstream kernel now, it still need some other functions.). We can
+> implement all the clock related suspend/resume function in the clock
+> driver.
 
-So it sounds like the bootloader has already configured the clock to a
-certain polarity. If so, why do we need to reconfigure it again?
-
-Or, is this code not duplicating something the bootloader must have
-done, but simply informing some HW in the PMC that's receiving SYSCLK
-how the clock is configured elsewhere?
+OK, I do see something similar in tegra20/30_cpu_clock_suspend/resume.
+Why can't this new code be part of the equivalent functions; does the
+Tegra114 suspend/resume code in mach-tegra/ not call
+tegra_cpu_car_ops.suspend/resume() in the same way it does on Tegra20/30?
