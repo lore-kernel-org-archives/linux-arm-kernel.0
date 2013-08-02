@@ -1,362 +1,110 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri,  2 Aug 2013 15:51:10 +0000
-Subject: [RFC PATCH V2 3/9] rename board.c to board-raumfeld.c
-In-Reply-To: <cover.1375457714.git.jason@lakedaemon.net>
-References: <cover.1375457714.git.jason@lakedaemon.net>
-Message-ID: <31d8fb76052462b837e972828fd312d2f9d91739.1375457714.git.jason@lakedaemon.net>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Fri, 2 Aug 2013 19:55:52 +0400
+Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
+In-Reply-To: <20130802105754.GF2884@e106331-lin.cambridge.arm.com>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <1374172501-26796-8-git-send-email-shc_work@mail.ru>
+ <20130802105754.GF2884@e106331-lin.cambridge.arm.com>
+Message-ID: <20130802195552.2f95c855fc20d6b3a205e40f@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- Makefile         |   6 ++-
- board-raumfeld.c | 153 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
- board.c          | 153 -------------------------------------------------------
- 3 files changed, 158 insertions(+), 154 deletions(-)
- create mode 100644 board-raumfeld.c
- delete mode 100644 board.c
+On Fri, 2 Aug 2013 11:57:54 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-diff --git a/Makefile b/Makefile
-index 814326d..bb3a154 100644
---- a/Makefile
-+++ b/Makefile
-@@ -6,6 +6,10 @@ LD=$(CROSS_COMPILE)ld
- LOADADDR=0xa0008000
- BINFMT=elf32-littlearm
- 
-+MFG=raumfeld
-+
-+BOARD_OBJ = board-$(MFG).o
-+
- COMMON_OBJS = \
- 	main.o \
- 	print.o \
-@@ -34,7 +38,7 @@ zimage.o: input/zImage
- %.o: %.c
- 	$(GCC) $(CFLAGS) -c $^
- 
--matcher: $(COMMON_OBJS) board.o $(INPUT_OBJS)
-+matcher: $(COMMON_OBJS) $(BOARD_OBJ) $(INPUT_OBJS)
- 	$(LD) $(LDFLAGS) -T matcher.lds -o $@ $^
- 
- matcher.bin: matcher
-diff --git a/board-raumfeld.c b/board-raumfeld.c
-new file mode 100644
-index 0000000..fe51bcb
---- /dev/null
-+++ b/board-raumfeld.c
-@@ -0,0 +1,153 @@
-+#include "atags.h"
-+#include "board.h"
-+#include "print.h"
-+#include "register.h"
-+#include "types.h"
-+
-+extern __u32 _binary_input_zImage_start;
-+extern __u32 _binary_input_raumfeld_controller_0_dtb_start;
-+extern __u32 _binary_input_raumfeld_controller_1_dtb_start;
-+extern __u32 _binary_input_raumfeld_controller_2_dtb_start;
-+extern __u32 _binary_input_raumfeld_connector_0_dtb_start;
-+extern __u32 _binary_input_raumfeld_connector_1_dtb_start;
-+extern __u32 _binary_input_raumfeld_connector_2_dtb_start;
-+extern __u32 _binary_input_raumfeld_speaker_0_dtb_start;
-+extern __u32 _binary_input_raumfeld_speaker_1_dtb_start;
-+extern __u32 _binary_input_raumfeld_speaker_2_dtb_start;
-+
-+static struct board boards[] = {
-+	/* Controller */
-+	{
-+		.machid		= 2413,
-+		.system_rev	= 0,
-+		.dtb		= &_binary_input_raumfeld_controller_0_dtb_start,
-+		.name		= "Raumfeld Controller, revision 0",
-+	},
-+	{
-+		.machid		= 2413,
-+		.system_rev	= 1,
-+		.dtb		= &_binary_input_raumfeld_controller_1_dtb_start,
-+		.name		= "Raumfeld Controller, revision 1",
-+	},
-+	{
-+		.machid		= 2413,
-+		.system_rev	= 2,
-+		.dtb		= &_binary_input_raumfeld_controller_2_dtb_start,
-+		.name		= "Raumfeld Controller, revision 2",
-+	},
-+
-+	/* Controller */
-+	{
-+		.machid		= 2414,
-+		.system_rev	= 0,
-+		.dtb		= &_binary_input_raumfeld_connector_0_dtb_start,
-+		.name		= "Raumfeld Connector, revision 0",
-+	},
-+	{
-+		.machid		= 2414,
-+		.system_rev	= 1,
-+		.dtb		= &_binary_input_raumfeld_connector_1_dtb_start,
-+		.name		= "Raumfeld Connector, revision 1",
-+	},
-+	{
-+		.machid		= 2414,
-+		.system_rev	= 2,
-+		.dtb		= &_binary_input_raumfeld_connector_2_dtb_start,
-+		.name		= "Raumfeld Connector, revision 2",
-+	},
-+
-+	/* Speaker */
-+	{
-+		.machid		= 2415,
-+		.system_rev	= 0,
-+		.dtb		= &_binary_input_raumfeld_speaker_0_dtb_start,
-+		.name		= "Raumfeld Speaker, revision 0",
-+	},
-+	{
-+		.machid		= 2415,
-+		.system_rev	= 1,
-+		.dtb		= &_binary_input_raumfeld_speaker_1_dtb_start,
-+		.name		= "Raumfeld Speaker, revision 1",
-+	},
-+	{
-+		.machid		= 2415,
-+		.system_rev	= 2,
-+		.dtb		= &_binary_input_raumfeld_speaker_2_dtb_start,
-+		.name		= "Raumfeld Speaker, revision 2",
-+	},
-+	{ 0, 0, NULL, NULL }	/* sentinel */
-+};
-+
-+static void wait(__u32 ticks)
-+{
-+	__u32 v;
-+
-+	/* OSCR */
-+	writel(0, 0x40A00010);
-+
-+	do {
-+		v = readl(0x40A00010);
-+	} while (ticks > v);
-+}
-+
-+static void led_init(void)
-+{
-+	writel(0, 0x40e10420);		/* GPIO35 */
-+	writel(0, 0x40e10424);		/* GPIO36 */
-+	writel(0x18, 0x40e00010);	/* GPDR1 */
-+}
-+
-+static void led_set(__u32 index, __u32 state)
-+{
-+	__u32 v = 1 << (index ? 3 : 4);
-+
-+	if (state)
-+		writel(v, 0x40e0001c);
-+	else
-+		writel(v, 0x40e00028);
-+}
-+
-+static void led_panic(void)
-+{
-+	int i;
-+
-+	led_init();
-+
-+	for (i = 0;; i++) {
-+		led_set(0, i & 1);
-+		led_set(1, ~i & 1);
-+		wait(500000);
-+	}
-+}
-+struct board *match_board(__u32 machid, const struct tag *tags)
-+{
-+	const struct tag *t;
-+	struct board *board;
-+	__u32 system_rev = 0;
-+
-+	/* walk the atags to determine the system revision */
-+	for_each_tag(t, tags)
-+		switch (t->hdr.tag) {
-+			case ATAG_REVISION:
-+				system_rev = t->u.rev.rev;
-+				break;
-+		}
-+
-+
-+	for (board = boards; board->machid; board++)
-+		if (board->machid == machid && board->system_rev == system_rev)
-+			break;
-+
-+	if (board->compatible == NULL) {
-+		putstr("ERROR MATCHING BOARD!\n");
-+		putstr("MACHID: 0x");
-+		printhex(machid);
-+		putstr("\n");
-+		putstr("SYSTEM_REV: 0x");
-+		printhex(system_rev);
-+		putstr("\n");
-+		led_panic(); /* doesn't return */
-+	}
-+
-+	return board;
-+}
-diff --git a/board.c b/board.c
-deleted file mode 100644
-index fe51bcb..0000000
---- a/board.c
-+++ /dev/null
-@@ -1,153 +0,0 @@
--#include "atags.h"
--#include "board.h"
--#include "print.h"
--#include "register.h"
--#include "types.h"
--
--extern __u32 _binary_input_zImage_start;
--extern __u32 _binary_input_raumfeld_controller_0_dtb_start;
--extern __u32 _binary_input_raumfeld_controller_1_dtb_start;
--extern __u32 _binary_input_raumfeld_controller_2_dtb_start;
--extern __u32 _binary_input_raumfeld_connector_0_dtb_start;
--extern __u32 _binary_input_raumfeld_connector_1_dtb_start;
--extern __u32 _binary_input_raumfeld_connector_2_dtb_start;
--extern __u32 _binary_input_raumfeld_speaker_0_dtb_start;
--extern __u32 _binary_input_raumfeld_speaker_1_dtb_start;
--extern __u32 _binary_input_raumfeld_speaker_2_dtb_start;
--
--static struct board boards[] = {
--	/* Controller */
--	{
--		.machid		= 2413,
--		.system_rev	= 0,
--		.dtb		= &_binary_input_raumfeld_controller_0_dtb_start,
--		.name		= "Raumfeld Controller, revision 0",
--	},
--	{
--		.machid		= 2413,
--		.system_rev	= 1,
--		.dtb		= &_binary_input_raumfeld_controller_1_dtb_start,
--		.name		= "Raumfeld Controller, revision 1",
--	},
--	{
--		.machid		= 2413,
--		.system_rev	= 2,
--		.dtb		= &_binary_input_raumfeld_controller_2_dtb_start,
--		.name		= "Raumfeld Controller, revision 2",
--	},
--
--	/* Controller */
--	{
--		.machid		= 2414,
--		.system_rev	= 0,
--		.dtb		= &_binary_input_raumfeld_connector_0_dtb_start,
--		.name		= "Raumfeld Connector, revision 0",
--	},
--	{
--		.machid		= 2414,
--		.system_rev	= 1,
--		.dtb		= &_binary_input_raumfeld_connector_1_dtb_start,
--		.name		= "Raumfeld Connector, revision 1",
--	},
--	{
--		.machid		= 2414,
--		.system_rev	= 2,
--		.dtb		= &_binary_input_raumfeld_connector_2_dtb_start,
--		.name		= "Raumfeld Connector, revision 2",
--	},
--
--	/* Speaker */
--	{
--		.machid		= 2415,
--		.system_rev	= 0,
--		.dtb		= &_binary_input_raumfeld_speaker_0_dtb_start,
--		.name		= "Raumfeld Speaker, revision 0",
--	},
--	{
--		.machid		= 2415,
--		.system_rev	= 1,
--		.dtb		= &_binary_input_raumfeld_speaker_1_dtb_start,
--		.name		= "Raumfeld Speaker, revision 1",
--	},
--	{
--		.machid		= 2415,
--		.system_rev	= 2,
--		.dtb		= &_binary_input_raumfeld_speaker_2_dtb_start,
--		.name		= "Raumfeld Speaker, revision 2",
--	},
--	{ 0, 0, NULL, NULL }	/* sentinel */
--};
--
--static void wait(__u32 ticks)
--{
--	__u32 v;
--
--	/* OSCR */
--	writel(0, 0x40A00010);
--
--	do {
--		v = readl(0x40A00010);
--	} while (ticks > v);
--}
--
--static void led_init(void)
--{
--	writel(0, 0x40e10420);		/* GPIO35 */
--	writel(0, 0x40e10424);		/* GPIO36 */
--	writel(0x18, 0x40e00010);	/* GPDR1 */
--}
--
--static void led_set(__u32 index, __u32 state)
--{
--	__u32 v = 1 << (index ? 3 : 4);
--
--	if (state)
--		writel(v, 0x40e0001c);
--	else
--		writel(v, 0x40e00028);
--}
--
--static void led_panic(void)
--{
--	int i;
--
--	led_init();
--
--	for (i = 0;; i++) {
--		led_set(0, i & 1);
--		led_set(1, ~i & 1);
--		wait(500000);
--	}
--}
--struct board *match_board(__u32 machid, const struct tag *tags)
--{
--	const struct tag *t;
--	struct board *board;
--	__u32 system_rev = 0;
--
--	/* walk the atags to determine the system revision */
--	for_each_tag(t, tags)
--		switch (t->hdr.tag) {
--			case ATAG_REVISION:
--				system_rev = t->u.rev.rev;
--				break;
--		}
--
--
--	for (board = boards; board->machid; board++)
--		if (board->machid == machid && board->system_rev == system_rev)
--			break;
--
--	if (board->compatible == NULL) {
--		putstr("ERROR MATCHING BOARD!\n");
--		putstr("MACHID: 0x");
--		printhex(machid);
--		putstr("\n");
--		putstr("SYSTEM_REV: 0x");
--		printhex(system_rev);
--		putstr("\n");
--		led_panic(); /* doesn't return */
--	}
--
--	return board;
--}
+> On Thu, Jul 18, 2013 at 07:34:58PM +0100, Alexander Shiyan wrote:
+> > This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
+> > Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+> > for this as the "OF" and "not-OF" calls implemented.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  .../interrupt-controller/cirrus,clps711x-intc.txt  |  42 ++++
+> >  arch/arm/Kconfig                                   |   2 -
+> >  drivers/irqchip/Kconfig                            |   6 +
+> >  drivers/irqchip/Makefile                           |   1 +
+> >  drivers/irqchip/irq-clps711x.c                     | 277 +++++++++++++++++++++
+> >  5 files changed, 326 insertions(+), 2 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+> >  create mode 100644 drivers/irqchip/irq-clps711x.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+> > new file mode 100644
+> > index 0000000..26f8983
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+> > @@ -0,0 +1,42 @@
+> > +Cirrus Logic CLPS711X Interrupt Controller
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: Should be "cirrus,clps711x-intc"
+> > +- reg: Specifies base physical address of the registers set
+> > +- interrupt-controller: Identifies the node as an interrupt controller
+> > +- #interrupt-cells: Specifies the number of cells needed to encode an
+> > +  interrupt source. The value shall be 1.
+> > +
+> > +The interrupt sources are as follows:
+> > +ID     Name    Description
+> > +---------------------------
+> > +1:     BLINT   Battery low (FIQ)
+> > +3:     MCINT   Media changed (FIQ)
+> > +4:     CSINT   CODEC sound
+> > +5:     EINT1   External 1
+> > +6:     EINT2   External 2
+> > +7:     EINT3   External 3
+> > +8:     TC1OI   TC1 under flow
+> > +9:     TC2OI   TC2 under flow
+> > +10:    RTCMI   RTC compare match
+> > +11:    TINT    64Hz tick
+> > +12:    UTXINT1 UART1 transmit FIFO half empty
+> > +13:    URXINT1 UART1 receive FIFO half full
+> > +14:    UMSINT  UART1 modem status changed
+> > +15:    SSEOTI  SSI1 end of transfer
+> > +16:    KBDINT  Keyboard
+> > +17:    SS2RX   SSI2 receive FIFO half or greater full
+> > +18:    SS2TX   SSI2 transmit FIFO less than half empty
+> > +28:    UTXINT2 UART2 transmit FIFO half empty
+> > +29:    URXINT2 UART2 receive FIFO half full
+> > +32:    DAIINT  DAI interface (FIQ)
+> 
+> Surely that's specific to the SoC the interrupt controller is used in,
+> not the interrupt controller IP itself?
+
+[...]
+> > +static const struct {
+> > +#define CLPS711X_FLAG_EN       (1 << 0)
+> > +#define CLPS711X_FLAG_FIQ      (1 << 1)
+> > +       unsigned int    flags;
+> > +       phys_addr_t     phys_eoi;
+> > +} clps711x_irqs[] __initconst = {
+> > +       [1]     = { CLPS711X_FLAG_FIQ, CLPS711X_BLEOI, },
+> > +       [3]     = { CLPS711X_FLAG_FIQ, CLPS711X_MCEOI, },
+> > +       [4]     = { CLPS711X_FLAG_EN, CLPS711X_COEOI, },
+> > +       [5]     = { CLPS711X_FLAG_EN, },
+> > +       [6]     = { CLPS711X_FLAG_EN, },
+> > +       [7]     = { CLPS711X_FLAG_EN, },
+> > +       [8]     = { CLPS711X_FLAG_EN, CLPS711X_TC1EOI, },
+> > +       [9]     = { CLPS711X_FLAG_EN, CLPS711X_TC2EOI, },
+> > +       [10]    = { CLPS711X_FLAG_EN, CLPS711X_RTCEOI, },
+> > +       [11]    = { CLPS711X_FLAG_EN, CLPS711X_TEOI, },
+> > +       [12]    = { CLPS711X_FLAG_EN, },
+> > +       [13]    = { CLPS711X_FLAG_EN, },
+> > +       [14]    = { CLPS711X_FLAG_EN, CLPS711X_UMSEOI, },
+> > +       [15]    = { CLPS711X_FLAG_EN, CLPS711X_SRXEOF, },
+> > +       [16]    = { CLPS711X_FLAG_EN, CLPS711X_KBDEOI, },
+> > +       [17]    = { CLPS711X_FLAG_EN, },
+> > +       [18]    = { CLPS711X_FLAG_EN, },
+> > +       [28]    = { CLPS711X_FLAG_EN, },
+> > +       [29]    = { CLPS711X_FLAG_EN, },
+> > +       [32]    = { CLPS711X_FLAG_FIQ, },
+> > +};
+> 
+> Isn't that SoC specific?
+
+I absolutely do not understand the last two comments.
+You are not difficult to describe them in other words?
+Thanks.
+
 -- 
-1.8.3.2
+Alexander Shiyan <shc_work@mail.ru>
