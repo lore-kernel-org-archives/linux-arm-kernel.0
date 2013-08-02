@@ -1,37 +1,73 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 2 Aug 2013 16:21:57 +0900
-Subject: [PATCH V2] ARM: allow DEBUG_UNCOMPRESS for Tegra
-In-Reply-To: <CAAVeFu+=sfk0zH59GFUqt58MfTZks8qWX1+wq1Rzuh7TUCr8tQ@mail.gmail.com>
-References: <1375379471-15615-1-git-send-email-swarren@wwwdotorg.org>
- <CAAVeFu+=sfk0zH59GFUqt58MfTZks8qWX1+wq1Rzuh7TUCr8tQ@mail.gmail.com>
-Message-ID: <CAAVeFu+2dxn7ZfYfUhqjK_bkWO8Vtg2tR8e7A0jMZ6fL7Yy9Uw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Aug 2013 00:22:21 -0700
+Subject: [PATCHv4 05/33] CLK: omap: add DT duplicate clock registration
+ mechanism
+In-Reply-To: <51FA7F12.6010407@ti.com>
+References: <1374564028-11352-1-git-send-email-t-kristo@ti.com>
+ <1374564028-11352-6-git-send-email-t-kristo@ti.com>
+ <51F808A8.6000503@ti.com> <51F8E1F5.20706@ti.com>
+ <51FA6FCA.3050900@ti.com> <51FA7C39.8090100@ti.com>
+ <51FA7DB6.3060002@ti.com> <51FA7F12.6010407@ti.com>
+Message-ID: <20130802072220.GV7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 2, 2013 at 10:59 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Fri, Aug 2, 2013 at 2:51 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> DEBUG_UNCOMPRESS was previously disallowed for Tegra due to tegra.S's
->> use of global data that was not linked into the decompressor. Solve this
->> by declaring this symbol in tegra.S when it is being built into the
->> decompressor. For the kernel proper, leave the declaration in
->> mach-tegra/common.c as explained in the comment.
->
-> Tested-by: Alexandre Courbot <acourbot@nvidia.com>
->
-> Thanks, I had to workaround this when debugging a kernel uncompression
-> issue, but have not yet found the time to craft a patch.
+* Tero Kristo <t-kristo@ti.com> [130801 08:37]:
+> On 08/01/2013 06:24 PM, Nishanth Menon wrote:
+> >On 08/01/2013 10:18 AM, Tero Kristo wrote:
+> >>On 08/01/2013 05:25 PM, Nishanth Menon wrote:
+> >>>On 07/31/2013 05:07 AM, Tero Kristo wrote:
+> >>>>On 07/30/2013 09:40 PM, Nishanth Menon wrote:
+> >>>>>On 07/23/2013 02:20 AM, Tero Kristo wrote:
+> >[..]
+> >>>if we can get rid of usage of omap_hwmod_get_main_clk by catching them
+> >>>with [1], then we can force the drivers to pick up based on device node
+> >>>clocks= property.
+> >>>
+> >>>It might be easier to fix 1 driver - timer, rather than introduce am33x,
+> >>>omap4, omap5 dra7 specific "SoC clk driver".
+> >>>
+> >>>with that this entire patch becomes redundant.
+> >>
+> >>It is not that simple. Looking at the architectures this set supports, I
+> >>see clock alias nodes at least for following drivers:
+> >>
+> >>- GPT timer
+> >>- USB
+> >>- DCAN
+> >>- EMAC
+> >>- VPFE
+> >>- UART
+> >>- SSI
+> >>- DSS
+> >>- security
+> >>- MMC
+> >>- MCBSP
+> >>- MCSPI
+> >>
+> >>I am _not_ going to fix all of these during the initial phase. :P
+> >>
+> >>But yes, eventually these should go away.
+> >
+> >How many of these are needed to boot? what functionality do we expect
+> >with the series -> we can constraint saying that remaining drivers
+> >should fix themselves the right way, else dont have the feature -
+> >example cpufreq- fix it the right way, or wont see the feature enabled.
+> >
+> >introducing a "way out" for all of these just invites more guys to screw
+> >around claiming "it was done before - see here"..
+> >
+> >lets just fix the darned basic ones, refuse to provide "way out" and let
+> >the others fix themselves.
+> >
+> 
+> Yea, that would be one way. I guess someone like Tony should comment
+> on this.
 
-Also on a related note there is a compilation error on
-arch/arm/boot/compressed/head.S if the DEBUG macro is defined (useful
-to take advantage of puts and putc for early debugging) at least on
-Tegra devices. The loadsp macro definition makes use of addruart,
-which has been changed to take 3 arguments since about 2 years ago
-(commit 639da5ee), but loadsp still uses the 2 arguments form. I'm not
-sure how this should be fixed, either by adding another argument to
-loadsp (which will turn out to be useless for most implementations) or
-by using an arbitrary register in the definition that uses addruart
-(probably dangerous).
+Well how about add some dev_warns so we can keep things working and
+know which ones to fix? Otherwise it seems that things will not work
+properly for many devices.
 
-Alex.
+Regards,
+
+Tony
