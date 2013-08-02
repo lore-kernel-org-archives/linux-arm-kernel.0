@@ -1,81 +1,108 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 2 Aug 2013 15:18:28 +0100
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1 CPU
- devices
-In-Reply-To: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130802141828.GC2361@localhost.localdomain>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 2 Aug 2013 22:20:10 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130802115334.GN2465@mudshark.cambridge.arm.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802115334.GN2465@mudshark.cambridge.arm.com>
+Message-ID: <20130802142010.GC7533@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 02:17:13PM -0400, Santosh Shilimkar wrote:
-> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
+> Hi Greg,
 > 
-> The generic code is well equipped to differentiate between
-> SMP and UP configurations.However, there are some devices which
-> use Cortex-A9 MP core IP with 1 CPU as configuration. To let
-> these SOCs to co-exist in a CONFIG_SMP=y build by leveraging
-> the SMP_ON_UP support, we need to additionally check the
-> number the cores in Cortex-A9 MPCore configuration. Without
-> such a check in place, the startup code tries to execute
-> ALT_SMP() set of instructions which lead to CPU faults.
+> On Thu, Aug 01, 2013 at 08:27:30PM +0100, Greg KH wrote:
+> > On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
+> > > Naturally, this would need to be described as a device-tree binding and
+> > > communicate:
+> > > 
+> > >   - Buses which can be configured as coherent, including which devices
+> > >     on those buses can be made coherent.
+> > > 
+> > >   - How IOMMUs sit on the bus and interact with masters on that bus (the
+> > >     current one-IOMMU-driver-per-bus may not work well for the
+> > >     platform_bus).
+> > 
+> > I've been waiting for people to finally run into this one, and realize
+> > that they shouldn't be using "platform_bus" :)
 > 
-> The issue was spotted on TI's Aegis device and this patch
-> makes now the device work with omap2plus_defconfig which
-> enables SMP by default. The change is kept limited to only
-> Cortex-A9 MPCore detection code.
+> But, as pointed out later in this thread, people have been doing the exact
+> opposite!
 
-Is there a specific reason why this can't happen for other processors
-such as A5/7/15?
+I guess they were wrong :(
 
-Cheers
----Dave
+I know I mentioned it a few times over the years, but I've been ignoring
+ARM for a long time for a variety of reasons.
 
+> We can change the mindset by yelling, but if you're writing a new
+> driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
+> because you get a bunch of device-tree parsing code for free (see
+> drivers/of/platform.c).
+
+I know :(
+
+So, who do I "yell at", and what do I do to make things easier for you
+from the driver-core perspective?
+
+> What's worse is that this nice-and-easy auto-probing doesn't work for nested
+> device-nodes (i.e. a bunch of device-nodes under a common parent, something
+> which you might think is pretty common in a `tree') so people shy away from
+> nesting as a means to group devices too.
+
+That's sad.
+
+> > >   - QoS and PM constraints. This isn't really in my area, but we do have
+> > >     buses that have these features and expect software to control them.
+> > > 
+> > >   - The system topology and linkages between buses and devices.
+> > 
+> > The driver core handles this really well, you just have to create new
+> > busses, and don't rely on the "catch-all" platform_bus.
 > 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Agreed, it's time that we started to describe these non-probable buses as
+> separate bus_types, with controller logic for configuring the bus itself
+> (there are weird-and-wonderful ring-based designs on the horizon which can
+> require a fair amount of setup).
+
+I've heard rumors of those for a while now, I'll believe it when I see
+them :)
+
+> > > The last point is increasingly important as various blocks of ARM system
+> > > IP start to require knowledge of masters and how things like memory
+> > > traffic, DVM messages, interrupts (think MSI) etc are routed between
+> > > them in order to configure the system correctly. For example, interfacing
+> > > a PCIe device with an SMMU requires knowledge of both the requester id
+> > > associated with the device and how that maps to incoming stream ids
+> > > (based off the AXI bus id) on the SMMU. Even worse, this mapping is
+> > > likely generated dynamically by the host controller, which would need to
+> > > know about downstream buses and their SMMUs.
+> > 
+> > Hm, sounds like an ACPI tree is what you need to be using :)
+> > 
+> > Seriously, why not use ACPI for stuff like this?  You already are
+> > starting to do that for ARM-based systems, why not just make it the
+> > standard?
 > 
-> Acked-by: Sricharan R <r.sricharan@ti.com>
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/kernel/head.S |   18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
+> So, like a good proportion of the ARM community, ACPI isn't something I'm
+> well-versed in. Yes, it's coming, but at the same time it's not going to be
+> everywhere and we need to continue to support new SoCs using device-tree.
+> Whilst it might even become a de-factor standard for servers, mobile devices
+> will likely continue with the bootloaders they currently have. Furthermore,
+> the mobile space is really the wild-west when it comes to system topology --
+> exynos SoCs tend to have one IOMMU per device, for example:
 > 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 9cf6063..4924b11 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -486,7 +486,23 @@ __fixup_smp:
->  	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
->  	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
->  	teq	r0, #0x80000000		@ not part of a uniprocessor system?
-> -	moveq	pc, lr			@ yes, assume SMP
-> +	bne    __fixup_smp_on_up	@ no, assume UP
-> +
-> +	@ Core indicates it is SMP.  Check for Aegis SOC where a single
-> +	@ Cortex-A9 CPU is present but SMP operations fault.
-> +	mov	r4, #0x41000000
-> +	orr	r4, r4, #0x0000c000
-> +	orr	r4, r4, #0x00000090
-> +	teq	r3, r4			@ Check for ARM Cortex-A9
-> +	movne	pc, lr			@ Not ARM Cortex-A9,
-> +
-> +	mrc	p15, 4, r0, c15, c0	@ get SCU base address
-> +	teq	r0, #0x0		@ '0' on actual UP A9 hardware
-> +	beq	__fixup_smp_on_up	@ So its an A9 UP
-> +	ldr	r0, [r0, #4]		@ read SCU Config
-> +	and	r0, r0, #0x3		@ number of CPUs
-> +	teq	r0, #0x0		@ is 1?
-> +	movne	pc, lr
->  
->  __fixup_smp_on_up:
->  	adr	r0, 1f
-> -- 
-> 1.7.9.5
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181922.html
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> On the back of that, how does ACPI describe these relationships? It would
+> certainly be a good idea to see what's already being done so we don't
+> reinvent everything again for device-tree.
+
+I don't recall the specifics of how it does this, but the spec is open
+(and bad to read, sorry), and the linux-acpi mailing list is very
+welcoming, so I suggest you start there if you have questions.
+
+thanks,
+
+greg k-h
