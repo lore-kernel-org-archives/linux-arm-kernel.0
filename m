@@ -1,90 +1,158 @@
-From: gururaja.hebbar@ti.com (Gururaja Hebbar)
-Date: Fri, 2 Aug 2013 16:37:36 +0530
-Subject: [Patch V2 4/4] ARM: dts: AM33XX: update rtc node compatibility
-In-Reply-To: <20130801170537.GF8095@e106331-lin.cambridge.arm.com>
-References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
- <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
- <51F749B0.7020802@ti.com>
- <20130730145501.GA29859@e106331-lin.cambridge.arm.com>
- <51F7E7FA.3080702@ti.com>
- <20130801170537.GF8095@e106331-lin.cambridge.arm.com>
-Message-ID: <51FB92F8.9020801@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Aug 2013 12:10:32 +0100
+Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
+In-Reply-To: <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+Message-ID: <20130802111031.GG2884@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/1/2013 10:35 PM, Mark Rutland wrote:
-> On Tue, Jul 30, 2013 at 05:21:14PM +0100, Sekhar Nori wrote:
->> On 7/30/2013 8:25 PM, Mark Rutland wrote:
->>> On Tue, Jul 30, 2013 at 06:05:52AM +0100, Gururaja Hebbar wrote:
->>>> Hi,
->>>>
->>>> On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
->>>>> Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
->>>>>
->>>>> Update the rtc compatible property to "ti,am3352-rtc" to enable handling
->>>>> of this feature inside rtc-omap driver.
->>>>
->>>> The other 2 rtc driver related patches have been pulled up. If you have
->>>> no comments, can you please pull this up.
->>>>
->>>> Regards
->>>> Gururaja
->>>>
->>>>>
->>>>> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
->>>>> ---
->>>>> :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
->>>>>    arch/arm/boot/dts/am33xx.dtsi |    2 +-
->>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->>>>> index 77aa1b0..dde180a 100644
->>>>> --- a/arch/arm/boot/dts/am33xx.dtsi
->>>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
->>>>> @@ -297,7 +297,7 @@
->>>>>    		};
->>>>>
->>>>>    		rtc at 44e3e000 {
->>>>> -			compatible = "ti,da830-rtc";
->>>>> +			compatible = "ti,am3352-rtc";
->>>
->>> Given that this is backwards compatible with the old binding, it would
->>> be nicer to have this as:
->>>
->>> 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
->>>
->>> We must get into the habit of changing dts files in a
->>> backwards-compatible fashion.
->>
->> Right, I suggested this when v1 was posted. It turns out the current
->> kernel does not handle the compatilble list correctly and the string
->> selected actually depends on the order in which it appears in match
->> table in driver instead.
->>
->> I saw there were patches being discussed to fix this issue, but until
->> that is fixed, we cannot really use what you (and I before) suggested.
->
-> A temporary solution would be to list the "ti,am3352-rtc" first in the
-> of_match_table kernel-side.
+On Thu, Jul 18, 2013 at 07:34:59PM +0100, Alexander Shiyan wrote:
+> This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
+> Designed primarily for migration CLPS711X subarch for multiplatform & DT.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/cpuidle/Kconfig            |  6 +++
+>  drivers/cpuidle/Makefile           |  1 +
+>  drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 87 insertions(+)
+>  create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
+> 
+> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+> index 0e2cd5c..c68a0cf 100644
+> --- a/drivers/cpuidle/Kconfig
+> +++ b/drivers/cpuidle/Kconfig
+> @@ -36,6 +36,12 @@ config CPU_IDLE_CALXEDA
+>  	help
+>  	  Select this to enable cpuidle on Calxeda processors.
+>  
+> +config CPU_IDLE_CLPS711X
+> +	bool "CPU Idle Driver for CLPS711X processors"
+> +	depends on ARCH_CLPS711X
+> +	help
+> +	  Select this to enable cpuidle on Cirrus Logic CLPS711X processors.
+> +
+>  config CPU_IDLE_ZYNQ
+>  	bool "CPU Idle Driver for Xilinx Zynq processors"
+>  	depends on ARCH_ZYNQ
+> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+> index 8767a7b..d07d2cb 100644
+> --- a/drivers/cpuidle/Makefile
+> +++ b/drivers/cpuidle/Makefile
+> @@ -6,5 +6,6 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+>  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>  
+>  obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+> +obj-$(CONFIG_CPU_IDLE_CLPS711X)	+= cpuidle-clps711x.o
+>  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+>  obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+> diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
+> new file mode 100644
+> index 0000000..9f0129f
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-clps711x.c
+> @@ -0,0 +1,80 @@
+> +/*
+> + *  CLPS711X CPU idle driver
+> + *
+> + *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/cpuidle.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +static void __iomem *clps711x_halt;
+> +
+> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
+> +				 struct cpuidle_driver *drv, int index)
+> +{
+> +	writel(1, clps711x_halt);
+> +	asm volatile ("mov r0, r0");
+> +	asm volatile ("mov r0, r0");
 
-If above method is followed, then it would cause trouble on davinci 
-platform because this rtc-omap driver is also used by Davinci platform.
-On davinci Plaform the driver would match with "ti,am3352-rtc" for 
-compatible.
+Huh?
 
-Regards
-Gururaja
+> +
+> +	return index;
+> +}
+> +
+> +static struct cpuidle_driver clps711x_idle_driver = {
+> +	.name			= "clps711x_idle",
+> +	.owner			= THIS_MODULE,
+> +	.state_count		= 1,
+> +	.states[0]	= {
+> +		.name		= "HALT",
+> +		.desc		= "CLPS711X WFI",
+> +		.enter		= clps711x_cpuidle_halt,
+> +		.exit_latency	= 1,
+> +	},
+> +};
+> +
+> +static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(clps711x_halt))
+> +		return PTR_ERR(clps711x_halt);
+> +
+> +	return cpuidle_register(&clps711x_idle_driver, NULL);
+> +}
+> +
+> +static int clps711x_cpuidle_remove(struct platform_device *pdev)
+> +{
+> +	cpuidle_unregister(&clps711x_idle_driver);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id clps711x_cpuidle_dt_ids[] = {
+> +	{ .compatible = "cirrus,clps711x-cpuidle", },
+> +	{ }
+> +};
 
-> That way you can keep the old compatible
-> string in the dts compatible list, and maintain backwards compatibilty
-> with older kernels.
->
-> Later if the way Linux matches compatible strings is changed, this
-> shouldn't break the probe order, and the of_match_table order could be
-> changed.
->
-> Have I missed something?
->
-> Thanks,
-> Mark.
->
+I don't like this -- cpuidle is a Linux abstraction, not a real device.
+Additionally you haven't provided a binding.
+
+What is the device being poked actually called? Is it a register in a
+larger power management unit?
+
+Thanks,
+Mark.
+
+> +MODULE_DEVICE_TABLE(of, clps711x_cpuidle_dt_ids);
+> +
+> +static struct platform_driver clps711x_cpuidle_driver = {
+> +	.driver	= {
+> +		.name		= "clps711x-cpuidle",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= clps711x_cpuidle_dt_ids,
+> +	},
+> +	.remove	= clps711x_cpuidle_remove,
+> +};
+> +module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
+> +
+> +MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
+> +MODULE_DESCRIPTION("CLPS711X CPU idle driver");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
