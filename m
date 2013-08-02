@@ -1,94 +1,39 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 02 Aug 2013 15:46:13 -0700
-Subject: [PATCH v3 16/31] dts: mpc512x: add clock related device tree specs
-In-Reply-To: <1374495298-22019-17-git-send-email-gsi@denx.de>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1374495298-22019-17-git-send-email-gsi@denx.de>
-Message-ID: <20130802224613.6450.5857@quantum>
+Date: Fri, 02 Aug 2013 15:53:51 -0700
+Subject: [PATCH v3 2/8] clk: samsung: pll: Add support for PLL6552 and
+ PLL6553
+In-Reply-To: <3758744.oOA9YxCvpA@flatron>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+ <11551938.yDBcNngaZN@flatron> <20130728123051.GQ9858@sirena.org.uk>
+ <3758744.oOA9YxCvpA@flatron>
+Message-ID: <20130802225351.6450.12004@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gerhard Sittig (2013-07-22 05:14:43)
-> this addresses the clock driver aka provider's side of clocks
-> - prepare for future '<&clks ID>' phandle references for device tree
->   based clock lookup in client drivers
-> - introduce a 'clocks' subtree with an 'osc' node for the crystal
->   or oscillator SoC input (fixed frequency)
-> - provide default values with 33MHz oscillator frequency in the
->   common include (the 66MHz IPS bus already was there), add
->   override values for the ifm AC14xx board which deviates from
->   the reference design (25MHz xtal, 80MHz IPS bus)
+Quoting Tomasz Figa (2013-07-28 05:38:25)
+> On Sunday 28 of July 2013 13:30:51 Mark Brown wrote:
+> > On Wed, Jul 24, 2013 at 01:52:19AM +0200, Tomasz Figa wrote:
+> > > Changes since v2:
+> > >  - Reworked to use new PLL registration method introduced by Yadwinder
+> > >  
+> > >    Singh Brar's patch series:
+> > >    ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20041 )
+> > 
+> > I'm not able to test this series since that lot isn't in -next and I
+> > didn't get a copy.
 > 
-> Signed-off-by: Gerhard Sittig <gsi@denx.de>
-
-Reviewed-by: Mike Turquette <mturquette@linaro.org>
-
-> ---
->  arch/powerpc/boot/dts/ac14xx.dts   |    7 +++++++
->  arch/powerpc/boot/dts/mpc5121.dtsi |   15 ++++++++++++++-
->  2 files changed, 21 insertions(+), 1 deletion(-)
+> Hmm, I wonder what happened with that series, as Mike was supposed to
+> try applying it to clk tree [1].
 > 
-> diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
-> index a543c40..a1b8837 100644
-> --- a/arch/powerpc/boot/dts/ac14xx.dts
-> +++ b/arch/powerpc/boot/dts/ac14xx.dts
-> @@ -139,7 +139,14 @@
->                 };
->         };
->  
-> +       clocks {
-> +               osc {
-> +                       clock-frequency = <25000000>;
-> +               };
-> +       };
-> +
->         soc at 80000000 {
-> +               bus-frequency = <80000000>;     /* 80 MHz ips bus */
->  
->                 clock at f00 {
->                         compatible = "fsl,mpc5121rev2-clock", "fsl,mpc5121-clock";
-> diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
-> index bd14c00..8f4cba0 100644
-> --- a/arch/powerpc/boot/dts/mpc5121.dtsi
-> +++ b/arch/powerpc/boot/dts/mpc5121.dtsi
-> @@ -9,6 +9,8 @@
->   * option) any later version.
->   */
->  
-> +#include <dt-bindings/clock/mpc512x-clock.h>
-> +
->  /dts-v1/;
->  
->  / {
-> @@ -73,6 +75,16 @@
->                 ranges = <0x0 0x0 0xfc000000 0x04000000>;
->         };
->  
-> +       clocks {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               osc {
-> +                       compatible = "fsl,mpc512x-osc", "fixed-clock";
-> +                       clock-frequency = <33000000>;
-> +               };
-> +       };
-> +
->         soc at 80000000 {
->                 compatible = "fsl,mpc5121-immr";
->                 #address-cells = <1>;
-> @@ -118,9 +130,10 @@
->                 };
->  
->                 /* Clock control */
-> -               clock at f00 {
-> +               clks: clock at f00 {
->                         compatible = "fsl,mpc5121-clock";
->                         reg = <0xf00 0x100>;
-> +                       #clock-cells = <1>;
->                 };
->  
->                 /* Power Management Controller */
-> -- 
-> 1.7.10.4
+> Mike, could you shed some light on this?
+
+It's merged and available from my tree.
+
+Regards,
+Mike
+
+> 
+> Best regards,
+> Tomasz
+> 
+> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20041/focus=21003
