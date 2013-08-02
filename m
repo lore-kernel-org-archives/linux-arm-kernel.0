@@ -1,63 +1,64 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Aug 2013 12:10:32 +0100
-Subject: [PATCH 08/10] ARM: clps711x: Add CLPS711X cpuidle driver
-In-Reply-To: <1374172501-26796-9-git-send-email-shc_work@mail.ru>
+Date: Fri, 2 Aug 2013 12:15:31 +0100
+Subject: [PATCH 10/10] ARM: clps711x: Add initial DT support
+In-Reply-To: <1374172501-26796-11-git-send-email-shc_work@mail.ru>
 References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-9-git-send-email-shc_work@mail.ru>
-Message-ID: <20130802111031.GG2884@e106331-lin.cambridge.arm.com>
+ <1374172501-26796-11-git-send-email-shc_work@mail.ru>
+Message-ID: <20130802111531.GH2884@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 07:34:59PM +0100, Alexander Shiyan wrote:
-> This adds the cpuidle driver for Cirrus Logic CLPS711X series SoCs.
-> Designed primarily for migration CLPS711X subarch for multiplatform & DT.
+On Thu, Jul 18, 2013 at 07:35:01PM +0100, Alexander Shiyan wrote:
+> This patch adds initial support for Cirrus Logic CLPS711X based platforms
+> using the device tree for discovery.
+> The basic devices is not yet DT-capable, so the CLPS711X DT option is marked
+> as experimental.
 > 
 > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > ---
->  drivers/cpuidle/Kconfig            |  6 +++
->  drivers/cpuidle/Makefile           |  1 +
->  drivers/cpuidle/cpuidle-clps711x.c | 80 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 87 insertions(+)
->  create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
+>  arch/arm/mach-clps711x/Kconfig    |  7 +++++
+>  arch/arm/mach-clps711x/Makefile   |  1 +
+>  arch/arm/mach-clps711x/board-dt.c | 56 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 64 insertions(+)
+>  create mode 100644 arch/arm/mach-clps711x/board-dt.c
 > 
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> index 0e2cd5c..c68a0cf 100644
-> --- a/drivers/cpuidle/Kconfig
-> +++ b/drivers/cpuidle/Kconfig
-> @@ -36,6 +36,12 @@ config CPU_IDLE_CALXEDA
->  	help
->  	  Select this to enable cpuidle on Calxeda processors.
+> diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
+> index bea6295..8ef38c6 100644
+> --- a/arch/arm/mach-clps711x/Kconfig
+> +++ b/arch/arm/mach-clps711x/Kconfig
+> @@ -33,6 +33,13 @@ config ARCH_P720T
+>  	  Say Y here if you intend to run this kernel on the ARM Prospector
+>  	  720T.
 >  
-> +config CPU_IDLE_CLPS711X
-> +	bool "CPU Idle Driver for CLPS711X processors"
-> +	depends on ARCH_CLPS711X
+> +config CLPS711X_DT
+> +	bool "Support CLPS711X platforms from device tree (Very Experimental!)"
+> +	depends on USE_OF
 > +	help
-> +	  Select this to enable cpuidle on Cirrus Logic CLPS711X processors.
+> +	  Include support for Cirrus Logic CLPS711X based platforms
+> +	  using the device tree for discovery.
 > +
->  config CPU_IDLE_ZYNQ
->  	bool "CPU Idle Driver for Xilinx Zynq processors"
->  	depends on ARCH_ZYNQ
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index 8767a7b..d07d2cb 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -6,5 +6,6 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
->  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->  
->  obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
-> +obj-$(CONFIG_CPU_IDLE_CLPS711X)	+= cpuidle-clps711x.o
->  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
->  obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
-> diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
+>  config EP72XX_ROM_BOOT
+>  	bool "EP721x/EP731x ROM boot"
+>  	help
+> diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
+> index f04151e..77d3a76 100644
+> --- a/arch/arm/mach-clps711x/Makefile
+> +++ b/arch/arm/mach-clps711x/Makefile
+> @@ -11,3 +11,4 @@ obj-$(CONFIG_ARCH_CDB89712)	+= board-cdb89712.o
+>  obj-$(CONFIG_ARCH_CLEP7312)	+= board-clep7312.o
+>  obj-$(CONFIG_ARCH_EDB7211)	+= board-edb7211.o
+>  obj-$(CONFIG_ARCH_P720T)	+= board-p720t.o
+> +obj-$(CONFIG_CLPS711X_DT)	+= board-dt.o
+> diff --git a/arch/arm/mach-clps711x/board-dt.c b/arch/arm/mach-clps711x/board-dt.c
 > new file mode 100644
-> index 0000000..9f0129f
+> index 0000000..5b6f3f1
 > --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-clps711x.c
-> @@ -0,0 +1,80 @@
+> +++ b/arch/arm/mach-clps711x/board-dt.c
+> @@ -0,0 +1,56 @@
 > +/*
-> + *  CLPS711X CPU idle driver
+> + *  CLPS711X Generic DT board
 > + *
-> + *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
+> + *  Author: Alexander Shiyan <shc_work@mail.ru>, 2013
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License as published by
@@ -65,88 +66,64 @@ On Thu, Jul 18, 2013 at 07:34:59PM +0100, Alexander Shiyan wrote:
 > + * (at your option) any later version.
 > + */
 > +
-> +#include <linux/cpuidle.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/init.h>
+> +#include <linux/of_platform.h>
 > +
-> +static void __iomem *clps711x_halt;
+> +#include <asm/mach/arch.h>
 > +
-> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
-> +				 struct cpuidle_driver *drv, int index)
+> +#include <mach/hardware.h>
+> +
+> +#include "common.h"
+> +
+> +void __init clps711x_timer_init_dt(void)
 > +{
-> +	writel(1, clps711x_halt);
-> +	asm volatile ("mov r0, r0");
-> +	asm volatile ("mov r0, r0");
+> +	of_clk_init(NULL);
+> +	clocksource_of_init();
+> +}
 
-Huh?
+Doesn't generic code do that now if you don't provide this callback?
 
 > +
-> +	return index;
-> +}
-> +
-> +static struct cpuidle_driver clps711x_idle_driver = {
-> +	.name			= "clps711x_idle",
-> +	.owner			= THIS_MODULE,
-> +	.state_count		= 1,
-> +	.states[0]	= {
-> +		.name		= "HALT",
-> +		.desc		= "CLPS711X WFI",
-> +		.enter		= clps711x_cpuidle_halt,
-> +		.exit_latency	= 1,
-> +	},
-> +};
-> +
-> +static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(clps711x_halt))
-> +		return PTR_ERR(clps711x_halt);
-> +
-> +	return cpuidle_register(&clps711x_idle_driver, NULL);
-> +}
-> +
-> +static int clps711x_cpuidle_remove(struct platform_device *pdev)
-> +{
-> +	cpuidle_unregister(&clps711x_idle_driver);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id clps711x_cpuidle_dt_ids[] = {
-> +	{ .compatible = "cirrus,clps711x-cpuidle", },
+> +static struct of_dev_auxdata clps711x_auxdata_lookup[] __initdata = {
+> +	OF_DEV_AUXDATA("cirrus,clps711x-syscon", CLPS711X_PHYS_BASE + SYSCON1,
+> +		       "syscon.1", NULL),
+> +	OF_DEV_AUXDATA("cirrus,clps711x-syscon", CLPS711X_PHYS_BASE + SYSCON2,
+> +		       "syscon.2", NULL),
+> +	OF_DEV_AUXDATA("cirrus,clps711x-syscon", CLPS711X_PHYS_BASE + SYSCON3,
+> +		       "syscon.3", NULL),
 > +	{ }
 > +};
 
-I don't like this -- cpuidle is a Linux abstraction, not a real device.
-Additionally you haven't provided a binding.
+Is there any reason these can't sit in the syscon driver? What are they
+used for?
 
-What is the device being poked actually called? Is it a register in a
-larger power management unit?
+> +
+> +static void __init clps711x_init_dt(void)
+> +{
+> +	of_platform_populate(NULL, of_default_bus_match_table,
+> +			     clps711x_auxdata_lookup, NULL);
+> +}
+
+Depending on the answer to the above, you may not need this.
 
 Thanks,
 Mark.
 
-> +MODULE_DEVICE_TABLE(of, clps711x_cpuidle_dt_ids);
 > +
-> +static struct platform_driver clps711x_cpuidle_driver = {
-> +	.driver	= {
-> +		.name		= "clps711x-cpuidle",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= clps711x_cpuidle_dt_ids,
-> +	},
-> +	.remove	= clps711x_cpuidle_remove,
+> +static const char *clps711x_dt_compat[] __initdata = {
+> +	"cirrus,clps711x",
+> +	NULL
 > +};
-> +module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
 > +
-> +MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
-> +MODULE_DESCRIPTION("CLPS711X CPU idle driver");
-> +MODULE_LICENSE("GPL");
+> +DT_MACHINE_START(CLPS711X_DT, "Cirrus Logic CLPS711X (Device Tree Support)")
+> +	.dt_compat	= clps711x_dt_compat,
+> +	.map_io		= clps711x_map_io,
+> +	.init_time	= clps711x_timer_init,
+> +	.init_machine	= clps711x_init_dt,
+> +	.restart	= clps711x_restart,
+> +MACHINE_END
 > -- 
 > 1.8.1.5
 > 
