@@ -1,46 +1,321 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 2 Aug 2013 17:06:02 -0400
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <20130726030812.GB30195@mtj.dyndns.org>
-References: <20130629152959.GB31339@mtj.dyndns.org>
- <20130629172123.GA3353@n2100.arm.linux.org.uk>
- <20130629175743.GA382@mtj.dyndns.org>
- <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
- <20130629195549.GE3353@n2100.arm.linux.org.uk>
- <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
- <51D18DBA.6090608@ti.com> <51F1A7AA.8080700@ti.com>
- <20130725223658.GJ26107@mtj.dyndns.org> <51F1B17F.30902@ti.com>
- <20130726030812.GB30195@mtj.dyndns.org>
-Message-ID: <51FC1F3A.8090201@ti.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Fri, 2 Aug 2013 14:17:58 -0700
+Subject: [PATCH] ARM: DT: binding fixup to align with
+ vendor-prefixes.txt
+Message-ID: <1375478278-22757-1-git-send-email-csd@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tejun,
+[ this is a follow-up to this discussion:
+http://archive.arm.linux.org.uk/lurker/message/20130730.230827.a1ceb12a.en.html ]
+This patchset renames all uses of "bcm," name bindings to
+"brcm," as they were done prior to knowing that brcm had
+already been standardized as Broadcom vendor prefix
+(in Documentation/devicetree/bindings/vendor-prefixes.txt).
+This will not cause any churn on devices because none of
+these bindings have made it into production yet.
+Also rename the the following dt binding docs that had "bcm,"
+in their name for consistency:
+ - bcm,kona-sdhci.txt -> kona-sdhci.txt
+ - bcm,kona-timer.txt -> kona-timer.txt
 
-On Thursday 25 July 2013 11:08 PM, Tejun Heo wrote:
-> Hello,
-> 
-> On Thu, Jul 25, 2013 at 07:15:11PM -0400, Santosh Shilimkar wrote:
->> Sorry if I wasn't clear before, but I need help to at least have new
->> memblock API support since I am not familiar with memblock code. 
->> I could help in adaptation to the new API for ARM arch and
->> core kernel code.
->>
->> Let me know your thoughts.
-> 
-> Unfortunately, I'm currently a bit too occupied to work on it myself.
-> Any volunteers?
-> 
-Looking at the situation, how about proceeding with patch updating
-the bootmem API signatures to use phys_addr_t  which can unblock me
-to get my machine working.
+Signed-off-by: Christian Daudt <csd@broadcom.com>
 
-Introduction of new API, conversions of core kernel code and then
-arches moving away from bootmem is going to take significant time
-anyways. I will continue my effort to get ARM port moved to no-bootmem
-and get that merged.
-
-Let me know how to make progress here. Appreciate your help on the subject.
-
-Regards,
-Santosh
+diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
+deleted file mode 100644
+index 59fa6e6..0000000
+--- a/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
++++ /dev/null
+@@ -1,19 +0,0 @@
+-Broadcom Kona Family timer
+------------------------------------------------------
+-This timer is used in the following Broadcom SoCs:
+- BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+-
+-Required properties:
+-- compatible : "bcm,kona-timer"
+-- reg : Register range for the timer
+-- interrupts : interrupt for the timer
+-- clock-frequency: frequency that the clock operates
+-
+-Example:
+-	timer at 35006000 {
+-		compatible = "bcm,kona-timer";
+-		reg = <0x35006000 0x1000>;
+-		interrupts = <0x0 7 0x4>;
+-		clock-frequency = <32768>;
+-	};
+-
+diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+index fb7b5cd..cf1b206 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+@@ -6,4 +6,4 @@ bcm11351, bcm28145, bcm28155 SoCs) shall have the following properties:
+ 
+ Required root node property:
+ 
+-compatible = "bcm,bcm11351";
++compatible = "brcm,bcm11351";
+diff --git a/Documentation/devicetree/bindings/arm/bcm/kona-timer.txt b/Documentation/devicetree/bindings/arm/bcm/kona-timer.txt
+new file mode 100644
+index 0000000..a716952
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/kona-timer.txt
+@@ -0,0 +1,19 @@
++Broadcom Kona Family timer
++-----------------------------------------------------
++This timer is used in the following Broadcom SoCs:
++ BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
++
++Required properties:
++- compatible : "brcm,kona-timer"
++- reg : Register range for the timer
++- interrupts : interrupt for the timer
++- clock-frequency: frequency that the clock operates
++
++Example:
++	timer at 35006000 {
++		compatible = "brcm,kona-timer";
++		reg = <0x35006000 0x1000>;
++		interrupts = <0x0 7 0x4>;
++		clock-frequency = <32768>;
++	};
++
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 69ddf9f..f4aa37e 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -16,7 +16,7 @@ Required properties:
+      performs the same operation).
+ 	"marvell,"aurora-outer-cache: Marvell Controller designed to be
+ 	 compatible with the ARM one with outer cache mode.
+-	"bcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
++	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
+ 	offset needs to be added to the address before passing down to the L2
+ 	cache controller
+ - cache-unified : Specifies the cache is a unified cache.
+diff --git a/Documentation/devicetree/bindings/misc/smc.txt b/Documentation/devicetree/bindings/misc/smc.txt
+index 02b4281..8126821 100644
+--- a/Documentation/devicetree/bindings/misc/smc.txt
++++ b/Documentation/devicetree/bindings/misc/smc.txt
+@@ -4,11 +4,11 @@ This binding defines the location of the bounce buffer
+ used for non-secure to secure communications.
+ 
+ Required properties:
+-- compatible : "bcm,kona-smc"
++- compatible : "brcm,kona-smc"
+ - reg : Location and size of bounce buffer
+ 
+ Example:
+ 	smc at 0x3404c000 {
+-		compatible = "bcm,bcm11351-smc", "bcm,kona-smc";
++		compatible = "brcm,bcm11351-smc", "brcm,kona-smc";
+ 		reg = <0x3404c000 0x400>; //1 KiB in SRAM
+ 	};
+diff --git a/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt b/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt
+deleted file mode 100644
+index 094ae01..0000000
+--- a/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt
++++ /dev/null
+@@ -1,16 +0,0 @@
+-Broadcom BCM281xx SDHCI
+-
+-This file documents differences between the core properties in mmc.txt
+-and the properties present in the bcm281xx SDHCI
+-
+-Required properties:
+-- compatible : Should be "bcm,kona-sdhci"
+-
+-Example:
+-
+-sdio2: sdio at 0x3f1a0000 {
+-	compatible = "bcm,kona-sdhci";
+-	reg = <0x3f1a0000 0x10000>;
+-	interrupts = <0x0 74 0x4>;
+-};
+-
+diff --git a/Documentation/devicetree/bindings/mmc/kona-sdhci.txt b/Documentation/devicetree/bindings/mmc/kona-sdhci.txt
+new file mode 100644
+index 0000000..199d97a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/kona-sdhci.txt
+@@ -0,0 +1,16 @@
++Broadcom BCM281xx SDHCI
++
++This file documents differences between the core properties in mmc.txt
++and the properties present in the bcm281xx SDHCI
++
++Required properties:
++- compatible : Should be "brcm,kona-sdhci"
++
++Example:
++
++sdio2: sdio at 0x3f1a0000 {
++	compatible = "brcm,kona-sdhci";
++	reg = <0x3f1a0000 0x10000>;
++	interrupts = <0x0 74 0x4>;
++};
++
+diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+index 67ec524..ed60a49 100644
+--- a/arch/arm/boot/dts/bcm11351-brt.dts
++++ b/arch/arm/boot/dts/bcm11351-brt.dts
+@@ -17,7 +17,7 @@
+ 
+ / {
+ 	model = "BCM11351 BRT board";
+-	compatible = "bcm,bcm11351-brt", "bcm,bcm11351";
++	compatible = "brcm,bcm11351-brt", "brcm,bcm11351";
+ 
+ 	memory {
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index c0cdf66..343ecc4f 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -18,7 +18,7 @@
+ 
+ / {
+ 	model = "BCM11351 SoC";
+-	compatible = "bcm,bcm11351";
++	compatible = "brcm,bcm11351";
+ 	interrupt-parent = <&gic>;
+ 
+ 	chosen {
+@@ -35,12 +35,12 @@
+ 	};
+ 
+ 	smc at 0x3404c000 {
+-		compatible = "bcm,bcm11351-smc", "bcm,kona-smc";
++		compatible = "brcm,bcm11351-smc", "brcm,kona-smc";
+ 		reg = <0x3404c000 0x400>; /* 1 KiB in SRAM */
+ 	};
+ 
+ 	uart at 3e000000 {
+-		compatible = "bcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
++		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
+ 		status = "disabled";
+ 		reg = <0x3e000000 0x1000>;
+ 		clock-frequency = <13000000>;
+@@ -50,42 +50,42 @@
+ 	};
+ 
+ 	L2: l2-cache {
+-		compatible = "bcm,bcm11351-a2-pl310-cache";
++		compatible = "brcm,bcm11351-a2-pl310-cache";
+ 		reg = <0x3ff20000 0x1000>;
+ 		cache-unified;
+ 		cache-level = <2>;
+ 	};
+ 
+ 	timer at 35006000 {
+-		compatible = "bcm,kona-timer";
++		compatible = "brcm,kona-timer";
+ 		reg = <0x35006000 0x1000>;
+ 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 		clock-frequency = <32768>;
+ 	};
+ 
+ 	sdio0: sdio at 0x3f180000 {
+-		compatible = "bcm,kona-sdhci";
++		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f180000 0x10000>;
+ 		interrupts = <0x0 77 0x4>;
+ 		status = "disabled";
+ 	};
+ 
+ 	sdio1: sdio at 0x3f190000 {
+-		compatible = "bcm,kona-sdhci";
++		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f190000 0x10000>;
+ 		interrupts = <0x0 76 0x4>;
+ 		status = "disabled";
+ 	};
+ 
+ 	sdio2: sdio at 0x3f1a0000 {
+-		compatible = "bcm,kona-sdhci";
++		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1a0000 0x10000>;
+ 		interrupts = <0x0 74 0x4>;
+ 		status = "disabled";
+ 	};
+ 
+ 	sdio3: sdio at 0x3f1b0000 {
+-		compatible = "bcm,kona-sdhci";
++		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1b0000 0x10000>;
+ 		interrupts = <0x0 73 0x4>;
+ 		status = "disabled";
+diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+index 56d9d19..fcc425a 100644
+--- a/arch/arm/mach-bcm/bcm_kona_smc.c
++++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+@@ -36,7 +36,7 @@ struct bcm_kona_smc_data {
+ };
+ 
+ static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
+-	{.compatible = "bcm,kona-smc"},
++	{.compatible = "brcm,kona-smc"},
+ 	{},
+ };
+ 
+diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
+index 2859932..6296fdf 100644
+--- a/arch/arm/mach-bcm/board_bcm.c
++++ b/arch/arm/mach-bcm/board_bcm.c
+@@ -50,7 +50,7 @@ static void __init board_init(void)
+ 	kona_l2_cache_init();
+ }
+ 
+-static const char * const bcm11351_dt_compat[] = { "bcm,bcm11351", NULL, };
++static const char * const bcm11351_dt_compat[] = { "brcm,bcm11351", NULL, };
+ 
+ DT_MACHINE_START(BCM11351_DT, "Broadcom Application Processor")
+ 	.init_time = clocksource_of_init,
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index d70e0ab..3ff8307 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -929,7 +929,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
+ 	  .data = (void *)&aurora_no_outer_data},
+ 	{ .compatible = "marvell,aurora-outer-cache",
+ 	  .data = (void *)&aurora_with_outer_data},
+-	{ .compatible = "bcm,bcm11351-a2-pl310-cache",
++	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
+ 	  .data = (void *)&bcm_l2x0_data},
+ 	{}
+ };
+diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
+index ba3d859..6d2b8c7 100644
+--- a/drivers/clocksource/bcm_kona_timer.c
++++ b/drivers/clocksource/bcm_kona_timer.c
+@@ -99,7 +99,7 @@ kona_timer_get_counter(void *timer_base, uint32_t *msw, uint32_t *lsw)
+ }
+ 
+ static const struct of_device_id bcm_timer_ids[] __initconst = {
+-	{.compatible = "bcm,kona-timer"},
++	{.compatible = "brcm,kona-timer"},
+ 	{},
+ };
+ 
+@@ -201,4 +201,4 @@ static void __init kona_timer_init(struct device_node *node)
+ 	kona_timer_set_next_event((arch_timer_rate / HZ), NULL);
+ }
+ 
+-CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer", kona_timer_init);
++CLOCKSOURCE_OF_DECLARE(bcm_kona, "brcm,kona-timer", kona_timer_init);
+diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
+index 87175f9..ffb5d10 100644
+--- a/drivers/mmc/host/sdhci-bcm-kona.c
++++ b/drivers/mmc/host/sdhci-bcm-kona.c
+@@ -222,7 +222,7 @@ static struct sdhci_pltfm_data sdhci_pltfm_data_kona = {
+ };
+ 
+ static const struct of_device_id sdhci_bcm_kona_of_match[] __initdata = {
+-	{ .compatible = "bcm,kona-sdhci"},
++	{ .compatible = "brcm,kona-sdhci"},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sdhci_bcm_kona_of_match);
+-- 
+1.7.10.4
