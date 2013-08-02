@@ -1,66 +1,64 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 2 Aug 2013 13:09:51 +0100
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 2 Aug 2013 08:13:40 -0400
 Subject: [PATCH RFC 1/8] arm: make SWIOTLB available
-In-Reply-To: <20130801110927.GF24642@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.DEB.2.02.1308021250050.4893@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
  <1375292732-7627-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130801110927.GF24642@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1308021302340.4893@kaball.uk.xensource.com>
+ <334c4fe7-e40c-489c-84db-9bb58c705d44@email.android.com>
+ <alpine.DEB.2.02.1308021250050.4893@kaball.uk.xensource.com>
+Message-ID: <20130802121340.GH24540@konrad-lan.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Aug 2013, Russell King - ARM Linux wrote:
-> On Wed, Jul 31, 2013 at 06:45:25PM +0100, Stefano Stabellini wrote:
-> > +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> > +{
-> > +	unsigned int offset = paddr & ~PAGE_MASK;
-> > +	return pfn_to_dma(dev, paddr >> PAGE_SHIFT) + offset;
-> > +}
-> > +
-> > +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-> > +{
-> > +	unsigned int offset = dev_addr & ~PAGE_MASK;
-> > +	return (dma_to_pfn(dev, dev_addr) << PAGE_SHIFT) + offset;
-> > +}
+On Fri, Aug 02, 2013 at 12:59:00PM +0100, Stefano Stabellini wrote:
+> On Wed, 31 Jul 2013, Konrad Rzeszutek Wilk wrote:
+> > Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+> > >Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > >CC: will.deacon at arm.com
+> > >CC: linux at arm.linux.org.uk
+> > >---
+> > > arch/arm/Kconfig                   |    7 +++++++
+> > > arch/arm/include/asm/dma-mapping.h |   24 ++++++++++++++++++++++++
+> > > 2 files changed, 31 insertions(+), 0 deletions(-)
+> > >
+> > >diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > >index ba412e0..05125ab 100644
+> > >--- a/arch/arm/Kconfig
+> > >+++ b/arch/arm/Kconfig
+> > >@@ -1832,6 +1832,13 @@ config CC_STACKPROTECTOR
+> > > 	  neutralized via a kernel panic.
+> > > 	  This feature requires gcc version 4.2 or above.
+> > > 
+> > >+config SWIOTLB
+> > >+	def_bool y
+> > >+	select NEED_SG_DMA_LENGTH
+> > >+
+> > >+config IOMMU_HELPER
+> > >+	def_bool SWIOTLB
+> > >+
+> > 
+> > Could you explain the purpose of these two a bit more please? 
 > 
-> These two helpers look fine on the face of it.
+> SWIOTLB is not available on arm at the moment.
+> We need to make it available, otherwise SWIOTLB_XEN won't be able to
+> select it.
 > 
-> > +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-> > +{
-> > +	if (!dev->dma_mask)
-> > +		return 0;
-> > +
-> > +	return addr + size - 1 <= *dev->dma_mask;
-> > +}
-> 
-> You may wish to have a closer look at the DMA bounce code, because this
-> assumes that DMA masks are a set of zeros followed by a set of ones.
-> That may not always be the case (and we have the odd platform where that
-> isn't the case.)
-> 
-> It has always bugged me that we call this thing a dma _mask_ and then
-> much kernel code treats it as a limit - it should've been called "dma
-> limit" if that's how it was to be interpreted.  If it really is a _mask_
-> then the right way to test whether a DMA address/size is possible is:
-> 
-> 	u64 limit, mask = *dev->dma_mask;
-> 
-> 	limit = (mask + 1) & ~mask;
-> 	if (limit && size > limit)
-> 		return 0;
-> 
-> 	if ((addr | (addr + size - 1)) & ~mask)
-> 		return 0;
-> 
-> 	return 1;
-> 
-> The first checks whether 'size' fits within the least significant
-> contiguous set of '1' bits in the DMA mask, and the second checks
-> whether the region itself contains any address bits which may not
-> meet the DMA mask.
- 
-I'll make the change, thanks for the explanation.
+> Similarly, IOMMU_HELPER is another lib Kconfig symbol needed by SWIOTLB
+> to compile.
 
+I was more curious about the NEED_SG_DMA_LENGTH and IOMMU_HELPER.
+I think the NEED_SG_DMA_LENGTH is optional? Or does SWIOTLB complain
+about? I do recall seeing a patch for this at some point but it was
+malformed. It was just changing SWIOTLB to use a macro for
+sg->dma_length or such.
 
-> I guess if we aren't going to encounter any of these cases anymore,
-> your test is entirely sufficient.
+But the IOMMU_HELPER? That seems odds as the DMA API (which as you know
+is what SWIOTLB hooks up to) is _below_ the IOMMU API.  Ah, it is 
+'iommu_is_span_boundary' function.  Gotcha.
+
+Could you mention that in the git commit please? Just say that SWIOTLB
+uses some of the common code that IOMMU API uses - which is in the
+lib/iommu_helper.c hence the need for that.
+
+And for the NEED_SG_DMA_LENGTH let me dig up the patch at some point and
+send it your way so you can make it part of this series.
