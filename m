@@ -1,41 +1,66 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Fri, 2 Aug 2013 13:50:27 +1000
-Subject: [Ksummit-2013-discuss] DT bindings as ABI [was: Do we have
- people interested in device tree janitoring / cleanup?]
-In-Reply-To: <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
-References: <20130725175702.GC22291@e106331-lin.cambridge.arm.com>
- <1999586.84BnWE5EUh@thinkpad> <20130731191209.GA8027@netboy>
- <1409617.9untvfnOTJ@flatron> <20130731200017.GC8027@netboy>
- <20130731201457.GA24642@n2100.arm.linux.org.uk>
- <CAKON4Ow7rE9cDj_tS7kmYN4incM+ay=BK96q-ph2JxYH3xiQzg@mail.gmail.com>
- <20130731204817.GC24642@n2100.arm.linux.org.uk>
- <CAKON4Ozfe=endqnXWkcWR2HuJ489Otpcu2QsjB0DNg6jpRgG+Q@mail.gmail.com>
-Message-ID: <20130802035027.GA19115@voom.redhat.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 2 Aug 2013 10:28:53 +0530
+Subject: [RFC] ARM: spear: remove spear13xx_secondary_startup from INIT
+ section.
+In-Reply-To: <1375360601-24591-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1375360601-24591-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <CAOh2x=nyN5TwsAMrt2-4-2cBjBG0W9X8fMeBJwvTTKJJzsxBBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 05:26:47PM -0400, jonsmirl at gmail.com wrote:
-> On Wed, Jul 31, 2013 at 4:48 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Jul 31, 2013 at 04:37:36PM -0400, jonsmirl at gmail.com
-> wrote:
-[snip]
-> Alternatively you may be of the belief that it is impossible to get
-> rid of the board specific code. But x86 doesn't have any of it, why
-> should ARM?
+Hi..
 
-Sure x86 has board specific code.  It's just that x86 basically only
-has one board - PC.
+s/spear/SPEAr
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/5f25dc97/attachment.sig>
+On Thu, Aug 1, 2013 at 6:06 PM, Srinivas KANDAGATLA
+<srinivas.kandagatla@st.com> wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>
+> This patch removes spear13xx_secondary_startup fromm _INIT section, there are
+
+s/fromm/from
+
+> two  reasons for this removal.
+>  1. discarding such a small code does not save much, given the RAM sizes.
+>  2. Having this code discarded, creates corruption issue when we boot
+> smp-kernel with nr_cpus=1 or with single cpu node in DT.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> ---
+> Hi,
+>
+> I did encounter corruption issues on STi CA9 SOCs when a SMP kernel is booted with
+> nr_cpus=1. This boiled down to freeing the __INIT section of the secondary
+> startup code. It looks like two other SOCs(Spear and ux500) might have same
+> issue.
+>
+> Do you think this patch is valid for Spear?
+>
+> Thanks,
+> srini
+>
+>  arch/arm/mach-spear/headsmp.S |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-spear/headsmp.S b/arch/arm/mach-spear/headsmp.S
+> index ed85473..aad3253 100644
+> --- a/arch/arm/mach-spear/headsmp.S
+> +++ b/arch/arm/mach-spear/headsmp.S
+> @@ -13,8 +13,6 @@
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+>
+> -       __INIT
+> -
+>  /*
+
+Honestly speaking, I haven't written this piece of code and the person who
+wrote it also copied it from Tegra (probably), I believe. And so even he
+might not have the exact picture in mind.
+
+I would let the other three guys in cc to speak on our behalf :)
+If they don't have a issue with it, then I would be happy to
+Ack it :)
+
+--
+viresh
