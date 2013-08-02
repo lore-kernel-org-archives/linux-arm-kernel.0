@@ -1,79 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Aug 2013 10:35:59 +0100
-Subject: [PATCH] Documentation: Add device tree binding file for MOXA
- ART SoCs interrupt controller
-In-Reply-To: <1374137426-6763-1-git-send-email-jonas.jensen@gmail.com>
-References: <1374137426-6763-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130802093559.GB2884@e106331-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 2 Aug 2013 11:39:11 +0200
+Subject: [ARM ATTEND] Marvell development, ARM discussions
+Message-ID: <20130802113911.44b74d9e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 18, 2013 at 09:50:26AM +0100, Jonas Jensen wrote:
-> Add binding document for MOXA ART SoCs interrupt controller.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
-> 
-> Notes:
->     The MOXA ART irqchip driver was added without accompanying devicetree document.
->     ( in next-20130716   drivers/irqchip/irq-moxart.c )
+Hello,
 
-Aaargh. That should not have happened >:(
+I'm working quite actively on Marvell ARM SoC support in the kernel
+(Armada 370, Armada XP, Kirkwood, etc.). I don't have any specific
+topic to put on the table as others have already mentioned them, but
+I'm interested in following where the ARM code is heading to. I'm
+especially interested about the Device Tree discussions, arch/arm SoC
+organization, kernel data bloat.
 
->     
->     Applies to next-20130716
-> 
->  .../interrupt-controller/moxa,moxart-ic.txt        | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
-> new file mode 100644
-> index 0000000..58f1fe1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
-> @@ -0,0 +1,28 @@
-> +* MOXA ART Interrupt Controller
-> +
-> +MOXA ART Interrupt Controller (moxart-ic) is used on MOXA ART SoCs
-> +and supports 32 non-configurable number of interrupts
-> +
-> +Main node required properties:
-> +
-> +- compatible : "moxa,moxart-ic"
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. The type shall be a <u32> and the value shall be 2.
-> +
-> +  The first cell contains the interrupt number in the range [0-31].
-> +  The second cell contains the interrupt type
-> +
-> +- reg: physical base address and size of the intc registers map.
-> +- interrupt-mask: Specifies if the interrupt is edge or level-triggered
-> +  each bit represent an interrupt 0-31 where 1 signify edge
-
-For the GIC, this gets descrbied in the interrupt sepcifier rather than
-on the interrupt controller's root node. Is there a reason to do this
-differently here?
+I did had the chance to attend the ARM kernel mini-summit last year and
+I found it very useful. I'll be in Edinburgh this year, so attending
+the ARM kernel mini-summit would be very interesting.
 
 Thanks,
-Mark.
 
-> +
-> +Example:
-> +
-> +	intc: interrupt-controller at 98800000 {
-> +		compatible = "moxa,moxart-ic";
-> +		reg = <0x98800000 0x38>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-> +		interrupt-mask = <0x00080000>;
-> +	};
-> -- 
-> 1.8.2.1
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
