@@ -1,54 +1,50 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 2 Aug 2013 17:32:23 +0800
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130802090355.GF7656@atomide.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802090355.GF7656@atomide.com>
-Message-ID: <20130802093222.GA8982@kroah.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Fri, 02 Aug 2013 10:32:40 +0100
+Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
+In-Reply-To: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <51FB7CB8.6080103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 02:03:55AM -0700, Tony Lindgren wrote:
-> * Greg KH <greg@kroah.com> [130801 12:33]:
-> > On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
-> > > Hello,
-> > > 
-> > > Whilst Linux implements a bunch of different bus types (many of which
-> > > are in fact virtual), devices sitting on non-probable, memory mapped
-> > > buses inside SoCs typically live on either the platform_bus or the
-> > > amba_bus. So far, this has worked out alright; the buses haven't needed
-> > > to be visible to software and no additional software control is really
-> > > required from the OS. However, as I/O coherency and hardware
-> > > virtualisation capabilities start to creep into ARM-based SoCs, Linux
-> > > needs to know the topology of the system on which it is running.
-> > > 
-> > > Naturally, this would need to be described as a device-tree binding and
-> > > communicate:
-> > > 
-> > >   - Buses which can be configured as coherent, including which devices
-> > >     on those buses can be made coherent.
-> > > 
-> > >   - How IOMMUs sit on the bus and interact with masters on that bus (the
-> > >     current one-IOMMU-driver-per-bus may not work well for the
-> > >     platform_bus).
-> > 
-> > I've been waiting for people to finally run into this one, and realize
-> > that they shouldn't be using "platform_bus" :)
-> > 
-> > >   - QoS and PM constraints. This isn't really in my area, but we do have
-> > >     buses that have these features and expect software to control them.
-> > > 
-> > >   - The system topology and linkages between buses and devices.
-> > 
-> > The driver core handles this really well, you just have to create new
-> > busses, and don't rely on the "catch-all" platform_bus.
+Hi Daniel,
+
+On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
-> Hmm do you have some example of a device driver that is generic and
-> is supported on platform_bus and some other bus?
+> This patch series adds support to configure the rate and enable the event
+> stream for architected timer. Since the timer control register is reset to
+> zero on warm boot, CPU PM notifier is added to re-initialse it.
+> 
+This series is required to support TC2 cpuidle.
+It will be good if you can review and get this in for v3.12
 
-Take a look at drivers/usb/host/ohci* for one example that I know of,
-there are others all through the kernel as well.
+Regards,
+Sudeep
 
-greg k-h
+> Changes v1->v2:
+> 1. Saved event stream divider value on cold reset path and re-used it
+>    in CPU PM notifier instead of calculating every time.
+> 2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
+> 3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
+>    arch_counter_set_user_access"(already done as part of __cpuinit*
+>    deletion)
+> 
+> Regards,
+> Sudeep
+> 
+> 
+> Sudeep KarkadaNagesha (2):
+>   ARM: arch_timer: add macros for bits in control register
+>   drivers: clocksource: add CPU PM notifier for ARM architected timer
+> 
+> Will Deacon (1):
+>   drivers: clocksource: configure event stream for ARM arch timer
+> 
+>  arch/arm/include/asm/arch_timer.h    | 10 ++++++--
+>  arch/arm64/include/asm/arch_timer.h  | 12 +++++++---
+>  drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++++++++++++-
+>  include/clocksource/arm_arch_timer.h | 10 ++++++++
+>  4 files changed, 71 insertions(+), 6 deletions(-)
+> 
