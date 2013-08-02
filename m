@@ -1,50 +1,79 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Fri, 02 Aug 2013 10:32:40 +0100
-Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
-In-Reply-To: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <51FB7CB8.6080103@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Aug 2013 10:35:59 +0100
+Subject: [PATCH] Documentation: Add device tree binding file for MOXA
+ ART SoCs interrupt controller
+In-Reply-To: <1374137426-6763-1-git-send-email-jonas.jensen@gmail.com>
+References: <1374137426-6763-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130802093559.GB2884@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Jul 18, 2013 at 09:50:26AM +0100, Jonas Jensen wrote:
+> Add binding document for MOXA ART SoCs interrupt controller.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+> 
+> Notes:
+>     The MOXA ART irqchip driver was added without accompanying devicetree document.
+>     ( in next-20130716   drivers/irqchip/irq-moxart.c )
 
-On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> This patch series adds support to configure the rate and enable the event
-> stream for architected timer. Since the timer control register is reset to
-> zero on warm boot, CPU PM notifier is added to re-initialse it.
-> 
-This series is required to support TC2 cpuidle.
-It will be good if you can review and get this in for v3.12
+Aaargh. That should not have happened >:(
 
-Regards,
-Sudeep
+>     
+>     Applies to next-20130716
+> 
+>  .../interrupt-controller/moxa,moxart-ic.txt        | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
+> new file mode 100644
+> index 0000000..58f1fe1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/moxa,moxart-ic.txt
+> @@ -0,0 +1,28 @@
+> +* MOXA ART Interrupt Controller
+> +
+> +MOXA ART Interrupt Controller (moxart-ic) is used on MOXA ART SoCs
+> +and supports 32 non-configurable number of interrupts
+> +
+> +Main node required properties:
+> +
+> +- compatible : "moxa,moxart-ic"
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The type shall be a <u32> and the value shall be 2.
+> +
+> +  The first cell contains the interrupt number in the range [0-31].
+> +  The second cell contains the interrupt type
+> +
+> +- reg: physical base address and size of the intc registers map.
+> +- interrupt-mask: Specifies if the interrupt is edge or level-triggered
+> +  each bit represent an interrupt 0-31 where 1 signify edge
 
-> Changes v1->v2:
-> 1. Saved event stream divider value on cold reset path and re-used it
->    in CPU PM notifier instead of calculating every time.
-> 2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
-> 3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
->    arch_counter_set_user_access"(already done as part of __cpuinit*
->    deletion)
+For the GIC, this gets descrbied in the interrupt sepcifier rather than
+on the interrupt controller's root node. Is there a reason to do this
+differently here?
+
+Thanks,
+Mark.
+
+> +
+> +Example:
+> +
+> +	intc: interrupt-controller at 98800000 {
+> +		compatible = "moxa,moxart-ic";
+> +		reg = <0x98800000 0x38>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
+> +		interrupt-mask = <0x00080000>;
+> +	};
+> -- 
+> 1.8.2.1
 > 
-> Regards,
-> Sudeep
-> 
-> 
-> Sudeep KarkadaNagesha (2):
->   ARM: arch_timer: add macros for bits in control register
->   drivers: clocksource: add CPU PM notifier for ARM architected timer
-> 
-> Will Deacon (1):
->   drivers: clocksource: configure event stream for ARM arch timer
-> 
->  arch/arm/include/asm/arch_timer.h    | 10 ++++++--
->  arch/arm64/include/asm/arch_timer.h  | 12 +++++++---
->  drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++++++++++++-
->  include/clocksource/arm_arch_timer.h | 10 ++++++++
->  4 files changed, 71 insertions(+), 6 deletions(-)
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
 > 
