@@ -1,166 +1,208 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 2 Aug 2013 16:33:57 +0800
-Subject: [PATCH v14 04/12] usb: chipidea: otg: Add otg file used to access
- otgsc
+Date: Fri, 2 Aug 2013 16:33:58 +0800
+Subject: [PATCH v14 05/12] usb: chipidea: Add role init and destory APIs
 In-Reply-To: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
 References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1375432445-31918-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1375432445-31918-6-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file is mainly used to access otgsc currently, it may
-add otg related things in the future.
+- The role's init will be called at probe procedure.
+- The role's destory will be called at fail patch
+at probe and driver's removal.
+- The role's start/stop will be called when specific
+role has started.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/Makefile |    2 +-
- drivers/usb/chipidea/bits.h   |   10 ++++++++
- drivers/usb/chipidea/core.c   |    3 +-
- drivers/usb/chipidea/otg.c    |   50 +++++++++++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.h    |   19 +++++++++++++++
- 5 files changed, 82 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/core.c |   10 ++++++++--
+ drivers/usb/chipidea/host.c |    7 +++++++
+ drivers/usb/chipidea/host.h |    6 ++++++
+ drivers/usb/chipidea/udc.c  |   36 +++++++++++++++++++++++++++---------
+ drivers/usb/chipidea/udc.h  |    6 ++++++
+ 5 files changed, 54 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index 6cf5f68..a99d980 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
- 
- obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
- 
--ci_hdrc-y				:= core.o
-+ci_hdrc-y				:= core.o otg.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index aefa026..dd0cf9e 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -79,11 +79,21 @@
- #define OTGSC_ASVIS	      BIT(18)
- #define OTGSC_BSVIS	      BIT(19)
- #define OTGSC_BSEIS	      BIT(20)
-+#define OTGSC_1MSIS	      BIT(21)
-+#define OTGSC_DPIS	      BIT(22)
- #define OTGSC_IDIE	      BIT(24)
- #define OTGSC_AVVIE	      BIT(25)
- #define OTGSC_ASVIE	      BIT(26)
- #define OTGSC_BSVIE	      BIT(27)
- #define OTGSC_BSEIE	      BIT(28)
-+#define OTGSC_1MSIE	      BIT(29)
-+#define OTGSC_DPIE	      BIT(30)
-+#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
-+				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
-+				| OTGSC_DPIE)
-+#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
-+				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
-+				| OTGSC_DPIS)
- 
- /* USBMODE */
- #define USBMODE_CM            (0x03UL <<  0)
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 26f6599..a4be8a5 100644
+index a4be8a5..bfc9aef 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -72,6 +72,7 @@
+@@ -420,6 +420,12 @@ void ci_hdrc_remove_device(struct platform_device *pdev)
+ }
+ EXPORT_SYMBOL_GPL(ci_hdrc_remove_device);
+ 
++static inline void ci_role_destroy(struct ci_hdrc *ci)
++{
++	ci_hdrc_gadget_destroy(ci);
++	ci_hdrc_host_destroy(ci);
++}
++
+ static int ci_hdrc_probe(struct platform_device *pdev)
+ {
+ 	struct device	*dev = &pdev->dev;
+@@ -539,7 +545,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 
+ 	free_irq(ci->irq, ci);
+ stop:
+-	ci_role_stop(ci);
++	ci_role_destroy(ci);
+ rm_wq:
+ 	flush_workqueue(ci->wq);
+ 	destroy_workqueue(ci->wq);
+@@ -555,7 +561,7 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+ 	flush_workqueue(ci->wq);
+ 	destroy_workqueue(ci->wq);
+ 	free_irq(ci->irq, ci);
+-	ci_role_stop(ci);
++	ci_role_destroy(ci);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index e94e52b..382be5b 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -105,6 +105,13 @@ static void host_stop(struct ci_hdrc *ci)
+ 		regulator_disable(ci->platdata->reg_vbus);
+ }
+ 
++
++void ci_hdrc_host_destroy(struct ci_hdrc *ci)
++{
++	if (ci->role == CI_ROLE_HOST)
++		host_stop(ci);
++}
++
+ int ci_hdrc_host_init(struct ci_hdrc *ci)
+ {
+ 	struct ci_role_driver *rdrv;
+diff --git a/drivers/usb/chipidea/host.h b/drivers/usb/chipidea/host.h
+index 058875c..5707bf3 100644
+--- a/drivers/usb/chipidea/host.h
++++ b/drivers/usb/chipidea/host.h
+@@ -4,6 +4,7 @@
+ #ifdef CONFIG_USB_CHIPIDEA_HOST
+ 
+ int ci_hdrc_host_init(struct ci_hdrc *ci);
++void ci_hdrc_host_destroy(struct ci_hdrc *ci);
+ 
+ #else
+ 
+@@ -12,6 +13,11 @@ static inline int ci_hdrc_host_init(struct ci_hdrc *ci)
+ 	return -ENXIO;
+ }
+ 
++static inline void ci_hdrc_host_destroy(struct ci_hdrc *ci)
++{
++
++}
++
+ #endif
+ 
+ #endif /* __DRIVERS_USB_CHIPIDEA_HOST_H */
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 116c762..24a100d 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -27,6 +27,7 @@
+ #include "udc.h"
  #include "bits.h"
- #include "host.h"
  #include "debug.h"
 +#include "otg.h"
  
- /* Controller register map */
- static uintptr_t ci_regs_nolpm[] = {
-@@ -530,7 +531,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		goto stop;
+ /* control endpoint description */
+ static const struct usb_endpoint_descriptor
+@@ -1844,13 +1845,13 @@ free_qh_pool:
+ }
  
- 	if (ci->is_otg)
--		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
-+		ci_hdrc_otg_init(ci);
+ /**
+- * udc_remove: parent remove must call this to remove UDC
++ * ci_hdrc_gadget_destroy: parent remove must call this to remove UDC
+  *
+  * No interrupts active, the IRQ has been released
+  */
+-static void udc_stop(struct ci_hdrc *ci)
++void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
+ {
+-	if (ci == NULL)
++	if (!ci->roles[CI_ROLE_GADGET])
+ 		return;
  
- 	ret = dbg_create_files(ci);
- 	if (!ret)
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-new file mode 100644
-index 0000000..abefb4d
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.c
-@@ -0,0 +1,50 @@
-+/*
-+ * otg.c - ChipIdea USB IP core OTG driver
-+ *
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * This file mainly handles otgsc register, it may include OTG operation
-+ * in the future.
-+ */
-+
-+#include <linux/usb/otg.h>
-+#include <linux/usb/gadget.h>
-+#include <linux/usb/chipidea.h>
-+
-+#include "ci.h"
-+#include "bits.h"
-+
-+void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	/* Only clear request bits */
-+	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
+ 	usb_del_gadget_udc(&ci->gadget);
+@@ -1865,15 +1866,32 @@ static void udc_stop(struct ci_hdrc *ci)
+ 		if (ci->global_phy)
+ 			usb_put_phy(ci->transceiver);
+ 	}
+-	/* my kobject is dynamic, I swear! */
+-	memset(&ci->gadget, 0, sizeof(ci->gadget));
 +}
 +
-+void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
++static int udc_id_switch_for_device(struct ci_hdrc *ci)
 +{
-+	hw_write(ci, OP_OTGSC, bits, bits);
-+}
-+
-+void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	hw_write(ci, OP_OTGSC, bits, 0);
-+}
-+
-+/**
-+ * ci_hdrc_otg_init - initialize otgsc bits
-+ * ci: the controller
-+ */
-+int ci_hdrc_otg_init(struct ci_hdrc *ci)
-+{
-+	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
++	if (ci->is_otg) {
++		ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
++		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
++	}
 +
 +	return 0;
 +}
-diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-new file mode 100644
-index 0000000..f24ec37
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
 +
-+#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
-+#define __DRIVERS_USB_CHIPIDEA_OTG_H
++static void udc_id_switch_for_host(struct ci_hdrc *ci)
++{
++	if (ci->is_otg) {
++		/* host doesn't care B_SESSION_VALID event */
++		ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
++		ci_disable_otg_interrupt(ci, OTGSC_BSVIE);
++	}
+ }
+ 
+ /**
+  * ci_hdrc_gadget_init - initialize device related bits
+  * ci: the controller
+  *
+- * This function enables the gadget role, if the device is "device capable".
++ * This function initializes the gadget, if the device is "device capable".
+  */
+ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+ {
+@@ -1886,11 +1904,11 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+ 	if (!rdrv)
+ 		return -ENOMEM;
+ 
+-	rdrv->start	= udc_start;
+-	rdrv->stop	= udc_stop;
++	rdrv->start	= udc_id_switch_for_device;
++	rdrv->stop	= udc_id_switch_for_host;
+ 	rdrv->irq	= udc_irq;
+ 	rdrv->name	= "gadget";
+ 	ci->roles[CI_ROLE_GADGET] = rdrv;
+ 
+-	return 0;
++	return udc_start(ci);
+ }
+diff --git a/drivers/usb/chipidea/udc.h b/drivers/usb/chipidea/udc.h
+index 455ac21..e66df00 100644
+--- a/drivers/usb/chipidea/udc.h
++++ b/drivers/usb/chipidea/udc.h
+@@ -84,6 +84,7 @@ struct ci_hw_req {
+ #ifdef CONFIG_USB_CHIPIDEA_UDC
+ 
+ int ci_hdrc_gadget_init(struct ci_hdrc *ci);
++void ci_hdrc_gadget_destroy(struct ci_hdrc *ci);
+ 
+ #else
+ 
+@@ -92,6 +93,11 @@ static inline int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+ 	return -ENXIO;
+ }
+ 
++static inline void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
++{
 +
-+int ci_hdrc_otg_init(struct ci_hdrc *ci);
-+void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-+void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
++}
 +
-+#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
+ #endif
+ 
+ #endif /* __DRIVERS_USB_CHIPIDEA_UDC_H */
 -- 
 1.7.0.4
