@@ -1,39 +1,50 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 2 Aug 2013 16:34:05 +0800
-Subject: [PATCH v14 12/12] usb: chipidea: udc: .pullup is valid when vbus is
- on at CI_HDRC_PULLUP_ON_VBUS
-In-Reply-To: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
-References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1375432445-31918-13-git-send-email-peter.chen@freescale.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 2 Aug 2013 11:35:29 +0300
+Subject: [PATCHv3 1/3] video: mxsfb: fix color settings for 18bit data
+ bus and 32bpp
+In-Reply-To: <1375346437-18991-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375346437-18991-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <51FB6F51.7090500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the flag CI_HDRC_PULLUP_ON_VBUS is set, .pullup should only be
-called when the vbus is active. When the CI_HDRC_PULLUP_ON_VBUS
-is set, the controller only begins to run when the vbus is on,
-So, it is only meaningful software set pullup/pulldown after
-the controller begins to run.
+On 01/08/13 11:40, Maxime Ripard wrote:
+> From: Hector Palacios <hector.palacios@digi.com>
+> 
+> For a combination of 18bit LCD data bus width and a color
+> mode of 32bpp, the driver was setting the color mapping to
+> rgb666, which is wrong, as the color in memory realy has an
+> rgb888 layout.
+> 
+> This patch also removes the setting of flag CTRL_DF24 that
+> makes the driver dimiss the upper 2 bits when handling 32/24bpp
+> colors in a diplay with 18bit data bus width. This flag made
+> true color images display wrong in such configurations.
+> 
+> Finally, the color mapping rgb666 has also been removed as nobody
+> is using it and high level applications like Qt5 cannot work
+> with it either.
+> 
+> Reference: https://lkml.org/lkml/2013/5/23/220
+> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+> Acked-by: Juergen Beisert <jbe@pengutronix.de>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/video/mxsfb.c | 26 --------------------------
+>  1 file changed, 26 deletions(-)
 
-Tested-by: Marek Vasut <marex@denx.de>
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/udc.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+This one is labeled as "fix". Should it got to v3.11?
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 45abf4d..b7ead5f 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1514,6 +1514,10 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
- {
- 	struct ci_hdrc *ci = container_of(_gadget, struct ci_hdrc, gadget);
- 
-+	if ((ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)
-+			&& !ci->vbus_active)
-+		return -EOPNOTSUPP;
-+
- 	if (is_on)
- 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
- 	else
--- 
-1.7.0.4
+ Tomi
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/098526fa/attachment.sig>
