@@ -1,216 +1,228 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 2 Aug 2013 16:34:02 +0800
-Subject: [PATCH v14 09/12] usb: chipidea: add vbus interrupt handler
+Date: Fri, 2 Aug 2013 16:34:01 +0800
+Subject: [PATCH v14 08/12] usb: chipidea: move otg relate things to otg file
 In-Reply-To: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
 References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1375432445-31918-10-git-send-email-peter.chen@freescale.com>
+Message-ID: <1375432445-31918-9-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We add vbus interrupt handler at ci_otg_work, it uses OTGSC_BSV(at otgsc)
-to know it is connect or disconnet event.
-Meanwhile, we introduce two flags id_event and b_sess_valid_event to
-indicate it is an id interrupt or a vbus interrupt.
+Move otg relate things to otg file.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci.h   |    5 +++++
- drivers/usb/chipidea/core.c |   28 +++++++++++++++++++++++-----
- drivers/usb/chipidea/otg.c  |   42 +++++++++++++++++++++++++++++++++++-------
- drivers/usb/chipidea/otg.h  |    1 +
- drivers/usb/chipidea/udc.c  |    7 +++++++
- 5 files changed, 71 insertions(+), 12 deletions(-)
+ drivers/usb/chipidea/core.c |   63 +++++++++----------------------------------
+ drivers/usb/chipidea/otg.c  |   57 +++++++++++++++++++++++++++++++++++++-
+ drivers/usb/chipidea/otg.h  |    2 +
+ 3 files changed, 70 insertions(+), 52 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 33cb29f..3160363 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -132,6 +132,9 @@ struct hw_bank {
-  * @transceiver: pointer to USB PHY, if any
-  * @hcd: pointer to usb_hcd for ehci host driver
-  * @debugfs: root dentry for this controller in debugfs
-+ * @id_event: indicates there is an id event, and handled at ci_otg_work
-+ * @b_sess_valid_event: indicates there is a vbus event, and handled
-+ * at ci_otg_work
-  */
- struct ci_hdrc {
- 	struct device			*dev;
-@@ -168,6 +171,8 @@ struct ci_hdrc {
- 	struct usb_phy			*transceiver;
- 	struct usb_hcd			*hcd;
- 	struct dentry			*debugfs;
-+	bool				id_event;
-+	bool				b_sess_valid_event;
- };
- 
- static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 30be811..0e69282 100644
+index 2223954..30be811 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -303,16 +303,34 @@ static irqreturn_t ci_irq(int irq, void *data)
- 	if (ci->is_otg)
- 		otgsc = hw_read(ci, OP_OTGSC, ~0);
- 
--	if (ci->role != CI_ROLE_END)
--		ret = ci_role(ci)->irq(ci);
-+	/*
-+	 * Handle id change interrupt, it indicates device/host function
-+	 * switch.
-+	 */
-+	if (ci->is_otg && (otgsc & OTGSC_IDIE) && (otgsc & OTGSC_IDIS)) {
-+		ci->id_event = true;
-+		ci_clear_otg_interrupt(ci, OTGSC_IDIS);
-+		disable_irq_nosync(ci->irq);
-+		queue_work(ci->wq, &ci->work);
-+		return IRQ_HANDLED;
-+	}
- 
--	if (ci->is_otg && (otgsc & OTGSC_IDIS)) {
--		hw_write(ci, OP_OTGSC, OTGSC_IDIS, OTGSC_IDIS);
-+	/*
-+	 * Handle vbus change interrupt, it indicates device connection
-+	 * and disconnection events.
-+	 */
-+	if (ci->is_otg && (otgsc & OTGSC_BSVIE) && (otgsc & OTGSC_BSVIS)) {
-+		ci->b_sess_valid_event = true;
-+		ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
- 		disable_irq_nosync(ci->irq);
- 		queue_work(ci->wq, &ci->work);
--		ret = IRQ_HANDLED;
-+		return IRQ_HANDLED;
- 	}
- 
-+	/* Handle device/host interrupt */
-+	if (ci->role != CI_ROLE_END)
-+		ret = ci_role(ci)->irq(ci);
-+
- 	return ret;
+@@ -294,40 +294,6 @@ int hw_device_reset(struct ci_hdrc *ci, u32 mode)
+ 	return 0;
  }
  
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index 68f2faf..c74194d 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -52,13 +52,23 @@ enum ci_role ci_otg_role(struct ci_hdrc *ci)
- 	return role;
- }
- 
+-/**
+- * ci_otg_role - pick role based on ID pin state
+- * @ci: the controller
+- */
+-static enum ci_role ci_otg_role(struct ci_hdrc *ci)
+-{
+-	u32 sts = hw_read(ci, OP_OTGSC, ~0);
+-	enum ci_role role = sts & OTGSC_ID
+-		? CI_ROLE_GADGET
+-		: CI_ROLE_HOST;
+-
+-	return role;
+-}
+-
 -/**
 - * ci_role_work - perform role changing based on ID pin
 - * @work: work struct
 - */
 -static void ci_role_work(struct work_struct *work)
-+void ci_handle_vbus_change(struct ci_hdrc *ci)
-+{
-+	u32 otgsc;
-+
-+	if (!ci->is_otg)
-+		return;
-+
-+	otgsc = hw_read(ci, OP_OTGSC, ~0);
-+
-+	if (otgsc & OTGSC_BSV)
-+		usb_gadget_vbus_connect(&ci->gadget);
-+	else
-+		usb_gadget_vbus_disconnect(&ci->gadget);
-+}
-+
-+static void ci_handle_id_switch(struct ci_hdrc *ci)
- {
+-{
 -	struct ci_hdrc *ci = container_of(work, struct ci_hdrc, work);
- 	enum ci_role role = ci_otg_role(ci);
- 
- 	if (role != ci->role) {
-@@ -68,17 +78,35 @@ static void ci_role_work(struct work_struct *work)
- 		ci_role_stop(ci);
- 		ci_role_start(ci, role);
- 	}
-+}
-+/**
-+ * ci_otg_work - perform otg (vbus/id) event handle
-+ * @work: work struct
-+ */
-+static void ci_otg_work(struct work_struct *work)
-+{
-+	struct ci_hdrc *ci = container_of(work, struct ci_hdrc, work);
-+
-+	if (ci->id_event) {
-+		ci->id_event = false;
-+		ci_handle_id_switch(ci);
-+	} else if (ci->b_sess_valid_event) {
-+		ci->b_sess_valid_event = false;
-+		ci_handle_vbus_change(ci);
-+	} else
-+		dev_err(ci->dev, "unexpected event occurs at %s\n", __func__);
- 
- 	enable_irq(ci->irq);
+-	enum ci_role role = ci_otg_role(ci);
+-
+-	if (role != ci->role) {
+-		dev_dbg(ci->dev, "switching from %s to %s\n",
+-			ci_role(ci)->name, ci->roles[role]->name);
+-
+-		ci_role_stop(ci);
+-		ci_role_start(ci, role);
+-	}
+-
+-	enable_irq(ci->irq);
+-}
+-
+ static irqreturn_t ci_irq(int irq, void *data)
+ {
+ 	struct ci_hdrc *ci = data;
+@@ -430,6 +396,8 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
+ {
+ 	ci_hdrc_gadget_destroy(ci);
+ 	ci_hdrc_host_destroy(ci);
++	if (ci->is_otg)
++		ci_hdrc_otg_destory(ci);
  }
  
+ static void ci_get_otg_capable(struct ci_hdrc *ci)
+@@ -496,13 +464,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	INIT_WORK(&ci->work, ci_role_work);
+-	ci->wq = create_singlethread_workqueue("ci_otg");
+-	if (!ci->wq) {
+-		dev_err(dev, "can't create workqueue\n");
+-		return -ENODEV;
+-	}
+-
+ 	/* To know if controller is OTG capable or not */
+ 	ci_get_otg_capable(ci);
+ 
+@@ -533,8 +494,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 
+ 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+ 		dev_err(dev, "no supported roles\n");
+-		ret = -ENODEV;
+-		goto rm_wq;
++		return -ENODEV;
++	}
 +
++	if (ci->is_otg) {
++		ret = ci_hdrc_otg_init(ci);
++		if (ret) {
++			dev_err(dev, "init otg fails, ret = %d\n", ret);
++			goto stop;
++		}
+ 	}
+ 
+ 	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+@@ -545,7 +513,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 			 */
+ 			mdelay(2);
+ 			ci->role = ci_otg_role(ci);
+-			ci_hdrc_otg_init(ci);
++			ci_enable_otg_interrupt(ci, OTGSC_IDIE);
+ 		} else {
+ 			/*
+ 			 * If the controller is not OTG capable, but support
+@@ -563,7 +531,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	ret = ci_role_start(ci, ci->role);
+ 	if (ret) {
+ 		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+-		goto rm_wq;
++		goto stop;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, ci);
+@@ -579,9 +547,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	free_irq(ci->irq, ci);
+ stop:
+ 	ci_role_destroy(ci);
+-rm_wq:
+-	flush_workqueue(ci->wq);
+-	destroy_workqueue(ci->wq);
+ 
+ 	return ret;
+ }
+@@ -591,8 +556,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+ 	struct ci_hdrc *ci = platform_get_drvdata(pdev);
+ 
+ 	dbg_remove_files(ci);
+-	flush_workqueue(ci->wq);
+-	destroy_workqueue(ci->wq);
+ 	free_irq(ci->irq, ci);
+ 	ci_role_destroy(ci);
+ 
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index abefb4d..68f2faf 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -39,12 +39,65 @@ void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
+ }
+ 
  /**
-  * ci_hdrc_otg_init - initialize otg struct
+- * ci_hdrc_otg_init - initialize otgsc bits
++ * ci_otg_role - pick role based on ID pin state
++ * @ci: the controller
++ */
++enum ci_role ci_otg_role(struct ci_hdrc *ci)
++{
++	u32 sts = hw_read(ci, OP_OTGSC, ~0);
++	enum ci_role role = sts & OTGSC_ID
++		? CI_ROLE_GADGET
++		: CI_ROLE_HOST;
++
++	return role;
++}
++
++/**
++ * ci_role_work - perform role changing based on ID pin
++ * @work: work struct
++ */
++static void ci_role_work(struct work_struct *work)
++{
++	struct ci_hdrc *ci = container_of(work, struct ci_hdrc, work);
++	enum ci_role role = ci_otg_role(ci);
++
++	if (role != ci->role) {
++		dev_dbg(ci->dev, "switching from %s to %s\n",
++			ci_role(ci)->name, ci->roles[role]->name);
++
++		ci_role_stop(ci);
++		ci_role_start(ci, role);
++	}
++
++	enable_irq(ci->irq);
++}
++
++/**
++ * ci_hdrc_otg_init - initialize otg struct
   * ci: the controller
   */
  int ci_hdrc_otg_init(struct ci_hdrc *ci)
  {
--	INIT_WORK(&ci->work, ci_role_work);
-+	INIT_WORK(&ci->work, ci_otg_work);
- 	ci->wq = create_singlethread_workqueue("ci_otg");
- 	if (!ci->wq) {
- 		dev_err(ci->dev, "can't create workqueue\n");
-diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-index 8913062..b8d5c05 100644
---- a/drivers/usb/chipidea/otg.h
-+++ b/drivers/usb/chipidea/otg.h
-@@ -17,5 +17,6 @@ void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
- void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
- void ci_hdrc_otg_destory(struct ci_hdrc *ci);
- enum ci_role ci_otg_role(struct ci_hdrc *ci);
-+void ci_handle_vbus_change(struct ci_hdrc *ci);
+-	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
++	INIT_WORK(&ci->work, ci_role_work);
++	ci->wq = create_singlethread_workqueue("ci_otg");
++	if (!ci->wq) {
++		dev_err(ci->dev, "can't create workqueue\n");
++		return -ENODEV;
++	}
  
- #endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 24a100d..c70ce38 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -85,8 +85,10 @@ static int hw_device_state(struct ci_hdrc *ci, u32 dma)
- 		/* interrupt, error, port change, reset, sleep/suspend */
- 		hw_write(ci, OP_USBINTR, ~0,
- 			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
-+		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
- 	} else {
- 		hw_write(ci, OP_USBINTR, ~0, 0);
-+		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
- 	}
  	return 0;
  }
-@@ -1460,6 +1462,7 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
- 			pm_runtime_get_sync(&_gadget->dev);
- 			hw_device_reset(ci, USBMODE_CM_DC);
- 			hw_device_state(ci, ci->ep0out->qh.dma);
-+			dev_dbg(ci->dev, "Connected to host\n");
- 		} else {
- 			hw_device_state(ci, 0);
- 			if (ci->platdata->notify_event)
-@@ -1467,6 +1470,7 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
- 				CI_HDRC_CONTROLLER_STOPPED_EVENT);
- 			_gadget_stop_activity(&ci->gadget);
- 			pm_runtime_put_sync(&_gadget->dev);
-+			dev_dbg(ci->dev, "Disconnected from host\n");
- 		}
- 	}
- 
-@@ -1822,6 +1826,9 @@ static int udc_start(struct ci_hdrc *ci)
- 	pm_runtime_no_callbacks(&ci->gadget.dev);
- 	pm_runtime_enable(&ci->gadget.dev);
- 
-+	/* Update ci->vbus_active */
-+	ci_handle_vbus_change(ci);
 +
- 	return retval;
++/**
++ * ci_hdrc_otg_destroy - destory otg struct
++ * ci: the controller
++ */
++void ci_hdrc_otg_destory(struct ci_hdrc *ci)
++{
++	if (ci->wq) {
++		flush_workqueue(ci->wq);
++		destroy_workqueue(ci->wq);
++	}
++	ci_disable_otg_interrupt(ci, OTGSC_INT_EN_BITS);
++	ci_clear_otg_interrupt(ci, OTGSC_INT_STATUS_BITS);
++}
+diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
+index f24ec37..8913062 100644
+--- a/drivers/usb/chipidea/otg.h
++++ b/drivers/usb/chipidea/otg.h
+@@ -15,5 +15,7 @@ int ci_hdrc_otg_init(struct ci_hdrc *ci);
+ void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits);
+ void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
+ void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
++void ci_hdrc_otg_destory(struct ci_hdrc *ci);
++enum ci_role ci_otg_role(struct ci_hdrc *ci);
  
- remove_trans:
+ #endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
 -- 
 1.7.0.4
