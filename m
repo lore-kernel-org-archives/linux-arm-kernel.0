@@ -1,46 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Aug 2013 05:46:12 -0700
-Subject: [PATCH 0/2] OMAP: Panda DVI fix and a cleanup
-In-Reply-To: <51FB9EDB.8010600@ti.com>
-References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
- <51FB9EDB.8010600@ti.com>
-Message-ID: <20130802124611.GJ7656@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 2 Aug 2013 08:49:32 -0400
+Subject: [PATCHv2 3/9] ARM: kirkwood: remove support for legacy booting
+ of Guruplug
+In-Reply-To: <1375369655-1310-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375369655-1310-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130802124932.GX5882@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [130802 05:05]:
-> On 23/07/13 12:06, Tomi Valkeinen wrote:
-> > Hi Tony,
-> > 
-> > Here's a fix for 3.11 that makes EDID read for DVI work again.
-> > 
-> > I also included a cleanup patch that removes the non-DT support functions that
-> > are no longer called from anywhere. It's not a fix, but as we're in quite early
-> > rcs, I thought it would be nice to remove the dead code.
-> > 
-> > Up to you if you want to include that one for 3.11 or not. If not, I'll include
-> > it in a board file series for 3.12 that I'll send soon.
-> > 
-> >  Tomi
-> > 
-> > Tomi Valkeinen (2):
-> >   ARM: OMAP: dss-common: fix Panda's DVI DDC channel
-> >   ARM: OMAP2+: Remove legacy DSS initialization for omap4
-> > 
-> >  arch/arm/mach-omap2/dss-common.c | 49 +---------------------------------------
-> >  arch/arm/mach-omap2/dss-common.h |  2 --
-> >  2 files changed, 1 insertion(+), 50 deletions(-)
-> > 
+On Thu, Aug 01, 2013 at 05:07:29PM +0200, Thomas Petazzoni wrote:
+> The Kirkwood Guruplug platform has already been converted to the
+> Device Tree, so we can remove the legacy booting option for this
+> platform.
 > 
-> Ping.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-kirkwood/Kconfig          |   7 --
+>  arch/arm/mach-kirkwood/Makefile         |   1 -
+>  arch/arm/mach-kirkwood/guruplug-setup.c | 133 --------------------------------
+>  3 files changed, 141 deletions(-)
+>  delete mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
+> 
+...
+> diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+...
+> -static struct mv_sata_platform_data guruplug_sata_data = {
+> -	.n_ports	= 1,
+> -};
 
-Oops, sorry I was offline last week and still not caught up on mails..
-If you have other DSS fixes I suggest you also send these fixes:
+This just caught my eye.  iirc, there were two flavors of the Guruplug,
+the Guruplug, and the Guruplug Server Plus (had eSATA plus something
+else).
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Nothing needs to be done with this patch, just making a note that we
+should look into doing an extra dts file for the Guruplug.
 
-If not, let me know and I'll queue these.
+thx,
 
-Regards,
-
-Tony
+Jason.
