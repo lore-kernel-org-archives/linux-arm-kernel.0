@@ -1,544 +1,282 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 2 Aug 2013 11:23:45 +0100
-Subject: [PATCH v4] net: Add MOXA ART SoCs ethernet driver
-In-Reply-To: <20130802100406.GC2884@e106331-lin.cambridge.arm.com>
-References: <1375280401-5564-1-git-send-email-jonas.jensen@gmail.com>
- <1375349968-16059-1-git-send-email-jonas.jensen@gmail.com>
- <20130802100406.GC2884@e106331-lin.cambridge.arm.com>
-Message-ID: <CAGVrzcYt0GR1UQuDGKnu5vDHhQiXuyL5=QQi0rm7W8mHDduXvQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Aug 2013 11:25:40 +0100
+Subject: [PATCH 05/10] ARM: clps711x: Add CLPS711X clk driver
+In-Reply-To: <1374172501-26796-6-git-send-email-shc_work@mail.ru>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <1374172501-26796-6-git-send-email-shc_work@mail.ru>
+Message-ID: <20130802102540.GD2884@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/2 Mark Rutland <mark.rutland@arm.com>:
-> On Thu, Aug 01, 2013 at 10:39:28AM +0100, Jonas Jensen wrote:
->> The MOXA UC-711X hardware(s) has an ethernet controller that seem to be
->> developed internally. The IC used is "RTL8201CP".
->>
->> Since there is no public documentation, this driver is mostly the one
->> published by MOXA that has been heavily cleaned up / ported from linux 2.6.9.
->>
->> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
->> ---
->
-> [...]
->
->> diff --git a/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt b/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt
->> new file mode 100644
->> index 0000000..1fc44ff
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt
->> @@ -0,0 +1,25 @@
->> +MOXA ART Ethernet Controller
->> +
->> +Required properties:
->> +
->> +- compatible : Must be "moxa,moxart-mac"
->> +- reg : Should contain registers location and length
->> +  index 0 : main register
->
-> I assume there's more than one register in the main register bank?
->
-> Are there any other register banks not used by this driver?
->
->> +  index 1 : mac address (stored on flash)
->
-> Is that flash a part of the MAC unit?
->
-> Is it only 6 bytes long (judging by the examples), or is the th only
-> portion used by the driver?
->
-> If it's bigger, I'd prefer to describe the whole of flash. This driver
-> will know the offset within it, and can choose to map only the protion
-> it wants to use. Another driver may choose to do more interesting
-> things. We need to describe the hardware, not how we expect it to be
-> used...
->
-> If it's not associated with the MAC, I'm not sure this is the best way
-> of describing the linkage...
+On Thu, Jul 18, 2013 at 07:34:56PM +0100, Alexander Shiyan wrote:
+> This adds the clock driver for Cirrus Logic CLPS711X series SoCs
+> using common clock infrastructure.
+> Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+> for this as the "OF" and "not-OF" calls implemented.
+> Additionally, patch removes unnecessary symbol CLKDEV_LOOKUP for CLPS711X
+> from main ARM Kconfig since this symbol is selected automatically by COMMON_CLK.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  .../devicetree/bindings/clock/clps711x-clock.txt   |  47 +++++++
+>  arch/arm/Kconfig                                   |   1 -
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/clk-clps711x.c                         | 150 +++++++++++++++++++++
+>  4 files changed, 198 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clps711x-clock.txt
+>  create mode 100644 drivers/clk/clk-clps711x.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/clps711x-clock.txt b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> new file mode 100644
+> index 0000000..0fb9fff
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> @@ -0,0 +1,47 @@
+> +Device Tree Clock bindings for the Cirrus Logic CLPS711X CPUs
+> +
+> +=== Clock subsystem ===
+> +Required properties:
+> +- compatible: Should be "cirrus,clps711x-clk"
+> +- reg: Address of the internal register set
+> +- #clock-cells: Should be <1>
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell. The following table is a full list of
+> +CLPS711X clocks and IDs.
+> +
+> +	Clock		ID
+> +	------------------
+> +	dummy		0
+> +	cpu		1
+> +	pll		2
+> +	bus		3
+> +	timer_hf	4
+> +	timer_lf	5
+> +	tc1		6
+> +	tc2		7
+> +	spi		8
+> +	uart		9
+> +
+> +=== Clocksource subsystem ===
+> +Required properties:
+> +- compatible: Should be "cirrus,clps711x-clocksource"
+> +- reg: Address of the internal register set
+> +- clocks: phandle to the source clocks TC1 and TC2
+> +- interrupts: The interrupt of the TC2 timer
 
-I also do not quite like it, this is very unusual. Here is how you
-could potentially solve this:
+That sounds odd. What's the interrupt generated by?
 
-- generate a random ethernet MAC adddress and later on let user-space
-fetch the MAC address from the flash and set it correctly
-- have some early code in arch/arm/mach-moxart which fetches the MAC
-address from the flash and then update the ethernet node
-local-mac-address property accordingly
+> +
+> +Example:
+> +
+> +clks: clks at 80000000 {
+> +	compatible = "cirrus,clps711x-clk";
+> +	reg = <0x80000000 0>;
 
-Ideally, fetching the MAC address from whatever backend storage is
-something that should really be left to user-space...
+Zero length?
 
->
->> +- interrupts : Should contain the mac interrupt number
->
-> Is there no need to link this to a phy, or is it a fixed-link device?
->
->> +
->> +Example:
->> +
->> +       mac0: mac at 90900000 {
->> +               compatible = "moxa,moxart-mac";
->> +               reg =   <0x90900000 0x100>,
->> +                       <0x80000050 0x6>;
->> +               interrupts = <25 0>;
->> +       };
->> +
->> +       mac1: mac at 92000000 {
->> +               compatible = "moxa,moxart-mac";
->> +               reg =   <0x92000000 0x100>,
->> +                       <0x80000056 0x6>;
->> +               interrupts = <27 0>;
->> +       };
->
-> [...]
->
->> diff --git a/drivers/net/ethernet/moxa/moxart_ether.h b/drivers/net/ethernet/moxa/moxart_ether.h
->> new file mode 100644
->> index 0000000..790b6a9
->> --- /dev/null
->> +++ b/drivers/net/ethernet/moxa/moxart_ether.h
->> @@ -0,0 +1,513 @@
->> +/* MOXA ART Ethernet (RTL8201CP) driver.
->> + *
->> + * Copyright (C) 2013 Jonas Jensen
->> + *
->> + * Jonas Jensen <jonas.jensen@gmail.com>
->> + *
->> + * Based on code from
->> + * Moxa Technology Co., Ltd. <www.moxa.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef _MOXART_ETHERNET_H
->> +#define _MOXART_ETHERNET_H
->> +
->> +#define TX_DESC_NUM            64
->> +#define TX_DESC_NUM_MASK       (TX_DESC_NUM-1)
->> +#define TX_NEXT(N)             (((N) + 1) & (TX_DESC_NUM_MASK))
->> +#define TX_BUF_SIZE            1600
->> +
->> +#define RX_DESC_NUM            64
->> +#define RX_DESC_NUM_MASK       (RX_DESC_NUM-1)
->> +#define RX_NEXT(N)             (((N) + 1) & (RX_DESC_NUM_MASK))
->> +#define RX_BUF_SIZE            1600
->> +
->> +struct tx_desc_t {
->> +       union {
->> +#define TXDMA_OWN              BIT(31)
->> +#define TXPKT_EXSCOL           BIT(1)
->> +#define TXPKT_LATECOL          BIT(0)
->> +               unsigned int ui;
->> +
->> +               struct {
->> +                       /* is aborted due to late collision */
->> +                       unsigned int tx_pkt_late_col:1;
->> +
->> +                       /* is aborted after 16 collisions */
->> +                       unsigned int rx_pkt_exs_col:1;
->> +
->> +                       unsigned int reserved1:29;
->> +
->> +                       /* is owned by the MAC controller */
->> +                       unsigned int tx_dma_own:1;
->> +               } ubit;
->> +       } txdes0;
->
-> Unless I've misunderstood the later code, this is the format of data
-> shared with the device? Bitfields aren't portable, and you can't rely on
-> the padding here being what you expect...
->
-> Similarly, the other structures below used in this way below seem scary
-> to me.
->
->> +
->> +       union {
->> +#define EDOTR                  BIT(31)
->> +#define TXIC                   BIT(30)
->> +#define TX2FIC                 BIT(29)
->> +#define FTS                    BIT(28)
->> +#define LTS                    BIT(27)
->> +#define TXBUF_SIZE_MASK                0x7ff
->> +#define TXBUF_SIZE_MAX         (TXBUF_SIZE_MASK+1)
->> +               unsigned int ui;
->> +
->> +               struct {
->> +                       /* transmit buffer size in byte */
->> +                       unsigned int tx_buf_size:11;
->> +
->> +                       unsigned int reserved2:16;
->> +
->> +                       /* is the last descriptor of a Tx packet */
->> +                       unsigned int lts:1;
->> +
->> +                       /* is the first descriptor of a Tx packet */
->> +                       unsigned int fts:1;
->> +
->> +                       /* transmit to FIFO interrupt on completion */
->> +                       unsigned int tx2_fic:1;
->> +
->> +                       /* transmit interrupt on completion */
->> +                       unsigned int tx_ic:1;
->> +
->> +                       /* end descriptor of transmit ring */
->> +                       unsigned int edotr:1;
->> +               } ubit;
->> +       } txdes1;
->> +
->> +       struct {
->> +               /* transmit buffer physical base address */
->> +               unsigned int addr_phys;
->> +
->> +               /* transmit buffer virtual base address */
->> +               unsigned char *addr_virt;
->> +       } txdes2;
->> +};
->> +
->> +struct rx_desc_t {
->> +       union {
->> +#define RXDMA_OWN              BIT(31)
->> +#define FRS                    BIT(29)
->> +#define LRS                    BIT(28)
->> +#define RX_ODD_NB              BIT(22)
->> +#define RUNT                   BIT(21)
->> +#define FTL                    BIT(20)
->> +#define CRC_ERR                        BIT(19)
->> +#define RX_ERR                 BIT(18)
->> +#define BROADCAST_RXDES0       BIT(17)
->> +#define MULTICAST_RXDES0       BIT(16)
->> +#define RFL_MASK               0x7ff
->> +#define RFL_MAX                        (RFL_MASK+1)
->> +               unsigned int ui;
->> +
->> +               struct {
->> +                       /* receive frame length */
->> +                       unsigned int recv_frame_len:11;
->> +                       unsigned int reserved1:5;
->> +
->> +                       /* multicast frame */
->> +                       unsigned int multicast:1;
->> +
->> +                       /* broadcast frame */
->> +                       unsigned int broadcast:1;
->> +                       unsigned int rx_err:1;          /* receive error */
->> +                       unsigned int crc_err:1;         /* CRC error */
->> +                       unsigned int ftl:1;             /* frame too long */
->> +
->> +                       /* runt packet, less than 64 bytes */
->> +                       unsigned int runt:1;
->> +
->> +                       /* receive odd nibbles */
->> +                       unsigned int rx_odd_nb:1;
->> +                       unsigned int reserved2:5;
->> +
->> +                       /* last receive segment descriptor */
->> +                       unsigned int lrs:1;
->> +
->> +                       /* first receive segment descriptor */
->> +                       unsigned int frs:1;
->> +
->> +                       unsigned int reserved3:1;
->> +                       unsigned int rx_dma_own:1;      /* RXDMA onwership */
->> +               } ubit;
->> +       } rxdes0;
->> +
->> +       union {
->> +#define EDORR                  BIT(31)
->> +#define RXBUF_SIZE_MASK                0x7ff
->> +#define RXBUF_SIZE_MAX         (RXBUF_SIZE_MASK+1)
->> +               unsigned int ui;
->> +
->> +               struct {
->> +                       /* receive buffer size */
->> +                       unsigned int rx_buf_size:11;
->> +
->> +                       unsigned int reserved4:20;
->> +
->> +                       /* end descriptor of receive ring */
->> +                       unsigned int edorr:1;
->> +               } ubit;
->> +       } rxdes1;
->> +
->> +       struct {
->> +               /* receive buffer physical base address */
->> +               unsigned int addr_phys;
->> +
->> +               /* receive buffer virtual base address */
->> +               unsigned char *addr_virt;
->> +       } rxdes2;
->> +};
->> +
->> +struct mac_control_reg_t {
->> +
->> +/* RXDMA has received packets into RX buffer successfully */
->> +#define RPKT_FINISH            BIT(0)
->> +/* receive buffer unavailable */
->> +#define NORXBUF                        BIT(1)
->> +/* TXDMA has moved data into the TX FIFO */
->> +#define XPKT_FINISH            BIT(2)
->> +/* transmit buffer unavailable */
->> +#define NOTXBUF                        BIT(3)
->> +/* packets transmitted to ethernet successfully */
->> +#define XPKT_OK_INT_STS                BIT(4)
->> +/* packets transmitted to ethernet lost due to late
->> + * collision or excessive collision
->> + */
->> +#define XPKT_LOST_INT_STS      BIT(5)
->> +/* packets received into RX FIFO successfully */
->> +#define RPKT_SAV               BIT(6)
->> +/* received packet lost due to RX FIFO full */
->> +#define RPKT_LOST_INT_STS      BIT(7)
->> +#define AHB_ERR                        BIT(8)          /* AHB error */
->> +#define PHYSTS_CHG             BIT(9)          /* PHY link status change */
->> +       unsigned int isr;                       /* interrupt status, 0x0 */
->> +
->> +#define RPKT_FINISH_M          BIT(0)          /* interrupt mask of ISR[0] */
->> +#define NORXBUF_M              BIT(1)          /* interrupt mask of ISR[1] */
->> +#define XPKT_FINISH_M          BIT(2)          /* interrupt mask of ISR[2] */
->> +#define NOTXBUF_M              BIT(3)          /* interrupt mask of ISR[3] */
->> +#define XPKT_OK_M              BIT(4)          /* interrupt mask of ISR[4] */
->> +#define XPKT_LOST_M            BIT(5)          /* interrupt mask of ISR[5] */
->> +#define RPKT_SAV_M             BIT(6)          /* interrupt mask of ISR[6] */
->> +#define RPKT_LOST_M            BIT(7)          /* interrupt mask of ISR[7] */
->> +#define AHB_ERR_M              BIT(8)          /* interrupt mask of ISR[8] */
->> +#define PHYSTS_CHG_M           BIT(9)          /* interrupt mask of ISR[9] */
->> +       unsigned int imr;                       /* interrupt mask, 0x4 */
->> +
->> +/* the most significant 2 bytes of MAC address */
->> +#define MAC_MADR_MASK          0xffff
->> +       /* MAC most significant address, 0x8 */
->> +       unsigned int mac_madr;
->> +
->> +       /* MAC least significant address, 0xc */
->> +       unsigned int mac_ldar;
->> +
->> +       /* multicast address hash table 0, 0x10 */
->> +       unsigned int matht0;
->> +
->> +       /* multicast address hash table 1, 0x14 */
->> +       unsigned int matht1;
->> +
->> +       /* transmit poll demand, 0x18 */
->> +       unsigned int txpd;
->> +
->> +       /* receive poll demand, 0x1c */
->> +       unsigned int rxpd;
->> +
->> +       /* transmit ring base address, 0x20 */
->> +       unsigned int txr_badr;
->> +
->> +       /* receive ring base address, 0x24 */
->> +       unsigned int rxr_badr;
->> +
->> +/* defines the period of TX cycle time */
->> +#define TXINT_TIME_SEL         BIT(15)
->> +#define TXINT_THR_MASK         0x7000
->> +#define TXINT_CNT_MASK         0xf00
->> +/* defines the period of RX cycle time */
->> +#define RXINT_TIME_SEL         BIT(7)
->> +#define RXINT_THR_MASK         0x70
->> +#define RXINT_CNT_MASK         0xF
->> +       /* interrupt timer control, 0x28 */
->> +       unsigned int itc;
->> +
->> +/* defines the period of TX poll time */
->> +#define TXPOLL_TIME_SEL                BIT(12)
->> +#define TXPOLL_CNT_MASK                0xf00
->> +#define TXPOLL_CNT_SHIFT_BIT   8
->> +/* defines the period of RX poll time */
->> +#define RXPOLL_TIME_SEL                BIT(4)
->> +#define RXPOLL_CNT_MASK                0xF
->> +#define RXPOLL_CNT_SHIFT_BIT   0
->> +       /* automatic polling timer control, 0x2c */
->> +       unsigned int aptc;
->> +
->> +/* enable RX FIFO threshold arbitration */
->> +#define RX_THR_EN              BIT(9)
->> +#define RXFIFO_HTHR_MASK       0x1c0
->> +#define RXFIFO_LTHR_MASK       0x38
->> +/* use INCR16 burst command in AHB bus */
->> +#define INCR16_EN              BIT(2)
->> +/* use INCR8 burst command in AHB bus */
->> +#define INCR8_EN               BIT(1)
->> +/* use INCR4 burst command in AHB bus */
->> +#define INCR4_EN               BIT(0)
->> +       /* DMA burst length and arbitration control, 0x30 */
->> +       unsigned int dblac;
->> +
->> +       unsigned int reserved1[21];             /* 0x34 - 0x84 */
->> +
->> +#define RX_BROADPKT            BIT(17)         /* receive boradcast packet */
->> +/* receive all multicast packet */
->> +#define RX_MULTIPKT            BIT(16)
->> +#define FULLDUP                        BIT(15)         /* full duplex */
->> +/* append CRC to transmitted packet */
->> +#define CRC_APD                        BIT(14)
->> +/* do not check incoming packet's destination address */
->> +#define RCV_ALL                        BIT(12)
->> +/* store incoming packet even if its length is great than 1518 bytes */
->> +#define RX_FTL                 BIT(11)
->> +/* store incoming packet even if its length is less than 64 bytes */
->> +#define RX_RUNT                        BIT(10)
->> +/* enable storing incoming packet if the packet passes hash table
->> + * address filtering and is a multicast packet
->> + */
->> +#define HT_MULTI_EN            BIT(9)
->> +#define RCV_EN                 BIT(8)          /* receiver enable */
->> +/* enable packet reception when transmitting packet in half duplex mode */
->> +#define ENRX_IN_HALFTX         BIT(6)
->> +#define XMT_EN                 BIT(5)          /* transmitter enable */
->> +/* disable CRC check when receiving packets */
->> +#define CRC_DIS                        BIT(4)
->> +#define LOOP_EN                        BIT(3)          /* internal loop-back */
->> +/* software reset, last 64 AHB bus clocks */
->> +#define SW_RST                 BIT(2)
->> +#define RDMA_EN                        BIT(1)          /* enable receive DMA chan */
->> +#define XDMA_EN                        BIT(0)          /* enable transmit DMA chan */
->> +       unsigned int maccr;                     /* MAC control, 0x88 */
->> +
->> +#define COL_EXCEED             BIT(11)         /* collisions exceeds 16 */
->> +/* transmitter detects late collision */
->> +#define LATE_COL               BIT(10)
->> +/* packet transmitted to ethernet lost due to late collision
->> + * or excessive collision
->> + */
->> +#define XPKT_LOST              BIT(9)
->> +/* packets transmitted to ethernet successfully */
->> +#define XPKT_OK                        BIT(8)
->> +/* receiver detects a runt packet */
->> +#define RUNT_MAC_STS           BIT(7)
->> +/* receiver detects a frame that is too long */
->> +#define FTL_MAC_STS            BIT(6)
->> +#define CRC_ERR_MAC_STS                BIT(5)
->> +/* received packets list due to RX FIFO full */
->> +#define RPKT_LOST              BIT(4)
->> +/* packets received into RX FIFO successfully */
->> +#define RPKT_SAVE              BIT(3)
->> +/* incoming packet dropped due to collision */
->> +#define COL                    BIT(2)
->> +#define MCPU_BROADCAST         BIT(1)
->> +#define MCPU_MULTICAST         BIT(0)
->> +       unsigned int macsr;                     /* MAC status, 0x8c */
->> +
->> +/* initialize a write sequence to PHY by setting this bit to 1
->> + * this bit would be auto cleared after the write operation is finished.
->> + */
->> +#define MIIWR                  BIT(27)
->> +#define MIIRD                  BIT(26)
->> +#define REGAD_MASK             0x3e00000
->> +#define PHYAD_MASK             0x1f0000
->> +#define MIIRDATA_MASK          0xffff
->> +       unsigned int phycr;                     /* PHY control, 0x90 */
->> +
->> +#define MIIWDATA_MASK          0xffff
->> +       unsigned int phywdata;                  /* PHY write data, 0x94 */
->> +
->> +#define PAUSE_TIME_MASK                0xffff0000
->> +#define FC_HIGH_MASK           0xf000
->> +#define FC_LOW_MASK            0xf00
->> +#define RX_PAUSE               BIT(4)          /* receive pause frame */
->> +/* packet transmission is paused due to receive */
->> +#define TXPAUSED               BIT(3)
->> +       /* pause frame */
->> +/* enable flow control threshold mode. */
->> +#define FCTHR_EN               BIT(2)
->> +#define TX_PAUSE               BIT(1)          /* transmit pause frame */
->> +#define FC_EN                  BIT(0)          /* flow control mode enable */
->> +       unsigned int fcr;                       /* flow control, 0x98 */
->> +
->> +#define BK_LOW_MASK            0xf00
->> +#define BKJAM_LEN_MASK         0xf0
->> +#define BK_MODE                        BIT(1)          /* back pressure address mode */
->> +#define BK_EN                  BIT(0)          /* back pressure mode enable */
->> +       unsigned int bpr;                       /* back pressure, 0x9c */
->> +
->> +       unsigned int reserved2[9];              /* 0xa0 - 0xc0 */
->> +
->> +#define TEST_SEED_MASK      0x3fff
->> +       unsigned int ts;                        /* test seed, 0xc4 */
->> +
->> +#define TXD_REQ                        BIT(31)         /* TXDMA request */
->> +#define RXD_REQ                        BIT(30)         /* RXDMA request */
->> +#define DARB_TXGNT             BIT(29)         /* TXDMA grant */
->> +#define DARB_RXGNT             BIT(28)         /* RXDMA grant */
->> +#define TXFIFO_EMPTY           BIT(27)         /* TX FIFO is empty */
->> +#define RXFIFO_EMPTY           BIT(26)         /* RX FIFO is empty */
->> +#define TXDMA2_SM_MASK         0x7000
->> +#define TXDMA1_SM_MASK         0xf00
->> +#define RXDMA2_SM_MASK         0x70
->> +#define RXDMA1_SM_MASK         0xF
->> +       unsigned int dmafifos;                  /* DMA/FIFO state, 0xc8 */
->> +
->> +#define SINGLE_PKT             BIT(26)         /* single packet mode */
->> +/* automatic polling timer test mode */
->> +#define PTIMER_TEST            BIT(25)
->> +#define ITIMER_TEST            BIT(24)         /* interrupt timer test mode */
->> +#define TEST_SEED_SEL          BIT(22)         /* test seed select */
->> +#define SEED_SEL               BIT(21)         /* seed select */
->> +#define TEST_MODE              BIT(20)         /* transmission test mode */
->> +#define TEST_TIME_MASK         0xffc00
->> +#define TEST_EXCEL_MASK                0x3e0
->> +       unsigned int tm;                        /* test mode, 0xcc */
->> +
->> +       unsigned int reserved3;                 /* 0xd0 */
->> +
->> +#define TX_MCOL_MASK           0xffff0000
->> +#define TX_MCOL_SHIFT_BIT      16
->> +#define TX_SCOL_MASK           0xffff
->> +#define TX_SCOL_SHIFT_BIT      0
->> +       /* TX_MCOL and TX_SCOL counter, 0xd4 */
->> +       unsigned int txmcol_xscol;
->> +
->> +#define RPF_MASK               0xffff0000
->> +#define RPF_SHIFT_BIT          16
->> +#define AEP_MASK               0xffff
->> +#define AEP_SHIFT_BIT          0
->> +       unsigned int rpf_aep;                   /* RPF and AEP counter, 0xd8 */
->> +
->> +#define XM_MASK                        0xffff0000
->> +#define XM_SHIFT_BIT           16
->> +#define PG_MASK                        0xffff
->> +#define PG_SHIFT_BIT           0
->> +       unsigned int xm_pg;                     /* XM and PG counter, 0xdc */
->> +
->> +#define RUNT_CNT_MASK          0xffff0000
->> +#define RUNT_CNT_SHIFT_BIT     16
->> +#define TLCC_MASK              0xffff
->> +#define TLCC_SHIFT_BIT         0
->> +       /* RUNT_CNT and TLCC counter, 0xe0 */
->> +       unsigned int runtcnt_tlcc;
->> +
->> +#define CRCER_CNT_MASK         0xffff0000
->> +#define CRCER_CNT_SHIFT_BIT    16
->> +#define FTL_CNT_MASK           0xffff
->> +#define FTL_CNT_SHIFT_BIT      0
->> +       /* CRCER_CNT and FTL_CNT counter, 0xe4 */
->> +       unsigned int crcercnt_ftlcnt;
->> +
->> +#define RLC_MASK               0xffff0000
->> +#define RLC_SHIFT_BIT          16
->> +#define RCC_MASK               0xffff
->> +#define RCC_SHIFT_BIT          0
->> +       unsigned int rlc_rcc;           /* RLC and RCC counter, 0xe8 */
->> +
->> +       unsigned int broc;              /* BROC counter, 0xec */
->> +       unsigned int mulca;             /* MULCA counter, 0xf0 */
->> +       unsigned int rp;                /* RP counter, 0xf4 */
->> +       unsigned int xp;                /* XP counter, 0xf8 */
->> +};
->
-> I don't think you can rely on the fields to be the size you expect (int
-> is not necessarily 32 bits), and nor can you expect them to have the
-> padding you expect (a 64 bit arch could pad ints to 64 bits). I think it
-> would be better to just #define the offsets explicitly, which will be
-> safe and easy to verify.
->
-> Thanks,
-> Mark.
+> +	#clock-cells = <1>;
+> +};
+> +
+> +timer {
+> +	compatible = "cirrus,clps711x-clocksource";
+> +	reg = <0x80000000 0>;
 
+Zero length again?
 
+> +	clocks = <&clks 6>, <&clks 7>;
+> +	clock-names = "tc1", "tc2";
+> +	interrupts = <9>;
+> +};
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ba412e0..dfb1e7f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -370,7 +370,6 @@ config ARCH_CLPS711X
+>  	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select AUTO_ZRELADDR
+> -	select CLKDEV_LOOKUP
+>  	select CLKSRC_MMIO
+>  	select COMMON_CLK
+>  	select CPU_ARM720T
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 4038c2b..a7e9b73 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+>  
+>  # SoCs specific
+>  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+> +obj-$(CONFIG_ARCH_CLPS711X)	+= clk-clps711x.o
+>  obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+>  obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+>  obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
+> diff --git a/drivers/clk/clk-clps711x.c b/drivers/clk/clk-clps711x.c
+> new file mode 100644
+> index 0000000..662908c
+> --- /dev/null
+> +++ b/drivers/clk/clk-clps711x.c
+> @@ -0,0 +1,150 @@
+> +/*
+> + *  CLPS711X clk driver
+> + *
+> + *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#define pr_fmt(fmt)	"clk-clps711x: " fmt
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/io.h>
+> +#include <linux/ioport.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +
+> +#include <linux/mfd/syscon/clps711x.h>
+> +
+> +#define CLPS711X_SYSCON1	(0x0100)
+> +#define CLPS711X_SYSCON2	(0x1100)
+> +#define CLPS711X_PLLR		(0xa5a8)
+> +
+> +#define CLPS711X_EXT_FREQ	(13000000)
+> +#define CLPS711X_OSC_FREQ	(3686400)
+> +
+> +enum clps711x_clks {
+> +	dummy, cpu, pll, bus, timer_hf, timer_lf, tc1, tc2, spi, uart, clk_max
+> +};
+> +
+> +static struct {
+> +	struct clk_onecell_data	clk_data;
+> +	struct clk		*clks[clk_max];
+> +} *clps711x_clk;
+> +
+> +static void __init _clps711x_clk_init(phys_addr_t phys_base)
+> +{
+> +	const char *tc_parents[] = { "timer_lf", "timer_hf" };
+> +	u32 tmp, f_cpu, f_pll, f_bus, f_timh, f_spi;
+> +	void __iomem *pllr, *syscon1, *syscon2;
+> +
+> +	BUG_ON(!request_mem_region(phys_base + CLPS711X_PLLR, SZ_4, NULL));
+> +	BUG_ON(!request_mem_region(phys_base + CLPS711X_SYSCON1, SZ_128, NULL));
+> +	BUG_ON(!request_mem_region(phys_base + CLPS711X_SYSCON2, SZ_128, NULL));
 
--- 
-Florian
+This is a wider issue than just this driver, but is BUG_ON appropriate
+here? Is a pr_warn("Could not initialise [some clocks], it may not be
+possible to use the machine") and a return not good enough?
+
+Also, doesn't that leak an allocated resource? Surely there's a better
+way to check that the window given to you was big enough (e.g. make this
+take a resource or device_node, and check the size on that).
+
+> +
+> +	clps711x_clk = kzalloc(sizeof(*clps711x_clk), GFP_KERNEL);
+> +	BUG_ON(!clps711x_clk);
+> +
+> +	pllr = ioremap(phys_base + CLPS711X_PLLR, SZ_4);
+> +	BUG_ON(!pllr);
+> +
+> +	syscon1 = ioremap(phys_base + CLPS711X_SYSCON1, SZ_128);
+> +	BUG_ON(!syscon1);
+> +
+> +	syscon2 = ioremap(phys_base + CLPS711X_SYSCON2, SZ_128);
+> +	BUG_ON(!syscon2);
+> +
+> +	tmp = readl(pllr) >> 24;
+> +	if (tmp)
+> +		f_pll = DIV_ROUND_UP(CLPS711X_OSC_FREQ * tmp, 2);
+> +	else
+> +		f_pll = 73728000; /* Old CPUs default value */
+
+A comment explaining what the value of ((readl(pllr) >> 24) represents
+would be nice.
+
+> +
+> +	tmp = readl(syscon2 + SYSFLG_OFFSET);
+> +	if (tmp & SYSFLG2_CKMODE) {
+> +		f_cpu = CLPS711X_EXT_FREQ;
+> +		f_bus = CLPS711X_EXT_FREQ;
+> +		f_spi = 135400;
+> +		f_pll = 0;
+> +	} else {
+> +		f_cpu = f_pll;
+> +		if (f_cpu >= 36864000)
+> +			f_bus = DIV_ROUND_UP(f_cpu, 2);
+> +		else
+> +			f_bus = 36864000 / 2;
+> +		f_spi = DIV_ROUND_CLOSEST(f_cpu, 576);
+> +	}
+> +
+> +	if (tmp & SYSFLG2_CKMODE) {
+> +		if (readl(syscon2 + SYSCON_OFFSET) & SYSCON2_OSTB)
+> +			f_timh = DIV_ROUND_CLOSEST(CLPS711X_EXT_FREQ, 26);
+> +		else
+> +			f_timh = DIV_ROUND_CLOSEST(CLPS711X_EXT_FREQ, 24);
+> +	} else
+> +		f_timh = DIV_ROUND_CLOSEST(f_cpu, 144);
+> +
+> +	clps711x_clk->clks[dummy] =
+> +		clk_register_fixed_rate(NULL, "dummy", NULL, CLK_IS_ROOT, 0);
+> +	clps711x_clk->clks[cpu] =
+> +		clk_register_fixed_rate(NULL, "cpu", NULL, CLK_IS_ROOT, f_cpu);
+> +	clps711x_clk->clks[pll] =
+> +		clk_register_fixed_rate(NULL, "pll", NULL, CLK_IS_ROOT, f_pll);
+> +	clps711x_clk->clks[bus] =
+> +		clk_register_fixed_rate(NULL, "bus", NULL, CLK_IS_ROOT, f_bus);
+> +	clps711x_clk->clks[timer_hf] =
+> +		clk_register_fixed_rate(NULL, "timer_hf", NULL, CLK_IS_ROOT,
+> +					f_timh);
+> +	clps711x_clk->clks[timer_lf] =
+> +		clk_register_fixed_factor(NULL, "timer_lf", "timer_hf",
+> +					  0, 1, 256);
+> +	clps711x_clk->clks[tc1] =
+> +		clk_register_mux(NULL, "tc1", tc_parents, 2,
+> +				 CLK_GET_RATE_NOCACHE, syscon1, 5, 1, 0, NULL);
+> +	clps711x_clk->clks[tc2] =
+> +		clk_register_mux(NULL, "tc2", tc_parents, 2,
+> +				 CLK_GET_RATE_NOCACHE, syscon1, 7, 1, 0, NULL);
+> +	clps711x_clk->clks[spi] =
+> +		clk_register_fixed_rate(NULL, "spi", NULL, CLK_IS_ROOT, f_spi);
+> +	clps711x_clk->clks[uart] =
+> +		clk_register_fixed_factor(NULL, "uart", "bus", 0, 1, 10);
+> +
+> +	clk_set_parent(clps711x_clk->clks[tc1], clps711x_clk->clks[timer_lf]);
+> +	clk_set_parent(clps711x_clk->clks[tc2], clps711x_clk->clks[timer_hf]);
+> +
+> +	/* Temporary export clocks for non-DT capable drivers */
+> +	clk_register_clkdev(clps711x_clk->clks[pll], "pll", NULL);
+> +	clk_register_clkdev(clps711x_clk->clks[spi], "spi", NULL);
+> +	clk_register_clkdev(clps711x_clk->clks[uart], "uart", NULL);
+
+If you've booted with dt, do those drivers get probed from platform
+data, and use these clocks?
+
+I have a concern that if we allow that, we're forced to keep platform
+data for those devices to maintain backwards compatibility, as otherwise
+we require dt changes later (adding those devices and their clock
+properties) to keep those devices functioning, rather than only
+requiring dt changes later to add new device support.
+
+> +
+> +	pr_debug("CPU: %u Hz, Timer: %u Hz\n", f_cpu, f_timh);
+> +}
+> +
+> +void __init clps711x_clk_init(phys_addr_t phys_base)
+> +{
+
+This could take a resource and pass it on...
+
+> +	_clps711x_clk_init(phys_base);
+> +
+> +	clk_register_clkdev(clps711x_clk->clks[tc1], "tc1", NULL);
+> +	clk_register_clkdev(clps711x_clk->clks[tc2], "tc2", NULL);
+> +}
+
+Thanks,
+Mark.
