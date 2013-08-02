@@ -1,52 +1,105 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 2 Aug 2013 16:34:00 +0800
-Subject: [PATCH v14 07/12] usb: chipidea: disable all interrupts and clear all
- interrupts status
+Date: Fri, 2 Aug 2013 16:34:03 +0800
+Subject: [PATCH v14 10/12] usb: chipidea: add wait vbus lower than OTGSC_BSV
+ before role starts
 In-Reply-To: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
 References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1375432445-31918-8-git-send-email-peter.chen@freescale.com>
+Message-ID: <1375432445-31918-11-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the initialization, it needs to disable all interrupts
-enable bit as well as clear all interrupts status bits to avoid
-exceptional interrupt.
+When the gadget role starts, we need to make sure the vbus is lower
+than OTGSC_BSV, or there will be an vbus interrupt since we use
+B_SESSION_VALID as vbus interrupt to indicate connect and disconnect.
+When the host role starts, it may not be useful to wait vbus to lower
+than OTGSC_BSV, but it can indicate some hardware problems like the
+vbus is still higher than OTGSC_BSV after we disconnect to host some
+time later (5000 milliseconds currently), which is obvious not correct.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/core.c |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+ drivers/usb/chipidea/ci.h   |    3 +++
+ drivers/usb/chipidea/core.c |   32 ++++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/otg.c  |    4 ++++
+ 3 files changed, 39 insertions(+), 0 deletions(-)
 
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index 3160363..1c94fc5 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -308,4 +308,7 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
+ 
+ u8 hw_port_test_get(struct ci_hdrc *ci);
+ 
++int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
++				u32 value, unsigned int timeout_ms);
++
+ #endif	/* __DRIVERS_USB_CHIPIDEA_CI_H */
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 2ae18fd..2223954 100644
+index 0e69282..f09b4db 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -199,6 +199,12 @@ static int hw_device_init(struct ci_hdrc *ci, void __iomem *base)
- 	if (ci->hw_ep_max > ENDPT_MAX)
- 		return -ENODEV;
- 
-+	/* Disable all interrupts bits */
-+	hw_write(ci, OP_USBINTR, 0xffffffff, 0);
-+
-+	/* Clear all interrupts status bits*/
-+	hw_write(ci, OP_USBSTS, 0xffffffff, 0xffffffff);
-+
- 	dev_dbg(ci->dev, "ChipIdea HDRC found, lpm: %d; cap: %p op: %p\n",
- 		ci->hw_bank.lpm, ci->hw_bank.cap, ci->hw_bank.op);
- 
-@@ -434,8 +440,11 @@ static void ci_get_otg_capable(struct ci_hdrc *ci)
- 		ci->is_otg = (hw_read(ci, CAP_DCCPARAMS,
- 				DCCPARAMS_DC | DCCPARAMS_HC)
- 					== (DCCPARAMS_DC | DCCPARAMS_HC));
--	if (ci->is_otg)
-+	if (ci->is_otg) {
- 		dev_dbg(ci->dev, "It is OTG capable controller\n");
-+		ci_disable_otg_interrupt(ci, OTGSC_INT_EN_BITS);
-+		ci_clear_otg_interrupt(ci, OTGSC_INT_STATUS_BITS);
-+	}
+@@ -294,6 +294,38 @@ int hw_device_reset(struct ci_hdrc *ci, u32 mode)
+ 	return 0;
  }
  
- static int ci_hdrc_probe(struct platform_device *pdev)
++/**
++ * hw_wait_reg: wait the register value
++ *
++ * Sometimes, it needs to wait register value before going on.
++ * Eg, when switch to device mode, the vbus value should be lower
++ * than OTGSC_BSV before connects to host.
++ *
++ * @ci: the controller
++ * @reg: register index
++ * @mask: mast bit
++ * @value: the bit value to wait
++ * @timeout_ms: timeout in millisecond
++ *
++ * This function returns an error code if timeout
++ */
++int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
++				u32 value, unsigned int timeout_ms)
++{
++	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
++
++	while (hw_read(ci, reg, mask) != value) {
++		if (time_after(jiffies, elapse)) {
++			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
++					mask, reg);
++			return -ETIMEDOUT;
++		}
++		msleep(20);
++	}
++
++	return 0;
++}
++
+ static irqreturn_t ci_irq(int irq, void *data)
+ {
+ 	struct ci_hdrc *ci = data;
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index c74194d..d39cce8 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -67,6 +67,7 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
+ 		usb_gadget_vbus_disconnect(&ci->gadget);
+ }
+ 
++#define CI_VBUS_STABLE_TIMEOUT_MS 5000
+ static void ci_handle_id_switch(struct ci_hdrc *ci)
+ {
+ 	enum ci_role role = ci_otg_role(ci);
+@@ -76,6 +77,9 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
+ 			ci_role(ci)->name, ci->roles[role]->name);
+ 
+ 		ci_role_stop(ci);
++		/* wait vbus lower than OTGSC_BSV */
++		hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
++				CI_VBUS_STABLE_TIMEOUT_MS);
+ 		ci_role_start(ci, role);
+ 	}
+ }
 -- 
 1.7.0.4
