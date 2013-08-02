@@ -1,28 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 2 Aug 2013 11:39:11 +0200
-Subject: [ARM ATTEND] Marvell development, ARM discussions
-Message-ID: <20130802113911.44b74d9e@skate>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 02 Aug 2013 11:48:49 +0200
+Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
+In-Reply-To: <51FB7CB8.6080103@arm.com>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <51FB7CB8.6080103@arm.com>
+Message-ID: <51FB8081.6040501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
+> Hi Daniel,
+> 
+> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
+>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>
+>> This patch series adds support to configure the rate and enable the event
+>> stream for architected timer. Since the timer control register is reset to
+>> zero on warm boot, CPU PM notifier is added to re-initialse it.
+>>
+> This series is required to support TC2 cpuidle.
+> It will be good if you can review and get this in for v3.12
 
-I'm working quite actively on Marvell ARM SoC support in the kernel
-(Armada 370, Armada XP, Kirkwood, etc.). I don't have any specific
-topic to put on the table as others have already mentioned them, but
-I'm interested in following where the ARM code is heading to. I'm
-especially interested about the Device Tree discussions, arch/arm SoC
-organization, kernel data bloat.
+So do you want me to take the series through my tree ?
 
-I did had the chance to attend the ARM kernel mini-summit last year and
-I found it very useful. I'll be in Edinburgh this year, so attending
-the ARM kernel mini-summit would be very interesting.
+> Regards,
+> Sudeep
+> 
+>> Changes v1->v2:
+>> 1. Saved event stream divider value on cold reset path and re-used it
+>>    in CPU PM notifier instead of calculating every time.
+>> 2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
+>> 3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
+>>    arch_counter_set_user_access"(already done as part of __cpuinit*
+>>    deletion)
+>>
+>> Regards,
+>> Sudeep
+>>
+>>
+>> Sudeep KarkadaNagesha (2):
+>>   ARM: arch_timer: add macros for bits in control register
+>>   drivers: clocksource: add CPU PM notifier for ARM architected timer
+>>
+>> Will Deacon (1):
+>>   drivers: clocksource: configure event stream for ARM arch timer
+>>
+>>  arch/arm/include/asm/arch_timer.h    | 10 ++++++--
+>>  arch/arm64/include/asm/arch_timer.h  | 12 +++++++---
+>>  drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++++++++++++-
+>>  include/clocksource/arm_arch_timer.h | 10 ++++++++
+>>  4 files changed, 71 insertions(+), 6 deletions(-)
+>>
+> 
+> 
 
-Thanks,
 
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
