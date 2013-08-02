@@ -1,68 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Aug 2013 01:39:23 -0700
-Subject: [Ksummit-2013-discuss] [ATTEND] [ARM ATTEND] kernel data bloat
- and how to avoid it
-In-Reply-To: <20130802081103.GA3042@kroah.com>
-References: <20130731073802.GT7656@atomide.com>
- <20130731123351.GA30474@kroah.com>
- <20130802075352.GY7656@atomide.com>
- <20130802081103.GA3042@kroah.com>
-Message-ID: <20130802083923.GD7656@atomide.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 02 Aug 2013 10:45:10 +0200
+Subject: [GIT PULL] clocksource/clockevents : arch_timer memory mapped support
+Message-ID: <51FB7196.6060809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Greg KH <greg@kroah.com> [130802 01:16]:
-> On Fri, Aug 02, 2013 at 12:53:53AM -0700, Tony Lindgren wrote:
-> > * Greg KH <greg@kroah.com> [130731 05:39]:
-> > > On Wed, Jul 31, 2013 at 12:38:03AM -0700, Tony Lindgren wrote:
-> > > > Hi all,
-> > > > 
-> > > > Probably the biggest kernel data bloat issue is in the ARM land, but
-> > > > it also seems that it's becoming a Linux generic issue too, so I
-> > > > guess it could be discussed in either context.
-> > > 
-> > > Why is it specific to ARM?  What is so unique to ARM that causes it to
-> > > "bloat"?
-> > 
-> > I think it has so far showed up on ARM because of no discoverable busses,
-> > but chances are it will be more of a generic problem.
-> > 
-> > > And what exactly do you mean by "bloat"?
-> > 
-> > Stuffing data to kernel that should not be in the kernel at all. Or
-> > if the data is needed by kernel, there should be only one set of the
-> > data defined rather than multiple copies of the data built into the
-> > kernel for each SoC or driver variant.
-> > 
-> > > > Basically the data bloat issue is there for the arch code and drivers
-> > > > and may not show up initially until things have headed the wrong way for
-> > > > too long.
-> > > 
-> > > What do you mean by this?  You seem to be very vague here.
-> > 
-> > People are unnecessarily defining registers in kernel for similar devices
-> > over and over again for each new SoC at the arch level and now more and
-> > more at the driver level.
-> > 
-> > One example of that are device tree based drivers that don't describe
-> > the actual hardware, but instead have a binding that points to an index
-> > of defined registers in the driver.
-> 
-> Ok, and exactly how much "larger" does something like this cost as a
-> real number, and as a percentage of the size of the kernel?
+The following changes since commit 07862c1cd6675cde2dd4bd64e64d704ea2185b79:
 
-Well one example has been making omap4 SoC booting device tree only, and
-that has reduced the built in kernel data for pinmux, board support and
-platform init code by something like 6000 lines, with patches posted to
-reduce the clock related build in kernel data by about additional 1700
-lines. Sure some of that has moved to live under drivers, but mostly defined
-in the .dts files.
+  ARM: clocksource: Add support for MOXA ART SoCs (2013-07-18 15:27:47
++0200)
 
-But I'm afraid quite a bit of stuff in general is now just moved to
-drivers without dealing with the data issues properly. So I'm hoping
-we could establish some guidelines on doing things that might help other
-maintainers to catch and solve similar issues.
+are available in the git repository at:
 
-Regards,
+  git://git.linaro.org/people/dlezcano/clockevents.git
+timers/clockevents-next
 
-Tony
+for you to fetch changes up to 220069945b298d3998c6598b081c466dca259929:
+
+  clocksource: arch_timer: Add support for memory mapped timers
+(2013-08-01 01:13:37 +0200)
+----------------------------------------------------------------
+
+This series contains some trivial fixes for the moxart driver:
+documentation updates and a missing header file.
+
+It also provides the arch_timer memory mapped support.
+
+----------------------------------------------------------------
+Jonas Jensen (3):
+      ARM: clocksource: moxart: documentation: Fix device tree bindings
+document
+      ARM: clocksource: moxart: Add bitops.h include
+      ARM: clocksource: moxart: documentation: Update device tree
+bindings document
+
+Stephen Boyd (5):
+      clocksource: arch_timer: Make register accessors less error-prone
+      clocksource: arch_timer: Pass clock event to set_mode callback
+      Documentation: Add memory mapped ARM architected timer binding
+      clocksource: arch_timer: Push the read/write wrappers deeper
+      clocksource: arch_timer: Add support for memory mapped timers
+
+ .../devicetree/bindings/arm/arch_timer.txt         |   59 ++-
+ .../bindings/timer/moxa,moxart-timer.txt           |    6 +-
+ arch/arm/include/asm/arch_timer.h                  |   14 +-
+ arch/arm64/include/asm/arch_timer.h                |   23 +-
+ drivers/clocksource/arm_arch_timer.c               |  446
++++++++++++++++++---
+ drivers/clocksource/moxart_timer.c                 |    1 +
+ include/clocksource/arm_arch_timer.h               |   10 +-
+ 7 files changed, 459 insertions(+), 100 deletions(-)
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
