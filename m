@@ -1,35 +1,42 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Fri, 02 Aug 2013 19:23:57 +0100
-Subject: [ARM ATTEND] Interested in R/M-class (!MMU), automated testing
-Message-ID: <51FBF93D.8040707@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 2 Aug 2013 14:43:52 -0400
+Subject: [RFC PATCH V2 0/9] impedance-matcher generic improvements
+In-Reply-To: <51FBF214.8070304@gmail.com>
+References: <51F2A014.7000209@gmail.com>
+ <cover.1375457714.git.jason@lakedaemon.net>
+ <51FBF214.8070304@gmail.com>
+Message-ID: <20130802184352.GA5882@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Daniel,
 
-I'm keen to attend the ARM Kernel summit this year. I haven't got a 
-specific proposal, but I'd really like to talk to people about !MMU, 
-R/M-class (which is where I've done most of my work so far) and 
-automation of testing on ARM hardware.
+On Fri, Aug 02, 2013 at 07:53:24PM +0200, Daniel Mack wrote:
+> Hi Jason,
+> 
+> On 02.08.2013 17:51, Jason Cooper wrote:
+> > Here's a new version of my attempt to make this code generically useful.  I've
+> > tested this on my dreamplug both using the commandline
+> > 'loadaddrs=appended,0x0700000' and appending all kirkwood*.dtb's.
+> > 
+> > It's still hacky and can't update the dtb yet.  But it definitely works.
+> 
+> Merged and pushed, thanks :)
+> 
+> Note the changes on top of yours though. it took me a while to figure
+> out that my boards won't boots images that are concatinated to the
+> finale image. I changed that back so that things are treated by objcopy,
+> and now everything's fine.
 
-I'm pretty new to the kernel and based on the accounts of other hackers, 
-getting to the ARM (mini) summits and meeting people in person is a 
-great way to get more involved, so if there are places I'd love to come.
+Ok, that's probably cleaner anyway.  I did get to learn more about
+linker scripts, so that was fun. :-)
 
-Specifically, after the merging of my MPU support for R-class and 
-Uwe/Catalin's M-class patches, I'd like to talk about:
+I have one change to catch up to yours (replacing __end_of_image), plus
+I added versioning support for when you want to tag a release.  Feel
+free to pull from:
 
-- Whether we can make better use of the MPU/actually have real
-   kernel/userspace protection even without an MMU, and how not to kill
-   performance doing this
-- Whether we want to do MPU support for M-class
-- How we can get more eyes on the !MMU code in the kernel - is it
-   because nobody's got R/M hardware? R/M isn?t interesting to people so
-   far? etc
-- Ways to do more automated testing of ARM kernels, including hearing
-   from other people what they use to build/boot/test/benchmark their
-   code (perhaps even get a discussion going about using the diverse
-   range of hardware people have around put to use as test-machines).
+  git://git.infradead.org/users/jcooper/impedance-matcher.git dreamplug
 
-Thanks,
-Jonny
+thx,
+
+Jason.
