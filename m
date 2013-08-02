@@ -1,64 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 02 Aug 2013 11:48:49 +0200
-Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
-In-Reply-To: <51FB7CB8.6080103@arm.com>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51FB7CB8.6080103@arm.com>
-Message-ID: <51FB8081.6040501@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Aug 2013 10:53:50 +0100
+Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1 CPU
+ devices
+In-Reply-To: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130802095350.GI2465@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
-> Hi Daniel,
+On Thu, Aug 01, 2013 at 07:17:13PM +0100, Santosh Shilimkar wrote:
+> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
 > 
-> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> This patch series adds support to configure the rate and enable the event
->> stream for architected timer. Since the timer control register is reset to
->> zero on warm boot, CPU PM notifier is added to re-initialse it.
->>
-> This series is required to support TC2 cpuidle.
-> It will be good if you can review and get this in for v3.12
-
-So do you want me to take the series through my tree ?
-
-> Regards,
-> Sudeep
+> The generic code is well equipped to differentiate between
+> SMP and UP configurations.However, there are some devices which
+> use Cortex-A9 MP core IP with 1 CPU as configuration. To let
+> these SOCs to co-exist in a CONFIG_SMP=y build by leveraging
+> the SMP_ON_UP support, we need to additionally check the
+> number the cores in Cortex-A9 MPCore configuration. Without
+> such a check in place, the startup code tries to execute
+> ALT_SMP() set of instructions which lead to CPU faults.
 > 
->> Changes v1->v2:
->> 1. Saved event stream divider value on cold reset path and re-used it
->>    in CPU PM notifier instead of calculating every time.
->> 2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
->> 3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
->>    arch_counter_set_user_access"(already done as part of __cpuinit*
->>    deletion)
->>
->> Regards,
->> Sudeep
->>
->>
->> Sudeep KarkadaNagesha (2):
->>   ARM: arch_timer: add macros for bits in control register
->>   drivers: clocksource: add CPU PM notifier for ARM architected timer
->>
->> Will Deacon (1):
->>   drivers: clocksource: configure event stream for ARM arch timer
->>
->>  arch/arm/include/asm/arch_timer.h    | 10 ++++++--
->>  arch/arm64/include/asm/arch_timer.h  | 12 +++++++---
->>  drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++++++++++++-
->>  include/clocksource/arm_arch_timer.h | 10 ++++++++
->>  4 files changed, 71 insertions(+), 6 deletions(-)
->>
+> The issue was spotted on TI's Aegis device and this patch
+> makes now the device work with omap2plus_defconfig which
+> enables SMP by default. The change is kept limited to only
+> Cortex-A9 MPCore detection code.
 > 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 > 
+> Acked-by: Sricharan R <r.sricharan@ti.com>
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/kernel/head.S |   18 +++++++++++++++++-
+>  1 file changed, 17 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 9cf6063..4924b11 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -486,7 +486,23 @@ __fixup_smp:
+>  	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
+>  	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
+>  	teq	r0, #0x80000000		@ not part of a uniprocessor system?
+> -	moveq	pc, lr			@ yes, assume SMP
+> +	bne    __fixup_smp_on_up	@ no, assume UP
+> +
+> +	@ Core indicates it is SMP.  Check for Aegis SOC where a single
+> +	@ Cortex-A9 CPU is present but SMP operations fault.
+> +	mov	r4, #0x41000000
+> +	orr	r4, r4, #0x0000c000
+> +	orr	r4, r4, #0x00000090
+> +	teq	r3, r4			@ Check for ARM Cortex-A9
+> +	movne	pc, lr			@ Not ARM Cortex-A9,
+> +
+> +	mrc	p15, 4, r0, c15, c0	@ get SCU base address
+> +	teq	r0, #0x0		@ '0' on actual UP A9 hardware
+> +	beq	__fixup_smp_on_up	@ So its an A9 UP
 
+What if somebody builds an MP A9 with the private peripheral base address at
+0x0?
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Will
