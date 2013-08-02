@@ -1,102 +1,66 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 2 Aug 2013 08:06:19 -0400
-Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate possible
- check of_node
-In-Reply-To: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
-References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
-Message-ID: <51FBA0BB.6080408@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 2 Aug 2013 13:09:51 +0100
+Subject: [PATCH RFC 1/8] arm: make SWIOTLB available
+In-Reply-To: <20130801110927.GF24642@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
+ <1375292732-7627-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130801110927.GF24642@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1308021302340.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 August 2013 10:00 PM, Richard Zhao wrote:
-> pass of_phandle_args dma_spec to dma_request_channel in of_dma_simple_xlate,
-> so the filter function could access of_node in of_phandle_args.
->
-Am just curious the reasoning behind doing so. Can you please expand
-above bit more with why you need to change it.
+On Thu, 1 Aug 2013, Russell King - ARM Linux wrote:
+> On Wed, Jul 31, 2013 at 06:45:25PM +0100, Stefano Stabellini wrote:
+> > +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+> > +{
+> > +	unsigned int offset = paddr & ~PAGE_MASK;
+> > +	return pfn_to_dma(dev, paddr >> PAGE_SHIFT) + offset;
+> > +}
+> > +
+> > +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> > +{
+> > +	unsigned int offset = dev_addr & ~PAGE_MASK;
+> > +	return (dma_to_pfn(dev, dev_addr) << PAGE_SHIFT) + offset;
+> > +}
+> 
+> These two helpers look fine on the face of it.
+> 
+> > +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+> > +{
+> > +	if (!dev->dma_mask)
+> > +		return 0;
+> > +
+> > +	return addr + size - 1 <= *dev->dma_mask;
+> > +}
+> 
+> You may wish to have a closer look at the DMA bounce code, because this
+> assumes that DMA masks are a set of zeros followed by a set of ones.
+> That may not always be the case (and we have the odd platform where that
+> isn't the case.)
+> 
+> It has always bugged me that we call this thing a dma _mask_ and then
+> much kernel code treats it as a limit - it should've been called "dma
+> limit" if that's how it was to be interpreted.  If it really is a _mask_
+> then the right way to test whether a DMA address/size is possible is:
+> 
+> 	u64 limit, mask = *dev->dma_mask;
+> 
+> 	limit = (mask + 1) & ~mask;
+> 	if (limit && size > limit)
+> 		return 0;
+> 
+> 	if ((addr | (addr + size - 1)) & ~mask)
+> 		return 0;
+> 
+> 	return 1;
+> 
+> The first checks whether 'size' fits within the least significant
+> contiguous set of '1' bits in the DMA mask, and the second checks
+> whether the region itself contains any address bits which may not
+> meet the DMA mask.
  
-> It also remove restriction of #dma-cells has to be one.
-> 
-> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
-> ---
->  drivers/dma/edma.c     |  7 +++++--
->  drivers/dma/of-dma.c   | 10 ++++------
->  drivers/dma/omap-dma.c |  6 ++++--
->  3 files changed, 13 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 4f6d87b..54582fd 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -23,6 +23,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> +#include <linux/of_dma.h>
->  
->  #include <linux/platform_data/edma.h>
->  
-> @@ -604,9 +605,11 @@ static struct platform_driver edma_driver = {
->  
->  bool edma_filter_fn(struct dma_chan *chan, void *param)
->  {
-> -	if (chan->device->dev->driver == &edma_driver.driver) {
-> +	struct of_phandle_args *dma_spec = param;
-> +	if (chan->device->dev->driver == &edma_driver.driver &&
-> +			dma_spec->np == chan->device->dev->of_node) {
->  		struct edma_chan *echan = to_edma_chan(chan);
-> -		unsigned ch_req = *(unsigned *)param;
-> +		unsigned ch_req = dma_spec->args[0];
->  		return ch_req == echan->ch_num;
->  	}
->  	return false;
-> diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-> index 75334bd..e1c4d3b 100644
-> --- a/drivers/dma/of-dma.c
-> +++ b/drivers/dma/of-dma.c
-> @@ -192,11 +192,9 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
->   * @dma_spec:	pointer to DMA specifier as found in the device tree
->   * @of_dma:	pointer to DMA controller data
->   *
-> - * A simple translation function for devices that use a 32-bit value for the
-> + * A simple translation function for devices that use dma_spec for the
->   * filter_param when calling the DMA engine dma_request_channel() function.
-> - * Note that this translation function requires that #dma-cells is equal to 1
-> - * and the argument of the dma specifier is the 32-bit filter_param. Returns
-> - * pointer to appropriate dma channel on success or NULL on error.
-> + * Returns pointer to appropriate dma channel on success or NULL on error.
->   */
->  struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
->  						struct of_dma *ofdma)
-> @@ -207,10 +205,10 @@ struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
->  	if (!info || !info->filter_fn)
->  		return NULL;
->  
-> -	if (count != 1)
-> +	if (count < 1)
->  		return NULL;
->  
->  	return dma_request_channel(info->dma_cap, info->filter_fn,
-> -			&dma_spec->args[0]);
-> +			dma_spec);
->  }
->  EXPORT_SYMBOL_GPL(of_dma_simple_xlate);
-> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> index ec3fc4f..32547ec 100644
-> --- a/drivers/dma/omap-dma.c
-> +++ b/drivers/dma/omap-dma.c
-> @@ -693,9 +693,11 @@ static struct platform_driver omap_dma_driver = {
->  
->  bool omap_dma_filter_fn(struct dma_chan *chan, void *param)
->  {
-> -	if (chan->device->dev->driver == &omap_dma_driver.driver) {
-> +	struct of_phandle_args *dma_spec = param;
-> +	if (chan->device->dev->driver == &omap_dma_driver.driver &&
-> +			dma_spec->np == chan->device->dev->of_node) {
->  		struct omap_chan *c = to_omap_dma_chan(chan);
-> -		unsigned req = *(unsigned *)param;
-> +		unsigned req = dma_spec->args[0];
->  
->  		return req == c->dma_sig;
->  	}
-> 
+I'll make the change, thanks for the explanation.
+
+
+> I guess if we aren't going to encounter any of these cases anymore,
+> your test is entirely sufficient.
