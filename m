@@ -1,45 +1,87 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 02 Aug 2013 15:08:56 +0200
-Subject: [PATCHv2 3/9] ARM: kirkwood: remove support for legacy booting of
- Guruplug
-In-Reply-To: <20130802124932.GX5882@titan.lakedaemon.net> (Jason Cooper's
- message of "Fri, 2 Aug 2013 08:49:32 -0400")
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375369655-1310-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130802124932.GX5882@titan.lakedaemon.net>
-Message-ID: <87txj8tf2v.fsf@lebrac.rtp-net.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 2 Aug 2013 09:18:50 -0400
+Subject: select statement sort order in arch/arm/Kconfig -- again
+In-Reply-To: <20130801170812.GA23006@n2100.arm.linux.org.uk>
+References: <20130801170812.GA23006@n2100.arm.linux.org.uk>
+Message-ID: <20130802131850.GY5882@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper <jason@lakedaemon.net> writes:
+On Thu, Aug 01, 2013 at 06:08:12PM +0100, Russell King - ARM Linux wrote:
+> So, we go one kernel release since I fixed the ordering in this file
+> after Andrew Morton's complaint about conflicts, and people manage to
+> mess up the ordering.  Sorting the stuff in this file is clearly a
+> waste of time.
+> 
+> Not impressed.
+> 
+> On the plus side, I have a script which sorts these, so it's not
+> difficult to put them back into the correct order - that's not the
+> point - I _shouldn't_ have to do this.  It's just that it's _EXTRA_
+> _UNNECESSARY_ _CHURN_ each time I have to clean up after the fact.
 
-> On Thu, Aug 01, 2013 at 05:07:29PM +0200, Thomas Petazzoni wrote:
->> The Kirkwood Guruplug platform has already been converted to the
->> Device Tree, so we can remove the legacy booting option for this
->> platform.
->> 
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>  arch/arm/mach-kirkwood/Kconfig          |   7 --
->>  arch/arm/mach-kirkwood/Makefile         |   1 -
->>  arch/arm/mach-kirkwood/guruplug-setup.c | 133 --------------------------------
->>  3 files changed, 141 deletions(-)
->>  delete mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
->> 
-> ...
->> diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
-> ...
->> -static struct mv_sata_platform_data guruplug_sata_data = {
->> -	.n_ports	= 1,
->> -};
->
-> This just caught my eye.  iirc, there were two flavors of the Guruplug,
-> the Guruplug, and the Guruplug Server Plus (had eSATA plus something
-> else).
+iirc, you had to update the script since you posted it the last time.
+Would you mind posting it again?
 
-the difference between the guruplug server and the server plus is that
-there's one extra ethernet port and a eSATA port on server plus
-(iirc, there's also the guruplug display but it's a very different
-beast)
+> 
+> --- a/arch/arm/Kconfig	2013-08-01 15:43:46.335784638 +0100
+> +++ b/arch/arm/Kconfig	2013-08-01 18:01:52.161928393 +0100
+...
+> @@ -498,11 +498,11 @@
+>  	select CPU_PJ4
+>  	select GENERIC_CLOCKEVENTS
+>  	select MIGHT_HAVE_PCI
+> +	select MVEBU_MBUS
+>  	select PINCTRL
+>  	select PINCTRL_DOVE
+>  	select PLAT_ORION_LEGACY
+>  	select USB_ARCH_HAS_EHCI
+> -	select MVEBU_MBUS
+>  	help
+>  	  Support for the Marvell Dove SoC 88AP510
+>  
+> @@ -512,12 +512,12 @@
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CPU_FEROCEON
+>  	select GENERIC_CLOCKEVENTS
+> +	select MVEBU_MBUS
+>  	select PCI
+>  	select PCI_QUIRKS
+>  	select PINCTRL
+>  	select PINCTRL_KIRKWOOD
+>  	select PLAT_ORION_LEGACY
+> -	select MVEBU_MBUS
+>  	help
+>  	  Support for the following Marvell Kirkwood series SoCs:
+>  	  88F6180, 88F6192 and 88F6281.
+> @@ -527,9 +527,9 @@
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CPU_FEROCEON
+>  	select GENERIC_CLOCKEVENTS
+> +	select MVEBU_MBUS
+>  	select PCI
+>  	select PLAT_ORION_LEGACY
+> -	select MVEBU_MBUS
+>  	help
+>  	  Support for the following Marvell MV78xx0 series SoCs:
+>  	  MV781x0, MV782x0.
+> @@ -540,9 +540,9 @@
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CPU_FEROCEON
+>  	select GENERIC_CLOCKEVENTS
+> +	select MVEBU_MBUS
+>  	select PCI
+>  	select PLAT_ORION_LEGACY
+> -	select MVEBU_MBUS
+>  	help
+>  	  Support for the following Marvell Orion 5x series SoCs:
+>  	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
 
-Arnaud
+damn.  This block was my fault.
+
+So, it looks like I just volunteered myself to add a check to checkpatch
+;-)
+
+sorry,
+
+Jason.
