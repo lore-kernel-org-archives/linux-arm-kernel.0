@@ -1,187 +1,81 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Fri, 2 Aug 2013 23:45:31 +0200
-Subject: [PATCHv2 8/9] ARM: kirkwood: remove unused common code for LaCie
- platforms
-In-Reply-To: <1375369655-1310-9-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375369655-1310-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130802214531.GB20330@kw.sim.vm.gnt>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 02 Aug 2013 14:46:59 -0700
+Subject: [PATCH v2 1/8] clk: mux: Add support for read-only muxes.
+In-Reply-To: <1460068.oJXN9T0Uhp@flatron>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+ <1374536965-3545-2-git-send-email-tomasz.figa@gmail.com>
+ <1460068.oJXN9T0Uhp@flatron>
+Message-ID: <20130802214659.6450.88936@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 05:07:34PM +0200, Thomas Petazzoni wrote:
-> Now that all LaCie platforms have been converted to use the Device
-> Tree, we can get rid of the lacie_v2-common.{c,h} files.
+Quoting Tomasz Figa (2013-07-27 05:41:05)
+> Hi Mike,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Acked-by: Simon Guinot <simon.guinot@sequanux.org>
-
-Thanks,
-
-Simon
-
-> ---
->  arch/arm/mach-kirkwood/lacie_v2-common.c | 114 -------------------------------
->  arch/arm/mach-kirkwood/lacie_v2-common.h |  16 -----
->  2 files changed, 130 deletions(-)
->  delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
->  delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
+> On Tuesday 23 of July 2013 01:49:18 Tomasz Figa wrote:
+> > Some platforms have read-only clock muxes that are preconfigured at
+> > reset and cannot be changed at runtime. This patch extends mux clock
+> > driver to allow handling such read-only muxes by adding new
+> > CLK_MUX_READ_ONLY mux flag.
+> > 
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > ---
+> >  drivers/clk/clk-mux.c        | 10 +++++++++-
+> >  include/linux/clk-provider.h |  2 ++
+> >  2 files changed, 11 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> > index 614444c..92f1a1b 100644
+> > --- a/drivers/clk/clk-mux.c
+> > +++ b/drivers/clk/clk-mux.c
+> > @@ -107,6 +107,11 @@ const struct clk_ops clk_mux_ops = {
+> >  };
+> >  EXPORT_SYMBOL_GPL(clk_mux_ops);
+> > 
+> > +const struct clk_ops clk_mux_ro_ops = {
+> > +     .get_parent = clk_mux_get_parent,
+> > +};
+> > +EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
+> > +
+> >  struct clk *clk_register_mux_table(struct device *dev, const char
+> > *name, const char **parent_names, u8 num_parents, unsigned long flags,
+> > void __iomem *reg, u8 shift, u32 mask,
+> > @@ -133,7 +138,10 @@ struct clk *clk_register_mux_table(struct device
+> > *dev, const char *name, }
+> > 
+> >       init.name = name;
+> > -     init.ops = &clk_mux_ops;
+> > +     if (clk_mux_flags & CLK_MUX_READ_ONLY)
+> > +             init.ops = &clk_mux_ro_ops;
+> > +     else
+> > +             init.ops = &clk_mux_ops;
+> >       init.flags = flags | CLK_IS_BASIC;
+> >       init.parent_names = parent_names;
+> >       init.num_parents = num_parents;
+> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> > index 1ec14a7..9487b96 100644
+> > --- a/include/linux/clk-provider.h
+> > +++ b/include/linux/clk-provider.h
+> > @@ -327,8 +327,10 @@ struct clk_mux {
+> >  #define CLK_MUX_INDEX_ONE            BIT(0)
+> >  #define CLK_MUX_INDEX_BIT            BIT(1)
+> >  #define CLK_MUX_HIWORD_MASK          BIT(2)
+> > +#define CLK_MUX_READ_ONLY    BIT(3) /* mux setting cannot be changed */
+> > 
+> >  extern const struct clk_ops clk_mux_ops;
+> > +extern const struct clk_ops clk_mux_ro_ops;
+> > 
+> >  struct clk *clk_register_mux(struct device *dev, const char *name,
+> >               const char **parent_names, u8 num_parents, unsigned long 
+> flags,
 > 
-> diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.c b/arch/arm/mach-kirkwood/lacie_v2-common.c
-> deleted file mode 100644
-> index 4894959..0000000
-> --- a/arch/arm/mach-kirkwood/lacie_v2-common.c
-> +++ /dev/null
-> @@ -1,114 +0,0 @@
-> -/*
-> - * arch/arm/mach-kirkwood/lacie_v2-common.c
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#include <linux/kernel.h>
-> -#include <linux/init.h>
-> -#include <linux/mtd/physmap.h>
-> -#include <linux/spi/flash.h>
-> -#include <linux/spi/spi.h>
-> -#include <linux/i2c.h>
-> -#include <linux/i2c/at24.h>
-> -#include <linux/gpio.h>
-> -#include <asm/mach/time.h>
-> -#include <mach/kirkwood.h>
-> -#include <mach/irqs.h>
-> -#include <plat/time.h>
-> -#include "common.h"
-> -#include "lacie_v2-common.h"
-> -
-> -/*****************************************************************************
-> - * 512KB SPI Flash on Boot Device (MACRONIX MX25L4005)
-> - ****************************************************************************/
-> -
-> -static struct mtd_partition lacie_v2_flash_parts[] = {
-> -	{
-> -		.name = "u-boot",
-> -		.size = MTDPART_SIZ_FULL,
-> -		.offset = 0,
-> -		.mask_flags = MTD_WRITEABLE, /* force read-only */
-> -	},
-> -};
-> -
-> -static const struct flash_platform_data lacie_v2_flash = {
-> -	.type		= "mx25l4005a",
-> -	.name		= "spi_flash",
-> -	.parts		= lacie_v2_flash_parts,
-> -	.nr_parts	= ARRAY_SIZE(lacie_v2_flash_parts),
-> -};
-> -
-> -static struct spi_board_info __initdata lacie_v2_spi_slave_info[] = {
-> -	{
-> -		.modalias	= "m25p80",
-> -		.platform_data	= &lacie_v2_flash,
-> -		.irq		= -1,
-> -		.max_speed_hz	= 20000000,
-> -		.bus_num	= 0,
-> -		.chip_select	= 0,
-> -	},
-> -};
-> -
-> -void __init lacie_v2_register_flash(void)
-> -{
-> -	spi_register_board_info(lacie_v2_spi_slave_info,
-> -				ARRAY_SIZE(lacie_v2_spi_slave_info));
-> -	kirkwood_spi_init();
-> -}
-> -
-> -/*****************************************************************************
-> - * I2C devices
-> - ****************************************************************************/
-> -
-> -static struct at24_platform_data at24c04 = {
-> -	.byte_len	= SZ_4K / 8,
-> -	.page_size	= 16,
-> -};
-> -
-> -/*
-> - * i2c addr | chip         | description
-> - * 0x50     | HT24LC04     | eeprom (512B)
-> - */
-> -
-> -static struct i2c_board_info __initdata lacie_v2_i2c_info[] = {
-> -	{
-> -		I2C_BOARD_INFO("24c04", 0x50),
-> -		.platform_data  = &at24c04,
-> -	}
-> -};
-> -
-> -void __init lacie_v2_register_i2c_devices(void)
-> -{
-> -	kirkwood_i2c_init();
-> -	i2c_register_board_info(0, lacie_v2_i2c_info,
-> -				ARRAY_SIZE(lacie_v2_i2c_info));
-> -}
-> -
-> -/*****************************************************************************
-> - * Hard Disk power
-> - ****************************************************************************/
-> -
-> -static int __initdata lacie_v2_gpio_hdd_power[] = { 16, 17, 41, 42, 43 };
-> -
-> -void __init lacie_v2_hdd_power_init(int hdd_num)
-> -{
-> -	int i;
-> -	int err;
-> -
-> -	/* Power up all hard disks. */
-> -	for (i = 0; i < hdd_num; i++) {
-> -		err = gpio_request(lacie_v2_gpio_hdd_power[i], NULL);
-> -		if (err == 0) {
-> -			err = gpio_direction_output(
-> -					lacie_v2_gpio_hdd_power[i], 1);
-> -			/* Free the HDD power GPIOs. This allow user-space to
-> -			 * configure them via the gpiolib sysfs interface. */
-> -			gpio_free(lacie_v2_gpio_hdd_power[i]);
-> -		}
-> -		if (err)
-> -			pr_err("Failed to power up HDD%d\n", i + 1);
-> -	}
-> -}
-> diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.h b/arch/arm/mach-kirkwood/lacie_v2-common.h
-> deleted file mode 100644
-> index fc64f57..0000000
-> --- a/arch/arm/mach-kirkwood/lacie_v2-common.h
-> +++ /dev/null
-> @@ -1,16 +0,0 @@
-> -/*
-> - * arch/arm/mach-kirkwood/lacie_v2-common.h
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#ifndef __ARCH_KIRKWOOD_LACIE_V2_COMMON_H
-> -#define __ARCH_KIRKWOOD_LACIE_V2_COMMON_H
-> -
-> -void lacie_v2_register_flash(void);
-> -void lacie_v2_register_i2c_devices(void);
-> -void lacie_v2_hdd_power_init(int hdd_num);
-> -
-> -#endif
-> -- 
-> 1.8.1.2
+> What do you think about this?
+
+Looks good to me. This makes sense for OMAP's sys_clkin clock, probably
+a common pattern.
+
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/1a74be57/attachment.sig>
+> Best regards,
+> Tomasz
