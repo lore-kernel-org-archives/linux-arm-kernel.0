@@ -1,58 +1,45 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 2 Aug 2013 16:04:28 +0300
-Subject: [PATCH 2/2] ARM: OMAP2+: Remove legacy DSS initialization for
- omap4
-In-Reply-To: <51FBAC91.8040401@ti.com>
-References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
- <1374570405-8301-3-git-send-email-tomi.valkeinen@ti.com>
- <51FBAC91.8040401@ti.com>
-Message-ID: <51FBAE5C.1060602@ti.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 02 Aug 2013 15:08:56 +0200
+Subject: [PATCHv2 3/9] ARM: kirkwood: remove support for legacy booting of
+ Guruplug
+In-Reply-To: <20130802124932.GX5882@titan.lakedaemon.net> (Jason Cooper's
+ message of "Fri, 2 Aug 2013 08:49:32 -0400")
+References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375369655-1310-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130802124932.GX5882@titan.lakedaemon.net>
+Message-ID: <87txj8tf2v.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/13 15:56, Nishanth Menon wrote:
-> On 07/23/2013 04:06 AM, Tomi Valkeinen wrote:
->> This is no longer needed as omap4 is now booted using device tree.
->>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Jason Cooper <jason@lakedaemon.net> writes:
+
+> On Thu, Aug 01, 2013 at 05:07:29PM +0200, Thomas Petazzoni wrote:
+>> The Kirkwood Guruplug platform has already been converted to the
+>> Device Tree, so we can remove the legacy booting option for this
+>> platform.
+>> 
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 >> ---
+>>  arch/arm/mach-kirkwood/Kconfig          |   7 --
+>>  arch/arm/mach-kirkwood/Makefile         |   1 -
+>>  arch/arm/mach-kirkwood/guruplug-setup.c | 133 --------------------------------
+>>  3 files changed, 141 deletions(-)
+>>  delete mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
+>> 
+> ...
+>> diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+> ...
+>> -static struct mv_sata_platform_data guruplug_sata_data = {
+>> -	.n_ports	= 1,
+>> -};
+>
+> This just caught my eye.  iirc, there were two flavors of the Guruplug,
+> the Guruplug, and the Guruplug Server Plus (had eSATA plus something
+> else).
 
-<snip>
+the difference between the guruplug server and the server plus is that
+there's one extra ethernet port and a eSATA port on server plus
+(iirc, there's also the guruplug display but it's a very different
+beast)
 
->> diff --git a/arch/arm/mach-omap2/dss-common.h
->> b/arch/arm/mach-omap2/dss-common.h
->> index 915f6ff..c28fe3c 100644
->> --- a/arch/arm/mach-omap2/dss-common.h
->> +++ b/arch/arm/mach-omap2/dss-common.h
->> @@ -6,9 +6,7 @@
->>    * This file will be removed when DSS supports DT.
->>    */
->>
->> -void __init omap4_panda_display_init(void);
->>   void __init omap4_panda_display_init_of(void);
->> -void __init omap_4430sdp_display_init(void);
->>   void __init omap_4430sdp_display_init_of(void);
->>
->>   #endif
->>
-> 
-> Am I missing some series which introduces dts entries for the pinctrl
-> and gpios for omap4 support?
-
-Umm... What? =).
-
-In this dss-common.c file we have code to add the SDP and Panda DSS
-related devices, for both board-file booting and for DT booting. Now the
-board-file booting is no longer available, so we can remove the parts
-that are purely for board-file booting.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/4bdf2627/attachment.sig>
+Arnaud
