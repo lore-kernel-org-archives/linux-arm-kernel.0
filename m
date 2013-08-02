@@ -1,262 +1,119 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri,  2 Aug 2013 16:40:45 +0200
-Subject: [PATCH v8] watchdog: Add MOXA ART watchdog driver
-In-Reply-To: <1375101228-10930-1-git-send-email-jonas.jensen@gmail.com>
-References: <1375101228-10930-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1375454445-15589-1-git-send-email-jonas.jensen@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 2 Aug 2013 09:43:36 -0500
+Subject: [PATCH 1/2] ARM: OMAP: dss-common: fix Panda's DVI DDC channel
+In-Reply-To: <51FBC0C0.2060207@ti.com>
+References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
+ <1374570405-8301-2-git-send-email-tomi.valkeinen@ti.com>
+ <51FBAC21.2040609@ti.com> <51FBAD64.5090600@ti.com> <51FBB461.7010209@ti.com>
+ <51FBC0C0.2060207@ti.com>
+Message-ID: <51FBC598.50601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a watchdog driver for the main hardware watchdog timer
-found on MOXA ART SoCs.
+On 08/02/2013 09:22 AM, Tomi Valkeinen wrote:
+> On 02/08/13 16:30, Nishanth Menon wrote:
+>> On 08/02/2013 08:00 AM, Tomi Valkeinen wrote:
+>
+>>> Feel free to help me develop the DT support for DSS =). When that's
+>>> done, we can remove all this code.
+>>
+>> suggesting here - but it will be nice we have some steps towards this
+>> direction - is there anything you'd suggest we do first?
+>
+> I do have a DSS-DT branch, which works. I've had such a branch for
+> almost a year, although I've been refining it all the time. But I'm
+> still not happy with the DT bindings I have there, and I haven't had any
+> clear ideas how to solve those issues. And, as the DT bindings are an
+> external API, I've been very cautious with it.
+>
+> I'm currently cleaning the branch up, and I hope I can send the series
+> next week. Hopefully I'll receive some ideas for the problematic parts.
+> I'll cc you =).
 
-The MOXA ART SoC provides one writable timer register, restarting
-the hardware once it reaches zero. The register is auto decremented
-every APB clock cycle.
+Awesome, given that there is work in progress to do this properly and 
+the current solution is meant for 3.11 transition, I dont have any 
+objections.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
 
-Notes:
-    Changes since v7:
-    
-    1. remove unlikely from watchdog_register_device return value check
-    2. elaborate commit message
-    
-    Applies to next-20130802
+>
+>>>> Example: if -EPROBEDEFER is incurred due to some unexpected dependency,
+>>>> we'd have to redo the numbering in the kernel yet again.
+>>>
+>>> Hmm, sorry? Do you mean that the i2c bus numbers can change "randomly"?
+>>>
+>>> With board files they were numbered 1, 2, 3, 4, but with DT boot they
+>>> seem to be 0, 1, 2, 3. And as we have the current situation where omap4
+>>> boots with DT, but DSS does not have DT support, we add the DSS related
+>>> devices in a board-file-like-fashion.
+>>
+>> Aah we are then depending on the following
+>> i2c-omap.c:
+>>   adap->nr = pdev->id;
+>>   r = i2c_add_numbered_adapter(adap);
+>>
+>> mach-omapx/i2c.c:
+>> .. i2c_bus_register..
+>> pdev->id = bus_id
+>> platform_device_register(pdev);
+>>
+>>
+>> I dont seem to see any similar numbering enforced in dtsi - if I reorder
+>> the i2c entries in SoC dtsi, i'd have an issue as well, no?
+>
+> I don't know, but yes, possibly. But you probably won't reorder them, as
+> they are in the HW I2C ID module order.
 
- .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
- drivers/watchdog/Kconfig                           |  10 ++
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/moxart_wdt.c                      | 165 +++++++++++++++++++++
- 4 files changed, 191 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
- create mode 100644 drivers/watchdog/moxart_wdt.c
+we dont want to depend on ordering of anything usually.. anyways, 
+besides the point, I guess.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-new file mode 100644
-index 0000000..1169857
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
-@@ -0,0 +1,15 @@
-+MOXA ART Watchdog timer
-+
-+Required properties:
-+
-+- compatible : Must be "moxa,moxart-watchdog"
-+- reg : Should contain registers location and length
-+- clocks : Should contain phandle for the clock that drives the counter
-+
-+Example:
-+
-+	watchdog: watchdog at 98500000 {
-+		compatible = "moxa,moxart-watchdog";
-+		reg = <0x98500000 0x10>;
-+		clocks = <&coreclk>;
-+	};
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 362085d..6883aab 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -382,6 +382,16 @@ config RETU_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called retu_wdt.
- 
-+config MOXART_WDT
-+	tristate "MOXART watchdog"
-+	depends on ARCH_MOXART
-+	help
-+	  Say Y here to include Watchdog timer support for the watchdog
-+	  existing on the MOXA ART SoC series platforms.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called moxart_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 2f26a0b..7cab53a 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
- obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
- obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
- obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-+obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
-new file mode 100644
-index 0000000..4166e4d
---- /dev/null
-+++ b/drivers/watchdog/moxart_wdt.c
-@@ -0,0 +1,165 @@
-+/*
-+ * MOXA ART SoCs watchdog driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/watchdog.h>
-+#include <linux/moduleparam.h>
-+
-+#define REG_COUNT			0x4
-+#define REG_MODE			0x8
-+#define REG_ENABLE			0xC
-+
-+struct moxart_wdt_dev {
-+	struct watchdog_device dev;
-+	void __iomem *base;
-+	unsigned int clock_frequency;
-+};
-+
-+static int heartbeat;
-+
-+static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+
-+	writel(0, moxart_wdt->base + REG_ENABLE);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_start(struct watchdog_device *wdt_dev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+
-+	writel(moxart_wdt->clock_frequency * wdt_dev->timeout,
-+	       moxart_wdt->base + REG_COUNT);
-+	writel(0x5ab9, moxart_wdt->base + REG_MODE);
-+	writel(0x03, moxart_wdt->base + REG_ENABLE);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
-+				  unsigned int timeout)
-+{
-+	wdt_dev->timeout = timeout;
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_info moxart_wdt_info = {
-+	.identity       = "moxart-wdt",
-+	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
-+			  WDIOF_MAGICCLOSE,
-+};
-+
-+static const struct watchdog_ops moxart_wdt_ops = {
-+	.owner          = THIS_MODULE,
-+	.start          = moxart_wdt_start,
-+	.stop           = moxart_wdt_stop,
-+	.set_timeout    = moxart_wdt_set_timeout,
-+};
-+
-+static int moxart_wdt_probe(struct platform_device *pdev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *node = dev->of_node;
-+	struct resource *res;
-+	struct clk *clk;
-+	int err;
-+	unsigned int max_timeout;
-+	bool nowayout = WATCHDOG_NOWAYOUT;
-+
-+	moxart_wdt = devm_kzalloc(dev, sizeof(*moxart_wdt), GFP_KERNEL);
-+	if (!moxart_wdt)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, moxart_wdt);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	moxart_wdt->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(moxart_wdt->base))
-+		return PTR_ERR(moxart_wdt->base);
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: of_clk_get failed\n", __func__);
-+		return PTR_ERR(clk);
-+	}
-+
-+	moxart_wdt->clock_frequency = clk_get_rate(clk);
-+	if (moxart_wdt->clock_frequency == 0) {
-+		pr_err("%s: incorrect clock frequency\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
-+
-+	moxart_wdt->dev.info = &moxart_wdt_info;
-+	moxart_wdt->dev.ops = &moxart_wdt_ops;
-+	moxart_wdt->dev.timeout = max_timeout;
-+	moxart_wdt->dev.min_timeout = 1;
-+	moxart_wdt->dev.max_timeout = max_timeout;
-+	moxart_wdt->dev.parent = dev;
-+
-+	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, dev);
-+	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
-+
-+	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
-+
-+	err = watchdog_register_device(&moxart_wdt->dev);
-+	if (err)
-+		return err;
-+
-+	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
-+		moxart_wdt->dev.timeout, nowayout);
-+
-+	return 0;
-+}
-+
-+static int moxart_wdt_remove(struct platform_device *pdev)
-+{
-+	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
-+
-+	moxart_wdt_stop(&moxart_wdt->dev);
-+	watchdog_unregister_device(&moxart_wdt->dev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id moxart_watchdog_match[] = {
-+	{ .compatible = "moxa,moxart-watchdog" },
-+	{ },
-+};
-+
-+static struct platform_driver moxart_wdt_driver = {
-+	.probe      = moxart_wdt_probe,
-+	.remove     = moxart_wdt_remove,
-+	.driver     = {
-+		.name		= "moxart-watchdog",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= moxart_watchdog_match,
-+	},
-+};
-+module_platform_driver(moxart_wdt_driver);
-+
-+module_param(heartbeat, int, 0);
-+MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
-+
-+MODULE_DESCRIPTION("MOXART watchdog driver");
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+>
+>> probe deferral could create problems as well.. not saying it can change
+>> random order on a given kernel between boots, but am saying that when
+>> new changes come in, deferral mechanism ensures proper ordering
+>> dynamically, which kind of messes up with expected device numbers. I had
+>> an issue with mmc sometime back where probe deferal on mmc1 made it
+>> registered as second device as the dependency was not present on the mmc2.
+>
+> Yes, interesting point. If I got you right, you're saying that if a
+> single i2c device gets deferred, but the others not, the ID numbering
+> could change?
+>
+> I don't if it's possible to get only single i2c device deferred. Maybe.
+>
+> Anyway, we need some way to fix this for 3.11. As far as I understand,
+> it's rather unlikely that the bus number would change, so I think this
+> fix is the best I can do.
+>
+>> No reason this cannot happen on other busses as well. To solve this on
+>> i2c dts, the usual convention is as follows (from omap3-beagle):
+>> &i2c1 {
+>>          clock-frequency = <2600000>;
+>>
+>>          twl: twl at 48 {
+>>                  reg = <0x48>;
+>>                  interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+>>                  interrupt-parent = <&intc>;
+>>          };
+>> };
+>>
+>> this ensures that probe success order is made independent of device
+>> expectation of i2c bus numbering or the order in which it was defined in
+>> dts.
+>
+> With dts, this is not a problem, it's handle with phandles. Although not
+> as you show above, because we don't really have an i2c device on the board.
+>
+> The i2c in question goes through the DVI connector to the monitor. So
+> the monitor is the i2c device. Thus we just get a handle to the i2c bus
+> going to the monitor, and send messages to it directly, without having a
+> linux i2c device.
+
+I think we should take this as part of your series next week :). I could 
+argue that the device on remote display which communicates over DCC is 
+an real i2c device and communicates using real i2c protocol? when we 
+read it, how the gates to EDID information is opened up is upto the driver.
+
+
 -- 
-1.8.2.1
+Regards,
+Nishanth Menon
