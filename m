@@ -1,196 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Aug 2013 15:09:51 +0100
-Subject: [PATCH v6] dmaengine: Add MOXA ART DMA engine driver
-In-Reply-To: <1375450125-29767-1-git-send-email-jonas.jensen@gmail.com>
-References: <1375445018-20713-1-git-send-email-jonas.jensen@gmail.com>
- <1375450125-29767-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130802140951.GP2884@e106331-lin.cambridge.arm.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 2 Aug 2013 22:14:49 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130802123445.GG7656@atomide.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802090355.GF7656@atomide.com>
+ <20130802093222.GA8982@kroah.com>
+ <20130802123445.GG7656@atomide.com>
+Message-ID: <20130802141449.GA7533@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 02:28:45PM +0100, Jonas Jensen wrote:
-> Add dmaengine driver for MOXA ART SoCs.
+On Fri, Aug 02, 2013 at 05:34:45AM -0700, Tony Lindgren wrote:
+> * Greg KH <greg@kroah.com> [130802 02:37]:
+> > On Fri, Aug 02, 2013 at 02:03:55AM -0700, Tony Lindgren wrote:
+> > > * Greg KH <greg@kroah.com> [130801 12:33]:
+> > > > On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
+> > > > > Hello,
+> > > > > 
+> > > > > Whilst Linux implements a bunch of different bus types (many of which
+> > > > > are in fact virtual), devices sitting on non-probable, memory mapped
+> > > > > buses inside SoCs typically live on either the platform_bus or the
+> > > > > amba_bus. So far, this has worked out alright; the buses haven't needed
+> > > > > to be visible to software and no additional software control is really
+> > > > > required from the OS. However, as I/O coherency and hardware
+> > > > > virtualisation capabilities start to creep into ARM-based SoCs, Linux
+> > > > > needs to know the topology of the system on which it is running.
+> > > > > 
+> > > > > Naturally, this would need to be described as a device-tree binding and
+> > > > > communicate:
+> > > > > 
+> > > > >   - Buses which can be configured as coherent, including which devices
+> > > > >     on those buses can be made coherent.
+> > > > > 
+> > > > >   - How IOMMUs sit on the bus and interact with masters on that bus (the
+> > > > >     current one-IOMMU-driver-per-bus may not work well for the
+> > > > >     platform_bus).
+> > > > 
+> > > > I've been waiting for people to finally run into this one, and realize
+> > > > that they shouldn't be using "platform_bus" :)
+> > > > 
+> > > > >   - QoS and PM constraints. This isn't really in my area, but we do have
+> > > > >     buses that have these features and expect software to control them.
+> > > > > 
+> > > > >   - The system topology and linkages between buses and devices.
+> > > > 
+> > > > The driver core handles this really well, you just have to create new
+> > > > busses, and don't rely on the "catch-all" platform_bus.
+> > > 
+> > > Hmm do you have some example of a device driver that is generic and
+> > > is supported on platform_bus and some other bus?
+> > 
+> > Take a look at drivers/usb/host/ohci* for one example that I know of,
+> > there are others all through the kernel as well.
 > 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
-> 
-> Notes:
->     Preemptively submitting a new version that has the previously
->     mentioned two cell xlate.
-> 
->     Changes since v5:
-> 
->     1. add line request number and use two cell xlate
-> 
->     device tree bindings document:
->     2. update description, describe the two cells of #dma-cells
-> 
->     Applies to next-20130802
-> 
->  .../devicetree/bindings/dma/moxa,moxart-dma.txt    |  21 +
->  drivers/dma/Kconfig                                |   7 +
->  drivers/dma/Makefile                               |   1 +
->  drivers/dma/moxart-dma.c                           | 610 +++++++++++++++++++++
->  4 files changed, 639 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
->  create mode 100644 drivers/dma/moxart-dma.c
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
-> new file mode 100644
-> index 0000000..dc2b686
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
-> @@ -0,0 +1,21 @@
-> +MOXA ART DMA Controller
-> +
-> +See dma.txt first
-> +
-> +Required properties:
-> +
-> +- compatible : Must be "moxa,moxart-dma"
-> +- reg :                Should contain registers location and length
-> +- interrupts : Should contain the interrupt number
-> +- #dma-cells : Should be 2
-> +               cell index 0: channel number between 0-3
-> +               cell index 1: line request number
-> +
-> +Example:
-> +
-> +       dma: dma at 90500000 {
-> +               compatible = "moxa,moxart-dma";
-> +               reg = <0x90500000 0x1000>;
-> +               interrupts = <24 0>;
-> +               #dma-cells = <1>;
+> Uhh OK so I guess the answer is that the bus glue still needs to
+> be implemented separately for each driver and there's no generic
+> way of supporting multiple busses?
 
-This should be #dma-cells = <2>;
+Different busses implies that there are different ways to physically
+talk to the device hardware, so of course there is no generic way to
+support that.
 
-[...]
+Unless your subsystem wants to do what we did for USB, and define a
+generic way to talk to the hardware in a very abstract way, allowing for
+totally different types of physical layers to handle lots of different
+logical layer drivers.  But odds are, you don't want to do that.
 
-> +struct moxart_dma_reg {
-> +       u32 source_addr;
-> +       u32 dest_addr;
-> +#define APB_DMA_CYCLES_MASK                    0x00ffffff
-> +       u32 cycles;     /* depend on burst mode */
-> +       u32 ctrl;
-> +};
+It should be easy to just abstract out your "this is how I write a byte
+to the hardware" logic to handle the different bus types, if you really
+are using the same chip/core.  Lots of drivers do this today just fine,
+it isn't a big deal.
 
-I'm not keen on relying on structs for register offsets, but at least
-they're exact width u32s.
+thanks,
 
-[...]
-
-> +static int moxart_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +       struct moxart_dma_chan *mchan = to_moxart_dma_chan(chan);
-> +       int i;
-> +       bool found = false;
-> +
-> +       for (i = 0; i < APB_DMA_MAX_CHANNEL; i++) {
-> +               if (i == mchan->ch_num
-> +                       && !mchan->allocated) {
-> +                       dev_dbg(chan2dev(chan), "%s: allocating channel #%d\n",
-> +                               __func__, mchan->ch_num);
-> +                       mchan->allocated = true;
-> +                       found = true;
-
-Why not return 0 here...
-
-> +                       break;
-> +               }
-> +       }
-
-
-...and always return -ENODEV here?
-
-That way you can also get rid of the found variable.
-
-> +
-> +       if (!found)
-> +               return -ENODEV;
-> +
-> +       return 0;
-> +}
-
-[...]
-
-> +static struct irqaction moxart_dma_irq = {
-> +       .name       = "moxart-dma-engine",
-> +       .flags      = IRQF_DISABLED,
-> +       .handler    = moxart_dma_interrupt,
-> +};
-> +
-> +static int moxart_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *node = dev->of_node;
-> +       struct resource *res;
-> +       static void __iomem *dma_base_addr;
-> +       int ret, i;
-> +       unsigned int irq;
-> +       struct moxart_dma_chan *mchan;
-> +       struct moxart_dma_container *mdc;
-> +
-> +       mdc = devm_kzalloc(dev, sizeof(*mdc), GFP_KERNEL);
-> +       if (!mdc) {
-> +               dev_err(dev, "can't allocate DMA container\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       irq = irq_of_parse_and_map(node, 0);
-
-What if this fails (where irq == 0)?.
-
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       dma_base_addr = devm_ioremap_resource(dev, res);
-> +       if (IS_ERR(dma_base_addr)) {
-> +               dev_err(dev, "devm_ioremap_resource failed\n");
-> +               return PTR_ERR(dma_base_addr);
-> +       }
-> +
-> +       mdc->ctlr = pdev->id;
-> +       spin_lock_init(&mdc->dma_lock);
-> +
-> +       dma_cap_zero(mdc->dma_slave.cap_mask);
-> +       dma_cap_set(DMA_SLAVE, mdc->dma_slave.cap_mask);
-> +
-> +       moxart_dma_init(&mdc->dma_slave, dev);
-> +
-> +       mchan = &mdc->slave_chans[0];
-> +       for (i = 0; i < APB_DMA_MAX_CHANNEL; i++, mchan++) {
-> +               mchan->ch_num = i;
-> +               mchan->reg = (struct moxart_dma_reg *)(dma_base_addr + 0x80
-> +                            + i * sizeof(struct moxart_dma_reg));
-> +               mchan->callback = NULL;
-> +               mchan->allocated = 0;
-> +               mchan->callback_param = NULL;
-> +
-> +               dma_cookie_init(&mchan->chan);
-> +               mchan->chan.device = &mdc->dma_slave;
-> +               list_add_tail(&mchan->chan.device_node,
-> +                             &mdc->dma_slave.channels);
-> +
-> +               dev_dbg(dev, "%s: mchans[%d]: mchan->ch_num=%d mchan->reg=%p\n",
-> +                       __func__, i, mchan->ch_num, mchan->reg);
-> +       }
-> +
-> +       ret = dma_async_device_register(&mdc->dma_slave);
-> +       platform_set_drvdata(pdev, mdc);
-> +
-> +       of_dma_controller_register(node, moxart_of_xlate, &moxart_dma_info);
-> +
-> +       moxart_dma_irq.dev_id = &mdc->dma_slave;
-> +       setup_irq(irq, &moxart_dma_irq);
-
-What if this fails?
-
-Is there any reason you can't use request_irq over setup_irq?
-
-> +
-> +       dev_dbg(dev, "%s: IRQ=%d\n", __func__, irq);
-> +
-> +       return ret;
-> +}
-
-Thanks,
-Mark.
+greg k-h
