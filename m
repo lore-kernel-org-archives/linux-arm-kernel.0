@@ -1,54 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 2 Aug 2013 11:19:26 +0200
-Subject: [PATCHv3 1/3] video: mxsfb: fix color settings for 18bit data
- bus and 32bpp
-In-Reply-To: <51FB6F51.7090500@ti.com>
-References: <1375346437-18991-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375346437-18991-2-git-send-email-maxime.ripard@free-electrons.com>
- <51FB6F51.7090500@ti.com>
-Message-ID: <20130802091926.GR2911@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Aug 2013 10:26:00 +0100
+Subject: [PATCH] ARM: Fix memblock_reserve() to include stext
+In-Reply-To: <CANqRtoQkfDcCNYdYJMpf4zc3P0=kuV-LJFva33vSmio6YAOBrQ@mail.gmail.com>
+References: <20130731055807.14054.70106.sendpatchset@w520>
+ <20130731094352.GV24642@n2100.arm.linux.org.uk>
+ <CANqRtoR5j2VyRwf0suABfVLxzU30pZndEcCj7uZ2sSrzfGmx_A@mail.gmail.com>
+ <20130731193930.GY24642@n2100.arm.linux.org.uk>
+ <CANqRtoQkfDcCNYdYJMpf4zc3P0=kuV-LJFva33vSmio6YAOBrQ@mail.gmail.com>
+Message-ID: <20130802092600.GN23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 11:35:29AM +0300, Tomi Valkeinen wrote:
-> On 01/08/13 11:40, Maxime Ripard wrote:
-> > From: Hector Palacios <hector.palacios@digi.com>
-> > 
-> > For a combination of 18bit LCD data bus width and a color
-> > mode of 32bpp, the driver was setting the color mapping to
-> > rgb666, which is wrong, as the color in memory realy has an
-> > rgb888 layout.
-> > 
-> > This patch also removes the setting of flag CTRL_DF24 that
-> > makes the driver dimiss the upper 2 bits when handling 32/24bpp
-> > colors in a diplay with 18bit data bus width. This flag made
-> > true color images display wrong in such configurations.
-> > 
-> > Finally, the color mapping rgb666 has also been removed as nobody
-> > is using it and high level applications like Qt5 cannot work
-> > with it either.
-> > 
-> > Reference: https://lkml.org/lkml/2013/5/23/220
-> > Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-> > Acked-by: Juergen Beisert <jbe@pengutronix.de>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/video/mxsfb.c | 26 --------------------------
-> >  1 file changed, 26 deletions(-)
+On Fri, Aug 02, 2013 at 12:24:17PM +0900, Magnus Damm wrote:
+> On Thu, Aug 1, 2013 at 4:39 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Aug 01, 2013 at 04:34:03AM +0900, Magnus Damm wrote:
+> >> Are you aware of any existing fix for this or anyone working on
+> >> solving this issue? If not then I don't mind stepping up. I can
+> >> however think of quite a few other things to do if this has been
+> >> solved already though, so please let me know if you think I should
+> >> focus on fixing this.
+> >
+> > I committed a fix for it this morning, so it should be in linux-next by
+> > tomorrow.
 > 
-> This one is labeled as "fix". Should it got to v3.11?
+> Thanks for writing a fix, Russell. I cherry picked the following
+> commit from linux-arm:
+> 
+> cd717a2 ARM: Add .text annotations where required after __CPUINIT removal
+> 
+> Applying it on top of kernel.org renesas git tag
+> renesas-devel-20130801v2 (v3.11-rc3 + v3.12 material) solves the
+> problem for me. I just tested this on KZM9G hardware without and with
+> the patch, so I can confirm that CPU Hotplug is now working again.
+> 
+> Tested-by: Magnus Damm <damm@opensource.se>
 
-It would be better yes. Otherwise, 3.12 will do.
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/7d50883f/attachment.sig>
+It should've ended up in Linus' tree last night, but from the looks of
+how quiet things seem to be, I guess everyone's away on August vacations
+at the moment.
