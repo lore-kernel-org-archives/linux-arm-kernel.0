@@ -1,110 +1,262 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Fri, 02 Aug 2013 11:40:14 -0300
-Subject: [PATCH 2/2] ARM: sun5i: dt: Use the A10s gates in the DTSI
-In-Reply-To: <1374618504-19391-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1374618504-19391-1-git-send-email-maxime.ripard@free-electrons.com>
- <1374618504-19391-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51FBC4CE.8090009@elopez.com.ar>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri,  2 Aug 2013 16:40:45 +0200
+Subject: [PATCH v8] watchdog: Add MOXA ART watchdog driver
+In-Reply-To: <1375101228-10930-1-git-send-email-jonas.jensen@gmail.com>
+References: <1375101228-10930-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1375454445-15589-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+This patch adds a watchdog driver for the main hardware watchdog timer
+found on MOXA ART SoCs.
 
-El 23/07/13 19:28, Maxime Ripard escribi?:
-> The A10s has only a subset of the A10 gates. Now that the clock driver
-> has support for this gates set, switch to it in the DTSI.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The MOXA ART SoC provides one writable timer register, restarting
+the hardware once it reaches zero. The register is auto decremented
+every APB clock cycle.
 
-As I mentioned on the other patch, my board boots, so
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Tested-by: Emilio L?pez <emilio@elopez.com.ar>
+Notes:
+    Changes since v7:
+    
+    1. remove unlikely from watchdog_register_device return value check
+    2. elaborate commit message
+    
+    Applies to next-20130802
 
-> ---
->  arch/arm/boot/dts/sun5i-a10s.dtsi | 36 ++++++++++++++----------------------
->  1 file changed, 14 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> index 0f0881a..b8fc1c2 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> @@ -95,20 +95,16 @@
->  
->  		ahb_gates: ahb_gates at 01c20060 {
->  			#clock-cells = <1>;
-> -			compatible = "allwinner,sun4i-ahb-gates-clk";
-> +			compatible = "allwinner,sun5i-a10s-ahb-gates-clk";
->  			reg = <0x01c20060 0x8>;
->  			clocks = <&ahb>;
-> -			clock-output-names = "ahb_usb0", "ahb_ehci0",
-> -				"ahb_ohci0", "ahb_ehci1", "ahb_ohci1", "ahb_ss",
-> -				"ahb_dma", "ahb_bist", "ahb_mmc0", "ahb_mmc1",
-> -				"ahb_mmc2", "ahb_mmc3", "ahb_ms", "ahb_nand",
-> -				"ahb_sdram", "ahb_ace",	"ahb_emac", "ahb_ts",
-> -				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_spi3",
-> -				"ahb_pata", "ahb_sata", "ahb_gps", "ahb_ve",
-> -				"ahb_tvd", "ahb_tve0", "ahb_tve1", "ahb_lcd0",
-> -				"ahb_lcd1", "ahb_csi0", "ahb_csi1", "ahb_hdmi",
-> -				"ahb_de_be0", "ahb_de_be1", "ahb_de_fe0",
-> -				"ahb_de_fe1", "ahb_mp", "ahb_mali400";
-> +			clock-output-names = "ahb_usbotg", "ahb_ehci", "ahb_ohci",
-> +				"ahb_ss", "ahb_dma", "ahb_bist", "ahb_mmc0",
-> +				"ahb_mmc1", "ahb_mmc2",
+ .../bindings/watchdog/moxa,moxart-watchdog.txt     |  15 ++
+ drivers/watchdog/Kconfig                           |  10 ++
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/moxart_wdt.c                      | 165 +++++++++++++++++++++
+ 4 files changed, 191 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+ create mode 100644 drivers/watchdog/moxart_wdt.c
 
-I noticed the vendor code also has "ahb_ms" here, it might be worth
-keeping it in mind.
-
-> "ahb_nand", "ahb_sdram",
-> +				"ahb_emac", "ahb_ts", "ahb_spi0", "ahb_spi1",
-> +				"ahb_spi2", "ahb_gps", "ahb_stimer", "ahb_ve",
-> +				"ahb_tve", "ahb_lcd", "ahb_csi", "ahb_hdmi",
-> +				"ahb_de_be", "ahb_de_fe", "ahb_iep", "ahb_mali400";
->  		};
->  
->  		apb0: apb0 at 01c20054 {
-> @@ -120,12 +116,11 @@
->  
->  		apb0_gates: apb0_gates at 01c20068 {
->  			#clock-cells = <1>;
-> -			compatible = "allwinner,sun4i-apb0-gates-clk";
-> +			compatible = "allwinner,sun5i-a10s-apb0-gates-clk";
->  			reg = <0x01c20068 0x4>;
->  			clocks = <&apb0>;
-> -			clock-output-names = "apb0_codec", "apb0_spdif",
-> -				"apb0_ac97", "apb0_iis", "apb0_pio", "apb0_ir0",
-> -				"apb0_ir1", "apb0_keypad";
-> +			clock-output-names = "apb0_codec", "apb0_iis", "apb0_pio",
-> +				"apb0_ir", "apb0_keypad";
->  		};
->  
->  		/* dummy is pll62 */
-> @@ -145,15 +140,12 @@
->  
->  		apb1_gates: apb1_gates at 01c2006c {
->  			#clock-cells = <1>;
-> -			compatible = "allwinner,sun4i-apb1-gates-clk";
-> +			compatible = "allwinner,sun5i-a10s-apb1-gates-clk";
->  			reg = <0x01c2006c 0x4>;
->  			clocks = <&apb1>;
->  			clock-output-names = "apb1_i2c0", "apb1_i2c1",
-> -				"apb1_i2c2", "apb1_can", "apb1_scr",
-> -				"apb1_ps20", "apb1_ps21", "apb1_uart0",
-> -				"apb1_uart1", "apb1_uart2", "apb1_uart3",
-> -				"apb1_uart4", "apb1_uart5", "apb1_uart6",
-> -				"apb1_uart7";
-> +				"apb1_i2c2", "apb1_uart0", "apb1_uart1",
-> +				"apb1_uart2", "apb1_uart3";
->  		};
->  	};
->  
-> 
-
-An update to the documentation mentioning these compatibles[1] and
-gates[2] would be great :)
-
-[1] Documentation/devicetree/bindings/clock/sunxi.txt
-[2] Documentation/devicetree/bindings/clock/sunxi/sun5i-a10s-gates.txt
-
-Thanks for working on this!
-
-Emilio
+diff --git a/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+new file mode 100644
+index 0000000..1169857
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/moxa,moxart-watchdog.txt
+@@ -0,0 +1,15 @@
++MOXA ART Watchdog timer
++
++Required properties:
++
++- compatible : Must be "moxa,moxart-watchdog"
++- reg : Should contain registers location and length
++- clocks : Should contain phandle for the clock that drives the counter
++
++Example:
++
++	watchdog: watchdog at 98500000 {
++		compatible = "moxa,moxart-watchdog";
++		reg = <0x98500000 0x10>;
++		clocks = <&coreclk>;
++	};
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 362085d..6883aab 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -382,6 +382,16 @@ config RETU_WATCHDOG
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called retu_wdt.
+ 
++config MOXART_WDT
++	tristate "MOXART watchdog"
++	depends on ARCH_MOXART
++	help
++	  Say Y here to include Watchdog timer support for the watchdog
++	  existing on the MOXA ART SoC series platforms.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called moxart_wdt.
++
+ # AVR32 Architecture
+ 
+ config AT32AP700X_WDT
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 2f26a0b..7cab53a 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -54,6 +54,7 @@ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+ obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+ obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
+ obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
++obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
+ 
+ # AVR32 Architecture
+ obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
+new file mode 100644
+index 0000000..4166e4d
+--- /dev/null
++++ b/drivers/watchdog/moxart_wdt.c
+@@ -0,0 +1,165 @@
++/*
++ * MOXA ART SoCs watchdog driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/watchdog.h>
++#include <linux/moduleparam.h>
++
++#define REG_COUNT			0x4
++#define REG_MODE			0x8
++#define REG_ENABLE			0xC
++
++struct moxart_wdt_dev {
++	struct watchdog_device dev;
++	void __iomem *base;
++	unsigned int clock_frequency;
++};
++
++static int heartbeat;
++
++static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
++{
++	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
++
++	writel(0, moxart_wdt->base + REG_ENABLE);
++
++	return 0;
++}
++
++static int moxart_wdt_start(struct watchdog_device *wdt_dev)
++{
++	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
++
++	writel(moxart_wdt->clock_frequency * wdt_dev->timeout,
++	       moxart_wdt->base + REG_COUNT);
++	writel(0x5ab9, moxart_wdt->base + REG_MODE);
++	writel(0x03, moxart_wdt->base + REG_ENABLE);
++
++	return 0;
++}
++
++static int moxart_wdt_set_timeout(struct watchdog_device *wdt_dev,
++				  unsigned int timeout)
++{
++	wdt_dev->timeout = timeout;
++
++	return 0;
++}
++
++static const struct watchdog_info moxart_wdt_info = {
++	.identity       = "moxart-wdt",
++	.options        = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
++			  WDIOF_MAGICCLOSE,
++};
++
++static const struct watchdog_ops moxart_wdt_ops = {
++	.owner          = THIS_MODULE,
++	.start          = moxart_wdt_start,
++	.stop           = moxart_wdt_stop,
++	.set_timeout    = moxart_wdt_set_timeout,
++};
++
++static int moxart_wdt_probe(struct platform_device *pdev)
++{
++	struct moxart_wdt_dev *moxart_wdt;
++	struct device *dev = &pdev->dev;
++	struct device_node *node = dev->of_node;
++	struct resource *res;
++	struct clk *clk;
++	int err;
++	unsigned int max_timeout;
++	bool nowayout = WATCHDOG_NOWAYOUT;
++
++	moxart_wdt = devm_kzalloc(dev, sizeof(*moxart_wdt), GFP_KERNEL);
++	if (!moxart_wdt)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, moxart_wdt);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	moxart_wdt->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(moxart_wdt->base))
++		return PTR_ERR(moxart_wdt->base);
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk)) {
++		pr_err("%s: of_clk_get failed\n", __func__);
++		return PTR_ERR(clk);
++	}
++
++	moxart_wdt->clock_frequency = clk_get_rate(clk);
++	if (moxart_wdt->clock_frequency == 0) {
++		pr_err("%s: incorrect clock frequency\n", __func__);
++		return -EINVAL;
++	}
++
++	max_timeout = UINT_MAX / moxart_wdt->clock_frequency;
++
++	moxart_wdt->dev.info = &moxart_wdt_info;
++	moxart_wdt->dev.ops = &moxart_wdt_ops;
++	moxart_wdt->dev.timeout = max_timeout;
++	moxart_wdt->dev.min_timeout = 1;
++	moxart_wdt->dev.max_timeout = max_timeout;
++	moxart_wdt->dev.parent = dev;
++
++	watchdog_init_timeout(&moxart_wdt->dev, heartbeat, dev);
++	watchdog_set_nowayout(&moxart_wdt->dev, nowayout);
++
++	watchdog_set_drvdata(&moxart_wdt->dev, moxart_wdt);
++
++	err = watchdog_register_device(&moxart_wdt->dev);
++	if (err)
++		return err;
++
++	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
++		moxart_wdt->dev.timeout, nowayout);
++
++	return 0;
++}
++
++static int moxart_wdt_remove(struct platform_device *pdev)
++{
++	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
++
++	moxart_wdt_stop(&moxart_wdt->dev);
++	watchdog_unregister_device(&moxart_wdt->dev);
++
++	return 0;
++}
++
++static const struct of_device_id moxart_watchdog_match[] = {
++	{ .compatible = "moxa,moxart-watchdog" },
++	{ },
++};
++
++static struct platform_driver moxart_wdt_driver = {
++	.probe      = moxart_wdt_probe,
++	.remove     = moxart_wdt_remove,
++	.driver     = {
++		.name		= "moxart-watchdog",
++		.owner		= THIS_MODULE,
++		.of_match_table	= moxart_watchdog_match,
++	},
++};
++module_platform_driver(moxart_wdt_driver);
++
++module_param(heartbeat, int, 0);
++MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
++
++MODULE_DESCRIPTION("MOXART watchdog driver");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Jonas Jensen <jonas.jensen@gmail.com>");
+-- 
+1.8.2.1
