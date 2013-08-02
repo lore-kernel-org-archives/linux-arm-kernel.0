@@ -1,122 +1,83 @@
-From: gururaja.hebbar@ti.com (Gururaja Hebbar)
-Date: Fri, 2 Aug 2013 17:18:07 +0530
-Subject: [Patch V2 4/4] ARM: dts: AM33XX: update rtc node compatibility
-In-Reply-To: <20130802112018.GI2884@e106331-lin.cambridge.arm.com>
-References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
- <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
- <51F749B0.7020802@ti.com>
- <20130730145501.GA29859@e106331-lin.cambridge.arm.com>
- <51F7E7FA.3080702@ti.com>
- <20130801170537.GF8095@e106331-lin.cambridge.arm.com>
- <51FB92F8.9020801@ti.com>
- <20130802112018.GI2884@e106331-lin.cambridge.arm.com>
-Message-ID: <51FB9C77.3090202@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Aug 2013 12:53:34 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130801192730.GC9174@kroah.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+Message-ID: <20130802115334.GN2465@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/2/2013 4:50 PM, Mark Rutland wrote:
-> On Fri, Aug 02, 2013 at 12:07:36PM +0100, Gururaja Hebbar wrote:
->> On 8/1/2013 10:35 PM, Mark Rutland wrote:
->>> On Tue, Jul 30, 2013 at 05:21:14PM +0100, Sekhar Nori wrote:
->>>> On 7/30/2013 8:25 PM, Mark Rutland wrote:
->>>>> On Tue, Jul 30, 2013 at 06:05:52AM +0100, Gururaja Hebbar wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
->>>>>>> Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
->>>>>>>
->>>>>>> Update the rtc compatible property to "ti,am3352-rtc" to enable handling
->>>>>>> of this feature inside rtc-omap driver.
->>>>>>
->>>>>> The other 2 rtc driver related patches have been pulled up. If you have
->>>>>> no comments, can you please pull this up.
->>>>>>
->>>>>> Regards
->>>>>> Gururaja
->>>>>>
->>>>>>>
->>>>>>> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
->>>>>>> ---
->>>>>>> :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
->>>>>>>     arch/arm/boot/dts/am33xx.dtsi |    2 +-
->>>>>>>     1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->>>>>>> index 77aa1b0..dde180a 100644
->>>>>>> --- a/arch/arm/boot/dts/am33xx.dtsi
->>>>>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
->>>>>>> @@ -297,7 +297,7 @@
->>>>>>>     		};
->>>>>>>
->>>>>>>     		rtc at 44e3e000 {
->>>>>>> -			compatible = "ti,da830-rtc";
->>>>>>> +			compatible = "ti,am3352-rtc";
->>>>>
->>>>> Given that this is backwards compatible with the old binding, it would
->>>>> be nicer to have this as:
->>>>>
->>>>> 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
->>>>>
->>>>> We must get into the habit of changing dts files in a
->>>>> backwards-compatible fashion.
->>>>
->>>> Right, I suggested this when v1 was posted. It turns out the current
->>>> kernel does not handle the compatilble list correctly and the string
->>>> selected actually depends on the order in which it appears in match
->>>> table in driver instead.
->>>>
->>>> I saw there were patches being discussed to fix this issue, but until
->>>> that is fixed, we cannot really use what you (and I before) suggested.
->>>
->>> A temporary solution would be to list the "ti,am3352-rtc" first in the
->>> of_match_table kernel-side.
->>
->> If above method is followed, then it would cause trouble on davinci
->> platform because this rtc-omap driver is also used by Davinci platform.
->> On davinci Plaform the driver would match with "ti,am3352-rtc" for
->> compatible.
->
-> Sorry, I don't follow. Does the davinci dt have "ti,am3352-rtc" in it's
-> compatible string list?
+Hi Greg,
 
-no no. Davinci .dts uses "ti,da830-rtc".
+On Thu, Aug 01, 2013 at 08:27:30PM +0100, Greg KH wrote:
+> On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
+> > Naturally, this would need to be described as a device-tree binding and
+> > communicate:
+> > 
+> >   - Buses which can be configured as coherent, including which devices
+> >     on those buses can be made coherent.
+> > 
+> >   - How IOMMUs sit on the bus and interact with masters on that bus (the
+> >     current one-IOMMU-driver-per-bus may not work well for the
+> >     platform_bus).
+> 
+> I've been waiting for people to finally run into this one, and realize
+> that they shouldn't be using "platform_bus" :)
 
-I was saying if we reverse the order of "of_device_id" structure in 
-rtc-omap driver, then it would work nicely for am335x but will cause 
-trouble on davinci platform.
+But, as pointed out later in this thread, people have been doing the exact
+opposite! We can change the mindset by yelling, but if you're writing a new
+driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
+because you get a bunch of device-tree parsing code for free (see
+drivers/of/platform.c).
 
->
-> If so, and it's not compatible, the dts is wrong.
->
-> If not, then we won't use the behaviour specific to "ti,am3352-rtc", and
-> there's no problem.
->
-> What trouble would this cause?
->
-> Thanks,
-> Mark.
->
->>
->> Regards
->> Gururaja
->>
->>> That way you can keep the old compatible
->>> string in the dts compatible list, and maintain backwards compatibilty
->>> with older kernels.
->>>
->>> Later if the way Linux matches compatible strings is changed, this
->>> shouldn't break the probe order, and the of_match_table order could be
->>> changed.
->>>
->>> Have I missed something?
->>>
->>> Thanks,
->>> Mark.
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+What's worse is that this nice-and-easy auto-probing doesn't work for nested
+device-nodes (i.e. a bunch of device-nodes under a common parent, something
+which you might think is pretty common in a `tree') so people shy away from
+nesting as a means to group devices too.
+
+> >   - QoS and PM constraints. This isn't really in my area, but we do have
+> >     buses that have these features and expect software to control them.
+> > 
+> >   - The system topology and linkages between buses and devices.
+> 
+> The driver core handles this really well, you just have to create new
+> busses, and don't rely on the "catch-all" platform_bus.
+
+Agreed, it's time that we started to describe these non-probable buses as
+separate bus_types, with controller logic for configuring the bus itself
+(there are weird-and-wonderful ring-based designs on the horizon which can
+require a fair amount of setup).
+
+> > The last point is increasingly important as various blocks of ARM system
+> > IP start to require knowledge of masters and how things like memory
+> > traffic, DVM messages, interrupts (think MSI) etc are routed between
+> > them in order to configure the system correctly. For example, interfacing
+> > a PCIe device with an SMMU requires knowledge of both the requester id
+> > associated with the device and how that maps to incoming stream ids
+> > (based off the AXI bus id) on the SMMU. Even worse, this mapping is
+> > likely generated dynamically by the host controller, which would need to
+> > know about downstream buses and their SMMUs.
+> 
+> Hm, sounds like an ACPI tree is what you need to be using :)
+> 
+> Seriously, why not use ACPI for stuff like this?  You already are
+> starting to do that for ARM-based systems, why not just make it the
+> standard?
+
+So, like a good proportion of the ARM community, ACPI isn't something I'm
+well-versed in. Yes, it's coming, but at the same time it's not going to be
+everywhere and we need to continue to support new SoCs using device-tree.
+Whilst it might even become a de-factor standard for servers, mobile devices
+will likely continue with the bootloaders they currently have. Furthermore,
+the mobile space is really the wild-west when it comes to system topology --
+exynos SoCs tend to have one IOMMU per device, for example:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181922.html
+
+On the back of that, how does ACPI describe these relationships? It would
+certainly be a good idea to see what's already being done so we don't
+reinvent everything again for device-tree.
+
+Will
