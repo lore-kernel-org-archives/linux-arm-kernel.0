@@ -1,42 +1,94 @@
-From: greg@kroah.com (Greg KH)
-Date: Sat, 3 Aug 2013 06:32:47 +0800
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130802160932.GG5292@mudshark.cambridge.arm.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802115334.GN2465@mudshark.cambridge.arm.com>
- <20130802142010.GC7533@kroah.com>
- <20130802160932.GG5292@mudshark.cambridge.arm.com>
-Message-ID: <20130802223247.GC28831@kroah.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 02 Aug 2013 15:43:08 -0700
+Subject: [PATCH v3 15/31] dts: mpc512x: introduce dt-bindings/clock/ header
+In-Reply-To: <1374495298-22019-16-git-send-email-gsi@denx.de>
+References: <1374166855-7280-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-16-git-send-email-gsi@denx.de>
+Message-ID: <20130802224308.6450.55171@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
-> On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
-> > On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
-> > > We can change the mindset by yelling, but if you're writing a new
-> > > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
-> > > because you get a bunch of device-tree parsing code for free (see
-> > > drivers/of/platform.c).
-> > 
-> > I know :(
-> > 
-> > So, who do I "yell at", and what do I do to make things easier for you
-> > from the driver-core perspective?
+Quoting Gerhard Sittig (2013-07-22 05:14:42)
+> introduce a dt-bindings/ header file for MPC512x clocks,
+> providing symbolic identifiers for those SoC clocks which
+> clients will reference from their device tree nodes
 > 
-> I would anticipate most of these drivers going through the arm-soc tree, so
-> Olof and Kevin would be doing the yelling. You could join in the chorus too!
+> Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> ---
+>  include/dt-bindings/clock/mpc512x-clock.h |   59 +++++++++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/mpc512x-clock.h
 > 
-> We basically need reviewers to adopt the position that a new bus should be
-> considered and dismissed before using the platform_bus, then you can yell
-> transitively through them.
+> diff --git a/include/dt-bindings/clock/mpc512x-clock.h b/include/dt-bindings/clock/mpc512x-clock.h
+> new file mode 100644
+> index 0000000..46c560e
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/mpc512x-clock.h
+> @@ -0,0 +1,59 @@
+> +/*
+> + * This header provides constants for MPC512x clock specs in DT bindings.
+> + *
+> + * Unfortunately the clock number declaration cannot be an enum but
+> + * needs to be a list of #define directives since when referenced from
+> + * within DTS files they need to get resolved "at compile time".
 
-I don't scale if I'm forced to review every driver to ensure that they
-shouldn't be using platform device and should be creating their own bus
-type.  You can do that, along with the other ARM developers reviewing
-these new subsystems and code being added.
+Above comment is not really necessary. Otherwise,
 
-thanks,
+Reviewed-by: Mike Turquette <mturquette@linaro.org>
 
-greg k-h
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
+> +#define _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
+> +
+> +#define MPC512x_CLK_DUMMY              0
+> +#define MPC512x_CLK_REF                        1
+> +#define MPC512x_CLK_SYS                        2
+> +#define MPC512x_CLK_DIU                        3
+> +#define MPC512x_CLK_VIU                        4
+> +#define MPC512x_CLK_CSB                        5
+> +#define MPC512x_CLK_E300               6
+> +#define MPC512x_CLK_IPS                        7
+> +#define MPC512x_CLK_FEC                        8
+> +#define MPC512x_CLK_SATA               9
+> +#define MPC512x_CLK_PATA               10
+> +#define MPC512x_CLK_NFC                        11
+> +#define MPC512x_CLK_LPC                        12
+> +#define MPC512x_CLK_MBX_BUS            13
+> +#define MPC512x_CLK_MBX                        14
+> +#define MPC512x_CLK_MBX_3D             15
+> +#define MPC512x_CLK_AXE                        16
+> +#define MPC512x_CLK_USB1               17
+> +#define MPC512x_CLK_USB2               18
+> +#define MPC512x_CLK_I2C                        19
+> +#define MPC512x_CLK_MSCAN0_MCLK                20
+> +#define MPC512x_CLK_MSCAN1_MCLK                21
+> +#define MPC512x_CLK_MSCAN2_MCLK                22
+> +#define MPC512x_CLK_MSCAN3_MCLK                23
+> +#define MPC512x_CLK_SDHC               24
+> +#define MPC512x_CLK_PCI                        25
+> +#define MPC512x_CLK_PSC_MCLK_IN                26
+> +#define MPC512x_CLK_SPDIF_TX           27
+> +#define MPC512x_CLK_SPDIF_RX           28
+> +#define MPC512x_CLK_SPDIF_MCLK         29
+> +#define MPC512x_CLK_AC97               30
+> +#define MPC512x_CLK_PSC0_MCLK          31
+> +#define MPC512x_CLK_PSC1_MCLK          32
+> +#define MPC512x_CLK_PSC2_MCLK          33
+> +#define MPC512x_CLK_PSC3_MCLK          34
+> +#define MPC512x_CLK_PSC4_MCLK          35
+> +#define MPC512x_CLK_PSC5_MCLK          36
+> +#define MPC512x_CLK_PSC6_MCLK          37
+> +#define MPC512x_CLK_PSC7_MCLK          38
+> +#define MPC512x_CLK_PSC8_MCLK          39
+> +#define MPC512x_CLK_PSC9_MCLK          40
+> +#define MPC512x_CLK_PSC10_MCLK         41
+> +#define MPC512x_CLK_PSC11_MCLK         42
+> +#define MPC512x_CLK_PSC_FIFO           43
+> +
+> +#define MPC512x_CLK_LAST_PUBLIC                43
+> +
+> +#endif
+> -- 
+> 1.7.10.4
