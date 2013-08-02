@@ -1,68 +1,214 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Aug 2013 17:09:32 +0100
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130802142010.GC7533@kroah.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802115334.GN2465@mudshark.cambridge.arm.com>
- <20130802142010.GC7533@kroah.com>
-Message-ID: <20130802160932.GG5292@mudshark.cambridge.arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 2 Aug 2013 17:12:48 +0100
+Subject: [PATCH RFC 7/8] swiotlb-xen: support autotranslate guests
+In-Reply-To: <20130802123740.GI24540@konrad-lan.dumpdata.com>
+References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
+ <1375292732-7627-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130802123740.GI24540@konrad-lan.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1308021529090.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
-> On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
-> > We can change the mindset by yelling, but if you're writing a new
-> > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
-> > because you get a bunch of device-tree parsing code for free (see
-> > drivers/of/platform.c).
-> 
-> I know :(
-> 
-> So, who do I "yell at", and what do I do to make things easier for you
-> from the driver-core perspective?
-
-I would anticipate most of these drivers going through the arm-soc tree, so
-Olof and Kevin would be doing the yelling. You could join in the chorus too!
-
-We basically need reviewers to adopt the position that a new bus should be
-considered and dismissed before using the platform_bus, then you can yell
-transitively through them.
-
-> > Agreed, it's time that we started to describe these non-probable buses as
-> > separate bus_types, with controller logic for configuring the bus itself
-> > (there are weird-and-wonderful ring-based designs on the horizon which can
-> > require a fair amount of setup).
-> 
-> I've heard rumors of those for a while now, I'll believe it when I see
-> them :)
-
-Oh, they're coming. I'm trying to understand the programmer's model for one
-as we speak :) On the plus side, you also get a whole bunch of debug and PMU
-data on these things, which is interesting from a kernel perspective.
-
-> > So, like a good proportion of the ARM community, ACPI isn't something I'm
-> > well-versed in. Yes, it's coming, but at the same time it's not going to be
-> > everywhere and we need to continue to support new SoCs using device-tree.
-> > Whilst it might even become a de-factor standard for servers, mobile devices
-> > will likely continue with the bootloaders they currently have. Furthermore,
-> > the mobile space is really the wild-west when it comes to system topology --
-> > exynos SoCs tend to have one IOMMU per device, for example:
+On Fri, 2 Aug 2013, Konrad Rzeszutek Wilk wrote:
+> On Wed, Jul 31, 2013 at 06:45:31PM +0100, Stefano Stabellini wrote:
+> > Support autotranslate guests in swiotlb-xen by keeping track of the
+> > phys-to-bus and bus-to-phys mappings of the swiotlb buffer
+> > (xen_io_tlb_start-xen_io_tlb_end).
 > > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181922.html
+> > Use a simple direct access on a pre-allocated array for phys-to-bus
+> > queries. Use a red-black tree for bus-to-phys queries.
 > > 
-> > On the back of that, how does ACPI describe these relationships? It would
-> > certainly be a good idea to see what's already being done so we don't
-> > reinvent everything again for device-tree.
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: david.vrabel at citrix.com
+> > ---
+> >  drivers/xen/swiotlb-xen.c |  127 +++++++++++++++++++++++++++++++++++++++------
+> >  1 files changed, 111 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> > index 353f013..c79ac88 100644
+> > --- a/drivers/xen/swiotlb-xen.c
+> > +++ b/drivers/xen/swiotlb-xen.c
+> > @@ -38,32 +38,116 @@
+> >  #include <linux/bootmem.h>
+> >  #include <linux/dma-mapping.h>
+> >  #include <linux/export.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/spinlock_types.h>
+> > +#include <linux/rbtree.h>
+> >  #include <xen/swiotlb-xen.h>
+> >  #include <xen/page.h>
+> >  #include <xen/xen-ops.h>
+> >  #include <xen/hvc-console.h>
+> > +#include <xen/features.h>
+> >  /*
+> >   * Used to do a quick range check in swiotlb_tbl_unmap_single and
+> >   * swiotlb_tbl_sync_single_*, to see if the memory was in fact allocated by this
+> >   * API.
+> >   */
+> >  
+> > +#define NR_DMA_SEGS  ((xen_io_tlb_nslabs + IO_TLB_SEGSIZE - 1) / IO_TLB_SEGSIZE)
+> >  static char *xen_io_tlb_start, *xen_io_tlb_end;
+> >  static unsigned long xen_io_tlb_nslabs;
+> >  /*
+> >   * Quick lookup value of the bus address of the IOTLB.
+> >   */
+> >  
+> > -static u64 start_dma_addr;
+> > +struct xen_dma{
+>                  ^
+> Ahem! I think scripts/checkpath.pl would tell you about.
 > 
-> I don't recall the specifics of how it does this, but the spec is open
-> (and bad to read, sorry), and the linux-acpi mailing list is very
-> welcoming, so I suggest you start there if you have questions.
+> You did run checkpath.pl right :-)
+> 
+> The name is very generic. Xen DMA. Brings a lot of ideas around but none
+> of them to do with tracking a tuple. Perhaps a name of 'xen_dma_entry'?
+> 'xen_dma_node' ? 'xen_dma_info' ?
 
-Understandable, I'll make an effort to RTFM, although I don't think that
-mitigates the need for discussion in this area.
+Thanks for the detailed review. I have made this and all the other
+changes that you mentioned, except the ones commented below.
 
-Cheers,
 
-Will
+> > +	spin_lock(&xen_dma_lock);
+> > +
+> > +	while (n) {
+> > +		e = rb_entry(n, struct xen_dma, rbnode);
+> > +		if (e->dma_addr <= dma_addr && e->dma_addr + e->size > dma_addr) {
+> 
+> Shouldn't this check be for '==' not '<=' ?
+
+Nope: e->dma_addr is the start address of one of the contiguous chucks of
+memory of size (IO_TLB_SEGSIZE << IO_TLB_SHIFT). However
+xen_swiotlb_map_page can be called asking for a smaller buffer. As a
+result xen_phys_to_bus is going to be called passing dma addresses that
+do not always match the beginning of a contiguous region.
+
+
+> Hm, maybe I am not sure what this tree is suppose to do. Somehow I
+> thought it was to keep a consistent mapping of phys and dma addresses.
+> But this seems to be more of 'free' phys and dma addresses. In which
+> case I think you need to change the name of the rb root node to have the
+> word 'free' in it.
+
+It keeps track of the bus to phys mappings.  It doesn't matter whether
+the corresponding buffers are free or in use as long as the mapping is
+valid.
+
+
+> > +
+> > +	offset = vaddr - xen_io_tlb_start;
+> > +	nr_seg = offset / (IO_TLB_SEGSIZE << IO_TLB_SHIFT);
+> > +
+> > +	return xen_dma_seg[nr_seg].dma_addr + (paddr & ((IO_TLB_SEGSIZE << IO_TLB_SHIFT) - 1));
+> >  }
+> >  
+> >  static phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
+> >  {
+> > -	return machine_to_phys(XMADDR(baddr)).paddr;
+> > +	if (xen_feature(XENFEAT_auto_translated_physmap))
+> 
+> I am curios to how this will work with PVH x86 which is
+> auto_translated_physmap, but maps the whole kernel in its IOMMU context.
+> 
+> Perhaps we should have some extra logic here? For guests that have IOMMU
+> support and for those that don't?
+
+I would avoid using the swiotlb altogether if an IOMMU is available.
+Maybe we can pass a flag in xen_features.
+
+
+> B/c in some way this could be used on x86 with VT-x + without an VT-d
+> and PVH for dom0 I think.
+
+Right, it could be a good fit for that.
+We could spot whether Xen passes a certain flag in xen_features and
+enable the swiotlb if we need it.
+
+
+> > +		else
+> > +			return dma->phys_addr + (baddr & ((IO_TLB_SEGSIZE << IO_TLB_SHIFT) - 1));
+> > +	} else
+> > +		return machine_to_phys(XMADDR(baddr)).paddr;
+> >  }
+> >  
+> >  static dma_addr_t xen_virt_to_bus(void *address)
+> > @@ -107,6 +191,9 @@ static int is_xen_swiotlb_buffer(dma_addr_t dma_addr)
+> >  	unsigned long pfn = mfn_to_local_pfn(mfn);
+> >  	phys_addr_t paddr;
+> >  
+> > +	if (xen_feature(XENFEAT_auto_translated_physmap))
+> > +		return 1;
+> > +
+> 
+> That does not look right to me. I think this would make PVH go bonk.
+
+On PVH if an IOMMU is available we would never initialize the swiotlb
+and we would never use this function.
+If no IOMMUs are available and we initialized the swiotlb, then this
+assumption is correct: all contiguous buffers used with
+xen_swiotlb_sync_single and xen_unmap_single are swiotlb bounce buffers.
+
+
+> > @@ -351,14 +444,15 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+> >  	 * we can safely return the device addr and not worry about bounce
+> >  	 * buffering it.
+> >  	 */
+> > -	if (dma_capable(dev, dev_addr, size) &&
+> > +	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+> > +	    dma_capable(dev, dev_addr, size) &&
+> >  	    !range_straddles_page_boundary(phys, size) && !swiotlb_force)
+> >  		return dev_addr;
+> 
+> I am returning back to PVH on these and just not sure what the impact
+> is. Mukesh, thoughts?
+
+Same as before: any dma_capable and range_straddles_page_boundary checks
+on a random buffer are meaningless for XENFEAT_auto_translated_physmap
+guests (we don't know the p2m mapping of a given page and that mapping
+might be transient).
+It's best to avoid them altogether and take the slow path.
+
+It should have no impact for PVH today though: PVH guests should just
+assume that an IOMMU is present and avoid initializing the swiotlb for
+now.  If we want to give them a backup option in case no IOMMU is
+available, then we can come back to this later.
+
+
+> >  	/*
+> >  	 * Oh well, have to allocate and map a bounce buffer.
+> >  	 */
+> > -	map = swiotlb_tbl_map_single(dev, start_dma_addr, phys, size, dir);
+> > +	map = swiotlb_tbl_map_single(dev, xen_dma_seg[0].dma_addr, phys, size, dir);
+> 
+> At 0? Not some index?
+
+Right, I agree with you, I doesn't make sense to me either.
+However the code does exactly the same thing that was done before. It's
+just a naming change.
+
+
+> >  	if (map == SWIOTLB_MAP_ERROR)
+> >  		return DMA_ERROR_CODE;
+> >  
+> > @@ -494,10 +588,11 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+> >  		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
+> >  
+> >  		if (swiotlb_force ||
+> > +		    xen_feature(XENFEAT_auto_translated_physmap) ||
+> >  		    !dma_capable(hwdev, dev_addr, sg->length) ||
+> >  		    range_straddles_page_boundary(paddr, sg->length)) {
+> >  			phys_addr_t map = swiotlb_tbl_map_single(hwdev,
+> > -								 start_dma_addr,
+> > +								 xen_dma_seg[0].dma_addr,
+> 
+> I am not sure I understand the purpose of 'xen_dma_seg'. Could you
+> clarify that please?
+
+xen_dma_seg is an array of struct xen_dma that keeps track of the phys
+to bus mappings. Each entry is (IO_TLB_SEGSIZE << IO_TLB_SHIFT) bytes,
+except for the last one that could be smaller. Getting the dma address
+corresponding to a physical address within xen_io_tlb_start -
+xen_io_tlb_end is just a matter of calculating the index in the array,
+see xen_phys_to_bus.
+
+Also the bus_to_phys tree is conveniently built upon these pre-allocated
+xen_dma_seg entries.
