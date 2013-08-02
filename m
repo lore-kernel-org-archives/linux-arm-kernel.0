@@ -1,52 +1,78 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 02 Aug 2013 13:59:59 -0600
-Subject: [PATCH] DMA: add help function to check whether dma controller
- registered
-In-Reply-To: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
-References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
-Message-ID: <51FC0FBF.9010107@wwwdotorg.org>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Fri, 2 Aug 2013 13:08:42 -0700
+Subject: [PATCH v2 2/2] ARM: bcm281xx: DT changes for reboot code
+In-Reply-To: <1374708923-11956-3-git-send-email-markus.mayer@linaro.org>
+References: <1374708923-11956-1-git-send-email-markus.mayer@linaro.org>
+ <1374708923-11956-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <CAPdLdq=8EAVpbi9uGEV+AfYFgpK768mnMtphqz=55bP24FiKKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2013 12:04 AM, Richard Zhao wrote:
-> DMA client device driver usually needs to know at probe time whether
-> dma controller has been registered to deffer probe. So add a help
-> function of_dma_check_controller.
-> 
-> DMA request channel functions can also used to check it, but they
-> are usually called at open() time.
+There are some minor changes necessary for this patch.
 
-> diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-> index e1c4d3b..b6828c1 100644
+> This patch adds the device tree bindings for the bcm281xx reboot code.
 
-> +int of_dma_check_controller(struct device *dev, const char *name)
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm,kona-wdt.txt b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-wdt.txt
+> new file mode 100644
+> index 0000000..bb7be64
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-wdt.txt
 
+Name changed to brcm,kona-wdt.txt.
 
-> +	for (i = 0; i < count; i++) {
-> +		if (of_dma_match_channel(np, name, i, &dma_spec))
-> +			continue;
+> @@ -0,0 +1,15 @@
+> +Broadcom Kona Family Watchdog Timer
+> +-----------------------------------
 > +
-> +		mutex_lock(&of_dma_lock);
-> +		ofdma = of_dma_find_controller(&dma_spec);
-> +		mutex_unlock(&of_dma_lock);
-> +		of_node_put(dma_spec.np);
+> +This watchdog timer is used in the following Broadcom SoCs:
+> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+> +
+> +Required properties:
+> +  - compatible = "brcm,kona-wdt";
 
-Do we need to add the following here:
+Change to:  - compatible = "brcm,bcm11351-wdt", "brcm,kona-wdt";
 
-if (ofdma)
-	break
+> +  - reg: memory range
+> +
+> +Example:
+> +       watchdog at 35002f40 {
+> +               compatible = "brcm,kona-wdt";
 
-To ensure that as soon as a successful match is found, the loop exits?
-Otherwise, if there are multiple providers for that name, and the first
-N are registered but the last isn't, this function will still return
-failure.
+Change to: compatible = "brcm,bcm11351-wdt", "brcm,kona-wdt";
 
-> +	if (ofdma)
-> +		return 0;
-> +	else
-> +		return -ENODEV;
+> +               reg = <0x35002f40 0x6c>;
+> +       };
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+> index c0cdf66..a1c1881 100644
+> --- a/arch/arm/boot/dts/bcm11351.dtsi
+> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright (C) 2012 Broadcom Corporation
+> + * Copyright (C) 2012-2013 Broadcom Corporation
+>   *
+>   * This program is free software; you can redistribute it and/or
+>   * modify it under the terms of the GNU General Public License as
+> @@ -56,6 +56,11 @@
+>                 cache-level = <2>;
+>         };
+>
+> +       watchdog at 35002f40 {
+> +               compatible = "bcm,kona-wdt";
 
-That probably should be -EPROBE_DEFER?
+Change to: compatible = "brcm,bcm11351-wdt", "brcm,kona-wdt";
 
-Although, what about differentiating between "entry not found by
-of_dma_match_channel" and "controller not yet probed"?
+> +               reg = <0x35002f40 0x6c>;
+> +       };
+> +
+>         timer at 35006000 {
+>                 compatible = "bcm,kona-timer";
+>                 reg = <0x35006000 0x1000>;
+> --
+> 1.7.9.5
+>
+>
+
+-- 
+Markus Mayer
+Broadcom Landing Team
