@@ -1,38 +1,122 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 2 Aug 2013 12:42:16 +0100
-Subject: [PATCH v2 RFC 2/8] arm: introduce a global dma_ops pointer
-In-Reply-To: <20130731200135.GZ24642@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1307312048511.4893@kaball.uk.xensource.com>
- <1375300452-12545-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130731200135.GZ24642@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1308021238570.4893@kaball.uk.xensource.com>
+From: gururaja.hebbar@ti.com (Gururaja Hebbar)
+Date: Fri, 2 Aug 2013 17:18:07 +0530
+Subject: [Patch V2 4/4] ARM: dts: AM33XX: update rtc node compatibility
+In-Reply-To: <20130802112018.GI2884@e106331-lin.cambridge.arm.com>
+References: <1372841225-18813-1-git-send-email-gururaja.hebbar@ti.com>
+ <1372841225-18813-5-git-send-email-gururaja.hebbar@ti.com>
+ <51F749B0.7020802@ti.com>
+ <20130730145501.GA29859@e106331-lin.cambridge.arm.com>
+ <51F7E7FA.3080702@ti.com>
+ <20130801170537.GF8095@e106331-lin.cambridge.arm.com>
+ <51FB92F8.9020801@ti.com>
+ <20130802112018.GI2884@e106331-lin.cambridge.arm.com>
+Message-ID: <51FB9C77.3090202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Jul 2013, Russell King - ARM Linux wrote:
-> On Wed, Jul 31, 2013 at 08:54:06PM +0100, Stefano Stabellini wrote:
-> > Initially set dma_ops to arm_dma_ops.
-> > Use dma_ops instead of arm_dma_ops in dmabounce.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: will.deacon at arm.com
-> > CC: linux at arm.linux.org.uk
-> 
-> If you're using swiotlb, there's little point in converting dmabounce
-> to be able to use it, because it's basically providing the same
-> functionality - dmabounce is there to do software buffer bouncing within
-> the DMA to move streaming buffers from DMA-inaccessible memory into
-> DMA-accessible memory.
-> 
-> It's original use is with older SoCs with buggy DMA (eg, those which
-> can only address alternate 1MB chunks of memory for example) but also
-> got used in situations where alternative solutions would've been better
-> (like using swiotlb.)  I've been discouraging its use as it's suffered
-> from memory exhaustion problems (there's a number of threads and bug
-> reports which were never solved about IXP4xx(?) platforms suffering
-> this due to this bouncing.)
+On 8/2/2013 4:50 PM, Mark Rutland wrote:
+> On Fri, Aug 02, 2013 at 12:07:36PM +0100, Gururaja Hebbar wrote:
+>> On 8/1/2013 10:35 PM, Mark Rutland wrote:
+>>> On Tue, Jul 30, 2013 at 05:21:14PM +0100, Sekhar Nori wrote:
+>>>> On 7/30/2013 8:25 PM, Mark Rutland wrote:
+>>>>> On Tue, Jul 30, 2013 at 06:05:52AM +0100, Gururaja Hebbar wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 7/3/2013 2:17 PM, Hebbar Gururaja wrote:
+>>>>>>> Since AM33xx  RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up.
+>>>>>>>
+>>>>>>> Update the rtc compatible property to "ti,am3352-rtc" to enable handling
+>>>>>>> of this feature inside rtc-omap driver.
+>>>>>>
+>>>>>> The other 2 rtc driver related patches have been pulled up. If you have
+>>>>>> no comments, can you please pull this up.
+>>>>>>
+>>>>>> Regards
+>>>>>> Gururaja
+>>>>>>
+>>>>>>>
+>>>>>>> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+>>>>>>> ---
+>>>>>>> :100644 100644 77aa1b0... dde180a... M	arch/arm/boot/dts/am33xx.dtsi
+>>>>>>>     arch/arm/boot/dts/am33xx.dtsi |    2 +-
+>>>>>>>     1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>>>>>>> index 77aa1b0..dde180a 100644
+>>>>>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>>>>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>>>>>> @@ -297,7 +297,7 @@
+>>>>>>>     		};
+>>>>>>>
+>>>>>>>     		rtc at 44e3e000 {
+>>>>>>> -			compatible = "ti,da830-rtc";
+>>>>>>> +			compatible = "ti,am3352-rtc";
+>>>>>
+>>>>> Given that this is backwards compatible with the old binding, it would
+>>>>> be nicer to have this as:
+>>>>>
+>>>>> 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
+>>>>>
+>>>>> We must get into the habit of changing dts files in a
+>>>>> backwards-compatible fashion.
+>>>>
+>>>> Right, I suggested this when v1 was posted. It turns out the current
+>>>> kernel does not handle the compatilble list correctly and the string
+>>>> selected actually depends on the order in which it appears in match
+>>>> table in driver instead.
+>>>>
+>>>> I saw there were patches being discussed to fix this issue, but until
+>>>> that is fixed, we cannot really use what you (and I before) suggested.
+>>>
+>>> A temporary solution would be to list the "ti,am3352-rtc" first in the
+>>> of_match_table kernel-side.
+>>
+>> If above method is followed, then it would cause trouble on davinci
+>> platform because this rtc-omap driver is also used by Davinci platform.
+>> On davinci Plaform the driver would match with "ti,am3352-rtc" for
+>> compatible.
+>
+> Sorry, I don't follow. Does the davinci dt have "ti,am3352-rtc" in it's
+> compatible string list?
 
-OK, I'll let dmabounce keep using arm_dma_ops directly (instead of
-dma_ops).
+no no. Davinci .dts uses "ti,da830-rtc".
 
-Should I add "depends on !DMABOUNCE" to the SWIOTLB Kconfig entry too?
+I was saying if we reverse the order of "of_device_id" structure in 
+rtc-omap driver, then it would work nicely for am335x but will cause 
+trouble on davinci platform.
+
+>
+> If so, and it's not compatible, the dts is wrong.
+>
+> If not, then we won't use the behaviour specific to "ti,am3352-rtc", and
+> there's no problem.
+>
+> What trouble would this cause?
+>
+> Thanks,
+> Mark.
+>
+>>
+>> Regards
+>> Gururaja
+>>
+>>> That way you can keep the old compatible
+>>> string in the dts compatible list, and maintain backwards compatibilty
+>>> with older kernels.
+>>>
+>>> Later if the way Linux matches compatible strings is changed, this
+>>> shouldn't break the probe order, and the of_match_table order could be
+>>> changed.
+>>>
+>>> Have I missed something?
+>>>
+>>> Thanks,
+>>> Mark.
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
