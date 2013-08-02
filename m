@@ -1,54 +1,54 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Fri, 02 Aug 2013 11:57:38 +0200
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <51F8CC35.1070704@collabora.co.uk>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
- <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
- <51F8CC35.1070704@collabora.co.uk>
-Message-ID: <51FB8292.9090000@ahsoftware.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  2 Aug 2013 12:02:44 +0200
+Subject: [PATCHv2 0/9] 
+Message-ID: <1375437773-3211-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 31.07.2013 10:35, schrieb Javier Martinez Canillas:
+Hi everyone,
 
->
-> The problem is that board files and drivers that has not not been completed
-> migrated to DT assumes (at least for OMAP) that *every* GPIO line is mapped as
-> an IRQ and they just do:
->
-> gpio_request(gpio,...);
-> gpio_direction_input()
-> request[_threaded]_irq(gpio_to_irq(gpio), ...);
->
-> My patch-set changed the gpio-omap driver to not map all GPIO lines but only the
-> ones that were really used as an IRQ and let the DT core to do the mapping from
-> irq_create_of_mapping(). The first problem reported with the OMAP patch was that
-> a driver was using the above sequence and that the GPIO had not been mapped.
-> This user was booting with DT and so this showed a bug in the driver and a DT
-> that did not conform with the standard schema used in mainline but this shows a
-> potential issue.
+This patchset brings in support for the Allwinner A20 SoC.
 
-There must have been a bug in the patch too. I've also added that 
-iinterrupt-parent stuff (with the same flags as used by the driver) and 
-just have let the driver call
+This SoC is pretty much the heir of the Allwinner A10. They both have a lot of
+IP in common, the A20 is pin-compatible with the A10, the only major difference
+being that the A20 has 2 Cortex-A7 instead of the single Cortex-A8 found in the
+A10.
 
-request_threaded_irq(gpio_to_irq(gpio), flags);
+Just like the A31, the SMP support isn't there yet, nor do we have clock
+support or any storage device.
 
-without the gpio_request()/input() before. And request_threaded_irq() 
-returned -EBUSY. I'm pretty sure nothing else did use that gpio, but I 
-haven't looked at why request_threaded_irq() returned -EBUSY. I assume 
-the new mapping stuff did reserve the irq in such a way, that the driver 
-couldn't request the IRQ.
+We also have the same SMP bit issue that makes Linux run without the caches
+enabled for the time being when CONFIG_SMP isn't set.
 
-Otherwise I wouldn't have had a problem by just adding the necessary 
-entries to the DT.
+This serie comes on top of the serie "ARM: sunxi: Add support for the Allwinner
+A31 SoC" I sent previously.
 
-But I have to say I didn't like the syntax too, and it wasn't obvious 
-how the syntax is and how to conclude from a gpio number to an 
-irq-number and the patch didn't really include some documentation or 
-useful example.
+Thanks,
+Maxime
 
-Regards,
+Changes from v1:
+  - Removed the patch that wrapped the compatibles in the clock driver
 
-Alexander Holler
+Maxime Ripard (9):
+  ARM: sunxi: Introduce Allwinner A20 support
+  ARM: sun7i: Add Allwinner A20 DTSI
+  ARM: sun7i: Add Olimex A20-Olinuxino-Micro support
+  pinctrl: sunxi: Add Allwinner A20 pins set
+  pinctrl: sunxi: Fix inconsistent indentation
+  ARM: sun7i: Add the PIO controller node to the DTSI
+  ARM: sun7i: DT: Add UART muxing options to the DTSI
+  ARM: sun7i: a20-olinuxino: Enable UARTs muxing
+  ARM: sun7i: a20-olinuxino: Enable the user LED
+
+ arch/arm/boot/dts/Makefile                      |    3 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |   61 ++
+ arch/arm/boot/dts/sun7i-a20.dtsi                |  205 +++++
+ arch/arm/mach-sunxi/sunxi.c                     |    1 +
+ drivers/pinctrl/pinctrl-sunxi-pins.h            | 1028 ++++++++++++++++++++++-
+ drivers/pinctrl/pinctrl-sunxi.c                 |    1 +
+ 6 files changed, 1293 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20.dtsi
+
+-- 
+1.8.3.4
