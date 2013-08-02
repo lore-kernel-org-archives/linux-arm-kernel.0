@@ -1,92 +1,301 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  2 Aug 2013 12:38:21 +0200
-Subject: [PATCH 1/7] gpio: mxc: Support initialization as subdevice
+Date: Fri,  2 Aug 2013 12:38:26 +0200
+Subject: [PATCH 6/7] ARM: dts: imx27 pinctrl
 In-Reply-To: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
 References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1375439907-10462-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <1375439907-10462-7-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx27 and imx21, there is no clear seperation between iomux control
-registers and GPIO data registers. For easier pingroup definitions, the
-gpio drivers will be initialized as subnodes of the iomux controller. It
-is necessary to share the registers between iomux and gpio.
-
-This patch adds support to pass a register memory region via platform
-data.
+Pinctrl driver node and pin group definitions for other driver nodes.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/gpio/gpio-mxc.c                | 18 ++++++++++++++----
- include/linux/platform_data/gpio-mxc.h | 17 +++++++++++++++++
- 2 files changed, 31 insertions(+), 4 deletions(-)
- create mode 100644 include/linux/platform_data/gpio-mxc.h
+ arch/arm/boot/dts/imx27.dtsi | 216 +++++++++++++++++++++++++++++++------------
+ 1 file changed, 158 insertions(+), 58 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 875a7c5..41922e8 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -27,6 +27,7 @@
- #include <linux/irqdomain.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/gpio.h>
-+#include <linux/platform_data/gpio-mxc.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/basic_mmio_gpio.h>
-@@ -401,6 +402,7 @@ static int mxc_gpio_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	struct mxc_gpio_port *port;
- 	struct resource *iores;
-+	struct mxc_gpio_platform_data *pdata = pdev->dev.platform_data;
- 	int irq_base;
- 	int err;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 76cd89f..57a4855 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -10,6 +10,7 @@
+  */
  
-@@ -410,10 +412,18 @@ static int mxc_gpio_probe(struct platform_device *pdev)
- 	if (!port)
- 		return -ENOMEM;
+ #include "skeleton.dtsi"
++#include "imx27-pinfunc.h"
  
--	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	port->base = devm_ioremap_resource(&pdev->dev, iores);
--	if (IS_ERR(port->base))
--		return PTR_ERR(port->base);
-+	if (pdata) {
-+		port->base = pdata->base;
-+		if (!pdata->base) {
-+			dev_err(&pdev->dev, "No mapped memory in platform_data\n");
-+			return -EINVAL;
-+		}
-+	} else {
-+		iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		port->base = devm_ioremap_resource(&pdev->dev, iores);
-+		if (IS_ERR(port->base))
-+			return PTR_ERR(port->base);
-+	}
+ / {
+ 	aliases {
+@@ -142,6 +143,8 @@
+ 				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
+ 				reg = <0x10009000 0x1000>;
+ 				clocks = <&clks 35>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_owire>;
+ 				status = "disabled";
+ 			};
  
- 	port->irq_high = platform_get_irq(pdev, 1);
- 	port->irq = platform_get_irq(pdev, 0);
-diff --git a/include/linux/platform_data/gpio-mxc.h b/include/linux/platform_data/gpio-mxc.h
-new file mode 100644
-index 0000000..fb3e06b
---- /dev/null
-+++ b/include/linux/platform_data/gpio-mxc.h
-@@ -0,0 +1,17 @@
-+#ifndef _LINUX_GPIO_MXC_H
-+#define _LINUX_GPIO_MXC_H
+@@ -151,6 +154,8 @@
+ 				interrupts = <20>;
+ 				clocks = <&clks 81>, <&clks 61>;
+ 				clock-names = "ipg", "per";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -160,6 +165,8 @@
+ 				interrupts = <19>;
+ 				clocks = <&clks 80>, <&clks 61>;
+ 				clock-names = "ipg", "per";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -169,6 +176,8 @@
+ 				interrupts = <18>;
+ 				clocks = <&clks 79>, <&clks 61>;
+ 				clock-names = "ipg", "per";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart3>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -210,6 +219,8 @@
+ 				reg = <0x10012000 0x1000>;
+ 				interrupts = <12>;
+ 				clocks = <&clks 40>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -235,64 +246,149 @@
+ 				status = "disabled";
+ 			};
+ 
+-			gpio1: gpio at 10015000 {
+-				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+-				reg = <0x10015000 0x100>;
+-				interrupts = <8>;
+-				gpio-controller;
+-				#gpio-cells = <2>;
+-				interrupt-controller;
+-				#interrupt-cells = <2>;
+-			};
+-
+-			gpio2: gpio at 10015100 {
+-				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+-				reg = <0x10015100 0x100>;
+-				interrupts = <8>;
+-				gpio-controller;
+-				#gpio-cells = <2>;
+-				interrupt-controller;
+-				#interrupt-cells = <2>;
+-			};
+-
+-			gpio3: gpio at 10015200 {
+-				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+-				reg = <0x10015200 0x100>;
+-				interrupts = <8>;
+-				gpio-controller;
+-				#gpio-cells = <2>;
+-				interrupt-controller;
+-				#interrupt-cells = <2>;
+-			};
+-
+-			gpio4: gpio at 10015300 {
+-				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+-				reg = <0x10015300 0x100>;
+-				interrupts = <8>;
+-				gpio-controller;
+-				#gpio-cells = <2>;
+-				interrupt-controller;
+-				#interrupt-cells = <2>;
+-			};
+-
+-			gpio5: gpio at 10015400 {
+-				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+-				reg = <0x10015400 0x100>;
+-				interrupts = <8>;
+-				gpio-controller;
+-				#gpio-cells = <2>;
+-				interrupt-controller;
+-				#interrupt-cells = <2>;
+-			};
+-
+-			gpio6: gpio at 10015500 {
+-				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+-				reg = <0x10015500 0x100>;
+-				interrupts = <8>;
+-				gpio-controller;
+-				#gpio-cells = <2>;
+-				interrupt-controller;
+-				#interrupt-cells = <2>;
++			iomuxc: iomuxc at 10015000 {
++				compatible = "fsl,imx27-iomuxc";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x10015000 0x600>;
 +
-+#include <linux/types.h>
++				gpio1: gpio at 10015000 {
++					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
++					reg = <0x10015000>;
++					interrupts = <8>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
 +
-+/*
-+ * MXC GPIO driver platform data. If this platform data is passed to the
-+ * driver, it will use the memory base defined in the struct. This is used for
-+ * iomuxc drivers on imx1/imx21/imx27, where the GPIO data register is embedded
-+ * between iomuxc registers.
-+ */
++				gpio2: gpio at 10015100 {
++					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
++					reg = <0x10015100>;
++					interrupts = <8>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
 +
-+struct mxc_gpio_platform_data {
-+	void __iomem *base;
-+};
++				gpio3: gpio at 10015200 {
++					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
++					reg = <0x10015200>;
++					interrupts = <8>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
 +
-+#endif /* _LINUX_GPIO_MXC_H */
++				gpio4: gpio at 10015300 {
++					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
++					reg = <0x10015300>;
++					interrupts = <8>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				gpio5: gpio at 10015400 {
++					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
++					reg = <0x10015400>;
++					interrupts = <8>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				gpio6: gpio at 10015500 {
++					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
++					reg = <0x10015500>;
++					interrupts = <8>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				fec {
++					pinctrl_fec: fec-1 {
++						fsl,pins = <
++							MX27_PAD_SD3_CMD__FEC_TXD0 0x0
++							MX27_PAD_SD3_CLK__FEC_TXD1 0x0
++							MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
++							MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
++							MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
++							MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
++							MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
++							MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
++							MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
++							MX27_PAD_ATA_DATA7__FEC_MDC 0x0
++							MX27_PAD_ATA_DATA8__FEC_CRS 0x0
++							MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
++							MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
++							MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
++							MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
++							MX27_PAD_ATA_DATA13__FEC_COL 0x0
++							MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
++							MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
++						>;
++					};
++				};
++
++				i2c {
++					pinctrl_i2c1: i2c-1 {
++						fsl,pins = <
++							MX27_PAD_I2C_DATA__I2C_DATA 0x0
++							MX27_PAD_I2C_CLK__I2C_CLK 0x0
++						>;
++					};
++
++					pinctrl_i2c2: i2c-2 {
++						fsl,pins = <
++							MX27_PAD_I2C2_SDA__I2C2_SDA 0x0
++							MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
++						>;
++					};
++				};
++
++				owire {
++					pinctrl_owire: owire-1 {
++						fsl,pins = <
++							MX27_PAD_RTCK__OWIRE 0x0
++						>;
++					};
++				};
++
++				uart {
++					pinctrl_uart1: uart-1 {
++						fsl,pins = <
++							MX27_PAD_UART1_TXD__UART1_TXD 0x0
++							MX27_PAD_UART1_RXD__UART1_RXD 0x0
++							MX27_PAD_UART1_CTS__UART1_CTS 0x0
++							MX27_PAD_UART1_RTS__UART1_RTS 0x0
++						>;
++					};
++
++					pinctrl_uart2: uart-2 {
++						fsl,pins = <
++							MX27_PAD_UART2_TXD__UART2_TXD 0x0
++							MX27_PAD_UART2_RXD__UART2_RXD 0x0
++							MX27_PAD_UART2_CTS__UART2_CTS 0x0
++							MX27_PAD_UART2_RTS__UART2_RTS 0x0
++						>;
++					};
++
++					pinctrl_uart3: uart-3 {
++						fsl,pins = <
++							MX27_PAD_UART3_TXD__UART3_TXD 0x0
++							MX27_PAD_UART3_RXD__UART3_RXD 0x0
++							MX27_PAD_UART3_CTS__UART3_CTS 0x0
++							MX27_PAD_UART3_RTS__UART3_RTS 0x0
++						>;
++					};
++				};
+ 			};
+ 
+ 			audmux: audmux at 10016000 {
+@@ -354,6 +450,8 @@
+ 				reg = <0x1001d000 0x1000>;
+ 				interrupts = <1>;
+ 				clocks = <&clks 39>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c2>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -429,6 +527,8 @@
+ 				interrupts = <50>;
+ 				clocks = <&clks 48>, <&clks 67>;
+ 				clock-names = "ipg", "ahb";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_fec>;
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
 1.8.3.2
