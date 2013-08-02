@@ -1,225 +1,83 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 2 Aug 2013 10:43:48 -0500
-Subject: [PATCH 3/4] ARM: msm: Add SMP support for 8960
-In-Reply-To: <1375409725-22004-4-git-send-email-rvaswani@codeaurora.org>
-References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
- <1375409725-22004-4-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <44303FA4-18A4-4DD3-A3BE-27741B7460C4@codeaurora.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Fri, 02 Aug 2013 16:45:46 +0100
+Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1
+ CPU devices
+In-Reply-To: <51FBCEC3.4030207@ti.com>
+References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
+ <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
+Message-ID: <51FBD42A.9040901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/08/13 16:22, Santosh Shilimkar wrote:
+> On Friday 02 August 2013 10:45 AM, Sudeep KarkadaNagesha wrote:
+>> On 01/08/13 19:17, Santosh Shilimkar wrote:
+>>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>>
+>>> The generic code is well equipped to differentiate between
+>>> SMP and UP configurations.However, there are some devices which
+>>> use Cortex-A9 MP core IP with 1 CPU as configuration. To let
+>>> these SOCs to co-exist in a CONFIG_SMP=y build by leveraging
+>>> the SMP_ON_UP support, we need to additionally check the
+>>> number the cores in Cortex-A9 MPCore configuration. Without
+>>> such a check in place, the startup code tries to execute
+>>> ALT_SMP() set of instructions which lead to CPU faults.
+>>>
+>>> The issue was spotted on TI's Aegis device and this patch
+>>> makes now the device work with omap2plus_defconfig which
+>>> enables SMP by default. The change is kept limited to only
+>>> Cortex-A9 MPCore detection code.
+>>>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>
+>>> Acked-by: Sricharan R <r.sricharan@ti.com>
+>>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
+>>>  arch/arm/kernel/head.S |   18 +++++++++++++++++-
+>>>  1 file changed, 17 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+>>> index 9cf6063..4924b11 100644
+>>> --- a/arch/arm/kernel/head.S
+>>> +++ b/arch/arm/kernel/head.S
+>>> @@ -486,7 +486,23 @@ __fixup_smp:
+>>>  	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
+>>>  	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
+>>>  	teq	r0, #0x80000000		@ not part of a uniprocessor system?
+>>> -	moveq	pc, lr			@ yes, assume SMP
+>>> +	bne    __fixup_smp_on_up	@ no, assume UP
+>>> +
+>>> +	@ Core indicates it is SMP.  Check for Aegis SOC where a single
+>>> +	@ Cortex-A9 CPU is present but SMP operations fault.
+>>> +	mov	r4, #0x41000000
+>>> +	orr	r4, r4, #0x0000c000
+>>> +	orr	r4, r4, #0x00000090
+>>> +	teq	r3, r4			@ Check for ARM Cortex-A9
+>>> +	movne	pc, lr			@ Not ARM Cortex-A9,
+>>> +
+>>> +	mrc	p15, 4, r0, c15, c0	@ get SCU base address
+>> Correct me if I am interpreting this wrong, but CRn=15 here which is
+>> IMPLEMENTATION DEFINED registers.
+>>
+>> If not, then I wonder why few platform have to read SCU base from DT or
+>> some header, why not this way ?
+>>
+> I don't know if there is Cortex-A9 based SOC which don't implement SCU
+> CP15 base address register, so can't comment really why not always use
+> CP15 based method. I am not even sure if there are other reasons behind
+> DT usage.
+> 
+I may be wrong, but it's just my understanding as I see that ARM ARM
+clearly states CRn=15 space is IMPLEMENTATION DEFINED registers and we
+can't expect it to work on all IMPLEMENTATIONS.
 
-On Aug 1, 2013, at 9:15 PM, Rohit Vaswani wrote:
+I just had a glance at all the usage of CR15 space of CP15 register, its
+either platform specific or under specific errata/condition.
 
-> Add the cpus bindings and the Krait release sequence
-> to make SMP work for MSM8960
-> 
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
-> Documentation/devicetree/bindings/arm/cpus.txt     |  2 +
-> Documentation/devicetree/bindings/arm/msm/kpss.txt | 16 ++++++
-> arch/arm/boot/dts/msm8960-cdp.dts                  | 22 +++++++++
-> arch/arm/mach-msm/platsmp.c                        | 57 ++++++++++++++++++++++
-> arch/arm/mach-msm/scm-boot.h                       |  8 +--
-> 5 files changed, 102 insertions(+), 3 deletions(-)
-> create mode 100644 Documentation/devicetree/bindings/arm/msm/kpss.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 327aad2..1132eac 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -45,11 +45,13 @@ For the ARM architecture every CPU node must contain the following properties:
-> 		"marvell,xsc3"
-> 		"marvell,xscale"
-> 		"qcom,scorpion"
-> +		"qcom,krait"
-> - enable-method: Specifies the method used to enable or take the secondary cores
-> 		 out of reset. This allows different reset sequence for
-> 		 different types of cpus.
-> 		 This should be one of:
-> 		 "qcom,scss"
-> +		 "qcom,kpssv1"
-> 
-> Example:
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/msm/kpss.txt b/Documentation/devicetree/bindings/arm/msm/kpss.txt
-> new file mode 100644
-> index 0000000..7272340
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/kpss.txt
-> @@ -0,0 +1,16 @@
-> +* KPSS - Krait Processor Sub-system
-> +
-> +Properties
-> +
-> +- compatible : Should contain "qcom,kpss".
-> +
-> +- reg: Specifies the base address for the KPSS registers used for
-> +       booting up secondary cores.
-> +
-> +Example:
-> +
-> +	kpss at 2088000 {
-> +		compatible = "qcom,kpss";
-> +		reg = <0x02088000 0x1000
-> +			0x02098000 0x2000>;
-> +	};
-> diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
-> index db2060c..8c82d5e 100644
-> --- a/arch/arm/boot/dts/msm8960-cdp.dts
-> +++ b/arch/arm/boot/dts/msm8960-cdp.dts
-> @@ -7,6 +7,22 @@
-> 	compatible = "qcom,msm8960-cdp", "qcom,msm8960";
-> 	interrupt-parent = <&intc>;
-> 
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "qcom,krait";
-> +		device_type = "cpu";
-> +		enable-method = "qcom,kpssv1";
-> +
-> +		cpu at 0 {
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			reg = <1>;
-> +		};
-> +	};
-> +
-> 	intc: interrupt-controller at 2000000 {
-> 		compatible = "qcom,msm-qgic2";
-> 		interrupt-controller;
-> @@ -37,6 +53,12 @@
-> 		reg = <0xfd510000 0x4000>;
-> 	};
-> 
-> +	kpss at 2088000 {
-> +		compatible = "qcom,kpss";
-> +		reg = <0x02088000 0x1000
-> +			0x02098000 0x2000>;
-> +	};
-> +
-> 	serial at 16440000 {
-> 		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
-> 		reg = <0x16440000 0x1000>,
-> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-> index 17022e0..82eb079 100644
-> --- a/arch/arm/mach-msm/platsmp.c
-> +++ b/arch/arm/mach-msm/platsmp.c
-> @@ -74,6 +74,56 @@ static int scorpion_release_secondary(void)
-> 	return 0;
-> }
-> 
-> +static int msm8960_release_secondary(unsigned int cpu)
-> +{
-> +	void __iomem *reg;
-> +	struct device_node *dn = NULL;
-> +
-> +	if (cpu == 0 || cpu >= num_possible_cpus())
-> +		return -EINVAL;
-> +
-> +	dn = of_find_compatible_node(dn, NULL, "qcom,kpss");
-> +	if (!dn) {
-> +		pr_err("%s : Missing kpss node from device tree\n", __func__);
-> +		return -ENXIO;
-> +	}
-> +
-> +	reg = of_iomap(dn, cpu);
-> +	if (!reg)
-> +		return -ENOMEM;
-> +
-> +	pr_debug("Starting secondary CPU %d\n", cpu);
-> +
-> +	/* Turn on CPU Rail */
-> +	writel_relaxed(0xA4, reg+0x1014);
+Will/Dave/Russell can confirm if it's safe to access these registers on
+any implementation or you may need to make it conditional.
 
-Is there some reason we are using magic numbers for both values and offsets?
-
-> +	mb();
-> +	udelay(512);
-> +
-> +	/* Krait bring-up sequence */
-> +	writel_relaxed(0x109, reg+0x04);
-> +	writel_relaxed(0x101, reg+0x04);
-> +	mb();
-> +	ndelay(300);
-> +
-> +	writel_relaxed(0x121, reg+0x04);
-> +	mb();
-> +	udelay(2);
-> +
-> +	writel_relaxed(0x120, reg+0x04);
-> +	mb();
-> +	udelay(2);
-> +
-> +	writel_relaxed(0x100, reg+0x04);
-> +	mb();
-> +	udelay(100);
-> +
-> +	writel_relaxed(0x180, reg+0x04);
-> +	mb();
-> +
-> +	iounmap(reg);
-> +	return 0;
-> +}
-> +
-> static DEFINE_PER_CPU(int, cold_boot_done);
-> 
-> static void boot_cold_cpu(unsigned int cpu)
-> @@ -96,6 +146,11 @@ static void boot_cold_cpu(unsigned int cpu)
-> 			scorpion_release_secondary();
-> 			per_cpu(cold_boot_done, cpu) = true;
-> 		}
-> +	} else if (!strcmp(enable_method, "qcom,kpssv1")) {
-> +		if (per_cpu(cold_boot_done, cpu) == false) {
-> +			msm8960_release_secondary(cpu);
-
-Is this really msm8960 specific, if so than we should be doing something other than comparing against "qcom,kpssv1" or we should change the function to kpssv1_release_secondary()
-
-> +			per_cpu(cold_boot_done, cpu) = true;
-> +		}
-> 	} else {
-> 		pr_err("%s: Invalid enable-method property: %s\n",
-> 				__func__, enable_method);
-> @@ -151,6 +206,8 @@ static void __init msm_smp_init_cpus(void)
-> static const int cold_boot_flags[] __initconst = {
-> 	0,
-> 	SCM_FLAG_COLDBOOT_CPU1,
-> +	SCM_FLAG_COLDBOOT_CPU2,
-> +	SCM_FLAG_COLDBOOT_CPU3,
-> };
-> 
-> static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
-> diff --git a/arch/arm/mach-msm/scm-boot.h b/arch/arm/mach-msm/scm-boot.h
-> index 7be32ff..6aabb24 100644
-> --- a/arch/arm/mach-msm/scm-boot.h
-> +++ b/arch/arm/mach-msm/scm-boot.h
-> @@ -13,9 +13,11 @@
-> #define __MACH_SCM_BOOT_H
-> 
-> #define SCM_BOOT_ADDR			0x1
-> -#define SCM_FLAG_COLDBOOT_CPU1		0x1
-> -#define SCM_FLAG_WARMBOOT_CPU1		0x2
-> -#define SCM_FLAG_WARMBOOT_CPU0		0x4
-> +#define SCM_FLAG_COLDBOOT_CPU1		0x01
-> +#define SCM_FLAG_COLDBOOT_CPU2		0x08
-> +#define SCM_FLAG_COLDBOOT_CPU3		0x20
-> +#define SCM_FLAG_WARMBOOT_CPU0		0x04
-> +#define SCM_FLAG_WARMBOOT_CPU1		0x02
-> 
-> int scm_set_boot_addr(phys_addr_t addr, int flags);
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
---
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+Sudeep
