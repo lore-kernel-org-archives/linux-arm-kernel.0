@@ -1,34 +1,29 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  2 Aug 2013 12:38:22 +0200
-Subject: [PATCH 2/7] pinctrl: imx header, conditional probe functions
+Date: Fri,  2 Aug 2013 12:38:27 +0200
+Subject: [PATCH 7/7] ARM: imx27: enable pinctrl
 In-Reply-To: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
 References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1375439907-10462-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1375439907-10462-8-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functions are not available if included by imx1 core driver.
-
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/pinctrl/pinctrl-imx.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-imx/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
-index bcedd99..446fc01 100644
---- a/drivers/pinctrl/pinctrl-imx.h
-+++ b/drivers/pinctrl/pinctrl-imx.h
-@@ -89,7 +89,11 @@ struct imx_pinctrl_soc_info {
- #define IMX_MUX_MASK	0x7
- #define IOMUXC_CONFIG_SION	(0x1 << 4)
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index f7a5ad1..52c5e7e 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -120,6 +120,8 @@ config SOC_IMX27
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MACH_MX27
+ 	select MXC_AVIC
++	select PINCTRL
++	select PINCTRL_IMX27
  
-+#if IS_ENABLED(PINCTRL_IMX)
-+
- int imx_pinctrl_probe(struct platform_device *pdev,
- 			struct imx_pinctrl_soc_info *info);
- int imx_pinctrl_remove(struct platform_device *pdev);
-+
-+#endif
- #endif /* __DRIVERS_PINCTRL_IMX_H */
+ config SOC_IMX31
+ 	bool
 -- 
 1.8.3.2
