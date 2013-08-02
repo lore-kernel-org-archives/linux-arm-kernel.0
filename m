@@ -1,108 +1,108 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 2 Aug 2013 22:20:10 +0800
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130802115334.GN2465@mudshark.cambridge.arm.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802115334.GN2465@mudshark.cambridge.arm.com>
-Message-ID: <20130802142010.GC7533@kroah.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 2 Aug 2013 17:22:56 +0300
+Subject: [PATCH 1/2] ARM: OMAP: dss-common: fix Panda's DVI DDC channel
+In-Reply-To: <51FBB461.7010209@ti.com>
+References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
+ <1374570405-8301-2-git-send-email-tomi.valkeinen@ti.com>
+ <51FBAC21.2040609@ti.com> <51FBAD64.5090600@ti.com> <51FBB461.7010209@ti.com>
+Message-ID: <51FBC0C0.2060207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
-> Hi Greg,
+On 02/08/13 16:30, Nishanth Menon wrote:
+> On 08/02/2013 08:00 AM, Tomi Valkeinen wrote:
+
+>> Feel free to help me develop the DT support for DSS =). When that's
+>> done, we can remove all this code.
 > 
-> On Thu, Aug 01, 2013 at 08:27:30PM +0100, Greg KH wrote:
-> > On Thu, Aug 01, 2013 at 07:35:31PM +0100, Will Deacon wrote:
-> > > Naturally, this would need to be described as a device-tree binding and
-> > > communicate:
-> > > 
-> > >   - Buses which can be configured as coherent, including which devices
-> > >     on those buses can be made coherent.
-> > > 
-> > >   - How IOMMUs sit on the bus and interact with masters on that bus (the
-> > >     current one-IOMMU-driver-per-bus may not work well for the
-> > >     platform_bus).
-> > 
-> > I've been waiting for people to finally run into this one, and realize
-> > that they shouldn't be using "platform_bus" :)
+> suggesting here - but it will be nice we have some steps towards this
+> direction - is there anything you'd suggest we do first?
+
+I do have a DSS-DT branch, which works. I've had such a branch for
+almost a year, although I've been refining it all the time. But I'm
+still not happy with the DT bindings I have there, and I haven't had any
+clear ideas how to solve those issues. And, as the DT bindings are an
+external API, I've been very cautious with it.
+
+I'm currently cleaning the branch up, and I hope I can send the series
+next week. Hopefully I'll receive some ideas for the problematic parts.
+I'll cc you =).
+
+>>> Example: if -EPROBEDEFER is incurred due to some unexpected dependency,
+>>> we'd have to redo the numbering in the kernel yet again.
+>>
+>> Hmm, sorry? Do you mean that the i2c bus numbers can change "randomly"?
+>>
+>> With board files they were numbered 1, 2, 3, 4, but with DT boot they
+>> seem to be 0, 1, 2, 3. And as we have the current situation where omap4
+>> boots with DT, but DSS does not have DT support, we add the DSS related
+>> devices in a board-file-like-fashion.
 > 
-> But, as pointed out later in this thread, people have been doing the exact
-> opposite!
-
-I guess they were wrong :(
-
-I know I mentioned it a few times over the years, but I've been ignoring
-ARM for a long time for a variety of reasons.
-
-> We can change the mindset by yelling, but if you're writing a new
-> driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
-> because you get a bunch of device-tree parsing code for free (see
-> drivers/of/platform.c).
-
-I know :(
-
-So, who do I "yell at", and what do I do to make things easier for you
-from the driver-core perspective?
-
-> What's worse is that this nice-and-easy auto-probing doesn't work for nested
-> device-nodes (i.e. a bunch of device-nodes under a common parent, something
-> which you might think is pretty common in a `tree') so people shy away from
-> nesting as a means to group devices too.
-
-That's sad.
-
-> > >   - QoS and PM constraints. This isn't really in my area, but we do have
-> > >     buses that have these features and expect software to control them.
-> > > 
-> > >   - The system topology and linkages between buses and devices.
-> > 
-> > The driver core handles this really well, you just have to create new
-> > busses, and don't rely on the "catch-all" platform_bus.
+> Aah we are then depending on the following
+> i2c-omap.c:
+>  adap->nr = pdev->id;
+>  r = i2c_add_numbered_adapter(adap);
 > 
-> Agreed, it's time that we started to describe these non-probable buses as
-> separate bus_types, with controller logic for configuring the bus itself
-> (there are weird-and-wonderful ring-based designs on the horizon which can
-> require a fair amount of setup).
-
-I've heard rumors of those for a while now, I'll believe it when I see
-them :)
-
-> > > The last point is increasingly important as various blocks of ARM system
-> > > IP start to require knowledge of masters and how things like memory
-> > > traffic, DVM messages, interrupts (think MSI) etc are routed between
-> > > them in order to configure the system correctly. For example, interfacing
-> > > a PCIe device with an SMMU requires knowledge of both the requester id
-> > > associated with the device and how that maps to incoming stream ids
-> > > (based off the AXI bus id) on the SMMU. Even worse, this mapping is
-> > > likely generated dynamically by the host controller, which would need to
-> > > know about downstream buses and their SMMUs.
-> > 
-> > Hm, sounds like an ACPI tree is what you need to be using :)
-> > 
-> > Seriously, why not use ACPI for stuff like this?  You already are
-> > starting to do that for ARM-based systems, why not just make it the
-> > standard?
+> mach-omapx/i2c.c:
+> .. i2c_bus_register..
+> pdev->id = bus_id
+> platform_device_register(pdev);
 > 
-> So, like a good proportion of the ARM community, ACPI isn't something I'm
-> well-versed in. Yes, it's coming, but at the same time it's not going to be
-> everywhere and we need to continue to support new SoCs using device-tree.
-> Whilst it might even become a de-factor standard for servers, mobile devices
-> will likely continue with the bootloaders they currently have. Furthermore,
-> the mobile space is really the wild-west when it comes to system topology --
-> exynos SoCs tend to have one IOMMU per device, for example:
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181922.html
+> I dont seem to see any similar numbering enforced in dtsi - if I reorder
+> the i2c entries in SoC dtsi, i'd have an issue as well, no?
+
+I don't know, but yes, possibly. But you probably won't reorder them, as
+they are in the HW I2C ID module order.
+
+> probe deferral could create problems as well.. not saying it can change
+> random order on a given kernel between boots, but am saying that when
+> new changes come in, deferral mechanism ensures proper ordering
+> dynamically, which kind of messes up with expected device numbers. I had
+> an issue with mmc sometime back where probe deferal on mmc1 made it
+> registered as second device as the dependency was not present on the mmc2.
+
+Yes, interesting point. If I got you right, you're saying that if a
+single i2c device gets deferred, but the others not, the ID numbering
+could change?
+
+I don't if it's possible to get only single i2c device deferred. Maybe.
+
+Anyway, we need some way to fix this for 3.11. As far as I understand,
+it's rather unlikely that the bus number would change, so I think this
+fix is the best I can do.
+
+> No reason this cannot happen on other busses as well. To solve this on
+> i2c dts, the usual convention is as follows (from omap3-beagle):
+> &i2c1 {
+>         clock-frequency = <2600000>;
 > 
-> On the back of that, how does ACPI describe these relationships? It would
-> certainly be a good idea to see what's already being done so we don't
-> reinvent everything again for device-tree.
+>         twl: twl at 48 {
+>                 reg = <0x48>;
+>                 interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+>                 interrupt-parent = <&intc>;
+>         };
+> };
+> 
+> this ensures that probe success order is made independent of device
+> expectation of i2c bus numbering or the order in which it was defined in
+> dts.
 
-I don't recall the specifics of how it does this, but the spec is open
-(and bad to read, sorry), and the linux-acpi mailing list is very
-welcoming, so I suggest you start there if you have questions.
+With dts, this is not a problem, it's handle with phandles. Although not
+as you show above, because we don't really have an i2c device on the board.
 
-thanks,
+The i2c in question goes through the DVI connector to the monitor. So
+the monitor is the i2c device. Thus we just get a handle to the i2c bus
+going to the monitor, and send messages to it directly, without having a
+linux i2c device.
 
-greg k-h
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/ed22bd84/attachment.sig>
