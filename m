@@ -1,84 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 2 Aug 2013 13:18:04 +0100
-Subject: [PATCH RFC 1/8] arm: make SWIOTLB available
-In-Reply-To: <20130802121340.GH24540@konrad-lan.dumpdata.com>
-References: <alpine.DEB.2.02.1307311833040.4893@kaball.uk.xensource.com>
- <1375292732-7627-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <334c4fe7-e40c-489c-84db-9bb58c705d44@email.android.com>
- <alpine.DEB.2.02.1308021250050.4893@kaball.uk.xensource.com>
- <20130802121340.GH24540@konrad-lan.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1308021316290.4893@kaball.uk.xensource.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 02 Aug 2013 14:12:13 +0200
+Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
+In-Reply-To: <51FB81FB.3060709@arm.com>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <51FB7CB8.6080103@arm.com> <51FB8081.6040501@linaro.org>
+ <51FB81FB.3060709@arm.com>
+Message-ID: <51FBA21D.5010308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Aug 2013, Konrad Rzeszutek Wilk wrote:
-> On Fri, Aug 02, 2013 at 12:59:00PM +0100, Stefano Stabellini wrote:
-> > On Wed, 31 Jul 2013, Konrad Rzeszutek Wilk wrote:
-> > > Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> > > >Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > >CC: will.deacon at arm.com
-> > > >CC: linux at arm.linux.org.uk
-> > > >---
-> > > > arch/arm/Kconfig                   |    7 +++++++
-> > > > arch/arm/include/asm/dma-mapping.h |   24 ++++++++++++++++++++++++
-> > > > 2 files changed, 31 insertions(+), 0 deletions(-)
-> > > >
-> > > >diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > >index ba412e0..05125ab 100644
-> > > >--- a/arch/arm/Kconfig
-> > > >+++ b/arch/arm/Kconfig
-> > > >@@ -1832,6 +1832,13 @@ config CC_STACKPROTECTOR
-> > > > 	  neutralized via a kernel panic.
-> > > > 	  This feature requires gcc version 4.2 or above.
-> > > > 
-> > > >+config SWIOTLB
-> > > >+	def_bool y
-> > > >+	select NEED_SG_DMA_LENGTH
-> > > >+
-> > > >+config IOMMU_HELPER
-> > > >+	def_bool SWIOTLB
-> > > >+
-> > > 
-> > > Could you explain the purpose of these two a bit more please? 
-> > 
-> > SWIOTLB is not available on arm at the moment.
-> > We need to make it available, otherwise SWIOTLB_XEN won't be able to
-> > select it.
-> > 
-> > Similarly, IOMMU_HELPER is another lib Kconfig symbol needed by SWIOTLB
-> > to compile.
-> 
-> I was more curious about the NEED_SG_DMA_LENGTH and IOMMU_HELPER.
-> I think the NEED_SG_DMA_LENGTH is optional? Or does SWIOTLB complain
-> about?
+On 08/02/2013 11:55 AM, Sudeep KarkadaNagesha wrote:
+> On 02/08/13 10:48, Daniel Lezcano wrote:
+>> On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
+>>> Hi Daniel,
+>>>
+>>> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
+>>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>>>
+>>>> This patch series adds support to configure the rate and enable the event
+>>>> stream for architected timer. Since the timer control register is reset to
+>>>> zero on warm boot, CPU PM notifier is added to re-initialse it.
+>>>>
+>>> This series is required to support TC2 cpuidle.
+>>> It will be good if you can review and get this in for v3.12
+>>
+>> So do you want me to take the series through my tree ?
+>>
+> Yes I believe it has to go through your(ARM specific clocksource?) tree,
+> but currently there's a conflict with another bug fix(that should come
+> from rmk as -rc fix)
+> (Commit ab8d46c0 "ARM: 7788/1: elf: fix lpae hwcap feature reporting in
+> proc/cpuinfo" in rmk -fixes)
 
-Yes, it does:
-
-lib/swiotlb.c: In function 'swiotlb_map_sg_attrs':
-lib/swiotlb.c:873:11: error: 'struct scatterlist' has no member named 'dma_length'
-lib/swiotlb.c:879:5: error: 'struct scatterlist' has no member named 'dma_length'
-lib/swiotlb.c: In function 'swiotlb_unmap_sg_attrs':
-lib/swiotlb.c:907:42: error: 'struct scatterlist' has no member named 'dma_length'
-lib/swiotlb.c: In function 'swiotlb_sync_sg':
-lib/swiotlb.c:937:11: error: 'struct scatterlist' has no member named 'dma_length'
+IMO, you should rebase this patch on top of tips/core, I will apply the
+series and when the rmk fix hits this branch (through tips/urgent), that
+will be up to the maintainer to resolve this conflict.
 
 
-> I do recall seeing a patch for this at some point but it was
-> malformed. It was just changing SWIOTLB to use a macro for
-> sg->dma_length or such.
-> 
-> But the IOMMU_HELPER? That seems odds as the DMA API (which as you know
-> is what SWIOTLB hooks up to) is _below_ the IOMMU API.  Ah, it is 
-> 'iommu_is_span_boundary' function.  Gotcha.
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Yep, that's the one.
-
-
-> Could you mention that in the git commit please? Just say that SWIOTLB
-> uses some of the common code that IOMMU API uses - which is in the
-> lib/iommu_helper.c hence the need for that.
-> 
-> And for the NEED_SG_DMA_LENGTH let me dig up the patch at some point and
-> send it your way so you can make it part of this series.
-
-OK
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
