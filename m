@@ -1,36 +1,122 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Aug 2013 01:13:15 -0700
-Subject: [Ksummit-2013-discuss] [ATTEND] [ARM ATTEND] kernel data bloat
- and how to avoid it
-In-Reply-To: <20130731152131.GW2296@suse.de>
-References: <20130731073802.GT7656@atomide.com> <20130731152131.GW2296@suse.de>
-Message-ID: <20130802081315.GA7656@atomide.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Fri, 02 Aug 2013 01:13:34 -0700
+Subject: [PATCH trivial] include: uapi: standard all files' macro prefix
+ and suffix, excluding "linux/" sub-directory
+In-Reply-To: <51FB634F.5070401@asianux.com> (Chen Gang's message of "Fri, 02
+ Aug 2013 15:44:15 +0800")
+References: <51FB6216.6010008@asianux.com> <51FB634F.5070401@asianux.com>
+Message-ID: <87iozoqzm9.fsf@tw-ebiederman.twitter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mel Gorman <mgorman@suse.de> [130731 08:28]:
-> On Wed, Jul 31, 2013 at 12:38:03AM -0700, Tony Lindgren wrote:
-> > Hi all,
-> > 
-> > Probably the biggest kernel data bloat issue is in the ARM land, but
-> > it also seems that it's becoming a Linux generic issue too, so I
-> > guess it could be discussed in either context.
-> > 
-> 
-> Would scripts/bloat-o-meter highlight where the growth problems are?
+Chen Gang <gang.chen@asianux.com> writes:
 
-Well to some extent yes, the board/SoC/driver specific options are
-often behind Kconfig options. So if you want to limit the set of
-supported SoCs and drivers for the kernel you can optimize it out.
+> It is a trivial patch for "include/uapi", exclude "linux" sub-directory.
+>
+> If it is useful, I will send another patch for "linux" sub-directory.
+>
+> BTW: it is really big mail addresses from
+> "./scripts/get_maintainers.pl"
 
-The bloat-o-meter won't help for things like checking that a device
-tree binding really describes the hardware, and is not just pointing
-to a table of defined registers in the device driver.
+What is the point?  Is there a bug that this fixes?
 
-A lot of the board specific, SoC specific, driver specific, debug
-specifc and so on "data" should not be in the kernel to start with
-and we can provide the same level of supported features in the kernel.
+These files are not used with api in their path in userspace so I
+suspect your change just makes things strange and confusing.
 
-Regards,
+Eric
 
-Tony
+> Thanks.
+>
+> On 08/02/2013 03:39 PM, Chen Gang wrote:
+>> For "include/uapi/*", excluding "linux/" sub-directory, let all files'
+>> macro prefix match the standard format, and give related stand comments
+>> for their macro suffix.
+>> 
+>> The related standard format is:
+>> 
+>>   "_SUBDIRNAME_SUBDIRNAME[_SUBDIRNAME]_FILENAME" (1st _SUBDIRNAME is _UAPI), and use '_' instead of '.' and '-'.
+>> 
+>> 
+>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>> ---
+>>  include/uapi/asm-generic/auxvec.h      |    6 +++---
+>>  include/uapi/asm-generic/bitsperlong.h |    6 +++---
+>>  include/uapi/asm-generic/errno-base.h  |    6 +++---
+>>  include/uapi/asm-generic/errno.h       |    6 +++---
+>>  include/uapi/asm-generic/fcntl.h       |    6 +++---
+>>  include/uapi/asm-generic/ioctls.h      |    6 +++---
+>>  include/uapi/asm-generic/ipcbuf.h      |    6 +++---
+>>  include/uapi/asm-generic/kvm_para.h    |    5 +++++
+>>  include/uapi/asm-generic/mman-common.h |    6 +++---
+>>  include/uapi/asm-generic/mman.h        |    6 +++---
+>>  include/uapi/asm-generic/msgbuf.h      |    6 +++---
+>>  include/uapi/asm-generic/param.h       |    6 +++---
+>>  include/uapi/asm-generic/poll.h        |    6 +++---
+>>  include/uapi/asm-generic/posix_types.h |    6 +++---
+>>  include/uapi/asm-generic/sembuf.h      |    6 +++---
+>>  include/uapi/asm-generic/setup.h       |    6 +++---
+>>  include/uapi/asm-generic/shmbuf.h      |    6 +++---
+>>  include/uapi/asm-generic/shmparam.h    |    6 +++---
+>>  include/uapi/asm-generic/signal-defs.h |    6 +++---
+>>  include/uapi/asm-generic/signal.h      |    6 +++---
+>>  include/uapi/asm-generic/socket.h      |    6 +++---
+>>  include/uapi/asm-generic/sockios.h     |    6 +++---
+>>  include/uapi/asm-generic/stat.h        |    6 +++---
+>>  include/uapi/asm-generic/statfs.h      |    6 +++---
+>>  include/uapi/asm-generic/swab.h        |    6 +++---
+>>  include/uapi/asm-generic/termbits.h    |    6 +++---
+>>  include/uapi/asm-generic/types.h       |    6 +++---
+>>  include/uapi/asm-generic/ucontext.h    |    6 +++---
+>>  include/uapi/asm-generic/unistd.h      |    5 +++++
+>>  include/uapi/drm/drm.h                 |    6 +++---
+>>  include/uapi/drm/drm_fourcc.h          |    6 +++---
+>>  include/uapi/drm/drm_mode.h            |    6 +++---
+>>  include/uapi/drm/drm_sarea.h           |    6 +++---
+>>  include/uapi/drm/exynos_drm.h          |    6 +++---
+>>  include/uapi/drm/i810_drm.h            |    6 +++---
+>>  include/uapi/drm/i915_drm.h            |    6 +++---
+>>  include/uapi/drm/mga_drm.h             |    6 +++---
+>>  include/uapi/drm/nouveau_drm.h         |    6 +++---
+>>  include/uapi/drm/omap_drm.h            |    6 +++---
+>>  include/uapi/drm/qxl_drm.h             |    6 +++---
+>>  include/uapi/drm/r128_drm.h            |    6 +++---
+>>  include/uapi/drm/radeon_drm.h          |    6 +++---
+>>  include/uapi/drm/savage_drm.h          |    6 +++---
+>>  include/uapi/drm/sis_drm.h             |    6 +++---
+>>  include/uapi/drm/tegra_drm.h           |    6 +++---
+>>  include/uapi/drm/via_drm.h             |    6 +++---
+>>  include/uapi/drm/vmwgfx_drm.h          |    6 +++---
+>>  include/uapi/mtd/inftl-user.h          |    6 +++---
+>>  include/uapi/mtd/mtd-abi.h             |    6 +++---
+>>  include/uapi/mtd/mtd-user.h            |    6 +++---
+>>  include/uapi/mtd/nftl-user.h           |    6 +++---
+>>  include/uapi/mtd/ubi-user.h            |    6 +++---
+>>  include/uapi/rdma/ib_user_cm.h         |    6 +++---
+>>  include/uapi/rdma/ib_user_mad.h        |    6 +++---
+>>  include/uapi/rdma/ib_user_sa.h         |    6 +++---
+>>  include/uapi/rdma/ib_user_verbs.h      |    6 +++---
+>>  include/uapi/rdma/rdma_netlink.h       |    6 +++---
+>>  include/uapi/rdma/rdma_user_cm.h       |    6 +++---
+>>  include/uapi/scsi/fc/fc_els.h          |    6 +++---
+>>  include/uapi/scsi/fc/fc_fs.h           |    6 +++---
+>>  include/uapi/scsi/fc/fc_gs.h           |    6 +++---
+>>  include/uapi/scsi/fc/fc_ns.h           |    6 +++---
+>>  include/uapi/scsi/scsi_bsg_fc.h        |    7 +++----
+>>  include/uapi/scsi/scsi_netlink.h       |    7 +++----
+>>  include/uapi/scsi/scsi_netlink_fc.h    |    7 +++----
+>>  include/uapi/sound/asequencer.h        |    6 +++---
+>>  include/uapi/sound/asound.h            |    6 +++---
+>>  include/uapi/sound/asound_fm.h         |    6 +++---
+>>  include/uapi/sound/compress_offload.h  |    6 +++---
+>>  include/uapi/sound/compress_params.h   |    6 +++---
+>>  include/uapi/sound/emu10k1.h           |    6 +++---
+>>  include/uapi/sound/hdsp.h              |    6 +++---
+>>  include/uapi/sound/hdspm.h             |    6 +++---
+>>  include/uapi/sound/sb16_csp.h          |    6 +++---
+>>  include/uapi/sound/sfnt_info.h         |    6 +++---
+>>  include/uapi/video/edid.h              |    6 +++---
+>>  include/uapi/video/sisfb.h             |    6 +++---
+>>  include/uapi/video/uvesafb.h           |    6 +++---
+>>  include/uapi/xen/evtchn.h              |    6 +++---
+>>  include/uapi/xen/privcmd.h             |    6 +++---
+>>  80 files changed, 244 insertions(+), 237 deletions(-)
