@@ -1,62 +1,48 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 2 Aug 2013 15:52:02 +0300
-Subject: [PATCH 0/2] OMAP: Panda DVI fix and a cleanup
-In-Reply-To: <20130802124611.GJ7656@atomide.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 2 Aug 2013 07:54:57 -0500
+Subject: [PATCH 1/2] ARM: OMAP: dss-common: fix Panda's DVI DDC channel
+In-Reply-To: <1374570405-8301-2-git-send-email-tomi.valkeinen@ti.com>
 References: <1374570405-8301-1-git-send-email-tomi.valkeinen@ti.com>
- <51FB9EDB.8010600@ti.com> <20130802124611.GJ7656@atomide.com>
-Message-ID: <51FBAB72.9020108@ti.com>
+ <1374570405-8301-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <51FBAC21.2040609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/13 15:46, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [130802 05:05]:
->> On 23/07/13 12:06, Tomi Valkeinen wrote:
->>> Hi Tony,
->>>
->>> Here's a fix for 3.11 that makes EDID read for DVI work again.
->>>
->>> I also included a cleanup patch that removes the non-DT support functions that
->>> are no longer called from anywhere. It's not a fix, but as we're in quite early
->>> rcs, I thought it would be nice to remove the dead code.
->>>
->>> Up to you if you want to include that one for 3.11 or not. If not, I'll include
->>> it in a board file series for 3.12 that I'll send soon.
->>>
->>>  Tomi
->>>
->>> Tomi Valkeinen (2):
->>>   ARM: OMAP: dss-common: fix Panda's DVI DDC channel
->>>   ARM: OMAP2+: Remove legacy DSS initialization for omap4
->>>
->>>  arch/arm/mach-omap2/dss-common.c | 49 +---------------------------------------
->>>  arch/arm/mach-omap2/dss-common.h |  2 --
->>>  2 files changed, 1 insertion(+), 50 deletions(-)
->>>
->>
->> Ping.
-> 
-> Oops, sorry I was offline last week and still not caught up on mails..
+On 07/23/2013 04:06 AM, Tomi Valkeinen wrote:
+> Panda's DVI connector's DDC pins are connected to OMAP's third i2c bus.
+> With non-DT, the bus number was 3, and that is what is used in the
+> dss-common.c which contains the platform data for Panda's DVI.
+>
+> However, with DT, the bus number is 2. As we now only have DT boot for
+> Panda, we have to change the bus number to make DVI EDID read
+> operational.
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>   arch/arm/mach-omap2/dss-common.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
+> index 393aeef..043e570 100644
+> --- a/arch/arm/mach-omap2/dss-common.c
+> +++ b/arch/arm/mach-omap2/dss-common.c
+> @@ -42,7 +42,7 @@
+>
+>   /* Using generic display panel */
+>   static struct tfp410_platform_data omap4_dvi_panel = {
+> -	.i2c_bus_num		= 3,
+> +	.i2c_bus_num		= 2,
+>   	.power_down_gpio	= PANDA_DVI_TFP410_POWER_DOWN_GPIO,
+>   };
+>
+>
+completely dumb question :) :
+why cant we have dts support for this instead of having to renumber 
+every time?
 
-Ok, no prob. There's the "ARM: OMAP2+: use new display drivers" series
-also waiting for you, but that's for 3.12 =).
+Example: if -EPROBEDEFER is incurred due to some unexpected dependency, 
+we'd have to redo the numbering in the kernel yet again.
 
-> If you have other DSS fixes I suggest you also send these fixes:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> If not, let me know and I'll queue these.
-
-I've got a few fbdev fixes, I can apply the fix to that branch. I'll
-leave the second patch for 3.12 as it's really a cleanup (it's actually
-also included in the "use new display drivers" series).
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130802/64dc5500/attachment.sig>
+-- 
+Regards,
+Nishanth Menon
