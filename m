@@ -1,49 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 2 Aug 2013 10:46:50 +0200
-Subject: NSA310 + DT
-In-Reply-To: <51FB6F59.4010205@uni-bremen.de>
-References: <20130710073706.GA28212@lunn.ch> <51F6A0DC.3020501@uni-bremen.de>
- <20130729192112.GY29916@titan.lakedaemon.net>
- <20130729204315.GK24782@lunn.ch> <51F78DA6.8010307@uni-bremen.de>
- <20130730144752.GR24782@lunn.ch> <20130730172407.3aab15c6@skate>
- <51F7EBB9.7000504@uni-bremen.de> <20130730191943.49f8070c@skate>
- <20130730183610.GT24782@lunn.ch> <51F814A0.2050403@uni-bremen.de>
- <20130730232316.10dc7019@skate> <20130731111414.47e7670b@skate>
- <51F8DC3A.6010007@uni-bremen.de> <20130731115108.21c043fd@skate>
- <51FB6F59.4010205@uni-bremen.de>
-Message-ID: <20130802104650.68a13327@skate>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Fri, 2 Aug 2013 15:55:46 +0800
+Subject: [PATCH 1/3] ARM: imx: Add DMAMUX clock for Vybrid vf610 SoC
+Message-ID: <1375430148-4550-1-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Finn Hoffmann,
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+ arch/arm/mach-imx/clk-vf610.c           | 5 +++++
+ include/dt-bindings/clock/vf610-clock.h | 6 +++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-On Fri, 02 Aug 2013 10:35:37 +0200, Finn Hoffmann wrote:
-
-> I just came across one thing. Is it ok that I have different Marvell 
-> device with patched 3.11.0-rc3?
-> With 3.10.2 it has pci id 11ab:6281, with 3.11.0-rc3 and your patch it 
-> has 11ab:7846.
-
-Yes, this is expected. 3.11-rc uses a completely new PCI driver for
-Marvell platforms, that has a proper Device Tree binding. This driver
-uses a very different strategy than the old driver in terms of MBus
-window configuration, and to achieve this it relies on an emulated
-PCI-to-PCI bridge. The numbers you're seeing are the one of the
-emulated PCI-to-PCI bridge.
-
-And the patch I've done fixes this PCI-to-PCI bridge emulation. BTW,
-I've officially submitted the patch, which has been taken by the PCI
-maintainer and will be part of one of the next 3.11-rc, and therefore
-of the final 3.11. I mentioned you as Reported-by and thought git
-send-email would automatically Cc you on the patch, but it did not.
-
-Thanks again for your report!
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index b169a39..29f88a2 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -298,6 +298,11 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
+ 	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
+ 
++	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
++	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
++	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(1));
++	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(2));
++
+ 	clk_set_parent(clk[VF610_CLK_QSPI0_SEL], clk[VF610_CLK_PLL1_PFD4]);
+ 	clk_set_rate(clk[VF610_CLK_QSPI0_X4_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_SEL]) / 2);
+ 	clk_set_rate(clk[VF610_CLK_QSPI0_X2_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_X4_DIV]) / 2);
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 4aa2b48..a916029 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -160,6 +160,10 @@
+ #define VF610_CLK_GPU2D			147
+ #define VF610_CLK_ENET0			148
+ #define VF610_CLK_ENET1			149
+-#define VF610_CLK_END			150
++#define VF610_CLK_DMAMUX0		150
++#define VF610_CLK_DMAMUX1		151
++#define VF610_CLK_DMAMUX2		152
++#define VF610_CLK_DMAMUX3		153
++#define VF610_CLK_END			154
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.0
