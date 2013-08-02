@@ -1,50 +1,37 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 02 Aug 2013 14:35:16 -0700
-Subject: [PATCH v2 1/6] clk: samsung: move common plls registration into
- separate function
-In-Reply-To: <201307111052.13618.heiko@sntech.de>
-References: <201307100057.06061.heiko@sntech.de>
- <CAKew6eUPBUZj4TuhNAjp6NitFUaeFBZscr_jqU3Y_wLi1m7Ekg@mail.gmail.com>
- <1874409.iWz7oWBuYA@thinkpad> <201307111052.13618.heiko@sntech.de>
-Message-ID: <20130802213516.6450.7848@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 02 Aug 2013 15:35:42 -0600
+Subject: [PATCH] ARM: DT: binding fixup to align with vendor-prefixes.txt
+In-Reply-To: <1375478278-22757-1-git-send-email-csd@broadcom.com>
+References: <1375478278-22757-1-git-send-email-csd@broadcom.com>
+Message-ID: <51FC262E.6090706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2013-07-11 01:52:13)
-> Am Donnerstag, 11. Juli 2013, 09:46:53 schrieb Tomasz Figa:
-> > Hi,
-> > 
-> > On Wednesday 10 of July 2013 22:29:13 Yadwinder Singh Brar wrote:
-> > > Hi Heiko,
-> > > 
-> > > On Wed, Jul 10, 2013 at 4:27 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > > > All Samsung PLLs use similar code to register the clocks and clkdev
-> > > > lookups. Therefore move these into a separate function to reduce code
-> > > > duplication.
-> > > > 
-> > > > Suggested-by: Russell King <linux@arm.linux.org.uk>
-> > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > ---
-> > > 
-> > > I have posted patch for adding common pll registration function
-> > > which some how missed to get merged. I hope will get merged after rc1.
-> > > Please give a look at that :
-> > > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg19543.ht
-> > > ml
-> > 
-> > Yeah, I was going to post a link to it, but I couldn't find it on any
-> > mailing list archive. I think we should go with the way of registration
-> > introduced by Yadwinder.
-> 
-> the linked patch looks nice, thanks for the link. So I'll redo the plls 
-> against it in the next round.
+On 08/02/2013 03:17 PM, Christian Daudt wrote:
+> [ this is a follow-up to this discussion:
+> http://archive.arm.linux.org.uk/lurker/message/20130730.230827.a1ceb12a.en.html ]
+> This patchset renames all uses of "bcm," name bindings to
+> "brcm," as they were done prior to knowing that brcm had
+> already been standardized as Broadcom vendor prefix
+> (in Documentation/devicetree/bindings/vendor-prefixes.txt).
+> This will not cause any churn on devices because none of
+> these bindings have made it into production yet.
+> Also rename the the following dt binding docs that had "bcm,"
+> in their name for consistency:
+>  - bcm,kona-sdhci.txt -> kona-sdhci.txt
+>  - bcm,kona-timer.txt -> kona-timer.txt
 
-I just took that series into clk-next, so you can base v2 of this series
-against clk-next.
+Using "git format-patch -M" for renames would make it much easier to see
+that all that's happening is a file rename and/or whatever other diff is
+happening.
 
-Regards,
-Mike
+I'd actually prefer to go the other way on the file renaming, and name
+all binding files after the complete compatible value they describe,
+rather than removing the vendor prefix on some files. But, I don't feel
+strongly for files I don't directly own.
 
-> 
-> 
-> Heiko
+Technically this change shouldn't be made since it's an incompatible
+change to the DT ABI, unless you keep all the old entries in the
+driver's match tables and just add the new entries rather than deleting
+the old ones. If you do that, it should be enough to placate anyone
+adamantly opposed to this change, I think.
