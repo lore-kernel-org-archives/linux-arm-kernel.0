@@ -1,36 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Aug 2013 00:29:25 -0700
-Subject: [PATCH] ARM: allow DEBUG_UNCOMPRESS for omap2plus
-In-Reply-To: <51F94200.2060202@wwwdotorg.org>
-References: <1375224558-8170-1-git-send-email-swarren@wwwdotorg.org>
- <20130730225233.GF21614@n2100.arm.linux.org.uk>
- <51F845C7.8020106@wwwdotorg.org>
- <20130731064634.GR7656@atomide.com>
- <51F94200.2060202@wwwdotorg.org>
-Message-ID: <20130802072925.GX7656@atomide.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 2 Aug 2013 09:34:20 +0200
+Subject: [PATCH 2/10] ARM: dts: mxs: add labels to most nodes for easier
+ reference
+In-Reply-To: <51F969A1.8070509@wwwdotorg.org>
+References: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
+ <1375281480-25775-2-git-send-email-LW@KARO-electronics.de>
+ <51F969A1.8070509@wwwdotorg.org>
+Message-ID: <20987.24828.836885.285381@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130731 10:04]:
-> On 07/31/2013 12:46 AM, Tony Lindgren wrote:
-> > 
-> > I think we're best off removing the remaining uncompress code
-> > configured port detection features as the port properties are now
-> > defined in kconfig anyways. That simplifies the code quite a bit.
+Hi,
+
+Stephen Warren writes:
+> On 07/31/2013 08:37 AM, Lothar Wa?mann wrote:
 > 
-> If you want to do that with OMAP, I'm happy to drop this patch.
+> Are the labels needed? Adding them when they're used might be a better
+> approach.
+>
+I'd prefer to have them defined once, so that possible new users of
+the labels won't have to add the labels to this file, which might
+produce conflicts when multiple patches try to add the same label to
+the file.
 
-Yes on my list of things to do..
- 
-> For Tegra, automatic determination of the DEBUG_LL UART is rather
-> useful, so I'm not going to give that up:-)
 
-For omaps there's just too many options to try to detect anything.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-It seems the best strategy seems to be to just init things later on
-so DEBUG_LL is only needed when booting breaks really early on
-during the boot process.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Regards,
-
-Tony
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
