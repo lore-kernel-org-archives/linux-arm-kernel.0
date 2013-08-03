@@ -1,50 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 3 Aug 2013 10:12:00 -0400
-Subject: [PATCH] leds: leds-netxbig: depends on ARCH_KIRKWOOD
-In-Reply-To: <1375479274-9942-1-git-send-email-simon.guinot@sequanux.org>
-References: <1375369655-1310-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375479274-9942-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20130803141200.GI5882@titan.lakedaemon.net>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sat, 03 Aug 2013 16:16:09 +0200
+Subject: [RFC PATCH V2 4/9] s/.name/.compatible/
+In-Reply-To: <20130803140741.GH5882@titan.lakedaemon.net>
+References: <cover.1375457714.git.jason@lakedaemon.net>
+ <1e66851fa0a7c137afbb39a27c77d5a585b466f6.1375457714.git.jason@lakedaemon.net>
+ <51FC2A34.8010806@wwwdotorg.org> <20130803140741.GH5882@titan.lakedaemon.net>
+Message-ID: <51FD10A9.9030300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 11:34:34PM +0200, Simon Guinot wrote:
-> With the DT conversion, the board Kconfig symbols MACH_ are going to be
-> removed. In order to prepare this removal, this patch replaces alls the
-> machines dependencies for leds-netxbig by ARCH_KIRKWOOD.
+On 03.08.2013 16:07, Jason Cooper wrote:
+> I changed the api so that the user could link in a random number of dtbs
+> _without_ hardcoding the addresses.  Searching by the compatible string
+> was the easiest way to accomplish this.  Unfortunately, I didn't know
+> his compatible strings when I made the change.
 > 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> ---
-> Thomas,
+> For the curious, the code that does this is here:
 > 
-> Please, insert this patch in your series before the patch named:
-> [PATCHv2 7/9] ARM: kirkwood: convert LaCie Net{2, 5}Big v2 platforms to DT
-
-Nah, this should go through linux-leds.
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
-
->  drivers/leds/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>   https://github.com/zonque/pxa-impedance-matcher/blob/master/dtbs.c
 > 
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 0e41460..7226696 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -407,8 +407,8 @@ config LEDS_NS2
->  
->  config LEDS_NETXBIG
->  	tristate "LED support for Big Network series LEDs"
-> -	depends on MACH_NET2BIG_V2 || MACH_NET5BIG_V2
->  	depends on LEDS_CLASS
-> +	depends on ARCH_KIRKWOOD
->  	default y
->  	help
->  	  This option enable support for LEDs found on the LaCie 2Big
-> -- 
-> 1.7.10.4
-> 
+> We plan to add dtb parsing in the future so that we can change the dtb
+> based on the atags passed by the legacy bootloader.
+
+... and then we can also specifically look into the compatible node of
+the dtb, and not just do a string search over the entire binary.
+
+But for now, it's good enough.
+
+
+Daniel
