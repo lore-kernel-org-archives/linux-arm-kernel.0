@@ -1,122 +1,206 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 3 Aug 2013 21:45:41 +0200
-Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <20130802195552.2f95c855fc20d6b3a205e40f@mail.ru>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <20130802105754.GF2884@e106331-lin.cambridge.arm.com>
- <20130802195552.2f95c855fc20d6b3a205e40f@mail.ru>
-Message-ID: <201308032145.41860.arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sat, 3 Aug 2013 21:14:11 +0100
+Subject: [PATCH] ARM: EXYNOS: add power domains support for EXYNOS5440
+In-Reply-To: <51FC1E40.7030807@wwwdotorg.org>
+References: <2729097.X0eAsuYF97@amdc1032>
+ <51FC1E40.7030807@wwwdotorg.org>
+Message-ID: <20130803201411.GB17755@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 August 2013, Alexander Shiyan wrote:
-> On Fri, 2 Aug 2013 11:57:54 +0100
-> Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Jul 18, 2013 at 07:34:58PM +0100, Alexander Shiyan wrote:
-
-> > > +The interrupt sources are as follows:
-> > > +ID     Name    Description
-> > > +---------------------------
-> > > +1:     BLINT   Battery low (FIQ)
-> > > +3:     MCINT   Media changed (FIQ)
-> > > +4:     CSINT   CODEC sound
-> > > +5:     EINT1   External 1
-> > > +6:     EINT2   External 2
-> > > +7:     EINT3   External 3
-> > > +8:     TC1OI   TC1 under flow
-> > > +9:     TC2OI   TC2 under flow
-> > > +10:    RTCMI   RTC compare match
-> > > +11:    TINT    64Hz tick
-> > > +12:    UTXINT1 UART1 transmit FIFO half empty
-> > > +13:    URXINT1 UART1 receive FIFO half full
-> > > +14:    UMSINT  UART1 modem status changed
-> > > +15:    SSEOTI  SSI1 end of transfer
-> > > +16:    KBDINT  Keyboard
-> > > +17:    SS2RX   SSI2 receive FIFO half or greater full
-> > > +18:    SS2TX   SSI2 transmit FIFO less than half empty
-> > > +28:    UTXINT2 UART2 transmit FIFO half empty
-> > > +29:    URXINT2 UART2 receive FIFO half full
-> > > +32:    DAIINT  DAI interface (FIQ)
-> > 
-> > Surely that's specific to the SoC the interrupt controller is used in,
-> > not the interrupt controller IP itself?
+On Fri, Aug 02, 2013 at 10:01:52PM +0100, Stephen Warren wrote:
+> (CCing the other DT maintainers, hence quoting binding in full)
 > 
-> [...]
-> > > +static const struct {
-> > > +#define CLPS711X_FLAG_EN       (1 << 0)
-> > > +#define CLPS711X_FLAG_FIQ      (1 << 1)
-> > > +       unsigned int    flags;
-> > > +       phys_addr_t     phys_eoi;
-> > > +} clps711x_irqs[] __initconst = {
-> > > +       [1]     = { CLPS711X_FLAG_FIQ, CLPS711X_BLEOI, },
-> > > +       [3]     = { CLPS711X_FLAG_FIQ, CLPS711X_MCEOI, },
-> > > +       [4]     = { CLPS711X_FLAG_EN, CLPS711X_COEOI, },
-> > > +       [5]     = { CLPS711X_FLAG_EN, },
-> > > +       [6]     = { CLPS711X_FLAG_EN, },
-> > > +       [7]     = { CLPS711X_FLAG_EN, },
-> > > +       [8]     = { CLPS711X_FLAG_EN, CLPS711X_TC1EOI, },
-> > > +       [9]     = { CLPS711X_FLAG_EN, CLPS711X_TC2EOI, },
-> > > +       [10]    = { CLPS711X_FLAG_EN, CLPS711X_RTCEOI, },
-> > > +       [11]    = { CLPS711X_FLAG_EN, CLPS711X_TEOI, },
-> > > +       [12]    = { CLPS711X_FLAG_EN, },
-> > > +       [13]    = { CLPS711X_FLAG_EN, },
-> > > +       [14]    = { CLPS711X_FLAG_EN, CLPS711X_UMSEOI, },
-> > > +       [15]    = { CLPS711X_FLAG_EN, CLPS711X_SRXEOF, },
-> > > +       [16]    = { CLPS711X_FLAG_EN, CLPS711X_KBDEOI, },
-> > > +       [17]    = { CLPS711X_FLAG_EN, },
-> > > +       [18]    = { CLPS711X_FLAG_EN, },
-> > > +       [28]    = { CLPS711X_FLAG_EN, },
-> > > +       [29]    = { CLPS711X_FLAG_EN, },
-> > > +       [32]    = { CLPS711X_FLAG_FIQ, },
-> > > +};
+> On 08/02/2013 07:23 AM, Bartlomiej Zolnierkiewicz wrote:
+> > On EXYNOS5440 power domains are handled in a different way than on
+> > the previous EXYNOS SoCs. Add support for them to EXYNOS pm_domains
+> > driver. Then add device tree nodes for PCIe (controlling power for
+> > PCIe host controller) and Conn2 (controlling power for Ethernet,
+> > SATA and USB controllers) power domains to exynos5440.dtsi.
 > > 
-> > Isn't that SoC specific?
+> > Currently if runtime Power Management is enabled and the driver
+> > for devices under power domain is disabled then the power domain
+> > will be disabled by EXYNOS pm_domains driver. To make more active
+> > use of power domains (dynamically enable and disabled them as
+> > needed) it is required to add runtime PM support to pci-exynos,
+> > stmmac, ahci_platform, ohci-exynos and ehci-s5p drivers (to be
+> > done later).
+> > 
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Signed-off-by: Myungjoo Ham <myungjoo.ham@samsung.com>
+> > Cc: Tomasz Figa <t.figa@samsung.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > ---
+> >  Documentation/devicetree/bindings/arm/exynos/power_domain.txt |   33 ++
+> >  arch/arm/boot/dts/exynos5440.dtsi                             |   23 +
+> >  arch/arm/mach-exynos/Kconfig                                  |    1 
+> >  arch/arm/mach-exynos/common.c                                 |    4 
+> >  arch/arm/mach-exynos/pm_domains.c                             |  138 +++++++++-
+> >  5 files changed, 190 insertions(+), 9 deletions(-)
+> > 
+> > Index: b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> > ===================================================================
+> > --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:45:53.551392396 +0200
+> > +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:46:29.799391845 +0200
+> > @@ -5,20 +5,47 @@ to gate power to one or more peripherals
+> >  
+> >  Required Properties:
+> >  - compatible: should be one of the following.
+> > -    * samsung,exynos4210-pd - for exynos4210 type power domain.
+> > +    * samsung,exynos4210-pd - for Exynos4210 type power domain.
+> > +    * samsung,exynos5440-pd - for Exynos5440 type power domain.
+> >  - reg: physical base address of the controller and length of memory mapped
+> > -    region.
+> > +    region (Exynos4210 type power domain) or bit offset in the control
+> > +    register (Exynos5440 type power domain).
+> > +
+> > +Additional parent node must be created for Exynos5440 power domains with
+> > +the following required properties:
+> > +- compatible: samsung,exynos5440-power-domains, simple-bus
+> > +- reg: physical base address of the XMU controller and length of memory
+> > +    mapped region
 > 
-> I absolutely do not understand the last two comments.
-> You are not difficult to describe them in other words?
+> It's a little odd to describe the child nodes first. Given the 4210 and
+> 5440 bindings work so differently, I'd suggest making separate binding
+> files for the two; samsung,exynos4210-pd.txt and samsung,exynos5440-pd.txt.
+> 
+> The node being describe here clearly is not a simple-bus; the child
+> nodes appear to have a specific need that their parent be compatible =
+> "samsung,exynos5440-power-domains", hence they aren't the independent
+> devices that simple-bus would usually contain.
 
-The point that Mark was making is that the both the binding and the driver
-should be written to only specify what the interrupt controller itself
-looks like, not how any of the lines are connected or configured.
++1. This is most definitely not a simple-bus, the child nodes reg
+properties cdon't represent the same address space as the
+parent's reg property.
 
-For instance, if the same interrupt controller is used in another SoC
-(ep93xx?) but that soc has an i2c controller connected to IRQ 4 rather than
-the sound, the driver should still be usable unmodified.
+How much does the association of bit-offsets to power domains vary? 
 
-Unfortunately, the EOI register offset cannot be computed from the
-interrupt number. What Mark was getting at here is that it could be
-done in a more generic way if you define the interrupt specifier to
-take three cells instead of one, and pass the flag and EOI number
-along with the interrupt number, e.g.
+> 
+> Note that I only briefly reviewed the low-level structural aspects of
+> the binding that I mentioned above; I haven't thought about the binding
+> at a higher level of e.g. "does this binding conceptually make sense".
 
-	serial at abcd0000 {
-		reg = <0xabcd0000 10000>;
-		interrupts = <12 0 0>, <13 0 0>, <14 1 6>;
-	}
+This is unfortunately difficult to do :(
 
-Where '1' signifies the use of an EOI register, and '6' is the index of that register,
-so you can compute the actual register as (0x600 + i * 0x40).
+> 
+> >  Node of a device using power domains must have a samsung,power-domain property
+> >  defined with a phandle to respective power domain.
+> >  
+> > -Example:
+> > +Example for Exynos4210 compatible power domain:
+> >  
+> >  	lcd0: power-domain-lcd0 {
+> >  		compatible = "samsung,exynos4210-pd";
+> >  		reg = <0x10023C00 0x10>;
+> >  	};
+> >  
+> > +Example for Exynos5440 compatible power domains:
+> > +
+> > +	power-domains at 00160000 {
+> > +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
+> > +		reg = <0x00160000 0x1000>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		pd_pcie: pcie-power-domain at 6 {
+> > +			compatible = "samsung,exynos5440-pd";
+> > +			reg = <6>;
+> > +		};
+> > +
+> > +		pd_conn2: conn2-power-domain at 7 {
+> > +			compatible = "samsung,exynos5440-pd";
+> > +			reg = <7>;
+> > +		};
+> > +	};
+> > +
+> >  Example of the node using power domain:
+> >  
+> >  	node {
+> > Index: b/arch/arm/boot/dts/exynos5440.dtsi
+> > ===================================================================
+> > --- a/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:45:53.599392397 +0200
+> > +++ b/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:46:29.815391842 +0200
+> > @@ -29,6 +29,23 @@
+> >  		#clock-cells = <1>;
+> >  	};
+> >  
+> > +	power-domains at 00160000 {
+> > +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
+> > +		reg = <0x00160000 0x1000>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		pd_pcie: pcie-power-domain at 6 {
+> > +			compatible = "samsung,exynos5440-pd";
+> > +			reg = <6>;
+> > +		};
+> > +
+> > +		pd_conn2: conn2-power-domain at 7 {
+> > +			compatible = "samsung,exynos5440-pd";
+> > +			reg = <7>;
+> > +		};
+> > +	};
+> > +
+> >  	gic:interrupt-controller at 2E0000 {
+> >  		compatible = "arm,cortex-a15-gic";
+> >  		#interrupt-cells = <3>;
+> > @@ -192,6 +209,7 @@
+> >  		phy-mode = "sgmii";
+> >  		clocks = <&clock 25>;
+> >  		clock-names = "stmmaceth";
+> > +		samsung,power-domain = <&pd_conn2>;
+> >  	};
 
-I don't actually think that would be much of an improvement though, as the controller
-can be considered 'complex', so I'm also fine with your approach. Maybe Mark has some
-further thoughts on this.
+This feels like a clock style binding would fit better:
+samsung,power-domain = <&pwr 7>;
 
-On Thursday 18 July 2013, Alexander Shiyan wrote:
-> +static void __iomem __init *clps711x_ioremap_one(phys_addr_t reg)
-> +{
-> +       void __iomem *ret;
-> +
-> +       if (!request_mem_region(clps711x_intc->phys_base + reg, SZ_4, NULL))
-> +               return ERR_PTR(-EBUSY);
-> +
-> +       ret = ioremap(clps711x_intc->phys_base + reg, SZ_4);
-> +       if (!ret)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       return ret;
+But there may be a better, more general way of handling this. I'm not
+sure how this relates to regulators and so on, and how other vendors
+handle this stuff...
 
-Another unrelated comment: Doing repeated ioremap() and request_mem_region calls
-is rather wasteful as every single call will consume resources. Better do a single
-ioremap in the probe function and just add the offsets later.
+Thanks,
+Mark.
 
-	Arnd
+> >  
+> >  	amba {
+> > @@ -240,6 +258,7 @@
+> >  		interrupts = <0 30 0>;
+> >  		clocks = <&clock 23>;
+> >  		clock-names = "sata";
+> > +		samsung,power-domain = <&pd_conn2>;
+> >  	};
+> >  
+> >  	ohci at 220000 {
+> > @@ -248,6 +267,7 @@
+> >  		interrupts = <0 29 0>;
+> >  		clocks = <&clock 24>;
+> >  		clock-names = "usbhost";
+> > +		samsung,power-domain = <&pd_conn2>;
+> >  	};
+> >  
+> >  	ehci at 221000 {
+> > @@ -256,6 +276,7 @@
+> >  		interrupts = <0 29 0>;
+> >  		clocks = <&clock 24>;
+> >  		clock-names = "usbhost";
+> > +		samsung,power-domain = <&pd_conn2>;
+> >  	};
+> >  
+> >  	pcie at 290000 {
+> > @@ -275,6 +296,7 @@
+> >  		#interrupt-cells = <1>;
+> >  		interrupt-map-mask = <0 0 0 0>;
+> >  		interrupt-map = <0x0 0 &gic 53>;
+> > +		samsung,power-domain = <&pd_pcie>;
+> >  	};
+> >  
+> >  	pcie at 2a0000 {
+> > @@ -294,5 +316,6 @@
+> >  		#interrupt-cells = <1>;
+> >  		interrupt-map-mask = <0 0 0 0>;
+> >  		interrupt-map = <0x0 0 &gic 56>;
+> > +		samsung,power-domain = <&pd_pcie>;
+> >  	};
+> >  };
+> 
+> 
