@@ -1,54 +1,53 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 3 Aug 2013 13:12:35 -0400
-Subject: [PATCHv2 7/9] ARM: kirkwood: convert LaCie Net{2, 5}Big v2
- platforms to DT
-In-Reply-To: <20130802212553.GA20330@kw.sim.vm.gnt>
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375369655-1310-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130802212553.GA20330@kw.sim.vm.gnt>
-Message-ID: <20130803171235.GK5882@titan.lakedaemon.net>
+Date: Sat, 3 Aug 2013 13:36:40 -0400
+Subject: [PATCH 3/3] ARM: dts: mvebu: Introduce a new compatible string
+ for mv64xxx-i2c
+In-Reply-To: <1373898278-4805-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
+ <1373898278-4805-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130803173640.GA13555@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 11:25:53PM +0200, Simon Guinot wrote:
-> On Thu, Aug 01, 2013 at 05:07:33PM +0200, Thomas Petazzoni wrote:
-> > This commit converts the LaCie Net2big and Net5Big Kirkwood boards to
-> > use a Device Tree representation. All devices are converted to use a
-> > DT representation, except the GPIO extension leds that use a special
-> > leds-netxbig driver that does not yet have a DT binding.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile                |   2 +
-> >  arch/arm/boot/dts/kirkwood-net2big-v2.dts | 219 ++++++++++++++++
-> >  arch/arm/boot/dts/kirkwood-net5big-v2.dts | 265 +++++++++++++++++++
-> >  arch/arm/mach-kirkwood/Kconfig            |  26 +-
-> >  arch/arm/mach-kirkwood/Makefile           |   4 +-
-> >  arch/arm/mach-kirkwood/board-dt.c         |   4 +
-> >  arch/arm/mach-kirkwood/board-netxbig_v2.c | 199 ++++++++++++++
-> >  arch/arm/mach-kirkwood/common.h           |   6 +
-> >  arch/arm/mach-kirkwood/netxbig_v2-setup.c | 422 ------------------------------
-> >  9 files changed, 709 insertions(+), 438 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-net2big-v2.dts
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-net5big-v2.dts
-> >  create mode 100644 arch/arm/mach-kirkwood/board-netxbig_v2.c
-> >  delete mode 100644 arch/arm/mach-kirkwood/netxbig_v2-setup.c
-...
-> > +		serial at 12000 {
-> > +			pinctrl-0 = <&pmx_uart0>;
-> > +			pinctrl-names = "default";
-> > +			clock-frequency = <200000000>;
+On Mon, Jul 15, 2013 at 04:24:38PM +0200, Gregory CLEMENT wrote:
+> The mv64xxx-i2c embedded in the Armada XP have a new feature to
+> offload i2c transaction. This new version of the IP come also with
+> some errata. This lead to the introduction to a another compatible
+> string.
 > 
-> The serial clock-frequency is 166666667 for the net2big_v2 as well as
-> the TCLK frequency. It could smart to inherit the clock frequencies (if
-> not given) from the TCLK.
+> This commit split the i2c information into armada-370.dtsi and
+> armada-xp.dtsi. Most of the data remains the same and stay in the
+> common file Armada-370-xp.dtsi. With this new feature the size of the
+> registers are bigger for Armada XP and the new compatible string is
+> used.
+> 
+> The Device Tree binding documentation is updated accordingly.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
+>  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
+>  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
+>  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
+>  4 files changed, 30 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index a1ee681..c5dd952 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -4,7 +4,8 @@
+>  Required properties :
+>  
+>   - reg             : Offset and length of the register set for the device
+> - - compatible      : Should be "marvell,mv64xxx-i2c"
+> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
+> +for controller which support the I2C Transaction Generator
+>   - interrupts      : The interrupt number
 
-iirc, I wrote a patch a release or two ago removing the clock-frequency
-from the serial nodes because it jacked up the of_serial driver.
-Something about if it was specified, the driver skipped something
-critical.
+As you've preserved backwards compatibility with the original compat
+string,
 
-Sorry I don't have it on hand atm, I'm away from my development station.
+Applied to mvebu/dt
 
 thx,
 
