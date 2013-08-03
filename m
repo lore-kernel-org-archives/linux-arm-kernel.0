@@ -1,37 +1,56 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 3 Aug 2013 07:54:42 +0400
-Subject: [PATCH 00/10] ARM: clps711x: Initial DT support / Fixes
-In-Reply-To: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130803075442.6d1a418eb60217f7196a25fc@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 2 Aug 2013 22:16:57 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130802223247.GC28831@kroah.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802115334.GN2465@mudshark.cambridge.arm.com>
+ <20130802142010.GC7533@kroah.com>
+ <20130802160932.GG5292@mudshark.cambridge.arm.com>
+ <20130802223247.GC28831@kroah.com>
+Message-ID: <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Jul 2013 22:34:51 +0400
-Alexander Shiyan <shc_work@mail.ru> wrote:
+On Fri, Aug 2, 2013 at 3:32 PM, Greg KH <greg@kroah.com> wrote:
+> On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
+>> On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
+>> > On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
+>> > > We can change the mindset by yelling, but if you're writing a new
+>> > > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
+>> > > because you get a bunch of device-tree parsing code for free (see
+>> > > drivers/of/platform.c).
+>> >
+>> > I know :(
+>> >
+>> > So, who do I "yell at", and what do I do to make things easier for you
+>> > from the driver-core perspective?
+>>
+>> I would anticipate most of these drivers going through the arm-soc tree, so
+>> Olof and Kevin would be doing the yelling. You could join in the chorus too!
+>>
+>> We basically need reviewers to adopt the position that a new bus should be
+>> considered and dismissed before using the platform_bus, then you can yell
+>> transitively through them.
+>
+> I don't scale if I'm forced to review every driver to ensure that they
+> shouldn't be using platform device and should be creating their own bus
+> type.  You can do that, along with the other ARM developers reviewing
+> these new subsystems and code being added.
 
-> Here is next patchset for the Cirrus Logic CLPS711X target CPUs.
-> The first four patches is a small fixes. The rest is a attempt
-> to add DT support for this subarch.
-> As long as DT support is incomplete (no peripherals), I did not
-> add DTS yet. This is the next step.
-> 
-> Alexander Shiyan (10):
->   ARM: clps711x: Remove the special name for the syscon driver
->   ARM: clps711x: Drop fortunet board support
->   ARM: clps711x: autcpu12: Remove incorrect config checking
->   ARM: clps711x: edb7211: Remove extra iotable_init() call
->   ARM: clps711x: Add CLPS711X clk driver
->   ARM: clps711x: Add CLPS711X clocksource driver
->   ARM: clps711x: Add CLPS711X irqchip driver
->   ARM: clps711x: Add CLPS711X cpuidle driver
->   ARM: clps711x: Migrate CLPS711X subarch to the new basic drivers
->   ARM: clps711x: Add initial DT support
-[...]
+For most new platforms, using basic platform_bus devices makes sense
+when the setup is simple and just has a few devices. It's only when
+they need to add support for {S,IO}MMUs and get the more advanced
+functionality going that things get messy and platform_bus stops
+working.
 
-If there is no objection about "fixes" part of patchset,
-can these parts (1/10-4/10) be applied?
-Thanks.
+So, we have the option of having someone care about the {S,IO}MMU
+pieces, and when they spot the attempts to make that work, push them
+towards a proper bus architecture. Until then, the simpler solution is
+probably a reasonable idea compared to having newcomers worry about
+defining new bus architectures and raising the bar for what it takes
+to sort out the initial contributions and getting engaged upstream.
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+
+-Olof
