@@ -1,75 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 3 Aug 2013 14:56:34 -0400
-Subject: [PATCHv2 0/9] ARM: kirkwood: convert a few more boards to DT
-In-Reply-To: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130803185634.GH13555@titan.lakedaemon.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 3 Aug 2013 15:02:30 -0400
+Subject: [PATCH v2 0/6] ARM: mm: Extend the runtime patch stub for PAE
+ systems
+In-Reply-To: <alpine.LFD.2.03.1308022150210.14472@syhkavp.arg>
+References: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.LFD.2.03.1308022150210.14472@syhkavp.arg>
+Message-ID: <51FD53C6.1010904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 05:07:26PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On Friday 02 August 2013 09:52 PM, Nicolas Pitre wrote:
+> On Wed, 31 Jul 2013, Santosh Shilimkar wrote:
 > 
-> Here is a set of patches that converts a few additional Kirkwood
-> boards to use the Device Tree. I intend to continue this effort with
-> the remaining Kirkwood boards. It is based on the mvebu/boards branch
-> of linux-mvebu.git, which allows to use the Ethernet DT bindings.
+>> This is version 2 of the series which addresses the comments/suggestions
+>> we received on earlier version. The series trying to extend the existing
+>> v2p runtime patching for LPAE machines which can have physical memory
+>> beyond 4 GB. Keystone is one such ARM machine.
 > 
-> Note that I don't have access to any of the platforms that are being
-> converted in this patch series, so this means that:
-> 
->  - A careful review would be useful
-> 
->  - Testing from owners of the boards would be appreciated. The DT
->    conversion of Kirkwood boards is a process that has now been
->    started a while ago, and we would like to finalize it. If board
->    owners don't react by testing the proposed patches, then the
->    support for those boards might be broken.
-> 
-> To ease testing, the branch containing those changes has been pushed
-> to:
-> 
->   https://github.com/MISL-EBU-System-SW/mainline-public/tree/kirkwood-dt-conversion-step1-v2
-> 
-> and kernel images for the affected boards have been uploaded to the
-> following locations. They contain the correct appended DTB, and a
-> small initramfs to ease testing:
-> 
->   http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-d2net-v2
->   http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-mv88f6281gtw-ge
->   http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-net2big-v2
->   http://free-electrons.com/~thomas/pub/kirkwood/uImage.kirkwood-net5big-v2
-> 
-> In detail:
-> 
->  * Patch 1 converts the d2net_v2 board completely to DT.
-> 
->  * Patches 2, 3, 4 and 5 remove support for boards that have already
->    been converted to the Deice Tree, but for which the legacy board
->    file was not removed.
-> 
->  * Patch 6 converts the mv88f6281gtw_ge board to DT.
-> 
->    The remaining devices probed in a legacy way are the mv643xx_eth
->    driver, and the DSA switch (note that I have an Armada 370 platform
->    with a DSA switch, so I'll have to look at how to make this appear
->    in the DT). I've left the Ethernet device not converted to DT
->    because the interaction with the DSA switch is a bit special.
-> 
->  * Patch 7 converts the LaCie Net{2,5}Big v2 platforms to DT
-> 
->    The remaining device probed is the one managed by the leds-netxbig
->    driver. For Ethernet, see above. For leds-netxbig, Simon Guinot is
->    currently working on this (see the LAKML thread "Location for a
->    kind of GPIO bus driver").
-> 
->  * Patch 8 removes some common code for LaCie boards that has become
->    useless after the DT conversions.
-> 
->  * Patch 9 adjusts kirkwood_defconfig after the DT conversions.
+> FYI: I never received patch 1/6.
+>
+Looks like since I converted the CC to ack for the 1/6, you didn't
+received it.
 
-I've applied patches 2,3,4,5,6 to mvebu/boards,
+ 
+>> In testing various modes(LPAE/non-LPAE, ARM/THMUB), we found an issue
+>> with the patching code for THUMB2 build. So there is a patch added in
+>> the series to address it. I was planning to squash it in the parent
+>> 64 bit patch but thought of keeping it separate for ease of review.
+>> We can squash it while merging the patches. 
+> 
+> Is this an issue with the current code before implementing 64 bit offset 
+> patching?
+> 
+The issue was found with newly added code. I already see quite a bit of
+discussion on those patches.
 
-thx,
-
-Jason.
+Regards,
+Santosh
