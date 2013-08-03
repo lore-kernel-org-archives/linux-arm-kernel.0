@@ -1,206 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Sat, 3 Aug 2013 21:14:11 +0100
-Subject: [PATCH] ARM: EXYNOS: add power domains support for EXYNOS5440
-In-Reply-To: <51FC1E40.7030807@wwwdotorg.org>
-References: <2729097.X0eAsuYF97@amdc1032>
- <51FC1E40.7030807@wwwdotorg.org>
-Message-ID: <20130803201411.GB17755@e106331-lin.cambridge.arm.com>
+From: seif@marvell.com (Seif Mazareeb)
+Date: Sat, 3 Aug 2013 13:35:34 -0700
+Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
+In-Reply-To: <20130803181146.GD13555@titan.lakedaemon.net>
+References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130803181146.GD13555@titan.lakedaemon.net>
+Message-ID: <0DB595A2CB707F458400BE9663B6A72269594F77E1@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 10:01:52PM +0100, Stephen Warren wrote:
-> (CCing the other DT maintainers, hence quoting binding in full)
+Post approval, but I've tested on my board too.
+UART, USB3.0, mini-PCIe, SPI, Sata, and Ethernet - looking good.
+
+Seif
+
+-----Original Message-----
+From: Jason Cooper [mailto:jason at lakedaemon.net] 
+Sent: Saturday, August 03, 2013 11:12 AM
+To: Thomas Petazzoni
+Cc: Andrew Lunn; Gregory Clement; Lior Amsalem; Seif Mazareeb; linux-arm-kernel at lists.infradead.org; Ezequiel Garcia
+Subject: Re: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
+
+On Tue, Jul 30, 2013 at 05:44:50PM +0200, Thomas Petazzoni wrote:
+> The AXP WiFi AP board is a Marvell platform based on the Armada XP
+> MV78230 SoC. It has two mini-PCIe connectors, one USB 3.0 port powered 
+> by a USB 3.0 controller on PCIe, two Ethernet ports, 1 GB of RAM, 1 GB 
+> of NAND, 16 MB of SPI flash, one SATA port and one button, two UARTs
 > 
-> On 08/02/2013 07:23 AM, Bartlomiej Zolnierkiewicz wrote:
-> > On EXYNOS5440 power domains are handled in a different way than on
-> > the previous EXYNOS SoCs. Add support for them to EXYNOS pm_domains
-> > driver. Then add device tree nodes for PCIe (controlling power for
-> > PCIe host controller) and Conn2 (controlling power for Ethernet,
-> > SATA and USB controllers) power domains to exynos5440.dtsi.
-> > 
-> > Currently if runtime Power Management is enabled and the driver
-> > for devices under power domain is disabled then the power domain
-> > will be disabled by EXYNOS pm_domains driver. To make more active
-> > use of power domains (dynamically enable and disabled them as
-> > needed) it is required to add runtime PM support to pci-exynos,
-> > stmmac, ahci_platform, ohci-exynos and ehci-s5p drivers (to be
-> > done later).
-> > 
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Signed-off-by: Myungjoo Ham <myungjoo.ham@samsung.com>
-> > Cc: Tomasz Figa <t.figa@samsung.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > ---
-> >  Documentation/devicetree/bindings/arm/exynos/power_domain.txt |   33 ++
-> >  arch/arm/boot/dts/exynos5440.dtsi                             |   23 +
-> >  arch/arm/mach-exynos/Kconfig                                  |    1 
-> >  arch/arm/mach-exynos/common.c                                 |    4 
-> >  arch/arm/mach-exynos/pm_domains.c                             |  138 +++++++++-
-> >  5 files changed, 190 insertions(+), 9 deletions(-)
-> > 
-> > Index: b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> > ===================================================================
-> > --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:45:53.551392396 +0200
-> > +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:46:29.799391845 +0200
-> > @@ -5,20 +5,47 @@ to gate power to one or more peripherals
-> >  
-> >  Required Properties:
-> >  - compatible: should be one of the following.
-> > -    * samsung,exynos4210-pd - for exynos4210 type power domain.
-> > +    * samsung,exynos4210-pd - for Exynos4210 type power domain.
-> > +    * samsung,exynos5440-pd - for Exynos5440 type power domain.
-> >  - reg: physical base address of the controller and length of memory mapped
-> > -    region.
-> > +    region (Exynos4210 type power domain) or bit offset in the control
-> > +    register (Exynos5440 type power domain).
-> > +
-> > +Additional parent node must be created for Exynos5440 power domains with
-> > +the following required properties:
-> > +- compatible: samsung,exynos5440-power-domains, simple-bus
-> > +- reg: physical base address of the XMU controller and length of memory
-> > +    mapped region
+> Successfully tested: USB 3.0 port, the mini-PCIe connectors, SPI 
+> flash, Ethernet ports, SATA port, button, UART.
 > 
-> It's a little odd to describe the child nodes first. Given the 4210 and
-> 5440 bindings work so differently, I'd suggest making separate binding
-> files for the two; samsung,exynos4210-pd.txt and samsung,exynos5440-pd.txt.
+> Untested: NAND flash, due to lack of mainline support for the Armada 
+> 370/XP NAND controller for now.
 > 
-> The node being describe here clearly is not a simple-bus; the child
-> nodes appear to have a specific need that their parent be compatible =
-> "samsung,exynos5440-power-domains", hence they aren't the independent
-> devices that simple-bus would usually contain.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile                |   1 +
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 164 
+> ++++++++++++++++++++++++++++++
+>  2 files changed, 165 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-xp-axpwifiap.dts
 
-+1. This is most definitely not a simple-bus, the child nodes reg
-properties cdon't represent the same address space as the
-parent's reg property.
+Applied to mvebu/dt
 
-How much does the association of bit-offsets to power domains vary? 
+thx,
 
-> 
-> Note that I only briefly reviewed the low-level structural aspects of
-> the binding that I mentioned above; I haven't thought about the binding
-> at a higher level of e.g. "does this binding conceptually make sense".
-
-This is unfortunately difficult to do :(
-
-> 
-> >  Node of a device using power domains must have a samsung,power-domain property
-> >  defined with a phandle to respective power domain.
-> >  
-> > -Example:
-> > +Example for Exynos4210 compatible power domain:
-> >  
-> >  	lcd0: power-domain-lcd0 {
-> >  		compatible = "samsung,exynos4210-pd";
-> >  		reg = <0x10023C00 0x10>;
-> >  	};
-> >  
-> > +Example for Exynos5440 compatible power domains:
-> > +
-> > +	power-domains at 00160000 {
-> > +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
-> > +		reg = <0x00160000 0x1000>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		pd_pcie: pcie-power-domain at 6 {
-> > +			compatible = "samsung,exynos5440-pd";
-> > +			reg = <6>;
-> > +		};
-> > +
-> > +		pd_conn2: conn2-power-domain at 7 {
-> > +			compatible = "samsung,exynos5440-pd";
-> > +			reg = <7>;
-> > +		};
-> > +	};
-> > +
-> >  Example of the node using power domain:
-> >  
-> >  	node {
-> > Index: b/arch/arm/boot/dts/exynos5440.dtsi
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:45:53.599392397 +0200
-> > +++ b/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:46:29.815391842 +0200
-> > @@ -29,6 +29,23 @@
-> >  		#clock-cells = <1>;
-> >  	};
-> >  
-> > +	power-domains at 00160000 {
-> > +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
-> > +		reg = <0x00160000 0x1000>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		pd_pcie: pcie-power-domain at 6 {
-> > +			compatible = "samsung,exynos5440-pd";
-> > +			reg = <6>;
-> > +		};
-> > +
-> > +		pd_conn2: conn2-power-domain at 7 {
-> > +			compatible = "samsung,exynos5440-pd";
-> > +			reg = <7>;
-> > +		};
-> > +	};
-> > +
-> >  	gic:interrupt-controller at 2E0000 {
-> >  		compatible = "arm,cortex-a15-gic";
-> >  		#interrupt-cells = <3>;
-> > @@ -192,6 +209,7 @@
-> >  		phy-mode = "sgmii";
-> >  		clocks = <&clock 25>;
-> >  		clock-names = "stmmaceth";
-> > +		samsung,power-domain = <&pd_conn2>;
-> >  	};
-
-This feels like a clock style binding would fit better:
-samsung,power-domain = <&pwr 7>;
-
-But there may be a better, more general way of handling this. I'm not
-sure how this relates to regulators and so on, and how other vendors
-handle this stuff...
-
-Thanks,
-Mark.
-
-> >  
-> >  	amba {
-> > @@ -240,6 +258,7 @@
-> >  		interrupts = <0 30 0>;
-> >  		clocks = <&clock 23>;
-> >  		clock-names = "sata";
-> > +		samsung,power-domain = <&pd_conn2>;
-> >  	};
-> >  
-> >  	ohci at 220000 {
-> > @@ -248,6 +267,7 @@
-> >  		interrupts = <0 29 0>;
-> >  		clocks = <&clock 24>;
-> >  		clock-names = "usbhost";
-> > +		samsung,power-domain = <&pd_conn2>;
-> >  	};
-> >  
-> >  	ehci at 221000 {
-> > @@ -256,6 +276,7 @@
-> >  		interrupts = <0 29 0>;
-> >  		clocks = <&clock 24>;
-> >  		clock-names = "usbhost";
-> > +		samsung,power-domain = <&pd_conn2>;
-> >  	};
-> >  
-> >  	pcie at 290000 {
-> > @@ -275,6 +296,7 @@
-> >  		#interrupt-cells = <1>;
-> >  		interrupt-map-mask = <0 0 0 0>;
-> >  		interrupt-map = <0x0 0 &gic 53>;
-> > +		samsung,power-domain = <&pd_pcie>;
-> >  	};
-> >  
-> >  	pcie at 2a0000 {
-> > @@ -294,5 +316,6 @@
-> >  		#interrupt-cells = <1>;
-> >  		interrupt-map-mask = <0 0 0 0>;
-> >  		interrupt-map = <0x0 0 &gic 56>;
-> > +		samsung,power-domain = <&pd_pcie>;
-> >  	};
-> >  };
-> 
-> 
+Jason.
