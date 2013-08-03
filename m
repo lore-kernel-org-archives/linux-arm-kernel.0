@@ -1,34 +1,28 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sat,  3 Aug 2013 10:09:16 -0400
-Subject: [PATCH v3 3/3] ARM: dts: imx28-evk: add the RTS/CTS property for
- auart0
-In-Reply-To: <1375538956-15862-1-git-send-email-shijie8@gmail.com>
-References: <1375538956-15862-1-git-send-email-shijie8@gmail.com>
-Message-ID: <1375538956-15862-4-git-send-email-shijie8@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 2 Aug 2013 19:14:56 -0700
+Subject: Build breakage due to latest ARM fixes
+In-Reply-To: <20130803004838.GU23006@n2100.arm.linux.org.uk>
+References: <CAOesGMgWeP-CdmOE-S7XZmJ-+1buP9a1cqavUns2gpgKrrhaxQ@mail.gmail.com>
+ <20130803000731.GS23006@n2100.arm.linux.org.uk>
+ <CAOesGMi3FBz7-tQSxgQMgHiHmPTnO4k57MkhQTQTvtB0Q6WyNw@mail.gmail.com>
+ <20130803004111.GT23006@n2100.arm.linux.org.uk>
+ <20130803004838.GU23006@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMjCKD+1E_LTPbaEiLBC054nPcnXevXUtt5+OOYBqW6e-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Huang Shijie <b32955@freescale.com>
+On Fri, Aug 2, 2013 at 5:48 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Add the RTS/CTS property for auart0 which means we enable the
-DMA support for it.
+> Okay, this should fix it - *untested* though because of the fscking time
+> it is here again.  The problem is that install_special_mapping() assumes
+> that the pointer to the pages will be persistent, and it wasn't.  I found
+> that during testing and thought I'd merged the patches in, but I seem to
+> have totally destroyed the original fixes for this.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Ran it through my autobuilder/booter here, didn't fall over like without it.
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index e035f46..15715d9 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -220,6 +220,7 @@
- 			auart0: serial at 8006a000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&auart0_pins_a>;
-+				fsl,uart-has-rtscts;
- 				status = "okay";
- 			};
- 
--- 
-1.7.4.4
+Tested-by: Olof Johansson <olof@lixom.net>
+
+
+-Olof
