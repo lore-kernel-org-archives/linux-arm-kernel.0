@@ -1,57 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 Aug 2013 21:55:44 -0400 (EDT)
-Subject: [PATCH v2 3/6] ARM: mm: Move the idmap print to appropriate
- place in the code
-In-Reply-To: <1375289086-5315-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
- <1375289086-5315-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.LFD.2.03.1308022155210.14472@syhkavp.arg>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat,  3 Aug 2013 10:09:13 -0400
+Subject: [PATCH v3 0/3] serial: mxs-auart: add RTS/CTS check for DMA support
+Message-ID: <1375538956-15862-1-git-send-email-shijie8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Jul 2013, Santosh Shilimkar wrote:
+The original DMA support works only when RTS/CTS is enabled.
+(see the "e800163 serial: mxs-auart: add the DMA support for mx28")
+But after several patches, DMA support has lost this limit.
+(see the "bcc20f9 serial: mxs-auart: move to use generic DMA helper")
 
-> Commit 9e9a367c29cebd2 {ARM: Section based HYP idmap} moved
-> the address conversion inside identity_mapping_add() without
-> respective print which carries useful idmap information.
-> 
-> Move the print as well inside identity_mapping_add() to
-> fix the same.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+So a UART without the RTS/CTS lines may also enables the DMA support
+for it, but it may does not work or works abnormally (since without the
+RTS/CTS signals, the TX/RX may not works)		
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+This patch set remove the unnecessary macro MXS_AUART_DMA_CONFIG,
+and adds an optional property "fsl,uart-has-rtscts" for the UART DT node
+which indicates the UART has RTS and CTS lines.
 
+This patch set also adds a macro MXS_AUART_RTSCTS, and uses it to check
+RTS/CTS before we enable the DMA for the UART.
 
-> ---
->  arch/arm/mm/idmap.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-> index c0a1e48..8e0e52e 100644
-> --- a/arch/arm/mm/idmap.c
-> +++ b/arch/arm/mm/idmap.c
-> @@ -70,6 +70,7 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
->  
->  	addr = virt_to_idmap(text_start);
->  	end = virt_to_idmap(text_end);
-> +	pr_info("Setting up static identity map for 0x%lx - 0x%lx\n", addr, end);
->  
->  	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
->  
-> @@ -91,8 +92,6 @@ static int __init init_static_idmap(void)
->  	if (!idmap_pgd)
->  		return -ENOMEM;
->  
-> -	pr_info("Setting up static identity map for 0x%p - 0x%p\n",
-> -		__idmap_text_start, __idmap_text_end);
->  	identity_mapping_add(idmap_pgd, __idmap_text_start,
->  			     __idmap_text_end, 0);
->  
-> -- 
-> 1.7.9.5
-> 
+At last, enable the DMA support for auart0 in the imx28-evk boards.
+
+v2 --> v3:
+	[0] make the patch 2 as the first patch.
+	[1] add more comments.
+
+v1 --> v2:
+	[0] changed the comments.
+	[1] fix the typos.
+
+Huang Shijie (3):
+  serial: mxs: enable the DMA only when the RTS/CTS is valid
+  serial: mxs: remove the MXS_AUART_DMA_CONFIG
+  ARM: dts: imx28-evk: add the RTS/CTS property for auart0
+
+ .../bindings/tty/serial/fsl-mxs-auart.txt          |    4 ++++
+ arch/arm/boot/dts/imx28-evk.dts                    |    1 +
+ drivers/tty/serial/mxs-auart.c                     |    8 +++++---
+ 3 files changed, 10 insertions(+), 3 deletions(-)
+
+-- 
+1.7.4.4
