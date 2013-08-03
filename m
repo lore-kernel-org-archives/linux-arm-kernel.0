@@ -1,56 +1,77 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 2 Aug 2013 22:16:57 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130802223247.GC28831@kroah.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802115334.GN2465@mudshark.cambridge.arm.com>
- <20130802142010.GC7533@kroah.com>
- <20130802160932.GG5292@mudshark.cambridge.arm.com>
- <20130802223247.GC28831@kroah.com>
-Message-ID: <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
+Date: Fri, 2 Aug 2013 22:24:42 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] arch/arm SoC organization
+In-Reply-To: <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
+References: <20130731141841.GP5882@titan.lakedaemon.net>
+ <20130802083346.GC7656@atomide.com>
+ <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
+Message-ID: <CAOesGMiq4M-8=CUsKf3bxBnxxiBQMEPc11K8pDePZnzHkv9QTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 2, 2013 at 3:32 PM, Greg KH <greg@kroah.com> wrote:
-> On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
->> On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
->> > On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
->> > > We can change the mindset by yelling, but if you're writing a new
->> > > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
->> > > because you get a bunch of device-tree parsing code for free (see
->> > > drivers/of/platform.c).
->> >
->> > I know :(
->> >
->> > So, who do I "yell at", and what do I do to make things easier for you
->> > from the driver-core perspective?
+On Fri, Aug 2, 2013 at 4:06 PM, Christian Daudt <csd_b@daudt.org> wrote:
+> On Fri, Aug 2, 2013 at 1:33 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> * Jason Cooper <jason@lakedaemon.net> [130731 07:25]:
+>>> So, I'd like to propose we discuss some lessons learned and maybe arrive
+>>> at some best practices.  eg, should we just go with mach-$COMPANY/?  How
+>>> best to handle config symbols for efficient building?  Deprecation path
+>>> for legacy (unconverted) boards?
 >>
->> I would anticipate most of these drivers going through the arm-soc tree, so
->> Olof and Kevin would be doing the yelling. You could join in the chorus too!
->>
->> We basically need reviewers to adopt the position that a new bus should be
->> considered and dismissed before using the platform_bus, then you can yell
->> transitively through them.
->
-> I don't scale if I'm forced to review every driver to ensure that they
-> shouldn't be using platform device and should be creating their own bus
-> type.  You can do that, along with the other ARM developers reviewing
-> these new subsystems and code being added.
+>> A lot of that problem goes away by initializing everything as late
+>> as possible, and making things to live under drivers.
+> One category of items that we haven't found a good place for in this
+> new multiplatform world is where does dt-driven non-driver code reside
+> ? e.g. we have a secure monitor access function that only kicks in if
+> the appropriate dt entry is available . It currently resides in
+> mach-bcm/bcm_kona_smc.c as it seems like the only location for it at
+> the moment, but that doesn't seem like the best place because (a)
+> mach-bcm might end up littered with one-of cases like this and (b)
+> anything in mach-bcm is not visible to arm64 SoCs, and some of those
+> in the future will need to share with their arm32 cousins.
 
-For most new platforms, using basic platform_bus devices makes sense
-when the setup is simple and just has a few devices. It's only when
-they need to add support for {S,IO}MMUs and get the more advanced
-functionality going that things get messy and platform_bus stops
-working.
+ARM is working on standardizing some of these interfaces through
+things like PSCI. It should take care of _some_ of the SMC needs. I
+know you're already shipping some of these platforms though and
+firmware interfaces might be locked in to something that's not
+PSCI-compatible. :(
 
-So, we have the option of having someone care about the {S,IO}MMU
-pieces, and when they spot the attempts to make that work, push them
-towards a proper bus architecture. Until then, the simpler solution is
-probably a reasonable idea compared to having newcomers worry about
-defining new bus architectures and raising the bar for what it takes
-to sort out the initial contributions and getting engaged upstream.
+>  But putting in drivers (e.g. drivers/smc) seems like the wrong thing
+> to do also because this is not a driver.
+
+I really don't think we need to migrate everything to drivers/*. At
+some point the need of exorcising code out of arch/arm will reach a
+plateu, and there's some code that just simply belongs in that sub
+directory.
+
+The sharing with arm64 is the obvious sticky point, since the base
+directories aren't the same. Luckily not too many vendors have shipped
+arm64 platforms, and nobody is shipping in volume yet, so there's a
+little time to sort out some of this.
+
+>  We have a couple of other smallish pieces of IP that just need a bit
+> of generic init code to keep them happy, which we were discussing
+> internally where to best land them. At present they are also headed to
+> mach-bcm.
+
+I think the 3.12 merge window will see the introduction of
+drivers/platform/arm. It must not become a dumping ground for
+board-file equivalent code though, so I am a little scared to
+introduce it. Mostly it should contain whatever glue code isn't
+possible or practical to describe with device tree (or ACPI) today,
+and in particular for established consumer devices, i.e. for actual
+product needs. Compare to what's in drivers/platform/x86 to get a feel
+for what we're talking about.
+
+>  Ultimately the question is 'what is allowed to reside in mach-<misc>
+> ?' And by extension: 'is there a good home for everything else ?''
+
+Right, and see above about some of my opinions on the matter. arm64
+does complicate things quite a bit since it's no longer easy to share
+code between the architectures.
+
+Having a few concise examples of what code you're looking for a home
+for could be useful for the discussion though. Would you mind
+volunteering a few? :)
 
 
 -Olof
