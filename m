@@ -1,300 +1,108 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 03 Aug 2013 16:16:21 +0200
-Subject: [PATCHv5 06/31] ARM: dts: omap4 clock data
-In-Reply-To: <1375460751-23676-7-git-send-email-t-kristo@ti.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-7-git-send-email-t-kristo@ti.com>
-Message-ID: <4452066.ogQpVHnZLL@flatron>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sat, 3 Aug 2013 16:19:54 +0200
+Subject: [PATCH v3 15/31] dts: mpc512x: introduce dt-bindings/clock/ header
+In-Reply-To: <20130802224308.6450.55171@quantum>
+References: <1374166855-7280-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1374495298-22019-16-git-send-email-gsi@denx.de>
+ <20130802224308.6450.55171@quantum>
+Message-ID: <20130803141954.GG2580@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 of August 2013 19:25:25 Tero Kristo wrote:
-> This patch creates a unique node for each clock in the OMAP4 power,
-> reset and clock manager (PRCM). OMAP443x and OMAP446x have slightly
-> different clock tree which is taken into account in the data.
+On Fri, Aug 02, 2013 at 15:43 -0700, Mike Turquette wrote:
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  arch/arm/boot/dts/omap443x-clocks.dtsi |   17 +
->  arch/arm/boot/dts/omap443x.dtsi        |    8 +
->  arch/arm/boot/dts/omap4460.dtsi        |    8 +
->  arch/arm/boot/dts/omap446x-clocks.dtsi |   27 +
->  arch/arm/boot/dts/omap44xx-clocks.dtsi | 1648
-> ++++++++++++++++++++++++++++++++ 5 files changed, 1708 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap443x-clocks.dtsi
->  create mode 100644 arch/arm/boot/dts/omap446x-clocks.dtsi
->  create mode 100644 arch/arm/boot/dts/omap44xx-clocks.dtsi
+> Quoting Gerhard Sittig (2013-07-22 05:14:42)
+> > introduce a dt-bindings/ header file for MPC512x clocks,
+> > providing symbolic identifiers for those SoC clocks which
+> > clients will reference from their device tree nodes
+> > 
+> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> > ---
+> >  include/dt-bindings/clock/mpc512x-clock.h |   59 +++++++++++++++++++++++++++++
+> >  1 file changed, 59 insertions(+)
+> >  create mode 100644 include/dt-bindings/clock/mpc512x-clock.h
+> > 
+> > diff --git a/include/dt-bindings/clock/mpc512x-clock.h b/include/dt-bindings/clock/mpc512x-clock.h
+> > new file mode 100644
+> > index 0000000..46c560e
+> > --- /dev/null
+> > +++ b/include/dt-bindings/clock/mpc512x-clock.h
+> > @@ -0,0 +1,59 @@
+> > +/*
+> > + * This header provides constants for MPC512x clock specs in DT bindings.
+> > + *
+> > + * Unfortunately the clock number declaration cannot be an enum but
+> > + * needs to be a list of #define directives since when referenced from
+> > + * within DTS files they need to get resolved "at compile time".
 > 
-> diff --git a/arch/arm/boot/dts/omap443x-clocks.dtsi
-> b/arch/arm/boot/dts/omap443x-clocks.dtsi new file mode 100644
-> index 0000000..2bd82b2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap443x-clocks.dtsi
-> @@ -0,0 +1,17 @@
-> +/*
-> + * Device Tree Source for OMAP443x clock data
-> + *
-> + * Copyright (C) 2013 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as +
-> * published by the Free Software Foundation.
-> + */
-> +
-> +bandgap_fclk: bandgap_fclk at 4a307888 {
-> +	#clock-cells = <0>;
-> +	compatible = "gate-clock";
-> +	clocks = <&sys_32k_ck>;
-> +	bit-shift = <8>;
-> +	reg = <0x4a307888 0x4>;
-> +};
-> diff --git a/arch/arm/boot/dts/omap443x.dtsi
-> b/arch/arm/boot/dts/omap443x.dtsi index bcf455e..dfd648c 100644
-> --- a/arch/arm/boot/dts/omap443x.dtsi
-> +++ b/arch/arm/boot/dts/omap443x.dtsi
-> @@ -30,4 +30,12 @@
->  		       0x4a00232C 0x4>;
->  		compatible = "ti,omap4430-bandgap";
->  	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		/include/ "omap44xx-clocks.dtsi"
-> +		/include/ "omap443x-clocks.dtsi"
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/omap4460.dtsi
-> b/arch/arm/boot/dts/omap4460.dtsi index c2f0f39..d9d00b2 100644
-> --- a/arch/arm/boot/dts/omap4460.dtsi
-> +++ b/arch/arm/boot/dts/omap4460.dtsi
-> @@ -38,4 +38,12 @@
->  		interrupts = <0 126 IRQ_TYPE_LEVEL_HIGH>; /* talert */
->  		gpios = <&gpio3 22 0>; /* tshut */
->  	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		/include/ "omap44xx-clocks.dtsi"
-> +		/include/ "omap446x-clocks.dtsi"
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/omap446x-clocks.dtsi
-> b/arch/arm/boot/dts/omap446x-clocks.dtsi new file mode 100644
-> index 0000000..86d0805
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap446x-clocks.dtsi
-> @@ -0,0 +1,27 @@
-> +/*
-> + * Device Tree Source for OMAP446x clock data
-> + *
-> + * Copyright (C) 2013 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as +
-> * published by the Free Software Foundation.
-> + */
-> +
-> +div_ts_ck: div_ts_ck at 4a307888 {
-> +	#clock-cells = <0>;
-> +	compatible = "divider-clock";
-> +	clocks = <&l4_wkup_clk_mux_ck>;
-> +	bit-shift = <24>;
-> +	reg = <0x4a307888 0x4>;
-> +	table = < 8 0 >, < 16 1 >, < 32 2 >;
-> +	bit-mask = <0x3>;
-> +};
-> +
-> +bandgap_ts_fclk: bandgap_ts_fclk at 4a307888 {
-> +	#clock-cells = <0>;
-> +	compatible = "gate-clock";
-> +	clocks = <&div_ts_ck>;
-> +	bit-shift = <8>;
-> +	reg = <0x4a307888 0x4>;
-> +};
-> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi
-> b/arch/arm/boot/dts/omap44xx-clocks.dtsi new file mode 100644
-> index 0000000..23f623c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
-> @@ -0,0 +1,1648 @@
-> +/*
-> + * Device Tree Source for OMAP4 clock data
-> + *
-> + * Copyright (C) 2013 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as +
-> * published by the Free Software Foundation.
-> + */
-> +
-> +extalt_clkin_ck: extalt_clkin_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <59000000>;
-> +};
-> +
-> +pad_clks_src_ck: pad_clks_src_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <12000000>;
-> +};
-> +
-> +pad_clks_ck: pad_clks_ck at 4a004108 {
-> +	#clock-cells = <0>;
-> +	compatible = "gate-clock";
-> +	clocks = <&pad_clks_src_ck>;
-> +	bit-shift = <8>;
-> +	reg = <0x4a004108 0x4>;
-> +};
-> +
-> +pad_slimbus_core_clks_ck: pad_slimbus_core_clks_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <12000000>;
-> +};
-> +
-> +secure_32k_clk_src_ck: secure_32k_clk_src_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <32768>;
-> +};
-> +
-> +slimbus_src_clk: slimbus_src_clk {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <12000000>;
-> +};
-> +
-> +slimbus_clk: slimbus_clk at 4a004108 {
-> +	#clock-cells = <0>;
-> +	compatible = "gate-clock";
-> +	clocks = <&slimbus_src_clk>;
-> +	bit-shift = <10>;
-> +	reg = <0x4a004108 0x4>;
-> +};
-> +
-> +sys_32k_ck: sys_32k_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <32768>;
-> +};
-> +
-> +virt_12000000_ck: virt_12000000_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <12000000>;
-> +};
-> +
-> +virt_13000000_ck: virt_13000000_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <13000000>;
-> +};
-> +
-> +virt_16800000_ck: virt_16800000_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <16800000>;
-> +};
-> +
-> +virt_19200000_ck: virt_19200000_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <19200000>;
-> +};
-> +
-> +virt_26000000_ck: virt_26000000_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <26000000>;
-> +};
-> +
-> +virt_27000000_ck: virt_27000000_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <27000000>;
-> +};
-> +
-> +virt_38400000_ck: virt_38400000_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <38400000>;
-> +};
-> +
-> +sys_clkin_ck: sys_clkin_ck at 4a306110 {
-> +	#clock-cells = <0>;
-> +	compatible = "mux-clock";
-> +	clocks = <&virt_12000000_ck>, <&virt_13000000_ck>,
-> <&virt_16800000_ck>, <&virt_19200000_ck>, <&virt_26000000_ck>,
-> <&virt_27000000_ck>, <&virt_38400000_ck>; +	reg = <0x4a306110 0x4>;
-> +	bit-mask = <0x7>;
-> +	index-starts-at-one;
-> +};
-> +
-> +tie_low_clock_ck: tie_low_clock_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <0>;
-> +};
-> +
-> +utmi_phy_clkout_ck: utmi_phy_clkout_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <60000000>;
-> +};
-> +
-> +xclk60mhsp1_ck: xclk60mhsp1_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <60000000>;
-> +};
-> +
-> +xclk60mhsp2_ck: xclk60mhsp2_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <60000000>;
-> +};
-> +
-> +xclk60motg_ck: xclk60motg_ck {
-> +	#clock-cells = <0>;
-> +	compatible = "fixed-clock";
-> +	clock-frequency = <60000000>;
-> +};
-> +
-> +abe_dpll_bypass_clk_mux_ck: abe_dpll_bypass_clk_mux_ck at 4a306108 {
-> +	#clock-cells = <0>;
-> +	compatible = "mux-clock";
-> +	clocks = <&sys_clkin_ck>, <&sys_32k_ck>;
-> +	bit-shift = <24>;
-> +	reg = <0x4a306108 0x4>;
-> +	bit-mask = <0x1>;
-> +};
-> +
-> +abe_dpll_refclk_mux_ck: abe_dpll_refclk_mux_ck at 4a30610c {
-> +	#clock-cells = <0>;
-> +	compatible = "mux-clock";
-> +	clocks = <&sys_clkin_ck>, <&sys_32k_ck>;
-> +	reg = <0x4a30610c 0x4>;
-> +	bit-mask = <0x1>;
-> +};
-> +
-> +dpll_abe_ck: dpll_abe_ck at 4a0041e0 {
-> +	#clock-cells = <0>;
-> +	compatible = "ti,omap4-dpll-m4xen-clock";
-> +	clocks = <&abe_dpll_refclk_mux_ck>, <&abe_dpll_bypass_clk_mux_ck>;
-> +	reg = <0x4a0041e0 0x4>, <0x4a0041e4 0x4>, <0x4a0041e8 0x4>,
-> <0x4a0041ec 0x4>; +	ti,clk-ref = <&abe_dpll_refclk_mux_ck>;
-> +	ti,clk-bypass = <&abe_dpll_bypass_clk_mux_ck>;
+> Above comment is not really necessary. Otherwise,
+> 
+> Reviewed-by: Mike Turquette <mturquette@linaro.org>
 
-Hmm, why do you need to pass references to other clocks using private 
-properties? Is there a reason you can't use the clocks and clock-names 
-properties defined by standard clock bindings?
+OK, the next update of the series will remove this comment.
 
-The same for other PLLs defined in this patch.
 
-Best regards,
-Tomasz
+> > + */
+> > +
+> > +#ifndef _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
+> > +#define _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
+> > +
+> > +#define MPC512x_CLK_DUMMY              0
+> > +#define MPC512x_CLK_REF                        1
+> > +#define MPC512x_CLK_SYS                        2
+> > +#define MPC512x_CLK_DIU                        3
+> > +#define MPC512x_CLK_VIU                        4
+> > +#define MPC512x_CLK_CSB                        5
+> > +#define MPC512x_CLK_E300               6
+> > +#define MPC512x_CLK_IPS                        7
+> > +#define MPC512x_CLK_FEC                        8
+> > +#define MPC512x_CLK_SATA               9
+> > +#define MPC512x_CLK_PATA               10
+> > +#define MPC512x_CLK_NFC                        11
+> > +#define MPC512x_CLK_LPC                        12
+> > +#define MPC512x_CLK_MBX_BUS            13
+> > +#define MPC512x_CLK_MBX                        14
+> > +#define MPC512x_CLK_MBX_3D             15
+> > +#define MPC512x_CLK_AXE                        16
+> > +#define MPC512x_CLK_USB1               17
+> > +#define MPC512x_CLK_USB2               18
+> > +#define MPC512x_CLK_I2C                        19
+> > +#define MPC512x_CLK_MSCAN0_MCLK                20
+> > +#define MPC512x_CLK_MSCAN1_MCLK                21
+> > +#define MPC512x_CLK_MSCAN2_MCLK                22
+> > +#define MPC512x_CLK_MSCAN3_MCLK                23
+> > +#define MPC512x_CLK_SDHC               24
+> > +#define MPC512x_CLK_PCI                        25
+> > +#define MPC512x_CLK_PSC_MCLK_IN                26
+> > +#define MPC512x_CLK_SPDIF_TX           27
+> > +#define MPC512x_CLK_SPDIF_RX           28
+> > +#define MPC512x_CLK_SPDIF_MCLK         29
+> > +#define MPC512x_CLK_AC97               30
+> > +#define MPC512x_CLK_PSC0_MCLK          31
+> > +#define MPC512x_CLK_PSC1_MCLK          32
+> > +#define MPC512x_CLK_PSC2_MCLK          33
+> > +#define MPC512x_CLK_PSC3_MCLK          34
+> > +#define MPC512x_CLK_PSC4_MCLK          35
+> > +#define MPC512x_CLK_PSC5_MCLK          36
+> > +#define MPC512x_CLK_PSC6_MCLK          37
+> > +#define MPC512x_CLK_PSC7_MCLK          38
+> > +#define MPC512x_CLK_PSC8_MCLK          39
+> > +#define MPC512x_CLK_PSC9_MCLK          40
+> > +#define MPC512x_CLK_PSC10_MCLK         41
+> > +#define MPC512x_CLK_PSC11_MCLK         42
+> > +#define MPC512x_CLK_PSC_FIFO           43
+> > +
+> > +#define MPC512x_CLK_LAST_PUBLIC                43
+> > +
+> > +#endif
+> > -- 
+> > 1.7.10.4
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
