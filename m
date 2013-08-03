@@ -1,29 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 3 Aug 2013 14:27:02 -0400
-Subject: [PATCHv2 2/9] ARM: kirkwood: remove support for legacy booting
- of Dockstar
-In-Reply-To: <1375369655-1310-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375369655-1310-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130803182702.GG13555@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 3 Aug 2013 19:31:43 +0100
+Subject: [PATCHv5 01/31] CLK: clkdev: add support for looking up clocks
+ from DT
+In-Reply-To: <1375460751-23676-2-git-send-email-t-kristo@ti.com>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20130803183143.GE23053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 05:07:28PM +0200, Thomas Petazzoni wrote:
-> The Kirkwood Dockstar platform has already been converted to the
-> Device Tree, so we can remove the legacy booting option for this
-> platform.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-kirkwood/Kconfig          |   7 --
->  arch/arm/mach-kirkwood/Makefile         |   1 -
->  arch/arm/mach-kirkwood/dockstar-setup.c | 111 --------------------------------
->  3 files changed, 119 deletions(-)
->  delete mode 100644 arch/arm/mach-kirkwood/dockstar-setup.c
+On Fri, Aug 02, 2013 at 07:25:20PM +0300, Tero Kristo wrote:
+> +
+> +	if (cl)
+> +		return cl;
+> +
+> +	/* If clock was not found, attempt to look-up from DT */
+> +	node = of_find_node_by_name(NULL, con_id);
 
-Applied to mvebu/boards
+This is utterly broken if you're looking up purely by a connection ID.
+Please, go back and read clk_get()'s documentation in linux/clk.h.
+It's spelt out very plainly there.
 
-thx,
-
-Jason.
+NAK.
