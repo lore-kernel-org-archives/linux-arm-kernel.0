@@ -1,93 +1,41 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Sat, 3 Aug 2013 18:21:49 +0530
-Subject: [PATCH v2 5/6] ARM: mm: Update runtime patching code to THUMB2
- mode
-In-Reply-To: <alpine.LFD.2.03.1308022333470.14472@syhkavp.arg>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 3 Aug 2013 10:01:10 -0400 (EDT)
+Subject: [PATCH v2 4/6] ARM: mm: LPAE: Correct virt_to_phys patching for
+ 64 bit physical addresses
+In-Reply-To: <51FCFBE1.5090000@ti.com>
 References: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
- <1375289086-5315-6-git-send-email-santosh.shilimkar@ti.com>
- <alpine.LFD.2.03.1308022333470.14472@syhkavp.arg>
-Message-ID: <51FCFCE5.1010709@ti.com>
+ <1375289086-5315-5-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.LFD.2.03.1308022156120.14472@syhkavp.arg> <51FCFBE1.5090000@ti.com>
+Message-ID: <alpine.LFD.2.03.1308030943320.14472@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Sat, 3 Aug 2013, Sricharan R wrote:
 
-On Saturday 03 August 2013 09:10 AM, Nicolas Pitre wrote:
-> On Wed, 31 Jul 2013, Santosh Shilimkar wrote:
->
->> From: Sricharan R <r.sricharan@ti.com>
->>
->> Update the runtime patching  code to support Thumb2. In testing the
->> 64 bit patching code, the issue was uncovered.
->>
->> For better review, the patch is kept separate. If needed it can be
->> merged into "ARM: LPAE: Correct virt_to_phys patching for 64 bit
->> physical addresses"
->>
->> Cc: Nicolas Pitre <nico@linaro.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->>
->> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->> [santosh.shilimkar at ti.com: reduced #ifdef, updated commit log]
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/kernel/head.S |   69 ++++++++++++++++++++++++++++--------------------
->>  1 file changed, 40 insertions(+), 29 deletions(-)
->>
->> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
->> index aa3b0f7..a70d330 100644
->> --- a/arch/arm/kernel/head.S
->> +++ b/arch/arm/kernel/head.S
->> @@ -573,62 +573,73 @@ ENDPROC(__fixup_pv_table)
->>  
->>  	.text
->>  __fixup_a_pv_table:
->> -#ifdef CONFIG_THUMB2_KERNEL
->> -	lsls	r6, #24
->> -	beq	2f
->> -	clz	r7, r6
->> -	lsr	r6, #24
->> -	lsl	r6, r7
->> -	bic	r6, #0x0080
->> -	lsrs	r7, #1
->> -	orrcs	r6, #0x0080
->> -	orr	r6, r6, r7, lsl #12
->> -	orr	r6, #0x4000
->> -	b	2f
->> -1:	add     r7, r3
->> -	ldrh	ip, [r7, #2]
->> -	and	ip, 0x8f00
->> -	orr	ip, r6	@ mask in offset bits 31-24
->> -	strh	ip, [r7, #2]
->> -2:	cmp	r4, r5
->> -	ldrcc	r7, [r4], #4	@ use branch for delay slot
->> -	bcc	1b
->> -	bx	lr
->> -#else
->>  	adr	r0, 5f
->>  	b	4f
->>  1:	ldr	ip, [r7, r3]
->> + THUMB(	1:	add	r7, r3)
->> + THUMB(	ldrh	ip, [r7])
->> + THUMB(	ldrh	r6, [r7, #2])
->> + THUMB(	orr	ip, r6, ip, lsl #16)
->> + ARM( 1: ldr	ip, [r7, r3])
->>  	lsr	r6, ip, #20		@ extract opcode
-> Please don't do this.
->
-> - Remember my comment about using mnemonics such as "lsr" in an 
->   ARM-mode compiled kernel when old binutils are used.
- Ok, i will remove this to be generic.
-> - There is rather little commonalities between the patching of ARM 
->   instructions vs Thumb instructions.  Especially after you take into 
->   account my previous comments.  Interlacing them makes it harder 
->   to follow as well in this case.
->
->
-> Nicolas
- Ok, then i will keep it under #ifdef CONFIG_THUMB2_KERNEL
- as it was originally.
+> On Saturday 03 August 2013 08:58 AM, Nicolas Pitre wrote:
+> > ... meaning that, instead of using 0x81 for the stub value on the mov 
+> > instruction, it only has to be 0x83.  Bits 7 and 0 still act as anchors 
+> > for the rotation field in the opcode, while bit 1 indicates which value 
+> > to patch in.
+>   I started with this kind of augmenting with the immediate operand
+>   while starting V2. But the problem was, we do the runtime patching twice.
 
-Regards,
- Sricharan
- 
+Ahhh... Bummer.
+
+>   Once while booting from low address alias space and
+>   other while switching to higher memory address. So in this
+>   case, the augmented bits are lost after doing the patching for
+>   the first time. So the augmented bits are not valid while trying
+>   to patch for second time.
+> 
+>   This was the reason, i thought of using opcodes which
+>   is always there.
+
+In which case you only have to look for a mov.
+
+Better yet: just look at the rotate field in the shifter operand.  If it 
+is 0 then it is the __PV_BITS_8_0 case, if it is non zero then it is the 
+__PV_BITS_31_24 case.
+
+
+Nicolas
