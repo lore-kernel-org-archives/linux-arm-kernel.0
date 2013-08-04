@@ -1,43 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 4 Aug 2013 13:27:11 -0700
-Subject: [GIT PULL] msm gpio fixes for 3.11
-In-Reply-To: <1374876322-2222-1-git-send-email-davidb@codeaurora.org>
-References: <1374876322-2222-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <20130804202711.GC15602@quad.lixom.net>
+Date: Sun, 4 Aug 2013 13:31:31 -0700
+Subject: [PATCH 0/5] Renesas ARM-based SoC board updates for v3.12
+In-Reply-To: <cover.1375174556.git.horms+renesas@verge.net.au>
+References: <cover.1375174556.git.horms+renesas@verge.net.au>
+Message-ID: <20130804203131.GD15602@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 03:05:22PM -0700, David Brown wrote:
-> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+On Tue, Jul 30, 2013 at 06:00:41PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
->   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> please consider these Renesas ARM-based SoC board updates for v3.12.
+> This pull-request is based on renesas-soc-for-v3.12 which I have previously
+> sent a pull-request for.
+> 
+> The following changes since commit 81b9d5351fa96caad4accc6711bc1b9342927d4a:
+> 
+>   ARM: shmobile: Setup r8a7790 arch timer based on MD pins (2013-07-17 14:26:56 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-3.11-fix1
-> 
-> for you to fetch changes up to 8fd62389a778c902c7e8532594ea924bbaf465e8:
-> 
->   ARM: msm: Consolidate gpiomux for older architectures (2013-07-26 14:55:38 -0700)
-> 
-> ----------------------------------------------------------------
-> Fixes for MSM for 3.11
-> 
-> Two small fixes for MSM.
-> 
-> The first fixes the a gpio controller register address.  I didn't see
-> any acks from the devicetree maintainers, so I've copied them on this
-> pull request.  The change itself is minor, and just to the register
-> address.
-> 
-> The second change removes the gpiomux V1 code from MSM.  This was
-> breaking compilation for some of the targets.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
 
-I'm guessing the second breakage was nothing new, but who am I to turn away
-code removal even during -rc. :)
+Hi, can I get a tag for this please?
 
-
-Pulled.
+Also, your subject says [PATCH 0/5], which might make me miss it. Please
+label it [GIT PULL] if you don't mind?
 
 
 -Olof
