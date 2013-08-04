@@ -1,58 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  4 Aug 2013 11:58:41 +0200
-Subject: [PATCHv3 0/9] ARM: sunxi: Introduce Allwinner A20 support
-Message-ID: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  4 Aug 2013 11:58:46 +0200
+Subject: [PATCHv3 5/9] pinctrl: sunxi: Fix inconsistent indentation
+In-Reply-To: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375610330-18185-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Some pin functions in the array were not indented like the other
+functions in this array. Fix this.
 
-This patchset brings in support for the Allwinner A20 SoC.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-sunxi-pins.h | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-This SoC is pretty much the heir of the Allwinner A10. They both have a lot of
-IP in common, the A20 is pin-compatible with the A10, the only major difference
-being that the A20 has 2 Cortex-A7 instead of the single Cortex-A8 found in the
-A10.
-
-Just like the A31, the SMP support isn't there yet, nor do we have clock
-support or any storage device.
-
-We also have the same SMP bit issue that makes Linux run without the caches
-enabled for the time being when CONFIG_SMP isn't set.
-
-This serie comes on top of the serie "ARM: sunxi: Add support for the Allwinner
-A31 SoC" I sent previously.
-
-Thanks,
-Maxime
-
-Changes from v2:
-  - Fix the SoC base address in the DT
-  - Fixed a typo in the olinuxino's LED label
-
-Changes from v1:
-  - Removed the patch that wrapped the compatibles in the clock driver
-
-Maxime Ripard (9):
-  ARM: sunxi: Introduce Allwinner A20 support
-  ARM: sun7i: Add Allwinner A20 DTSI
-  ARM: sun7i: Add Olimex A20-Olinuxino-Micro support
-  pinctrl: sunxi: Add Allwinner A20 pins set
-  pinctrl: sunxi: Fix inconsistent indentation
-  ARM: sun7i: Add the PIO controller node to the DTSI
-  ARM: sun7i: DT: Add UART muxing options to the DTSI
-  ARM: sun7i: a20-olinuxino: Enable UARTs muxing
-  ARM: sun7i: a20-olinuxino: Enable the user LED
-
- arch/arm/boot/dts/Makefile                      |    3 +-
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |   61 ++
- arch/arm/boot/dts/sun7i-a20.dtsi                |  205 +++++
- arch/arm/mach-sunxi/sunxi.c                     |    1 +
- drivers/pinctrl/pinctrl-sunxi-pins.h            | 1028 ++++++++++++++++++++++-
- drivers/pinctrl/pinctrl-sunxi.c                 |    1 +
- 6 files changed, 1293 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
- create mode 100644 arch/arm/boot/dts/sun7i-a20.dtsi
-
+diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
+index 3368965..2c7446a 100644
+--- a/drivers/pinctrl/pinctrl-sunxi-pins.h
++++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
+@@ -806,7 +806,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+ 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAD13 */
+ 		  SUNXI_FUNCTION(0x4, "keypad"),	/* IN7 */
+ 		  SUNXI_FUNCTION(0x5, "sim"),		/* VCCEN */
+-		SUNXI_FUNCTION_IRQ(0x6, 17),		/* EINT17 */
++		  SUNXI_FUNCTION_IRQ(0x6, 17),		/* EINT17 */
+ 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D17 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH18,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+@@ -815,7 +815,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+ 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAD14 */
+ 		  SUNXI_FUNCTION(0x4, "keypad"),	/* OUT0 */
+ 		  SUNXI_FUNCTION(0x5, "sim"),		/* SCK */
+-		SUNXI_FUNCTION_IRQ(0x6, 18),		/* EINT18 */
++		  SUNXI_FUNCTION_IRQ(0x6, 18),		/* EINT18 */
+ 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D18 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH19,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+@@ -824,7 +824,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+ 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAD15 */
+ 		  SUNXI_FUNCTION(0x4, "keypad"),	/* OUT1 */
+ 		  SUNXI_FUNCTION(0x5, "sim"),		/* SDA */
+-		SUNXI_FUNCTION_IRQ(0x6, 19),		/* EINT19 */
++		  SUNXI_FUNCTION_IRQ(0x6, 19),		/* EINT19 */
+ 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D19 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH20,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+@@ -832,7 +832,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+ 		  SUNXI_FUNCTION(0x2, "lcd1"),		/* D20 */
+ 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAOE */
+ 		  SUNXI_FUNCTION(0x4, "can"),		/* TX */
+-		SUNXI_FUNCTION_IRQ(0x6, 20),		/* EINT20 */
++		  SUNXI_FUNCTION_IRQ(0x6, 20),		/* EINT20 */
+ 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D20 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH21,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+@@ -840,7 +840,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+ 		  SUNXI_FUNCTION(0x2, "lcd1"),		/* D21 */
+ 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATADREQ */
+ 		  SUNXI_FUNCTION(0x4, "can"),		/* RX */
+-		SUNXI_FUNCTION_IRQ(0x6, 21),		/* EINT21 */
++		  SUNXI_FUNCTION_IRQ(0x6, 21),		/* EINT21 */
+ 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D21 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH22,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
 -- 
 1.8.3.4
