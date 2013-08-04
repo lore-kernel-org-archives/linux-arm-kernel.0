@@ -1,56 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 4 Aug 2013 22:57:58 +0200
-Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <201308042246.54776.arnd@arndb.de>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <20130804085046.6e6cb18954a57dbddeee814d@mail.ru>
- <201308042246.54776.arnd@arndb.de>
-Message-ID: <201308042257.58707.arnd@arndb.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 04 Aug 2013 23:45:30 +0200
+Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
+In-Reply-To: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+Message-ID: <51FECB7A.6010208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 04 August 2013, Arnd Bergmann wrote:
-> On Sunday 04 August 2013, Alexander Shiyan wrote:
-> > On Sat, 3 Aug 2013 21:45:41 +0200
-> > Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > [...]
-> > > > +static void __iomem __init *clps711x_ioremap_one(phys_addr_t reg)
-> > > > +{
-> > > > +       void __iomem *ret;
-> > > > +
-> > > > +       if (!request_mem_region(clps711x_intc->phys_base + reg, SZ_4, NULL))
-> > > > +               return ERR_PTR(-EBUSY);
-> > > > +
-> > > > +       ret = ioremap(clps711x_intc->phys_base + reg, SZ_4);
-> > > > +       if (!ret)
-> > > > +               return ERR_PTR(-ENOMEM);
-> > > > +
-> > > > +       return ret;
-> > > 
-> > > Another unrelated comment: Doing repeated ioremap() and request_mem_region calls
-> > > is rather wasteful as every single call will consume resources. Better do a single
-> > > ioremap in the probe function and just add the offsets later.
-> > 
-> > Registers are not arranged linearly for each submodule, so for example there are
-> > registers for LCD, Timers, PWM, UART etc. between INTMR1 and INTMR2.
-> > Single request cannot be used here, since it block access to these holes from drivers.
-> 
-> Well, you could still have a single ioremap() but separate request_mem_region()
-> calls then. Each ioremap() actually installs a full page anyway.
-> 
-> Alternatively, you could use the syscon driver to provide access to all the registers.
+On 08/04/2013 09:21 PM, Russell King - ARM Linux wrote:
+> This is only a RFC at present due to the need to test on Kirkwood and
+> fix at least one bug in ASoC core code.
+>
+> I can't say that this stuff is fully tested, because I don't have any
+> Kirkwood platforms, but I do have one Dove platform, which as I've
+> said in the past doesn't run mainline.  I don't run DT on it, so these
+> patches also don't contain anything DT related.
 
-There is another problem, which is that you have overlapping register ranges
-in the DT if the interrupt controller device node contains all the registers
-including those that are used by the other drivers. Using the syscon driver
-would solve that, too.
+Added Thomas Petazzoni to Cc, IIRC he has access to a T5325. I'll add
+DT support as I already did for Jean-Francois' patches. But as currently
+DT maintainers are very busy, I suggest to have a separate patch set for
+those and take these in earlier.
 
-Rethinking the whole situation, I wonder if the EOI registers could be accessed
-by the individual drivers instead, if they are in their register sets anyway.
-Handling them in the irqchip driver probably seemed like a logical solution
-when the code was initially written, but if you move that access into the
-device drivers, you can probably remove the irqchip driver entirely and just
-use the generic irqchip implementation.
+> However, this patch set is aimed at sorting out the SPDIF on Dove and
+> Kirkwood, which the Dove-based Cubox uses.
 
-	Arnd
+[...]
+
+> What I haven't included is the board file (like the openrd and t5325
+> ones already present) for SPDIF support on Dove, as that's based on the
+> pre-DT setups, and I'm not sure anyone in mainline is interested in
+> that.  So the above provides the components necessary, hopefully someone
+> with ASoC & DT knowledge can bind these components together via
+> appropriate DT bindings.  For reference, the DAI link looks like this:
+>
+>                  .name = "S/PDIF1",
+>                  .stream_name = "IEC958 Playback",
+>                  .platform_name = "mvebu-audio.1",
+>                  .cpu_dai_name = "mvebu-audio.1",
+>                  .codec_dai_name = "dit-hifi",
+>                  .codec_name = "spdif-dit",
+
+Not a big deal for DT. I suggest to have a "audio-codecs" property that
+link CPU DAI to codec(s). One thing, I have noticed is that currently
+you need to supply both codec_name (or DT node) _and_ codec_dai_name.
+For that it would be helpful, if ASoC supplies helpers to get the DAI
+by index and use phandle with args here.
+
+As an example, the nodes could look like:
+
+spdif: spdif-transmitter {
+	compatible = "linux,spdif-dit";
+};
+
+i2s1: audio-controller at b0000 {
+	compatible = "marvell,dove-i2s";
+	reg = <0xb0000 0x2345>;
+	audio-codecs = <&spdif 0>;
+};
+
+ASoC then should resolve DT node and index to codec_dai and
+codec_dai_name. (Or have child nodes for each dai? Will also look
+through other drivers first).
+
+Also, the compatibles for mvebu-audio driver should be
+marvell,dove-i2s, marvell,kirkwood-i2s, and marvell,armada-370-i2s
+(if supported). With those, we can distinguish the controller features 
+easily.
+
+> and the required route:
+>
+> static const struct snd_soc_dapm_route routes[] = {
+>          { "Playback", NULL, "spdifdo" },
+> };
+
+I am not sure about how to represent DAPM in DT but I guess there are
+already drivers that make use of it.
+
+Sebastian
