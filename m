@@ -1,47 +1,27 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  4 Aug 2013 11:47:33 +0200
-Subject: [PATCHv3 06/10] ARM: sun6i: Add WITS Colombus A31 evaluation kit
- support
+Date: Sun,  4 Aug 2013 11:47:32 +0200
+Subject: [PATCHv3 05/10] ARM: sunxi: Add Allwinner A31 DTSI
 In-Reply-To: <1375609657-15434-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1375609657-15434-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1375609657-15434-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375609657-15434-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform from WITS is the evaluation board for the Allwinner A31.
-It features a quad-Cortex A7, 2048MB of RAM, NAND, USB, MMC, several
-UART, HDMI, a 2048 x 1536 10" screen, powered by a PowerVR, etc.
-
-Of course, most of these peripherals aren't supported yet, but support
-for those will come eventually.
+The Allwinner A31 SoC is a multimedia SoC powered by 4 Cortex-A7 and a
+PowerVR GPU.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile               |  3 ++-
- arch/arm/boot/dts/sun6i-a31-colombus.dts | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun6i-a31-colombus.dts
+ arch/arm/boot/dts/sun6i-a31.dtsi | 156 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 156 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 641b3c9..1482533 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -210,7 +210,8 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-hackberry.dtb \
- 	sun5i-a10s-olinuxino-micro.dtb \
--	sun5i-a13-olinuxino.dtb
-+	sun5i-a13-olinuxino.dtb \
-+	sun6i-a31-colombus.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-iris-512.dtb \
- 	tegra20-medcom-wide.dtb \
-diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
 new file mode 100644
-index 0000000..99c4b18
+index 0000000..45487e4
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-@@ -0,0 +1,30 @@
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -0,0 +1,156 @@
 +/*
 + * Copyright 2013 Maxime Ripard
 + *
@@ -55,20 +35,146 @@ index 0000000..99c4b18
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+/dts-v1/;
-+/include/ "sun6i-a31.dtsi"
++/include/ "skeleton.dtsi"
 +
 +/ {
-+	model = "WITS A31 Colombus Evaluation Board";
-+	compatible = "wits,colombus", "allwinner,sun6i-a31";
++	interrupt-parent = <&gic>;
 +
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <0>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <1>;
++		};
++
++		cpu at 2 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <2>;
++		};
++
++		cpu at 3 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <3>;
++		};
++	};
++
++	memory {
++		reg = <0x40000000 0x80000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		osc: oscillator {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++		};
 +	};
 +
 +	soc at 01c00000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		timer at 01c20c00 {
++			compatible = "allwinner,sun4i-timer";
++			reg = <0x01c20c00 0xa0>;
++			interrupts = <0 18 1>,
++				     <0 19 1>,
++				     <0 20 1>,
++				     <0 21 1>,
++				     <0 22 1>;
++			clocks = <&osc>;
++		};
++
++		wdt1: watchdog at 01c20ca0 {
++			compatible = "allwinner,sun6i-wdt";
++			reg = <0x01c20ca0 0x20>;
++		};
++
 +		uart0: serial at 01c28000 {
-+			status = "okay";
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28000 0x400>;
++			interrupts = <0 0 1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc>;
++			status = "disabled";
++		};
++
++		uart1: serial at 01c28400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28400 0x400>;
++			interrupts = <0 1 1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc>;
++			status = "disabled";
++		};
++
++		uart2: serial at 01c28800 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28800 0x400>;
++			interrupts = <0 2 1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc>;
++			status = "disabled";
++		};
++
++		uart3: serial at 01c28c00 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28c00 0x400>;
++			interrupts = <0 3 1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc>;
++			status = "disabled";
++		};
++
++		uart4: serial at 01c29000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c29000 0x400>;
++			interrupts = <0 4 1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc>;
++			status = "disabled";
++		};
++
++		uart5: serial at 01c29400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c29400 0x400>;
++			interrupts = <0 5 1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc>;
++			status = "disabled";
++		};
++
++		gic: interrupt-controller at 01c81000 {
++			compatible = "arm,cortex-a7-gic";
++			reg = <0x01c81000 0x1000>,
++			      <0x01c82000 0x1000>,
++			      <0x01c84000 0x2000>,
++			      <0x01c86000 0x2000>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			interrupts = <1 9 0xf04>;
 +		};
 +	};
 +};
