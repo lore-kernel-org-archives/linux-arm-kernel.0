@@ -1,48 +1,70 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Sun,  4 Aug 2013 13:30:49 +0530
-Subject: [PATCH] MFD: Make VEXPRESS MFD controller depends on VEXPRESS systems
-Message-ID: <1375603249-27206-1-git-send-email-manjunath.goudar@linaro.org>
+From: mhocko@suse.cz (Michal Hocko)
+Date: Sun, 4 Aug 2013 10:09:54 +0200
+Subject: [PATCH] MM: Make Contiguous Memory Allocator depends on MMU
+In-Reply-To: <1375593061-11350-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1375593061-11350-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <20130804080954.GB24005@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a Kconfig dependency on an ARCH_VEXPRESS(it is for
-both ARM and ARM64) or ARCH_VEXPRESS_CA9X being available before
-VEXPRESS_CONFIG can be enabled. Without this patch,build system
-can lead to issues. This was discovered during randconfig testing,
-in which VEXPRESS_CONFIG was enabled w/o ARCH_VEXPRESS or VEXPRESS_CONFIG
-being enabled,leading to the following error:
+On Sun 04-08-13 10:41:01, Manjunath Goudar wrote:
+> s patch adds a Kconfig dependency on an MMU being available before
+> CMA can be enabled.  Without this patch, CMA can be enabled on an
+> MMU-less system which can lead to issues. This was discovered during
+> randconfig testing, in which CMA was enabled w/o MMU being enabled,
+> leading to the following error:
+> 
+>  CC      mm/migrate.o
+> mm/migrate.c: In function ?remove_migration_pte?:
+> mm/migrate.c:134:3: error: implicit declaration of function ?pmd_trans_huge?
+> [-Werror=implicit-function-declaration]
+>    if (pmd_trans_huge(*pmd))
+>    ^
+> mm/migrate.c:137:3: error: implicit declaration of function ?pte_offset_map?
+> [-Werror=implicit-function-declaration]
+>    ptep = pte_offset_map(pmd, addr);
 
-CC      drivers/mfd/vexpress-config.o
-drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
-drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
-?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
-    bridge_node = of_find_node_by_phandle(
-    ^
-drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
-integer without a cast [enabled by default]
-    bridge_node = of_find_node_by_phandle(
+This is a migration code but you are updating configuration for CMA
+which doesn't make much sense to me.
+I guess you wanted to disable migration for CMA instead?
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Deepak Saxena <dsaxena@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@linaro.org>
+> Cc: Deepak Saxena <dsaxena@linaro.org>
+> Cc: IWAMOTO Toshihiro <iwamoto@valinux.co.jp>
+> Cc: Hirokazu Takahashi <taka@valinux.co.jp>
+> Cc: Dave Hansen <haveblue@us.ibm.com>
+> Cc: linux-mm at kvack.org
+> Cc: Johannes Weiner <hannes@cmpxchg.org>
+> Cc: Michal Hocko <mhocko@suse.cz>
+> Cc: Balbir Singh <bsingharora@gmail.com>
+> Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+> ---
+>  mm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/mm/Kconfig b/mm/Kconfig
+> index 256bfd0..ad6b98e 100644
+> --- a/mm/Kconfig
+> +++ b/mm/Kconfig
+> @@ -522,7 +522,7 @@ config MEM_SOFT_DIRTY
+>  
+>  config CMA
+>  	bool "Contiguous Memory Allocator"
+> -	depends on HAVE_MEMBLOCK
+> +	depends on MMU && HAVE_MEMBLOCK
+>  	select MIGRATION
+>  	select MEMORY_ISOLATION
+>  	help
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 633ee43..c9202f6 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -1174,7 +1174,7 @@ endmenu
- 
- config VEXPRESS_CONFIG
- 	bool "ARM Versatile Express platform infrastructure"
--	depends on ARM || ARM64
-+	depends on ARCH_VEXPRESS || ARCH_VEXPRESS_CA9X4
- 	help
- 	  Platform configuration infrastructure for the ARM Ltd.
- 	  Versatile Express.
 -- 
-1.7.9.5
+Michal Hocko
+SUSE Labs
