@@ -1,57 +1,42 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 4 Aug 2013 16:31:13 +0400
-Subject: [PATCH 06/10] ARM: clps711x: Add CLPS711X clocksource driver
-In-Reply-To: <20130802104635.GE2884@e106331-lin.cambridge.arm.com>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <1374172501-26796-7-git-send-email-shc_work@mail.ru>
- <20130802104635.GE2884@e106331-lin.cambridge.arm.com>
-Message-ID: <20130804163113.07d94f707528c15b1bff13d7@mail.ru>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 4 Aug 2013 20:54:54 +0800
+Subject: [PATCH 1/2] pinctrl: imx: work around select input quirk
+In-Reply-To: <20130801083221.GA32696@nchen-desktop>
+References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
+ <20130801065147.GM8540@nchen-desktop>
+ <CAAQ0ZWQajP49jM_0wqvqmuv19ZcSQ_1QUzgxfsBYzKU_5w0bMA@mail.gmail.com>
+ <20130801083221.GA32696@nchen-desktop>
+Message-ID: <20130804125452.GF18119@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Aug 2013 11:46:35 +0100
-Mark Rutland <mark.rutland@arm.com> wrote:
-
-> On Thu, Jul 18, 2013 at 07:34:57PM +0100, Alexander Shiyan wrote:
-> > This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
-> > Designed primarily for migration CLPS711X subarch for multiplatform & DT,
-> > for this as the "OF" and "not-OF" calls implemented.
+On Thu, Aug 01, 2013 at 04:32:23PM +0800, Peter Chen wrote:
+> On Thu, Aug 01, 2013 at 03:08:06PM +0800, Shawn Guo wrote:
+> > On 1 August 2013 14:51, Peter Chen <peter.chen@freescale.com> wrote:
+> > > Shawn, input_reg[i] may be 0 if the fixed one at first register of IOMUXC
 > > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
+> > Ah, yes.  Now select input register at offset 0 becomes possible.  I
+> > will try to fix it.
+> > 
+> > Regardless of this, does the series work for you?
+> > 
+> Yes, it works, you can add : Tested-by: Peter Chen <peter.chen@freescale.com>
+
+Thanks.
+
 > 
-> [...]
+> I changed the second patch manually, have you changed the pin prefix
+> at arch/arm/boot/dts/imx6q-pinfunc.h?  At 3.10, it is MX6Q_XXX.
 
-> > +static struct clock_event_device clps711x_clockevent = {
-> > +	.name		= "clps711x-clockevent",
-> > +	.rating		= 300,
-> > +	.features	= CLOCK_EVT_FEAT_PERIODIC,
-> > +	.set_mode	= clps711x_clockevent_set_mode,
-> > +};
+Yes, we changed the prefix to simplify the DTS files for imx6q and
+imx6dl.
+
 > 
-> This seems to be a global clockevent, or a CPU0-only clockevent. Please
-> set the cpumask to clarify this, or core clockevent code will scream at
-> you (see clockevents_register_device).
-> 
-> I assume this doesn't stop in low power states (CLOCK_EVT_FEAT_C3STOP)?
+> Besides, please add comments for u16 *input_reg at struct imx_pin_group.
 
-This feature is marked as "x86(64) specific" in the header.
+I'm not fond of documenting a workaround for a random quirky select
+input as a feature all over the files where input_reg is documented.
+It should be good enough to have it well documented at where the quirk
+is handled.
 
-[...]
-> > +static void __init _clps711x_clksrc_init(phys_addr_t phys_base, int irq,
-> > +					 struct clk *tc1, struct clk *tc2)
-> > +{
-> > +	unsigned long tc1_rate, tc2_rate;
-> > +	void __iomem *tc2d, *syscon1;
-> > +	u32 tmp;
-> > +
-> > +	BUG_ON(IS_ERR(tc1) || IS_ERR(tc2));
-> 
-> Is this the only timer possible in the SoCs it'll be used in? You might
-> not be capable of initialising this timer, but another timer may be able
-> to keep the system running...
-
-This CPU have two HW timers only. Both are used here.
-
--- 
-Alexander Shiyan <shc_work@mail.ru>
+Shawn
