@@ -1,42 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 4 Aug 2013 20:54:54 +0800
-Subject: [PATCH 1/2] pinctrl: imx: work around select input quirk
-In-Reply-To: <20130801083221.GA32696@nchen-desktop>
-References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
- <20130801065147.GM8540@nchen-desktop>
- <CAAQ0ZWQajP49jM_0wqvqmuv19ZcSQ_1QUzgxfsBYzKU_5w0bMA@mail.gmail.com>
- <20130801083221.GA32696@nchen-desktop>
-Message-ID: <20130804125452.GF18119@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 4 Aug 2013 13:53:46 +0100
+Subject: Build breakage due to latest ARM fixes
+In-Reply-To: <20130803000731.GS23006@n2100.arm.linux.org.uk>
+References: <CAOesGMgWeP-CdmOE-S7XZmJ-+1buP9a1cqavUns2gpgKrrhaxQ@mail.gmail.com>
+ <20130803000731.GS23006@n2100.arm.linux.org.uk>
+Message-ID: <20130804125346.GH23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 04:32:23PM +0800, Peter Chen wrote:
-> On Thu, Aug 01, 2013 at 03:08:06PM +0800, Shawn Guo wrote:
-> > On 1 August 2013 14:51, Peter Chen <peter.chen@freescale.com> wrote:
-> > > Shawn, input_reg[i] may be 0 if the fixed one at first register of IOMUXC
-> > 
-> > Ah, yes.  Now select input register at offset 0 becomes possible.  I
-> > will try to fix it.
-> > 
-> > Regardless of this, does the series work for you?
-> > 
-> Yes, it works, you can add : Tested-by: Peter Chen <peter.chen@freescale.com>
+On Sat, Aug 03, 2013 at 01:07:31AM +0100, Russell King - ARM Linux wrote:
+> I'll look into that.  Obviously, I never build nommu because it isn't
+> part of the build system and the nommu platform I do have - OKI67001 -
+> doesn't have mainline kernel support.  (And if it did, it would not be
+> DT, so I doubt it's submittable.)
 
-Thanks.
+Okay, what I'm going to do is push the OKI67001 stuff into mainline
+irrespective of DT or not, so that I can then add noMMU build _and_
+boot tests to my build system, which should ensure that problems
+like that get detected before they're pushed upstream.
 
-> 
-> I changed the second patch manually, have you changed the pin prefix
-> at arch/arm/boot/dts/imx6q-pinfunc.h?  At 3.10, it is MX6Q_XXX.
-
-Yes, we changed the prefix to simplify the DTS files for imx6q and
-imx6dl.
-
-> 
-> Besides, please add comments for u16 *input_reg at struct imx_pin_group.
-
-I'm not fond of documenting a workaround for a random quirky select
-input as a feature all over the files where input_reg is documented.
-It should be good enough to have it well documented at where the quirk
-is handled.
-
-Shawn
+If people want me to care about noMMU, that's what has to happen
+because I have no other noMMU platform - if not, people can put up with
+noMMU breaking from time to time.
