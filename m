@@ -1,26 +1,22 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 3 Aug 2013 16:43:59 -0400
+Date: Sat, 3 Aug 2013 21:06:56 -0400
 Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
 In-Reply-To: <0DB595A2CB707F458400BE9663B6A72269594F77E1@SC-VEXCH2.marvell.com>
 References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
  <20130803181146.GD13555@titan.lakedaemon.net>
  <0DB595A2CB707F458400BE9663B6A72269594F77E1@SC-VEXCH2.marvell.com>
-Message-ID: <20130803204359.GI13555@titan.lakedaemon.net>
+Message-ID: <20130804010656.GA19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Seif,
 
-For future reference, please don't toppost.
-
 On Sat, Aug 03, 2013 at 01:35:34PM -0700, Seif Mazareeb wrote:
 > Post approval, but I've tested on my board too.
 > UART, USB3.0, mini-PCIe, SPI, Sata, and Ethernet - looking good.
 
-Shall I consider this your Tested-by ?
-
-I can amend the commits up until I send the PR.
+Added your Tested-by,
 
 thx,
 
@@ -58,3 +54,8 @@ Jason.
 > thx,
 > 
 > Jason.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
