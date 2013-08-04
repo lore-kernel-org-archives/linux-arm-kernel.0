@@ -1,61 +1,177 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 3 Aug 2013 21:06:56 -0400
-Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
-In-Reply-To: <0DB595A2CB707F458400BE9663B6A72269594F77E1@SC-VEXCH2.marvell.com>
-References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130803181146.GD13555@titan.lakedaemon.net>
- <0DB595A2CB707F458400BE9663B6A72269594F77E1@SC-VEXCH2.marvell.com>
-Message-ID: <20130804010656.GA19280@titan.lakedaemon.net>
+Date: Sat, 3 Aug 2013 21:09:04 -0400
+Subject: [PATCH 1/2] ARM: remove dmacap,memset from Device tree binding
+In-Reply-To: <20130725153104.GH23879@titan.lakedaemon.net>
+References: <1372762453-12018-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1372762453-12018-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130725153104.GH23879@titan.lakedaemon.net>
+Message-ID: <20130804010904.GB19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seif,
+DT Maintainers,
 
-On Sat, Aug 03, 2013 at 01:35:34PM -0700, Seif Mazareeb wrote:
-> Post approval, but I've tested on my board too.
-> UART, USB3.0, mini-PCIe, SPI, Sata, and Ethernet - looking good.
-
-Added your Tested-by,
+It's been a week with no comment.  Shall I assume it's ok to apply
+this?
 
 thx,
 
 Jason.
 
-> -----Original Message-----
-> From: Jason Cooper [mailto:jason at lakedaemon.net] 
-> Sent: Saturday, August 03, 2013 11:12 AM
-> To: Thomas Petazzoni
-> Cc: Andrew Lunn; Gregory Clement; Lior Amsalem; Seif Mazareeb; linux-arm-kernel at lists.infradead.org; Ezequiel Garcia
-> Subject: Re: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
-> 
-> On Tue, Jul 30, 2013 at 05:44:50PM +0200, Thomas Petazzoni wrote:
-> > The AXP WiFi AP board is a Marvell platform based on the Armada XP
-> > MV78230 SoC. It has two mini-PCIe connectors, one USB 3.0 port powered 
-> > by a USB 3.0 controller on PCIe, two Ethernet ports, 1 GB of RAM, 1 GB 
-> > of NAND, 16 MB of SPI flash, one SATA port and one button, two UARTs
+On Thu, Jul 25, 2013 at 11:31:04AM -0400, Jason Cooper wrote:
+> On Tue, Jul 02, 2013 at 12:54:12PM +0200, Sebastian Hesselbarth wrote:
+> > DMA_MEMSET support has been removed, so update the device tree files
+> > and corresponding binding documentation for Marvell SoCs.
 > > 
-> > Successfully tested: USB 3.0 port, the mini-PCIe connectors, SPI 
-> > flash, Ethernet ports, SATA port, button, UART.
-> > 
-> > Untested: NAND flash, due to lack of mainline support for the Armada 
-> > 370/XP NAND controller for now.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > > ---
-> >  arch/arm/boot/dts/Makefile                |   1 +
-> >  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 164 
-> > ++++++++++++++++++++++++++++++
-> >  2 files changed, 165 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> > Cc: Russell King <linux@arm.linux.org.uk> 
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com> 
+> > Cc: devicetree-discuss at lists.ozlabs.org 
+> > Cc: linux-kernel at vger.kernel.org 
+> > Cc: linux-arm-kernel at lists.infradead.org 
+> > ---
+> >  Documentation/devicetree/bindings/dma/mv-xor.txt |    2 --
+> >  arch/arm/boot/dts/armada-370.dtsi                |    2 --
+> >  arch/arm/boot/dts/armada-xp.dtsi                 |    2 --
+> >  arch/arm/boot/dts/dove.dtsi                      |    2 --
+> >  arch/arm/boot/dts/kirkwood.dtsi                  |    2 --
+> >  arch/arm/boot/dts/orion5x.dtsi                   |    1 -
+> >  6 files changed, 0 insertions(+), 11 deletions(-)
 > 
-> Applied to mvebu/dt
+> Adding the new devicetree ml to the Cc:
+> 
+> I'm fine with the changes to the dts{i} files, but I think the binding
+> document should be handled differently.
 > 
 > thx,
 > 
 > Jason.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > index 7c6cb7f..68f7004 100644
+> > --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > @@ -14,7 +14,6 @@ properties:
+> >  
+> >  And the following optional properties:
+> >  - dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
+> > -- dmacap,memset to indicate that the XOR channel is capable of memset operations
+> >  - dmacap,xor to indicate that the XOR channel is capable of xor operations
+> >  
+> >  Example:
+> > @@ -35,6 +34,5 @@ xor at d0060900 {
+> >  	      interrupts = <52>;
+> >  	      dmacap,memcpy;
+> >  	      dmacap,xor;
+> > -	      dmacap,memset;
+> >  	};
+> >  };
+> > diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> > index fa3dfc6..a315ad1 100644
+> > --- a/arch/arm/boot/dts/armada-370.dtsi
+> > +++ b/arch/arm/boot/dts/armada-370.dtsi
+> > @@ -132,7 +132,6 @@
+> >  					interrupts = <52>;
+> >  					dmacap,memcpy;
+> >  					dmacap,xor;
+> > -					dmacap,memset;
+> >  				};
+> >  			};
+> >  
+> > @@ -151,7 +150,6 @@
+> >  					interrupts = <95>;
+> >  					dmacap,memcpy;
+> >  					dmacap,xor;
+> > -					dmacap,memset;
+> >  				};
+> >  			};
+> >  
+> > diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> > index 416eb94..4b3dd56 100644
+> > --- a/arch/arm/boot/dts/armada-xp.dtsi
+> > +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> > @@ -114,7 +114,6 @@
+> >  					interrupts = <52>;
+> >  					dmacap,memcpy;
+> >  					dmacap,xor;
+> > -					dmacap,memset;
+> >  				};
+> >  			};
+> >  
+> > @@ -134,7 +133,6 @@
+> >  					interrupts = <95>;
+> >  					dmacap,memcpy;
+> >  					dmacap,xor;
+> > -					dmacap,memset;
+> >  				};
+> >  			};
+> >  
+> > diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> > index 6cab468..2cef34f 100644
+> > --- a/arch/arm/boot/dts/dove.dtsi
+> > +++ b/arch/arm/boot/dts/dove.dtsi
+> > @@ -232,7 +232,6 @@
+> >  
+> >  			channel1 {
+> >  				interrupts = <40>;
+> > -				dmacap,memset;
+> >  				dmacap,memcpy;
+> >  				dmacap,xor;
+> >  			};
+> > @@ -253,7 +252,6 @@
+> >  
+> >  			channel1 {
+> >  				interrupts = <43>;
+> > -				dmacap,memset;
+> >  				dmacap,memcpy;
+> >  				dmacap,xor;
+> >  			};
+> > diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> > index 9809fc1..078637c 100644
+> > --- a/arch/arm/boot/dts/kirkwood.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> > @@ -126,7 +126,6 @@
+> >  			      interrupts = <6>;
+> >  			      dmacap,memcpy;
+> >  			      dmacap,xor;
+> > -			      dmacap,memset;
+> >  			};
+> >  		};
+> >  
+> > @@ -146,7 +145,6 @@
+> >  			      interrupts = <8>;
+> >  			      dmacap,memcpy;
+> >  			      dmacap,xor;
+> > -			      dmacap,memset;
+> >  			};
+> >  		};
+> >  
+> > diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> > index 892c64e..f82ece7 100644
+> > --- a/arch/arm/boot/dts/orion5x.dtsi
+> > +++ b/arch/arm/boot/dts/orion5x.dtsi
+> > @@ -120,7 +120,6 @@
+> >  			      interrupts = <31>;
+> >  			      dmacap,memcpy;
+> >  			      dmacap,xor;
+> > -			      dmacap,memset;
+> >  			};
+> >  		};
+> >  
+> > -- 
+> > 1.7.2.5
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
