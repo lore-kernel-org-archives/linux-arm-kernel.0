@@ -1,69 +1,76 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  4 Aug 2013 11:58:46 +0200
-Subject: [PATCHv3 5/9] pinctrl: sunxi: Fix inconsistent indentation
+Date: Sun,  4 Aug 2013 11:58:44 +0200
+Subject: [PATCHv3 3/9] ARM: sun7i: Add Olimex A20-Olinuxino-Micro support
 In-Reply-To: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1375610330-18185-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375610330-18185-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some pin functions in the array were not indented like the other
-functions in this array. Fix this.
+The Olimex A20-Olinuxino is an open-hardware board based on the
+Allwinner A20 SoC, with most of the pins exported on headers, a 10/100M
+ethernet port, SATA, SD and uSD slots, etc.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/pinctrl-sunxi-pins.h | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/Makefile                      |  3 ++-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 34 +++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
 
-diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
-index 3368965..2c7446a 100644
---- a/drivers/pinctrl/pinctrl-sunxi-pins.h
-+++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
-@@ -806,7 +806,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAD13 */
- 		  SUNXI_FUNCTION(0x4, "keypad"),	/* IN7 */
- 		  SUNXI_FUNCTION(0x5, "sim"),		/* VCCEN */
--		SUNXI_FUNCTION_IRQ(0x6, 17),		/* EINT17 */
-+		  SUNXI_FUNCTION_IRQ(0x6, 17),		/* EINT17 */
- 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D17 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH18,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
-@@ -815,7 +815,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAD14 */
- 		  SUNXI_FUNCTION(0x4, "keypad"),	/* OUT0 */
- 		  SUNXI_FUNCTION(0x5, "sim"),		/* SCK */
--		SUNXI_FUNCTION_IRQ(0x6, 18),		/* EINT18 */
-+		  SUNXI_FUNCTION_IRQ(0x6, 18),		/* EINT18 */
- 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D18 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH19,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
-@@ -824,7 +824,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAD15 */
- 		  SUNXI_FUNCTION(0x4, "keypad"),	/* OUT1 */
- 		  SUNXI_FUNCTION(0x5, "sim"),		/* SDA */
--		SUNXI_FUNCTION_IRQ(0x6, 19),		/* EINT19 */
-+		  SUNXI_FUNCTION_IRQ(0x6, 19),		/* EINT19 */
- 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D19 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH20,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
-@@ -832,7 +832,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION(0x2, "lcd1"),		/* D20 */
- 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATAOE */
- 		  SUNXI_FUNCTION(0x4, "can"),		/* TX */
--		SUNXI_FUNCTION_IRQ(0x6, 20),		/* EINT20 */
-+		  SUNXI_FUNCTION_IRQ(0x6, 20),		/* EINT20 */
- 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D20 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH21,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
-@@ -840,7 +840,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION(0x2, "lcd1"),		/* D21 */
- 		  SUNXI_FUNCTION(0x3, "pata"),		/* ATADREQ */
- 		  SUNXI_FUNCTION(0x4, "can"),		/* RX */
--		SUNXI_FUNCTION_IRQ(0x6, 21),		/* EINT21 */
-+		  SUNXI_FUNCTION_IRQ(0x6, 21),		/* EINT21 */
- 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D21 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PH22,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1482533..18a7374 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -211,7 +211,8 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun4i-a10-hackberry.dtb \
+ 	sun5i-a10s-olinuxino-micro.dtb \
+ 	sun5i-a13-olinuxino.dtb \
+-	sun6i-a31-colombus.dtb
++	sun6i-a31-colombus.dtb \
++	sun7i-a20-olinuxino-micro.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-iris-512.dtb \
+ 	tegra20-medcom-wide.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+new file mode 100644
+index 0000000..d339584
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -0,0 +1,34 @@
++/*
++ * Copyright 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++
++/ {
++	model = "Olimex A20-Olinuxino Micro";
++	compatible = "olimex,a20-olinuxino-micro", "allwinner,sun7i-a20";
++
++	soc at 01c00000 {
++		uart0: serial at 01c28000 {
++			status = "okay";
++		};
++
++		uart6: serial at 01c29800 {
++			status = "okay";
++		};
++
++		uart7: serial at 01c29c00 {
++			status = "okay";
++		};
++	};
++};
 -- 
 1.8.3.4
