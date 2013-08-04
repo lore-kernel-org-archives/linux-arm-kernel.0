@@ -1,24 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 4 Aug 2013 13:53:46 +0100
-Subject: Build breakage due to latest ARM fixes
-In-Reply-To: <20130803000731.GS23006@n2100.arm.linux.org.uk>
-References: <CAOesGMgWeP-CdmOE-S7XZmJ-+1buP9a1cqavUns2gpgKrrhaxQ@mail.gmail.com>
- <20130803000731.GS23006@n2100.arm.linux.org.uk>
-Message-ID: <20130804125346.GH23006@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 4 Aug 2013 21:30:47 +0800
+Subject: [PATCH RESEND 1/2] ARM: dts: vf610-twr: enable i2c0 device
+In-Reply-To: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130804133045.GG18119@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 03, 2013 at 01:07:31AM +0100, Russell King - ARM Linux wrote:
-> I'll look into that.  Obviously, I never build nommu because it isn't
-> part of the build system and the nommu platform I do have - OKI67001 -
-> doesn't have mainline kernel support.  (And if it did, it would not be
-> DT, so I doubt it's submittable.)
+On Fri, Aug 02, 2013 at 12:44:07PM +0800, Jingchang Lu wrote:
+> enable i2c0 device on Vybrid VF610 Tower Board
+> 
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
 
-Okay, what I'm going to do is push the OKI67001 stuff into mainline
-irrespective of DT or not, so that I can then add noMMU build _and_
-boot tests to my build system, which should ensure that problems
-like that get detected before they're pushed upstream.
+I suggest you send me the patch after the driver part gets accepted by
+subsystem maintainer.
 
-If people want me to care about noMMU, that's what has to happen
-because I have no other noMMU platform - if not, people can put up with
-noMMU breaking from time to time.
+Shawn
+
+> ---
+>  arch/arm/boot/dts/vf610-twr.dts | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index b3905f5..1a58678 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -50,6 +50,13 @@
+>  	status = "okay";
+>  };
+>  
+> +&i2c0 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c0_1>;
+> +	status = "okay";
+> +};
+> +
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart1_1>;
+> -- 
+> 1.8.0
+> 
+> 
