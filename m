@@ -1,97 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  4 Aug 2013 12:04:01 +0200
-Subject: [PATCH] ARM: sun7i: Add Cubieboard2 Device Tree
-Message-ID: <1375610641-18807-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  4 Aug 2013 12:38:47 +0200
+Subject: [PATCH 1/2] pinctrl: sunxi: Read register before writing to it in
+ irq_set_type
+In-Reply-To: <1375612728-20501-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375612728-20501-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375612728-20501-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cubieboard2 is the successor of the first Cubieboard, and shares the
-same hardware, except that the Allwinner A10 found initially has been
-replaced by an Allwinner A20.
+The current irq_set_type code doesn't read the current register value
+before writing to it, leading to the older programmed values being
+overwritten and everything but the latest value being reset.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
+ drivers/pinctrl/pinctrl-sunxi.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Hi,
-
-This patch depends on the v3 of the patchset "ARM: sunxi: Introduce Allwinner A20
-support" I sent previously.
-
- arch/arm/boot/dts/Makefile                  |  1 +
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 53 +++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 18a7374..5d0f365 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -212,6 +212,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
- 	sun5i-a10s-olinuxino-micro.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun6i-a31-colombus.dtb \
-+	sun7i-a20-cubieboard2.dtb \
- 	sun7i-a20-olinuxino-micro.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-iris-512.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-new file mode 100644
-index 0000000..31b76f0
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright 2013 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "sun7i-a20.dtsi"
-+
-+/ {
-+	model = "Cubietech Cubieboard2";
-+	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
-+
-+	soc at 01c00000 {
-+		pinctrl at 01c20800 {
-+			led_pins_cubieboard2: led_pins at 0 {
-+				allwinner,pins = "PH20", "PH21";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_cubieboard2>;
-+
-+		blue {
-+			label = "cubieboard2:blue:usr";
-+			gpios = <&pio 7 21 0>;
-+		};
-+
-+		green {
-+			label = "cubieboard2:green:usr";
-+			gpios = <&pio 7 20 0>;
-+		};
-+	};
-+};
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index ea4a4749..8ed4b4a 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -532,6 +532,7 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+ 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+ 	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
+ 	u8 index = sunxi_irq_cfg_offset(d->hwirq);
++	u32 regval;
+ 	u8 mode;
+ 
+ 	switch (type) {
+@@ -554,7 +555,9 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+ 		return -EINVAL;
+ 	}
+ 
+-	writel((mode & IRQ_CFG_IRQ_MASK) << index, pctl->membase + reg);
++	regval = readl(pctl->membase + reg);
++	regval &= ~IRQ_CFG_IRQ_MASK;
++	writel(regval | (mode << index), pctl->membase + reg);
+ 
+ 	return 0;
+ }
 -- 
 1.8.3.4
