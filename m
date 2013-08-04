@@ -1,76 +1,131 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 4 Aug 2013 21:39:23 +0800
-Subject: [PATCH v2] pinctrl: imx: work around select input quirk
-Message-ID: <1375623563-23706-1-git-send-email-shawn.guo@linaro.org>
+Date: Sun, 4 Aug 2013 21:55:51 +0800
+Subject: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <1375430148-4550-3-git-send-email-b35083@freescale.com>
+References: <1375430148-4550-1-git-send-email-b35083@freescale.com>
+ <1375430148-4550-3-git-send-email-b35083@freescale.com>
+Message-ID: <20130804135550.GH18119@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The select input for some pin may not be implemented using the regular
-select input register but the general purpose register.  A real example
-is that imx6q designers found the select input for USB OTG ID pin is
-missing at the very late stage, and can not add a new select input
-register but have to use a general purpose register bit to implement it.
+On Fri, Aug 02, 2013 at 03:55:48PM +0800, Jingchang Lu wrote:
+> Add Freescale enhanced direct memory(eDMA) controller support.
+> The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
+> to eDMA channels.
+> This module can be found on Vybrid and LS-1 SoCs.
+> 
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Xiaochun Li <b41219@freescale.com>
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+>  .../devicetree/bindings/dma/fsl-vf610-edma.txt     |  84 +++
+>  drivers/dma/Kconfig                                |  10 +
+>  drivers/dma/Makefile                               |   1 +
+>  drivers/dma/fsl-edma.c                             | 826 +++++++++++++++++++++
+>  4 files changed, 921 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/fsl-vf610-edma.txt
+>  create mode 100644 drivers/dma/fsl-edma.c
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/fsl-vf610-edma.txt b/Documentation/devicetree/bindings/dma/fsl-vf610-edma.txt
+> new file mode 100644
+> index 0000000..e6dc5cd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/fsl-vf610-edma.txt
+> @@ -0,0 +1,84 @@
+> +* Freescale enhanced direct memory access(eDMA) Controller
+> +
+> +The eDMA engine deploys DMAMUXs routing request sources(slot) to
+> +eDMA controller channels.
+> +
+> +* eDMA Controller
+> +Required properties:
+> +- compatible : Should be "fsl,<chip>-edma"
+> +- reg : Should contain eDMA registers location and length
+> +- interrupts : Should contain eDMA interrupt
+> +- interrupt-names : Should be "edma-tx" for tx interrupt and
+> +  "edma-err" for err interrupt
+> +- #dma-cells : Must be <2>.
+> +  The first cell specifies the DMAMUX ID. Specific request source
+> +  can only be routed by specific DMAMUXs.
+> +  the second cell specifies the request source(slot) ID.
+> +  See include/dt-bindings/dma/<soc>-edma.h for all the supported
+> +  request source IDs.
+> +- fsl,dma-channels : Number of channels supported by the controller
 
-The patch adds a workaround for such select input quirk by interpreting
-the input_val cell of pin function ID in a different way, so that all
-the info that needed for setting up select input bits in general purpose
-register could be decoded from there.
+The generic dma bindings Documentation/devicetree/bindings/dma/dma.txt
+defines property dma-channels.  You shouldn't need a vendor specific
+definition.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Tested-by: Peter Chen <peter.chen@freescale.com>
----
-Changes since v1:
- * For quirky select input where IOMUXC general purpose register is
-   used, the register could be possibly at offset 0.  Cover this case
-   in v2.
+> +- fsl,dma-mux : Phandle of the DMAMUXs deployed by the controller
+> +
+> +
+> +* DMAMUX
+> +Required properties:
+> +- reg : Should contain DMAMUX registers location and length
+> +- fsl,dmamux-id : DMAMUX ID. DMAMUX IDs are unique in each eDMA controller.
+> +  inside one eDMA controller, specific request source can only be routed by
+> +  one of its DMAMUXs.
+> +  However Specific request source may be routed to different eDMA controller,
+> +  thus all the DMAMUXs sharing a the same request sources have the same ID.
+> +- clocks : Phandle of the clock used by the DMAMUX
+> +- clock-names : The clock names
+> +
+> +Below is the eDMA controller and DMAMUX association, and DMAMUX IDs assignment
+> +On Vybrid vf610 SoC, DMAMUX0 and DMAMU3 share the same request source group,
+> +and DMAMUX1 and DMAMU2 share the same request source group.
+> +
+> +eDMA controller		DMAMUXs		DMAMUX ID
+> +-------------------------------------------------
+> +eDMA0			DMAMUX0		0
+> +			DMAMUX1		1
+> +
+> +eDMA1			DMAMUX2		1
+> +			DMAMUX3		0
+> +
+> +Examples:
+> +
+> +edma0: edma at 40018000 {
+> +	#dma-cells = <2>;
+> +	compatible = "fsl,vf610-edma";
+> +	reg = <0x40018000 0x2000>;
+> +	interrupts = <0 8 0x04>, <0 9 0x04>;
+> +	interrupt-names = "edma-tx", "edma-err";
+> +	fsl,edma-channels = <32>;
+> +	fsl,edma-mux = <&dmamux0>, <&dmamux1>;
+> +	};
 
- drivers/pinctrl/pinctrl-imx.c |   34 ++++++++++++++++++++++++++++++++--
- 1 file changed, 32 insertions(+), 2 deletions(-)
+Broken indentation.
 
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index 57a4eb0..7284b86 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -239,8 +239,38 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
- 		dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
- 			pin_reg->mux_reg, mux[i]);
- 
--		/* some pins also need select input setting, set it if found */
--		if (input_reg[i]) {
-+		/*
-+		 * If the select input value begins with 0xff, it's a quirky
-+		 * select input and the value should be interpreted as below.
-+		 *     31     23      15      7        0
-+		 *     | 0xff | shift | width | select |
-+		 * It's used to work around the problem that the select
-+		 * input for some pin is not implemented in the select
-+		 * input register but in some general purpose register.
-+		 * We encode the select input value, width and shift of
-+		 * the bit field into input_val cell of pin function ID
-+		 * in device tree, and then decode them here for setting
-+		 * up the select input bits in general purpose register.
-+		 */
-+		if (input_val[i] >> 24 == 0xff) {
-+			u32 val = input_val[i];
-+			u8 select = val & 0xff;
-+			u8 width = (val >> 8) & 0xff;
-+			u8 shift = (val >> 16) & 0xff;
-+			u32 mask = ((1 << width) - 1) << shift;
-+			/*
-+			 * The input_reg[i] here is actually some IOMUXC general
-+			 * purpose register, not regular select input register.
-+			 */
-+			val = readl(ipctl->base + input_reg[i]);
-+			val &= ~mask;
-+			val |= select << shift;
-+			writel(val, ipctl->base + input_reg[i]);
-+		} else if (input_reg[i]) {
-+			/*
-+			 * Regular select input register can never be at offset
-+			 * 0, and we only print register value for regular case.
-+			 */
- 			writel(input_val[i], ipctl->base + input_reg[i]);
- 			dev_dbg(ipctl->dev,
- 				"==>select_input: offset 0x%x val 0x%x\n",
--- 
-1.7.9.5
+> +
+> +dmamux0: dmamux at 40024000 {
+> +	reg = <0x40024000 0x1000>;
+> +	fsl,dmamux-id = <0>;
+> +	clocks = <&clks VF610_CLK_DMAMUX0>;
+> +	clock-names = "dmamux";
+> +};
+> +
+> +
+> +* DMA clients
+> +DMA client drivers that uses the DMA function must use the format described
+> +in the dma.txt file, using a three-cell specifier for each channel: a phandle
+> +plus two integer cells as described above.
+> +
+> +Examples:
+> +
+> +sai2: sai at 40031000 {
+> +	compatible = "fsl,vf610-sai";
+> +	reg = <0x40031000 0x1000>;
+> +	interrupts = <0 86 0x04>;
+> +	clocks = <&clks VF610_CLK_SAI2>;
+> +	clock-names = "sai";
+> +	fsl,sai-dma-events = <21 20>;
+
+This should be dropped, right?
+
+Shawn
+
+> +	dma-names = "tx", "rx";
+> +	dmas = <&edma0 0 DMA_MUXID0_SAI2_TX>,
+> +		<&edma0 0 DMA_MUXID0_SAI2_RX>;
+> +	status = "disabled";
+> +};
