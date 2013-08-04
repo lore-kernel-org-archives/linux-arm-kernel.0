@@ -1,31 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 4 Aug 2013 13:31:31 -0700
-Subject: [PATCH 0/5] Renesas ARM-based SoC board updates for v3.12
-In-Reply-To: <cover.1375174556.git.horms+renesas@verge.net.au>
-References: <cover.1375174556.git.horms+renesas@verge.net.au>
-Message-ID: <20130804203131.GD15602@quad.lixom.net>
+Date: Sun, 4 Aug 2013 13:32:44 -0700
+Subject: [GIT PULL] urgent omap5 regulator updates against v3.11-rc3
+In-Reply-To: <20130730133052.GK7656@atomide.com>
+References: <20130730133052.GK7656@atomide.com>
+Message-ID: <20130804203244.GE15602@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 06:00:41PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Tue, Jul 30, 2013 at 06:30:52AM -0700, Tony Lindgren wrote:
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 > 
-> please consider these Renesas ARM-based SoC board updates for v3.12.
-> This pull-request is based on renesas-soc-for-v3.12 which I have previously
-> sent a pull-request for.
-> 
-> The following changes since commit 81b9d5351fa96caad4accc6711bc1b9342927d4a:
-> 
->   ARM: shmobile: Setup r8a7790 arch timer based on MD pins (2013-07-17 14:26:56 +0900)
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-omap5
 
-Hi, can I get a tag for this please?
-
-Also, your subject says [PATCH 0/5], which might make me miss it. Please
-label it [GIT PULL] if you don't mind?
+Pulled, thanks.
 
 
 -Olof
