@@ -1,45 +1,76 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 4 Aug 2013 21:30:47 +0800
-Subject: [PATCH RESEND 1/2] ARM: dts: vf610-twr: enable i2c0 device
-In-Reply-To: <1375418648-22760-1-git-send-email-b35083@freescale.com>
-References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130804133045.GG18119@S2101-09.ap.freescale.net>
+Date: Sun, 4 Aug 2013 21:39:23 +0800
+Subject: [PATCH v2] pinctrl: imx: work around select input quirk
+Message-ID: <1375623563-23706-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 12:44:07PM +0800, Jingchang Lu wrote:
-> enable i2c0 device on Vybrid VF610 Tower Board
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+The select input for some pin may not be implemented using the regular
+select input register but the general purpose register.  A real example
+is that imx6q designers found the select input for USB OTG ID pin is
+missing at the very late stage, and can not add a new select input
+register but have to use a general purpose register bit to implement it.
 
-I suggest you send me the patch after the driver part gets accepted by
-subsystem maintainer.
+The patch adds a workaround for such select input quirk by interpreting
+the input_val cell of pin function ID in a different way, so that all
+the info that needed for setting up select input bits in general purpose
+register could be decoded from there.
 
-Shawn
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Tested-by: Peter Chen <peter.chen@freescale.com>
+---
+Changes since v1:
+ * For quirky select input where IOMUXC general purpose register is
+   used, the register could be possibly at offset 0.  Cover this case
+   in v2.
 
-> ---
->  arch/arm/boot/dts/vf610-twr.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index b3905f5..1a58678 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> @@ -50,6 +50,13 @@
->  	status = "okay";
->  };
->  
-> +&i2c0 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c0_1>;
-> +	status = "okay";
-> +};
-> +
->  &uart1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_uart1_1>;
-> -- 
-> 1.8.0
-> 
-> 
+ drivers/pinctrl/pinctrl-imx.c |   34 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index 57a4eb0..7284b86 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -239,8 +239,38 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 		dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
+ 			pin_reg->mux_reg, mux[i]);
+ 
+-		/* some pins also need select input setting, set it if found */
+-		if (input_reg[i]) {
++		/*
++		 * If the select input value begins with 0xff, it's a quirky
++		 * select input and the value should be interpreted as below.
++		 *     31     23      15      7        0
++		 *     | 0xff | shift | width | select |
++		 * It's used to work around the problem that the select
++		 * input for some pin is not implemented in the select
++		 * input register but in some general purpose register.
++		 * We encode the select input value, width and shift of
++		 * the bit field into input_val cell of pin function ID
++		 * in device tree, and then decode them here for setting
++		 * up the select input bits in general purpose register.
++		 */
++		if (input_val[i] >> 24 == 0xff) {
++			u32 val = input_val[i];
++			u8 select = val & 0xff;
++			u8 width = (val >> 8) & 0xff;
++			u8 shift = (val >> 16) & 0xff;
++			u32 mask = ((1 << width) - 1) << shift;
++			/*
++			 * The input_reg[i] here is actually some IOMUXC general
++			 * purpose register, not regular select input register.
++			 */
++			val = readl(ipctl->base + input_reg[i]);
++			val &= ~mask;
++			val |= select << shift;
++			writel(val, ipctl->base + input_reg[i]);
++		} else if (input_reg[i]) {
++			/*
++			 * Regular select input register can never be at offset
++			 * 0, and we only print register value for regular case.
++			 */
+ 			writel(input_val[i], ipctl->base + input_reg[i]);
+ 			dev_dbg(ipctl->dev,
+ 				"==>select_input: offset 0x%x val 0x%x\n",
+-- 
+1.7.9.5
