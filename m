@@ -1,29 +1,31 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sun,  4 Aug 2013 16:13:21 +0200
-Subject: [PATCH 2/2] ARM: pxa: fix pwri2c of_dev_auxdata entry
-In-Reply-To: <1375625601-32257-1-git-send-email-zonque@gmail.com>
-References: <1375625601-32257-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375625601-32257-2-git-send-email-zonque@gmail.com>
+From: panetta.mike@gmail.com (Mike Panetta)
+Date: Sun, 4 Aug 2013 11:31:52 -0400
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-wandboard: add gpio lines to
+ wandboard shared dtsi.
+In-Reply-To: <20130804090816.GB18119@S2101-09.ap.freescale.net>
+References: <CAJB6Qec_bTt_+Sj07J3Jh0e=XQni=R59Fb-KD=tbVw6vhApHww@mail.gmail.com>
+ <20130804090816.GB18119@S2101-09.ap.freescale.net>
+Message-ID: <CAJB6QecX_L+mC83ciKzitKw0qbJ_2a9N4FC5Y3jNcUfsn0_XaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/mach-pxa/pxa-dt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I resent using git send-email the day after.  Was that one ok?  It has
+been forever since I submitted a patch, none of these tools were
+available then...
 
-diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
-index 3e1ec71..b6acb5f 100644
---- a/arch/arm/mach-pxa/pxa-dt.c
-+++ b/arch/arm/mach-pxa/pxa-dt.c
-@@ -31,7 +31,7 @@ static const struct of_dev_auxdata pxa3xx_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("intel,pxa3xx-gpio",	0x40e00000, "pxa3xx-gpio", NULL),
- 	OF_DEV_AUXDATA("marvell,pxa-ohci",	0x4c000000, "pxa27x-ohci", NULL),
- 	OF_DEV_AUXDATA("mrvl,pxa-i2c",		0x40301680, "pxa2xx-i2c.0", NULL),
--	OF_DEV_AUXDATA("mrvl,pwri2c",		0x40f500c0, "pxa3xx-i2c.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,pwri2c",		0x40f500c0, "pxa3xx-pwri2c.1", NULL),
- 	OF_DEV_AUXDATA("marvell,pxa3xx-nand",	0x43100000, "pxa3xx-nand", NULL),
- 	OF_DEV_AUXDATA("mrvl,pxa27x-ssp",	0x41000000, "pxa27x-ssp.0", NULL),
- 	OF_DEV_AUXDATA("mrvl,pxa27x-ssp",	0x41700000, "pxa27x-ssp.1", NULL),
--- 
-1.8.3.1
+Thanks,
+Mike
+
+On Sun, Aug 4, 2013 at 5:08 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Jul 30, 2013 at 08:33:26PM -0400, Mike Panetta wrote:
+>> Hello, I'm not yet subscribed to the list, so I hope this makes it.  I am
+>> working on adding some extra IO to the wandboard, this is the first patch in
+>> the series, it adds the pin configs for the 10 available GPIO pins on the
+>> wandboard EDM module.
+>>
+>> Signed-off-by: Mike Panetta <panetta.mike@gmail.com>
+>
+> Sorry.  I'm not taking patches sent in attachment.
+>
+> Shawn
+>
