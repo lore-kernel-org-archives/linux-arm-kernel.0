@@ -1,47 +1,48 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 04 Aug 2013 20:24:03 +0100
-Subject: [PATCH RFC 03/13] ASoC: avoid duplicated DAI routes
+Date: Sun, 04 Aug 2013 20:25:03 +0100
+Subject: [PATCH RFC 04/13] ASoC: HACK: avoid creating duplicated widgets
 In-Reply-To: <20130804192136.GK23006@n2100.arm.linux.org.uk>
 References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
-Message-ID: <E1V63uN-0004lL-7q@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1V63vL-0004lQ-Bl@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC automatically creates snd_soc_dapm_dai_in and snd_soc_dapm_dai_out
-widgets for DAI drivers, and adds them to the list.  Later on, ASoC
-creates automatic routes between these widgets and a widget with a
-stream name.
+The CPU DAI widgets are created twice by the core when the CPU DAI
+and the platform DAI are registered against the same device structure
+since commit be09ad90e1 (ASoC: core: Add platform DAI widget mapping).
+This wouldn't be a problem except that these widgets are stored in the
+DAI structure, and the platform ones are created first, and the CPU
+ones later.
 
-We look for a snd_soc_dapm_dai_in or snd_soc_dapm_dai_out widget, and
-use this to obtain the DAI structure.  We then scan all widgets for
-any with a stream name refering to either the capture or the playback
-stream, and create routes.
+We end up with two sets of widgets: the platform ones appear in debugfs,
+but the CPU ones do not, and these two sets of widgets with the same
+name are added to the card's DAI list.  This makes it difficult to
+ensure that the right set of widgets (which will be activated by
+playback) are correctly linked to other widgets by the DAPM routes.
+It's also very confusing because the widgets you can view via debugfs
+may not be the ones ASoC is actually using.
 
-If you have both a snd_soc_dapm_dai_in and a snd_soc_dapm_dai_out
-referring to the same DAI structure, this ends up creating one set of
-routes for the DAI for the snd_soc_dapm_dai_in widget, and a duplicated
-set of routes for the snd_soc_dapm_dai_out widget.
-
-Fix this by checking that the stream name for the widget matches the
-DAI widget name.
+This needs fixing properly - this patch is just a hack around the
+problem which gets Kirkwood with SPDIF working.  It is likely this
+patch breaks other implementations.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- sound/soc/soc-dapm.c |    2 +-
+ sound/soc/soc-core.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
-index c7051c4..9f67976 100644
---- a/sound/soc/soc-dapm.c
-+++ b/sound/soc/soc-dapm.c
-@@ -3439,7 +3439,7 @@ int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
- 				break;
- 			}
+diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+index d56bbea..48e883e 100644
+--- a/sound/soc/soc-core.c
++++ b/sound/soc/soc-core.c
+@@ -1362,7 +1362,7 @@ static int soc_probe_link_dais(struct snd_soc_card *card, int num, int order)
+ 				return -ENODEV;
  
--			if (!w->sname)
-+			if (!w->sname || !strstr(w->sname, dai_w->name))
- 				continue;
+ 			list_add(&cpu_dai->dapm.list, &card->dapm_list);
+-			snd_soc_dapm_new_dai_widgets(&cpu_dai->dapm, cpu_dai);
++//			snd_soc_dapm_new_dai_widgets(&cpu_dai->dapm, cpu_dai);
+ 		}
  
- 			if (dai->driver->playback.stream_name &&
+ 		if (cpu_dai->driver->probe) {
 -- 
 1.7.4.4
