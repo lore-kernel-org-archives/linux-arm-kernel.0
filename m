@@ -1,45 +1,57 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Sun, 4 Aug 2013 14:25:27 +0200
-Subject: [ARM ATTEND] Interested in R/M-class (!MMU), automated testing
-In-Reply-To: <51FBF93D.8040707@arm.com>
-References: <51FBF93D.8040707@arm.com>
-Message-ID: <20130804122527.GV3880@pengutronix.de>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 4 Aug 2013 16:31:13 +0400
+Subject: [PATCH 06/10] ARM: clps711x: Add CLPS711X clocksource driver
+In-Reply-To: <20130802104635.GE2884@e106331-lin.cambridge.arm.com>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <1374172501-26796-7-git-send-email-shc_work@mail.ru>
+ <20130802104635.GE2884@e106331-lin.cambridge.arm.com>
+Message-ID: <20130804163113.07d94f707528c15b1bff13d7@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+On Fri, 2 Aug 2013 11:46:35 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-On Fri, Aug 02, 2013 at 07:23:57PM +0100, Jonathan Austin wrote:
-> - How we can get more eyes on the !MMU code in the kernel - is it
->   because nobody's got R/M hardware? R/M isn?t interesting to people so
->   far? etc
+> On Thu, Jul 18, 2013 at 07:34:57PM +0100, Alexander Shiyan wrote:
+> > This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
+> > Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+> > for this as the "OF" and "not-OF" calls implemented.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> 
+> [...]
 
-Since my team (mainly Uwe) has worked on the Cortex-M port, I still
-havn't seen many real usecases where Cortex-M and Linux made sense. The
-original idea was to use EFM32 because it was a) very low power and b)
-got a high quality network stack with Linux.
+> > +static struct clock_event_device clps711x_clockevent = {
+> > +	.name		= "clps711x-clockevent",
+> > +	.rating		= 300,
+> > +	.features	= CLOCK_EVT_FEAT_PERIODIC,
+> > +	.set_mode	= clps711x_clockevent_set_mode,
+> > +};
+> 
+> This seems to be a global clockevent, or a CPU0-only clockevent. Please
+> set the cpumask to clarify this, or core clockevent code will scream at
+> you (see clockevents_register_device).
+> 
+> I assume this doesn't stop in low power states (CLOCK_EVT_FEAT_C3STOP)?
 
-Unfortunately, most requests we got since then were from people who
-expected an extraordinairy "cheap" system, but that doesn't work if you
-look at the BOM for a complete system, both in terms of money and power
-consumption.
+This feature is marked as "x86(64) specific" in the header.
 
-That may be a reason for having not that many hardware out there.
+[...]
+> > +static void __init _clps711x_clksrc_init(phys_addr_t phys_base, int irq,
+> > +					 struct clk *tc1, struct clk *tc2)
+> > +{
+> > +	unsigned long tc1_rate, tc2_rate;
+> > +	void __iomem *tc2d, *syscon1;
+> > +	u32 tmp;
+> > +
+> > +	BUG_ON(IS_ERR(tc1) || IS_ERR(tc2));
+> 
+> Is this the only timer possible in the SoCs it'll be used in? You might
+> not be capable of initialising this timer, but another timer may be able
+> to keep the system running...
 
-There are some FPGAs with Cortex-M out there, which might be an
-interesting target.
+This CPU have two HW timers only. Both are used here.
 
-> - Ways to do more automated testing of ARM kernels, including hearing
->   from other people what they use to build/boot/test/benchmark their
->   code (perhaps even get a discussion going about using the diverse
->   range of hardware people have around put to use as test-machines).
-
-That's pretty interesting; we have a test farm at PTX, but it mainly
-does nightly build + boot tests on mainline, for systems we care of.
-
-rsc
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Alexander Shiyan <shc_work@mail.ru>
