@@ -1,35 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 4 Aug 2013 18:22:05 +0100
-Subject: [PATCH V2 7/8] ARM: dts: wm8994: Add wm8994 support on smdk5420
-In-Reply-To: <CAAgF-BcPT24LcQe5SUyOP3qHThXqZ1mVts=_cnww3EAUYEYikw@mail.gmail.com>
-References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
- <1374845812-7803-8-git-send-email-padma.v@samsung.com>
- <20130726151902.GL9858@sirena.org.uk>
- <CAAgF-Be8SNxTZv1yFCwH6yJ-O_3R4reh=3y+pSCLJYW7S9TkUg@mail.gmail.com>
- <CAAgF-Bexp_fGT8KV+TQ0_kZLJBtq7UK=TG4eYRA6qpTSL+scxg@mail.gmail.com>
- <20130729134311.GX9858@sirena.org.uk>
- <CAAgF-BeDYm1jNJpkyfTeS5HjpEuaHiumFq+D_PNs=QYG6-Px+w@mail.gmail.com>
- <CAAgF-BcPT24LcQe5SUyOP3qHThXqZ1mVts=_cnww3EAUYEYikw@mail.gmail.com>
-Message-ID: <20130804172205.GT9858@sirena.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 Aug 2013 11:20:21 -0700
+Subject: Build breakage due to latest ARM fixes
+In-Reply-To: <20130804125346.GH23006@n2100.arm.linux.org.uk>
+References: <CAOesGMgWeP-CdmOE-S7XZmJ-+1buP9a1cqavUns2gpgKrrhaxQ@mail.gmail.com>
+ <20130803000731.GS23006@n2100.arm.linux.org.uk>
+ <20130804125346.GH23006@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMhNr5-6T9s8Y9jr2pWy=baceuZwGFNj2HtnqU9DbwPLvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 04:15:28PM +0530, Padma Venkat wrote:
+On Sun, Aug 4, 2013 at 5:53 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Aug 03, 2013 at 01:07:31AM +0100, Russell King - ARM Linux wrote:
+>> I'll look into that.  Obviously, I never build nommu because it isn't
+>> part of the build system and the nommu platform I do have - OKI67001 -
+>> doesn't have mainline kernel support.  (And if it did, it would not be
+>> DT, so I doubt it's submittable.)
+>
+> Okay, what I'm going to do is push the OKI67001 stuff into mainline
+> irrespective of DT or not, so that I can then add noMMU build _and_
+> boot tests to my build system, which should ensure that problems
+> like that get detected before they're pushed upstream.
 
-> Sorry for giving some what wrong info here. I verified the schemata.
-> There is a switch on the board which can be used to select the input
-> clock of codec MCLK1. We can either select oscillator clock which is
-> 16.9MHz which is on the board or XCLKOUT which is from PMU or
-> i2scdclk(codec slave mode). Right now we are using oscillator clock as
-> input clock to MCLK1.
+That seems like a step backwards. How have !MMU changes been handled
+until now? Someone external has been relied on for testing?
 
-I agree that going with whatever the board ships with as default seems
-sensible.  Might be worth putting in a comment with the XCLKOUT option
-saying how it maps into the control on the board.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130804/e55ce207/attachment.sig>
+> If people want me to care about noMMU, that's what has to happen
+> because I have no other noMMU platform - if not, people can put up with
+> noMMU breaking from time to time.
+
+It seems that qemu has a couple of the stellaris platforms supported,
+but as usual I suspect they can't be relied on to actually work.
+
+
+-Olof
