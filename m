@@ -1,93 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 4 Aug 2013 23:43:56 -0700
-Subject: [Ksummit-2013-discuss] [ATTEND] [ARM ATTEND] kernel data bloat
- and how to avoid it
-In-Reply-To: <CAOesGMgASk8yH0Og4sEREkwxcZLx11gtj4buSEXxoJHDEV9F8g@mail.gmail.com>
-References: <20130731073802.GT7656@atomide.com> <20130731152131.GW2296@suse.de>
- <20130802081315.GA7656@atomide.com>
- <CAHCPf3v75tJyUGzxcrPfWW7V+bVxPCJupnDV4UbDQsrsXBXTrQ@mail.gmail.com>
- <CAOesGMgASk8yH0Og4sEREkwxcZLx11gtj4buSEXxoJHDEV9F8g@mail.gmail.com>
-Message-ID: <20130805064356.GN7656@atomide.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Sun, 4 Aug 2013 10:45:00 +0200
+Subject: [PATCH v3 1/2] ARM: OMAP: Add secure function omap_smc3() which
+ calling instruction smc #1
+In-Reply-To: <20130712102430.GA3249@localhost.localdomain>
+References: <531356997.66774.1373571839852.JavaMail.apache@mail81.abv.bg>
+ <51DF0D7A.4090008@ti.com> <20130712102430.GA3249@localhost.localdomain>
+Message-ID: <201308041045.00698@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130802 22:37]:
-> On Fri, Aug 2, 2013 at 2:31 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
-> > On Fri, Aug 2, 2013 at 3:13 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> * Mel Gorman <mgorman@suse.de> [130731 08:28]:
-> >>> On Wed, Jul 31, 2013 at 12:38:03AM -0700, Tony Lindgren wrote:
-> >>> > Hi all,
-> >>> >
-> >>> > Probably the biggest kernel data bloat issue is in the ARM land, but
-> >>> > it also seems that it's becoming a Linux generic issue too, so I
-> >>> > guess it could be discussed in either context.
-> >>> >
-> >>>
-> >>> Would scripts/bloat-o-meter highlight where the growth problems are?
-> >>
-> >> Well to some extent yes, the board/SoC/driver specific options are
-> >> often behind Kconfig options. So if you want to limit the set of
-> >> supported SoCs and drivers for the kernel you can optimize it out.
-> >>
-> >> The bloat-o-meter won't help for things like checking that a device
-> >> tree binding really describes the hardware, and is not just pointing
-> >> to a table of defined registers in the device driver.
-> >
-> > Specifically naming and shaming, like arch/arm/mach-imx/clk-*.c kind
-> 
-> [...]
-> 
-> TL;DR. Some friendly advice is to reduce the verbosity of your emails.
-> I lost patience a couple of paragraphs in.
-> 
-> 
-> I think we could come a long way on this if we could sort out probe
-> and init order enough that we could modularize some of this data (and
-> init code). I.e. if you could load some of these tables and drivers as
-> modules a lot of the bloat would no longer be an issue.
-> 
-> The problem, of course, is that things like clock, pinmux, etc tables
-> (and drivers) tend to be needed very early during boot and thus can
-> definitely not wait to the point where we usually run ramdisk
-> contents.
+Here is new version (v3) of omap secure part patch:
 
-I think there's no need for that any longer. We've pretty much sorted
-out all the issues so not much is needed early on.
+Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
+but Nokia RX-51 board needs to call smc #1 for PPA access.
 
-Sure some clocks might be needed for the SoC specific clockevent.
-But if those can be defined in the .dts files only those need to
-be initialized early on.
-
-For the pinmux, bootloader already must set up pins for SDRAM so
-not much should be needed early on. But if some pins are needed, those
-should be defined in the .dts files and the rest can be initialized
-later on based on .dts, loadable modules, or /lib/firmware.
+Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
+Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+---
+diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+index 0e72917..c4586f4 100644
+--- a/arch/arm/mach-omap2/omap-secure.h
++++ b/arch/arm/mach-omap2/omap-secure.h
+@@ -51,6 +51,7 @@
+ extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+ 				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+ extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
++extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
+ extern phys_addr_t omap_secure_ram_mempool_base(void);
+ extern int omap_secure_ram_reserve_memblock(void);
  
-> We could mandate that whatever drivers are needed on top also be
-> modules, which would take care of some of the dependency chain, but we
-> don't have a great way today to describe the needed probe/load order
-> of said modules. So it'd still need some new and additional
-> functionality to work well.
-
-Hmm I think we're just missing a concept of initializing the SoC
-specific things in stages as most of it can be done at module init
-time as long as the needed pieces can be initialized early.
+diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
+index f6441c1..7bbc043 100644
+--- a/arch/arm/mach-omap2/omap-smc.S
++++ b/arch/arm/mach-omap2/omap-smc.S
+@@ -1,9 +1,11 @@
+ /*
+- * OMAP44xx secure APIs file.
++ * OMAP34xx and OMAP44xx secure APIs file.
+  *
+  * Copyright (C) 2010 Texas Instruments, Inc.
+  * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
+  *
++ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
++ * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
+  *
+  * This program is free software,you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -54,6 +56,23 @@ ENTRY(omap_smc2)
+ 	ldmfd   sp!, {r4-r12, pc}
+ ENDPROC(omap_smc2)
  
-> Pushing everything out into modules will also add some complexity for
-> embedded platforms who rather avoid ramdisks, and it will likely add
-> boot time which matters a lot to some users. On the other hand, it's
-> less likely to matter to the users who at the same time care about the
-> bloat of a multiplatform kernel, i.e. you tend to ether optimize for
-> boot time on particular well-defined hardware, or you care more about
-> having something that boots on most hardware but possibly with some
-> overhead in boot performance.
++/**
++ * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
++ * Low level common routine for secure HAL and PPA APIs via smc #1
++ * r0 - @service_id: Secure Service ID
++ * r1 - @process_id: Process ID
++ * r2 - @flag: Flag to indicate the criticality of operation
++ * r3 - @pargs: Physical address of parameter list
++ */
++ENTRY(omap_smc3)
++	stmfd	sp!, {r4-r11, lr}
++	mov	r12, r0		@ Copy the secure service ID
++	mov	r6, #0xff	@ Indicate new Task call
++	dsb			@ Memory Barrier
++	smc	#1		@ Call PPA service
++	ldmfd	sp!, {r4-r11, pc}
++ENDPROC(omap_smc3)
++
+ ENTRY(omap_modify_auxcoreboot0)
+ 	stmfd   sp!, {r1-r12, lr}
+ 	ldr	r12, =0x104
 
-The Linux generic frameworks should support initializing things
-in multiple stages. Some of them do, but not all of them. Then
-depending on the use case, SoC specific things can be initialized
-with a suitable combination of .dts entries, loadable modules and
-data from /lib/firmware.
-
-Regards,
-
-Tony
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130804/c2ba9517/attachment.sig>
