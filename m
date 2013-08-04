@@ -1,21 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 4 Aug 2013 17:08:18 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-wandboard: add gpio lines to
- wandboard shared dtsi.
-In-Reply-To: <CAJB6Qec_bTt_+Sj07J3Jh0e=XQni=R59Fb-KD=tbVw6vhApHww@mail.gmail.com>
-References: <CAJB6Qec_bTt_+Sj07J3Jh0e=XQni=R59Fb-KD=tbVw6vhApHww@mail.gmail.com>
-Message-ID: <20130804090816.GB18119@S2101-09.ap.freescale.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun,  4 Aug 2013 11:34:02 +0200
+Subject: [PATCH 4/6] ARM: sun5i: dt: Fix A10s SoC bus base address
+In-Reply-To: <1375608844-13159-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375608844-13159-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1375608844-13159-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 08:33:26PM -0400, Mike Panetta wrote:
-> Hello, I'm not yet subscribed to the list, so I hope this makes it.  I am
-> working on adding some extra IO to the wandboard, this is the first patch in
-> the series, it adds the pin configs for the 10 available GPIO pins on the
-> wandboard EDM module.
-> 
-> Signed-off-by: Mike Panetta <panetta.mike@gmail.com>
+There was a typo in the base address used for the soc node in the A10s
+device tree. Fix it with the proper base address.
 
-Sorry.  I'm not taking patches sent in attachment.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 2 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Shawn
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index 24dd8bb..3c9f8b3 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -18,7 +18,7 @@
+ 	model = "Olimex A10s-Olinuxino Micro";
+ 	compatible = "olimex,a10s-olinuxino-micro", "allwinner,sun5i-a10s";
+ 
+-	soc at 01c20000 {
++	soc at 01c00000 {
+ 		emac: ethernet at 01c0b000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&emac_pins_a>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index ec6c2b6..ee0ff9b 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -157,7 +157,7 @@
+ 		};
+ 	};
+ 
+-	soc at 01c20000 {
++	soc at 01c00000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-- 
+1.8.3.4
