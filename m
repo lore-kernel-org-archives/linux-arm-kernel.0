@@ -1,35 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 4 Aug 2013 13:23:00 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.12
-In-Reply-To: <20130725174132.GO23879@titan.lakedaemon.net>
-References: <20130725174132.GO23879@titan.lakedaemon.net>
-Message-ID: <20130804202300.GB15602@quad.lixom.net>
+Date: Sun, 4 Aug 2013 13:27:11 -0700
+Subject: [GIT PULL] msm gpio fixes for 3.11
+In-Reply-To: <1374876322-2222-1-git-send-email-davidb@codeaurora.org>
+References: <1374876322-2222-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <20130804202711.GC15602@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 01:41:32PM -0400, Jason Cooper wrote:
+On Fri, Jul 26, 2013 at 03:05:22PM -0700, David Brown wrote:
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 > 
-> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
-> 
->   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/fixes-non-3.12
+>   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-3.11-fix1
+> 
+> for you to fetch changes up to 8fd62389a778c902c7e8532594ea924bbaf465e8:
+> 
+>   ARM: msm: Consolidate gpiomux for older architectures (2013-07-26 14:55:38 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for MSM for 3.11
+> 
+> Two small fixes for MSM.
+> 
+> The first fixes the a gpio controller register address.  I didn't see
+> any acks from the devicetree maintainers, so I've copied them on this
+> pull request.  The change itself is minor, and just to the register
+> address.
+> 
+> The second change removes the gpiomux V1 code from MSM.  This was
+> breaking compilation for some of the targets.
 
-Hi Jason,
+I'm guessing the second breakage was nothing new, but who am I to turn away
+code removal even during -rc. :)
 
-I pulled this, but I was wondering if you'd mind holding back on basing your
-branches on the very latest -rc all the time, and instead go almost as far back
-as you can without merge conflicts? In particular for those who have trivial
-contents such as these.
 
-Main reason is to avoid bringing in new -rcs in the next/* branches too often,
-since there's _usually_ not a need for it.
-
-Of course, the opposite condition tends to frustrate me too, i.e. if someone
-sends a pull request for the merge window that conflicts with fixes they've
-already sent that has gone in. So please watch out for that. :)
+Pulled.
 
 
 -Olof
