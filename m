@@ -1,75 +1,35 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Sun, 4 Aug 2013 21:57:37 +0530
-Subject: [PATCH v3 9/9] ARM: DRA7: Add the build support in omap2plus
-In-Reply-To: <1375633657-6835-1-git-send-email-rnayak@ti.com>
-References: <1375633657-6835-1-git-send-email-rnayak@ti.com>
-Message-ID: <1375633657-6835-10-git-send-email-rnayak@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 4 Aug 2013 18:22:05 +0100
+Subject: [PATCH V2 7/8] ARM: dts: wm8994: Add wm8994 support on smdk5420
+In-Reply-To: <CAAgF-BcPT24LcQe5SUyOP3qHThXqZ1mVts=_cnww3EAUYEYikw@mail.gmail.com>
+References: <1374845812-7803-1-git-send-email-padma.v@samsung.com>
+ <1374845812-7803-8-git-send-email-padma.v@samsung.com>
+ <20130726151902.GL9858@sirena.org.uk>
+ <CAAgF-Be8SNxTZv1yFCwH6yJ-O_3R4reh=3y+pSCLJYW7S9TkUg@mail.gmail.com>
+ <CAAgF-Bexp_fGT8KV+TQ0_kZLJBtq7UK=TG4eYRA6qpTSL+scxg@mail.gmail.com>
+ <20130729134311.GX9858@sirena.org.uk>
+ <CAAgF-BeDYm1jNJpkyfTeS5HjpEuaHiumFq+D_PNs=QYG6-Px+w@mail.gmail.com>
+ <CAAgF-BcPT24LcQe5SUyOP3qHThXqZ1mVts=_cnww3EAUYEYikw@mail.gmail.com>
+Message-ID: <20130804172205.GT9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R Sricharan <r.sricharan@ti.com>
+On Fri, Aug 02, 2013 at 04:15:28PM +0530, Padma Venkat wrote:
 
-Now that the needed pieces for DRA7 based SoCs' is present, enable
-the build support in omap2plus_defconfig
+> Sorry for giving some what wrong info here. I verified the schemata.
+> There is a switch on the board which can be used to select the input
+> clock of codec MCLK1. We can either select oscillator clock which is
+> 16.9MHz which is on the board or XCLKOUT which is from PMU or
+> i2scdclk(codec slave mode). Right now we are using oscillator clock as
+> input clock to MCLK1.
 
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/configs/omap2plus_defconfig |    1 +
- arch/arm/mach-omap2/Kconfig          |   10 +++++++++-
- arch/arm/plat-omap/Kconfig           |    2 +-
- 3 files changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 5339e6a..1da7cf9 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -306,3 +306,4 @@ CONFIG_TI_DAVINCI_MDIO=y
- CONFIG_TI_DAVINCI_CPDMA=y
- CONFIG_TI_CPSW=y
- CONFIG_AT803X_PHY=y
-+CONFIG_SOC_DRA7XX=y
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index fc6ec23..740f41b 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -118,7 +118,7 @@ config ARCH_OMAP2PLUS_TYPICAL
- 	select I2C
- 	select I2C_OMAP
- 	select MENELAUS if ARCH_OMAP2
--	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
-+	select NEON if CPU_V7
- 	select PM_RUNTIME
- 	select REGULATOR
- 	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
-@@ -135,6 +135,14 @@ config SOC_HAS_REALTIME_COUNTER
- 	depends on SOC_OMAP5 || SOC_DRA7XX
- 	default y
- 
-+config SOC_DRA7XX
-+	bool "TI DRA7XX"
-+	select ARM_ARCH_TIMER
-+	select CPU_V7
-+	select ARM_GIC
-+	select HAVE_SMP
-+	select COMMON_CLK
-+
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
- 
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index f82bae2..436ea97 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -106,7 +106,7 @@ config OMAP_32K_TIMER
- 	  This timer saves power compared to the OMAP_MPU_TIMER, and has
- 	  support for no tick during idle. The 32KHz timer provides less
- 	  intra-tick resolution than OMAP_MPU_TIMER. The 32KHz timer is
--	  currently only available for OMAP16XX, 24XX, 34XX and OMAP4/5.
-+	  currently only available for OMAP16XX, 24XX, 34XX, OMAP4/5 and DRA7XX.
- 
- 	  On OMAP2PLUS this value is only used for CONFIG_HZ and
- 	  CLOCK_TICK_RATE compile time calculation.
--- 
-1.7.9.5
+I agree that going with whatever the board ships with as default seems
+sensible.  Might be worth putting in a comment with the XCLKOUT option
+saying how it maps into the control on the board.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130804/e55ce207/attachment.sig>
