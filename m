@@ -1,40 +1,53 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 4 Aug 2013 08:50:46 +0400
-Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <201308032145.41860.arnd@arndb.de>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <20130802105754.GF2884@e106331-lin.cambridge.arm.com>
- <20130802195552.2f95c855fc20d6b3a205e40f@mail.ru>
- <201308032145.41860.arnd@arndb.de>
-Message-ID: <20130804085046.6e6cb18954a57dbddeee814d@mail.ru>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Sun,  4 Aug 2013 10:41:01 +0530
+Subject: [PATCH] MM: Make Contiguous Memory Allocator depends on MMU
+Message-ID: <1375593061-11350-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 3 Aug 2013 21:45:41 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+s patch adds a Kconfig dependency on an MMU being available before
+CMA can be enabled.  Without this patch, CMA can be enabled on an
+MMU-less system which can lead to issues. This was discovered during
+randconfig testing, in which CMA was enabled w/o MMU being enabled,
+leading to the following error:
 
-[...]
-> > +static void __iomem __init *clps711x_ioremap_one(phys_addr_t reg)
-> > +{
-> > +       void __iomem *ret;
-> > +
-> > +       if (!request_mem_region(clps711x_intc->phys_base + reg, SZ_4, NULL))
-> > +               return ERR_PTR(-EBUSY);
-> > +
-> > +       ret = ioremap(clps711x_intc->phys_base + reg, SZ_4);
-> > +       if (!ret)
-> > +               return ERR_PTR(-ENOMEM);
-> > +
-> > +       return ret;
-> 
-> Another unrelated comment: Doing repeated ioremap() and request_mem_region calls
-> is rather wasteful as every single call will consume resources. Better do a single
-> ioremap in the probe function and just add the offsets later.
+ CC      mm/migrate.o
+mm/migrate.c: In function ?remove_migration_pte?:
+mm/migrate.c:134:3: error: implicit declaration of function ?pmd_trans_huge?
+[-Werror=implicit-function-declaration]
+   if (pmd_trans_huge(*pmd))
+   ^
+mm/migrate.c:137:3: error: implicit declaration of function ?pte_offset_map?
+[-Werror=implicit-function-declaration]
+   ptep = pte_offset_map(pmd, addr);
 
-Registers are not arranged linearly for each submodule, so for example there are
-registers for LCD, Timers, PWM, UART etc. between INTMR1 and INTMR2.
-Single request cannot be used here, since it block access to these holes from drivers.
-Thanks.
+Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Acked-by: Arnd Bergmann <arnd@linaro.org>
+Cc: Deepak Saxena <dsaxena@linaro.org>
+Cc: IWAMOTO Toshihiro <iwamoto@valinux.co.jp>
+Cc: Hirokazu Takahashi <taka@valinux.co.jp>
+Cc: Dave Hansen <haveblue@us.ibm.com>
+Cc: linux-mm at kvack.org
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: Balbir Singh <bsingharora@gmail.com>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+---
+ mm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/mm/Kconfig b/mm/Kconfig
+index 256bfd0..ad6b98e 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -522,7 +522,7 @@ config MEM_SOFT_DIRTY
+ 
+ config CMA
+ 	bool "Contiguous Memory Allocator"
+-	depends on HAVE_MEMBLOCK
++	depends on MMU && HAVE_MEMBLOCK
+ 	select MIGRATION
+ 	select MEMORY_ISOLATION
+ 	help
 -- 
-Alexander Shiyan <shc_work@mail.ru>
+1.7.9.5
