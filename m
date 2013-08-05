@@ -1,72 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Aug 2013 00:27:04 -0700
-Subject: [PATCHv5 07/31] CLK: TI: add omap4 clock init file
-In-Reply-To: <1375460751-23676-8-git-send-email-t-kristo@ti.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-8-git-send-email-t-kristo@ti.com>
-Message-ID: <20130805072704.GS7656@atomide.com>
+From: mhocko@suse.cz (Michal Hocko)
+Date: Mon, 5 Aug 2013 09:32:39 +0200
+Subject: [PATCH] MM: Make Contiguous Memory Allocator depends on MMU
+In-Reply-To: <CAJFYCKEhJtG1x1PaiwpwOADxthXRSh0pQsE3uYWO2i4xnHGvYQ@mail.gmail.com>
+References: <1375593061-11350-1-git-send-email-manjunath.goudar@linaro.org>
+ <51fe08c6.87ef440a.10fc.1786SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAJFYCKEhJtG1x1PaiwpwOADxthXRSh0pQsE3uYWO2i4xnHGvYQ@mail.gmail.com>
+Message-ID: <20130805073239.GC10146@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [130802 09:33]:
-> clk-44xx.c now contains the clock init functionality for omap4, including
-> DT clock registration and adding of static clkdev entries.
+On Mon 05-08-13 10:10:08, Manjunath Goudar wrote:
+> On 4 August 2013 13:24, Wanpeng Li <liwanp@linux.vnet.ibm.com> wrote:
+> 
+> > On Sun, Aug 04, 2013 at 10:41:01AM +0530, Manjunath Goudar wrote:
+> > >s patch adds a Kconfig dependency on an MMU being available before
+> > >CMA can be enabled.  Without this patch, CMA can be enabled on an
+> > >MMU-less system which can lead to issues. This was discovered during
+> > >randconfig testing, in which CMA was enabled w/o MMU being enabled,
+> > >leading to the following error:
+> > >
+> > > CC      mm/migrate.o
+> > >mm/migrate.c: In function ?remove_migration_pte?:
+> > >mm/migrate.c:134:3: error: implicit declaration of function
+> > ?pmd_trans_huge?
+> > >[-Werror=implicit-function-declaration]
+> > >   if (pmd_trans_huge(*pmd))
+> > >   ^
+> > >mm/migrate.c:137:3: error: implicit declaration of function
+> > ?pte_offset_map?
+> > >[-Werror=implicit-function-declaration]
+> > >   ptep = pte_offset_map(pmd, addr);
+> > >
+> >
+> > Similar one.
+> >
+> > http://marc.info/?l=linux-mm&m=137532486405085&w=2
+> 
+> 
+> In this patch MIGRATION config is not required MMU, because already CMA
+> config depends
+> on MMU and HAVE_MEMBLOCK if both are true then only selecting MIGRATION and
+> MEMORY_ISOLATION.
 
-Few comments below from "boot new hardware with old kernels" point of
-view that seems to be pretty close for clocks.
- 
-> --- /dev/null
-> +++ b/drivers/clk/ti/clk-44xx.c
-...
+No, I think it should be config MIGRATION that should depend on MMU
+explicitly because that is where the problem exists. It shouldn't rely
+on other configs to not select it automatically.
 
-> +int __init omap4xxx_clk_init(void)
-> +{
-> +	int rc;
-> +	struct clk *abe_dpll_ref, *abe_dpll, *sys_32k_ck, *usb_dpll;
-> +
-> +	/* FIXME register clocks from DT first */
-> +	of_clk_init(NULL);
-> +
-> +	omap_dt_clocks_register(omap44xx_clks);
-> +
-> +	omap2_clk_disable_autoidle_all();
-> +
-> +	/*
-> +	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
-> +	 * state when turning the ABE clock domain. Workaround this by
-> +	 * locking the ABE DPLL on boot.
-> +	 * Lock the ABE DPLL in any case to avoid issues with audio.
-> +	 */
-> +	abe_dpll_ref = clk_get_sys(NULL, "abe_dpll_refclk_mux_ck");
-> +	sys_32k_ck = clk_get_sys(NULL, "sys_32k_ck");
-> +	rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
-> +	abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
-> +	if (!rc)
-> +		rc = clk_set_rate(abe_dpll, OMAP4_DPLL_ABE_DEFFREQ);
-> +	if (rc)
-> +		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
-> +
-> +	/*
-> +	 * Lock USB DPLL on OMAP4 devices so that the L3INIT power
-> +	 * domain can transition to retention state when not in use.
-> +	 */
-> +	usb_dpll = clk_get_sys(NULL, "dpll_usb_ck");
-> +	rc = clk_set_rate(usb_dpll, OMAP4_DPLL_USB_DEFFREQ);
-> +	if (rc)
-> +		pr_err("%s: failed to configure USB DPLL!\n", __func__);
-> +
-> +	return 0;
-> +}
-
-Maybe try to have a generic init function, then have SoC specific
-quirk function pointers set up based on the DT compatible property?
-
-Grep for varioius _of_match[] examples in the drivers.
-
-That way you might be able to make clocks work for some new similar
-hardware with just .dts change and patching in the quirks later on
-as needed ;)
-
-Regards,
-
-Tony
+The question is. Does CMA need to depend on MMU as well? Why?
+But please comment on the original thread instead.
+-- 
+Michal Hocko
+SUSE Labs
