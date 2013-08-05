@@ -1,35 +1,93 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 5 Aug 2013 12:06:45 +0530
-Subject: [PATCH v3 1/3] ARM: BCM5301X: initial support for the
- BCM5301X/BCM470X SoCs with ARM CPU
-In-Reply-To: <51F827EC.3090104@hauke-m.de>
-References: <1374792135-30343-1-git-send-email-hauke@hauke-m.de>
- <51F28A20.7060105@hauke-m.de>
- <20130726165311.GH17886@mudshark.cambridge.arm.com>
- <201307272149.17108.arnd@arndb.de>
- <20130730133601.GN11527@mudshark.cambridge.arm.com>
- <51F827EC.3090104@hauke-m.de>
-Message-ID: <51FF47FD.6080401@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 4 Aug 2013 23:43:56 -0700
+Subject: [Ksummit-2013-discuss] [ATTEND] [ARM ATTEND] kernel data bloat
+ and how to avoid it
+In-Reply-To: <CAOesGMgASk8yH0Og4sEREkwxcZLx11gtj4buSEXxoJHDEV9F8g@mail.gmail.com>
+References: <20130731073802.GT7656@atomide.com> <20130731152131.GW2296@suse.de>
+ <20130802081315.GA7656@atomide.com>
+ <CAHCPf3v75tJyUGzxcrPfWW7V+bVxPCJupnDV4UbDQsrsXBXTrQ@mail.gmail.com>
+ <CAOesGMgASk8yH0Og4sEREkwxcZLx11gtj4buSEXxoJHDEV9F8g@mail.gmail.com>
+Message-ID: <20130805064356.GN7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hauke,
+* Olof Johansson <olof@lixom.net> [130802 22:37]:
+> On Fri, Aug 2, 2013 at 2:31 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
+> > On Fri, Aug 2, 2013 at 3:13 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >> * Mel Gorman <mgorman@suse.de> [130731 08:28]:
+> >>> On Wed, Jul 31, 2013 at 12:38:03AM -0700, Tony Lindgren wrote:
+> >>> > Hi all,
+> >>> >
+> >>> > Probably the biggest kernel data bloat issue is in the ARM land, but
+> >>> > it also seems that it's becoming a Linux generic issue too, so I
+> >>> > guess it could be discussed in either context.
+> >>> >
+> >>>
+> >>> Would scripts/bloat-o-meter highlight where the growth problems are?
+> >>
+> >> Well to some extent yes, the board/SoC/driver specific options are
+> >> often behind Kconfig options. So if you want to limit the set of
+> >> supported SoCs and drivers for the kernel you can optimize it out.
+> >>
+> >> The bloat-o-meter won't help for things like checking that a device
+> >> tree binding really describes the hardware, and is not just pointing
+> >> to a table of defined registers in the device driver.
+> >
+> > Specifically naming and shaming, like arch/arm/mach-imx/clk-*.c kind
+> 
+> [...]
+> 
+> TL;DR. Some friendly advice is to reduce the verbosity of your emails.
+> I lost patience a couple of paragraphs in.
+> 
+> 
+> I think we could come a long way on this if we could sort out probe
+> and init order enough that we could modularize some of this data (and
+> init code). I.e. if you could load some of these tables and drivers as
+> modules a lot of the bloat would no longer be an issue.
+> 
+> The problem, of course, is that things like clock, pinmux, etc tables
+> (and drivers) tend to be needed very early during boot and thus can
+> definitely not wait to the point where we usually run ramdisk
+> contents.
 
-On Wednesday 31 July 2013 02:24 AM, Hauke Mehrtens wrote:
+I think there's no need for that any longer. We've pretty much sorted
+out all the issues so not much is needed early on.
 
-> Now, with 3.11-rc3 it crashed reproducible after Freeing unused kernel
-> memory, see this:
->
-> [    0.859198] Freeing unused kernel memory: 1124K (c0260000 - c0379000)
-> [    0.866298] Unhandled fault: imprecise external abort (0x1c06) at
-> 0xb6f8b005
-> [    0.873538] Kernel panic - not syncing: Attempted to kill init!
-> exitcode=0x00000007
->
-> Do you have some more informations about this type of error?
+Sure some clocks might be needed for the SoC specific clockevent.
+But if those can be defined in the .dts files only those need to
+be initialized early on.
 
-If upon entry to kernel, CPSR.A is '1', change it '0' (enable 
-asynchronous abort) and see if it makes the abort more precise.
+For the pinmux, bootloader already must set up pins for SDRAM so
+not much should be needed early on. But if some pins are needed, those
+should be defined in the .dts files and the rest can be initialized
+later on based on .dts, loadable modules, or /lib/firmware.
+ 
+> We could mandate that whatever drivers are needed on top also be
+> modules, which would take care of some of the dependency chain, but we
+> don't have a great way today to describe the needed probe/load order
+> of said modules. So it'd still need some new and additional
+> functionality to work well.
 
-Regards
-Afzal
+Hmm I think we're just missing a concept of initializing the SoC
+specific things in stages as most of it can be done at module init
+time as long as the needed pieces can be initialized early.
+ 
+> Pushing everything out into modules will also add some complexity for
+> embedded platforms who rather avoid ramdisks, and it will likely add
+> boot time which matters a lot to some users. On the other hand, it's
+> less likely to matter to the users who at the same time care about the
+> bloat of a multiplatform kernel, i.e. you tend to ether optimize for
+> boot time on particular well-defined hardware, or you care more about
+> having something that boots on most hardware but possibly with some
+> overhead in boot performance.
+
+The Linux generic frameworks should support initializing things
+in multiple stages. Some of them do, but not all of them. Then
+depending on the use case, SoC specific things can be initialized
+with a suitable combination of .dts entries, loadable modules and
+data from /lib/firmware.
+
+Regards,
+
+Tony
