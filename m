@@ -1,38 +1,34 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 Aug 2013 14:11:08 -0400
-Subject: [RESEND PATCH 1/7] ARM: keystone: drop useless HAVE_SCHED_CLOCK
+Date: Mon, 5 Aug 2013 14:11:09 -0400
+Subject: [RESEND PATCH 2/7] ARM: keystone: remove redundant smp_init_cpus
+ definition
 In-Reply-To: <1375726274-26000-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1375726274-26000-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1375726274-26000-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1375726274-26000-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Bolle <pebolle@tiscali.nl>
+From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
 
-The Kconfig symbol HAVE_SCHED_CLOCK got removed in v3.4,
-with commit 6905a65879b5 ("ARM: Make the sched_clock
-framework mandatory"). But a select statement for it popped up again
-through commit 828989ad87af ("ARM: keystone: Add minimal TI Keystone
-platform support"). Drop that statement, as it is useless.
+arm_dt_init_cpu_maps is called before smp_init_cpus. It makes the
+platform/SoC definition of smp_init_cpus unnecessary.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-[santosh.shilimkar at ti.com: Minor edit in the subject]
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-keystone/Kconfig |    1 -
+ arch/arm/mach-keystone/platsmp.c |    1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 51a50e9..366d1a3 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -7,7 +7,6 @@ config ARCH_KEYSTONE
- 	select HAVE_SMP
- 	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_SCHED_CLOCK
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_ERRATA_798181 if SMP
- 	help
+diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+index 14378e3..c122961 100644
+--- a/arch/arm/mach-keystone/platsmp.c
++++ b/arch/arm/mach-keystone/platsmp.c
+@@ -38,6 +38,5 @@ static int keystone_smp_boot_secondary(unsigned int cpu,
+ }
+ 
+ struct smp_operations keystone_smp_ops __initdata = {
+-	.smp_init_cpus		= arm_dt_init_cpu_maps,
+ 	.smp_boot_secondary	= keystone_smp_boot_secondary,
+ };
 -- 
 1.7.9.5
