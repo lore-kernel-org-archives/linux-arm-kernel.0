@@ -1,60 +1,266 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Aug 2013 15:56:44 +0100
-Subject: [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM links between
- codec and cpu DAI
-In-Reply-To: <20130805144054.GE9858@sirena.org.uk>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <E1V641A-0004lv-DM@rmk-PC.arm.linux.org.uk>
- <20130805112733.GY9858@sirena.org.uk>
- <20130805113310.GU23006@n2100.arm.linux.org.uk>
- <20130805144054.GE9858@sirena.org.uk>
-Message-ID: <20130805145644.GV23006@n2100.arm.linux.org.uk>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 05 Aug 2013 08:57:20 -0600
+Subject: [PATCH 2/3] Initial skeleton of VFIO support for Device Tree
+ based devices
+In-Reply-To: <1375708632-26356-3-git-send-email-a.motakis@virtualopensystems.com>
+References: <1375708632-26356-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1375708632-26356-3-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <1375714640.31262.364.camel@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 03:40:54PM +0100, Mark Brown wrote:
-> On Mon, Aug 05, 2013 at 12:33:10PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Aug 05, 2013 at 12:27:33PM +0100, Mark Brown wrote:
+On Mon, 2013-08-05 at 15:17 +0200, Antonios Motakis wrote:
+> Platform devices in the Linux kernel are usually managed by the DT
+> interface. This patch forms the base to support these kind of devices
+> with VFIO.
 > 
-> > > This doesn't look good - this is adding DAPM routes which should
-> > > correspond to the DAI link that's already been configured.
+> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> ---
+>  drivers/vfio/Kconfig      |  10 +++
+>  drivers/vfio/Makefile     |   1 +
+>  drivers/vfio/vfio_dt.c    | 187 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/vfio.h |   1 +
+>  4 files changed, 199 insertions(+)
+>  create mode 100644 drivers/vfio/vfio_dt.c
 > 
-> > No, you're wrong there:
-> 
-> > CPU DAI:				Codec DAI
-> > dma-playback	--->	i2sdo	--->	Playback
-> > 		`-->	spdifdo -> not connected
-> > dma-capture	<---	i2sdi	<---	Capture
-> 
-> > And the intermediate level is needed to determine which outputs from
-> > the chip are wired up.
-> 
-> Right, and that's exactly what the dai_links are doing - they're showing
-> what's hanging off each of the DAIs.
-> 
-> > And don't even say "use dpcm" - if you say that, I want _you_ to write
-> > it because dpcm is totally and utterly unusable as it currently stands -
-> > as you can see from all the emails I've sent over the weekend.
-> 
-> I'm going to tell you to work with the framework rather than around it;
+> diff --git a/drivers/vfio/Kconfig b/drivers/vfio/Kconfig
+> index 1f84eda..a77a2e4 100644
+> --- a/drivers/vfio/Kconfig
+> +++ b/drivers/vfio/Kconfig
+> @@ -13,4 +13,14 @@ menuconfig VFIO
+>  
+>  	  If you don't know what to do here, say N.
+>  
+> +config VFIO_DT
+> +	tristate "VFIO support for Device Tree devices"
+> +	depends on VFIO && EVENTFD
 
-Work with the fscking undocumented framework.  If you want that, then
-sodding well document this pile of crap.  If not, stop telling people
-to "work around it".
+I think there needs to be another depends item here, this would allow
+configuration even on architectures that have no concept of device tree.
+Also, do we want to put this in a subdirectory like we've done for pci?
+The rest looks like a reasonable start.  Thanks,
 
-> adding routes that link the CODEC and CPU together in parallel with the
-> links set up for the DAIs is not something that seems like it's going to
-> continue to work sensibly going forwards.
+Alex
 
-So you're *TOTALLY* missing why I've had to do that.  Tell me, how can
-the CPU DAI detect which of its frigging outputs are connected to the
-codec without doing the above?  Show me how your crappy subsystem is
-supposed to work.  Document the sodding thing.
-
-If you don't do this, don't expect people to understand it.  Don't
-expect people not to find "other solutions" around the utter shite that
-I've had to deal with ALL FRIGGING WEEKEND.
-
-These patches stay as they are until you get a clue about what's required
-to drive this hardware and start providing some sensible assistance with
-your undocumented code.
+> +	help
+> +	  Support for the VFIO Device Tree driver.  This is required to make
+> +	  use of platform devices present on Device Tree nodes using the VFIO
+> +	  framework.
+> +
+> +	  If you don't know what to do here, say N.
+> +
+>  source "drivers/vfio/pci/Kconfig"
+> diff --git a/drivers/vfio/Makefile b/drivers/vfio/Makefile
+> index 2398d4a..d599a67 100644
+> --- a/drivers/vfio/Makefile
+> +++ b/drivers/vfio/Makefile
+> @@ -1,3 +1,4 @@
+>  obj-$(CONFIG_VFIO) += vfio.o
+>  obj-$(CONFIG_VFIO_IOMMU_TYPE1) += vfio_iommu_type1.o
+>  obj-$(CONFIG_VFIO_PCI) += pci/
+> +obj-$(CONFIG_VFIO_DT) += vfio_dt.o
+> diff --git a/drivers/vfio/vfio_dt.c b/drivers/vfio/vfio_dt.c
+> new file mode 100644
+> index 0000000..ad4d31d
+> --- /dev/null
+> +++ b/drivers/vfio/vfio_dt.c
+> @@ -0,0 +1,187 @@
+> +/*
+> + * Copyright (C) 2013 - Virtual Open Systems
+> + * Author: Antonios Motakis <a.motakis@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/eventfd.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/iommu.h>
+> +#include <linux/module.h>
+> +#include <linux/mutex.h>
+> +#include <linux/notifier.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/slab.h>
+> +#include <linux/types.h>
+> +#include <linux/uaccess.h>
+> +#include <linux/vfio.h>
+> +
+> +#define DRIVER_VERSION  "0.1"
+> +#define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
+> +#define DRIVER_DESC     "VFIO Device Tree devices - User Level meta-driver"
+> +
+> +struct vfio_dt_device {
+> +	struct platform_device	*pdev;
+> +};
+> +
+> +static void vfio_dt_release(void *device_data)
+> +{
+> +	module_put(THIS_MODULE);
+> +}
+> +
+> +static int vfio_dt_open(void *device_data)
+> +{
+> +	if (!try_module_get(THIS_MODULE))
+> +		return -ENODEV;
+> +
+> +	return 0;
+> +}
+> +
+> +static long vfio_dt_ioctl(void *device_data,
+> +			   unsigned int cmd, unsigned long arg)
+> +{
+> +	struct vfio_dt_device *vdev = device_data;
+> +	unsigned long minsz;
+> +
+> +	if (cmd == VFIO_DEVICE_GET_INFO) {
+> +		struct vfio_device_info info;
+> +
+> +		minsz = offsetofend(struct vfio_device_info, num_irqs);
+> +
+> +		if (copy_from_user(&info, (void __user *)arg, minsz))
+> +			return -EFAULT;
+> +
+> +		if (info.argsz < minsz)
+> +			return -EINVAL;
+> +
+> +		info.flags = VFIO_DEVICE_FLAGS_DT;
+> +		info.num_regions = 0;
+> +		info.num_irqs = 0;
+> +
+> +		return copy_to_user((void __user *)arg, &info, minsz);
+> +
+> +	} else if (cmd == VFIO_DEVICE_GET_REGION_INFO)
+> +		return -EINVAL;
+> +
+> +	else if (cmd == VFIO_DEVICE_GET_IRQ_INFO)
+> +		return -EINVAL;
+> +
+> +	else if (cmd == VFIO_DEVICE_SET_IRQS)
+> +		return -EINVAL;
+> +
+> +	else if (cmd == VFIO_DEVICE_RESET)
+> +		return -EINVAL;
+> +
+> +	return -ENOTTY;
+> +}
+> +
+> +static ssize_t vfio_dt_read(void *device_data, char __user *buf,
+> +			     size_t count, loff_t *ppos)
+> +{
+> +	return 0;
+> +}
+> +
+> +static ssize_t vfio_dt_write(void *device_data, const char __user *buf,
+> +			      size_t count, loff_t *ppos)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int vfio_dt_mmap(void *device_data, struct vm_area_struct *vma)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +static const struct vfio_device_ops vfio_dt_ops = {
+> +	.name		= "vfio-dts",
+> +	.open		= vfio_dt_open,
+> +	.release	= vfio_dt_release,
+> +	.ioctl		= vfio_dt_ioctl,
+> +	.read		= vfio_dt_read,
+> +	.write		= vfio_dt_write,
+> +	.mmap		= vfio_dt_mmap,
+> +};
+> +
+> +static int vfio_dt_probe(struct platform_device *pdev)
+> +{
+> +	struct vfio_dt_device *vdev;
+> +	struct iommu_group *group;
+> +	int ret;
+> +
+> +	group = iommu_group_get(&pdev->dev);
+> +	if (!group) {
+> +		pr_err("VFIO: No IOMMU group for device %s\n", pdev->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
+> +	if (!vdev) {
+> +		iommu_group_put(group);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	vdev->pdev = pdev;
+> +
+> +	ret = vfio_add_group_dev(&pdev->dev, &vfio_dt_ops, vdev);
+> +	if (ret) {
+> +		iommu_group_put(group);
+> +		kfree(vdev);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int vfio_dt_remove(struct platform_device *pdev)
+> +{
+> +	struct vfio_dt_device *vdev;
+> +
+> +	vdev = vfio_del_group_dev(&pdev->dev);
+> +	if (!vdev)
+> +		return -EINVAL;
+> +
+> +	iommu_group_put(pdev->dev.iommu_group);
+> +	kfree(vdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id vfio_dt_match[] = {
+> +	/* In the future, we can implement a better mechanism to bind the
+> +	 * module to any device. For now add the compatible property to the
+> +	 * dtb of the devices we want to use.	*/
+> +	{
+> +		.compatible = "vfio-dt",
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, vfio_dt_match);
+> +
+> +static struct platform_driver vfio_dt_driver = {
+> +	.probe		= vfio_dt_probe,
+> +	.remove		= vfio_dt_remove,
+> +	.driver	= {
+> +		.name	= "vfio-dt",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = vfio_dt_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(vfio_dt_driver);
+> +
+> +MODULE_VERSION(DRIVER_VERSION);
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR(DRIVER_AUTHOR);
+> +MODULE_DESCRIPTION(DRIVER_DESC);
+> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+> index 284ff24..1e4bef2 100644
+> --- a/include/uapi/linux/vfio.h
+> +++ b/include/uapi/linux/vfio.h
+> @@ -147,6 +147,7 @@ struct vfio_device_info {
+>  	__u32	flags;
+>  #define VFIO_DEVICE_FLAGS_RESET	(1 << 0)	/* Device supports reset */
+>  #define VFIO_DEVICE_FLAGS_PCI	(1 << 1)	/* vfio-pci device */
+> +#define VFIO_DEVICE_FLAGS_DT	(1 << 2)	/* vfio-dt device */
+>  	__u32	num_regions;	/* Max region index + 1 */
+>  	__u32	num_irqs;	/* Max IRQ index + 1 */
+>  };
