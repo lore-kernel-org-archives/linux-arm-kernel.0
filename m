@@ -1,65 +1,49 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Mon, 5 Aug 2013 09:44:55 +0000
-Subject: [PATCH v2 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <20991.23049.78707.457046@ipc1.ka-ro>
-References: <1375682824-11443-1-git-send-email-b35083@freescale.com>
- <1375682824-11443-2-git-send-email-b35083@freescale.com>
- <20991.23049.78707.457046@ipc1.ka-ro>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851FC086@039-SN1MPN1-004.039d.mgd.msft.net>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Mon, 05 Aug 2013 10:45:41 +0100
+Subject: Build breakage due to latest ARM fixes
+In-Reply-To: <20130804193647.GD6104@pengutronix.de>
+References: <CAOesGMgWeP-CdmOE-S7XZmJ-+1buP9a1cqavUns2gpgKrrhaxQ@mail.gmail.com>
+ <20130803000731.GS23006@n2100.arm.linux.org.uk>
+ <20130804125346.GH23006@n2100.arm.linux.org.uk>
+ <CAOesGMhNr5-6T9s8Y9jr2pWy=baceuZwGFNj2HtnqU9DbwPLvw@mail.gmail.com>
+ <20130804183708.GI23006@n2100.arm.linux.org.uk>
+ <CAOesGMiDBT9NAhCiVe0mMTk4KXJZVynNaBHqk5+T9a6QYaFZvw@mail.gmail.com>
+ <20130804193647.GD6104@pengutronix.de>
+Message-ID: <51FF7445.9080602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Lothar Wa?mann [mailto:LW at KARO-electronics.de]
-> Sent: Monday, August 05, 2013 3:54 PM
-> To: Lu Jingchang-B35083
-> Cc: vinod.koul at intel.com; Li Xiaochun-B41219; Wang Huan-B18965; linux-
-> kernel at vger.kernel.org; djbw at fb.com; shawn.guo at linaro.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 3/3] dma: Add Freescale eDMA engine driver support
+On 04/08/13 20:36, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Sun, Aug 04, 2013 at 11:47:04AM -0700, Olof Johansson wrote:
+>> On Sun, Aug 4, 2013 at 11:37 AM, Russell King - ARM Linux
+>>> The only real testing I'm aware of is when I recreated the OKI67001
+>>> support a while back and got my board to boot.
+>>
+>> Uwe has been busy pushing various patches for M3/M4 support, I don't
+>> know how far it is from having some real hardware usable though. Uwe?
+> On my efm32 devboard I have 3.11-rc running. The missing bits are
+> available in my efm32 branch at
+>
+> 	git://git.pengutronix.de/git/ukl/linux.git efm32
+> 	http://git.pengutronix.de/?p=ukl/linux.git;a=shortlog;h=refs/heads/efm32
+>
+> . It's not yet in a form ready for mainline but there isn't much
+> missing. There is one problem I didn't debug yet (/proc/devicetree
+> doesn't appear although I have the respective Kconfig symbol on); other
+> than that I didn't notice any no-mmu problems. Also Jonathan Austin does
+> some no-MMU work.
+>
 
-> [...]
-> > +	fsl_desc->n_tcds = sg_len;
-> > +	for (i = 0; i < sg_len; i++) {
-> > +		fsl_desc->tcd[i].vtcd = dma_pool_alloc(fsl_chan->tcd_pool,
-> > +					GFP_ATOMIC, &fsl_desc->tcd[i].ptcd);
-> >
-> Why is this called with GFP_ATOMIC while fsl_desc above is being
-> allocated with GFP_KERNEL?
-[Lu Jingchang-B35083] 
- I will make these consistently. Thanks.
-> 
-> > +	for (ch = 0; ch < 32; ch++)
-> > +		if (intr & (0x1 << ch))
-> > +			break;
-> > +
-> What, if IRQs for multiple channels are pending at the same time?
-> You could handle them all in one go without extra calls of the IRQ
-> handler.
-[Lu Jingchang-B35083] 
-Yes, It will be more efficiently to handle all the irqs once. Thanks.
-> 
-> > +	writeb(EDMA_CINT_CINT(ch), base_addr + EDMA_CINT);
-> > +
-> > +	fsl_chan = &fsl_edma->chans[ch];
-> > +
-> > +	if (!fsl_chan->edesc->iscyclic) {
-> > +		list_del(&fsl_chan->edesc->vdesc.node);
-> >
-> Ain't there any protection needed for the list operation?
-[Lu Jingchang-B35083] 
-Protection is needed indeed, I will fix this, thanks.
-> 
-> > +		clk_prepare_enable(fsl_edmamux->clk);
-> >
-> What, if this fails?
-[Lu Jingchang-B35083] 
-I will add code to check the return value. Thanks.
-> 
+We use !MMU internally here for R-class stuff (see the recently added 
+Cortex-R7 support).
 
+Our CONFIG_MMU=n testing all happens on Versatile Express, and it should 
+even be possible to run !MMU on TC2 (IE with an A-class processor). 
+Perhaps if we feel that it isn't easy enough for people to test these 
+configurations I can submit a vexpress_nommu defconfig or similar? It 
+might need some additional patches to complete the story, but if it 
+makes it easier to catch these breakages early then maybe it is worth it?
 
-
-
-
-Best Regards,
-Jingchang
+Jonny
