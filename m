@@ -1,37 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  5 Aug 2013 17:50:09 -0500
-Subject: [PATCH 5/5] ARM: highbank: select required errata work-arounds
-In-Reply-To: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
-References: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1375743009-28972-5-git-send-email-robherring2@gmail.com>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Mon, 5 Aug 2013 15:50:15 -0700
+Subject: [PATCH] leds: leds-ns2: depends on ARCH_KIRKWOOD
+In-Reply-To: <20130803181648.GF13555@titan.lakedaemon.net>
+References: <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375454798-6849-1-git-send-email-simon.guinot@sequanux.org>
+ <20130803181648.GF13555@titan.lakedaemon.net>
+Message-ID: <CAK5ve-KCjaLfoxBt-nBN_K1CKB=jTYYUPaR4bBmKvfVp-vmfWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Sat, Aug 3, 2013 at 11:16 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Fri, Aug 02, 2013 at 04:46:38PM +0200, Simon Guinot wrote:
+>> With the DT conversion, the board Kconfig symbols MACH_ are going to be
+>> removed. In order to prepare this removal, this patch replaces alls the
+>> machines dependencies for leds-ns2 by ARCH_KIRKWOOD.
+>>
+>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+>> ---
+>> Thomas,
+>>
+>> Please, insert this patch in your series before the patch named:
+>> [PATCHv2 1/9] ARM: kirkwood: convert d2net_v2 to DT
+>>
+>> Simon
+>>
+>>  drivers/leds/Kconfig |    5 +----
+>>  1 file changed, 1 insertion(+), 4 deletions(-)
+>
+> Almost missed this one.  This should also go through -leds.
+>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>
 
-Ensure necessary errata work-arounds are always enabled for Highbank
-and Midway platforms. Highbank requires 764369 and 764369. Midway requires
-798181, but only the first half of the work-around (no IPI). Support for
-skipping the IPI is introduced in another commit.
+Sure, looks good to me and merged into my tree with Jason's Acked-by.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-highbank/Kconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index 8b2948f..386835e 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -5,6 +5,9 @@ config ARCH_HIGHBANK
- 	select ARCH_HAS_OPP
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
-+	select ARM_ERRATA_764369
-+	select ARM_ERRATA_775420
-+	select ARM_ERRATA_798181
- 	select ARM_GIC
- 	select ARM_TIMER_SP804
- 	select CACHE_L2X0
--- 
-1.8.1.2
+Thanks,
+-Bryan
