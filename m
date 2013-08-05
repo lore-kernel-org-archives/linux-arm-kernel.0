@@ -1,79 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 05 Aug 2013 11:39:47 -0600
-Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
-In-Reply-To: <51FFDA20.6050403@wwwdotorg.org>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-4-git-send-email-josephl@nvidia.com>
- <51F6F209.2090309@wwwdotorg.org>
- <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
- <51FC1751.9010401@wwwdotorg.org>
- <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
- <51FFDA20.6050403@wwwdotorg.org>
-Message-ID: <51FFE363.4080603@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Aug 2013 02:42:26 +0900
+Subject: [PATCH v4 00/13] ARM: dts: Add camera and magnetometer support
+ for TRATS(2) board
+In-Reply-To: <1374671845-30373-1-git-send-email-s.nawrocki@samsung.com>
+References: <1374671845-30373-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <51FFE402.5040902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 11:00 AM, Stephen Warren wrote:
-> On 08/05/2013 02:02 AM, Joseph Lo wrote:
->> On Sat, 2013-08-03 at 04:32 +0800, Stephen Warren wrote:
->>> On 08/02/2013 02:09 AM, Joseph Lo wrote:
->>>> On Tue, 2013-07-30 at 06:51 +0800, Stephen Warren wrote:
->>>>> On 07/26/2013 03:15 AM, Joseph Lo wrote:
->>>>>> When the system suspends to LP1, the clock of the CPU would be switched to
->>>>>> CLK_M (12MHz Oscillator) during suspend/resume flow. The clock driver
->>>>>> needs to restore the clock of CPU after LP1 resume.
->>>>>
->>>>> It's unclear to me how the code change implements "restore the clock of
->>>>> the CPU". A register name of CCLKG_BURST_POLICY doesn't sound like it's
->>>>> anything to do with enabled/disabling the CPU clock, nor configuring its
->>>>> rate. What exactly does this register do, and hence what does this new
->>>>> code actually restore?
->>>>>
->>>> When system suspend to LP1, most of the PLLs was clock gated. Because we
->>>> didn't cut off the core power, the settings of PLL still keep there. But
->>>> we switch the clock source of CPU to CLK_M before shut off PLLs by
->>>> CCLKG_BURSY_POLICY register. So we need to resume it back to original
->>>> clock source by CCLKG_BURST_POLICY register. Or it would be keep in low
->>>> rate (CLK_M) after resume.
->>>
->>> OK, I guess the register name was badly chosen by HW. I'd like to see
->>> part of your description above in the patch description. How about
->>> replacing the patch description with:
->>>
->>> ----------
->>> When the system suspends to LP1, the CPU clock source is switched to
->>> CLK_M (12MHz Oscillator) during suspend/resume flow[1]. The CPU clock
->>> source is controlled by the CCLKG_BURST_POLICY register, and hence this
->>> register must be restored during LP1 resume.
->>> ----------
->>>
->>> [1] Question: where does this happen? This patch doesn't make that
->>> change. I wonder why the suspend path can't save this register, rather
->>> than implementing a separate suspend syscore op in the clock driver.
->>> Does the HW auto-switch the value in the register itself?
->>
->> If we switch CPU to CLK_M in clock driver, the system will become slowly
->> during the middle of suspending flow. We do this at the very end of the
->> LP1 suspending flow before the CPU disable all the PLL clocks.
-> 
-> I think you answered "why is the switch to CLK_M performed very late",
-> whereas I asked "where is the code that performs the switch to CLK_M".
+On 07/24/13 22:17, Sylwester Nawrocki wrote:
+> This patch series includes some fixes and extensions to the Exynos dts
+> files to add the camera and magnetometer sensor support for the TRATS
+> and TRATS2 board. It depends on a patch from Tomasz adding initial
+> TRATS2 board dts file [1].
+>
+> Changes since v3 include:
+>   - removed patch adding MIPI PHY node (although it is unlikely the DT
+>     binding will change the PHY driver is still in review phase),
+>   - added one more patch for SPI and s5c73m3 camera.
+>
+> Detailed changes are listed in each patch.
+>
+> This series has been tested with the S5K6A3/FIMC-IS, S5C73M3 and
+> S5K5BAFX cameras on top of v3.11-rc2.
+>
+> I have a couple more similar patches that actually enable remaining
+> devices I intend to submit for v3.12, once corresponding driver
+> patches are reviewed and queued.
+>
+> [1] http://www.spinics.net/lists/arm-kernel/msg253184.html
+>
+> Andrzej Hajda (3):
+>    ARM: dts: Add SPI1 controller and s5c73m3 sensor node for TRATS2
+>    ARM: dts: Add Exynos4210 SoC camera port pinctrl nodes
+>    ARM: dts: Add S5K5BA sensor regulator definitions for Trats board
+>
+> Jacek Anaszewski (1):
+>    ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
+>
+> Sylwester Nawrocki (9):
+>    ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
+>    ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
+>    ARM: dts: Add ISP power domain node for Exynos4x12
+>    ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
+>    ARM: dts: Add camera subsystem device nodes to exynos4.dtsi
+>    ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
+>    ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
+>    ARM: dts: Add camera device nodes for Exynos4210 SoCs
+>    ARM: dts: Add FIMC nodes for Exynos4210 Trats board
+>
+>   arch/arm/boot/dts/exynos4.dtsi            |  100 +++++++++++++++++++++--
+>   arch/arm/boot/dts/exynos4210-pinctrl.dtsi |   23 ++++++
+>   arch/arm/boot/dts/exynos4210-trats.dts    |  100 +++++++++++++++++++----
+>   arch/arm/boot/dts/exynos4210.dtsi         |   30 +++++++
+>   arch/arm/boot/dts/exynos4412-trats2.dts   |  123 +++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   61 ++++++++++++--
+>   arch/arm/boot/dts/exynos4x12.dtsi         |  103 ++++++++++++++++++++++++
+>   7 files changed, 511 insertions(+), 29 deletions(-)
+>
+Applied this whole series, thanks.
 
-To expand on this a bit more, I can't find any reference to register
-CCLKG_BURST_POLICY in arch/arm/mach-tegra/ or drivers/clk/tegra/ except
-for the definition of clock cclk_g, nor any reference to that clock in
-those two directories. And that CCLKG_BURST_POLICY register is what this
-patch saves/restores.
-
-I do see function tegra30_switch_cpu_to_clk32k in patch 5/8 appears to
-do something related to switching to clk_m and touches some other
-burst-related registers, but not CCLKG_BURST_POLICY...
-
-So, if this syscore_op is attempting to undo some change that happens to
-CCLKG_BURST_POLICY during suspend, I still can't see what change is
-happening to that register during suspemd, nor which piece of code
-causes it.
-
-If the issue is that the value in this register is simply lost during
-LP1 because the power is turned off, then I wonder what sets up this
-register during the original boot path?
+- Kukjin
