@@ -1,52 +1,126 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 05 Aug 2013 16:18:42 +0200
-Subject: [PATCH 4/5] fb: Add DCU framebuffer driver for Vybrid VF610
- platform
-In-Reply-To: <20130805130911.GF30920@pengutronix.de>
-References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
- <1373609276-14566-5-git-send-email-b18965@freescale.com>
- <20130729111457.GB3029@pengutronix.de>
- <81BA6E5E0BC2344391CABCEE22D1B6D83CA6F0@039-SN1MPN1-002.039d.mgd.msft.net>
- <20130805130911.GF30920@pengutronix.de>
-Message-ID: <1375712322.4276.12.camel@weser.hi.pengutronix.de>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 05 Aug 2013 16:30:56 +0200
+Subject: [PATCH v4 2/4] drivers: of: add function to scan fdt nodes given
+ by path
+In-Reply-To: <1375275119-12787-3-git-send-email-m.szyprowski@samsung.com>
+References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
+ <1375275119-12787-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <xa1ttxj4us4f.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 05.08.2013, 15:09 +0200 schrieb Robert Schwebel:
-> On Mon, Aug 05, 2013 at 09:51:40AM +0000, Wang Huan-B18965 wrote:
-> > > On Fri, Jul 12, 2013 at 02:07:55PM +0800, Alison Wang wrote:
-> > > > The Display Controller Unit (DCU) module is a system master that
-> > > > fetches graphics stored in internal or external memory and displays
-> > > > them on a TFT LCD panel. A wide range of panel sizes is supported and
-> > > > the timing of the interface signals is highly configurable.
-> > > > Graphics are read directly from memory and then blended in real-time,
-> > > > which allows for dynamic content creation with minimal CPU
-> > > intervention.
-> > > 
-> > > Only a review of the code inline.
-> > > 
-> > > Maybe the real question is whether we want to introduce another
-> > > framebuffer driver at all instead of making it a DRM driver.
-> > [Alison Wang] I think DCU module is more suitable to be designed as a framebuffer driver than a DRM driver. Just like DIU framebuffer driver for PowerPC.
-> 
-> We looked at the Vybrid datasheet and it's DCU section last week, and
-> with its 64 planes, the controller really wants to get a DRM driver.
-> 
-Exactly, with it's extensive hardware composition capabilities the
-controller begs for being driven by a proper DRM driver. There is no way
-in fbdev to properly support all those hardware planes without
-introducing a lot of non standard ioctls, which in turn will force you
-into writing a lot of custom userspace code instead of running proven
-technology that sits on top of KMS.
+On Wed, Jul 31 2013, Marek Szyprowski wrote:
+> Add a function to scan the flattened device-tree starting from the
+> node given by the path. It is used to extract information (like reserved
+> memory), which is required on ealy boot before we can unflatten the
+                                ^^^^ early
+> tree.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Doing things in DRM might be slightly more work for the initial bring
-up, but will pay off in the long run when you are going to really use
-the hardware caps of the controller.
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
-Regards,
-Lucas
+Some minor comments inline.
+
+> +static int __init fdt_scan_node_by_path(unsigned long node, const char *uname,
+> +					int depth, void *data)
+> +{
+> +	struct fdt_scan_status *st = data;
+> +
+> +	/*
+> +	 * if scan at the requested fdt node has been completed,
+> +	 * return -ENXIO to abort further scanning
+> +	 */
+> +	if (depth <= st->depth)
+> +		return -ENXIO;
+> +
+> +	/* requested fdt node has been found, so call iterator function */
+> +	if (st->found)
+> +		return st->iterator(node, uname, depth, st->data);
+> +
+> +	/* check if scanning automata is entering next level of fdt nodes */
+> +	if (depth == st->depth + 1 &&
+> +	    strncmp(st->name, uname, st->namelen) == 0) {
+
++	    strncmp(st->name, uname, st->namelen) == 0 &&
++	    uname[st->namelen] == 0) {
+
+> +		st->depth += 1;
+> +		if (st->name[st->namelen] == 0) {
+> +			st->found = 1;
+> +		} else {
+> +			const char *next = st->name + st->namelen + 1;
+> +			const char *p = next;
+> +			while (*p != '/' && *p != 0)
+> +				p++;
+> +			st->name = next;
+> +			st->namelen = p - next;
+
++			st->namelen = strcspn(next, "/");
+
+except this might be slightly slower since the second argument is looped
+over, but something to consider I guess since it get rid of few of the
+lines of code.
+
+> +		}
+> +		return 0;
+> +	}
+> +
+> +	/* scan next fdt node */
+> +	return 0;
+> +}
+> +
+> +/**
+> + * of_scan_flat_dt_by_path - scan flattened tree blob and call callback on each
+> + *			     child of the given path.
+> + * @path: path to start searching for children
+> + * @it: callback function
+> + * @data: context data pointer
+> + *
+> + * This function is used to scan the flattened device-tree starting from the
+> + * node given by path. It is used to extract information (like reserved
+> + * memory), which is required on ealy boot before we can unflatten the tree.
+> + */
+> +int __init of_scan_flat_dt_by_path(const char *path,
+> +	int (*it)(unsigned long node, const char *name, int depth, void *data),
+> +	void *data)
+> +{
+> +	struct fdt_scan_status st = {path, 0, -1, 0, it, data};
+> +	int ret = 0;
+> +
+> +	if (initial_boot_params)
+> +		ret = of_scan_flat_dt(fdt_scan_node_by_path, &st);
+> +
+> +	if (st.found && ret == -ENXIO)	/* scan has been completed */
+> +		return 0;
+> +	else
+> +		return -ENOENT;
+
+Perhaps propagate ret:
+
++	if (!st.found)
++		return -ENOENT;
++	else if (ret == -ENXIO)
++		return 0;
++	else
++		return ret;
+
+> +}
+> +
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>  /**
+>   * early_init_dt_check_for_initrd - Decode initrd location from flat tree
+
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 835 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/6cec4a65/attachment.sig>
