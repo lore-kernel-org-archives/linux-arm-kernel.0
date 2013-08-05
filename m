@@ -1,53 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 5 Aug 2013 14:47:17 +0530
-Subject: [PATCH] mach-ks8695/Kconfig: Make MACH_KS8695 depends on PCI
-In-Reply-To: <1375693624-21548-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1375693624-21548-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <CAKohpomo-J1Y_Zf8OLCCvrgfqi7m7tBju=rPp9+wuDAYL_-x7g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 5 Aug 2013 17:18:39 +0800
+Subject: [PATCH 02/25] ARM: mxs: Fix BUG() when invoking mxs_restart()
+ from interrupt context
+In-Reply-To: <20991.26498.114005.439057@ipc1.ka-ro>
+References: <1375279690-16893-1-git-send-email-LW@KARO-electronics.de>
+ <20130804111108.GD18119@S2101-09.ap.freescale.net>
+ <20991.26498.114005.439057@ipc1.ka-ro>
+Message-ID: <20130805091837.GI24629@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 August 2013 14:37, Manjunath Goudar <manjunath.goudar@linaro.org> wrote:
-> From: root <root@si-cspbld63.lge.net>
+On Mon, Aug 05, 2013 at 10:51:14AM +0200, Lothar Wa?mann wrote:
+> You're right, of course, new version of this patch below.
+> 
+> The mxs_restart() function uses of_iomap() which triggers the
+> following BUG_ON(in_interrupt()) when called in interrupt context
+> (e.g. thru SYSRQ-B):
+> 
+>       SysRq : Resetting
+>       ------------[ cut here ]------------
+>       kernel BUG at mm/vmalloc.c:1310!
+>       Internal error: Oops - BUG: 0 [#1] PREEMPT ARM
+>       Modules linked in: i2c_dev
+>       CPU: 0 PID: 0 Comm: swapper Not tainted 3.11.0-rc2-next-20130729-karo+ #196
+>       task: c04e1c38 ti: c04d8000 task.ti: c04d8000
+>       PC is at __get_vm_area_node.clone.25+0x34/0x140
+>       LR is at get_vm_area_caller+0x38/0x44
+>       pc : [<c008a988>]    lr : [<c008b434>]    psr: 20000013
+>       sp : c04d9db0  ip : 00000001  fp : 00000001
+>       r10: c8800000  r9 : 00000000  r8 : 000000d0
+>       r7 : 00002000  r6 : 00000001  r5 : 00000001  r4 : 00002000
+>       r3 : 00010000  r2 : 00000001  r1 : c04d9db0  r0 : 00002000
+>       Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+>       Control: 0005317f  Table: 46920000  DAC: 00000017
+>       Process swapper (pid: 0, stack limit = 0xc04d81b8)
+> 
+> Create the mapping upon startup from mxs_machine_init().
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-:)
-
-> This patch adds a Kconfig dependency on MACH_KS8695,MACH_CM* or MACH_IM*
-> being available before PCI can be enabled. Without this patch,build system
-
-Add Space after ','
-
-> can lead to issues. This was discovered during randconfig testing,
-> without PCI if any one of MACH_KS8695,MACH_CM* or MACH_IM* being enabled,
-
-Same here.
-
-> leading to the following error:
->
-> LD      init/built-in.o
-> arch/arm/mach-ks8695/built-in.o: In function `og_register_pci':
-> arch/arm/mach-ks8695/board-og.c:47:undefined reference to `ks8695_init_pci'
-> make: *** [vmlinux] Error 1
->
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Deepak Saxena <dsaxena@linaro.org>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/mach-ks8695/Kconfig | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
-> index a545976..29d7d9f 100644
-> --- a/arch/arm/mach-ks8695/Kconfig
-> +++ b/arch/arm/mach-ks8695/Kconfig
-> @@ -5,6 +5,7 @@ menu "Kendin/Micrel KS8695 Implementations"
->  config MACH_KS8695
->         bool "KS8695 development board"
->         select MIGHT_HAVE_PCI
-> +       depends on PCI
-
-You need both PCI and MIGHT_HAVE_PCI? Don't know but it looks
-like defconfig is missing PCI stuff.. and MIGHT_HAVE_PCI is enough
-here?
+Applied, thanks.
