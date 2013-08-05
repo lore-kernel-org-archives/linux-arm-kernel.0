@@ -1,47 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Aug 2013 11:20:55 +0100
-Subject: [PATCH RFC 06/13] ASoC: kirkwood: combine kirkwood-i2s and
- kirkwood-dma drivers
-In-Reply-To: <20130805121307.555cb419@armhf>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <E1V63xH-0004lZ-TX@rmk-PC.arm.linux.org.uk> <20130805121307.555cb419@armhf>
-Message-ID: <20130805102055.GP23006@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 5 Aug 2013 12:22:09 +0200
+Subject: [PATCH v9 29/30] bus: mvebu-mbus: Add devicetree binding
+In-Reply-To: <20130804011526.GC19280@titan.lakedaemon.net>
+References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1374844687-19981-30-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130804011526.GC19280@titan.lakedaemon.net>
+Message-ID: <20130805122209.3526f970@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 12:13:07PM +0200, Jean-Francois Moine wrote:
-> On Sun, 04 Aug 2013 20:27:03 +0100
-> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+DT maintainers,
+
+On Sat, 3 Aug 2013 21:15:26 -0400, Jason Cooper wrote:
+> DT Maintainers,
 > 
-> > These really should be a single driver because they're fully integrated
-> > in hardware.  Make them so.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/mach-dove/common.c          |    4 ++--
-> >  arch/arm/mach-kirkwood/common.c      |   24 +++++++++---------------
-> >  sound/soc/kirkwood/Kconfig           |    5 -----
-> >  sound/soc/kirkwood/Makefile          |    4 +---
-> >  sound/soc/kirkwood/kirkwood-dma.c    |   30 +-----------------------------
-> >  sound/soc/kirkwood/kirkwood-i2s.c    |   21 ++++++++++++++++-----
-> >  sound/soc/kirkwood/kirkwood-openrd.c |    4 ++--
-> >  sound/soc/kirkwood/kirkwood-t5325.c  |    4 ++--
-> >  sound/soc/kirkwood/kirkwood.h        |    2 ++
-> >  9 files changed, 35 insertions(+), 63 deletions(-)
-> 	[snip]
+> It's been a week since this was sent to the ml...  It's been through *9*
+> revisions with extensive commenting and corrections by Arnd Bergmann,
+> Jason Gunthorpe, and others.
 > 
-> Glad to see you got my patch, but why did you changed all the names?
+> Unless someone has a serious objection, I'd like to apply this series
+> shortly so it can get some time in -next before sending to Arnd and
+> Olof.
 
-You clearly didn't read the covering email to this series.  I don't know
-why I bothered to write it if you don't bother to read it.
+The final DT binding that is showed in this patch set was presented in
+an e-mail at:
 
-> Replacing "kirkwood-pcm-audio" by "kirkwood-i2s" should be enough.
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/182095.html
 
-Quite simply, i2s is a bus protocol, just like spdif is.  It can do both.
-If we're changing its name, then naming it after just one of the protocols
-it does is stupid.  And PCM is also inappropriate - it does more than PCM
-because it can also transmit AC3 and MPEG audio over SPDIF to a suitable
-decoder (and that does work - I've tested it.)
+Arnd Bergmann indicated his agreement on this DT binding as a reply to
+this e-mail, at:
 
-At the end of the day, this is _just_ a DMA engine which outputs I2S
-and/or SPDIF formatted data of unknown type at a known rate.
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/182097.html
+
+And Jason Gunthorpe also agreed in a reply to Arnd's answer:
+
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/182371.html
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
