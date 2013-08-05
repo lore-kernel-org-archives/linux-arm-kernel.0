@@ -1,57 +1,68 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 4 Aug 2013 23:49:29 -0700
-Subject: [ARM ATTEND] Interested in R/M-class (!MMU), automated testing
-In-Reply-To: <CAOesGMgnYLXRWRtKckofNpsxmRgT0cXL=JcAMirXibe92+AWOQ@mail.gmail.com>
-References: <51FBF93D.8040707@arm.com> <20130804122527.GV3880@pengutronix.de>
- <CAOesGMgnYLXRWRtKckofNpsxmRgT0cXL=JcAMirXibe92+AWOQ@mail.gmail.com>
-Message-ID: <CAOesGMhDQE8S=L-h+5u3Q_h8Vm=vFs4swfR5Za2MVut7ai-yRQ@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 5 Aug 2013 14:51:53 +0800
+Subject: [PATCH 7/8] ARM: tegra114: add LP1 suspend support
+In-Reply-To: <51F7007F.6090200@wwwdotorg.org>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+ <1374830110-30685-8-git-send-email-josephl@nvidia.com>
+ <51F7007F.6090200@wwwdotorg.org>
+Message-ID: <1375685513.1731.25.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ksummit-discuss which had fallen off]
+On Tue, 2013-07-30 at 07:53 +0800, Stephen Warren wrote:
+> On 07/26/2013 03:15 AM, Joseph Lo wrote:
+> > The LP1 suspend mode will power off the CPU, clock gated the PLLs and put
+> > SDRAM to self-refresh mode. Any interrupt can wake up device from LP1. The
+> > sequence when LP1 suspending:
+> 
+> > diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+> > index 5ae7ee5..36cadaa 100644
+> > --- a/arch/arm/mach-tegra/pm.c
+> > +++ b/arch/arm/mach-tegra/pm.c
+> > @@ -214,6 +214,7 @@ static bool tegra_lp1_iram_hook(void)
+> >  		tegra20_lp1_iram_hook();
+> >  		break;
+> >  	case TEGRA30:
+> > +	case TEGRA114:
+> >  		tegra30_lp1_iram_hook();
+> 
+> That's in pm-tegra30.c, which is only compiled in if
+> CONFIG_ARCH_TEGRA_3x_SOC is enabled. Similarly, this patch adds a lot of
+> code to sleep-tegra30.S, which also isn't built/linked if
+> !CONFIG_ARCH_TEGRA_3x_SOC.
+> 
+The "pm-tegra30.c" would be build when just CONFIG_ARCH_TEGRA_3x_SOC,
+CONFIG_ARCH_TEGRA_114_SOC or both.
 
-On Sun, Aug 4, 2013 at 11:49 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sun, Aug 4, 2013 at 5:25 AM, Robert Schwebel
-> <r.schwebel@pengutronix.de> wrote:
->
->>> - Ways to do more automated testing of ARM kernels, including hearing
->>>   from other people what they use to build/boot/test/benchmark their
->>>   code (perhaps even get a discussion going about using the diverse
->>>   range of hardware people have around put to use as test-machines).
->>
->> That's pretty interesting; we have a test farm at PTX, but it mainly
->> does nightly build + boot tests on mainline, for systems we care of.
->
-> I have a small (but growing) farm of boards here that I do some (so
-> far) limited boot testing, but I do it a few times a day on mainline,
-> and nightly on linux-next and arm-soc for-next branches. I also do it
-> for -stable but right now only for published releases since I so far
-> only handle pulling whole git branches.
->
-> I also build every defconfig on arm at the same cadence. Everything's
-> handled by a couple of scripts that emails me the results (as compared
-> to building a status webpage that I have to go check). So essentially
-> every morning I have an email with the fresh -next breakage waiting
-> for me to look at.
->
-> The hardware comes from various sources; some I've bought myself,
-> other I've been sent by kind vendors. All of them are "modern" though,
-> i.e. v7-class hardware with decent amount of memory, etc. I netboot
-> everything with local rootfs at the moment.
->
->
-> I honestly don't know if there's much point in doing complex
-> centralized testing/reporting. I've found that I never go look for the
-> results. I don't regularly check Russell's autobuilder status, for
-> example. Nor the kisskb -next build status. But having my own scripts
-> email me has been useful. I do hope that most ARM subplatform
-> maintainers have some semi-automated setup for frequent testing as
-> well, but I know that reality is that far from all do.
->
-> It could make sense to show what some of us use to give others
-> examples of what might work for them. There's a thousand ways to build
-> these kind of things, some elaborate and others quite simple. I've
-> definitely started at the simple end myself. :)
->
->
-> -Olof
+> Does this series built with all 7 combinations of Tegra20/30/114 support
+> enabled?
+Yes, I did some test about this. But not include all 7 combination.
+> 
+> > diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+> 
+> > @@ -96,9 +100,15 @@
+> >  	orreq	\rd, \rd, #(1 << 30)
+> >  	streq	\rd, [\r_car_base, #\pll_base]
+> >  	/* Enable lock detector */
+> > +	.if	\pll_misc
+> > +	ldr	\rd, [\r_car_base, #\pll_misc]
+> > +	bic	\rd, \rd, #(1 << 18)
+> > +	str	\rd, [\r_car_base, #\pll_misc]
+> > +	ldr	\rd, [\r_car_base, #\pll_misc]
+> >  	ldr	\rd, [\r_car_base, #\pll_misc]
+> >  	orr	\rd, \rd, #(1 << 18)
+> >  	str	\rd, [\r_car_base, #\pll_misc]
+> > +	.endif
+> 
+> Hmm. Those last 3 lines that aren't touched by this patch already
+> touched the pll_misc register even if !pll_misc. Was that a bug in a
+> previous patch?
+Oops. Yes, will fix in next version.
+> 
+> Is git bisect maintained for both compile and run-time across this whole
+> patch series?
+Yes, it's OK. Will do it again before V2 sent.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
