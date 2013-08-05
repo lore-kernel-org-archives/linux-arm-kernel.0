@@ -1,41 +1,47 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Mon, 5 Aug 2013 15:51:14 +0000
-Subject: =?big5?B?tarOYDogW1BBVENIIHYzIDIvMl0gaTJjOiBpbXg6IEFkZCBWeWJyaWQgVkY2MTAg?=
- =?big5?Q?I2C_controller_support?=
-In-Reply-To: <20130805095322.GP26614@pengutronix.de>
-References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
- <1375418648-22760-2-git-send-email-b35083@freescale.com>
- <20130805083050.GN26614@pengutronix.de>
- <B56CDBE15CE27145A4B77D2D24263E851FC075@039-SN1MPN1-004.039d.mgd.msft.net>,
- <20130805095322.GP26614@pengutronix.de>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851FD14C@039-SN1MPN1-004.039d.mgd.msft.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 05 Aug 2013 10:01:06 -0600
+Subject: [PATCH v2] ARM: DT: binding fixup to align with
+ vendor-prefixes.txt
+In-Reply-To: <1375482479-15732-1-git-send-email-csd@broadcom.com>
+References: <1375482479-15732-1-git-send-email-csd@broadcom.com>
+Message-ID: <51FFCC42.6040300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/02/2013 04:27 PM, Christian Daudt wrote:
+> [ this is a follow-up to this discussion:
+> http://archive.arm.linux.org.uk/lurker/message/20130730.230827.a1ceb12a.en.html ]
+> This patchset renames all uses of "bcm," name bindings to
+> "brcm," as they were done prior to knowing that brcm had
+> already been standardized as Broadcom vendor prefix
+> (in Documentation/devicetree/bindings/vendor-prefixes.txt).
+> This will not cause any churn on devices because none of
+> these bindings have made it into production yet.
+> Also rename the the following dt binding docs that had "bcm,"
+> in their name for consistency:
+>  - bcm,kona-sdhci.txt -> kona-sdhci.txt
+>  - bcm,kona-timer.txt -> kona-timer.txt
 
-> > > + [VF610_I2C] = {
-> > > +         .devtype = VF610_I2C,
-> > > +         .hwdata = &vf610_i2c_hwdata
-> > > + },
-> > >  };
-> >
-> > Why add this array?
-> > You should reference imx_i2c_hwdata/vf610_i2c_hwdata directly here.
-[Lu Jingchang-B35083]
-The imx_i2c_devtype[] array is used to support platform that doesn't support dts currently. So the array is added to make the driver consistent. Thanks.
+> Changes since v1:
+>  - added driver match table entries for deprecated names
 
-> >
-> > >
-> > >   if (of_id)
-> > >           pdev->id_entry = of_id->data;
-> >
-> > This is wrong in the original driver code. This field should be changed
-> > in a driver.
- [Lu Jingchang-B35083]
-The assignment to id_entry is due to support both dts device and non-dts devices, just as you said, maybe this field shouldn't be changed out of platform driver core,
-so I will try to change this but make the drive for both dts and non-dts still work well. Thanks.
+That should usually go below the --- line so it doesn't make it into the
+final patch description.
 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+> index fb7b5cd..cf1b206 100644
+> --- a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+> +++ b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
 
+I wonder if this patch should rename bindings/arm/bcm/ to
+bindings/arm/brcm/ too?
 
-Best Regards,
-Jingchang
+>  Required root node property:
+>  
+> -compatible = "bcm,bcm11351";
+> +compatible = "brcm,bcm11351";
+
+In a patch of mine that deprecated a property, Mark wondered if it would
+make sense to mention the old deprecated DT content simply to document
+that it existed, so that old DTs would still make sense when checking
+the documentation. I wonder if the same argument applies to this patch?
