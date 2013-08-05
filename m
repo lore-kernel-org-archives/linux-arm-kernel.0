@@ -1,135 +1,94 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 05 Aug 2013 17:28:33 +0100
-Subject: [PATCH v3 05/16] ARM: mvebu: remove device tree parsing for cpu
- nodes
-In-Reply-To: <20130801120256.GW5882@titan.lakedaemon.net>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51FA3064.9080502@arm.com> <20130801120256.GW5882@titan.lakedaemon.net>
-Message-ID: <51FFD2B1.70509@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 5 Aug 2013 17:29:48 +0100
+Subject: [PATCH v3 0/10] enable swiotlb-xen on arm and arm64
+Message-ID: <alpine.DEB.2.02.1308051503190.4893@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/13 13:02, Jason Cooper wrote:
-> Sudeep,
-> 
-> On Thu, Aug 01, 2013 at 10:54:44AM +0100, Sudeep KarkadaNagesha wrote:
->> On 22/07/13 12:32, Sudeep KarkadaNagesha wrote:
->>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>
->>> Currently set_secondary_cpus_clock assume the CPU logical ordering
->>> and the MPDIR in DT are same, which is incorrect.
->>>
->>> Since the CPU device nodes can be retrieved in the logical ordering
->>> using the DT helper, we can remove the devices tree parsing.
->>>
->>> This patch removes DT parsing by making use of of_get_cpu_node.
->>>
->>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>> Cc: Andrew Lunn <andrew@lunn.ch>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Hi Gregory/Andrew/Jason,
->>
->> Does this change look fine for mvebu?
->> If yes, can I have your ACKs ?
-> 
-> Gregory is the one best suited to review/Ack this.  He'll be back on
-> Monday.
-> 
-Hi Gregory,
+Hi all,
+this patch series enables xen-swiotlb on arm and arm64.
 
-Can you please review this patch ?
+Considering that all guests, including dom0, run on xen on arm with
+second stage translation enabled, it follows that without an IOMMU no
+guests could actually drive the hardware.
 
-Regards,
-Sudeep
->>> ---
->>>  arch/arm/mach-mvebu/platsmp.c | 52 ++++++++++++++++++++-----------------------
->>>  1 file changed, 24 insertions(+), 28 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
->>> index ce81d30..001dd42 100644
->>> --- a/arch/arm/mach-mvebu/platsmp.c
->>> +++ b/arch/arm/mach-mvebu/platsmp.c
->>> @@ -23,51 +23,47 @@
->>>  #include <linux/of.h>
->>>  #include <linux/mbus.h>
->>>  #include <asm/cacheflush.h>
->>> +#include <asm/prom.h>
->>>  #include <asm/smp_plat.h>
->>>  #include "common.h"
->>>  #include "armada-370-xp.h"
->>>  #include "pmsu.h"
->>>  #include "coherency.h"
->>>  
->>> +static struct clk *__init get_cpu_clk(int cpu)
->>> +{
->>> +	struct clk *cpu_clk;
->>> +	struct device_node *np = of_get_cpu_node(cpu);
->>> +
->>> +	if (WARN(!np, "missing cpu node\n"))
->>> +		return NULL;
->>> +	cpu_clk = of_clk_get(np, 0);
->>> +	if (WARN_ON(IS_ERR(cpu_clk)))
->>> +		return NULL;
->>> +	return cpu_clk;
->>> +}
->>> +
->>>  void __init set_secondary_cpus_clock(void)
->>>  {
->>> -	int thiscpu;
->>> +	int thiscpu, cpu;
->>>  	unsigned long rate;
->>> -	struct clk *cpu_clk = NULL;
->>> -	struct device_node *np = NULL;
->>> +	struct clk *cpu_clk;
->>>  
->>>  	thiscpu = smp_processor_id();
->>> -	for_each_node_by_type(np, "cpu") {
->>> -		int err;
->>> -		int cpu;
->>> -
->>> -		err = of_property_read_u32(np, "reg", &cpu);
->>> -		if (WARN_ON(err))
->>> -			return;
->>> -
->>> -		if (cpu == thiscpu) {
->>> -			cpu_clk = of_clk_get(np, 0);
->>> -			break;
->>> -		}
->>> -	}
->>> -	if (WARN_ON(IS_ERR(cpu_clk)))
->>> +	cpu_clk = get_cpu_clk(thiscpu);
->>> +	if (!cpu_clk)
->>>  		return;
->>>  	clk_prepare_enable(cpu_clk);
->>>  	rate = clk_get_rate(cpu_clk);
->>>  
->>>  	/* set all the other CPU clk to the same rate than the boot CPU */
->>> -	for_each_node_by_type(np, "cpu") {
->>> -		int err;
->>> -		int cpu;
->>> -
->>> -		err = of_property_read_u32(np, "reg", &cpu);
->>> -		if (WARN_ON(err))
->>> +	for_each_possible_cpu(cpu) {
->>> +		if (cpu == thiscpu)
->>> +			continue;
->>> +		cpu_clk = get_cpu_clk(cpu);
->>> +		if (!cpu_clk)
->>>  			return;
->>> -
->>> -		if (cpu != thiscpu) {
->>> -			cpu_clk = of_clk_get(np, 0);
->>> -			clk_set_rate(cpu_clk, rate);
->>> -		}
->>> +		clk_set_rate(cpu_clk, rate);
->>>  	}
->>>  }
->>>  
->>>
->>
->>
-> 
+The solution for platforms without an IOMMU is to use swiotlb-xen,
+adapted to autotranslate guests. swiotlb-xen provides a set of dma_ops
+that can be used by Linux to setup a contiguous buffer in stage-2
+addresses and use it for dma operations.
+Basically Linux asks Xen to make a buffer contiguous and gets the
+machine address for it. This buffer is going to be used by lib/swiotlb.c
+to allocate bounce buffers.
+
+
+The first 5 patches lay the groundwork on arm and arm64 to have
+alternative dma_ops and swiotlb.
+
+The sixth patch moves Xen initialization earlier so that we already know
+whether we are running on Xen at the time of initializing dma_ops on the
+platform.
+
+The following patches adapt swiotlb-xen to autotranslate guests (guest
+with second stage translation in hardware) and provide an arm
+implementation of xen_create_contiguous_region.
+
+
+Feedback is very welcome.
+Cheers,
+
+Stefano
+
+
+Changes in v3:
+- add a patch to compile SWIOTLB without CONFIG_NEED_SG_DMA_LENGTH;
+- add a patch to compile SWIOTLB_XEN without CONFIG_NEED_SG_DMA_LENGTH;
+- arm/dma_capable: do not treat dma_mask as a limit;
+- arm/dmabounce: keep using arm_dma_ops;
+- add missing __init in xen_early_init declaration;
+- many code style and name changes in swiotlb-xen.c;
+- improve error checks in xen_dma_add_entry;
+- warn on XENMEM_put_dma_buf failures.
+
+Changes in v2:
+- fixed a couple of errors in xen_bus_to_phys, xen_phys_to_bus and
+xen_swiotlb_fixup.
+
+
+
+EUNBONG SONG (1):
+      swiotlb: replace dma_length with sg_dma_len() macro
+
+Stefano Stabellini (9):
+      swiotlb-xen: replace dma_length with sg_dma_len() macro
+      arm: make SWIOTLB available
+      arm: introduce a global dma_ops pointer
+      arm64: do not initialize arm64_swiotlb if dma_ops is already set
+      xen/arm,arm64: move Xen initialization earlier
+      xen: introduce XENMEM_get_dma_buf and xen_put_dma_buf
+      xen: make xen_create_contiguous_region return the dma address
+      swiotlb-xen: support autotranslate guests
+      xen/arm,arm64: enable SWIOTLB_XEN
+
+ arch/arm/Kconfig                      |    7 ++
+ arch/arm/include/asm/dma-mapping.h    |   33 ++++++-
+ arch/arm/include/asm/xen/hypervisor.h |    8 ++
+ arch/arm/include/asm/xen/page.h       |    2 +
+ arch/arm/kernel/setup.c               |    2 +
+ arch/arm/mm/dma-mapping.c             |    3 +
+ arch/arm/xen/Makefile                 |    2 +-
+ arch/arm/xen/enlighten.c              |   24 +++--
+ arch/arm/xen/mm.c                     |  117 ++++++++++++++++++++
+ arch/arm64/Kconfig                    |    1 +
+ arch/arm64/kernel/setup.c             |    2 +
+ arch/arm64/mm/dma-mapping.c           |    2 +
+ arch/arm64/xen/Makefile               |    2 +-
+ arch/x86/xen/mmu.c                    |    4 +-
+ drivers/xen/Kconfig                   |    1 -
+ drivers/xen/swiotlb-xen.c             |  188 +++++++++++++++++++++++++++++----
+ include/xen/interface/memory.h        |   62 +++++++++++
+ include/xen/xen-ops.h                 |    3 +-
+ lib/swiotlb.c                         |    8 +-
+ 19 files changed, 433 insertions(+), 38 deletions(-)
+ create mode 100644 arch/arm/xen/mm.c
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git swiotlb-xen-3
