@@ -1,61 +1,66 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 Aug 2013 12:12:23 -0400
-Subject: [PATCH 4/8] clk: keystone: Build Keystone clock drivers
-In-Reply-To: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1375719147-7578-5-git-send-email-santosh.shilimkar@ti.com>
+Date: Mon, 5 Aug 2013 12:12:19 -0400
+Subject: [PATCH 0/8] clk: keystone: Add common clock drivers and PM bus
+Message-ID: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now build the keystone common clock drivers. The build is made
-conditional based on COMMON_CLK_KEYSTONE
+Series is an attempt to add the clock drivers for Keystone SOCs
+based on common clock framework. A PLL drivers taking care of
+SOC PLLs and a gate control driver taking clock management for
+the IPs. The current Keystone based SOCs don' support dynamic power
+management usecases like DVFS, SOC ilde etc and hence most of the
+usage is limited to enabling clocks and finding the current clock
+rate etc. Future SOCs will start supporting some of these dynamic
+power saving features.
 
-Cc: Mike Turquette <mturquette@linaro.org>
+The series also contains the PM Bus driver which makes use of
+pm_clk infrastructure of the PM core. This SOC doesn't need
+the clocks to be enabled very early in the boot and hence the
+clock initialsation is left to the subsystem_init() level. The
+series is cooked up based on downstream work done by Murali K
+but I ended up mostly rewriting it.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/clk/Kconfig           |    7 +++++++
- drivers/clk/Makefile          |    1 +
- drivers/clk/keystone/Makefile |    1 +
- 3 files changed, 9 insertions(+)
+Based on to of Mike's dt binding series [1] and tested on Keystone2
+EVM with I2C, UART and SPI driver enabled in the build.
+
+Santosh Shilimkar (8):
+  clk: keystone: add Keystone PLL clock driver
+  clk: keystone: Add gate control clock driver
+  clk: keystone: common clk driver initialization
+  clk: keystone: Build Keystone clock drivers
+  ARM: dts: keystone: Add clock tree data to devicetree
+  ARM: dts: keystone: Add clock phandle to UART nodes
+  ARM: keystone: Enable and initialise clock drivers
+  ARM: keystone: add PM bus support for clock management
+
+ .../devicetree/bindings/clock/keystone-gate.txt    |   30 +
+ .../devicetree/bindings/clock/keystone-pll.txt     |   36 +
+ arch/arm/boot/dts/keystone-clocks.dtsi             |  824 ++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dts                     |    4 +
+ arch/arm/mach-keystone/Kconfig                     |    1 +
+ drivers/bus/Makefile                               |    2 +
+ drivers/bus/keystone_pm_bus.c                      |   68 ++
+ drivers/clk/Kconfig                                |    7 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/keystone/Makefile                      |    1 +
+ drivers/clk/keystone/clk.c                         |   34 +
+ drivers/clk/keystone/gate.c                        |  306 ++++++++
+ drivers/clk/keystone/pll.c                         |  197 +++++
+ include/linux/clk/keystone.h                       |   20 +
+ 14 files changed, 1531 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/keystone-pll.txt
+ create mode 100644 arch/arm/boot/dts/keystone-clocks.dtsi
+ create mode 100644 drivers/bus/keystone_pm_bus.c
  create mode 100644 drivers/clk/keystone/Makefile
+ create mode 100644 drivers/clk/keystone/clk.c
+ create mode 100644 drivers/clk/keystone/gate.c
+ create mode 100644 drivers/clk/keystone/pll.c
+ create mode 100644 include/linux/clk/keystone.h
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 51380d6..45c01c6 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -87,6 +87,13 @@ config CLK_PPC_CORENET
- 	  This adds the clock driver support for Freescale PowerPC corenet
- 	  platforms using common clock framework.
- 
-+config COMMON_CLK_KEYSTONE
-+	tristate "Clock drivers for Keystone based SOCs"
-+	depends on ARCH_KEYSTONE && OF
-+	---help---
-+          Supports clock drivers for Keystone based SOCs. These SOCs have local
-+	  a power sleep control module that gate the clock to the IPs and PLLs.
-+
- endmenu
- 
- source "drivers/clk/mvebu/Kconfig"
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 4038c2b..ec9e290 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
- obj-$(CONFIG_ARCH_ZYNQ)		+= zynq/
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
- obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
-+obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
- 
- obj-$(CONFIG_X86)		+= x86/
- 
-diff --git a/drivers/clk/keystone/Makefile b/drivers/clk/keystone/Makefile
-new file mode 100644
-index 0000000..8706ca7
---- /dev/null
-+++ b/drivers/clk/keystone/Makefile
-@@ -0,0 +1 @@
-+obj-y			+= clk.o pll.o gate.o
+Regards,
+Santosh
+[1] https://lkml.org/lkml/2013/6/21/35
 -- 
 1.7.9.5
