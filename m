@@ -1,99 +1,59 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 5 Aug 2013 16:07:15 +0800
-Subject: [PATCH 4/8] ARM: tegra: add common LP1 suspend support
-In-Reply-To: <51FC1926.9030103@wwwdotorg.org>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-5-git-send-email-josephl@nvidia.com>
- <51F6F725.6000106@wwwdotorg.org>
- <1375435620.6761.120.camel@jlo-ubuntu-64.nvidia.com>
- <51FC1926.9030103@wwwdotorg.org>
-Message-ID: <1375690035.1731.41.camel@jlo-ubuntu-64.nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 5 Aug 2013 08:59:24 +0100
+Subject: [PATCH] MFD: Make VEXPRESS MFD controller depends on VEXPRESS
+ systems
+In-Reply-To: <1375603249-27206-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1375603249-27206-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <20130805075924.GC29942@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-08-03 at 04:40 +0800, Stephen Warren wrote:
-> On 08/02/2013 03:27 AM, Joseph Lo wrote:
-> > On Tue, 2013-07-30 at 07:13 +0800, Stephen Warren wrote:
-> >> On 07/26/2013 03:15 AM, Joseph Lo wrote:
-> >>> The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
-> >>> clock gated and SDRAM in self-refresh mode. That means the low level LP1
-> >>> suspending and resuming code couldn't be run on DRAM and the CPU must
-> >>> switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
-> >>> the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
-> >>> The LP1 low level handling code need to be moved to IRAM area first. And
-> >>> marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
-> >>> power timer needs to be re-calculated based on 32KHz that was originally
-> >>> based on PCLK.
-> >>
-> >>> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-> >>
-> >>>  #ifdef CONFIG_PM_SLEEP
-> >>>  static DEFINE_SPINLOCK(tegra_lp2_lock);
-> >>> +static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
-> >>> +static u32 iram_save_size;
-> >>> +static void *iram_save_addr;
-> >>> +struct tegra_lp1_iram *tegra_lp1_iram;
-> >>>  void (*tegra_tear_down_cpu)(void);
-> >>> +void (*tegra_sleep_core_finish)(unsigned long v2p);
-> >>
-> >> I'm not sure all of those are required to be global variables. For
-> >> example, iram_code is just a constant, so you could easily just use it
-> >> directly in code.
-> >
-> > All of them does not mean the same thing. The LP1 resume code was built
-> > in kernel image and store in RAM.
-> > The tegra_lp1_iram hooks the LP1 resume code for different chips. Before
-> > LP1 suspend, the original stuffs that in the area of IRAM would be store
-> > in the iram_save_addr (RAM). Then copy the LP1 resume code to iram_code
-> > area (IRAM).
-> 
-> Sure, some of those variable may differ based on the SoC at runtime etc.
-> 
-> But at least the value of iram_code never changes, right?
-Yes.
+On Sun, 04 Aug 2013, Manjunath Goudar wrote:
 
-> >>> +static void tegra_suspend_enter_lp1(void)
-> >>> +{
-> >>> +	tegra_pmc_suspend();
-> >>> +
-> >>> +	/* copy the reset vector & SDRAM shutdown code into IRAM */
-> >>> +	memcpy(iram_save_addr, iram_code, iram_save_size);
-> >>> +	memcpy(iram_code, tegra_lp1_iram->start_addr, iram_save_size);
-> >>> +
-> >>> +	*((u32 *)tegra_cpu_lp1_mask) = 1;
-> >>> +}
-> >>> +
-> >>> +static void tegra_suspend_exit_lp1(void)
-> >>> +{
-> >>> +	tegra_pmc_resume();
-> >>> +
-> >>> +	/* restore IRAM */
-> >>> +	memcpy(iram_code, iram_save_addr, iram_save_size);
-> >>> +
-> >>> +	*(u32 *)tegra_cpu_lp1_mask = 0;
-> >>> +}
-> >>
-> >> I'm not really sure I like that, but I suppose it's OK. It sure seems
-> >> like a performance limiter, but I suppose LP1 is so slow it doesn't
-> >> matter, due to the need to ramp power rails, PLLs, SDRAM controller, etc.
-> >
-> > That's why we only back up the code size that exactly same with the LP1
-> > resume code of the SoC.
-> >
-> >> It'd be nice to simply reserve more IRAM for the kernel's use. Right
-> >> now, only 1K is reserved, and presumably the code running on the AVP
-> >> can't use the rest of that page anyway, or can it?
-> >
-> > The LP1 resume code still running on the CPU (The LP0 would resume from
-> > AVP).
+> This patch adds a Kconfig dependency on an ARCH_VEXPRESS(it is for
+> both ARM and ARM64) or ARCH_VEXPRESS_CA9X being available before
+> VEXPRESS_CONFIG can be enabled. Without this patch,build system
+> can lead to issues. This was discovered during randconfig testing,
+> in which VEXPRESS_CONFIG was enabled w/o ARCH_VEXPRESS or VEXPRESS_CONFIG
+> being enabled,leading to the following error:
 > 
-> Sure. However, if the AVP never touched the IRAM region where the LP1
-> resume code is placed, we would only need to copy the LP1 resume code to
-> IRAM once at kernel boot time, rather than every time we enter/leave LP1.
+> CC      drivers/mfd/vexpress-config.o
+> drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
+> drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
+> ?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
+>     bridge_node = of_find_node_by_phandle(
+>     ^
+> drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
+> integer without a cast [enabled by default]
+>     bridge_node = of_find_node_by_phandle(
 > 
-> I guess the idea is that once we have an AVP driver, we will force the
-> AVP to suspend first, save the IRAM that it might have been using, do
-> the system suspend/resume, then restore the IRAM. And that changing that
-> sequence so that the AVP never ever touched the LP1 IRAM area would
-> require AVP firmware changes that we can't make?
-Yes, exactly.
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Deepak Saxena <dsaxena@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 633ee43..c9202f6 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1174,7 +1174,7 @@ endmenu
+>  
+>  config VEXPRESS_CONFIG
+>  	bool "ARM Versatile Express platform infrastructure"
+> -	depends on ARM || ARM64
+> +	depends on ARCH_VEXPRESS || ARCH_VEXPRESS_CA9X4
+>  	help
+>  	  Platform configuration infrastructure for the ARM Ltd.
+>  	  Versatile Express.
+
+Looks fine to me, but I'd really like Arnd's Ack on this one.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
