@@ -1,49 +1,34 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  5 Aug 2013 17:50:07 -0500
-Subject: [PATCH 3/5] ARM: highbank: enable DMA zone for LPAE
+Date: Mon,  5 Aug 2013 17:50:08 -0500
+Subject: [PATCH 4/5] ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
 In-Reply-To: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
 References: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1375743009-28972-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1375743009-28972-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Some devices are restricted to 32-bit DMA. Thus the platform dma_zone_size
-needs to be set. Otherwise dma-mapping code is complaining, e.g.
+On Midway, the first 4G of memory starts at 0 and the rest of memory
+(4GB+) starts at 0x2_00000000, so we need to enable pfn_valid checks
+by selecting ARCH_HAS_HOLES_MEMORYMODEL.
 
-calxedaxgmac fff50000.ethernet: coherent DMA mask 0xffffffff is smaller
-than system GFP_DMA mask 0xffffffffffffffff
-
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-highbank/Kconfig    | 1 +
- arch/arm/mach-highbank/highbank.c | 3 +++
- 2 files changed, 4 insertions(+)
+ arch/arm/mach-highbank/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index cd9fcb1..efe4961 100644
+index efe4961..8b2948f 100644
 --- a/arch/arm/mach-highbank/Kconfig
 +++ b/arch/arm/mach-highbank/Kconfig
-@@ -18,3 +18,4 @@ config ARCH_HIGHBANK
- 	select PL320_MBOX
- 	select SPARSE_IRQ
- 	select USE_OF
-+	select ZONE_DMA if ARM_LPAE
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 8881579..1894dcf 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -176,6 +176,9 @@ static const char *highbank_match[] __initconst = {
- };
- 
- DT_MACHINE_START(HIGHBANK, "Highbank")
-+#ifdef CONFIG_ZONE_DMA
-+	.dma_zone_size	= (4ULL * SZ_1G),
-+#endif
- 	.smp		= smp_ops(highbank_smp_ops),
- 	.init_irq	= highbank_init_irq,
- 	.init_time	= highbank_timer_init,
+@@ -1,6 +1,7 @@
+ config ARCH_HIGHBANK
+ 	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_HAS_OPP
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
 -- 
 1.8.1.2
