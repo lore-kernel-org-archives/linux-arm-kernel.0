@@ -1,66 +1,73 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 Aug 2013 12:12:19 -0400
-Subject: [PATCH 0/8] clk: keystone: Add common clock drivers and PM bus
-Message-ID: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Mon, 5 Aug 2013 12:12:22 -0400
+Subject: [PATCH 3/8] clk: keystone: common clk driver initialization
+In-Reply-To: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1375719147-7578-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Series is an attempt to add the clock drivers for Keystone SOCs
-based on common clock framework. A PLL drivers taking care of
-SOC PLLs and a gate control driver taking clock management for
-the IPs. The current Keystone based SOCs don' support dynamic power
-management usecases like DVFS, SOC ilde etc and hence most of the
-usage is limited to enabling clocks and finding the current clock
-rate etc. Future SOCs will start supporting some of these dynamic
-power saving features.
+Initialise common clock drivers for Keystone 2 devices.
 
-The series also contains the PM Bus driver which makes use of
-pm_clk infrastructure of the PM core. This SOC doesn't need
-the clocks to be enabled very early in the boot and hence the
-clock initialsation is left to the subsystem_init() level. The
-series is cooked up based on downstream work done by Murali K
-but I ended up mostly rewriting it.
+Cc: Mike Turquette <mturquette@linaro.org>
 
-Based on to of Mike's dt binding series [1] and tested on Keystone2
-EVM with I2C, UART and SPI driver enabled in the build.
-
-Santosh Shilimkar (8):
-  clk: keystone: add Keystone PLL clock driver
-  clk: keystone: Add gate control clock driver
-  clk: keystone: common clk driver initialization
-  clk: keystone: Build Keystone clock drivers
-  ARM: dts: keystone: Add clock tree data to devicetree
-  ARM: dts: keystone: Add clock phandle to UART nodes
-  ARM: keystone: Enable and initialise clock drivers
-  ARM: keystone: add PM bus support for clock management
-
- .../devicetree/bindings/clock/keystone-gate.txt    |   30 +
- .../devicetree/bindings/clock/keystone-pll.txt     |   36 +
- arch/arm/boot/dts/keystone-clocks.dtsi             |  824 ++++++++++++++++++++
- arch/arm/boot/dts/keystone.dts                     |    4 +
- arch/arm/mach-keystone/Kconfig                     |    1 +
- drivers/bus/Makefile                               |    2 +
- drivers/bus/keystone_pm_bus.c                      |   68 ++
- drivers/clk/Kconfig                                |    7 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/keystone/Makefile                      |    1 +
- drivers/clk/keystone/clk.c                         |   34 +
- drivers/clk/keystone/gate.c                        |  306 ++++++++
- drivers/clk/keystone/pll.c                         |  197 +++++
- include/linux/clk/keystone.h                       |   20 +
- 14 files changed, 1531 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
- create mode 100644 Documentation/devicetree/bindings/clock/keystone-pll.txt
- create mode 100644 arch/arm/boot/dts/keystone-clocks.dtsi
- create mode 100644 drivers/bus/keystone_pm_bus.c
- create mode 100644 drivers/clk/keystone/Makefile
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/clk/keystone/clk.c   |   34 ++++++++++++++++++++++++++++++++++
+ include/linux/clk/keystone.h |    1 +
+ 2 files changed, 35 insertions(+)
  create mode 100644 drivers/clk/keystone/clk.c
- create mode 100644 drivers/clk/keystone/gate.c
- create mode 100644 drivers/clk/keystone/pll.c
- create mode 100644 include/linux/clk/keystone.h
 
-Regards,
-Santosh
-[1] https://lkml.org/lkml/2013/6/21/35
+diff --git a/drivers/clk/keystone/clk.c b/drivers/clk/keystone/clk.c
+new file mode 100644
+index 0000000..9001380
+--- /dev/null
++++ b/drivers/clk/keystone/clk.c
+@@ -0,0 +1,34 @@
++/*
++ * Common Clock initialization code for Keystone SOCs
++ *
++ * Copyright (C) 2013 Texas Instruments Inc.
++ *	Murali Karicheri <m-karicheri2@ti.com>
++ *	Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/init.h>
++#include <linux/types.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/clk/keystone.h>
++
++static const __initconst struct of_device_id clk_match[] = {
++	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
++	{ .compatible = "fixed-factor-clock", .data =
++					 of_fixed_factor_clk_setup, },
++	{ .compatible = "keystone,pll-clk", .data = of_keystone_pll_clk_init, },
++	{ .compatible = "mux-clk", .data = of_mux_clk_setup, },
++	{ .compatible = "divider-clock", .data = of_divider_clk_setup, },
++	{ .compatible = "keystone,psc-clk", .data = of_keystone_psc_clk_init, },
++	{}
++};
++
++void __init of_keystone_clk_init()
++{
++	/* initialize clk providers from device tree */
++	of_clk_init(clk_match);
++}
+diff --git a/include/linux/clk/keystone.h b/include/linux/clk/keystone.h
+index 7b3e154..282e88f 100644
+--- a/include/linux/clk/keystone.h
++++ b/include/linux/clk/keystone.h
+@@ -15,5 +15,6 @@
+ 
+ extern void of_keystone_pll_clk_init(struct device_node *node);
+ extern void of_keystone_psc_clk_init(struct device_node *node);
++extern void of_keystone_clk_init(void);
+ 
+ #endif /* __LINUX_CLK_KEYSTONE_H_ */
 -- 
 1.7.9.5
