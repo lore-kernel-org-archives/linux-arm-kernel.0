@@ -1,352 +1,141 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 5 Aug 2013 16:36:55 -0400
-Subject: DT binding stalemate proposal, was: Re: [PATCH v9 29/30] bus:
- mvebu-mbus: Add devicetree binding
-In-Reply-To: <1374844687-19981-30-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1374844687-19981-30-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130805203655.GL19280@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Aug 2013 21:32:02 +0100
+Subject: [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM links between
+ codec and cpu DAI
+In-Reply-To: <20130805145644.GV23006@n2100.arm.linux.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <E1V641A-0004lv-DM@rmk-PC.arm.linux.org.uk>
+ <20130805112733.GY9858@sirena.org.uk>
+ <20130805113310.GU23006@n2100.arm.linux.org.uk>
+ <20130805144054.GE9858@sirena.org.uk>
+ <20130805145644.GV23006@n2100.arm.linux.org.uk>
+Message-ID: <20130805203202.GX23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT maintainers,
+On Mon, Aug 05, 2013 at 03:56:44PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Aug 05, 2013 at 03:40:54PM +0100, Mark Brown wrote:
+> > On Mon, Aug 05, 2013 at 12:33:10PM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Aug 05, 2013 at 12:27:33PM +0100, Mark Brown wrote:
+> > 
+> > > > This doesn't look good - this is adding DAPM routes which should
+> > > > correspond to the DAI link that's already been configured.
+> > 
+> > > No, you're wrong there:
+> > 
+> > > CPU DAI:				Codec DAI
+> > > dma-playback	--->	i2sdo	--->	Playback
+> > > 		`-->	spdifdo -> not connected
+> > > dma-capture	<---	i2sdi	<---	Capture
 
-I understand you guys are swamped with reviewing atm.  This binding in
-particular is complicated, has a long history (9 versions just for the
-devicetree binding itself), and no one wants to commit to supporting it
-forever without fully understanding where it came from and why it's
-needed.
+Well, having followed your suggestions and re-analysed Liam's driver, it
+basically does not work, because none of the widgets get powered up.
 
-On the other side of the coin, we have other patches depending on this
-work, and the submitters have been more than patient with the process
-(and the maintainership change).  I'd prefer not to delay it if it can
-be helped.
+Liam's DAPM driver does this:
 
-So here's my proposal: Let use this as a guinea pig for the 'unstable'
-class of bindings.  eg s:/bindings/:/bindings/unstable/:  and merge it
-in.
+==== Frontend ====
+DAI drivers:    DAI stream names
+System Pin      System Playback
+Offload0 Pin    Offload0 Playback
+Offload1 Pin    Offload1 Playback
+Loopback Pin    Loopback Capture
+Capture Pin     Analog Capture
 
-As we've said a couple of times, Arnd Bergmann has helped out plenty
-with developing this binding, but he's not available for the next few
-months.  So unless we do something, we're essentially starting over from
-scratch.
+Routing:
+[s]System Playback   --------v           .----> [aif]SSP0 CODEC OUT
+[s]Offload0 Playback ---> [w]Playback VMixer
+[s]Offload1 Playback --------^           `----> [s]Loopback Capture
 
-As a side note, Olof prefers all pull requests be sent by -rc6, which
-means I'd like to have the patches in by -rc5 so they get some coverage
-in -next before I send the PR to Olof.  Which means time is getting
-short :)
+[aif]SSP0 CODEC IN ---> [s]Analog Capture
 
-thx,
+==== Platform ====
+Routing:
+[aif]SSP0 CODEC OUT ---> [s]AIF1 Playback
+...
 
-Jason.
+==== Codec ====
+DAI drivers:    DAI stream names
+rt5640-aif1     AIF1 Playback --> AIF1RX --> DAI1 RX Mux --> IF1 DAC -->...
+                AIF1 Capture ...
 
-On Fri, Jul 26, 2013 at 10:18:06AM -0300, Ezequiel Garcia wrote:
-> Introduce the devicetree binding for the mvebu MBus driver
-> avaiable in the mvebu SoCs (Armada 370/XP, Kirkwood, Dove, ...).
-> 
-> This binding provides an accurate model of the SoC address space,
-> and allows to declare the address and size of the decoding windows the MBus
-> needs to access the peripherals, together with the target ID and attribute
-> for those windows.
-> 
-> The binding is composed of two required nodes: one for the MBus bus
-> and one for the MBus controller.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
->  .../devicetree/bindings/bus/mvebu-mbus.txt         | 276 +++++++++++++++++++++
->  1 file changed, 276 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/mvebu-mbus.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
-> new file mode 100644
-> index 0000000..7586fb6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
-> @@ -0,0 +1,276 @@
-> +
-> +* Marvell MBus
-> +
-> +Required properties:
-> +
-> +- compatible:	 Should be set to one of the following:
-> +		 marvell,armada370-mbus
-> +		 marvell,armadaxp-mbus
-> +		 marvell,armada370-mbus
-> +		 marvell,armadaxp-mbus
-> +		 marvell,kirkwood-mbus
-> +		 marvell,dove-mbus
-> +		 marvell,orion5x-88f5281-mbus
-> +		 marvell,orion5x-88f5182-mbus
-> +		 marvell,orion5x-88f5181-mbus
-> +		 marvell,orion5x-88f6183-mbus
-> +		 marvell,mv78xx0-mbus
-> +
-> +- address-cells: Must be '2'. The first cell for the MBus ID encoding,
-> +                 the second cell for the address offset within the window.
-> +
-> +- size-cells:    Must be '1'.
-> +
-> +- ranges:        Must be set up to provide a proper translation for each child.
-> +	         See the examples below.
-> +
-> +- controller:    Contains a single phandle referring to the MBus controller
-> +                 node. This allows to specify the node that contains the
-> +		 registers that control the MBus, which is typically contained
-> +		 within the internal register window (see below).
-> +
-> +Optional properties:
-> +
-> +- pcie-mem-aperture:	This optional property contains the aperture for
-> +			the memory region of the PCIe driver.
-> +			If it's defined, it must encode the base address and
-> +			size for the address decoding windows allocated for
-> +			the PCIe memory region.
-> +
-> +- pcie-io-aperture:	Just as explained for the above property, this
-> +			optional property contains the aperture for the
-> +			I/O region of the PCIe driver.
-> +
-> +* Marvell MBus controller
-> +
-> +Required properties:
-> +
-> +- compatible:	Should be set to "marvell,mbus-controller".
-> +
-> +- reg:          Device's register space.
-> +		Two entries are expected (see the examples below):
-> +		the first one controls the devices decoding window and
-> +		the second one controls the SDRAM decoding window.
-> +
-> +Example:
-> +
-> +	soc {
-> +		compatible = "marvell,armada370-mbus", "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		controller = <&mbusc>;
-> +		pcie-mem-aperture = <0xe0000000 0x8000000>;
-> +		pcie-io-aperture  = <0xe8000000 0x100000>;
-> +
-> +		internal-regs {
-> +			compatible = "simple-bus";
-> +
-> +			mbusc: mbus-controller at 20000 {
-> +				compatible = "marvell,mbus-controller";
-> +				reg = <0x20000 0x100>, <0x20180 0x20>;
-> +			};
-> +
-> +			/* more children ...*/
-> +		};
-> +	};
-> +
-> +** MBus address decoding window specification
-> +
-> +The MBus children address space is comprised of two cells: the first one for
-> +the window ID and the second one for the offset within the window.
-> +In order to allow to describe valid and non-valid window entries, the
-> +following encoding is used:
-> +
-> +  0xSIAA0000 0x00oooooo
-> +
-> +Where:
-> +
-> +  S = 0x0 for a MBus valid window
-> +  S = 0xf for a non-valid window (see below)
-> +
-> +If S = 0x0, then:
-> +
-> +   I = 4-bit window target ID
-> +  AA = windpw attribute
-> +
-> +If S = 0xf, then:
-> +
-> +   I = don't care
-> +   AA = 1 for internal register
-> +
-> +Following the above encoding, for each ranges entry for a MBus valid window
-> +(S = 0x0), an address decoding window is allocated. On the other side,
-> +entries for translation that do not correspond to valid windows (S = 0xf)
-> +are skipped.
-> +
-> +	soc {
-> +		compatible = "marvell,armada370-mbus", "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		controller = <&mbusc>;
-> +
-> +		ranges = <0xf0010000 0 0 0xd0000000 0x100000
-> +			  0x01e00000 0 0 0xfff00000 0x100000>;
-> +
-> +		bootrom {
-> +			compatible = "marvell,bootrom";
-> +			reg = <0x01e00000 0 0x100000>;
-> +		};
-> +
-> +		/* other children */
-> +		...
-> +
-> +		internal-regs {
-> +			compatible = "simple-bus";
-> +			ranges = <0 0xf0010000 0 0x100000>;
-> +
-> +			mbusc: mbus-controller at 20000 {
-> +				compatible = "marvell,mbus-controller";
-> +				reg = <0x20000 0x100>, <0x20180 0x20>;
-> +			};
-> +
-> +			/* more children ...*/
-> +		};
-> +	};
-> +
-> +In the shown example, the translation entry in the 'ranges' property is what
-> +makes the MBus driver create a static decoding window for the corresponding
-> +given child device. Note that the binding does not require child nodes to be
-> +present. Of course, child nodes are needed to probe the devices.
-> +
-> +Since each window is identified by its target ID and attribute ID there's
-> +a special macro that can be use to simplify the translation entries:
-> +
-> +#define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
-> +
-> +Using this macro, the above example would be:
-> +
-> +	soc {
-> +		compatible = "marvell,armada370-mbus", "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		controller = <&mbusc>;
-> +
-> +		ranges = < MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-> +			   MBUS_ID(0x01, 0xe0) 0 0 0xfff00000 0x100000>;
-> +
-> +		bootrom {
-> +			compatible = "marvell,bootrom";
-> +			reg = <MBUS_ID(0x01, 0xe0) 0 0x100000>;
-> +		};
-> +
-> +		/* other children */
-> +		...
-> +
-> +		internal-regs {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
-> +
-> +			mbusc: mbus-controller at 20000 {
-> +				compatible = "marvell,mbus-controller";
-> +				reg = <0x20000 0x100>, <0x20180 0x20>;
-> +			};
-> +
-> +			/* other children */
-> +			...
-> +		};
-> +	};
-> +
-> +
-> +** About the window base address
-> +
-> +Remember the MBus controller allows a great deal of flexibility for choosing
-> +the decoding window base address. When planning the device tree layout it's
-> +possible to choose any address as the base address, provided of course there's
-> +a region large enough available, and with the required alignment.
-> +
-> +Yet in other words: there's nothing preventing us from setting a base address
-> +of 0xf0000000, or 0xd0000000 for the NOR device shown above, if such region is
-> +unused.
-> +
-> +** Window allocation policy
-> +
-> +The mbus-node ranges property defines a set of mbus windows that are expected
-> +to be set by the operating system and that are guaranteed to be free of overlaps
-> +with one another or with the system memory ranges.
-> +
-> +Each entry in the property refers to exactly one window. If the operating system
-> +choses to use a different set of mbus windows, it must ensure that any address
-> +translations performed from downstream devices are adapted accordingly.
-> +
-> +The operating system may insert additional mbus windows that do not conflict
-> +with the ones listed in the ranges, e.g. for mapping PCIe devices.
-> +As a special case, the internal register window must be set up by the boot
-> +loader at the address listed in the ranges property, since access to that region
-> +is needed to set up the other windows.
-> +
-> +** Example
-> +
-> +See the example below, where a more complete device tree is shown:
-> +
-> +	soc {
-> +		compatible = "marvell,armadaxp-mbus", "simple-bus";
-> +		controller = <&mbusc>;
-> +
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000   /* internal-regs */
-> +			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-> +			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
-> +
-> +		bootrom {
-> +			compatible = "marvell,bootrom";
-> +			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
-> +		};
-> +
-> +		devbus-bootcs {
-> +			status = "okay";
-> +			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x8000000>;
-> +
-> +			/* NOR */
-> +			nor {
-> +				compatible = "cfi-flash";
-> +				reg = <0 0x8000000>;
-> +				bank-width = <2>;
-> +			};
-> +		};
-> +
-> +		pcie-controller {
-> +			compatible = "marvell,armada-xp-pcie";
-> +			status = "okay";
-> +			device_type = "pci";
-> +
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +
-> +			ranges =
-> +			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
-> +				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
-> +				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
-> +				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
-> +				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
-> +				0x82000800 0 0xe0000000 MBUS_ID(0x04, 0xe8) 0xe0000000 0 0x08000000 /* Port 0.0 MEM */
-> +				0x81000800 0 0          MBUS_ID(0x04, 0xe0) 0xe8000000 0 0x00100000 /* Port 0.0 IO */>;
-> +
-> +
-> +			pcie at 1,0 {
-> +				/* Port 0, Lane 0 */
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		internal-regs {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
-> +
-> +			mbusc: mbus-controller at 20000 {
-> +				reg = <0x20000 0x100>, <0x20180 0x20>;
-> +			};
-> +
-> +			interrupt-controller at 20000 {
-> +			      reg = <0x20a00 0x2d0>, <0x21070 0x58>;
-> +			};
-> +		};
-> +	};
-> -- 
-> 1.8.1.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+And what I have already in kirkwood-i2s is:
+
+CPU DAI:
+[s]dma-playback	---> [aif]i2sdo
+		`--> [aif]spdifdo
+[s]dma-capture	<--- [aif]i2sdi
+
+So that follows exactly what Liam's driver does.  So no changes are
+required there.
+
+I've changed the DAI links to this in kirkwood-spdif.c:
+
+static struct snd_soc_dai_link kirkwood_spdif_dai1[] = {
+        {
+                .name = "S/PDIF1",
+                .stream_name = "IEC958 Playback",
+                .platform_name = "mvebu-audio.1",
+                .cpu_dai_name = "mvebu-audio.1",
+		.dynamic = 1,
+                .codec_name = "snd-soc-dummy",
+                .codec_dai_name = "snd-soc-dummy-dai",
+        }, {
+                .name = "Codec",
+                .cpu_dai_name = "snd-soc-dummy-dai",
+                .platform_name = "snd-soc-dummy",
+                .no_pcm = 1,
+                .codec_dai_name = "dit-hifi",
+                .codec_name = "spdif-dit",
+                .ops = &kirkwood_spdif_ops,
+        },
+};
+
+which is similar to what's in Liam's driver.  However, There is no
+.dpcm_playback member in mainline ASoC.
+
+However, when trying to play something:
+
+bash# grep . /sys/kernel/debug/asoc/Kirkwood\ SPDIF/*/dapm/* | \
+sed 's,/sys/kernel/debug/asoc/Kirkwood SPDIF/,,'
+mvebu-audio.1/dapm/bias_level:Off
+mvebu-audio.1/dapm/i2sdi:i2sdi: Off  in 0 out 0
+mvebu-audio.1/dapm/i2sdi: stream dma-rx inactive
+mvebu-audio.1/dapm/i2sdo:i2sdo: Off  in 0 out 0
+mvebu-audio.1/dapm/i2sdo: stream dma-tx inactive
+mvebu-audio.1/dapm/spdifdo:spdifdo: Off  in 0 out 0
+mvebu-audio.1/dapm/spdifdo: stream dma-tx inactive
+mvebu-audio.1/dapm/spdifdo: out "static" "Playback"
+snd-soc-dummy/dapm/Capture:Capture: Off  in 0 out 0
+snd-soc-dummy/dapm/Capture: stream Capture inactive
+snd-soc-dummy/dapm/Playback:Playback: Off  in 0 out 0
+snd-soc-dummy/dapm/Playback: stream Playback inactive
+snd-soc-dummy/dapm/Playback: in  "static" "spdifdo"
+snd-soc-dummy/dapm/bias_level:Standby
+spdif-dit/dapm/Playback:Playback: Off  in 0 out 1
+spdif-dit/dapm/Playback: stream Playback inactive
+spdif-dit/dapm/Playback: out "static" "spdif-out"
+spdif-dit/dapm/bias_level:Standby
+spdif-dit/dapm/spdif-out:spdif-out: Off  in 0 out 1
+spdif-dit/dapm/spdif-out: in  "static" "Playback"
+
+Nothing gets powered up.  This is hardly surprising, because of how
+ASoC connects the widgets.
+
+So, let's summarise this.  You're saying that I'm doing it all wrong in
+my driver creating those widgets and paths.  Yet, the widgets and paths
+are exactly what Liam creates in his driver.
+
+Not only that, but we have even more duplicated widgets created with this
+method, even with the hack from this patch set.
+
+snd_soc_dapm_new_dai_widgets: creating playback widget Playback:Playback
+  for dai d81247c0 dapm d8263f10 (playback_widget  was   (null), new c05ab080)
+snd_soc_dapm_new_dai_widgets: creating playback widget Playback:Playback
+  for dai d81247c0 dapm d8263c70 (playback_widget was c05ab080, new d8fe2b40)
+
+It seems Liam's commit needs to be reverted to fix that.  Whether that's
+correct or not, I've no idea.
+
+Plus, when I try to set things up as Liam has, the result doesn't work,
+because of the widget naming scheme having no disambiguation.
