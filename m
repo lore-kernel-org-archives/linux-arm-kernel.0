@@ -1,76 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Aug 2013 14:18:21 +0800
-Subject: [PATCH 6/7] ARM: dts: imx27 pinctrl
-In-Reply-To: <1375439907-10462-7-git-send-email-mpa@pengutronix.de>
-References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-7-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130805061819.GF24629@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 4 Aug 2013 23:21:29 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] arch/arm SoC organization
+In-Reply-To: <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
+References: <20130731141841.GP5882@titan.lakedaemon.net>
+ <20130802083346.GC7656@atomide.com>
+ <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
+Message-ID: <20130805062129.GK7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 12:38:26PM +0200, Markus Pargmann wrote:
-> Pinctrl driver node and pin group definitions for other driver nodes.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx27.dtsi | 216 +++++++++++++++++++++++++++++++------------
->  1 file changed, 158 insertions(+), 58 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 76cd89f..57a4855 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -10,6 +10,7 @@
->   */
->  
->  #include "skeleton.dtsi"
-> +#include "imx27-pinfunc.h"
->  
->  / {
->  	aliases {
-> @@ -142,6 +143,8 @@
->  				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
->  				reg = <0x10009000 0x1000>;
->  				clocks = <&clks 35>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_owire>;
+* Christian Daudt <csd_b@daudt.org> [130802 16:13]:
+> On Fri, Aug 2, 2013 at 1:33 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Jason Cooper <jason@lakedaemon.net> [130731 07:25]:
+> >> So, I'd like to propose we discuss some lessons learned and maybe arrive
+> >> at some best practices.  eg, should we just go with mach-$COMPANY/?  How
+> >> best to handle config symbols for efficient building?  Deprecation path
+> >> for legacy (unconverted) boards?
+> >
+> > A lot of that problem goes away by initializing everything as late
+> > as possible, and making things to live under drivers.
+> One category of items that we haven't found a good place for in this
+> new multiplatform world is where does dt-driven non-driver code reside
+> ? e.g. we have a secure monitor access function that only kicks in if
+> the appropriate dt entry is available . It currently resides in
+> mach-bcm/bcm_kona_smc.c as it seems like the only location for it at
+> the moment, but that doesn't seem like the best place because (a)
+> mach-bcm might end up littered with one-of cases like this and (b)
+> anything in mach-bcm is not visible to arm64 SoCs, and some of those
+> in the future will need to share with their arm32 cousins.
+>  But putting in drivers (e.g. drivers/smc) seems like the wrong thing
+> to do also because this is not a driver.
+>  We have a couple of other smallish pieces of IP that just need a bit
+> of generic init code to keep them happy, which we were discussing
+> internally where to best land them. At present they are also headed to
+> mach-bcm.
+>  Ultimately the question is 'what is allowed to reside in mach-<misc>
+> ?' And by extension: 'is there a good home for everything else ?''
 
-These should be added in board level dts file.
+Well I guess the question is how early do you need it?
 
-Shawn
+We only need the following things early on that might be SoC specific:
 
->  				status = "disabled";
->  			};
+1. Timers for clockevents
 
-<snip>
+2. Interrupt controller
 
-> +				fec {
-> +					pinctrl_fec: fec-1 {
+If you need the SoC specific code for the two items above, then
+you probably want to set it up in the SoC specific init_early.
 
-I suggest we name the node and label in the same pattern we use in
-imx5/6.  I do not know how you will label node fec-2.
+Everything else should be possible to do as device drivers with
+initramfs. If the code has an interrupt handler, chances are it
+can be a driver :)
 
-Shawn
+Regards,
 
-> +						fsl,pins = <
-> +							MX27_PAD_SD3_CMD__FEC_TXD0 0x0
-> +							MX27_PAD_SD3_CLK__FEC_TXD1 0x0
-> +							MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
-> +							MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
-> +							MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
-> +							MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
-> +							MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
-> +							MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
-> +							MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
-> +							MX27_PAD_ATA_DATA7__FEC_MDC 0x0
-> +							MX27_PAD_ATA_DATA8__FEC_CRS 0x0
-> +							MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
-> +							MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
-> +							MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
-> +							MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
-> +							MX27_PAD_ATA_DATA13__FEC_COL 0x0
-> +							MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
-> +							MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
-> +						>;
-> +					};
-> +				};
+Tony
