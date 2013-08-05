@@ -1,74 +1,72 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 5 Aug 2013 15:11:06 +0800
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130805065535.GP7656@atomide.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802090355.GF7656@atomide.com>
- <20130802093222.GA8982@kroah.com>
- <20130802123445.GG7656@atomide.com>
- <20130802141449.GA7533@kroah.com>
- <20130805065535.GP7656@atomide.com>
-Message-ID: <20130805071106.GA14215@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Aug 2013 00:27:04 -0700
+Subject: [PATCHv5 07/31] CLK: TI: add omap4 clock init file
+In-Reply-To: <1375460751-23676-8-git-send-email-t-kristo@ti.com>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-8-git-send-email-t-kristo@ti.com>
+Message-ID: <20130805072704.GS7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 04, 2013 at 11:55:35PM -0700, Tony Lindgren wrote:
-> * Greg KH <greg@kroah.com> [130802 07:20]:
-> > On Fri, Aug 02, 2013 at 05:34:45AM -0700, Tony Lindgren wrote:
-> > > * Greg KH <greg@kroah.com> [130802 02:37]:
-> > > > On Fri, Aug 02, 2013 at 02:03:55AM -0700, Tony Lindgren wrote:
-> > > > > * Greg KH <greg@kroah.com> [130801 12:33]:
-> > > > > > 
-> > > > > > The driver core handles this really well, you just have to create new
-> > > > > > busses, and don't rely on the "catch-all" platform_bus.
-> > > > > 
-> > > > > Hmm do you have some example of a device driver that is generic and
-> > > > > is supported on platform_bus and some other bus?
-> > > > 
-> > > > Take a look at drivers/usb/host/ohci* for one example that I know of,
-> > > > there are others all through the kernel as well.
-> > > 
-> > > Uhh OK so I guess the answer is that the bus glue still needs to
-> > > be implemented separately for each driver and there's no generic
-> > > way of supporting multiple busses?
-> > 
-> > Different busses implies that there are different ways to physically
-> > talk to the device hardware, so of course there is no generic way to
-> > support that.
-> 
-> Right, but in many cases the only difference between SoCs are some bus
-> specific things like reset and idling of the devices. And using platform
-> bus allows the driver to stay generic.
+* Tero Kristo <t-kristo@ti.com> [130802 09:33]:
+> clk-44xx.c now contains the clock init functionality for omap4, including
+> DT clock registration and adding of static clkdev entries.
 
-Just because it "is there", doesn't mean you should abuse it :)
+Few comments below from "boot new hardware with old kernels" point of
+view that seems to be pretty close for clocks.
+ 
+> --- /dev/null
+> +++ b/drivers/clk/ti/clk-44xx.c
+...
 
-> > Unless your subsystem wants to do what we did for USB, and define a
-> > generic way to talk to the hardware in a very abstract way, allowing for
-> > totally different types of physical layers to handle lots of different
-> > logical layer drivers.  But odds are, you don't want to do that.
-> > 
-> > It should be easy to just abstract out your "this is how I write a byte
-> > to the hardware" logic to handle the different bus types, if you really
-> > are using the same chip/core.  Lots of drivers do this today just fine,
-> > it isn't a big deal.
-> 
-> I agree that makes sense for the driver specific things.
-> 
-> But for things that are completely bus specific for various SoCs, how
-> would you like to handle those?
-> 
-> For example, we are currently using platform bus and bus notifiers and
-> then the runtime PM calls from device driver trigger the bus specific
-> things.
-> 
-> Would you prefer to instead use a custom bus instead of extending
-> the platform bus for things like that?
+> +int __init omap4xxx_clk_init(void)
+> +{
+> +	int rc;
+> +	struct clk *abe_dpll_ref, *abe_dpll, *sys_32k_ck, *usb_dpll;
+> +
+> +	/* FIXME register clocks from DT first */
+> +	of_clk_init(NULL);
+> +
+> +	omap_dt_clocks_register(omap44xx_clks);
+> +
+> +	omap2_clk_disable_autoidle_all();
+> +
+> +	/*
+> +	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
+> +	 * state when turning the ABE clock domain. Workaround this by
+> +	 * locking the ABE DPLL on boot.
+> +	 * Lock the ABE DPLL in any case to avoid issues with audio.
+> +	 */
+> +	abe_dpll_ref = clk_get_sys(NULL, "abe_dpll_refclk_mux_ck");
+> +	sys_32k_ck = clk_get_sys(NULL, "sys_32k_ck");
+> +	rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
+> +	abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
+> +	if (!rc)
+> +		rc = clk_set_rate(abe_dpll, OMAP4_DPLL_ABE_DEFFREQ);
+> +	if (rc)
+> +		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
+> +
+> +	/*
+> +	 * Lock USB DPLL on OMAP4 devices so that the L3INIT power
+> +	 * domain can transition to retention state when not in use.
+> +	 */
+> +	usb_dpll = clk_get_sys(NULL, "dpll_usb_ck");
+> +	rc = clk_set_rate(usb_dpll, OMAP4_DPLL_USB_DEFFREQ);
+> +	if (rc)
+> +		pr_err("%s: failed to configure USB DPLL!\n", __func__);
+> +
+> +	return 0;
+> +}
 
-Yes I would.  I would really like to only use the platform bus for very
-few things, if any at all.
+Maybe try to have a generic init function, then have SoC specific
+quirk function pointers set up based on the DT compatible property?
 
-thanks,
+Grep for varioius _of_match[] examples in the drivers.
 
-greg k-h
+That way you might be able to make clocks work for some new similar
+hardware with just .dts change and patching in the quirks later on
+as needed ;)
+
+Regards,
+
+Tony
