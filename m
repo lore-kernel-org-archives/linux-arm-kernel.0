@@ -1,68 +1,83 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 5 Aug 2013 19:20:56 +0800
-Subject: [PATCH V2 0/8] ARM: tegra: support LP1 suspend mode
-Message-ID: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
+Date: Mon, 5 Aug 2013 19:20:57 +0800
+Subject: [PATCH V2 1/8] ARM: tegra: add common resume handling code for LP1
+ resuming
+In-Reply-To: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
+References: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1375701664-14965-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the support of LP1 suspend mode for Tegra.
+Add support to the Tegra CPU reset vector to detect whether the CPU is
+resuming from LP1 suspend state. If it is, branch to the LP1-specific
+resume code.
 
+When Tegra enters the LP1 suspend state, the SDRAM controller is placed
+into a self-refresh state. For this reason, we must place the LP1 resume
+code into IRAM, so that it is accessible before SDRAM access has been
+re-enabled.
+
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
 V2:
-* double confirm each patch can be built with all the combination of
-  Tegra SoCs by bisect
-* and make sure the function is still OK with above testing
+* update the commit message
+* move the define of IRAM_CODE_AREA to iomap.h
+* move the THUMB marco code before the 'bx' instruction
+---
+ arch/arm/mach-tegra/iomap.h         |  2 ++
+ arch/arm/mach-tegra/reset-handler.S | 13 +++++++++++++
+ arch/arm/mach-tegra/reset.c         |  2 ++
+ 3 files changed, 17 insertions(+)
 
-Verified on Seaboard, Cardhu and Dalmore.
-And tested with THUMB2_KERNEL as well.
-
-P.S.
-A known issue on Dalmore, the LP1 resume may take 10 ~ 15 seconds due to
-the 792MHz BCT. It can't be reproduced on Seaboard or Cardhu. And the
-root cause of this is about the default settings of EMC registers that
-cause the DRAM can't leave self-refresh mode immediately. If you want
-to test with quick LP1 resume on Dalmore, I can provide another HACK for
-this.
-
-Joseph Lo (8):
-  ARM: tegra: add common resume handling code for LP1 resuming
-  ARM: tegra: config the polarity of the request of sys clock
-  clk: tegra114: add LP1 suspend/resume support
-  ARM: tegra: add common LP1 suspend support
-  ARM: tegra: add LP1 suspend support for Tegra30
-  ARM: tegra: add LP1 suspend support for Tegra20
-  ARM: tegra: add LP1 suspend support for Tegra114
-  ARM: tegra: enable LP1 suspend mode
-
- arch/arm/boot/dts/tegra114-dalmore.dts     |   2 +-
- arch/arm/boot/dts/tegra20-colibri-512.dtsi |   2 +-
- arch/arm/boot/dts/tegra20-harmony.dts      |   2 +-
- arch/arm/boot/dts/tegra20-paz00.dts        |   2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts     |   2 +-
- arch/arm/boot/dts/tegra20-tamonten.dtsi    |   2 +-
- arch/arm/boot/dts/tegra20-trimslice.dts    |   2 +-
- arch/arm/boot/dts/tegra20-ventana.dts      |   2 +-
- arch/arm/boot/dts/tegra20-whistler.dts     |   2 +-
- arch/arm/boot/dts/tegra30-beaver.dts       |   2 +-
- arch/arm/boot/dts/tegra30-cardhu.dtsi      |   2 +-
- arch/arm/mach-tegra/Makefile               |   3 +
- arch/arm/mach-tegra/iomap.h                |   8 +
- arch/arm/mach-tegra/pm-tegra20.c           |  34 ++
- arch/arm/mach-tegra/pm-tegra30.c           |  34 ++
- arch/arm/mach-tegra/pm.c                   | 138 ++++++-
- arch/arm/mach-tegra/pm.h                   |  12 +
- arch/arm/mach-tegra/pmc.c                  |  37 ++
- arch/arm/mach-tegra/pmc.h                  |   3 +
- arch/arm/mach-tegra/reset-handler.S        |  13 +
- arch/arm/mach-tegra/reset.c                |   2 +
- arch/arm/mach-tegra/reset.h                |   4 +
- arch/arm/mach-tegra/sleep-tegra20.S        | 296 ++++++++++++++
- arch/arm/mach-tegra/sleep-tegra30.S        | 605 +++++++++++++++++++++++++++++
- arch/arm/mach-tegra/sleep.S                |   8 +-
- arch/arm/mach-tegra/sleep.h                |   8 +
- drivers/clk/tegra/clk-tegra114.c           |  32 ++
- 27 files changed, 1239 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/mach-tegra/pm-tegra20.c
- create mode 100644 arch/arm/mach-tegra/pm-tegra30.c
-
+diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
+index 399fbca..f2bdcb4 100644
+--- a/arch/arm/mach-tegra/iomap.h
++++ b/arch/arm/mach-tegra/iomap.h
+@@ -24,6 +24,8 @@
+ #define TEGRA_IRAM_BASE			0x40000000
+ #define TEGRA_IRAM_SIZE			SZ_256K
+ 
++#define TEGRA_IRAM_CODE_AREA		(TEGRA_IRAM_BASE + SZ_4K)
++
+ #define TEGRA_HOST1X_BASE		0x50000000
+ #define TEGRA_HOST1X_SIZE		0x24000
+ 
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 34614bd..f527b2c 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -182,6 +182,19 @@ after_errata:
+ 1:
+ #endif
+ 
++	/* Waking up from LP1? */
++	ldr	r8, [r12, #RESET_DATA(MASK_LP1)]
++	tst	r8, r11				@ if in_lp1
++	beq	__is_not_lp1
++	cmp	r10, #0
++	bne	__die				@ only CPU0 can be here
++	ldr	lr, [r12, #RESET_DATA(STARTUP_LP1)]
++	cmp	lr, #0
++	bleq	__die				@ no LP1 startup handler
++ THUMB(	add	lr, lr, #1 )			@ switch to Thumb mode
++	bx	lr
++__is_not_lp1:
++
+ 	/* Waking up from LP2? */
+ 	ldr	r9, [r12, #RESET_DATA(MASK_LP2)]
+ 	tst	r9, r11				@ if in_lp2
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 1ac434e..fd0bbf8 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -81,6 +81,8 @@ void __init tegra_cpu_reset_handler_init(void)
+ #endif
+ 
+ #ifdef CONFIG_PM_SLEEP
++	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP1] =
++		TEGRA_IRAM_CODE_AREA;
+ 	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP2] =
+ 		virt_to_phys((void *)tegra_resume);
+ #endif
 -- 
 1.8.3.4
