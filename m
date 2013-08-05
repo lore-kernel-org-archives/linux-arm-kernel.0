@@ -1,33 +1,78 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  5 Aug 2013 14:40:45 +0200
-Subject: [PATCH 2/2] serial: i.MX: evaluate linux,stdout-path property
-In-Reply-To: <1375706445-15375-1-git-send-email-s.hauer@pengutronix.de>
-References: <1375706445-15375-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1375706445-15375-3-git-send-email-s.hauer@pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon,  5 Aug 2013 13:42:53 +0100
+Subject: [RFC PATCH] ARM: vectors: fix poison for BE8 endianness
+Message-ID: <1375706573-7685-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devicetrees may have the linux,stdout-path property to specify the
-console. This patch adds support to the i.MX serial driver for this.
+Writing instructions using data accesses or .word will result in
+the wrong instruction endianness on BE8.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+This patch uses the opcodes.h macros to insert the poison
+instruction instead.  This adapts correctly to all endianness
+variants.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- drivers/tty/serial/imx.c | 3 +++
- 1 file changed, 3 insertions(+)
+Build+disassemble tested to check correct kuser instruction byte order
+and correct code generation in early_trap_init().
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 415cec6..420ad02 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1472,6 +1472,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+Byte order for the injected instruction in the kuser helpers is LE
+for LE, BE8 and BE for BE32.
+
+Operand byte order in early_trap_init() is native for LE, BE32 and
+swabbed for BE8.
+
+
+In BE32, the Thumb view of the poison is transposed, reducing the
+effective size of the poison by a halfword.
+
+
+ arch/arm/kernel/entry-armv.S |    3 ++-
+ arch/arm/kernel/traps.c      |    3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index d40d0ef..d457583 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -23,6 +23,7 @@
+ #ifndef CONFIG_MULTI_IRQ_HANDLER
+ #include <mach/entry-macro.S>
+ #endif
++#include <asm/opcodes.h>
+ #include <asm/thread_notify.h>
+ #include <asm/unwind.h>
+ #include <asm/unistd.h>
+@@ -749,7 +750,7 @@ ENDPROC(__switch_to)
+ 	.endr
+ 	.endif
+ 	.rept	(\size - (. - \sym)) / 4
+-	.word	0xe7fddef1
++	__inst_arm(0xe7fddef1)
+ 	.endr
+ 	.endm
  
- 	sport->devdata = of_id->data;
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index ab517fc..dc49356 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -29,6 +29,7 @@
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+ #include <asm/exception.h>
++#include <asm/opcodes.h>
+ #include <asm/unistd.h>
+ #include <asm/traps.h>
+ #include <asm/unwind.h>
+@@ -836,7 +837,7 @@ void __init early_trap_init(void *vectors_base)
+ 	 * branch back to the undefined instruction.
+ 	 */
+ 	for (i = 0; i < PAGE_SIZE / sizeof(u32); i++)
+-		((u32 *)vectors_base)[i] = 0xe7fddef1;
++		((u32 *)vectors_base)[i] = __opcode_to_mem_arm(0xe7fddef1);
  
-+	if (of_device_is_stdout_path(np))
-+		add_preferred_console(imx_reg.cons->name, sport->port.line, 0);
-+
- 	return 0;
- }
- #else
+ 	/*
+ 	 * Copy the vectors, stubs and kuser helpers (in entry-armv.S)
 -- 
-1.8.4.rc0
+1.7.9.5
