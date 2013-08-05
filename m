@@ -1,60 +1,76 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Aug 2013 14:14:56 +0800
-Subject: [PATCH 5/7] ARM: dts: imx27 pin functions
-In-Reply-To: <1375439907-10462-6-git-send-email-mpa@pengutronix.de>
+Date: Mon, 5 Aug 2013 14:18:21 +0800
+Subject: [PATCH 6/7] ARM: dts: imx27 pinctrl
+In-Reply-To: <1375439907-10462-7-git-send-email-mpa@pengutronix.de>
 References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130805061453.GE24629@S2101-09.ap.freescale.net>
+ <1375439907-10462-7-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130805061819.GF24629@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 12:38:25PM +0200, Markus Pargmann wrote:
+On Fri, Aug 02, 2013 at 12:38:26PM +0200, Markus Pargmann wrote:
+> Pinctrl driver node and pin group definitions for other driver nodes.
+> 
 > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
->  arch/arm/boot/dts/imx27-pinfunc.h | 520 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 520 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
+>  arch/arm/boot/dts/imx27.dtsi | 216 +++++++++++++++++++++++++++++++------------
+>  1 file changed, 158 insertions(+), 58 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx27-pinfunc.h b/arch/arm/boot/dts/imx27-pinfunc.h
-> new file mode 100644
-> index 0000000..f3b4c55
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx27-pinfunc.h
-> @@ -0,0 +1,520 @@
-> +/*
-> + * Copyright 2013 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#ifndef __DTS_IMX27_PINFUNC_H
-> +#define __DTS_IMX27_PINFUNC_H
-> +
-> +/*
-> + * The pin function ID is a tuple of
-> + * <pin mux_config>
-> + * mux_config consists of
-> + * function + (direction << 2) + (gpio_oconf << 4) + (gpio_iconfa << 8) + (gpio_iconfb << 10)
-> + *
-> + * function:      0 - Primary function
-> + *                1 - Alternate function
-> + *                2 - GPIO
-> + * direction:     0 - Input
-> + *                1 - Output
-> + * gpio_oconf:    0 - A_IN
-> + *                1 - B_IN
-> + *                2 - C_IN
-> + *                3 - Data Register
-> + * gpio_iconfa/b: 0 - GPIO_IN
-> + *                1 - Interrupt Status Register
-> + *                2 - 0
-> + *                3 - 1
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 76cd89f..57a4855 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -10,6 +10,7 @@
+>   */
+>  
+>  #include "skeleton.dtsi"
+> +#include "imx27-pinfunc.h"
+>  
+>  / {
+>  	aliases {
+> @@ -142,6 +143,8 @@
+>  				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
+>  				reg = <0x10009000 0x1000>;
+>  				clocks = <&clks 35>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_owire>;
 
-This should be documented in bindings doc as well.
+These should be added in board level dts file.
 
 Shawn
 
-> + */
+>  				status = "disabled";
+>  			};
+
+<snip>
+
+> +				fec {
+> +					pinctrl_fec: fec-1 {
+
+I suggest we name the node and label in the same pattern we use in
+imx5/6.  I do not know how you will label node fec-2.
+
+Shawn
+
+> +						fsl,pins = <
+> +							MX27_PAD_SD3_CMD__FEC_TXD0 0x0
+> +							MX27_PAD_SD3_CLK__FEC_TXD1 0x0
+> +							MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
+> +							MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
+> +							MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
+> +							MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
+> +							MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
+> +							MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
+> +							MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
+> +							MX27_PAD_ATA_DATA7__FEC_MDC 0x0
+> +							MX27_PAD_ATA_DATA8__FEC_CRS 0x0
+> +							MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
+> +							MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
+> +							MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
+> +							MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
+> +							MX27_PAD_ATA_DATA13__FEC_COL 0x0
+> +							MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
+> +							MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
+> +						>;
+> +					};
+> +				};
