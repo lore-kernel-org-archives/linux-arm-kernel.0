@@ -1,74 +1,153 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 5 Aug 2013 14:29:44 +0100
-Subject: [PATCH v3 1/2] ARM: OMAP: Add secure function omap_smc3() which
- calling instruction smc #1
-In-Reply-To: <201308041045.00698@pali>
-References: <531356997.66774.1373571839852.JavaMail.apache@mail81.abv.bg>
- <51DF0D7A.4090008@ti.com>
- <20130712102430.GA3249@localhost.localdomain>
- <201308041045.00698@pali>
-Message-ID: <20130805132939.GA2755@localhost.localdomain>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 05 Aug 2013 15:34:58 +0200
+Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of Exynos
+ SoCs
+In-Reply-To: <1429191.3FDem6vW0S@amdc1032>
+References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
+ <27536111.odlCO093Zi@amdc1032> <003c01ce91cd$427fad70$c77f0850$@samsung.com>
+ <1429191.3FDem6vW0S@amdc1032>
+Message-ID: <51FFAA02.50407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 04, 2013 at 10:45:00AM +0200, Pali Roh?r wrote:
-> Here is new version (v3) of omap secure part patch:
-> 
-> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
-> but Nokia RX-51 board needs to call smc #1 for PPA access.
-> 
-> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
-> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-> index 0e72917..c4586f4 100644
-> --- a/arch/arm/mach-omap2/omap-secure.h
-> +++ b/arch/arm/mach-omap2/omap-secure.h
-> @@ -51,6 +51,7 @@
->  extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
->  				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
->  extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
-> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
->  extern phys_addr_t omap_secure_ram_mempool_base(void);
->  extern int omap_secure_ram_reserve_memblock(void);
->  
-> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
-> index f6441c1..7bbc043 100644
-> --- a/arch/arm/mach-omap2/omap-smc.S
-> +++ b/arch/arm/mach-omap2/omap-smc.S
-> @@ -1,9 +1,11 @@
->  /*
-> - * OMAP44xx secure APIs file.
-> + * OMAP34xx and OMAP44xx secure APIs file.
->   *
->   * Copyright (C) 2010 Texas Instruments, Inc.
->   * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
->   *
-> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-> + * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
->   *
->   * This program is free software,you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -54,6 +56,23 @@ ENTRY(omap_smc2)
->  	ldmfd   sp!, {r4-r12, pc}
->  ENDPROC(omap_smc2)
->  
-> +/**
-> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
-> + * Low level common routine for secure HAL and PPA APIs via smc #1
-> + * r0 - @service_id: Secure Service ID
-> + * r1 - @process_id: Process ID
-> + * r2 - @flag: Flag to indicate the criticality of operation
-> + * r3 - @pargs: Physical address of parameter list
-> + */
-> +ENTRY(omap_smc3)
-> +	stmfd	sp!, {r4-r11, lr}
-> +	mov	r12, r0		@ Copy the secure service ID
-> +	mov	r6, #0xff	@ Indicate new Task call
-> +	dsb			@ Memory Barrier
+Hello,
 
-Can you explain _why_ the barrier is there?  The reader doesn't need to
-be told that a barrier instruction is a barrier instruction.
+On 8/5/2013 3:09 PM, Bartlomiej Zolnierkiewicz wrote:
+> On Monday, August 05, 2013 08:16:40 PM Cho KyongHo wrote:
+> > > -----Original Message-----
+> > > From: Bartlomiej Zolnierkiewicz [mailto:b.zolnierkie at samsung.com]
+> > > Sent: Saturday, August 03, 2013 2:14 AM
+> > >
+> > > Hi,
+> > >
+> > > On Friday, July 26, 2013 08:28:19 PM Cho KyongHo wrote:
+> > > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > > > ---
+> > > >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
+> > > >  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
+> > > >  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
+> > > >  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
+> > > >  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
+> > > >  5 files changed, 617 insertions(+), 0 deletions(-)
+> > > >  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > >
+> > > > diff --git a/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > > b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > > new file mode 100644
+> > > > index 0000000..92f0a33
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > > @@ -0,0 +1,103 @@
+> > > > +Samsung Exynos4210 IOMMU H/W, System MMU (System Memory Management Unit)
+> > > > +
+> > > > +Samsung's Exynos architecture contains System MMU that enables scattered
+> > > > +physical memory chunks visible as a contiguous region to DMA-capable peripheral
+> > > > +devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
+> > > > +
+> > > > +System MMU is a sort of IOMMU and support identical translation table format to
+> > > > +ARMv7 translation tables with minimum set of page properties including access
+> > > > +permissions, shareability and security protection. In addition, System MMU has
+> > > > +another capabilities like L2 TLB or block-fetch buffers to minimize translation
+> > > > +latency.
+> > > > +
+> > > > +A System MMU is dedicated to a single master peripheral device.  Thus, it is
+> > > > +important to specify the correct System MMU in the device node of its master
+> > > > +device. Whereas a System MMU is dedicated to a master device, the master device
+> > > > +may have more than one System MMU.
+> > > > +
+> > > > +Required properties:
+> > > > +- compatible: Should be "samsung,exynos4210-sysmmu"
+> > > > +- reg: A tuple of base address and size of System MMU registers.
+> > > > +- interrupt-parent: The phandle of the interrupt controller of System MMU
+> > > > +- interrupts: A tuple of numbers that indicates the interrupt source.
+> > > > +- clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
+> > > > +               Please refer to the following documents:
+> > > > +	       Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > > > +	       Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> > > > +	       Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+> > > > +	       Optional "master" if the clock to the System MMU is gated by
+> > > > +	       another gate clock other than "sysmmu". The System MMU driver
+> > > > +	       sets "master" the parent of "sysmmu".
+> > > > +	       Exynos4 SoCs, there needs no "master" clocks.
+> > > > +	       Exynos5 SoCs, some System MMUs must have "master" clocks.
+> > > > +- clocks: Required if the System MMU is needed to gate its clock.
+> > > > +	  Please refer to the documents listed above.
+> > > > +- samsung,power-domain: Required if the System MMU is needed to gate its power.
+> > > > +	  Please refer to the following document:
+> > > > +	  Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> > > > +
+> > > > +Required properties for the master peripheral devices:
+> > > > +- iommu: phandles to the System MMUs of the device
+> > > > +
+> > > > +Examples:
+> > > > +A System MMU is dedicated to a single master device.
+> > > > +	gsc_0:  gsc at 0x13e00000 {
+> > > > +		compatible = "samsung,exynos5-gsc";
+> > > > +		reg = <0x13e00000 0x1000>;
+> > > > +		interrupts = <0 85 0>;
+> > > > +		samsung,power-domain = <&pd_gsc>;
+> > > > +		clocks = <&clock 256>;
+> > > > +		clock-names = "gscl";
+> > > > +		iommu = <&sysmmu_gsc1>;
+> > > > +	};
+> > > > +
+> > > > +	sysmmu_gsc0: sysmmu at 13E80000 {
+> > > > +		compatible = "samsung,exynos4210-sysmmu";
+> > > > +		reg = <0x13E80000 0x1000>;
+> > > > +		interrupt-parent = <&combiner>;
+> > > > +		interrupt-names = "sysmmu-gsc0";
+> > > > +		interrupts = <2 0>;
+> > > > +		clock-names = "sysmmu", "master";
+> > > > +		clocks = <&clock 262>, <&clock 256>;
+> > > > +		samsung,power-domain = <&pd_gsc>;
+> > > > +		status = "ok";
+> > > > +	};
+> > > > +
+> > > > +MFC has 2 System MMUs for each port that MFC is attached. Thus it seems natural
+> > > > +to define 2 System MMUs for each port of the MFC:
+> > >
+> > > Marek Szyprowski (added to cc:) has a patch fixing MFC to create separate
+> > > mfc_l and mfc_r devices (like it was in the past). Using this patch it
+> > > would be possible to bind sysmmu_mfc_l to mfc_l device and sysmmu_mfc_r to
+> > > mfc_r device. This probably also requires adding some MFC specific handling
+> > > in a device tree node and to the new master's device PM ops (in patch #10)
+> > > as previously (in our trees) sysmmu_mfc r device was set as parent of
+> > > sysmmu_mfc_l device which in turn was a parent for main MFC device (to make
+> > > runtime Power Management work). However because MFC is the only device
+> > > requiring use of multiple System MMUs above changes would allow us (unless
+> > > I'm missing something?) to use just one System MMU device per struct
+> > > exynos_iommu_client instance (making driver a lot simpler).
+> > >
+> >
+> > Does it mean that we can make the exynos-iommu driver simpler
+> > with Marek Szyprowski's patch?
+>
+> I think so and you probably need to change MFC handling anyway because
+> MFC driver does DMA allocations per mfc_l/mfc_r devices and not per main
+> device (at least in the upstream kernels).
+>
+> [ Marek, could you please resfresh and post your patch on the list? ]
 
-Cheers
----Dave
+My proposal for cleaning up MFC's bindings is available here:
+
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/21536/
+
+> BTW There is an additional problem with combining System MMU devices per
+> one main device - it limits available address space (which in case of MFC
+> is very limited by hardware design).
+>
+> > It is welcome but I don't think it covers all topologies of System MMU and
+> > master H/W. Those are getting more complex.
+>
+> Could you please be more specific? I know about FIMC ISP subsystem but
+> it doesn't require combining System MMUs. Are there any other examples of
+> complex System MMU + master H/W topologies?
+>
+> Anyway I think that System MMUs should not be combined (as it is done in
+> patch #10) and should be binded per "memport" devices and not per main
+> device (as done in this patch).
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
