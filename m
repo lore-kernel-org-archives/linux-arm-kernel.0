@@ -1,84 +1,86 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 05 Aug 2013 11:00:16 -0600
-Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
-In-Reply-To: <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-4-git-send-email-josephl@nvidia.com>
- <51F6F209.2090309@wwwdotorg.org>
- <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
- <51FC1751.9010401@wwwdotorg.org>
- <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <51FFDA20.6050403@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Aug 2013 02:01:36 +0900
+Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
+In-Reply-To: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <51FFDA70.7080900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 02:02 AM, Joseph Lo wrote:
-> On Sat, 2013-08-03 at 04:32 +0800, Stephen Warren wrote:
->> On 08/02/2013 02:09 AM, Joseph Lo wrote:
->>> On Tue, 2013-07-30 at 06:51 +0800, Stephen Warren wrote:
->>>> On 07/26/2013 03:15 AM, Joseph Lo wrote:
->>>>> When the system suspends to LP1, the clock of the CPU would be switched to
->>>>> CLK_M (12MHz Oscillator) during suspend/resume flow. The clock driver
->>>>> needs to restore the clock of CPU after LP1 resume.
->>>>
->>>> It's unclear to me how the code change implements "restore the clock of
->>>> the CPU". A register name of CCLKG_BURST_POLICY doesn't sound like it's
->>>> anything to do with enabled/disabling the CPU clock, nor configuring its
->>>> rate. What exactly does this register do, and hence what does this new
->>>> code actually restore?
->>>>
->>> When system suspend to LP1, most of the PLLs was clock gated. Because we
->>> didn't cut off the core power, the settings of PLL still keep there. But
->>> we switch the clock source of CPU to CLK_M before shut off PLLs by
->>> CCLKG_BURSY_POLICY register. So we need to resume it back to original
->>> clock source by CCLKG_BURST_POLICY register. Or it would be keep in low
->>> rate (CLK_M) after resume.
->>
->> OK, I guess the register name was badly chosen by HW. I'd like to see
->> part of your description above in the patch description. How about
->> replacing the patch description with:
->>
->> ----------
->> When the system suspends to LP1, the CPU clock source is switched to
->> CLK_M (12MHz Oscillator) during suspend/resume flow[1]. The CPU clock
->> source is controlled by the CCLKG_BURST_POLICY register, and hence this
->> register must be restored during LP1 resume.
->> ----------
->>
->> [1] Question: where does this happen? This patch doesn't make that
->> change. I wonder why the suspend path can't save this register, rather
->> than implementing a separate suspend syscore op in the clock driver.
->> Does the HW auto-switch the value in the register itself?
+On 07/23/13 08:49, Tomasz Figa wrote:
+> This series is an attempt to move clock support on Samsung S3C64xx SoCs
+> to Common Clock Framework.
 >
-> If we switch CPU to CLK_M in clock driver, the system will become slowly
-> during the middle of suspending flow. We do this at the very end of the
-> LP1 suspending flow before the CPU disable all the PLL clocks.
-
-I think you answered "why is the switch to CLK_M performed very late",
-whereas I asked "where is the code that performs the switch to CLK_M".
-
->>>> Why don't Tegra20/30 need a similar change?
->>>
->>> For Tegra20/30, the same code had been implemented in the suspend/resume
->>> function of tegra_cpu_car_ops. It restores the CPU clock ASAP when CPU
->>> resume from a suspend state to get quick performance I believe.
->>>
->>> For Tegra114, the resume performance is cool (although we can't see it
->>> in upstream kernel now, it still need some other functions.). We can
->>> implement all the clock related suspend/resume function in the clock
->>> driver.
->>
->> OK, I do see something similar in tegra20/30_cpu_clock_suspend/resume.
->> Why can't this new code be part of the equivalent functions; does the
->> Tegra114 suspend/resume code in mach-tegra/ not call
->> tegra_cpu_car_ops.suspend/resume() in the same way it does on Tegra20/30?
+> First, support for PLL types present on S3C64xx SoCs is added to Samsung
+> Common Clock Framework driver. Then the main clock driver for mentioned
+> SoCs is introduced. Further patches contain fixes for drivers to make them
+> compliant with CCF semantics, migration of platform code to use the new
+> clock driver and removal of old clock management code.
 >
-> One of the main reasons is due to DFLL clock. The CPU clock of Tegra114
-> is going to switch to DFLL to a get higher clock rate. But it depends
-> some other HW (i.e. I2C), we can't resume it so early when the CPU just
-> resume like we did in tegra_cpu_car_ops.suspend/resume for Tegra20/30.
+> Depends on:
+>   - [PATCH v4 00/20] Samsung PWM support cleanup
+>     http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20856
+>
+> On S3C6410-based Tiny6410 board (Mini6410-compatible):
+>
+> Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+>
+> For v1:
+>
+> Acked-by: Mike Turquette<mturquette@linaro.org>
+>
+> Changes since v1:
+>   - added patch for read-only muxes,
+>   - exported configurable muxes and dividers,
+>   - defined mout_syncmux as read-only mux,
+>   - in DT-enabled case fixed-clock binding is used to define external clocks.
+>
+> Tomasz Figa (8):
+>    clk: mux: Add support for read-only muxes.
+>    clk: samsung: pll: Add support for PLL6552 and PLL6553
+>    clk: samsung: Add clock driver for S3C64xx SoCs
+>    ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
+>    ARM: s3c64xx: dma: Use clk_prepare_enable/clk_disable_unprepare
+>    usb: host: ohci-s3c2410 Use clk_prepare_enable/clk_disable_unprepare
+>    ARM: s3c64xx: Migrate clock handling to Common Clock Framework
+>    ARM: s3c64xx: Remove old clock management code
+>
+>   .../bindings/clock/samsung,s3c64xx-clock.txt       |   77 ++
+>   arch/arm/Kconfig                                   |    2 +-
+>   arch/arm/mach-s3c64xx/Makefile                     |    2 +-
+>   arch/arm/mach-s3c64xx/clock.c                      | 1007 --------------------
+>   arch/arm/mach-s3c64xx/common.c                     |   21 +-
+>   arch/arm/mach-s3c64xx/common.h                     |   12 +-
+>   arch/arm/mach-s3c64xx/dma.c                        |    4 +-
+>   arch/arm/mach-s3c64xx/include/mach/regs-clock.h    |  132 +--
+>   arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+>   arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+>   arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+>   arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+>   arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+>   arch/arm/mach-s3c64xx/mach-smartq.c                |   11 +-
+>   arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +-
+>   arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+>   arch/arm/mach-s3c64xx/pm.c                         |   21 -
+>   arch/arm/mach-s3c64xx/s3c6400.c                    |    6 -
+>   arch/arm/mach-s3c64xx/s3c6410.c                    |    7 -
+>   arch/arm/plat-samsung/include/plat/cpu.h           |    4 +
+>   drivers/clk/clk-mux.c                              |   10 +-
+>   drivers/clk/samsung/Makefile                       |    1 +
+>   drivers/clk/samsung/clk-pll.c                      |  160 ++++
+>   drivers/clk/samsung/clk-pll.h                      |    4 +
+>   drivers/clk/samsung/clk-s3c64xx.c                  |  465 +++++++++
+>   drivers/usb/host/ohci-s3c2410.c                    |    8 +-
+>   include/dt-bindings/clock/samsung,s3c64xx-clock.h  |  178 ++++
+>   include/linux/clk-provider.h                       |    2 +
+>   28 files changed, 943 insertions(+), 1205 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
+>   delete mode 100644 arch/arm/mach-s3c64xx/clock.c
+>   create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
+>   create mode 100644 include/dt-bindings/clock/samsung,s3c64xx-clock.h
+>
+Basically, this series looks good to me, but I'm not sure how this 
+should be handled because of dependency with PWM cleanup and clk stuff 
+in clk tree now...
 
-Is there a guarantee that the syscore_ops are run after the call to
-tegar_cpu_car_ops.resume() would be? Perhaps the mach-tegra/ code should
-simply call tegra_cpu_car_ops.resume() later on Tegra114 than it does on
-earlier chips, so it's run at a suitable time?
+- Kukjin
