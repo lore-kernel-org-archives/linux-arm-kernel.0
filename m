@@ -1,300 +1,150 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Mon, 5 Aug 2013 09:51:40 +0000
-Subject: [PATCH 4/5] fb: Add DCU framebuffer driver for Vybrid VF610
- platform
-In-Reply-To: <20130729111457.GB3029@pengutronix.de>
-References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
- <1373609276-14566-5-git-send-email-b18965@freescale.com>
- <20130729111457.GB3029@pengutronix.de>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D83CA6F0@039-SN1MPN1-002.039d.mgd.msft.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 5 Aug 2013 10:52:35 +0100
+Subject: [PATCH 1/3] ARM: vexpress: move spc driver back under
+ mach-vexpress
+In-Reply-To: <1375675793-16492-2-git-send-email-olof@lixom.net>
+References: <1375675793-16492-1-git-send-email-olof@lixom.net>
+ <1375675793-16492-2-git-send-email-olof@lixom.net>
+Message-ID: <20130805095235.GB29090@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sascha,
+On Mon, Aug 05, 2013 at 05:09:51AM +0100, Olof Johansson wrote:
+> Otherwise we have tc2_pm platform code calling into exported driver functions,
+> which doesn't make sense at this level.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/mach-vexpress/Makefile                         |  2 +-
+>  .../platform/vexpress => arch/arm/mach-vexpress}/spc.c  |  1 -
+>  arch/arm/mach-vexpress/tc2_pm.c                         |  3 ++-
+>  drivers/platform/Kconfig                                |  3 ---
+>  drivers/platform/Makefile                               |  1 -
+>  drivers/platform/vexpress/Kconfig                       |  9 ---------
+>  drivers/platform/vexpress/Makefile                      |  1 -
+>  include/linux/vexpress.h                                | 17 -----------------
+>  8 files changed, 3 insertions(+), 34 deletions(-)
+>  rename {drivers/platform/vexpress => arch/arm/mach-vexpress}/spc.c (99%)
+>  delete mode 100644 drivers/platform/vexpress/Kconfig
+>  delete mode 100644 drivers/platform/vexpress/Makefile
+> 
+> diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+> index 0853da6..36ea824 100644
+> --- a/arch/arm/mach-vexpress/Makefile
+> +++ b/arch/arm/mach-vexpress/Makefile
+> @@ -7,6 +7,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>  obj-y					:= v2m.o
+>  obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+>  obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
+> -obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o
+> +obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o spc.o
+>  obj-$(CONFIG_SMP)			+= platsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+> diff --git a/drivers/platform/vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+> similarity index 99%
+> rename from drivers/platform/vexpress/spc.c
+> rename to arch/arm/mach-vexpress/spc.c
+> index aa8c2a4..34e4bf4 100644
+> --- a/drivers/platform/vexpress/spc.c
+> +++ b/arch/arm/mach-vexpress/spc.c
+> @@ -250,4 +250,3 @@ int __init ve_spc_init(void)
+>  
+>  	return ve_spc_init_status;
+>  }
+> -early_initcall(ve_spc_init);
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> index dfb55d4..79cf4bc 100644
+> --- a/arch/arm/mach-vexpress/tc2_pm.c
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -23,9 +23,10 @@
+>  #include <asm/cputype.h>
+>  #include <asm/cp15.h>
+>  
+> -#include <linux/vexpress.h>
+>  #include <linux/arm-cci.h>
+>  
+> +#include "spc.h"
 
-> On Fri, Jul 12, 2013 at 02:07:55PM +0800, Alison Wang wrote:
-> > The Display Controller Unit (DCU) module is a system master that
-> > fetches graphics stored in internal or external memory and displays
-> > them on a TFT LCD panel. A wide range of panel sizes is supported and
-> > the timing of the interface signals is highly configurable.
-> > Graphics are read directly from memory and then blended in real-time,
-> > which allows for dynamic content creation with minimal CPU
-> intervention.
-> 
-> Only a review of the code inline.
-> 
-> Maybe the real question is whether we want to introduce another
-> framebuffer driver at all instead of making it a DRM driver.
-[Alison Wang] I think DCU module is more suitable to be designed as a framebuffer driver than a DRM driver. Just like DIU framebuffer driver for PowerPC.
-> 
-> > +
-> > +#define DRIVER_NAME			"fsl-dcu-fb"
-> > +
-> > +#define DCU_DCU_MODE			0x0010
-> > +#define DCU_MODE_BLEND_ITER(x)		(x << 20)
-> 
-> What's the result of DCU_MODE_BLEND_ITER(1 + 1)?
-[Alison Wang] Is it really necessary? I don't use this macro like DCU_MODE_BLEND_ITER(1 + 1), just use DCU_MODE_BLEND_ITER(2).
-> 
-> > +static struct fb_videomode dcu_mode_db[] = {
-> > +	{
-> > +		.name		= "480x272",
-> > +		.refresh	= 75,
-> > +		.xres		= 480,
-> > +		.yres		= 272,
-> > +		.pixclock	= 91996,
-> > +		.left_margin	= 2,
-> > +		.right_margin	= 2,
-> > +		.upper_margin	= 1,
-> > +		.lower_margin	= 1,
-> > +		.hsync_len	= 41,
-> > +		.vsync_len	= 2,
-> > +		.sync		= FB_SYNC_COMP_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-> > +		.vmode		= FB_VMODE_NONINTERLACED,
-> > +	},
-> > +};
-> 
-> We have ways to describe a panel in dt. Use them.
-[Alison Wang] Ok. I don't know it is common to describe the panel in dts for the latest kernel. Thanks.
-> 
-> > +
-> > +static struct mfb_info mfb_template[] = {
-> > +	{
-> > +	.index = LAYER0,
-> > +	.id = "Layer0",
-> > +	.alpha = 0xff,
-> > +	.blend = 0,
-> > +	.count = 0,
-> > +	.x_layer_d = 0,
-> > +	.y_layer_d = 0,
-> > +	},
-> 
-> Wrong indentation.
-[Alison Wang] I will fix it in next version.
-> 
-> > +	default:
-> > +		printk(KERN_ERR "unsupported color depth: %u\n",
-> > +			var->bits_per_pixel);
-> 
-> Use dev_* for printing messages in drivers.
-[Alison Wang] Ok.
-> 
-> > +static int fsl_dcu_check_var(struct fb_var_screeninfo *var,
-> > +		struct fb_info *info)
-> > +{
-> > +	if (var->xres_virtual < var->xres)
-> > +		var->xres_virtual = var->xres;
-> > +	if (var->yres_virtual < var->yres)
-> > +		var->yres_virtual = var->yres;
-> > +
-> > +	if (var->xoffset < 0)
-> > +		var->xoffset = 0;
-> > +
-> > +	if (var->yoffset < 0)
-> > +		var->yoffset = 0;
-> 
-> Ever seen an unsigned value going below zero?
-[Alison Wang] You are right, I will remove them in next version.
-> 
-> > +	default:
-> > +		printk(KERN_ERR "unsupported color depth: %u\n",
-> > +			var->bits_per_pixel);
-> 
-> BUG(). This can't happen since you make that sure above.
-[Alison Wang] You are right, I will remove it in next version.
-> 
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int calc_div_ratio(struct fb_info *info) {
-> 
-> Use a consistent namespace for function names (fsl_dcu_)
-[Alison Wang] Is it necessary to use a consistent namespace for this generic function? I think it is necessary to use a consistent namespace (fsl_dcu_) for the function names in structure fsl_dcu_ops.
-> 
-> > +	writel(DCU_THRESHOLD_LS_BF_VS(0x3) |
-> DCU_THRESHOLD_OUT_BUF_HIGH(0x78) |
-> > +		DCU_THRESHOLD_OUT_BUF_LOW(0), dcufb->reg_base +
-> DCU_THRESHOLD);
-> > +
-> > +	enable_controller(info);
-> > +}
-> 
-> Make your functions symmetric. If there's update_controller(), the
-> function should do exactly that, it should *not* enable the controller.
-> Call this from the users of this function if necessary.
-[Alison Wang] Ok, I will move this function out, and add it here.
-if (mfbi->index == LAYER0) {
-	update_controller(info);
-+	enable_controller(info);
-}
-> 
-> > +		if (copy_to_user(buf, &alpha, sizeof(alpha)))
-> > +			return -EFAULT;
-> > +		break;
-> > +	case MFB_SET_ALPHA:
-> > +		if (copy_from_user(&alpha, buf, sizeof(alpha)))
-> > +			return -EFAULT;
-> > +		mfbi->blend = 1;
-> > +		mfbi->alpha = alpha;
-> > +		fsl_dcu_set_par(info);
-> > +		break;
-> 
-> Is it still state of the art to introduce ioctls in the fb framework
-> without any kind of documentation?
-[Alison Wang] Do you mean I need to add a documentation in Documentation/fb/?
-> 
-> > +	default:
-> > +		printk(KERN_ERR "unknown ioctl command (0x%08X)\n", cmd);
-> 
-> What shall a reader of the kernel log do with a message like this? It's
-> utterly useless when he doesn't even now which device failed here. Just
-> drop this.
-[Alison Wang] Ok.
-> 
-> > +static void enable_interrupts(struct dcu_fb_data *dcufb) {
-> > +	u32 int_mask = readl(dcufb->reg_base + DCU_INT_MASK);
-> > +
-> > +	writel(int_mask & ~DCU_INT_MASK_UNDRUN, dcufb->reg_base +
-> > +DCU_INT_MASK); }
-> 
-> Inline this code where you need it. Introducing a function for a single
-> register write seems quite useless.
-[Alison Wang] Ok, I will inline it.
-> 
-> > +static int install_framebuffer(struct fb_info *info) {
-> > +	struct mfb_info *mfbi = info->par;
-> > +	struct fb_videomode *db = dcu_mode_db;
-> > +	unsigned int dbsize = ARRAY_SIZE(dcu_mode_db);
-> > +	int ret;
-> > +
-> > +	info->var.activate = FB_ACTIVATE_NOW;
-> > +	info->fbops = &fsl_dcu_ops;
-> > +	info->flags = FBINFO_FLAG_DEFAULT;
-> > +	info->pseudo_palette = &mfbi->pseudo_palette;
-> > +
-> > +	fb_alloc_cmap(&info->cmap, 16, 0);
-> > +
-> > +	ret = fb_find_mode(&info->var, info, fb_mode, db, dbsize,
-> > +			NULL, default_bpp);
-> > +
-> > +	if (fsl_dcu_check_var(&info->var, info)) {
-> > +		ret = -EINVAL;
-> 
-> Propagate the error.
-[Alison Wang] I will fix in next version.
-> 
-> > +		goto failed_checkvar;
-> > +	}
-> > +
-> > +	if (register_framebuffer(info) < 0) {
-> > +		ret = -EINVAL;
-> 
-> ditto
-[Alison Wang] I will fix in next version.
-> 
-> > +static irqreturn_t fsl_dcu_irq(int irq, void *dev_id) {
-> > +	struct dcu_fb_data *dcufb = dev_id;
-> > +	unsigned int status = readl(dcufb->reg_base + DCU_INT_STATUS);
-> > +	u32 dcu_mode;
-> > +
-> > +	if (status) {
-> 
-> Save indendation level by bailing out early.
-[Alison Wang] What do you mean?
-> 
-> > +		if (status & DCU_INT_STATUS_UNDRUN) {
-> > +			dcu_mode = readl(dcufb->reg_base + DCU_DCU_MODE);
-> > +			dcu_mode &= ~DCU_MODE_DCU_MODE_MASK;
-> > +			writel(dcu_mode | DCU_MODE_DCU_MODE(DCU_MODE_OFF),
-> > +				dcufb->reg_base + DCU_DCU_MODE);
-> > +			udelay(1);
-> > +			writel(dcu_mode | DCU_MODE_DCU_MODE(DCU_MODE_NORMAL),
-> > +				dcufb->reg_base + DCU_DCU_MODE);
-> > +		}
-> > +		writel(status, dcufb->reg_base + DCU_INT_STATUS);
-> > +		return IRQ_HANDLED;
-> > +	}
-> > +	return IRQ_NONE;
-> > +}
-> > +
-> > +	if (IS_ERR(tcon_clk)) {
-> > +		ret = PTR_ERR(tcon_clk);
-> > +		goto failed_getclock;
-> > +	}
-> > +	clk_prepare_enable(tcon_clk);
-> > +
-> > +	tcon_reg = of_iomap(tcon_np, 0);
-> 
-> Use devm_*
-[Alison Wang] Ok.
-> 
-> > +	dcufb->irq = platform_get_irq(pdev, 0);
-> > +	if (!dcufb->irq) {
-> > +		ret = -EINVAL;
-> > +		goto failed_getirq;
-> > +	}
-> > +
-> > +	ret = request_irq(dcufb->irq, fsl_dcu_irq, 0, DRIVER_NAME, dcufb);
-> 
-> Use devm_request_irq
-[Alison Wang] Ok.
-> 
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "could not request irq\n");
-> > +		goto failed_requestirq;
-> > +	}
-> > +
-> > +	/* Put TCON in bypass mode, so the input signals from DCU are
-> passed
-> > +	 * through TCON unchanged */
-> > +	ret = bypass_tcon(pdev->dev.of_node);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "could not bypass TCON\n");
-> > +		goto failed_bypasstcon;
-> > +	}
-> > +
-> > +	dcufb->clk = devm_clk_get(&pdev->dev, "dcu");
-> > +	if (IS_ERR(dcufb->clk)) {
-> > +		dev_err(&pdev->dev, "could not get clock\n");
-> > +		goto failed_getclock;
-> 
-> You will return 0 here.
-[Alison Wang] You are right, I will fix it in next version.
-> 
-> > +	}
-> > +	clk_prepare_enable(dcufb->clk);
-> > +
-> > +	for (i = 0; i < ARRAY_SIZE(dcufb->fsl_dcu_info); i++) {
-> > +		dcufb->fsl_dcu_info[i] =
-> > +			framebuffer_alloc(sizeof(struct mfb_info), &pdev-
-> >dev);
-> > +		if (!dcufb->fsl_dcu_info[i]) {
-> > +			ret = ENOMEM;
-> 
-> -ENOMEM
-> 
-> > +failed_alloc_framebuffer:
-> > +failed_getclock:
-> > +failed_bypasstcon:
-> > +	free_irq(dcufb->irq, dcufb);
-> > +failed_requestirq:
-> > +failed_getirq:
-> > +	iounmap(dcufb->reg_base);
-> 
-> You used devm_ioremap, so drop this.
-[Alison Wang] Ok.
-> 
-> > +failed_ioremap:
-> > +	kfree(dcufb);
-> 
-> This is allocated with devm_*. Drop this.
-[Alison Wang] Ok.
+Missing. Should we add it to mach-vexpress/include/mach ?
 
-Thanks for your comments.
+I have not sent a patch to check what we should do first and if Pawel is
+ok with these changes.
 
+Lorenzo
 
-Best Regards,
-Alison Wang
+> +
+>  /*
+>   * We can't use regular spinlocks. In the switcher case, it is possible
+>   * for an outbound CPU to call power_down() after its inbound counterpart
+> diff --git a/drivers/platform/Kconfig b/drivers/platform/Kconfig
+> index 449010e..57811ea 100644
+> --- a/drivers/platform/Kconfig
+> +++ b/drivers/platform/Kconfig
+> @@ -4,6 +4,3 @@ endif
+>  if GOLDFISH
+>  source "drivers/platform/goldfish/Kconfig"
+>  endif
+> -if ARCH_VEXPRESS
+> -source "drivers/platform/vexpress/Kconfig"
+> -endif
+> diff --git a/drivers/platform/Makefile b/drivers/platform/Makefile
+> index c1173d6..8a44a4c 100644
+> --- a/drivers/platform/Makefile
+> +++ b/drivers/platform/Makefile
+> @@ -5,4 +5,3 @@
+>  obj-$(CONFIG_X86)		+= x86/
+>  obj-$(CONFIG_OLPC)		+= olpc/
+>  obj-$(CONFIG_GOLDFISH)		+= goldfish/
+> -obj-$(CONFIG_ARCH_VEXPRESS)	+= vexpress/
+> diff --git a/drivers/platform/vexpress/Kconfig b/drivers/platform/vexpress/Kconfig
+> deleted file mode 100644
+> index d09a7c4..0000000
+> --- a/drivers/platform/vexpress/Kconfig
+> +++ /dev/null
+> @@ -1,9 +0,0 @@
+> -config VEXPRESS_SPC
+> -	bool "Versatile Express SPC driver support"
+> -	help
+> -	  The Serial Power Controller (SPC) for ARM Ltd. test chips, is
+> -	  an IP that provides a memory mapped interface to power controller
+> -	  HW. The driver provides an API abstraction meant to be used by
+> -	  subsystem drivers allowing to program registers controlling
+> -	  low-level power management features like power down flags,
+> -	  global and per-cpu wake-up IRQs.
+> diff --git a/drivers/platform/vexpress/Makefile b/drivers/platform/vexpress/Makefile
+> deleted file mode 100644
+> index d31eca2..0000000
+> --- a/drivers/platform/vexpress/Makefile
+> +++ /dev/null
+> @@ -1 +0,0 @@
+> -obj-$(CONFIG_VEXPRESS_SPC)	+= spc.o
+> diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
+> index 3e35556..617c01b 100644
+> --- a/include/linux/vexpress.h
+> +++ b/include/linux/vexpress.h
+> @@ -124,21 +124,4 @@ void vexpress_osc_of_setup(struct device_node *node);
+>  void vexpress_clk_init(void __iomem *sp810_base);
+>  void vexpress_clk_of_init(void);
+>  
+> -/* SPC */
+> -
+> -#ifdef CONFIG_VEXPRESS_SPC
+> -int __init ve_spc_init(void);
+> -void ve_spc_global_wakeup_irq(bool set);
+> -void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set);
+> -void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr);
+> -u32 ve_spc_get_nr_cpus(u32 cluster);
+> -void ve_spc_powerdown(u32 cluster, bool enable);
+> -#else
+> -static inline int ve_spc_init(void) { return -ENODEV; }
+> -static inline void ve_spc_global_wakeup_irq(bool set) { }
+> -static inline void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set) { }
+> -static inline void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr) { }
+> -static inline u32 ve_spc_get_nr_cpus(u32 cluster) { return 0; }
+> -static inline void ve_spc_powerdown(u32 cluster, bool enable) { }
+> -#endif
+>  #endif
+> -- 
+> 1.8.1.192.gc4361b8
+> 
+> 
