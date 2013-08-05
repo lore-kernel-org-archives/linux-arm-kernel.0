@@ -1,68 +1,21 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 05 Aug 2013 11:48:07 -0600
-Subject: [PATCH V2 4/8] ARM: tegra: add common LP1 suspend support
-In-Reply-To: <1375701664-14965-5-git-send-email-josephl@nvidia.com>
-References: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
- <1375701664-14965-5-git-send-email-josephl@nvidia.com>
-Message-ID: <51FFE557.4000103@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Aug 2013 02:50:50 +0900
+Subject: [PATCH v4 05/13] ARM: dts: Add camera subsystem device nodes
+ to exynos4.dtsi
+In-Reply-To: <1374671845-30373-6-git-send-email-s.nawrocki@samsung.com>
+References: <1374671845-30373-1-git-send-email-s.nawrocki@samsung.com>
+ <1374671845-30373-6-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <51FFE5FA.6030409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 05:21 AM, Joseph Lo wrote:
-> The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
-> clock gated and SDRAM in self-refresh mode. That means the low level LP1
-> suspending and resuming code couldn't be run on DRAM and the CPU must
-> switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
-> the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
-> The LP1 low level handling code need to be moved to IRAM area first. And
-> marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
-> power timer needs to be re-calculated based on 32KHz that was originally
-> based on PCLK.
-> 
-> When resuming from LP1, the LP1 reset handler will resume PLLs and then
-> put DRAM to normal mode. Then jumping to the "tegra_resume" that will
-> restore full context before back to kernel. The "tegra_resume" handler
-> was expected to be found in PMC_SCRATCH41 register.
-> 
-> This is common LP1 procedures for Tegra, so we do these jobs mainly in
-> this patch:
-> * moving LP1 low level handling code to IRAM
-> * marking LP1 mask
-> * copying the physical address of "tegra_resume" to PMC_SCRATCH41
-> * re-calculate the CPU power timer based on 32KHz
+On 07/24/13 22:17, Sylwester Nawrocki wrote:
+> This patch adds common Exynos4 SoC series FIMC and MIPI CSIS
+> device nodes.
+>
+> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com
 
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+missing '>' at the end of above line.
 
-> +static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
-
-I repeat: Why store that value in a global variable? It's constant.
-
-> @@ -174,14 +181,75 @@ enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
->  				enum tegra_suspend_mode mode)
->  {
->  	/*
-> -	 * The Tegra devices only support suspending to LP2 currently.
-> +	 * The Tegra devices support suspending to LP1 or lower currently.
->  	 */
-> -	if (mode > TEGRA_SUSPEND_LP2)
-> -		return TEGRA_SUSPEND_LP2;
-> +	if (mode > TEGRA_SUSPEND_LP1)
-> +		return TEGRA_SUSPEND_LP1;
->  
->  	return mode;
->  }
-
-I think that change needs to happen after patch 7. At this point in the
-series, LP1 doesn't work on any chip. After patch 7, it will work on all
-chips.
-
-If you don't make that change, you should move this change into patch 5,
-but only enable LP1 for Tegra30, then make patch 6 also enable it for
-Tegra20, then make patch 7 also enable it for Tegra114. That's a lot
-more complex, so just moving the change above into a new patch after
-patch 7 seems better.
-
-Note: You must assume that the DT changes are all checked in before any
-of the code changes, so the code needs to work correctly even if the DT
-contains the data that allows usage of LP1 before the driver actually
-implements LP1.
+- Kukjin
