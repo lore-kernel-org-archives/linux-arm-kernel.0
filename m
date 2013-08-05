@@ -1,10 +1,10 @@
 From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 05 Aug 2013 12:55:58 +0300
+Date: Mon, 05 Aug 2013 12:56:28 +0300
 Subject: [PATCH v5 0/6] mtd: atmel_nand: enable Nand Flash Controller
  (NFC) support
 In-Reply-To: <1372845034-5579-1-git-send-email-josh.wu@atmel.com>
 References: <1372845034-5579-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1375696558.14869.420.camel@sauron.fi.intel.com>
+Message-ID: <1375696588.14869.421.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,10 +16,7 @@ On Wed, 2013-07-03 at 17:50 +0800, Josh Wu wrote:
 > The mtd speed test results (non-NFC vs NFC), run in sama5d3x-ek with DMA
 > enable, is in the end of this patch.
 
-Hi,
-
-would you please update this patch-set against the tip of the l2-mtd.git
-tree, and re-send? It does not apply with many conflicts.
+Please, also all all the acks to the patches.
 
 -- 
 Best Regards,
