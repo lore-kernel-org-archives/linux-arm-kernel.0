@@ -1,41 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 05 Aug 2013 11:24:07 -0600
-Subject: [PATCH v10] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1375687936.4000.21.camel@pizza.hi.pengutronix.de>
-References: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
- <20130802092823.GA2884@e106331-lin.cambridge.arm.com>
- <1375687936.4000.21.camel@pizza.hi.pengutronix.de>
-Message-ID: <51FFDFB7.6080806@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Aug 2013 02:38:18 +0900
+Subject: [GIT PULL] Samsung-fixes-2 for v3.11
+Message-ID: <51FFE30A.5040800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 01:32 AM, Philipp Zabel wrote:
-> Am Freitag, den 02.08.2013, 10:28 +0100 schrieb Mark Rutland:
->> On Thu, Jul 18, 2013 at 10:26:26AM +0100, Philipp Zabel wrote:
->>> This driver implements a reset controller device that toggle a gpio
->>> connected to a reset pin of a peripheral IC. The delay between assertion
->>> and de-assertion of the reset signal can be configured via device tree.
-...
->> I think this should look more like the below:
->>
->> /* Device with nRESET pin connected to GPIO5_0 */
->> sii902x at 39 {
->> 	/* named for the actual input line */
->> 	nreset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
->> 	/* 
->> 	 * If there's some configurable property relating to the reset
->> 	 * line, we can describe it
->> 	 */
->> 	vendor,some-optional-reset-gpio-property;
->> 	...
->> };
-> 
-> I don't like the arbitrary name, as that makes it difficult to handle
-> this in an automated way. In this case I'd prefer to use 'reset-gpios'
-> and optionally 'reset-gpio-names' analogous to how clocks and interrupts
-> (and resets) are handled.
+The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
 
-Hmm. Just be aware that you can't force existing bindings to be
-retro-actively modified, or you'll break the DT ABI. So, at the very
-least we'd have to allow the existing custom-property-based approach for
-bindings where it's already been used.
+   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes-2
+
+for you to fetch changes up to 35f8550c8f27968af94ba5235cc611e3b6d86981:
+
+   ARM: SAMSUNG: fix to support for missing cpu specific map_io 
+(2013-07-30 13:30:57 +0900)
+
+----------------------------------------------------------------
+Fix to boot kernel on exynos5440 which has no specific map_io(). Current 
+kernel
+cannot support no CPU specific map_io() for Samsung SoCs.
+
+----------------------------------------------------------------
+Kukjin Kim (1):
+       ARM: SAMSUNG: fix to support for missing cpu specific map_io
+
+  arch/arm/plat-samsung/init.c | 5 +++--
+  1 file changed, 3 insertions(+), 2 deletions(-)
