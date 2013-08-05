@@ -1,369 +1,118 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 05 Aug 2013 20:59:23 +0200
-Subject: [PATCH v4 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
-References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
- <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <xa1teha8ufp0.fsf@mina86.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 05 Aug 2013 12:02:16 -0700
+Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
+In-Reply-To: <51FFEB63.6060901@samsung.com>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+ <51FFDA70.7080900@samsung.com> <20130805180625.5348.79570@quantum>
+ <51FFEB63.6060901@samsung.com>
+Message-ID: <20130805190216.5348.8595@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31 2013, Marek Szyprowski wrote:
-> Add device tree support for contiguous and reserved memory regions
-> defined in device tree. Initialization is done in 2 steps. First, the
-> memory is reserved, what happens very early when only flattened device
-> tree is available. Then on device initialization the corresponding cma
-> and reserved regions are assigned to each device structure.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Quoting Kukjin Kim (2013-08-05 11:13:55)
+> On 08/06/13 03:06, Mike Turquette wrote:
+> > Quoting Kukjin Kim (2013-08-05 10:01:36)
+> >> On 07/23/13 08:49, Tomasz Figa wrote:
+> >>> This series is an attempt to move clock support on Samsung S3C64xx SoCs
+> >>> to Common Clock Framework.
+> >>>
+> >>> First, support for PLL types present on S3C64xx SoCs is added to Samsung
+> >>> Common Clock Framework driver. Then the main clock driver for mentioned
+> >>> SoCs is introduced. Further patches contain fixes for drivers to make them
+> >>> compliant with CCF semantics, migration of platform code to use the new
+> >>> clock driver and removal of old clock management code.
+> >>>
+> >>> Depends on:
+> >>>    - [PATCH v4 00/20] Samsung PWM support cleanup
+> >>>      http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20856
+> >>>
+> >>> On S3C6410-based Tiny6410 board (Mini6410-compatible):
+> >>>
+> >>> Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+> >>>
+> >>> For v1:
+> >>>
+> >>> Acked-by: Mike Turquette<mturquette@linaro.org>
+> >>>
+> >>> Changes since v1:
+> >>>    - added patch for read-only muxes,
+> >>>    - exported configurable muxes and dividers,
+> >>>    - defined mout_syncmux as read-only mux,
+> >>>    - in DT-enabled case fixed-clock binding is used to define external clocks.
+> >>>
+> >>> Tomasz Figa (8):
+> >>>     clk: mux: Add support for read-only muxes.
+> >>>     clk: samsung: pll: Add support for PLL6552 and PLL6553
+> >>>     clk: samsung: Add clock driver for S3C64xx SoCs
+> >>>     ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
+> >>>     ARM: s3c64xx: dma: Use clk_prepare_enable/clk_disable_unprepare
+> >>>     usb: host: ohci-s3c2410 Use clk_prepare_enable/clk_disable_unprepare
+> >>>     ARM: s3c64xx: Migrate clock handling to Common Clock Framework
+> >>>     ARM: s3c64xx: Remove old clock management code
+> >>>
+> >>>    .../bindings/clock/samsung,s3c64xx-clock.txt       |   77 ++
+> >>>    arch/arm/Kconfig                                   |    2 +-
+> >>>    arch/arm/mach-s3c64xx/Makefile                     |    2 +-
+> >>>    arch/arm/mach-s3c64xx/clock.c                      | 1007 --------------------
+> >>>    arch/arm/mach-s3c64xx/common.c                     |   21 +-
+> >>>    arch/arm/mach-s3c64xx/common.h                     |   12 +-
+> >>>    arch/arm/mach-s3c64xx/dma.c                        |    4 +-
+> >>>    arch/arm/mach-s3c64xx/include/mach/regs-clock.h    |  132 +--
+> >>>    arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+> >>>    arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+> >>>    arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+> >>>    arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+> >>>    arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+> >>>    arch/arm/mach-s3c64xx/mach-smartq.c                |   11 +-
+> >>>    arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +-
+> >>>    arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+> >>>    arch/arm/mach-s3c64xx/pm.c                         |   21 -
+> >>>    arch/arm/mach-s3c64xx/s3c6400.c                    |    6 -
+> >>>    arch/arm/mach-s3c64xx/s3c6410.c                    |    7 -
+> >>>    arch/arm/plat-samsung/include/plat/cpu.h           |    4 +
+> >>>    drivers/clk/clk-mux.c                              |   10 +-
+> >>>    drivers/clk/samsung/Makefile                       |    1 +
+> >>>    drivers/clk/samsung/clk-pll.c                      |  160 ++++
+> >>>    drivers/clk/samsung/clk-pll.h                      |    4 +
+> >>>    drivers/clk/samsung/clk-s3c64xx.c                  |  465 +++++++++
+> >>>    drivers/usb/host/ohci-s3c2410.c                    |    8 +-
+> >>>    include/dt-bindings/clock/samsung,s3c64xx-clock.h  |  178 ++++
+> >>>    include/linux/clk-provider.h                       |    2 +
+> >>>    28 files changed, 943 insertions(+), 1205 deletions(-)
+> >>>    create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
+> >>>    delete mode 100644 arch/arm/mach-s3c64xx/clock.c
+> >>>    create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
+> >>>    create mode 100644 include/dt-bindings/clock/samsung,s3c64xx-clock.h
+> >>>
+> >> Basically, this series looks good to me, but I'm not sure how this
+> >> should be handled because of dependency with PWM cleanup and clk stuff
+> >> in clk tree now...
+> >
+> > Patches 1-3 can go into the clk tree. 4-6 should go through their
+> > respective trees.
+> >
+> > If you want I can take 7&  8 through the clk tree.
+> >
+> > Alternatively I can provide patches 1-3 in a separate stable topic
+> > branch for you to pull in as a dependency. We'll both merge that stable
+> > topic branch into our trees and you can make a note of it for the
+> > arm-soc folks.
+> >
+> Thanks for your quick response. Would be helpful to samsung tree if you 
+> could provide a separate stable topic branch what you suggested for clk 
+> stuff in this series.
 
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
+git://git.linaro.org/people/mturquette/linux.git clk-next-s3c64xx
 
-Minor comments inline.
+Topic branch contains patches 1-3 of this series on top of v3.11-rc2. I
+have already merged the same into the clk-next branch.
 
-> ---
->  Documentation/devicetree/bindings/memory.txt |  152 ++++++++++++++++++++++
->  drivers/of/Kconfig                           |    6 +
->  drivers/of/Makefile                          |    1 +
->  drivers/of/of_reserved_mem.c                 |  175 ++++++++++++++++++++++++++
->  include/asm-generic/dma-coherent.h           |    6 +
->  5 files changed, 340 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory.txt
->  create mode 100644 drivers/of/of_reserved_mem.c
->
-> diff --git a/Documentation/devicetree/bindings/memory.txt b/Documentation/devicetree/bindings/memory.txt
-> new file mode 100644
-> index 0000000..4aece19
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory.txt
-> @@ -0,0 +1,152 @@
-> +*** Memory binding ***
-> +
-> +The /memory node provides basic information about the address and size
-> +of the physical memory. This node is usually filled or updated by the
-> +bootloader, depending on the actual memory configuration of the given
-> +hardware.
-> +
-> +The memory layout is described by the folllowing node:
-> +
-> +memory {
-> +	reg =  <(baseaddr1) (size1)
-> +		(baseaddr2) (size2)
-> +		...
-> +		(baseaddrN) (sizeN)>;
-> +};
-> +
-> +baseaddrX:	the base address of the defined memory bank
-> +sizeX:		the size of the defined memory bank
-> +
-> +More than one memory bank can be defined.
-> +
-> +
-> +*** Reserved memory regions ***
-> +
-> +In /memory/reserved-memory node one can create additional nodes
-> +describing particular reserved (excluded from normal use) memory
-> +regions. Such memory regions are usually designed for the special usage
-> +by various device drivers. A good example are contiguous memory
-> +allocations or memory sharing with other operating system on the same
-> +hardware board. Those special memory regions might depend on the board
-> +configuration and devices used on the target system.
-> +
-> +Parameters for each memory region can be encoded into the device tree
-> +wit the following convention:
-> +
-> +[(label):] (name)@(address) {
-> +	compatible = "contiguous-memory-region", "reserved-memory-region";
-> +	reg = <(address) (size)>;
-> +	(linux,contiguous-region);
-> +	(linux,default-contiguous-region);
-> +};
-> +
-> +label:		label given to the defined region (optional)
-> +name:		an name given to the defined region
-> +address:	the base address of the defined region
-> +size:		the size of the memory region
-> +
-> +compatible:	"contiguous-memory-region" - enables binding of this
-> +		region to Contiguous Memory Allocator (special region for
-> +		contiguous memory allocations, shared with movable system
-> +		memory, Linux kernel-specific), alternatively if
-> +		"reserved-memory-region" - compatibility is defined, given
-> +		region is assigned for exclusive usage for DMA transfers
-> +
-> +linux,default-contiguous-region: property indicating that the region
-> +		is the default region for all contiguous memory
-> +		allocations, Linux specific (optional)
-> +
-> +Each defined region must use unique name. It is optional to specify the
-> +base address, so if one wants to use autoconfiguration of the base
-> +address, he must specify the '0' as base address in the 'reg' property
-> +and assign ann uniqe name to such regions.
-> +
-> +
-> +*** Device node's properties ***
-> +
-> +Once the regions in the /memory/reserved-memory node are defined, they
-> +can be assigned to device nodes to enable drivers for their special use.
-> +The following properties are defined:
-> +
-> +dma-memory-region = <&phandle_to_defined_region>;
-> +
-> +This property indicates that the device driver should use the
-> +memory region pointed by the given phandle.
-> +
-> +
-> +*** Example ***
-> +
-> +This example defines a memory consisting of 4 memory banks. 3 contiguous
-> +regions are defined for Linux kernel, one default of all device drivers
-> +(named contig_mem, placed at 0x72000000, 64MiB), one dedicated to the
-> +framebuffer device (labelled display_mem, placed at 0x78000000, 8MiB)
-> +and one for multimedia processing (labelled multimedia_mem, placed at
-> +0x77000000, 64MiB). 'display_mem' region is then assigned to fb at 12300000
-> +device for DMA memory allocations (Linux kernel drivers will use CMA is
-> +available or dma-exclusive usage otherwise). 'multimedia_mem' is
-> +assigned to scaller at 12500000 and codec at 12600000 devices for contiguous
-> +memory allocations when CMA driver is enabled.
-> +
-> +The reason for creating a separate region for framebuffer device is to
-> +match the framebuffer base address to the one configured by bootloader,
-> +so once Linux kernel drivers starts no glitches on the displayed boot
-> +logo appears. Scaller and codec drivers should share the memory
-> +allocations.
-> +
-> +/ {
-> +	/* ... */
-> +	memory {
-> +		reg =  <0x40000000 0x10000000
-> +			0x50000000 0x10000000
-> +			0x60000000 0x10000000
-> +			0x70000000 0x10000000>;
-> +
-> +		reserved-memory {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			/*
-> +			 * global autoconfigured region for contiguous allocations
-> +			 * (used only with Contiguous Memory Allocator)
-> +			 */
-> +			contig_region at 0 {
-> +				compatible = "contiguous-memory-region";
-> +				reg = <0x0 0x4000000>;
-> +				linux,default-contiguous-region;
-> +			};
-> +
-> +			/*
-> +			 * special region for framebuffer
-> +			 */
-> +			display_mem: region at 78000000 {
-> +				compatible = "contiguous-memory-region", "reserved-memory-region";
-> +				reg = <0x78000000 0x800000>;
-> +			};
-> +
-> +			/*
-> +			 * special region for multimedia processing devices
-> +			 */
-> +			multimedia_mem: region at 77000000 {
-> +				compatible = "contiguous-memory-region";
-> +				reg = <0x77000000 0x4000000>;
-> +			};
-> +		};
-> +	};
-> +
-> +	/* ... */
-> +
-> +	fb0: fb at 12300000 {
-> +		status = "okay";
-> +		dma-memory-region = <&display_mem>;
-> +	};
-> +
-> +	scaller: scaller at 12500000 {
-> +		status = "okay";
-> +		dma-memory-region = <&multimedia_mem>;
-> +	};
-> +
-> +	codec: codec at 12600000 {
-> +		status = "okay";
-> +		dma-memory-region = <&multimedia_mem>;
-> +	};
-> +};
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index 80e5c13..a83ab43 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -80,4 +80,10 @@ config OF_MTD
->  	depends on MTD
->  	def_bool y
->  
-> +config OF_RESERVED_MEM
-> +	depends on CMA || (HAVE_GENERIC_DMA_COHERENT && HAVE_MEMBLOCK)
-> +	def_bool y
-> +	help
-> +	  Initialization code for DMA reserved memory
-> +
->  endmenu # OF
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index 1f9c0c4..e7e3322 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
->  obj-$(CONFIG_OF_PCI)	+= of_pci.o
->  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
->  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-> +obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-> new file mode 100644
-> index 0000000..d97fcdf
-> --- /dev/null
-> +++ b/drivers/of/of_reserved_mem.c
-> @@ -0,0 +1,175 @@
-> +/*
-> + * Device tree based initialization code for reserved memory.
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of the
-> + * License or (at your optional) any later version of the license.
-> + */
-> +
-> +#include <asm/dma-contiguous.h>
-> +
-> +#include <linux/memblock.h>
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/mm.h>
-> +#include <linux/sizes.h>
-> +#include <linux/mm_types.h>
-> +#include <linux/dma-contiguous.h>
-> +#include <linux/dma-mapping.h>
-> +
-> +#define MAX_RESERVED_REGIONS	16
-> +struct reserved_mem {
-> +	phys_addr_t		base;
-> +	unsigned long		size;
-> +	struct cma		*cma;
-> +	char			name[32];
-> +};
-> +static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
-> +static int reserved_mem_count;
-> +
-> +static int __init reserved_mem_fdt_scan(unsigned long node, const char *uname,
-> +				    int depth, void *data)
-> +{
-> +	phys_addr_t base, size;
-> +	int is_cma, is_reserved;
-> +	unsigned long len;
-> +	void *prop;
-> +
-> +	is_cma = of_flat_dt_is_compatible(node, "contiguous-memory-region");
+Regards,
+Mike
 
-Perhaps:
-
-+	is_cma = IS_ENABLED(CONFIG_CMA) && 
-+		of_flat_dt_is_compatible(node, "contiguous-memory-region");
-
-which will save on typing IS_ENABLED(CONFIG_CMA) later on.
-
-> +	is_reserved = of_flat_dt_is_compatible(node, "reserved-memory-region");
-
-is_reserved value is used only if !is_cma, so maybe skip computing it if
-is_cma?  Just a thought.
-
-> +
-> +	if (!is_reserved && !(is_cma && IS_ENABLED(CONFIG_CMA)))
-> +		return 0;
-> +
-> +	prop = of_get_flat_dt_prop(node, "reg", &len);
-> +	if (!prop || (len != 2 * sizeof(unsigned long))) {
-> +		pr_err("Reserved mem: node %s, incorrect \"reg\" property\n",
-> +		       uname);
-> +		return 0;
-> +	}
-> +
-> +	if (sizeof(unsigned long) == 4) {
-> +		base = be32_to_cpu(((__be32 *)prop)[0]);
-> +		size = be32_to_cpu(((__be32 *)prop)[1]);
-> +	} else {
-> +		base = be64_to_cpu(((__be64 *)prop)[0]);
-> +		size = be64_to_cpu(((__be64 *)prop)[1]);
-> +	}
-> +
-> +	pr_info("Reserved mem: found %s, memory base %lx, size %ld MiB\n",
-> +		uname, (unsigned long)base, (unsigned long)size / SZ_1M);
-> +
-> +	if (reserved_mem_count == ARRAY_SIZE(reserved_mem))
-> +		return -ENOMEM;
-
-+		return -ENOSPC;
-
-> +
-> +	reserved_mem[reserved_mem_count].base = base;
-> +	reserved_mem[reserved_mem_count].size = size;
-> +	strcpy(reserved_mem[reserved_mem_count].name, uname);
-
-strlcpy(reserved_mem[reserved_mem_count].name,
-        sizeof(reserved_mem[reserved_mem_count].name), uname);
-
-> +
-> +	if (IS_ENABLED(CONFIG_CMA) && is_cma) {
-> +		struct cma *cma;
-> +		if (dma_contiguous_reserve_area(size, base, 0, &cma) == 0) {
-> +			reserved_mem[reserved_mem_count].cma = cma;
-> +			reserved_mem_count++;
-> +
-> +			if (of_get_flat_dt_prop(node,
-> +						"linux,default-contiguous-region",
-> +						NULL))
-> +				dma_contiguous_set_default_area(cma);
-> +		}
-> +	} else if (is_reserved) {
-> +		if (memblock_remove(base, size) == 0)
-> +			reserved_mem_count++;
-> +		else
-> +			pr_err("Failed to reserve memory for %s\n", uname);
-> +	}
-> +
-> +	return 0;
-> +}
-
-> diff --git a/include/asm-generic/dma-coherent.h b/include/asm-generic/dma-coherent.h
-> index 2be8a2d..06111d00 100644
-> --- a/include/asm-generic/dma-coherent.h
-> +++ b/include/asm-generic/dma-coherent.h
-> @@ -32,4 +32,10 @@ dma_mark_declared_memory_occupied(struct device *dev,
->  #define dma_mmap_from_coherent(dev, vma, vaddr, order, ret) (0)
->  #endif
->  
-> +#ifdef CONFIG_OF_RESERVED_MEM
-> +void __init dma_reserved_mem_of_reserve(void);
-> +#else
-> +#define dma_reserved_mem_of_reserve()
-
-+#define dma_reserved_mem_of_reserve() (void)0
-
-> +#endif
-> +
->  #endif
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/23e6f7c4/attachment.sig>
+> 
+> Of course, I will inform when I send pull-request for this series to 
+> arm-soc.
+> 
+> Thanks,
+> Kukjin
