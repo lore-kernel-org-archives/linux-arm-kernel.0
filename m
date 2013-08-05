@@ -1,156 +1,39 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  5 Aug 2013 10:56:38 +0900
-Subject: [PATCH 1/2] clocksource: sh_cmt: 32-bit control register support
-In-Reply-To: <1375667799-6327-1-git-send-email-horms+renesas@verge.net.au>
-References: <1375667799-6327-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1375667799-6327-2-git-send-email-horms+renesas@verge.net.au>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Mon, 5 Aug 2013 10:13:14 +0800
+Subject: [PATCH v4 0/2] support hisilicon i2c
+In-Reply-To: <1374844938-25505-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1374844938-25505-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <CAMj5BkjMw2oxWy5+fgT9hoHLT-DiSv6u7zSzAhi8B_d-=-v8Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Fri, Jul 26, 2013 at 9:22 PM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
+> V4:
+> rebase on 3.11
+>
+> v3:
+> patch 02, use size instead of threshold
+>
+> v2:
+> Suggested by Baruch
+> Support hisilicon i2c in i2c-designware-platdrv.c, and adding two optional properties
+>
+> Zhangfei Gao (2):
+>   i2c: designware: use module_platform_driver
+>   i2c: designware: add two optional property tx/rx-fifo-size
+>
+>  .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
+>  drivers/i2c/busses/i2c-designware-platdrv.c        |   17 +++++------------
+>  2 files changed, 12 insertions(+), 12 deletions(-)
+>
 
-Add support for CMT hardware with 32-bit control and counter
-registers, as found on r8a73a4 and r8a7790. To use the CMT
-with 32-bit hardware a second I/O memory resource needs to
-point out the CMSTR register and it needs to be 32 bit wide.
+"Basically OK, but please resend for 3.12, so we get enough testing
+before entering mainline. I am a bit anxious of side
+effects and 3.11 is too near."
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/clocksource/sh_cmt.c | 50 +++++++++++++++++++++++++++++++-------------
- 1 file changed, 36 insertions(+), 14 deletions(-)
+Dear Wolfram
 
-diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index 08d0c41..0965e98 100644
---- a/drivers/clocksource/sh_cmt.c
-+++ b/drivers/clocksource/sh_cmt.c
-@@ -37,6 +37,7 @@
- 
- struct sh_cmt_priv {
- 	void __iomem *mapbase;
-+	void __iomem *mapbase_str;
- 	struct clk *clk;
- 	unsigned long width; /* 16 or 32 bit version of hardware block */
- 	unsigned long overflow_bit;
-@@ -79,6 +80,12 @@ struct sh_cmt_priv {
-  * CMCSR 0xffca0060 16-bit
-  * CMCNT 0xffca0064 32-bit
-  * CMCOR 0xffca0068 32-bit
-+ *
-+ * "32-bit counter and 32-bit control" as found on r8a73a4 and r8a7790:
-+ * CMSTR 0xffca0500 32-bit
-+ * CMCSR 0xffca0510 32-bit
-+ * CMCNT 0xffca0514 32-bit
-+ * CMCOR 0xffca0518 32-bit
-  */
- 
- static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
-@@ -109,9 +116,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
- 
- static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
- {
--	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
--
--	return p->read_control(p->mapbase - cfg->channel_offset, 0);
-+	return p->read_control(p->mapbase_str, 0);
- }
- 
- static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
-@@ -127,9 +132,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
- static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
- 				      unsigned long value)
- {
--	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
--
--	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
-+	p->write_control(p->mapbase_str, 0, value);
- }
- 
- static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
-@@ -676,7 +679,7 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
- static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
- {
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
--	struct resource *res;
-+	struct resource *res, *res2;
- 	int irq, ret;
- 	ret = -ENXIO;
- 
-@@ -694,6 +697,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
- 		goto err0;
- 	}
- 
-+	/* optional resource for the shared timer start/stop register */
-+	res2 = platform_get_resource(p->pdev, IORESOURCE_MEM, 1);
-+
- 	irq = platform_get_irq(p->pdev, 0);
- 	if (irq < 0) {
- 		dev_err(&p->pdev->dev, "failed to get irq\n");
-@@ -707,6 +713,15 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
- 		goto err0;
- 	}
- 
-+	/* map second resource for CMSTR */
-+	p->mapbase_str = ioremap_nocache(res2 ? res2->start :
-+					 res->start - cfg->channel_offset,
-+					 res2 ? resource_size(res2) : 2);
-+	if (p->mapbase_str == NULL) {
-+		dev_err(&p->pdev->dev, "failed to remap I/O second memory\n");
-+		goto err1;
-+	}
-+
- 	/* request irq using setup_irq() (too early for request_irq()) */
- 	p->irqaction.name = dev_name(&p->pdev->dev);
- 	p->irqaction.handler = sh_cmt_interrupt;
-@@ -719,11 +734,17 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
- 	if (IS_ERR(p->clk)) {
- 		dev_err(&p->pdev->dev, "cannot get clock\n");
- 		ret = PTR_ERR(p->clk);
--		goto err1;
-+		goto err2;
- 	}
- 
--	p->read_control = sh_cmt_read16;
--	p->write_control = sh_cmt_write16;
-+	if (res2 && (resource_size(res2) == 4)) {
-+		/* assume both CMSTR and CMCSR to be 32-bit */
-+		p->read_control = sh_cmt_read32;
-+		p->write_control = sh_cmt_write32;
-+	} else {
-+		p->read_control = sh_cmt_read16;
-+		p->write_control = sh_cmt_write16;
-+	}
- 
- 	if (resource_size(res) == 6) {
- 		p->width = 16;
-@@ -752,22 +773,23 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
- 			      cfg->clocksource_rating);
- 	if (ret) {
- 		dev_err(&p->pdev->dev, "registration failed\n");
--		goto err2;
-+		goto err3;
- 	}
- 	p->cs_enabled = false;
- 
- 	ret = setup_irq(irq, &p->irqaction);
- 	if (ret) {
- 		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
--		goto err2;
-+		goto err3;
- 	}
- 
- 	platform_set_drvdata(pdev, p);
- 
- 	return 0;
--err2:
-+err3:
- 	clk_put(p->clk);
--
-+err2:
-+	iounmap(p->mapbase_str);
- err1:
- 	iounmap(p->mapbase);
- err0:
--- 
-1.8.3.2
+The patches are rebased on 3.11 rc2 as your suggestion,
+Do you have any other suggestion?
+
+Thanks
