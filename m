@@ -1,19 +1,22 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Aug 2013 14:24:58 +0800
-Subject: [PATCH v3 0/3] serial: mxs-auart: add RTS/CTS check for DMA
- support
-In-Reply-To: <1375538956-15862-1-git-send-email-shijie8@gmail.com>
-References: <1375538956-15862-1-git-send-email-shijie8@gmail.com>
-Message-ID: <20130805062456.GG24629@S2101-09.ap.freescale.net>
+Date: Mon, 5 Aug 2013 14:28:43 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-wandboard: add gpio lines to
+ wandboard shared dtsi.
+In-Reply-To: <CAJB6QecX_L+mC83ciKzitKw0qbJ_2a9N4FC5Y3jNcUfsn0_XaA@mail.gmail.com>
+References: <CAJB6Qec_bTt_+Sj07J3Jh0e=XQni=R59Fb-KD=tbVw6vhApHww@mail.gmail.com>
+ <20130804090816.GB18119@S2101-09.ap.freescale.net>
+ <CAJB6QecX_L+mC83ciKzitKw0qbJ_2a9N4FC5Y3jNcUfsn0_XaA@mail.gmail.com>
+Message-ID: <20130805062840.GA24632@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 03, 2013 at 10:09:13AM -0400, Huang Shijie wrote:
-> Huang Shijie (3):
->   serial: mxs: enable the DMA only when the RTS/CTS is valid
->   serial: mxs: remove the MXS_AUART_DMA_CONFIG
->   ARM: dts: imx28-evk: add the RTS/CTS property for auart0
+On Sun, Aug 04, 2013 at 11:31:52AM -0400, Mike Panetta wrote:
+> I resent using git send-email the day after.  Was that one ok?
 
-For the series,
+Hmm, I did not receive it.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Shawn
+
+> It has
+> been forever since I submitted a patch, none of these tools were
+> available then...
