@@ -1,26 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Aug 2013 17:18:39 +0100
-Subject: [PATCH RFC 03/13] ASoC: avoid duplicated DAI routes
-In-Reply-To: <E1V63uN-0004lL-7q@rmk-PC.arm.linux.org.uk>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <E1V63uN-0004lL-7q@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130805161839.GQ9858@sirena.org.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 05 Aug 2013 17:25:03 +0100
+Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
+In-Reply-To: <51FBA21D.5010308@linaro.org>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <51FB7CB8.6080103@arm.com> <51FB8081.6040501@linaro.org>
+ <51FB81FB.3060709@arm.com> <51FBA21D.5010308@linaro.org>
+Message-ID: <51FFD1DF.9000907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 04, 2013 at 08:24:03PM +0100, Russell King wrote:
-> ASoC automatically creates snd_soc_dapm_dai_in and snd_soc_dapm_dai_out
-> widgets for DAI drivers, and adds them to the list.  Later on, ASoC
-> creates automatic routes between these widgets and a widget with a
-> stream name.
+Hi Daniel,
 
-Applied, thanks.  It's possible to do this a bit more neatly for example
-by checking the direction of the link but this works and fixes the
-problem, we can always improve it further later.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/905173c4/attachment.sig>
+On 02/08/13 13:12, Daniel Lezcano wrote:
+> On 08/02/2013 11:55 AM, Sudeep KarkadaNagesha wrote:
+>> On 02/08/13 10:48, Daniel Lezcano wrote:
+>>> On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
+>>>> Hi Daniel,
+>>>>
+>>>> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
+>>>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>>>>
+>>>>> This patch series adds support to configure the rate and enable the event
+>>>>> stream for architected timer. Since the timer control register is reset to
+>>>>> zero on warm boot, CPU PM notifier is added to re-initialse it.
+>>>>>
+>>>> This series is required to support TC2 cpuidle.
+>>>> It will be good if you can review and get this in for v3.12
+>>>
+>>> So do you want me to take the series through my tree ?
+>>>
+>> Yes I believe it has to go through your(ARM specific clocksource?) tree,
+>> but currently there's a conflict with another bug fix(that should come
+>> from rmk as -rc fix)
+>> (Commit ab8d46c0 "ARM: 7788/1: elf: fix lpae hwcap feature reporting in
+>> proc/cpuinfo" in rmk -fixes)
+> 
+> IMO, you should rebase this patch on top of tips/core, I will apply the
+> series and when the rmk fix hits this branch (through tips/urgent), that
+> will be up to the maintainer to resolve this conflict.
+> 
+
+The fix with which this series was conflicting is already in v3.11-rc4
+So can I send pull request based on v3.11-rc4 or if you prefer any
+particular tree, can you provide details please ?
+
+Regards,
+Sudeep
