@@ -1,59 +1,153 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 5 Aug 2013 11:14:50 -0500
-Subject: [PATCH v3 05/12] ARM: edma: Add function to enable interrupt for a
- PaRAM slot
+Date: Mon, 5 Aug 2013 11:14:49 -0500
+Subject: [PATCH v3 04/12] dma: edma: Write out and handle MAX_NR_SG at a given
+ time
 In-Reply-To: <1375719297-12871-1-git-send-email-joelf@ti.com>
 References: <1375719297-12871-1-git-send-email-joelf@ti.com>
-Message-ID: <1375719297-12871-6-git-send-email-joelf@ti.com>
+Message-ID: <1375719297-12871-5-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prevent common programming errors, add a function to enable
-interrupts correctly. Also keeps calling code more readable.
+Process SG-elements in batches of MAX_NR_SG if they are greater
+than MAX_NR_SG. Due to this, at any given time only those many
+slots will be used in the given channel no matter how long the
+scatter list is. We keep track of how much has been written
+inorder to process the next batch of elements in the scatter-list
+and detect completion.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/common/edma.c             |   15 +++++++++++++++
- include/linux/platform_data/edma.h |    1 +
- 2 files changed, 16 insertions(+)
+ drivers/dma/edma.c |   76 ++++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 50 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 6433b6c..aa43c49 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1095,6 +1095,21 @@ void edma_set_transfer_params(unsigned slot,
- EXPORT_SYMBOL(edma_set_transfer_params);
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index b6d609c..080d669 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -56,6 +56,7 @@ struct edma_desc {
+ 	struct list_head		node;
+ 	int				absync;
+ 	int				pset_nr;
++	int				total_processed;
+ 	struct edmacc_param		pset[0];
+ };
  
- /**
-+ * edma_enable_interrupt - enable interrupt on parameter RAM slot
-+ * @slot: parameter RAM slot which is the link target
-+ *
-+ * The originating slot should not be part of any active DMA transfer.
-+ */
-+void edma_enable_interrupt(unsigned slot)
-+{
-+	pr_debug("Enabling interrupt on slot %d\n", slot);
-+
-+	edma_parm_modify(EDMA_CTLR(slot), PARM_OPT, EDMA_CHAN_SLOT(slot),
-+			 ~TCINTEN, TCINTEN);
-+}
-+EXPORT_SYMBOL(edma_enable_interrupt);
-+
-+/**
-  * edma_link - link one parameter RAM slot to another
-  * @from: parameter RAM slot originating the link
-  * @to: parameter RAM slot which is the link target
-diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-index 57300fd..184ff5f 100644
---- a/include/linux/platform_data/edma.h
-+++ b/include/linux/platform_data/edma.h
-@@ -136,6 +136,7 @@ void edma_set_dest_index(unsigned slot, s16 dest_bidx, s16 dest_cidx);
- void edma_set_transfer_params(unsigned slot, u16 acnt, u16 bcnt, u16 ccnt,
- 		u16 bcnt_rld, enum sync_dimension sync_mode);
- void edma_link(unsigned from, unsigned to);
-+void edma_enable_interrupt(unsigned slot);
- void edma_unlink(unsigned from);
+@@ -104,22 +105,36 @@ static void edma_desc_free(struct virt_dma_desc *vdesc)
+ /* Dispatch a queued descriptor to the controller (caller holds lock) */
+ static void edma_execute(struct edma_chan *echan)
+ {
+-	struct virt_dma_desc *vdesc = vchan_next_desc(&echan->vchan);
++	struct virt_dma_desc *vdesc;
+ 	struct edma_desc *edesc;
+-	int i;
++	struct device *dev = echan->vchan.chan.device->dev;
  
- /* calls that operate on an entire parameter RAM slot */
+-	if (!vdesc) {
+-		echan->edesc = NULL;
+-		return;
++	int i, j, total_left, total_process;
++
++	/* If either we processed all psets or we're still not started */
++	if (!echan->edesc ||
++	    echan->edesc->pset_nr == echan->edesc->total_processed) {
++		/* Get next vdesc */
++		vdesc = vchan_next_desc(&echan->vchan);
++		if (!vdesc) {
++			echan->edesc = NULL;
++			return;
++		}
++		list_del(&vdesc->node);
++		echan->edesc = to_edma_desc(&vdesc->tx);
+ 	}
+ 
+-	list_del(&vdesc->node);
++	edesc = echan->edesc;
++
++	/* Find out how many left */
++	total_left = edesc->pset_nr - edesc->total_processed;
++	total_process = total_left > MAX_NR_SG ? MAX_NR_SG : total_left;
+ 
+-	echan->edesc = edesc = to_edma_desc(&vdesc->tx);
+ 
+ 	/* Write descriptor PaRAM set(s) */
+-	for (i = 0; i < edesc->pset_nr; i++) {
+-		edma_write_slot(echan->slot[i], &edesc->pset[i]);
++	for (i = 0; i < total_process; i++) {
++		j = i + edesc->total_processed;
++		edma_write_slot(echan->slot[i], &edesc->pset[j]);
+ 		dev_dbg(echan->vchan.chan.device->dev,
+ 			"\n pset[%d]:\n"
+ 			"  chnum\t%d\n"
+@@ -132,24 +147,29 @@ static void edma_execute(struct edma_chan *echan)
+ 			"  bidx\t%08x\n"
+ 			"  cidx\t%08x\n"
+ 			"  lkrld\t%08x\n",
+-			i, echan->ch_num, echan->slot[i],
+-			edesc->pset[i].opt,
+-			edesc->pset[i].src,
+-			edesc->pset[i].dst,
+-			edesc->pset[i].a_b_cnt,
+-			edesc->pset[i].ccnt,
+-			edesc->pset[i].src_dst_bidx,
+-			edesc->pset[i].src_dst_cidx,
+-			edesc->pset[i].link_bcntrld);
++			j, echan->ch_num, echan->slot[i],
++			edesc->pset[j].opt,
++			edesc->pset[j].src,
++			edesc->pset[j].dst,
++			edesc->pset[j].a_b_cnt,
++			edesc->pset[j].ccnt,
++			edesc->pset[j].src_dst_bidx,
++			edesc->pset[j].src_dst_cidx,
++			edesc->pset[j].link_bcntrld);
+ 		/* Link to the previous slot if not the last set */
+-		if (i != (edesc->pset_nr - 1))
++		if (i != (total_process - 1))
+ 			edma_link(echan->slot[i], echan->slot[i+1]);
+ 		/* Final pset links to the dummy pset */
+ 		else
+ 			edma_link(echan->slot[i], echan->ecc->dummy_slot);
+ 	}
+ 
+-	edma_start(echan->ch_num);
++	edesc->total_processed += total_process;
++
++	if (edesc->total_processed <= MAX_NR_SG) {
++		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
++		edma_start(echan->ch_num);
++	}
+ }
+ 
+ static int edma_terminate_all(struct edma_chan *echan)
+@@ -358,19 +378,23 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
+ 	struct edma_desc *edesc;
+ 	unsigned long flags;
+ 
+-	/* Stop the channel */
+-	edma_stop(echan->ch_num);
+-
+ 	switch (ch_status) {
+ 	case DMA_COMPLETE:
+-		dev_dbg(dev, "transfer complete on channel %d\n", ch_num);
+-
+ 		spin_lock_irqsave(&echan->vchan.lock, flags);
+ 
+ 		edesc = echan->edesc;
+ 		if (edesc) {
++			if (edesc->total_processed == edesc->pset_nr) {
++				dev_dbg(dev, "transfer complete." \
++					" stopping channel %d\n", ch_num);
++				edma_stop(echan->ch_num);
++				vchan_cookie_complete(&edesc->vdesc);
++			} else {
++				dev_dbg(dev, "Intermediate transfer complete" \
++					" on channel %d\n", ch_num);
++			}
++
+ 			edma_execute(echan);
+-			vchan_cookie_complete(&edesc->vdesc);
+ 		}
+ 
+ 		spin_unlock_irqrestore(&echan->vchan.lock, flags);
 -- 
 1.7.9.5
