@@ -1,47 +1,34 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  5 Aug 2013 17:50:05 -0500
-Subject: [PATCH 1/5] ARM: use phys_addr_t for DMA zone sizes
-Message-ID: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
+Date: Mon,  5 Aug 2013 17:50:06 -0500
+Subject: [PATCH 2/5] ARM: make dma_addr_t 64-bit on LPAE
+In-Reply-To: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
+References: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1375743009-28972-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-In order to specify a DMA zone size of 4GB on LPAE systems, the sizes need
-to be 64-bit. So make machine_desc.dma_zone_size and arm_dma_zone_size be
-phys_addr_t instead of unsigned long.
+LPAE systems may have 64-bit capable DMA, so dma_addr_t needs to be
+64-bit.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/mach/arch.h | 2 +-
- arch/arm/mm/init.c               | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 441efc4..d91b168 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -35,7 +35,7 @@ struct machine_desc {
- 	unsigned int		nr_irqs;	/* number of IRQs */
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 6cacdc8..9f6f3d7 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -625,7 +625,7 @@ config ARCH_PHYS_ADDR_T_64BIT
+ 	def_bool ARM_LPAE
  
- #ifdef CONFIG_ZONE_DMA
--	unsigned long		dma_zone_size;	/* size of DMA-able area */
-+	phys_addr_t		dma_zone_size;	/* size of DMA-able area */
- #endif
+ config ARCH_DMA_ADDR_T_64BIT
+-	bool
++	def_bool ARM_LPAE
  
- 	unsigned int		video_start;	/* start of video RAM	*/
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 15225d8..c0bb66e 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -207,7 +207,7 @@ static void __init arm_bootmem_init(unsigned long start_pfn,
- 
- #ifdef CONFIG_ZONE_DMA
- 
--unsigned long arm_dma_zone_size __read_mostly;
-+phys_addr_t arm_dma_zone_size __read_mostly;
- EXPORT_SYMBOL(arm_dma_zone_size);
- 
- /*
+ config ARM_THUMB
+ 	bool "Support Thumb user binaries" if !CPU_THUMBONLY
 -- 
 1.8.1.2
