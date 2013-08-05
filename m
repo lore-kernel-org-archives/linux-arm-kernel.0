@@ -1,60 +1,54 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 05 Aug 2013 16:31:50 +0200
-Subject: [PATCH v4 4/4] ARM: init: add support for reserved memory defined
- by device tree
-In-Reply-To: <1375275119-12787-5-git-send-email-m.szyprowski@samsung.com>
-References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
- <1375275119-12787-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <xa1tr4e8us2x.fsf@mina86.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 5 Aug 2013 10:38:13 -0400
+Subject: [PATCH v2 4/6] ARM: mm: LPAE: Correct virt_to_phys patching for
+ 64 bit physical addresses
+In-Reply-To: <alpine.LFD.2.03.1308040126560.14472@syhkavp.arg>
+References: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
+ <1375289086-5315-5-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.LFD.2.03.1308022156120.14472@syhkavp.arg> <51FCFBE1.5090000@ti.com>
+ <alpine.LFD.2.03.1308030943320.14472@syhkavp.arg> <51FD5922.1060705@ti.com>
+ <alpine.LFD.2.03.1308040126560.14472@syhkavp.arg>
+Message-ID: <51FFB8D5.8070506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31 2013, Marek Szyprowski wrote:
-> Enable reserved memory initialization from device tree.
+On Sunday 04 August 2013 01:32 AM, Nicolas Pitre wrote:
+> On Sat, 3 Aug 2013, Santosh Shilimkar wrote:
+> 
+>> On Saturday 03 August 2013 10:01 AM, Nicolas Pitre wrote:
+>>> On Sat, 3 Aug 2013, Sricharan R wrote:
+>>>
+>>>> On Saturday 03 August 2013 08:58 AM, Nicolas Pitre wrote:
+>>>>> ... meaning that, instead of using 0x81 for the stub value on the mov 
+>>>>> instruction, it only has to be 0x83.  Bits 7 and 0 still act as anchors 
+>>>>> for the rotation field in the opcode, while bit 1 indicates which value 
+>>>>> to patch in.
+>>>>   I started with this kind of augmenting with the immediate operand
+>>>>   while starting V2. But the problem was, we do the runtime patching twice.
+>>>
+>>> Ahhh... Bummer.
+>>>
+>> Sorry if it wasn't clear but I thought we discussed why patching is
+>> done twice.
+> 
+> Yeah, I know the reasons.  I just had forgotten about the effects on the 
+> anchor bits.
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+I see.
+ 
+>> This was purely based on the discussion where RMK suggested to follow 
+>> that approach to minimize code changes.
+>>  
+>> Looks like we need to revisit that now based on Russell's latest
+>> comment.
+> 
+> Note that my comments on this particular patch are still valid and 
+> independent from whatever approach is used globally to deal with the 
+> memory alias.  I do think that the value to patch should be selected 
+> depending on the opcode's rotation field which makes it compatible with 
+> a double patching approach as well.
+> 
+Completely agree.
 
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
-
-> ---
->  arch/arm/mm/init.c |    3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 15225d8..82db8d8 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -20,6 +20,7 @@
->  #include <linux/highmem.h>
->  #include <linux/gfp.h>
->  #include <linux/memblock.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/dma-contiguous.h>
->  #include <linux/sizes.h>
->  
-> @@ -377,6 +378,8 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
->  	if (mdesc->reserve)
->  		mdesc->reserve();
->  
-> +	dma_reserved_mem_of_reserve();
-> +
->  	/*
->  	 * reserve memory for DMA contigouos allocations,
->  	 * must come from DMA area inside low memory
-> -- 
-> 1.7.9.5
->
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/937c3e43/attachment.sig>
+Regards,
+Santosh
