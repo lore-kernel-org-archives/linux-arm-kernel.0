@@ -1,54 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 Aug 2013 11:29:46 -0400
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <20130805150127.GC19631@mtj.dyndns.org>
-References: <20130629175743.GA382@mtj.dyndns.org>
- <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
- <20130629195549.GE3353@n2100.arm.linux.org.uk>
- <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
- <51D18DBA.6090608@ti.com> <51F1A7AA.8080700@ti.com>
- <20130725223658.GJ26107@mtj.dyndns.org> <51F1B17F.30902@ti.com>
- <20130726030812.GB30195@mtj.dyndns.org> <51FC1F3A.8090201@ti.com>
- <20130805150127.GC19631@mtj.dyndns.org>
-Message-ID: <51FFC4EA.40908@ti.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 5 Aug 2013 17:33:19 +0200
+Subject: [PATCH 6/7] Add EFI stub for ARM
+In-Reply-To: <20130805141149.GB2755@localhost.localdomain>
+References: <1375478948-22562-1-git-send-email-roy.franz@linaro.org>
+ <1375478948-22562-7-git-send-email-roy.franz@linaro.org>
+ <20130805141149.GB2755@localhost.localdomain>
+Message-ID: <20130805153318.GL18151@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 August 2013 11:01 AM, Tejun Heo wrote:
-> Hello,
+On Mon, Aug 05, 2013 at 03:11:49PM +0100, Dave Martin wrote:
+> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> > index 75189f1..4c70b9e 100644
+> > --- a/arch/arm/boot/compressed/head.S
+> > +++ b/arch/arm/boot/compressed/head.S
+> > @@ -122,19 +122,106 @@
+> >  		.arm				@ Always enter in ARM state
+> >  start:
+> >  		.type	start,#function
+> > -		.rept	7
+> > +#ifdef CONFIG_EFI_STUB
+> > +		@ Magic MSDOS signature for PE/COFF + ADD opcode
+> > +		.word	0x62805a4d
 > 
-> On Fri, Aug 02, 2013 at 05:06:02PM -0400, Santosh Shilimkar wrote:
->> Looking at the situation, how about proceeding with patch updating
->> the bootmem API signatures to use phys_addr_t  which can unblock me
->> to get my machine working.
-> 
-> I'm not sure about that.  No matter how you play it, it'll end up
-> duplicating memblock interface.
-> 
-fair enough.
+> What about BE32?
+ 
+The ARM bindings for UEFI specify that the processor must be in
+little-endian mode.
 
->> Introduction of new API, conversions of core kernel code and then
+> In that case, the instruction is a coprocessor load, that loads from a
+> random address to a coprocessor that almost certainly doesn't exist.
+> This will probably fault.
 > 
-> What new API are we talking about?  Wasn't the plan to convert core
-> kernel code to use memblock and let bootmem emulate bootmem API?
-> There's no new API.
-> 
-So looks like I am bit confused here. The current memblock_alloc()
-API just returns the physical address which not mapped memory.
-Most of the bootmem users including core code expects the
-mapped memory pointer which the code can directly operate on.
-So the current memblock_alloc() isn't going to help. The nobootmem.c
-has __alloc_memory_core_early() which is actually used by most of
-the bootmem wrappers to achieve the same. So my assumption was
-that we need an equivalent exported memblock API.
+> Since BE32 is only for older platforms (<v6) and this is not easily
+> solvable, it might be sensible to make the EFI stub support depend on
+> !CPU_ENDIAN_BE32.
+ 
+Well, it would make more sense to make EFI_STUB depend on EFI and
+EFI depend on !CPU_ENDIAN_BE32. Which is something I can add to
+my next set of general ARM UEFI patches. Thanks.
 
-What am I missing?
-
->> arches moving away from bootmem is going to take significant time
-> 
-> And arches moving away from bootmem doesn't have to happen now.
-> 
-I agree. The core code conversion is more of an issue.
-
-Regards,
-Santosh
+/
+    Leif
