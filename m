@@ -1,63 +1,68 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Aug 2013 02:42:26 +0900
-Subject: [PATCH v4 00/13] ARM: dts: Add camera and magnetometer support
- for TRATS(2) board
-In-Reply-To: <1374671845-30373-1-git-send-email-s.nawrocki@samsung.com>
-References: <1374671845-30373-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <51FFE402.5040902@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 05 Aug 2013 11:48:07 -0600
+Subject: [PATCH V2 4/8] ARM: tegra: add common LP1 suspend support
+In-Reply-To: <1375701664-14965-5-git-send-email-josephl@nvidia.com>
+References: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
+ <1375701664-14965-5-git-send-email-josephl@nvidia.com>
+Message-ID: <51FFE557.4000103@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/13 22:17, Sylwester Nawrocki wrote:
-> This patch series includes some fixes and extensions to the Exynos dts
-> files to add the camera and magnetometer sensor support for the TRATS
-> and TRATS2 board. It depends on a patch from Tomasz adding initial
-> TRATS2 board dts file [1].
->
-> Changes since v3 include:
->   - removed patch adding MIPI PHY node (although it is unlikely the DT
->     binding will change the PHY driver is still in review phase),
->   - added one more patch for SPI and s5c73m3 camera.
->
-> Detailed changes are listed in each patch.
->
-> This series has been tested with the S5K6A3/FIMC-IS, S5C73M3 and
-> S5K5BAFX cameras on top of v3.11-rc2.
->
-> I have a couple more similar patches that actually enable remaining
-> devices I intend to submit for v3.12, once corresponding driver
-> patches are reviewed and queued.
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg253184.html
->
-> Andrzej Hajda (3):
->    ARM: dts: Add SPI1 controller and s5c73m3 sensor node for TRATS2
->    ARM: dts: Add Exynos4210 SoC camera port pinctrl nodes
->    ARM: dts: Add S5K5BA sensor regulator definitions for Trats board
->
-> Jacek Anaszewski (1):
->    ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
->
-> Sylwester Nawrocki (9):
->    ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
->    ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
->    ARM: dts: Add ISP power domain node for Exynos4x12
->    ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
->    ARM: dts: Add camera subsystem device nodes to exynos4.dtsi
->    ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
->    ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
->    ARM: dts: Add camera device nodes for Exynos4210 SoCs
->    ARM: dts: Add FIMC nodes for Exynos4210 Trats board
->
->   arch/arm/boot/dts/exynos4.dtsi            |  100 +++++++++++++++++++++--
->   arch/arm/boot/dts/exynos4210-pinctrl.dtsi |   23 ++++++
->   arch/arm/boot/dts/exynos4210-trats.dts    |  100 +++++++++++++++++++----
->   arch/arm/boot/dts/exynos4210.dtsi         |   30 +++++++
->   arch/arm/boot/dts/exynos4412-trats2.dts   |  123 +++++++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |   61 ++++++++++++--
->   arch/arm/boot/dts/exynos4x12.dtsi         |  103 ++++++++++++++++++++++++
->   7 files changed, 511 insertions(+), 29 deletions(-)
->
-Applied this whole series, thanks.
+On 08/05/2013 05:21 AM, Joseph Lo wrote:
+> The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
+> clock gated and SDRAM in self-refresh mode. That means the low level LP1
+> suspending and resuming code couldn't be run on DRAM and the CPU must
+> switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
+> the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
+> The LP1 low level handling code need to be moved to IRAM area first. And
+> marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
+> power timer needs to be re-calculated based on 32KHz that was originally
+> based on PCLK.
+> 
+> When resuming from LP1, the LP1 reset handler will resume PLLs and then
+> put DRAM to normal mode. Then jumping to the "tegra_resume" that will
+> restore full context before back to kernel. The "tegra_resume" handler
+> was expected to be found in PMC_SCRATCH41 register.
+> 
+> This is common LP1 procedures for Tegra, so we do these jobs mainly in
+> this patch:
+> * moving LP1 low level handling code to IRAM
+> * marking LP1 mask
+> * copying the physical address of "tegra_resume" to PMC_SCRATCH41
+> * re-calculate the CPU power timer based on 32KHz
 
-- Kukjin
+> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+
+> +static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
+
+I repeat: Why store that value in a global variable? It's constant.
+
+> @@ -174,14 +181,75 @@ enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
+>  				enum tegra_suspend_mode mode)
+>  {
+>  	/*
+> -	 * The Tegra devices only support suspending to LP2 currently.
+> +	 * The Tegra devices support suspending to LP1 or lower currently.
+>  	 */
+> -	if (mode > TEGRA_SUSPEND_LP2)
+> -		return TEGRA_SUSPEND_LP2;
+> +	if (mode > TEGRA_SUSPEND_LP1)
+> +		return TEGRA_SUSPEND_LP1;
+>  
+>  	return mode;
+>  }
+
+I think that change needs to happen after patch 7. At this point in the
+series, LP1 doesn't work on any chip. After patch 7, it will work on all
+chips.
+
+If you don't make that change, you should move this change into patch 5,
+but only enable LP1 for Tegra30, then make patch 6 also enable it for
+Tegra20, then make patch 7 also enable it for Tegra114. That's a lot
+more complex, so just moving the change above into a new patch after
+patch 7 seems better.
+
+Note: You must assume that the DT changes are all checked in before any
+of the code changes, so the code needs to work correctly even if the DT
+contains the data that allows usage of LP1 before the driver actually
+implements LP1.
