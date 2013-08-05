@@ -1,46 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 5 Aug 2013 12:32:14 +0200
-Subject: [PATCH v2 2/3] ARM: dts: vf610: Add eDMA node
-In-Reply-To: <1375682824-11443-1-git-send-email-b35083@freescale.com>
-References: <1375682824-11443-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130805103214.GA30913@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  5 Aug 2013 11:32:23 +0100
+Subject: [PATCH] ARM: fix is_gate_vma() when CONFIG_KUSER_HELPERS is enabled
+Message-ID: <1375698743-2738-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 02:07:03PM +0800, Jingchang Lu wrote:
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> ---
-> changes in v2:
->   using generic dma-channels property instead of fsl,dma-channels.
-> 
-> diff --git a/include/dt-bindings/dma/vf610-edma.h b/include/dt-bindings/dma/vf610-edma.h
-> new file mode 100644
-> index 0000000..3ae481c
-> --- /dev/null
-> +++ b/include/dt-bindings/dma/vf610-edma.h
-> @@ -0,0 +1,103 @@
-> +/*
-> + * Copyright 2013 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-> + *
-> + */
-> +
-> +#ifndef __DT_BINDINGS_DMA_VF610_H__
-> +#define __DT_BINDINGS_DMA_VF610_H__
-> +
-> +/* DMAMUX0,3 reqeust slot number */
-> +#define DMA_MUXID0_UART0_RX	2
+Commit a5463cd34354 (ARM: make vectors page inaccessible from
+userspace) introduced the is_gate_vma() facility to identify the
+vectors page, but a typo broke the /proc/<pid>/maps output:
 
-Never add defines without a proper namespace. I suggest VF610_ here.
+[...]
+b6ef4000-b6f0b000 r-xp 00000000 00:0c 3953760    /lib/arm-linux-gnueabi/ld-2.15.so
+b6f0d000-b6f11000 rw-p 00000000 00:00 0          [vectors]
+b6f11000-b6f12000 r-xp 00000000 00:00 0          [vectors]
+b6f12000-b6f13000 r--p 00016000 00:0c 3953760    /lib/arm-linux-gnueabi/ld-2.15.so
+b6f13000-b6f14000 rw-p 00017000 00:0c 3953760    /lib/arm-linux-gnueabi/ld-2.15.so
+be886000-be8a7000 rw-p 00000000 00:00 0          [vectors]
+ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]
+[...]
 
-Sascha
+With the fix in place, it now reads (different run, hence the
+slightly different output):
 
+[...]
+b6fb1000-b6fc8000 r-xp 00000000 00:0c 3953760    /lib/arm-linux-gnueabi/ld-2.15.so
+b6fca000-b6fce000 rw-p 00000000 00:00 0
+b6fce000-b6fcf000 r-xp 00000000 00:00 0          [sigpage]
+b6fcf000-b6fd0000 r--p 00016000 00:0c 3953760    /lib/arm-linux-gnueabi/ld-2.15.so
+b6fd0000-b6fd1000 rw-p 00017000 00:0c 3953760    /lib/arm-linux-gnueabi/ld-2.15.so
+bea41000-bea62000 rw-p 00000000 00:00 0          [stack]
+ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]
+[...]
+
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/process.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 536c85f..94f6b05 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -462,7 +462,7 @@ int in_gate_area_no_mm(unsigned long addr)
+ {
+ 	return in_gate_area(NULL, addr);
+ }
+-#define is_gate_vma(vma)	((vma) = &gate_vma)
++#define is_gate_vma(vma)	((vma) == &gate_vma)
+ #else
+ #define is_gate_vma(vma)	0
+ #endif
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.2.3
