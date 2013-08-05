@@ -1,27 +1,202 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Aug 2013 01:51:25 +0900
-Subject: [PATCH v4 00/20] Samsung PWM support cleanup
-In-Reply-To: <CAOesGMjAHsGuXE9bMjGCzrrBFb=qPko_3P67QC4uENa1ktPYiw@mail.gmail.com>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>	<6035387.7ekicDUVuU@flatron>
- <CAOesGMjAHsGuXE9bMjGCzrrBFb=qPko_3P67QC4uENa1ktPYiw@mail.gmail.com>
-Message-ID: <51FFD80D.4010309@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 5 Aug 2013 17:57:55 +0100
+Subject: [PATCH v7] dmaengine: Add MOXA ART DMA engine driver
+In-Reply-To: <1375713457-5562-1-git-send-email-jonas.jensen@gmail.com>
+References: <1375450125-29767-1-git-send-email-jonas.jensen@gmail.com>
+ <1375713457-5562-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130805165755.GD13091@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/13 04:28, Olof Johansson wrote:
-> On Wed, Jul 31, 2013 at 12:03 PM, Tomasz Figa<tomasz.figa@gmail.com>  wrote:
->> Hi Kukjin,
->>
->> Since I think we already got all the necessary Acks, do you want me to
->> send you a pull request or you already have this series applied (I can't
->> see it in your tree on kernel.org)?
+On Mon, Aug 05, 2013 at 03:37:37PM +0100, Jonas Jensen wrote:
+> The MOXA ART SoC has a DMA controller capable of offloading expensive
+> memory operations, such as large copies. This patch adds support for
+> the controller including four channels. Two of these are used to
+> handle MMC copy on the UC-7112-LX hardware. The remaining two can be
+> used in a future audio driver or client application.
 >
-> I'll take it directly. Please send me a pull request.
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
 >
-Sorry for late response :(
+> Notes:
+>     Thanks for the replies.
+>
+>     Changes since v6:
+>
+>     1. move callback from interrupt context to tasklet
+>     2. remove callback and callback_param, use those provided by tx_desc
+>     3. don't rely on structs for register offsets
+>     4. remove local bool "found" variable from moxart_alloc_chan_resources()
+>     5. check return value of irq_of_parse_and_map
+>     6. use devm_request_irq instead of setup_irq
+>     7. elaborate commit message
+>
+>     device tree bindings document:
+>     8. in the example, change "#dma-cells" to "<2>"
+>
+>     Applies to next-20130805
+>
+>  .../devicetree/bindings/dma/moxa,moxart-dma.txt    |  21 +
+>  drivers/dma/Kconfig                                |   7 +
+>  drivers/dma/Makefile                               |   1 +
+>  drivers/dma/moxart-dma.c                           | 614 +++++++++++++++++++++
+>  4 files changed, 643 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
+>  create mode 100644 drivers/dma/moxart-dma.c
+>
+> diff --git a/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
+> new file mode 100644
+> index 0000000..5b9f82c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
+> @@ -0,0 +1,21 @@
+> +MOXA ART DMA Controller
+> +
+> +See dma.txt first
+> +
+> +Required properties:
+> +
+> +- compatible : Must be "moxa,moxart-dma"
+> +- reg :                Should contain registers location and length
+> +- interrupts : Should contain the interrupt number
+> +- #dma-cells : Should be 2
+> +               cell index 0: channel number between 0-3
+> +               cell index 1: line request number
+> +
+> +Example:
+> +
+> +       dma: dma at 90500000 {
+> +               compatible = "moxa,moxart-dma";
+> +               reg = <0x90500000 0x1000>;
+> +               interrupts = <24 0>;
+> +               #dma-cells = <2>;
+> +       };
 
-Yes, I'm OK either way, my pulling or Olof's taking in this case. So 
-Tomasz, please send a pull request for this series, it should be fine to me.
+Thanks for the updates on this. :)
+
+The binding and example look sensible to me; it would be nice if someone
+familiar with the dma subsystem could check that this has the necessary
+information.
+
+[...]
+
+> +static int moxart_alloc_chan_resources(struct dma_chan *chan)
+> +{
+> +       struct moxart_dma_chan *mchan = to_moxart_dma_chan(chan);
+> +       int i;
+> +
+> +       for (i = 0; i < APB_DMA_MAX_CHANNEL; i++) {
+> +               if (i == mchan->ch_num
+> +                       && !mchan->allocated) {
+> +                       dev_dbg(chan2dev(chan), "%s: allocating channel #%d\n",
+> +                               __func__, mchan->ch_num);
+> +                       mchan->allocated = true;
+> +                       return 0;
+> +               }
+> +       }
+
+Come to think of it, why do you need to iterate over all of the channels
+to handle a particular channel number that you already know, and already
+have the struct for?
+
+I'm not familiar with the dma subsystem, and I couldn't spot when the
+dma channel is actually assigned/selected prior to this.
+
+[...]
+
+> +static enum dma_status moxart_tx_status(struct dma_chan *chan,
+> +                                       dma_cookie_t cookie,
+> +                                       struct dma_tx_state *txstate)
+> +{
+> +       enum dma_status ret;
+> +
+> +       ret = dma_cookie_status(chan, cookie, txstate);
+> +       if (ret == DMA_SUCCESS || !txstate)
+> +               return ret;
+> +
+> +       return ret;
+
+No special status handling?
+
+This function is equivalent to:
+
+        return dma_cookie_status(chan, cookie, txstate);
+
+[...]
+
+> +static int moxart_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct device_node *node = dev->of_node;
+> +       struct resource *res;
+> +       static void __iomem *dma_base_addr;
+> +       int ret, i;
+> +       unsigned int irq;
+> +       struct moxart_dma_chan *mchan;
+> +       struct moxart_dma_container *mdc;
+> +
+> +       mdc = devm_kzalloc(dev, sizeof(*mdc), GFP_KERNEL);
+> +       if (!mdc) {
+> +               dev_err(dev, "can't allocate DMA container\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       irq = irq_of_parse_and_map(node, 0);
+> +       if (irq <= 0) {
+> +               dev_err(dev, "irq_of_parse_and_map failed\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       dma_base_addr = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(dma_base_addr)) {
+> +               dev_err(dev, "devm_ioremap_resource failed\n");
+> +               return PTR_ERR(dma_base_addr);
+> +       }
+> +
+> +       mdc->ctlr = pdev->id;
+> +       spin_lock_init(&mdc->dma_lock);
+> +
+> +       dma_cap_zero(mdc->dma_slave.cap_mask);
+> +       dma_cap_set(DMA_SLAVE, mdc->dma_slave.cap_mask);
+> +
+> +       moxart_dma_init(&mdc->dma_slave, dev);
+> +
+> +       mchan = &mdc->slave_chans[0];
+> +       for (i = 0; i < APB_DMA_MAX_CHANNEL; i++, mchan++) {
+> +               mchan->ch_num = i;
+> +               mchan->base = dma_base_addr + 0x80 + i * REG_CHAN_SIZE;
+> +               mchan->allocated = 0;
+> +
+> +               dma_cookie_init(&mchan->chan);
+> +               mchan->chan.device = &mdc->dma_slave;
+> +               list_add_tail(&mchan->chan.device_node,
+> +                             &mdc->dma_slave.channels);
+> +
+> +               dev_dbg(dev, "%s: mchans[%d]: mchan->ch_num=%d mchan->base=%p\n",
+> +                       __func__, i, mchan->ch_num, mchan->base);
+> +       }
+> +
+> +       ret = dma_async_device_register(&mdc->dma_slave);
+
+What if this fails?
+
+> +       platform_set_drvdata(pdev, mdc);
+> +
+> +       of_dma_controller_register(node, moxart_of_xlate, &moxart_dma_info);
+> +
+> +       tasklet_init(&mdc->tasklet, moxart_dma_tasklet, (unsigned long)mdc);
+> +
+> +       devm_request_irq(dev, irq, moxart_dma_interrupt, 0,
+> +                        "moxart-dma-engine", mdc);
+
+The return value of devm_request_irq should be checked; it might fail.
+
+> +
+> +       dev_dbg(dev, "%s: IRQ=%d\n", __func__, irq);
+> +
+> +       return ret;
+> +}
 
 Thanks,
-Kukjin
+Mark.
