@@ -1,107 +1,102 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Aug 2013 03:13:55 +0900
-Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
-In-Reply-To: <20130805180625.5348.79570@quantum>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <51FFDA70.7080900@samsung.com> <20130805180625.5348.79570@quantum>
-Message-ID: <51FFEB63.6060901@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 05 Aug 2013 20:14:47 +0200
+Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
+In-Reply-To: <20130805165957.GT9858@sirena.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
+ <51FFA348.2010503@gmail.com> <20130805140729.GC9858@sirena.org.uk>
+ <51FFBF03.1000507@gmail.com> <20130805165957.GT9858@sirena.org.uk>
+Message-ID: <51FFEB97.30004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/13 03:06, Mike Turquette wrote:
-> Quoting Kukjin Kim (2013-08-05 10:01:36)
->> On 07/23/13 08:49, Tomasz Figa wrote:
->>> This series is an attempt to move clock support on Samsung S3C64xx SoCs
->>> to Common Clock Framework.
->>>
->>> First, support for PLL types present on S3C64xx SoCs is added to Samsung
->>> Common Clock Framework driver. Then the main clock driver for mentioned
->>> SoCs is introduced. Further patches contain fixes for drivers to make them
->>> compliant with CCF semantics, migration of platform code to use the new
->>> clock driver and removal of old clock management code.
->>>
->>> Depends on:
->>>    - [PATCH v4 00/20] Samsung PWM support cleanup
->>>      http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20856
->>>
->>> On S3C6410-based Tiny6410 board (Mini6410-compatible):
->>>
->>> Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
->>>
->>> For v1:
->>>
->>> Acked-by: Mike Turquette<mturquette@linaro.org>
->>>
->>> Changes since v1:
->>>    - added patch for read-only muxes,
->>>    - exported configurable muxes and dividers,
->>>    - defined mout_syncmux as read-only mux,
->>>    - in DT-enabled case fixed-clock binding is used to define external clocks.
->>>
->>> Tomasz Figa (8):
->>>     clk: mux: Add support for read-only muxes.
->>>     clk: samsung: pll: Add support for PLL6552 and PLL6553
->>>     clk: samsung: Add clock driver for S3C64xx SoCs
->>>     ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
->>>     ARM: s3c64xx: dma: Use clk_prepare_enable/clk_disable_unprepare
->>>     usb: host: ohci-s3c2410 Use clk_prepare_enable/clk_disable_unprepare
->>>     ARM: s3c64xx: Migrate clock handling to Common Clock Framework
->>>     ARM: s3c64xx: Remove old clock management code
->>>
->>>    .../bindings/clock/samsung,s3c64xx-clock.txt       |   77 ++
->>>    arch/arm/Kconfig                                   |    2 +-
->>>    arch/arm/mach-s3c64xx/Makefile                     |    2 +-
->>>    arch/arm/mach-s3c64xx/clock.c                      | 1007 --------------------
->>>    arch/arm/mach-s3c64xx/common.c                     |   21 +-
->>>    arch/arm/mach-s3c64xx/common.h                     |   12 +-
->>>    arch/arm/mach-s3c64xx/dma.c                        |    4 +-
->>>    arch/arm/mach-s3c64xx/include/mach/regs-clock.h    |  132 +--
->>>    arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
->>>    arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
->>>    arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
->>>    arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
->>>    arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
->>>    arch/arm/mach-s3c64xx/mach-smartq.c                |   11 +-
->>>    arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +-
->>>    arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
->>>    arch/arm/mach-s3c64xx/pm.c                         |   21 -
->>>    arch/arm/mach-s3c64xx/s3c6400.c                    |    6 -
->>>    arch/arm/mach-s3c64xx/s3c6410.c                    |    7 -
->>>    arch/arm/plat-samsung/include/plat/cpu.h           |    4 +
->>>    drivers/clk/clk-mux.c                              |   10 +-
->>>    drivers/clk/samsung/Makefile                       |    1 +
->>>    drivers/clk/samsung/clk-pll.c                      |  160 ++++
->>>    drivers/clk/samsung/clk-pll.h                      |    4 +
->>>    drivers/clk/samsung/clk-s3c64xx.c                  |  465 +++++++++
->>>    drivers/usb/host/ohci-s3c2410.c                    |    8 +-
->>>    include/dt-bindings/clock/samsung,s3c64xx-clock.h  |  178 ++++
->>>    include/linux/clk-provider.h                       |    2 +
->>>    28 files changed, 943 insertions(+), 1205 deletions(-)
->>>    create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
->>>    delete mode 100644 arch/arm/mach-s3c64xx/clock.c
->>>    create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
->>>    create mode 100644 include/dt-bindings/clock/samsung,s3c64xx-clock.h
->>>
->> Basically, this series looks good to me, but I'm not sure how this
->> should be handled because of dependency with PWM cleanup and clk stuff
->> in clk tree now...
+On 08/05/2013 06:59 PM, Mark Brown wrote:
+> On Mon, Aug 05, 2013 at 05:04:35PM +0200, Sebastian Hesselbarth wrote:
 >
-> Patches 1-3 can go into the clk tree. 4-6 should go through their
-> respective trees.
+>> I cannot follow you on the clocking arrangements. The binding
+>> proposal was for audio controller <-> CODEC connections. For clocks
+>> there are common properties ("clocks", "clock-names", "clock-frequency")
+>> to pass them to drivers - for "sound cards" in general there are not.
 >
-> If you want I can take 7&  8 through the clk tree.
->
-> Alternatively I can provide patches 1-3 in a separate stable topic
-> branch for you to pull in as a dependency. We'll both merge that stable
-> topic branch into our trees and you can make a note of it for the
-> arm-soc folks.
->
-Thanks for your quick response. Would be helpful to samsung tree if you 
-could provide a separate stable topic branch what you suggested for clk 
-stuff in this series.
+> The clocking arrangements are an example of why the boards can get
+> interesting enough to describe for themselves.
 
-Of course, I will inform when I send pull-request for this series to 
-arm-soc.
+I understand there are complex arrangements, I still don't think that
+you need a global super-node to describe them. Anyway, I am not voting
+against a super-node.
 
-Thanks,
-Kukjin
+>> So, having a look at the node in question:
+>
+>> sound {
+>>    compatible = "nvidia,tegra-audio-rt5640-beaver",
+>>                 "nvidia,tegra-audio-rt5640";
+>>    nvidia,model = "NVIDIA Tegra Beaver";
+>>
+>>    nvidia,audio-routing = "Headphones", "HPOR",
+>>                           "Headphones", "HPOL";
+>>
+>>    nvidia,i2s-controller = <&tegra_i2s1>;
+>>    nvidia,audio-codec = <&rt5640>;
+>>
+>>    nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(W, 2) GPIO_ACTIVE_HIGH>;
+>>
+>>    clocks = <&tegra_car TEGRA30_CLK_PLL_A>,
+>>             <&tegra_car TEGRA30_CLK_PLL_A_OUT0>,
+>>             <&tegra_car TEGRA30_CLK_EXTERN1>;
+>>    clock-names = "pll_a", "pll_a_out0", "mclk";
+>> };
+>>
+>> all those "nvidia," prefixed properties are not nvidia-specific at all.
+>
+> This is all because you have to add a prefix for DT.
+
+Right, like we have on all the other non-standard properties like
+"pinctrl-0", "bla-gpios", "clocks", ... come on, just make them generic
+enough and you can omit the vendor prefix.
+
+>> Also, all those "nvidia," properties would have fit very well into the
+>> i2s controller node
+>
+> No, almost none of them have any place there.  For example, the audio
+> routing contains only connections to the CODEC so the I2S controller
+> isn't in play, the headphone detection is connected to the AP but isn't
+> connected to the I2S port.
+
+ From a quick look in tegra30_hub.h, I can see configuration registers
+i2s formatting. I assume that i2s controller on Tegra can therefore
+directly connected to a I2S codec, can't it? Then, with an existing i2s
+node and an existing codec node - why is there no place to link both?
+
+I can think of use cases that are hard to describe in a link-to-link
+way, but none of them really requires a super-node nor special
+board-specific compatible strings. With that we can just have the root
+DT node be compatible with Beaver above and register all the old
+platform_device way.
+
+[...]
+>> I learned to never match "device nodes" with "drivers" as there
+>> is simply no relation between them.
+>
+> That's clearly a thinko for device node.
+
+I assume with "thinko" you mean "thought wrong" - IMHO the above 
+statement is very true. If it wouldn't, why not just have a node for
+kirkwood-dma and kirkwood-i2s instead of merging the drivers?
+You think that will also be accepted by DT maintainers?
+
+>> So, back to my original node proposal, can you tell me what is so
+>> different, except that I am not using "marvell,audio-codec(s)" but
+>> "audio-codecs"; and hook the one available codec output by using
+>> phandle/args instead of a new compatible string?
+>
+>  From my point of view I'd rather not be shoving vendor prefixes on all
+> the properties, this is coming from DT convention requiring vendor
+> prefixes on bindings.
+
+I understand that those vendor prefixes are part of the helper
+functions of ASoC. But no other subsystem has a similar approach but
+though of properties generic enough to help drivers find what they
+need to know. Either ASoC is mis-interpreting the vendor-prefix
+requirement - or all other subsystems are.
+
+Sebastian
