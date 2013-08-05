@@ -1,90 +1,369 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Aug 2013 19:59:22 +0100
-Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
-In-Reply-To: <51FFEB97.30004@gmail.com>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
- <51FFA348.2010503@gmail.com> <20130805140729.GC9858@sirena.org.uk>
- <51FFBF03.1000507@gmail.com> <20130805165957.GT9858@sirena.org.uk>
- <51FFEB97.30004@gmail.com>
-Message-ID: <20130805185922.GC9858@sirena.org.uk>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 05 Aug 2013 20:59:23 +0200
+Subject: [PATCH v4 3/4] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
+References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
+ <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <xa1teha8ufp0.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 08:14:47PM +0200, Sebastian Hesselbarth wrote:
-> On 08/05/2013 06:59 PM, Mark Brown wrote:
+On Wed, Jul 31 2013, Marek Szyprowski wrote:
+> Add device tree support for contiguous and reserved memory regions
+> defined in device tree. Initialization is done in 2 steps. First, the
+> memory is reserved, what happens very early when only flattened device
+> tree is available. Then on device initialization the corresponding cma
+> and reserved regions are assigned to each device structure.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-> >The clocking arrangements are an example of why the boards can get
-> >interesting enough to describe for themselves.
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
-> I understand there are complex arrangements, I still don't think that
-> you need a global super-node to describe them. Anyway, I am not voting
-> against a super-node.
+Minor comments inline.
 
-Please look back through the list archives, we've been round this loop
-repeatedly.
+> ---
+>  Documentation/devicetree/bindings/memory.txt |  152 ++++++++++++++++++++++
+>  drivers/of/Kconfig                           |    6 +
+>  drivers/of/Makefile                          |    1 +
+>  drivers/of/of_reserved_mem.c                 |  175 ++++++++++++++++++++++++++
+>  include/asm-generic/dma-coherent.h           |    6 +
+>  5 files changed, 340 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory.txt
+>  create mode 100644 drivers/of/of_reserved_mem.c
+>
+> diff --git a/Documentation/devicetree/bindings/memory.txt b/Documentation/devicetree/bindings/memory.txt
+> new file mode 100644
+> index 0000000..4aece19
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory.txt
+> @@ -0,0 +1,152 @@
+> +*** Memory binding ***
+> +
+> +The /memory node provides basic information about the address and size
+> +of the physical memory. This node is usually filled or updated by the
+> +bootloader, depending on the actual memory configuration of the given
+> +hardware.
+> +
+> +The memory layout is described by the folllowing node:
+> +
+> +memory {
+> +	reg =  <(baseaddr1) (size1)
+> +		(baseaddr2) (size2)
+> +		...
+> +		(baseaddrN) (sizeN)>;
+> +};
+> +
+> +baseaddrX:	the base address of the defined memory bank
+> +sizeX:		the size of the defined memory bank
+> +
+> +More than one memory bank can be defined.
+> +
+> +
+> +*** Reserved memory regions ***
+> +
+> +In /memory/reserved-memory node one can create additional nodes
+> +describing particular reserved (excluded from normal use) memory
+> +regions. Such memory regions are usually designed for the special usage
+> +by various device drivers. A good example are contiguous memory
+> +allocations or memory sharing with other operating system on the same
+> +hardware board. Those special memory regions might depend on the board
+> +configuration and devices used on the target system.
+> +
+> +Parameters for each memory region can be encoded into the device tree
+> +wit the following convention:
+> +
+> +[(label):] (name)@(address) {
+> +	compatible = "contiguous-memory-region", "reserved-memory-region";
+> +	reg = <(address) (size)>;
+> +	(linux,contiguous-region);
+> +	(linux,default-contiguous-region);
+> +};
+> +
+> +label:		label given to the defined region (optional)
+> +name:		an name given to the defined region
+> +address:	the base address of the defined region
+> +size:		the size of the memory region
+> +
+> +compatible:	"contiguous-memory-region" - enables binding of this
+> +		region to Contiguous Memory Allocator (special region for
+> +		contiguous memory allocations, shared with movable system
+> +		memory, Linux kernel-specific), alternatively if
+> +		"reserved-memory-region" - compatibility is defined, given
+> +		region is assigned for exclusive usage for DMA transfers
+> +
+> +linux,default-contiguous-region: property indicating that the region
+> +		is the default region for all contiguous memory
+> +		allocations, Linux specific (optional)
+> +
+> +Each defined region must use unique name. It is optional to specify the
+> +base address, so if one wants to use autoconfiguration of the base
+> +address, he must specify the '0' as base address in the 'reg' property
+> +and assign ann uniqe name to such regions.
+> +
+> +
+> +*** Device node's properties ***
+> +
+> +Once the regions in the /memory/reserved-memory node are defined, they
+> +can be assigned to device nodes to enable drivers for their special use.
+> +The following properties are defined:
+> +
+> +dma-memory-region = <&phandle_to_defined_region>;
+> +
+> +This property indicates that the device driver should use the
+> +memory region pointed by the given phandle.
+> +
+> +
+> +*** Example ***
+> +
+> +This example defines a memory consisting of 4 memory banks. 3 contiguous
+> +regions are defined for Linux kernel, one default of all device drivers
+> +(named contig_mem, placed at 0x72000000, 64MiB), one dedicated to the
+> +framebuffer device (labelled display_mem, placed at 0x78000000, 8MiB)
+> +and one for multimedia processing (labelled multimedia_mem, placed at
+> +0x77000000, 64MiB). 'display_mem' region is then assigned to fb at 12300000
+> +device for DMA memory allocations (Linux kernel drivers will use CMA is
+> +available or dma-exclusive usage otherwise). 'multimedia_mem' is
+> +assigned to scaller at 12500000 and codec at 12600000 devices for contiguous
+> +memory allocations when CMA driver is enabled.
+> +
+> +The reason for creating a separate region for framebuffer device is to
+> +match the framebuffer base address to the one configured by bootloader,
+> +so once Linux kernel drivers starts no glitches on the displayed boot
+> +logo appears. Scaller and codec drivers should share the memory
+> +allocations.
+> +
+> +/ {
+> +	/* ... */
+> +	memory {
+> +		reg =  <0x40000000 0x10000000
+> +			0x50000000 0x10000000
+> +			0x60000000 0x10000000
+> +			0x70000000 0x10000000>;
+> +
+> +		reserved-memory {
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			/*
+> +			 * global autoconfigured region for contiguous allocations
+> +			 * (used only with Contiguous Memory Allocator)
+> +			 */
+> +			contig_region at 0 {
+> +				compatible = "contiguous-memory-region";
+> +				reg = <0x0 0x4000000>;
+> +				linux,default-contiguous-region;
+> +			};
+> +
+> +			/*
+> +			 * special region for framebuffer
+> +			 */
+> +			display_mem: region at 78000000 {
+> +				compatible = "contiguous-memory-region", "reserved-memory-region";
+> +				reg = <0x78000000 0x800000>;
+> +			};
+> +
+> +			/*
+> +			 * special region for multimedia processing devices
+> +			 */
+> +			multimedia_mem: region at 77000000 {
+> +				compatible = "contiguous-memory-region";
+> +				reg = <0x77000000 0x4000000>;
+> +			};
+> +		};
+> +	};
+> +
+> +	/* ... */
+> +
+> +	fb0: fb at 12300000 {
+> +		status = "okay";
+> +		dma-memory-region = <&display_mem>;
+> +	};
+> +
+> +	scaller: scaller at 12500000 {
+> +		status = "okay";
+> +		dma-memory-region = <&multimedia_mem>;
+> +	};
+> +
+> +	codec: codec at 12600000 {
+> +		status = "okay";
+> +		dma-memory-region = <&multimedia_mem>;
+> +	};
+> +};
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index 80e5c13..a83ab43 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -80,4 +80,10 @@ config OF_MTD
+>  	depends on MTD
+>  	def_bool y
+>  
+> +config OF_RESERVED_MEM
+> +	depends on CMA || (HAVE_GENERIC_DMA_COHERENT && HAVE_MEMBLOCK)
+> +	def_bool y
+> +	help
+> +	  Initialization code for DMA reserved memory
+> +
+>  endmenu # OF
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index 1f9c0c4..e7e3322 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+>  obj-$(CONFIG_OF_PCI)	+= of_pci.o
+>  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+>  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+> +obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> new file mode 100644
+> index 0000000..d97fcdf
+> --- /dev/null
+> +++ b/drivers/of/of_reserved_mem.c
+> @@ -0,0 +1,175 @@
+> +/*
+> + * Device tree based initialization code for reserved memory.
+> + *
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License or (at your optional) any later version of the license.
+> + */
+> +
+> +#include <asm/dma-contiguous.h>
+> +
+> +#include <linux/memblock.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/mm.h>
+> +#include <linux/sizes.h>
+> +#include <linux/mm_types.h>
+> +#include <linux/dma-contiguous.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +#define MAX_RESERVED_REGIONS	16
+> +struct reserved_mem {
+> +	phys_addr_t		base;
+> +	unsigned long		size;
+> +	struct cma		*cma;
+> +	char			name[32];
+> +};
+> +static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
+> +static int reserved_mem_count;
+> +
+> +static int __init reserved_mem_fdt_scan(unsigned long node, const char *uname,
+> +				    int depth, void *data)
+> +{
+> +	phys_addr_t base, size;
+> +	int is_cma, is_reserved;
+> +	unsigned long len;
+> +	void *prop;
+> +
+> +	is_cma = of_flat_dt_is_compatible(node, "contiguous-memory-region");
 
-> >>Also, all those "nvidia," properties would have fit very well into the
-> >>i2s controller node
+Perhaps:
 
-> >No, almost none of them have any place there.  For example, the audio
-> >routing contains only connections to the CODEC so the I2S controller
-> >isn't in play, the headphone detection is connected to the AP but isn't
-> >connected to the I2S port.
++	is_cma = IS_ENABLED(CONFIG_CMA) && 
++		of_flat_dt_is_compatible(node, "contiguous-memory-region");
 
-> From a quick look in tegra30_hub.h, I can see configuration registers
-> i2s formatting. I assume that i2s controller on Tegra can therefore
-> directly connected to a I2S codec, can't it? Then, with an existing i2s
-> node and an existing codec node - why is there no place to link both?
+which will save on typing IS_ENABLED(CONFIG_CMA) later on.
 
-At a minimum we'd need to figure out which end of the link to put it on
-and what to do about multi-drop links or links which share some or all
-of the clocks but have split data lines.
+> +	is_reserved = of_flat_dt_is_compatible(node, "reserved-memory-region");
 
-> I can think of use cases that are hard to describe in a link-to-link
-> way, but none of them really requires a super-node nor special
-> board-specific compatible strings. With that we can just have the root
-> DT node be compatible with Beaver above and register all the old
-> platform_device way.
+is_reserved value is used only if !is_cma, so maybe skip computing it if
+is_cma?  Just a thought.
 
-It's just plain good practice to have some way to figure out which board
-we're running on.
+> +
+> +	if (!is_reserved && !(is_cma && IS_ENABLED(CONFIG_CMA)))
+> +		return 0;
+> +
+> +	prop = of_get_flat_dt_prop(node, "reg", &len);
+> +	if (!prop || (len != 2 * sizeof(unsigned long))) {
+> +		pr_err("Reserved mem: node %s, incorrect \"reg\" property\n",
+> +		       uname);
+> +		return 0;
+> +	}
+> +
+> +	if (sizeof(unsigned long) == 4) {
+> +		base = be32_to_cpu(((__be32 *)prop)[0]);
+> +		size = be32_to_cpu(((__be32 *)prop)[1]);
+> +	} else {
+> +		base = be64_to_cpu(((__be64 *)prop)[0]);
+> +		size = be64_to_cpu(((__be64 *)prop)[1]);
+> +	}
+> +
+> +	pr_info("Reserved mem: found %s, memory base %lx, size %ld MiB\n",
+> +		uname, (unsigned long)base, (unsigned long)size / SZ_1M);
+> +
+> +	if (reserved_mem_count == ARRAY_SIZE(reserved_mem))
+> +		return -ENOMEM;
 
-> [...]
-> >>I learned to never match "device nodes" with "drivers" as there
-> >>is simply no relation between them.
++		return -ENOSPC;
 
-> >That's clearly a thinko for device node.
+> +
+> +	reserved_mem[reserved_mem_count].base = base;
+> +	reserved_mem[reserved_mem_count].size = size;
+> +	strcpy(reserved_mem[reserved_mem_count].name, uname);
 
-> I assume with "thinko" you mean "thought wrong" - IMHO the above
-> statement is very true. If it wouldn't, why not just have a node for
-> kirkwood-dma and kirkwood-i2s instead of merging the drivers?
-> You think that will also be accepted by DT maintainers?
+strlcpy(reserved_mem[reserved_mem_count].name,
+        sizeof(reserved_mem[reserved_mem_count].name), uname);
 
-We don't have a node for the DMA driver because it's just a software
-wrapper for the DMA controller.  We do have a node for the board because
-it's an actual physical thing that we can point at, the board driver is
-representing the audio subsystem schematic.
+> +
+> +	if (IS_ENABLED(CONFIG_CMA) && is_cma) {
+> +		struct cma *cma;
+> +		if (dma_contiguous_reserve_area(size, base, 0, &cma) == 0) {
+> +			reserved_mem[reserved_mem_count].cma = cma;
+> +			reserved_mem_count++;
+> +
+> +			if (of_get_flat_dt_prop(node,
+> +						"linux,default-contiguous-region",
+> +						NULL))
+> +				dma_contiguous_set_default_area(cma);
+> +		}
+> +	} else if (is_reserved) {
+> +		if (memblock_remove(base, size) == 0)
+> +			reserved_mem_count++;
+> +		else
+> +			pr_err("Failed to reserve memory for %s\n", uname);
+> +	}
+> +
+> +	return 0;
+> +}
 
-> > From my point of view I'd rather not be shoving vendor prefixes on all
-> >the properties, this is coming from DT convention requiring vendor
-> >prefixes on bindings.
+> diff --git a/include/asm-generic/dma-coherent.h b/include/asm-generic/dma-coherent.h
+> index 2be8a2d..06111d00 100644
+> --- a/include/asm-generic/dma-coherent.h
+> +++ b/include/asm-generic/dma-coherent.h
+> @@ -32,4 +32,10 @@ dma_mark_declared_memory_occupied(struct device *dev,
+>  #define dma_mmap_from_coherent(dev, vma, vaddr, order, ret) (0)
+>  #endif
+>  
+> +#ifdef CONFIG_OF_RESERVED_MEM
+> +void __init dma_reserved_mem_of_reserve(void);
+> +#else
+> +#define dma_reserved_mem_of_reserve()
 
-> I understand that those vendor prefixes are part of the helper
-> functions of ASoC. But no other subsystem has a similar approach but
++#define dma_reserved_mem_of_reserve() (void)0
 
-No?  I can't parse what you're saying here at all.
+> +#endif
+> +
+>  #endif
 
-> though of properties generic enough to help drivers find what they
-> need to know. Either ASoC is mis-interpreting the vendor-prefix
-> requirement - or all other subsystems are.
-
-This isn't me, this is people like Stephen (who's one of the DT
-guys...).
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/f1e2979e/attachment.sig>
+Size: 835 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/23e6f7c4/attachment.sig>
