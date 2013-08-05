@@ -1,245 +1,68 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 5 Aug 2013 19:14:37 +0800
-Subject: [PATCH 5/6] mtd: atmel_nand: enable Nand Flash Controller (NFC) write
- via sram
-In-Reply-To: <1375701279-11495-1-git-send-email-josh.wu@atmel.com>
-References: <1375701279-11495-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1375701279-11495-6-git-send-email-josh.wu@atmel.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 5 Aug 2013 19:20:56 +0800
+Subject: [PATCH V2 0/8] ARM: tegra: support LP1 suspend mode
+Message-ID: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable writing nand flash via NFC SRAM. It will minimize the CPU
-overhead. The SRAM write only support ECC_NONE and ECC_HW with PMECC.
+This series adds the support of LP1 suspend mode for Tegra.
 
-To enable this NFC write by SRAM feature, you can add a string in dts under
-NFC driver node.
+V2:
+* double confirm each patch can be built with all the combination of
+  Tegra SoCs by bisect
+* and make sure the function is still OK with above testing
 
-This driver has been tested on SAMA5D3X-EK with JFFS2, YAFFS2, UBIFS and
-mtd-utils.
+Verified on Seaboard, Cardhu and Dalmore.
+And tested with THUMB2_KERNEL as well.
 
-Here is part of mtd_speedtest (writing test) result, compare with non-NFC
-writing, it reduces %65 cpu load with loss %12 speed.
+P.S.
+A known issue on Dalmore, the LP1 resume may take 10 ~ 15 seconds due to
+the 792MHz BCT. It can't be reproduced on Seaboard or Cardhu. And the
+root cause of this is about the default settings of EMC registers that
+cause the DRAM can't leave self-refresh mode immediately. If you want
+to test with quick LP1 resume on Dalmore, I can provide another HACK for
+this.
 
-- commands use to test:
-  # insmod /mnt/mtd_speedtest.ko dev=2 &
-  # top -n 30 -d 1 | grep speedtest
+Joseph Lo (8):
+  ARM: tegra: add common resume handling code for LP1 resuming
+  ARM: tegra: config the polarity of the request of sys clock
+  clk: tegra114: add LP1 suspend/resume support
+  ARM: tegra: add common LP1 suspend support
+  ARM: tegra: add LP1 suspend support for Tegra30
+  ARM: tegra: add LP1 suspend support for Tegra20
+  ARM: tegra: add LP1 suspend support for Tegra114
+  ARM: tegra: enable LP1 suspend mode
 
-- test result:
-=================================================
-mtd_speedtest: MTD device: 2
-mtd_speedtest: MTD device size 41943040, eraseblock size 131072, page size 2048, count of eraseblocks 320, pages per eraseblock 64, OOB size 64
-mtd_speedtest: testing eraseblock write speed
-  509   495 root     D     1164   0%   7% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%   8% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     R     1164   0%   5% insmod /mnt/mtd_speedtest.ko dev=2
-mtd_speedtest: eraseblock write speed is 5194 KiB/s
-mtd_speedtest: testing page write speed
-  509   495 root     D     1164   0%  32% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%  27% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%  25% insmod /mnt/mtd_speedtest.ko dev=2
-  509   495 root     D     1164   0%  30% insmod /mnt/mtd_speedtest.ko dev=2
-mtd_speedtest: page write speed is 5024 KiB/s
+ arch/arm/boot/dts/tegra114-dalmore.dts     |   2 +-
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi |   2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts      |   2 +-
+ arch/arm/boot/dts/tegra20-paz00.dts        |   2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts     |   2 +-
+ arch/arm/boot/dts/tegra20-tamonten.dtsi    |   2 +-
+ arch/arm/boot/dts/tegra20-trimslice.dts    |   2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts      |   2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts     |   2 +-
+ arch/arm/boot/dts/tegra30-beaver.dts       |   2 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi      |   2 +-
+ arch/arm/mach-tegra/Makefile               |   3 +
+ arch/arm/mach-tegra/iomap.h                |   8 +
+ arch/arm/mach-tegra/pm-tegra20.c           |  34 ++
+ arch/arm/mach-tegra/pm-tegra30.c           |  34 ++
+ arch/arm/mach-tegra/pm.c                   | 138 ++++++-
+ arch/arm/mach-tegra/pm.h                   |  12 +
+ arch/arm/mach-tegra/pmc.c                  |  37 ++
+ arch/arm/mach-tegra/pmc.h                  |   3 +
+ arch/arm/mach-tegra/reset-handler.S        |  13 +
+ arch/arm/mach-tegra/reset.c                |   2 +
+ arch/arm/mach-tegra/reset.h                |   4 +
+ arch/arm/mach-tegra/sleep-tegra20.S        | 296 ++++++++++++++
+ arch/arm/mach-tegra/sleep-tegra30.S        | 605 +++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/sleep.S                |   8 +-
+ arch/arm/mach-tegra/sleep.h                |   8 +
+ drivers/clk/tegra/clk-tegra114.c           |  32 ++
+ 27 files changed, 1239 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/pm-tegra20.c
+ create mode 100644 arch/arm/mach-tegra/pm-tegra30.c
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
-v3 --> v4:
-  - no blank line change.
-
-v2 --> v3:
-  - use a property of NFC node to enable/disable NFC write via sram.
-
- .../devicetree/bindings/mtd/atmel-nand.txt         |    2 +
- drivers/mtd/nand/atmel_nand.c                      |  106 +++++++++++++++++++-
- 2 files changed, 103 insertions(+), 5 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-index 5d8b7d5..c472883 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-@@ -36,6 +36,8 @@ Optional properties:
-     - reg : should specify the address and size used for NFC command registers,
-             NFC registers and NFC Sram. NFC Sram address and size can be absent
-             if don't want to use it.
-+  - Optional properties:
-+    - atmel,write-by-sram: boolean to enable NFC write by sram.
- 
- Examples:
- nand0: nand at 40000000,0 {
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 1905aa6..65b302c 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -94,12 +94,14 @@ struct atmel_nfc {
- 	void __iomem		*sram_bank0;
- 	dma_addr_t		sram_bank0_phys;
- 	bool			use_nfc_sram;
-+	bool			write_by_sram;
- 
- 	bool			is_initialized;
- 	struct completion	comp_nfc;
- 
- 	/* Point to the sram bank which include readed data via NFC */
- 	void __iomem		*data_in_sram;
-+	bool			will_write_sram;
- };
- static struct atmel_nfc	nand_nfc;
- 
-@@ -261,6 +263,16 @@ static void memcpy32_fromio(void *trg, const void __iomem  *src, size_t size)
- 		*t++ = readl_relaxed(s++);
- }
- 
-+static void memcpy32_toio(void __iomem *trg, const void *src, int size)
-+{
-+	int i;
-+	u32 __iomem *t = trg;
-+	const u32 *s = src;
-+
-+	for (i = 0; i < (size >> 2); i++)
-+		writel_relaxed(*s++, t++);
-+}
-+
- /*
-  * Minimal-overhead PIO for data access.
-  */
-@@ -382,7 +394,11 @@ static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
- 		dma_dst_addr = phys_addr;
- 	} else {
- 		dma_src_addr = phys_addr;
--		dma_dst_addr = host->io_phys;
-+
-+		if (nfc && nfc->write_by_sram)
-+			dma_dst_addr = nfc_sram_phys(host);
-+		else
-+			dma_dst_addr = host->io_phys;
- 	}
- 
- 	tx = dma_dev->device_prep_dma_memcpy(host->dma_chan, dma_dst_addr,
-@@ -954,9 +970,10 @@ static int atmel_nand_pmecc_write_page(struct mtd_info *mtd,
- 	int i, j;
- 	unsigned long end_time;
- 
--	pmecc_enable(host, NAND_ECC_WRITE);
--
--	chip->write_buf(mtd, (u8 *)buf, mtd->writesize);
-+	if (!host->nfc || !host->nfc->write_by_sram) {
-+		pmecc_enable(host, NAND_ECC_WRITE);
-+		chip->write_buf(mtd, (u8 *)buf, mtd->writesize);
-+	}
- 
- 	end_time = jiffies + msecs_to_jiffies(PMECC_MAX_TIMEOUT_MS);
- 	while ((pmecc_readl_relaxed(host->ecc, SR) & PMECC_SR_BUSY)) {
-@@ -1798,6 +1815,8 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
- 	case NAND_CMD_SEQIN:
- 	case NAND_CMD_RNDIN:
- 		nfcwr = NFCADDR_CMD_NFCWR;
-+		if (host->nfc->will_write_sram && command == NAND_CMD_SEQIN)
-+			dataen = NFCADDR_CMD_DATAEN;
- 		break;
- 	default:
- 		break;
-@@ -1842,6 +1861,68 @@ static void nfc_nand_command(struct mtd_info *mtd, unsigned int command,
- 	}
- }
- 
-+static int nfc_sram_write_page(struct mtd_info *mtd, struct nand_chip *chip,
-+			uint32_t offset, int data_len, const uint8_t *buf,
-+			int oob_required, int page, int cached, int raw)
-+{
-+	int cfg, len;
-+	int status = 0;
-+	struct atmel_nand_host *host = chip->priv;
-+	void __iomem *sram = host->nfc->sram_bank0 + nfc_get_sram_off(host);
-+
-+	/* Subpage write is not supported */
-+	if (offset || (data_len < mtd->writesize))
-+		return -EINVAL;
-+
-+	cfg = nfc_readl(host->nfc->hsmc_regs, CFG);
-+	len = mtd->writesize;
-+
-+	if (unlikely(raw)) {
-+		len += mtd->oobsize;
-+		nfc_writel(host->nfc->hsmc_regs, CFG, cfg | NFC_CFG_WSPARE);
-+	} else
-+		nfc_writel(host->nfc->hsmc_regs, CFG, cfg & ~NFC_CFG_WSPARE);
-+
-+	/* Copy page data to sram that will write to nand via NFC */
-+	if (use_dma) {
-+		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) != 0)
-+			/* Fall back to use cpu copy */
-+			memcpy32_toio(sram, buf, len);
-+	} else {
-+		memcpy32_toio(sram, buf, len);
-+	}
-+
-+	if (chip->ecc.mode == NAND_ECC_HW && host->has_pmecc)
-+		/*
-+		 * When use NFC sram, need set up PMECC before send
-+		 * NAND_CMD_SEQIN command. Since when the nand command
-+		 * is sent, nfc will do transfer from sram and nand.
-+		 */
-+		pmecc_enable(host, NAND_ECC_WRITE);
-+
-+	host->nfc->will_write_sram = true;
-+	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
-+	host->nfc->will_write_sram = false;
-+
-+	if (likely(!raw))
-+		/* Need to write ecc into oob */
-+		status = chip->ecc.write_page(mtd, chip, buf, oob_required);
-+
-+	if (status < 0)
-+		return status;
-+
-+	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-+	status = chip->waitfunc(mtd, chip);
-+
-+	if ((status & NAND_STATUS_FAIL) && (chip->errstat))
-+		status = chip->errstat(mtd, chip, FL_WRITING, status, page);
-+
-+	if (status & NAND_STATUS_FAIL)
-+		return -EIO;
-+
-+	return 0;
-+}
-+
- static int nfc_sram_init(struct mtd_info *mtd)
- {
- 	struct nand_chip *chip = mtd->priv;
-@@ -1884,10 +1965,20 @@ static int nfc_sram_init(struct mtd_info *mtd)
- 
- 	nfc_writel(host->nfc->hsmc_regs, CFG, cfg_nfc);
- 
-+	host->nfc->will_write_sram = false;
- 	nfc_set_sram_bank(host, 0);
- 
--	dev_info(host->dev, "Using NFC Sram read\n");
-+	/* Use Write page with NFC SRAM only for PMECC or ECC NONE. */
-+	if (host->nfc->write_by_sram) {
-+		if ((chip->ecc.mode == NAND_ECC_HW && host->has_pmecc) ||
-+				chip->ecc.mode == NAND_ECC_NONE)
-+			chip->write_page = nfc_sram_write_page;
-+		else
-+			host->nfc->write_by_sram = false;
-+	}
- 
-+	dev_info(host->dev, "Using NFC Sram read %s\n",
-+			host->nfc->write_by_sram ? "and write" : "");
- 	return 0;
- }
- 
-@@ -2147,6 +2238,11 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 		} else {
- 			nfc->use_nfc_sram = true;
- 			nfc->sram_bank0_phys = (dma_addr_t)nfc_sram->start;
-+
-+			if (pdev->dev.of_node)
-+				nfc->write_by_sram = of_property_read_bool(
-+						pdev->dev.of_node,
-+						"atmel,write-by-sram");
- 		}
- 	}
- 
 -- 
-1.7.9.5
+1.8.3.4
