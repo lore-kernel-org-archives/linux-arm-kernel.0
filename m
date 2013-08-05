@@ -1,50 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Aug 2013 02:22:43 +0900
-Subject: [PATCH 17/18] ARM: SAMSUNG: Switch to sched_clock_register()
-In-Reply-To: <1375309877-16617-18-git-send-email-sboyd@codeaurora.org>
-References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
- <1375309877-16617-18-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51FFDF63.1090505@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 05 Aug 2013 11:24:07 -0600
+Subject: [PATCH v10] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <1375687936.4000.21.camel@pizza.hi.pengutronix.de>
+References: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
+ <20130802092823.GA2884@e106331-lin.cambridge.arm.com>
+ <1375687936.4000.21.camel@pizza.hi.pengutronix.de>
+Message-ID: <51FFDFB7.6080806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/13 07:31, Stephen Boyd wrote:
-> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
-> the 64 bit function to allow us to remove the 32 bit registration
-> interface.
->
-> Cc: Ben Dooks<ben-linux@fluff.org>
-> Cc: Kukjin Kim<kgene.kim@samsung.com>
+On 08/05/2013 01:32 AM, Philipp Zabel wrote:
+> Am Freitag, den 02.08.2013, 10:28 +0100 schrieb Mark Rutland:
+>> On Thu, Jul 18, 2013 at 10:26:26AM +0100, Philipp Zabel wrote:
+>>> This driver implements a reset controller device that toggle a gpio
+>>> connected to a reset pin of a peripheral IC. The delay between assertion
+>>> and de-assertion of the reset signal can be configured via device tree.
+...
+>> I think this should look more like the below:
+>>
+>> /* Device with nRESET pin connected to GPIO5_0 */
+>> sii902x at 39 {
+>> 	/* named for the actual input line */
+>> 	nreset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+>> 	/* 
+>> 	 * If there's some configurable property relating to the reset
+>> 	 * line, we can describe it
+>> 	 */
+>> 	vendor,some-optional-reset-gpio-property;
+>> 	...
+>> };
+> 
+> I don't like the arbitrary name, as that makes it difficult to handle
+> this in an automated way. In this case I'd prefer to use 'reset-gpios'
+> and optionally 'reset-gpio-names' analogous to how clocks and interrupts
+> (and resets) are handled.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks,
-Kukjin
-
-> Signed-off-by: Stephen Boyd<sboyd@codeaurora.org>
-> ---
->   arch/arm/plat-samsung/samsung-time.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/samsung-time.c b/arch/arm/plat-samsung/samsung-time.c
-> index 2957075..1e2119b 100644
-> --- a/arch/arm/plat-samsung/samsung-time.c
-> +++ b/arch/arm/plat-samsung/samsung-time.c
-> @@ -312,7 +312,7 @@ static void __iomem *samsung_timer_reg(void)
->    * this wraps around for now, since it is just a relative time
->    * stamp. (Inspired by U300 implementation.)
->    */
-> -static u32 notrace samsung_read_sched_clock(void)
-> +static u64 notrace samsung_read_sched_clock(void)
->   {
->   	void __iomem *reg = samsung_timer_reg();
->
-> @@ -337,7 +337,7 @@ static void __init samsung_clocksource_init(void)
->   	samsung_time_setup(timer_source.source_id, TCNT_MAX);
->   	samsung_time_start(timer_source.source_id, PERIODIC);
->
-> -	setup_sched_clock(samsung_read_sched_clock, TSIZE, clock_rate);
-> +	sched_clock_register(samsung_read_sched_clock, TSIZE, clock_rate);
->
->   	if (clocksource_mmio_init(samsung_timer_reg(), "samsung_clocksource_timer",
->   			clock_rate, 250, TSIZE, clocksource_mmio_readl_down))
+Hmm. Just be aware that you can't force existing bindings to be
+retro-actively modified, or you'll break the DT ABI. So, at the very
+least we'd have to allow the existing custom-property-based approach for
+bindings where it's already been used.
