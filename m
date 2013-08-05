@@ -1,42 +1,73 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 5 Aug 2013 15:02:35 +0800
-Subject: [PATCH v3 1/3] serial: mxs: enable the DMA only when the RTS/CTS
- is valid
-In-Reply-To: <1375538956-15862-2-git-send-email-shijie8@gmail.com>
-References: <1375538956-15862-1-git-send-email-shijie8@gmail.com>
- <1375538956-15862-2-git-send-email-shijie8@gmail.com>
-Message-ID: <20130805070235.GA30211@kroah.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 5 Aug 2013 15:11:06 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130805065535.GP7656@atomide.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802090355.GF7656@atomide.com>
+ <20130802093222.GA8982@kroah.com>
+ <20130802123445.GG7656@atomide.com>
+ <20130802141449.GA7533@kroah.com>
+ <20130805065535.GP7656@atomide.com>
+Message-ID: <20130805071106.GA14215@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 03, 2013 at 10:09:14AM -0400, Huang Shijie wrote:
-> From: Huang Shijie <b32955@freescale.com>
+On Sun, Aug 04, 2013 at 11:55:35PM -0700, Tony Lindgren wrote:
+> * Greg KH <greg@kroah.com> [130802 07:20]:
+> > On Fri, Aug 02, 2013 at 05:34:45AM -0700, Tony Lindgren wrote:
+> > > * Greg KH <greg@kroah.com> [130802 02:37]:
+> > > > On Fri, Aug 02, 2013 at 02:03:55AM -0700, Tony Lindgren wrote:
+> > > > > * Greg KH <greg@kroah.com> [130801 12:33]:
+> > > > > > 
+> > > > > > The driver core handles this really well, you just have to create new
+> > > > > > busses, and don't rely on the "catch-all" platform_bus.
+> > > > > 
+> > > > > Hmm do you have some example of a device driver that is generic and
+> > > > > is supported on platform_bus and some other bus?
+> > > > 
+> > > > Take a look at drivers/usb/host/ohci* for one example that I know of,
+> > > > there are others all through the kernel as well.
+> > > 
+> > > Uhh OK so I guess the answer is that the bus glue still needs to
+> > > be implemented separately for each driver and there's no generic
+> > > way of supporting multiple busses?
+> > 
+> > Different busses implies that there are different ways to physically
+> > talk to the device hardware, so of course there is no generic way to
+> > support that.
 > 
-> The original DMA support works only when RTS/CTS is enabled.
-> (see the "e800163 serial: mxs-auart: add the DMA support for mx28")
-> But after several patches, DMA support has lost this limit.
-> (see the "bcc20f9 serial: mxs-auart: move to use generic DMA helper")
-> 
-> So an UART without the RTS/CTS lines may also enables the DMA support,
-> in which case the UART may gets unpredictable results.
-> 
-> This patch adds an optional property for the UART DT node
-> which indicates the UART has RTS and CTS lines, and it also means you
-> enable the DMA support for this UART.
-> 
-> This patch also adds a macro MXS_AUART_RTSCTS, and uses it to check
-> RTS/CTS before we enable the DMA for the UART.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> Signed-off-by: Huang Shijie <shijie8@gmail.com>
-> ---
->  .../bindings/tty/serial/fsl-mxs-auart.txt          |    4 ++++
->  drivers/tty/serial/mxs-auart.c                     |    7 ++++++-
->  2 files changed, 10 insertions(+), 1 deletions(-)
+> Right, but in many cases the only difference between SoCs are some bus
+> specific things like reset and idling of the devices. And using platform
+> bus allows the driver to stay generic.
 
-I don't see how this patch follows the stable kernel guidelines, so I'll
-take the marking of it off, and queue it up for 3.12.
+Just because it "is there", doesn't mean you should abuse it :)
+
+> > Unless your subsystem wants to do what we did for USB, and define a
+> > generic way to talk to the hardware in a very abstract way, allowing for
+> > totally different types of physical layers to handle lots of different
+> > logical layer drivers.  But odds are, you don't want to do that.
+> > 
+> > It should be easy to just abstract out your "this is how I write a byte
+> > to the hardware" logic to handle the different bus types, if you really
+> > are using the same chip/core.  Lots of drivers do this today just fine,
+> > it isn't a big deal.
+> 
+> I agree that makes sense for the driver specific things.
+> 
+> But for things that are completely bus specific for various SoCs, how
+> would you like to handle those?
+> 
+> For example, we are currently using platform bus and bus notifiers and
+> then the runtime PM calls from device driver trigger the bus specific
+> things.
+> 
+> Would you prefer to instead use a custom bus instead of extending
+> the platform bus for things like that?
+
+Yes I would.  I would really like to only use the platform bus for very
+few things, if any at all.
 
 thanks,
 
