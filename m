@@ -1,150 +1,83 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 5 Aug 2013 10:52:35 +0100
-Subject: [PATCH 1/3] ARM: vexpress: move spc driver back under
- mach-vexpress
-In-Reply-To: <1375675793-16492-2-git-send-email-olof@lixom.net>
-References: <1375675793-16492-1-git-send-email-olof@lixom.net>
- <1375675793-16492-2-git-send-email-olof@lixom.net>
-Message-ID: <20130805095235.GB29090@e102568-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 5 Aug 2013 11:53:22 +0200
+Subject: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851FC075@039-SN1MPN1-004.039d.mgd.msft.net>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>
+ <20130805083050.GN26614@pengutronix.de>
+ <B56CDBE15CE27145A4B77D2D24263E851FC075@039-SN1MPN1-004.039d.mgd.msft.net>
+Message-ID: <20130805095322.GP26614@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 05:09:51AM +0100, Olof Johansson wrote:
-> Otherwise we have tc2_pm platform code calling into exported driver functions,
-> which doesn't make sense at this level.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/mach-vexpress/Makefile                         |  2 +-
->  .../platform/vexpress => arch/arm/mach-vexpress}/spc.c  |  1 -
->  arch/arm/mach-vexpress/tc2_pm.c                         |  3 ++-
->  drivers/platform/Kconfig                                |  3 ---
->  drivers/platform/Makefile                               |  1 -
->  drivers/platform/vexpress/Kconfig                       |  9 ---------
->  drivers/platform/vexpress/Makefile                      |  1 -
->  include/linux/vexpress.h                                | 17 -----------------
->  8 files changed, 3 insertions(+), 34 deletions(-)
->  rename {drivers/platform/vexpress => arch/arm/mach-vexpress}/spc.c (99%)
->  delete mode 100644 drivers/platform/vexpress/Kconfig
->  delete mode 100644 drivers/platform/vexpress/Makefile
-> 
-> diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
-> index 0853da6..36ea824 100644
-> --- a/arch/arm/mach-vexpress/Makefile
-> +++ b/arch/arm/mach-vexpress/Makefile
-> @@ -7,6 +7,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->  obj-y					:= v2m.o
->  obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
->  obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
-> -obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o
-> +obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o spc.o
->  obj-$(CONFIG_SMP)			+= platsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-> diff --git a/drivers/platform/vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-> similarity index 99%
-> rename from drivers/platform/vexpress/spc.c
-> rename to arch/arm/mach-vexpress/spc.c
-> index aa8c2a4..34e4bf4 100644
-> --- a/drivers/platform/vexpress/spc.c
-> +++ b/arch/arm/mach-vexpress/spc.c
-> @@ -250,4 +250,3 @@ int __init ve_spc_init(void)
->  
->  	return ve_spc_init_status;
->  }
-> -early_initcall(ve_spc_init);
-> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-> index dfb55d4..79cf4bc 100644
-> --- a/arch/arm/mach-vexpress/tc2_pm.c
-> +++ b/arch/arm/mach-vexpress/tc2_pm.c
-> @@ -23,9 +23,10 @@
->  #include <asm/cputype.h>
->  #include <asm/cp15.h>
->  
-> -#include <linux/vexpress.h>
->  #include <linux/arm-cci.h>
->  
-> +#include "spc.h"
+On Mon, Aug 05, 2013 at 09:32:11AM +0000, Lu Jingchang-B35083 wrote:
+> > Subject: Re: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller
+> > > +struct imx_i2c_clk_pair {
+> > > +	u16	div;
+> > > +	u16	regval;
+> > > +}i;
+> > 
+> > Converting this to a struct should be a separate patch. This is an
+> > obvious cleanup which makes maintainers happy and more willing to take
+> > the features you are adding later.
+> > 
+> [Lu Jingchang-B35083] 
+> Do you mean all changes to i.MX common should be a separate patch including the clk div pair, and 
+> the struct imx_i2c_hwdata, struct imx_i2c_drvdata and other things changed to be easier to
+> use adding other SoCs support later. Thanks.
 
-Missing. Should we add it to mach-vexpress/include/mach ?
+I mean that each patch should only contain a single logical change.
 
-I have not sent a patch to check what we should do first and if Pawel is
-ok with these changes.
+Converting the two dimensional array into an array of struct is such a
+logical change and thus should be a separate patch.
 
-Lorenzo
+The smaller a patch is the easier it is for people to review it.
 
-> +
->  /*
->   * We can't use regular spinlocks. In the switcher case, it is possible
->   * for an outbound CPU to call power_down() after its inbound counterpart
-> diff --git a/drivers/platform/Kconfig b/drivers/platform/Kconfig
-> index 449010e..57811ea 100644
-> --- a/drivers/platform/Kconfig
-> +++ b/drivers/platform/Kconfig
-> @@ -4,6 +4,3 @@ endif
->  if GOLDFISH
->  source "drivers/platform/goldfish/Kconfig"
->  endif
-> -if ARCH_VEXPRESS
-> -source "drivers/platform/vexpress/Kconfig"
-> -endif
-> diff --git a/drivers/platform/Makefile b/drivers/platform/Makefile
-> index c1173d6..8a44a4c 100644
-> --- a/drivers/platform/Makefile
-> +++ b/drivers/platform/Makefile
-> @@ -5,4 +5,3 @@
->  obj-$(CONFIG_X86)		+= x86/
->  obj-$(CONFIG_OLPC)		+= olpc/
->  obj-$(CONFIG_GOLDFISH)		+= goldfish/
-> -obj-$(CONFIG_ARCH_VEXPRESS)	+= vexpress/
-> diff --git a/drivers/platform/vexpress/Kconfig b/drivers/platform/vexpress/Kconfig
-> deleted file mode 100644
-> index d09a7c4..0000000
-> --- a/drivers/platform/vexpress/Kconfig
-> +++ /dev/null
-> @@ -1,9 +0,0 @@
-> -config VEXPRESS_SPC
-> -	bool "Versatile Express SPC driver support"
-> -	help
-> -	  The Serial Power Controller (SPC) for ARM Ltd. test chips, is
-> -	  an IP that provides a memory mapped interface to power controller
-> -	  HW. The driver provides an API abstraction meant to be used by
-> -	  subsystem drivers allowing to program registers controlling
-> -	  low-level power management features like power down flags,
-> -	  global and per-cpu wake-up IRQs.
-> diff --git a/drivers/platform/vexpress/Makefile b/drivers/platform/vexpress/Makefile
-> deleted file mode 100644
-> index d31eca2..0000000
-> --- a/drivers/platform/vexpress/Makefile
-> +++ /dev/null
-> @@ -1 +0,0 @@
-> -obj-$(CONFIG_VEXPRESS_SPC)	+= spc.o
-> diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
-> index 3e35556..617c01b 100644
-> --- a/include/linux/vexpress.h
-> +++ b/include/linux/vexpress.h
-> @@ -124,21 +124,4 @@ void vexpress_osc_of_setup(struct device_node *node);
->  void vexpress_clk_init(void __iomem *sp810_base);
->  void vexpress_clk_of_init(void);
->  
-> -/* SPC */
-> -
-> -#ifdef CONFIG_VEXPRESS_SPC
-> -int __init ve_spc_init(void);
-> -void ve_spc_global_wakeup_irq(bool set);
-> -void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set);
-> -void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr);
-> -u32 ve_spc_get_nr_cpus(u32 cluster);
-> -void ve_spc_powerdown(u32 cluster, bool enable);
-> -#else
-> -static inline int ve_spc_init(void) { return -ENODEV; }
-> -static inline void ve_spc_global_wakeup_irq(bool set) { }
-> -static inline void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set) { }
-> -static inline void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr) { }
-> -static inline u32 ve_spc_get_nr_cpus(u32 cluster) { return 0; }
-> -static inline void ve_spc_powerdown(u32 cluster, bool enable) { }
-> -#endif
->  #endif
-> -- 
-> 1.8.1.192.gc4361b8
-> 
-> 
+> > >
+> > > +#define IMX_I2C_IADR	(0x00 << i2c_imx->i2c_hwdata->regshift)
+> > > +#define IMX_I2C_IFDR	(0x01 << i2c_imx->i2c_hwdata->regshift)
+> > > +#define IMX_I2C_I2CR	(0x02 << i2c_imx->i2c_hwdata->regshift)
+> > > +#define IMX_I2C_I2SR	(0x03 << i2c_imx->i2c_hwdata->regshift)
+> > > +#define IMX_I2C_I2DR	(0x04 << i2c_imx->i2c_hwdata->regshift)
+> > 
+> > Macros should not assume there is a i2c_imx variable present in a
+> > function. Instead, add static inline accessor functions.
+> [Lu Jingchang-B35083] 
+> Ok, I will add inline functions instead. Thanks.
+> > 
+> > 
+> > > +	[VF610_I2C] = {
+> > > +		.devtype = VF610_I2C,
+> > > +		.hwdata = &vf610_i2c_hwdata
+> > > +	},
+> > >  };
+> > 
+> > Why add this array?
+> > You should reference imx_i2c_hwdata/vf610_i2c_hwdata directly here.
+> [Lu Jingchang-B35083] 
+> The "is_imx1_i2c()"function need the devtype variable the test the arch, so the devtype is out of the
+> imx_i2c_hwdata struct to let all other i.MX i2c device can sharing the same imx_i2c_hwdata setting. Thanks.
+
+Then add the devtype variable to struct imx_i2c_hwdata and split
+imx_i2c_hwdata into imx1_i2c_hwdata and imx21_i2c_hwdata.
+
+> > 
+> > >
+> > >  	if (of_id)
+> > >  		pdev->id_entry = of_id->data;
+> > 
+> > This is wrong in the original driver code. This field should be changed
+> > in a driver.
+> [Lu Jingchang-B35083] 
+> Could you please give some more comments on this? Thanks.
+
+It's not the drivers business of changing pdev->id_entry. This should
+only be modified by the driver core.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
