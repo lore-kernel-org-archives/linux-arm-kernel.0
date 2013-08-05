@@ -1,46 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 5 Aug 2013 12:22:09 +0200
-Subject: [PATCH v9 29/30] bus: mvebu-mbus: Add devicetree binding
-In-Reply-To: <20130804011526.GC19280@titan.lakedaemon.net>
-References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1374844687-19981-30-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130804011526.GC19280@titan.lakedaemon.net>
-Message-ID: <20130805122209.3526f970@skate>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 5 Aug 2013 12:32:14 +0200
+Subject: [PATCH v2 2/3] ARM: dts: vf610: Add eDMA node
+In-Reply-To: <1375682824-11443-1-git-send-email-b35083@freescale.com>
+References: <1375682824-11443-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130805103214.GA30913@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT maintainers,
-
-On Sat, 3 Aug 2013 21:15:26 -0400, Jason Cooper wrote:
-> DT Maintainers,
+On Mon, Aug 05, 2013 at 02:07:03PM +0800, Jingchang Lu wrote:
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+> changes in v2:
+>   using generic dma-channels property instead of fsl,dma-channels.
 > 
-> It's been a week since this was sent to the ml...  It's been through *9*
-> revisions with extensive commenting and corrections by Arnd Bergmann,
-> Jason Gunthorpe, and others.
-> 
-> Unless someone has a serious objection, I'd like to apply this series
-> shortly so it can get some time in -next before sending to Arnd and
-> Olof.
+> diff --git a/include/dt-bindings/dma/vf610-edma.h b/include/dt-bindings/dma/vf610-edma.h
+> new file mode 100644
+> index 0000000..3ae481c
+> --- /dev/null
+> +++ b/include/dt-bindings/dma/vf610-edma.h
+> @@ -0,0 +1,103 @@
+> +/*
+> + * Copyright 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + */
+> +
+> +#ifndef __DT_BINDINGS_DMA_VF610_H__
+> +#define __DT_BINDINGS_DMA_VF610_H__
+> +
+> +/* DMAMUX0,3 reqeust slot number */
+> +#define DMA_MUXID0_UART0_RX	2
 
-The final DT binding that is showed in this patch set was presented in
-an e-mail at:
+Never add defines without a proper namespace. I suggest VF610_ here.
 
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/182095.html
+Sascha
 
-Arnd Bergmann indicated his agreement on this DT binding as a reply to
-this e-mail, at:
-
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/182097.html
-
-And Jason Gunthorpe also agreed in a reply to Arnd's answer:
-
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/182371.html
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
