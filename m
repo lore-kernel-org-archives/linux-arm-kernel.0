@@ -1,66 +1,209 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Mon, 5 Aug 2013 17:42:17 +0530
-Subject: Kexec: BE kernel on ARM VE TC2
-Message-ID: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 5 Aug 2013 08:26:38 -0400
+Subject: [PATCH 1/2] ARM: remove dmacap,memset from Device tree binding
+In-Reply-To: <20130805095341.GA7594@e106331-lin.cambridge.arm.com>
+References: <1372762453-12018-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1372762453-12018-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130725153104.GH23879@titan.lakedaemon.net>
+ <20130804010904.GB19280@titan.lakedaemon.net>
+ <20130805095341.GA7594@e106331-lin.cambridge.arm.com>
+Message-ID: <20130805122638.GE19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Mon, Aug 05, 2013 at 10:53:41AM +0100, Mark Rutland wrote:
+> On Sun, Aug 04, 2013 at 02:09:04AM +0100, Jason Cooper wrote:
+> > DT Maintainers,
+> > 
+> > It's been a week with no comment.  Shall I assume it's ok to apply
+> > this?
+> 
+> Apologies for the delay, still catching up on binding review.
+> 
+> I'm not entirely sure on this. The property described is still true for
+> the device, even if the kernel's not using that information now. My
+> feeling would be to keep them, unless there's a plan to better describe
+> the properties of the XOR channels.
+> 
+> It shouldn't harm the kernel to have some properties we don't use at
+> this point in time. If we want to reorganise the binding, the first step
+> would be to make the properties as deprecated, rather than removing them
+> outright.
 
-I am trying to make kexec work on BE kernel on ARM VE TC2.
+Ok, that matches what I was originally thinking.  The bindings are
+supposed to be OS-agnostic, so the fact that we no longer use it is
+irrelevant.  The hardware still has the capability.
 
-First, to make KEXEC work with SMP on ARM VE TC2 board,
-I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
+Sebastian, I'm just going to drop this patch.
 
-However, I made below changes to make KEXEC work for BE kernel.
-my question is: why delay is required for board to reboot with kexec?.
-Is it platform issue?.
+thx,
 
-diff --git a/arch/arm/kernel /machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 4fb074c..0fb0ff9 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -123,6 +123,18 @@ void machine_crash_shutdown(struct pt_regs *regs)
-        printk(KERN_INFO "Loading crashdump kernel...\n");
- }
+Jason.
 
-+static void byte_copy_relocate_kernel(void *dst, const void *src, int size)
-+{
-+        char *d, *s;
-+        d = (char *) dst;
-+        s = (char *) src;
-+        while (size > 0)
-+        {
-+                *d++ = *s++;
-+                size--;
-+        }
-+}
-+
- /*
-  * Function pointer to optional machine-specific reinitialization
-  */
-@@ -155,9 +167,8 @@ void machine_kexec(struct kimage *image)
-
-
-        /* copy our kernel relocation code to the control code page */
--       memcpy(reboot_code_buffer,
--              relocate_new_kernel, relocate_new_kernel_size);
--
-+       byte_copy_relocate_kernel(reboot_code_buffer,
-+              relocate_new_kernel, relocate_new_kernel_size);
-
-        flush_icache_range((unsigned long) reboot_code_buffer,
-                           (unsigned long) reboot_code_buffer +
-KEXEC_CONTROL_PAGE_SIZE);
-@@ -165,6 +176,6 @@ void machine_kexec(struct kimage *image)
-
-        if (kexec_reinit)
-                kexec_reinit();
--
-+       mdelay(500);
-        soft_restart(reboot_code_buffer_phys);
- }
-
-
-Thanks & Regards
-Vijay
+> > On Thu, Jul 25, 2013 at 11:31:04AM -0400, Jason Cooper wrote:
+> > > On Tue, Jul 02, 2013 at 12:54:12PM +0200, Sebastian Hesselbarth wrote:
+> > > > DMA_MEMSET support has been removed, so update the device tree files
+> > > > and corresponding binding documentation for Marvell SoCs.
+> > > > 
+> > > > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > > ---
+> > > > Cc: Russell King <linux@arm.linux.org.uk> 
+> > > > Cc: Jason Cooper <jason@lakedaemon.net>
+> > > > Cc: Andrew Lunn <andrew@lunn.ch>
+> > > > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com> 
+> > > > Cc: devicetree-discuss at lists.ozlabs.org 
+> > > > Cc: linux-kernel at vger.kernel.org 
+> > > > Cc: linux-arm-kernel at lists.infradead.org 
+> > > > ---
+> > > >  Documentation/devicetree/bindings/dma/mv-xor.txt |    2 --
+> > > >  arch/arm/boot/dts/armada-370.dtsi                |    2 --
+> > > >  arch/arm/boot/dts/armada-xp.dtsi                 |    2 --
+> > > >  arch/arm/boot/dts/dove.dtsi                      |    2 --
+> > > >  arch/arm/boot/dts/kirkwood.dtsi                  |    2 --
+> > > >  arch/arm/boot/dts/orion5x.dtsi                   |    1 -
+> > > >  6 files changed, 0 insertions(+), 11 deletions(-)
+> > > 
+> > > Adding the new devicetree ml to the Cc:
+> > > 
+> > > I'm fine with the changes to the dts{i} files, but I think the binding
+> > > document should be handled differently.
+> > > 
+> > > thx,
+> > > 
+> > > Jason.
+> > > 
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > > > index 7c6cb7f..68f7004 100644
+> > > > --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > > > +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > > > @@ -14,7 +14,6 @@ properties:
+> > > >  
+> > > >  And the following optional properties:
+> > > >  - dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
+> > > > -- dmacap,memset to indicate that the XOR channel is capable of memset operations
+> > > >  - dmacap,xor to indicate that the XOR channel is capable of xor operations
+> > > >  
+> > > >  Example:
+> > > > @@ -35,6 +34,5 @@ xor at d0060900 {
+> > > >  	      interrupts = <52>;
+> > > >  	      dmacap,memcpy;
+> > > >  	      dmacap,xor;
+> > > > -	      dmacap,memset;
+> > > >  	};
+> > > >  };
+> > > > diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> > > > index fa3dfc6..a315ad1 100644
+> > > > --- a/arch/arm/boot/dts/armada-370.dtsi
+> > > > +++ b/arch/arm/boot/dts/armada-370.dtsi
+> > > > @@ -132,7 +132,6 @@
+> > > >  					interrupts = <52>;
+> > > >  					dmacap,memcpy;
+> > > >  					dmacap,xor;
+> > > > -					dmacap,memset;
+> > > >  				};
+> > > >  			};
+> > > >  
+> > > > @@ -151,7 +150,6 @@
+> > > >  					interrupts = <95>;
+> > > >  					dmacap,memcpy;
+> > > >  					dmacap,xor;
+> > > > -					dmacap,memset;
+> > > >  				};
+> > > >  			};
+> > > >  
+> > > > diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> > > > index 416eb94..4b3dd56 100644
+> > > > --- a/arch/arm/boot/dts/armada-xp.dtsi
+> > > > +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> > > > @@ -114,7 +114,6 @@
+> > > >  					interrupts = <52>;
+> > > >  					dmacap,memcpy;
+> > > >  					dmacap,xor;
+> > > > -					dmacap,memset;
+> > > >  				};
+> > > >  			};
+> > > >  
+> > > > @@ -134,7 +133,6 @@
+> > > >  					interrupts = <95>;
+> > > >  					dmacap,memcpy;
+> > > >  					dmacap,xor;
+> > > > -					dmacap,memset;
+> > > >  				};
+> > > >  			};
+> > > >  
+> > > > diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> > > > index 6cab468..2cef34f 100644
+> > > > --- a/arch/arm/boot/dts/dove.dtsi
+> > > > +++ b/arch/arm/boot/dts/dove.dtsi
+> > > > @@ -232,7 +232,6 @@
+> > > >  
+> > > >  			channel1 {
+> > > >  				interrupts = <40>;
+> > > > -				dmacap,memset;
+> > > >  				dmacap,memcpy;
+> > > >  				dmacap,xor;
+> > > >  			};
+> > > > @@ -253,7 +252,6 @@
+> > > >  
+> > > >  			channel1 {
+> > > >  				interrupts = <43>;
+> > > > -				dmacap,memset;
+> > > >  				dmacap,memcpy;
+> > > >  				dmacap,xor;
+> > > >  			};
+> > > > diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> > > > index 9809fc1..078637c 100644
+> > > > --- a/arch/arm/boot/dts/kirkwood.dtsi
+> > > > +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> > > > @@ -126,7 +126,6 @@
+> > > >  			      interrupts = <6>;
+> > > >  			      dmacap,memcpy;
+> > > >  			      dmacap,xor;
+> > > > -			      dmacap,memset;
+> > > >  			};
+> > > >  		};
+> > > >  
+> > > > @@ -146,7 +145,6 @@
+> > > >  			      interrupts = <8>;
+> > > >  			      dmacap,memcpy;
+> > > >  			      dmacap,xor;
+> > > > -			      dmacap,memset;
+> > > >  			};
+> > > >  		};
+> > > >  
+> > > > diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> > > > index 892c64e..f82ece7 100644
+> > > > --- a/arch/arm/boot/dts/orion5x.dtsi
+> > > > +++ b/arch/arm/boot/dts/orion5x.dtsi
+> > > > @@ -120,7 +120,6 @@
+> > > >  			      interrupts = <31>;
+> > > >  			      dmacap,memcpy;
+> > > >  			      dmacap,xor;
+> > > > -			      dmacap,memset;
+> > > >  			};
+> > > >  		};
+> > > >  
+> > > > -- 
+> > > > 1.7.2.5
+> > > > 
+> > > > 
+> > > > _______________________________________________
+> > > > linux-arm-kernel mailing list
+> > > > linux-arm-kernel at lists.infradead.org
+> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
