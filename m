@@ -1,60 +1,62 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Mon, 5 Aug 2013 13:56:09 +0800
-Subject: [PATCH] DMA: add help function to check whether dma controller
- registered
-In-Reply-To: <51FC0FBF.9010107@wwwdotorg.org>
-References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
- <51FC0FBF.9010107@wwwdotorg.org>
-Message-ID: <20130805055607.GC31469@rizhao-lap>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 5 Aug 2013 11:36:07 +0530
+Subject: [PATCH 2/2] ARM: dts: AM4372: add few nodes
+In-Reply-To: <51FF335D.4050803@ti.com>
+References: <ffa2f76fcac54bfe76c234ffce0394fd2c25fe52.1375450395.git.afzal@ti.com>
+ <6f0f838176ab93aac8dab4c3ab9d9f95a3027ff7.1375450395.git.afzal@ti.com>
+ <51FCEE60.7080809@ti.com> <51FF335D.4050803@ti.com>
+Message-ID: <51FF40CF.4000008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 03, 2013 at 03:59:59AM +0800, Stephen Warren wrote:
-> On 08/02/2013 12:04 AM, Richard Zhao wrote:
-> > DMA client device driver usually needs to know at probe time whether
-> > dma controller has been registered to deffer probe. So add a help
-> > function of_dma_check_controller.
-> > 
-> > DMA request channel functions can also used to check it, but they
-> > are usually called at open() time.
-> 
-> > diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-> > index e1c4d3b..b6828c1 100644
-> 
-> > +int of_dma_check_controller(struct device *dev, const char *name)
-> 
-> 
-> > +	for (i = 0; i < count; i++) {
-> > +		if (of_dma_match_channel(np, name, i, &dma_spec))
-> > +			continue;
-> > +
-> > +		mutex_lock(&of_dma_lock);
-> > +		ofdma = of_dma_find_controller(&dma_spec);
-> > +		mutex_unlock(&of_dma_lock);
-> > +		of_node_put(dma_spec.np);
-> 
-> Do we need to add the following here:
-> 
-> if (ofdma)
-> 	break
-> 
-> To ensure that as soon as a successful match is found, the loop exits?
-> Otherwise, if there are multiple providers for that name, and the first
-> N are registered but the last isn't, this function will still return
-> failure.
-Right. Thanks.
-> 
-> > +	if (ofdma)
-> > +		return 0;
-> > +	else
-> > +		return -ENODEV;
-> 
-> That probably should be -EPROBE_DEFER?
-> 
-> Although, what about differentiating between "entry not found by
-> of_dma_match_channel" and "controller not yet probed"?
-I thought it might be called in non-probe functions.  If no people
-against it, I'll change it to EPROBE_DEFER.
+On Monday 05 August 2013 10:38 AM, Afzal Mohammed wrote:
+> Hi Muguthan,
+>
+> On Saturday 03 August 2013 05:19 PM, Mugunthan V N wrote:
+>> On 8/2/2013 7:16 PM, Afzal Mohammed wrote:
+>
+>>> +        mac: ethernet at 4a100000 {
+>>> +            compatible = "ti,am4372-cpsw","ti,cpsw";
+>
+>> compatibility "ti,am4372-cpsw" is not needed as driver has only
+>> "ti,cpsw"
+>> compatibility
+>
+> No, please read device tree documentation [1].
+>
+> DT is a pure hardware description, it does not depend on driver,
+> dependency is only vice versa.
 
-Thanks
-Richard
+Thanks for the clarification
+
+>
+>>> +            reg = <0x4a100000 0x800
+>>> +                   0x4a101200 0x100>;
+>>> +            interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH
+>>> +                      GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH
+>>> +                      GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH
+>>> +                      GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+>>> +            ti,hwmods = "cpgmac0";
+>>> +            status = "disabled";
+>>> +        };
+>
+>> There are many other parameters which are missed here.
+>
+> Reason has been mentioned in the commit message, quoting relevant here
+> again,
+>
+> >> For i2c, spi, cpsw & pwm - only the properties that were sure to be
+> >> correct has been added (main intention is to make hwmod happy and
+> >> avoid any later modification to here added properties).
+>
+> I really wanted to avoid a later patch that has a line starting with
+> minus on DTS.
+>
+> Since you are working on cpsw support, can you help here with a patch
+> for other properties.
+
+Sure I can help you to add more DT entries which will not change
+according to hardware
+
+Regards
+Mugunthan V N
