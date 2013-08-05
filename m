@@ -1,39 +1,39 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Mon, 5 Aug 2013 10:13:14 +0800
-Subject: [PATCH v4 0/2] support hisilicon i2c
-In-Reply-To: <1374844938-25505-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1374844938-25505-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <CAMj5BkjMw2oxWy5+fgT9hoHLT-DiSv6u7zSzAhi8B_d-=-v8Vw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 Aug 2013 19:32:19 -0700
+Subject: [GIT PULL] ARM: OMAP2+: hwmod fixes for v3.11-rc
+In-Reply-To: <alpine.DEB.2.02.1308042345590.21276@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307301146110.4505@utopia.booyaka.com>
+ <20130730133336.GL7656@atomide.com>
+ <20130804203653.GF15602@quad.lixom.net>
+ <alpine.DEB.2.02.1308042345590.21276@utopia.booyaka.com>
+Message-ID: <CAOesGMim-Ku=HMEor-8Lh_jtfdy6vFve-vaeYPOGZ0nxWiH0sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 9:22 PM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
-> V4:
-> rebase on 3.11
+On Sun, Aug 4, 2013 at 4:46 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Sun, 4 Aug 2013, Olof Johansson wrote:
 >
-> v3:
-> patch 02, use size instead of threshold
+>> On Tue, Jul 30, 2013 at 06:33:36AM -0700, Tony Lindgren wrote:
+>> > Arnd & Olof,
+>> >
+>> > Can you please take this pull request directly? Other than the
+>> > omap5 regulator dts changes I just posted I don't yet have
+>> > anything else queued up right now.
+>>
+>>
+>> Pulled. But Paul, if you don't mind, please base your fixes on older -rcs
+>> unless there's a reason to go with the latest-and-greatest.
+>>
+>> I had to rebase our fixes branch since this pulled in a newer -rc than
+>> ours and I didn't want to have a back-merge in the history.
 >
-> v2:
-> Suggested by Baruch
-> Support hisilicon i2c in i2c-designware-platdrv.c, and adding two optional properties
->
-> Zhangfei Gao (2):
->   i2c: designware: use module_platform_driver
->   i2c: designware: add two optional property tx/rx-fifo-size
->
->  .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
->  drivers/i2c/busses/i2c-designware-platdrv.c        |   17 +++++------------
->  2 files changed, 12 insertions(+), 12 deletions(-)
->
+> Will do.  Sorry about the extra hassle.
 
-"Basically OK, but please resend for 3.12, so we get enough testing
-before entering mainline. I am a bit anxious of side
-effects and 3.11 is too near."
+No need to apologize, I've never asked for anything like it in the past.
 
-Dear Wolfram
+It's something I've realized as of late that it'd be good to avoid
+where possible. We used to start a new fixes branch on top of each -rc
+so it wasn't an issue before.
 
-The patches are rebased on 3.11 rc2 as your suggestion,
-Do you have any other suggestion?
 
-Thanks
+-Olof
