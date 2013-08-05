@@ -1,54 +1,52 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 Aug 2013 10:38:13 -0400
-Subject: [PATCH v2 4/6] ARM: mm: LPAE: Correct virt_to_phys patching for
- 64 bit physical addresses
-In-Reply-To: <alpine.LFD.2.03.1308040126560.14472@syhkavp.arg>
-References: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
- <1375289086-5315-5-git-send-email-santosh.shilimkar@ti.com>
- <alpine.LFD.2.03.1308022156120.14472@syhkavp.arg> <51FCFBE1.5090000@ti.com>
- <alpine.LFD.2.03.1308030943320.14472@syhkavp.arg> <51FD5922.1060705@ti.com>
- <alpine.LFD.2.03.1308040126560.14472@syhkavp.arg>
-Message-ID: <51FFB8D5.8070506@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 Aug 2013 15:40:54 +0100
+Subject: [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM links between
+ codec and cpu DAI
+In-Reply-To: <20130805113310.GU23006@n2100.arm.linux.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <E1V641A-0004lv-DM@rmk-PC.arm.linux.org.uk>
+ <20130805112733.GY9858@sirena.org.uk>
+ <20130805113310.GU23006@n2100.arm.linux.org.uk>
+Message-ID: <20130805144054.GE9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 04 August 2013 01:32 AM, Nicolas Pitre wrote:
-> On Sat, 3 Aug 2013, Santosh Shilimkar wrote:
-> 
->> On Saturday 03 August 2013 10:01 AM, Nicolas Pitre wrote:
->>> On Sat, 3 Aug 2013, Sricharan R wrote:
->>>
->>>> On Saturday 03 August 2013 08:58 AM, Nicolas Pitre wrote:
->>>>> ... meaning that, instead of using 0x81 for the stub value on the mov 
->>>>> instruction, it only has to be 0x83.  Bits 7 and 0 still act as anchors 
->>>>> for the rotation field in the opcode, while bit 1 indicates which value 
->>>>> to patch in.
->>>>   I started with this kind of augmenting with the immediate operand
->>>>   while starting V2. But the problem was, we do the runtime patching twice.
->>>
->>> Ahhh... Bummer.
->>>
->> Sorry if it wasn't clear but I thought we discussed why patching is
->> done twice.
-> 
-> Yeah, I know the reasons.  I just had forgotten about the effects on the 
-> anchor bits.
->
-I see.
- 
->> This was purely based on the discussion where RMK suggested to follow 
->> that approach to minimize code changes.
->>  
->> Looks like we need to revisit that now based on Russell's latest
->> comment.
-> 
-> Note that my comments on this particular patch are still valid and 
-> independent from whatever approach is used globally to deal with the 
-> memory alias.  I do think that the value to patch should be selected 
-> depending on the opcode's rotation field which makes it compatible with 
-> a double patching approach as well.
-> 
-Completely agree.
+On Mon, Aug 05, 2013 at 12:33:10PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Aug 05, 2013 at 12:27:33PM +0100, Mark Brown wrote:
 
-Regards,
-Santosh
+> > This doesn't look good - this is adding DAPM routes which should
+> > correspond to the DAI link that's already been configured.
+
+> No, you're wrong there:
+
+> CPU DAI:				Codec DAI
+> dma-playback	--->	i2sdo	--->	Playback
+> 		`-->	spdifdo -> not connected
+> dma-capture	<---	i2sdi	<---	Capture
+
+> And the intermediate level is needed to determine which outputs from
+> the chip are wired up.
+
+Right, and that's exactly what the dai_links are doing - they're showing
+what's hanging off each of the DAIs.
+
+> And don't even say "use dpcm" - if you say that, I want _you_ to write
+> it because dpcm is totally and utterly unusable as it currently stands -
+> as you can see from all the emails I've sent over the weekend.
+
+I'm going to tell you to work with the framework rather than around it;
+adding routes that link the CODEC and CPU together in parallel with the
+links set up for the DAIs is not something that seems like it's going to
+continue to work sensibly going forwards.  If this were done at a
+framework level that should be fine but having it as a special case in
+some specific boards isn't good.
+
+Since I don't have Kirkwood hardware or any particular use for it I've
+no real intention of working on the hardware directly, sorry.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/394a3b8d/attachment-0001.sig>
