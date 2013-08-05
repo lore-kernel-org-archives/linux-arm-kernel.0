@@ -1,83 +1,111 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 4 Aug 2013 10:45:00 +0200
-Subject: [PATCH v3 1/2] ARM: OMAP: Add secure function omap_smc3() which
- calling instruction smc #1
-In-Reply-To: <20130712102430.GA3249@localhost.localdomain>
-References: <531356997.66774.1373571839852.JavaMail.apache@mail81.abv.bg>
- <51DF0D7A.4090008@ti.com> <20130712102430.GA3249@localhost.localdomain>
-Message-ID: <201308041045.00698@pali>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 5 Aug 2013 14:46:28 +0800
+Subject: [PATCH 5/8] ARM: tegra30: add LP1 suspend support
+In-Reply-To: <51F6FE89.4060402@wwwdotorg.org>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+ <1374830110-30685-6-git-send-email-josephl@nvidia.com>
+ <51F6FE89.4060402@wwwdotorg.org>
+Message-ID: <1375685188.1731.19.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is new version (v3) of omap secure part patch:
+On Tue, 2013-07-30 at 07:45 +0800, Stephen Warren wrote:
+> On 07/26/2013 03:15 AM, Joseph Lo wrote:
+> > The LP1 suspend mode will power off the CPU, clock gated the PLLs and put
+> > SDRAM to self-refresh mode. Any interrupt can wake up device from LP1. The
+> > sequence when LP1 suspending:
+> 
+> > diff --git a/arch/arm/mach-tegra/pm-tegra30.c b/arch/arm/mach-tegra/pm-tegra30.c
+> 
+> > +void tegra30_lp1_iram_hook(void)
+> > +{
+> > +	tegra30_lp1_iram.start_addr = &tegra30_iram_start;
+> > +	tegra30_lp1_iram.end_addr = &tegra30_iram_end;
+> 
+> If you need to fill in the values in that struct dynamically anyway, why
+> not make tegra_lp1_iram be a struct rather than a pointer, and write
+> directly to it?
+> 
+OK. Will fix.
 
-Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
-but Nokia RX-51 board needs to call smc #1 for PPA access.
+> > +/*
+> > + * tegra30_lp1_reset
+> > + *
+> > + * reset vector for LP1 restore; copied into IRAM during suspend.
+> > + * Brings the system back up to a safe staring point (SDRAM out of
+> > + * self-refresh, PLLC, PLLM and PLLP reenabled, CPU running on PLLX,
+> > + * system clock running on the same PLL that it suspended at), and
+> > + * jumps to tegra_resume to restore virtual addressing.
+> > + * The physical address of tegra_resume expected to be stored in
+> > + * PMC_SCRATCH41.
+> > + *
+> > + * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_CODE_AREA AND MUST BE FIRST.
+> 
+> What does "AND MUST BE FIRST" mean?
+> 
+It means the LP1 reset vector needs to be copied to IRAM_CODE_AREA first
+before suspend to LP1. Looks no need this. Will remove it.
 
-Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
-Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
----
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index 0e72917..c4586f4 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -51,6 +51,7 @@
- extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
- 				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
- extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
-+extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
- extern phys_addr_t omap_secure_ram_mempool_base(void);
- extern int omap_secure_ram_reserve_memblock(void);
- 
-diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
-index f6441c1..7bbc043 100644
---- a/arch/arm/mach-omap2/omap-smc.S
-+++ b/arch/arm/mach-omap2/omap-smc.S
-@@ -1,9 +1,11 @@
- /*
-- * OMAP44xx secure APIs file.
-+ * OMAP34xx and OMAP44xx secure APIs file.
-  *
-  * Copyright (C) 2010 Texas Instruments, Inc.
-  * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
-  *
-+ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-+ * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
-  *
-  * This program is free software,you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -54,6 +56,23 @@ ENTRY(omap_smc2)
- 	ldmfd   sp!, {r4-r12, pc}
- ENDPROC(omap_smc2)
- 
-+/**
-+ * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
-+ * Low level common routine for secure HAL and PPA APIs via smc #1
-+ * r0 - @service_id: Secure Service ID
-+ * r1 - @process_id: Process ID
-+ * r2 - @flag: Flag to indicate the criticality of operation
-+ * r3 - @pargs: Physical address of parameter list
-+ */
-+ENTRY(omap_smc3)
-+	stmfd	sp!, {r4-r11, lr}
-+	mov	r12, r0		@ Copy the secure service ID
-+	mov	r6, #0xff	@ Indicate new Task call
-+	dsb			@ Memory Barrier
-+	smc	#1		@ Call PPA service
-+	ldmfd	sp!, {r4-r11, pc}
-+ENDPROC(omap_smc3)
-+
- ENTRY(omap_modify_auxcoreboot0)
- 	stmfd   sp!, {r1-r12, lr}
- 	ldr	r12, =0x104
+> > +ENTRY(tegra30_lp1_reset)
+> > +	/*
+> > +	 * The CPU and system bus are running at 32KHz and executing from
+> > +	 * IRAM when this code is executed; immediately switch to CLKM and
+> > +	 * enable PLLP, PLLM, PLLC, PLLA and PLLX.
+> > +	 */
+> > +	mov32	r0, TEGRA_CLK_RESET_BASE
+> > +
+> > +	mov	r1, #(1 << 28)
+> 
+> Some #defines for the various magic values used in this code would be
+> useful.
+It may still cause some confuse if I add a #defines value for it.
+Because it includes a clock policy and the clock source (the value maybe
+just 0). I add some comments for these codes about what they are doing.
+> 
+> > +tegra30_sdram_pad_save:
+> > +	.word	0
+> > +	.word	0
+> > +	.word	0
+> > +	.word	0
+> > +	.word	0
+> > +	.word	0
+> > +	.word	0
+> > +	.word	0
+> 
+> This might be simpler, and easier to validate it's the right length:
+> 
+>         .rept   8
+>         .long   0
+>         .endr
+> 
+> > +tegra30_sdram_pad_address:
+> > +	.word	TEGRA_EMC_BASE + EMC_CFG				@0x0
+> > +	.word	TEGRA_EMC_BASE + EMC_ZCAL_INTERVAL			@0x4
+> > +	.word	TEGRA_EMC_BASE + EMC_AUTO_CAL_INTERVAL			@0x8
+> > +	.word	TEGRA_EMC_BASE + EMC_XM2VTTGENPADCTRL			@0xc
+> > +	.word	TEGRA_EMC_BASE + EMC_XM2VTTGENPADCTRL2			@0x10
+> > +	.word	TEGRA_PMC_BASE + PMC_IO_DPD_STATUS			@0x14
+> > +	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_CLK_SOURCE_MSELECT	@0x18
+> > +	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_SCLK_BURST		@0x1c
+> > +
+> > +tegra30_sdram_pad_size:
+> > +	.word	tegra30_sdram_pad_address - tegra30_sdram_pad_save
+> 
+> Perhaps if you swapp the order of declaring tegra30_sdram_pad_save and
+> tegra30_sdram_pad_address, you can even do something like:
+> 
+> 	.rept (tegra30_sdram_pad_addr_end - tegra30_sdram_pad_addr) / 4
+> 
+> ?
+OK. Looks better. Will do this.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130804/c2ba9517/attachment.sig>
+> 
+> > +	/* 2uS delay delay between changing SCLK and CCLK */
+> > +	wait_for_us r1, r7, r9
+> > +	add	r1, r1, #2
+> > +	wait_until r1, r7, r9
+> 
+> Ah, I see how wait_for_us is used now. Perhaps rename it
+> wait_for_us_boundary or wait_for_us_tick? Alternatively, perhaps
+> wait_until can just incorporate that logic itself?
+Indeed. Will fix.
