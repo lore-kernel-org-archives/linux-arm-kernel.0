@@ -1,73 +1,59 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 5 Aug 2013 11:14:46 -0500
-Subject: [PATCH v3 01/12] dma: edma: Setup parameters to DMA MAX_NR_SG at a
- time
+Date: Mon, 5 Aug 2013 11:14:50 -0500
+Subject: [PATCH v3 05/12] ARM: edma: Add function to enable interrupt for a
+ PaRAM slot
 In-Reply-To: <1375719297-12871-1-git-send-email-joelf@ti.com>
 References: <1375719297-12871-1-git-send-email-joelf@ti.com>
-Message-ID: <1375719297-12871-2-git-send-email-joelf@ti.com>
+Message-ID: <1375719297-12871-6-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes are made here for configuring existing parameters to support
-DMA'ing them out in batches as needed.
-
-Also allocate as many as slots as needed by the SG list, but not more
-than MAX_NR_SG. Then these slots will be reused accordingly.
-For ex, if MAX_NR_SG=10, and number of SG entries is 40, still only
-10 slots will be allocated to DMA the entire SG list of size 40.
+To prevent common programming errors, add a function to enable
+interrupts correctly. Also keeps calling code more readable.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c |   14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ arch/arm/common/edma.c             |   15 +++++++++++++++
+ include/linux/platform_data/edma.h |    1 +
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 5f3e532..7b0853c 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -222,9 +222,9 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 	enum dma_slave_buswidth dev_width;
- 	u32 burst;
- 	struct scatterlist *sg;
--	int i;
- 	int acnt, bcnt, ccnt, src, dst, cidx;
- 	int src_bidx, dst_bidx, src_cidx, dst_cidx;
-+	int i, num_slots_needed;
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 6433b6c..aa43c49 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1095,6 +1095,21 @@ void edma_set_transfer_params(unsigned slot,
+ EXPORT_SYMBOL(edma_set_transfer_params);
  
- 	if (unlikely(!echan || !sgl || !sg_len))
- 		return NULL;
-@@ -262,8 +262,11 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 
- 	edesc->pset_nr = sg_len;
- 
--	for_each_sg(sgl, sg, sg_len, i) {
--		/* Allocate a PaRAM slot, if needed */
-+	/* Allocate a PaRAM slot, if needed */
+ /**
++ * edma_enable_interrupt - enable interrupt on parameter RAM slot
++ * @slot: parameter RAM slot which is the link target
++ *
++ * The originating slot should not be part of any active DMA transfer.
++ */
++void edma_enable_interrupt(unsigned slot)
++{
++	pr_debug("Enabling interrupt on slot %d\n", slot);
 +
-+	num_slots_needed = sg_len > MAX_NR_SG ? MAX_NR_SG : sg_len;
++	edma_parm_modify(EDMA_CTLR(slot), PARM_OPT, EDMA_CHAN_SLOT(slot),
++			 ~TCINTEN, TCINTEN);
++}
++EXPORT_SYMBOL(edma_enable_interrupt);
 +
-+	for (i = 0; i < num_slots_needed; i++) {
- 		if (echan->slot[i] < 0) {
- 			echan->slot[i] =
- 				edma_alloc_slot(EDMA_CTLR(echan->ch_num),
-@@ -273,6 +276,10 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 				return NULL;
- 			}
- 		}
-+	}
-+
-+	/* Configure PaRAM sets for each SG */
-+	for_each_sg(sgl, sg, sg_len, i) {
++/**
+  * edma_link - link one parameter RAM slot to another
+  * @from: parameter RAM slot originating the link
+  * @to: parameter RAM slot which is the link target
+diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+index 57300fd..184ff5f 100644
+--- a/include/linux/platform_data/edma.h
++++ b/include/linux/platform_data/edma.h
+@@ -136,6 +136,7 @@ void edma_set_dest_index(unsigned slot, s16 dest_bidx, s16 dest_cidx);
+ void edma_set_transfer_params(unsigned slot, u16 acnt, u16 bcnt, u16 ccnt,
+ 		u16 bcnt_rld, enum sync_dimension sync_mode);
+ void edma_link(unsigned from, unsigned to);
++void edma_enable_interrupt(unsigned slot);
+ void edma_unlink(unsigned from);
  
- 		acnt = dev_width;
- 
-@@ -330,6 +337,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 		/* Configure A or AB synchronized transfers */
- 		if (edesc->absync)
- 			edesc->pset[i].opt |= SYNCDIM;
-+
- 		/* If this is the last set, enable completion interrupt flag */
- 		if (i == sg_len - 1)
- 			edesc->pset[i].opt |= TCINTEN;
+ /* calls that operate on an entire parameter RAM slot */
 -- 
 1.7.9.5
