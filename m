@@ -1,175 +1,75 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 5 Aug 2013 17:43:47 -0500
-Subject: [PATCH RFC 46/51] ARM: DMA-API: better handing of DMA masks for
- coherent allocations
-In-Reply-To: <E1V51EE-0006uO-C2@rmk-PC.arm.linux.org.uk>
-References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
- <E1V51EE-0006uO-C2@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_JsqJH-T3bBNZvQZF2aWS18n5wfSzCMEi20-5e1RmYEfF3Ow@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 05 Aug 2013 16:47:12 -0600
+Subject: [alsa-devel] [PATCH RFC 00/13] Adding SPDIF support to
+ kirkwood-i2s
+In-Reply-To: <51FFBF03.1000507@gmail.com>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
+ <51FFA348.2010503@gmail.com> <20130805140729.GC9858@sirena.org.uk>
+ <51FFBF03.1000507@gmail.com>
+Message-ID: <52002B70.5050109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 5:20 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> We need to start treating DMA masks as something which is specific to
-> the bus that the device resides on, otherwise we're going to hit all
-> sorts of nasty issues with LPAE and 32-bit DMA controllers in >32-bit
-> systems, where memory is offset from PFN 0.
->
-> In order to start doing this, we convert the DMA mask to a PFN using
-> the device specific dma_to_pfn() macro.  This is the reverse of the
-> pfn_to_dma() macro which is used to get the DMA address for the device.
->
-> This gives us a PFN mask, which we can then check against the PFN
-> limit of the DMA zone.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mm/dma-mapping.c |   49 ++++++++++++++++++++++++++++++++++++++++----
->  arch/arm/mm/init.c        |    2 +
->  arch/arm/mm/mm.h          |    2 +
->  3 files changed, 48 insertions(+), 5 deletions(-)
+On 08/05/2013 09:04 AM, Sebastian Hesselbarth wrote:
+...
+> So, having a look at the node in question:
+> 
+> sound {
+>   compatible = "nvidia,tegra-audio-rt5640-beaver",
+>                "nvidia,tegra-audio-rt5640";
+>   nvidia,model = "NVIDIA Tegra Beaver";
+> 
+>   nvidia,audio-routing = "Headphones", "HPOR",
+>                          "Headphones", "HPOL";
+> 
+>   nvidia,i2s-controller = <&tegra_i2s1>;
+>   nvidia,audio-codec = <&rt5640>;
+> 
+>   nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(W, 2) GPIO_ACTIVE_HIGH>;
+> 
+>   clocks = <&tegra_car TEGRA30_CLK_PLL_A>,
+>            <&tegra_car TEGRA30_CLK_PLL_A_OUT0>,
+>            <&tegra_car TEGRA30_CLK_EXTERN1>;
+>   clock-names = "pll_a", "pll_a_out0", "mclk";
+> };
+> 
+> all those "nvidia," prefixed properties are not nvidia-specific at all.
 
-I believe you missed handling __dma_alloc. I have a different fix than
-what Andreas posted. I think DMA zone handling is broken in all cases
-here. Feel free to combine this in to your patch if you agree.
+Indeed. I do still have a desire to do a more encompassing generic
+binding that could use generic property names. However, I'm pulled in
+many directions and never manage to get around to that:-( Months or even
+years ago I did get as far as posting a binding with my ideas, but it
+needs a lot more work to correctly separate out what can be generic and
+what still needs to be SoC-/board-specific, how to represent it all in
+DT, and how to code stuff up into useful utility code that ASoC machine
+drivers will find useful, since custom machine drivers will almost
+certainly be required to do the last pieces of integration of
+SoC-specific control, even with a relatively complete generic DT
+representation (unless you start putting Forth into DT for the last bits!)
 
-Author: Rob Herring <rob.herring@calxeda.com>
-Date:   Thu Aug 1 15:51:17 2013 -0500
+> Also, all those "nvidia," properties would have fit very well into the
+> i2s controller node - there may be more complex SoCs requiring an extra
+> "sound card" node, Tegra is not.
 
-    ARM: fix dma-mapping on LPAE
+That's certainly not true. It only looks like that because the DTs we
+currently have upstream expose only a subset of the whole functionality
+of the system. It's certainly not possible to move all the properties
+into e.g. the I2S controller node in general, because the audio system
+as a whole spans far more devices than just a single I2S controller.
 
-    With LPAE, the DMA zone size may be 4GB, so the GFP_DMA flag needs to be
-    set when the mask is less than or equal to the arm_dma_limit. This also
-    fixes a bug with DMA zone mask handling. GFP_DMA should be set for any
-    mask less than or equal to arm_dma_limit, not just less than ~0UL.
+> Even those foo-gpios properties can be generalized and moved to ASoC;
+> have a look at MMC drivers using one common "cd-gpios" property for
+> very different drivers. What is so special with Tegra and this gpio
+> that it needs a vendor-specific property?
+> 
+> I was asking for generalizing those exact properties to generic ones
+> and them move support for them to the ASoC/ALSA framework. With all
+> that DT binding re-review coming up, I doubt that the tegra binding
+> will be accepted again anyway.
 
-    Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7f9b179..3d9bdfb 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -651,7 +651,7 @@ static void *__dma_alloc(struct device *dev,
-size_t size, dma_addr_t *handle,
-        if (!mask)
-                return NULL;
-
--       if (mask < 0xffffffffULL)
-+       if (mask <= (u64)arm_dma_limit)
-                gfp |= GFP_DMA;
-
-        /*
-
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 7f9b179..ef0efab 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -173,10 +173,30 @@ static u64 get_coherent_dma_mask(struct device *dev)
->                         return 0;
->                 }
->
-> -               if ((~mask) & (u64)arm_dma_limit) {
-> -                       dev_warn(dev, "coherent DMA mask %#llx is smaller "
-> -                                "than system GFP_DMA mask %#llx\n",
-> -                                mask, (u64)arm_dma_limit);
-> +               /*
-> +                * If the mask allows for more memory than we can address,
-> +                * and we actually have that much memory, then fail the
-> +                * allocation.
-> +                */
-> +               if (sizeof(mask) != sizeof(dma_addr_t) &&
-> +                   mask > (dma_addr_t)~0 &&
-> +                   dma_to_pfn(dev, ~0) > arm_dma_pfn_limit) {
-> +                       dev_warn(dev, "Coherent DMA mask %#llx is larger than dma_addr_t allows\n",
-> +                                mask);
-> +                       dev_warn(dev, "Driver did not use or check the return value from dma_set_coherent_mask()?\n");
-> +                       return 0;
-> +               }
-> +
-> +               /*
-> +                * Now check that the mask, when translated to a PFN,
-> +                * fits within the allowable addresses which we can
-> +                * allocate.
-> +                */
-> +               if (dma_to_pfn(dev, mask) < arm_dma_pfn_limit) {
-> +                       dev_warn(dev, "Coherent DMA mask %#llx (pfn %#lx-%#lx) covers a smaller range of system memory than the DMA zone pfn 0x0-%#lx\n",
-> +                                mask,
-> +                                dma_to_pfn(dev, 0), dma_to_pfn(dev, mask) + 1,
-> +                                arm_dma_pfn_limit + 1);
->                         return 0;
->                 }
->         }
-> @@ -1008,8 +1028,27 @@ void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
->   */
->  int dma_supported(struct device *dev, u64 mask)
->  {
-> -       if (mask < (u64)arm_dma_limit)
-> +       unsigned long limit;
-> +
-> +       /*
-> +        * If the mask allows for more memory than we can address,
-> +        * and we actually have that much memory, then we must
-> +        * indicate that DMA to this device is not supported.
-> +        */
-> +       if (sizeof(mask) != sizeof(dma_addr_t) &&
-> +           mask > (dma_addr_t)~0 &&
-> +           dma_to_pfn(dev, ~0) > arm_dma_pfn_limit)
-> +               return 0;
-> +
-> +       /*
-> +        * Translate the device's DMA mask to a PFN limit.  This
-> +        * PFN number includes the page which we can DMA to.
-> +        */
-> +       limit = dma_to_pfn(dev, mask);
-> +
-> +       if (limit < arm_dma_pfn_limit)
->                 return 0;
-> +
->         return 1;
->  }
->  EXPORT_SYMBOL(dma_supported);
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 15225d8..b5b5836 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -217,6 +217,7 @@ EXPORT_SYMBOL(arm_dma_zone_size);
->   * so a successful GFP_DMA allocation will always satisfy this.
->   */
->  phys_addr_t arm_dma_limit;
-> +unsigned long arm_dma_pfn_limit;
->
->  static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
->         unsigned long dma_size)
-> @@ -239,6 +240,7 @@ void __init setup_dma_zone(struct machine_desc *mdesc)
->                 arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
->         } else
->                 arm_dma_limit = 0xffffffff;
-> +       arm_dma_pfn_limit = arm_dma_limit >> PAGE_SHIFT;
->  #endif
->  }
->
-> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-> index d5a4e9a..d5a982d 100644
-> --- a/arch/arm/mm/mm.h
-> +++ b/arch/arm/mm/mm.h
-> @@ -81,8 +81,10 @@ extern __init void add_static_vm_early(struct static_vm *svm);
->
->  #ifdef CONFIG_ZONE_DMA
->  extern phys_addr_t arm_dma_limit;
-> +extern unsigned long arm_dma_pfn_limit;
->  #else
->  #define arm_dma_limit ((phys_addr_t)~0)
-> +#define arm_dma_pfn_limit (~0ul >> PAGE_SHIFT)
->  #endif
->
->  extern phys_addr_t arm_lowmem_limit;
-> --
-> 1.7.4.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I don't agree. It's not *generic*, but I don't see any requirement to
+only accept completely generic bindings. If there was such a
+requirement, we'd probably never get any more bindings for
+embedded-style audio HW... The only thing that might change is removing
+some of the prefixes from the property names.
