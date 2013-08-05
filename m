@@ -1,280 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Aug 2013 14:37:58 +0100
-Subject: [PATCH 2/3] Initial skeleton of VFIO support for Device Tree
- based devices
-In-Reply-To: <1375708632-26356-3-git-send-email-a.motakis@virtualopensystems.com>
-References: <1375708632-26356-1-git-send-email-a.motakis@virtualopensystems.com>
- <1375708632-26356-3-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <20130805133757.GF9910@e106331-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon,  5 Aug 2013 14:39:40 +0100
+Subject: [RFC PATCH v2 1/3] drivers: irq-chip: irq-gic: introduce
+ gic_cpu_if_down()
+In-Reply-To: <1375709982-27148-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1375709982-27148-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1375709982-27148-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding DT maintainers to Cc]
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-On Mon, Aug 05, 2013 at 02:17:11PM +0100, Antonios Motakis wrote:
-> Platform devices in the Linux kernel are usually managed by the DT
-> interface. This patch forms the base to support these kind of devices
-> with VFIO.
-> 
-> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-> ---
->  drivers/vfio/Kconfig      |  10 +++
->  drivers/vfio/Makefile     |   1 +
->  drivers/vfio/vfio_dt.c    | 187 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/vfio.h |   1 +
->  4 files changed, 199 insertions(+)
->  create mode 100644 drivers/vfio/vfio_dt.c
-> 
-> diff --git a/drivers/vfio/Kconfig b/drivers/vfio/Kconfig
-> index 1f84eda..a77a2e4 100644
-> --- a/drivers/vfio/Kconfig
-> +++ b/drivers/vfio/Kconfig
-> @@ -13,4 +13,14 @@ menuconfig VFIO
->  
->  	  If you don't know what to do here, say N.
->  
-> +config VFIO_DT
-> +	tristate "VFIO support for Device Tree devices"
-> +	depends on VFIO && EVENTFD
-> +	help
-> +	  Support for the VFIO Device Tree driver.  This is required to make
-> +	  use of platform devices present on Device Tree nodes using the VFIO
-> +	  framework.
-> +
-> +	  If you don't know what to do here, say N.
-> +
->  source "drivers/vfio/pci/Kconfig"
-> diff --git a/drivers/vfio/Makefile b/drivers/vfio/Makefile
-> index 2398d4a..d599a67 100644
-> --- a/drivers/vfio/Makefile
-> +++ b/drivers/vfio/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_VFIO) += vfio.o
->  obj-$(CONFIG_VFIO_IOMMU_TYPE1) += vfio_iommu_type1.o
->  obj-$(CONFIG_VFIO_PCI) += pci/
-> +obj-$(CONFIG_VFIO_DT) += vfio_dt.o
-> diff --git a/drivers/vfio/vfio_dt.c b/drivers/vfio/vfio_dt.c
-> new file mode 100644
-> index 0000000..ad4d31d
-> --- /dev/null
-> +++ b/drivers/vfio/vfio_dt.c
-> @@ -0,0 +1,187 @@
-> +/*
-> + * Copyright (C) 2013 - Virtual Open Systems
-> + * Author: Antonios Motakis <a.motakis@virtualopensystems.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/eventfd.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/iommu.h>
-> +#include <linux/module.h>
-> +#include <linux/mutex.h>
-> +#include <linux/notifier.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/slab.h>
-> +#include <linux/types.h>
-> +#include <linux/uaccess.h>
-> +#include <linux/vfio.h>
-> +
-> +#define DRIVER_VERSION  "0.1"
-> +#define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
-> +#define DRIVER_DESC     "VFIO Device Tree devices - User Level meta-driver"
-> +
-> +struct vfio_dt_device {
-> +	struct platform_device	*pdev;
-> +};
-> +
-> +static void vfio_dt_release(void *device_data)
-> +{
-> +	module_put(THIS_MODULE);
-> +}
-> +
-> +static int vfio_dt_open(void *device_data)
-> +{
-> +	if (!try_module_get(THIS_MODULE))
-> +		return -ENODEV;
-> +
-> +	return 0;
-> +}
-> +
-> +static long vfio_dt_ioctl(void *device_data,
-> +			   unsigned int cmd, unsigned long arg)
-> +{
-> +	struct vfio_dt_device *vdev = device_data;
-> +	unsigned long minsz;
-> +
-> +	if (cmd == VFIO_DEVICE_GET_INFO) {
-> +		struct vfio_device_info info;
-> +
-> +		minsz = offsetofend(struct vfio_device_info, num_irqs);
-> +
-> +		if (copy_from_user(&info, (void __user *)arg, minsz))
-> +			return -EFAULT;
-> +
-> +		if (info.argsz < minsz)
-> +			return -EINVAL;
-> +
-> +		info.flags = VFIO_DEVICE_FLAGS_DT;
-> +		info.num_regions = 0;
-> +		info.num_irqs = 0;
-> +
-> +		return copy_to_user((void __user *)arg, &info, minsz);
-> +
-> +	} else if (cmd == VFIO_DEVICE_GET_REGION_INFO)
-> +		return -EINVAL;
-> +
-> +	else if (cmd == VFIO_DEVICE_GET_IRQ_INFO)
-> +		return -EINVAL;
-> +
-> +	else if (cmd == VFIO_DEVICE_SET_IRQS)
-> +		return -EINVAL;
-> +
-> +	else if (cmd == VFIO_DEVICE_RESET)
-> +		return -EINVAL;
-> +
-> +	return -ENOTTY;
-> +}
-> +
-> +static ssize_t vfio_dt_read(void *device_data, char __user *buf,
-> +			     size_t count, loff_t *ppos)
-> +{
-> +	return 0;
-> +}
-> +
-> +static ssize_t vfio_dt_write(void *device_data, const char __user *buf,
-> +			      size_t count, loff_t *ppos)
-> +{
-> +	return 0;
-> +}
-> +
-> +static int vfio_dt_mmap(void *device_data, struct vm_area_struct *vma)
-> +{
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct vfio_device_ops vfio_dt_ops = {
-> +	.name		= "vfio-dts",
-> +	.open		= vfio_dt_open,
-> +	.release	= vfio_dt_release,
-> +	.ioctl		= vfio_dt_ioctl,
-> +	.read		= vfio_dt_read,
-> +	.write		= vfio_dt_write,
-> +	.mmap		= vfio_dt_mmap,
-> +};
-> +
-> +static int vfio_dt_probe(struct platform_device *pdev)
-> +{
-> +	struct vfio_dt_device *vdev;
-> +	struct iommu_group *group;
-> +	int ret;
-> +
-> +	group = iommu_group_get(&pdev->dev);
-> +	if (!group) {
-> +		pr_err("VFIO: No IOMMU group for device %s\n", pdev->name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
-> +	if (!vdev) {
-> +		iommu_group_put(group);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	vdev->pdev = pdev;
-> +
-> +	ret = vfio_add_group_dev(&pdev->dev, &vfio_dt_ops, vdev);
-> +	if (ret) {
-> +		iommu_group_put(group);
-> +		kfree(vdev);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int vfio_dt_remove(struct platform_device *pdev)
-> +{
-> +	struct vfio_dt_device *vdev;
-> +
-> +	vdev = vfio_del_group_dev(&pdev->dev);
-> +	if (!vdev)
-> +		return -EINVAL;
-> +
-> +	iommu_group_put(pdev->dev.iommu_group);
-> +	kfree(vdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id vfio_dt_match[] = {
-> +	/* In the future, we can implement a better mechanism to bind the
-> +	 * module to any device. For now add the compatible property to the
-> +	 * dtb of the devices we want to use.	*/
-> +	{
-> +		.compatible = "vfio-dt",
-> +	},
-> +	{},
-> +};
+When processors are about to hit low power states, the assertion of
+standbywfi signal, triggered by the wfi instruction, is essential to
+entering low power modes. If an IRQ is pending on the processor at the
+time wfi is issued, the wfi instruction completes and the processor
+restarts execution without asserting the standbywfi signal. Depending
+on the platform power controller HW this behaviour can be acceptable or
+not; if this behaviour must be prevented software should be provided
+with a way to disable the routing of interrupts to the core IRQ pins.
 
-This definitely doesn't belong in the dt. It's purely a Linux
-abstraction and does not represent a piece of hardware or common
-interface.
+On systems where raw GIC distributor interrupts are connected to the power
+controller as wake-up events (hence the power controller still senses
+IRQs and can wake up cores upon IRQ pending), the GIC CPU interface can
+be disabled on power down, so that the GIC CPU IF output is gated and wfi
+cannot complete, thereby preventing the standbywfi issue.
 
-We need to think of a better mechanism for binding the module to these
-devices now.
+This patch adds a simple function to the GIC driver that allows to
+disable the GIC CPU IF from power down procedures.
 
-Thanks,
-Mark.
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+[rewrote commit log]
+---
+ drivers/irqchip/irq-gic.c       | 6 ++++++
+ include/linux/irqchip/arm-gic.h | 1 +
+ 2 files changed, 7 insertions(+)
 
-> +MODULE_DEVICE_TABLE(of, vfio_dt_match);
-> +
-> +static struct platform_driver vfio_dt_driver = {
-> +	.probe		= vfio_dt_probe,
-> +	.remove		= vfio_dt_remove,
-> +	.driver	= {
-> +		.name	= "vfio-dt",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = vfio_dt_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(vfio_dt_driver);
-> +
-> +MODULE_VERSION(DRIVER_VERSION);
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR(DRIVER_AUTHOR);
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-> index 284ff24..1e4bef2 100644
-> --- a/include/uapi/linux/vfio.h
-> +++ b/include/uapi/linux/vfio.h
-> @@ -147,6 +147,7 @@ struct vfio_device_info {
->  	__u32	flags;
->  #define VFIO_DEVICE_FLAGS_RESET	(1 << 0)	/* Device supports reset */
->  #define VFIO_DEVICE_FLAGS_PCI	(1 << 1)	/* vfio-pci device */
-> +#define VFIO_DEVICE_FLAGS_DT	(1 << 2)	/* vfio-dt device */
->  	__u32	num_regions;	/* Max region index + 1 */
->  	__u32	num_irqs;	/* Max IRQ index + 1 */
->  };
-> -- 
-> 1.8.1.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index ee7c503..d0e9480 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -453,6 +453,12 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 	writel_relaxed(1, base + GIC_CPU_CTRL);
+ }
+ 
++void gic_cpu_if_down(void)
++{
++	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
++	writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
++}
++
+ #ifdef CONFIG_CPU_PM
+ /*
+  * Saves the GIC distributor registers during suspend or idle.  Must be called
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 3e203eb..0e5d9ec 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -66,6 +66,7 @@ extern struct irq_chip gic_arch_extn;
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
++void gic_cpu_if_down(void);
+ 
+ static inline void gic_init(unsigned int nr, int start,
+ 			    void __iomem *dist , void __iomem *cpu)
+-- 
+1.8.2.2
