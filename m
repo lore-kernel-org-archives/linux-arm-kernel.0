@@ -1,73 +1,207 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 05 Aug 2013 16:10:47 +0200
-Subject: [alsa-devel] [PATCH RFC 00/13] Adding SPDIF support to
- kirkwood-i2s
-In-Reply-To: <51FFA348.2010503@gmail.com>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
- <51FFA348.2010503@gmail.com>
-Message-ID: <51FFB267.3030107@metafoo.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 5 Aug 2013 15:12:21 +0100
+Subject: [PATCH 1/7] EFI stub documentation updates
+In-Reply-To: <1375478948-22562-2-git-send-email-roy.franz@linaro.org>
+References: <1375478948-22562-1-git-send-email-roy.franz@linaro.org>
+ <1375478948-22562-2-git-send-email-roy.franz@linaro.org>
+Message-ID: <20130805141221.GC2755@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 03:06 PM, Sebastian Hesselbarth wrote:
-> On 08/05/13 13:59, Mark Brown wrote:
->> On Sun, Aug 04, 2013 at 11:45:30PM +0200, Sebastian Hesselbarth wrote:
->>> On 08/04/2013 09:21 PM, Russell King - ARM Linux wrote:
->>
->>>>                  .name = "S/PDIF1",
->>>>                  .stream_name = "IEC958 Playback",
->>>>                  .platform_name = "mvebu-audio.1",
->>>>                  .cpu_dai_name = "mvebu-audio.1",
->>>>                  .codec_dai_name = "dit-hifi",
->>>>                  .codec_name = "spdif-dit",
->>
->>> Not a big deal for DT. I suggest to have a "audio-codecs" property that
->>> link CPU DAI to codec(s). One thing, I have noticed is that currently
->>> you need to supply both codec_name (or DT node) _and_ codec_dai_name.
->>> For that it would be helpful, if ASoC supplies helpers to get the DAI
->>> by index and use phandle with args here.
->>
->> This should follow the same pattern as the other board bindings.
+On Fri, Aug 02, 2013 at 02:29:02PM -0700, Roy Franz wrote:
+> The ARM kernel also has an EFI stub which works largely the same way
+> as the x86 stub, so move the documentation out of x86 directory and
+> update to reflect that it is generic, and add ARM specific text.
 > 
-> Mark,
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+> ---
+>  Documentation/efi-stub.txt     |   78 ++++++++++++++++++++++++++++++++++++++++
+>  Documentation/x86/efi-stub.txt |   65 ---------------------------------
+>  arch/x86/Kconfig               |    2 +-
+>  3 files changed, 79 insertions(+), 66 deletions(-)
+>  create mode 100644 Documentation/efi-stub.txt
+>  delete mode 100644 Documentation/x86/efi-stub.txt
 > 
-> looking at e.g. nvidia,tegra-audio-*.txt bindings, I guess you are
-> proposing to have a new binding for every SoC/codec/board combination?
-> Also, you should have seen "ASoC: fsl: Add S/PDIF machine driver", which
-> is - again - proposing a new binding for fsl with spdif "codec".
+> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+> new file mode 100644
+> index 0000000..7837df1
+> --- /dev/null
+> +++ b/Documentation/efi-stub.txt
+> @@ -0,0 +1,78 @@
+> +			  The EFI Boot Stub
+> +		     ---------------------------
+> +
+> +On the x86 and ARM platforms, a bzImage can masquerade as a PE/COFF image,
+> +thereby convincing EFI firmware loaders to load it as an EFI
+> +executable. The code that modifies the bzImage header, along with the
+
+
+Minor nit, I don't think there is such a thing as "bzImage" for ARM.
+
+Cheers
+---Dave
+
+> +EFI-specific entry point that the firmware loader jumps to are
+> +collectively known as the "EFI boot stub", and live in
+> +arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
+> +respectively.  For ARM the EFI stub is implemented in
+> +arch/arm/boot/compressed/efi-header.S and
+> +arch/arm/boot/compressed/efi-stub.c.  EFI stub code that is shared
+> +between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+> +
+> +By using the EFI boot stub it's possible to boot a Linux kernel
+> +without the use of a conventional EFI boot loader, such as grub or
+> +elilo. Since the EFI boot stub performs the jobs of a boot loader, in
+> +a certain sense it *IS* the boot loader.
+> +
+> +The EFI boot stub is enabled with the CONFIG_EFI_STUB kernel option.
+> +
+> +
+> +**** How to install bzImage.efi
+> +
+> +The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
+> +System Partiion (ESP) and renamed with the extension ".efi". Without
+> +the extension the EFI firmware loader will refuse to execute it. It's
+> +not possible to execute bzImage.efi from the usual Linux file systems
+> +because EFI firmware doesn't have support for them.  For ARM the
+> +arch/arm/boot/zImage should be copied to the system partition, and it
+> +may not need to be renamed.
+> +
+> +
+> +**** Passing kernel parameters from the EFI shell
+> +
+> +Arguments to the kernel can be passed after bzImage.efi, e.g.
+> +
+> +	fs0:> bzImage.efi console=ttyS0 root=/dev/sda4
+> +
+> +
+> +**** The "initrd=" option
+> +
+> +Like most boot loaders, the EFI stub allows the user to specify
+> +multiple initrd files using the "initrd=" option. This is the only EFI
+> +stub-specific command line parameter, everything else is passed to the
+> +kernel when it boots.
+> +
+> +The path to the initrd file must be an absolute path from the
+> +beginning of the ESP, relative path names do not work. Also, the path
+> +is an EFI-style path and directory elements must be separated with
+> +backslashes (\). For example, given the following directory layout,
+> +
+> +fs0:>
+> +	Kernels\
+> +			bzImage.efi
+> +			initrd-large.img
+> +
+> +	Ramdisks\
+> +			initrd-small.img
+> +			initrd-medium.img
+> +
+> +to boot with the initrd-large.img file if the current working
+> +directory is fs0:\Kernels, the following command must be used,
+> +
+> +	fs0:\Kernels> bzImage.efi initrd=\Kernels\initrd-large.img
+> +
+> +Notice how bzImage.efi can be specified with a relative path. That's
+> +because the image we're executing is interpreted by the EFI shell,
+> +which understands relative paths, whereas the rest of the command line
+> +is passed to bzImage.efi.
+> +
+> +
+> +**** The "dtb=" option
+> +
+> +For the ARM architecture, we also need to be able to provide a device
+> +tree to the kernel.  This is done with the "dtb=" command line option,
+> +and is process in the same manner as the "initrd=" option that is described
+> +above.
+> diff --git a/Documentation/x86/efi-stub.txt b/Documentation/x86/efi-stub.txt
+> deleted file mode 100644
+> index 44e6bb6..0000000
+> --- a/Documentation/x86/efi-stub.txt
+> +++ /dev/null
+> @@ -1,65 +0,0 @@
+> -			  The EFI Boot Stub
+> -		     ---------------------------
+> -
+> -On the x86 platform, a bzImage can masquerade as a PE/COFF image,
+> -thereby convincing EFI firmware loaders to load it as an EFI
+> -executable. The code that modifies the bzImage header, along with the
+> -EFI-specific entry point that the firmware loader jumps to are
+> -collectively known as the "EFI boot stub", and live in
+> -arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
+> -respectively.
+> -
+> -By using the EFI boot stub it's possible to boot a Linux kernel
+> -without the use of a conventional EFI boot loader, such as grub or
+> -elilo. Since the EFI boot stub performs the jobs of a boot loader, in
+> -a certain sense it *IS* the boot loader.
+> -
+> -The EFI boot stub is enabled with the CONFIG_EFI_STUB kernel option.
+> -
+> -
+> -**** How to install bzImage.efi
+> -
+> -The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
+> -System Partiion (ESP) and renamed with the extension ".efi". Without
+> -the extension the EFI firmware loader will refuse to execute it. It's
+> -not possible to execute bzImage.efi from the usual Linux file systems
+> -because EFI firmware doesn't have support for them.
+> -
+> -
+> -**** Passing kernel parameters from the EFI shell
+> -
+> -Arguments to the kernel can be passed after bzImage.efi, e.g.
+> -
+> -	fs0:> bzImage.efi console=ttyS0 root=/dev/sda4
+> -
+> -
+> -**** The "initrd=" option
+> -
+> -Like most boot loaders, the EFI stub allows the user to specify
+> -multiple initrd files using the "initrd=" option. This is the only EFI
+> -stub-specific command line parameter, everything else is passed to the
+> -kernel when it boots.
+> -
+> -The path to the initrd file must be an absolute path from the
+> -beginning of the ESP, relative path names do not work. Also, the path
+> -is an EFI-style path and directory elements must be separated with
+> -backslashes (\). For example, given the following directory layout,
+> -
+> -fs0:>
+> -	Kernels\
+> -			bzImage.efi
+> -			initrd-large.img
+> -
+> -	Ramdisks\
+> -			initrd-small.img
+> -			initrd-medium.img
+> -
+> -to boot with the initrd-large.img file if the current working
+> -directory is fs0:\Kernels, the following command must be used,
+> -
+> -	fs0:\Kernels> bzImage.efi initrd=\Kernels\initrd-large.img
+> -
+> -Notice how bzImage.efi can be specified with a relative path. That's
+> -because the image we're executing is interpreted by the EFI shell,
+> -which understands relative paths, whereas the rest of the command line
+> -is passed to bzImage.efi.
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index b32ebf9..ec65b51 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -1579,7 +1579,7 @@ config EFI_STUB
+>            This kernel feature allows a bzImage to be loaded directly
+>  	  by EFI firmware without the use of a bootloader.
+>  
+> -	  See Documentation/x86/efi-stub.txt for more information.
+> +	  See Documentation/efi-stub.txt for more information.
+>  
+>  config SECCOMP
+>  	def_bool y
+> -- 
+> 1.7.10.4
 > 
-> You really want me to go the same way or is there any "other board
-> binding" I should follow?
 > 
-
-In my opinion having different bindings for each board is not a good idea.
-Having a common set of property names will allow us to factor out the
-parsing to the ASoC core instead of doing this by hand for each board driver.
-
->>> i2s1: audio-controller at b0000 {
->>>     compatible = "marvell,dove-i2s";
->>>     reg = <0xb0000 0x2345>;
->>>     audio-codecs = <&spdif 0>;
->>> };
->>
->> No, things are glued together using the machine driver - again, look at
->> how all the other systems work.  The wiring on the board can get
->> interesting enough to need a binding of its own, for very simple
->> bindings that should just be pointing to a generic driver.
-> 
-> And that is what will be true for almost all codecs we hook up on
-> Marvell SoCs. The audio controller is very simple with only mute
-> control available. We need to connect either i2s or spdif or both to
-> any codec and the codecs output. The codecs is determined by phandle
-> and the output (codec_dai_name) could be determined by the phandle's
-> arg, e.g. 0 for the first codec_dai provided.
-
-Kuninori Morimoto started working on a xlate callback for CODECs and DAIs
-some time ago[1]. If nobody else is going to pick this up I'm probably going
-to continue his work on this.
-
-- Lars
-
-[1]
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-February/059788.html
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
