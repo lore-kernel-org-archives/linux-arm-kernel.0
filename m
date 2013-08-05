@@ -1,45 +1,57 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Aug 2013 00:43:39 -0400 (EDT)
-Subject: [GIT PULL] MCPM backends update
-In-Reply-To: <CAOesGMjB+=auLRTAEfjuW5udJzuj4YS0G4nS7gHmyurZMVdt3Q@mail.gmail.com>
-References: <alpine.LFD.2.03.1307221521200.15022@syhkavp.arg>
- <20130804200201.GH10876@quad.lixom.net>
- <alpine.LFD.2.03.1308042058280.14472@syhkavp.arg>
- <CAOesGMjB+=auLRTAEfjuW5udJzuj4YS0G4nS7gHmyurZMVdt3Q@mail.gmail.com>
-Message-ID: <alpine.LFD.2.03.1308050032350.14472@syhkavp.arg>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 5 Aug 2013 10:38:45 +0530
+Subject: [PATCH 2/2] ARM: dts: AM4372: add few nodes
+In-Reply-To: <51FCEE60.7080809@ti.com>
+References: <ffa2f76fcac54bfe76c234ffce0394fd2c25fe52.1375450395.git.afzal@ti.com>
+ <6f0f838176ab93aac8dab4c3ab9d9f95a3027ff7.1375450395.git.afzal@ti.com>
+ <51FCEE60.7080809@ti.com>
+Message-ID: <51FF335D.4050803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 4 Aug 2013, Olof Johansson wrote:
+Hi Muguthan,
 
-> On Sun, Aug 4, 2013 at 6:19 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > So could we stop fooling around please?
-> >
-> > I'd strongly plea for you to just pull this stuff as it is now.  We've
-> > wasted way too much time on the issue of a proper location for this code
-> > and other drivers are being gated on this. I think that
-> > drivers/platform/vexpress is Innocent enough to cause no harm.  So
-> > _please_ let's just use that and move it _if_ we find a more optimal
-> > location in the future.
-> >
-> > Please ?
-> 
-> How about this:
-> 
-> I'll pick this up in an unstable branch for now with three commits on
-> top of, which I will send out in a minute. Those three commits move
-> the code back next to tc2_pm, and has two tiny cleanups (quicker to do
-> that than go back and loop with code review). If you and Pawel and
-> Lorenzo are happy with those commits, I'll move the whole branch over
-> into next/soc and we'll lock it in for 3.12.
+On Saturday 03 August 2013 05:19 PM, Mugunthan V N wrote:
+> On 8/2/2013 7:16 PM, Afzal Mohammed wrote:
 
-I have no problem with that. Whatever makes you feel good (or at least 
-somewhat better) about this code is fine by me.
+>> +		mac: ethernet at 4a100000 {
+>> +			compatible = "ti,am4372-cpsw","ti,cpsw";
 
-I'm supposed to be on vacation right now, but I just cannot imagine 
-having _another_ merge window passing by without this functionality 
-being merged, which is why I'm replying nevertheless.  So by all means 
-please be my guest.
+> compatibility "ti,am4372-cpsw" is not needed as driver has only "ti,cpsw"
+> compatibility
 
+No, please read device tree documentation [1].
 
-Nicolas
+DT is a pure hardware description, it does not depend on driver, 
+dependency is only vice versa.
+
+>> +			reg = <0x4a100000 0x800
+>> +			       0x4a101200 0x100>;
+>> +			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH
+>> +				      GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH
+>> +				      GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH
+>> +				      GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+>> +			ti,hwmods = "cpgmac0";
+>> +			status = "disabled";
+>> +		};
+
+> There are many other parameters which are missed here.
+
+Reason has been mentioned in the commit message, quoting relevant here 
+again,
+
+ >> For i2c, spi, cpsw & pwm - only the properties that were sure to be
+ >> correct has been added (main intention is to make hwmod happy and
+ >> avoid any later modification to here added properties).
+
+I really wanted to avoid a later patch that has a line starting with 
+minus on DTS.
+
+Since you are working on cpsw support, can you help here with a patch 
+for other properties.
+
+Regards
+Afzal
+
+[1] 
+http://devicetree.org/Device_Tree_Usage#Understanding_the_compatible_Property
