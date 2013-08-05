@@ -1,31 +1,24 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 5 Aug 2013 11:14:51 -0500
-Subject: [PATCH v3 06/12] ARM: edma: Add pr_debug in edma_link
-In-Reply-To: <1375719297-12871-1-git-send-email-joelf@ti.com>
-References: <1375719297-12871-1-git-send-email-joelf@ti.com>
-Message-ID: <1375719297-12871-7-git-send-email-joelf@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 Aug 2013 17:16:04 +0100
+Subject: [PATCH RFC 02/13] ASoC: kirkwood: use devm_clk_get() for the
+ external clock
+In-Reply-To: <E1V63tP-0004lH-4Q@rmk-PC.arm.linux.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <E1V63tP-0004lH-4Q@rmk-PC.arm.linux.org.uk>
+Message-ID: <20130805161604.GP9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Useful for visualizing linking of PaRAM slots
+On Sun, Aug 04, 2013 at 08:23:03PM +0100, Russell King wrote:
+> Use devm_clk_get() to simplify the error path for the external clock.
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- arch/arm/common/edma.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index aa43c49..34d3fc9 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1125,6 +1125,8 @@ void edma_link(unsigned from, unsigned to)
- 	ctlr_to = EDMA_CTLR(to);
- 	to = EDMA_CHAN_SLOT(to);
- 
-+	pr_debug("Setting up link %d -> %d\n", from, to);
-+
- 	if (from >= edma_cc[ctlr_from]->num_slots)
- 		return;
- 	if (to >= edma_cc[ctlr_to]->num_slots)
--- 
-1.7.9.5
+I've applied the diff that remains from the existing upstream code
+(which frees extclk if it's just the internal clock) with a reworded
+commit message, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/605f101b/attachment.sig>
