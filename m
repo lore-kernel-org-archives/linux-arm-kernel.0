@@ -1,101 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 5 Aug 2013 11:29:52 +0200
-Subject: [PATCH 3/7] pinctrl: imx1 core driver
-In-Reply-To: <1375439907-10462-4-git-send-email-mpa@pengutronix.de>
-References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130805092952.GO26614@pengutronix.de>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Mon, 5 Aug 2013 09:32:11 +0000
+Subject: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
+In-Reply-To: <20130805083050.GN26614@pengutronix.de>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>
+ <20130805083050.GN26614@pengutronix.de>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851FC075@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 12:38:23PM +0200, Markus Pargmann wrote:
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/pinctrl/Kconfig             |   5 +
->  drivers/pinctrl/Makefile            |   1 +
->  drivers/pinctrl/pinctrl-imx1-core.c | 667 ++++++++++++++++++++++++++++++++++++
->  drivers/pinctrl/pinctrl-imx1.h      |  23 ++
->  4 files changed, 696 insertions(+)
->  create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
->  create mode 100644 drivers/pinctrl/pinctrl-imx1.h
+> Subject: Re: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller
+> > +struct imx_i2c_clk_pair {
+> > +	u16	div;
+> > +	u16	regval;
+> > +}i;
 > 
-> +static int imx1_pinctrl_parse_groups(struct device_node *np,
-> +				    struct imx_pin_group *grp,
-> +				    struct imx_pinctrl_soc_info *info,
-> +				    u32 index)
-> +{
-> +	int size;
-> +	const __be32 *list;
-> +	int i;
-> +	u32 config;
-> +
-> +	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
-> +
-> +	/* Initialise group */
-> +	grp->name = np->name;
-> +
-> +	/*
-> +	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
-> +	 * do sanity check and calculate pins number
-> +	 */
-> +	list = of_get_property(np, "fsl,pins", &size);
-> +	/* we do not check return since it's safe node passed down */
-> +	if (!size || size % 12) {
-> +		dev_notice(info->dev, "Not a valid fsl,pins property (%s)\n",
-> +				np->name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	grp->npins = size / 12;
-> +	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
-> +				GFP_KERNEL);
-> +	grp->mux_mode = devm_kzalloc(info->dev,
-> +				grp->npins * sizeof(unsigned int), GFP_KERNEL);
-> +	grp->configs = devm_kzalloc(info->dev,
-> +				grp->npins * sizeof(unsigned long), GFP_KERNEL);
-
-I know this is copied from the existing imx pinctrl driver, but normally
-we check for allocation failures.
-
-Also I find it very irritating that you allocate three arrays of
-integers instead of a single array of a struct type. I know the pinctrl
-framework forces you to pass an array of pin numbers (which is quite
-horrible for drivers to handle, who came up with the idea that a pin is
-a number instead of some struct pointer which can be attached data to?)
+> Converting this to a struct should be a separate patch. This is an
+> obvious cleanup which makes maintainers happy and more willing to take
+> the features you are adding later.
+> 
+[Lu Jingchang-B35083] 
+Do you mean all changes to i.MX common should be a separate patch including the clk div pair, and 
+the struct imx_i2c_hwdata, struct imx_i2c_drvdata and other things changed to be easier to
+use adding other SoCs support later. Thanks.
+> >
+> > +#define IMX_I2C_IADR	(0x00 << i2c_imx->i2c_hwdata->regshift)
+> > +#define IMX_I2C_IFDR	(0x01 << i2c_imx->i2c_hwdata->regshift)
+> > +#define IMX_I2C_I2CR	(0x02 << i2c_imx->i2c_hwdata->regshift)
+> > +#define IMX_I2C_I2SR	(0x03 << i2c_imx->i2c_hwdata->regshift)
+> > +#define IMX_I2C_I2DR	(0x04 << i2c_imx->i2c_hwdata->regshift)
+> 
+> Macros should not assume there is a i2c_imx variable present in a
+> function. Instead, add static inline accessor functions.
+[Lu Jingchang-B35083] 
+Ok, I will add inline functions instead. Thanks.
+> 
+> 
+> > +	[VF610_I2C] = {
+> > +		.devtype = VF610_I2C,
+> > +		.hwdata = &vf610_i2c_hwdata
+> > +	},
+> >  };
+> 
+> Why add this array?
+> You should reference imx_i2c_hwdata/vf610_i2c_hwdata directly here.
+[Lu Jingchang-B35083] 
+The "is_imx1_i2c()"function need the devtype variable the test the arch, so the devtype is out of the
+imx_i2c_hwdata struct to let all other i.MX i2c device can sharing the same imx_i2c_hwdata setting. Thanks.
+> 
+> >
+> >  	if (of_id)
+> >  		pdev->id_entry = of_id->data;
+> 
+> This is wrong in the original driver code. This field should be changed
+> in a driver.
+[Lu Jingchang-B35083] 
+Could you please give some more comments on this? Thanks.
 
 
-> +	for (i = 0; i < grp->npins; i++) {
-> +		grp->pins[i] = be32_to_cpu(*list++);
-> +		grp->mux_mode[i] = be32_to_cpu(*list++);
-> +
-> +		config = be32_to_cpu(*list++);
-> +		grp->configs[i] = config;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
 
-[...]
-
-> +
-> +	for_each_child_of_node(np, child) {
-> +		func->groups[i] = child->name;
-> +		grp = &info->groups[grp_index++];
-> +		ret = imx1_pinctrl_parse_groups(child, grp, info, i++);
-> +		if (ret)
-> +			return ret;
-
-This is one thing which nags me in the imx pinctrl driver aswell. Once
-you made a single mistake in a single pinctrl group in the devicetree
-you will never see the error message because the whole pinctrl driver
-bails out leaving the serial driver with the console unusable. Wouldn't
-it be possible to continue here instead of bailing out?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best Regards
