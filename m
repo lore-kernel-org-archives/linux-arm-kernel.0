@@ -1,102 +1,165 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 05 Aug 2013 11:06:25 -0700
-Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
-In-Reply-To: <51FFDA70.7080900@samsung.com>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <51FFDA70.7080900@samsung.com>
-Message-ID: <20130805180625.5348.79570@quantum>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 5 Aug 2013 14:07:12 -0400
+Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <51ffdc7e.06b8b40a.2cc8.0fe0SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
+ <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
+ <51f29ccd.f014b40a.34cc.ffffca2aSMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGvFPGueM_LHVij9KFzM6NJySHCzmaLstuzZkK5GwP+6gQ@mail.gmail.com>
+ <51ffdc7e.06b8b40a.2cc8.0fe0SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <CAF6AEGsyKk_G-R-OX_YcgYFDgTEmCy9Vf2LV1pAOV0452QKSww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-08-05 10:01:36)
-> On 07/23/13 08:49, Tomasz Figa wrote:
-> > This series is an attempt to move clock support on Samsung S3C64xx SoCs
-> > to Common Clock Framework.
-> >
-> > First, support for PLL types present on S3C64xx SoCs is added to Samsung
-> > Common Clock Framework driver. Then the main clock driver for mentioned
-> > SoCs is introduced. Further patches contain fixes for drivers to make them
-> > compliant with CCF semantics, migration of platform code to use the new
-> > clock driver and removal of old clock management code.
-> >
-> > Depends on:
-> >   - [PATCH v4 00/20] Samsung PWM support cleanup
-> >     http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20856
-> >
-> > On S3C6410-based Tiny6410 board (Mini6410-compatible):
-> >
-> > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
-> >
-> > For v1:
-> >
-> > Acked-by: Mike Turquette<mturquette@linaro.org>
-> >
-> > Changes since v1:
-> >   - added patch for read-only muxes,
-> >   - exported configurable muxes and dividers,
-> >   - defined mout_syncmux as read-only mux,
-> >   - in DT-enabled case fixed-clock binding is used to define external clocks.
-> >
-> > Tomasz Figa (8):
-> >    clk: mux: Add support for read-only muxes.
-> >    clk: samsung: pll: Add support for PLL6552 and PLL6553
-> >    clk: samsung: Add clock driver for S3C64xx SoCs
-> >    ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
-> >    ARM: s3c64xx: dma: Use clk_prepare_enable/clk_disable_unprepare
-> >    usb: host: ohci-s3c2410 Use clk_prepare_enable/clk_disable_unprepare
-> >    ARM: s3c64xx: Migrate clock handling to Common Clock Framework
-> >    ARM: s3c64xx: Remove old clock management code
-> >
-> >   .../bindings/clock/samsung,s3c64xx-clock.txt       |   77 ++
-> >   arch/arm/Kconfig                                   |    2 +-
-> >   arch/arm/mach-s3c64xx/Makefile                     |    2 +-
-> >   arch/arm/mach-s3c64xx/clock.c                      | 1007 --------------------
-> >   arch/arm/mach-s3c64xx/common.c                     |   21 +-
-> >   arch/arm/mach-s3c64xx/common.h                     |   12 +-
-> >   arch/arm/mach-s3c64xx/dma.c                        |    4 +-
-> >   arch/arm/mach-s3c64xx/include/mach/regs-clock.h    |  132 +--
-> >   arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
-> >   arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
-> >   arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
-> >   arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
-> >   arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
-> >   arch/arm/mach-s3c64xx/mach-smartq.c                |   11 +-
-> >   arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +-
-> >   arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
-> >   arch/arm/mach-s3c64xx/pm.c                         |   21 -
-> >   arch/arm/mach-s3c64xx/s3c6400.c                    |    6 -
-> >   arch/arm/mach-s3c64xx/s3c6410.c                    |    7 -
-> >   arch/arm/plat-samsung/include/plat/cpu.h           |    4 +
-> >   drivers/clk/clk-mux.c                              |   10 +-
-> >   drivers/clk/samsung/Makefile                       |    1 +
-> >   drivers/clk/samsung/clk-pll.c                      |  160 ++++
-> >   drivers/clk/samsung/clk-pll.h                      |    4 +
-> >   drivers/clk/samsung/clk-s3c64xx.c                  |  465 +++++++++
-> >   drivers/usb/host/ohci-s3c2410.c                    |    8 +-
-> >   include/dt-bindings/clock/samsung,s3c64xx-clock.h  |  178 ++++
-> >   include/linux/clk-provider.h                       |    2 +
-> >   28 files changed, 943 insertions(+), 1205 deletions(-)
-> >   create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
-> >   delete mode 100644 arch/arm/mach-s3c64xx/clock.c
-> >   create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
-> >   create mode 100644 include/dt-bindings/clock/samsung,s3c64xx-clock.h
-> >
-> Basically, this series looks good to me, but I'm not sure how this 
-> should be handled because of dependency with PWM cleanup and clk stuff 
-> in clk tree now...
+On Mon, Aug 5, 2013 at 1:10 PM, Tom Cooksey <tom.cooksey@arm.com> wrote:
+> Hi Rob,
+>
+> +linux-media, +linaro-mm-sig for discussion of video/camera
+> buffer constraints...
+>
+>
+>> On Fri, Jul 26, 2013 at 11:58 AM, Tom Cooksey <tom.cooksey@arm.com>
+>> wrote:
+>> >> >  * It abuses flags parameter of DRM_IOCTL_MODE_CREATE_DUMB to also
+>> >> >    allocate buffers for the GPU. Still not sure how to resolve
+>> >> >    this as we don't use DRM for our GPU driver.
+>> >>
+>> >> any thoughts/plans about a DRM GPU driver?  Ideally long term (esp.
+>> >> once the dma-fence stuff is in place), we'd have gpu-specific drm
+>> >> (gpu-only, no kms) driver, and SoC/display specific drm/kms driver,
+>> >> using prime/dmabuf to share between the two.
+>> >
+>> > The "extra" buffers we were allocating from armsoc DDX were really
+>> > being allocated through DRM/GEM so we could get an flink name
+>> > for them and pass a reference to them back to our GPU driver on
+>> > the client side. If it weren't for our need to access those
+>> > extra off-screen buffers with the GPU we wouldn't need to
+>> > allocate them with DRM at all. So, given they are really "GPU"
+>> > buffers, it does absolutely make sense to allocate them in a
+>> > different driver to the display driver.
+>> >
+>> > However, to avoid unnecessary memcpys & related cache
+>> > maintenance ops, we'd also like the GPU to render into buffers
+>> > which are scanned out by the display controller. So let's say
+>> > we continue using DRM_IOCTL_MODE_CREATE_DUMB to allocate scan
+>> > out buffers with the display's DRM driver but a custom ioctl
+>> > on the GPU's DRM driver to allocate non scanout, off-screen
+>> > buffers. Sounds great, but I don't think that really works
+>> > with DRI2. If we used two drivers to allocate buffers, which
+>> > of those drivers do we return in DRI2ConnectReply? Even if we
+>> > solve that somehow, GEM flink names are name-spaced to a
+>> > single device node (AFAIK). So when we do a DRI2GetBuffers,
+>> > how does the EGL in the client know which DRM device owns GEM
+>> > flink name "1234"? We'd need some pretty dirty hacks.
+>>
+>> You would return the name of the display driver allocating the
+>> buffers.  On the client side you can use generic ioctls to go from
+>> flink -> handle -> dmabuf.  So the client side would end up opening
+>> both the display drm device and the gpu, but without needing to know
+>> too much about the display.
+>
+> I think the bit I was missing was that a GEM bo for a buffer imported
+> using dma_buf/PRIME can still be flink'd. So the display controller's
+> DRM driver allocates scan-out buffers via the DUMB buffer allocate
+> ioctl. Those scan-out buffers than then be exported from the
+> dispaly's DRM driver and imported into the GPU's DRM driver using
+> PRIME. Once imported into the GPU's driver, we can use flink to get a
+> name for that buffer within the GPU DRM driver's name-space to return
+> to the DRI2 client. That same namespace is also what DRI2 back-buffers
+> are allocated from, so I think that could work... Except...
+>
 
-Patches 1-3 can go into the clk tree. 4-6 should go through their
-respective trees.
+(and.. the general direction is that things will move more to just use
+dmabuf directly, ie. wayland or dri3)
 
-If you want I can take 7 & 8 through the clk tree.
+>
+>> > Anyway, that latter case also gets quite difficult. The "GPU"
+>> > DRM driver would need to know the constraints of the display
+>> > controller when allocating buffers intended to be scanned out.
+>> > For example, pl111 typically isn't behind an IOMMU and so
+>> > requires physically contiguous memory. We'd have to teach the
+>> > GPU's DRM driver about the constraints of the display HW. Not
+>> > exactly a clean driver model. :-(
+>> >
+>> > I'm still a little stuck on how to proceed, so any ideas
+>> > would greatly appreciated! My current train of thought is
+>> > having a kind of SoC-specific DRM driver which allocates
+>> > buffers for both display and GPU within a single GEM
+>> > namespace. That SoC-specific DRM driver could then know the
+>> > constraints of both the GPU and the display HW. We could then
+>> > use PRIME to export buffers allocated with the SoC DRM driver
+>> > and import them into the GPU and/or display DRM driver.
+>>
+>> Usually if the display drm driver is allocating the buffers that might
+>> be scanned out, it just needs to have minimal knowledge of the GPU
+>> (pitch alignment constraints).  I don't think we need a 3rd device
+>> just to allocate buffers.
+>
+> While Mali can render to pretty much any buffer, there is a mild
+> performance improvement to be had if the buffer stride is aligned to
+> the AXI bus's max burst length when drawing to the buffer.
 
-Alternatively I can provide patches 1-3 in a separate stable topic
-branch for you to pull in as a dependency. We'll both merge that stable
-topic branch into our trees and you can make a note of it for the
-arm-soc folks.
+I suspect the display controllers might frequently benefit if the
+pitch is aligned to AXI burst length too..
 
-Regards,
-Mike
+> So in some respects, there is a constraint on how buffers which will
+> be drawn to using the GPU are allocated. I don't really like the idea
+> of teaching the display controller DRM driver about the GPU buffer
+> constraints, even if they are fairly trivial like this. If the same
+> display HW IP is being used on several SoCs, it seems wrong somehow
+> to enforce those GPU constraints if some of those SoCs don't have a
+> GPU.
 
-> 
-> - Kukjin
+Well, I suppose you could get min_pitch_alignment from devicetree, or
+something like this..
+
+In the end, the easy solution is just to make the display allocate to
+the worst-case pitch alignment.  In the early days of dma-buf
+discussions, we kicked around the idea of negotiating or
+programatically describing the constraints, but that didn't really
+seem like a bounded problem.
+
+> We may also then have additional constraints when sharing buffers
+> between the display HW and video decode or even camera ISP HW.
+> Programmatically describing buffer allocation constraints is very
+> difficult and I'm not sure you can actually do it - there's some
+> pretty complex constraints out there! E.g. I believe there's a
+> platform where Y and UV planes of the reference frame need to be in
+> separate DRAM banks for real-time 1080p decode, or something like
+> that?
+
+yes, this was discussed.  This is different from pitch/format/size
+constraints.. it is really just a placement constraint (ie. where do
+the physical pages go).  IIRC the conclusion was to use a dummy
+devices with it's own CMA pool for attaching the Y vs UV buffers.
+
+> Anyway, I guess my point is that even if we solve how to allocate
+> buffers which will be shared between the GPU and display HW such that
+> both sets of constraints are satisfied, that may not be the end of
+> the story.
+>
+
+that was part of the reason to punt this problem to userspace ;-)
+
+In practice, the kernel drivers doesn't usually know too much about
+the dimensions/format/etc.. that is really userspace level knowledge.
+There are a few exceptions when the kernel needs to know how to setup
+GTT/etc for tiled buffers, but normally this sort of information is up
+at the next level up (userspace, and drm_framebuffer in case of
+scanout).  Userspace media frameworks like GStreamer already have a
+concept of format/caps negotiation.  For non-display<->gpu sharing, I
+think this is probably where this sort of constraint negotiation
+should be handled.
+
+BR,
+-R
+
+>
+> Cheers,
+>
+> Tom
+>
+>
+>
+>
+>
