@@ -1,94 +1,61 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 5 Aug 2013 17:29:48 +0100
-Subject: [PATCH v3 0/10] enable swiotlb-xen on arm and arm64
-Message-ID: <alpine.DEB.2.02.1308051503190.4893@kaball.uk.xensource.com>
+Date: Mon, 5 Aug 2013 17:30:47 +0100
+Subject: [PATCH v3 01/10] swiotlb: replace dma_length with sg_dma_len() macro
+In-Reply-To: <alpine.DEB.2.02.1308051503190.4893@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1308051503190.4893@kaball.uk.xensource.com>
+Message-ID: <1375720256-8014-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series enables xen-swiotlb on arm and arm64.
+From: EUNBONG SONG <eunb.song@samsung.com>
 
-Considering that all guests, including dom0, run on xen on arm with
-second stage translation enabled, it follows that without an IOMMU no
-guests could actually drive the hardware.
+This patch replace dma_length in "lib/swiotlb.c" to sg_dma_len() macro,
+because the build error can occur if CONFIG_NEED_SG_DMA_LENGTH is not
+set, and CONFIG_SWIOTLB is set.
 
-The solution for platforms without an IOMMU is to use swiotlb-xen,
-adapted to autotranslate guests. swiotlb-xen provides a set of dma_ops
-that can be used by Linux to setup a contiguous buffer in stage-2
-addresses and use it for dma operations.
-Basically Linux asks Xen to make a buffer contiguous and gets the
-machine address for it. This buffer is going to be used by lib/swiotlb.c
-to allocate bounce buffers.
+Singed-off-by: EunBong Song <eunb.song@samsung.com>
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ lib/swiotlb.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-
-The first 5 patches lay the groundwork on arm and arm64 to have
-alternative dma_ops and swiotlb.
-
-The sixth patch moves Xen initialization earlier so that we already know
-whether we are running on Xen at the time of initializing dma_ops on the
-platform.
-
-The following patches adapt swiotlb-xen to autotranslate guests (guest
-with second stage translation in hardware) and provide an arm
-implementation of xen_create_contiguous_region.
-
-
-Feedback is very welcome.
-Cheers,
-
-Stefano
-
-
-Changes in v3:
-- add a patch to compile SWIOTLB without CONFIG_NEED_SG_DMA_LENGTH;
-- add a patch to compile SWIOTLB_XEN without CONFIG_NEED_SG_DMA_LENGTH;
-- arm/dma_capable: do not treat dma_mask as a limit;
-- arm/dmabounce: keep using arm_dma_ops;
-- add missing __init in xen_early_init declaration;
-- many code style and name changes in swiotlb-xen.c;
-- improve error checks in xen_dma_add_entry;
-- warn on XENMEM_put_dma_buf failures.
-
-Changes in v2:
-- fixed a couple of errors in xen_bus_to_phys, xen_phys_to_bus and
-xen_swiotlb_fixup.
-
-
-
-EUNBONG SONG (1):
-      swiotlb: replace dma_length with sg_dma_len() macro
-
-Stefano Stabellini (9):
-      swiotlb-xen: replace dma_length with sg_dma_len() macro
-      arm: make SWIOTLB available
-      arm: introduce a global dma_ops pointer
-      arm64: do not initialize arm64_swiotlb if dma_ops is already set
-      xen/arm,arm64: move Xen initialization earlier
-      xen: introduce XENMEM_get_dma_buf and xen_put_dma_buf
-      xen: make xen_create_contiguous_region return the dma address
-      swiotlb-xen: support autotranslate guests
-      xen/arm,arm64: enable SWIOTLB_XEN
-
- arch/arm/Kconfig                      |    7 ++
- arch/arm/include/asm/dma-mapping.h    |   33 ++++++-
- arch/arm/include/asm/xen/hypervisor.h |    8 ++
- arch/arm/include/asm/xen/page.h       |    2 +
- arch/arm/kernel/setup.c               |    2 +
- arch/arm/mm/dma-mapping.c             |    3 +
- arch/arm/xen/Makefile                 |    2 +-
- arch/arm/xen/enlighten.c              |   24 +++--
- arch/arm/xen/mm.c                     |  117 ++++++++++++++++++++
- arch/arm64/Kconfig                    |    1 +
- arch/arm64/kernel/setup.c             |    2 +
- arch/arm64/mm/dma-mapping.c           |    2 +
- arch/arm64/xen/Makefile               |    2 +-
- arch/x86/xen/mmu.c                    |    4 +-
- drivers/xen/Kconfig                   |    1 -
- drivers/xen/swiotlb-xen.c             |  188 +++++++++++++++++++++++++++++----
- include/xen/interface/memory.h        |   62 +++++++++++
- include/xen/xen-ops.h                 |    3 +-
- lib/swiotlb.c                         |    8 +-
- 19 files changed, 433 insertions(+), 38 deletions(-)
- create mode 100644 arch/arm/xen/mm.c
-
-git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git swiotlb-xen-3
+diff --git a/lib/swiotlb.c b/lib/swiotlb.c
+index d23762e..4e8686c 100644
+--- a/lib/swiotlb.c
++++ b/lib/swiotlb.c
+@@ -870,13 +870,13 @@ swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl, int nelems,
+ 				swiotlb_full(hwdev, sg->length, dir, 0);
+ 				swiotlb_unmap_sg_attrs(hwdev, sgl, i, dir,
+ 						       attrs);
+-				sgl[0].dma_length = 0;
++				sg_dma_len(sgl) = 0;
+ 				return 0;
+ 			}
+ 			sg->dma_address = phys_to_dma(hwdev, map);
+ 		} else
+ 			sg->dma_address = dev_addr;
+-		sg->dma_length = sg->length;
++		sg_dma_len(sg) = sg->length;
+ 	}
+ 	return nelems;
+ }
+@@ -904,7 +904,7 @@ swiotlb_unmap_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+ 	BUG_ON(dir == DMA_NONE);
+ 
+ 	for_each_sg(sgl, sg, nelems, i)
+-		unmap_single(hwdev, sg->dma_address, sg->dma_length, dir);
++		unmap_single(hwdev, sg->dma_address, sg_dma_len(sg), dir);
+ 
+ }
+ EXPORT_SYMBOL(swiotlb_unmap_sg_attrs);
+@@ -934,7 +934,7 @@ swiotlb_sync_sg(struct device *hwdev, struct scatterlist *sgl,
+ 
+ 	for_each_sg(sgl, sg, nelems, i)
+ 		swiotlb_sync_single(hwdev, sg->dma_address,
+-				    sg->dma_length, dir, target);
++				    sg_dma_len(sg), dir, target);
+ }
+ 
+ void
+-- 
+1.7.2.5
