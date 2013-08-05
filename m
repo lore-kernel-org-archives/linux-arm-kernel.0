@@ -1,76 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Aug 2013 00:44:02 +0100
-Subject: [PATCH RFC 46/51] ARM: DMA-API: better handing of DMA masks
- for coherent allocations
-In-Reply-To: <CAL_JsqJH-T3bBNZvQZF2aWS18n5wfSzCMEi20-5e1RmYEfF3Ow@mail.gmail.com>
-References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
- <E1V51EE-0006uO-C2@rmk-PC.arm.linux.org.uk>
- <CAL_JsqJH-T3bBNZvQZF2aWS18n5wfSzCMEi20-5e1RmYEfF3Ow@mail.gmail.com>
-Message-ID: <20130805234402.GZ23006@n2100.arm.linux.org.uk>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Mon, 5 Aug 2013 16:56:12 -0700
+Subject: [PATCH 1/7] EFI stub documentation updates
+In-Reply-To: <20130805141221.GC2755@localhost.localdomain>
+References: <1375478948-22562-1-git-send-email-roy.franz@linaro.org>
+ <1375478948-22562-2-git-send-email-roy.franz@linaro.org>
+ <20130805141221.GC2755@localhost.localdomain>
+Message-ID: <CAFECyb9h7aSzOAHC0t-xT1mNxW_CuMqpU8zGD50ZzZYQ74d0fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 05:43:47PM -0500, Rob Herring wrote:
-> On Thu, Aug 1, 2013 at 5:20 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > We need to start treating DMA masks as something which is specific to
-> > the bus that the device resides on, otherwise we're going to hit all
-> > sorts of nasty issues with LPAE and 32-bit DMA controllers in >32-bit
-> > systems, where memory is offset from PFN 0.
-> >
-> > In order to start doing this, we convert the DMA mask to a PFN using
-> > the device specific dma_to_pfn() macro.  This is the reverse of the
-> > pfn_to_dma() macro which is used to get the DMA address for the device.
-> >
-> > This gives us a PFN mask, which we can then check against the PFN
-> > limit of the DMA zone.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/mm/dma-mapping.c |   49 ++++++++++++++++++++++++++++++++++++++++----
-> >  arch/arm/mm/init.c        |    2 +
-> >  arch/arm/mm/mm.h          |    2 +
-> >  3 files changed, 48 insertions(+), 5 deletions(-)
-> 
-> I believe you missed handling __dma_alloc. I have a different fix than
-> what Andreas posted. I think DMA zone handling is broken in all cases
-> here. Feel free to combine this in to your patch if you agree.
+On Mon, Aug 5, 2013 at 7:12 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Fri, Aug 02, 2013 at 02:29:02PM -0700, Roy Franz wrote:
+>> The ARM kernel also has an EFI stub which works largely the same way
+>> as the x86 stub, so move the documentation out of x86 directory and
+>> update to reflect that it is generic, and add ARM specific text.
+>>
+>> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+>> ---
+>>  Documentation/efi-stub.txt     |   78 ++++++++++++++++++++++++++++++++++++++++
+>>  Documentation/x86/efi-stub.txt |   65 ---------------------------------
+>>  arch/x86/Kconfig               |    2 +-
+>>  3 files changed, 79 insertions(+), 66 deletions(-)
+>>  create mode 100644 Documentation/efi-stub.txt
+>>  delete mode 100644 Documentation/x86/efi-stub.txt
+>>
+>> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+>> new file mode 100644
+>> index 0000000..7837df1
+>> --- /dev/null
+>> +++ b/Documentation/efi-stub.txt
+>> @@ -0,0 +1,78 @@
+>> +                       The EFI Boot Stub
+>> +                  ---------------------------
+>> +
+>> +On the x86 and ARM platforms, a bzImage can masquerade as a PE/COFF image,
+>> +thereby convincing EFI firmware loaders to load it as an EFI
+>> +executable. The code that modifies the bzImage header, along with the
+>
+>
+> Minor nit, I don't think there is such a thing as "bzImage" for ARM.
+>
+> Cheers
+> ---Dave
+>
+Yeah, I don't thinks so either...  How about:
 
-I was starting to wonder if whether anyone was going to look at those
-patches...
+On the x86 and ARM platforms, a kernel zImage/bzImage can masquerade....
 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 7f9b179..3d9bdfb 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -651,7 +651,7 @@ static void *__dma_alloc(struct device *dev,
-> size_t size, dma_addr_t *handle,
->         if (!mask)
->                 return NULL;
-> 
-> -       if (mask < 0xffffffffULL)
-> +       if (mask <= (u64)arm_dma_limit)
->                 gfp |= GFP_DMA;
 
-I'm not convinced on that - I think you've missed the entire point in
-this patch series about what address space the 'mask' is in.  'mask' is
-in the device's address space, which may not be the same as the physical
-address space.
-
-With LPAE, the two can become quite different address spaces with a
-4GB offset between them.  That's why we must stop the old-school
-thinking that DMA addresses and physical addresses are the same thing.
-We also need to stop doing stuff like passing dma_addr_t variables into
-phys_to_virt().  (All those short-cuts are going to break!)
-
-arm_dma_limit is the physical address space.  So, comparing the two
-makes no sense what so ever.
-
-However, the use of arm_dma_limit at the top of get_coherent_dma_mask()
-is a bug, I think that should just become something like a 24-bit
-constant mask, so the NULL device gets GFP_DMA allocations like they
-do on x86 for that case.
-
-I also think that 'mask' should be converted to a pfn at the location
-you point out before comparing with the amount of memory in the DMA
-zone.
+Roy
