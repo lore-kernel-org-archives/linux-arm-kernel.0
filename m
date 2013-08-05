@@ -1,29 +1,103 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 05 Aug 2013 16:04:06 +0300
-Subject: [PATCH 1/6] MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio
- and ioremap
-In-Reply-To: <1375701279-11495-2-git-send-email-josh.wu@atmel.com>
-References: <1375701279-11495-1-git-send-email-josh.wu@atmel.com>
- <1375701279-11495-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <1375707846.14869.453.camel@sauron.fi.intel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 05 Aug 2013 07:59:01 -0500
+Subject: [PATCH 1/2] OF: Add helper for matching against linux, stdout-path
+In-Reply-To: <1375706445-15375-2-git-send-email-s.hauer@pengutronix.de>
+References: <1375706445-15375-1-git-send-email-s.hauer@pengutronix.de>
+ <1375706445-15375-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <51FFA195.6080903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-08-05 at 19:14 +0800, Josh Wu wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On 08/05/2013 07:40 AM, Sascha Hauer wrote:
+> devicetrees may have a linux,stdout-path property in the chosen
+> node describing the console device. This adds a helper function
+> to match a device against this property so a driver can call
+> add_preferred_console for a matching device.
 > 
-> this will allow to simply the error and remove path
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+There are no existing users that could take advantage of this?
+
+Rob
+
+> ---
+>  drivers/of/base.c  | 26 ++++++++++++++++++++++++++
+>  include/linux/of.h |  7 +++++++
+>  2 files changed, 33 insertions(+)
 > 
-> Cc: linux-mtd at lists.infradead.org
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [josh.wu at atmel.com: fix checkpatch warnings and rebase to latest mtd git tree]
-> [josh.wu at atmel.com: replace devm_request_and_ioremap with devm_ioremap_resource]
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-
-Pushed to l2-mtd.git. I did not review it much, though, so extra eyes
-would not hurt. But it generally looks good.
-
--- 
-Best Regards,
-Artem Bityutskiy
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 5c54279..1c3c79c 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -32,6 +32,7 @@ struct device_node *of_allnodes;
+>  EXPORT_SYMBOL(of_allnodes);
+>  struct device_node *of_chosen;
+>  struct device_node *of_aliases;
+> +static struct device_node *of_stdout;
+>  
+>  DEFINE_MUTEX(of_aliases_mutex);
+>  
+> @@ -1595,6 +1596,15 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
+>  	of_chosen = of_find_node_by_path("/chosen");
+>  	if (of_chosen == NULL)
+>  		of_chosen = of_find_node_by_path("/chosen at 0");
+> +
+> +	if (of_chosen) {
+> +		const char *name;
+> +
+> +		name = of_get_property(of_chosen, "linux,stdout-path", NULL);
+> +		if (name)
+> +			of_stdout = of_find_node_by_path(name);
+> +	}
+> +
+>  	of_aliases = of_find_node_by_path("/aliases");
+>  	if (!of_aliases)
+>  		return;
+> @@ -1703,3 +1713,19 @@ const char *of_prop_next_string(struct property *prop, const char *cur)
+>  	return curv;
+>  }
+>  EXPORT_SYMBOL_GPL(of_prop_next_string);
+> +
+> +/**
+> + * of_device_is_stdout_path - check if a device node matches the
+> + *                            linux,stdout-path property
+> + *
+> + * Check if this device node matches the linux,stdout-path property
+> + * in the chosen node. return true if yes, false otherwise.
+> + */
+> +int of_device_is_stdout_path(struct device_node *dn)
+> +{
+> +	if (!of_stdout)
+> +		return false;
+> +
+> +	return of_stdout == dn;
+> +}
+> +EXPORT_SYMBOL_GPL(of_device_is_stdout_path);
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 1fd08ca..429e168 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -343,6 +343,8 @@ const char *of_prop_next_string(struct property *prop, const char *cur);
+>  		s;						\
+>  		s = of_prop_next_string(prop, s))
+>  
+> +int of_device_is_stdout_path(struct device_node *dn);
+> +
+>  #else /* CONFIG_OF */
+>  
+>  static inline const char* of_node_full_name(struct device_node *np)
+> @@ -505,6 +507,11 @@ static inline int of_machine_is_compatible(const char *compat)
+>  	return 0;
+>  }
+>  
+> +static inline int of_device_is_stdout_path(struct device_node *dn)
+> +{
+> +	return 0;
+> +}
+> +
+>  #define of_match_ptr(_ptr)	NULL
+>  #define of_match_node(_matches, _node)	NULL
+>  #define of_property_for_each_u32(np, propname, prop, p, u) \
+> 
