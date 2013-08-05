@@ -1,23 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Aug 2013 18:03:42 +0100
-Subject: [PATCH RFC 05/13] ASoC: kirkwood: provide
- KIRKWOOD_PLAYCTL_ENABLE_MASK
-In-Reply-To: <E1V63wJ-0004lV-FZ@rmk-PC.arm.linux.org.uk>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <E1V63wJ-0004lV-FZ@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130805170342.GV9858@sirena.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Aug 2013 02:03:39 +0900
+Subject: [PATCH v2 6/6] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
+ clock framework
+In-Reply-To: <2236509.stVfXyPhpt@amdc1227>
+References: <201307100057.06061.heiko@sntech.de>
+ <201307100100.28992.heiko@sntech.de>
+ <02cf01ce81f3$6777e5f0$3667b1d0$%kim@samsung.com>
+ <2236509.stVfXyPhpt@amdc1227>
+Message-ID: <51FFDAEB.60508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 04, 2013 at 08:26:03PM +0100, Russell King wrote:
-> Provide a helper macro which includes the sum of all enable bits in
-> the playback control register.  This simplifies the code a little.
+On 07/23/13 02:07, Tomasz Figa wrote:
+> On Tuesday 16 of July 2013 16:09:24 Kukjin Kim wrote:
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/41ba0b97/attachment.sig>
+[...]
+
+>>> +	timer at 51000000 {
+>>> +		clocks =<&clocks PCLK_PWM>;
+>>
+>> +		clocks =<&clock PCLK_PWM>;
+>>
+>> And I'm not sure using definition PCLK_PWM is better here...
+>
+> Care to explain your doubts about it? I think this is fine.
+>
+I mean just would be better to use hard coded number here instead of 
+PCLK_PWM like others.
+
+- Kukjin
