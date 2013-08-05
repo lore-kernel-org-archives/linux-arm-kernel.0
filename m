@@ -1,78 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon,  5 Aug 2013 13:42:53 +0100
-Subject: [RFC PATCH] ARM: vectors: fix poison for BE8 endianness
-Message-ID: <1375706573-7685-1-git-send-email-Dave.Martin@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 5 Aug 2013 08:52:48 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.12
+In-Reply-To: <20130804202300.GB15602@quad.lixom.net>
+References: <20130725174132.GO23879@titan.lakedaemon.net>
+ <20130804202300.GB15602@quad.lixom.net>
+Message-ID: <20130805125248.GG19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing instructions using data accesses or .word will result in
-the wrong instruction endianness on BE8.
+On Sun, Aug 04, 2013 at 01:23:00PM -0700, Olof Johansson wrote:
+> On Thu, Jul 25, 2013 at 01:41:32PM -0400, Jason Cooper wrote:
+> > 
+> > The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+> > 
+> >   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/linux-mvebu.git tags/fixes-non-3.12
+> 
+> Hi Jason,
+> 
+> I pulled this, but I was wondering if you'd mind holding back on basing your
+> branches on the very latest -rc all the time, and instead go almost as far back
+> as you can without merge conflicts? In particular for those who have trivial
+> contents such as these.
+> 
+> Main reason is to avoid bringing in new -rcs in the next/* branches too often,
+> since there's _usually_ not a need for it.
 
-This patch uses the opcodes.h macros to insert the poison
-instruction instead.  This adapts correctly to all endianness
-variants.
+No problem.  Thanks for bringing it to my attention.  Do you want me to
+rebase my other branches (including mvebu/boards)?
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
-Build+disassemble tested to check correct kuser instruction byte order
-and correct code generation in early_trap_init().
+> Of course, the opposite condition tends to frustrate me too, i.e. if someone
+> sends a pull request for the merge window that conflicts with fixes they've
+> already sent that has gone in. So please watch out for that. :)
 
-Byte order for the injected instruction in the kuser helpers is LE
-for LE, BE8 and BE for BE32.
+Sounds reasonable, I usually track that anyway.  In most situations,
+though, I would just merge in mvebu/fixes to get the needed fix.  In
+those scenarios, basing on -rc1 should be fine.  Only when a fix goes
+through Russell's tree would it make sense to base off of the -rcX
+containing the fix.
 
-Operand byte order in early_trap_init() is native for LE, BE32 and
-swabbed for BE8.
+So, "Not too hot, not too cold, porridge that's just right" :-P
 
+thx,
 
-In BE32, the Thumb view of the poison is transposed, reducing the
-effective size of the poison by a halfword.
-
-
- arch/arm/kernel/entry-armv.S |    3 ++-
- arch/arm/kernel/traps.c      |    3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index d40d0ef..d457583 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -23,6 +23,7 @@
- #ifndef CONFIG_MULTI_IRQ_HANDLER
- #include <mach/entry-macro.S>
- #endif
-+#include <asm/opcodes.h>
- #include <asm/thread_notify.h>
- #include <asm/unwind.h>
- #include <asm/unistd.h>
-@@ -749,7 +750,7 @@ ENDPROC(__switch_to)
- 	.endr
- 	.endif
- 	.rept	(\size - (. - \sym)) / 4
--	.word	0xe7fddef1
-+	__inst_arm(0xe7fddef1)
- 	.endr
- 	.endm
- 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index ab517fc..dc49356 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -29,6 +29,7 @@
- #include <linux/atomic.h>
- #include <asm/cacheflush.h>
- #include <asm/exception.h>
-+#include <asm/opcodes.h>
- #include <asm/unistd.h>
- #include <asm/traps.h>
- #include <asm/unwind.h>
-@@ -836,7 +837,7 @@ void __init early_trap_init(void *vectors_base)
- 	 * branch back to the undefined instruction.
- 	 */
- 	for (i = 0; i < PAGE_SIZE / sizeof(u32); i++)
--		((u32 *)vectors_base)[i] = 0xe7fddef1;
-+		((u32 *)vectors_base)[i] = __opcode_to_mem_arm(0xe7fddef1);
- 
- 	/*
- 	 * Copy the vectors, stubs and kuser helpers (in entry-armv.S)
--- 
-1.7.9.5
+Jason.
