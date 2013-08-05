@@ -1,325 +1,104 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 05 Aug 2013 10:11:22 -0700
-Subject: [PATCH v3 17/31] clk: mpc512x: introduce COMMON_CLK for MPC512x
-In-Reply-To: <20130803143956.GH2580@book.gsilab.sittig.org>
-References: <1374166855-7280-1-git-send-email-gsi@denx.de>
- <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1374495298-22019-18-git-send-email-gsi@denx.de>
- <20130723131406.GI19071@book.gsilab.sittig.org>
- <20130802233009.6450.21915@quantum>
- <20130803143956.GH2580@book.gsilab.sittig.org>
-Message-ID: <20130805171122.5348.59628@quantum>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Aug 2013 02:12:54 +0900
+Subject: [PATCH 0/2] Exynos: MFC: clean up device tree bindings
+In-Reply-To: <1375705610-12724-1-git-send-email-m.szyprowski@samsung.com>
+References: <1375705610-12724-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <51FFDD16.80907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gerhard Sittig (2013-08-03 07:39:56)
-> [ we are strictly talking about clocks and source code again,
->   I have trimmed the CC: list to not spam the device tree ML or
->   subsystem maintainers ]
-> 
-> On Fri, Aug 02, 2013 at 16:30 -0700, Mike Turquette wrote:
-> > 
-> > Quoting Gerhard Sittig (2013-07-23 06:14:06)
-> > > [ summary: "shared gate" support desirable? approach acceptable? ]
-> > > 
-> > > On Mon, Jul 22, 2013 at 14:14 +0200, Gerhard Sittig wrote:
-> > > > 
-> > > > this change implements a clock driver for the MPC512x PowerPC platform
-> > > > which follows the COMMON_CLK approach and uses common clock drivers
-> > > > shared with other platforms
-> > > > 
-> > > > [ ... ]
-> > > > 
-> > > > some of the clock items get pre-enabled in the clock driver to not have
-> > > > them automatically disabled by the underlying clock subsystem because of
-> > > > their being unused -- this approach is desirable because
-> > > > [ ... ]
-> > > > - some help introduce support for and migrate to the common
-> > > >   infrastructure, while more appropriate support for specific hardware
-> > > >   constraints isn't available yet (remaining changes are strictly
-> > > >   internal to the clock driver and won't affect peripheral drivers)
-> > > 
-> > > This remark was related to the CAN clocks of the MPC512x SoC.
-> > 
-> > Gerhard,
-> > 
-> > Thanks for the patch (way far down below here). I'll check into it to
-> > see if that implementation looks OK. It would be helpful if another
-> > platform with shared gates could weigh in on whether the implementation
-> > works for them.
-> > 
-> > Still, a shared gate solution is not a prerequisite for this series,
-> > correct?
-> 
-> Well, the recent CAN driver related discussion suggested that I
-> had a mental misconception there.  The need for "shared gates"
-> was felt because of mixing up unrelated paths in the clock tree.
-> But the MCLK subtree is for bitrate generation, while the BDLC
-> gate is for register access into the peripheral controller.
-> 
-> Currently I'm investigating how I can cleanly tell those
-> individual aspects apart.  Telling the gate for register access
-> (in ARM speak often referred to as 'ipg') from the bitrate
-> generation (the 'per' clock, or 'mclk' here) seems so much more
-> appropriate.
-> 
-> After clean separation, and more testing to make sure nothing
-> gets broken throughout the series, there will be v4.
-> 
-> 
-> So "shared gate" support might have become obsolete for the
-> MPC512x platform.  But if others need it, the outlined approach
-> (patch below) may be viable.  The change to the common code is
-> minimal.  The use in the platform's clock driver was kind of
-> overengineered for the case of exactly one such gate, but this
-> immediately makes it a working approach for several gates, if
-> others need it.
-> 
-> I'll trim the motivation and just leave the suggested approach
-> for "shared gates" here.  Feel free to drop it or to only
-> resurrect it as the need may re-arise later.  So far nobody
-> appears to have felt the need up to now ...
+On 08/05/13 21:26, Marek Szyprowski wrote:
+> Hello,
+>
+Hi,
 
-You can drop it. If your platform does not need it and nobody else has
-said that they require shared gates then there is no reason to spend
-more time on it.
+> This patch series are an attempt to cleanup the reserved memory device
+> tree bindings for MFC device. MFC device has two memory ports (AXI
+> masters), which are used to do DMA. Usually separate memory regions are
+> being defined for each of those memory ports to improve performance.
+> Some versions of MFC block have also significant limitation on the
+> possible address range available for each of those memory ports/banks.
+>
+> In the board file era, there have been two additional platform devices
+> defined for each of memory ports (named "s5p-mfc-l" and "s5p-mfc-r") to
+> let the driver distinguish memory allocations done for each of them.
+> Each of those platform devices might have special DMA ops assigned to
+> fulfil specific memory requirements for a given memory port.
+>
+> Later, when device tree binding was added for MFC device, those memory
+> ports were designed as two additional properties: "samsung,mfc-l" and
+> "samsung,mfc-r" for codec node. This approach however has some
+> significant limitation, so I propose to redesign it before the binding
+> become considered as stable.
+>
+> The first problem with the proposed bindings is the fact that
+> "samsung,mfc-r"/"samsung,mfc-l" properties are tied only to "base
+> address + size" attributes of reserved memory and do not allow to assign
+> any other attributes to those memory ports. This limits using those
+> memory ports only to simple reserved memory.
+>
+> The second issue with those attributes is the fact that they are very
+> specific to the MFC device, while reserved memory region is something
+> more generic, which can be used for other devices as well. For example
+> even on Exynos4 platform, similar reserved memory handling will be
+> needed for the FIMC ISP device.
+>
+> For handling reserved memory regions and having a method to assign them
+> to particular device I have posted the patches [1], which add device
+> tree support to Contiguous Memory Allocator and simple reserved memory
+> allocator based on dma_declare_coherent() function.
+>
+> This patch series is my proposal for replacing those custom bindings
+> with generic approach, proposed in [1]. To get it working we need
+> separate device node for each memory port, what has been achieved by
+> adding "simple-bus" compatibility entry to the main MFC device node and
+> adding two child nodes, which represent each memory port. Those child
+> nodes have compatible property set to "samsung,memport".
+>
+> With such a structure "dma-memory-region" property with a phandle to
+> respective reserved region can be easily added to the child nodes of MFC
+> device. The advantage of such approach is the fact that those child
+> nodes can be also used for adding properties for IOMMU (SYSMMU)
+> controllers. This way also bindings for SYSMMU and the code, which
+> handles it can be simplified, because respective device tree part better
+> matches physical hardware design.
+>
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
+>
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/257615/
+>
+>
+> Patch summary:
+>
+> Marek Szyprowski (2):
+>    ARM: Exynos: replace custom MFC reserved memory handling with generic
+>      code
+>    media: s5p-mfc: remove DT hacks and simplify initialization code
+>
+>   .../devicetree/bindings/media/s5p-mfc.txt          |   63 +++++++++++++---
+>   arch/arm/boot/dts/exynos4.dtsi                     |   10 ++-
+>   arch/arm/boot/dts/exynos4210-origen.dts            |   25 ++++++-
+>   arch/arm/boot/dts/exynos4210-smdkv310.dts          |   25 ++++++-
+>   arch/arm/boot/dts/exynos4412-origen.dts            |   25 ++++++-
+>   arch/arm/boot/dts/exynos4412-smdk4412.dts          |   25 ++++++-
+>   arch/arm/boot/dts/exynos5250-arndale.dts           |   26 ++++++-
+>   arch/arm/boot/dts/exynos5250-smdk5250.dts          |   26 ++++++-
+>   arch/arm/boot/dts/exynos5250.dtsi                  |   10 ++-
+>   arch/arm/mach-exynos/mach-exynos4-dt.c             |   16 -----
+>   arch/arm/mach-exynos/mach-exynos5-dt.c             |   17 -----
+>   arch/arm/plat-samsung/include/plat/mfc.h           |   11 ---
+>   arch/arm/plat-samsung/s5p-dev-mfc.c                |   32 ---------
+>   drivers/media/platform/s5p-mfc/s5p_mfc.c           |   75 ++++----------------
+>   14 files changed, 227 insertions(+), 159 deletions(-)
+>
+Nice cleanup MFC dt bindings, BTW, IMHO, how about keeping the reserved 
+memory in exynos4.dtsi instead of adding them in each board dts files, 
+it depends on board though...
 
-Regards,
-Mike
+Kamil, if you're OK on the 2nd patch, please let me know so that this 
+could be merged into samsung tree for v3.12..
 
-> 
-> > > [ ... ]
-> > > 
-> > > The question now is how to correctly support the situation where
-> > > a gate is shared between subtrees yet isn't really part of any
-> > > path within the subtrees.  I really cannot find a single spot
-> > > where to introduce the gate such that it's not duplicated.
-> > > 
-> > > The appropriate solution would not be to pre-enable those clocks,
-> > > but to either introduce another gate clock type which supports a
-> > > shared reference, or to add support for the shared reference to
-> > > the existing gate code.
-> > > 
-> > > 
-> > > I'd rather not duplicate most or all of the code of clk-gate.c,
-> > > instead I looked into how to add "shared gate" support to the
-> > > existing driver.
-> > > 
-> > > My question is whether the approach is acceptable.  It adds
-> > > minimal overhead and shall be OK for the enable/disable path from
-> > > a technical POV.  And it doesn't feel like too much of a stretch.
-> > > But there may be non-technical reasons to reject the approach.
-> > > I'd like to learn whether to follow that path before preparing
-> > > another version of the patch series.
-> > > 
-> > > The diffs were taken with the '-w -b' options to demonstrate
-> > > their essence and not drown it in whitespace changes.  The
-> > > implementation assumes that the caller which registers the gate
-> > > (the platform's clock driver) provides both the counter cell and
-> > > the lock.  And that all gates with a "shared use counter" use the
-> > > same lock (which is satisfied as they all get registered from the
-> > > same spot in the platform's clock driver).
-> > > 
-> > > The CLK_IGNORE_UNUSED flag addresses a different problem.  The
-> > > SoC has four MSCAN components, while two of them are enabled in
-> > > the device tree (the other two are present but disabled).  So
-> > > during probe two of the clocks get enabled.  After probe all
-> > > unused clocks automatically get disabled (that's another two).
-> > > So the "shared use counter" drops to zero although components are
-> > > in use, because "disable, it's unused" isn't told from "disable
-> > > after enable, regular use".  The flag would become obsolete if
-> > > the common gate logic would implement a separate disable_unused()
-> > > routine, but I guess this isn't necessary and the use of the flag
-> > > is appropriate.
-> > > 
-> > > That the example use creates a field for just one counter is to
-> > > better demonstrate the use and potential extension as need
-> > > arises.  Reducing this to a mere integer variable would be a
-> > > micro optimization.
-> > > 
-> > > 
-> > > The extension of the existing clk_gate implementation:
-> > > 
-> > > --- a/drivers/clk/clk-gate.c
-> > > +++ b/drivers/clk/clk-gate.c
-> > > @@ -46,6 +46,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
-> > >         struct clk_gate *gate = to_clk_gate(hw);
-> > >         int set = gate->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
-> > >         unsigned long flags = 0;
-> > > +       int need_reg_access;
-> > >         u32 reg;
-> > >  
-> > >         set ^= enable;
-> > > @@ -53,6 +54,20 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
-> > >         if (gate->lock)
-> > >                 spin_lock_irqsave(gate->lock, flags);
-> > >  
-> > > +       /*
-> > > +        * if a "shared use counter" was specified, keep track of enable
-> > > +        * and disable calls and only access hardware registers upon the
-> > > +        * very first enable or very last disable call
-> > > +        */
-> > > +       if (!gate->share_count) {
-> > > +               need_reg_access = 1;
-> > > +       } else if (enable) {
-> > > +               need_reg_access = (*gate->share_count)++ == 0;
-> > > +       } else {
-> > > +               need_reg_access = --(*gate->share_count) == 0;
-> > > +       }
-> > > +
-> > > +       if (need_reg_access) {
-> > >                 if (gate->flags & CLK_GATE_HIWORD_MASK) {
-> > >                         reg = BIT(gate->bit_idx + 16);
-> > >                         if (set)
-> > > @@ -67,6 +82,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
-> > >                 }
-> > >  
-> > >                 clk_writel(reg, gate->reg);
-> > > +       }
-> > >  
-> > >         if (gate->lock)
-> > >                 spin_unlock_irqrestore(gate->lock, flags);
-> > > @@ -118,10 +134,11 @@ EXPORT_SYMBOL_GPL(clk_gate_ops);
-> > >   * @clk_gate_flags: gate-specific flags for this clock
-> > >   * @lock: shared register lock for this clock
-> > >   */
-> > > -struct clk *clk_register_gate(struct device *dev, const char *name,
-> > > +struct clk *clk_register_gate_shared(struct device *dev, const char *name,
-> > >                 const char *parent_name, unsigned long flags,
-> > >                 void __iomem *reg, u8 bit_idx,
-> > > -               u8 clk_gate_flags, spinlock_t *lock)
-> > > +               u8 clk_gate_flags, spinlock_t *lock,
-> > > +               int *share_count)
-> > >  {
-> > >         struct clk_gate *gate;
-> > >         struct clk *clk;
-> > > @@ -152,6 +169,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
-> > >         gate->bit_idx = bit_idx;
-> > >         gate->flags = clk_gate_flags;
-> > >         gate->lock = lock;
-> > > +       gate->share_count = share_count;
-> > >         gate->hw.init = &init;
-> > >  
-> > >         clk = clk_register(dev, &gate->hw);
-> > > @@ -161,3 +179,14 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
-> > >  
-> > >         return clk;
-> > >  }
-> > > +
-> > > +struct clk *clk_register_gate(struct device *dev, const char *name,
-> > > +               const char *parent_name, unsigned long flags,
-> > > +               void __iomem *reg, u8 bit_idx,
-> > > +               u8 clk_gate_flags, spinlock_t *lock)
-> > > +{
-> > > +
-> > > +       return clk_register_gate_shared(dev, name, parent_name, flags,
-> > > +                                       reg, bit_idx, clk_gate_flags,
-> > > +                                       lock, NULL);
-> > > +}
-> > > --- a/include/linux/clk-provider.h
-> > > +++ b/include/linux/clk-provider.h
-> > > @@ -222,6 +222,7 @@ struct clk_gate {
-> > >         u8              bit_idx;
-> > >         u8              flags;
-> > >         spinlock_t      *lock;
-> > > +       int             *share_count;
-> > >  };
-> > >  
-> > >  #define CLK_GATE_SET_TO_DISABLE                BIT(0)
-> > > @@ -232,6 +233,11 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
-> > >                 const char *parent_name, unsigned long flags,
-> > >                 void __iomem *reg, u8 bit_idx,
-> > >                 u8 clk_gate_flags, spinlock_t *lock);
-> > > +struct clk *clk_register_gate_shared(struct device *dev, const char *name,
-> > > +               const char *parent_name, unsigned long flags,
-> > > +               void __iomem *reg, u8 bit_idx,
-> > > +               u8 clk_gate_flags, spinlock_t *lock,
-> > > +               int *share_count);
-> > >  
-> > >  struct clk_div_table {
-> > >         unsigned int    val;
-> > > 
-> > > 
-> > > How to use these shared gates:
-> > > 
-> > > --- a/arch/powerpc/platforms/512x/clock-commonclk.c
-> > > +++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-> > > @@ -123,6 +123,39 @@ static inline struct clk *mpc512x_clk_gated(
-> > >                                  reg, pos, 0, &clklock);
-> > >  }
-> > >  
-> > > +enum mpc512x_clk_shared_gate_id_t {
-> > > +       MPC512x_CLK_SHARED_GATE_MSCAN,
-> > > +       MPC512x_CLK_SHARED_GATE_MAX,
-> > > +};
-> > > +
-> > > +static int mpc512x_clk_gate_counters[MPC512x_CLK_SHARED_GATE_MAX];
-> > > +
-> > > +/*
-> > > + * implementor's note:  since clk_gate items don't implement a separate
-> > > + * .disable_unused() callback, their .disable() routine gets called and
-> > > + * "disable the clock as we can't see it's in use" cannot be told from
-> > > + * "regular disable, count these events please"
-> > > + *
-> > > + * passing the CLK_IGNORE_UNUSED flag upon clock creation will suppress
-> > > + * the "disable, unused" call, so use counts won't get unbalanced, the
-> > > + * clock either never got enabled and thus need not get disabled, or
-> > > + * part of the hardware got enabled while disabling the other part isn't
-> > > + * wanted
-> > > + */
-> > > +static inline struct clk *mpc512x_clk_gated_shared(
-> > > +       const char *name, const char *parent_name,
-> > > +       u32 __iomem *reg, u8 pos,
-> > > +       enum mpc512x_clk_shared_gate_id_t share_id)
-> > > +{
-> > > +       int clkflags;
-> > > +
-> > > +       clkflags = CLK_SET_RATE_PARENT;
-> > > +       clkflags |= CLK_IGNORE_UNUSED;
-> > > +       return clk_register_gate_shared(NULL, name, parent_name, clkflags,
-> > > +                                       reg, pos, 0, &clklock,
-> > > +                                       &mpc512x_clk_gate_counters[share_id]);
-> > > +}
-> > > +
-> > >  static inline struct clk *mpc512x_clk_muxed(const char *name,
-> > >         const char **parent_names, int parent_count,
-> > >         u32 __iomem *reg, u8 pos, u8 len)
-> > > @@ -520,9 +553,16 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry)
-> > >                                 1, 1);
-> > >         }
-> > >         if (sccr_reg) {
-> > > +               if (entry->type == MCLK_TYPE_MSCAN) {
-> > > +                       clks[clks_idx_pub] = mpc512x_clk_gated_shared(
-> > > +                                       entry->name_mclk,
-> > > +                                       entry->name_mux1, sccr_reg, sccr_bit,
-> > > +                                       MPC512x_CLK_SHARED_GATE_MSCAN);
-> > > +               } else {
-> > >                         clks[clks_idx_pub] = mpc512x_clk_gated(
-> > >                                         entry->name_mclk,
-> > >                                         entry->name_mux1, sccr_reg, sccr_bit);
-> > > +               }
-> > >         } else {
-> > >                 clks[clks_idx_pub] = mpc512x_clk_factor(
-> > >                                 entry->name_mclk,
-> > > 
-> > > Local tests have shown that the extension solves the problem of
-> > > how to satisfy the SoC's constraints on the MPC512x platform.
-> > > The MSCAN clocks no longer need to get pre-enabled, instead they
-> > > get setup and enabled only as the mscan(4) driver probes devices
-> > > according to how it was instructed (device tree nodes).
-> > > 
-> > > What do you think?  Is the "shared gate" support in the common
-> > > logic appropriate?  I'd rather not duplicate all of this code
-> > > just to introduce the specific gate I need, while most of the
-> > > logic is identical to the existing gate implementation.  The
-> > > desire isn't to override the gate's operations, but to wrap them
-> > > and to consult a counter in addition, while the register access
-> > > still applies.
-> 
-> 
-> virtually yours
-> Gerhard Sittig
-> -- 
-> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-> HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-> Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Thanks,
+Kukjin
