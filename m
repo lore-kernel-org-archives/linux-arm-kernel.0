@@ -1,62 +1,86 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 5 Aug 2013 11:36:07 +0530
-Subject: [PATCH 2/2] ARM: dts: AM4372: add few nodes
-In-Reply-To: <51FF335D.4050803@ti.com>
-References: <ffa2f76fcac54bfe76c234ffce0394fd2c25fe52.1375450395.git.afzal@ti.com>
- <6f0f838176ab93aac8dab4c3ab9d9f95a3027ff7.1375450395.git.afzal@ti.com>
- <51FCEE60.7080809@ti.com> <51FF335D.4050803@ti.com>
-Message-ID: <51FF40CF.4000008@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 5 Aug 2013 14:12:06 +0800
+Subject: [PATCH 4/7] pinctrl: imx27: imx27 pincontrol driver
+In-Reply-To: <1375439907-10462-5-git-send-email-mpa@pengutronix.de>
+References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
+ <1375439907-10462-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130805061204.GD24629@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 August 2013 10:38 AM, Afzal Mohammed wrote:
-> Hi Muguthan,
->
-> On Saturday 03 August 2013 05:19 PM, Mugunthan V N wrote:
->> On 8/2/2013 7:16 PM, Afzal Mohammed wrote:
->
->>> +        mac: ethernet at 4a100000 {
->>> +            compatible = "ti,am4372-cpsw","ti,cpsw";
->
->> compatibility "ti,am4372-cpsw" is not needed as driver has only
->> "ti,cpsw"
->> compatibility
->
-> No, please read device tree documentation [1].
->
-> DT is a pure hardware description, it does not depend on driver,
-> dependency is only vice versa.
+On Fri, Aug 02, 2013 at 12:38:24PM +0200, Markus Pargmann wrote:
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  53 +++
+>  drivers/pinctrl/Kconfig                            |   8 +
+>  drivers/pinctrl/Makefile                           |   1 +
+>  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
+>  4 files changed, 539 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+>  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+> new file mode 100644
+> index 0000000..3352d94
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+> @@ -0,0 +1,53 @@
+> +* Freescale IMX27 IOMUX Controller
+> +
+> +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
+> +and usage.
+> +
+> +The iomuxc driver node can have pin configuration and gpio subnodes. gpio
+> +nodes defined as childs will share the registers with the iomuxc driver.
+> +Please have a look into
+> +Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt for information about
+> +the gpio properties.
+> +
+> +Required properties:
+> +- compatible: "fsl,imx27-iomuxc"
+> +
+> +Required properties for pin configuration node:
+> +- fsl,pins: three integers array, represents a group of pins mux and config
+> +  setting. The format is fsl,pins = <PIN MUX_ID CONFIG>. PIN and MUX_ID are
 
-Thanks for the clarification
+Neither here nor imx27-pinfunc.h is PIN documented clearly.  Also,
+imx27-pinfunc.h names MUX_CONFIG for what we name MUX_ID here.
 
->
->>> +            reg = <0x4a100000 0x800
->>> +                   0x4a101200 0x100>;
->>> +            interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH
->>> +                      GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH
->>> +                      GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH
->>> +                      GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
->>> +            ti,hwmods = "cpgmac0";
->>> +            status = "disabled";
->>> +        };
->
->> There are many other parameters which are missed here.
->
-> Reason has been mentioned in the commit message, quoting relevant here
-> again,
->
-> >> For i2c, spi, cpsw & pwm - only the properties that were sure to be
-> >> correct has been added (main intention is to make hwmod happy and
-> >> avoid any later modification to here added properties).
->
-> I really wanted to avoid a later patch that has a line starting with
-> minus on DTS.
->
-> Since you are working on cpsw support, can you help here with a patch
-> for other properties.
+Shawn
 
-Sure I can help you to add more DT entries which will not change
-according to hardware
-
-Regards
-Mugunthan V N
+> +  defined as macros in arch/arm/boot/dts/imx27-pinfunc.h. CONFIG can be 0 or
+> +  1, meaning Pullup disable/enable.
+> +
+> +Example:
+> +
+> +iomuxc: iomuxc at 10015000 {
+> +	compatible = "fsl,imx27-iomuxc";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	reg = <0x10015000 0x600>;
+> +
+> +	gpio1: gpio at 10015000 {
+> +		compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+> +		reg = <0x10015000>;
+> +		interrupts = <8>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
+> +	};
+> +
+> +	...
+> +
+> +	uart {
+> +		pinctrl_uart1: uart-1 {
+> +			fsl,pins = <
+> +				MX27_PAD_UART1_TXD__UART1_TXD 0x0
+> +				MX27_PAD_UART1_RXD__UART1_RXD 0x0
+> +				MX27_PAD_UART1_CTS__UART1_CTS 0x0
+> +				MX27_PAD_UART1_RTS__UART1_RTS 0x0
+> +			>;
+> +		};
+> +
+> +		...
+> +	};
+> +};
