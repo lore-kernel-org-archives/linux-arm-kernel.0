@@ -1,109 +1,156 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  5 Aug 2013 10:56:39 +0900
-Subject: [PATCH 2/2] clocksource: em_sti: Convert to devm_* managed helpers
+Date: Mon,  5 Aug 2013 10:56:38 +0900
+Subject: [PATCH 1/2] clocksource: sh_cmt: 32-bit control register support
 In-Reply-To: <1375667799-6327-1-git-send-email-horms+renesas@verge.net.au>
 References: <1375667799-6327-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1375667799-6327-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1375667799-6327-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-Replace kzalloc, clk_get, ioremap and request_irq by their managed
-counterparts to simplify error paths.
+Add support for CMT hardware with 32-bit control and counter
+registers, as found on r8a73a4 and r8a7790. To use the CMT
+with 32-bit hardware a second I/O memory resource needs to
+point out the CMSTR register and it needs to be 32 bit wide.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/clocksource/em_sti.c | 49 +++++++++++++-------------------------------
- 1 file changed, 14 insertions(+), 35 deletions(-)
+ drivers/clocksource/sh_cmt.c | 50 +++++++++++++++++++++++++++++++-------------
+ 1 file changed, 36 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/clocksource/em_sti.c b/drivers/clocksource/em_sti.c
-index 4329a29..b9c81b7 100644
---- a/drivers/clocksource/em_sti.c
-+++ b/drivers/clocksource/em_sti.c
-@@ -315,68 +315,47 @@ static int em_sti_probe(struct platform_device *pdev)
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index 08d0c41..0965e98 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -37,6 +37,7 @@
+ 
+ struct sh_cmt_priv {
+ 	void __iomem *mapbase;
++	void __iomem *mapbase_str;
+ 	struct clk *clk;
+ 	unsigned long width; /* 16 or 32 bit version of hardware block */
+ 	unsigned long overflow_bit;
+@@ -79,6 +80,12 @@ struct sh_cmt_priv {
+  * CMCSR 0xffca0060 16-bit
+  * CMCNT 0xffca0064 32-bit
+  * CMCOR 0xffca0068 32-bit
++ *
++ * "32-bit counter and 32-bit control" as found on r8a73a4 and r8a7790:
++ * CMSTR 0xffca0500 32-bit
++ * CMCSR 0xffca0510 32-bit
++ * CMCNT 0xffca0514 32-bit
++ * CMCOR 0xffca0518 32-bit
+  */
+ 
+ static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
+@@ -109,9 +116,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
+ 
+ static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
  {
- 	struct em_sti_priv *p;
- 	struct resource *res;
--	int irq, ret;
-+	int irq;
- 
--	p = kzalloc(sizeof(*p), GFP_KERNEL);
-+	p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
- 	if (p == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate driver data\n");
--		ret = -ENOMEM;
--		goto err0;
-+		return -ENOMEM;
- 	}
- 
- 	p->pdev = pdev;
- 	platform_set_drvdata(pdev, p);
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "failed to get I/O memory\n");
--		ret = -EINVAL;
--		goto err0;
--	}
+-	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
 -
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		dev_err(&pdev->dev, "failed to get irq\n");
--		ret = -EINVAL;
--		goto err0;
-+		return -EINVAL;
- 	}
- 
- 	/* map memory, let base point to the STI instance */
--	p->base = ioremap_nocache(res->start, resource_size(res));
--	if (p->base == NULL) {
--		dev_err(&pdev->dev, "failed to remap I/O memory\n");
--		ret = -ENXIO;
--		goto err0;
--	}
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	p->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(p->base))
-+		return PTR_ERR(p->base);
- 
- 	/* get hold of clock */
--	p->clk = clk_get(&pdev->dev, "sclk");
-+	p->clk = devm_clk_get(&pdev->dev, "sclk");
- 	if (IS_ERR(p->clk)) {
- 		dev_err(&pdev->dev, "cannot get clock\n");
--		ret = PTR_ERR(p->clk);
--		goto err1;
-+		return PTR_ERR(p->clk);
- 	}
- 
--	if (request_irq(irq, em_sti_interrupt,
--			IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
--			dev_name(&pdev->dev), p)) {
-+	if (devm_request_irq(&pdev->dev, irq, em_sti_interrupt,
-+			     IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
-+			     dev_name(&pdev->dev), p)) {
- 		dev_err(&pdev->dev, "failed to request low IRQ\n");
--		ret = -ENOENT;
--		goto err2;
-+		return -ENOENT;
- 	}
- 
- 	raw_spin_lock_init(&p->lock);
- 	em_sti_register_clockevent(p);
- 	em_sti_register_clocksource(p);
- 	return 0;
--
--err2:
--	clk_put(p->clk);
--err1:
--	iounmap(p->base);
--err0:
--	kfree(p);
--	return ret;
+-	return p->read_control(p->mapbase - cfg->channel_offset, 0);
++	return p->read_control(p->mapbase_str, 0);
  }
  
- static int em_sti_remove(struct platform_device *pdev)
+ static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
+@@ -127,9 +132,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
+ static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
+ 				      unsigned long value)
+ {
+-	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+-
+-	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
++	p->write_control(p->mapbase_str, 0, value);
+ }
+ 
+ static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
+@@ -676,7 +679,7 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
+ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ {
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+-	struct resource *res;
++	struct resource *res, *res2;
+ 	int irq, ret;
+ 	ret = -ENXIO;
+ 
+@@ -694,6 +697,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err0;
+ 	}
+ 
++	/* optional resource for the shared timer start/stop register */
++	res2 = platform_get_resource(p->pdev, IORESOURCE_MEM, 1);
++
+ 	irq = platform_get_irq(p->pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(&p->pdev->dev, "failed to get irq\n");
+@@ -707,6 +713,15 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err0;
+ 	}
+ 
++	/* map second resource for CMSTR */
++	p->mapbase_str = ioremap_nocache(res2 ? res2->start :
++					 res->start - cfg->channel_offset,
++					 res2 ? resource_size(res2) : 2);
++	if (p->mapbase_str == NULL) {
++		dev_err(&p->pdev->dev, "failed to remap I/O second memory\n");
++		goto err1;
++	}
++
+ 	/* request irq using setup_irq() (too early for request_irq()) */
+ 	p->irqaction.name = dev_name(&p->pdev->dev);
+ 	p->irqaction.handler = sh_cmt_interrupt;
+@@ -719,11 +734,17 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 	if (IS_ERR(p->clk)) {
+ 		dev_err(&p->pdev->dev, "cannot get clock\n");
+ 		ret = PTR_ERR(p->clk);
+-		goto err1;
++		goto err2;
+ 	}
+ 
+-	p->read_control = sh_cmt_read16;
+-	p->write_control = sh_cmt_write16;
++	if (res2 && (resource_size(res2) == 4)) {
++		/* assume both CMSTR and CMCSR to be 32-bit */
++		p->read_control = sh_cmt_read32;
++		p->write_control = sh_cmt_write32;
++	} else {
++		p->read_control = sh_cmt_read16;
++		p->write_control = sh_cmt_write16;
++	}
+ 
+ 	if (resource_size(res) == 6) {
+ 		p->width = 16;
+@@ -752,22 +773,23 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 			      cfg->clocksource_rating);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "registration failed\n");
+-		goto err2;
++		goto err3;
+ 	}
+ 	p->cs_enabled = false;
+ 
+ 	ret = setup_irq(irq, &p->irqaction);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+-		goto err2;
++		goto err3;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, p);
+ 
+ 	return 0;
+-err2:
++err3:
+ 	clk_put(p->clk);
+-
++err2:
++	iounmap(p->mapbase_str);
+ err1:
+ 	iounmap(p->mapbase);
+ err0:
 -- 
 1.8.3.2
