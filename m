@@ -1,39 +1,98 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 5 Aug 2013 10:43:35 +0200
-Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
-In-Reply-To: <51FECB7A.6010208@gmail.com>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com>
-Message-ID: <20130805104335.031b0fed@skate>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 5 Aug 2013 16:51:14 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130805082138.GV7656@atomide.com>
+References: <20130801192730.GC9174@kroah.com>
+ <20130802090355.GF7656@atomide.com>
+ <20130802093222.GA8982@kroah.com>
+ <20130802123445.GG7656@atomide.com>
+ <20130802141449.GA7533@kroah.com>
+ <20130805065535.GP7656@atomide.com>
+ <20130805071106.GA14215@kroah.com>
+ <20130805073730.GU7656@atomide.com>
+ <20130805080254.GA15376@kroah.com>
+ <20130805082138.GV7656@atomide.com>
+Message-ID: <20130805085114.GE15885@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian, Russell,
-
-On Sun, 04 Aug 2013 23:45:30 +0200, Sebastian Hesselbarth wrote:
-> On 08/04/2013 09:21 PM, Russell King - ARM Linux wrote:
-> > This is only a RFC at present due to the need to test on Kirkwood and
-> > fix at least one bug in ASoC core code.
-> >
-> > I can't say that this stuff is fully tested, because I don't have any
-> > Kirkwood platforms, but I do have one Dove platform, which as I've
-> > said in the past doesn't run mainline.  I don't run DT on it, so these
-> > patches also don't contain anything DT related.
+On Mon, Aug 05, 2013 at 01:21:38AM -0700, Tony Lindgren wrote:
+> * Greg KH <greg@kroah.com> [130805 01:08]:
+> > On Mon, Aug 05, 2013 at 12:37:30AM -0700, Tony Lindgren wrote:
+> > > * Greg KH <greg@kroah.com> [130805 00:16]:
+> > > > On Sun, Aug 04, 2013 at 11:55:35PM -0700, Tony Lindgren wrote:
+> > > > > 
+> > > > > But for things that are completely bus specific for various SoCs, how
+> > > > > would you like to handle those?
+> > > > > 
+> > > > > For example, we are currently using platform bus and bus notifiers and
+> > > > > then the runtime PM calls from device driver trigger the bus specific
+> > > > > things.
+> > > > > 
+> > > > > Would you prefer to instead use a custom bus instead of extending
+> > > > > the platform bus for things like that?
+> > > > 
+> > > > Yes I would.  I would really like to only use the platform bus for very
+> > > > few things, if any at all.
+> > > 
+> > > OK. How would you prefer to set up things from driver point of view
+> > > so the device drivers don't need to care which bus it's connected to?
+> > 
+> > What do you mean by "don't need to care"?  How are these drivers talking
+> > to the device on the bus in the first place?  If these are different
+> > busses, then they are talked to in different ways, right?
 > 
-> Added Thomas Petazzoni to Cc, IIRC he has access to a T5325.
+> Let's assume that just ioremap + read/write is needed.
 
-Yes, I have access to a Kirkwood t5325, which I'm currently trying to
-move to DT. Note that I also received Armada 370 audio hardware last
-week, so I'll be working on this as well in the future, this hardware
-has both in/out jack plugs as well as SPDIF ones.
+That implies that there is no "bus" at all involved here, so what's the
+problem?  :)
 
-So, yes, please Cc me on Kirkwood audio related developments.
+> > Any specific examples you have to point to in the kernel today?
+> 
+> The one I'm struggling with is the _omap_device_notifier_call
+> that's not currently doing much, but we've been trying to find
+> a clean way to implement runtime PM calls for the bus.
+> 
+> There are other examples doing notifiers with platform_bus, have
+> not checked but I'm guessing they have similar needs:
+> 
+> $ git grep bus_register_notifier | grep platform_bus_type
+> arch/arm/mach-exynos/pm_domains.c:      bus_register_notifier(&platform_bus_type, &platform_nb);
+> arch/arm/mach-highbank/highbank.c:      bus_register_notifier(&platform_bus_type, &highbank_platform_nb);
+> arch/arm/mach-mvebu/coherency.c:                bus_register_notifier(&platform_bus_type,
+> arch/arm/mach-omap2/omap_device.c:      bus_register_notifier(&platform_bus_type, &platform_nb);
+> arch/microblaze/kernel/setup.c: bus_register_notifier(&platform_bus_type, &dflt_plat_bus_notifier);
+> arch/powerpc/kernel/dma-swiotlb.c:      bus_register_notifier(&platform_bus_type,
+> arch/powerpc/platforms/cell/beat_iommu.c:       bus_register_notifier(&platform_bus_type, &celleb_of_bus_notifier);
+> arch/powerpc/platforms/cell/iommu.c:    bus_register_notifier(&platform_bus_type, &cell_of_bus_notifier);
+> drivers/acpi/acpi_lpss.c:               bus_register_notifier(&platform_bus_type, &acpi_lpss_nb);
+> drivers/media/platform/soc_camera/sh_mobile_ceu_camera.c:               err = bus_register_notifier(&platform_bus_type, &wait.notifier);
+> drivers/net/ethernet/ibm/emac/core.c:   bus_register_notifier(&platform_bus_type, &emac_of_bus_notifier);
+>  
+> > > That is, for the let's say 10 - 15 slightly different types of busses
+> > > that are currently handled as platform bus?
+> > 
+> > What makes them "different"?
+> 
+> How the power and clock domains are done and how the clocks are gated
+> or idled. So basically how the devices are reset and idled at the bus
+> level.
 
-Thanks!
+I think of a "bus" as the way that a device talks to the hardware (i.e.
+PCI, USB, i2c, spi, etc.)  You are saying a "bus" is something
+different, something that is used to control the "raw" devices that just
+do iowrites.
 
-Thomas Petazzoni
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Why not just create a bus for your devices, have them register platform
+devices (so you can take advantage of the existing drivers) and have
+your own "platform bus" of a specific type?  The code to do that would
+only need to be created once "per bus", and that way you can handle all
+of the needed reset/idle stuff properly for things "attached" to it.
+
+Perhaps we need to get in front of a whiteboard at the ARM mini summit
+and hash this all out...
+
+thanks,
+
+greg k-h
