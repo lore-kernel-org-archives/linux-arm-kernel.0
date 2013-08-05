@@ -1,39 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 4 Aug 2013 19:32:19 -0700
-Subject: [GIT PULL] ARM: OMAP2+: hwmod fixes for v3.11-rc
-In-Reply-To: <alpine.DEB.2.02.1308042345590.21276@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307301146110.4505@utopia.booyaka.com>
- <20130730133336.GL7656@atomide.com>
- <20130804203653.GF15602@quad.lixom.net>
- <alpine.DEB.2.02.1308042345590.21276@utopia.booyaka.com>
-Message-ID: <CAOesGMim-Ku=HMEor-8Lh_jtfdy6vFve-vaeYPOGZ0nxWiH0sA@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 5 Aug 2013 09:14:50 +0800
+Subject: [PATCH 1/2] pinctrl: imx: work around select input quirk
+In-Reply-To: <20130804125452.GF18119@S2101-09.ap.freescale.net>
+References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
+ <20130801065147.GM8540@nchen-desktop>
+ <CAAQ0ZWQajP49jM_0wqvqmuv19ZcSQ_1QUzgxfsBYzKU_5w0bMA@mail.gmail.com>
+ <20130801083221.GA32696@nchen-desktop>
+ <20130804125452.GF18119@S2101-09.ap.freescale.net>
+Message-ID: <20130805011449.GA23614@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 4, 2013 at 4:46 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Sun, 4 Aug 2013, Olof Johansson wrote:
->
->> On Tue, Jul 30, 2013 at 06:33:36AM -0700, Tony Lindgren wrote:
->> > Arnd & Olof,
->> >
->> > Can you please take this pull request directly? Other than the
->> > omap5 regulator dts changes I just posted I don't yet have
->> > anything else queued up right now.
->>
->>
->> Pulled. But Paul, if you don't mind, please base your fixes on older -rcs
->> unless there's a reason to go with the latest-and-greatest.
->>
->> I had to rebase our fixes branch since this pulled in a newer -rc than
->> ours and I didn't want to have a back-merge in the history.
->
-> Will do.  Sorry about the extra hassle.
+On Sun, Aug 04, 2013 at 08:54:54PM +0800, Shawn Guo wrote:
+> Yes, we changed the prefix to simplify the DTS files for imx6q and
+> imx6dl.
+> 
+> > 
+> > Besides, please add comments for u16 *input_reg at struct imx_pin_group.
+> 
+> I'm not fond of documenting a workaround for a random quirky select
+> input as a feature all over the files where input_reg is documented.
+> It should be good enough to have it well documented at where the quirk
+> is handled.
 
-No need to apologize, I've never asked for anything like it in the past.
+If the user finds "odd value" at xxx-pinfunc.h, how he knows what
+it stands for? At least, It should be documented where the user
+can find its meaning.
 
-It's something I've realized as of late that it'd be good to avoid
-where possible. We used to start a new fixes branch on top of each -rc
-so it wasn't an issue before.
-
-
--Olof
+Best regards,
+Peter
