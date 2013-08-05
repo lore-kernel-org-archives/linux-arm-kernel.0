@@ -1,121 +1,77 @@
 From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Mon,  5 Aug 2013 15:17:12 +0200
-Subject: [PATCH 3/3] Return info for device and its memory regions and
- interrupts
+Date: Mon,  5 Aug 2013 15:17:10 +0200
+Subject: [PATCH 1/3] VFIO_IOMMU_TYPE1 workaround to build for platform devices
 In-Reply-To: <1375708632-26356-1-git-send-email-a.motakis@virtualopensystems.com>
 References: <1375708632-26356-1-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <1375708632-26356-4-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <1375708632-26356-2-git-send-email-a.motakis@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A VFIO userspace driver will start by opening the VFIO device
-that corresponds to an IOMMU group, and will use the ioctl interface
-to get the basic device info, such as number of memory regions and
-interrupts, and their properties.
-
-This patch implements the IOCTLs:
- - VFIO_DEVICE_GET_INFO
- - VFIO_DEVICE_GET_REGION_INFO
- - VFIO_DEVICE_GET_IRQ_INFO
+This is a workaround to make the VFIO_IOMMU_TYPE1 driver usable with
+platform devices instead of PCI. A future permanent fix should support
+both. This is required in order to use the Exynos SMMU, or the ARM SMMU
+driver with VFIO.
 
 Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
 ---
- drivers/vfio/vfio_dt.c | 60 ++++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 53 insertions(+), 7 deletions(-)
+ drivers/vfio/Kconfig            |  2 +-
+ drivers/vfio/vfio_iommu_type1.c | 15 ++++++++++++---
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/vfio/vfio_dt.c b/drivers/vfio/vfio_dt.c
-index ad4d31d..817c552 100644
---- a/drivers/vfio/vfio_dt.c
-+++ b/drivers/vfio/vfio_dt.c
-@@ -28,6 +28,10 @@
- #include <linux/types.h>
+diff --git a/drivers/vfio/Kconfig b/drivers/vfio/Kconfig
+index 7cd5dec..1f84eda 100644
+--- a/drivers/vfio/Kconfig
++++ b/drivers/vfio/Kconfig
+@@ -6,7 +6,7 @@ config VFIO_IOMMU_TYPE1
+ menuconfig VFIO
+ 	tristate "VFIO Non-Privileged userspace driver framework"
+ 	depends on IOMMU_API
+-	select VFIO_IOMMU_TYPE1 if X86
++	select VFIO_IOMMU_TYPE1 if X86 || ARM
+ 	help
+ 	  VFIO provides a framework for secure userspace device drivers.
+ 	  See Documentation/vfio.txt for more details.
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 6f3fbc4..4339603 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -30,7 +30,8 @@
+ #include <linux/iommu.h>
+ #include <linux/module.h>
+ #include <linux/mm.h>
+-#include <linux/pci.h>		/* pci_bus_type */
++#include <linux/pci.h>			/* pci_bus_type */
++#include <linux/platform_device.h>	/* platform_bus_type */
+ #include <linux/sched.h>
+ #include <linux/slab.h>
  #include <linux/uaccess.h>
- #include <linux/vfio.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
+@@ -610,9 +611,17 @@ static void *vfio_iommu_type1_open(unsigned long arg)
+ 	mutex_init(&iommu->lock);
  
- #define DRIVER_VERSION  "0.1"
- #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
-@@ -54,10 +58,13 @@ static long vfio_dt_ioctl(void *device_data,
- 			   unsigned int cmd, unsigned long arg)
+ 	/*
++	 * ARM SMMU compatibility workaround
++	 */
++	iommu->domain = iommu_domain_alloc(&platform_bus_type);
++	if (iommu->domain)
++		return iommu;
++
++	/*
+ 	 * Wish we didn't have to know about bus_type here.
+ 	 */
+-	iommu->domain = iommu_domain_alloc(&pci_bus_type);
++	//iommu->domain = iommu_domain_alloc(&pci_bus_type);
++
+ 	if (!iommu->domain) {
+ 		kfree(iommu);
+ 		return ERR_PTR(-EIO);
+@@ -733,7 +742,7 @@ static const struct vfio_iommu_driver_ops vfio_iommu_driver_ops_type1 = {
+ 
+ static int __init vfio_iommu_type1_init(void)
  {
- 	struct vfio_dt_device *vdev = device_data;
-+	struct device_node *of_node = vdev->pdev->dev.of_node;
- 	unsigned long minsz;
+-	if (!iommu_present(&pci_bus_type))
++	if (!iommu_present(&platform_bus_type))
+ 		return -ENODEV;
  
- 	if (cmd == VFIO_DEVICE_GET_INFO) {
- 		struct vfio_device_info info;
-+		struct resource res;
-+		int cnt = 0;
- 
- 		minsz = offsetofend(struct vfio_device_info, num_irqs);
- 
-@@ -68,18 +75,57 @@ static long vfio_dt_ioctl(void *device_data,
- 			return -EINVAL;
- 
- 		info.flags = VFIO_DEVICE_FLAGS_DT;
--		info.num_regions = 0;
--		info.num_irqs = 0;
-+
-+		while (!of_address_to_resource(of_node, cnt, &res))
-+			cnt++;
-+
-+		info.num_regions = cnt;
-+
-+		info.num_irqs = of_irq_count(of_node);
- 
- 		return copy_to_user((void __user *)arg, &info, minsz);
- 
--	} else if (cmd == VFIO_DEVICE_GET_REGION_INFO)
--		return -EINVAL;
-+	} else if (cmd == VFIO_DEVICE_GET_REGION_INFO) {
-+		struct vfio_region_info info;
-+		struct resource res;
- 
--	else if (cmd == VFIO_DEVICE_GET_IRQ_INFO)
--		return -EINVAL;
-+		minsz = offsetofend(struct vfio_region_info, offset);
-+
-+		if (copy_from_user(&info, (void __user *)arg, minsz))
-+			return -EFAULT;
-+
-+		if (info.argsz < minsz)
-+			return -EINVAL;
-+
-+		if(of_address_to_resource(of_node, info.index, &res))
-+			return -EINVAL;
-+
-+		info.offset = res.start;	/* map phys addr with offset */
-+		info.size = resource_size(&res);
-+		info.flags = 0;
-+
-+		return copy_to_user((void __user *)arg, &info, minsz);	
-+
-+	} else if (cmd == VFIO_DEVICE_GET_IRQ_INFO) {
-+		struct vfio_irq_info info;
-+		struct resource res;
-+
-+		minsz = offsetofend(struct vfio_irq_info, count);
-+
-+		if (copy_from_user(&info, (void __user *)arg, minsz))
-+			return -EFAULT;
-+
-+		if (info.argsz < minsz)
-+			return -EINVAL;
-+
-+		of_irq_to_resource(of_node, info.index, &res);
-+
-+		info.flags = 0;
-+		info.count = 1;
-+
-+		return copy_to_user((void __user *)arg, &info, minsz);
- 
--	else if (cmd == VFIO_DEVICE_SET_IRQS)
-+	} else if (cmd == VFIO_DEVICE_SET_IRQS)
- 		return -EINVAL;
- 
- 	else if (cmd == VFIO_DEVICE_RESET)
+ 	return vfio_register_iommu_driver(&vfio_iommu_driver_ops_type1);
 -- 
 1.8.1.2
