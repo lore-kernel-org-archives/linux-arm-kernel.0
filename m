@@ -1,53 +1,139 @@
-From: mhocko@suse.cz (Michal Hocko)
-Date: Mon, 5 Aug 2013 09:32:39 +0200
-Subject: [PATCH] MM: Make Contiguous Memory Allocator depends on MMU
-In-Reply-To: <CAJFYCKEhJtG1x1PaiwpwOADxthXRSh0pQsE3uYWO2i4xnHGvYQ@mail.gmail.com>
-References: <1375593061-11350-1-git-send-email-manjunath.goudar@linaro.org>
- <51fe08c6.87ef440a.10fc.1786SMTPIN_ADDED_BROKEN@mx.google.com>
- <CAJFYCKEhJtG1x1PaiwpwOADxthXRSh0pQsE3uYWO2i4xnHGvYQ@mail.gmail.com>
-Message-ID: <20130805073239.GC10146@dhcp22.suse.cz>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 05 Aug 2013 09:32:16 +0200
+Subject: [PATCH v10] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <20130802092823.GA2884@e106331-lin.cambridge.arm.com>
+References: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
+ <20130802092823.GA2884@e106331-lin.cambridge.arm.com>
+Message-ID: <1375687936.4000.21.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 05-08-13 10:10:08, Manjunath Goudar wrote:
-> On 4 August 2013 13:24, Wanpeng Li <liwanp@linux.vnet.ibm.com> wrote:
-> 
-> > On Sun, Aug 04, 2013 at 10:41:01AM +0530, Manjunath Goudar wrote:
-> > >s patch adds a Kconfig dependency on an MMU being available before
-> > >CMA can be enabled.  Without this patch, CMA can be enabled on an
-> > >MMU-less system which can lead to issues. This was discovered during
-> > >randconfig testing, in which CMA was enabled w/o MMU being enabled,
-> > >leading to the following error:
-> > >
-> > > CC      mm/migrate.o
-> > >mm/migrate.c: In function ?remove_migration_pte?:
-> > >mm/migrate.c:134:3: error: implicit declaration of function
-> > ?pmd_trans_huge?
-> > >[-Werror=implicit-function-declaration]
-> > >   if (pmd_trans_huge(*pmd))
-> > >   ^
-> > >mm/migrate.c:137:3: error: implicit declaration of function
-> > ?pte_offset_map?
-> > >[-Werror=implicit-function-declaration]
-> > >   ptep = pte_offset_map(pmd, addr);
-> > >
-> >
-> > Similar one.
-> >
-> > http://marc.info/?l=linux-mm&m=137532486405085&w=2
-> 
-> 
-> In this patch MIGRATION config is not required MMU, because already CMA
-> config depends
-> on MMU and HAVE_MEMBLOCK if both are true then only selecting MIGRATION and
-> MEMORY_ISOLATION.
+Hi Mark,
 
-No, I think it should be config MIGRATION that should depend on MMU
-explicitly because that is where the problem exists. It shouldn't rely
-on other configs to not select it automatically.
+Am Freitag, den 02.08.2013, 10:28 +0100 schrieb Mark Rutland:
+> On Thu, Jul 18, 2013 at 10:26:26AM +0100, Philipp Zabel wrote:
+> > This driver implements a reset controller device that toggle a gpio
+> > connected to a reset pin of a peripheral IC. The delay between assertion
+> > and de-assertion of the reset signal can be configured via device tree.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> > ---
+> > Changes since v9:
+> >  - Use gpio_set_value_cansleep unconditionally. reset_controller_assert/deassert
+> >    should not be called from atomic context.
+> > ---
+> >  .../devicetree/bindings/reset/gpio-reset.txt       |  35 ++++
+> >  drivers/reset/Kconfig                              |  11 ++
+> >  drivers/reset/Makefile                             |   1 +
+> >  drivers/reset/gpio-reset.c                         | 184 +++++++++++++++++++++
+> >  4 files changed, 231 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/reset/gpio-reset.txt
+> >  create mode 100644 drivers/reset/gpio-reset.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/reset/gpio-reset.txt b/Documentation/devicetree/bindings/reset/gpio-reset.txt
+> > new file mode 100644
+> > index 0000000..bca5348
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/reset/gpio-reset.txt
+> > @@ -0,0 +1,35 @@
+> > +GPIO reset controller
+> > +=====================
+> > +
+> > +A GPIO reset controller controls a single GPIO that is connected to the reset
+> > +pin of a peripheral IC. Please also refer to reset.txt in this directory for
+> > +common reset controller binding usage.
+> > +
+> > +Required properties:
+> > +- compatible: Should be "gpio-reset"
+> > +- reset-gpios: A gpio used as reset line. The gpio specifier for this property
+> > +               depends on the gpio controller that provides the gpio.
+> > +- #reset-cells: 0, see below
+> > +
+> > +Optional properties:
+> > +- reset-delay-us: delay in microseconds. The gpio reset line will be asserted for
+> > +                  this duration to reset.
+> > +- initially-in-reset: boolean. If not set, the initial state should be a
+> > +                      deasserted reset line. If this property exists, the
+> > +                      reset line should be kept in reset.
+> > +
+> > +example:
+> > +
+> > +sii902x_reset: gpio-reset {
+> > +	compatible = "gpio-reset";
+> > +	reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+> > +	reset-delay-us = <10000>;
+> > +	initially-in-reset;
+> > +	#reset-cells = <0>;
+> > +};
+> > +
+> > +/* Device with nRESET pin connected to GPIO5_0 */
+> > +sii902x at 39 {
+> > +	/* ... */
+> > +	resets = <&sii902x_reset>; /* active-low GPIO5_0, 10 ms delay */
+> > +};
+> 
+> I don't like the approach here. The reset GPIO line is not a device in
+> itself, and surely the way in which it must be toggled to reset a device
+> is a property of that device, not the GPIO. We're leaking a Linux
+> internal abstraction rather than describing teh hardware.
 
-The question is. Does CMA need to depend on MMU as well? Why?
-But please comment on the original thread instead.
--- 
-Michal Hocko
-SUSE Labs
+you are right, this results from the reset bindings being designed for
+actual hardware reset controllers that appeared in several SoCs.
+Initially I've sent the GPIO reset driver only as an example.
+
+> I think thie linkage of the gpio would be better described on the node
+> for the device with the reset input, in a binding-specific property for
+> the device (e.g. names for the specific input line on the device):
+> 
+> I'd imagine the delay required would be fixed for a device (or possibly
+> influenced by clock inputs), and can either be knwon by the driver
+> without dt information, or discovered elsewhere (e.g. dervied from the
+> rates of clock inputs). We shuold be able to derive that from the
+> compatible string in most cases.
+> 
+> I think this should look more like the below:
+> 
+> /* Device with nRESET pin connected to GPIO5_0 */
+> sii902x at 39 {
+> 	/* named for the actual input line */
+> 	nreset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+> 	/* 
+> 	 * If there's some configurable property relating to the reset
+> 	 * line, we can describe it
+> 	 */
+> 	vendor,some-optional-reset-gpio-property;
+> 	...
+> };
+
+I don't like the arbitrary name, as that makes it difficult to handle
+this in an automated way. In this case I'd prefer to use 'reset-gpios'
+and optionally 'reset-gpio-names' analogous to how clocks and interrupts
+(and resets) are handled. The framework itself could then also check the
+reset-gpios property and create the gpio reset controllers on the fly:
+
+sii902x at 39 {
+	reset-gpios <&gpio5 0 GPIO_ACTIVE_LOW>;
+	reset-gpio-names = "nreset";
+	reset-delay-us = <10000>;
+	initially-in-reset;
+};
+
+But this reintroduces the (currently theoretical) problem of how to
+express delays and initially-in-reset information for multiple gpio
+resets on a single device if that information cannot be determined by
+the driver automatically.
+
+If there is a fixed delay (or a delay calculated from a known clock), we
+can just extend the API:
+	device_reset_usleep(dev, 1000);
+instead of currently:
+	device_reset(dev);
+
+> If we want a separate device in the Linux driver model to abstract this,
+> that's fine, but it should not be described in the dt. The device driver
+> can call some generic helpers to handle creating said reset device in
+> the driver model.
+
+regards
+Philipp
