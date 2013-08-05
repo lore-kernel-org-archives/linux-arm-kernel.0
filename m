@@ -1,62 +1,65 @@
 From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Mon, 5 Aug 2013 09:32:11 +0000
-Subject: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
-In-Reply-To: <20130805083050.GN26614@pengutronix.de>
-References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
- <1375418648-22760-2-git-send-email-b35083@freescale.com>
- <20130805083050.GN26614@pengutronix.de>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851FC075@039-SN1MPN1-004.039d.mgd.msft.net>
+Date: Mon, 5 Aug 2013 09:44:55 +0000
+Subject: [PATCH v2 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20991.23049.78707.457046@ipc1.ka-ro>
+References: <1375682824-11443-1-git-send-email-b35083@freescale.com>
+ <1375682824-11443-2-git-send-email-b35083@freescale.com>
+ <20991.23049.78707.457046@ipc1.ka-ro>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851FC086@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller
-> > +struct imx_i2c_clk_pair {
-> > +	u16	div;
-> > +	u16	regval;
-> > +}i;
-> 
-> Converting this to a struct should be a separate patch. This is an
-> obvious cleanup which makes maintainers happy and more willing to take
-> the features you are adding later.
-> 
-[Lu Jingchang-B35083] 
-Do you mean all changes to i.MX common should be a separate patch including the clk div pair, and 
-the struct imx_i2c_hwdata, struct imx_i2c_drvdata and other things changed to be easier to
-use adding other SoCs support later. Thanks.
+> -----Original Message-----
+> From: Lothar Wa?mann [mailto:LW at KARO-electronics.de]
+> Sent: Monday, August 05, 2013 3:54 PM
+> To: Lu Jingchang-B35083
+> Cc: vinod.koul at intel.com; Li Xiaochun-B41219; Wang Huan-B18965; linux-
+> kernel at vger.kernel.org; djbw at fb.com; shawn.guo at linaro.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 3/3] dma: Add Freescale eDMA engine driver support
+
+> [...]
+> > +	fsl_desc->n_tcds = sg_len;
+> > +	for (i = 0; i < sg_len; i++) {
+> > +		fsl_desc->tcd[i].vtcd = dma_pool_alloc(fsl_chan->tcd_pool,
+> > +					GFP_ATOMIC, &fsl_desc->tcd[i].ptcd);
 > >
-> > +#define IMX_I2C_IADR	(0x00 << i2c_imx->i2c_hwdata->regshift)
-> > +#define IMX_I2C_IFDR	(0x01 << i2c_imx->i2c_hwdata->regshift)
-> > +#define IMX_I2C_I2CR	(0x02 << i2c_imx->i2c_hwdata->regshift)
-> > +#define IMX_I2C_I2SR	(0x03 << i2c_imx->i2c_hwdata->regshift)
-> > +#define IMX_I2C_I2DR	(0x04 << i2c_imx->i2c_hwdata->regshift)
-> 
-> Macros should not assume there is a i2c_imx variable present in a
-> function. Instead, add static inline accessor functions.
+> Why is this called with GFP_ATOMIC while fsl_desc above is being
+> allocated with GFP_KERNEL?
 [Lu Jingchang-B35083] 
-Ok, I will add inline functions instead. Thanks.
+ I will make these consistently. Thanks.
 > 
-> 
-> > +	[VF610_I2C] = {
-> > +		.devtype = VF610_I2C,
-> > +		.hwdata = &vf610_i2c_hwdata
-> > +	},
-> >  };
-> 
-> Why add this array?
-> You should reference imx_i2c_hwdata/vf610_i2c_hwdata directly here.
+> > +	for (ch = 0; ch < 32; ch++)
+> > +		if (intr & (0x1 << ch))
+> > +			break;
+> > +
+> What, if IRQs for multiple channels are pending at the same time?
+> You could handle them all in one go without extra calls of the IRQ
+> handler.
 [Lu Jingchang-B35083] 
-The "is_imx1_i2c()"function need the devtype variable the test the arch, so the devtype is out of the
-imx_i2c_hwdata struct to let all other i.MX i2c device can sharing the same imx_i2c_hwdata setting. Thanks.
+Yes, It will be more efficiently to handle all the irqs once. Thanks.
 > 
+> > +	writeb(EDMA_CINT_CINT(ch), base_addr + EDMA_CINT);
+> > +
+> > +	fsl_chan = &fsl_edma->chans[ch];
+> > +
+> > +	if (!fsl_chan->edesc->iscyclic) {
+> > +		list_del(&fsl_chan->edesc->vdesc.node);
 > >
-> >  	if (of_id)
-> >  		pdev->id_entry = of_id->data;
-> 
-> This is wrong in the original driver code. This field should be changed
-> in a driver.
+> Ain't there any protection needed for the list operation?
 [Lu Jingchang-B35083] 
-Could you please give some more comments on this? Thanks.
+Protection is needed indeed, I will fix this, thanks.
+> 
+> > +		clk_prepare_enable(fsl_edmamux->clk);
+> >
+> What, if this fails?
+[Lu Jingchang-B35083] 
+I will add code to check the return value. Thanks.
+> 
 
 
 
-Best Regards
+
+
+Best Regards,
+Jingchang
