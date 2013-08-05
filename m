@@ -1,41 +1,49 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 5 Aug 2013 11:36:12 -0500
-Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <201308032145.41860.arnd@arndb.de>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <20130802105754.GF2884@e106331-lin.cambridge.arm.com>
- <20130802195552.2f95c855fc20d6b3a205e40f@mail.ru>
- <201308032145.41860.arnd@arndb.de>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0021DAC6D5D3A@AUSP01VMBX24.collaborationhost.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Aug 2013 09:45:05 -0700
+Subject: [PATCH 0/3] ARM: vexpress: TC2 MCPM/SPC cleanups
+In-Reply-To: <20130805094709.GA29090@e102568-lin.cambridge.arm.com>
+References: <1375675793-16492-1-git-send-email-olof@lixom.net>
+ <20130805094709.GA29090@e102568-lin.cambridge.arm.com>
+Message-ID: <CAOesGMjGqFfHhdUfd98ps5Sc_Z7Nsn2OpMBPbCHtfTkEeCYWKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, August 03, 2013 12:46 PM, Arnd Bergmann wrote:
-> On Friday 02 August 2013, Alexander Shiyan wrote:
->> On Fri, 2 Aug 2013 11:57:54 +0100
->> Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Thu, Jul 18, 2013 at 07:34:58PM +0100, Alexander Shiyan wrote:
-
-<snip>
-
->>> 
->>> Isn't that SoC specific?
->> 
->> I absolutely do not understand the last two comments.
->> You are not difficult to describe them in other words?
+On Mon, Aug 5, 2013 at 2:47 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Mon, Aug 05, 2013 at 05:09:50AM +0100, Olof Johansson wrote:
+>> Here's a short series on top of Nico's TC2 MCPM series to move the SPC driver
+>> back under mach-vexpress where it should be, and a couple of tiny cleanups
+>> to the driver.
+>>
+>> I'll pick this up together with the base branch in arm-soc for-next, but I
+>> haven't staged it in a next/* branch so it can be rebased/changed/dropped
+>> if needed.
+>>
+>> There's still one thing left to iron out, and that's the actual binding
+>> for the "SPC" node. Since the spc code needs a non-zero SPC_BASE, it
+>> implies that there's more than just SPC described by the device node. So
+>> either the naming and description needs to be changed, or there's need
+>> for more than one device node to describe the other register ranges. The
+>> former might be easier in this case...
+>>
+>> Pawel, I'd appreciate a quick test from you to make sure I didn't break
+>> anything since I don't have a way to boot this myself.
 >
-> The point that Mark was making is that the both the binding and the driver
-> should be written to only specify what the interrupt controller itself
-> looks like, not how any of the lines are connected or configured.
+> Thanks Olof.
 >
-> For instance, if the same interrupt controller is used in another SoC
->  (ep93xx?) but that soc has an i2c controller connected to IRQ 4 rather than
-> the sound, the driver should still be usable unmodified.
+> Tested, a couple of fixes needed to compile your series, comments in the
+> relative patches.
 
-FWIW, the cpls711x and ep93xx are completely different.
+Thanks. For some reason I figured vexpress_defconfig would provide
+build coverage, so it obviously missed build coverage by me. I also
+missed a git add.
 
-I'm not sure, but I think the cpls711x is a Cirrus EP73xx series processor 
-(CPU_ARM720T). The EP93xx series processor is a CPU_ARM920T.
+> For the bindings, you are right, how about this (commit log written just
+> for the sake of it, it should be squashed in Nico's original series) ?
 
-Regards,
-Hartley
+There's no harm in keeping the change history by having two patches.
+I'll add this below my series of three when I revise them.
+
+
+
+-Olof
