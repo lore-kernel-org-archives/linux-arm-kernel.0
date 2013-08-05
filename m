@@ -1,42 +1,60 @@
-From: B08248@freescale.com (Yoder Stuart-B08248)
-Date: Mon, 5 Aug 2013 14:50:33 +0000
-Subject: [PATCH 2/3] Initial skeleton of VFIO support for Device Tree
- based devices
-In-Reply-To: <1375708632-26356-3-git-send-email-a.motakis@virtualopensystems.com>
-References: <1375708632-26356-1-git-send-email-a.motakis@virtualopensystems.com>
- <1375708632-26356-3-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <9F6FE96B71CF29479FF1CDC8046E1503663FB7@039-SN1MPN1-002.039d.mgd.msft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Aug 2013 15:56:44 +0100
+Subject: [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM links between
+ codec and cpu DAI
+In-Reply-To: <20130805144054.GE9858@sirena.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <E1V641A-0004lv-DM@rmk-PC.arm.linux.org.uk>
+ <20130805112733.GY9858@sirena.org.uk>
+ <20130805113310.GU23006@n2100.arm.linux.org.uk>
+ <20130805144054.GE9858@sirena.org.uk>
+Message-ID: <20130805145644.GV23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +MODULE_VERSION(DRIVER_VERSION);
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR(DRIVER_AUTHOR);
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-> index 284ff24..1e4bef2 100644
-> --- a/include/uapi/linux/vfio.h
-> +++ b/include/uapi/linux/vfio.h
-> @@ -147,6 +147,7 @@ struct vfio_device_info {
->  	__u32	flags;
->  #define VFIO_DEVICE_FLAGS_RESET	(1 << 0)	/* Device supports reset
-> */
->  #define VFIO_DEVICE_FLAGS_PCI	(1 << 1)	/* vfio-pci device */
-> +#define VFIO_DEVICE_FLAGS_DT	(1 << 2)	/* vfio-dt device */
->  	__u32	num_regions;	/* Max region index + 1 */
->  	__u32	num_irqs;	/* Max IRQ index + 1 */
->  };
+On Mon, Aug 05, 2013 at 03:40:54PM +0100, Mark Brown wrote:
+> On Mon, Aug 05, 2013 at 12:33:10PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Aug 05, 2013 at 12:27:33PM +0100, Mark Brown wrote:
+> 
+> > > This doesn't look good - this is adding DAPM routes which should
+> > > correspond to the DAI link that's already been configured.
+> 
+> > No, you're wrong there:
+> 
+> > CPU DAI:				Codec DAI
+> > dma-playback	--->	i2sdo	--->	Playback
+> > 		`-->	spdifdo -> not connected
+> > dma-capture	<---	i2sdi	<---	Capture
+> 
+> > And the intermediate level is needed to determine which outputs from
+> > the chip are wired up.
+> 
+> Right, and that's exactly what the dai_links are doing - they're showing
+> what's hanging off each of the DAIs.
+> 
+> > And don't even say "use dpcm" - if you say that, I want _you_ to write
+> > it because dpcm is totally and utterly unusable as it currently stands -
+> > as you can see from all the emails I've sent over the weekend.
+> 
+> I'm going to tell you to work with the framework rather than around it;
 
-In the RFC I sent out the proposed flags were:
+Work with the fscking undocumented framework.  If you want that, then
+sodding well document this pile of crap.  If not, stop telling people
+to "work around it".
 
-   #define VFIO_DEVICE_FLAGS_PLATFORM (1 << ?) /* A platform bus device */
-   #define VFIO_DEVICE_FLAGS_DEVTREE  (1 << ?) /* device tree info available */
+> adding routes that link the CODEC and CPU together in parallel with the
+> links set up for the DAIs is not something that seems like it's going to
+> continue to work sensibly going forwards.
 
-Since you are only implementing the first part, the platform
-device support, just call it:  VFIO_DEVICE_FLAGS_PLATFORM
+So you're *TOTALLY* missing why I've had to do that.  Tell me, how can
+the CPU DAI detect which of its frigging outputs are connected to the
+codec without doing the above?  Show me how your crappy subsystem is
+supposed to work.  Document the sodding thing.
 
-I think the 'platform' term is more accurate as we are providing
-a mechanism to expose devices on the /sys/bus/platform bus to
-user space.
+If you don't do this, don't expect people to understand it.  Don't
+expect people not to find "other solutions" around the utter shite that
+I've had to deal with ALL FRIGGING WEEKEND.
 
-Stuart
+These patches stay as they are until you get a clue about what's required
+to drive this hardware and start providing some sensible assistance with
+your undocumented code.
