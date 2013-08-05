@@ -1,67 +1,202 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 4 Aug 2013 23:55:35 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130802141449.GA7533@kroah.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802090355.GF7656@atomide.com>
- <20130802093222.GA8982@kroah.com>
- <20130802123445.GG7656@atomide.com>
- <20130802141449.GA7533@kroah.com>
-Message-ID: <20130805065535.GP7656@atomide.com>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Mon, 5 Aug 2013 14:07:03 +0800
+Subject: [PATCH v2 2/3] ARM: dts: vf610: Add eDMA node
+Message-ID: <1375682824-11443-1-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Greg KH <greg@kroah.com> [130802 07:20]:
-> On Fri, Aug 02, 2013 at 05:34:45AM -0700, Tony Lindgren wrote:
-> > * Greg KH <greg@kroah.com> [130802 02:37]:
-> > > On Fri, Aug 02, 2013 at 02:03:55AM -0700, Tony Lindgren wrote:
-> > > > * Greg KH <greg@kroah.com> [130801 12:33]:
-> > > > > 
-> > > > > The driver core handles this really well, you just have to create new
-> > > > > busses, and don't rely on the "catch-all" platform_bus.
-> > > > 
-> > > > Hmm do you have some example of a device driver that is generic and
-> > > > is supported on platform_bus and some other bus?
-> > > 
-> > > Take a look at drivers/usb/host/ohci* for one example that I know of,
-> > > there are others all through the kernel as well.
-> > 
-> > Uhh OK so I guess the answer is that the bus glue still needs to
-> > be implemented separately for each driver and there's no generic
-> > way of supporting multiple busses?
-> 
-> Different busses implies that there are different ways to physically
-> talk to the device hardware, so of course there is no generic way to
-> support that.
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+changes in v2:
+  using generic dma-channels property instead of fsl,dma-channels.
 
-Right, but in many cases the only difference between SoCs are some bus
-specific things like reset and idling of the devices. And using platform
-bus allows the driver to stay generic.
+ arch/arm/boot/dts/vf610.dtsi         |  49 +++++++++++++++++
+ include/dt-bindings/dma/vf610-edma.h | 103 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 152 insertions(+)
+ create mode 100644 include/dt-bindings/dma/vf610-edma.h
 
-> Unless your subsystem wants to do what we did for USB, and define a
-> generic way to talk to the hardware in a very abstract way, allowing for
-> totally different types of physical layers to handle lots of different
-> logical layer drivers.  But odds are, you don't want to do that.
-> 
-> It should be easy to just abstract out your "this is how I write a byte
-> to the hardware" logic to handle the different bus types, if you really
-> are using the same chip/core.  Lots of drivers do this today just fine,
-> it isn't a big deal.
-
-I agree that makes sense for the driver specific things.
-
-But for things that are completely bus specific for various SoCs, how
-would you like to handle those?
-
-For example, we are currently using platform bus and bus notifiers and
-then the runtime PM calls from device driver trigger the bus specific
-things.
-
-Would you prefer to instead use a custom bus instead of extending
-the platform bus for things like that?
-
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 67d929c..18e3a4c 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -10,6 +10,7 @@
+ #include "skeleton.dtsi"
+ #include "vf610-pinfunc.h"
+ #include <dt-bindings/clock/vf610-clock.h>
++#include <dt-bindings/dma/vf610-edma.h>
+ 
+ / {
+ 	aliases {
+@@ -87,6 +88,30 @@
+ 				arm,tag-latency = <2 2 2>;
+ 			};
+ 
++			edma0: edma at 40018000 {
++				#dma-cells = <2>;
++				compatible = "fsl,vf610-edma";
++				reg = <0x40018000 0x2000>;
++				interrupts = <0 8 0x04>, <0 9 0x04>;
++				interrupt-names = "edma-tx", "edma-err";
++				dma-channels = <32>;
++				fsl,dma-mux = <&dmamux0>, <&dmamux1>;
++			};
++
++			dmamux0: dmamux at 40024000 {
++				reg = <0x40024000 0x1000>;
++				fsl,dmamux-id = <0>;
++				clocks = <&clks VF610_CLK_DMAMUX0>;
++				clock-names = "dmamux";
++			};
++
++			dmamux1: dmamux at 40025000 {
++				reg = <0x40025000 0x1000>;
++				fsl,dmamux-id = <1>;
++				clocks = <&clks VF610_CLK_DMAMUX1>;
++				clock-names = "dmamux";
++			};
++
+ 			uart0: serial at 40027000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x40027000 0x1000>;
+@@ -420,6 +445,30 @@
+ 			reg = <0x40080000 0x80000>;
+ 			ranges;
+ 
++			edma1: edma at 40098000 {
++				#dma-cells = <2>;
++				compatible = "fsl,vf610-edma";
++				reg = <0x40098000 0x2000>;
++				interrupts = <0 10 0x04>, <0 11 0x04>;
++				interrupt-names = "edma-tx", "edma-err";
++				dma-channels = <32>;
++				fsl,dma-mux = <&dmamux2>, <&dmamux3>;
++			};
++
++			dmamux2: dmamux at 400a1000 {
++				reg = <0x400a1000 0x1000>;
++				fsl,dmamux-id = <1>;
++				clocks = <&clks VF610_CLK_DMAMUX2>;
++				clock-names = "dmamux";
++			};
++
++			dmamux3: dmamux at 400a2000 {
++				reg = <0x400a2000 0x1000>;
++				fsl,dmamux-id = <0>;
++				clocks = <&clks VF610_CLK_DMAMUX3>;
++				clock-names = "dmamux";
++			};
++
+ 			uart4: serial at 400a9000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x400a9000 0x1000>;
+diff --git a/include/dt-bindings/dma/vf610-edma.h b/include/dt-bindings/dma/vf610-edma.h
+new file mode 100644
+index 0000000..3ae481c
+--- /dev/null
++++ b/include/dt-bindings/dma/vf610-edma.h
+@@ -0,0 +1,103 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ *
++ */
++
++#ifndef __DT_BINDINGS_DMA_VF610_H__
++#define __DT_BINDINGS_DMA_VF610_H__
++
++/* DMAMUX0,3 reqeust slot number */
++#define DMA_MUXID0_UART0_RX	2
++#define DMA_MUXID0_UART0_TX	3
++#define DMA_MUXID0_UART1_RX	4
++#define DMA_MUXID0_UART1_TX	5
++#define DMA_MUXID0_UART2_RX	6
++#define DMA_MUXID0_UART2_TX	7
++#define DMA_MUXID0_UART3_RX	8
++#define DMA_MUXID0_UART3_TX	9
++#define DMA_MUXID0_DSPI0_RX	12
++#define DMA_MUXID0_DSPI0_TX	13
++#define DMA_MUXID0_DSPI1_RX	14
++#define DMA_MUXID0_DSPI1_TX	15
++#define DMA_MUXID0_SAI0_RX	16
++#define DMA_MUXID0_SAI0_TX	17
++#define DMA_MUXID0_SAI1_RX	18
++#define DMA_MUXID0_SAI1_TX	19
++#define DMA_MUXID0_SAI2_RX	20
++#define DMA_MUXID0_SAI2_TX	21
++#define DMA_MUXID0_PDB		22
++#define DMA_MUXID0_FTM0_CH0	24
++#define DMA_MUXID0_FTM0_CH1	25
++#define DMA_MUXID0_FTM0_CH2	26
++#define DMA_MUXID0_FTM0_CH3	27
++#define DMA_MUXID0_FTM0_CH4	28
++#define DMA_MUXID0_FTM0_CH5	29
++#define DMA_MUXID0_FTM0_CH6	30
++#define DMA_MUXID0_FTM0_CH7	31
++#define DMA_MUXID0_FTM1_CH0	32
++#define DMA_MUXID0_FTM1_CH1	33
++#define DMA_MUXID0_ADC0		34
++#define DMA_MUXID0_QUADSPI0	36
++#define DMA_MUXID0_GPIOA	38
++#define DMA_MUXID0_GPIOB	39
++#define DMA_MUXID0_GPIOC	40
++#define DMA_MUXID0_GPIOD	41
++#define DMA_MUXID0_GPIOE	42
++#define DMA_MUXID0_RLE_RX	45
++#define DMA_MUXID0_RLE_TX	46
++#define DMA_MUXID0_SPDIF_RX	47
++#define DMA_MUXID0_SPDIF_TX	48
++#define DMA_MUXID0_I2C0_RX	50
++#define DMA_MUXID0_I2C0_TX	51
++#define DMA_MUXID0_I2C1_RX	52
++#define DMA_MUXID0_I2C1_TX	53
++
++/* DMA MUX1,2 request slot number */
++#define DMA_MUXID1_UART4_RX	2
++#define DMA_MUXID1_UART4_TX	3
++#define DMA_MUXID1_UART5_RX	4
++#define DMA_MUXID1_UART5_TX	5
++#define DMA_MUXID1_SAI3_RX	8
++#define DMA_MUXID1_SAI3_TX	9
++#define DMA_MUXID1_DSPI2_RX	10
++#define DMA_MUXID1_DSPI2_TX	11
++#define DMA_MUXID1_DSPI3_RX	12
++#define DMA_MUXID1_DSPI3_TX	13
++#define DMA_MUXID1_FTM2_CH0	16
++#define DMA_MUXID1_FTM2_CH1	17
++#define DMA_MUXID1_FTM3_CH0	18
++#define DMA_MUXID1_FTM3_CH1	19
++#define DMA_MUXID1_FTM3_CH2	20
++#define DMA_MUXID1_FTM3_CH3	21
++#define DMA_MUXID1_FTM3_CH4	22
++#define DMA_MUXID1_FTM3_CH5	24
++#define DMA_MUXID1_FTM3_CH6	25
++#define DMA_MUXID1_FTM3_CH7	26
++#define DMA_MUXID1_QUADSPI1	27
++#define DMA_MUXID1_DAC0		32
++#define DMA_MUXID1_DAC1		33
++#define DMA_MUXID1_ESAI_BIFIFO_TX	34
++#define DMA_MUXID1_ESAI_BIFIFO_RX	35
++#define DMA_MUXID1_I2C2_RX	36
++#define DMA_MUXID1_I2C2_TX	37
++#define DMA_MUXID1_I2C3_RX	38
++#define DMA_MUXID1_I2C3_TX	39
++#define DMA_MUXID1_ASRC0_TX	40
++#define DMA_MUXID1_ASRC0_RX	41
++#define DMA_MUXID1_ASRC1_TX	42
++#define DMA_MUXID1_ASRC1_RX	43
++#define DMA_MUXID1_TIMER0	44
++#define DMA_MUXID1_TIMER1	45
++#define DMA_MUXID1_TIMER2	46
++#define DMA_MUXID1_TIMER3	47
++#define DMA_MUXID1_TIMER4	48
++#define DMA_MUXID1_TIMER5	49
++#define DMA_MUXID1_TIMER6	50
++#define DMA_MUXID1_TIMER7	51
++
++#endif
+-- 
+1.8.0
