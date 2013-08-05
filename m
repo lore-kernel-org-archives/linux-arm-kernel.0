@@ -1,43 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 Aug 2013 11:47:52 -0400
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <20130805153822.GD19631@mtj.dyndns.org>
-References: <20130629195549.GE3353@n2100.arm.linux.org.uk>
- <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
- <51D18DBA.6090608@ti.com> <51F1A7AA.8080700@ti.com>
- <20130725223658.GJ26107@mtj.dyndns.org> <51F1B17F.30902@ti.com>
- <20130726030812.GB30195@mtj.dyndns.org> <51FC1F3A.8090201@ti.com>
- <20130805150127.GC19631@mtj.dyndns.org> <51FFC4EA.40908@ti.com>
- <20130805153822.GD19631@mtj.dyndns.org>
-Message-ID: <51FFC928.8020603@ti.com>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Mon, 5 Aug 2013 15:51:14 +0000
+Subject: =?big5?B?tarOYDogW1BBVENIIHYzIDIvMl0gaTJjOiBpbXg6IEFkZCBWeWJyaWQgVkY2MTAg?=
+ =?big5?Q?I2C_controller_support?=
+In-Reply-To: <20130805095322.GP26614@pengutronix.de>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>
+ <20130805083050.GN26614@pengutronix.de>
+ <B56CDBE15CE27145A4B77D2D24263E851FC075@039-SN1MPN1-004.039d.mgd.msft.net>,
+ <20130805095322.GP26614@pengutronix.de>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851FD14C@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 August 2013 11:38 AM, Tejun Heo wrote:
-> Hello,
-> 
-> On Mon, Aug 05, 2013 at 11:29:46AM -0400, Santosh Shilimkar wrote:
->> So looks like I am bit confused here. The current memblock_alloc()
->> API just returns the physical address which not mapped memory.
-> 
-> The memory returned by memblock is mapped if the memory area being
-> allocated can be mappable.  To access, the address just needs to be
-> converted to va.
-> 
->> Most of the bootmem users including core code expects the
->> mapped memory pointer which the code can directly operate on.
->> So the current memblock_alloc() isn't going to help. The nobootmem.c
->> has __alloc_memory_core_early() which is actually used by most of
->> the bootmem wrappers to achieve the same. So my assumption was
->> that we need an equivalent exported memblock API.
->>
->> What am I missing?
-> 
-> Oh, you weren't.  I was.  I thought we already had full interface
-> implemented.  Yeah, it looks like we need to build something new
-> around memblock / __alloc_memory_core_early().
-> 
-Exactly. This is what actually I referred as the new API.
 
-Regards,
-Santosh
+> > > + [VF610_I2C] = {
+> > > +         .devtype = VF610_I2C,
+> > > +         .hwdata = &vf610_i2c_hwdata
+> > > + },
+> > >  };
+> >
+> > Why add this array?
+> > You should reference imx_i2c_hwdata/vf610_i2c_hwdata directly here.
+[Lu Jingchang-B35083]
+The imx_i2c_devtype[] array is used to support platform that doesn't support dts currently. So the array is added to make the driver consistent. Thanks.
+
+> >
+> > >
+> > >   if (of_id)
+> > >           pdev->id_entry = of_id->data;
+> >
+> > This is wrong in the original driver code. This field should be changed
+> > in a driver.
+ [Lu Jingchang-B35083]
+The assignment to id_entry is due to support both dts device and non-dts devices, just as you said, maybe this field shouldn't be changed out of platform driver core,
+so I will try to change this but make the drive for both dts and non-dts still work well. Thanks.
+
+
+
+Best Regards,
+Jingchang
