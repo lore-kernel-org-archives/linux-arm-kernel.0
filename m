@@ -1,36 +1,75 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 5 Aug 2013 11:06:14 +0200
-Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
-In-Reply-To: <20130805085333.GO23006@n2100.arm.linux.org.uk>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805104335.031b0fed@skate>
- <20130805085333.GO23006@n2100.arm.linux.org.uk>
-Message-ID: <20130805110614.6e7b0d0c@skate>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Mon,  5 Aug 2013 14:37:04 +0530
+Subject: [PATCH] mach-ks8695/Kconfig: Make MACH_KS8695 depends on PCI
+Message-ID: <1375693624-21548-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
+From: root <root@si-cspbld63.lge.net>
 
-On Mon, 5 Aug 2013 09:53:34 +0100, Russell King - ARM Linux wrote:
+This patch adds a Kconfig dependency on MACH_KS8695,MACH_CM* or MACH_IM*
+being available before PCI can be enabled. Without this patch,build system
+can lead to issues. This was discovered during randconfig testing,
+without PCI if any one of MACH_KS8695,MACH_CM* or MACH_IM* being enabled,
+leading to the following error:
 
-> > Yes, I have access to a Kirkwood t5325, which I'm currently trying to
-> > move to DT. Note that I also received Armada 370 audio hardware last
-> > week, so I'll be working on this as well in the future, this hardware
-> > has both in/out jack plugs as well as SPDIF ones.
-> > 
-> > So, yes, please Cc me on Kirkwood audio related developments.
-> 
-> Can you pick the patches off the mailing list(s)?  Re-sending them is
-> just going to be noise for everyone.
+LD      init/built-in.o
+arch/arm/mach-ks8695/built-in.o: In function `og_register_pci':
+arch/arm/mach-ks8695/board-og.c:47:undefined reference to `ks8695_init_pci'
+make: *** [vmlinux] Error 1
 
-Yes, sure. I was just talking about future postings of this patch set.
-For the current version, no need to resend just to Cc me.
+Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Deepak Saxena <dsaxena@linaro.org>
+Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-ks8695/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks!
-
-Thomas
+diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
+index a545976..29d7d9f 100644
+--- a/arch/arm/mach-ks8695/Kconfig
++++ b/arch/arm/mach-ks8695/Kconfig
+@@ -5,6 +5,7 @@ menu "Kendin/Micrel KS8695 Implementations"
+ config MACH_KS8695
+ 	bool "KS8695 development board"
+ 	select MIGHT_HAVE_PCI
++	depends on PCI
+ 	help
+ 	  Say 'Y' here if you want your kernel to run on the original
+ 	  Kendin-Micrel KS8695 development board.
+@@ -53,6 +54,7 @@ config MACH_CM4002
+ config MACH_CM4008
+ 	bool "OpenGear CM4008"
+ 	select MIGHT_HAVE_PCI
++	depends on PCI
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the OpenGear
+ 	  CM4008 Console Server. See http://www.opengear.com for more
+@@ -61,6 +63,7 @@ config MACH_CM4008
+ config MACH_CM41xx
+ 	bool "OpenGear CM41xx"
+ 	select MIGHT_HAVE_PCI
++	depends on PCI
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the OpenGear
+ 	  CM4016 or CM4048 Console Servers. See http://www.opengear.com for
+@@ -69,6 +72,7 @@ config MACH_CM41xx
+ config MACH_IM4004
+ 	bool "OpenGear IM4004"
+ 	select MIGHT_HAVE_PCI
++	depends on PCI
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the OpenGear
+ 	  IM4004 Secure Access Server. See http://www.opengear.com for
+@@ -77,6 +81,7 @@ config MACH_IM4004
+ config MACH_IM42xx
+ 	bool "OpenGear IM42xx"
+ 	select MIGHT_HAVE_PCI
++	depends on PCI
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the OpenGear
+ 	  IM4216 or IM4248 Console Servers. See http://www.opengear.com for
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.1.2
