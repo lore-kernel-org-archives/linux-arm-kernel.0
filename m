@@ -1,67 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 4 Aug 2013 23:47:58 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802115334.GN2465@mudshark.cambridge.arm.com>
- <20130802142010.GC7533@kroah.com>
- <20130802160932.GG5292@mudshark.cambridge.arm.com>
- <20130802223247.GC28831@kroah.com>
- <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
-Message-ID: <20130805064758.GO7656@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 Aug 2013 23:49:03 -0700
+Subject: [ARM ATTEND] Interested in R/M-class (!MMU), automated testing
+In-Reply-To: <20130804122527.GV3880@pengutronix.de>
+References: <51FBF93D.8040707@arm.com> <20130804122527.GV3880@pengutronix.de>
+Message-ID: <CAOesGMgnYLXRWRtKckofNpsxmRgT0cXL=JcAMirXibe92+AWOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130802 22:23]:
-> On Fri, Aug 2, 2013 at 3:32 PM, Greg KH <greg@kroah.com> wrote:
-> > On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
-> >> On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
-> >> > On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
-> >> > > We can change the mindset by yelling, but if you're writing a new
-> >> > > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
-> >> > > because you get a bunch of device-tree parsing code for free (see
-> >> > > drivers/of/platform.c).
-> >> >
-> >> > I know :(
-> >> >
-> >> > So, who do I "yell at", and what do I do to make things easier for you
-> >> > from the driver-core perspective?
-> >>
-> >> I would anticipate most of these drivers going through the arm-soc tree, so
-> >> Olof and Kevin would be doing the yelling. You could join in the chorus too!
-> >>
-> >> We basically need reviewers to adopt the position that a new bus should be
-> >> considered and dismissed before using the platform_bus, then you can yell
-> >> transitively through them.
-> >
-> > I don't scale if I'm forced to review every driver to ensure that they
-> > shouldn't be using platform device and should be creating their own bus
-> > type.  You can do that, along with the other ARM developers reviewing
-> > these new subsystems and code being added.
-> 
-> For most new platforms, using basic platform_bus devices makes sense
-> when the setup is simple and just has a few devices. It's only when
-> they need to add support for {S,IO}MMUs and get the more advanced
-> functionality going that things get messy and platform_bus stops
-> working.
+On Sun, Aug 4, 2013 at 5:25 AM, Robert Schwebel
+<r.schwebel@pengutronix.de> wrote:
 
-Yes, and I think we could get some more mileage out of platform bus
-by adding some hooks for things like bus specific reset. That's something
-that the device drivers don't need to know about.
- 
-> So, we have the option of having someone care about the {S,IO}MMU
-> pieces, and when they spot the attempts to make that work, push them
-> towards a proper bus architecture. Until then, the simpler solution is
-> probably a reasonable idea compared to having newcomers worry about
-> defining new bus architectures and raising the bar for what it takes
-> to sort out the initial contributions and getting engaged upstream.
+>> - Ways to do more automated testing of ARM kernels, including hearing
+>>   from other people what they use to build/boot/test/benchmark their
+>>   code (perhaps even get a discussion going about using the diverse
+>>   range of hardware people have around put to use as test-machines).
+>
+> That's pretty interesting; we have a test farm at PTX, but it mainly
+> does nightly build + boot tests on mainline, for systems we care of.
 
-Yes I'd like to avoid having multiple versions of the same driver
-to bind to various SoC specific busses that only differ at the bus
-level.
+I have a small (but growing) farm of boards here that I do some (so
+far) limited boot testing, but I do it a few times a day on mainline,
+and nightly on linux-next and arm-soc for-next branches. I also do it
+for -stable but right now only for published releases since I so far
+only handle pulling whole git branches.
 
-Regards,
+I also build every defconfig on arm at the same cadence. Everything's
+handled by a couple of scripts that emails me the results (as compared
+to building a status webpage that I have to go check). So essentially
+every morning I have an email with the fresh -next breakage waiting
+for me to look at.
 
-Tony
+The hardware comes from various sources; some I've bought myself,
+other I've been sent by kind vendors. All of them are "modern" though,
+i.e. v7-class hardware with decent amount of memory, etc. I netboot
+everything with local rootfs at the moment.
+
+
+I honestly don't know if there's much point in doing complex
+centralized testing/reporting. I've found that I never go look for the
+results. I don't regularly check Russell's autobuilder status, for
+example. Nor the kisskb -next build status. But having my own scripts
+email me has been useful. I do hope that most ARM subplatform
+maintainers have some semi-automated setup for frequent testing as
+well, but I know that reality is that far from all do.
+
+It could make sense to show what some of us use to give others
+examples of what might work for them. There's a thousand ways to build
+these kind of things, some elaborate and others quite simple. I've
+definitely started at the simple end myself. :)
+
+
+-Olof
