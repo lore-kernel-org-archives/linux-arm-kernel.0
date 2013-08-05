@@ -1,111 +1,67 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 5 Aug 2013 14:46:28 +0800
-Subject: [PATCH 5/8] ARM: tegra30: add LP1 suspend support
-In-Reply-To: <51F6FE89.4060402@wwwdotorg.org>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-6-git-send-email-josephl@nvidia.com>
- <51F6FE89.4060402@wwwdotorg.org>
-Message-ID: <1375685188.1731.19.camel@jlo-ubuntu-64.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 4 Aug 2013 23:47:58 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802115334.GN2465@mudshark.cambridge.arm.com>
+ <20130802142010.GC7533@kroah.com>
+ <20130802160932.GG5292@mudshark.cambridge.arm.com>
+ <20130802223247.GC28831@kroah.com>
+ <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
+Message-ID: <20130805064758.GO7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-07-30 at 07:45 +0800, Stephen Warren wrote:
-> On 07/26/2013 03:15 AM, Joseph Lo wrote:
-> > The LP1 suspend mode will power off the CPU, clock gated the PLLs and put
-> > SDRAM to self-refresh mode. Any interrupt can wake up device from LP1. The
-> > sequence when LP1 suspending:
+* Olof Johansson <olof@lixom.net> [130802 22:23]:
+> On Fri, Aug 2, 2013 at 3:32 PM, Greg KH <greg@kroah.com> wrote:
+> > On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
+> >> On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
+> >> > On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
+> >> > > We can change the mindset by yelling, but if you're writing a new
+> >> > > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
+> >> > > because you get a bunch of device-tree parsing code for free (see
+> >> > > drivers/of/platform.c).
+> >> >
+> >> > I know :(
+> >> >
+> >> > So, who do I "yell at", and what do I do to make things easier for you
+> >> > from the driver-core perspective?
+> >>
+> >> I would anticipate most of these drivers going through the arm-soc tree, so
+> >> Olof and Kevin would be doing the yelling. You could join in the chorus too!
+> >>
+> >> We basically need reviewers to adopt the position that a new bus should be
+> >> considered and dismissed before using the platform_bus, then you can yell
+> >> transitively through them.
+> >
+> > I don't scale if I'm forced to review every driver to ensure that they
+> > shouldn't be using platform device and should be creating their own bus
+> > type.  You can do that, along with the other ARM developers reviewing
+> > these new subsystems and code being added.
 > 
-> > diff --git a/arch/arm/mach-tegra/pm-tegra30.c b/arch/arm/mach-tegra/pm-tegra30.c
-> 
-> > +void tegra30_lp1_iram_hook(void)
-> > +{
-> > +	tegra30_lp1_iram.start_addr = &tegra30_iram_start;
-> > +	tegra30_lp1_iram.end_addr = &tegra30_iram_end;
-> 
-> If you need to fill in the values in that struct dynamically anyway, why
-> not make tegra_lp1_iram be a struct rather than a pointer, and write
-> directly to it?
-> 
-OK. Will fix.
+> For most new platforms, using basic platform_bus devices makes sense
+> when the setup is simple and just has a few devices. It's only when
+> they need to add support for {S,IO}MMUs and get the more advanced
+> functionality going that things get messy and platform_bus stops
+> working.
 
-> > +/*
-> > + * tegra30_lp1_reset
-> > + *
-> > + * reset vector for LP1 restore; copied into IRAM during suspend.
-> > + * Brings the system back up to a safe staring point (SDRAM out of
-> > + * self-refresh, PLLC, PLLM and PLLP reenabled, CPU running on PLLX,
-> > + * system clock running on the same PLL that it suspended at), and
-> > + * jumps to tegra_resume to restore virtual addressing.
-> > + * The physical address of tegra_resume expected to be stored in
-> > + * PMC_SCRATCH41.
-> > + *
-> > + * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_CODE_AREA AND MUST BE FIRST.
-> 
-> What does "AND MUST BE FIRST" mean?
-> 
-It means the LP1 reset vector needs to be copied to IRAM_CODE_AREA first
-before suspend to LP1. Looks no need this. Will remove it.
+Yes, and I think we could get some more mileage out of platform bus
+by adding some hooks for things like bus specific reset. That's something
+that the device drivers don't need to know about.
+ 
+> So, we have the option of having someone care about the {S,IO}MMU
+> pieces, and when they spot the attempts to make that work, push them
+> towards a proper bus architecture. Until then, the simpler solution is
+> probably a reasonable idea compared to having newcomers worry about
+> defining new bus architectures and raising the bar for what it takes
+> to sort out the initial contributions and getting engaged upstream.
 
-> > +ENTRY(tegra30_lp1_reset)
-> > +	/*
-> > +	 * The CPU and system bus are running at 32KHz and executing from
-> > +	 * IRAM when this code is executed; immediately switch to CLKM and
-> > +	 * enable PLLP, PLLM, PLLC, PLLA and PLLX.
-> > +	 */
-> > +	mov32	r0, TEGRA_CLK_RESET_BASE
-> > +
-> > +	mov	r1, #(1 << 28)
-> 
-> Some #defines for the various magic values used in this code would be
-> useful.
-It may still cause some confuse if I add a #defines value for it.
-Because it includes a clock policy and the clock source (the value maybe
-just 0). I add some comments for these codes about what they are doing.
-> 
-> > +tegra30_sdram_pad_save:
-> > +	.word	0
-> > +	.word	0
-> > +	.word	0
-> > +	.word	0
-> > +	.word	0
-> > +	.word	0
-> > +	.word	0
-> > +	.word	0
-> 
-> This might be simpler, and easier to validate it's the right length:
-> 
->         .rept   8
->         .long   0
->         .endr
-> 
-> > +tegra30_sdram_pad_address:
-> > +	.word	TEGRA_EMC_BASE + EMC_CFG				@0x0
-> > +	.word	TEGRA_EMC_BASE + EMC_ZCAL_INTERVAL			@0x4
-> > +	.word	TEGRA_EMC_BASE + EMC_AUTO_CAL_INTERVAL			@0x8
-> > +	.word	TEGRA_EMC_BASE + EMC_XM2VTTGENPADCTRL			@0xc
-> > +	.word	TEGRA_EMC_BASE + EMC_XM2VTTGENPADCTRL2			@0x10
-> > +	.word	TEGRA_PMC_BASE + PMC_IO_DPD_STATUS			@0x14
-> > +	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_CLK_SOURCE_MSELECT	@0x18
-> > +	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_SCLK_BURST		@0x1c
-> > +
-> > +tegra30_sdram_pad_size:
-> > +	.word	tegra30_sdram_pad_address - tegra30_sdram_pad_save
-> 
-> Perhaps if you swapp the order of declaring tegra30_sdram_pad_save and
-> tegra30_sdram_pad_address, you can even do something like:
-> 
-> 	.rept (tegra30_sdram_pad_addr_end - tegra30_sdram_pad_addr) / 4
-> 
-> ?
-OK. Looks better. Will do this.
+Yes I'd like to avoid having multiple versions of the same driver
+to bind to various SoC specific busses that only differ at the bus
+level.
 
-> 
-> > +	/* 2uS delay delay between changing SCLK and CCLK */
-> > +	wait_for_us r1, r7, r9
-> > +	add	r1, r1, #2
-> > +	wait_until r1, r7, r9
-> 
-> Ah, I see how wait_for_us is used now. Perhaps rename it
-> wait_for_us_boundary or wait_for_us_tick? Alternatively, perhaps
-> wait_until can just incorporate that logic itself?
-Indeed. Will fix.
+Regards,
+
+Tony
