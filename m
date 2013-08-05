@@ -1,33 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Aug 2013 15:59:56 +0100
-Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
-In-Reply-To: <51FFA348.2010503@gmail.com>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
- <51FFA348.2010503@gmail.com>
-Message-ID: <20130805145955.GW23006@n2100.arm.linux.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 5 Aug 2013 11:01:27 -0400
+Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
+In-Reply-To: <51FC1F3A.8090201@ti.com>
+References: <20130629175743.GA382@mtj.dyndns.org>
+ <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
+ <20130629195549.GE3353@n2100.arm.linux.org.uk>
+ <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
+ <51D18DBA.6090608@ti.com> <51F1A7AA.8080700@ti.com>
+ <20130725223658.GJ26107@mtj.dyndns.org> <51F1B17F.30902@ti.com>
+ <20130726030812.GB30195@mtj.dyndns.org> <51FC1F3A.8090201@ti.com>
+Message-ID: <20130805150127.GC19631@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 03:06:16PM +0200, Sebastian Hesselbarth wrote:
-> And that is what will be true for almost all codecs we hook up on
-> Marvell SoCs. The audio controller is very simple with only mute
-> control available. We need to connect either i2s or spdif or both to
-> any codec and the codecs output. The codecs is determined by phandle
-> and the output (codec_dai_name) could be determined by the phandle's
-> arg, e.g. 0 for the first codec_dai provided.
+Hello,
 
-Sebastian,
+On Fri, Aug 02, 2013 at 05:06:02PM -0400, Santosh Shilimkar wrote:
+> Looking at the situation, how about proceeding with patch updating
+> the bootmem API signatures to use phys_addr_t  which can unblock me
+> to get my machine working.
 
-I suggest just not fucking bothering with this.  Mark has no intention
-to listen to what we need to make SPDIF and I2S work on this hardware,
-so persuing getting this stuff into mainline is just a total and utter
-waste of time.
+I'm not sure about that.  No matter how you play it, it'll end up
+duplicating memblock interface.
 
-Maybe when Mark stops being an arsehole and starts trying to understand
-what people need from ASoC, and he starts documenting this stuff, it
-might be possible to resurect this, but quite frankly with his attitude
-towards people trying to use his code, I think we're probably far better
-off dumping ASoC and going in at the ALSA level instead.
+> Introduction of new API, conversions of core kernel code and then
 
-I've had enough of ASoC crap.
+What new API are we talking about?  Wasn't the plan to convert core
+kernel code to use memblock and let bootmem emulate bootmem API?
+There's no new API.
+
+> arches moving away from bootmem is going to take significant time
+
+And arches moving away from bootmem doesn't have to happen now.
+
+> anyways. I will continue my effort to get ARM port moved to no-bootmem
+> and get that merged.
+
+Thanks.
+
+-- 
+tejun
