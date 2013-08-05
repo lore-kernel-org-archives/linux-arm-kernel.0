@@ -1,24 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Aug 2013 17:16:04 +0100
-Subject: [PATCH RFC 02/13] ASoC: kirkwood: use devm_clk_get() for the
- external clock
-In-Reply-To: <E1V63tP-0004lH-4Q@rmk-PC.arm.linux.org.uk>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <E1V63tP-0004lH-4Q@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130805161604.GP9858@sirena.org.uk>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 5 Aug 2013 11:14:57 -0500
+Subject: [PATCH v3 12/12] dma: edma: Return if nothing left todo in
+ edma_execute
+In-Reply-To: <1375719297-12871-1-git-send-email-joelf@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+Message-ID: <1375719297-12871-13-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 04, 2013 at 08:23:03PM +0100, Russell King wrote:
-> Use devm_clk_get() to simplify the error path for the external clock.
+It is possible edma_execute is called even when all the SG
+elements have been submitted for transmission, we add a check
+for the same and avoid executing the rest of the function.
 
-I've applied the diff that remains from the existing upstream code
-(which frees extclk if it's just the internal clock) with a reworded
-commit message, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/605f101b/attachment.sig>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ drivers/dma/edma.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index eca1b47..62987fc 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -168,6 +168,9 @@ static void edma_execute(struct edma_chan *echan)
+ 	total_left = edesc->pset_nr - edesc->total_processed;
+ 	total_link_set = total_left > MAX_NR_LS ? MAX_NR_LS : total_left;
+ 
++	if (!total_left)
++		return;
++
+ 	/* First time, setup 2 cyclically linked sets, each containing half
+ 	   the slots allocated for this channel */
+ 	if (edesc->total_processed == 0) {
+-- 
+1.7.9.5
