@@ -1,35 +1,68 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Aug 2013 03:16:14 +0900
-Subject: [PATCH v4 09/13] ARM: dts: Add SPI1 controller and s5c73m3 sensor
- node for TRATS2
-In-Reply-To: <51FFE85B.7050606@samsung.com>
-References: <1374671845-30373-1-git-send-email-s.nawrocki@samsung.com>
- <1374671845-30373-10-git-send-email-s.nawrocki@samsung.com>
- <51FFE694.3070503@samsung.com> <51FFE85B.7050606@samsung.com>
-Message-ID: <51FFEBEE.2050309@samsung.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Mon, 5 Aug 2013 22:16:31 +0400
+Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
+In-Reply-To: <201308042257.58707.arnd@arndb.de>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <20130804085046.6e6cb18954a57dbddeee814d@mail.ru>
+ <201308042246.54776.arnd@arndb.de>
+ <201308042257.58707.arnd@arndb.de>
+Message-ID: <20130805221631.f740b0d39de0e14e641f477c@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/13 03:00, Sylwester Nawrocki wrote:
-> On 08/05/2013 07:53 PM, Kukjin Kim wrote:
->> On 07/24/13 22:17, Sylwester Nawrocki wrote:
->>> From: Andrzej Hajda<a.hajda@samsung.com>
->>>
->>> This patch add dts entries required for the SPI bus used for
->>> firware upload by the S5C73M3 camera.
->>>
->>> Signed-off-by: Andrzej Hajda<a.hajda@samsung.com>
->>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->>
->> Sylwester, probably you missed your sign here?
->
-> Yes, I think it should be added, since I was sending out the patch.
-> Sorry about this omission and typo in patch 05/13.
->
-No problem, and if you want let me amend on this for your sign. I 
-couldn't it without your permission because it is a legal issue ;)
+On Sun, 4 Aug 2013 22:57:58 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-> Thank you for applying this series.
+> On Sunday 04 August 2013, Arnd Bergmann wrote:
+> > On Sunday 04 August 2013, Alexander Shiyan wrote:
+> > > On Sat, 3 Aug 2013 21:45:41 +0200
+> > > Arnd Bergmann <arnd@arndb.de> wrote:
+> > > 
+> > > [...]
+> > > > > +static void __iomem __init *clps711x_ioremap_one(phys_addr_t reg)
+> > > > > +{
+> > > > > +       void __iomem *ret;
+> > > > > +
+> > > > > +       if (!request_mem_region(clps711x_intc->phys_base + reg, SZ_4, NULL))
+> > > > > +               return ERR_PTR(-EBUSY);
+> > > > > +
+> > > > > +       ret = ioremap(clps711x_intc->phys_base + reg, SZ_4);
+> > > > > +       if (!ret)
+> > > > > +               return ERR_PTR(-ENOMEM);
+> > > > > +
+> > > > > +       return ret;
+> > > > 
+> > > > Another unrelated comment: Doing repeated ioremap() and request_mem_region calls
+> > > > is rather wasteful as every single call will consume resources. Better do a single
+> > > > ioremap in the probe function and just add the offsets later.
+> > > 
+> > > Registers are not arranged linearly for each submodule, so for example there are
+> > > registers for LCD, Timers, PWM, UART etc. between INTMR1 and INTMR2.
+> > > Single request cannot be used here, since it block access to these holes from drivers.
+> > 
+> > Well, you could still have a single ioremap() but separate request_mem_region()
+> > calls then. Each ioremap() actually installs a full page anyway.
+> > 
+> > Alternatively, you could use the syscon driver to provide access to all the registers.
+> 
+> There is another problem, which is that you have overlapping register ranges
+> in the DT if the interrupt controller device node contains all the registers
+> including those that are used by the other drivers. Using the syscon driver
+> would solve that, too.
+> 
+> Rethinking the whole situation, I wonder if the EOI registers could be accessed
+> by the individual drivers instead, if they are in their register sets anyway.
 
-You're welcome, thanks.
-- Kukjin
+Unfortunately, no.
+
+> Handling them in the irqchip driver probably seemed like a logical solution
+> when the code was initially written, but if you move that access into the
+> device drivers, you can probably remove the irqchip driver entirely and just
+> use the generic irqchip implementation.
+
+ioremap for a whole set of CPU registers is called from map_io, so ioremap
+returns already mapped address, that is, it's just converting physical to
+virtual addresses.
+
+-- 
+Alexander Shiyan <shc_work@mail.ru>
