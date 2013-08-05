@@ -1,42 +1,28 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 5 Aug 2013 11:01:27 -0400
-Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
-In-Reply-To: <51FC1F3A.8090201@ti.com>
-References: <20130629175743.GA382@mtj.dyndns.org>
- <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
- <20130629195549.GE3353@n2100.arm.linux.org.uk>
- <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
- <51D18DBA.6090608@ti.com> <51F1A7AA.8080700@ti.com>
- <20130725223658.GJ26107@mtj.dyndns.org> <51F1B17F.30902@ti.com>
- <20130726030812.GB30195@mtj.dyndns.org> <51FC1F3A.8090201@ti.com>
-Message-ID: <20130805150127.GC19631@mtj.dyndns.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 Aug 2013 16:03:09 +0100
+Subject: [alsa-devel] [PATCH RFC 00/13] Adding SPDIF support to
+ kirkwood-i2s
+In-Reply-To: <51FFB267.3030107@metafoo.de>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
+ <51FFA348.2010503@gmail.com> <51FFB267.3030107@metafoo.de>
+Message-ID: <20130805150309.GM9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Aug 05, 2013 at 04:10:47PM +0200, Lars-Peter Clausen wrote:
 
-On Fri, Aug 02, 2013 at 05:06:02PM -0400, Santosh Shilimkar wrote:
-> Looking at the situation, how about proceeding with patch updating
-> the bootmem API signatures to use phys_addr_t  which can unblock me
-> to get my machine working.
+> In my opinion having different bindings for each board is not a good idea.
+> Having a common set of property names will allow us to factor out the
+> parsing to the ASoC core instead of doing this by hand for each board driver.
 
-I'm not sure about that.  No matter how you play it, it'll end up
-duplicating memblock interface.
-
-> Introduction of new API, conversions of core kernel code and then
-
-What new API are we talking about?  Wasn't the plan to convert core
-kernel code to use memblock and let bootmem emulate bootmem API?
-There's no new API.
-
-> arches moving away from bootmem is going to take significant time
-
-And arches moving away from bootmem doesn't have to happen now.
-
-> anyways. I will continue my effort to get ARM port moved to no-bootmem
-> and get that merged.
-
-Thanks.
-
--- 
-tejun
+Yeah, that's the idea - right now there's blanks that need filling in by
+the machine drivers so we do have them but once those get dealt with the
+compatible strings can just be moved over into a generic binding.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/6e304dae/attachment.sig>
