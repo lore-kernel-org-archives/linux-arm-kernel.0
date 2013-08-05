@@ -1,103 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 05 Aug 2013 07:59:01 -0500
-Subject: [PATCH 1/2] OF: Add helper for matching against linux, stdout-path
-In-Reply-To: <1375706445-15375-2-git-send-email-s.hauer@pengutronix.de>
-References: <1375706445-15375-1-git-send-email-s.hauer@pengutronix.de>
- <1375706445-15375-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <51FFA195.6080903@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 05 Aug 2013 15:06:16 +0200
+Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
+In-Reply-To: <20130805115947.GA9858@sirena.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
+Message-ID: <51FFA348.2010503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 07:40 AM, Sascha Hauer wrote:
-> devicetrees may have a linux,stdout-path property in the chosen
-> node describing the console device. This adds a helper function
-> to match a device against this property so a driver can call
-> add_preferred_console for a matching device.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On 08/05/13 13:59, Mark Brown wrote:
+> On Sun, Aug 04, 2013 at 11:45:30PM +0200, Sebastian Hesselbarth wrote:
+>> On 08/04/2013 09:21 PM, Russell King - ARM Linux wrote:
+>
+>>>                  .name = "S/PDIF1",
+>>>                  .stream_name = "IEC958 Playback",
+>>>                  .platform_name = "mvebu-audio.1",
+>>>                  .cpu_dai_name = "mvebu-audio.1",
+>>>                  .codec_dai_name = "dit-hifi",
+>>>                  .codec_name = "spdif-dit",
+>
+>> Not a big deal for DT. I suggest to have a "audio-codecs" property that
+>> link CPU DAI to codec(s). One thing, I have noticed is that currently
+>> you need to supply both codec_name (or DT node) _and_ codec_dai_name.
+>> For that it would be helpful, if ASoC supplies helpers to get the DAI
+>> by index and use phandle with args here.
+>
+> This should follow the same pattern as the other board bindings.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Mark,
 
-There are no existing users that could take advantage of this?
+looking at e.g. nvidia,tegra-audio-*.txt bindings, I guess you are
+proposing to have a new binding for every SoC/codec/board combination?
+Also, you should have seen "ASoC: fsl: Add S/PDIF machine driver", which
+is - again - proposing a new binding for fsl with spdif "codec".
 
-Rob
+You really want me to go the same way or is there any "other board
+binding" I should follow?
 
-> ---
->  drivers/of/base.c  | 26 ++++++++++++++++++++++++++
->  include/linux/of.h |  7 +++++++
->  2 files changed, 33 insertions(+)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 5c54279..1c3c79c 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -32,6 +32,7 @@ struct device_node *of_allnodes;
->  EXPORT_SYMBOL(of_allnodes);
->  struct device_node *of_chosen;
->  struct device_node *of_aliases;
-> +static struct device_node *of_stdout;
->  
->  DEFINE_MUTEX(of_aliases_mutex);
->  
-> @@ -1595,6 +1596,15 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
->  	of_chosen = of_find_node_by_path("/chosen");
->  	if (of_chosen == NULL)
->  		of_chosen = of_find_node_by_path("/chosen at 0");
-> +
-> +	if (of_chosen) {
-> +		const char *name;
-> +
-> +		name = of_get_property(of_chosen, "linux,stdout-path", NULL);
-> +		if (name)
-> +			of_stdout = of_find_node_by_path(name);
-> +	}
-> +
->  	of_aliases = of_find_node_by_path("/aliases");
->  	if (!of_aliases)
->  		return;
-> @@ -1703,3 +1713,19 @@ const char *of_prop_next_string(struct property *prop, const char *cur)
->  	return curv;
->  }
->  EXPORT_SYMBOL_GPL(of_prop_next_string);
-> +
-> +/**
-> + * of_device_is_stdout_path - check if a device node matches the
-> + *                            linux,stdout-path property
-> + *
-> + * Check if this device node matches the linux,stdout-path property
-> + * in the chosen node. return true if yes, false otherwise.
-> + */
-> +int of_device_is_stdout_path(struct device_node *dn)
-> +{
-> +	if (!of_stdout)
-> +		return false;
-> +
-> +	return of_stdout == dn;
-> +}
-> +EXPORT_SYMBOL_GPL(of_device_is_stdout_path);
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 1fd08ca..429e168 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -343,6 +343,8 @@ const char *of_prop_next_string(struct property *prop, const char *cur);
->  		s;						\
->  		s = of_prop_next_string(prop, s))
->  
-> +int of_device_is_stdout_path(struct device_node *dn);
-> +
->  #else /* CONFIG_OF */
->  
->  static inline const char* of_node_full_name(struct device_node *np)
-> @@ -505,6 +507,11 @@ static inline int of_machine_is_compatible(const char *compat)
->  	return 0;
->  }
->  
-> +static inline int of_device_is_stdout_path(struct device_node *dn)
-> +{
-> +	return 0;
-> +}
-> +
->  #define of_match_ptr(_ptr)	NULL
->  #define of_match_node(_matches, _node)	NULL
->  #define of_property_for_each_u32(np, propname, prop, p, u) \
-> 
+>> i2s1: audio-controller at b0000 {
+>> 	compatible = "marvell,dove-i2s";
+>> 	reg = <0xb0000 0x2345>;
+>> 	audio-codecs = <&spdif 0>;
+>> };
+>
+> No, things are glued together using the machine driver - again, look at
+> how all the other systems work.  The wiring on the board can get
+> interesting enough to need a binding of its own, for very simple
+> bindings that should just be pointing to a generic driver.
+
+And that is what will be true for almost all codecs we hook up on
+Marvell SoCs. The audio controller is very simple with only mute
+control available. We need to connect either i2s or spdif or both to
+any codec and the codecs output. The codecs is determined by phandle
+and the output (codec_dai_name) could be determined by the phandle's
+arg, e.g. 0 for the first codec_dai provided.
+
+That will be one machine driver for possibly all Marvell boards, not
+what e.g. tegra is doing with one machine driver for each board they
+can find. I understand that the exact wiring on each board may get
+complicated, but I don't see why a (well thought) binding should not
+be able to describe it?
+
+Sebastian
