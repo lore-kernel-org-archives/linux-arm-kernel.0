@@ -1,60 +1,54 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 05 Aug 2013 16:28:16 +0100
-Subject: Kexec: BE kernel on ARM VE TC2
-In-Reply-To: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
-References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
-Message-ID: <51FFC490.5090907@codethink.co.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 5 Aug 2013 11:29:46 -0400
+Subject: [PATCH] WIP: HACK: LPAE, BOOTMEM and NO_BOOTMEM
+In-Reply-To: <20130805150127.GC19631@mtj.dyndns.org>
+References: <20130629175743.GA382@mtj.dyndns.org>
+ <CAE9FiQXHuP-n0eZ9wN73V4nSvE+XEExDsx1t50_=YaW+V=LGLg@mail.gmail.com>
+ <20130629195549.GE3353@n2100.arm.linux.org.uk>
+ <CAE9FiQUoVNvWmmTV2+ZkU_nMxFToTHw6QLwp_Z_EjwMzqdLwuA@mail.gmail.com>
+ <51D18DBA.6090608@ti.com> <51F1A7AA.8080700@ti.com>
+ <20130725223658.GJ26107@mtj.dyndns.org> <51F1B17F.30902@ti.com>
+ <20130726030812.GB30195@mtj.dyndns.org> <51FC1F3A.8090201@ti.com>
+ <20130805150127.GC19631@mtj.dyndns.org>
+Message-ID: <51FFC4EA.40908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/13 13:12, Vijay Kilari wrote:
-> Hi Will,
->
-> I am trying to make kexec work on BE kernel on ARM VE TC2.
->
-> First, to make KEXEC work with SMP on ARM VE TC2 board,
-> I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
->
-> However, I made below changes to make KEXEC work for BE kernel.
-> my question is: why delay is required for board to reboot with kexec?.
-> Is it platform issue?.
->
-> diff --git a/arch/arm/kernel /machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-> index 4fb074c..0fb0ff9 100644
-> --- a/arch/arm/kernel/machine_kexec.c
-> +++ b/arch/arm/kernel/machine_kexec.c
-> @@ -123,6 +123,18 @@ void machine_crash_shutdown(struct pt_regs *regs)
->          printk(KERN_INFO "Loading crashdump kernel...\n");
->   }
->
-> +static void byte_copy_relocate_kernel(void *dst, const void *src, int size)
-> +{
-> +        char *d, *s;
-> +        d = (char *) dst;
-> +        s = (char *) src;
-> +        while (size>  0)
-> +        {
-> +                *d++ = *s++;
-> +                size--;
-> +        }
-> +}
-> +
->   /*
->    * Function pointer to optional machine-specific reinitialization
->    */
-> @@ -155,9 +167,8 @@ void machine_kexec(struct kimage *image)
->
->
->          /* copy our kernel relocation code to the control code page */
-> -       memcpy(reboot_code_buffer,
-> -              relocate_new_kernel, relocate_new_kernel_size);
-> -
-> +       byte_copy_relocate_kernel(reboot_code_buffer,
-> +              relocate_new_kernel, relocate_new_kernel_size);
+On Monday 05 August 2013 11:01 AM, Tejun Heo wrote:
+> Hello,
+> 
+> On Fri, Aug 02, 2013 at 05:06:02PM -0400, Santosh Shilimkar wrote:
+>> Looking at the situation, how about proceeding with patch updating
+>> the bootmem API signatures to use phys_addr_t  which can unblock me
+>> to get my machine working.
+> 
+> I'm not sure about that.  No matter how you play it, it'll end up
+> duplicating memblock interface.
+> 
+fair enough.
 
-you should be able to use memcpy() here, as it shouldn't change the
-endian-ness of the data being copied.
+>> Introduction of new API, conversions of core kernel code and then
+> 
+> What new API are we talking about?  Wasn't the plan to convert core
+> kernel code to use memblock and let bootmem emulate bootmem API?
+> There's no new API.
+> 
+So looks like I am bit confused here. The current memblock_alloc()
+API just returns the physical address which not mapped memory.
+Most of the bootmem users including core code expects the
+mapped memory pointer which the code can directly operate on.
+So the current memblock_alloc() isn't going to help. The nobootmem.c
+has __alloc_memory_core_early() which is actually used by most of
+the bootmem wrappers to achieve the same. So my assumption was
+that we need an equivalent exported memblock API.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+What am I missing?
+
+>> arches moving away from bootmem is going to take significant time
+> 
+> And arches moving away from bootmem doesn't have to happen now.
+> 
+I agree. The core code conversion is more of an issue.
+
+Regards,
+Santosh
