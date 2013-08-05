@@ -1,209 +1,92 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 5 Aug 2013 08:26:38 -0400
-Subject: [PATCH 1/2] ARM: remove dmacap,memset from Device tree binding
-In-Reply-To: <20130805095341.GA7594@e106331-lin.cambridge.arm.com>
-References: <1372762453-12018-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1372762453-12018-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130725153104.GH23879@titan.lakedaemon.net>
- <20130804010904.GB19280@titan.lakedaemon.net>
- <20130805095341.GA7594@e106331-lin.cambridge.arm.com>
-Message-ID: <20130805122638.GE19280@titan.lakedaemon.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 05 Aug 2013 14:26:48 +0200
+Subject: [PATCH 0/2] Exynos: MFC: clean up device tree bindings
+Message-ID: <1375705610-12724-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 10:53:41AM +0100, Mark Rutland wrote:
-> On Sun, Aug 04, 2013 at 02:09:04AM +0100, Jason Cooper wrote:
-> > DT Maintainers,
-> > 
-> > It's been a week with no comment.  Shall I assume it's ok to apply
-> > this?
-> 
-> Apologies for the delay, still catching up on binding review.
-> 
-> I'm not entirely sure on this. The property described is still true for
-> the device, even if the kernel's not using that information now. My
-> feeling would be to keep them, unless there's a plan to better describe
-> the properties of the XOR channels.
-> 
-> It shouldn't harm the kernel to have some properties we don't use at
-> this point in time. If we want to reorganise the binding, the first step
-> would be to make the properties as deprecated, rather than removing them
-> outright.
+Hello,
 
-Ok, that matches what I was originally thinking.  The bindings are
-supposed to be OS-agnostic, so the fact that we no longer use it is
-irrelevant.  The hardware still has the capability.
+This patch series are an attempt to cleanup the reserved memory device
+tree bindings for MFC device. MFC device has two memory ports (AXI
+masters), which are used to do DMA. Usually separate memory regions are
+being defined for each of those memory ports to improve performance.
+Some versions of MFC block have also significant limitation on the
+possible address range available for each of those memory ports/banks.
 
-Sebastian, I'm just going to drop this patch.
+In the board file era, there have been two additional platform devices
+defined for each of memory ports (named "s5p-mfc-l" and "s5p-mfc-r") to
+let the driver distinguish memory allocations done for each of them.
+Each of those platform devices might have special DMA ops assigned to
+fulfil specific memory requirements for a given memory port.
 
-thx,
+Later, when device tree binding was added for MFC device, those memory
+ports were designed as two additional properties: "samsung,mfc-l" and
+"samsung,mfc-r" for codec node. This approach however has some
+significant limitation, so I propose to redesign it before the binding
+become considered as stable.
 
-Jason.
+The first problem with the proposed bindings is the fact that
+"samsung,mfc-r"/"samsung,mfc-l" properties are tied only to "base
+address + size" attributes of reserved memory and do not allow to assign
+any other attributes to those memory ports. This limits using those
+memory ports only to simple reserved memory.
 
-> > On Thu, Jul 25, 2013 at 11:31:04AM -0400, Jason Cooper wrote:
-> > > On Tue, Jul 02, 2013 at 12:54:12PM +0200, Sebastian Hesselbarth wrote:
-> > > > DMA_MEMSET support has been removed, so update the device tree files
-> > > > and corresponding binding documentation for Marvell SoCs.
-> > > > 
-> > > > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > > > ---
-> > > > Cc: Russell King <linux@arm.linux.org.uk> 
-> > > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > > Cc: Andrew Lunn <andrew@lunn.ch>
-> > > > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com> 
-> > > > Cc: devicetree-discuss at lists.ozlabs.org 
-> > > > Cc: linux-kernel at vger.kernel.org 
-> > > > Cc: linux-arm-kernel at lists.infradead.org 
-> > > > ---
-> > > >  Documentation/devicetree/bindings/dma/mv-xor.txt |    2 --
-> > > >  arch/arm/boot/dts/armada-370.dtsi                |    2 --
-> > > >  arch/arm/boot/dts/armada-xp.dtsi                 |    2 --
-> > > >  arch/arm/boot/dts/dove.dtsi                      |    2 --
-> > > >  arch/arm/boot/dts/kirkwood.dtsi                  |    2 --
-> > > >  arch/arm/boot/dts/orion5x.dtsi                   |    1 -
-> > > >  6 files changed, 0 insertions(+), 11 deletions(-)
-> > > 
-> > > Adding the new devicetree ml to the Cc:
-> > > 
-> > > I'm fine with the changes to the dts{i} files, but I think the binding
-> > > document should be handled differently.
-> > > 
-> > > thx,
-> > > 
-> > > Jason.
-> > > 
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
-> > > > index 7c6cb7f..68f7004 100644
-> > > > --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
-> > > > +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
-> > > > @@ -14,7 +14,6 @@ properties:
-> > > >  
-> > > >  And the following optional properties:
-> > > >  - dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
-> > > > -- dmacap,memset to indicate that the XOR channel is capable of memset operations
-> > > >  - dmacap,xor to indicate that the XOR channel is capable of xor operations
-> > > >  
-> > > >  Example:
-> > > > @@ -35,6 +34,5 @@ xor at d0060900 {
-> > > >  	      interrupts = <52>;
-> > > >  	      dmacap,memcpy;
-> > > >  	      dmacap,xor;
-> > > > -	      dmacap,memset;
-> > > >  	};
-> > > >  };
-> > > > diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> > > > index fa3dfc6..a315ad1 100644
-> > > > --- a/arch/arm/boot/dts/armada-370.dtsi
-> > > > +++ b/arch/arm/boot/dts/armada-370.dtsi
-> > > > @@ -132,7 +132,6 @@
-> > > >  					interrupts = <52>;
-> > > >  					dmacap,memcpy;
-> > > >  					dmacap,xor;
-> > > > -					dmacap,memset;
-> > > >  				};
-> > > >  			};
-> > > >  
-> > > > @@ -151,7 +150,6 @@
-> > > >  					interrupts = <95>;
-> > > >  					dmacap,memcpy;
-> > > >  					dmacap,xor;
-> > > > -					dmacap,memset;
-> > > >  				};
-> > > >  			};
-> > > >  
-> > > > diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> > > > index 416eb94..4b3dd56 100644
-> > > > --- a/arch/arm/boot/dts/armada-xp.dtsi
-> > > > +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> > > > @@ -114,7 +114,6 @@
-> > > >  					interrupts = <52>;
-> > > >  					dmacap,memcpy;
-> > > >  					dmacap,xor;
-> > > > -					dmacap,memset;
-> > > >  				};
-> > > >  			};
-> > > >  
-> > > > @@ -134,7 +133,6 @@
-> > > >  					interrupts = <95>;
-> > > >  					dmacap,memcpy;
-> > > >  					dmacap,xor;
-> > > > -					dmacap,memset;
-> > > >  				};
-> > > >  			};
-> > > >  
-> > > > diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> > > > index 6cab468..2cef34f 100644
-> > > > --- a/arch/arm/boot/dts/dove.dtsi
-> > > > +++ b/arch/arm/boot/dts/dove.dtsi
-> > > > @@ -232,7 +232,6 @@
-> > > >  
-> > > >  			channel1 {
-> > > >  				interrupts = <40>;
-> > > > -				dmacap,memset;
-> > > >  				dmacap,memcpy;
-> > > >  				dmacap,xor;
-> > > >  			};
-> > > > @@ -253,7 +252,6 @@
-> > > >  
-> > > >  			channel1 {
-> > > >  				interrupts = <43>;
-> > > > -				dmacap,memset;
-> > > >  				dmacap,memcpy;
-> > > >  				dmacap,xor;
-> > > >  			};
-> > > > diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> > > > index 9809fc1..078637c 100644
-> > > > --- a/arch/arm/boot/dts/kirkwood.dtsi
-> > > > +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> > > > @@ -126,7 +126,6 @@
-> > > >  			      interrupts = <6>;
-> > > >  			      dmacap,memcpy;
-> > > >  			      dmacap,xor;
-> > > > -			      dmacap,memset;
-> > > >  			};
-> > > >  		};
-> > > >  
-> > > > @@ -146,7 +145,6 @@
-> > > >  			      interrupts = <8>;
-> > > >  			      dmacap,memcpy;
-> > > >  			      dmacap,xor;
-> > > > -			      dmacap,memset;
-> > > >  			};
-> > > >  		};
-> > > >  
-> > > > diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-> > > > index 892c64e..f82ece7 100644
-> > > > --- a/arch/arm/boot/dts/orion5x.dtsi
-> > > > +++ b/arch/arm/boot/dts/orion5x.dtsi
-> > > > @@ -120,7 +120,6 @@
-> > > >  			      interrupts = <31>;
-> > > >  			      dmacap,memcpy;
-> > > >  			      dmacap,xor;
-> > > > -			      dmacap,memset;
-> > > >  			};
-> > > >  		};
-> > > >  
-> > > > -- 
-> > > > 1.7.2.5
-> > > > 
-> > > > 
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The second issue with those attributes is the fact that they are very
+specific to the MFC device, while reserved memory region is something
+more generic, which can be used for other devices as well. For example
+even on Exynos4 platform, similar reserved memory handling will be
+needed for the FIMC ISP device.
+
+For handling reserved memory regions and having a method to assign them
+to particular device I have posted the patches [1], which add device
+tree support to Contiguous Memory Allocator and simple reserved memory
+allocator based on dma_declare_coherent() function.
+
+This patch series is my proposal for replacing those custom bindings
+with generic approach, proposed in [1]. To get it working we need
+separate device node for each memory port, what has been achieved by
+adding "simple-bus" compatibility entry to the main MFC device node and
+adding two child nodes, which represent each memory port. Those child
+nodes have compatible property set to "samsung,memport".
+
+With such a structure "dma-memory-region" property with a phandle to
+respective reserved region can be easily added to the child nodes of MFC
+device. The advantage of such approach is the fact that those child
+nodes can be also used for adding properties for IOMMU (SYSMMU)
+controllers. This way also bindings for SYSMMU and the code, which
+handles it can be simplified, because respective device tree part better
+matches physical hardware design.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/257615/
+
+
+Patch summary:
+
+Marek Szyprowski (2):
+  ARM: Exynos: replace custom MFC reserved memory handling with generic
+    code
+  media: s5p-mfc: remove DT hacks and simplify initialization code
+
+ .../devicetree/bindings/media/s5p-mfc.txt          |   63 +++++++++++++---
+ arch/arm/boot/dts/exynos4.dtsi                     |   10 ++-
+ arch/arm/boot/dts/exynos4210-origen.dts            |   25 ++++++-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |   25 ++++++-
+ arch/arm/boot/dts/exynos4412-origen.dts            |   25 ++++++-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts          |   25 ++++++-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |   26 ++++++-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |   26 ++++++-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   10 ++-
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |   16 -----
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |   17 -----
+ arch/arm/plat-samsung/include/plat/mfc.h           |   11 ---
+ arch/arm/plat-samsung/s5p-dev-mfc.c                |   32 ---------
+ drivers/media/platform/s5p-mfc/s5p_mfc.c           |   75 ++++----------------
+ 14 files changed, 227 insertions(+), 159 deletions(-)
+
+-- 
+1.7.9.5
