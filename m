@@ -1,86 +1,60 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Aug 2013 14:12:06 +0800
-Subject: [PATCH 4/7] pinctrl: imx27: imx27 pincontrol driver
-In-Reply-To: <1375439907-10462-5-git-send-email-mpa@pengutronix.de>
+Date: Mon, 5 Aug 2013 14:14:56 +0800
+Subject: [PATCH 5/7] ARM: dts: imx27 pin functions
+In-Reply-To: <1375439907-10462-6-git-send-email-mpa@pengutronix.de>
 References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-5-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130805061204.GD24629@S2101-09.ap.freescale.net>
+ <1375439907-10462-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130805061453.GE24629@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 12:38:24PM +0200, Markus Pargmann wrote:
+On Fri, Aug 02, 2013 at 12:38:25PM +0200, Markus Pargmann wrote:
 > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
->  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  53 +++
->  drivers/pinctrl/Kconfig                            |   8 +
->  drivers/pinctrl/Makefile                           |   1 +
->  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
->  4 files changed, 539 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
->  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+>  arch/arm/boot/dts/imx27-pinfunc.h | 520 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 520 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
 > 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+> diff --git a/arch/arm/boot/dts/imx27-pinfunc.h b/arch/arm/boot/dts/imx27-pinfunc.h
 > new file mode 100644
-> index 0000000..3352d94
+> index 0000000..f3b4c55
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-> @@ -0,0 +1,53 @@
-> +* Freescale IMX27 IOMUX Controller
+> +++ b/arch/arm/boot/dts/imx27-pinfunc.h
+> @@ -0,0 +1,520 @@
+> +/*
+> + * Copyright 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
 > +
-> +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
-> +and usage.
+> +#ifndef __DTS_IMX27_PINFUNC_H
+> +#define __DTS_IMX27_PINFUNC_H
 > +
-> +The iomuxc driver node can have pin configuration and gpio subnodes. gpio
-> +nodes defined as childs will share the registers with the iomuxc driver.
-> +Please have a look into
-> +Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt for information about
-> +the gpio properties.
-> +
-> +Required properties:
-> +- compatible: "fsl,imx27-iomuxc"
-> +
-> +Required properties for pin configuration node:
-> +- fsl,pins: three integers array, represents a group of pins mux and config
-> +  setting. The format is fsl,pins = <PIN MUX_ID CONFIG>. PIN and MUX_ID are
+> +/*
+> + * The pin function ID is a tuple of
+> + * <pin mux_config>
+> + * mux_config consists of
+> + * function + (direction << 2) + (gpio_oconf << 4) + (gpio_iconfa << 8) + (gpio_iconfb << 10)
+> + *
+> + * function:      0 - Primary function
+> + *                1 - Alternate function
+> + *                2 - GPIO
+> + * direction:     0 - Input
+> + *                1 - Output
+> + * gpio_oconf:    0 - A_IN
+> + *                1 - B_IN
+> + *                2 - C_IN
+> + *                3 - Data Register
+> + * gpio_iconfa/b: 0 - GPIO_IN
+> + *                1 - Interrupt Status Register
+> + *                2 - 0
+> + *                3 - 1
 
-Neither here nor imx27-pinfunc.h is PIN documented clearly.  Also,
-imx27-pinfunc.h names MUX_CONFIG for what we name MUX_ID here.
+This should be documented in bindings doc as well.
 
 Shawn
 
-> +  defined as macros in arch/arm/boot/dts/imx27-pinfunc.h. CONFIG can be 0 or
-> +  1, meaning Pullup disable/enable.
-> +
-> +Example:
-> +
-> +iomuxc: iomuxc at 10015000 {
-> +	compatible = "fsl,imx27-iomuxc";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	reg = <0x10015000 0x600>;
-> +
-> +	gpio1: gpio at 10015000 {
-> +		compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-> +		reg = <0x10015000>;
-> +		interrupts = <8>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-> +	};
-> +
-> +	...
-> +
-> +	uart {
-> +		pinctrl_uart1: uart-1 {
-> +			fsl,pins = <
-> +				MX27_PAD_UART1_TXD__UART1_TXD 0x0
-> +				MX27_PAD_UART1_RXD__UART1_RXD 0x0
-> +				MX27_PAD_UART1_CTS__UART1_CTS 0x0
-> +				MX27_PAD_UART1_RTS__UART1_RTS 0x0
-> +			>;
-> +		};
-> +
-> +		...
-> +	};
-> +};
+> + */
