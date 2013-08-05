@@ -1,202 +1,115 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Aug 2013 17:57:55 +0100
-Subject: [PATCH v7] dmaengine: Add MOXA ART DMA engine driver
-In-Reply-To: <1375713457-5562-1-git-send-email-jonas.jensen@gmail.com>
-References: <1375450125-29767-1-git-send-email-jonas.jensen@gmail.com>
- <1375713457-5562-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130805165755.GD13091@e106331-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 Aug 2013 17:59:57 +0100
+Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
+In-Reply-To: <51FFBF03.1000507@gmail.com>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
+ <51FFA348.2010503@gmail.com> <20130805140729.GC9858@sirena.org.uk>
+ <51FFBF03.1000507@gmail.com>
+Message-ID: <20130805165957.GT9858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 03:37:37PM +0100, Jonas Jensen wrote:
-> The MOXA ART SoC has a DMA controller capable of offloading expensive
-> memory operations, such as large copies. This patch adds support for
-> the controller including four channels. Two of these are used to
-> handle MMC copy on the UC-7112-LX hardware. The remaining two can be
-> used in a future audio driver or client application.
->
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
->
-> Notes:
->     Thanks for the replies.
->
->     Changes since v6:
->
->     1. move callback from interrupt context to tasklet
->     2. remove callback and callback_param, use those provided by tx_desc
->     3. don't rely on structs for register offsets
->     4. remove local bool "found" variable from moxart_alloc_chan_resources()
->     5. check return value of irq_of_parse_and_map
->     6. use devm_request_irq instead of setup_irq
->     7. elaborate commit message
->
->     device tree bindings document:
->     8. in the example, change "#dma-cells" to "<2>"
->
->     Applies to next-20130805
->
->  .../devicetree/bindings/dma/moxa,moxart-dma.txt    |  21 +
->  drivers/dma/Kconfig                                |   7 +
->  drivers/dma/Makefile                               |   1 +
->  drivers/dma/moxart-dma.c                           | 614 +++++++++++++++++++++
->  4 files changed, 643 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
->  create mode 100644 drivers/dma/moxart-dma.c
->
-> diff --git a/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
-> new file mode 100644
-> index 0000000..5b9f82c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
-> @@ -0,0 +1,21 @@
-> +MOXA ART DMA Controller
-> +
-> +See dma.txt first
-> +
-> +Required properties:
-> +
-> +- compatible : Must be "moxa,moxart-dma"
-> +- reg :                Should contain registers location and length
-> +- interrupts : Should contain the interrupt number
-> +- #dma-cells : Should be 2
-> +               cell index 0: channel number between 0-3
-> +               cell index 1: line request number
-> +
-> +Example:
-> +
-> +       dma: dma at 90500000 {
-> +               compatible = "moxa,moxart-dma";
-> +               reg = <0x90500000 0x1000>;
-> +               interrupts = <24 0>;
-> +               #dma-cells = <2>;
-> +       };
+On Mon, Aug 05, 2013 at 05:04:35PM +0200, Sebastian Hesselbarth wrote:
 
-Thanks for the updates on this. :)
+> I cannot follow you on the clocking arrangements. The binding
+> proposal was for audio controller <-> CODEC connections. For clocks
+> there are common properties ("clocks", "clock-names", "clock-frequency")
+> to pass them to drivers - for "sound cards" in general there are not.
 
-The binding and example look sensible to me; it would be nice if someone
-familiar with the dma subsystem could check that this has the necessary
-information.
+The clocking arrangements are an example of why the boards can get
+interesting enough to describe for themselves.
 
-[...]
+> So, having a look at the node in question:
 
-> +static int moxart_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +       struct moxart_dma_chan *mchan = to_moxart_dma_chan(chan);
-> +       int i;
-> +
-> +       for (i = 0; i < APB_DMA_MAX_CHANNEL; i++) {
-> +               if (i == mchan->ch_num
-> +                       && !mchan->allocated) {
-> +                       dev_dbg(chan2dev(chan), "%s: allocating channel #%d\n",
-> +                               __func__, mchan->ch_num);
-> +                       mchan->allocated = true;
-> +                       return 0;
-> +               }
-> +       }
+> sound {
+>   compatible = "nvidia,tegra-audio-rt5640-beaver",
+>                "nvidia,tegra-audio-rt5640";
+>   nvidia,model = "NVIDIA Tegra Beaver";
+> 
+>   nvidia,audio-routing = "Headphones", "HPOR",
+>                          "Headphones", "HPOL";
+> 
+>   nvidia,i2s-controller = <&tegra_i2s1>;
+>   nvidia,audio-codec = <&rt5640>;
+> 
+>   nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(W, 2) GPIO_ACTIVE_HIGH>;
+> 
+>   clocks = <&tegra_car TEGRA30_CLK_PLL_A>,
+>            <&tegra_car TEGRA30_CLK_PLL_A_OUT0>,
+>            <&tegra_car TEGRA30_CLK_EXTERN1>;
+>   clock-names = "pll_a", "pll_a_out0", "mclk";
+> };
+> 
+> all those "nvidia," prefixed properties are not nvidia-specific at all.
 
-Come to think of it, why do you need to iterate over all of the channels
-to handle a particular channel number that you already know, and already
-have the struct for?
+This is all because you have to add a prefix for DT.
 
-I'm not familiar with the dma subsystem, and I couldn't spot when the
-dma channel is actually assigned/selected prior to this.
+> Also, all those "nvidia," properties would have fit very well into the
+> i2s controller node
 
-[...]
+No, almost none of them have any place there.  For example, the audio
+routing contains only connections to the CODEC so the I2S controller
+isn't in play, the headphone detection is connected to the AP but isn't
+connected to the I2S port.
 
-> +static enum dma_status moxart_tx_status(struct dma_chan *chan,
-> +                                       dma_cookie_t cookie,
-> +                                       struct dma_tx_state *txstate)
-> +{
-> +       enum dma_status ret;
-> +
-> +       ret = dma_cookie_status(chan, cookie, txstate);
-> +       if (ret == DMA_SUCCESS || !txstate)
-> +               return ret;
-> +
-> +       return ret;
+>                     - there may be more complex SoCs requiring an extra
+> "sound card" node, Tegra is not.
 
-No special status handling?
+This is nothing to do with the SoC and all to do with the rest of the
+board - Tegra systems will frequently have these issues since Tegra is
+frequently deployed in smartphones which tend to push the limits on
+these things.
 
-This function is equivalent to:
+The smartphone use case will typically have a separate digital clock
+domain for the baseband, there will usually also be a bluetooth SCO link
+slaved to one of the other digital domains.  Start drilling down into
+the details and you'll usually find a bit more complexity and usually a
+bunch of device specific constraints too.
 
-        return dma_cookie_status(chan, cookie, txstate);
+> Even those foo-gpios properties can be generalized and moved to ASoC;
+> have a look at MMC drivers using one common "cd-gpios" property for
+> very different drivers. What is so special with Tegra and this gpio
+> that it needs a vendor-specific property?
 
-[...]
+This is mostly just a function of the DT convention requiring a vendor
+prefix be shoved on everything.
 
-> +static int moxart_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *node = dev->of_node;
-> +       struct resource *res;
-> +       static void __iomem *dma_base_addr;
-> +       int ret, i;
-> +       unsigned int irq;
-> +       struct moxart_dma_chan *mchan;
-> +       struct moxart_dma_container *mdc;
-> +
-> +       mdc = devm_kzalloc(dev, sizeof(*mdc), GFP_KERNEL);
-> +       if (!mdc) {
-> +               dev_err(dev, "can't allocate DMA container\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       irq = irq_of_parse_and_map(node, 0);
-> +       if (irq <= 0) {
-> +               dev_err(dev, "irq_of_parse_and_map failed\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       dma_base_addr = devm_ioremap_resource(dev, res);
-> +       if (IS_ERR(dma_base_addr)) {
-> +               dev_err(dev, "devm_ioremap_resource failed\n");
-> +               return PTR_ERR(dma_base_addr);
-> +       }
-> +
-> +       mdc->ctlr = pdev->id;
-> +       spin_lock_init(&mdc->dma_lock);
-> +
-> +       dma_cap_zero(mdc->dma_slave.cap_mask);
-> +       dma_cap_set(DMA_SLAVE, mdc->dma_slave.cap_mask);
-> +
-> +       moxart_dma_init(&mdc->dma_slave, dev);
-> +
-> +       mchan = &mdc->slave_chans[0];
-> +       for (i = 0; i < APB_DMA_MAX_CHANNEL; i++, mchan++) {
-> +               mchan->ch_num = i;
-> +               mchan->base = dma_base_addr + 0x80 + i * REG_CHAN_SIZE;
-> +               mchan->allocated = 0;
-> +
-> +               dma_cookie_init(&mchan->chan);
-> +               mchan->chan.device = &mdc->dma_slave;
-> +               list_add_tail(&mchan->chan.device_node,
-> +                             &mdc->dma_slave.channels);
-> +
-> +               dev_dbg(dev, "%s: mchans[%d]: mchan->ch_num=%d mchan->base=%p\n",
-> +                       __func__, i, mchan->ch_num, mchan->base);
-> +       }
-> +
-> +       ret = dma_async_device_register(&mdc->dma_slave);
+> I was asking for generalizing those exact properties to generic ones
+> and them move support for them to the ASoC/ALSA framework. With all
+> that DT binding re-review coming up, I doubt that the tegra binding
+> will be accepted again anyway.
 
-What if this fails?
+Sure it would.
 
-> +       platform_set_drvdata(pdev, mdc);
-> +
-> +       of_dma_controller_register(node, moxart_of_xlate, &moxart_dma_info);
-> +
-> +       tasklet_init(&mdc->tasklet, moxart_dma_tasklet, (unsigned long)mdc);
-> +
-> +       devm_request_irq(dev, irq, moxart_dma_interrupt, 0,
-> +                        "moxart-dma-engine", mdc);
+> >> i2s1: audio-controller at b0000 {
+> >> 	compatible = "marvell,dove-i2s";
+> >> 	reg = <0xb0000 0x2345>;
+> >> 	audio-codecs = <&spdif 0>;
+> >> };
 
-The return value of devm_request_irq should be checked; it might fail.
+> > No, things are glued together using the machine driver - again, look at
+> > how all the other systems work.  The wiring on the board can get
+> > interesting enough to need a binding of its own, for very simple
+> > bindings that should just be pointing to a generic driver.
 
-> +
-> +       dev_dbg(dev, "%s: IRQ=%d\n", __func__, irq);
-> +
-> +       return ret;
-> +}
+> I learned to never match "device nodes" with "drivers" as there
+> is simply no relation between them.
 
-Thanks,
-Mark.
+That's clearly a thinko for device node.
+
+> So, back to my original node proposal, can you tell me what is so
+> different, except that I am not using "marvell,audio-codec(s)" but
+> "audio-codecs"; and hook the one available codec output by using
+> phandle/args instead of a new compatible string?
+
+>From my point of view I'd rather not be shoving vendor prefixes on all
+the properties, this is coming from DT convention requiring vendor
+prefixes on bindings.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/caef9b73/attachment.sig>
