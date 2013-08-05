@@ -1,49 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Aug 2013 11:12:14 +0100
-Subject: [PATCH v7] watchdog: Add MOXA ART watchdog driver
-In-Reply-To: <51FBE0D5.3070007@roeck-us.net>
-References: <1375098093-8975-1-git-send-email-jonas.jensen@gmail.com>
- <1375101228-10930-1-git-send-email-jonas.jensen@gmail.com>
- <20130802114159.GK2884@e106331-lin.cambridge.arm.com>
- <51FBE0D5.3070007@roeck-us.net>
-Message-ID: <20130805101214.GB7594@e106331-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Aug 2013 11:20:55 +0100
+Subject: [PATCH RFC 06/13] ASoC: kirkwood: combine kirkwood-i2s and
+ kirkwood-dma drivers
+In-Reply-To: <20130805121307.555cb419@armhf>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <E1V63xH-0004lZ-TX@rmk-PC.arm.linux.org.uk> <20130805121307.555cb419@armhf>
+Message-ID: <20130805102055.GP23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 05:39:49PM +0100, Guenter Roeck wrote:
-> On 08/02/2013 04:41 AM, Mark Rutland wrote:
-> > On Mon, Jul 29, 2013 at 01:33:48PM +0100, Jonas Jensen wrote:
-> >> Add watchdog driver for MOXA ART SoCs.
-> >>
-> [ ... ]
-> >> +
-> >> +	err = watchdog_register_device(&moxart_wdt->dev);
-> >> +	if (unlikely(err))
-> >> +		return err;
-> >
-> > This is a probe path. Is the use of unlikely() really appropriate here?
-> > I suspect it doesn't make any appreciable difference, and should go.
-> >
-> Just wondering, for my education - why ? Is there s rule that unlikely()
-> shall not be used in the probe path ? If so, I would like to know it and
-> its reasoning to be able to apply it to my own reviews.
+On Mon, Aug 05, 2013 at 12:13:07PM +0200, Jean-Francois Moine wrote:
+> On Sun, 04 Aug 2013 20:27:03 +0100
+> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> 
+> > These really should be a single driver because they're fully integrated
+> > in hardware.  Make them so.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/mach-dove/common.c          |    4 ++--
+> >  arch/arm/mach-kirkwood/common.c      |   24 +++++++++---------------
+> >  sound/soc/kirkwood/Kconfig           |    5 -----
+> >  sound/soc/kirkwood/Makefile          |    4 +---
+> >  sound/soc/kirkwood/kirkwood-dma.c    |   30 +-----------------------------
+> >  sound/soc/kirkwood/kirkwood-i2s.c    |   21 ++++++++++++++++-----
+> >  sound/soc/kirkwood/kirkwood-openrd.c |    4 ++--
+> >  sound/soc/kirkwood/kirkwood-t5325.c  |    4 ++--
+> >  sound/soc/kirkwood/kirkwood.h        |    2 ++
+> >  9 files changed, 35 insertions(+), 63 deletions(-)
+> 	[snip]
+> 
+> Glad to see you got my patch, but why did you changed all the names?
 
-I thought there had been some discussion on LKML about likely and
-unlikely being abused, but in some quick searching I couldn't find the
-thread I remembered. I found a comment from Steve Rostedt [1], but
-that's not necessarily canonical.
+You clearly didn't read the covering email to this series.  I don't know
+why I bothered to write it if you don't bother to read it.
 
-As I understand it, likely() and unlikely() should be used to tell the
-compiler to optimise for very specific cases where we know the branch
-likelihood far better than the compiler, and the performance gain is
-significant (i.e. hot paths). Using them elsewhere may lead to
-performance and/or size degradation, as we're asking the compiler to do
-something other than what it believes is optimal.
+> Replacing "kirkwood-pcm-audio" by "kirkwood-i2s" should be enough.
 
-Probing is far from a hot path, and it seems in this case at least that
-unlikely() is only present as part of some duplicated black magic.
+Quite simply, i2s is a bus protocol, just like spdif is.  It can do both.
+If we're changing its name, then naming it after just one of the protocols
+it does is stupid.  And PCM is also inappropriate - it does more than PCM
+because it can also transmit AC3 and MPEG audio over SPDIF to a suitable
+decoder (and that does work - I've tested it.)
 
-Thanks,
-Mark.
-
-[1] https://lkml.org/lkml/2011/1/3/135
+At the end of the day, this is _just_ a DMA engine which outputs I2S
+and/or SPDIF formatted data of unknown type at a known rate.
