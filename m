@@ -1,43 +1,73 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 5 Aug 2013 11:14:53 -0500
-Subject: [PATCH v3 08/12] dma: edma: Add one more required slot to MAX slots
+Date: Mon, 5 Aug 2013 11:14:46 -0500
+Subject: [PATCH v3 01/12] dma: edma: Setup parameters to DMA MAX_NR_SG at a
+ time
 In-Reply-To: <1375719297-12871-1-git-send-email-joelf@ti.com>
 References: <1375719297-12871-1-git-send-email-joelf@ti.com>
-Message-ID: <1375719297-12871-9-git-send-email-joelf@ti.com>
+Message-ID: <1375719297-12871-2-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We'd now need a separate slot just for the channel and separate
-ones for the 2 linked sets, so we make adjustments to allocate
-an extra channel accordingly.
+Changes are made here for configuring existing parameters to support
+DMA'ing them out in batches as needed.
+
+Also allocate as many as slots as needed by the SG list, but not more
+than MAX_NR_SG. Then these slots will be reused accordingly.
+For ex, if MAX_NR_SG=10, and number of SG entries is 40, still only
+10 slots will be allocated to DMA the entire SG list of size 40.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/dma/edma.c |   14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index a242269..df50a04 100644
+index 5f3e532..7b0853c 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -48,7 +48,7 @@
+@@ -222,9 +222,9 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	enum dma_slave_buswidth dev_width;
+ 	u32 burst;
+ 	struct scatterlist *sg;
+-	int i;
+ 	int acnt, bcnt, ccnt, src, dst, cidx;
+ 	int src_bidx, dst_bidx, src_cidx, dst_cidx;
++	int i, num_slots_needed;
  
- /* Max of 16 segments per channel to conserve PaRAM slots */
- #define MAX_NR_SG		16
--#define EDMA_MAX_SLOTS		MAX_NR_SG
-+#define EDMA_MAX_SLOTS		(MAX_NR_SG+1)
- #define EDMA_DESCRIPTORS	16
+ 	if (unlikely(!echan || !sgl || !sg_len))
+ 		return NULL;
+@@ -262,8 +262,11 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
  
- struct edma_desc {
-@@ -311,6 +311,9 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	edesc->pset_nr = sg_len;
  
- 	num_slots_needed = sg_len > MAX_NR_SG ? MAX_NR_SG : sg_len;
- 
-+	/* Allocate one extra to account for the channel itself */
-+	num_slots_needed++;
+-	for_each_sg(sgl, sg, sg_len, i) {
+-		/* Allocate a PaRAM slot, if needed */
++	/* Allocate a PaRAM slot, if needed */
 +
- 	for (i = 0; i < num_slots_needed; i++) {
++	num_slots_needed = sg_len > MAX_NR_SG ? MAX_NR_SG : sg_len;
++
++	for (i = 0; i < num_slots_needed; i++) {
  		if (echan->slot[i] < 0) {
  			echan->slot[i] =
+ 				edma_alloc_slot(EDMA_CTLR(echan->ch_num),
+@@ -273,6 +276,10 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 				return NULL;
+ 			}
+ 		}
++	}
++
++	/* Configure PaRAM sets for each SG */
++	for_each_sg(sgl, sg, sg_len, i) {
+ 
+ 		acnt = dev_width;
+ 
+@@ -330,6 +337,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 		/* Configure A or AB synchronized transfers */
+ 		if (edesc->absync)
+ 			edesc->pset[i].opt |= SYNCDIM;
++
+ 		/* If this is the last set, enable completion interrupt flag */
+ 		if (i == sg_len - 1)
+ 			edesc->pset[i].opt |= TCINTEN;
 -- 
 1.7.9.5
