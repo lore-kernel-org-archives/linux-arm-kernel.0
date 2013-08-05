@@ -1,64 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 05 Aug 2013 15:25:21 +0200
-Subject: [PATCHv1] arm: armada: Add .dts file for Netgear ReadyNAS 102
-In-Reply-To: <878v1mgh4x.fsf@natisbad.org>
-References: <878v1mgh4x.fsf@natisbad.org>
-Message-ID: <51FFA7C1.1050103@free-electrons.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 5 Aug 2013 14:29:44 +0100
+Subject: [PATCH v3 1/2] ARM: OMAP: Add secure function omap_smc3() which
+ calling instruction smc #1
+In-Reply-To: <201308041045.00698@pali>
+References: <531356997.66774.1373571839852.JavaMail.apache@mail81.abv.bg>
+ <51DF0D7A.4090008@ti.com>
+ <20130712102430.GA3249@localhost.localdomain>
+ <201308041045.00698@pali>
+Message-ID: <20130805132939.GA2755@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2013 23:16, Arnaud Ebalard wrote:
+On Sun, Aug 04, 2013 at 10:45:00AM +0200, Pali Roh?r wrote:
+> Here is new version (v3) of omap secure part patch:
 > 
-> All hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 102 are
-> supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
-> Gigabit controller and PHY, serial port, leds, buttons, SATA ports,
-> G762 fan controller) except for:
+> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
+> but Nokia RX-51 board needs to call smc #1 for PPA access.
 > 
->  - the Intersil ISL12057 I2C RTC Chip,
->  - the Armada NAND controller.
-> 
-> Support for both of those is currently work in progress and does not
-> prevent boot.
+> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> ---
+> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+> index 0e72917..c4586f4 100644
+> --- a/arch/arm/mach-omap2/omap-secure.h
+> +++ b/arch/arm/mach-omap2/omap-secure.h
+> @@ -51,6 +51,7 @@
+>  extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+>  				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+>  extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
+>  extern phys_addr_t omap_secure_ram_mempool_base(void);
+>  extern int omap_secure_ram_reserve_memblock(void);
+>  
+> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
+> index f6441c1..7bbc043 100644
+> --- a/arch/arm/mach-omap2/omap-smc.S
+> +++ b/arch/arm/mach-omap2/omap-smc.S
+> @@ -1,9 +1,11 @@
+>  /*
+> - * OMAP44xx secure APIs file.
+> + * OMAP34xx and OMAP44xx secure APIs file.
+>   *
+>   * Copyright (C) 2010 Texas Instruments, Inc.
+>   * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
+>   *
+> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
+> + * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
+>   *
+>   * This program is free software,you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -54,6 +56,23 @@ ENTRY(omap_smc2)
+>  	ldmfd   sp!, {r4-r12, pc}
+>  ENDPROC(omap_smc2)
+>  
+> +/**
+> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
+> + * Low level common routine for secure HAL and PPA APIs via smc #1
+> + * r0 - @service_id: Secure Service ID
+> + * r1 - @process_id: Process ID
+> + * r2 - @flag: Flag to indicate the criticality of operation
+> + * r3 - @pargs: Physical address of parameter list
+> + */
+> +ENTRY(omap_smc3)
+> +	stmfd	sp!, {r4-r11, lr}
+> +	mov	r12, r0		@ Copy the secure service ID
+> +	mov	r6, #0xff	@ Indicate new Task call
+> +	dsb			@ Memory Barrier
 
-If it is not too late you can add my
+Can you explain _why_ the barrier is there?  The reader doesn't need to
+be told that a barrier instruction is a barrier instruction.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Just a nitpick:
-
-For a better coherency in your file you could add an extra line before
-each sub-node as you have done for all the other nodes:
-
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-Here
-> +		button at 1 {
-> +			label = "Power Button";
-> +			linux,code = <116>;     /* KEY_POWER */
-> +			gpios = <&gpio1 30 1>;
-> +		};
-Here
-> +		button at 2 {
-> +			label = "Reset Button";
-> +			linux,code = <0x198>;   /* KEY_RESTART */
-> +			gpios = <&gpio0 6 1>;
-> +		};
-and here
-> +		button at 3 {
-> +			label = "Backup Button";
-> +			linux,code = <133>;     /* KEY_COPY */
-> +			gpios = <&gpio1 26 1>;
-> +		};
-> +	};
-> +
-> +};
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers
+---Dave
