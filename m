@@ -1,27 +1,55 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun,  4 Aug 2013 21:09:50 -0700
-Subject: [PATCH 0/3] ARM: vexpress: TC2 MCPM/SPC cleanups
-Message-ID: <1375675793-16492-1-git-send-email-olof@lixom.net>
+Date: Sun,  4 Aug 2013 21:09:52 -0700
+Subject: [PATCH 2/3] ARM: vexpress: make spc code TC2-only
+In-Reply-To: <1375675793-16492-1-git-send-email-olof@lixom.net>
+References: <1375675793-16492-1-git-send-email-olof@lixom.net>
+Message-ID: <1375675793-16492-3-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's a short series on top of Nico's TC2 MCPM series to move the SPC driver
-back under mach-vexpress where it should be, and a couple of tiny cleanups
-to the driver.
+It doesn't make sense to match this to the generic compatible value,
+since the code is quite specific to TC2 as it is.
 
-I'll pick this up together with the base branch in arm-soc for-next, but I
-haven't staged it in a next/* branch so it can be rebased/changed/dropped
-if needed.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-vexpress/spc.c | 14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
-There's still one thing left to iron out, and that's the actual binding
-for the "SPC" node. Since the spc code needs a non-zero SPC_BASE, it
-implies that there's more than just SPC described by the device node. So
-either the naming and description needs to be changed, or there's need
-for more than one device node to describe the other register ranges. The
-former might be easier in this case...
-
-Pawel, I'd appreciate a quick test from you to make sure I didn't break
-anything since I don't have a way to boot this myself.
-
-
--Olof
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+index 34e4bf4..30cfa9f 100644
+--- a/arch/arm/mach-vexpress/spc.c
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -187,18 +187,14 @@ void ve_spc_powerdown(u32 cluster, bool enable)
+ 	writel_relaxed(enable, info->baseaddr + pwdrn_reg);
+ }
+ 
+-static const struct of_device_id ve_spc_ids[] __initconst = {
+-	{ .compatible = "arm,vexpress-spc,v2p-ca15_a7" },
+-	{ .compatible = "arm,vexpress-spc" },
+-	{},
+-};
+-
+ static int __init ve_spc_probe(void)
+ {
+ 	int ret;
+-	struct device_node *node = of_find_matching_node(NULL, ve_spc_ids);
++	struct device_node *dn;
++
++	dn = of_find_compatible_node(NULL, "arm,vexpress-spc,v2p-ca15_a7");
+ 
+-	if (!node)
++	if (!dn)
+ 		return -ENODEV;
+ 
+ 	info = kzalloc(sizeof(*info), GFP_KERNEL);
+@@ -207,7 +203,7 @@ static int __init ve_spc_probe(void)
+ 		return -ENOMEM;
+ 	}
+ 
+-	info->baseaddr = of_iomap(node, 0);
++	info->baseaddr = of_iomap(dn, 0);
+ 	if (!info->baseaddr) {
+ 		pr_err(SPCLOG "unable to ioremap memory\n");
+ 		ret = -ENXIO;
+-- 
+1.8.1.192.gc4361b8
