@@ -1,297 +1,479 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 5 Aug 2013 19:21:00 +0800
-Subject: [PATCH V2 4/8] ARM: tegra: add common LP1 suspend support
+Date: Mon, 5 Aug 2013 19:21:02 +0800
+Subject: [PATCH V2 6/8] ARM: tegra: add LP1 suspend support for Tegra20
 In-Reply-To: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
 References: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1375701664-14965-5-git-send-email-josephl@nvidia.com>
+Message-ID: <1375701664-14965-7-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
-clock gated and SDRAM in self-refresh mode. That means the low level LP1
-suspending and resuming code couldn't be run on DRAM and the CPU must
-switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
-the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
-The LP1 low level handling code need to be moved to IRAM area first. And
-marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
-power timer needs to be re-calculated based on 32KHz that was originally
-based on PCLK.
+The LP1 suspend mode will power off the CPU, clock gated the PLLs and put
+SDRAM to self-refresh mode. Any interrupt can wake up device from LP1. The
+sequence when LP1 suspending:
 
-When resuming from LP1, the LP1 reset handler will resume PLLs and then
-put DRAM to normal mode. Then jumping to the "tegra_resume" that will
-restore full context before back to kernel. The "tegra_resume" handler
-was expected to be found in PMC_SCRATCH41 register.
+* tunning off L1 data cache and the MMU
+* putting SDRAM into self-refresh
+* storing some EMC registers and SCLK burst policy
+* switching CPU to CLK_M (12MHz OSC)
+* switching SCLK to CLK_S (32KHz OSC)
+* tunning off PLLM, PLLP and PLLC
+* shutting off the CPU rail
 
-This is common LP1 procedures for Tegra, so we do these jobs mainly in
-this patch:
-* moving LP1 low level handling code to IRAM
-* marking LP1 mask
-* copying the physical address of "tegra_resume" to PMC_SCRATCH41
-* re-calculate the CPU power timer based on 32KHz
+The sequence of LP1 resuming:
+
+* re-enabling PLLM, PLLP, and PLLC
+* restoring some EMC registers and SCLK burst policy
+* setting up CCLK burst policy to PLLP
+* resuming SDRAM to normal mode
+* jumping to the "tegra_resume" from PMC_SCRATCH41
+
+Due to the SDRAM will be put into self-refresh mode, the low level
+procedures of LP1 suspending and resuming should be copied to
+TEGRA_IRAM_CODE_AREA (TEGRA_IRAM_BASE + SZ_4K) when suspending. Before
+restoring the CPU context when resuming, the SDRAM needs to be switched
+back to normal mode. And the PLLs need to be re-enabled, SCLK burst policy
+be restored, CCLK burst policy be set in PLLP. Then jumping to
+"tegra_resume" that was expected to be stored in PMC_SCRATCH41 to restore
+CPU context and back to kernel.
+
+Based on the work by:
+Colin Cross <ccross@android.com>
+Gary King <gking@nvidia.com>
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* don't duplicate tegraXX_lp1_iram for different SoC
-* unify the suspend func call to cpu_suspend with "tegra_sleep_func"
+* using IS_ENABLE for SoC specific code
+* modify "tegra20_sdram_pad_save" as suggestion
 ---
- arch/arm/mach-tegra/pm.c    | 108 ++++++++++++++++++++++++++++++++++++++++++--
- arch/arm/mach-tegra/pm.h    |   7 +++
- arch/arm/mach-tegra/pmc.c   |  21 +++++++++
- arch/arm/mach-tegra/pmc.h   |   3 ++
- arch/arm/mach-tegra/reset.h |   4 ++
- 5 files changed, 138 insertions(+), 5 deletions(-)
+ arch/arm/mach-tegra/Makefile        |   1 +
+ arch/arm/mach-tegra/pm-tegra20.c    |  34 +++++
+ arch/arm/mach-tegra/pm.c            |   8 +
+ arch/arm/mach-tegra/pm.h            |   2 +
+ arch/arm/mach-tegra/sleep-tegra20.S | 296 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 341 insertions(+)
+ create mode 100644 arch/arm/mach-tegra/pm-tegra20.c
 
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index d341980..a3fe22d 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -17,6 +17,7 @@ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra20_speedo.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-tegra20.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pm-tegra20.o
+ ifeq ($(CONFIG_CPU_IDLE),y)
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= cpuidle-tegra20.o
+ endif
+diff --git a/arch/arm/mach-tegra/pm-tegra20.c b/arch/arm/mach-tegra/pm-tegra20.c
+new file mode 100644
+index 0000000..d65e1d7
+--- /dev/null
++++ b/arch/arm/mach-tegra/pm-tegra20.c
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (c) 2013, NVIDIA Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/kernel.h>
++
++#include "pm.h"
++
++#ifdef CONFIG_PM_SLEEP
++extern u32 tegra20_iram_start, tegra20_iram_end;
++extern void tegra20_sleep_core_finish(unsigned long);
++
++void tegra20_lp1_iram_hook(void)
++{
++	tegra_lp1_iram.start_addr = &tegra20_iram_start;
++	tegra_lp1_iram.end_addr = &tegra20_iram_end;
++}
++
++void tegra20_sleep_core_init(void)
++{
++	tegra_sleep_core_finish = tegra20_sleep_core_finish;
++}
++#endif
 diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 5792872..09cfa4b 100644
+index bbe5ccd..25f3df0 100644
 --- a/arch/arm/mach-tegra/pm.c
 +++ b/arch/arm/mach-tegra/pm.c
-@@ -37,12 +37,19 @@
- #include "reset.h"
- #include "flowctrl.h"
- #include "fuse.h"
-+#include "pm.h"
- #include "pmc.h"
- #include "sleep.h"
- 
- #ifdef CONFIG_PM_SLEEP
- static DEFINE_SPINLOCK(tegra_lp2_lock);
-+static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
-+static u32 iram_save_size;
-+static void *iram_save_addr;
-+struct tegra_lp1_iram tegra_lp1_iram;
- void (*tegra_tear_down_cpu)(void);
-+void (*tegra_sleep_core_finish)(unsigned long v2p);
-+static int (*tegra_sleep_func)(unsigned long v2p);
- 
- static void tegra_tear_down_cpu_init(void)
+@@ -211,6 +211,10 @@ static int tegra_sleep_core(unsigned long v2p)
+ static bool tegra_lp1_iram_hook(void)
  {
-@@ -174,14 +181,75 @@ enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
- 				enum tegra_suspend_mode mode)
+ 	switch (tegra_chip_id) {
++	case TEGRA20:
++		if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
++			tegra20_lp1_iram_hook();
++		break;
+ 	case TEGRA30:
+ 		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC))
+ 			tegra30_lp1_iram_hook();
+@@ -233,6 +237,10 @@ static bool tegra_lp1_iram_hook(void)
+ static bool tegra_sleep_core_init(void)
  {
- 	/*
--	 * The Tegra devices only support suspending to LP2 currently.
-+	 * The Tegra devices support suspending to LP1 or lower currently.
- 	 */
--	if (mode > TEGRA_SUSPEND_LP2)
--		return TEGRA_SUSPEND_LP2;
-+	if (mode > TEGRA_SUSPEND_LP1)
-+		return TEGRA_SUSPEND_LP1;
- 
- 	return mode;
- }
- 
-+static int tegra_sleep_core(unsigned long v2p)
-+{
-+	setup_mm_for_reboot();
-+	tegra_sleep_core_finish(v2p);
-+
-+	/* should never here */
-+	BUG();
-+
-+	return 0;
-+}
-+
-+/*
-+ * tegra_lp1_iram_hook
-+ *
-+ * Hooking the address of LP1 reset vector and SDRAM self-refresh code in
-+ * SDRAM. These codes not be copied to IRAM in this fuction. We need to
-+ * copy these code to IRAM before LP0/LP1 suspend and restore the content
-+ * of IRAM after resume.
-+ */
-+static bool tegra_lp1_iram_hook(void)
-+{
-+	if (!tegra_lp1_iram.start_addr || !tegra_lp1_iram.end_addr)
-+		return false;
-+
-+	iram_save_size = tegra_lp1_iram.end_addr - tegra_lp1_iram.start_addr;
-+	iram_save_addr = kmalloc(iram_save_size, GFP_KERNEL);
-+	if (!iram_save_addr)
-+		return false;
-+
-+	return true;
-+}
-+
-+static bool tegra_sleep_core_init(void)
-+{
-+	if (!tegra_sleep_core_finish)
-+		return false;
-+
-+	return true;
-+}
-+
-+static void tegra_suspend_enter_lp1(void)
-+{
-+	tegra_pmc_suspend();
-+
-+	/* copy the reset vector & SDRAM shutdown code into IRAM */
-+	memcpy(iram_save_addr, iram_code, iram_save_size);
-+	memcpy(iram_code, tegra_lp1_iram.start_addr, iram_save_size);
-+
-+	*((u32 *)tegra_cpu_lp1_mask) = 1;
-+}
-+
-+static void tegra_suspend_exit_lp1(void)
-+{
-+	tegra_pmc_resume();
-+
-+	/* restore IRAM */
-+	memcpy(iram_code, iram_save_addr, iram_save_size);
-+
-+	*(u32 *)tegra_cpu_lp1_mask = 0;
-+}
-+
- static const char *lp_state[TEGRA_MAX_SUSPEND_MODE] = {
- 	[TEGRA_SUSPEND_NONE] = "none",
- 	[TEGRA_SUSPEND_LP2] = "LP2",
-@@ -205,6 +273,9 @@ static int tegra_suspend_enter(suspend_state_t state)
- 
- 	suspend_cpu_complex();
- 	switch (mode) {
-+	case TEGRA_SUSPEND_LP1:
-+		tegra_suspend_enter_lp1();
+ 	switch (tegra_chip_id) {
++	case TEGRA20:
++		if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
++			tegra20_sleep_core_init();
 +		break;
- 	case TEGRA_SUSPEND_LP2:
- 		tegra_set_cpu_in_lp2();
- 		break;
-@@ -212,9 +283,12 @@ static int tegra_suspend_enter(suspend_state_t state)
- 		break;
- 	}
- 
--	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, &tegra_sleep_cpu);
-+	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, tegra_sleep_func);
- 
- 	switch (mode) {
-+	case TEGRA_SUSPEND_LP1:
-+		tegra_suspend_exit_lp1();
-+		break;
- 	case TEGRA_SUSPEND_LP2:
- 		tegra_clear_cpu_in_lp2();
- 		break;
-@@ -235,12 +309,36 @@ static const struct platform_suspend_ops tegra_suspend_ops = {
- 
- void __init tegra_init_suspend(void)
- {
--	if (tegra_pmc_get_suspend_mode() == TEGRA_SUSPEND_NONE)
-+	enum tegra_suspend_mode mode = tegra_pmc_get_suspend_mode();
-+
-+	if (mode == TEGRA_SUSPEND_NONE)
- 		return;
- 
- 	tegra_tear_down_cpu_init();
- 	tegra_pmc_suspend_init();
- 
-+	if (mode >= TEGRA_SUSPEND_LP1) {
-+		if (!tegra_lp1_iram_hook() || !tegra_sleep_core_init()) {
-+			pr_err("%s: unable to allocate memory for SDRAM"
-+			       "self-refresh -- LP0/LP1 unavailable\n",
-+			       __func__);
-+			tegra_pmc_set_suspend_mode(TEGRA_SUSPEND_LP2);
-+			mode = TEGRA_SUSPEND_LP2;
-+		}
-+	}
-+
-+	/* set up sleep function for cpu_suspend */
-+	switch (mode) {
-+	case TEGRA_SUSPEND_LP1:
-+		tegra_sleep_func = tegra_sleep_core;
-+		break;
-+	case TEGRA_SUSPEND_LP2:
-+		tegra_sleep_func = tegra_sleep_cpu;
-+		break;
-+	default:
-+		break;
-+	}
-+
- 	suspend_set_ops(&tegra_suspend_ops);
- }
- #endif
+ 	case TEGRA30:
+ 		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC))
+ 			tegra30_sleep_core_init();
 diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-index 94c4b9d..478706e 100644
+index 803bd53..fe204e5 100644
 --- a/arch/arm/mach-tegra/pm.h
 +++ b/arch/arm/mach-tegra/pm.h
-@@ -23,6 +23,13 @@
+@@ -30,6 +30,8 @@ struct tegra_lp1_iram {
+ extern struct tegra_lp1_iram tegra_lp1_iram;
+ extern void (*tegra_sleep_core_finish)(unsigned long v2p);
  
- #include "pmc.h"
++void tegra20_lp1_iram_hook(void);
++void tegra20_sleep_core_init(void);
+ void tegra30_lp1_iram_hook(void);
+ void tegra30_sleep_core_init(void);
  
-+struct tegra_lp1_iram {
-+	void	*start_addr;
-+	void	*end_addr;
-+};
-+extern struct tegra_lp1_iram tegra_lp1_iram;
-+extern void (*tegra_sleep_core_finish)(unsigned long v2p);
+diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+index f87721d..1106f45 100644
+--- a/arch/arm/mach-tegra/sleep-tegra20.S
++++ b/arch/arm/mach-tegra/sleep-tegra20.S
+@@ -23,10 +23,49 @@
+ #include <asm/assembler.h>
+ #include <asm/proc-fns.h>
+ #include <asm/cp15.h>
++#include <asm/cache.h>
+ 
+ #include "sleep.h"
+ #include "flowctrl.h"
+ 
++#define EMC_CFG				0xc
++#define EMC_ADR_CFG			0x10
++#define EMC_REFRESH			0x70
++#define EMC_NOP				0xdc
++#define EMC_SELF_REF			0xe0
++#define EMC_REQ_CTRL			0x2b0
++#define EMC_EMC_STATUS			0x2b4
 +
- extern unsigned long l2x0_saved_regs_addr;
- 
- void save_cpu_arch_register(void);
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index 03e6405..8acb881 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -196,6 +196,24 @@ enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
- 	return pmc_pm_data.suspend_mode;
- }
- 
-+void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode)
-+{
-+	if (mode < TEGRA_SUSPEND_NONE || mode >= TEGRA_MAX_SUSPEND_MODE)
-+		return;
++#define CLK_RESET_CCLK_BURST		0x20
++#define CLK_RESET_CCLK_DIVIDER		0x24
++#define CLK_RESET_SCLK_BURST		0x28
++#define CLK_RESET_SCLK_DIVIDER		0x2c
++#define CLK_RESET_PLLC_BASE		0x80
++#define CLK_RESET_PLLM_BASE		0x90
++#define CLK_RESET_PLLP_BASE		0xa0
 +
-+	pmc_pm_data.suspend_mode = mode;
-+}
++#define APB_MISC_XM2CFGCPADCTRL		0x8c8
++#define APB_MISC_XM2CFGDPADCTRL		0x8cc
++#define APB_MISC_XM2CLKCFGPADCTRL	0x8d0
++#define APB_MISC_XM2COMPPADCTRL		0x8d4
++#define APB_MISC_XM2VTTGENPADCTRL	0x8d8
++#define APB_MISC_XM2CFGCPADCTRL2	0x8e4
++#define APB_MISC_XM2CFGDPADCTRL2	0x8e8
 +
-+void tegra_pmc_suspend(void)
-+{
-+	tegra_pmc_writel(virt_to_phys(tegra_resume), PMC_SCRATCH41);
-+}
++.macro pll_enable, rd, r_car_base, pll_base
++	ldr	\rd, [\r_car_base, #\pll_base]
++	tst	\rd, #(1 << 30)
++	orreq	\rd, \rd, #(1 << 30)
++	streq	\rd, [\r_car_base, #\pll_base]
++.endm
 +
-+void tegra_pmc_resume(void)
-+{
-+	tegra_pmc_writel(0x0, PMC_SCRATCH41);
-+}
++.macro emc_device_mask, rd, base
++	ldr	\rd, [\base, #EMC_ADR_CFG]
++	tst	\rd, #(0x3 << 24)
++	moveq	\rd, #(0x1 << 8)		@ just 1 device
++	movne	\rd, #(0x3 << 8)		@ 2 devices
++.endm
 +
- void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
- {
- 	u32 reg, csr_reg;
-@@ -219,6 +237,9 @@ void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
- 	}
+ #if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_PM_SLEEP)
+ /*
+  * tegra20_hotplug_shutdown(void)
+@@ -181,6 +220,28 @@ ENTRY(tegra20_cpu_is_resettable_soon)
+ ENDPROC(tegra20_cpu_is_resettable_soon)
  
- 	switch (mode) {
-+	case TEGRA_SUSPEND_LP1:
-+		rate = 32768;
-+		break;
- 	case TEGRA_SUSPEND_LP2:
- 		rate = clk_get_rate(tegra_pclk);
- 		break;
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-index e1c2df2..549f8c7 100644
---- a/arch/arm/mach-tegra/pmc.h
-+++ b/arch/arm/mach-tegra/pmc.h
-@@ -28,6 +28,9 @@ enum tegra_suspend_mode {
+ /*
++ * tegra20_sleep_core_finish(unsigned long v2p)
++ *
++ * Enters suspend in LP0 or LP1 by turning off the mmu and jumping to
++ * tegra20_tear_down_core in IRAM
++ */
++ENTRY(tegra20_sleep_core_finish)
++	/* Flush, disable the L1 data cache and exit SMP */
++	bl	tegra_disable_clean_inv_dcache
++
++	mov32	r3, tegra_shut_off_mmu
++	add	r3, r3, r0
++
++	mov32	r0, tegra20_tear_down_core
++	mov32	r1, tegra20_iram_start
++	sub	r0, r0, r1
++	mov32	r1, TEGRA_IRAM_CODE_AREA
++	add	r0, r0, r1
++
++	mov	pc, r3
++ENDPROC(tegra20_sleep_core_finish)
++
++/*
+  * tegra20_sleep_cpu_secondary_finish(unsigned long v2p)
+  *
+  * Enters WFI on secondary CPU by exiting coherency.
+@@ -251,6 +312,150 @@ ENTRY(tegra20_tear_down_cpu)
+ 	b	tegra20_enter_sleep
+ ENDPROC(tegra20_tear_down_cpu)
  
- #ifdef CONFIG_PM_SLEEP
- enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
-+void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
-+void tegra_pmc_suspend(void);
-+void tegra_pmc_resume(void);
- void tegra_pmc_pm_set(enum tegra_suspend_mode mode);
- void tegra_pmc_suspend_init(void);
++/* START OF ROUTINES COPIED TO IRAM */
++	.align L1_CACHE_SHIFT
++	.globl tegra20_iram_start
++tegra20_iram_start:
++
++/*
++ * tegra20_lp1_reset
++ *
++ * reset vector for LP1 restore; copied into IRAM during suspend.
++ * Brings the system back up to a safe staring point (SDRAM out of
++ * self-refresh, PLLC, PLLM and PLLP reenabled, CPU running on PLLP,
++ * system clock running on the same PLL that it suspended at), and
++ * jumps to tegra_resume to restore virtual addressing and PLLX.
++ * The physical address of tegra_resume expected to be stored in
++ * PMC_SCRATCH41.
++ *
++ * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_CODE_AREA.
++ */
++ENTRY(tegra20_lp1_reset)
++	/*
++	 * The CPU and system bus are running@32KHz and executing from
++	 * IRAM when this code is executed; immediately switch to CLKM and
++	 * enable PLLM, PLLP, PLLC.
++	 */
++	mov32	r0, TEGRA_CLK_RESET_BASE
++
++	mov	r1, #(1 << 28)
++	str	r1, [r0, #CLK_RESET_SCLK_BURST]
++	str	r1, [r0, #CLK_RESET_CCLK_BURST]
++	mov	r1, #0
++	str	r1, [r0, #CLK_RESET_CCLK_DIVIDER]
++	str	r1, [r0, #CLK_RESET_SCLK_DIVIDER]
++
++	pll_enable r1, r0, CLK_RESET_PLLM_BASE
++	pll_enable r1, r0, CLK_RESET_PLLP_BASE
++	pll_enable r1, r0, CLK_RESET_PLLC_BASE
++
++	adr	r2, tegra20_sdram_pad_address
++	adr	r4, tegra20_sdram_pad_save
++	mov	r5, #0
++
++	ldr	r6, tegra20_sdram_pad_size
++padload:
++	ldr	r7, [r2, r5]		@ r7 is the addr in the pad_address
++
++	ldr	r1, [r4, r5]
++	str	r1, [r7]		@ restore the value in pad_save
++
++	add	r5, r5, #4
++	cmp	r6, r5
++	bne	padload
++
++padload_done:
++	/* 255uS delay for PLL stabilization */
++	mov32	r7, TEGRA_TMRUS_BASE
++	ldr	r1, [r7]
++	add	r1, r1, #0xff
++	wait_until r1, r7, r9
++
++	adr	r4, tegra20_sclk_save
++	ldr	r4, [r4]
++	str	r4, [r0, #CLK_RESET_SCLK_BURST]
++	mov32	r4, ((1 << 28) | (4))	@ burst policy is PLLP
++	str	r4, [r0, #CLK_RESET_CCLK_BURST]
++
++	mov32	r0, TEGRA_EMC_BASE
++	ldr	r1, [r0, #EMC_CFG]
++	bic	r1, r1, #(1 << 31)	@ disable DRAM_CLK_STOP
++	str	r1, [r0, #EMC_CFG]
++
++	mov	r1, #0
++	str	r1, [r0, #EMC_SELF_REF]	@ take DRAM out of self refresh
++	mov	r1, #1
++	str	r1, [r0, #EMC_NOP]
++	str	r1, [r0, #EMC_NOP]
++	str	r1, [r0, #EMC_REFRESH]
++
++	emc_device_mask r1, r0
++
++exit_selfrefresh_loop:
++	ldr	r2, [r0, #EMC_EMC_STATUS]
++	ands	r2, r2, r1
++	bne	exit_selfrefresh_loop
++
++	mov	r1, #0			@ unstall all transactions
++	str	r1, [r0, #EMC_REQ_CTRL]
++
++	mov32	r0, TEGRA_PMC_BASE
++	ldr	r0, [r0, #PMC_SCRATCH41]
++	mov	pc, r0			@ jump to tegra_resume
++ENDPROC(tegra20_lp1_reset)
++
++/*
++ * tegra20_tear_down_core
++ *
++ * copied into and executed from IRAM
++ * puts memory in self-refresh for LP0 and LP1
++ */
++tegra20_tear_down_core:
++	bl	tegra20_sdram_self_refresh
++	bl	tegra20_switch_cpu_to_clk32k
++	b	tegra20_enter_sleep
++
++/*
++ * tegra20_switch_cpu_to_clk32k
++ *
++ * In LP0 and LP1 all PLLs will be turned off. Switch the CPU and system clock
++ * to the 32KHz clock.
++ */
++tegra20_switch_cpu_to_clk32k:
++	/*
++	 * start by switching to CLKM to safely disable PLLs, then switch to
++	 * CLKS.
++	 */
++	mov	r0, #(1 << 28)
++	str	r0, [r5, #CLK_RESET_SCLK_BURST]
++	str	r0, [r5, #CLK_RESET_CCLK_BURST]
++	mov	r0, #0
++	str	r0, [r5, #CLK_RESET_CCLK_DIVIDER]
++	str	r0, [r5, #CLK_RESET_SCLK_DIVIDER]
++
++	/* 2uS delay delay between changing SCLK and disabling PLLs */
++	mov32	r7, TEGRA_TMRUS_BASE
++	ldr	r1, [r7]
++	add	r1, r1, #2
++	wait_until r1, r7, r9
++
++	/* switch to CLKS */
++	mov	r0, #0	/* brust policy = 32KHz */
++	str	r0, [r5, #CLK_RESET_SCLK_BURST]
++
++	/* disable PLLM, PLLP and PLLC */
++	ldr	r0, [r5, #CLK_RESET_PLLM_BASE]
++	bic	r0, r0, #(1 << 30)
++	str	r0, [r5, #CLK_RESET_PLLM_BASE]
++	ldr	r0, [r5, #CLK_RESET_PLLP_BASE]
++	bic	r0, r0, #(1 << 30)
++	str	r0, [r5, #CLK_RESET_PLLP_BASE]
++	ldr	r0, [r5, #CLK_RESET_PLLC_BASE]
++	bic	r0, r0, #(1 << 30)
++	str	r0, [r5, #CLK_RESET_PLLC_BASE]
++
++	mov	pc, lr
++
+ /*
+  * tegra20_enter_sleep
+  *
+@@ -275,4 +480,95 @@ halted:
+ 	isb
+ 	b	halted
+ 
++/*
++ * tegra20_sdram_self_refresh
++ *
++ * called with MMU off and caches disabled
++ * puts sdram in self refresh
++ * must be executed from IRAM
++ */
++tegra20_sdram_self_refresh:
++	mov32	r1, TEGRA_EMC_BASE	@ r1 reserved for emc base addr
++
++	mov	r2, #3
++	str	r2, [r1, #EMC_REQ_CTRL]	@ stall incoming DRAM requests
++
++emcidle:
++	ldr	r2, [r1, #EMC_EMC_STATUS]
++	tst	r2, #4
++	beq	emcidle
++
++	mov	r2, #1
++	str	r2, [r1, #EMC_SELF_REF]
++
++	emc_device_mask r2, r1
++
++emcself:
++	ldr	r3, [r1, #EMC_EMC_STATUS]
++	and	r3, r3, r2
++	cmp	r3, r2
++	bne	emcself			@ loop until DDR in self-refresh
++
++	adr	r2, tegra20_sdram_pad_address
++	adr	r3, tegra20_sdram_pad_safe
++	adr	r4, tegra20_sdram_pad_save
++	mov	r5, #0
++
++	ldr	r6, tegra20_sdram_pad_size
++padsave:
++	ldr	r0, [r2, r5]		@ r0 is the addr in the pad_address
++
++	ldr	r1, [r0]
++	str	r1, [r4, r5]		@ save the content of the addr
++
++	ldr	r1, [r3, r5]
++	str	r1, [r0]		@ set the save val to the addr
++
++	add	r5, r5, #4
++	cmp	r6, r5
++	bne	padsave
++padsave_done:
++
++	mov32	r5, TEGRA_CLK_RESET_BASE
++	ldr	r0, [r5, #CLK_RESET_SCLK_BURST]
++	adr	r2, tegra20_sclk_save
++	str	r0, [r2]
++	dsb
++	mov	pc, lr
++
++tegra20_sdram_pad_address:
++	.word	TEGRA_APB_MISC_BASE + APB_MISC_XM2CFGCPADCTRL
++	.word	TEGRA_APB_MISC_BASE + APB_MISC_XM2CFGDPADCTRL
++	.word	TEGRA_APB_MISC_BASE + APB_MISC_XM2CLKCFGPADCTRL
++	.word	TEGRA_APB_MISC_BASE + APB_MISC_XM2COMPPADCTRL
++	.word	TEGRA_APB_MISC_BASE + APB_MISC_XM2VTTGENPADCTRL
++	.word	TEGRA_APB_MISC_BASE + APB_MISC_XM2CFGCPADCTRL2
++	.word	TEGRA_APB_MISC_BASE + APB_MISC_XM2CFGDPADCTRL2
++
++tegra20_sdram_pad_size:
++	.word	tegra20_sdram_pad_size - tegra20_sdram_pad_address
++
++tegra20_sdram_pad_safe:
++	.word	0x8
++	.word	0x8
++	.word	0x0
++	.word	0x8
++	.word	0x5500
++	.word	0x08080040
++	.word	0x0
++
++tegra20_sclk_save:
++	.word	0x0
++
++tegra20_sdram_pad_save:
++	.rept (tegra20_sdram_pad_size - tegra20_sdram_pad_address) / 4
++	.long	0
++	.endr
++
++	.ltorg
++/* dummy symbol for end of IRAM */
++	.align L1_CACHE_SHIFT
++	.globl tegra20_iram_end
++tegra20_iram_end:
++	b	.
  #endif
-diff --git a/arch/arm/mach-tegra/reset.h b/arch/arm/mach-tegra/reset.h
-index c90d8e9..76a9343 100644
---- a/arch/arm/mach-tegra/reset.h
-+++ b/arch/arm/mach-tegra/reset.h
-@@ -39,6 +39,10 @@ void __tegra_cpu_reset_handler_end(void);
- void tegra_secondary_startup(void);
- 
- #ifdef CONFIG_PM_SLEEP
-+#define tegra_cpu_lp1_mask \
-+	(IO_ADDRESS(TEGRA_IRAM_BASE + TEGRA_IRAM_RESET_HANDLER_OFFSET + \
-+	((u32)&__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_LP1] - \
-+	 (u32)__tegra_cpu_reset_handler_start)))
- #define tegra_cpu_lp2_mask \
- 	(IO_ADDRESS(TEGRA_IRAM_BASE + TEGRA_IRAM_RESET_HANDLER_OFFSET + \
- 	((u32)&__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_LP2] - \
 -- 
 1.8.3.4
