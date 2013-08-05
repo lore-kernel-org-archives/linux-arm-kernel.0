@@ -1,385 +1,865 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 Aug 2013 12:12:21 -0400
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
+Date: Mon, 5 Aug 2013 12:12:24 -0400
+Subject: [PATCH 5/8] ARM: dts: keystone: Add clock tree data to devicetree
 In-Reply-To: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1375719147-7578-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1375719147-7578-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the driver for the clock gate control which uses PSC (Power Sleep
-Controller) IP on Keystone 2 based SOCs. It is responsible for enabling and
-disabling of the clocks for different IPs present in the SoC.
+Add clock tree for Keystone 2 based SOCs.
 
 Cc: Mike Turquette <mturquette@linaro.org>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- .../devicetree/bindings/clock/keystone-gate.txt    |   30 ++
- drivers/clk/keystone/gate.c                        |  306 ++++++++++++++++++++
- include/linux/clk/keystone.h                       |    1 +
- 3 files changed, 337 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
- create mode 100644 drivers/clk/keystone/gate.c
+ arch/arm/boot/dts/keystone-clocks.dtsi |  824 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dts         |    2 +
+ 2 files changed, 826 insertions(+)
+ create mode 100644 arch/arm/boot/dts/keystone-clocks.dtsi
 
-diff --git a/Documentation/devicetree/bindings/clock/keystone-gate.txt b/Documentation/devicetree/bindings/clock/keystone-gate.txt
+diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
 new file mode 100644
-index 0000000..40afef5
+index 0000000..b8c6b3a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-@@ -0,0 +1,30 @@
-+Binding for Keystone gate control driver which uses PSC controller IP.
++++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+@@ -0,0 +1,824 @@
++/*
++ * Device Tree Source for Keystone 2 clock tree
++ *
++ * Copyright (C) 2013 Texas Instruments, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+This binding uses the common clock binding[1].
++clocks {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
 +
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++	refclkmain: refclkmain {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <122880000>;
++		clock-output-names = "refclk-main";
++	};
 +
-+Required properties:
-+- compatible : shall be "keystone,psc-clk".
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : parent clock phandle
-+- reg :	psc address address space
++	mainpllclk: mainpllclk at 2310110 {
++		#clock-cells = <0>;
++		compatible = "keystone,pll-clk";
++		clocks = <&refclkmain>;
++		reg = <0x02310110 4	/* PLLCTRL PLLM */
++			0x02620350 4>;	/* MAINPLL_CTL0 */
++		pll_has_pllctrl;
++		pllm_lower_mask	= <0x3f>;
++		pllm_upper_mask = <0x7f000>;
++		pllm_upper_shift = <6>;
++		plld_mask = <0x3f>;
++		fixed_postdiv = <2>;
++	};
 +
-+Optional properties:
-+- clock-output-names : From common clock binding to override the
-+			default output clock name
-+- status : "enabled" if clock is always enabled
-+- lpsc : lpsc module id, if not set defaults to zero
-+- pd : power domain number, if not set defaults to zero (always ON)
-+- gpsc : gpsc number, if not set defaults to zero
++	mainmuxclk: mainmuxclk at 2310108 {
++		#clock-cells = <0>;
++		compatible = "mux-clk";
++		clocks = <&mainpllclk>, <&refclkmain>;
++		reg = <0x02310108 4>;
++		bit-shift = <23>;
++		bit-mask = <1>;
++		clock-output-names = "mainmuxclk";
++	};
 +
-+Example:
-+	clock {
++	chipclk1: chipclk1 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&mainmuxclk>;
++		clock-div = <1>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk1";
++	};
++
++	chipclk1rstiso: chipclk1rstiso {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&mainmuxclk>;
++		clock-div = <1>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk1rstiso";
++	};
++
++	gemtraceclk: gemtraceclk at 2310120 {
++		#clock-cells = <0>;
++		compatible = "divider-clock";
++		clocks = <&mainmuxclk>;
++		reg = <0x02310120 4>;
++		bit-shift = <0>;
++		bit-mask = <8>;
++		clock-output-names = "gemtraceclk";
++	};
++
++	chipstmxptclk: chipstmxptclk {
++		#clock-cells = <0>;
++		compatible = "divider-clock";
++		clocks = <&mainmuxclk>;
++		reg = <0x02310164 4>;
++		bit-shift = <0>;
++		bit-mask = <8>;
++		clock-output-names = "chipstmxptclk";
++	};
++
++	chipclk12: chipclk12 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1>;
++		clock-div = <2>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk12";
++	};
++
++	chipclk13: chipclk13 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1>;
++		clock-div = <3>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk13";
++	};
++
++	chipclk14: chipclk14 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1>;
++		clock-div = <4>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk14";
++	};
++
++	chipclk16: chipclk16 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1>;
++		clock-div = <6>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk16";
++	};
++
++	chipclk112: chipclk112 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1>;
++		clock-div = <12>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk112";
++	};
++
++	chipclk124: chipclk124 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1>;
++		clock-div = <24>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk114";
++	};
++
++	chipclk1rstiso13: chipclk1rstiso13 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1rstiso>;
++		clock-div = <3>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk1rstiso13";
++	};
++
++	chipclk1rstiso14: chipclk1rstiso14 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1rstiso>;
++		clock-div = <4>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk1rstiso14";
++	};
++
++	chipclk1rstiso16: chipclk1rstiso16 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1rstiso>;
++		clock-div = <6>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk1rstiso16";
++	};
++
++	chipclk1rstiso112: chipclk1rstiso112 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&chipclk1rstiso>;
++		clock-div = <12>;
++		clock-mult = <1>;
++		clock-output-names = "chipclk1rstiso112";
++	};
++
++	clkmodrst0: clkmodrst0 {
 +		#clock-cells = <0>;
 +		compatible = "keystone,psc-clk";
-+		clocks = <&chipclk3>;
-+		clock-output-names = "debugss_trc";
++		clocks = <&chipclk16>;
++		clock-output-names = "modrst0";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++
++	clkusb: clkusb {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk16>;
++		clock-output-names = "usb";
++		reg = <0x02350000 4096>;
++		lpsc = <2>;
++	};
++
++	clkaemifspi: clkaemifspi {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk16>;
++		clock-output-names = "aemif-spi";
++		reg = <0x02350000 4096>;
++		status = "enabled";
++		lpsc = <3>;
++	};
++
++
++	clkdebugsstrc: clkdebugsstrc {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "debugss-trc";
 +		reg = <0x02350000 4096>;
 +		lpsc = <5>;
 +		pd = <1>;
 +	};
-diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-new file mode 100644
-index 0000000..72ac478
---- /dev/null
-+++ b/drivers/clk/keystone/gate.c
-@@ -0,0 +1,306 @@
-+/*
-+ * Clock driver for Keystone 2 based devices
-+ *
-+ * Copyright (C) 2013 Texas Instruments.
-+ *	Murali Karicheri <m-karicheri2@ti.com>
-+ *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/of_address.h>
-+#include <linux/of.h>
-+#include <linux/module.h>
 +
-+/* PSC register offsets */
-+#define PTCMD			0x120
-+#define PTSTAT			0x128
-+#define PDSTAT			0x200
-+#define PDCTL			0x300
-+#define MDSTAT			0x800
-+#define MDCTL			0xa00
++	clktetbtrc: clktetbtrc {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "tetb-trc";
++		reg = <0x02350000 4096>;
++		lpsc = <6>;
++		pd = <1>;
++	};
 +
-+/* PSC module states */
-+#define PSC_STATE_SWRSTDISABLE	0
-+#define PSC_STATE_SYNCRST	1
-+#define PSC_STATE_DISABLE	2
-+#define PSC_STATE_ENABLE	3
++	clkpa: clkpa {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk16>;
++		clock-output-names = "pa";
++		reg = <0x02350000 4096>;
++		lpsc = <7>;
++		pd = <2>;
++	};
 +
-+#define MDSTAT_STATE_MASK	0x3f
-+#define MDSTAT_MCKOUT		BIT(12)
-+#define PDSTAT_STATE_MASK	0x1f
-+#define MDCTL_FORCE		BIT(31)
-+#define MDCTL_LRESET		BIT(8)
-+#define PDCTL_NEXT		BIT(0)
++	clkcpgmac: clkcpgmac {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkpa>;
++		clock-output-names = "cpgmac";
++		reg = <0x02350000 4096>;
++		lpsc = <8>;
++		pd = <2>;
++	};
 +
-+/* PSC flags. Disable state is SwRstDisable */
-+#define PSC_SWRSTDISABLE	BIT(0)
-+/* Force module state transtition */
-+#define PSC_FORCE		BIT(1)
-+/* Keep module in local reset */
-+#define PSC_LRESET		BIT(2)
-+#define NUM_GPSC		2
-+#define REG_OFFSET		4
++	clksa: clksa {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkpa>;
++		clock-output-names = "sa";
++		reg = <0x02350000 4096>;
++		lpsc = <9>;
++		pd = <2>;
++	};
 +
-+/**
-+ * struct clk_psc_data - PSC data
-+ * @base: Base address for a PSC
-+ * @flags: framework flags
-+ * @lpsc: Is it local PSC
-+ * @gpsc: Is it global PSC
-+ * @domain: PSC domain
-+ *
-+ */
-+struct clk_psc_data {
-+	void __iomem *base;
-+	u32	flags;
-+	u32	psc_flags;
-+	u8	lpsc;
-+	u8	gpsc;
-+	u8	domain;
++	clkpcie: clkpcie {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk12>;
++		clock-output-names = "pcie";
++		reg = <0x02350000 4096>;
++		lpsc = <10>;
++		pd = <3>;
++	};
++
++	clksrio: clksrio {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1rstiso13>;
++		clock-output-names = "srio";
++		reg = <0x02350000 4096>;
++		lpsc = <11>;
++		pd = <4>;
++	};
++
++	clkhyperlink0: clkhyperlink0 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk12>;
++		clock-output-names = "hyperlink-0";
++		reg = <0x02350000 4096>;
++		lpsc = <12>;
++		pd = <5>;
++	};
++
++	clksr: clksr {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1rstiso112>;
++		clock-output-names = "sr";
++		reg = <0x02350000 4096>;
++		lpsc = <13>;
++		pd = <6>;
++	};
++
++	clkmsmcsram: clkmsmcsram {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "msmcsram";
++		reg = <0x02350000 4096>;
++		lpsc = <14>;
++		pd = <7>;
++	};
++
++	clkgem0: clkgem0 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem0";
++		reg = <0x02350000 4096>;
++		lpsc = <15>;
++		pd = <8>;
++	};
++
++	clkgem1: clkgem1 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem1";
++		reg = <0x02350000 4096>;
++		lpsc = <16>;
++		pd = <9>;
++	};
++
++	clkgem2: clkgem2 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem2";
++		reg = <0x02350000 4096>;
++		lpsc = <17>;
++		pd = <10>;
++	};
++
++	clkgem3: clkgem3 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem3";
++		reg = <0x02350000 4096>;
++		lpsc = <18>;
++		pd = <11>;
++	};
++
++	clkgem4: clkgem4 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem4";
++		reg = <0x02350000 4096>;
++		lpsc = <19>;
++		pd = <12>;
++	};
++
++	clkgem5: clkgem5 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem5";
++		reg = <0x02350000 4096>;
++		lpsc = <20>;
++		pd = <13>;
++	};
++
++	clkgem6: clkgem6 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem6";
++		reg = <0x02350000 4096>;
++		lpsc = <21>;
++		pd = <14>;
++	};
++
++	clkgem7: clkgem7 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk1>;
++		clock-output-names = "gem7";
++		reg = <0x02350000 4096>;
++		lpsc = <22>;
++		pd = <15>;
++	};
++
++	clkddr30: clkddr30 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk12>;
++		clock-output-names = "ddr3-0";
++		reg = <0x02350000 4096>;
++		lpsc = <23>;
++		pd = <16>;
++	};
++
++	clkddr31: clkddr31 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "ddr3-1";
++		reg = <0x02350000 4096>;
++		lpsc = <24>;
++		pd = <16>;
++	};
++
++	clktac: clktac {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "tac";
++		reg = <0x02350000 4096>;
++		lpsc = <25>;
++		pd = <17>;
++	};
++
++	clkrac01: clktac01 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "rac-01";
++		reg = <0x02350000 4096>;
++		lpsc = <26>;
++		pd = <17>;
++	};
++
++	clkrac23: clktac23 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "rac-23";
++		reg = <0x02350000 4096>;
++		lpsc = <27>;
++		pd = <18>;
++	};
++
++	clkfftc0: clkfftc0 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "fftc-0";
++		reg = <0x02350000 4096>;
++		lpsc = <28>;
++		pd = <19>;
++	};
++
++	clkfftc1: clkfftc1 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "fftc-1";
++		reg = <0x02350000 4096>;
++		lpsc = <29>;
++		pd = <19>;
++	};
++
++	clkfftc2: clkfftc2 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "fftc-2";
++		reg = <0x02350000 4096>;
++		lpsc = <30>;
++		pd = <20>;
++	};
++
++	clkfftc3: clkfftc3 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "fftc-3";
++		reg = <0x02350000 4096>;
++		lpsc = <31>;
++		pd = <20>;
++	};
++
++	clkfftc4: clkfftc4 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "fftc-4";
++		reg = <0x02350000 4096>;
++		lpsc = <32>;
++		pd = <20>;
++	};
++
++	clkfftc5: clkfftc5 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "fftc-5";
++		reg = <0x02350000 4096>;
++		lpsc = <33>;
++		pd = <20>;
++	};
++
++	clkaif: clkaif {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "aif";
++		reg = <0x02350000 4096>;
++		lpsc = <34>;
++		pd = <21>;
++	};
++
++	clktcp3d0: clktcp3d0 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "tcp3d-0";
++		reg = <0x02350000 4096>;
++		lpsc = <35>;
++		pd = <22>;
++	};
++
++	clktcp3d1: clktcp3d1 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "tcp3d-1";
++		reg = <0x02350000 4096>;
++		lpsc = <36>;
++		pd = <22>;
++	};
++
++	clktcp3d2: clktcp3d2 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "tcp3d-2";
++		reg = <0x02350000 4096>;
++		lpsc = <37>;
++		pd = <23>;
++	};
++
++	clktcp3d3: clktcp3d3 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "tcp3d-3";
++		reg = <0x02350000 4096>;
++		lpsc = <38>;
++		pd = <23>;
++	};
++
++	clkvcp0: clkvcp0 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-0";
++		reg = <0x02350000 4096>;
++		lpsc = <39>;
++		pd = <24>;
++	};
++
++	clkvcp1: clkvcp1 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-1";
++		reg = <0x02350000 4096>;
++		lpsc = <40>;
++		pd = <24>;
++	};
++
++	clkvcp2: clkvcp2 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-2";
++		reg = <0x02350000 4096>;
++		lpsc = <41>;
++		pd = <24>;
++	};
++
++	clkvcp3: clkvcp3 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-3";
++		reg = <0x02350000 4096>;
++		lpsc = <42>;
++		pd = <24>;
++	};
++
++	clkvcp4: clkvcp4 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-4";
++		reg = <0x02350000 4096>;
++		lpsc = <43>;
++		pd = <25>;
++	};
++
++	clkvcp5: clkvcp5 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-5";
++		reg = <0x02350000 4096>;
++		lpsc = <44>;
++		pd = <25>;
++	};
++
++	clkvcp6: clkvcp6 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-6";
++		reg = <0x02350000 4096>;
++		lpsc = <45>;
++		pd = <25>;
++	};
++
++	clkvcp7: clkvcp7 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "vcp-7";
++		reg = <0x02350000 4096>;
++		lpsc = <46>;
++		pd = <25>;
++	};
++
++	clkbcp: clkbcp {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "bcp";
++		reg = <0x02350000 4096>;
++		lpsc = <47>;
++		pd = <26>;
++	};
++
++	clkdxb: clkdxb {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "dxb";
++		reg = <0x02350000 4096>;
++		lpsc = <48>;
++		pd = <27>;
++	};
++
++	clkhyperlink1: clkhyperlink1 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk12>;
++		clock-output-names = "hyperlink-1";
++		reg = <0x02350000 4096>;
++		lpsc = <49>;
++		pd = <28>;
++	};
++
++	clkxge: clkxge {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&chipclk13>;
++		clock-output-names = "xge";
++		reg = <0x02350000 4096>;
++		lpsc = <50>;
++		pd = <29>;
++	};
++
++	clkwdtimer0: clkwdtimer0 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "timer0";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkwdtimer1: clkwdtimer1 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "timer1";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkwdtimer2: clkwdtimer2 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "timer2";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkwdtimer3: clkwdtimer3 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "timer3";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkuart0: clkuart0 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "uart0";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkuart1: clkuart1 {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "uart1";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkaemif: clkaemif {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkaemifspi>;
++		clock-output-names = "aemif";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkusim: clkusim {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "usim";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clki2c: clki2c {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "i2c";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkspi: clkspi {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkaemifspi>;
++		clock-output-names = "spi";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkgpio: clkgpio {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "gpio";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	clkkeymgr: clkkeymgr {
++		#clock-cells = <0>;
++		compatible = "keystone,psc-clk";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "keymgr";
++		status = "enabled";
++		reg = <0x02350000 4096>;
++	};
++
++	papllclk: papllclk at 2620358 {
++		#clock-cells = <0>;
++		compatible = "keystone,pll-clk";
++		clocks = <&refclkmain>;
++		clock-output-names = "pa-pll-clk";
++		reg = <0x02620358 4>;	/* PAPLL_CTL0 */
++		pllm_lower_mask	= <0x3f>;
++		pllm_upper_mask = <0x7ffc0>;
++		pllm_upper_shift = <6>;
++		plld_mask = <0x3f>;
++		fixed_postdiv = <6>;
++	};
++
++	ddr3allclk: ddr3apllclk at 2620360 {
++		#clock-cells = <0>;
++		compatible = "keystone,pll-clk";
++		clocks = <&refclkmain>;
++		clock-output-names = "ddr-3a-pll-clk";
++		reg = <0x02620360 4>;
++		pllm_lower_mask	= <0x3f>;
++		pllm_upper_mask = <0x7ffc0>;
++		pllm_upper_shift = <6>;
++		plld_mask = <0x3f>;
++		fixed_postdiv = <6>;
++	};
++
++	ddr3bllclk: ddr3bpllclk at 2620368 {
++		#clock-cells = <0>;
++		compatible = "keystone,pll-clk";
++		clocks = <&refclkmain>;
++		clock-output-names = "ddr-3b-pll-clk";
++		reg = <0x02620368 4>;
++		pllm_lower_mask	= <0x3f>;
++		pllm_upper_mask = <0x7ffc0>;
++		pllm_upper_shift = <6>;
++		plld_mask = <0x3f>;
++		fixed_postdiv = <6>;
++	};
++
++	armpllclk: armpllclk at 2620370 {
++		#clock-cells = <0>;
++		compatible = "keystone,pll-clk";
++		clocks = <&refclkmain>;
++		clock-output-names = "arm-pll-clk";
++		reg = <0x02620370 4>;
++		pllm_lower_mask	= <0x3f>;
++		pllm_upper_mask = <0x7ffc0>;
++		pllm_upper_shift = <6>;
++		plld_mask = <0x3f>;
++		fixed_postdiv = <6>;
++	};
 +};
-+
-+/**
-+ * struct clk_psc - PSC clock structure
-+ * @hw: clk_hw for the psc
-+ * @psc_data: PSC driver specific data
-+ * @lock: Spinlock used by the driver
-+ */
-+struct clk_psc {
-+	struct clk_hw hw;
-+	struct clk_psc_data *psc_data;
-+	spinlock_t *lock;
-+};
-+
-+struct reg_psc {
-+	u32 phy_base;
-+	u32 size;
-+	void __iomem *io_base;
-+};
-+
-+static struct reg_psc psc_addr[NUM_GPSC];
-+static DEFINE_SPINLOCK(psc_lock);
-+
-+#define to_clk_psc(_hw) container_of(_hw, struct clk_psc, hw)
-+
-+static void psc_config(void __iomem *psc_base, unsigned int domain,
-+		unsigned int id, bool enable, u32 flags)
-+{
-+	u32 ptcmd, pdstat, pdctl, mdstat, mdctl, next_state;
-+
-+	if (enable)
-+		next_state = PSC_STATE_ENABLE;
-+	else if (flags & PSC_SWRSTDISABLE)
-+		next_state = PSC_STATE_SWRSTDISABLE;
-+	else
-+		next_state = PSC_STATE_DISABLE;
-+
-+	mdctl = readl(psc_base + MDCTL + REG_OFFSET * id);
-+	mdctl &= ~MDSTAT_STATE_MASK;
-+	mdctl |= next_state;
-+	if (flags & PSC_FORCE)
-+		mdctl |= MDCTL_FORCE;
-+	if (flags & PSC_LRESET)
-+		mdctl &= ~MDCTL_LRESET;
-+	writel(mdctl, psc_base + MDCTL + REG_OFFSET * id);
-+
-+	pdstat = readl(psc_base + PDSTAT + REG_OFFSET * domain);
-+	if (!(pdstat & PDSTAT_STATE_MASK)) {
-+		pdctl = readl(psc_base + PDCTL + REG_OFFSET * domain);
-+		pdctl |= PDCTL_NEXT;
-+		writel(pdctl, psc_base + PDCTL + REG_OFFSET * domain);
-+	}
-+
-+	ptcmd = 1 << domain;
-+	writel(ptcmd, psc_base + PTCMD);
-+	while ((readl(psc_base + PTSTAT) >> domain) & 1)
-+		;
-+
-+	do {
-+		mdstat = readl(psc_base + MDSTAT + REG_OFFSET * id);
-+	} while (!((mdstat & MDSTAT_STATE_MASK) == next_state));
-+}
-+
-+static int keystone_clk_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_psc *psc = to_clk_psc(hw);
-+	struct clk_psc_data *data = psc->psc_data;
-+	u32 mdstat = readl(data->base + MDSTAT + REG_OFFSET * data->lpsc);
-+
-+	return (mdstat & MDSTAT_MCKOUT) ? 1 : 0;
-+}
-+
-+static int keystone_clk_enable(struct clk_hw *hw)
-+{
-+	struct clk_psc *psc = to_clk_psc(hw);
-+	struct clk_psc_data *data = psc->psc_data;
-+	unsigned long flags = 0;
-+
-+	if (psc->lock)
-+		spin_lock_irqsave(psc->lock, flags);
-+
-+	psc_config(data->base, data->domain, data->lpsc, 1, data->psc_flags);
-+
-+	if (psc->lock)
-+		spin_unlock_irqrestore(psc->lock, flags);
-+
-+	return 0;
-+}
-+
-+static void keystone_clk_disable(struct clk_hw *hw)
-+{
-+	struct clk_psc *psc = to_clk_psc(hw);
-+	struct clk_psc_data *data = psc->psc_data;
-+	unsigned long flags = 0;
-+
-+	if (psc->lock)
-+		spin_lock_irqsave(psc->lock, flags);
-+
-+	psc_config(data->base, data->domain, data->lpsc, 0, data->psc_flags);
-+
-+	if (psc->lock)
-+		spin_unlock_irqrestore(psc->lock, flags);
-+}
-+
-+static const struct clk_ops clk_psc_ops = {
-+	.enable = keystone_clk_enable,
-+	.disable = keystone_clk_disable,
-+	.is_enabled = keystone_clk_is_enabled,
-+};
-+
-+/**
-+ * clk_register_psc - register psc clock
-+ * @dev: device that is registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @psc_data: platform data to configure this clock
-+ * @lock: spinlock used by this clock
-+ */
-+static struct clk *clk_register_psc(struct device *dev,
-+			const char *name,
-+			const char *parent_name,
-+			struct clk_psc_data *psc_data,
-+			spinlock_t *lock)
-+{
-+	struct clk_init_data init;
-+	struct clk_psc *psc;
-+	struct clk *clk;
-+
-+	psc = kzalloc(sizeof(*psc), GFP_KERNEL);
-+	if (!psc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &clk_psc_ops;
-+	init.flags = psc_data->flags;
-+	init.parent_names = (parent_name ? &parent_name : NULL);
-+	init.num_parents = (parent_name ? 1 : 0);
-+
-+	psc->psc_data = psc_data;
-+	psc->lock = lock;
-+	psc->hw.init = &init;
-+
-+	clk = clk_register(NULL, &psc->hw);
-+	if (IS_ERR(clk))
-+		kfree(psc);
-+
-+	return clk;
-+}
-+
-+/**
-+ * of_psc_clk_init - initialize psc clock through DT
-+ * @node: device tree node for this clock
-+ * @lock: spinlock used by this clock
-+ */
-+static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
-+{
-+	const char *parent_name, *status = NULL, *base_flags = NULL;
-+	struct clk_psc_data *data;
-+	const char *clk_name = node->name;
-+	u32 gpsc = 0, lpsc = 0, pd = 0;
-+	struct resource res;
-+	struct clk *clk;
-+	int rc;
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	WARN_ON(!data);
-+
-+	if (of_address_to_resource(node, 0, &res)) {
-+		pr_err("psc_clk_init - no reg property defined\n");
-+		goto out;
-+	}
-+
-+	of_property_read_u32(node, "gpsc", &gpsc);
-+	of_property_read_u32(node, "lpsc", &lpsc);
-+	of_property_read_u32(node, "pd", &pd);
-+
-+	if (gpsc >= NUM_GPSC) {
-+		pr_err("psc_clk_init - no reg property defined\n");
-+		goto out;
-+	}
-+
-+	of_property_read_string(node,
-+			"clock-output-names", &clk_name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+	WARN_ON(!parent_name);
-+
-+	/* Expected that same phy_base is used for all psc clocks of
-+	 * a give gpsc. So ioremap is done only once.
-+	 */
-+	if (psc_addr[gpsc].phy_base) {
-+		if (psc_addr[gpsc].phy_base != res.start) {
-+			pr_err("Different psc base for same GPSC\n");
-+			goto out;
-+		}
-+	} else {
-+		psc_addr[gpsc].phy_base = res.start;
-+		psc_addr[gpsc].io_base =
-+			ioremap(res.start, resource_size(&res));
-+	}
-+
-+	WARN_ON(!psc_addr[gpsc].io_base);
-+	data->base = psc_addr[gpsc].io_base;
-+	data->lpsc = lpsc;
-+	data->gpsc = gpsc;
-+	data->domain = pd;
-+
-+	if (of_property_read_bool(node, "ti,psc-lreset"))
-+		data->psc_flags |= PSC_LRESET;
-+	if (of_property_read_bool(node, "ti,psc-force"))
-+		data->psc_flags |= PSC_FORCE;
-+
-+	clk = clk_register_psc(NULL, clk_name, parent_name,
-+				data, lock);
-+
-+	if (clk) {
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+
-+		rc = of_property_read_string(node, "status", &status);
-+		if (status && !strcmp(status, "enabled"))
-+			clk_prepare_enable(clk);
-+		return;
-+	}
-+	pr_err("psc_clk_init - error registering psc clk %s\n", node->name);
-+out:
-+	kfree(data);
-+	return;
-+}
-+
-+/**
-+ * of_keystone_psc_clk_init - initialize psc clock through DT
-+ * @node: device tree node for this clock
-+ */
-+void __init of_keystone_psc_clk_init(struct device_node *node)
-+{
-+	of_psc_clk_init(node, &psc_lock);
-+}
-+EXPORT_SYMBOL_GPL(of_keystone_psc_clk_init);
-+CLK_OF_DECLARE(keystone_gate_clk, "keystone,psc-clk", of_keystone_psc_clk_init);
-diff --git a/include/linux/clk/keystone.h b/include/linux/clk/keystone.h
-index 1ade95d..7b3e154 100644
---- a/include/linux/clk/keystone.h
-+++ b/include/linux/clk/keystone.h
-@@ -14,5 +14,6 @@
- #define __LINUX_CLK_KEYSTONE_H_
+diff --git a/arch/arm/boot/dts/keystone.dts b/arch/arm/boot/dts/keystone.dts
+index 1334b42..57a7cd9 100644
+--- a/arch/arm/boot/dts/keystone.dts
++++ b/arch/arm/boot/dts/keystone.dts
+@@ -93,6 +93,8 @@
+ 			reg = <0x023100e8 4>;	/* pll reset control reg */
+ 		};
  
- extern void of_keystone_pll_clk_init(struct device_node *node);
-+extern void of_keystone_psc_clk_init(struct device_node *node);
- 
- #endif /* __LINUX_CLK_KEYSTONE_H_ */
++		/include/ "keystone-clocks.dtsi"
++
+ 		uart0: serial at 02530c00 {
+ 			compatible = "ns16550a";
+ 			current-speed = <115200>;
 -- 
 1.7.9.5
