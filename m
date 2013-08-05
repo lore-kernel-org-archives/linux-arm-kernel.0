@@ -1,34 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Aug 2013 09:53:34 +0100
-Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
-In-Reply-To: <20130805104335.031b0fed@skate>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805104335.031b0fed@skate>
-Message-ID: <20130805085333.GO23006@n2100.arm.linux.org.uk>
+From: mhocko@suse.cz (Michal Hocko)
+Date: Mon, 5 Aug 2013 11:04:55 +0200
+Subject: [PATCH] MM: Make Contiguous Memory Allocator depends on MMU
+In-Reply-To: <CAJFYCKGZte3FER8MNRX3T_c=jgYbCb+WEWtdz4wSPa9XZ8huGg@mail.gmail.com>
+References: <1375593061-11350-1-git-send-email-manjunath.goudar@linaro.org>
+ <51fe08c6.87ef440a.10fc.1786SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAJFYCKEhJtG1x1PaiwpwOADxthXRSh0pQsE3uYWO2i4xnHGvYQ@mail.gmail.com>
+ <20130805073239.GC10146@dhcp22.suse.cz>
+ <CAJFYCKGZte3FER8MNRX3T_c=jgYbCb+WEWtdz4wSPa9XZ8huGg@mail.gmail.com>
+Message-ID: <20130805090455.GG10146@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 10:43:35AM +0200, Thomas Petazzoni wrote:
-> Sebastian, Russell,
+On Mon 05-08-13 14:07:41, Manjunath Goudar wrote:
+> On 5 August 2013 13:02, Michal Hocko <mhocko@suse.cz> wrote:
 > 
-> On Sun, 04 Aug 2013 23:45:30 +0200, Sebastian Hesselbarth wrote:
-> > On 08/04/2013 09:21 PM, Russell King - ARM Linux wrote:
-> > > This is only a RFC at present due to the need to test on Kirkwood and
-> > > fix at least one bug in ASoC core code.
+> > On Mon 05-08-13 10:10:08, Manjunath Goudar wrote:
+> > > On 4 August 2013 13:24, Wanpeng Li <liwanp@linux.vnet.ibm.com> wrote:
 > > >
-> > > I can't say that this stuff is fully tested, because I don't have any
-> > > Kirkwood platforms, but I do have one Dove platform, which as I've
-> > > said in the past doesn't run mainline.  I don't run DT on it, so these
-> > > patches also don't contain anything DT related.
-> > 
-> > Added Thomas Petazzoni to Cc, IIRC he has access to a T5325.
+> > > > On Sun, Aug 04, 2013 at 10:41:01AM +0530, Manjunath Goudar wrote:
+> > > > >s patch adds a Kconfig dependency on an MMU being available before
+> > > > >CMA can be enabled.  Without this patch, CMA can be enabled on an
+> > > > >MMU-less system which can lead to issues. This was discovered during
+> > > > >randconfig testing, in which CMA was enabled w/o MMU being enabled,
+> > > > >leading to the following error:
+> > > > >
+> > > > > CC      mm/migrate.o
+> > > > >mm/migrate.c: In function ?remove_migration_pte?:
+> > > > >mm/migrate.c:134:3: error: implicit declaration of function
+> > > > ?pmd_trans_huge?
+> > > > >[-Werror=implicit-function-declaration]
+> > > > >   if (pmd_trans_huge(*pmd))
+> > > > >   ^
+> > > > >mm/migrate.c:137:3: error: implicit declaration of function
+> > > > ?pte_offset_map?
+> > > > >[-Werror=implicit-function-declaration]
+> > > > >   ptep = pte_offset_map(pmd, addr);
+> > > > >
+> > > >
+> > > > Similar one.
+> > > >
+> > > > http://marc.info/?l=linux-mm&m=137532486405085&w=2
+> > >
+> > >
+> > > In this patch MIGRATION config is not required MMU, because already CMA
+> > > config depends
+> > > on MMU and HAVE_MEMBLOCK if both are true then only selecting MIGRATION
+> > and
+> > > MEMORY_ISOLATION.
+> >
+> > No, I think it should be config MIGRATION that should depend on MMU
+> > explicitly because that is where the problem exists. It shouldn't rely
+> > on other configs to not select it automatically.
+> >
+> >  Yes you are correct.
 > 
-> Yes, I have access to a Kirkwood t5325, which I'm currently trying to
-> move to DT. Note that I also received Armada 370 audio hardware last
-> week, so I'll be working on this as well in the future, this hardware
-> has both in/out jack plugs as well as SPDIF ones.
+> > The question is. Does CMA need to depend on MMU as well? Why?
+> > But please comment on the original thread instead.
+> >
 > 
-> So, yes, please Cc me on Kirkwood audio related developments.
+> I went through the mm/Kconfig, I think MMU dependence is not required
+> for CMA.
 
-Can you pick the patches off the mailing list(s)?  Re-sending them is
-just going to be noise for everyone.
+OK, it turned out that it is needed in the end. Kcofing forces selects
+so CMA config would force MIGRATION even if that one depends on MMU.
+
+-- 
+Michal Hocko
+SUSE Labs
