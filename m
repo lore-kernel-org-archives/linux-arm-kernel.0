@@ -1,54 +1,67 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 4 Aug 2013 23:30:13 -0700
+Date: Sun, 4 Aug 2013 23:36:55 -0700
 Subject: [Ksummit-2013-discuss] [ATTEND] [ARM ATTEND] kernel data bloat
  and how to avoid it
-In-Reply-To: <20130802132419.GO23006@n2100.arm.linux.org.uk>
+In-Reply-To: <20130802195730.6450.84988@quantum>
 References: <20130731073802.GT7656@atomide.com>
  <20130731123351.GA30474@kroah.com>
  <20130802075352.GY7656@atomide.com>
- <20130802124130.GI7656@atomide.com>
- <20130802132419.GO23006@n2100.arm.linux.org.uk>
-Message-ID: <20130805063013.GL7656@atomide.com>
+ <20130802195730.6450.84988@quantum>
+Message-ID: <20130805063654.GM7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130802 06:31]:
-> On Fri, Aug 02, 2013 at 05:41:31AM -0700, Tony Lindgren wrote:
-> > Oh and thinking about it a bit more, this issue is mostly with the
-> > device drivers implementing frameworks, not the device drivers
-> > using the frameworks. Things like clocks, regulators, muxes etc where
-> > an almost similar instance is repeated tens or hundreds of times for
-> > each SoC.
+* Mike Turquette <mturquette@linaro.org> [130802 13:04]:
+> Quoting Tony Lindgren (2013-08-02 00:53:53)
+> > People are unnecessarily defining registers in kernel for similar devices
+> > over and over again for each new SoC at the arch level and now more and
+> > more at the driver level.
+> > 
+> > One example of that are device tree based drivers that don't describe
+> > the actual hardware, but instead have a binding that points to an index
+> > of defined registers in the driver.
 > 
-> That is where it helps to have a strong maintainer for a subsystem who
-> has the guts to refuse to accept stuff which is similar to existing
-> implementations and insist that existing implementations are either
-> adapted or reused.
+> Apologies for possibly hijacking this thread, but this issue keeps me up
+> at night. People use DT for different things and have different ideas
+> about its Purpose In The World.
 > 
-> It's all very well someone coming along and writing a "generic" set of
-> implementations (like tglx did for the IRQ subsystem) but unless there's
-> a motivation for people to use the generic stuff (such as... you won't
-> get your code in if you don't use the provided generics unless you can
-> provide a very good reasoned argument) then people are just going to
-> write their own code time and time again.
-> 
-> It's just like how the clocksources have gone.  We now have multiple
-> implementations of how to read a counter which ticks at a specific
-> rate.  You wouldn't think that I wrote drivers/clocksource/mmio.c which
-> can handle all of these simple 32-bit/16-bit up/down counter cases.
-> Again, the problem is there is no strong reviewer there who looks over
-> every addition and says "no, use the generic stuff".
-> 
-> That's the basic problem here: the review, and people saying "no" to
-> new stuff doing the same as generic stuff.
+> Tony wants to move data out of the kernel, which was the impetus behind
+> the OMAP DT clock patches that describes every single clock in a DT node
+> (around 250 clocks). This create very large dts, but reduces the clock
+> drivers to pure logic, no data.
 
-Right, but to make all that easier I was thinking that we can possibly
-provide some generic guidelines and tools for maintainers to avoid some
-of these issues.
+Yes that should eventually allow "booting new hardware with old
+kernels".. But ideally with clocks we should support any combination of
+DT defined clocks and /lib/firmware defined clocks should be allowed to
+avoid bloating the DT files. We should be able to boot to user space
+with a pretty minimal set of clocks, and deal with the PM related settings
+based on SoC specific data from /lib/firmware.
+ 
+> Other folks are motivated only to get rid of board files and platform
+> data hacks. They keep all of the clock data in the clock driver and
+> instead use DT only as a way to hook up clocks to devices via a simple
+> mapping, thus describing how individual boards or SoC variants are set
+> up outside of the kernel source. dts remains small, essentially just an
+> array to map bindings but all of the clock data remains in the kernel.
 
-The data issues should be pretty easy to spot based on the size of the
-driver, or looking at the object file with size command for the data to
-text ratio etc.
+Right, that just moves the real problem to drivers and then it will
+eventually suck up all your maintainer time with constant churn to patch
+that data for various SoC revisions :)
+ 
+> Both approaches have their merits and drawbacks. Is it possible to
+> gather consensus on selecting a single approach? For the clock subsystem
+> I've accepted drivers and DT bindings which do either. I simply do not
+> have the DT experience or sensibilities to draw a line in the sand...
+> and maybe I should not draw a line in the sand and just let people pick
+> whichever approach they prefer (which maintains the status quo).
+> 
+> If the ARM Summit figures out all the answers then please let me know
+> what they are :-)
+
+Well I think it's been discussed many times earlier and it should be
+clear that Linus wants this kind of data out of the kernel. So maybe
+we could establish some kind of set of standards for the maintainers
+to follow.
 
 Regards,
 
