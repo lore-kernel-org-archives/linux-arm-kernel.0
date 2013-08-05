@@ -1,115 +1,31 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 5 Aug 2013 11:14:56 -0500
-Subject: [PATCH v3 11/12] dma: edma: Keep tracking of Pending interrupts
- (pending_acks)
+Date: Mon, 5 Aug 2013 11:14:51 -0500
+Subject: [PATCH v3 06/12] ARM: edma: Add pr_debug in edma_link
 In-Reply-To: <1375719297-12871-1-git-send-email-joelf@ti.com>
 References: <1375719297-12871-1-git-send-email-joelf@ti.com>
-Message-ID: <1375719297-12871-12-git-send-email-joelf@ti.com>
+Message-ID: <1375719297-12871-7-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The total_processed variable was being used to keep track of when
-DMA is completed for a particular descriptor.
-
-This doesn't work anymore, as the interrupt for completion can come
-in much later than when the total_processed variable is updated to
-reflect that all SG entries have been issues. Introduce another
-variable that reflects the actual value. This will serve a purpose
-different from what total_processed was required to help with.
-
-Also add code that give special treatment for the first linked set
-interrupt as pending_acks is handled a bit differently for that case.
+Useful for visualizing linking of PaRAM slots
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c |   32 +++++++++++++++++++++++++++++---
- 1 file changed, 29 insertions(+), 3 deletions(-)
+ arch/arm/common/edma.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 061f0cf..eca1b47 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -59,6 +59,10 @@ struct edma_desc {
- 	int				pset_nr;
- 	int				total_processed;
- 	int				next_setup_linkset;
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index aa43c49..34d3fc9 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1125,6 +1125,8 @@ void edma_link(unsigned from, unsigned to)
+ 	ctlr_to = EDMA_CTLR(to);
+ 	to = EDMA_CHAN_SLOT(to);
+ 
++	pr_debug("Setting up link %d -> %d\n", from, to);
 +
-+	int				no_first_ls_ack;
-+	int				pending_acks;
-+
- 	struct edmacc_param		pset[0];
- };
- 
-@@ -147,8 +151,7 @@ static void edma_execute(struct edma_chan *echan)
- 	struct edmacc_param tmp_param;
- 
- 	/* If either we processed all psets or we're still not started */
--	if (!echan->edesc ||
--	    echan->edesc->pset_nr == echan->edesc->total_processed) {
-+	if (!echan->edesc || !echan->edesc->pending_acks) {
- 		/* Get next vdesc */
- 		vdesc = vchan_next_desc(&echan->vchan);
- 		if (!vdesc) {
-@@ -180,6 +183,8 @@ static void edma_execute(struct edma_chan *echan)
- 
- 		edesc->total_processed += total_link_set;
- 
-+		edesc->pending_acks += total_link_set;
-+
- 		total_left = edesc->pset_nr - edesc->total_processed;
- 
- 		total_link_set = total_left > MAX_NR_LS ?
-@@ -190,6 +195,8 @@ static void edma_execute(struct edma_chan *echan)
- 			   where total pset_nr is strictly within MAX_NR size */
- 			if (total_left > total_link_set)
- 				edma_enable_interrupt(echan->slot[i]);
-+			else
-+				edesc->no_first_ls_ack = 1;
- 
- 			/* Setup link between linked set 0 to set 1 */
- 			edma_link(echan->slot[i], echan->slot[i+1]);
-@@ -210,6 +217,9 @@ static void edma_execute(struct edma_chan *echan)
- 			}
- 
- 			edesc->total_processed += total_link_set;
-+
-+			edesc->pending_acks += total_link_set;
-+
- 			total_left = edesc->pset_nr - edesc->total_processed;
- 
- 			if (total_left)
-@@ -267,6 +277,8 @@ static void edma_execute(struct edma_chan *echan)
- 
- 	edesc->total_processed += total_link_set;
- 
-+	edesc->pending_acks += total_link_set;
-+
- 	slot_off = total_link_set + ls_cur_off - 1;
- 
- 	if (edesc->total_processed == edesc->pset_nr)
-@@ -498,8 +510,22 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
- 
- 		edesc = echan->edesc;
- 
-+		if (edesc->pending_acks < MAX_NR_LS)
-+			edesc->pending_acks = 0;
-+		else
-+			edesc->pending_acks -= MAX_NR_LS;
-+
-+		if (edesc->no_first_ls_ack) {
-+			if (edesc->pending_acks < MAX_NR_LS)
-+				edesc->pending_acks = 0;
-+			else
-+				edesc->pending_acks -= MAX_NR_LS;
-+
-+			edesc->no_first_ls_ack = 0;
-+		}
-+
- 		if (edesc) {
--			if (edesc->total_processed == edesc->pset_nr) {
-+			if (!edesc->pending_acks) {
- 				dev_dbg(dev, "Transfer complete,"
- 					" stopping channel %d\n", ch_num);
- 				edma_stop(echan->ch_num);
+ 	if (from >= edma_cc[ctlr_from]->num_slots)
+ 		return;
+ 	if (to >= edma_cc[ctlr_to]->num_slots)
 -- 
 1.7.9.5
