@@ -1,58 +1,81 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 5 Aug 2013 19:20:58 +0800
-Subject: [PATCH V2 2/8] ARM: tegra: config the polarity of the request of sys
- clock
+Date: Mon, 5 Aug 2013 19:20:59 +0800
+Subject: [PATCH V2 3/8] clk: tegra114: add LP1 suspend/resume support
 In-Reply-To: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
 References: <1375701664-14965-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1375701664-14965-3-git-send-email-josephl@nvidia.com>
+Message-ID: <1375701664-14965-4-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When suspending to LP1 mode, the SYSCLK will be clock gated. And different
-board may have different polarity of the request of SYSCLK, this patch
-configure the polarity from the DT for the board.
+When the system suspends to LP1, the CPU clock source is switched to
+CLK_M (12MHz Oscillator) during suspend/resume flow. The CPU clock
+source is controlled by the CCLKG_BURST_POLICY register, and hence this
+register must be restored during LP1 resume.
 
+Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* s/inverts/polarity/
+* update the commit message
 ---
- arch/arm/mach-tegra/pmc.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/clk/tegra/clk-tegra114.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index 8345fcd..03e6405 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -27,6 +27,8 @@
- #include "pmc.h"
- #include "sleep.h"
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index f74ed19..b0e745a 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_address.h>
+ #include <linux/delay.h>
+ #include <linux/export.h>
++#include <linux/syscore_ops.h>
+ #include <linux/clk/tegra.h>
  
-+#define TEGRA_POWER_SYSCLK_POLARITY	(1 << 10)  /* sys clk polarity */
-+#define TEGRA_POWER_SYSCLK_OE		(1 << 11)  /* system clock enable */
- #define TEGRA_POWER_EFFECT_LP0		(1 << 14)  /* LP0 when CPU pwr gated */
- #define TEGRA_POWER_CPU_PWRREQ_POLARITY	(1 << 15)  /* CPU pwr req polarity */
- #define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
-@@ -238,6 +240,20 @@ void tegra_pmc_suspend_init(void)
- 	reg = tegra_pmc_readl(PMC_CTRL);
- 	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
- 	tegra_pmc_writel(reg, PMC_CTRL);
-+
-+	reg = tegra_pmc_readl(PMC_CTRL);
-+
-+	if (!pmc_pm_data.sysclkreq_high)
-+		reg |= TEGRA_POWER_SYSCLK_POLARITY;
-+	else
-+		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
-+
-+	/* configure the output polarity while the request is tristated */
-+	tegra_pmc_writel(reg, PMC_CTRL);
-+
-+	/* now enable the request */
-+	reg |= TEGRA_POWER_SYSCLK_OE;
-+	tegra_pmc_writel(reg, PMC_CTRL);
+ #include "clk.h"
+@@ -2332,6 +2333,33 @@ void tegra114_clock_deassert_dfll_dvco_reset(void)
  }
- #endif
+ EXPORT_SYMBOL(tegra114_clock_deassert_dfll_dvco_reset);
  
++#ifdef CONFIG_PM_SLEEP
++static u32 clk_rst_suspend[2];
++
++static int tegra114_clk_suspend(void)
++{
++	u32 *ctx = clk_rst_suspend;
++
++	*ctx++ = readl_relaxed(clk_base + CCLKG_BURST_POLICY);
++	*ctx++ = readl_relaxed(clk_base + CCLKG_BURST_POLICY + 4);
++
++	return 0;
++}
++
++static void tegra114_clk_resume(void)
++{
++	u32 *ctx = clk_rst_suspend;
++
++	writel_relaxed(*ctx++, clk_base + CCLKG_BURST_POLICY);
++	writel_relaxed(*ctx++, clk_base + CCLKG_BURST_POLICY + 4);
++}
++
++static struct syscore_ops tegra114_clk_syscore_ops = {
++	.suspend = tegra114_clk_suspend,
++	.resume = tegra114_clk_resume,
++};
++#endif
++
+ static void __init tegra114_clock_init(struct device_node *np)
+ {
+ 	struct device_node *node;
+@@ -2384,5 +2412,9 @@ static void __init tegra114_clock_init(struct device_node *np)
+ 	tegra_clk_apply_init_table = tegra114_clock_apply_init_table;
+ 
+ 	tegra_cpu_car_ops = &tegra114_cpu_car_ops;
++
++#ifdef CONFIG_PM_SLEEP
++	register_syscore_ops(&tegra114_clk_syscore_ops);
++#endif
+ }
+ CLK_OF_DECLARE(tegra114, "nvidia,tegra114-car", tegra114_clock_init);
 -- 
 1.8.3.4
