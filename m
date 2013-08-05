@@ -1,42 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Aug 2013 13:43:15 +0800
-Subject: [PATCH 2/7] pinctrl: imx header, conditional probe functions
-In-Reply-To: <1375439907-10462-3-git-send-email-mpa@pengutronix.de>
-References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130805054312.GC24629@S2101-09.ap.freescale.net>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Mon, 5 Aug 2013 13:56:09 +0800
+Subject: [PATCH] DMA: add help function to check whether dma controller
+ registered
+In-Reply-To: <51FC0FBF.9010107@wwwdotorg.org>
+References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
+ <51FC0FBF.9010107@wwwdotorg.org>
+Message-ID: <20130805055607.GC31469@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 12:38:22PM +0200, Markus Pargmann wrote:
-> The functions are not available if included by imx1 core driver.
+On Sat, Aug 03, 2013 at 03:59:59AM +0800, Stephen Warren wrote:
+> On 08/02/2013 12:04 AM, Richard Zhao wrote:
+> > DMA client device driver usually needs to know at probe time whether
+> > dma controller has been registered to deffer probe. So add a help
+> > function of_dma_check_controller.
+> > 
+> > DMA request channel functions can also used to check it, but they
+> > are usually called at open() time.
 > 
-
-Does imx1 core driver include the header?
-
-Shawn
-
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/pinctrl/pinctrl-imx.h | 4 ++++
->  1 file changed, 4 insertions(+)
+> > diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+> > index e1c4d3b..b6828c1 100644
 > 
-> diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
-> index bcedd99..446fc01 100644
-> --- a/drivers/pinctrl/pinctrl-imx.h
-> +++ b/drivers/pinctrl/pinctrl-imx.h
-> @@ -89,7 +89,11 @@ struct imx_pinctrl_soc_info {
->  #define IMX_MUX_MASK	0x7
->  #define IOMUXC_CONFIG_SION	(0x1 << 4)
->  
-> +#if IS_ENABLED(PINCTRL_IMX)
-> +
->  int imx_pinctrl_probe(struct platform_device *pdev,
->  			struct imx_pinctrl_soc_info *info);
->  int imx_pinctrl_remove(struct platform_device *pdev);
-> +
-> +#endif
->  #endif /* __DRIVERS_PINCTRL_IMX_H */
-> -- 
-> 1.8.3.2
+> > +int of_dma_check_controller(struct device *dev, const char *name)
 > 
+> 
+> > +	for (i = 0; i < count; i++) {
+> > +		if (of_dma_match_channel(np, name, i, &dma_spec))
+> > +			continue;
+> > +
+> > +		mutex_lock(&of_dma_lock);
+> > +		ofdma = of_dma_find_controller(&dma_spec);
+> > +		mutex_unlock(&of_dma_lock);
+> > +		of_node_put(dma_spec.np);
+> 
+> Do we need to add the following here:
+> 
+> if (ofdma)
+> 	break
+> 
+> To ensure that as soon as a successful match is found, the loop exits?
+> Otherwise, if there are multiple providers for that name, and the first
+> N are registered but the last isn't, this function will still return
+> failure.
+Right. Thanks.
+> 
+> > +	if (ofdma)
+> > +		return 0;
+> > +	else
+> > +		return -ENODEV;
+> 
+> That probably should be -EPROBE_DEFER?
+> 
+> Although, what about differentiating between "entry not found by
+> of_dma_match_channel" and "controller not yet probed"?
+I thought it might be called in non-probe functions.  If no people
+against it, I'll change it to EPROBE_DEFER.
+
+Thanks
+Richard
