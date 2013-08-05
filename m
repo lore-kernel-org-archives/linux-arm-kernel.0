@@ -1,45 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Aug 2013 12:59:47 +0100
-Subject: [PATCH RFC 00/13] Adding SPDIF support to kirkwood-i2s
-In-Reply-To: <51FECB7A.6010208@gmail.com>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com>
-Message-ID: <20130805115947.GA9858@sirena.org.uk>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 5 Aug 2013 17:42:17 +0530
+Subject: Kexec: BE kernel on ARM VE TC2
+Message-ID: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 04, 2013 at 11:45:30PM +0200, Sebastian Hesselbarth wrote:
-> On 08/04/2013 09:21 PM, Russell King - ARM Linux wrote:
+Hi Will,
 
-> >                 .name = "S/PDIF1",
-> >                 .stream_name = "IEC958 Playback",
-> >                 .platform_name = "mvebu-audio.1",
-> >                 .cpu_dai_name = "mvebu-audio.1",
-> >                 .codec_dai_name = "dit-hifi",
-> >                 .codec_name = "spdif-dit",
+I am trying to make kexec work on BE kernel on ARM VE TC2.
 
-> Not a big deal for DT. I suggest to have a "audio-codecs" property that
-> link CPU DAI to codec(s). One thing, I have noticed is that currently
-> you need to supply both codec_name (or DT node) _and_ codec_dai_name.
-> For that it would be helpful, if ASoC supplies helpers to get the DAI
-> by index and use phandle with args here.
+First, to make KEXEC work with SMP on ARM VE TC2 board,
+I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
 
-This should follow the same pattern as the other board bindings.
+However, I made below changes to make KEXEC work for BE kernel.
+my question is: why delay is required for board to reboot with kexec?.
+Is it platform issue?.
 
-> i2s1: audio-controller at b0000 {
-> 	compatible = "marvell,dove-i2s";
-> 	reg = <0xb0000 0x2345>;
-> 	audio-codecs = <&spdif 0>;
-> };
+diff --git a/arch/arm/kernel /machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 4fb074c..0fb0ff9 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -123,6 +123,18 @@ void machine_crash_shutdown(struct pt_regs *regs)
+        printk(KERN_INFO "Loading crashdump kernel...\n");
+ }
 
-No, things are glued together using the machine driver - again, look at
-how all the other systems work.  The wiring on the board can get
-interesting enough to need a binding of its own, for very simple
-bindings that should just be pointing to a generic driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130805/384d21d3/attachment.sig>
++static void byte_copy_relocate_kernel(void *dst, const void *src, int size)
++{
++        char *d, *s;
++        d = (char *) dst;
++        s = (char *) src;
++        while (size > 0)
++        {
++                *d++ = *s++;
++                size--;
++        }
++}
++
+ /*
+  * Function pointer to optional machine-specific reinitialization
+  */
+@@ -155,9 +167,8 @@ void machine_kexec(struct kimage *image)
+
+
+        /* copy our kernel relocation code to the control code page */
+-       memcpy(reboot_code_buffer,
+-              relocate_new_kernel, relocate_new_kernel_size);
+-
++       byte_copy_relocate_kernel(reboot_code_buffer,
++              relocate_new_kernel, relocate_new_kernel_size);
+
+        flush_icache_range((unsigned long) reboot_code_buffer,
+                           (unsigned long) reboot_code_buffer +
+KEXEC_CONTROL_PAGE_SIZE);
+@@ -165,6 +176,6 @@ void machine_kexec(struct kimage *image)
+
+        if (kexec_reinit)
+                kexec_reinit();
+-
++       mdelay(500);
+        soft_restart(reboot_code_buffer_phys);
+ }
+
+
+Thanks & Regards
+Vijay
