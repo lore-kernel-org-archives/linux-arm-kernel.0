@@ -1,39 +1,145 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 05 Aug 2013 12:37:40 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <51FF8E84.7000108@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 5 Aug 2013 14:44:37 +0300
+Subject: [PATCH v3 7/9] ARM: DRA7: id: Add cpu detection support for DRA7xx
+ based SoCs'
+In-Reply-To: <1375633657-6835-8-git-send-email-rnayak@ti.com>
+References: <1375633657-6835-1-git-send-email-rnayak@ti.com>
+ <1375633657-6835-8-git-send-email-rnayak@ti.com>
+Message-ID: <51FF9025.6040401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 23/07/13 10:19, Punit Agrawal wrote:
-> The CCI PMU can profile bus transactions at the master and slave
-> interfaces of the CCI. The PMU can be used to observe an aggregated view
-> of the bus traffic between the various components connected to the CCI.
+On 08/04/2013 07:27 PM, Rajendra Nayak wrote:
+> From: R Sricharan <r.sricharan@ti.com>
 >
-> Extend the existing CCI driver to support the PMU by registering a perf
-> backend for it.
+> The DRA7xx is a high-performance, infotainment application device,
+> based on enhanced OMAP architecture integrated on a 28-nm technology.
 >
-> Document the device tree binding to describe the CCI PMU.
+> Since DRA7 is a platform supported only using DT, the cpu detection
+> is based on the compatibles passed from DT blobs as suggested here
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187712.html
 >
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> Suggested-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->   Documentation/devicetree/bindings/arm/cci.txt |   38 ++
->   drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
->   2 files changed, 680 insertions(+)
+>   arch/arm/mach-omap1/include/mach/soc.h |    1 +
+>   arch/arm/mach-omap2/id.c               |    4 ++--
+>   arch/arm/mach-omap2/soc.h              |   17 +++++++++++++++++
+>   3 files changed, 20 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/include/mach/soc.h b/arch/arm/mach-omap1/include/mach/soc.h
+> index 6cf9c1c..612bd1c 100644
+> --- a/arch/arm/mach-omap1/include/mach/soc.h
+> +++ b/arch/arm/mach-omap1/include/mach/soc.h
+> @@ -195,6 +195,7 @@ IS_OMAP_TYPE(1710, 0x1710)
+>   #define cpu_is_omap34xx()		0
+>   #define cpu_is_omap44xx()		0
+>   #define soc_is_omap54xx()		0
+> +#define soc_is_dra7xx()			0
+>   #define soc_is_am33xx()			0
+>   #define cpu_class_is_omap1()		1
+>   #define cpu_class_is_omap2()		0
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 2dc62a2..0289adc 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -61,7 +61,7 @@ int omap_type(void)
+>   		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+>   	} else if (cpu_is_omap44xx()) {
+>   		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
+> -	} else if (soc_is_omap54xx()) {
+> +	} else if (soc_is_omap54xx() || soc_is_dra7xx()) {
+>   		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
+>   		val &= OMAP5_DEVICETYPE_MASK;
+>   		val >>= 6;
+> @@ -116,7 +116,7 @@ static u16 tap_prod_id;
+>
+>   void omap_get_die_id(struct omap_die_id *odi)
+>   {
+> -	if (cpu_is_omap44xx() || soc_is_omap54xx()) {
+> +	if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx()) {
+>   		odi->id_0 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_0);
+>   		odi->id_1 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_1);
+>   		odi->id_2 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_2);
+> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+> index 8c616e4..4588df1 100644
+> --- a/arch/arm/mach-omap2/soc.h
+> +++ b/arch/arm/mach-omap2/soc.h
+> @@ -8,6 +8,7 @@
+>    * Written by Tony Lindgren <tony.lindgren@nokia.com>
+>    *
+>    * Added OMAP4/5 specific defines - Santosh Shilimkar<santosh.shilimkar@ti.com>
+> + * Added DRA7xxx specific defines - Sricharan R<r.sricharan@ti.com>
+>    *
+>    * This program is free software; you can redistribute it and/or modify
+>    * it under the terms of the GNU General Public License as published by
+> @@ -35,6 +36,7 @@
+>   #ifndef __ASSEMBLY__
+>
+>   #include <linux/bitops.h>
+> +#include <linux/of.h>
+>
+>   /*
+>    * Test if multicore OMAP support is needed
+> @@ -105,6 +107,15 @@
+>   # endif
+>   #endif
+>
+> +#ifdef CONFIG_SOC_DRA7XX
+> +# ifdef OMAP_NAME
+> +#  undef MULTI_OMAP2
+> +#  define MULTI_OMAP2
+> +# else
+> +#  define OMAP_NAME DRA7XX
+> +# endif
+> +#endif
+> +
+>   /*
+>    * Omap device type i.e. EMU/HS/TST/GP/BAD
+>    */
+> @@ -233,6 +244,7 @@ IS_AM_SUBCLASS(437x, 0x437)
+>   #define cpu_is_omap447x()		0
+>   #define soc_is_omap54xx()		0
+>   #define soc_is_omap543x()		0
+> +#define soc_is_dra7xx()			0
+>
+>   #if defined(MULTI_OMAP2)
+>   # if defined(CONFIG_ARCH_OMAP2)
+> @@ -379,6 +391,11 @@ IS_OMAP_TYPE(3430, 0x3430)
+>   # define soc_is_omap543x()		is_omap543x()
+>   #endif
+>
+> +#if defined(CONFIG_SOC_DRA7XX)
+> +#undef soc_is_dra7xx
+> +#define soc_is_dra7xx()	(of_machine_is_compatible("ti,dra7"))
+
+Wouldn't that be too expensive to call of_machine_is_compatible every
+time for DRA7 detection?
+
+May be static variable can be used to store DRA7 presence status,
+smth. like this:
+
+static inline int is_dra7xx(void)
+{
+static int is_dra7 = -1;
+
+if (is_dra7 < 0)
+  is_dra7 = of_machine_is_compatible("ti,dra7");
+
+return !!is_dra7;
+}
+
+(it's just an idea, not verified)
+
+> +#endif
+> +
+>   /* Various silicon revisions for omap2 */
+>   #define OMAP242X_CLASS		0x24200024
+>   #define OMAP2420_REV_ES1_0	OMAP242X_CLASS
 >
 
-It's been 2 rc's since this patch was posted. If there are no objections 
-would you be ok to take this patch via your tree?
 
-Thanks,
-Punit
+Regards,
+-grygorii
