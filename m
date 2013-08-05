@@ -1,29 +1,45 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 5 Aug 2013 19:28:52 +0800
-Subject: [PATCH v5 0/6] mtd: atmel_nand: enable Nand Flash Controller
- (NFC) support
-In-Reply-To: <1375696588.14869.421.camel@sauron.fi.intel.com>
-References: <1372845034-5579-1-git-send-email-josh.wu@atmel.com>
- <1375696588.14869.421.camel@sauron.fi.intel.com>
-Message-ID: <51FF8C74.2060204@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Aug 2013 12:33:10 +0100
+Subject: [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM links between
+ codec and cpu DAI
+In-Reply-To: <20130805112733.GY9858@sirena.org.uk>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <E1V641A-0004lv-DM@rmk-PC.arm.linux.org.uk>
+ <20130805112733.GY9858@sirena.org.uk>
+Message-ID: <20130805113310.GU23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Artem
+On Mon, Aug 05, 2013 at 12:27:33PM +0100, Mark Brown wrote:
+> On Sun, Aug 04, 2013 at 08:31:04PM +0100, Russell King wrote:
+> > Add the DAPM links to connect the codec DAC and ADCs to the cpu DAI
+> > I2S inputs/outputs.
+> 
+> > +	{ "i2sdi",		NULL,	"Capture" },
+> > +	{ "Playback",		NULL,	"i2sdo" },
+> 
+> This doesn't look good - this is adding DAPM routes which should
+> correspond to the DAI link that's already been configured.
 
-On 8/5/2013 5:56 PM, Artem Bityutskiy wrote:
-> On Wed, 2013-07-03 at 17:50 +0800, Josh Wu wrote:
->> This patch series enable NFC support for SAMA5 soc. It can send command,
->> address cycles automaticly. Also when enable NFC sram, NFC will transfer
->> data to sram. Which can save lots of cpu time.
->>
->> The mtd speed test results (non-NFC vs NFC), run in sama5d3x-ek with DMA
->> enable, is in the end of this patch.
-> Please, also all all the acks to the patches.
->
+No, you're wrong there:
 
-I already sent out the v6 for this NFC patch series. Which is rebased on 
-the top of l2-mtd.git and add the Acks in patch. Thanks for the remind.
+CPU DAI:				Codec DAI
+dma-playback	--->	i2sdo	--->	Playback
+		`-->	spdifdo -> not connected
+dma-capture	<---	i2sdi	<---	Capture
 
-Best Regards,
-Josh Wu
+And the intermediate level is needed to determine which outputs from
+the chip are wired up.
+
+This structure, which is what ASoC normally does, for this SoC is wrong:
+
+CPU DAI:		Codec DAI
+dma-playback	--->	Playback
+dma-capture	<---	Capture
+
+because it contains no information on how the connectivity between the
+codec and DAI is performed.
+
+And don't even say "use dpcm" - if you say that, I want _you_ to write
+it because dpcm is totally and utterly unusable as it currently stands -
+as you can see from all the emails I've sent over the weekend.
