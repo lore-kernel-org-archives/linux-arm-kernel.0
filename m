@@ -1,22 +1,16 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Aug 2013 12:15:28 +0200
-Subject: [PATCH] ARM: u300: fix return value check in
- __u300_init_boardpower()
-In-Reply-To: <CAPgLHd9cUJtF7WXmY4Sy+53MxjKJRe8RVNNtbfdYLzh6OwbNzg@mail.gmail.com>
-References: <CAPgLHd9cUJtF7WXmY4Sy+53MxjKJRe8RVNNtbfdYLzh6OwbNzg@mail.gmail.com>
-Message-ID: <CACRpkdZ9VBjPVOB9t4E6MJ80m_Mb78Fvp5sPk2Y0hOTQqu1wBA@mail.gmail.com>
+Date: Tue, 6 Aug 2013 12:16:47 +0200
+Subject: [PATCH 03/22] ARM: u300: Remove '0x's from U300 DTS file
+In-Reply-To: <1374490361-25769-3-git-send-email-lee.jones@linaro.org>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYvOKmBcJZDaeDPu1wag0qQdzSG=3mb58Xhu02kmSS=xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 4, 2013 at 3:51 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+On Mon, Jul 22, 2013 at 12:52 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->
-> In case of error, the function syscon_node_to_regmap() returns ERR_PTR()
-> and never returns NULL. The NULL test in the return value check should
-> be replaced with IS_ERR().
->
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
 Patch applied.
 
