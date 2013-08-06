@@ -1,43 +1,44 @@
-From: panetta.mike@gmail.com (Michael Panetta)
-Date: Tue,  6 Aug 2013 17:35:17 -0400
-Subject: [PATCH] Add dts info for wandboard GPIO lines.
-In-Reply-To: <1375824917-9420-1-git-send-email-panetta.mike@gmail.com>
-References: <1375824917-9420-1-git-send-email-panetta.mike@gmail.com>
-Message-ID: <1375824917-9420-2-git-send-email-panetta.mike@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 6 Aug 2013 14:36:07 -0700
+Subject: [PATCH v2 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
+ clear WAKEUP_INT
+In-Reply-To: <CAD=FV=XZcf8xWWxrCoe9KqjnQs4p4y7ENnuUYsVKU+yrE09GeQ@mail.gmail.com>
+References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
+ <1373411961-23812-1-git-send-email-dianders@chromium.org>
+ <1373411961-23812-4-git-send-email-dianders@chromium.org>
+ <002a01ce7d7d$6bd9e870$438db950$%jun@samsung.com>
+ <CAD=FV=UtX0Z1ABdi5h270ks8Py2o1iPK4DonOHJH3N0Q1YShTQ@mail.gmail.com>
+ <003f01ce8154$2f5ea1d0$8e1be570$%jun@samsung.com>
+ <CAD=FV=XZcf8xWWxrCoe9KqjnQs4p4y7ENnuUYsVKU+yrE09GeQ@mail.gmail.com>
+Message-ID: <CAD=FV=U3jLPTh8T3cxyebOGrCOO6O15qB57x7KxUWHXxOmR84A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Seungwon,
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index a55113e..b40bbe1 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -84,6 +84,23 @@
- 			>;
- 		};
- 	};
-+
-+	gpio {
-+		pinctrl_gpio: gpiogrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_DA12__GPIO3_IO12   0x80000000 /* GPIO3_12 EDM pin 255 */
-+				MX6QDL_PAD_EIM_DA11__GPIO3_IO11   0x80000000 /* GPIO3_11 EDM pin 256 */
-+				MX6QDL_PAD_EIM_DA10__GPIO3_IO10   0x80000000 /* GPIO3_10 EDM pin 257 */
-+				MX6QDL_PAD_EIM_D27__GPIO3_IO27    0x80000000 /* GPIO3_27 EDM pin 258 */
-+				MX6QDL_PAD_EIM_D26__GPIO3_IO26    0x80000000 /* GPIO3_26 EDM pin 259 */
-+				MX6QDL_PAD_EIM_BCLK__GPIO6_IO31   0x80000000 /* GPIO6_31 EDM pin 260 */
-+				MX6QDL_PAD_EIM_DA8__GPIO3_IO08    0x80000000 /* GPIO3_8  EDM pin 261 */
-+				MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24 0x80000000 /* GPIO1_24 EDM pin 262 */
-+				MX6QDL_PAD_GPIO_19__GPIO4_IO05    0x80000000 /* GPIO4_5  EDM pin 263 */
-+				MX6QDL_PAD_SD3_RST__GPIO7_IO08    0x80000000 /* GPIO7_8  EDM pin 264 */
-+			>;
-+		};
-+	};
- };
- 
- &fec {
--- 
-1.7.11.7
+On Wed, Jul 31, 2013 at 9:18 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Seungwon,
+>
+> On Mon, Jul 15, 2013 at 5:09 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+>> Sorry for late response.
+>> Yes, it's not clear.
+>> If you get the confirmation, could you share this problem?
+>> Possibly, auto-clear may not be implemented.
+>> Then, manual should be correct.
+>
+> I just got an update from my contacts.  They confirm that bit 11 is
+> not automatically cleared and that writing to it will clear it.
+> Hopefully this information will make it into the next version of any
+> documentation that you receive as well.
+>
+> It is still unclear exactly why the WAKEUP_INT was being asserted on
+> our board despite the fact that all of the wakeup control signals
+> (bits 10:8) were 0.  That is still being investigated.
+
+I have further confirmed from my contacts at Samsung that this is a
+real silicon errata and that clearing the WAKEUP_INT as I am doing in
+this series is the right workaround.
+
+New patch coming shortly based against ToT linux
+(v3.11-rc4-20-g0fff106).  I have confirmed that it applies cleanly to
+mmc-next, though I haven't tried booting with that tree.
