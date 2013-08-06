@@ -1,53 +1,96 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Aug 2013 18:21:51 +0200
-Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
-In-Reply-To: <5200E684.5080003@free-electrons.com>
-References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
- <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
- <20130716080503.GA3125@lukather>
- <5200E684.5080003@free-electrons.com>
-Message-ID: <20130806162151.GB2911@lukather>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 6 Aug 2013 09:25:05 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <52011FA5.9000406@linaro.org>
+References: <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <712d31e9-3584-48e1-aa9f-55bc94fa62c9@DB9EHSMHS001.ehs.local>
+ <5200B7FE.4000306@linaro.org>
+ <e43ebbd7-f520-4c66-bc8c-71a1122226ad@CO9EHSMHS020.ehs.local>
+ <5200EC4C.5090202@linaro.org>
+ <07cc684f-1d5c-44d7-b25c-6314efea4c58@CO9EHSMHS022.ehs.local>
+ <5200F553.6000200@linaro.org> <5200F7C2.8090802@monstr.eu>
+ <52011FA5.9000406@linaro.org>
+Message-ID: <a32b1270-0d09-46f7-8cb2-4c109582f1b5@VA3EHSMHS022.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 02:05:24PM +0200, Gregory CLEMENT wrote:
-> On 16/07/2013 10:05, Maxime Ripard wrote:
-> > Hi Gregory,
-> > 
-> > On Mon, Jul 15, 2013 at 04:24:36PM +0200, Gregory CLEMENT wrote:
-> >> The I2C Transaction Generator offloads CPU from managing I2C transfer step by step.
-> >> 
-> >> This feature is currently only available on Armada XP, so usage of this mechanism is activated through device tree.
-> >> 
-> >> Based on the work of Piotr Ziecik and rewrote to use the new way of handling multiples i2c messages.
-> >> 
-> >> Signed-off-by: Piotr Ziecik <kosmo@semihalf.com> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com> --- drivers/i2c/busses/i2c-mv64xxx.c | 207
-> >> ++++++++++++++++++++++++++++++++++++--- 1 file changed, 196 insertions(+), 11 deletions(-)
-> > 
-> > [...]
-> > 
-> >> +	/* +	 * For controllers embedded in new SoCs activate the +	 * Transaction Generator support. +	 */ +	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) +
-> >> drv_data->offload_enabled = true; +
-> > 
-> > Do you have a reason for not adding it to the match table? I mean, you will introduce a new compatible here, but if that compatible is used alone, won't probe the driver? That doesn't
-> > seem very right to me.
+On Tue, Aug 06, 2013 at 06:09:09PM +0200, Daniel Lezcano wrote:
+> On 08/06/2013 03:18 PM, Michal Simek wrote:
 > 
-> But we shouldn't use it alone: we should always use:
-> compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> [ ... ]
 > 
-> From my point of view using  "marvell,mv78230-i2c" alone is an error.
+> >>>>> Soren: Are you able to replicate this issue on QEMU?
+> >>>>> If yes, it should be the best if you can provide Qemu, kernel .config/
+> >>>>> rootfs and simple manual to Daniel how to reach that fault.
+> >>>>
+> >>>> I tried to download qemu for zynq but it fails:
+> >>>>
+> >>>> git clone git://git.xilinx.com/qemu-xarm.git
+> >>>> Cloning into 'qemu-xarm'...
+> >>>> fatal: The remote end hung up unexpectedly
+> >>>
+> >>> Not sure which site have you found but
+> >>> it should be just qemu.git
+> >>> https://github.com/Xilinx/qemu
+> >>>
+> >>> or github clone.
+> >>
+> >> Ok, cool I was able to clone it.
+> >>
+> >>>> I am also looking for the option specified for the kernel:
+> >>>>
+> >>>> "The kernel needs to be built with this feature turned on (in
+> >>>> menuconfig, System Type->Xilinx Specific Features -> Device Tree At
+> >>>> Fixed Address)."
+> >>
+> >> Ok.
+> >>
+> >>> This also sound like a very ancient tree.
+> >>> This is the latest kernel tree - master-next is the latest devel branch.
+> >>> https://github.com/Xilinx/linux-xlnx
+> >>
+> >> Ok, cool. I have the right one.
+> 
+> Following the documentation, I was able to boot a kernel with qemu for
+> the linux-xlnx and qemu-xilinx.
+> 
+> But this kernel is outdated regarding the upstream one, so I tried to
+> boot a 3.11-rc4 kernel without success, I did the following:
+> 
+> I used the default config file from linux-xlnx for the upstream kernel.
+> 
+> I compiled the kernel with:
+> 
+> make -j 5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-
+> UIMAGE_LOADADDR=0x8000 uImage
+> 
+> I generated the dtb with:
+> 
+> make -j 5 ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- dtbs
+> 
+> For qemu, I started qemu with:
+> 
+> ./arm-softmmu/qemu-system-arm -M arm-generic-fdt -nographic -smp 2
+> -machine linux=on -serial mon:stdio -dtb zynq-zed.dtb -kernel
+> kernel/zImage -initrd filesystem/ramdisk.img
+> 
+> I tried with the dtb available for the upstream kernel:
+> 
+> zynq-zc706.dtb, zynq-zc702.dtb and zynq-zed.dtb
+> 
+> Did I miss something ?
 
-Why is that? If the I2C controller is a new IP with additional features,
-it should have a full compatible of its own, doesn't it?
+Some debugging hints in case you wanna go through this.
+Add this additional option to configure:
+ --extra-cflags="-DFDT_GENERIC_UTIL_ERR_DEBUG=1
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130806/58933445/attachment-0001.sig>
+That'll print out a lot of messages when the dtb is parsed. It's likely
+that QEMU invalidates some vital node due to its compatible string being
+unknown. In that case you can simply add it to the list of known devices
+in 
+	hw/core/fdt_generic_devices.c
+The list is pretty much at the end of that file. I try to get it running
+here and might be able to send you a patch.
+
+	S?ren
