@@ -1,55 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 6 Aug 2013 13:06:12 -0400
-Subject: [PATCH 0/5] ARM: dove: switch to DT MBus
-In-Reply-To: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1375101114-28858-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130806170612.GW19280@titan.lakedaemon.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 06 Aug 2013 18:06:21 +0100
+Subject: [PATCH 0/3] ARM: vexpress: TC2 MCPM/SPC cleanups
+In-Reply-To: <20130806165459.GB28176@e102568-lin.cambridge.arm.com>
+References: <1375675793-16492-1-git-send-email-olof@lixom.net>
+ <20130805094709.GA29090@e102568-lin.cambridge.arm.com>
+ <1375805993.12043.80.camel@hornet>
+ <20130806165459.GB28176@e102568-lin.cambridge.arm.com>
+Message-ID: <1375808781.12043.98.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 02:31:49PM +0200, Sebastian Hesselbarth wrote:
-> This patch set converts DT based Dove boards to DT probed MBus to be
-> introduced with v3.12.
+On Tue, 2013-08-06 at 17:55 +0100, Lorenzo Pieralisi wrote:
+> > And here comes the V2P-CA15_A7, also known as TC2 ;-) where the
+> > interface was re-(or ab-?)used as a "convenient" communication channel
+> > between the test chip and the microcontroller. And the SPC is even
+> > described as "being merged" with the SCC. Uh...
 > 
-> The first two patches prepare Dove DT nodes for MBus ID remapping by using
-> preprocessor includes and adding the MBUS_ID macro. The third patch adds a
-> MBus DT node to Dove SoC dtsi with required ranges for internal MBus and
-> AXI registers, and PCIe mem and I/O apertures. The forth patch relocates
-> the nodes for the internal devices to the new MBus node. Also, internal-regs
-> ranges are updated to allow proper translation of MBus children's reg
-> properties. Finally, legacy MBus init is replaced by DT based MBus init
-> for DT based Dove.
+> Yes, the "merging" of SCC and SPC is the root cause of this hopefully happy
+> ended story, they lumped together pieces of HW that should have been kept
+> separate.
+
+Show me an SOC when the silicon people didn't try to save silicon area
+and pads, for the cost of "solutions" like this...
+
+> > Now, the bottom line. How about keeping the driver look for
+> > "arm,vexpress-spc,v2p-ca15_a7" because it's a driver for the SPC bit
+> > after all and doing the following in the tree:
+> > 
+> > scc at 7fff0000 {
+> > 	compatible = "arm,vexpress-scc,v2p-ca15_a7", "arm,vexpress-scc";
+> > 	reg = <0x7fff0000 0x1000>;
+> > 	interrupts = <0 95 4>;
+> > 
+> > 	spc at b00 {
+> > 		compatible = "arm,vexpress-spc,v2p-ca15_a7", "arm,vexpress-spc";
+> > 		reg = <0xb00 0x100>;
+> > 	};
+> > };
+> > 
+> > This, I believe, would represent the actual situation, require no change
+> > in the driver (except for the retirement of SPC_BASE which is good :-)
+> > and allowed as, if and when necessary, to drive the SCC as a MFD/syscon
+> > device.
 > 
-> The patch set depends on the MBus device tree patches that should appear
-> in v3.12. Currently, it is based on v3.11-rc2 with Dove DT cleanup patches
-> and MBus patch set v8 applied.
+> I do need some SCC registers to check the cluster ID against the MPIDR in
+> order to carry out powerdown operations. So if we do what you suggest we have
+> to change the driver, I would avoid doing that at this stage.
 
-Grrr.  It also depends on the mv643xx_eth and irqchip/clocksource
-changes.  I caught it, so no big deal.  In the future, please try to
-make each series stand alone unless absolutely necessary.
+That's what I'm saying - if we do the binding right, you won't have to
+change the driver at all. It will do the same 
+	of_find_compatible_node(NULL, NULL, "arm,vexpress-spc,v2p-ca15_a7");
+as previously.
 
-> The patch set is _not_ sent to devicetree mainling list, because the MBus
-> binding will be discussed there on the MBus patches itself.
-> 
-> Sebastian Hesselbarth (5):
->   ARM: dove: use preprocessor on device tree files
->   ARM: dove: add MBUS_ID macro to Dove DT
->   ARM: dove: add MBus DT node
->   ARM: dove: relocate internal registers device nodes
->   ARM: dove: switch to DT probed mbus address windows
-> 
->  arch/arm/boot/dts/dove-cm-a510.dts |    2 +-
->  arch/arm/boot/dts/dove-cubox.dts   |    2 +-
->  arch/arm/boot/dts/dove-d2plug.dts  |    2 +-
->  arch/arm/boot/dts/dove-dove-db.dts |    2 +-
->  arch/arm/boot/dts/dove.dtsi        |  958 ++++++++++++++++++------------------
->  arch/arm/mach-dove/board-dt.c      |   10 +-
->  6 files changed, 491 insertions(+), 485 deletions(-)
-
-whole series applied to mvebu/dove_mbus with dependencies on
-mvebu/dove_dt, mvebu/mbus_dt, and mvebu/boards.  I may redo this to
-merge mvebu/dove_dt back into mvebu/boards.  I haven't decided yet.
-
-thx,
-
-Jason.
+Pawe?
