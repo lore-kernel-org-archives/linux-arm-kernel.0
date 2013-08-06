@@ -1,124 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  7 Aug 2013 01:04:12 +0200
-Subject: [PATCH] ARM: nomadik: switch to use the Nomadik I2C driver
-Message-ID: <1375830252-27233-1-git-send-email-linus.walleij@linaro.org>
+From: csd_b@daudt.org (Christian Daudt)
+Date: Tue, 6 Aug 2013 16:07:20 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] arch/arm SoC organization
+In-Reply-To: <20130805062129.GK7656@atomide.com>
+References: <20130731141841.GP5882@titan.lakedaemon.net>
+ <20130802083346.GC7656@atomide.com>
+ <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
+ <20130805062129.GK7656@atomide.com>
+Message-ID: <CAGFynZ-sk7bzZMKujAZ9y1OQJFEQQwqWNY_SZUhz+0xEWiF=_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using bit-banged I2C, let's use the actual I2C
-driver in the kernel. Since the I2C block may be communicating
-with things like the PMIC, we need to select it from the Kconfig
-just like the bit-banged adapter is selected today. The rest of
-the configuration for this driver can be done from the device
-tree.
+On Sun, Aug 4, 2013 at 11:21 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Christian Daudt <csd_b@daudt.org> [130802 16:13]:
+>> On Fri, Aug 2, 2013 at 1:33 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> > * Jason Cooper <jason@lakedaemon.net> [130731 07:25]:
+>> >> So, I'd like to propose we discuss some lessons learned and maybe arrive
+>> >> at some best practices.  eg, should we just go with mach-$COMPANY/?  How
+>> >> best to handle config symbols for efficient building?  Deprecation path
+>> >> for legacy (unconverted) boards?
+>> >
+>> > A lot of that problem goes away by initializing everything as late
+>> > as possible, and making things to live under drivers.
+>> One category of items that we haven't found a good place for in this
+>> new multiplatform world is where does dt-driven non-driver code reside
+>> ? e.g. we have a secure monitor access function that only kicks in if
+>> the appropriate dt entry is available . It currently resides in
+>> mach-bcm/bcm_kona_smc.c as it seems like the only location for it at
+>> the moment, but that doesn't seem like the best place because (a)
+>> mach-bcm might end up littered with one-of cases like this and (b)
+>> anything in mach-bcm is not visible to arm64 SoCs, and some of those
+>> in the future will need to share with their arm32 cousins.
+>>  But putting in drivers (e.g. drivers/smc) seems like the wrong thing
+>> to do also because this is not a driver.
+>>  We have a couple of other smallish pieces of IP that just need a bit
+>> of generic init code to keep them happy, which we were discussing
+>> internally where to best land them. At present they are also headed to
+>> mach-bcm.
+>>  Ultimately the question is 'what is allowed to reside in mach-<misc>
+>> ?' And by extension: 'is there a good home for everything else ?''
+>
+> Well I guess the question is how early do you need it?
+>
+> We only need the following things early on that might be SoC specific:
+>
+> 1. Timers for clockevents
+>
+> 2. Interrupt controller
+>
+> If you need the SoC specific code for the two items above, then
+> you probably want to set it up in the SoC specific init_early.
+>
+> Everything else should be possible to do as device drivers with
+> initramfs. If the code has an interrupt handler, chances are it
+> can be a driver :)
+>
+I agree that most anything can be made into a driver. I'm asking if
+that's what we want to do for all arm code that doesn't need to be
+done at the earliest stages. If there's code that doesn't need
+interrupts, doesn't register for fileops, doesn't register for any
+framework, etc... Do we still want to make a driver out of it ?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 42 ++++++++++++++++++++++--------
- arch/arm/mach-nomadik/Kconfig              |  1 +
- 2 files changed, 32 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index a3acfa7..9169d30 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -140,18 +140,30 @@
- 			};
- 		};
- 		i2c0 {
-+			i2c0_default_mux: i2c0_mux {
-+				i2c0_default_mux {
-+					ste,function = "i2c0";
-+					ste,pins = "i2c0_a_1";
-+				};
-+			};
- 			i2c0_default_mode: i2c0_default {
- 				i2c0_default_cfg {
- 					ste,pins = "GPIO62_D3", "GPIO63_D2";
--					ste,input = <1>;
-+					ste,input = <0>;
- 				};
- 			};
- 		};
- 		i2c1 {
-+			i2c1_default_mux: i2c1_mux {
-+				i2c1_default_mux {
-+					ste,function = "i2c1";
-+					ste,pins = "i2c1_a_1";
-+				};
-+			};
- 			i2c1_default_mode: i2c1_default {
- 				i2c1_default_cfg {
- 					ste,pins = "GPIO53_L4", "GPIO54_L3";
--					ste,input = <1>;
-+					ste,input = <0>;
- 				};
- 			};
- 		};
-@@ -159,7 +171,7 @@
- 			i2c2_default_mode: i2c2_default {
- 				i2c2_default_cfg {
- 					ste,pins = "GPIO73_C21", "GPIO74_C20";
--					ste,input = <1>;
-+					ste,input = <0>;
- 				};
- 			};
- 		};
-@@ -682,13 +694,17 @@
- 
- 	/* I2C0 connected to the STw4811 power management chip */
- 	i2c0 {
--		compatible = "i2c-gpio";
--		gpios = <&gpio1 31 0>, /* sda */
--			<&gpio1 30 0>; /* scl */
-+		compatible = "st,nomadik-i2c", "arm,primecell";
-+		reg = <0x101f8000 0x1000>;
-+		interrupt-parent = <&vica>;
-+		interrupts = <20>;
-+		clock-frequency = <100000>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&i2c0clk>, <&pclki2c0>;
-+		clock-names = "mclk", "apb_pclk";
- 		pinctrl-names = "default";
--		pinctrl-0 = <&i2c0_default_mode>;
-+		pinctrl-0 = <&i2c0_default_mux>, <&i2c0_default_mode>;
- 
- 		stw4811 at 2d {
- 			   compatible = "st,stw4811";
-@@ -698,13 +714,17 @@
- 
- 	/* I2C1 connected to various sensors */
- 	i2c1 {
--		compatible = "i2c-gpio";
--		gpios = <&gpio1 22 0>, /* sda */
--			<&gpio1 21 0>; /* scl */
-+		compatible = "st,nomadik-i2c", "arm,primecell";
-+		reg = <0x101f7000 0x1000>;
-+		interrupt-parent = <&vica>;
-+		interrupts = <21>;
-+		clock-frequency = <100000>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&i2c1clk>, <&pclki2c1>;
-+		clock-names = "mclk", "apb_pclk";
- 		pinctrl-names = "default";
--		pinctrl-0 = <&i2c1_default_mode>;
-+		pinctrl-0 = <&i2c1_default_mux>, <&i2c1_default_mode>;
- 
- 		camera at 2d {
- 			   compatible = "st,camera";
-diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
-index 5981c3d..4d42da4 100644
---- a/arch/arm/mach-nomadik/Kconfig
-+++ b/arch/arm/mach-nomadik/Kconfig
-@@ -27,6 +27,7 @@ config MACH_NOMADIK_8815NHK
- 	select NOMADIK_8815
- 	select I2C
- 	select I2C_ALGOBIT
-+	select I2C_NOMADIK
- 
- endmenu
- endif
--- 
-1.8.1.4
+ thanks,
+   csd
