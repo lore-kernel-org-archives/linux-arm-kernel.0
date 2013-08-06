@@ -1,69 +1,42 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue,  6 Aug 2013 19:54:24 +0100
-Subject: [PATCH 5/5] ARM: vexpress/TC2: implement PM suspend method
+Date: Tue,  6 Aug 2013 19:54:22 +0100
+Subject: [PATCH 3/5] ARM: vexpress: Add SCC & SPC to V2P-CA15_A7's device tree
 In-Reply-To: <1375815264-29414-1-git-send-email-pawel.moll@arm.com>
 References: <1375815264-29414-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1375815264-29414-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <1375815264-29414-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nico@linaro.org>
+SCC is a set of random system control registers. One of
+the functionality provided is an interface to power
+management features (SPC).
 
-Similar to power_down(), except that for a suspend, the firmware
-mailbox address has to be set prior entering low power mode.
-
-The residency argument is not used yet, so the last man always shuts
-down the cluster for now.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/tc2_pm.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index 1d4de8e..79cf4bc 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -85,7 +85,7 @@ static int tc2_pm_power_up(unsigned int cpu, unsigned int cluster)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index d2803be..004025d 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -125,6 +125,17 @@
+ 		clock-names = "apb_pclk";
+ 	};
  
--static void tc2_pm_power_down(void)
-+static void tc2_pm_down(u64 residency)
- {
- 	unsigned int mpidr, cpu, cluster;
- 	bool last_man = false, skip_wfi = false;
-@@ -199,6 +199,22 @@ static void tc2_pm_power_down(void)
- 	/* Not dead at this point?  Let our caller cope. */
- }
- 
-+static void tc2_pm_power_down(void)
-+{
-+	tc2_pm_down(0);
-+}
++        scc at 7fff0000 {
++                #address-cells = <1>;
++                #size-cells = <1>;
++                ranges = <0 0 0x7fff0000 0x1000>;
 +
-+static void tc2_pm_suspend(u64 residency)
-+{
-+	unsigned int mpidr, cpu, cluster;
++                spc at b00 {
++                        compatible = "arm,vexpress-spc,v2p-ca15_a7", "arm,vexpress-spc";
++                        reg = <0xb00 0x100>;
++                };
++        };
 +
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+	ve_spc_set_resume_addr(cluster, cpu, virt_to_phys(mcpm_entry_point));
-+	tc2_pm_down(residency);
-+}
-+
- static void tc2_pm_powered_up(void)
- {
- 	unsigned int mpidr, cpu, cluster;
-@@ -232,6 +248,7 @@ static void tc2_pm_powered_up(void)
- static const struct mcpm_platform_ops tc2_pm_power_ops = {
- 	.power_up	= tc2_pm_power_up,
- 	.power_down	= tc2_pm_power_down,
-+	.suspend	= tc2_pm_suspend,
- 	.powered_up	= tc2_pm_powered_up,
- };
- 
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <1 13 0xf08>,
 -- 
 1.8.1.2
