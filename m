@@ -1,23 +1,134 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Aug 2013 11:20:44 +0100
-Subject: [PATCH] spi: sirf: use DMA if both buffer address and length are
- aligned
-In-Reply-To: <1375770081-12873-1-git-send-email-Baohua.Song@csr.com>
-References: <1375770081-12873-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130806102044.GA13956@sirena.org.uk>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Tue, 06 Aug 2013 12:22:33 +0200
+Subject: [PATCH 2/2] media: s5p-mfc: remove DT hacks and simplify
+ initialization code
+In-Reply-To: <1375705610-12724-3-git-send-email-m.szyprowski@samsung.com>
+References: <1375705610-12724-1-git-send-email-m.szyprowski@samsung.com>
+ <1375705610-12724-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <030d01ce928e$de27e190$9a77a4b0$%debski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 02:21:21PM +0800, Barry Song wrote:
-> this patch enables DMA support for SiRFSoC SPI driver, if both
-> buffers and length are aligned with DMA controller's hardware
-> limitation, use generic SiRF generic dmaengine driver.
+Hi Kukjin,
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130806/c3f3e550/attachment.sig>
+This patch looks good.
+
+Best wishes,
+Kamil Debski
+
+> From: Marek Szyprowski [mailto:m.szyprowski at samsung.com]
+> Sent: Monday, August 05, 2013 2:27 PM
+> 
+> This patch removes custom initialization of reserved memory regions
+> from s5p-mfc driver. Memory initialization can be now handled by
+> generic code.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+Acked-by: Kamil Debski <k.debski@samsung.com>
+
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc.c |   75 ++++++----------------
+> --------
+>  1 file changed, 15 insertions(+), 60 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> index a130dcd..696e0e0 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> @@ -1011,51 +1011,11 @@ static int match_child(struct device *dev, void
+> *data)  {
+>  	if (!dev_name(dev))
+>  		return 0;
+> -	return !strcmp(dev_name(dev), (char *)data);
+> +	return !!strstr(dev_name(dev), (char *)data);
+>  }
+> 
+>  static void *mfc_get_drv_data(struct platform_device *pdev);
+> 
+> -static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev) -{
+> -	unsigned int mem_info[2] = { };
+> -
+> -	dev->mem_dev_l = devm_kzalloc(&dev->plat_dev->dev,
+> -			sizeof(struct device), GFP_KERNEL);
+> -	if (!dev->mem_dev_l) {
+> -		mfc_err("Not enough memory\n");
+> -		return -ENOMEM;
+> -	}
+> -	device_initialize(dev->mem_dev_l);
+> -	of_property_read_u32_array(dev->plat_dev->dev.of_node,
+> -			"samsung,mfc-l", mem_info, 2);
+> -	if (dma_declare_coherent_memory(dev->mem_dev_l, mem_info[0],
+> -				mem_info[0], mem_info[1],
+> -				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0)
+{
+> -		mfc_err("Failed to declare coherent memory for\n"
+> -		"MFC device\n");
+> -		return -ENOMEM;
+> -	}
+> -
+> -	dev->mem_dev_r = devm_kzalloc(&dev->plat_dev->dev,
+> -			sizeof(struct device), GFP_KERNEL);
+> -	if (!dev->mem_dev_r) {
+> -		mfc_err("Not enough memory\n");
+> -		return -ENOMEM;
+> -	}
+> -	device_initialize(dev->mem_dev_r);
+> -	of_property_read_u32_array(dev->plat_dev->dev.of_node,
+> -			"samsung,mfc-r", mem_info, 2);
+> -	if (dma_declare_coherent_memory(dev->mem_dev_r, mem_info[0],
+> -				mem_info[0], mem_info[1],
+> -				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0)
+{
+> -		pr_err("Failed to declare coherent memory for\n"
+> -		"MFC device\n");
+> -		return -ENOMEM;
+> -	}
+> -	return 0;
+> -}
+> -
+>  /* MFC probe function */
+>  static int s5p_mfc_probe(struct platform_device *pdev)  { @@ -1107,25
+> +1067,20 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+>  		goto err_res;
+>  	}
+> 
+> -	if (pdev->dev.of_node) {
+> -		ret = s5p_mfc_alloc_memdevs(dev);
+> -		if (ret < 0)
+> -			goto err_res;
+> -	} else {
+> -		dev->mem_dev_l = device_find_child(&dev->plat_dev->dev,
+> -				"s5p-mfc-l", match_child);
+> -		if (!dev->mem_dev_l) {
+> -			mfc_err("Mem child (L) device get failed\n");
+> -			ret = -ENODEV;
+> -			goto err_res;
+> -		}
+> -		dev->mem_dev_r = device_find_child(&dev->plat_dev->dev,
+> -				"s5p-mfc-r", match_child);
+> -		if (!dev->mem_dev_r) {
+> -			mfc_err("Mem child (R) device get failed\n");
+> -			ret = -ENODEV;
+> -			goto err_res;
+> -		}
+> +	dev->mem_dev_l = device_find_child(&dev->plat_dev->dev, "-l",
+> +					   match_child);
+> +	if (!dev->mem_dev_l) {
+> +		mfc_err("Mem child (L) device get failed\n");
+> +		ret = -ENODEV;
+> +		goto err_res;
+> +	}
+> +
+> +	dev->mem_dev_r = device_find_child(&dev->plat_dev->dev, "-r",
+> +					   match_child);
+> +	if (!dev->mem_dev_r) {
+> +		mfc_err("Mem child (R) device get failed\n");
+> +		ret = -ENODEV;
+> +		goto err_res;
+>  	}
+> 
+>  	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
+> --
+> 1.7.9.5
