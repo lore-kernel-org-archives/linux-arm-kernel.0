@@ -1,64 +1,38 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue,  6 Aug 2013 14:41:15 -0700
-Subject: [PATCH] ARM: Add ".text.unlikely" and ".text.hot" to arm unwind tables
-Message-ID: <1375825275-21962-1-git-send-email-dianders@chromium.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 6 Aug 2013 14:44:12 -0700
+Subject: [ARM ATTEND] catching up on exploit mitigations
+In-Reply-To: <20130803000321.GR23006@n2100.arm.linux.org.uk>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+ <20130803000321.GR23006@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5jJv-hp3wbaqJyk2pPHASemhepy+C4X+9np+xcbrBfnZEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears that gcc may put some code in ".text.unlikely" or
-".text.hot" sections.  Right now those aren't accounted for in unwind
-tables.  Add them.
+On Fri, Aug 2, 2013 at 5:03 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 30, 2013 at 12:05:40PM -0700, Kees Cook wrote:
+>> - vector table protections (needs to be protected like the x86_64
+>> vsyscall table, RO, etc)
+>
+> (Dropped some mailing lists to reduce the visibility of this as its
+> soo close to the patches being merged...)
+>
+> On the subject of this, those who are following what's going on at the
+> blackhat conference will be aware that there was a presentation
+> yesterday on this very subject.
+>
+> Now that the presentation has been done, and the fixes are now merged
+> into Linus' tree, I can now talk about this.
 
-I found some docs about this at:
-  http://gcc.gnu.org/onlinedocs/gcc-4.6.2/gcc.pdf
+This all sounds excellent. Thanks for working on it!
 
-Without this, if you have slub_debug turned on, you can get messages
-that look like this:
-  unwind: Index not found 7f008c50
+Do you see other areas that might need similar attention, or could
+benefit from more hardening?
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- arch/arm/include/asm/module.h | 2 ++
- arch/arm/kernel/module.c      | 8 ++++++++
- 2 files changed, 10 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-index 0d3a28d..ed690c4 100644
---- a/arch/arm/include/asm/module.h
-+++ b/arch/arm/include/asm/module.h
-@@ -12,6 +12,8 @@ enum {
- 	ARM_SEC_CORE,
- 	ARM_SEC_EXIT,
- 	ARM_SEC_DEVEXIT,
-+	ARM_SEC_HOT,
-+	ARM_SEC_UNLIKELY,
- 	ARM_SEC_MAX,
- };
- 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 85c3fb6..084dc88 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -292,12 +292,20 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
- 			maps[ARM_SEC_CORE].unw_sec = s;
- 		else if (strcmp(".ARM.exidx.exit.text", secname) == 0)
- 			maps[ARM_SEC_EXIT].unw_sec = s;
-+		else if (strcmp(".ARM.exidx.text.unlikely", secname) == 0)
-+			maps[ARM_SEC_UNLIKELY].unw_sec = s;
-+		else if (strcmp(".ARM.exidx.text.hot", secname) == 0)
-+			maps[ARM_SEC_HOT].unw_sec = s;
- 		else if (strcmp(".init.text", secname) == 0)
- 			maps[ARM_SEC_INIT].txt_sec = s;
- 		else if (strcmp(".text", secname) == 0)
- 			maps[ARM_SEC_CORE].txt_sec = s;
- 		else if (strcmp(".exit.text", secname) == 0)
- 			maps[ARM_SEC_EXIT].txt_sec = s;
-+		else if (strcmp(".text.unlikely", secname) == 0)
-+			maps[ARM_SEC_UNLIKELY].txt_sec = s;
-+		else if (strcmp(".text.hot", secname) == 0)
-+			maps[ARM_SEC_HOT].txt_sec = s;
- 	}
- 
- 	for (i = 0; i < ARM_SEC_MAX; i++)
+-Kees
+
 -- 
-1.8.3
+Kees Cook
+Chrome OS Security
