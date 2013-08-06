@@ -1,33 +1,64 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 6 Aug 2013 14:40:20 -0700
-Subject: [PATCH v2] ARM: DT: binding fixup to align with
- vendor-prefixes.txt
-In-Reply-To: <520079DB.5090309@wwwdotorg.org>
-References: <1375482479-15732-1-git-send-email-csd@broadcom.com>
- <51FFCC42.6040300@wwwdotorg.org> <5200407A.4010407@broadcom.com>
- <520079DB.5090309@wwwdotorg.org>
-Message-ID: <52016D44.7060808@broadcom.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue,  6 Aug 2013 14:41:15 -0700
+Subject: [PATCH] ARM: Add ".text.unlikely" and ".text.hot" to arm unwind tables
+Message-ID: <1375825275-21962-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-05 09:21 PM, Stephen Warren wrote:
->>>>    Required root node property:
->>>>    -compatible = "bcm,bcm11351";
->>>> +compatible = "brcm,bcm11351";
->>> In a patch of mine that deprecated a property, Mark wondered if it would
->>> make sense to mention the old deprecated DT content simply to document
->>> that it existed, so that old DTs would still make sense when checking
->>> the documentation. I wonder if the same argument applies to this patch?
->> I would think the opposite. Deprecated items should be dropped from
->> documentation. They are in the code (for a holdover period) but clearly
->> marked as deprecated. No one should be extending the life of these, and
->> adding documentation on it is a step in the wrong direction of making it
->> easier for it to linger beyond what it should.
-> The deprecated stuff will have to be fully documented once the DT schema
-> validation is in place...
->
-This deprecated code should be short lived, given that in actual fact it 
-is actually quite unnecessary since no boards exist that rely on it.
+It appears that gcc may put some code in ".text.unlikely" or
+".text.hot" sections.  Right now those aren't accounted for in unwind
+tables.  Add them.
 
-  thanks,
-    csd
+I found some docs about this at:
+  http://gcc.gnu.org/onlinedocs/gcc-4.6.2/gcc.pdf
+
+Without this, if you have slub_debug turned on, you can get messages
+that look like this:
+  unwind: Index not found 7f008c50
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/include/asm/module.h | 2 ++
+ arch/arm/kernel/module.c      | 8 ++++++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+index 0d3a28d..ed690c4 100644
+--- a/arch/arm/include/asm/module.h
++++ b/arch/arm/include/asm/module.h
+@@ -12,6 +12,8 @@ enum {
+ 	ARM_SEC_CORE,
+ 	ARM_SEC_EXIT,
+ 	ARM_SEC_DEVEXIT,
++	ARM_SEC_HOT,
++	ARM_SEC_UNLIKELY,
+ 	ARM_SEC_MAX,
+ };
+ 
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 85c3fb6..084dc88 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -292,12 +292,20 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+ 			maps[ARM_SEC_CORE].unw_sec = s;
+ 		else if (strcmp(".ARM.exidx.exit.text", secname) == 0)
+ 			maps[ARM_SEC_EXIT].unw_sec = s;
++		else if (strcmp(".ARM.exidx.text.unlikely", secname) == 0)
++			maps[ARM_SEC_UNLIKELY].unw_sec = s;
++		else if (strcmp(".ARM.exidx.text.hot", secname) == 0)
++			maps[ARM_SEC_HOT].unw_sec = s;
+ 		else if (strcmp(".init.text", secname) == 0)
+ 			maps[ARM_SEC_INIT].txt_sec = s;
+ 		else if (strcmp(".text", secname) == 0)
+ 			maps[ARM_SEC_CORE].txt_sec = s;
+ 		else if (strcmp(".exit.text", secname) == 0)
+ 			maps[ARM_SEC_EXIT].txt_sec = s;
++		else if (strcmp(".text.unlikely", secname) == 0)
++			maps[ARM_SEC_UNLIKELY].txt_sec = s;
++		else if (strcmp(".text.hot", secname) == 0)
++			maps[ARM_SEC_HOT].txt_sec = s;
+ 	}
+ 
+ 	for (i = 0; i < ARM_SEC_MAX; i++)
+-- 
+1.8.3
