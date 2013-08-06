@@ -1,101 +1,124 @@
-From: csd_b@daudt.org (Christian Daudt)
-Date: Tue, 6 Aug 2013 15:57:59 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] arch/arm SoC organization
-In-Reply-To: <CAOesGMiq4M-8=CUsKf3bxBnxxiBQMEPc11K8pDePZnzHkv9QTA@mail.gmail.com>
-References: <20130731141841.GP5882@titan.lakedaemon.net>
- <20130802083346.GC7656@atomide.com>
- <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
- <CAOesGMiq4M-8=CUsKf3bxBnxxiBQMEPc11K8pDePZnzHkv9QTA@mail.gmail.com>
-Message-ID: <CAGFynZ89h=+teygKAnMepR5Ot5Qf1yjRdRkPSnMfz8BeJmuThQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  7 Aug 2013 01:04:12 +0200
+Subject: [PATCH] ARM: nomadik: switch to use the Nomadik I2C driver
+Message-ID: <1375830252-27233-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 2, 2013 at 10:24 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Aug 2, 2013 at 4:06 PM, Christian Daudt <csd_b@daudt.org> wrote:
->> On Fri, Aug 2, 2013 at 1:33 AM, Tony Lindgren <tony@atomide.com> wrote:
->>> * Jason Cooper <jason@lakedaemon.net> [130731 07:25]:
->>>> So, I'd like to propose we discuss some lessons learned and maybe arrive
->>>> at some best practices.  eg, should we just go with mach-$COMPANY/?  How
->>>> best to handle config symbols for efficient building?  Deprecation path
->>>> for legacy (unconverted) boards?
->>>
->>> A lot of that problem goes away by initializing everything as late
->>> as possible, and making things to live under drivers.
->> One category of items that we haven't found a good place for in this
->> new multiplatform world is where does dt-driven non-driver code reside
->> ? e.g. we have a secure monitor access function that only kicks in if
->> the appropriate dt entry is available . It currently resides in
->> mach-bcm/bcm_kona_smc.c as it seems like the only location for it at
->> the moment, but that doesn't seem like the best place because (a)
->> mach-bcm might end up littered with one-of cases like this and (b)
->> anything in mach-bcm is not visible to arm64 SoCs, and some of those
->> in the future will need to share with their arm32 cousins.
->
-> ARM is working on standardizing some of these interfaces through
-> things like PSCI. It should take care of _some_ of the SMC needs. I
-> know you're already shipping some of these platforms though and
-> firmware interfaces might be locked in to something that's not
-> PSCI-compatible. :(
->
-Agreed, but that is in the future. Most ARMv7 platforms will likely
-never see PSCI and they still need to talk to their secure half. Even
-when PSCI code gets into mainline, where will it sit ?
+Instead of using bit-banged I2C, let's use the actual I2C
+driver in the kernel. Since the I2C block may be communicating
+with things like the PMIC, we need to select it from the Kconfig
+just like the bit-banged adapter is selected today. The rest of
+the configuration for this driver can be done from the device
+tree.
 
->>  But putting in drivers (e.g. drivers/smc) seems like the wrong thing
->> to do also because this is not a driver.
->
-> I really don't think we need to migrate everything to drivers/*. At
-> some point the need of exorcising code out of arch/arm will reach a
-> plateu, and there's some code that just simply belongs in that sub
-> directory.
->
-Ok, that's why I'm trying to determine. How low do we want to go with
-the thinning of mach-* dirs.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 42 ++++++++++++++++++++++--------
+ arch/arm/mach-nomadik/Kconfig              |  1 +
+ 2 files changed, 32 insertions(+), 11 deletions(-)
 
-> The sharing with arm64 is the obvious sticky point, since the base
-> directories aren't the same. Luckily not too many vendors have shipped
-> arm64 platforms, and nobody is shipping in volume yet, so there's a
-> little time to sort out some of this.
->
->>  We have a couple of other smallish pieces of IP that just need a bit
->> of generic init code to keep them happy, which we were discussing
->> internally where to best land them. At present they are also headed to
->> mach-bcm.
->
-> I think the 3.12 merge window will see the introduction of
-> drivers/platform/arm. It must not become a dumping ground for
-> board-file equivalent code though, so I am a little scared to
-> introduce it. Mostly it should contain whatever glue code isn't
-> possible or practical to describe with device tree (or ACPI) today,
-> and in particular for established consumer devices, i.e. for actual
-> product needs. Compare to what's in drivers/platform/x86 to get a feel
-> for what we're talking about.
->
-So putting things in drivers/platform solves the a32/a64 sharing
-problem at least. So it's a positive step.
-
->>  Ultimately the question is 'what is allowed to reside in mach-<misc>
->> ?' And by extension: 'is there a good home for everything else ?''
->
-> Right, and see above about some of my opinions on the matter. arm64
-> does complicate things quite a bit since it's no longer easy to share
-> code between the architectures.
->
-> Having a few concise examples of what code you're looking for a home
-> for could be useful for the discussion though. Would you mind
-> volunteering a few? :)
-Other than the already upstreamed SMC code, this again came up in the
-context of a dma mux block that we have. The code needs to do static
-configuration of the block @ bringup and then there's nothing else for
-it to do. We're trying to figure out where the best place for it is.
-Options being:
- a) write a couple of functions in arch/arm/mach-bcm/<filename>.c
-which based on dt config do the necessary setup
- b) write those same functions with a bit of driver wrapper to make it
-pretend to be a driver (i.e. add a probe/remove) and plunk it into
-drivers/dma/<filename>.c
- c) ?
-
-
- Thanks,
-   csd
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index a3acfa7..9169d30 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -140,18 +140,30 @@
+ 			};
+ 		};
+ 		i2c0 {
++			i2c0_default_mux: i2c0_mux {
++				i2c0_default_mux {
++					ste,function = "i2c0";
++					ste,pins = "i2c0_a_1";
++				};
++			};
+ 			i2c0_default_mode: i2c0_default {
+ 				i2c0_default_cfg {
+ 					ste,pins = "GPIO62_D3", "GPIO63_D2";
+-					ste,input = <1>;
++					ste,input = <0>;
+ 				};
+ 			};
+ 		};
+ 		i2c1 {
++			i2c1_default_mux: i2c1_mux {
++				i2c1_default_mux {
++					ste,function = "i2c1";
++					ste,pins = "i2c1_a_1";
++				};
++			};
+ 			i2c1_default_mode: i2c1_default {
+ 				i2c1_default_cfg {
+ 					ste,pins = "GPIO53_L4", "GPIO54_L3";
+-					ste,input = <1>;
++					ste,input = <0>;
+ 				};
+ 			};
+ 		};
+@@ -159,7 +171,7 @@
+ 			i2c2_default_mode: i2c2_default {
+ 				i2c2_default_cfg {
+ 					ste,pins = "GPIO73_C21", "GPIO74_C20";
+-					ste,input = <1>;
++					ste,input = <0>;
+ 				};
+ 			};
+ 		};
+@@ -682,13 +694,17 @@
+ 
+ 	/* I2C0 connected to the STw4811 power management chip */
+ 	i2c0 {
+-		compatible = "i2c-gpio";
+-		gpios = <&gpio1 31 0>, /* sda */
+-			<&gpio1 30 0>; /* scl */
++		compatible = "st,nomadik-i2c", "arm,primecell";
++		reg = <0x101f8000 0x1000>;
++		interrupt-parent = <&vica>;
++		interrupts = <20>;
++		clock-frequency = <100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&i2c0clk>, <&pclki2c0>;
++		clock-names = "mclk", "apb_pclk";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&i2c0_default_mode>;
++		pinctrl-0 = <&i2c0_default_mux>, <&i2c0_default_mode>;
+ 
+ 		stw4811 at 2d {
+ 			   compatible = "st,stw4811";
+@@ -698,13 +714,17 @@
+ 
+ 	/* I2C1 connected to various sensors */
+ 	i2c1 {
+-		compatible = "i2c-gpio";
+-		gpios = <&gpio1 22 0>, /* sda */
+-			<&gpio1 21 0>; /* scl */
++		compatible = "st,nomadik-i2c", "arm,primecell";
++		reg = <0x101f7000 0x1000>;
++		interrupt-parent = <&vica>;
++		interrupts = <21>;
++		clock-frequency = <100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&i2c1clk>, <&pclki2c1>;
++		clock-names = "mclk", "apb_pclk";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&i2c1_default_mode>;
++		pinctrl-0 = <&i2c1_default_mux>, <&i2c1_default_mode>;
+ 
+ 		camera at 2d {
+ 			   compatible = "st,camera";
+diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
+index 5981c3d..4d42da4 100644
+--- a/arch/arm/mach-nomadik/Kconfig
++++ b/arch/arm/mach-nomadik/Kconfig
+@@ -27,6 +27,7 @@ config MACH_NOMADIK_8815NHK
+ 	select NOMADIK_8815
+ 	select I2C
+ 	select I2C_ALGOBIT
++	select I2C_NOMADIK
+ 
+ endmenu
+ endif
+-- 
+1.8.1.4
