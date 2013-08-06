@@ -1,96 +1,71 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue,  6 Aug 2013 22:43:46 +0200
-Subject: [PATCH v4 06/31] i2c: mpc: cleanup clock API use
+Date: Tue,  6 Aug 2013 22:43:44 +0200
+Subject: [PATCH v4 04/31] mtd: mpc5121_nfc: cleanup clock API use
 In-Reply-To: <1375821851-31609-1-git-send-email-gsi@denx.de>
 References: <1374495298-22019-1-git-send-email-gsi@denx.de>
  <1375821851-31609-1-git-send-email-gsi@denx.de>
-Message-ID: <1375821851-31609-7-git-send-email-gsi@denx.de>
+Message-ID: <1375821851-31609-5-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make the MPC I2C driver get, prepare and enable the peripheral clock
-during probe ('per' for access to the peripheral's registers); disable
-and unprepare the clock upon remove(), put is done by the devm approach;
-hold a reference to the clock over the period of use
-
-clock lookup is non-fatal in this implementation as not all platforms
-may provide clock specs in their device tree, but enable errors for
-specified clocks are considered fatal
+use devm_clk_get() for automatic put after device close, check for and
+propagate errors when enabling clocks, need to prepare clocks before
+they can get enabled, adjust error code paths to correctly balance
+get/put and prepare/unprepare and enable/disable calls
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/i2c/busses/i2c-mpc.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/mtd/nand/mpc5121_nfc.c |   21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
-index 7607dc0..4b00dd0 100644
---- a/drivers/i2c/busses/i2c-mpc.c
-+++ b/drivers/i2c/busses/i2c-mpc.c
-@@ -21,6 +21,7 @@
- #include <linux/of_i2c.h>
- #include <linux/slab.h>
+diff --git a/drivers/mtd/nand/mpc5121_nfc.c b/drivers/mtd/nand/mpc5121_nfc.c
+index 3c9cdcb..3c60a00 100644
+--- a/drivers/mtd/nand/mpc5121_nfc.c
++++ b/drivers/mtd/nand/mpc5121_nfc.c
+@@ -617,10 +617,8 @@ static void mpc5121_nfc_free(struct device *dev, struct mtd_info *mtd)
+ 	struct nand_chip *chip = mtd->priv;
+ 	struct mpc5121_nfc_prv *prv = chip->priv;
  
-+#include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/fsl_devices.h>
- #include <linux/i2c.h>
-@@ -67,6 +68,7 @@ struct mpc_i2c {
- #ifdef CONFIG_PM
- 	u8 fdr, dfsrr;
- #endif
-+	struct clk *clk_per;
- };
+-	if (prv->clk) {
+-		clk_disable(prv->clk);
+-		clk_put(prv->clk);
+-	}
++	if (prv->clk)
++		clk_disable_unprepare(prv->clk);
  
- struct mpc_i2c_divider {
-@@ -623,6 +625,8 @@ static int fsl_i2c_probe(struct platform_device *op)
- 	u32 clock = MPC_I2C_CLOCK_LEGACY;
- 	int result = 0;
- 	int plen;
+ 	if (prv->csreg)
+ 		iounmap(prv->csreg);
+@@ -629,6 +627,7 @@ static void mpc5121_nfc_free(struct device *dev, struct mtd_info *mtd)
+ static int mpc5121_nfc_probe(struct platform_device *op)
+ {
+ 	struct device_node *rootnode, *dn = op->dev.of_node;
 +	struct clk *clk;
-+	int err;
+ 	struct device *dev = &op->dev;
+ 	struct mpc5121_nfc_prv *prv;
+ 	struct resource res;
+@@ -730,14 +729,18 @@ static int mpc5121_nfc_probe(struct platform_device *op)
+ 	of_node_put(rootnode);
  
- 	match = of_match_device(mpc_i2c_of_match, &op->dev);
- 	if (!match)
-@@ -653,6 +657,21 @@ static int fsl_i2c_probe(struct platform_device *op)
- 		}
+ 	/* Enable NFC clock */
+-	prv->clk = clk_get(dev, "nfc_clk");
+-	if (IS_ERR(prv->clk)) {
++	clk = devm_clk_get(dev, "nfc_clk");
++	if (IS_ERR(clk)) {
+ 		dev_err(dev, "Unable to acquire NFC clock!\n");
+-		retval = PTR_ERR(prv->clk);
++		retval = PTR_ERR(clk);
+ 		goto error;
  	}
- 
-+	/*
-+	 * enable clock for the I2C peripheral (non fatal),
-+	 * keep a reference upon successful allocation
-+	 */
-+	clk = devm_clk_get(&op->dev, "per");
-+	if (!IS_ERR(clk)) {
-+		err = clk_prepare_enable(clk);
-+		if (err) {
-+			dev_err(&op->dev, "failed to enable clock\n");
-+			goto fail_request;
-+		} else {
-+			i2c->clk_per = clk;
-+		}
+-
+-	clk_enable(prv->clk);
++	retval = clk_prepare_enable(clk);
++	if (retval) {
++		dev_err(dev, "Unable to enable NFC clock!\n");
++		goto error;
 +	}
-+
- 	if (of_get_property(op->dev.of_node, "fsl,preserve-clocking", NULL)) {
- 		clock = MPC_I2C_CLOCK_PRESERVE;
- 	} else {
-@@ -696,6 +715,8 @@ static int fsl_i2c_probe(struct platform_device *op)
- 	return result;
++	prv->clk = clk;
  
-  fail_add:
-+	if (i2c->clk_per)
-+		clk_disable_unprepare(i2c->clk_per);
- 	free_irq(i2c->irq, i2c);
-  fail_request:
- 	irq_dispose_mapping(i2c->irq);
-@@ -711,6 +732,9 @@ static int fsl_i2c_remove(struct platform_device *op)
- 
- 	i2c_del_adapter(&i2c->adap);
- 
-+	if (i2c->clk_per)
-+		clk_disable_unprepare(i2c->clk_per);
-+
- 	if (i2c->irq)
- 		free_irq(i2c->irq, i2c);
- 
+ 	/* Reset NAND Flash controller */
+ 	nfc_set(mtd, NFC_CONFIG1, NFC_RESET);
 -- 
 1.7.10.4
