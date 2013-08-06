@@ -1,74 +1,55 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 06 Aug 2013 12:07:02 +1000
-Subject: [PATCH] mach-ks8695/Kconfig: Make MACH_KS8695 depends on PCI
-In-Reply-To: <CAJFYCKHVb7EXiYPDBACotSc8bwnBM4bTXvtV-Fr=F2MonV7rKg@mail.gmail.com>
-References: <1375693624-21548-1-git-send-email-manjunath.goudar@linaro.org>
- <CAKohpomo-J1Y_Zf8OLCCvrgfqi7m7tBju=rPp9+wuDAYL_-x7g@mail.gmail.com>
- <CAJFYCKHVb7EXiYPDBACotSc8bwnBM4bTXvtV-Fr=F2MonV7rKg@mail.gmail.com>
-Message-ID: <52005A46.4090306@uclinux.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 05 Aug 2013 19:18:40 -0700 (PDT)
+Subject: [PATCH v6 3/3] ARM: shmobile: lager: enable nfsroot in DTS
+In-Reply-To: <20130806010736.GA20940@verge.net.au>
+References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
+ <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
+ <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
+ <20130801080226.GF15265@verge.net.au>
+ <20130806010736.GA20940@verge.net.au>
+Message-ID: <87r4e7h88z.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
 
-On 05/08/13 20:31, Manjunath Goudar wrote:
-> On 5 August 2013 14:47, Viresh Kumar <viresh.kumar at linaro.org <mailto:viresh.kumar@linaro.org>> wrote:
-> 
->     On 5 August 2013 14:37, Manjunath Goudar <manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org>> wrote:
->     > From: root <root at si-cspbld63.lge.net <mailto:root@si-cspbld63.lge.net>>
-> 
->     :)
-> 
->     > This patch adds a Kconfig dependency on MACH_KS8695,MACH_CM* or MACH_IM*
->     > being available before PCI can be enabled. Without this patch,build system
-> 
->     Add Space after ','
-> 
->     > can lead to issues. This was discovered during randconfig testing,
->     > without PCI if any one of MACH_KS8695,MACH_CM* or MACH_IM* being enabled,
-> 
->     Same here.
-> 
->     > leading to the following error:
->     >
->     > LD      init/built-in.o
->     > arch/arm/mach-ks8695/built-in.o: In function `og_register_pci':
->     > arch/arm/mach-ks8695/board-og.c:47:undefined reference to `ks8695_init_pci'
->     > make: *** [vmlinux] Error 1
->     >
->     > Signed-off-by: Manjunath Goudar <manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org>>
->     > Cc: Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>
->     > Cc: Deepak Saxena <dsaxena at linaro.org <mailto:dsaxena@linaro.org>>
->     > Cc: Greg Ungerer <gerg at uclinux.org <mailto:gerg@uclinux.org>>
->     > Cc: linux-arm-kernel at lists.infradead.org <mailto:linux-arm-kernel@lists.infradead.org>
->     > ---
->     >  arch/arm/mach-ks8695/Kconfig | 5 +++++
->     >  1 file changed, 5 insertions(+)
->     >
->     > diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
->     > index a545976..29d7d9f 100644
->     > --- a/arch/arm/mach-ks8695/Kconfig
->     > +++ b/arch/arm/mach-ks8695/Kconfig
->     > @@ -5,6 +5,7 @@ menu "Kendin/Micrel KS8695 Implementations"
->     >  config MACH_KS8695
->     >         bool "KS8695 development board"
->     >         select MIGHT_HAVE_PCI
->     > +       depends on PCI
-> 
->     You need both PCI and MIGHT_HAVE_PCI? Don't know but it looks
->     like defconfig is missing PCI stuff.. and MIGHT_HAVE_PCI is enough
->     here?
-> 
-> 
->  PCI is needed here because board-og.c file depends on pci.o.
+Hi Simon
 
-It shouldn't though, thus the original use of MIGHT_HAVE_PCI.
-The board-og.c machine code supports a number of boards, some of
-which don't have a PCI bus (that is they use the KS8695 CPU that
-doesn't contain the PCI bus silicon).
+> > > >  	chosen {
+> > > > -		bootargs = "console=ttySC6,115200 ignore_loglevel";
+> > > > +		bootargs = "console=ttySC6,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
+> > > 
+(snip)
+> The purpose of adding NFS information to bootargs in r8a7790-lager.dts is
+> to cause the lager board to use NFS root when booting from using the C
+> version of the board code which lives in board-lager.c. This is in contrast
+> to the DT reverence version of the board code, which uses DT more heavily,
+> does not initialise sh-eth because DT bindings are not available (as far as
+> I know) and is not effected by r8a7790-lager.dts.
+> 
+> Historically this kind of NFS information was added to the command line in
+> the defconfig.  However, as part of the long journey to consolidate (reduce
+> the number of) shmobile defconfigs it now goes in DT instead.
 
-I think you want a fix that makes the pci support code in this file
-conditional on CONFIG_PCI.
+Thank you.
+I don't have any objection to bootargs having NFS information.
+My question was only for "rsize/wsize".
+Sorry for my confusion English.
 
-Regards
-Greg
+> With regards to the "rsize/wsize" settings, I will remove them.
+> However, I do see them present in the following files and I believe
+> historically they were present in some of the shmobile defconfigs.
+> 
+> emev2-kzm9d-reference.dts
+> emev2-kzm9d.dts
+> r8a7740-armadillo800eva-reference.dts
+> r8a7740-armadillo800eva.dts
+
+I see.
+I don't know why these defconfigs have "rsize/wsize".
+But, this information was needed on old kernel version somehow (I forgot when, which version),
+and (I guess) there is no such issue now.
+We can remove it ?
+
+Best regards
+---
+Kuninori Morimoto
