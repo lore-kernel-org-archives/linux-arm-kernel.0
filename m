@@ -1,36 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 6 Aug 2013 15:30:11 -0400
-Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <20130806182201.GB2123@gmail.com>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130806182201.GB2123@gmail.com>
-Message-ID: <20130806193011.GA19280@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 06 Aug 2013 12:43:36 -0700
+Subject: [PATCH 1/3] clk: exynos4: Make exynos4_plls static
+In-Reply-To: <1375788675-2638-1-git-send-email-sachin.kamat@linaro.org>
+References: <1375788675-2638-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <20130806194336.5348.81505@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 11:22:01AM -0700, Daniel Price wrote:
-> On Thu, Aug 01, 2013 at 03:25:03PM +0200, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > This set of patches introduces Message Signaled Interrupt support in
-> > the Marvell EBU PCIe driver. It has been successfully tested on the
-> > Armada XP GP platform with an Intel e1000e PCIe network card that
-> > supports MSI.
+Quoting Sachin Kamat (2013-08-06 04:31:13)
+> 'exynos4_plls' is used only in this file. Make it static.
 > 
-> Thomas,
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+
+Taken all three into clk-next. Seems like a lot of static-ization
+patches for Exynos lately.
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/samsung/clk-exynos4.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I tested this set of patches on a custom Marvell Armada XP 78260 based
-> board.  It was connected to another system over PCIe, through a
-> non-transparent bridge; MSI support was required.  We also tested a
-> similar configuration using the Armada XP GP platform.  The patch seems
-> to work for us.  Many thanks!
-
-That's awesome!
-
-> Tested-by: Daniel Price <daniel.price@gmail.com>
-
-Thanks, I've added this to the patches.
-
-thx,
-
-Jason.
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index 68f9a4a..fec319d 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -984,7 +984,7 @@ static __initdata struct of_device_id ext_clk_match[] = {
+>         {},
+>  };
+>  
+> -struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+> +static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+>         [apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+>                 APLL_CON0, "fout_apll", NULL),
+>         [mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll",
+> -- 
+> 1.7.9.5
