@@ -1,17 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 06 Aug 2013 13:28:50 -0600
-Subject: [PATCH 2/2] ARM: tegra: use dt-binding header for key code
-In-Reply-To: <1375798370-2231-2-git-send-email-ldewangan@nvidia.com>
-References: <1375798370-2231-1-git-send-email-ldewangan@nvidia.com>
- <1375798370-2231-2-git-send-email-ldewangan@nvidia.com>
-Message-ID: <52014E72.2070604@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 6 Aug 2013 15:30:11 -0400
+Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <20130806182201.GB2123@gmail.com>
+References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130806182201.GB2123@gmail.com>
+Message-ID: <20130806193011.GA19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2013 08:12 AM, Laxman Dewangan wrote:
-> In place of hardcoding the key code in DTS file and comment the key code
-> as side notes, use the key code macro defines in the dt-bindings/input/input.h
-> directly.
+On Tue, Aug 06, 2013 at 11:22:01AM -0700, Daniel Price wrote:
+> On Thu, Aug 01, 2013 at 03:25:03PM +0200, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > This set of patches introduces Message Signaled Interrupt support in
+> > the Marvell EBU PCIe driver. It has been successfully tested on the
+> > Armada XP GP platform with an Intel e1000e PCIe network card that
+> > supports MSI.
+> 
+> Thomas,
+> 
+> I tested this set of patches on a custom Marvell Armada XP 78260 based
+> board.  It was connected to another system over PCIe, through a
+> non-transparent bridge; MSI support was required.  We also tested a
+> similar configuration using the Armada XP GP platform.  The patch seems
+> to work for us.  Many thanks!
 
-This one also looks fine to me. I'll wait for an updated version that
-converts everything once patch 1/2 is accepted/applied.
+That's awesome!
+
+> Tested-by: Daniel Price <daniel.price@gmail.com>
+
+Thanks, I've added this to the patches.
+
+thx,
+
+Jason.
