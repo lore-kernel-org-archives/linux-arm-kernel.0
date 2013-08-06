@@ -1,59 +1,80 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Aug 2013 12:36:18 +0200
-Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support
- in PCI-to-PCI bridge
-In-Reply-To: <20130802174350.GA15787@obsidianresearch.com>
-References: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130802174350.GA15787@obsidianresearch.com>
-Message-ID: <20130806123618.6b95224e@skate>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Tue, 6 Aug 2013 11:40:24 +0100
+Subject: [PATCH 6/7] Add EFI stub for ARM
+In-Reply-To: <CAFECyb-WciwMu0MBmZ8LzkaM=VxnaOH5e9V5f_AP3ZbLA9CW9A@mail.gmail.com>
+References: <1375478948-22562-1-git-send-email-roy.franz@linaro.org>
+ <1375478948-22562-7-git-send-email-roy.franz@linaro.org>
+ <20130805141149.GB2755@localhost.localdomain>
+ <20130805153318.GL18151@rocoto.smurfnet.nu>
+ <CAFECyb-WciwMu0MBmZ8LzkaM=VxnaOH5e9V5f_AP3ZbLA9CW9A@mail.gmail.com>
+Message-ID: <20130806104023.GE2791@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+On Tue, Aug 06, 2013 at 01:06:17AM +0100, Roy Franz wrote:
+> On Mon, Aug 5, 2013 at 8:33 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> > On Mon, Aug 05, 2013 at 03:11:49PM +0100, Dave Martin wrote:
+> >> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> >> > index 75189f1..4c70b9e 100644
+> >> > --- a/arch/arm/boot/compressed/head.S
+> >> > +++ b/arch/arm/boot/compressed/head.S
+> >> > @@ -122,19 +122,106 @@
+> >> >             .arm                            @ Always enter in ARM state
+> >> >  start:
+> >> >             .type   start,#function
+> >> > -           .rept   7
+> >> > +#ifdef CONFIG_EFI_STUB
+> >> > +           @ Magic MSDOS signature for PE/COFF + ADD opcode
+> >> > +           .word   0x62805a4d
 
-On Fri, 2 Aug 2013 11:43:50 -0600, Jason Gunthorpe wrote:
+Is BE8 supported?  If so, this would put the bytes
 
-> > To achieve this, we simply make the prefetchable memory base a
-> > read-only register that always returns 0. Reading/writing all the
-> > other prefetchable memory related registers has no effect.
-> 
-> Looks good to me. It is very good that you were able to merge the
-> downstream prefetchable BARs into the normal MMIO window.
+	62 80 5A 4D
 
-Thanks.
+in the binary, which is not the right magic.
 
-> Though looking at the original thread I really wonder if something
-> else is wrong here as well. The ethernet should not have only
-> prefetchable BARs.
-> 
-> For instance, I found this link:
-> 
-> https://bugzilla.redhat.com/show_bug.cgi?id=448712
-> 
-> Which shows a more resonable arrangement:
-> 
-> 02:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. RTL8111/8168B PCI Express Gigabit Ethernet controller (rev 02)
->         Region 0: I/O ports at e800 [size=256]
->         Region 2: Memory at dffff000 (64-bit, non-prefetchable) [size=4K]
->         Region 4: Memory at deff0000 (64-bit, prefetchable) [size=64K]
->         Expansion ROM at dffc0000 [disabled] [size=128K]
-> 
-> vs Finn's:
-> 
-> 01:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. RTL8111/8168B PCI Express Gigabit Ethernet controller (rev)
->          Subsystem: Realtek Semiconductor Co., Ltd. TEG-ECTX Gigabit PCI-E Adapter [Trendnet]
->          Flags: bus master, fast devsel, latency 0, IRQ 9
->          I/O ports at 10000 [size=256]
->          Memory at e0014000 (64-bit, prefetchable) [size=4K]
->          Memory at e0010000 (64-bit, prefetchable) [size=16K]
+For this magic, you could use .byte instead.
 
-Right, but Finn had the same output in 3.10, where the old Kirkwood PCI
-driver was used. So it doesn't seem to be related to the driver, but
-maybe to how the hardware works?
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+To help future maintainers, I suggest noting in a comment that
+executing through this magic relies on little-endian instruction byte
+order (so, LE or BE8), and the ARM instruction set.
+
+What about the endianness of the other PE/COFF header fields?  Are they
+always little-endian, or are some fields native-endian (and if so, how
+is the endianness of the header determined by the loader)?
+
+> >>
+> >> What about BE32?
+> >
+> > The ARM bindings for UEFI specify that the processor must be in
+> > little-endian mode.
+> >
+> >> In that case, the instruction is a coprocessor load, that loads from a
+> >> random address to a coprocessor that almost certainly doesn't exist.
+> >> This will probably fault.
+> >>
+> >> Since BE32 is only for older platforms (<v6) and this is not easily
+> >> solvable, it might be sensible to make the EFI stub support depend on
+> >> !CPU_ENDIAN_BE32.
+> >
+> > Well, it would make more sense to make EFI_STUB depend on EFI and
+> > EFI depend on !CPU_ENDIAN_BE32. Which is something I can add to
+> > my next set of general ARM UEFI patches. Thanks.
+> > /
+> >     Leif
+> 
+> I had EFI_STUB depend on EFI at one point during my development, but took
+> it out because there was no actual dependency (the stub will work fine without
+> other EFI features.)  The features will most likely be used together,
+> but I wasn't
+> sure if we would want to enforce this with a config dependency.  I
+> don't care one
+> way or the other, I'd just like the dependencies to be correct and
+> follow best practices.
+
+I guess it's up to you, so long as the constraint is expressed in Kconfig
+somehow.
+
+Cheers
+---Dave
