@@ -1,231 +1,368 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 6 Aug 2013 11:53:43 -0400
-Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
-In-Reply-To: <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130806155343.GU19280@titan.lakedaemon.net>
+Date: Tue, 6 Aug 2013 11:56:23 -0400
+Subject: [PATCH v9 00/30] MBus DT binding for Armada 370/XP and Kirkwood
+In-Reply-To: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1374844687-19981-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130806155623.GV19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Ezequiel,
 
-On Tue, Jul 30, 2013 at 05:44:50PM +0200, Thomas Petazzoni wrote:
-> The AXP WiFi AP board is a Marvell platform based on the Armada XP
-> MV78230 SoC. It has two mini-PCIe connectors, one USB 3.0 port powered
-> by a USB 3.0 controller on PCIe, two Ethernet ports, 1 GB of RAM, 1 GB
-> of NAND, 16 MB of SPI flash, one SATA port and one button, two UARTs
-> 
-> Successfully tested: USB 3.0 port, the mini-PCIe connectors, SPI
-> flash, Ethernet ports, SATA port, button, UART.
-> 
-> Untested: NAND flash, due to lack of mainline support for the Armada
-> 370/XP NAND controller for now.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 164 ++++++++++++++++++++++++++++++
->  2 files changed, 165 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-xp-axpwifiap.dts
-
-When I merge this code with your MBus series I get the following
-warning:
-
-  DTC     arch/arm/boot/dts/armada-xp-axpwifiap.dtb
-Warning (ranges_format): "ranges" property in /soc has invalid length (32 bytes)
- (parent #address-cells == 2, child #address-cells == 2, #size-cells == 1)
-
-Could you please take a look and provide a separate patch to fix it up?
+Whole series applied to mvebu/mbus_dt
 
 thx,
 
 Jason.
 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 641b3c9..66bb64f 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -101,6 +101,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->  	armada-370-mirabox.dtb \
->  	armada-370-rd.dtb \
-> +	armada-xp-axpwifiap.dtb \
->  	armada-xp-db.dtb \
->  	armada-xp-gp.dtb \
->  	armada-xp-openblocks-ax3-4.dtb
-> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> new file mode 100644
-> index 0000000..2a542bd
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> @@ -0,0 +1,164 @@
-> +/*
-> + * Device Tree file for Marvell RD-AXPWiFiAP.
-> + *
-> + * Note: this board is shipped with a new generation boot loader that
-> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
-> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
-> + * used.
-> + *
-> + * Copyright (C) 2013 Marvell
-> + *
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "armada-xp-mv78230.dtsi"
-> +
-> +/ {
-> +	model = "Marvell RD-AXPWiFiAP";
-> +	compatible = "marvell,rd-axpwifiap", "marvell,armadaxp-mv78230", "marvell,armadaxp", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x00000000 0x00000000 0x40000000>; /* 1GB */
-> +	};
-> +
-> +	soc {
-> +		ranges = <0          0 0xf1000000 0x100000  /* Internal registers 1MiB */
-> +			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
-> +
-> +		internal-regs {
-> +			pinctrl {
-> +				pinctrl-0 = <&pmx_phy_int>;
-> +				pinctrl-names = "default";
-> +
-> +				pmx_ge0: pmx-ge0 {
-> +					marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
-> +						       "mpp4", "mpp5", "mpp6", "mpp7",
-> +						       "mpp8", "mpp9", "mpp10", "mpp11";
-> +					marvell,function = "ge0";
-> +				};
-> +
-> +				pmx_ge1: pmx-ge1 {
-> +					marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15",
-> +						       "mpp16", "mpp17", "mpp18", "mpp19",
-> +						       "mpp20", "mpp21", "mpp22", "mpp23";
-> +					marvell,function = "ge1";
-> +				};
-> +
-> +				pmx_keys: pmx-keys {
-> +					marvell,pins = "mpp33";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_spi: pmx-spi {
-> +					marvell,pins = "mpp36", "mpp37", "mpp38", "mpp39";
-> +					marvell,function = "spi";
-> +				};
-> +
-> +				pmx_phy_int: pmx-phy-int {
-> +					marvell,pins = "mpp32";
-> +					marvell,function = "gpio";
-> +				};
-> +			};
-> +
-> +			serial at 12000 {
-> +				clock-frequency = <250000000>;
-> +				status = "okay";
-> +			};
-> +
-> +			serial at 12100 {
-> +				clock-frequency = <250000000>;
-> +				status = "okay";
-> +			};
-> +
-> +			sata at a0000 {
-> +				nr-ports = <1>;
-> +				status = "okay";
-> +			};
-> +
-> +			mdio {
-> +				phy0: ethernet-phy at 0 {
-> +					reg = <0>;
-> +				};
-> +
-> +				phy1: ethernet-phy at 1 {
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			ethernet at 70000 {
-> +				pinctrl-0 = <&pmx_ge0>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +				phy = <&phy0>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +			ethernet at 74000 {
-> +				pinctrl-0 = <&pmx_ge1>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +				phy = <&phy1>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			spi0: spi at 10600 {
-> +				status = "okay";
-> +				pinctrl-0 = <&pmx_spi>;
-> +				pinctrl-names = "default";
-> +
-> +				spi-flash at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +					compatible = "n25q128a13";
-> +					reg = <0>; /* Chip select 0 */
-> +					spi-max-frequency = <108000000>;
-> +				};
-> +			};
-> +
-> +			pcie-controller {
-> +				status = "okay";
-> +
-> +				/* First mini-PCIe port */
-> +				pcie at 1,0 {
-> +					/* Port 0, Lane 0 */
-> +					status = "okay";
-> +				};
-> +
-> +				/* Second mini-PCIe port */
-> +				pcie at 2,0 {
-> +					/* Port 0, Lane 1 */
-> +					status = "okay";
-> +				};
-> +
-> +				/* Renesas uPD720202 USB 3.0 controller */
-> +				pcie at 3,0 {
-> +					/* Port 0, Lane 3 */
-> +					status = "okay";
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-0 = <&pmx_keys>;
-> +		pinctrl-names = "default";
-> +
-> +		button at 1 {
-> +			label = "Factory Reset Button";
-> +			linux,code = <141>; /* KEY_SETUP */
-> +			gpios = <&gpio1 1 1>;
-> +		};
-> +	};
-> +};
+On Fri, Jul 26, 2013 at 10:17:37AM -0300, Ezequiel Garcia wrote:
+> This is a minor revision of the patchset, splitting patches with DT bindings
+> changes to separate patches. See the changelog for more context information.
+> 
+> Except for this patch splitting, this can be considered as a v8 resend.
+> 
+> This has been tested on several Armada 370/XP boards, and on Plathome Openblocks
+> A6 Kirkwood board by myself; Kirkwood and Dove testing has been performed by
+> Andrew Lunn and Sebastian Hesselbarth respectively.
+> 
+> If anyone wants to do further testing, there's a public branch:
+> 
+>   https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-mvebu-mbus-v9
+> 
+> At this point all that's left is to have formal Acked-by from some DT maintainer/s
+> to the DT binding itself.
+> 
+> This is based on v3.11-rc2.
+> 
+> Changelog
+> ---------
+> 
+> v9:
+> 
+>  * Split DT bindings in separate patches and send only these to the devicetree
+>    mailing list to avoid overloading it, as suggested by Olof Johansson.
+> 
+> v8:
+> 
+>  * Introduce Kirkwood MBus DT binding and use it to relocate
+>    the PCIe nodes *only*.
+> 
+>  * Allow MBus to initialize when the node has no ranges property.
+> 
+>  * Add a sanity check for PCIe port base address to prevent a kernel
+>    panic when this address has not been obtained. Instead of panic,
+>    the PCIe won't work in such cases.
+> 
+> v7:
+> 
+>  * Add two optional properties pcie-{mem,io}-aperture to the MBus node
+>    defining the PCIe mem and IO region apertures.
+> 
+>  * Encode the PCIe port in the second cell of the ranges entries, using
+>    the PCIe slot; and remove such encoding from the first cell, since it
+>    was violating the specification.
+> 
+>    Quoting Jason Gunthorpe:
+>    """ [...] the OF spec says that the phys.hi fields of the child address
+>    spaces in the "ranges" property for PCI does not contain the same
+>    information as "reg" property entries within PCI nodes. The only information
+>    that is present in "ranges" phys.hi entries are the non-relocatable,
+>    prefetchable and the PCI address space bits for which the entry applies.
+>    I.e., only the n, p and ss bits are present; the bbbbbbbb, ddddd, fff and
+>    rrrrrrrr fields are 0."""
+> 
+> v6:
+> 
+>  * Change the PCIe ranges translations encoding, removing the big fake
+>    window encoded as MBUS_ID(0xf0, 0x02) by an array of entries representing
+>    the PCIe real windows with full 4 GiB size.
+> 
+>  * The corresponding PCIe port is selected by encoding the bus in the first cell
+>    of the PCIe controller node ranges entry.
+> 
+>  * Remove the name-based MBus window allocation API, replacing it by an
+>    ID-based API.
+> 
+> v5:
+> 
+>  * Add a required a 'controller' property to specify a phandle containing
+>    the MBus controller MMIO registers.
+> 
+> v4:
+> 
+>  * Fixed the pcie-controller to mbus address space translations, to match
+>    a 1:1 mapping between the PCI and CPU busses.
+> 
+>  * Fixed the binding documentation with suggestions from Arnd Bergmann.
+> 
+>  * Added a BootROM sanity check on AXP SMP initialization, as suggested
+>    by Jason Gunthorpe. This also implied changing slightly the bootrom
+>    node.
+> 
+>  * Changed the first cell format for the MBus address space.
+> 
+> v3:
+> 
+>  * Replaced the PCIe mapping with 0xffff0002, to avoid using a representation
+>    that might correspond to a possible window id.
+> 
+>  * Remove every mbus-node 'ranges' property from the dtsi files. Having them
+>    on the per-board dts files only makes maintaince less painful.
+> 
+>  * Declare children window size, in the children 'ranges' property, as large
+>    as possible (4 GiB size) and move the property to the dtsi files.
+>    The per-board dts, does not need to declare that property now.
+> 
+>  * The MBus driver now creates the decoding window using the base address and
+>    size specified in the mbus-node, instead of using the children entries.
+> 
+> v2:
+> 
+>  * Use the preprocessor on the DT and define a macro for the window ID.
+> 
+>  * Changed the way the address spaces were declared: the window's base
+>    addresses are only present in the mbus-node ranges property.
+>    This makes sense since that information belongs only to the MBus
+>    address space.
+> 
+>  * Drop the ranges dynamic update, since now the DT translations are complete.
+> 
+>  * Replaced the internal register first cell mapping with 0xffff0001, to avoid
+>    clashing when using 0x00000000.
+> 
+>  * Replaced the PCIe mapping with 0xffff0000.
+> 
+> v1:
+> 
+>   * Initial proposal
+> 
+> Example
+> -------
+> 
+> Here's an example showing how the MBus DT binding looks now:
+> 
+> soc {
+> 	compatible = "marvell,armadaxp-mbus", "simple-bus";
+> 	controller = <&mbusc>;
+> 	pcie-mem-aperture = <0xe0000000 0x8000000>;
+> 	pcie-io-aperture  = <0xe8000000 0x100000>;
+> 
+> 	ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000   /* internal-regs */
+> 		  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> 		  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
+> 
+> 	bootrom {
+> 		compatible = "marvell,bootrom";
+> 		reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
+> 	};
+> 
+> 	devbus-bootcs {
+> 		status = "okay";
+> 		ranges = <0 MBUS_ID(0x01, 0x2f) 0 0x8000000>;
+> 
+> 		/* NOR */
+> 		nor {
+> 			compatible = "cfi-flash";
+> 			reg = <0 0x8000000>;
+> 			bank-width = <2>;
+> 		};
+> 	};
+> 
+> 	pcie-controller {
+> 		compatible = "marvell,armada-xp-pcie";
+> 		status = "okay";
+> 		device_type = "pci";
+> 		#address-cells = <3>;
+> 		#size-cells = <2>;
+> 
+> 		ranges =
+> 			<0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+> 			0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
+> 			0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
+> 			0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
+> 			0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
+> 			0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
+> 			0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO */
+> 			0x82000000 0x2 0       MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
+> 			0x81000000 0x2 0       MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO */>;
+> 
+> 
+> 		pcie at 1,0 {
+> 			device_type = "pci";
+> 			assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+> 			reg = <0x0800 0 0 0 0>;
+> 			#address-cells = <3>;
+> 			#size-cells = <2>;
+> 			#interrupt-cells = <1>;
+> 			ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
+> 				  0x81000000 0 0 0x81000000 0x1 0 1 0>;
+> 			interrupt-map-mask = <0 0 0 0>;
+> 			interrupt-map = <0 0 0 0 &mpic 58>;
+> 			marvell,pcie-port = <0>;
+> 			marvell,pcie-lane = <0>;
+> 			clocks = <&gateclk 5>;
+> 			status = "disabled";
+> 		};
+> 
+> 		pcie at 2,0 {
+> 			device_type = "pci";
+> 			assigned-addresses = <0x82002800 0 0x80000 0 0x2000>;
+> 			reg = <0x1000 0 0 0 0>;
+> 			#address-cells = <3>;
+> 			#size-cells = <2>;
+> 			#interrupt-cells = <1>;
+> 			ranges = <0x82000000 0 0 0x82000000 0x2 0 1 0
+> 				  0x81000000 0 0 0x81000000 0x2 0 1 0>;
+> 			interrupt-map-mask = <0 0 0 0>;
+> 			interrupt-map = <0 0 0 0 &mpic 62>;
+> 			marvell,pcie-port = <1>;
+> 			marvell,pcie-lane = <0>;
+> 			clocks = <&gateclk 9>;
+> 			status = "disabled";
+> 		};
+> 	};
+> 
+> 	internal-regs {
+> 		compatible = "simple-bus";
+> 		#address-cells = <1>;
+> 		#size-cells = <1>;
+> 		ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+> 
+> 		mbusc: mbus-controller at 20000 {
+> 			reg = <0x20000 0x100>, <0x20180 0x20>;
+> 		};
+> 
+> 		interrupt-controller at 20000 {
+> 			reg = <0x20a00 0x2d0>, <0x21070 0x58>;
+> 		};
+> 	};
+> };
+> 
+> 
+> Ezequiel Garcia (19):
+>   memory: mvebu-devbus: Remove address decoding window workaround
+>   bus: mvebu-mbus: Factor out initialization details
+>   bus: mvebu-mbus: Introduce device tree binding
+>   bus: mvebu-mbus: Add static window allocation to the DT binding
+>   bus: mvebu-mbus: Add new API for the PCIe memory and IO aperture
+>   PCI: mvebu: Check valid base address before port setup
+>   ARM: mvebu: Remove the harcoded BootROM window allocation
+>   ARM: mvebu: Initialize MBus using the DT binding
+>   ARM: mvebu: Use the preprocessor on Armada 370/XP device tree files
+>   ARM: mvebu: Add MBus to Armada 370/XP device tree
+>   ARM: mvebu: Add BootROM to Armada 370/XP device tree
+>   ARM: mvebu: Relocate Armada 370/XP DeviceBus device tree nodes
+>   ARM: mvebu: Relocate Armada 370/XP PCIe device tree nodes
+>   ARM: kirkwood: Split DT and legacy MBus initialization
+>   ARM: kirkwood: Use the preprocessor on device tree files
+>   ARM: kirkwood: Introduce MBus DT node
+>   ARM: kirkwood: Introduce MBUS_ID
+>   ARM: kirkwood: Relocate PCIe device tree nodes
+>   bus: mvebu-mbus: Add devicetree binding
+> 
+> Thomas Petazzoni (11):
+>   bus: mvebu-mbus: Add new API for window creation
+>   ARM: kirkwood: Move to ID based MBus window creation
+>   ARM: mv78xx0: Move to ID based window creation
+>   ARM: orion5x: Move to ID based window creation
+>   ARM: dove: Move to ID based window creation
+>   PCI: mvebu: Adapt to the new device tree layout
+>   bus: mvebu-mbus: Remove the no longer used name-based API
+>   bus: mvebu-mbus: Remove name -> target, attribute mapping tables
+>   bus: mvebu-mbus: Update main description
+>   bus: mvebu-mbus: Factorize Armada 370/XP data structures
+>   PCI: mvebu: Adapt to the new device tree layout
+> 
+>  .../devicetree/bindings/bus/mvebu-mbus.txt         | 276 +++++++++++++
+>  .../devicetree/bindings/pci/mvebu-pci.txt          | 145 +++++--
+>  arch/arm/boot/dts/armada-370-db.dts                |   5 +-
+>  arch/arm/boot/dts/armada-370-mirabox.dts           |  37 +-
+>  arch/arm/boot/dts/armada-370-rd.dts                |   5 +-
+>  arch/arm/boot/dts/armada-370-xp.dtsi               | 111 +++---
+>  arch/arm/boot/dts/armada-370.dtsi                  | 112 +++---
+>  arch/arm/boot/dts/armada-xp-db.dts                 | 131 +++---
+>  arch/arm/boot/dts/armada-xp-gp.dts                 | 107 +++--
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi           | 222 ++++++-----
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi           | 263 ++++++------
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi           | 411 ++++++++++---------
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  88 ++--
+>  arch/arm/boot/dts/armada-xp.dtsi                   |   9 +-
+>  arch/arm/boot/dts/kirkwood-6281.dtsi               |  66 +--
+>  arch/arm/boot/dts/kirkwood-6282.dtsi               | 102 ++---
+>  arch/arm/boot/dts/kirkwood-cloudbox.dts            |   4 +-
+>  arch/arm/boot/dts/kirkwood-db-88f6281.dts          |   7 +-
+>  arch/arm/boot/dts/kirkwood-db-88f6282.dts          |   7 +-
+>  arch/arm/boot/dts/kirkwood-db.dtsi                 |  10 +-
+>  arch/arm/boot/dts/kirkwood-dns320.dts              |   2 +-
+>  arch/arm/boot/dts/kirkwood-dns325.dts              |   2 +-
+>  arch/arm/boot/dts/kirkwood-dnskw.dtsi              |   4 +-
+>  arch/arm/boot/dts/kirkwood-dockstar.dts            |   4 +-
+>  arch/arm/boot/dts/kirkwood-dreamplug.dts           |   4 +-
+>  arch/arm/boot/dts/kirkwood-goflexnet.dts           |   4 +-
+>  .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |   4 +-
+>  arch/arm/boot/dts/kirkwood-ib62x0.dts              |   4 +-
+>  arch/arm/boot/dts/kirkwood-iconnect.dts            |  23 +-
+>  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |   4 +-
+>  arch/arm/boot/dts/kirkwood-is2.dts                 |   2 +-
+>  arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |   4 +-
+>  arch/arm/boot/dts/kirkwood-lschlv2.dts             |   2 +-
+>  arch/arm/boot/dts/kirkwood-lsxhl.dts               |   2 +-
+>  arch/arm/boot/dts/kirkwood-lsxl.dtsi               |   4 +-
+>  arch/arm/boot/dts/kirkwood-mplcec4.dts             |  23 +-
+>  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |  23 +-
+>  arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   4 +-
+>  arch/arm/boot/dts/kirkwood-ns2.dts                 |   2 +-
+>  arch/arm/boot/dts/kirkwood-ns2lite.dts             |   2 +-
+>  arch/arm/boot/dts/kirkwood-ns2max.dts              |   2 +-
+>  arch/arm/boot/dts/kirkwood-ns2mini.dts             |   2 +-
+>  arch/arm/boot/dts/kirkwood-nsa310.dts              |  23 +-
+>  arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |   4 +-
+>  arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |   4 +-
+>  arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts    |   2 +-
+>  arch/arm/boot/dts/kirkwood-sheevaplug.dts          |   2 +-
+>  arch/arm/boot/dts/kirkwood-topkick.dts             |   4 +-
+>  arch/arm/boot/dts/kirkwood-ts219-6281.dts          |   6 +-
+>  arch/arm/boot/dts/kirkwood-ts219-6282.dts          |  25 +-
+>  arch/arm/boot/dts/kirkwood-ts219.dtsi              |  17 +-
+>  arch/arm/boot/dts/kirkwood.dtsi                    |  17 +-
+>  arch/arm/mach-dove/common.c                        |  68 ++--
+>  arch/arm/mach-kirkwood/board-dt.c                  |   1 +
+>  arch/arm/mach-kirkwood/common.c                    |  26 +-
+>  arch/arm/mach-kirkwood/pcie.c                      |  40 +-
+>  arch/arm/mach-mv78xx0/pcie.c                       |  23 +-
+>  arch/arm/mach-mvebu/armada-370-xp.c                |  34 +-
+>  arch/arm/mach-mvebu/platsmp.c                      |  25 +-
+>  arch/arm/mach-orion5x/common.c                     |  36 +-
+>  arch/arm/mach-orion5x/common.h                     |  17 +
+>  arch/arm/mach-orion5x/d2net-setup.c                |   6 +-
+>  arch/arm/mach-orion5x/db88f5281-setup.c            |  24 +-
+>  arch/arm/mach-orion5x/dns323-setup.c               |   6 +-
+>  arch/arm/mach-orion5x/edmini_v2-setup.c            |   6 +-
+>  arch/arm/mach-orion5x/kurobox_pro-setup.c          |  12 +-
+>  arch/arm/mach-orion5x/ls-chl-setup.c               |   6 +-
+>  arch/arm/mach-orion5x/ls_hgl-setup.c               |   6 +-
+>  arch/arm/mach-orion5x/lsmini-setup.c               |   6 +-
+>  arch/arm/mach-orion5x/mss2-setup.c                 |   6 +-
+>  arch/arm/mach-orion5x/mv2120-setup.c               |   6 +-
+>  arch/arm/mach-orion5x/net2big-setup.c              |   6 +-
+>  arch/arm/mach-orion5x/pci.c                        |   9 +-
+>  arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c       |   6 +-
+>  arch/arm/mach-orion5x/rd88f5181l-ge-setup.c        |   6 +-
+>  arch/arm/mach-orion5x/rd88f5182-setup.c            |  13 +-
+>  arch/arm/mach-orion5x/terastation_pro2-setup.c     |   6 +-
+>  arch/arm/mach-orion5x/ts209-setup.c                |   6 +-
+>  arch/arm/mach-orion5x/ts409-setup.c                |   6 +-
+>  arch/arm/mach-orion5x/wnr854t-setup.c              |   6 +-
+>  arch/arm/mach-orion5x/wrt350n-v2-setup.c           |   6 +-
+>  drivers/bus/mvebu-mbus.c                           | 441 ++++++++++++---------
+>  drivers/memory/mvebu-devbus.c                      |  64 +--
+>  drivers/pci/host/pci-mvebu.c                       | 115 ++++--
+>  include/linux/mbus.h                               |  16 +-
+>  85 files changed, 2030 insertions(+), 1379 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+> 
 > -- 
-> 1.8.1.2
+> 1.8.1.5
 > 
 > 
 > _______________________________________________
