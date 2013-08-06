@@ -1,236 +1,186 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Aug 2013 18:16:56 +0200
-Subject: [PATCH] ARM: EXYNOS: add power domains support for EXYNOS5440
-In-Reply-To: <20130803201411.GB17755@e106331-lin.cambridge.arm.com>
-References: <2729097.X0eAsuYF97@amdc1032> <51FC1E40.7030807@wwwdotorg.org>
- <20130803201411.GB17755@e106331-lin.cambridge.arm.com>
-Message-ID: <3043957.b1xFlRWI5P@amdc1032>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 6 Aug 2013 09:18:32 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <5200B7FE.4000306@linaro.org>
+References: <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
+ <51F97CE3.9030306@linaro.org>
+ <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
+ <51F99747.4060901@linaro.org>
+ <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
+ <51FA9AE8.1060004@linaro.org>
+ <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <712d31e9-3584-48e1-aa9f-55bc94fa62c9@DB9EHSMHS001.ehs.local>
+ <5200B7FE.4000306@linaro.org>
+Message-ID: <ff0f72c1-9868-4c11-869c-05c9e7aa5f0c@DB9EHSMHS022.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Saturday, August 03, 2013 09:14:11 PM Mark Rutland wrote:
-> On Fri, Aug 02, 2013 at 10:01:52PM +0100, Stephen Warren wrote:
-> > (CCing the other DT maintainers, hence quoting binding in full)
+On Tue, Aug 06, 2013 at 10:46:54AM +0200, Daniel Lezcano wrote:
+> On 08/06/2013 03:28 AM, S?ren Brinkmann wrote:
+> > Hi Daniel,
 > > 
-> > On 08/02/2013 07:23 AM, Bartlomiej Zolnierkiewicz wrote:
-> > > On EXYNOS5440 power domains are handled in a different way than on
-> > > the previous EXYNOS SoCs. Add support for them to EXYNOS pm_domains
-> > > driver. Then add device tree nodes for PCIe (controlling power for
-> > > PCIe host controller) and Conn2 (controlling power for Ethernet,
-> > > SATA and USB controllers) power domains to exynos5440.dtsi.
-> > > 
-> > > Currently if runtime Power Management is enabled and the driver
-> > > for devices under power domain is disabled then the power domain
-> > > will be disabled by EXYNOS pm_domains driver. To make more active
-> > > use of power domains (dynamically enable and disabled them as
-> > > needed) it is required to add runtime PM support to pci-exynos,
-> > > stmmac, ahci_platform, ohci-exynos and ehci-s5p drivers (to be
-> > > done later).
-> > > 
-> > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > Signed-off-by: Myungjoo Ham <myungjoo.ham@samsung.com>
-> > > Cc: Tomasz Figa <t.figa@samsung.com>
-> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > ---
-> > >  Documentation/devicetree/bindings/arm/exynos/power_domain.txt |   33 ++
-> > >  arch/arm/boot/dts/exynos5440.dtsi                             |   23 +
-> > >  arch/arm/mach-exynos/Kconfig                                  |    1 
-> > >  arch/arm/mach-exynos/common.c                                 |    4 
-> > >  arch/arm/mach-exynos/pm_domains.c                             |  138 +++++++++-
-> > >  5 files changed, 190 insertions(+), 9 deletions(-)
-> > > 
-> > > Index: b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> > > ===================================================================
-> > > --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:45:53.551392396 +0200
-> > > +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt	2013-08-02 14:46:29.799391845 +0200
-> > > @@ -5,20 +5,47 @@ to gate power to one or more peripherals
-> > >  
-> > >  Required Properties:
-> > >  - compatible: should be one of the following.
-> > > -    * samsung,exynos4210-pd - for exynos4210 type power domain.
-> > > +    * samsung,exynos4210-pd - for Exynos4210 type power domain.
-> > > +    * samsung,exynos5440-pd - for Exynos5440 type power domain.
-> > >  - reg: physical base address of the controller and length of memory mapped
-> > > -    region.
-> > > +    region (Exynos4210 type power domain) or bit offset in the control
-> > > +    register (Exynos5440 type power domain).
-> > > +
-> > > +Additional parent node must be created for Exynos5440 power domains with
-> > > +the following required properties:
-> > > +- compatible: samsung,exynos5440-power-domains, simple-bus
-> > > +- reg: physical base address of the XMU controller and length of memory
-> > > +    mapped region
+> > On Thu, Aug 01, 2013 at 07:48:04PM +0200, Daniel Lezcano wrote:
+> >> On 08/01/2013 07:43 PM, S?ren Brinkmann wrote:
+> >>> On Thu, Aug 01, 2013 at 07:29:12PM +0200, Daniel Lezcano wrote:
+> >>>> On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
+> >>>>> On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
+> >>>>>> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
+> >>>>>>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
+> >>>>>>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
+> >>>>>>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
+> >>>>>>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+> >>>>>>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+> >>>>>>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+> >>>>>>>>>>>>> Hi Daniel,
+> >>>>>>>>>>>>>
+> >>>>>>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+> >>>>>>>>>>>>> (snip)
+> >>>>>>>>>>>>>>
+> >>>>>>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+> >>>>>>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
+> >>>>>>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+> >>>>>>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+> >>>>>>>>>>>>>> idle state, switching the local timer back in use.
+> >>>>>>>>>>>>>
+> >>>>>>>>>>>>> I've been thinking about this, trying to understand how this makes my
+> >>>>>>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+> >>>>>>>>>>>>> would make the timer core switch to a broadcast device even though it
+> >>>>>>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+> >>>>>>>>>>>>> something useless, but nothing wrong in a sense that it should result in
+> >>>>>>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
+> >>>>>>>>>>>>> always remain a mystery to me.
+> >>>>>>>>>>>>>
+> >>>>>>>>>>>>> Actually this more or less leads to the question: What is this
+> >>>>>>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
+> >>>>>>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+> >>>>>>>>>>>>> hang pointing to some issue with that driver?
+> >>>>>>>>>>>>
+> >>>>>>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
+> >>>>>>>>>>>
+> >>>>>>>>>>> So, the correct run results (full output attached).
+> >>>>>>>>>>>
+> >>>>>>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
+> >>>>>>>>>>> broadcast device:
+> >>>>>>>>>>> 	Tick Device: mode:     1                                                         
+> >>>>>>>>>>> 	Broadcast device  
+> >>>>>>>>>>> 	Clock Event Device: ttc_clockevent
+> >>>>>>>>>>>
+> >>>>>>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
+> >>>>>>>>>>> enable the global timer, the twd timers are still used as local timers
+> >>>>>>>>>>> and the broadcast device is the global timer:
+> >>>>>>>>>>> 	Tick Device: mode:     1                                                         
+> >>>>>>>>>>> 	Broadcast device                                                                 
+> >>>>>>>>>>> 	Clock Event Device: arm_global_timer
+> >>>>>>>>>>>
+> >>>>>>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
+> >>>>>>>>>>> obtain this information for that case.
+> >>>>>>>>>>
+> >>>>>>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
+> >>>>>>>>>
+> >>>>>>>>> Right, that works. I forgot about that option after you mentioned, that
+> >>>>>>>>> it is most likely not that useful.
+> >>>>>>>>>
+> >>>>>>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
+> >>>>>>>>> the gt enabled and having maxcpus=1 set.
+> >>>>>>>>>
+> >>>>>>>>> /proc/timer_list:
+> >>>>>>>>> 	Tick Device: mode:     1
+> >>>>>>>>> 	Broadcast device
+> >>>>>>>>> 	Clock Event Device: arm_global_timer
+> >>>>>>>>> 	 max_delta_ns:   12884902005
+> >>>>>>>>> 	 min_delta_ns:   1000
+> >>>>>>>>> 	 mult:           715827876
+> >>>>>>>>> 	 shift:          31
+> >>>>>>>>> 	 mode:           3
+> >>>>>>>>
+> >>>>>>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
+> >>>>>>>>
+> >>>>>>>> The previous timer_list output you gave me when removing the offending
+> >>>>>>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
+> >>>>>>>>
+> >>>>>>>> Is it possible you try to get this output again right after onlining the
+> >>>>>>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
+> >>>>>>>
+> >>>>>>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
+> >>>>>>> and that didn't end well:
+> >>>>>>> 	# echo 1 > online && cat /proc/timer_list 
+> >>>>>>
+> >>>>>> Hmm, I was hoping to have a small delay before the kernel hangs but
+> >>>>>> apparently this is not the case... :(
+> >>>>>>
+> >>>>>> I suspect the global timer is shutdown at one moment but I don't
+> >>>>>> understand why and when.
+> >>>>>>
+> >>>>>> Can you add a stack trace in the "clockevents_shutdown" function with
+> >>>>>> the clockevent device name ? Perhaps, we may see at boot time an
+> >>>>>> interesting trace when it hangs.
+> >>>>>
+> >>>>> I did this change:
+> >>>>> 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+> >>>>> 	index 38959c8..3ab11c1 100644
+> >>>>> 	--- a/kernel/time/clockevents.c
+> >>>>> 	+++ b/kernel/time/clockevents.c
+> >>>>> 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
+> >>>>> 	  */
+> >>>>> 	 void clockevents_shutdown(struct clock_event_device *dev)
+> >>>>> 	 {
+> >>>>> 	+       pr_info("ce->name:%s\n", dev->name);
+> >>>>> 	+       dump_stack();
+> >>>>> 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
+> >>>>> 	        dev->next_event.tv64 = KTIME_MAX;
+> >>>>> 	 }
+> >>>>>
+> >>>>> It is hit a few times during boot, so I attach a full boot log. I really
+> >>>>> don't know what to look for, but I hope you can spot something in it. I
+> >>>>> really appreciate you taking the time.
+> >>>>
+> >>>> Thanks for the traces.
+> >>>
+> >>> Sure.
+> >>>
+> >>>>
+> >>>> If you try without the ttc_clockevent configured in the kernel (but with
+> >>>> twd and gt), does it boot ?
+> >>>
+> >>> Absence of the TTC doesn't seem to make any difference. It hangs at the
+> >>> same location.
+> >>
+> >> Ok, IMO there is a problem with the broadcast device registration (may
+> >> be vs twd).
+> >>
+> >> I will check later (kid duty) :)
 > > 
-> > It's a little odd to describe the child nodes first. Given the 4210 and
-> > 5440 bindings work so differently, I'd suggest making separate binding
-> > files for the two; samsung,exynos4210-pd.txt and samsung,exynos5440-pd.txt.
-
-OK, I'll fix it.
-
-> > The node being describe here clearly is not a simple-bus; the child
-> > nodes appear to have a specific need that their parent be compatible =
-> > "samsung,exynos5440-power-domains", hence they aren't the independent
-> > devices that simple-bus would usually contain.
+> > I was actually waiting for an update from your side and did something
+> > else, but I seem to have run into this again. I was overhauling the
+> > cadence_ttc (patch attached, based on tip/timers/core). And it seems to
+> > show the same behavior as enabling the global_timer. With cpuidle off, it
+> > works. With cpuidle, on it hangs. Removing the TIMER_STOP flag from the
+> > C2 state makes it boot again.
+> > It works just fine on our 3.10 kernel.
 > 
-> +1. This is most definitely not a simple-bus, the child nodes reg
-> properties cdon't represent the same address space as the
-> parent's reg property.
-
-What does in mean in the practice? What should I do instead?
-
-> How much does the association of bit-offsets to power domains vary? 
-
-On EXYNOS5440 power domains are controlled by control and status registers
-which are shared among all power domains. On other EXYNOS SoCs there are
-separate control/status registers for each power domain.
-
-> > Note that I only briefly reviewed the low-level structural aspects of
-> > the binding that I mentioned above; I haven't thought about the binding
-> > at a higher level of e.g. "does this binding conceptually make sense".
+> This is not necessary related to the bug. If the patch you sent broke
+> the cadence_ttc driver, when you use it (with the TIMER_STOP), you will
+> be stuck. Removing the flag, may signifies you don't use the broadcast
+> timer, hence the bug is not surfacing.
 > 
-> This is unfortunately difficult to do :(
+> Going back to the bug with the arm_global_timer, what is observed is the
+> broadcast timer is *shutdown* when the second cpu is online.
 > 
-> > 
-> > >  Node of a device using power domains must have a samsung,power-domain property
-> > >  defined with a phandle to respective power domain.
-> > >  
-> > > -Example:
-> > > +Example for Exynos4210 compatible power domain:
-> > >  
-> > >  	lcd0: power-domain-lcd0 {
-> > >  		compatible = "samsung,exynos4210-pd";
-> > >  		reg = <0x10023C00 0x10>;
-> > >  	};
-> > >  
-> > > +Example for Exynos5440 compatible power domains:
-> > > +
-> > > +	power-domains at 00160000 {
-> > > +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
-> > > +		reg = <0x00160000 0x1000>;
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <0>;
-> > > +
-> > > +		pd_pcie: pcie-power-domain at 6 {
-> > > +			compatible = "samsung,exynos5440-pd";
-> > > +			reg = <6>;
-> > > +		};
-> > > +
-> > > +		pd_conn2: conn2-power-domain at 7 {
-> > > +			compatible = "samsung,exynos5440-pd";
-> > > +			reg = <7>;
-> > > +		};
-> > > +	};
-> > > +
-> > >  Example of the node using power domain:
-> > >  
-> > >  	node {
-> > > Index: b/arch/arm/boot/dts/exynos5440.dtsi
-> > > ===================================================================
-> > > --- a/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:45:53.599392397 +0200
-> > > +++ b/arch/arm/boot/dts/exynos5440.dtsi	2013-08-02 14:46:29.815391842 +0200
-> > > @@ -29,6 +29,23 @@
-> > >  		#clock-cells = <1>;
-> > >  	};
-> > >  
-> > > +	power-domains at 00160000 {
-> > > +		compatible = "samsung,exynos5440-power-domains", "simple-bus";
-> > > +		reg = <0x00160000 0x1000>;
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <0>;
-> > > +
-> > > +		pd_pcie: pcie-power-domain at 6 {
-> > > +			compatible = "samsung,exynos5440-pd";
-> > > +			reg = <6>;
-> > > +		};
-> > > +
-> > > +		pd_conn2: conn2-power-domain at 7 {
-> > > +			compatible = "samsung,exynos5440-pd";
-> > > +			reg = <7>;
-> > > +		};
-> > > +	};
-> > > +
-> > >  	gic:interrupt-controller at 2E0000 {
-> > >  		compatible = "arm,cortex-a15-gic";
-> > >  		#interrupt-cells = <3>;
-> > > @@ -192,6 +209,7 @@
-> > >  		phy-mode = "sgmii";
-> > >  		clocks = <&clock 25>;
-> > >  		clock-names = "stmmaceth";
-> > > +		samsung,power-domain = <&pd_conn2>;
-> > >  	};
+> I have to dig into the kernel/time/clockevents.c|tick-*.c because IMO
+> the issue is coming from there but before I have to reproduce the bug,
+> so find a board I have where I can add the arm_global_timer.
 > 
-> This feels like a clock style binding would fit better:
-> samsung,power-domain = <&pwr 7>;
+> > Another thing I noticed - probably unrelated but hard to tell: On
+> > 3.11-rc1 and later my system stops for quite some time at the hand off
+> > to userspace. I.e. I see the 'freeing unused kernel memory...' line and
+> > sometimes the following 'Welcome to Buildroot...' and then it stops and
+> > on good kernels it continues after a while and boots through and on bad
+> > ones it just hangs there.
 > 
-> But there may be a better, more general way of handling this. I'm not
-> sure how this relates to regulators and so on, and how other vendors
-> handle this stuff...
+> did you try to dump the stacks with magic-sysrq ? Or git bisect ?
 
-Other vendors don't implement device tree for their power domains yet.
+That's my plan for today. Trying to find a reasonable approach for
+bisecting some of this stuff.
 
-Also there is not much power domain users in the tree currently:
-
-$ git grep pm_genpd_init
-arch/arm/mach-exynos/pm_domains.c:          pm_genpd_init(&pd->pd, NULL, !on);
-arch/arm/mach-s3c64xx/pm.c:         pm_genpd_init(&s3c64xx_always_on_pm_domains[i]->pd,
-arch/arm/mach-s3c64xx/pm.c:         pm_genpd_init(&s3c64xx_pm_domains[i]->pd, NULL, false);
-arch/arm/mach-shmobile/pm-r8a7779.c:        pm_genpd_init(genpd, NULL, false);
-arch/arm/mach-shmobile/pm-rmobile.c:        pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
-drivers/base/power/domain.c: * pm_genpd_init - Initialize a generic I/O PM domain object.
-drivers/base/power/domain.c:void pm_genpd_init(struct generic_pm_domain *genpd,
-include/linux/pm_domain.h:extern void pm_genpd_init(struct generic_pm_domain *genpd,
-include/linux/pm_domain.h:static inline void pm_genpd_init(struct generic_pm_domain *genpd,
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> Thanks,
-> Mark.
-> 
-> > >  
-> > >  	amba {
-> > > @@ -240,6 +258,7 @@
-> > >  		interrupts = <0 30 0>;
-> > >  		clocks = <&clock 23>;
-> > >  		clock-names = "sata";
-> > > +		samsung,power-domain = <&pd_conn2>;
-> > >  	};
-> > >  
-> > >  	ohci at 220000 {
-> > > @@ -248,6 +267,7 @@
-> > >  		interrupts = <0 29 0>;
-> > >  		clocks = <&clock 24>;
-> > >  		clock-names = "usbhost";
-> > > +		samsung,power-domain = <&pd_conn2>;
-> > >  	};
-> > >  
-> > >  	ehci at 221000 {
-> > > @@ -256,6 +276,7 @@
-> > >  		interrupts = <0 29 0>;
-> > >  		clocks = <&clock 24>;
-> > >  		clock-names = "usbhost";
-> > > +		samsung,power-domain = <&pd_conn2>;
-> > >  	};
-> > >  
-> > >  	pcie at 290000 {
-> > > @@ -275,6 +296,7 @@
-> > >  		#interrupt-cells = <1>;
-> > >  		interrupt-map-mask = <0 0 0 0>;
-> > >  		interrupt-map = <0x0 0 &gic 53>;
-> > > +		samsung,power-domain = <&pd_pcie>;
-> > >  	};
-> > >  
-> > >  	pcie at 2a0000 {
-> > > @@ -294,5 +316,6 @@
-> > >  		#interrupt-cells = <1>;
-> > >  		interrupt-map-mask = <0 0 0 0>;
-> > >  		interrupt-map = <0x0 0 &gic 56>;
-> > > +		samsung,power-domain = <&pd_pcie>;
-> > >  	};
-> > >  };
+	S?ren
