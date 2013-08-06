@@ -1,128 +1,179 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 06 Aug 2013 23:58:13 +0200
-Subject: [PATCH v4 2/4] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <1375825071-20922-3-git-send-email-dianders@chromium.org>
-References: <1373470926-19314-1-git-send-email-dianders@chromium.org>
- <1375825071-20922-1-git-send-email-dianders@chromium.org>
- <1375825071-20922-3-git-send-email-dianders@chromium.org>
-Message-ID: <19655139.gpQFe0oLNI@flatron>
+Date: Wed, 07 Aug 2013 00:06:07 +0200
+Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
+In-Reply-To: <20130806194751.5348.55680@quantum>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+ <7952777.WiMApbNK0e@flatron> <20130806194751.5348.55680@quantum>
+Message-ID: <2308912.pxOVkGYgip@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+On Tuesday 06 of August 2013 12:47:51 Mike Turquette wrote:
+> Quoting Tomasz Figa (2013-08-05 16:42:16)
+> 
+> > On Monday 05 of August 2013 12:02:16 Mike Turquette wrote:
+> > > Quoting Kukjin Kim (2013-08-05 11:13:55)
+> > > 
+> > > > On 08/06/13 03:06, Mike Turquette wrote:
+> > > > > Quoting Kukjin Kim (2013-08-05 10:01:36)
+> > > > > 
+> > > > >> On 07/23/13 08:49, Tomasz Figa wrote:
+> > > > >>> This series is an attempt to move clock support on Samsung
+> > > > >>> S3C64xx
+> > > > >>> SoCs
+> > > > >>> to Common Clock Framework.
+> > > > >>> 
+> > > > >>> First, support for PLL types present on S3C64xx SoCs is added
+> > > > >>> to
+> > > > >>> Samsung Common Clock Framework driver. Then the main clock
+> > > > >>> driver
+> > > > >>> for mentioned SoCs is introduced. Further patches contain
+> > > > >>> fixes
+> > > > >>> for drivers to make them compliant with CCF semantics,
+> > > > >>> migration
+> > > > >>> of platform code to use the new clock driver and removal of
+> > > > >>> old
+> > > > >>> clock management code.
+> > > > >>> 
+> > > > >>> Depends on:
+> > > > >>>    - [PATCH v4 00/20] Samsung PWM support cleanup
+> > > > >>>    
+> > > > >>>      http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20
+> > > > >>>      856
+> > > > >>> 
+> > > > >>> On S3C6410-based Tiny6410 board (Mini6410-compatible):
+> > > > >>> 
+> > > > >>> Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+> > > > >>> 
+> > > > >>> For v1:
+> > > > >>> 
+> > > > >>> Acked-by: Mike Turquette<mturquette@linaro.org>
+> > > > >>> 
+> > > > >>> Changes since v1:
+> > > > >>>    - added patch for read-only muxes,
+> > > > >>>    - exported configurable muxes and dividers,
+> > > > >>>    - defined mout_syncmux as read-only mux,
+> > > > >>>    - in DT-enabled case fixed-clock binding is used to define
+> > > > >>>    external clocks.> >>>
+> > > > >>> 
+> > > > >>> Tomasz Figa (8):
+> > > > >>>     clk: mux: Add support for read-only muxes.
+> > > > >>>     clk: samsung: pll: Add support for PLL6552 and PLL6553
+> > > > >>>     clk: samsung: Add clock driver for S3C64xx SoCs
+> > > > >>>     ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
+> > > > >>>     ARM: s3c64xx: dma: Use
+> > > > >>>     clk_prepare_enable/clk_disable_unprepare
+> > > > >>>     usb: host: ohci-s3c2410 Use
+> > > > >>>     clk_prepare_enable/clk_disable_unprepare
+> > > > >>>     ARM: s3c64xx: Migrate clock handling to Common Clock
+> > > > >>>     Framework
+> > > > >>>     ARM: s3c64xx: Remove old clock management code
+> > > > >>>    
+> > > > >>>    .../bindings/clock/samsung,s3c64xx-clock.txt       |   77
+> > > > >>>    ++
+> > > > >>>    arch/arm/Kconfig                                   |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/Makefile                     |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/clock.c                      | 1007
+> > > > >>>    -------------------- arch/arm/mach-s3c64xx/common.c
+> > > > >>>    
+> > > > >>>             |   21 +-
+> > > > >>>    
+> > > > >>>    arch/arm/mach-s3c64xx/common.h                     |   12
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/dma.c                        |    4
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/include/mach/regs-clock.h    |  132
+> > > > >>>    +--
+> > > > >>>    arch/arm/mach-s3c64xx/mach-anw6410.c               |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/mach-crag6410.c              |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/mach-hmt.c                   |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/mach-mini6410.c              |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/mach-ncp.c                   |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/mach-smartq.c                |   11
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2
+> > > > >>>    +-
+> > > > >>>    arch/arm/mach-s3c64xx/pm.c                         |   21 -
+> > > > >>>    arch/arm/mach-s3c64xx/s3c6400.c                    |    6 -
+> > > > >>>    arch/arm/mach-s3c64xx/s3c6410.c                    |    7 -
+> > > > >>>    arch/arm/plat-samsung/include/plat/cpu.h           |    4 +
+> > > > >>>    drivers/clk/clk-mux.c                              |   10
+> > > > >>>    +-
+> > > > >>>    drivers/clk/samsung/Makefile                       |    1 +
+> > > > >>>    drivers/clk/samsung/clk-pll.c                      |  160
+> > > > >>>    ++++
+> > > > >>>    drivers/clk/samsung/clk-pll.h                      |    4 +
+> > > > >>>    drivers/clk/samsung/clk-s3c64xx.c                  |  465
+> > > > >>>    +++++++++
+> > > > >>>    drivers/usb/host/ohci-s3c2410.c                    |    8
+> > > > >>>    +-
+> > > > >>>    include/dt-bindings/clock/samsung,s3c64xx-clock.h  |  178
+> > > > >>>    ++++
+> > > > >>>    include/linux/clk-provider.h                       |    2 +
+> > > > >>>    28 files changed, 943 insertions(+), 1205 deletions(-)
+> > > > >>>    create mode 100644
+> > > > >>>    Documentation/devicetree/bindings/clock/samsung,s3c64xx-clo
+> > > > >>>    ck.
+> > > > >>>    txt delete mode 100644 arch/arm/mach-s3c64xx/clock.c
+> > > > >>>    create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
+> > > > >>>    create mode 100644
+> > > > >>>    include/dt-bindings/clock/samsung,s3c64xx-clock.h
+> > > > >> 
+> > > > >> Basically, this series looks good to me, but I'm not sure how
+> > > > >> this
+> > > > >> should be handled because of dependency with PWM cleanup and
+> > > > >> clk
+> > > > >> stuff
+> > > > >> in clk tree now...
+> > > > > 
+> > > > > Patches 1-3 can go into the clk tree. 4-6 should go through
+> > > > > their
+> > > > > respective trees.
+> > > > > 
+> > > > > If you want I can take 7&  8 through the clk tree.
+> > > > > 
+> > > > > Alternatively I can provide patches 1-3 in a separate stable
+> > > > > topic
+> > > > > branch for you to pull in as a dependency. We'll both merge that
+> > > > > stable
+> > > > > topic branch into our trees and you can make a note of it for
+> > > > > the
+> > > > > arm-soc folks.
+> > > > 
+> > > > Thanks for your quick response. Would be helpful to samsung tree
+> > > > if
+> > > > you
+> > > > could provide a separate stable topic branch what you suggested
+> > > > for
+> > > > clk
+> > > > stuff in this series.
+> > > 
+> > > git://git.linaro.org/people/mturquette/linux.git clk-next-s3c64xx
+> > > 
+> > > Topic branch contains patches 1-3 of this series on top of
+> > > v3.11-rc2. I
+> > > have already merged the same into the clk-next branch.
+> > 
+> > What about the dependency on PWM cleanup series? Patches 7-8 must be
+> > merged after them, otherwise there will be a regression, because the
+> > old PWM clocksource driver will be broken and so s3c64xx won't boot
+> > until moved to new one, which is done by mentioned series.
+> 
+> Is this a question for me? I did not take patches 7 or 8 into clk-next.
+> Sounds like those patches should go through Samsung tree into arm-soc,
+> and perhaps be a late-applied branch to get the ordering right.
 
-See my comment inline.
-
-On Tuesday 06 of August 2013 14:37:49 Doug Anderson wrote:
-> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
-> looping around forever.  This has been seen to happen on exynos5420
-> silicon despite the fact that we haven't enabled any wakeup events due
-> to a silicon errata.  It is safe to do on all exynos variants.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> Changes in v4:
-> - Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
-> 
-> Changes in v3:
-> - Add freeze/thaw and poweroff/restore noirq entries.
-> 
-> Changes in v2:
-> - Use suspend_noirq as per James Hogan.
-> 
->  drivers/mmc/host/dw_mmc-exynos.c | 51
-> ++++++++++++++++++++++++++++++++++++++-- 1 file changed, 49
-> insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-exynos.c
-> b/drivers/mmc/host/dw_mmc-exynos.c index 866edef..0c1f192 100644
-> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> @@ -30,6 +30,7 @@
->  #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
->  					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
->  					SDMMC_CLKSEL_CCLK_DIVIDER(z))
-> +#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
-> 
->  #define EXYNOS4210_FIXED_CIU_CLK_DIV	2
->  #define EXYNOS4412_FIXED_CIU_CLK_DIV	4
-> @@ -100,6 +101,30 @@ static int dw_mci_exynos_setup_clock(struct dw_mci
-> *host) return 0;
->  }
-> 
-> +/**
-> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
-> + *
-> + * On exynos5420 there is a silicon errata that will sometimes leave
-> the + * WAKEUP_INT bit in the CLKSEL register asserted.  This bit is 1
-> to indicate + * that it fired and we can clear it by writing a 1 back. 
-> Clear it to prevent + * interrupts from going off constantly.
-> + *
-> + * We run this code on all exynos variants because it doesn't hurt and
-> the bug + * may be more widespread than just exynos5420.
-> + */
-> +
-> +static int dw_mci_exynos_resume_noirq(struct device *dev)
-> +{
-> +	struct dw_mci *host = dev_get_drvdata(dev);
-> +	u32 clksel;
-> +
-> +	clksel = mci_readl(host, CLKSEL);
-> +	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
-> +		mci_writel(host, CLKSEL, clksel);
-
-What about clock gating? Will the clock used for clocking this register be 
-always enabled when this gets called?
+It's just continuation of the topic. I guess the question is mostly for 
+Kukjin. Anyway, your suggestion is most likely the right thing, thanks.
 
 Best regards,
 Tomasz
-
-> +	return 0;
-> +}
-> +
->  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32
-> *cmdr) {
->  	/*
-> @@ -187,17 +212,39 @@ static int dw_mci_exynos_probe(struct
-> platform_device *pdev) return dw_mci_pltfm_register(pdev, drv_data);
->  }
-> 
-> +static struct dev_pm_ops dw_mci_exynos_pmops;
-> +
->  static struct platform_driver dw_mci_exynos_pltfm_driver = {
->  	.probe		= dw_mci_exynos_probe,
->  	.remove		= __exit_p(dw_mci_pltfm_remove),
->  	.driver		= {
->  		.name		= "dwmmc_exynos",
->  		.of_match_table	= dw_mci_exynos_match,
-> -		.pm		= &dw_mci_pltfm_pmops,
-> +		.pm		= &dw_mci_exynos_pmops,
->  	},
->  };
-> 
-> -module_platform_driver(dw_mci_exynos_pltfm_driver);
-> +static int __init dw_mci_exynos_init(void)
-> +{
-> +	/* Add a "noirq" resume to platform pmops */
-> +	memcpy(&dw_mci_exynos_pmops, &dw_mci_pltfm_pmops,
-> +	       sizeof(dw_mci_exynos_pmops));
-> +	WARN_ON(dw_mci_exynos_pmops.resume_noirq ||
-> +		dw_mci_exynos_pmops.thaw_noirq ||
-> +		dw_mci_exynos_pmops.restore_noirq);
-> +	dw_mci_exynos_pmops.resume_noirq = dw_mci_exynos_resume_noirq;
-> +	dw_mci_exynos_pmops.thaw_noirq = dw_mci_exynos_resume_noirq;
-> +	dw_mci_exynos_pmops.restore_noirq = dw_mci_exynos_resume_noirq;
-> +
-> +	return platform_driver_register(&dw_mci_exynos_pltfm_driver);
-> +}
-> +module_init(dw_mci_exynos_init);
-> +
-> +static void __exit dw_mci_exynos_exit(void)
-> +{
-> +	platform_driver_unregister(&dw_mci_exynos_pltfm_driver);
-> +}
-> +module_exit(dw_mci_exynos_exit);
-> 
->  MODULE_DESCRIPTION("Samsung Specific DW-MSHC Driver Extension");
->  MODULE_AUTHOR("Thomas Abraham <thomas.ab@samsung.com");
