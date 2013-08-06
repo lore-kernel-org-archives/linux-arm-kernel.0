@@ -1,239 +1,234 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 06 Aug 2013 17:51:57 +0200
-Subject: [PATCH RFC 2/2] clk: implement clk_unregister
-In-Reply-To: <1375804317-10576-1-git-send-email-s.nawrocki@samsung.com>
-References: <1375804317-10576-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1375804317-10576-3-git-send-email-s.nawrocki@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 6 Aug 2013 11:53:43 -0400
+Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
+In-Reply-To: <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130806155343.GU19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_unregister() is currently not implemented and it is required when
-a clock provider module needs to be unloaded.
+Ezequiel,
 
-Normally the clock supplier module is prevented to be unloaded by
-taking reference on the module in clk_get().
+On Tue, Jul 30, 2013 at 05:44:50PM +0200, Thomas Petazzoni wrote:
+> The AXP WiFi AP board is a Marvell platform based on the Armada XP
+> MV78230 SoC. It has two mini-PCIe connectors, one USB 3.0 port powered
+> by a USB 3.0 controller on PCIe, two Ethernet ports, 1 GB of RAM, 1 GB
+> of NAND, 16 MB of SPI flash, one SATA port and one button, two UARTs
+> 
+> Successfully tested: USB 3.0 port, the mini-PCIe connectors, SPI
+> flash, Ethernet ports, SATA port, button, UART.
+> 
+> Untested: NAND flash, due to lack of mainline support for the Armada
+> 370/XP NAND controller for now.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile                |   1 +
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 164 ++++++++++++++++++++++++++++++
+>  2 files changed, 165 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-xp-axpwifiap.dts
 
-For cases when the clock supplier module deinitializes despite the
-consumers of its clocks holding a reference on the module, e.g. when
-the driver is unbound through "unbind" sysfs attribute, there are
-empty clock ops added. These ops are assigned temporarily to struct
-clk and used until all consumers release the clock, to avoid invoking
-callbacks from the module which just got its driver remove() callback
-called on it.
+When I merge this code with your MBus series I get the following
+warning:
 
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
+  DTC     arch/arm/boot/dts/armada-xp-axpwifiap.dtb
+Warning (ranges_format): "ranges" property in /soc has invalid length (32 bytes)
+ (parent #address-cells == 2, child #address-cells == 2, #size-cells == 1)
 
-Changes since v3 of the original patch [1]:
- - reparent all children to the orphan list instead of leaving
-   the clock unregistered when it has child clocks,
- - removed unnecessary prerequisite checks in clk_debug_unregister(),
- - struct clk is now being freed only when the last clock consumer
-   calls clk_put(),
- - empty clock ops are used after clk_unregister() has been called
-   until all references to the clock are released and the clock
-   object is freed.
+Could you please take a look and provide a separate patch to fix it up?
 
-[1] http://www.spinics.net/lists/arm-kernel/msg247548.html
----
- drivers/clk/clk.c           |  123 +++++++++++++++++++++++++++++++++++++++++--
- include/linux/clk-private.h |    2 +
- 2 files changed, 122 insertions(+), 3 deletions(-)
+thx,
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 4877bd6..327f83f 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -342,6 +342,21 @@ out:
- 	return ret;
- }
+Jason.
 
-+ /**
-+ * clk_debug_unregister - remove a clk node from the debugfs clk tree
-+ * @clk: the clk being removed from the debugfs clk tree
-+ *
-+ * Dynamically removes a clk and all it's children clk nodes from the
-+ * debugfs clk tree if clk->dentry points to debugfs created by
-+ * clk_debug_register in __clk_init.
-+ *
-+ * Caller must hold prepare_lock.
-+ */
-+static void clk_debug_unregister(struct clk *clk)
-+{
-+	debugfs_remove_recursive(clk->dentry);
-+}
-+
- /**
-  * clk_debug_reparent - reparent clk node in the debugfs clk tree
-  * @clk: the clk being reparented
-@@ -432,6 +447,9 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
- static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
- {
- }
-+static inline void clk_debug_unregister(struct clk *clk)
-+{
-+}
- #endif
-
- /* caller must hold prepare_lock */
-@@ -1655,6 +1673,7 @@ int __clk_init(struct device *dev, struct clk *clk)
-
- 	clk_debug_register(clk);
-
-+	kref_init(&clk->ref);
- out:
- 	clk_prepare_unlock();
-
-@@ -1784,13 +1803,106 @@ fail_out:
- }
- EXPORT_SYMBOL_GPL(clk_register);
-
-+/*
-+ * Free memory allocated for a clock.
-+ * Caller must hold prepare_lock.
-+ */
-+static void __clk_release(struct kref *ref)
-+{
-+	struct clk *clk = container_of(ref, struct clk, ref);
-+	int i = clk->num_parents;
-+
-+	kfree(clk->parents);
-+	while (--i >= 0)
-+		kfree(clk->parent_names[i]);
-+
-+	kfree(clk->parent_names);
-+	kfree(clk->name);
-+	kfree(clk);
-+}
-+
-+/*
-+ * Empty clk_ops for unregistered clocks. These are used temporarily
-+ * after clk_unregister() was called on a clock and until last clock
-+ * consumer calls clk_put() and the struct clk object is freed.
-+ */
-+static int clk_dummy_prepare_enable(struct clk_hw *hw)
-+{
-+	return -ENXIO;
-+}
-+
-+static void clk_dummy_disable_unprepare(struct clk_hw *hw)
-+{
-+	WARN_ON(1);
-+}
-+
-+static int clk_dummy_set_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long parent_rate)
-+{
-+	return -ENXIO;
-+}
-+
-+static int clk_dummy_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	return -ENXIO;
-+}
-+
-+static const struct clk_ops clk_dummy_ops = {
-+	.enable		= clk_dummy_prepare_enable,
-+	.disable	= clk_dummy_disable_unprepare,
-+	.prepare	= clk_dummy_prepare_enable,
-+	.unprepare	= clk_dummy_disable_unprepare,
-+	.set_rate	= clk_dummy_set_rate,
-+	.set_parent	= clk_dummy_set_parent,
-+};
-+
- /**
-  * clk_unregister - unregister a currently registered clock
-  * @clk: clock to unregister
-- *
-- * Currently unimplemented.
-  */
--void clk_unregister(struct clk *clk) {}
-+void clk_unregister(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	clk_prepare_lock();
-+
-+	if (!clk || IS_ERR(clk)) {
-+		pr_err("%s: invalid clock: %p\n", __func__, clk);
-+		goto out;
-+	}
-+
-+	if (clk->ops == &clk_dummy_ops) {
-+		pr_err("%s: unregistered clock: %s\n", __func__, clk->name);
-+		goto out;
-+	}
-+	/*
-+	 * Assign dummy clock ops for consumers that might still hold
-+	 * a reference to this clock.
-+	 */
-+	flags = clk_enable_lock();
-+	clk->ops = &clk_dummy_ops;
-+	clk_enable_unlock(flags);
-+
-+	if (!hlist_empty(&clk->children)) {
-+		struct clk *child;
-+
-+		/* Reparent all children to the orphan list. */
-+		hlist_for_each_entry(child, &clk->children, child_node)
-+			clk_set_parent(child, NULL);
-+	}
-+
-+	clk_debug_unregister(clk);
-+
-+	hlist_del_init(&clk->child_node);
-+
-+	if (clk->prepare_count)
-+		pr_warn("%s: unregistering prepared clock: %s\n",
-+					__func__, clk->name);
-+
-+	kref_put(&clk->ref, __clk_release);
-+out:
-+	clk_prepare_unlock();
-+}
- EXPORT_SYMBOL_GPL(clk_unregister);
-
- static void devm_clk_release(struct device *dev, void *res)
-@@ -1861,6 +1973,7 @@ int __clk_get(struct clk *clk)
- 	if (!try_module_get(clk->owner))
- 		return 0;
-
-+	kref_get(&clk->ref);
- 	return 1;
- }
- EXPORT_SYMBOL(__clk_get);
-@@ -1870,6 +1983,10 @@ void __clk_put(struct clk *clk)
- 	if (!clk || IS_ERR(clk))
- 		return;
-
-+	clk_prepare_lock();
-+	kref_put(&clk->ref, __clk_release);
-+	clk_prepare_unlock();
-+
- 	module_put(clk->owner);
- }
- EXPORT_SYMBOL(__clk_put);
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index b7c0b58..36c1fc8 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -12,6 +12,7 @@
- #define __LINUX_CLK_PRIVATE_H
-
- #include <linux/clk-provider.h>
-+#include <linux/kref.h>
- #include <linux/list.h>
-
- /*
-@@ -47,6 +48,7 @@ struct clk {
- #ifdef CONFIG_COMMON_CLK_DEBUG
- 	struct dentry		*dentry;
- #endif
-+	struct kref		ref;
- };
-
- /*
---
-1.7.9.5
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 641b3c9..66bb64f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -101,6 +101,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>  	armada-370-mirabox.dtb \
+>  	armada-370-rd.dtb \
+> +	armada-xp-axpwifiap.dtb \
+>  	armada-xp-db.dtb \
+>  	armada-xp-gp.dtb \
+>  	armada-xp-openblocks-ax3-4.dtb
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> new file mode 100644
+> index 0000000..2a542bd
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -0,0 +1,164 @@
+> +/*
+> + * Device Tree file for Marvell RD-AXPWiFiAP.
+> + *
+> + * Note: this board is shipped with a new generation boot loader that
+> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
+> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
+> + * used.
+> + *
+> + * Copyright (C) 2013 Marvell
+> + *
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "armada-xp-mv78230.dtsi"
+> +
+> +/ {
+> +	model = "Marvell RD-AXPWiFiAP";
+> +	compatible = "marvell,rd-axpwifiap", "marvell,armadaxp-mv78230", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x00000000 0x00000000 0x40000000>; /* 1GB */
+> +	};
+> +
+> +	soc {
+> +		ranges = <0          0 0xf1000000 0x100000  /* Internal registers 1MiB */
+> +			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
+> +
+> +		internal-regs {
+> +			pinctrl {
+> +				pinctrl-0 = <&pmx_phy_int>;
+> +				pinctrl-names = "default";
+> +
+> +				pmx_ge0: pmx-ge0 {
+> +					marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
+> +						       "mpp4", "mpp5", "mpp6", "mpp7",
+> +						       "mpp8", "mpp9", "mpp10", "mpp11";
+> +					marvell,function = "ge0";
+> +				};
+> +
+> +				pmx_ge1: pmx-ge1 {
+> +					marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15",
+> +						       "mpp16", "mpp17", "mpp18", "mpp19",
+> +						       "mpp20", "mpp21", "mpp22", "mpp23";
+> +					marvell,function = "ge1";
+> +				};
+> +
+> +				pmx_keys: pmx-keys {
+> +					marvell,pins = "mpp33";
+> +					marvell,function = "gpio";
+> +				};
+> +
+> +				pmx_spi: pmx-spi {
+> +					marvell,pins = "mpp36", "mpp37", "mpp38", "mpp39";
+> +					marvell,function = "spi";
+> +				};
+> +
+> +				pmx_phy_int: pmx-phy-int {
+> +					marvell,pins = "mpp32";
+> +					marvell,function = "gpio";
+> +				};
+> +			};
+> +
+> +			serial at 12000 {
+> +				clock-frequency = <250000000>;
+> +				status = "okay";
+> +			};
+> +
+> +			serial at 12100 {
+> +				clock-frequency = <250000000>;
+> +				status = "okay";
+> +			};
+> +
+> +			sata at a0000 {
+> +				nr-ports = <1>;
+> +				status = "okay";
+> +			};
+> +
+> +			mdio {
+> +				phy0: ethernet-phy at 0 {
+> +					reg = <0>;
+> +				};
+> +
+> +				phy1: ethernet-phy at 1 {
+> +					reg = <1>;
+> +				};
+> +			};
+> +
+> +			ethernet at 70000 {
+> +				pinctrl-0 = <&pmx_ge0>;
+> +				pinctrl-names = "default";
+> +				status = "okay";
+> +				phy = <&phy0>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +			ethernet at 74000 {
+> +				pinctrl-0 = <&pmx_ge1>;
+> +				pinctrl-names = "default";
+> +				status = "okay";
+> +				phy = <&phy1>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +
+> +			spi0: spi at 10600 {
+> +				status = "okay";
+> +				pinctrl-0 = <&pmx_spi>;
+> +				pinctrl-names = "default";
+> +
+> +				spi-flash at 0 {
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +					compatible = "n25q128a13";
+> +					reg = <0>; /* Chip select 0 */
+> +					spi-max-frequency = <108000000>;
+> +				};
+> +			};
+> +
+> +			pcie-controller {
+> +				status = "okay";
+> +
+> +				/* First mini-PCIe port */
+> +				pcie at 1,0 {
+> +					/* Port 0, Lane 0 */
+> +					status = "okay";
+> +				};
+> +
+> +				/* Second mini-PCIe port */
+> +				pcie at 2,0 {
+> +					/* Port 0, Lane 1 */
+> +					status = "okay";
+> +				};
+> +
+> +				/* Renesas uPD720202 USB 3.0 controller */
+> +				pcie at 3,0 {
+> +					/* Port 0, Lane 3 */
+> +					status = "okay";
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = <&pmx_keys>;
+> +		pinctrl-names = "default";
+> +
+> +		button at 1 {
+> +			label = "Factory Reset Button";
+> +			linux,code = <141>; /* KEY_SETUP */
+> +			gpios = <&gpio1 1 1>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
