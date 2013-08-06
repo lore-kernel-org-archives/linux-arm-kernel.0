@@ -1,247 +1,195 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 06 Aug 2013 08:40:29 -0700
-Subject: [RFC PATCH 3/3] cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver
-In-Reply-To: <1374750866-750-4-git-send-email-lorenzo.pieralisi@arm.com>
- (Lorenzo Pieralisi's message of "Thu, 25 Jul 2013 12:14:26 +0100")
-References: <1374750866-750-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1374750866-750-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <87txj2g74i.fsf@linaro.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 6 Aug 2013 10:47:48 -0500
+Subject: [PATCH 1/2] ARM: msm: Add support for MSM8974 Dragonboard
+In-Reply-To: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
+References: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <76477E73-B68A-4025-875E-4BA30F5E175A@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+On Aug 5, 2013, at 6:02 PM, Rohit Vaswani wrote:
 
-> The big.LITTLE architecture is composed of two clusters of cpus. One cluster
-> contains less powerful but more energy efficient processors and the other
-> cluster groups the powerful but energy-intensive cpus.
->
-> The TC2 testchip implements two clusters of CPUs (A7 and A15 clusters in
-> a big.LITTLE configuration) connected through a CCI interconnect that manages
-> coherency of their respective L2 caches and intercluster distributed
-> virtual memory messages (DVM).
->
-> TC2 testchip integrates a power controller that manages cores resets, wake-up
-> IRQs and cluster low-power states. Power states are managed at cluster
-> level, which means that voltage is removed from a cluster iff all cores
-> in a cluster are in a wfi state. Single cores can enter a reset state
-> which is identical to wfi in terms of power consumption but simplifies the
-> way cluster states are entered.
->
-> This patch provides a multiple driver CPU idle implementation for TC2
-> which paves the way for a generic big.LITTLE idle driver for all
-> upcoming big.LITTLE based systems on chip.
->
-> The driver relies on the MCPM infrastructure to coordinate and manage
-> core power states; in particular MCPM allows to suspend specific cores
-> and hides the CPUs coordination required to shut-down clusters of CPUs.
->
-> Power down sequences for the respective clusters are implemented in the
-> MCPM TC2 backend, with all code needed to clean caches and exit coherency.
->
-> The multiple driver CPU idle infrastructure allows to define different
-> C-states for big and little cores, determined at boot by checking the
-> part id of the possible CPUs and initializing the respective logical
-> masks in the big and little drivers.
->
-> Current big.little systems are composed of A7 and A15 clusters, as
-> implemented in TC2, but in the future that may change and the driver
-> will have evolve to retrieve what is a 'big' cpu and what is a 'little'
-> cpu in order to build the correct topology.
->
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Amit Kucheria <amit.kucheria@linaro.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> This patch adds basic board support for MSM8974 Dragonboard
+> which belongs to the Snapdragon 800 family.
+> For now, just support a basic machine with device tree.
 
-Some minor comments below, as well as some readability nits.
+I think the board is APQ8074 and not MSM8974.
 
-> +#include <linux/cpuidle.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/slab.h>
-> +#include <linux/of.h>
+> 
+> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> ---
+> arch/arm/boot/dts/Makefile        |  3 ++-
+> arch/arm/boot/dts/msm8974-db.dts  | 26 ++++++++++++++++++++++++++
+> arch/arm/mach-msm/Kconfig         | 21 ++++++++++++++++++---
+> arch/arm/mach-msm/Makefile        |  1 +
+> arch/arm/mach-msm/board-dt-8974.c | 23 +++++++++++++++++++++++
+> 5 files changed, 70 insertions(+), 4 deletions(-)
+> create mode 100644 arch/arm/boot/dts/msm8974-db.dts
+> create mode 100644 arch/arm/mach-msm/board-dt-8974.c
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 641b3c9a..62cea36 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -97,7 +97,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+> 	kirkwood-openblocks_a6.dtb
+> dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+> -	msm8960-cdp.dtb
+> +	msm8960-cdp.dtb \
+> +	msm8974-db.dtb
+> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+> 	armada-370-mirabox.dtb \
+> 	armada-370-rd.dtb \
+> diff --git a/arch/arm/boot/dts/msm8974-db.dts b/arch/arm/boot/dts/msm8974-db.dts
+> new file mode 100644
+> index 0000000..badfc61
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/msm8974-db.dts
+> @@ -0,0 +1,26 @@
+> +/dts-v1/;
 > +
-> +#include <asm/cpu.h>
+> +/include/ "skeleton.dtsi"
 
-from checkpatch: WARNING: Use #include <linux/cpu.h> instead of <asm/cpu.h>
+We should change msm8974.dts to msm8974.dtsi and include it for the board.
 
-> +#include <asm/cputype.h>
-> +#include <asm/cpuidle.h>
-
-You already have <linux/cpuidle.h>, this shouldn't be necessary.
-
-> +#include <asm/mcpm.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/suspend.h>
-
-from checkpatch: WARNING: Use #include <linux/suspend.h> instead of <asm/suspend.h>
-
-[...]
-
-> +static struct cpuidle_driver bl_idle_little_driver = {
-> +	.name = "little_idle",
-> +	.owner = THIS_MODULE,
-> +	.states[0] = ARM_CPUIDLE_WFI_STATE,
-> +	.states[1] = {
-> +		.enter			= bl_enter_powerdown,
-> +		.exit_latency		= 1000,
-> +		.target_residency	= 3500,
-
-It would be good to have some comments about where these numbers come
-from.  The changelog suggests this will be generic for all b.L
-platforms, but I suspect these values to have various SoC specific
-components to them.  Eventually, we'll probably need some way specify
-these values, maybe from DT?
-
-Same comment for the 'big' driver definition.
-
-[...]
-
-> +/*
-> + * notrace prevents trace shims from getting inserted where they
-> + * should not. Global jumps and ldrex/strex must not be inserted
-> + * in power down sequences where caches and MMU may be turned off.
-> + */
-> +static int notrace bl_powerdown_finisher(unsigned long arg)
-> +{
-> +	/* MCPM works with HW CPU identifiers */
-> +	unsigned int mpidr = read_cpuid_mpidr();
-> +	unsigned int cluster = (mpidr >> 8) & 0xf;
-> +	unsigned int cpu = mpidr & 0xf;
 > +
-> +	mcpm_set_entry_vector(cpu, cluster, cpu_resume);
-
-add blank line
-
-> +	/*
-> +	 * Residency value passed to mcpm_cpu_suspend back-end
-> +	 * has to be given clear semantics. Set to 0 as a
-> +	 * temporary value.
-> +	 */
-> +	mcpm_cpu_suspend(0);
-
-add blank line
-
-> +	/* return value != 0 means failure */
-> +	return 1;
-> +}
+> +/ {
+> +	model = "Qualcomm MSM8974 Dragonboard";
+> +	compatible = "qcom,msm8974-db", "qcom,msm8974";
+> +	interrupt-parent = <&intc>;
 > +
-> +/**
-> + * bl_enter_powerdown - Programs CPU to enter the specified state
-> + * @dev: cpuidle device
-> + * @drv: The target state to be programmed
-> + * @idx: state index
+> +	intc: interrupt-controller at f9000000 {
+> +		compatible = "qcom,msm-qgic2";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		reg = < 0xf9000000 0x1000 >,
+> +		      < 0xf9002000 0x1000 >;
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv7-timer";
+> +		interrupts = <1 2 0xf08>,
+> +			     <1 3 0xf08>,
+> +			     <1 4 0xf08>,
+> +			     <1 1 0xf08>;
+> +		clock-frequency = <19200000>;
+> +	};
+> +};
+> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+> index 614e41e..343675b 100644
+> --- a/arch/arm/mach-msm/Kconfig
+> +++ b/arch/arm/mach-msm/Kconfig
+> @@ -1,12 +1,12 @@
+> if ARCH_MSM
+> 
+> comment "Qualcomm MSM SoC Type"
+> -	depends on (ARCH_MSM8X60 || ARCH_MSM8960)
+> +	depends on ARCH_MSM_DT
+> 
+> choice
+> 	prompt "Qualcomm MSM SoC Type"
+> 	default ARCH_MSM7X00A
+> -	depends on !(ARCH_MSM8X60 || ARCH_MSM8960)
+> +	depends on !ARCH_MSM_DT
+> 
+> config ARCH_MSM7X00A
+> 	bool "MSM7x00A / MSM7x01A"
+> @@ -60,6 +60,19 @@ config ARCH_MSM8960
+> 	select MSM_SCM if SMP
+> 	select USE_OF
+> 
+> +config ARCH_MSM8974
+> +	bool "MSM8974"
+> +	select ARM_GIC
+> +	select CPU_V7
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select HAVE_SMP
+> +	select MSM_SCM if SMP
+> +	select USE_OF
+> +
+> +config ARCH_MSM_DT
+> +	def_bool y
+> +	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
+> +
+> config MSM_HAS_DEBUG_UART_HS
+> 	bool
+> 
+> @@ -68,6 +81,7 @@ config MSM_SOC_REV_A
+> 
+> config  ARCH_MSM_ARM11
+> 	bool
+> +
+> config  ARCH_MSM_SCORPION
+> 	bool
+> 
+> @@ -75,6 +89,7 @@ config  MSM_VIC
+> 	bool
+> 
+> menu "Qualcomm MSM Board Type"
+> +	depends on !ARCH_MSM_DT
+> 
+> config MACH_HALIBUT
+> 	depends on ARCH_MSM
+> @@ -121,7 +136,7 @@ config MSM_SMD
+> 	bool
+> 
+> config MSM_GPIOMUX
+> -	depends on !(ARCH_MSM8X60 || ARCH_MSM8960)
+> +	depends on !ARCH_MSM_DT
+> 	bool "MSM V1 TLMM GPIOMUX architecture"
+> 	help
+> 	  Support for MSM V1 TLMM GPIOMUX architecture.
+> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+> index d257ff4..80e3b15 100644
+> --- a/arch/arm/mach-msm/Makefile
+> +++ b/arch/arm/mach-msm/Makefile
+> @@ -29,5 +29,6 @@ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
+> obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
+> obj-$(CONFIG_ARCH_MSM8X60) += board-dt-8660.o
+> obj-$(CONFIG_ARCH_MSM8960) += board-dt-8960.o
+> +obj-$(CONFIG_ARCH_MSM8974) += board-dt-8974.o
+> obj-$(CONFIG_MSM_GPIOMUX) += gpiomux.o
+> obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o
+> diff --git a/arch/arm/mach-msm/board-dt-8974.c b/arch/arm/mach-msm/board-dt-8974.c
+> new file mode 100644
+> index 0000000..697623e
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/board-dt-8974.c
+> @@ -0,0 +1,23 @@
+> +/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
 > + *
-> + * Called from the CPUidle framework to program the device to the
-> + * specified target state selected by the governor.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 > + */
-> +static int bl_enter_powerdown(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv, int idx)
-> +{
-> +	struct timespec ts_preidle, ts_postidle, ts_idle;
-> +	int ret;
 > +
-> +	/* Used to keep track of the total time in idle */
-> +	getnstimeofday(&ts_preidle);
+> +#include <linux/of_platform.h>
+> +#include <asm/mach/arch.h>
 > +
-> +	cpu_pm_enter();
+> +static const char * const msm8974_dt_match[] __initconst = {
+> +	"qcom,msm8974-db",
+> +	NULL
+> +};
 > +
-> +	ret = cpu_suspend(0, bl_powerdown_finisher);
+> +DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM (Flattened Device Tree)")
+> +	.dt_compat = msm8974_dt_match,
+> +MACHINE_END
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-add blank line
-
-> +	/* signals the MCPM core that CPU is out of low power state */
-> +	mcpm_cpu_powered_up();
-> +
-> +	cpu_pm_exit();
-> +
-> +	getnstimeofday(&ts_postidle);
-> +	ts_idle = timespec_sub(ts_postidle, ts_preidle);
-> +
-> +	dev->last_residency = ts_idle.tv_nsec / NSEC_PER_USEC +
-> +					ts_idle.tv_sec * USEC_PER_SEC;
-> +	local_irq_enable();
-
-All of the residency caluclations and IRQ disable stuff is handled by
-the CPUidle core now, so should be removed from here.
-
-> +	return idx;
-> +}
-> +
-> +static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
-> +{
-> +	struct cpuinfo_arm *cpu_info;
-> +	struct cpumask *cpumask;
-> +	unsigned long cpuid;
-> +	int cpu;
-> +
-> +	cpumask = kzalloc(cpumask_size(), GFP_KERNEL);
-> +	if (!cpumask)
-> +		return -ENOMEM;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		cpu_info = &per_cpu(cpu_data, cpu);
-> +		cpuid = is_smp() ? cpu_info->cpuid : read_cpuid_id();
-> +
-> +		/* read cpu id part number */
-> +		if ((cpuid & 0xFFF0) == cpu_id)
-> +			cpumask_set_cpu(cpu, cpumask);
-> +	}
-> +
-> +	drv->cpumask = cpumask;
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init bl_idle_init(void)
-> +{
-> +	int ret;
-
-add blank line
-
-> +	/*
-> +	 * Initialize the driver just for a compliant set of machines
-> +	 */
-> +	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7"))
-> +		return -ENODEV;
-> +	/*
-> +	 * For now the differentiation between little and big cores
-> +	 * is based on the part number. A7 cores are considered little
-> +	 * cores, A15 are considered big cores. This distinction may
-> +	 * evolve in the future with a more generic matching approach.
-> +	 */
-> +	ret = bl_idle_driver_init(&bl_idle_little_driver,
-> +				  ARM_CPU_PART_CORTEX_A7);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = bl_idle_driver_init(&bl_idle_big_driver, ARM_CPU_PART_CORTEX_A15);
-> +	if (ret)
-> +		goto out_uninit_little;
-> +
-> +	ret = cpuidle_register(&bl_idle_little_driver, NULL);
-> +	if (ret)
-> +		goto out_uninit_big;
-> +
-> +	ret = cpuidle_register(&bl_idle_big_driver, NULL);
-> +	if (ret)
-> +		goto out_unregister_little;
-> +
-> +	return 0;
-> +
-> +out_unregister_little:
-> +	cpuidle_unregister(&bl_idle_little_driver);
-> +out_uninit_big:
-> +	kfree(bl_idle_big_driver.cpumask);
-> +out_uninit_little:
-> +	kfree(bl_idle_little_driver.cpumask);
-> +
-> +	return ret;
-> +}
-> +device_initcall(bl_idle_init);
-
-Kevin
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
