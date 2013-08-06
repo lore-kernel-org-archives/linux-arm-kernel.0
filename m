@@ -1,44 +1,42 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 6 Aug 2013 14:36:07 -0700
-Subject: [PATCH v2 3/5] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <CAD=FV=XZcf8xWWxrCoe9KqjnQs4p4y7ENnuUYsVKU+yrE09GeQ@mail.gmail.com>
-References: <1373391071-6312-1-git-send-email-dianders@chromium.org>
- <1373411961-23812-1-git-send-email-dianders@chromium.org>
- <1373411961-23812-4-git-send-email-dianders@chromium.org>
- <002a01ce7d7d$6bd9e870$438db950$%jun@samsung.com>
- <CAD=FV=UtX0Z1ABdi5h270ks8Py2o1iPK4DonOHJH3N0Q1YShTQ@mail.gmail.com>
- <003f01ce8154$2f5ea1d0$8e1be570$%jun@samsung.com>
- <CAD=FV=XZcf8xWWxrCoe9KqjnQs4p4y7ENnuUYsVKU+yrE09GeQ@mail.gmail.com>
-Message-ID: <CAD=FV=U3jLPTh8T3cxyebOGrCOO6O15qB57x7KxUWHXxOmR84A@mail.gmail.com>
+Date: Tue,  6 Aug 2013 14:37:47 -0700
+Subject: [PATCH v4 0/4] mmc: dw_mmc: fixes for suspend/resume on exynos
+In-Reply-To: <1373470926-19314-1-git-send-email-dianders@chromium.org>
+References: <1373470926-19314-1-git-send-email-dianders@chromium.org>
+Message-ID: <1375825071-20922-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon,
+This series of patches addresses some suspend/resume problems with
+dw_mmc on exynos platforms, espeically exynos5420.  Since
+suspend/resume is not fully working on ToT Linux (v3.11-rc4) on
+exynos5250-snow, this series was tested against the current ToT
+ChromeOS 3.8 tree.  I have confirmed basic booting and eMMC / SD card
+usage (and compiling, honest!) against ToT Linux.
 
-On Wed, Jul 31, 2013 at 9:18 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Seungwon,
->
-> On Mon, Jul 15, 2013 at 5:09 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
->> Sorry for late response.
->> Yes, it's not clear.
->> If you get the confirmation, could you share this problem?
->> Possibly, auto-clear may not be implemented.
->> Then, manual should be correct.
->
-> I just got an update from my contacts.  They confirm that bit 11 is
-> not automatically cleared and that writing to it will clear it.
-> Hopefully this information will make it into the next version of any
-> documentation that you receive as well.
->
-> It is still unclear exactly why the WAKEUP_INT was being asserted on
-> our board despite the fact that all of the wakeup control signals
-> (bits 10:8) were 0.  That is still being investigated.
+I have received confirmation from Samsung that the problem solved is a
+silicon errata on exynos5420 and that this is a good fix.
 
-I have further confirmed from my contacts at Samsung that this is a
-real silicon errata and that clearing the WAKEUP_INT as I am doing in
-this series is the right workaround.
+Changes in v4:
+- Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
 
-New patch coming shortly based against ToT linux
-(v3.11-rc4-20-g0fff106).  I have confirmed that it applies cleanly to
-mmc-next, though I haven't tried booting with that tree.
+Changes in v3:
+- Add freeze/thaw and poweroff/restore noirq entries.
+
+Changes in v2:
+- Fix typo (some -> come)
+- Use ~0 instead of 0xFFFFFFFF; add comment about value
+- Use suspend_noirq as per James Hogan.
+
+Doug Anderson (4):
+  mmc: dw_mmc: Invalidate cache of current_speed after suspend/resume
+  mmc: dw_mmc: Add exynos resume_noirq callback to clear WAKEUP_INT
+  mmc: dw_mmc: Always setup the bus after suspend/resume
+  mmc: dw_mmc: Set timeout to max upon resume
+
+ drivers/mmc/host/dw_mmc-exynos.c | 51 ++++++++++++++++++++++++++++++++++++++--
+ drivers/mmc/host/dw_mmc.c        | 15 ++++++++----
+ 2 files changed, 60 insertions(+), 6 deletions(-)
+
+-- 
+1.8.3
