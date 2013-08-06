@@ -1,119 +1,31 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 6 Aug 2013 11:17:18 -0700
-Subject: [PATCH 3/3] ARM: dts: AM33xx: Add RNG node
-In-Reply-To: <1375777984-6267-4-git-send-email-lokeshvutla@ti.com>
-References: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
- <1375777984-6267-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <CA+Bv8XZ0SqtCJQszrpVcRuksJU+GNBoJD7FaP+NuQrbshnnBpg@mail.gmail.com>
+From: daniel.price@gmail.com (Daniel Price)
+Date: Tue, 6 Aug 2013 11:22:01 -0700
+Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130806182201.GB2123@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 6, 2013 at 1:33 AM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
-> Add the generic AM33xx RNG module's device tree data and
-> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-> platforms.  Also add Documentation file describing the data
-> for the RNG module.
->
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
->  arch/arm/boot/dts/am335x-bone.dts                  |    4 ++++
->  arch/arm/boot/dts/am335x-evm.dts                   |    4 ++++
->  arch/arm/boot/dts/am335x-evmsk.dts                 |    4 ++++
->  arch/arm/boot/dts/am33xx.dtsi                      |    8 +++++++
->  5 files changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
->
-> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> new file mode 100644
-> index 0000000..6a62acd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> @@ -0,0 +1,22 @@
-> +OMAP SoC HWRNG Module
-> +
-> +Required properties:
-> +
-> +- compatible : Should contain entries for this and backward compatible
-> +  RNG versions:
-> +  - "ti,omap2-rng" for OMAP2.
-> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
-> +  Note that these two versions are incompatible.
-> +- ti,hwmods: Name of the hwmod associated with the RNG module
-> +- reg : Offset and length of the register set for the module
-> +- interrupts : the interrupt number for the RNG module.
-> +               Only used for "ti,omap4-rng".
-> +
-> +Example:
-> +/* AM335x */
-> +rng: rng at 48310000 {
-> +       compatible = "ti,omap4-rng";
-> +       ti,hwmods = "rng";
-> +       reg = <0x48310000 0x2000>;
-> +       interrupts = <111>;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index 444b4ed..46a3887 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -234,3 +234,7 @@
->         pinctrl-0 = <&davinci_mdio_default>;
->         pinctrl-1 = <&davinci_mdio_sleep>;
->  };
-> +
-> +&rng {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index 3aee1a4..ebfbebe1 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -488,3 +488,7 @@
->                 ti,adc-channels = <4 5 6 7>;
->         };
->  };
-> +
-> +&rng {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-> index 0c8ad17..6610a05 100644
-> --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> @@ -402,3 +402,7 @@
->         phy_id = <&davinci_mdio>, <1>;
->         phy-mode = "rgmii-txid";
->  };
-> +
-> +&rng {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 38b446b..b1e6205 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -530,5 +530,13 @@
->                         #size-cells = <1>;
->                         status = "disabled";
->                 };
-> +
-> +               rng: rng at 48310000 {
-> +                       compatible = "ti,omap4-rng";
-> +                       ti,hwmods = "rng";
-> +                       reg = <0x48310000 0x2000>;
-> +                       interrupts = <111>;
-> +                       status = "disabled";
+On Thu, Aug 01, 2013 at 03:25:03PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This set of patches introduces Message Signaled Interrupt support in
+> the Marvell EBU PCIe driver. It has been successfully tested on the
+> Armada XP GP platform with an Intel e1000e PCIe network card that
+> supports MSI.
 
-Is there any point in making this default to "disabled"? Are there any
-am335x platforms where the trng doesn't function?
+Thomas,
 
-> +               };
->         };
->  };
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I tested this set of patches on a custom Marvell Armada XP 78260 based
+board.  It was connected to another system over PCIe, through a
+non-transparent bridge; MSI support was required.  We also tested a
+similar configuration using the Armada XP GP platform.  The patch seems
+to work for us.  Many thanks!
+
+Tested-by: Daniel Price <daniel.price@gmail.com>
+
+	-dp
+
+--
+Daniel Price; daniel.price at gmail.com; Twitter: @danielbprice
