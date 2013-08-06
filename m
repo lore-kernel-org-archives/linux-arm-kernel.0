@@ -1,57 +1,43 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Mon, 5 Aug 2013 17:06:17 -0700
-Subject: [PATCH 6/7] Add EFI stub for ARM
-In-Reply-To: <20130805153318.GL18151@rocoto.smurfnet.nu>
-References: <1375478948-22562-1-git-send-email-roy.franz@linaro.org>
- <1375478948-22562-7-git-send-email-roy.franz@linaro.org>
- <20130805141149.GB2755@localhost.localdomain>
- <20130805153318.GL18151@rocoto.smurfnet.nu>
-Message-ID: <CAFECyb-WciwMu0MBmZ8LzkaM=VxnaOH5e9V5f_AP3ZbLA9CW9A@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 6 Aug 2013 08:09:18 +0800
+Subject: [alsa-devel] [PATCH 1/3] ASoC: bt-sco: enable OF support
+In-Reply-To: <20130717094718.GE22506@sirena.org.uk>
+References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
+ <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
+ <20130717094718.GE22506@sirena.org.uk>
+Message-ID: <CAGsJ_4w3fS=vzZmeJOxhKO1TdL9d6pgbrjtzfPugOSOprLV+nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 5, 2013 at 8:33 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Mon, Aug 05, 2013 at 03:11:49PM +0100, Dave Martin wrote:
->> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
->> > index 75189f1..4c70b9e 100644
->> > --- a/arch/arm/boot/compressed/head.S
->> > +++ b/arch/arm/boot/compressed/head.S
->> > @@ -122,19 +122,106 @@
->> >             .arm                            @ Always enter in ARM state
->> >  start:
->> >             .type   start,#function
->> > -           .rept   7
->> > +#ifdef CONFIG_EFI_STUB
->> > +           @ Magic MSDOS signature for PE/COFF + ADD opcode
->> > +           .word   0x62805a4d
->>
->> What about BE32?
+2013/7/17 Mark Brown <broonie@kernel.org>:
+> On Wed, Jul 17, 2013 at 09:40:39AM +0100, Mark Rutland wrote:
+>> On Wed, Jul 17, 2013 at 07:12:14AM +0100, Barry Song wrote:
 >
-> The ARM bindings for UEFI specify that the processor must be in
-> little-endian mode.
+>> > this makes users be able to add a bt-sco node in dts instead of
+>> > hardcoding a platform device in mach.
 >
->> In that case, the instruction is a coprocessor load, that loads from a
->> random address to a coprocessor that almost certainly doesn't exist.
->> This will probably fault.
->>
->> Since BE32 is only for older platforms (<v6) and this is not easily
->> solvable, it might be sensible to make the EFI stub support depend on
->> !CPU_ENDIAN_BE32.
+>> I'm slightly confused by this. The driver doesn't seem to pick up any
+>> information out of the dts, and the binding doesn't even describe any
+>> linkage to a piece of hardware. I'm not familiar with bluetooth or ASoC,
+>> could you give an explanation as to why this is needed?
 >
-> Well, it would make more sense to make EFI_STUB depend on EFI and
-> EFI depend on !CPU_ENDIAN_BE32. Which is something I can add to
-> my next set of general ARM UEFI patches. Thanks.
-> /
->     Leif
+>> I don't think this should be in the dt as is. Could this not be
+>> registered based on the presence of a bluetooth controller that supports
+>> this?
+>
+> Audio devices are linked together by a separate board binding which
+> specifies how all the different components in the audio subsystem on the
+> board are wired together.  Even where things have no meanignful software
+> control (as is the case here and for a lot of simple DACs or ADCs) the
+> rest of the system needs information on their capabilites and ideally
+> the ability to interchange them with more substantial devices.  If there
+> were meaningful control there'd be a control bus here.
+>
+> There is likely to be a control interface for the BT device hanging off
+> a UART but it's not clear there's much more meaningful data for those
+> than there is here.
 
-I had EFI_STUB depend on EFI at one point during my development, but took
-it out because there was no actual dependency (the stub will work fine without
-other EFI features.)  The features will most likely be used together,
-but I wasn't
-sure if we would want to enforce this with a config dependency.  I
-don't care one
-way or the other, I'd just like the dependencies to be correct and
-follow best practices.
+so the idea is that we don't add codec platform device in uart, and we
+add a dt node for it as we are doing here?
 
-Thanks,
-Roy
+-barry
