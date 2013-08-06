@@ -1,189 +1,145 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue,  6 Aug 2013 22:43:51 +0200
-Subject: [PATCH v4 11/31] net: can: mscan: improve clock API use
+Date: Tue,  6 Aug 2013 22:43:53 +0200
+Subject: [PATCH v4 13/31] clk: wrap I/O access for improved portability
 In-Reply-To: <1375821851-31609-1-git-send-email-gsi@denx.de>
 References: <1374495298-22019-1-git-send-email-gsi@denx.de>
  <1375821851-31609-1-git-send-email-gsi@denx.de>
-Message-ID: <1375821851-31609-12-git-send-email-gsi@denx.de>
+Message-ID: <1375821851-31609-14-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the .get_clock() callback is run from probe() and might allocate
-resources, introduce a .put_clock() callback that is run from remove()
-to undo any allocation activities
+the common clock drivers were motivated/initiated by ARM development
+and apparently assume little endian peripherals
 
-prepare and enable the clocks in open(), disable and unprepare the
-clocks in close() if clocks were acquired during probe(), to not assume
-knowledge about which activities are done in probe() and remove()
-
-use devm_get_clk() to lookup the SYS and REF clocks, to have the clocks
-put upon device shutdown
-
-store pointers to data structures upon successful allocation already
-instead of deferral until complete setup, such that subroutines in the
-setup sequence may access those data structures as well to track their
-resource acquisition
-
-since clock allocation remains optional, the release callback as well as
-the enable/disable calls in open/close are optional as well
+wrap register/peripherals access in the common code (div, gate, mux)
+in preparation of adding COMMON_CLK support for other platforms
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/net/can/mscan/mpc5xxx_can.c |   18 ++++++++++++------
- drivers/net/can/mscan/mscan.c       |   27 ++++++++++++++++++++++++++-
- drivers/net/can/mscan/mscan.h       |    3 +++
- 3 files changed, 41 insertions(+), 7 deletions(-)
+ drivers/clk/clk-divider.c    |    6 +++---
+ drivers/clk/clk-gate.c       |    6 +++---
+ drivers/clk/clk-mux.c        |    6 +++---
+ include/linux/clk-provider.h |   17 +++++++++++++++++
+ 4 files changed, 26 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
-index bc422ba..e59b3a3 100644
---- a/drivers/net/can/mscan/mpc5xxx_can.c
-+++ b/drivers/net/can/mscan/mpc5xxx_can.c
-@@ -40,6 +40,7 @@ struct mpc5xxx_can_data {
- 	unsigned int type;
- 	u32 (*get_clock)(struct platform_device *ofdev, const char *clock_name,
- 			 int *mscan_clksrc);
-+	void (*put_clock)(struct platform_device *ofdev);
- };
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 6d55eb2..2c07061 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -104,7 +104,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+ 	struct clk_divider *divider = to_clk_divider(hw);
+ 	unsigned int div, val;
  
- #ifdef CONFIG_PPC_MPC52xx
-@@ -180,7 +181,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
- 			clockdiv = 1;
+-	val = readl(divider->reg) >> divider->shift;
++	val = clk_readl(divider->reg) >> divider->shift;
+ 	val &= div_mask(divider);
  
- 		if (!clock_name || !strcmp(clock_name, "sys")) {
--			sys_clk = clk_get(&ofdev->dev, "sys_clk");
-+			sys_clk = devm_clk_get(&ofdev->dev, "sys_clk");
- 			if (IS_ERR(sys_clk)) {
- 				dev_err(&ofdev->dev, "couldn't get sys_clk\n");
- 				goto exit_unmap;
-@@ -203,7 +204,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
- 		}
+ 	div = _get_div(divider, val);
+@@ -230,11 +230,11 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
+ 		val = div_mask(divider) << (divider->shift + 16);
+ 	} else {
+-		val = readl(divider->reg);
++		val = clk_readl(divider->reg);
+ 		val &= ~(div_mask(divider) << divider->shift);
+ 	}
+ 	val |= value << divider->shift;
+-	writel(val, divider->reg);
++	clk_writel(val, divider->reg);
  
- 		if (clocksrc < 0) {
--			ref_clk = clk_get(&ofdev->dev, "ref_clk");
-+			ref_clk = devm_clk_get(&ofdev->dev, "ref_clk");
- 			if (IS_ERR(ref_clk)) {
- 				dev_err(&ofdev->dev, "couldn't get ref_clk\n");
- 				goto exit_unmap;
-@@ -280,6 +281,8 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
- 	dev = alloc_mscandev();
- 	if (!dev)
- 		goto exit_dispose_irq;
-+	platform_set_drvdata(ofdev, dev);
-+	SET_NETDEV_DEV(dev, &ofdev->dev);
+ 	if (divider->lock)
+ 		spin_unlock_irqrestore(divider->lock, flags);
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 790306e..b7fbd96 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -58,7 +58,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
+ 	} else {
+-		reg = readl(gate->reg);
++		reg = clk_readl(gate->reg);
  
- 	priv = netdev_priv(dev);
- 	priv->reg_base = base;
-@@ -296,8 +299,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
- 		goto exit_free_mscan;
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
+@@ -66,7 +66,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 			reg &= ~BIT(gate->bit_idx);
  	}
  
--	SET_NETDEV_DEV(dev, &ofdev->dev);
--
- 	err = register_mscandev(dev, mscan_clksrc);
- 	if (err) {
- 		dev_err(&ofdev->dev, "registering %s failed (err=%d)\n",
-@@ -305,8 +306,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
- 		goto exit_free_mscan;
+-	writel(reg, gate->reg);
++	clk_writel(reg, gate->reg);
+ 
+ 	if (gate->lock)
+ 		spin_unlock_irqrestore(gate->lock, flags);
+@@ -89,7 +89,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ 	u32 reg;
+ 	struct clk_gate *gate = to_clk_gate(hw);
+ 
+-	reg = readl(gate->reg);
++	reg = clk_readl(gate->reg);
+ 
+ 	/* if a set bit disables this clk, flip it before masking */
+ 	if (gate->flags & CLK_GATE_SET_TO_DISABLE)
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 614444c..02ef506 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -42,7 +42,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
+ 	 * val = 0x4 really means "bit 2, index starts at bit 0"
+ 	 */
+-	val = readl(mux->reg) >> mux->shift;
++	val = clk_readl(mux->reg) >> mux->shift;
+ 	val &= mux->mask;
+ 
+ 	if (mux->table) {
+@@ -89,11 +89,11 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
+ 		val = mux->mask << (mux->shift + 16);
+ 	} else {
+-		val = readl(mux->reg);
++		val = clk_readl(mux->reg);
+ 		val &= ~(mux->mask << mux->shift);
  	}
+ 	val |= index << mux->shift;
+-	writel(val, mux->reg);
++	clk_writel(val, mux->reg);
  
--	platform_set_drvdata(ofdev, dev);
--
- 	dev_info(&ofdev->dev, "MSCAN at 0x%p, irq %d, clock %d Hz\n",
- 		 priv->reg_base, dev->irq, priv->can.clock.freq);
+ 	if (mux->lock)
+ 		spin_unlock_irqrestore(mux->lock, flags);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1ec14a7..c4f7799 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -12,6 +12,7 @@
+ #define __LINUX_CLK_PROVIDER_H
  
-@@ -324,10 +323,17 @@ exit_unmap_mem:
+ #include <linux/clk.h>
++#include <linux/io.h>
  
- static int mpc5xxx_can_remove(struct platform_device *ofdev)
- {
-+	const struct of_device_id *match;
-+	const struct mpc5xxx_can_data *data;
- 	struct net_device *dev = platform_get_drvdata(ofdev);
- 	struct mscan_priv *priv = netdev_priv(dev);
+ #ifdef CONFIG_COMMON_CLK
  
-+	match = of_match_device(mpc5xxx_can_table, &ofdev->dev);
-+	data = match ? match->data : NULL;
+@@ -490,5 +491,21 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+ #define of_clk_init(matches) \
+ 	{ while (0); }
+ #endif /* CONFIG_OF */
 +
- 	unregister_mscandev(dev);
-+	if (data && data->put_clock)
-+		data->put_clock(ofdev);
- 	iounmap(priv->reg_base);
- 	irq_dispose_mapping(dev->irq);
- 	free_candev(dev);
-diff --git a/drivers/net/can/mscan/mscan.c b/drivers/net/can/mscan/mscan.c
-index e6b4095..4f998f5 100644
---- a/drivers/net/can/mscan/mscan.c
-+++ b/drivers/net/can/mscan/mscan.c
-@@ -573,10 +573,24 @@ static int mscan_open(struct net_device *dev)
- 	struct mscan_priv *priv = netdev_priv(dev);
- 	struct mscan_regs __iomem *regs = priv->reg_base;
- 
-+	if (priv->clk_ipg) {
-+		ret = clk_prepare_enable(priv->clk_ipg);
-+		if (ret)
-+			goto exit_retcode;
-+	}
-+	if (priv->clk_can) {
-+		ret = clk_prepare_enable(priv->clk_can);
-+		if (ret) {
-+			if (priv->clk_ipg)
-+				clk_disable_unprepare(priv->clk_ipg);
-+			goto exit_retcode;
-+		}
-+	}
++/*
++ * wrap access to peripherals in accessor routines
++ * for improved portability across platforms
++ */
 +
- 	/* common open */
- 	ret = open_candev(dev);
- 	if (ret)
--		return ret;
-+		goto exit_dis_clock;
- 
- 	napi_enable(&priv->napi);
- 
-@@ -604,6 +618,12 @@ exit_free_irq:
- exit_napi_disable:
- 	napi_disable(&priv->napi);
- 	close_candev(dev);
-+exit_dis_clock:
-+	if (priv->clk_can)
-+		clk_disable_unprepare(priv->clk_can);
-+	if (priv->clk_ipg)
-+		clk_disable_unprepare(priv->clk_ipg);
-+exit_retcode:
- 	return ret;
- }
- 
-@@ -621,6 +641,11 @@ static int mscan_close(struct net_device *dev)
- 	close_candev(dev);
- 	free_irq(dev->irq, dev);
- 
-+	if (priv->clk_can)
-+		clk_disable_unprepare(priv->clk_can);
-+	if (priv->clk_ipg)
-+		clk_disable_unprepare(priv->clk_ipg);
++static inline u32 clk_readl(u32 __iomem *reg)
++{
++	return readl(reg);
++}
 +
- 	return 0;
- }
- 
-diff --git a/drivers/net/can/mscan/mscan.h b/drivers/net/can/mscan/mscan.h
-index af2ed8b..9c24d60 100644
---- a/drivers/net/can/mscan/mscan.h
-+++ b/drivers/net/can/mscan/mscan.h
-@@ -21,6 +21,7 @@
- #ifndef __MSCAN_H__
- #define __MSCAN_H__
- 
-+#include <linux/clk.h>
- #include <linux/types.h>
- 
- /* MSCAN control register 0 (CANCTL0) bits */
-@@ -283,6 +284,8 @@ struct mscan_priv {
- 	unsigned int type; 	/* MSCAN type variants */
- 	unsigned long flags;
- 	void __iomem *reg_base;	/* ioremap'ed address to registers */
-+	struct clk *clk_ipg;	/* clock for registers */
-+	struct clk *clk_can;	/* clock for bitrates */
- 	u8 shadow_statflg;
- 	u8 shadow_canrier;
- 	u8 cur_pri;
++static inline void clk_writel(u32 val, u32 __iomem *reg)
++{
++	writel(val, reg);
++}
++
+ #endif /* CONFIG_COMMON_CLK */
+ #endif /* CLK_PROVIDER_H */
 -- 
 1.7.10.4
