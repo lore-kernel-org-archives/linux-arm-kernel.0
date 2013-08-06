@@ -1,108 +1,387 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue,  6 Aug 2013 19:54:20 +0100
-Subject: [PATCH 1/5] ARM: vexpress/dcscb: fix cache disabling sequences
+Date: Tue,  6 Aug 2013 19:54:21 +0100
+Subject: [PATCH 2/5] ARM: vexpress/TC2: add Serial Power Controller (SPC)
+ support
 In-Reply-To: <1375815264-29414-1-git-send-email-pawel.moll@arm.com>
 References: <1375815264-29414-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1375815264-29414-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1375815264-29414-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Unlike real A15/A7's, the RTSM simulation doesn't appear to hit the
-cache when the CTRL.C bit is cleared.  Let's ensure there is no memory
-access within the disable and flush cache sequence, including to the
-stack.
+The TC2 versatile express core tile integrates a logic block that provides
+the interface between the dual cluster test-chip and the M3 microcontroller
+that carries out power management. The logic block, called Serial Power
+Controller (SPC), contains several memory mapped registers to control among
+other things low-power states, wake-up irqs and per-CPU jump addresses
+registers.
 
+This patch provides a driver that enables run-time control of features
+implemented by the SPC power management control logic with an API to
+be used by different subsystem drivers on top.
+
+The SPC control logic is required to be programmed very early in the boot
+process to reset secondary CPUs on the TC2 testchip, set-up jump addresses
+and wake-up IRQs for power management. Hence, waiting for core changes to
+be made in the device core code to enable early registration of platform
+devices, the driver puts in place an early init scheme that allows kernel
+drivers to initialize the SPC driver directly from the components requiring
+it, if their initialization routine is called before this driver init
+function during the boot process.
+
+Device tree bindings documentation for the SPC component is also provided.
+
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Amit Kucheria <amit.kucheria@linaro.org>
+Cc: Jon Medhurst <tixy@linaro.org>
+Signed-off-by: Achin Gupta <achin.gupta@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+[ np: moved from drivers/mfd/ to drivers/platform/vexpress/ ]
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
+[ PM: moved again to arch/arm/mach-vexpress, requested by Olof ]
+[ PM: removed generic compatible value and useless printk, from Olof ]
+[ PM: removed SPC_BASE so the driver only uses SPC registers ]
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/dcscb.c | 58 +++++++++++++++++++++++++++---------------
- 1 file changed, 37 insertions(+), 21 deletions(-)
+ .../devicetree/bindings/arm/vexpress-spc.txt       |  30 +++
+ arch/arm/mach-vexpress/spc.c                       | 246 +++++++++++++++++++++
+ arch/arm/mach-vexpress/spc.h                       |  25 +++
+ drivers/platform/Kconfig                           |   1 -
+ 4 files changed, 301 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress-spc.txt
+ create mode 100644 arch/arm/mach-vexpress/spc.c
+ create mode 100644 arch/arm/mach-vexpress/spc.h
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 16d57a8..85fffa7 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -136,14 +136,29 @@ static void dcscb_power_down(void)
- 		/*
- 		 * Flush all cache levels for this cluster.
- 		 *
--		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
--		 * a preliminary flush here for those CPUs.  At least, that's
--		 * the theory -- without the extra flush, Linux explodes on
--		 * RTSM (to be investigated).
-+		 * To do so we do:
-+		 * - Clear the SCTLR.C bit to prevent further cache allocations
-+		 * - Flush the whole cache
-+		 * - Clear the ACTLR "SMP" bit to disable local coherency
-+		 *
-+		 * Let's do it in the safest possible way i.e. with
-+		 * no memory access within the following sequence
-+		 * including to the stack.
- 		 */
--		flush_cache_all();
--		set_cr(get_cr() & ~CR_C);
--		flush_cache_all();
-+		asm volatile(
-+		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
-+		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-+		"isb	\n\t"
-+		"bl	v7_flush_dcache_all \n\t"
-+		"clrex	\n\t"
-+		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
-+		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
-+		"isb	\n\t"
-+		"dsb	"
-+		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-+		      "r9","r10","r11","lr","memory");
- 
- 		/*
- 		 * This is a harmless no-op.  On platforms with a real
-@@ -152,9 +167,6 @@ static void dcscb_power_down(void)
- 		 */
- 		outer_flush_all();
- 
--		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
--		set_auxcr(get_auxcr() & ~(1 << 6));
+diff --git a/Documentation/devicetree/bindings/arm/vexpress-spc.txt b/Documentation/devicetree/bindings/arm/vexpress-spc.txt
+new file mode 100644
+index 0000000..c2e0e6b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vexpress-spc.txt
+@@ -0,0 +1,30 @@
++* ARM Versatile Express Serial Power Controller device tree bindings
++
++Latest ARM development boards implement a power management interface (serial
++power controller - SPC) that is capable of managing power states transitions,
++wake-up IRQs and resume addresses for ARM multiprocessor testchips.
++The serial controller can be programmed through a memory mapped interface
++that enables communication between firmware running on the microcontroller
++managing power states and the application processors.
++
++The SPC DT bindings are defined as follows:
++
++- spc node
++
++	- compatible:
++		Usage: required
++		Value type: <stringlist>
++		Definition: must be
++			    "arm,vexpress-spc,v2p-ca15_a7", "arm,vexpress-spc"
++	- reg:
++		Usage: required
++		Value type: <prop-encode-array>
++		Definition: A standard property that specifies the base address
++			    and the size of the SPC address space
++
++Example:
++
++spc at 7fff0b00 {
++	compatible = "arm,vexpress-spc,v2p-ca15_a7", "arm,vexpress-spc";
++	reg = <0x7fff0b00 0x100>;
++};
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+new file mode 100644
+index 0000000..bd6d4f2
+--- /dev/null
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -0,0 +1,246 @@
++/*
++ * Versatile Express Serial Power Controller (SPC) support
++ *
++ * Copyright (C) 2013 ARM Ltd.
++ *
++ * Authors: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
++ *          Achin Gupta           <achin.gupta@arm.com>
++ *          Lorenzo Pieralisi     <lorenzo.pieralisi@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/vexpress.h>
++
++#include <asm/cacheflush.h>
++
++#define SPCLOG "vexpress-spc: "
++
++/* SCC conf registers */
++#define A15_CONF		0x400
++#define SYS_INFO		0x700
++
++/* SPC wake-up IRQs status and mask */
++#define WAKE_INT_MASK		0x24
++#define WAKE_INT_RAW		0x28
++#define WAKE_INT_STAT		0x2c
++/* SPC power down registers */
++#define A15_PWRDN_EN		0x30
++#define A7_PWRDN_EN		0x34
++/* SPC per-CPU mailboxes */
++#define A15_BX_ADDR0		0x68
++#define A7_BX_ADDR0		0x78
++
++/* wake-up interrupt masks */
++#define GBL_WAKEUP_INT_MSK	(0x3 << 10)
++
++/* TC2 static dual-cluster configuration */
++#define MAX_CLUSTERS		2
++
++struct ve_spc_drvdata {
++	void __iomem *baseaddr;
++	/*
++	 * A15s cluster identifier
++	 * It corresponds to A15 processors MPIDR[15:8] bitfield
++	 */
++	u32 a15_clusid;
++};
++
++static struct ve_spc_drvdata *info;
++
++static inline bool cluster_is_a15(u32 cluster)
++{
++	return cluster == info->a15_clusid;
++}
++
++/**
++ * ve_spc_global_wakeup_irq()
++ *
++ * Function to set/clear global wakeup IRQs. Not protected by locking since
++ * it might be used in code paths where normal cacheable locks are not
++ * working. Locking must be provided by the caller to ensure atomicity.
++ *
++ * @set: if true, global wake-up IRQs are set, if false they are cleared
++ */
++void ve_spc_global_wakeup_irq(bool set)
++{
++	u32 reg;
++
++	reg = readl_relaxed(info->baseaddr + WAKE_INT_MASK);
++
++	if (set)
++		reg |= GBL_WAKEUP_INT_MSK;
++	else
++		reg &= ~GBL_WAKEUP_INT_MSK;
++
++	writel_relaxed(reg, info->baseaddr + WAKE_INT_MASK);
++}
++
++/**
++ * ve_spc_cpu_wakeup_irq()
++ *
++ * Function to set/clear per-CPU wake-up IRQs. Not protected by locking since
++ * it might be used in code paths where normal cacheable locks are not
++ * working. Locking must be provided by the caller to ensure atomicity.
++ *
++ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
++ * @cpu: mpidr[7:0] bitfield describing cpu affinity level
++ * @set: if true, wake-up IRQs are set, if false they are cleared
++ */
++void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set)
++{
++	u32 mask, reg;
++
++	if (cluster >= MAX_CLUSTERS)
++		return;
++
++	mask = 1 << cpu;
++
++	if (!cluster_is_a15(cluster))
++		mask <<= 4;
++
++	reg = readl_relaxed(info->baseaddr + WAKE_INT_MASK);
++
++	if (set)
++		reg |= mask;
++	else
++		reg &= ~mask;
++
++	writel_relaxed(reg, info->baseaddr + WAKE_INT_MASK);
++}
++
++/**
++ * ve_spc_set_resume_addr() - set the jump address used for warm boot
++ *
++ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
++ * @cpu: mpidr[7:0] bitfield describing cpu affinity level
++ * @addr: physical resume address
++ */
++void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr)
++{
++	void __iomem *baseaddr;
++
++	if (cluster >= MAX_CLUSTERS)
++		return;
++
++	if (cluster_is_a15(cluster))
++		baseaddr = info->baseaddr + A15_BX_ADDR0 + (cpu << 2);
++	else
++		baseaddr = info->baseaddr + A7_BX_ADDR0 + (cpu << 2);
++
++	writel_relaxed(addr, baseaddr);
++}
++
++/**
++ * ve_spc_get_nr_cpus() - get number of cpus in a cluster
++ *
++ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
++ *
++ * Return: > 0 number of cpus in the cluster
++ *         or 0 if cluster number invalid
++ */
++u32 ve_spc_get_nr_cpus(u32 cluster)
++{
++	u32 val;
++
++	if (cluster >= MAX_CLUSTERS)
++		return 0;
++
++	val = readl_relaxed(info->baseaddr + SYS_INFO);
++	val = cluster_is_a15(cluster) ? (val >> 16) : (val >> 20);
++	return val & 0xf;
++}
++
++/**
++ * ve_spc_powerdown()
++ *
++ * Function to enable/disable cluster powerdown. Not protected by locking
++ * since it might be used in code paths where normal cacheable locks are not
++ * working. Locking must be provided by the caller to ensure atomicity.
++ *
++ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
++ * @enable: if true enables powerdown, if false disables it
++ */
++void ve_spc_powerdown(u32 cluster, bool enable)
++{
++	u32 pwdrn_reg;
++
++	if (cluster >= MAX_CLUSTERS)
++		return;
++
++	pwdrn_reg = cluster_is_a15(cluster) ? A15_PWRDN_EN : A7_PWRDN_EN;
++	writel_relaxed(enable, info->baseaddr + pwdrn_reg);
++}
++
++static int __init ve_spc_probe(void)
++{
++	int ret;
++	struct device_node *dn;
++
++	dn = of_find_compatible_node(NULL, NULL,
++				     "arm,vexpress-scc,v2p-ca15_a7");
++
++	if (!dn)
++		return -ENODEV;
++
++	info = kzalloc(sizeof(*info), GFP_KERNEL);
++	if (!info) {
++		pr_err(SPCLOG "unable to allocate mem\n");
++		return -ENOMEM;
++	}
++
++	info->baseaddr = of_iomap(dn, 0);
++	if (!info->baseaddr) {
++		pr_err(SPCLOG "unable to ioremap memory\n");
++		ret = -ENXIO;
++		goto mem_free;
++	}
++
++	info->a15_clusid = readl_relaxed(info->baseaddr + A15_CONF) & 0xf;
++
++	/*
++	 * Multi-cluster systems may need this data when non-coherent, during
++	 * cluster power-up/power-down. Make sure driver info reaches main
++	 * memory.
++	 */
++	sync_cache_w(info);
++	sync_cache_w(&info);
++
++	return 0;
++
++mem_free:
++	kfree(info);
++	return ret;
++}
++
++/**
++ * ve_spc_init()
++ *
++ * Function exported to manage pre early_initcall initialization.
++ * SPC code is needed very early in the boot process to bring CPUs out of
++ * reset and initialize power management back-end so an init interface is
++ * provided to platform code to allow early initialization. The init
++ * interface can be removed as soon as the DT layer and platform bus allow
++ * platform device creation and probing before SMP boot.
++ */
++int __init ve_spc_init(void)
++{
++	static int ve_spc_init_status __initdata = -EAGAIN;
++
++	if (ve_spc_init_status == -EAGAIN)
++		ve_spc_init_status = ve_spc_probe();
++
++	return ve_spc_init_status;
++}
+diff --git a/arch/arm/mach-vexpress/spc.h b/arch/arm/mach-vexpress/spc.h
+new file mode 100644
+index 0000000..f6b87fc
+--- /dev/null
++++ b/arch/arm/mach-vexpress/spc.h
+@@ -0,0 +1,25 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
++ */
++
++
++#ifndef __SPC_H_
++#define __SPC_H_
++
++int __init ve_spc_init(void);
++void ve_spc_global_wakeup_irq(bool set);
++void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set);
++void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr);
++u32 ve_spc_get_nr_cpus(u32 cluster);
++void ve_spc_powerdown(u32 cluster, bool enable);
++
++#endif
+diff --git a/drivers/platform/Kconfig b/drivers/platform/Kconfig
+index 69616ae..57811ea 100644
+--- a/drivers/platform/Kconfig
++++ b/drivers/platform/Kconfig
+@@ -4,4 +4,3 @@ endif
+ if GOLDFISH
+ source "drivers/platform/goldfish/Kconfig"
+ endif
 -
- 		/*
- 		 * Disable cluster-level coherency by masking
- 		 * incoming snoops and DVM messages:
-@@ -167,18 +179,22 @@ static void dcscb_power_down(void)
- 
- 		/*
- 		 * Flush the local CPU cache.
--		 *
--		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
--		 * a preliminary flush here for those CPUs.  At least, that's
--		 * the theory -- without the extra flush, Linux explodes on
--		 * RTSM (to be investigated).
-+		 * Let's do it in the safest possible way as above.
- 		 */
--		flush_cache_louis();
--		set_cr(get_cr() & ~CR_C);
--		flush_cache_louis();
--
--		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
--		set_auxcr(get_auxcr() & ~(1 << 6));
-+		asm volatile(
-+		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
-+		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-+		"isb	\n\t"
-+		"bl	v7_flush_dcache_louis \n\t"
-+		"clrex	\n\t"
-+		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
-+		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
-+		"isb	\n\t"
-+		"dsb	"
-+		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-+		      "r9","r10","r11","lr","memory");
- 	}
- 
- 	__mcpm_cpu_down(cpu, cluster);
 -- 
 1.8.1.2
