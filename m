@@ -1,48 +1,54 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Tue, 6 Aug 2013 11:31:08 +0100
-Subject: [PATCH 6/7] Add EFI stub for ARM
-In-Reply-To: <20130805153318.GL18151@rocoto.smurfnet.nu>
-References: <1375478948-22562-1-git-send-email-roy.franz@linaro.org>
- <1375478948-22562-7-git-send-email-roy.franz@linaro.org>
- <20130805141149.GB2755@localhost.localdomain>
- <20130805153318.GL18151@rocoto.smurfnet.nu>
-Message-ID: <20130806103108.GD2791@e103592.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 06 Aug 2013 11:36:15 +0100
+Subject: [PATCH] MFD: Make VEXPRESS MFD controller depends on VEXPRESS
+ systems
+In-Reply-To: <1375603249-27206-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1375603249-27206-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1375785375.12043.4.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 04:33:19PM +0100, Leif Lindholm wrote:
-> On Mon, Aug 05, 2013 at 03:11:49PM +0100, Dave Martin wrote:
-> > > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> > > index 75189f1..4c70b9e 100644
-> > > --- a/arch/arm/boot/compressed/head.S
-> > > +++ b/arch/arm/boot/compressed/head.S
-> > > @@ -122,19 +122,106 @@
-> > >  		.arm				@ Always enter in ARM state
-> > >  start:
-> > >  		.type	start,#function
-> > > -		.rept	7
-> > > +#ifdef CONFIG_EFI_STUB
-> > > +		@ Magic MSDOS signature for PE/COFF + ADD opcode
-> > > +		.word	0x62805a4d
-> > 
-> > What about BE32?
->  
-> The ARM bindings for UEFI specify that the processor must be in
-> little-endian mode.
+On Sun, 2013-08-04 at 09:00 +0100, Manjunath Goudar wrote:
+> This patch adds a Kconfig dependency on an ARCH_VEXPRESS(it is for
+> both ARM and ARM64) or ARCH_VEXPRESS_CA9X being available before
+> VEXPRESS_CONFIG can be enabled. Without this patch,build system
+> can lead to issues. This was discovered during randconfig testing,
+> in which VEXPRESS_CONFIG was enabled w/o ARCH_VEXPRESS or VEXPRESS_CONFIG
+> being enabled,leading to the following error:
 > 
-> > In that case, the instruction is a coprocessor load, that loads from a
-> > random address to a coprocessor that almost certainly doesn't exist.
-> > This will probably fault.
-> > 
-> > Since BE32 is only for older platforms (<v6) and this is not easily
-> > solvable, it might be sensible to make the EFI stub support depend on
-> > !CPU_ENDIAN_BE32.
+> CC      drivers/mfd/vexpress-config.o
+> drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
+> drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
+> ?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
+>     bridge_node = of_find_node_by_phandle(
+>     ^
+> drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
+> integer without a cast [enabled by default]
+>     bridge_node = of_find_node_by_phandle(
+
+Thanks for reporting the problem...
+
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 633ee43..c9202f6 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1174,7 +1174,7 @@ endmenu
 >  
-> Well, it would make more sense to make EFI_STUB depend on EFI and
-> EFI depend on !CPU_ENDIAN_BE32. Which is something I can add to
-> my next set of general ARM UEFI patches. Thanks.
+>  config VEXPRESS_CONFIG
+>  	bool "ARM Versatile Express platform infrastructure"
+> -	depends on ARM || ARM64
+> +	depends on ARCH_VEXPRESS || ARCH_VEXPRESS_CA9X4
+>  	help
+>  	  Platform configuration infrastructure for the ARM Ltd.
+>  	  Versatile Express.
 
-That sounds fair enough.
+... but this is not the right way to fix it. In case of ARM64 there is
+no (or maybe: there will be no) ARCH_VEXPRESS nor ARCH_ANYTHING if it
+comes to it ;-)
 
-Cheers
----Dave
+What is really missing is a stub for of_find_node_by_phandle() in case
+of CONFIG_OF != y. Care to send a patch adding it?
+
+Thanks!
+
+Pawel
