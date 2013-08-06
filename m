@@ -1,54 +1,85 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Aug 2013 14:05:24 +0200
-Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
-In-Reply-To: <20130716080503.GA3125@lukather>
-References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
- <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
- <20130716080503.GA3125@lukather>
-Message-ID: <5200E684.5080003@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  6 Aug 2013 13:05:48 +0100
+Subject: [PATCH] arm64: KVM: fix 2-level page tables unmapping
+Message-ID: <1375790748-10296-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/2013 10:05, Maxime Ripard wrote:
-> Hi Gregory,
-> 
-> On Mon, Jul 15, 2013 at 04:24:36PM +0200, Gregory CLEMENT wrote:
->> The I2C Transaction Generator offloads CPU from managing I2C transfer step by step.
->> 
->> This feature is currently only available on Armada XP, so usage of this mechanism is activated through device tree.
->> 
->> Based on the work of Piotr Ziecik and rewrote to use the new way of handling multiples i2c messages.
->> 
->> Signed-off-by: Piotr Ziecik <kosmo@semihalf.com> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com> --- drivers/i2c/busses/i2c-mv64xxx.c | 207
->> ++++++++++++++++++++++++++++++++++++--- 1 file changed, 196 insertions(+), 11 deletions(-)
-> 
-> [...]
-> 
->> +	/* +	 * For controllers embedded in new SoCs activate the +	 * Transaction Generator support. +	 */ +	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) +
->> drv_data->offload_enabled = true; +
-> 
-> Do you have a reason for not adding it to the match table? I mean, you will introduce a new compatible here, but if that compatible is used alone, won't probe the driver? That doesn't
-> seem very right to me.
+When using 64kB pages, we only have two levels of page tables,
+meaning that PGD, PUD and PMD are fused. In this case, trying
+to refcount PUDs and PMDs independantly is a a complete disaster,
+as they are the same.
 
-But we shouldn't use it alone: we should always use:
-compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+We manage to get it right for the allocation (stage2_set_pte uses
+{pmd,pud}_none), but the unmapping path clears both pud and pmd
+refcounts, which fails spectacularly with 2-level page tables.
 
->From my point of view using  "marvell,mv78230-i2c" alone is an error.
+The fix is to avoid calling clear_pud_entry when both the pmd and
+pud pages are empty. For this, and instead of introducing another
+pud_empty function, consolidate both pte_empty and pmd_empty into
+page_empty (the code is actually identical) and use that to also
+test the validity of the pud.
 
-Wolfram what is your opinion on it?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/mmu.c | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
-
-> 
-> Also, you should probably add it to the bindings documentation.
-See the patch 3 for the bindings documentation.
-
-> 
-> Maxime
-> 
-
-
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index ca6bea4..7e1d899 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -85,6 +85,12 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+ 	return p;
+ }
+ 
++static bool page_empty(void *ptr)
++{
++	struct page *ptr_page = virt_to_page(ptr);
++	return page_count(ptr_page) == 1;
++}
++
+ static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+ {
+ 	pmd_t *pmd_table = pmd_offset(pud, 0);
+@@ -103,12 +109,6 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+ 	put_page(virt_to_page(pmd));
+ }
+ 
+-static bool pmd_empty(pmd_t *pmd)
+-{
+-	struct page *pmd_page = virt_to_page(pmd);
+-	return page_count(pmd_page) == 1;
+-}
+-
+ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+ {
+ 	if (pte_present(*pte)) {
+@@ -118,12 +118,6 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+ 	}
+ }
+ 
+-static bool pte_empty(pte_t *pte)
+-{
+-	struct page *pte_page = virt_to_page(pte);
+-	return page_count(pte_page) == 1;
+-}
+-
+ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 			unsigned long long start, u64 size)
+ {
+@@ -153,10 +147,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 		range = PAGE_SIZE;
+ 
+ 		/* If we emptied the pte, walk back up the ladder */
+-		if (pte_empty(pte)) {
++		if (page_empty(pte)) {
+ 			clear_pmd_entry(kvm, pmd, addr);
+ 			range = PMD_SIZE;
+-			if (pmd_empty(pmd)) {
++			if (page_empty(pmd) && !page_empty(pud)) {
+ 				clear_pud_entry(kvm, pud, addr);
+ 				range = PUD_SIZE;
+ 			}
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.2.3
