@@ -1,24 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Aug 2013 17:59:02 +0100
-Subject: [PATCH v10 4/7] ASoC: fsl-ssi: Add support for imx-pcm-fiq
-In-Reply-To: <1374924716-23475-5-git-send-email-mpa@pengutronix.de>
-References: <1374924716-23475-1-git-send-email-mpa@pengutronix.de>
- <1374924716-23475-5-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130806165902.GI6427@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 06 Aug 2013 10:59:28 -0600
+Subject: [PATCH v10] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <1375774345.4004.25.camel@pizza.hi.pengutronix.de>
+References: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
+ <20130802092823.GA2884@e106331-lin.cambridge.arm.com>
+ <1375687936.4000.21.camel@pizza.hi.pengutronix.de>
+ <51FFDFB7.6080806@wwwdotorg.org>
+ <1375774345.4004.25.camel@pizza.hi.pengutronix.de>
+Message-ID: <52012B70.7050306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 27, 2013 at 01:31:53PM +0200, Markus Pargmann wrote:
-> Add support for non-dma pcm for imx platforms with imx-pcm-fiq support.
-> Instead of imx-pcm-audio, in this case imx-pcm-fiq-audio device is added
-> and the SIER flags are set differently.
+On 08/06/2013 01:32 AM, Philipp Zabel wrote:
+> Am Montag, den 05.08.2013, 11:24 -0600 schrieb Stephen Warren:
+>> On 08/05/2013 01:32 AM, Philipp Zabel wrote:
+>>> Am Freitag, den 02.08.2013, 10:28 +0100 schrieb Mark Rutland:
+>>>> On Thu, Jul 18, 2013 at 10:26:26AM +0100, Philipp Zabel wrote:
+>>>>> This driver implements a reset controller device that toggle a gpio
+>>>>> connected to a reset pin of a peripheral IC. The delay between assertion
+>>>>> and de-assertion of the reset signal can be configured via device tree.
+>> ...
+>>>> I think this should look more like the below:
+>>>>
+>>>> /* Device with nRESET pin connected to GPIO5_0 */
+>>>> sii902x at 39 {
+>>>> 	/* named for the actual input line */
+>>>> 	nreset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+>>>> 	/* 
+>>>> 	 * If there's some configurable property relating to the reset
+>>>> 	 * line, we can describe it
+>>>> 	 */
+>>>> 	vendor,some-optional-reset-gpio-property;
+>>>> 	...
+>>>> };
+>>>
+>>> I don't like the arbitrary name, as that makes it difficult to handle
+>>> this in an automated way. In this case I'd prefer to use 'reset-gpios'
+>>> and optionally 'reset-gpio-names' analogous to how clocks and interrupts
+>>> (and resets) are handled.
+>>
+>> Hmm. Just be aware that you can't force existing bindings to be
+>> retro-actively modified, or you'll break the DT ABI. So, at the very
+>> least we'd have to allow the existing custom-property-based approach for
+>> bindings where it's already been used.
+> 
+> Of course we have to continue supporting existing bindings. We could
+> continue using the GPIO API directly for those cases, or we could add a
+> function similar to of_get_named_gpio to wrap the GPIO:
+> 
+> 	rstc = of_get_named_reset_control(np, "nvidia,phy-reset-gpio", 0);
+> 	reset_control_assert(rstc);
+> 	usleep(1000);
+> 	reset_control_deassert(rstc);
 
-Applied, thanks.  Ideally we'd have a quirk infrastructure to figure out
-if this is required but it really doesn't seem worth it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130806/9e120bde/attachment.sig>
+Well, you'd need to pass two names into that function; one would be the
+name of the legacy property and the other the entry in reset-names or
+reset-gpio-names. It's quite unlikely that the same string would be used
+in both places.
+
+> My point is that for new bindings I'd prefer a well known property name
+> such as reset-gpios and a -names string list (as described
+> Documentation/devicetree/bindings/resource-names.txt) over ad-hoc
+> property names such as nreset-gpios, <vendor>-<submodule>-(n)reset,
+> nrst-gpios etc., both for consistency with existing resource properties
+> and because it is easier to grep for a single property name than for a
+> combination of all possible datasheet spellings of "reset".
+> 
+> I'd like
+> 	rstc = reset_control_get(dev, "nreset");
+> to go look for
+> 	resets = <&src 3>;
+> 	reset-names = "nreset";
+> or for
+> 	reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+> 	reset-gpio-names = "nreset";
+> by default.
+
+That's rather complex for little benefit though. Take a look at existing
+plain GPIO bindings, regulators, etc. They all simply encode the name
+you're looking for directly into the property name, which is a lot less
+overhead; simpler for humans to write and read without having to match n
+properties together, and simpler to parse in code.
