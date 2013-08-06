@@ -1,41 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 6 Aug 2013 17:37:55 +0900
-Subject: [PATCH 0/2] ARM: shmobile: remove nfsroot settings
-In-Reply-To: <uzjsvrzs5.wl%kuninori.morimoto.gx@renesas.com>
-References: <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
- <20130801080226.GF15265@verge.net.au>
- <20130806010736.GA20940@verge.net.au>
- <87r4e7h88z.wl%kuninori.morimoto.gx@renesas.com>
- <20130806022955.GA25114@verge.net.au>
- <87pptrh6f3.wl%kuninori.morimoto.gx@renesas.com>
- <87ob9bh5mt.wl%kuninori.morimoto.gx@renesas.com>
- <87haf3gxg6.wl%kuninori.morimoto.gx@renesas.com>
- <20130806082333.GA10748@verge.net.au>
- <uzjsvrzs5.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130806083753.GA28493@verge.net.au>
+Date: Tue, 6 Aug 2013 17:38:16 +0900
+Subject: [PATCH v7 0/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <87fvungsc4.wl%kuninori.morimoto.gx@renesas.com>
+References: <1375775411-4545-1-git-send-email-horms+renesas@verge.net.au>
+ <87fvungsc4.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130806083814.GB28493@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 05:26:06PM +0900, Kuninori Morimoto wrote:
+On Tue, Aug 06, 2013 at 01:02:23AM -0700, Kuninori Morimoto wrote:
 > 
 > Hi Simon
 > 
-> > > > > Yes, I can send patches.
-> > > > > But, I can't test emev2-kzm9d board.
-> > > > > Do you have it ?
-> > > > 
-> > > > These patches remove nfsroot settings from kzm9d/armadillo dts file.
-> > > > I tested #1 patch on Armadillo board, but I don't have kzm9d board.
-> > > 
-> > > I could test kzm9d board on Magnus's environment.
-> > > It works well without "rsize/wsize"
+> > this short series enables the on-board ethernet
+> > of the r8a7790 SoC for on lager board.
 > > 
-> > Thanks, I will test Armadillo.
+> > This series has a run-time dependency on
+> > "sh_eth: add support for r8a7790 SoC"
+> > 
+> > This series has been built on top of renesas-next-201300806.
+> > 
+> > Changes noted in changelogs of individual patches.
+> > Simon Horman (3):
+> >   ARM: shmobile: r8a7790: clocks for Ether support
+> >   ARM: shmobile: lager: enable Ether
+> >   ARM: shmobile: lager: enable nfsroot in DTS
+> > 
+> >  arch/arm/boot/dts/r8a7790-lager.dts    |  2 +-
+> >  arch/arm/mach-shmobile/board-lager.c   | 29 +++++++++++++++++++++++++++++
+> >  arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+> >  3 files changed, 34 insertions(+), 1 deletion(-)
 > 
-> Thank you.
-> But I already tested it on Armadillo :)
-> It works well
+> For all patches
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Great!
-
-I will queue these changes up for v3.12 in the cleanup3 branch.
+Thanks, I will queue these up for v3.12.
