@@ -1,73 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 6 Aug 2013 10:32:53 +0900
-Subject: [GIT PULL 0/2 v2] Renesas ARM based SoC clocksource updates for
- v3.12
-In-Reply-To: <51FF8212.5090406@linaro.org>
-References: <1375667799-6327-1-git-send-email-horms+renesas@verge.net.au>
- <51FF8212.5090406@linaro.org>
-Message-ID: <20130806013253.GB11356@verge.net.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 5 Aug 2013 20:59:18 -0500
+Subject: [PATCH 2/5] ARM: make dma_addr_t 64-bit on LPAE
+In-Reply-To: <20130806001551.GB23006@n2100.arm.linux.org.uk>
+References: <1375743009-28972-1-git-send-email-robherring2@gmail.com>
+ <1375743009-28972-2-git-send-email-robherring2@gmail.com>
+ <20130806001551.GB23006@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqL+cmsXtJvD=G8+35cHtzXymo6UVWyiXFoAcP+sUqVk7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 12:44:34PM +0200, Daniel Lezcano wrote:
-> On 08/05/2013 03:56 AM, Simon Horman wrote:
-> > Hi Daniel,
-> > 
-> > please consider the following Renesas ARM based SoC clocksource updates
-> > for v3.12.
-> > 
-> > 
-> > The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
-> > 
-> >   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.12
-> > 
-> > for you to fetch changes up to 172705f8a40b6e72c53f8cceda079504ed71c4e0:
-> > 
-> >   clocksource: em_sti: Convert to devm_* managed helpers (2013-08-05 10:47:10 +0900)
-> 
-> Shall I pull your tree or applying the patches to my branch is ok also ?
+On Mon, Aug 5, 2013 at 7:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 05, 2013 at 05:50:06PM -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> LPAE systems may have 64-bit capable DMA, so dma_addr_t needs to be
+>> 64-bit.
+>
+> The question I put to you here is: any can your DMA controllers produce
+> more than 32-bits of address?
 
-I have a slight preference for you to pull the
-renesas-clocksource-for-v3.12 tag of my tree.
-But I am happy for you to apply the patches if you prefer.
+Yes. SATA is 64-bit. And the ones that are 32-bit only have an IOMMU
+in front of them.
 
-> 
-> Thanks
->   -- Daniel
-> 
-> > 
-> > ----------------------------------------------------------------
-> > Renesas ARM based SoC clocksource updates for v3.12
-> > 
-> > * Add support for CMT hardware with 32-bit control and counter registers
-> > * em_sti: Convert to devm_* managed helpers
-> > 
-> > ----------------------------------------------------------------
-> > Laurent Pinchart (1):
-> >       clocksource: em_sti: Convert to devm_* managed helpers
-> > 
-> > Magnus Damm (1):
-> >       clocksource: sh_cmt: 32-bit control register support
-> > 
-> >  drivers/clocksource/em_sti.c | 49 +++++++++++++------------------------------
-> >  drivers/clocksource/sh_cmt.c | 50 +++++++++++++++++++++++++++++++-------------
-> >  2 files changed, 50 insertions(+), 49 deletions(-)
-> > 
-> 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Yes, physical memory may be mapped at addresses greater than 4GB phys.
+> That doesn't mean that dma_addr_t also becomes 64-bit.
+>
+> dma_addr_t is the bus address - the address you program into the DMA
+> controller.  If you're only ever writing it into a 32-bit address
+> register then you can only address 32-bits of memory, even though that
+> may be in the physical address range of 4GB-8GB.  In such cases where
+> that applies to all DMA controllers in the system, dma_addr_t should
+> still be 32-bit.
+>
+> This is where it's broken to think that DMA addresses are the same as
+> physical addresses.  They aren't.
+
+Understood, but it's not that clear once IOMMUs are in the mix. While
+IOMMU drivers will return 32-bit addresses at the DMA API level, I'd
+think internally they will need 64-bit addresses.
+
+I'm fine with just selecting this in ARCH_HIGHBANK, but the machine
+kconfig selects are getting rather long. We'll be cleaning those up at
+some point if we keep selecting everything at the machine level.
+
+Rob
