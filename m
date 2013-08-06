@@ -1,59 +1,150 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Tue,  6 Aug 2013 22:44:11 +0200
-Subject: [PATCH v4 31/31] clk: mpc512x: remove remaining migration workarounds
-In-Reply-To: <1375821851-31609-1-git-send-email-gsi@denx.de>
-References: <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1375821851-31609-1-git-send-email-gsi@denx.de>
-Message-ID: <1375821851-31609-32-git-send-email-gsi@denx.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Aug 2013 13:49:43 -0700
+Subject: [PATCH] arm64: KVM: fix 2-level page tables unmapping
+In-Reply-To: <1375790748-10296-1-git-send-email-marc.zyngier@arm.com>
+References: <1375790748-10296-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130806204943.GK16694@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove the last clkdev registration call ("sys_clk" and "ref_clk"
-for CAN), as well as the clkdev header inclusion and the "compat
-registration" comment
+On Tue, Aug 06, 2013 at 01:05:48PM +0100, Marc Zyngier wrote:
+> When using 64kB pages, we only have two levels of page tables,
+> meaning that PGD, PUD and PMD are fused. In this case, trying
+> to refcount PUDs and PMDs independantly is a a complete disaster,
 
-all client lookups for clock items are device tree based now, no
-compatibility alias names need to get provided any longer
+independently
 
-remove the now obsolete TODO comment on trimming the list of pre-enabled
-clock items, after all the respective peripheral drivers were adjusted
+> as they are the same.
+> 
+> We manage to get it right for the allocation (stage2_set_pte uses
+> {pmd,pud}_none), but the unmapping path clears both pud and pmd
+> refcounts, which fails spectacularly with 2-level page tables.
+> 
+> The fix is to avoid calling clear_pud_entry when both the pmd and
+> pud pages are empty. For this, and instead of introducing another
+> pud_empty function, consolidate both pte_empty and pmd_empty into
+> page_empty (the code is actually identical) and use that to also
+> test the validity of the pud.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/mmu.c | 22 ++++++++--------------
+>  1 file changed, 8 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index ca6bea4..7e1d899 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -85,6 +85,12 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+>  	return p;
+>  }
+>  
+> +static bool page_empty(void *ptr)
+> +{
+> +	struct page *ptr_page = virt_to_page(ptr);
+> +	return page_count(ptr_page) == 1;
+> +}
+> +
+>  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+>  {
+>  	pmd_t *pmd_table = pmd_offset(pud, 0);
+> @@ -103,12 +109,6 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+>  	put_page(virt_to_page(pmd));
+>  }
+>  
+> -static bool pmd_empty(pmd_t *pmd)
+> -{
+> -	struct page *pmd_page = virt_to_page(pmd);
+> -	return page_count(pmd_page) == 1;
+> -}
+> -
+>  static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+>  {
+>  	if (pte_present(*pte)) {
+> @@ -118,12 +118,6 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+>  	}
+>  }
+>  
+> -static bool pte_empty(pte_t *pte)
+> -{
+> -	struct page *pte_page = virt_to_page(pte);
+> -	return page_count(pte_page) == 1;
+> -}
+> -
+>  static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+>  			unsigned long long start, u64 size)
+>  {
+> @@ -153,10 +147,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+>  		range = PAGE_SIZE;
+>  
+>  		/* If we emptied the pte, walk back up the ladder */
+> -		if (pte_empty(pte)) {
+> +		if (page_empty(pte)) {
+>  			clear_pmd_entry(kvm, pmd, addr);
+>  			range = PMD_SIZE;
+> -			if (pmd_empty(pmd)) {
+> +			if (page_empty(pmd) && !page_empty(pud)) {
+>  				clear_pud_entry(kvm, pud, addr);
+>  				range = PUD_SIZE;
+>  			}
 
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/platforms/512x/clock-commonclk.c |    7 -------
- 1 file changed, 7 deletions(-)
+looks right, an alternative would be to check in clear_pud_entry if the
+entry actually had a value, but I don't think it's really clearer.
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index fa95814..621a8d9 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -12,7 +12,6 @@
-  */
+However, this got me thinking a bit.  What happens if we pass a non-pmd
+aligned address to unmap_range, and let's assume the size of the range
+is more than 2MB, won't we be leaking memory by incrementing with
+PMD_SIZE?  (same argument goes for PUD_SIZE).  See the patch below:
+
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index ca6bea4..80a83ec 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -132,37 +132,37 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 	unsigned long long addr = start, end = start + size;
+-	u64 range;
++	u64 next;
  
- #include <linux/clk-provider.h>
--#include <linux/clkdev.h>
- #include <linux/device.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-@@ -522,8 +521,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
- 	 *   specific and cannot get mapped to componsites (at least not
- 	 *   a single one, maybe two of them, but see the comment about
- 	 *   "intermediates are referenced from elsewhere, too")
--	 * - trim the list of auto-enabled clocks after drivers acquire
--	 *   them correctly as needed
- 	 */
+ 	while (addr < end) {
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 		if (pud_none(*pud)) {
+-			addr += PUD_SIZE;
++			addr = pud_addr_end(addr, end);
+ 			continue;
+ 		}
  
- 	/* regardless of whether XTAL/OSC exists, have REF created */
-@@ -653,10 +650,6 @@ static void mpc512x_clk_setup_clock_tree(int busfreq)
- 	/* fixed frequency for AC97, always 24.567MHz */
- 	clks[MPC512x_CLK_AC97] = mpc512x_clk_fixed("ac97", 24567000);
+ 		pmd = pmd_offset(pud, addr);
+ 		if (pmd_none(*pmd)) {
+-			addr += PMD_SIZE;
++			addr = pmd_addr_end(addr, end);
+ 			continue;
+ 		}
  
--	/* clkdev registration for compatibility reasons */
--	clk_register_clkdev(clks[MPC512x_CLK_REF], "ref_clk", NULL);
--	clk_register_clkdev(clks[MPC512x_CLK_SYS], "sys_clk", NULL);
--
- 	/* enable some of the clocks here unconditionally because ... */
- 	pr_debug("automatically enabling some clocks\n");
- 	/* some are essential yet never get claimed by any driver */
--- 
-1.7.10.4
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		clear_pte_entry(kvm, pte, addr);
+-		range = PAGE_SIZE;
++		next = addr + PAGE_SIZE;
+ 
+ 		/* If we emptied the pte, walk back up the ladder */
+ 		if (pte_empty(pte)) {
+ 			clear_pmd_entry(kvm, pmd, addr);
+-			range = PMD_SIZE;
++			next = pmd_addr_end(addr, end);
+ 			if (pmd_empty(pmd)) {
+ 				clear_pud_entry(kvm, pud, addr);
+-				range = PUD_SIZE;
++				next = pud_addr_end(addr, end);
+ 			}
+ 		}
+ 
+-		addr += range;
++		addr = next;
+ 	}
+ }
+ 
+--
+Christoffer
