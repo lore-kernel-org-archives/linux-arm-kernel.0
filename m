@@ -1,27 +1,34 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 05 Aug 2013 17:02:29 -0700 (PDT)
-Subject: [alsa-devel] [PATCH RFC 00/13] Adding SPDIF support
- to	kirkwood-i2s
-In-Reply-To: <51FFB267.3030107@metafoo.de>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
- <51FFA348.2010503@gmail.com> <51FFB267.3030107@metafoo.de>
-Message-ID: <87wqnzhek5.wl%kuninori.morimoto.gx@renesas.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 6 Aug 2013 08:03:21 +0800
+Subject: [alsa-devel] [PATCH 2/3] ASoC: hdmi-codec: enable OF support
+In-Reply-To: <20130717095708.GG22506@sirena.org.uk>
+References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
+ <1374041536-27643-2-git-send-email-Baohua.Song@csr.com>
+ <20130717084910.GB15981@e106331-lin.cambridge.arm.com>
+ <20130717095708.GG22506@sirena.org.uk>
+Message-ID: <CAGsJ_4ydsiEjYnP7YXGHWK0CDEfHgi9N12gw=bzQZU_2_fEA4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/7/17 Mark Brown <broonie@kernel.org>:
+> On Wed, Jul 17, 2013 at 09:49:10AM +0100, Mark Rutland wrote:
+>> On Wed, Jul 17, 2013 at 07:12:15AM +0100, Barry Song wrote:
+>
+>> > this makes users be able to add a hdmi-codec node in dts instead of
+>> > hardcoding a platform device in mach.
+>
+>> Similarly to my comment on the first patch, I'm not sure this is the
+>> best way to wire this up to devicetree. Can this not be hung off of hdmi
+>> controller drivers?
+>
+> This one is different to the BT case - as you say it's hanging off the
+> HDMI controller so the HDMI controller ought to enumerate it either as a
+> stub or by actually seeing a device.  The platform device is fine but
+> it's not something that should appear in the DT unless it's conveying
+> some information about what's connected there (eg, power supplies for
+> something soldered down on the board).
 
-Hi Lars
+it should be ok that the platform_device is allocated and added in the
+HDMI controller codes.
 
-> Kuninori Morimoto started working on a xlate callback for CODECs and DAIs
-> some time ago[1]. If nobody else is going to pick this up I'm probably going
-> to continue his work on this.
-
-Thank you for your offer about above.
-I'm sorry for my late work for xlate callback.
-but, unfortunately, I busy now, so, I can't work for it now.
-I'm very happy if someone/you can work for it.
-
-Best regards
----
-Kuninori Morimoto
+-barry
