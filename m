@@ -1,108 +1,56 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 6 Aug 2013 14:03:04 +0530
-Subject: [PATCH 3/3] ARM: dts: AM33xx: Add RNG node
-In-Reply-To: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
-References: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1375777984-6267-4-git-send-email-lokeshvutla@ti.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue,  6 Aug 2013 14:04:22 +0530
+Subject: [RFC PATCH 0/3] add temporary parent migration support
+Message-ID: <1375778065-21808-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the generic AM33xx RNG module's device tree data and
-enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-platforms.  Also add Documentation file describing the data
-for the RNG module.
+Some platform has provision to change cpu parent clock during
+cpu frequency scaling. This patch series provides a mechanism to
+implement the same using CCF.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts                  |    4 ++++
- arch/arm/boot/dts/am335x-evm.dts                   |    4 ++++
- arch/arm/boot/dts/am335x-evmsk.dts                 |    4 ++++
- arch/arm/boot/dts/am33xx.dtsi                      |    8 +++++++
- 5 files changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
+Patch1 provides mechanism to migrate to new parent temporarily.
 
-diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-new file mode 100644
-index 0000000..6a62acd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-@@ -0,0 +1,22 @@
-+OMAP SoC HWRNG Module
-+
-+Required properties:
-+
-+- compatible : Should contain entries for this and backward compatible
-+  RNG versions:
-+  - "ti,omap2-rng" for OMAP2.
-+  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
-+  Note that these two versions are incompatible.
-+- ti,hwmods: Name of the hwmod associated with the RNG module
-+- reg : Offset and length of the register set for the module
-+- interrupts : the interrupt number for the RNG module.
-+		Only used for "ti,omap4-rng".
-+
-+Example:
-+/* AM335x */
-+rng: rng at 48310000 {
-+	compatible = "ti,omap4-rng";
-+	ti,hwmods = "rng";
-+	reg = <0x48310000 0x2000>;
-+	interrupts = <111>;
-+};
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 444b4ed..46a3887 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -234,3 +234,7 @@
- 	pinctrl-0 = <&davinci_mdio_default>;
- 	pinctrl-1 = <&davinci_mdio_sleep>;
- };
-+
-+&rng {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 3aee1a4..ebfbebe1 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -488,3 +488,7 @@
- 		ti,adc-channels = <4 5 6 7>;
- 	};
- };
-+
-+&rng {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 0c8ad17..6610a05 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -402,3 +402,7 @@
- 	phy_id = <&davinci_mdio>, <1>;
- 	phy-mode = "rgmii-txid";
- };
-+
-+&rng {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 38b446b..b1e6205 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -530,5 +530,13 @@
- 			#size-cells = <1>;
- 			status = "disabled";
- 		};
-+
-+		rng: rng at 48310000 {
-+			compatible = "ti,omap4-rng";
-+			ti,hwmods = "rng";
-+			reg = <0x48310000 0x2000>;
-+			interrupts = <111>;
-+			status = "disabled";
-+		};
- 	};
- };
+Patch2 updates the user of clk_register_mux and DEFINE_CLK_MUX which are
+modified to add support for clk migration.
+
+Patch3 adds support to Exynos5250 to use the clock parent migration feature
+implemented in CCF.
+
+Chander Kashyap (3):
+  clk: add support for temporary parent clock migration
+  clk: update users of "clk_register_mux" and "DEFINE_CLK_MUX"
+  clk: Exynos5250: Add alternate parent name for mout_cpu
+
+ arch/arm/mach-imx/clk.h                |    6 +-
+ arch/arm/mach-omap2/cclock2420_data.c  |    2 +-
+ arch/arm/mach-omap2/cclock2430_data.c  |    4 +-
+ arch/arm/mach-omap2/cclock33xx_data.c  |    7 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c  |    8 +-
+ arch/arm/mach-omap2/cclock44xx_data.c  |   61 +++++++------
+ drivers/clk/clk-mux.c                  |   13 +--
+ drivers/clk/clk.c                      |   45 ++++++++-
+ drivers/clk/mmp/clk-mmp2.c             |   39 +++++---
+ drivers/clk/mmp/clk-pxa910.c           |   31 ++++---
+ drivers/clk/mxs/clk.h                  |    2 +-
+ drivers/clk/samsung/clk-exynos-audss.c |    4 +-
+ drivers/clk/samsung/clk-exynos4.c      |   10 +-
+ drivers/clk/samsung/clk-exynos5250.c   |   10 +-
+ drivers/clk/samsung/clk.c              |    3 +-
+ drivers/clk/samsung/clk.h              |   17 ++--
+ drivers/clk/spear/spear1310_clock.c    |  156 ++++++++++++++++----------------
+ drivers/clk/spear/spear1340_clock.c    |   82 +++++++++--------
+ drivers/clk/spear/spear3xx_clock.c     |   39 ++++----
+ drivers/clk/spear/spear6xx_clock.c     |   18 ++--
+ drivers/clk/sunxi/clk-sunxi.c          |    2 +-
+ drivers/clk/tegra/clk-tegra114.c       |   24 ++---
+ drivers/clk/tegra/clk-tegra20.c        |    4 +-
+ drivers/clk/tegra/clk-tegra30.c        |   22 ++---
+ drivers/clk/versatile/clk-vexpress.c   |    2 +-
+ drivers/clk/zynq/clkc.c                |   36 ++++----
+ include/linux/clk-private.h            |   19 ++--
+ include/linux/clk-provider.h           |   10 +-
+ 28 files changed, 379 insertions(+), 297 deletions(-)
+
 -- 
 1.7.9.5
