@@ -1,150 +1,98 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Aug 2013 13:49:43 -0700
-Subject: [PATCH] arm64: KVM: fix 2-level page tables unmapping
-In-Reply-To: <1375790748-10296-1-git-send-email-marc.zyngier@arm.com>
-References: <1375790748-10296-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130806204943.GK16694@cbox>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue,  6 Aug 2013 22:43:55 +0200
+Subject: [PATCH v4 15/31] dts: mpc512x: introduce dt-bindings/clock/ header
+In-Reply-To: <1375821851-31609-1-git-send-email-gsi@denx.de>
+References: <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-1-git-send-email-gsi@denx.de>
+Message-ID: <1375821851-31609-16-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 01:05:48PM +0100, Marc Zyngier wrote:
-> When using 64kB pages, we only have two levels of page tables,
-> meaning that PGD, PUD and PMD are fused. In this case, trying
-> to refcount PUDs and PMDs independantly is a a complete disaster,
+introduce a dt-bindings/ header file for MPC512x clocks,
+providing symbolic identifiers for those SoC clocks which
+clients will reference from their device tree nodes
 
-independently
+Reviewed-by: Mike Turquette <mturquette@linaro.org>	# for v3: w/o bdlc, PSC ipg
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ include/dt-bindings/clock/mpc512x-clock.h |   69 +++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
+ create mode 100644 include/dt-bindings/clock/mpc512x-clock.h
 
-> as they are the same.
-> 
-> We manage to get it right for the allocation (stage2_set_pte uses
-> {pmd,pud}_none), but the unmapping path clears both pud and pmd
-> refcounts, which fails spectacularly with 2-level page tables.
-> 
-> The fix is to avoid calling clear_pud_entry when both the pmd and
-> pud pages are empty. For this, and instead of introducing another
-> pud_empty function, consolidate both pte_empty and pmd_empty into
-> page_empty (the code is actually identical) and use that to also
-> test the validity of the pud.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/mmu.c | 22 ++++++++--------------
->  1 file changed, 8 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index ca6bea4..7e1d899 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -85,6 +85,12 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
->  	return p;
->  }
->  
-> +static bool page_empty(void *ptr)
-> +{
-> +	struct page *ptr_page = virt_to_page(ptr);
-> +	return page_count(ptr_page) == 1;
-> +}
-> +
->  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
->  {
->  	pmd_t *pmd_table = pmd_offset(pud, 0);
-> @@ -103,12 +109,6 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
->  	put_page(virt_to_page(pmd));
->  }
->  
-> -static bool pmd_empty(pmd_t *pmd)
-> -{
-> -	struct page *pmd_page = virt_to_page(pmd);
-> -	return page_count(pmd_page) == 1;
-> -}
-> -
->  static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
->  {
->  	if (pte_present(*pte)) {
-> @@ -118,12 +118,6 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
->  	}
->  }
->  
-> -static bool pte_empty(pte_t *pte)
-> -{
-> -	struct page *pte_page = virt_to_page(pte);
-> -	return page_count(pte_page) == 1;
-> -}
-> -
->  static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
->  			unsigned long long start, u64 size)
->  {
-> @@ -153,10 +147,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
->  		range = PAGE_SIZE;
->  
->  		/* If we emptied the pte, walk back up the ladder */
-> -		if (pte_empty(pte)) {
-> +		if (page_empty(pte)) {
->  			clear_pmd_entry(kvm, pmd, addr);
->  			range = PMD_SIZE;
-> -			if (pmd_empty(pmd)) {
-> +			if (page_empty(pmd) && !page_empty(pud)) {
->  				clear_pud_entry(kvm, pud, addr);
->  				range = PUD_SIZE;
->  			}
-
-looks right, an alternative would be to check in clear_pud_entry if the
-entry actually had a value, but I don't think it's really clearer.
-
-However, this got me thinking a bit.  What happens if we pass a non-pmd
-aligned address to unmap_range, and let's assume the size of the range
-is more than 2MB, won't we be leaking memory by incrementing with
-PMD_SIZE?  (same argument goes for PUD_SIZE).  See the patch below:
-
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index ca6bea4..80a83ec 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -132,37 +132,37 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 	pmd_t *pmd;
- 	pte_t *pte;
- 	unsigned long long addr = start, end = start + size;
--	u64 range;
-+	u64 next;
- 
- 	while (addr < end) {
- 		pgd = pgdp + pgd_index(addr);
- 		pud = pud_offset(pgd, addr);
- 		if (pud_none(*pud)) {
--			addr += PUD_SIZE;
-+			addr = pud_addr_end(addr, end);
- 			continue;
- 		}
- 
- 		pmd = pmd_offset(pud, addr);
- 		if (pmd_none(*pmd)) {
--			addr += PMD_SIZE;
-+			addr = pmd_addr_end(addr, end);
- 			continue;
- 		}
- 
- 		pte = pte_offset_kernel(pmd, addr);
- 		clear_pte_entry(kvm, pte, addr);
--		range = PAGE_SIZE;
-+		next = addr + PAGE_SIZE;
- 
- 		/* If we emptied the pte, walk back up the ladder */
- 		if (pte_empty(pte)) {
- 			clear_pmd_entry(kvm, pmd, addr);
--			range = PMD_SIZE;
-+			next = pmd_addr_end(addr, end);
- 			if (pmd_empty(pmd)) {
- 				clear_pud_entry(kvm, pud, addr);
--				range = PUD_SIZE;
-+				next = pud_addr_end(addr, end);
- 			}
- 		}
- 
--		addr += range;
-+		addr = next;
- 	}
- }
- 
---
-Christoffer
+diff --git a/include/dt-bindings/clock/mpc512x-clock.h b/include/dt-bindings/clock/mpc512x-clock.h
+new file mode 100644
+index 0000000..9e81b3b
+--- /dev/null
++++ b/include/dt-bindings/clock/mpc512x-clock.h
+@@ -0,0 +1,69 @@
++/*
++ * This header provides constants for MPC512x clock specs in DT bindings.
++ */
++
++#ifndef _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
++#define _DT_BINDINGS_CLOCK_MPC512x_CLOCK_H
++
++#define MPC512x_CLK_DUMMY		0
++#define MPC512x_CLK_REF			1
++#define MPC512x_CLK_SYS			2
++#define MPC512x_CLK_DIU			3
++#define MPC512x_CLK_VIU			4
++#define MPC512x_CLK_CSB			5
++#define MPC512x_CLK_E300		6
++#define MPC512x_CLK_IPS			7
++#define MPC512x_CLK_FEC			8
++#define MPC512x_CLK_SATA		9
++#define MPC512x_CLK_PATA		10
++#define MPC512x_CLK_NFC			11
++#define MPC512x_CLK_LPC			12
++#define MPC512x_CLK_MBX_BUS		13
++#define MPC512x_CLK_MBX			14
++#define MPC512x_CLK_MBX_3D		15
++#define MPC512x_CLK_AXE			16
++#define MPC512x_CLK_USB1		17
++#define MPC512x_CLK_USB2		18
++#define MPC512x_CLK_I2C			19
++#define MPC512x_CLK_MSCAN0_MCLK		20
++#define MPC512x_CLK_MSCAN1_MCLK		21
++#define MPC512x_CLK_MSCAN2_MCLK		22
++#define MPC512x_CLK_MSCAN3_MCLK		23
++#define MPC512x_CLK_BDLC		24
++#define MPC512x_CLK_SDHC		25
++#define MPC512x_CLK_PCI			26
++#define MPC512x_CLK_PSC_MCLK_IN		27
++#define MPC512x_CLK_SPDIF_TX		28
++#define MPC512x_CLK_SPDIF_RX		29
++#define MPC512x_CLK_SPDIF_MCLK		30
++#define MPC512x_CLK_SPDIF		31
++#define MPC512x_CLK_AC97		32
++#define MPC512x_CLK_PSC0_MCLK		33
++#define MPC512x_CLK_PSC1_MCLK		34
++#define MPC512x_CLK_PSC2_MCLK		35
++#define MPC512x_CLK_PSC3_MCLK		36
++#define MPC512x_CLK_PSC4_MCLK		37
++#define MPC512x_CLK_PSC5_MCLK		38
++#define MPC512x_CLK_PSC6_MCLK		39
++#define MPC512x_CLK_PSC7_MCLK		40
++#define MPC512x_CLK_PSC8_MCLK		41
++#define MPC512x_CLK_PSC9_MCLK		42
++#define MPC512x_CLK_PSC10_MCLK		43
++#define MPC512x_CLK_PSC11_MCLK		44
++#define MPC512x_CLK_PSC_FIFO		45
++#define MPC512x_CLK_PSC0		46
++#define MPC512x_CLK_PSC1		47
++#define MPC512x_CLK_PSC2		48
++#define MPC512x_CLK_PSC3		49
++#define MPC512x_CLK_PSC4		50
++#define MPC512x_CLK_PSC5		51
++#define MPC512x_CLK_PSC6		52
++#define MPC512x_CLK_PSC7		53
++#define MPC512x_CLK_PSC8		54
++#define MPC512x_CLK_PSC9		55
++#define MPC512x_CLK_PSC10		56
++#define MPC512x_CLK_PSC11		57
++
++#define MPC512x_CLK_LAST_PUBLIC		57
++
++#endif
+-- 
+1.7.10.4
