@@ -1,34 +1,57 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 6 Aug 2013 08:03:21 +0800
-Subject: [alsa-devel] [PATCH 2/3] ASoC: hdmi-codec: enable OF support
-In-Reply-To: <20130717095708.GG22506@sirena.org.uk>
-References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
- <1374041536-27643-2-git-send-email-Baohua.Song@csr.com>
- <20130717084910.GB15981@e106331-lin.cambridge.arm.com>
- <20130717095708.GG22506@sirena.org.uk>
-Message-ID: <CAGsJ_4ydsiEjYnP7YXGHWK0CDEfHgi9N12gw=bzQZU_2_fEA4Q@mail.gmail.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Mon, 5 Aug 2013 17:06:17 -0700
+Subject: [PATCH 6/7] Add EFI stub for ARM
+In-Reply-To: <20130805153318.GL18151@rocoto.smurfnet.nu>
+References: <1375478948-22562-1-git-send-email-roy.franz@linaro.org>
+ <1375478948-22562-7-git-send-email-roy.franz@linaro.org>
+ <20130805141149.GB2755@localhost.localdomain>
+ <20130805153318.GL18151@rocoto.smurfnet.nu>
+Message-ID: <CAFECyb-WciwMu0MBmZ8LzkaM=VxnaOH5e9V5f_AP3ZbLA9CW9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/7/17 Mark Brown <broonie@kernel.org>:
-> On Wed, Jul 17, 2013 at 09:49:10AM +0100, Mark Rutland wrote:
->> On Wed, Jul 17, 2013 at 07:12:15AM +0100, Barry Song wrote:
+On Mon, Aug 5, 2013 at 8:33 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Mon, Aug 05, 2013 at 03:11:49PM +0100, Dave Martin wrote:
+>> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> > index 75189f1..4c70b9e 100644
+>> > --- a/arch/arm/boot/compressed/head.S
+>> > +++ b/arch/arm/boot/compressed/head.S
+>> > @@ -122,19 +122,106 @@
+>> >             .arm                            @ Always enter in ARM state
+>> >  start:
+>> >             .type   start,#function
+>> > -           .rept   7
+>> > +#ifdef CONFIG_EFI_STUB
+>> > +           @ Magic MSDOS signature for PE/COFF + ADD opcode
+>> > +           .word   0x62805a4d
+>>
+>> What about BE32?
 >
->> > this makes users be able to add a hdmi-codec node in dts instead of
->> > hardcoding a platform device in mach.
+> The ARM bindings for UEFI specify that the processor must be in
+> little-endian mode.
 >
->> Similarly to my comment on the first patch, I'm not sure this is the
->> best way to wire this up to devicetree. Can this not be hung off of hdmi
->> controller drivers?
+>> In that case, the instruction is a coprocessor load, that loads from a
+>> random address to a coprocessor that almost certainly doesn't exist.
+>> This will probably fault.
+>>
+>> Since BE32 is only for older platforms (<v6) and this is not easily
+>> solvable, it might be sensible to make the EFI stub support depend on
+>> !CPU_ENDIAN_BE32.
 >
-> This one is different to the BT case - as you say it's hanging off the
-> HDMI controller so the HDMI controller ought to enumerate it either as a
-> stub or by actually seeing a device.  The platform device is fine but
-> it's not something that should appear in the DT unless it's conveying
-> some information about what's connected there (eg, power supplies for
-> something soldered down on the board).
+> Well, it would make more sense to make EFI_STUB depend on EFI and
+> EFI depend on !CPU_ENDIAN_BE32. Which is something I can add to
+> my next set of general ARM UEFI patches. Thanks.
+> /
+>     Leif
 
-it should be ok that the platform_device is allocated and added in the
-HDMI controller codes.
+I had EFI_STUB depend on EFI at one point during my development, but took
+it out because there was no actual dependency (the stub will work fine without
+other EFI features.)  The features will most likely be used together,
+but I wasn't
+sure if we would want to enforce this with a config dependency.  I
+don't care one
+way or the other, I'd just like the dependencies to be correct and
+follow best practices.
 
--barry
+Thanks,
+Roy
