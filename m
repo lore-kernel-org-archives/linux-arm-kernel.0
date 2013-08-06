@@ -1,58 +1,55 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 06 Aug 2013 10:02:50 +0100
-Subject: [PATCH v3 05/16] ARM: mvebu: remove device tree parsing for cpu
- nodes
-In-Reply-To: <5200B2E9.8090009@free-electrons.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51FA3064.9080502@arm.com> <20130801120256.GW5882@titan.lakedaemon.net>
- <51FFD2B1.70509@arm.com> <5200B2E9.8090009@free-electrons.com>
-Message-ID: <5200BBBA.7020303@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 06 Aug 2013 11:04:45 +0200
+Subject: [PATCH v4 14/17] clocksource: time-armada-370-xp: Switch to
+ sched_clock_register()
+In-Reply-To: <1374189690-10810-15-git-send-email-sboyd@codeaurora.org>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <1374189690-10810-15-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5200BC2D.6050200@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/13 09:25, Gregory CLEMENT wrote:
-> On 05/08/2013 18:28, Sudeep KarkadaNagesha wrote:
->> On 01/08/13 13:02, Jason Cooper wrote:
->>> Sudeep,
->>>
->>> On Thu, Aug 01, 2013 at 10:54:44AM +0100, Sudeep KarkadaNagesha wrote:
->>>> On 22/07/13 12:32, Sudeep KarkadaNagesha wrote:
->>>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>>>
->>>>> Currently set_secondary_cpus_clock assume the CPU logical ordering
->>>>> and the MPDIR in DT are same, which is incorrect.
->>>>>
->>>>> Since the CPU device nodes can be retrieved in the logical ordering
->>>>> using the DT helper, we can remove the devices tree parsing.
->>>>>
->>>>> This patch removes DT parsing by making use of of_get_cpu_node.
->>>>>
->>>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>>>> Cc: Andrew Lunn <andrew@lunn.ch>
->>>>> Cc: Jason Cooper <jason@lakedaemon.net>
->>>>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>>
->>>> Hi Gregory/Andrew/Jason,
->>>>
->>>> Does this change look fine for mvebu?
->>>> If yes, can I have your ACKs ?
->>>
->>> Gregory is the one best suited to review/Ack this.  He'll be back on
->>> Monday.
->>>
->> Hi Gregory,
->>
->> Can you please review this patch ?
-> 
-> Your patch is a nice improvement, I reviewed it and I also tested it on the
-> Armada XP DB board.
-> 
-> You can add my:
-> Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
+On 19/07/2013 01:21, Stephen Boyd wrote:
+> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
+> the 64 bit function to allow us to remove the 32 bit registration
+> interface.
 
-Thanks Gregory.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Regards,
-Sudeep
+> 
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clocksource/time-armada-370-xp.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+> index efdca32..2bec8dc 100644
+> --- a/drivers/clocksource/time-armada-370-xp.c
+> +++ b/drivers/clocksource/time-armada-370-xp.c
+> @@ -71,7 +71,7 @@ static u32 ticks_per_jiffy;
+>  
+>  static struct clock_event_device __percpu **percpu_armada_370_xp_evt;
+>  
+> -static u32 notrace armada_370_xp_read_sched_clock(void)
+> +static u64 notrace armada_370_xp_read_sched_clock(void)
+>  {
+>  	return ~readl(timer_base + TIMER0_VAL_OFF);
+>  }
+> @@ -258,7 +258,7 @@ void __init armada_370_xp_timer_init(void)
+>  	/*
+>  	 * Set scale and timer for sched_clock.
+>  	 */
+> -	setup_sched_clock(armada_370_xp_read_sched_clock, 32, timer_clk);
+> +	sched_clock_register(armada_370_xp_read_sched_clock, 32, timer_clk);
+>  
+>  	/*
+>  	 * Setup free-running clocksource timer (interrupts
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
