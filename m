@@ -1,48 +1,89 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 6 Aug 2013 13:32:41 -0300
-Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
-In-Reply-To: <20130806155343.GU19280@titan.lakedaemon.net>
-References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130806155343.GU19280@titan.lakedaemon.net>
-Message-ID: <20130806163240.GB2705@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Aug 2013 09:44:55 -0700
+Subject: [PATCH 0/3] ARM: vexpress: TC2 MCPM/SPC cleanups
+In-Reply-To: <1375805993.12043.80.camel@hornet>
+References: <1375675793-16492-1-git-send-email-olof@lixom.net>
+ <20130805094709.GA29090@e102568-lin.cambridge.arm.com>
+ <1375805993.12043.80.camel@hornet>
+Message-ID: <CAOesGMiTr1bTE_A=DGrgMQQd3sN9+E6HbahSHKJpOSfouLqHnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 11:53:43AM -0400, Jason Cooper wrote:
-> Ezequiel,
-> 
-> On Tue, Jul 30, 2013 at 05:44:50PM +0200, Thomas Petazzoni wrote:
-> > The AXP WiFi AP board is a Marvell platform based on the Armada XP
-> > MV78230 SoC. It has two mini-PCIe connectors, one USB 3.0 port powered
-> > by a USB 3.0 controller on PCIe, two Ethernet ports, 1 GB of RAM, 1 GB
-> > of NAND, 16 MB of SPI flash, one SATA port and one button, two UARTs
-> > 
-> > Successfully tested: USB 3.0 port, the mini-PCIe connectors, SPI
-> > flash, Ethernet ports, SATA port, button, UART.
-> > 
-> > Untested: NAND flash, due to lack of mainline support for the Armada
-> > 370/XP NAND controller for now.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile                |   1 +
-> >  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 164 ++++++++++++++++++++++++++++++
-> >  2 files changed, 165 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> 
-> When I merge this code with your MBus series I get the following
-> warning:
-> 
->   DTC     arch/arm/boot/dts/armada-xp-axpwifiap.dtb
-> Warning (ranges_format): "ranges" property in /soc has invalid length (32 bytes)
->  (parent #address-cells == 2, child #address-cells == 2, #size-cells == 1)
-> 
-> Could you please take a look and provide a separate patch to fix it up?
-> 
+On Tue, Aug 6, 2013 at 9:19 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Mon, 2013-08-05 at 10:47 +0100, Lorenzo Pieralisi wrote:
+>> For the bindings, you are right, how about this (commit log written just
+>> for the sake of it, it should be squashed in Nico's original series) ?
+>
+> So I finally sat down and did what I should have done long time ago...
+> Read the spec ;-)
 
-Sure. Let me take a look.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Uh... Ok. Biting my tongue. :)
+
+Is the spec public, per chance?
+
+> SCC is (was?) mainly used to set initial conditions for the cores,
+> interconnect and all the other bits and pieces inside the test chip. It
+> could be considered an equivalent of the classic "boot mode" pins, but
+> as test chips have many more of them comparing to the normal SOCs, the
+> data is being "injected" to the chip in a serial fashion *before* the
+> main reset is being de-asserted. This is done by an external entity,
+> namely the DCC (daughterboard configuration controller, so simply a
+> microcontroller living next to the test chip). Why is this detail
+> important at all? Because traditionally the SCC was *not* available in
+> the normal memory map, otherwise it would be a perfect candidate for
+> the . In order to change anything one had to go through the usual
+> Versatile Express config infrastructure. Fortunately there was no need
+> to do this at all...
+
+Vexpress is such a hack. :) It's unfortunate that it ends up being the
+lead platform on these kind of technologies, in some ways.
+
+I think it makes sense to hide some of this ick in mach-vexpress, I
+don't think we should ever aim to empty it out. Not based on how messy
+the platform architecture is. I'd rather hide it in there than pollute
+other parts of the kernel. Or at least, we should keep it as an option
+in some cases such as these -- there might be other parts that do make
+sense to move out to generic kernel.
+
+> And here comes the V2P-CA15_A7, also known as TC2 ;-) where the
+> interface was re-(or ab-?)used as a "convenient" communication channel
+> between the test chip and the microcontroller. And the SPC is even
+> described as "being merged" with the SCC. Uh...
+>
+> Now, the bottom line. How about keeping the driver look for
+> "arm,vexpress-spc,v2p-ca15_a7" because it's a driver for the SPC bit
+> after all and doing the following in the tree:
+>
+> scc at 7fff0000 {
+>         compatible = "arm,vexpress-scc,v2p-ca15_a7", "arm,vexpress-scc";
+>         reg = <0x7fff0000 0x1000>;
+>         interrupts = <0 95 4>;
+>
+>         spc at b00 {
+>                 compatible = "arm,vexpress-spc,v2p-ca15_a7", "arm,vexpress-spc";
+>                 reg = <0xb00 0x100>;
+>         };
+> };
+>
+> This, I believe, would represent the actual situation, require no change
+> in the driver (except for the retirement of SPC_BASE which is good :-)
+> and allowed as, if and when necessary, to drive the SCC as a MFD/syscon
+> device.
+>
+> Does it make some sense?
+
+It does, but you need to setup the scc as a bus (with ranges, etc) for
+that binding to work.
+
+I pushed the fixed-up set of patches to the branch in arm-soc, so you
+can find them there (olof/vexpress). Sounds like this isn't quite
+ready to merge if these things still need to be worked out. So feel
+free to take my patches, change them up as needed and send a fresh
+copy.
+
+Or, if you want to rebase the whole series and squash things in with
+Nico's patches, that's ok too. But sounds like it needs a little more
+work still. 3.12 is still a realistic target though.
+
+
+-Olof
