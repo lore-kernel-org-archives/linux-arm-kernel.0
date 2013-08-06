@@ -1,69 +1,74 @@
-From: tobetter@gmail.com (Dongjin Kim)
-Date: Wed, 7 Aug 2013 01:48:05 +0900
-Subject: [PATCH RESEND] ARM: dts: Add USBPHY nodes to Exynos4x12
-In-Reply-To: <CAK9yfHwxVtJFZMQNoh-RepaF53L_TruPBSUt3YH_XY+8iXjffA@mail.gmail.com>
-References: <1375726723-20862-1-git-send-email-tobetter@gmail.com>
- <CAK9yfHwxVtJFZMQNoh-RepaF53L_TruPBSUt3YH_XY+8iXjffA@mail.gmail.com>
-Message-ID: <CADoNuNdOV4uwnCdtnYGzDGb=j-Qqnhx9fRrif5c=f-X=-gRoGw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 6 Aug 2013 17:55:00 +0100
+Subject: [PATCH 0/3] ARM: vexpress: TC2 MCPM/SPC cleanups
+In-Reply-To: <1375805993.12043.80.camel@hornet>
+References: <1375675793-16492-1-git-send-email-olof@lixom.net>
+ <20130805094709.GA29090@e102568-lin.cambridge.arm.com>
+ <1375805993.12043.80.camel@hornet>
+Message-ID: <20130806165459.GB28176@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aha, yes...my misunderstanding.
-This node is not only for OTG or HSIC, could miss USB HOST transceiver
-if certain board file does not set "okay".
+On Tue, Aug 06, 2013 at 05:19:53PM +0100, Pawel Moll wrote:
+> On Mon, 2013-08-05 at 10:47 +0100, Lorenzo Pieralisi wrote:
+> > For the bindings, you are right, how about this (commit log written just
+> > for the sake of it, it should be squashed in Nico's original series) ?
+> 
+> So I finally sat down and did what I should have done long time ago...
+> Read the spec ;-)
+> 
+> SCC is (was?) mainly used to set initial conditions for the cores,
+> interconnect and all the other bits and pieces inside the test chip. It
+> could be considered an equivalent of the classic "boot mode" pins, but
+> as test chips have many more of them comparing to the normal SOCs, the
+> data is being "injected" to the chip in a serial fashion *before* the
+> main reset is being de-asserted. This is done by an external entity,
+> namely the DCC (daughterboard configuration controller, so simply a
+> microcontroller living next to the test chip). Why is this detail
+> important at all? Because traditionally the SCC was *not* available in
+> the normal memory map, otherwise it would be a perfect candidate for
+> the . In order to change anything one had to go through the usual
+> Versatile Express config infrastructure. Fortunately there was no need
+> to do this at all...
+> 
+> And here comes the V2P-CA15_A7, also known as TC2 ;-) where the
+> interface was re-(or ab-?)used as a "convenient" communication channel
+> between the test chip and the microcontroller. And the SPC is even
+> described as "being merged" with the SCC. Uh...
 
-Thanks,
-Dongjin.
+Yes, the "merging" of SCC and SPC is the root cause of this hopefully happy
+ended story, they lumped together pieces of HW that should have been kept
+separate.
 
-On Tue, Aug 6, 2013 at 3:09 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> Hi Dongjin,
->
-> On 5 August 2013 23:48, Dongjin Kim <tobetter@gmail.com> wrote:
->> This patch adds device nodes for USBPHY to Exynos4x12.
->>
->> CC: Sachin Kamat <sachin.kamat@linaro.org>
->> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
->> ---
->>  arch/arm/boot/dts/exynos4x12.dtsi |   18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
->> index 01da194..9c3335b 100644
->> --- a/arch/arm/boot/dts/exynos4x12.dtsi
->> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
->> @@ -73,4 +73,22 @@
->>                 clock-names = "sclk_fimg2d", "fimg2d";
->>                 status = "disabled";
->>         };
->> +
->> +       usbphy at 125B00000 {
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               compatible = "samsung,exynos4x12-usb2phy";
->> +               reg = <0x125B0000 0x100>;
->> +               ranges;
->> +
->> +               clocks = <&clock 2>, <&clock 305>;
->> +               clock-names = "xusbxti", "otg";
->> +               status = "disabled";
->
-> I don't think this node has any other board specific dependencies. In
-> that case you don't need to disable this.
->
->> +
->> +               usbphy-sys {
->> +                       /* USB device and host PHY_CONTROL registers */
->> +                       reg = <0x10020704 0xc>,
->> +                             <0x1001021c 0x4>;
->> +               };
->> +       };
->>  };
->> --
->> 1.7.9.5
->>
->
->
->
-> --
-> With warm regards,
-> Sachin
+> Now, the bottom line. How about keeping the driver look for
+> "arm,vexpress-spc,v2p-ca15_a7" because it's a driver for the SPC bit
+> after all and doing the following in the tree:
+> 
+> scc at 7fff0000 {
+> 	compatible = "arm,vexpress-scc,v2p-ca15_a7", "arm,vexpress-scc";
+> 	reg = <0x7fff0000 0x1000>;
+> 	interrupts = <0 95 4>;
+> 
+> 	spc at b00 {
+> 		compatible = "arm,vexpress-spc,v2p-ca15_a7", "arm,vexpress-spc";
+> 		reg = <0xb00 0x100>;
+> 	};
+> };
+> 
+> This, I believe, would represent the actual situation, require no change
+> in the driver (except for the retirement of SPC_BASE which is good :-)
+> and allowed as, if and when necessary, to drive the SCC as a MFD/syscon
+> device.
+
+I do need some SCC registers to check the cluster ID against the MPIDR in
+order to carry out powerdown operations. So if we do what you suggest we have
+to change the driver, I would avoid doing that at this stage.
+
+> Does it make some sense?
+
+Well, it does but it complicates our lives for not much IMHO (and Olof
+mentioned that in the cover letter). I still need to map the SCC as a
+whole to read some IDs registers as I mentioned. We can find a way to make
+SPC part of a MFD device later on.
+
+Lorenzo
