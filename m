@@ -1,60 +1,33 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 6 Aug 2013 11:39:57 +0530
-Subject: [PATCH RESEND] ARM: dts: Add USBPHY nodes to Exynos4x12
-In-Reply-To: <1375726723-20862-1-git-send-email-tobetter@gmail.com>
-References: <1375726723-20862-1-git-send-email-tobetter@gmail.com>
-Message-ID: <CAK9yfHwxVtJFZMQNoh-RepaF53L_TruPBSUt3YH_XY+8iXjffA@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 05 Aug 2013 23:11:56 -0700 (PDT)
+Subject: [PATCH 0/2] ARM: shmobile: remove nfsroot settings
+In-Reply-To: <87ob9bh5mt.wl%kuninori.morimoto.gx@renesas.com>
+References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
+ <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
+ <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
+ <20130801080226.GF15265@verge.net.au>
+ <20130806010736.GA20940@verge.net.au>
+ <87r4e7h88z.wl%kuninori.morimoto.gx@renesas.com>
+ <20130806022955.GA25114@verge.net.au>
+ <87pptrh6f3.wl%kuninori.morimoto.gx@renesas.com>
+ <87ob9bh5mt.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87haf3gxg6.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjin,
 
-On 5 August 2013 23:48, Dongjin Kim <tobetter@gmail.com> wrote:
-> This patch adds device nodes for USBPHY to Exynos4x12.
->
-> CC: Sachin Kamat <sachin.kamat@linaro.org>
-> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos4x12.dtsi |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index 01da194..9c3335b 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -73,4 +73,22 @@
->                 clock-names = "sclk_fimg2d", "fimg2d";
->                 status = "disabled";
->         };
-> +
-> +       usbphy at 125B00000 {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "samsung,exynos4x12-usb2phy";
-> +               reg = <0x125B0000 0x100>;
-> +               ranges;
-> +
-> +               clocks = <&clock 2>, <&clock 305>;
-> +               clock-names = "xusbxti", "otg";
-> +               status = "disabled";
+Hi Simon again
 
-I don't think this node has any other board specific dependencies. In
-that case you don't need to disable this.
+> > Yes, I can send patches.
+> > But, I can't test emev2-kzm9d board.
+> > Do you have it ?
+> 
+> These patches remove nfsroot settings from kzm9d/armadillo dts file.
+> I tested #1 patch on Armadillo board, but I don't have kzm9d board.
 
-> +
-> +               usbphy-sys {
-> +                       /* USB device and host PHY_CONTROL registers */
-> +                       reg = <0x10020704 0xc>,
-> +                             <0x1001021c 0x4>;
-> +               };
-> +       };
->  };
-> --
-> 1.7.9.5
->
+I could test kzm9d board on Magnus's environment.
+It works well without "rsize/wsize"
 
-
-
--- 
-With warm regards,
-Sachin
+Best regards
+---
+Kuninori Morimoto
