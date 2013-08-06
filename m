@@ -1,251 +1,185 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 06 Aug 2013 15:08:35 +0200
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <07cc684f-1d5c-44d7-b25c-6314efea4c58@CO9EHSMHS022.ehs.local>
-References: <51F77D93.4030505@linaro.org> <51F97842.6050200@linaro.org>
- <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
- <51F97CE3.9030306@linaro.org>
- <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
- <51F99747.4060901@linaro.org>
- <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <712d31e9-3584-48e1-aa9f-55bc94fa62c9@DB9EHSMHS001.ehs.local>
- <5200B7FE.4000306@linaro.org>
- <e43ebbd7-f520-4c66-bc8c-71a1122226ad@CO9EHSMHS020.ehs.local>
- <5200EC4C.5090202@linaro.org>
- <07cc684f-1d5c-44d7-b25c-6314efea4c58@CO9EHSMHS022.ehs.local>
-Message-ID: <5200F553.6000200@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 06 Aug 2013 15:17:53 +0200
+Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of Exynos
+ SoCs
+In-Reply-To: <002001ce928a$f5a7f390$e0f7dab0$@samsung.com>
+References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
+ <27536111.odlCO093Zi@amdc1032> <003c01ce91cd$427fad70$c77f0850$@samsung.com>
+ <1429191.3FDem6vW0S@amdc1032> <002001ce928a$f5a7f390$e0f7dab0$@samsung.com>
+Message-ID: <5200F781.9020300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2013 02:41 PM, Michal Simek wrote:
-> On 08/06/2013 02:30 PM, Daniel Lezcano wrote:
->> On 08/06/2013 11:18 AM, Michal Simek wrote:
->>> On 08/06/2013 10:46 AM, Daniel Lezcano wrote:
->>>> On 08/06/2013 03:28 AM, S?ren Brinkmann wrote:
->>>>> Hi Daniel,
->>>>>
->>>>> On Thu, Aug 01, 2013 at 07:48:04PM +0200, Daniel Lezcano wrote:
->>>>>> On 08/01/2013 07:43 PM, S?ren Brinkmann wrote:
->>>>>>> On Thu, Aug 01, 2013 at 07:29:12PM +0200, Daniel Lezcano wrote:
->>>>>>>> On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
->>>>>>>>> On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
->>>>>>>>>> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
->>>>>>>>>>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
->>>>>>>>>>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
->>>>>>>>>>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
->>>>>>>>>>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
->>>>>>>>>>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
->>>>>>>>>>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
->>>>>>>>>>>>>>>>> Hi Daniel,
->>>>>>>>>>>>>>>>>
->>>>>>>>>>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
->>>>>>>>>>>>>>>>> (snip)
->>>>>>>>>>>>>>>>>>
->>>>>>>>>>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
->>>>>>>>>>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
->>>>>>>>>>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
->>>>>>>>>>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
->>>>>>>>>>>>>>>>>> idle state, switching the local timer back in use.
->>>>>>>>>>>>>>>>>
->>>>>>>>>>>>>>>>> I've been thinking about this, trying to understand how this makes my
->>>>>>>>>>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
->>>>>>>>>>>>>>>>> would make the timer core switch to a broadcast device even though it
->>>>>>>>>>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
->>>>>>>>>>>>>>>>> something useless, but nothing wrong in a sense that it should result in
->>>>>>>>>>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
->>>>>>>>>>>>>>>>> always remain a mystery to me.
->>>>>>>>>>>>>>>>>
->>>>>>>>>>>>>>>>> Actually this more or less leads to the question: What is this
->>>>>>>>>>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
->>>>>>>>>>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
->>>>>>>>>>>>>>>>> hang pointing to some issue with that driver?
->>>>>>>>>>>>>>>>
->>>>>>>>>>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> So, the correct run results (full output attached).
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
->>>>>>>>>>>>>>> broadcast device:
->>>>>>>>>>>>>>> 	Tick Device: mode:     1                                                         
->>>>>>>>>>>>>>> 	Broadcast device  
->>>>>>>>>>>>>>> 	Clock Event Device: ttc_clockevent
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
->>>>>>>>>>>>>>> enable the global timer, the twd timers are still used as local timers
->>>>>>>>>>>>>>> and the broadcast device is the global timer:
->>>>>>>>>>>>>>> 	Tick Device: mode:     1                                                         
->>>>>>>>>>>>>>> 	Broadcast device                                                                 
->>>>>>>>>>>>>>> 	Clock Event Device: arm_global_timer
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
->>>>>>>>>>>>>>> obtain this information for that case.
->>>>>>>>>>>>>>
->>>>>>>>>>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
->>>>>>>>>>>>>
->>>>>>>>>>>>> Right, that works. I forgot about that option after you mentioned, that
->>>>>>>>>>>>> it is most likely not that useful.
->>>>>>>>>>>>>
->>>>>>>>>>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
->>>>>>>>>>>>> the gt enabled and having maxcpus=1 set.
->>>>>>>>>>>>>
->>>>>>>>>>>>> /proc/timer_list:
->>>>>>>>>>>>> 	Tick Device: mode:     1
->>>>>>>>>>>>> 	Broadcast device
->>>>>>>>>>>>> 	Clock Event Device: arm_global_timer
->>>>>>>>>>>>> 	 max_delta_ns:   12884902005
->>>>>>>>>>>>> 	 min_delta_ns:   1000
->>>>>>>>>>>>> 	 mult:           715827876
->>>>>>>>>>>>> 	 shift:          31
->>>>>>>>>>>>> 	 mode:           3
->>>>>>>>>>>>
->>>>>>>>>>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
->>>>>>>>>>>>
->>>>>>>>>>>> The previous timer_list output you gave me when removing the offending
->>>>>>>>>>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
->>>>>>>>>>>>
->>>>>>>>>>>> Is it possible you try to get this output again right after onlining the
->>>>>>>>>>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
->>>>>>>>>>>
->>>>>>>>>>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
->>>>>>>>>>> and that didn't end well:
->>>>>>>>>>> 	# echo 1 > online && cat /proc/timer_list 
->>>>>>>>>>
->>>>>>>>>> Hmm, I was hoping to have a small delay before the kernel hangs but
->>>>>>>>>> apparently this is not the case... :(
->>>>>>>>>>
->>>>>>>>>> I suspect the global timer is shutdown at one moment but I don't
->>>>>>>>>> understand why and when.
->>>>>>>>>>
->>>>>>>>>> Can you add a stack trace in the "clockevents_shutdown" function with
->>>>>>>>>> the clockevent device name ? Perhaps, we may see at boot time an
->>>>>>>>>> interesting trace when it hangs.
->>>>>>>>>
->>>>>>>>> I did this change:
->>>>>>>>> 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
->>>>>>>>> 	index 38959c8..3ab11c1 100644
->>>>>>>>> 	--- a/kernel/time/clockevents.c
->>>>>>>>> 	+++ b/kernel/time/clockevents.c
->>>>>>>>> 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
->>>>>>>>> 	  */
->>>>>>>>> 	 void clockevents_shutdown(struct clock_event_device *dev)
->>>>>>>>> 	 {
->>>>>>>>> 	+       pr_info("ce->name:%s\n", dev->name);
->>>>>>>>> 	+       dump_stack();
->>>>>>>>> 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
->>>>>>>>> 	        dev->next_event.tv64 = KTIME_MAX;
->>>>>>>>> 	 }
->>>>>>>>>
->>>>>>>>> It is hit a few times during boot, so I attach a full boot log. I really
->>>>>>>>> don't know what to look for, but I hope you can spot something in it. I
->>>>>>>>> really appreciate you taking the time.
->>>>>>>>
->>>>>>>> Thanks for the traces.
->>>>>>>
->>>>>>> Sure.
->>>>>>>
->>>>>>>>
->>>>>>>> If you try without the ttc_clockevent configured in the kernel (but with
->>>>>>>> twd and gt), does it boot ?
->>>>>>>
->>>>>>> Absence of the TTC doesn't seem to make any difference. It hangs at the
->>>>>>> same location.
->>>>>>
->>>>>> Ok, IMO there is a problem with the broadcast device registration (may
->>>>>> be vs twd).
->>>>>>
->>>>>> I will check later (kid duty) :)
->>>>>
->>>>> I was actually waiting for an update from your side and did something
->>>>> else, but I seem to have run into this again. I was overhauling the
->>>>> cadence_ttc (patch attached, based on tip/timers/core). And it seems to
->>>>> show the same behavior as enabling the global_timer. With cpuidle off, it
->>>>> works. With cpuidle, on it hangs. Removing the TIMER_STOP flag from the
->>>>> C2 state makes it boot again.
->>>>> It works just fine on our 3.10 kernel.
->>>>
->>>> This is not necessary related to the bug. If the patch you sent broke
->>>> the cadence_ttc driver, when you use it (with the TIMER_STOP), you will
->>>> be stuck. Removing the flag, may signifies you don't use the broadcast
->>>> timer, hence the bug is not surfacing.
->>>>
->>>> Going back to the bug with the arm_global_timer, what is observed is the
->>>> broadcast timer is *shutdown* when the second cpu is online.
->>>>
->>>> I have to dig into the kernel/time/clockevents.c|tick-*.c because IMO
->>>> the issue is coming from there but before I have to reproduce the bug,
->>>> so find a board I have where I can add the arm_global_timer.
->>>>
->>>>> Another thing I noticed - probably unrelated but hard to tell: On
->>>>> 3.11-rc1 and later my system stops for quite some time at the hand off
->>>>> to userspace. I.e. I see the 'freeing unused kernel memory...' line and
->>>>> sometimes the following 'Welcome to Buildroot...' and then it stops and
->>>>> on good kernels it continues after a while and boots through and on bad
->>>>> ones it just hangs there.
->>>>
->>>> did you try to dump the stacks with magic-sysrq ? Or git bisect ?
->>>
->>> Soren: Are you able to replicate this issue on QEMU?
->>> If yes, it should be the best if you can provide Qemu, kernel .config/
->>> rootfs and simple manual to Daniel how to reach that fault.
->>
->> I tried to download qemu for zynq but it fails:
->>
->> git clone git://git.xilinx.com/qemu-xarm.git
->> Cloning into 'qemu-xarm'...
->> fatal: The remote end hung up unexpectedly
-> 
-> Not sure which site have you found but
-> it should be just qemu.git
-> https://github.com/Xilinx/qemu
-> 
-> or github clone.
+Hello,
 
-Ok, cool I was able to clone it.
+On 8/6/2013 11:54 AM, Cho KyongHo wrote:
+> > -----Original Message-----
+> > From: Bartlomiej Zolnierkiewicz [mailto:b.zolnierkie at samsung.com]
+> > Sent: Monday, August 05, 2013 10:10 PM
+> >
+> > On Monday, August 05, 2013 08:16:40 PM Cho KyongHo wrote:
+> > > > -----Original Message-----
+> > > > From: Bartlomiej Zolnierkiewicz [mailto:b.zolnierkie at samsung.com]
+> > > > Sent: Saturday, August 03, 2013 2:14 AM
+> > > >
+> > > > Hi,
+> > > >
+> > > > On Friday, July 26, 2013 08:28:19 PM Cho KyongHo wrote:
+> > > > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > > > > ---
+> > > > >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
+> > > > >  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
+> > > > >  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
+> > > > >  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
+> > > > >  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
+> > > > >  5 files changed, 617 insertions(+), 0 deletions(-)
+> > > > >  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > > >
+> > > > > diff --git a/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > > > b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > > > new file mode 100644
+> > > > > index 0000000..92f0a33
+> > > > > --- /dev/null
+> > > > > +++ b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> > > > > @@ -0,0 +1,103 @@
+> > > > > +Samsung Exynos4210 IOMMU H/W, System MMU (System Memory Management Unit)
+> > > > > +
+> > > > > +Samsung's Exynos architecture contains System MMU that enables scattered
+> > > > > +physical memory chunks visible as a contiguous region to DMA-capable peripheral
+> > > > > +devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
+> > > > > +
+> > > > > +System MMU is a sort of IOMMU and support identical translation table format to
+> > > > > +ARMv7 translation tables with minimum set of page properties including access
+> > > > > +permissions, shareability and security protection. In addition, System MMU has
+> > > > > +another capabilities like L2 TLB or block-fetch buffers to minimize translation
+> > > > > +latency.
+> > > > > +
+> > > > > +A System MMU is dedicated to a single master peripheral device.  Thus, it is
+> > > > > +important to specify the correct System MMU in the device node of its master
+> > > > > +device. Whereas a System MMU is dedicated to a master device, the master device
+> > > > > +may have more than one System MMU.
+> > > > > +
+> > > > > +Required properties:
+> > > > > +- compatible: Should be "samsung,exynos4210-sysmmu"
+> > > > > +- reg: A tuple of base address and size of System MMU registers.
+> > > > > +- interrupt-parent: The phandle of the interrupt controller of System MMU
+> > > > > +- interrupts: A tuple of numbers that indicates the interrupt source.
+> > > > > +- clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
+> > > > > +               Please refer to the following documents:
+> > > > > +	       Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > > > > +	       Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> > > > > +	       Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+> > > > > +	       Optional "master" if the clock to the System MMU is gated by
+> > > > > +	       another gate clock other than "sysmmu". The System MMU driver
+> > > > > +	       sets "master" the parent of "sysmmu".
+> > > > > +	       Exynos4 SoCs, there needs no "master" clocks.
+> > > > > +	       Exynos5 SoCs, some System MMUs must have "master" clocks.
+> > > > > +- clocks: Required if the System MMU is needed to gate its clock.
+> > > > > +	  Please refer to the documents listed above.
+> > > > > +- samsung,power-domain: Required if the System MMU is needed to gate its power.
+> > > > > +	  Please refer to the following document:
+> > > > > +	  Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> > > > > +
+> > > > > +Required properties for the master peripheral devices:
+> > > > > +- iommu: phandles to the System MMUs of the device
+> > > > > +
+> > > > > +Examples:
+> > > > > +A System MMU is dedicated to a single master device.
+> > > > > +	gsc_0:  gsc at 0x13e00000 {
+> > > > > +		compatible = "samsung,exynos5-gsc";
+> > > > > +		reg = <0x13e00000 0x1000>;
+> > > > > +		interrupts = <0 85 0>;
+> > > > > +		samsung,power-domain = <&pd_gsc>;
+> > > > > +		clocks = <&clock 256>;
+> > > > > +		clock-names = "gscl";
+> > > > > +		iommu = <&sysmmu_gsc1>;
+> > > > > +	};
+> > > > > +
+> > > > > +	sysmmu_gsc0: sysmmu at 13E80000 {
+> > > > > +		compatible = "samsung,exynos4210-sysmmu";
+> > > > > +		reg = <0x13E80000 0x1000>;
+> > > > > +		interrupt-parent = <&combiner>;
+> > > > > +		interrupt-names = "sysmmu-gsc0";
+> > > > > +		interrupts = <2 0>;
+> > > > > +		clock-names = "sysmmu", "master";
+> > > > > +		clocks = <&clock 262>, <&clock 256>;
+> > > > > +		samsung,power-domain = <&pd_gsc>;
+> > > > > +		status = "ok";
+> > > > > +	};
+> > > > > +
+> > > > > +MFC has 2 System MMUs for each port that MFC is attached. Thus it seems natural
+> > > > > +to define 2 System MMUs for each port of the MFC:
+> > > >
+> > > > Marek Szyprowski (added to cc:) has a patch fixing MFC to create separate
+> > > > mfc_l and mfc_r devices (like it was in the past). Using this patch it
+> > > > would be possible to bind sysmmu_mfc_l to mfc_l device and sysmmu_mfc_r to
+> > > > mfc_r device. This probably also requires adding some MFC specific handling
+> > > > in a device tree node and to the new master's device PM ops (in patch #10)
+> > > > as previously (in our trees) sysmmu_mfc r device was set as parent of
+> > > > sysmmu_mfc_l device which in turn was a parent for main MFC device (to make
+> > > > runtime Power Management work). However because MFC is the only device
+> > > > requiring use of multiple System MMUs above changes would allow us (unless
+> > > > I'm missing something?) to use just one System MMU device per struct
+> > > > exynos_iommu_client instance (making driver a lot simpler).
+> > > >
+> > >
+> > > Does it mean that we can make the exynos-iommu driver simpler
+> > > with Marek Szyprowski's patch?
+> >
+> > I think so and you probably need to change MFC handling anyway because
+> > MFC driver does DMA allocations per mfc_l/mfc_r devices and not per main
+> > device (at least in the upstream kernels).
+> >
+> > [ Marek, could you please resfresh and post your patch on the list? ]
+> >
+> > BTW There is an additional problem with combining System MMU devices per
+> > one main device - it limits available address space (which in case of MFC
+> > is very limited by hardware design).
+> >
+> > > It is welcome but I don't think it covers all topologies of System MMU and
+> > > master H/W. Those are getting more complex.
+> >
+> > Could you please be more specific? I know about FIMC ISP subsystem but
+> > it doesn't require combining System MMUs. Are there any other examples of
+> > complex System MMU + master H/W topologies?
+>
+> I meant a lot of System MMUs in FIMC-IS subsystem.
+> A big challenge to System MMU configuration is FIMC-IS as you mentioned.
+> Since I don't know how the driver of FIMC-IS controls its H/W,
+> I made the System MMU driver to configure System MMUs flexibly.
 
->> I am also looking for the option specified for the kernel:
->>
->> "The kernel needs to be built with this feature turned on (in
->> menuconfig, System Type->Xilinx Specific Features -> Device Tree At
->> Fixed Address)."
+Don't think that combining the IOMMU controllers together made them 
+flexible.
+I only see it as overengineering of the complex FIMC-IS and MFC devices 
+topology.
 
-Ok.
+IMHO it is much better to have a simple driver, which binds to a single 
+IOMMU
+controller and leave it to the driver whether to have a same virtual address
+space for all parts of FIMC-IS or MFC submodules/memory ports or not. 
+Just make
+sure that it will be possible to attach more than one sysmmu controller 
+to one
+iommu domain.
 
-> This also sound like a very ancient tree.
-> This is the latest kernel tree - master-next is the latest devel branch.
-> https://github.com/Xilinx/linux-xlnx
+With some fixes and additional initialization code I have finally 
+managed to
+get Your driver working with FIMC & memport-based MFC together with 
+iommu based
+dma-mapping on Exynos4210. I will post my patches after you post Your 
+updated
+version.
 
-Ok, cool. I have the right one.
+> > Anyway I think that System MMUs should not be combined (as it is done in
+> > patch #10) and should be binded per "memport" devices and not per main
+> > device (as done in this patch).
+> >
+>
+> Ok.
+> I will make it them as you advised.
+> And we can make the driver better gradually.
 
-> Or there should be an option to use the latest kernel from kernel.org.
-> (I think Soren is using it)
-> 
-> Zynq is the part of multiplatfrom kernel and cadence ttc is there,
-> dts is also in the mainline kernel.
-> 
->> ps : apart that, well documented website !
-> 
-> Can you send me the link to it?
-
-http://xilinx.wikidot.com/zynq-qemu
-http://xilinx.wikidot.com/zynq-linux
-
-
-> This should be the main page for it.
-> http://www.wiki.xilinx.com/
-
-Thanks Michal !
-
-  -- Daniel
-
-
-
-
+Best regards
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Marek Szyprowski
+Samsung R&D Institute Poland
