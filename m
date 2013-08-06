@@ -1,202 +1,33 @@
-From: b35083@freescale.com (Jingchang Lu)
-Date: Tue, 6 Aug 2013 14:05:17 +0800
-Subject: [PATCH v2 2/3] ARM: dts: vf610: Add eDMA node
-Message-ID: <1375769118-20783-1-git-send-email-b35083@freescale.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 06 Aug 2013 09:13:01 +0200
+Subject: [RFC PATCH v2 0/3] ARM: TC2 big.LITTLE CPU idle driver
+In-Reply-To: <1375709982-27148-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1375709982-27148-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5200A1FD.6050709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
-changes in v2:
-  add vf610 edma dt-bindings namespace with prefix VF610_*.
+On 08/05/2013 03:39 PM, Lorenzo Pieralisi wrote:
+> This patch is v2 of a previous posting:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186352.html
+> 
+> v2 changes:
+> 
+> - removed duplicated idle statistics and irq enabling
+> - use MPIDR masks to compute cluster and cpu ids
 
- arch/arm/boot/dts/vf610.dtsi         |  49 +++++++++++++++++
- include/dt-bindings/dma/vf610-edma.h | 103 +++++++++++++++++++++++++++++++++++
- 2 files changed, 152 insertions(+)
- create mode 100644 include/dt-bindings/dma/vf610-edma.h
+Hi Lorenzo,
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 67d929c..18e3a4c 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -10,6 +10,7 @@
- #include "skeleton.dtsi"
- #include "vf610-pinfunc.h"
- #include <dt-bindings/clock/vf610-clock.h>
-+#include <dt-bindings/dma/vf610-edma.h>
- 
- / {
- 	aliases {
-@@ -87,6 +88,30 @@
- 				arm,tag-latency = <2 2 2>;
- 			};
- 
-+			edma0: edma at 40018000 {
-+				#dma-cells = <2>;
-+				compatible = "fsl,vf610-edma";
-+				reg = <0x40018000 0x2000>;
-+				interrupts = <0 8 0x04>, <0 9 0x04>;
-+				interrupt-names = "edma-tx", "edma-err";
-+				dma-channels = <32>;
-+				fsl,dma-mux = <&dmamux0>, <&dmamux1>;
-+			};
-+
-+			dmamux0: dmamux at 40024000 {
-+				reg = <0x40024000 0x1000>;
-+				fsl,dmamux-id = <0>;
-+				clocks = <&clks VF610_CLK_DMAMUX0>;
-+				clock-names = "dmamux";
-+			};
-+
-+			dmamux1: dmamux at 40025000 {
-+				reg = <0x40025000 0x1000>;
-+				fsl,dmamux-id = <1>;
-+				clocks = <&clks VF610_CLK_DMAMUX1>;
-+				clock-names = "dmamux";
-+			};
-+
- 			uart0: serial at 40027000 {
- 				compatible = "fsl,vf610-lpuart";
- 				reg = <0x40027000 0x1000>;
-@@ -420,6 +445,30 @@
- 			reg = <0x40080000 0x80000>;
- 			ranges;
- 
-+			edma1: edma at 40098000 {
-+				#dma-cells = <2>;
-+				compatible = "fsl,vf610-edma";
-+				reg = <0x40098000 0x2000>;
-+				interrupts = <0 10 0x04>, <0 11 0x04>;
-+				interrupt-names = "edma-tx", "edma-err";
-+				dma-channels = <32>;
-+				fsl,dma-mux = <&dmamux2>, <&dmamux3>;
-+			};
-+
-+			dmamux2: dmamux at 400a1000 {
-+				reg = <0x400a1000 0x1000>;
-+				fsl,dmamux-id = <1>;
-+				clocks = <&clks VF610_CLK_DMAMUX2>;
-+				clock-names = "dmamux";
-+			};
-+
-+			dmamux3: dmamux at 400a2000 {
-+				reg = <0x400a2000 0x1000>;
-+				fsl,dmamux-id = <0>;
-+				clocks = <&clks VF610_CLK_DMAMUX3>;
-+				clock-names = "dmamux";
-+			};
-+
- 			uart4: serial at 400a9000 {
- 				compatible = "fsl,vf610-lpuart";
- 				reg = <0x400a9000 0x1000>;
-diff --git a/include/dt-bindings/dma/vf610-edma.h b/include/dt-bindings/dma/vf610-edma.h
-new file mode 100644
-index 0000000..dbe1db2
---- /dev/null
-+++ b/include/dt-bindings/dma/vf610-edma.h
-@@ -0,0 +1,103 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ */
-+
-+#ifndef __DT_BINDINGS_VF610_EDMA_H__
-+#define __DT_BINDINGS_VF610_EDMA_H__
-+
-+/* DMAMUX0,3 reqeust source(slot) number */
-+#define VF610_EDMA_MUXID0_UART0_RX	2
-+#define VF610_EDMA_MUXID0_UART0_TX	3
-+#define VF610_EDMA_MUXID0_UART1_RX	4
-+#define VF610_EDMA_MUXID0_UART1_TX	5
-+#define VF610_EDMA_MUXID0_UART2_RX	6
-+#define VF610_EDMA_MUXID0_UART2_TX	7
-+#define VF610_EDMA_MUXID0_UART3_RX	8
-+#define VF610_EDMA_MUXID0_UART3_TX	9
-+#define VF610_EDMA_MUXID0_DSPI0_RX	12
-+#define VF610_EDMA_MUXID0_DSPI0_TX	13
-+#define VF610_EDMA_MUXID0_DSPI1_RX	14
-+#define VF610_EDMA_MUXID0_DSPI1_TX	15
-+#define VF610_EDMA_MUXID0_SAI0_RX	16
-+#define VF610_EDMA_MUXID0_SAI0_TX	17
-+#define VF610_EDMA_MUXID0_SAI1_RX	18
-+#define VF610_EDMA_MUXID0_SAI1_TX	19
-+#define VF610_EDMA_MUXID0_SAI2_RX	20
-+#define VF610_EDMA_MUXID0_SAI2_TX	21
-+#define VF610_EDMA_MUXID0_PDB		22
-+#define VF610_EDMA_MUXID0_FTM0_CH0	24
-+#define VF610_EDMA_MUXID0_FTM0_CH1	25
-+#define VF610_EDMA_MUXID0_FTM0_CH2	26
-+#define VF610_EDMA_MUXID0_FTM0_CH3	27
-+#define VF610_EDMA_MUXID0_FTM0_CH4	28
-+#define VF610_EDMA_MUXID0_FTM0_CH5	29
-+#define VF610_EDMA_MUXID0_FTM0_CH6	30
-+#define VF610_EDMA_MUXID0_FTM0_CH7	31
-+#define VF610_EDMA_MUXID0_FTM1_CH0	32
-+#define VF610_EDMA_MUXID0_FTM1_CH1	33
-+#define VF610_EDMA_MUXID0_ADC0		34
-+#define VF610_EDMA_MUXID0_QUADSPI0	36
-+#define VF610_EDMA_MUXID0_GPIOA		38
-+#define VF610_EDMA_MUXID0_GPIOB		39
-+#define VF610_EDMA_MUXID0_GPIOC		40
-+#define VF610_EDMA_MUXID0_GPIOD		41
-+#define VF610_EDMA_MUXID0_GPIOE		42
-+#define VF610_EDMA_MUXID0_RLE_RX	45
-+#define VF610_EDMA_MUXID0_RLE_TX	46
-+#define VF610_EDMA_MUXID0_SPDIF_RX	47
-+#define VF610_EDMA_MUXID0_SPDIF_TX	48
-+#define VF610_EDMA_MUXID0_I2C0_RX	50
-+#define VF610_EDMA_MUXID0_I2C0_TX	51
-+#define VF610_EDMA_MUXID0_I2C1_RX	52
-+#define VF610_EDMA_MUXID0_I2C1_TX	53
-+
-+/* DMA MUX1,2 request source(slot) number */
-+#define VF610_EDMA_MUXID1_UART4_RX	2
-+#define VF610_EDMA_MUXID1_UART4_TX	3
-+#define VF610_EDMA_MUXID1_UART5_RX	4
-+#define VF610_EDMA_MUXID1_UART5_TX	5
-+#define VF610_EDMA_MUXID1_SAI3_RX	8
-+#define VF610_EDMA_MUXID1_SAI3_TX	9
-+#define VF610_EDMA_MUXID1_DSPI2_RX	10
-+#define VF610_EDMA_MUXID1_DSPI2_TX	11
-+#define VF610_EDMA_MUXID1_DSPI3_RX	12
-+#define VF610_EDMA_MUXID1_DSPI3_TX	13
-+#define VF610_EDMA_MUXID1_FTM2_CH0	16
-+#define VF610_EDMA_MUXID1_FTM2_CH1	17
-+#define VF610_EDMA_MUXID1_FTM3_CH0	18
-+#define VF610_EDMA_MUXID1_FTM3_CH1	19
-+#define VF610_EDMA_MUXID1_FTM3_CH2	20
-+#define VF610_EDMA_MUXID1_FTM3_CH3	21
-+#define VF610_EDMA_MUXID1_FTM3_CH4	22
-+#define VF610_EDMA_MUXID1_FTM3_CH5	24
-+#define VF610_EDMA_MUXID1_FTM3_CH6	25
-+#define VF610_EDMA_MUXID1_FTM3_CH7	26
-+#define VF610_EDMA_MUXID1_QUADSPI1	27
-+#define VF610_EDMA_MUXID1_DAC0		32
-+#define VF610_EDMA_MUXID1_DAC1		33
-+#define VF610_EDMA_MUXID1_ESAI_BIFIFO_TX	34
-+#define VF610_EDMA_MUXID1_ESAI_BIFIFO_RX	35
-+#define VF610_EDMA_MUXID1_I2C2_RX	36
-+#define VF610_EDMA_MUXID1_I2C2_TX	37
-+#define VF610_EDMA_MUXID1_I2C3_RX	38
-+#define VF610_EDMA_MUXID1_I2C3_TX	39
-+#define VF610_EDMA_MUXID1_ASRC0_TX	40
-+#define VF610_EDMA_MUXID1_ASRC0_RX	41
-+#define VF610_EDMA_MUXID1_ASRC1_TX	42
-+#define VF610_EDMA_MUXID1_ASRC1_RX	43
-+#define VF610_EDMA_MUXID1_TIMER0	44
-+#define VF610_EDMA_MUXID1_TIMER1	45
-+#define VF610_EDMA_MUXID1_TIMER2	46
-+#define VF610_EDMA_MUXID1_TIMER3	47
-+#define VF610_EDMA_MUXID1_TIMER4	48
-+#define VF610_EDMA_MUXID1_TIMER5	49
-+#define VF610_EDMA_MUXID1_TIMER6	50
-+#define VF610_EDMA_MUXID1_TIMER7	51
-+
-+#endif
+I don't think this patch is still in RFC but ready for merging if nobody
+complains :)
+
+Thanks
+  -- Daniel
+
 -- 
-1.8.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
