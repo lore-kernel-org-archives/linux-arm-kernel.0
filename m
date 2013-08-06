@@ -1,38 +1,66 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 6 Aug 2013 14:44:12 -0700
-Subject: [ARM ATTEND] catching up on exploit mitigations
-In-Reply-To: <20130803000321.GR23006@n2100.arm.linux.org.uk>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <20130803000321.GR23006@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jJv-hp3wbaqJyk2pPHASemhepy+C4X+9np+xcbrBfnZEg@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 6 Aug 2013 16:39:53 -0500
+Subject: [PATCHv3 0/8] omap mailbox dt
+Message-ID: <1375825193-18046-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 2, 2013 at 5:03 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jul 30, 2013 at 12:05:40PM -0700, Kees Cook wrote:
->> - vector table protections (needs to be protected like the x86_64
->> vsyscall table, RO, etc)
->
-> (Dropped some mailing lists to reduce the visibility of this as its
-> soo close to the patches being merged...)
->
-> On the subject of this, those who are following what's going on at the
-> blackhat conference will be aware that there was a presentation
-> yesterday on this very subject.
->
-> Now that the presentation has been done, and the fixes are now merged
-> into Linus' tree, I can now talk about this.
+Hi,
 
-This all sounds excellent. Thanks for working on it!
+This is an updated series for adding the device tree support to
+the OMAP mailbox driver. The series is based on 3.11-rc4 and now
+includes the support for AM335 WkupM3 mailbox.
 
-Do you see other areas that might need similar attention, or could
-benefit from more hardening?
+The support for WkupM3 mailbox is essential for achieving the PM
+Suspend on AM335 devices, and this series is a dependency for
+the AM335 suspend/resume series [1]. The AM335 support patches
+required the mailbox DT patches posted previously, so I have
+refreshed all of them together.
 
-Thanks,
+Tested this on Beagle-XM, Panda4 and OMAP5 uEVM (with
+out-of-tree clock patches).
 
--Kees
+v3:
+- Includes 3 new patches on top of the unchanged patches in v2.
+- Patches 7 and 8 adds the driver support and DT node for AM335.
+- Patch6 is a minor cleanup patch removing omap_mbox_type_t from
+  mbox ops.
+
+v2:
+- Removed the #ti,mbox-data-cells from DT bindings and node data
+- Includes 2 new patches that adds the data for OMAP5.
+http://marc.info/?l=linux-omap&m=137452880325361&w=2
+
+v1:
+http://marc.info/?l=linux-omap&m=137159523405468&w=2
+
+[1] http://marc.info/?l=linux-omap&m=137581142013093&w=2
+
+Suman Anna (8):
+  mailbox/omap: add a parent structure common to all mboxes
+  mailbox/omap: add support for parsing dt devices
+  ARM: dts: OMAP2+: Add mailbox nodes
+  ARM: OMAP5: hwmod data: Add mailbox data
+  ARM: dts: OMAP5: Add mailbox dt node
+  mailbox/omap: remove omap_mbox_type_t from mailbox ops
+  mailbox/omap: add code to support the wkupm3 operations
+  ARM: dts: AM33xx: Add mailbox node
+
+ .../devicetree/bindings/mailbox/omap-mailbox.txt   |  43 +++
+ arch/arm/boot/dts/am33xx.dtsi                      |  11 +
+ arch/arm/boot/dts/omap2420.dtsi                    |  12 +
+ arch/arm/boot/dts/omap2430.dtsi                    |  11 +
+ arch/arm/boot/dts/omap3.dtsi                       |  11 +
+ arch/arm/boot/dts/omap4.dtsi                       |  11 +
+ arch/arm/boot/dts/omap5.dtsi                       |  11 +
+ arch/arm/mach-omap2/devices.c                      |   2 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  42 +++
+ drivers/mailbox/mailbox-omap1.c                    |  54 +++-
+ drivers/mailbox/mailbox-omap2.c                    | 315 +++++++++++++++++----
+ drivers/mailbox/omap-mailbox.c                     |  58 ++--
+ drivers/mailbox/omap-mbox.h                        |  17 +-
+ 13 files changed, 490 insertions(+), 108 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
 
 -- 
-Kees Cook
-Chrome OS Security
+1.8.3.3
