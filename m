@@ -1,37 +1,24 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 6 Aug 2013 09:55:50 +0100
-Subject: [PATCH 1/3] ARM: vexpress: move spc driver back under
- mach-vexpress
-In-Reply-To: <20130805232605.GA32172@quad.lixom.net>
-References: <1375675793-16492-1-git-send-email-olof@lixom.net>
- <1375675793-16492-2-git-send-email-olof@lixom.net>
- <20130805095235.GB29090@e102568-lin.cambridge.arm.com>
- <20130805232605.GA32172@quad.lixom.net>
-Message-ID: <20130806085549.GA18810@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Aug 2013 09:51:23 +0100
+Subject: [PATCH RFC 51/51] ARM: 7805/1: mm: change max*pfn to include
+ the physical offset of memory
+In-Reply-To: <CAL_Jsq+9+LBVCwQKKJznbPP06WA0Wn-7m+cFoyF==GRkP9XXmQ@mail.gmail.com>
+References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
+ <E1V51J5-0006uq-1h@rmk-PC.arm.linux.org.uk>
+ <CAL_Jsq+9+LBVCwQKKJznbPP06WA0Wn-7m+cFoyF==GRkP9XXmQ@mail.gmail.com>
+Message-ID: <20130806085123.GC23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 12:26:05AM +0100, Olof Johansson wrote:
-> On Mon, Aug 05, 2013 at 10:52:35AM +0100, Lorenzo Pieralisi wrote:
-> > > +#include "spc.h"
-> > 
-> > Missing. Should we add it to mach-vexpress/include/mach ?
+On Mon, Aug 05, 2013 at 10:15:11PM -0500, Rob Herring wrote:
+> On Thu, Aug 1, 2013 at 5:25 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> > +/* The ARM override for dma_max_pfn() */
+> > +static inline unsigned long dma_max_pfn(struct device *dev)
+> > +{
+> > +       return PHYS_PFN_OFFSET + dma_to_pfn(dev, *dev->dma_mask);
 > 
-> Oops, missed the git add on it.
-> 
-> No, include/mach is going away on all multiplatform platforms. Since the
-> exposed functions are only used in the other file in the same directory, local
-> include file is the way to go.
-> 
-> > I have not sent a patch to check what we should do first and if Pawel is
-> > ok with these changes.
-> 
-> Not sure I'm following, but see above.
+> Do we need to handle dev == NULL case?
 
-I just wanted to say that sending a patch to fix the issue was inappropriate
-because it depended on where the spc.h has to be created and did not
-know if Pawel was ok with the idea of moving spc back to mach-vexpress.
-
-I am ok with your changes, thank you very much.
-
-Lorenzo
+No, look at where it's used and the code it's replacing.  You'll find
+that its callsites handle the dev = NULL case.
