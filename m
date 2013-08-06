@@ -1,35 +1,55 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 05 Aug 2013 20:15:10 -0700 (PDT)
-Subject: [PATCH 0/2] ARM: shmobile: remove nfsroot settings
-In-Reply-To: <87pptrh6f3.wl%kuninori.morimoto.gx@renesas.com>
-References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
- <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
- <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
- <20130801080226.GF15265@verge.net.au>
- <20130806010736.GA20940@verge.net.au>
- <87r4e7h88z.wl%kuninori.morimoto.gx@renesas.com>
- <20130806022955.GA25114@verge.net.au>
- <87pptrh6f3.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87ob9bh5mt.wl%kuninori.morimoto.gx@renesas.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 5 Aug 2013 22:15:11 -0500
+Subject: [PATCH RFC 51/51] ARM: 7805/1: mm: change max*pfn to include the
+ physical offset of memory
+In-Reply-To: <E1V51J5-0006uq-1h@rmk-PC.arm.linux.org.uk>
+References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
+ <E1V51J5-0006uq-1h@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+9+LBVCwQKKJznbPP06WA0Wn-7m+cFoyF==GRkP9XXmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 1, 2013 at 5:25 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Most of the kernel code assumes that max*pfn is maximum pfns because
+> the physical start of memory is expected to be PFN0. Since this
+> assumption is not true on ARM architectures, the meaning of max*pfn
+> is number of memory pages. This is done to keep drivers happy which
+> are making use of of these variable to calculate the dma bounce limit
+> using dma_mask.
+>
+> Now since we have a architecture override possibility for DMAable
+> maximum pfns, lets make meaning of max*pfns as maximum pnfs on ARM
+> as well.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/dma-mapping.h |    8 ++++++++
+>  arch/arm/mm/init.c                 |   10 ++++------
+>  2 files changed, 12 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 5b579b9..863cd84 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -64,6 +64,7 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  {
+>         return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+>  }
+> +
+>  #else
+>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>  {
+> @@ -86,6 +87,13 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  }
+>  #endif
+>
+> +/* The ARM override for dma_max_pfn() */
+> +static inline unsigned long dma_max_pfn(struct device *dev)
+> +{
+> +       return PHYS_PFN_OFFSET + dma_to_pfn(dev, *dev->dma_mask);
 
-Hi Simon
+Do we need to handle dev == NULL case?
 
-> Yes, I can send patches.
-> But, I can't test emev2-kzm9d board.
-> Do you have it ?
-
-These patches remove nfsroot settings from kzm9d/armadillo dts file.
-I tested #1 patch on Armadillo board, but I don't have kzm9d board.
-
-Kuninori Morimoto (2):
-      ARM: shmobile: armadillo800eva: remove nfsroot settings from bootargs
-      ARM: shmobile: kzm9d: remove nfsroot settings from bootargs
-
- arch/arm/boot/dts/emev2-kzm9d-reference.dts        |    2 +-
- arch/arm/boot/dts/emev2-kzm9d.dts                  |    2 +-
- .../boot/dts/r8a7740-armadillo800eva-reference.dts |    2 +-
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |    2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Rob
