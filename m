@@ -1,73 +1,90 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue,  6 Aug 2013 22:43:49 +0200
-Subject: [PATCH v4 09/31] powerpc/fsl-pci: improve clock API use
+Date: Tue,  6 Aug 2013 22:43:56 +0200
+Subject: [PATCH v4 16/31] dts: mpc512x: add clock related device tree specs
 In-Reply-To: <1375821851-31609-1-git-send-email-gsi@denx.de>
 References: <1374495298-22019-1-git-send-email-gsi@denx.de>
  <1375821851-31609-1-git-send-email-gsi@denx.de>
-Message-ID: <1375821851-31609-10-git-send-email-gsi@denx.de>
+Message-ID: <1375821851-31609-17-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make the Freescale PCI driver get, prepare and enable the PCI clock
-during probe(); the clock gets put upon device close by the devm approach
+this addresses the clock driver aka provider's side of clocks
+- prepare for future '<&clks ID>' phandle references for device tree
+  based clock lookup in client drivers
+- introduce a 'clocks' subtree with an 'osc' node for the crystal
+  or oscillator SoC input (fixed frequency)
+- provide default values with 33MHz oscillator frequency in the
+  common include (the 66MHz IPS bus already was there), add
+  override values for the ifm AC14xx board which deviates from
+  the reference design (25MHz xtal, 80MHz IPS bus)
 
-clock lookup is non-fatal as not all platforms may provide clock specs
-in their device tree, but failure to enable specified clocks are fatal
-
-the driver appears to not have a remove() routine, so no reference to
-the clock is kept during use, and the clock isn't released (the devm
-approach will put the clock, but it won't get disabled or unprepared)
-
+Reviewed-by: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/sysdev/fsl_pci.c |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/powerpc/boot/dts/ac14xx.dts   |    7 +++++++
+ arch/powerpc/boot/dts/mpc5121.dtsi |   15 ++++++++++++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
-index 46ac1dd..549ff08 100644
---- a/arch/powerpc/sysdev/fsl_pci.c
-+++ b/arch/powerpc/sysdev/fsl_pci.c
-@@ -17,6 +17,8 @@
-  * Free Software Foundation;  either version 2 of the  License, or (at your
+diff --git a/arch/powerpc/boot/dts/ac14xx.dts b/arch/powerpc/boot/dts/ac14xx.dts
+index a543c40..a1b8837 100644
+--- a/arch/powerpc/boot/dts/ac14xx.dts
++++ b/arch/powerpc/boot/dts/ac14xx.dts
+@@ -139,7 +139,14 @@
+ 		};
+ 	};
+ 
++	clocks {
++		osc {
++			clock-frequency = <25000000>;
++		};
++	};
++
+ 	soc at 80000000 {
++		bus-frequency = <80000000>;	/* 80 MHz ips bus */
+ 
+ 		clock at f00 {
+ 			compatible = "fsl,mpc5121rev2-clock", "fsl,mpc5121-clock";
+diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
+index bd14c00..8f4cba0 100644
+--- a/arch/powerpc/boot/dts/mpc5121.dtsi
++++ b/arch/powerpc/boot/dts/mpc5121.dtsi
+@@ -9,6 +9,8 @@
   * option) any later version.
   */
+ 
++#include <dt-bindings/clock/mpc512x-clock.h>
 +
-+#include <linux/clk.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/delay.h>
-@@ -926,12 +928,32 @@ void fsl_pci_assign_primary(void)
+ /dts-v1/;
  
- static int fsl_pci_probe(struct platform_device *pdev)
- {
-+	struct clk *clk;
- 	int ret;
- 	struct device_node *node;
- #ifdef CONFIG_SWIOTLB
- 	struct pci_controller *hose;
- #endif
+ / {
+@@ -73,6 +75,16 @@
+ 		ranges = <0x0 0x0 0xfc000000 0x04000000>;
+ 	};
  
-+	/*
-+	 * clock lookup is non-fatal since the driver is shared among
-+	 * platforms and not all of them provide clocks specs in their
-+	 * device tree, but failure to enable a specified clock is
-+	 * considered fatal
-+	 */
-+	clk = devm_clk_get(&pdev->dev, "per");
-+	if (!IS_ERR(clk)) {
-+		ret = clk_prepare_enable(clk);
-+		if (ret) {
-+			dev_err(dev, "Could not enable peripheral clock\n");
-+			return ret;
-+		}
-+		/*
-+		 * TODO where to store the 'clk' reference?  there appears
-+		 * to be no remove() routine which undoes what probe() does
-+		 */
-+	}
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
- 	node = pdev->dev.of_node;
- 	ret = fsl_add_bridge(pdev, fsl_pci_primary == node);
++		osc {
++			compatible = "fsl,mpc512x-osc", "fixed-clock";
++			clock-frequency = <33000000>;
++		};
++	};
++
+ 	soc at 80000000 {
+ 		compatible = "fsl,mpc5121-immr";
+ 		#address-cells = <1>;
+@@ -118,9 +130,10 @@
+ 		};
  
+ 		/* Clock control */
+-		clock at f00 {
++		clks: clock at f00 {
+ 			compatible = "fsl,mpc5121-clock";
+ 			reg = <0xf00 0x100>;
++			#clock-cells = <1>;
+ 		};
+ 
+ 		/* Power Management Controller */
 -- 
 1.7.10.4
