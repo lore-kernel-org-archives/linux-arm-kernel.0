@@ -1,179 +1,137 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 07 Aug 2013 00:06:07 +0200
-Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
-In-Reply-To: <20130806194751.5348.55680@quantum>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <7952777.WiMApbNK0e@flatron> <20130806194751.5348.55680@quantum>
-Message-ID: <2308912.pxOVkGYgip@flatron>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Aug 2013 07:08:47 +0900
+Subject: [GIT PULL] Samsung PWM support cleanup
+In-Reply-To: <3573853.gDiLaTfgOu@flatron>
+References: <3573853.gDiLaTfgOu@flatron>
+Message-ID: <520173EF.1040808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 of August 2013 12:47:51 Mike Turquette wrote:
-> Quoting Tomasz Figa (2013-08-05 16:42:16)
-> 
-> > On Monday 05 of August 2013 12:02:16 Mike Turquette wrote:
-> > > Quoting Kukjin Kim (2013-08-05 11:13:55)
-> > > 
-> > > > On 08/06/13 03:06, Mike Turquette wrote:
-> > > > > Quoting Kukjin Kim (2013-08-05 10:01:36)
-> > > > > 
-> > > > >> On 07/23/13 08:49, Tomasz Figa wrote:
-> > > > >>> This series is an attempt to move clock support on Samsung
-> > > > >>> S3C64xx
-> > > > >>> SoCs
-> > > > >>> to Common Clock Framework.
-> > > > >>> 
-> > > > >>> First, support for PLL types present on S3C64xx SoCs is added
-> > > > >>> to
-> > > > >>> Samsung Common Clock Framework driver. Then the main clock
-> > > > >>> driver
-> > > > >>> for mentioned SoCs is introduced. Further patches contain
-> > > > >>> fixes
-> > > > >>> for drivers to make them compliant with CCF semantics,
-> > > > >>> migration
-> > > > >>> of platform code to use the new clock driver and removal of
-> > > > >>> old
-> > > > >>> clock management code.
-> > > > >>> 
-> > > > >>> Depends on:
-> > > > >>>    - [PATCH v4 00/20] Samsung PWM support cleanup
-> > > > >>>    
-> > > > >>>      http://thread.gmane.org/gmane.linux.kernel.samsung-soc/20
-> > > > >>>      856
-> > > > >>> 
-> > > > >>> On S3C6410-based Tiny6410 board (Mini6410-compatible):
-> > > > >>> 
-> > > > >>> Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
-> > > > >>> 
-> > > > >>> For v1:
-> > > > >>> 
-> > > > >>> Acked-by: Mike Turquette<mturquette@linaro.org>
-> > > > >>> 
-> > > > >>> Changes since v1:
-> > > > >>>    - added patch for read-only muxes,
-> > > > >>>    - exported configurable muxes and dividers,
-> > > > >>>    - defined mout_syncmux as read-only mux,
-> > > > >>>    - in DT-enabled case fixed-clock binding is used to define
-> > > > >>>    external clocks.> >>>
-> > > > >>> 
-> > > > >>> Tomasz Figa (8):
-> > > > >>>     clk: mux: Add support for read-only muxes.
-> > > > >>>     clk: samsung: pll: Add support for PLL6552 and PLL6553
-> > > > >>>     clk: samsung: Add clock driver for S3C64xx SoCs
-> > > > >>>     ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
-> > > > >>>     ARM: s3c64xx: dma: Use
-> > > > >>>     clk_prepare_enable/clk_disable_unprepare
-> > > > >>>     usb: host: ohci-s3c2410 Use
-> > > > >>>     clk_prepare_enable/clk_disable_unprepare
-> > > > >>>     ARM: s3c64xx: Migrate clock handling to Common Clock
-> > > > >>>     Framework
-> > > > >>>     ARM: s3c64xx: Remove old clock management code
-> > > > >>>    
-> > > > >>>    .../bindings/clock/samsung,s3c64xx-clock.txt       |   77
-> > > > >>>    ++
-> > > > >>>    arch/arm/Kconfig                                   |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/Makefile                     |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/clock.c                      | 1007
-> > > > >>>    -------------------- arch/arm/mach-s3c64xx/common.c
-> > > > >>>    
-> > > > >>>             |   21 +-
-> > > > >>>    
-> > > > >>>    arch/arm/mach-s3c64xx/common.h                     |   12
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/dma.c                        |    4
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/include/mach/regs-clock.h    |  132
-> > > > >>>    +--
-> > > > >>>    arch/arm/mach-s3c64xx/mach-anw6410.c               |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/mach-crag6410.c              |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/mach-hmt.c                   |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/mach-mini6410.c              |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/mach-ncp.c                   |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/mach-smartq.c                |   11
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2
-> > > > >>>    +-
-> > > > >>>    arch/arm/mach-s3c64xx/pm.c                         |   21 -
-> > > > >>>    arch/arm/mach-s3c64xx/s3c6400.c                    |    6 -
-> > > > >>>    arch/arm/mach-s3c64xx/s3c6410.c                    |    7 -
-> > > > >>>    arch/arm/plat-samsung/include/plat/cpu.h           |    4 +
-> > > > >>>    drivers/clk/clk-mux.c                              |   10
-> > > > >>>    +-
-> > > > >>>    drivers/clk/samsung/Makefile                       |    1 +
-> > > > >>>    drivers/clk/samsung/clk-pll.c                      |  160
-> > > > >>>    ++++
-> > > > >>>    drivers/clk/samsung/clk-pll.h                      |    4 +
-> > > > >>>    drivers/clk/samsung/clk-s3c64xx.c                  |  465
-> > > > >>>    +++++++++
-> > > > >>>    drivers/usb/host/ohci-s3c2410.c                    |    8
-> > > > >>>    +-
-> > > > >>>    include/dt-bindings/clock/samsung,s3c64xx-clock.h  |  178
-> > > > >>>    ++++
-> > > > >>>    include/linux/clk-provider.h                       |    2 +
-> > > > >>>    28 files changed, 943 insertions(+), 1205 deletions(-)
-> > > > >>>    create mode 100644
-> > > > >>>    Documentation/devicetree/bindings/clock/samsung,s3c64xx-clo
-> > > > >>>    ck.
-> > > > >>>    txt delete mode 100644 arch/arm/mach-s3c64xx/clock.c
-> > > > >>>    create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
-> > > > >>>    create mode 100644
-> > > > >>>    include/dt-bindings/clock/samsung,s3c64xx-clock.h
-> > > > >> 
-> > > > >> Basically, this series looks good to me, but I'm not sure how
-> > > > >> this
-> > > > >> should be handled because of dependency with PWM cleanup and
-> > > > >> clk
-> > > > >> stuff
-> > > > >> in clk tree now...
-> > > > > 
-> > > > > Patches 1-3 can go into the clk tree. 4-6 should go through
-> > > > > their
-> > > > > respective trees.
-> > > > > 
-> > > > > If you want I can take 7&  8 through the clk tree.
-> > > > > 
-> > > > > Alternatively I can provide patches 1-3 in a separate stable
-> > > > > topic
-> > > > > branch for you to pull in as a dependency. We'll both merge that
-> > > > > stable
-> > > > > topic branch into our trees and you can make a note of it for
-> > > > > the
-> > > > > arm-soc folks.
-> > > > 
-> > > > Thanks for your quick response. Would be helpful to samsung tree
-> > > > if
-> > > > you
-> > > > could provide a separate stable topic branch what you suggested
-> > > > for
-> > > > clk
-> > > > stuff in this series.
-> > > 
-> > > git://git.linaro.org/people/mturquette/linux.git clk-next-s3c64xx
-> > > 
-> > > Topic branch contains patches 1-3 of this series on top of
-> > > v3.11-rc2. I
-> > > have already merged the same into the clk-next branch.
-> > 
-> > What about the dependency on PWM cleanup series? Patches 7-8 must be
-> > merged after them, otherwise there will be a regression, because the
-> > old PWM clocksource driver will be broken and so s3c64xx won't boot
-> > until moved to new one, which is done by mentioned series.
-> 
-> Is this a question for me? I did not take patches 7 or 8 into clk-next.
-> Sounds like those patches should go through Samsung tree into arm-soc,
-> and perhaps be a late-applied branch to get the ordering right.
+On 08/06/13 08:32, Tomasz Figa wrote:
+> Hi Olof, Arnd,
+>
+> Here is the Samsung PWM cleanup series for you. Particular patches of the
+> series involve following modifications:
+>   1) fixing up few things in samsung_pwm_timer clocksource driver,
+>   2) moving remaining Samsung platforms to the new clocksource driver,
+>   3) removing old clocksource driver,
+>   4) adding new multiplatform- and DT-aware PWM driver,
+>   5) moving all Samsung platforms to use the new PWM driver,
+>   6) removing old PWM driver,
+>   7) removing all PWM-related code that is not used anymore.
+>
+> This is my first pull request ever, so I hope I haven't screwed up anything. ;)
+>
+> Best regards,
+> Tomasz
+>
+> The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
+>
+>    Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
+>
+> are available in the git repository at:
+>
+>    git://github.com/tom3q/linux.git v3.12-next/pwm-cleanup
+>
+> for you to fetch changes up to 519e8e0da7509fcc71c12bcd3a681bb62770f692:
+>
+>    ARM: SAMSUNG: Remove plat/regs-timer.h header (2013-08-06 01:21:55 +0200)
+>
+> ----------------------------------------------------------------
+> Tomasz Figa (20):
+>        clocksource: samsung_pwm_timer: Do not request PWM mem region
+>        clocksource: samsung_pwm_timer: Correct definition of AUTORELOAD bit
+>        clocksource: samsung_pwm_timer: Cache clocksource register address
+>        clocksource: samsung_pwm_timer: Do not use clocksource_mmio
+>        clocksource: samsung_pwm_timer: Handle suspend/resume correctly
+>        ARM: SAMSUNG: Unify base address definitions of timer block
+>        ARM: SAMSUNG: Add new PWM platform device
+>        ARM: SAMSUNG: Set PWM platform data
+>        ARM: SAMSUNG: Move all platforms to new clocksource driver
+>        ARM: SAMSUNG: Remove old samsung-time driver
+>        ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+>        pwm: samsung: Rename to pwm-samsung-legacy
+>        pwm: Add new pwm-samsung driver
+>        ARM: SAMSUNG: Rework private data handling in dev-backlight
+>        ARM: SAMSUNG: Modify board files to use new PWM platform device
+>        pwm: Remove superseded pwm-samsung-legacy driver
+>        ARM: SAMSUNG: Remove old PWM timer platform devices
+>        ARM: SAMSUNG: Remove pwm-clock infrastructure
+>        ARM: SAMSUNG: Remove remaining uses of plat/regs-timer.h header
+>        ARM: SAMSUNG: Remove plat/regs-timer.h header
+>
+>   arch/arm/Kconfig                                   |  11 +-
+>   arch/arm/mach-s3c24xx/Kconfig                      |   6 -
+>   arch/arm/mach-s3c24xx/clock-s3c2410.c              |   1 -
+>   arch/arm/mach-s3c24xx/clock-s3c2412.c              |   1 -
+>   arch/arm/mach-s3c24xx/clock-s3c2416.c              |   2 -
+>   arch/arm/mach-s3c24xx/clock-s3c2443.c              |   2 -
+>   arch/arm/mach-s3c24xx/common.c                     |  27 +
+>   arch/arm/mach-s3c24xx/include/mach/map.h           |   2 +
+>   arch/arm/mach-s3c24xx/mach-h1940.c                 |   4 +-
+>   arch/arm/mach-s3c24xx/mach-rx1950.c                |   5 +-
+>   arch/arm/mach-s3c64xx/Kconfig                      |   2 -
+>   arch/arm/mach-s3c64xx/clock.c                      |   2 -
+>   arch/arm/mach-s3c64xx/common.c                     |  32 +-
+>   arch/arm/mach-s3c64xx/include/mach/irqs.h          |   8 -
+>   arch/arm/mach-s3c64xx/include/mach/map.h           |   1 +
+>   arch/arm/mach-s3c64xx/irq-pm.c                     |   2 -
+>   arch/arm/mach-s3c64xx/mach-crag6410.c              |   4 +-
+>   arch/arm/mach-s3c64xx/mach-hmt.c                   |   4 +-
+>   arch/arm/mach-s3c64xx/mach-smartq.c                |   4 +-
+>   arch/arm/mach-s3c64xx/mach-smdk6410.c              |   5 +-
+>   arch/arm/mach-s5p64x0/Kconfig                      |   2 -
+>   arch/arm/mach-s5p64x0/clock-s5p6440.c              |   2 -
+>   arch/arm/mach-s5p64x0/clock-s5p6450.c              |   2 -
+>   arch/arm/mach-s5p64x0/common.c                     |  27 +
+>   arch/arm/mach-s5p64x0/include/mach/irqs.h          |   2 -
+>   arch/arm/mach-s5p64x0/include/mach/map.h           |   1 +
+>   arch/arm/mach-s5p64x0/mach-smdk6440.c              |   5 +-
+>   arch/arm/mach-s5p64x0/mach-smdk6450.c              |   5 +-
+>   arch/arm/mach-s5p64x0/pm.c                         |   3 -
+>   arch/arm/mach-s5pc100/Kconfig                      |   1 -
+>   arch/arm/mach-s5pc100/clock.c                      |   2 -
+>   arch/arm/mach-s5pc100/common.c                     |  28 +
+>   arch/arm/mach-s5pc100/include/mach/irqs.h          |   2 -
+>   arch/arm/mach-s5pc100/include/mach/map.h           |   1 +
+>   arch/arm/mach-s5pc100/mach-smdkc100.c              |   5 +-
+>   arch/arm/mach-s5pv210/Kconfig                      |   1 -
+>   arch/arm/mach-s5pv210/clock.c                      |   1 -
+>   arch/arm/mach-s5pv210/common.c                     |  28 +
+>   arch/arm/mach-s5pv210/include/mach/irqs.h          |   2 -
+>   arch/arm/mach-s5pv210/include/mach/map.h           |   1 +
+>   arch/arm/mach-s5pv210/mach-smdkv210.c              |   5 +-
+>   arch/arm/mach-s5pv210/pm.c                         |  10 -
+>   arch/arm/plat-samsung/Kconfig                      |  14 -
+>   arch/arm/plat-samsung/Makefile                     |   3 -
+>   arch/arm/plat-samsung/dev-backlight.c              |  61 +-
+>   arch/arm/plat-samsung/devs.c                       |  42 +-
+>   arch/arm/plat-samsung/include/plat/clock.h         |   4 -
+>   arch/arm/plat-samsung/include/plat/devs.h          |   1 +
+>   arch/arm/plat-samsung/include/plat/irq-vic-timer.h |  13 -
+>   arch/arm/plat-samsung/include/plat/irqs.h          |   9 -
+>   arch/arm/plat-samsung/include/plat/pwm-clock.h     |  81 ---
+>   arch/arm/plat-samsung/include/plat/pwm-core.h      |  22 +
+>   arch/arm/plat-samsung/include/plat/regs-timer.h    | 124 ----
+>   arch/arm/plat-samsung/include/plat/samsung-time.h  |  23 -
+>   arch/arm/plat-samsung/irq-vic-timer.c              |  98 ---
+>   arch/arm/plat-samsung/pwm-clock.c                  | 474 --------------
+>   arch/arm/plat-samsung/s5p-irq.c                    |   4 -
+>   arch/arm/plat-samsung/samsung-time.c               | 394 ------------
+>   drivers/clocksource/Kconfig                        |   1 -
+>   drivers/clocksource/samsung_pwm_timer.c            | 108 ++--
+>   drivers/pwm/pwm-samsung.c                          | 709 ++++++++++++++-------
+>   61 files changed, 786 insertions(+), 1660 deletions(-)
+>   delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+>   delete mode 100644 arch/arm/plat-samsung/include/plat/pwm-clock.h
+>   create mode 100644 arch/arm/plat-samsung/include/plat/pwm-core.h
+>   delete mode 100644 arch/arm/plat-samsung/include/plat/regs-timer.h
+>   delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
+>   delete mode 100644 arch/arm/plat-samsung/pwm-clock.c
+>   delete mode 100644 arch/arm/plat-samsung/samsung-time.c
+>
+Just note that I also have pulled into samsung tree because of 
+dependency with others, this will be pulled directly by Olof though.
 
-It's just continuation of the topic. I guess the question is mostly for 
-Kukjin. Anyway, your suggestion is most likely the right thing, thanks.
-
-Best regards,
-Tomasz
+Thanks,
+Kukjin
