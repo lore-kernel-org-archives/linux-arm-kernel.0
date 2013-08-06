@@ -1,89 +1,66 @@
-From: shaojie.sun@linaro.org (Shaojie Sun)
-Date: Tue,  6 Aug 2013 11:57:37 +0800
-Subject: [PATCH] clk: gate: add CLK_GATE_ALWAYS_ON
-Message-ID: <1375761457-16364-1-git-send-email-shaojie.sun@linaro.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 05 Aug 2013 22:21:47 -0600
+Subject: [PATCH v2] ARM: DT: binding fixup to align with
+ vendor-prefixes.txt
+In-Reply-To: <5200407A.4010407@broadcom.com>
+References: <1375482479-15732-1-git-send-email-csd@broadcom.com>
+ <51FFCC42.6040300@wwwdotorg.org> <5200407A.4010407@broadcom.com>
+Message-ID: <520079DB.5090309@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default gate clock could be enable and disable. but
-in some debug condition, must keep clock on, and never be closed.
-setting this flag then gate clock never be closed.
+On 08/05/2013 06:16 PM, Christian Daudt wrote:
+> On 13-08-05 09:01 AM, Stephen Warren wrote:
+>> On 08/02/2013 04:27 PM, Christian Daudt wrote:
+>>> [ this is a follow-up to this discussion:
+>>> http://archive.arm.linux.org.uk/lurker/message/20130730.230827.a1ceb12a.en.html
+>>> ]
+>>> This patchset renames all uses of "bcm," name bindings to
+>>> "brcm," as they were done prior to knowing that brcm had
+>>> already been standardized as Broadcom vendor prefix
+>>> (in Documentation/devicetree/bindings/vendor-prefixes.txt).
+>>> This will not cause any churn on devices because none of
+>>> these bindings have made it into production yet.
+>>> Also rename the the following dt binding docs that had "bcm,"
+>>> in their name for consistency:
+>>>   - bcm,kona-sdhci.txt -> kona-sdhci.txt
+>>>   - bcm,kona-timer.txt -> kona-timer.txt
+>>> Changes since v1:
+>>>   - added driver match table entries for deprecated names
 
-Signed-off-by: Shaojie Sun <shaojie.sun@linaro.com>
----
- drivers/clk/clk-gate.c       |   24 ++++++++++++++++++++++++
- include/linux/clk-provider.h |    4 ++++
- 2 files changed, 28 insertions(+)
+>>> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+>>> b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+>>> index fb7b5cd..cf1b206 100644
+>>> --- a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+>> I wonder if this patch should rename bindings/arm/bcm/ to
+>> bindings/arm/brcm/ too?
+>
+> I'd rather keep it as-is - to me the vendor prefix is a DT concept only,
+> and I'd rather not extend its tentacles into other parts of the kernel
+> (and the other arm/ subtrees in there all show no attempt at
+> dirname==vendor-prefix), but I'm ok with changing it to broadcom if you
+> prefer.
 
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index 790306e..cc2b00e 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/err.h>
- #include <linux/string.h>
-+#include <linux/device.h>
- 
- /**
-  * DOC: basic gatable clock which can gate and ungate it's ouput
-@@ -48,6 +49,9 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
- 	unsigned long flags = 0;
- 	u32 reg;
- 
-+	if (!enable && (gate->flags & CLK_GATE_ALWAYS_ON))
-+		return;
-+
- 	set ^= enable;
- 
- 	if (gate->lock)
-@@ -159,5 +163,25 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 	if (IS_ERR(clk))
- 		kfree(gate);
- 
-+	if (clk_gate_flags & CLK_GATE_ALWAYS_ON) {
-+		int ret;
-+		if (flags & CLK_SET_PARENT_GATE)
-+			pr_debug("%s: %salways on, but need parent gate.\n",
-+					__func__, name);
-+
-+		ret = clk_prepare(clk);
-+		if (ret) {
-+			pr_debug("%s: %s could not be prepared.\n",
-+					__func__, name);
-+			return clk;
-+		}
-+		ret = clk_enable(clk);
-+		if (ret) {
-+			pr_debug("%s: %s could not be enabled.\n",
-+					__func__, name);
-+			clk_unprepare(clk);
-+		}
-+	}
-+
- 	return clk;
- }
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 1ec14a7..641422c 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -214,6 +214,9 @@ void of_fixed_clk_setup(struct device_node *np);
-  *   of this register, and mask of gate bits are in higher 16-bit of this
-  *   register.  While setting the gate bits, higher 16-bit should also be
-  *   updated to indicate changing gate bits.
-+ * CLK_GATE_ALWAYS_ON - by default this clock could be enable and disable. but
-+ *   in some debug condition, must keep this clock on, and never be closed.
-+ *   setting this flag then this clock never be closed.
-  */
- struct clk_gate {
- 	struct clk_hw hw;
-@@ -225,6 +228,7 @@ struct clk_gate {
- 
- #define CLK_GATE_SET_TO_DISABLE		BIT(0)
- #define CLK_GATE_HIWORD_MASK		BIT(1)
-+#define CLK_GATE_ALWAYS_ON		BIT(4)
- 
- extern const struct clk_ops clk_gate_ops;
- struct clk *clk_register_gate(struct device *dev, const char *name,
--- 
-1.7.9.5
+Well, except that Documentation/devicetree/bindings is more part of DT
+than the kernel, and there are active moves afoot to separate it out.
+
+But, I suppose it's not a big deal; we can fix it when that happens I
+suppose.
+
+>>>   Required root node property:
+>>>   -compatible = "bcm,bcm11351";
+>>> +compatible = "brcm,bcm11351";
+>> In a patch of mine that deprecated a property, Mark wondered if it would
+>> make sense to mention the old deprecated DT content simply to document
+>> that it existed, so that old DTs would still make sense when checking
+>> the documentation. I wonder if the same argument applies to this patch?
+>
+> I would think the opposite. Deprecated items should be dropped from
+> documentation. They are in the code (for a holdover period) but clearly
+> marked as deprecated. No one should be extending the life of these, and
+> adding documentation on it is a step in the wrong direction of making it
+> easier for it to linger beyond what it should.
+
+The deprecated stuff will have to be fully documented once the DT schema
+validation is in place...
