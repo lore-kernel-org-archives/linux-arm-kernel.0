@@ -1,59 +1,155 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 06 Aug 2013 10:09:37 +0200
-Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
-In-Reply-To: <51FFD1DF.9000907@arm.com>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51FB7CB8.6080103@arm.com> <51FB8081.6040501@linaro.org>
- <51FB81FB.3060709@arm.com> <51FBA21D.5010308@linaro.org>
- <51FFD1DF.9000907@arm.com>
-Message-ID: <5200AF41.7090405@linaro.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 6 Aug 2013 13:41:44 +0530
+Subject: [PATCH v3 7/9] ARM: DRA7: id: Add cpu detection support for DRA7xx
+ based SoCs'
+In-Reply-To: <51FF9025.6040401@ti.com>
+References: <1375633657-6835-1-git-send-email-rnayak@ti.com>
+ <1375633657-6835-8-git-send-email-rnayak@ti.com> <51FF9025.6040401@ti.com>
+Message-ID: <5200AFC0.9030303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 06:25 PM, Sudeep KarkadaNagesha wrote:
-> Hi Daniel,
-> 
-> On 02/08/13 13:12, Daniel Lezcano wrote:
->> On 08/02/2013 11:55 AM, Sudeep KarkadaNagesha wrote:
->>> On 02/08/13 10:48, Daniel Lezcano wrote:
->>>> On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
->>>>> Hi Daniel,
->>>>>
->>>>> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
->>>>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>>>>
->>>>>> This patch series adds support to configure the rate and enable the event
->>>>>> stream for architected timer. Since the timer control register is reset to
->>>>>> zero on warm boot, CPU PM notifier is added to re-initialse it.
->>>>>>
->>>>> This series is required to support TC2 cpuidle.
->>>>> It will be good if you can review and get this in for v3.12
->>>>
->>>> So do you want me to take the series through my tree ?
->>>>
->>> Yes I believe it has to go through your(ARM specific clocksource?) tree,
->>> but currently there's a conflict with another bug fix(that should come
->>> from rmk as -rc fix)
->>> (Commit ab8d46c0 "ARM: 7788/1: elf: fix lpae hwcap feature reporting in
->>> proc/cpuinfo" in rmk -fixes)
+Hi Grygorii,
+
+On Monday 05 August 2013 05:14 PM, Grygorii Strashko wrote:
+> On 08/04/2013 07:27 PM, Rajendra Nayak wrote:
+>> From: R Sricharan <r.sricharan@ti.com>
 >>
->> IMO, you should rebase this patch on top of tips/core, I will apply the
->> series and when the rmk fix hits this branch (through tips/urgent), that
->> will be up to the maintainer to resolve this conflict.
+>> The DRA7xx is a high-performance, infotainment application device,
+>> based on enhanced OMAP architecture integrated on a 28-nm technology.
+>>
+>> Since DRA7 is a platform supported only using DT, the cpu detection
+>> is based on the compatibles passed from DT blobs as suggested here
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187712.html
+>>
+>> Suggested-by: Felipe Balbi <balbi@ti.com>
+>> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>   arch/arm/mach-omap1/include/mach/soc.h |    1 +
+>>   arch/arm/mach-omap2/id.c               |    4 ++--
+>>   arch/arm/mach-omap2/soc.h              |   17 +++++++++++++++++
+>>   3 files changed, 20 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap1/include/mach/soc.h b/arch/arm/mach-omap1/include/mach/soc.h
+>> index 6cf9c1c..612bd1c 100644
+>> --- a/arch/arm/mach-omap1/include/mach/soc.h
+>> +++ b/arch/arm/mach-omap1/include/mach/soc.h
+>> @@ -195,6 +195,7 @@ IS_OMAP_TYPE(1710, 0x1710)
+>>   #define cpu_is_omap34xx()        0
+>>   #define cpu_is_omap44xx()        0
+>>   #define soc_is_omap54xx()        0
+>> +#define soc_is_dra7xx()            0
+>>   #define soc_is_am33xx()            0
+>>   #define cpu_class_is_omap1()        1
+>>   #define cpu_class_is_omap2()        0
+>> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+>> index 2dc62a2..0289adc 100644
+>> --- a/arch/arm/mach-omap2/id.c
+>> +++ b/arch/arm/mach-omap2/id.c
+>> @@ -61,7 +61,7 @@ int omap_type(void)
+>>           val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+>>       } else if (cpu_is_omap44xx()) {
+>>           val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
+>> -    } else if (soc_is_omap54xx()) {
+>> +    } else if (soc_is_omap54xx() || soc_is_dra7xx()) {
+>>           val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
+>>           val &= OMAP5_DEVICETYPE_MASK;
+>>           val >>= 6;
+>> @@ -116,7 +116,7 @@ static u16 tap_prod_id;
+>>
+>>   void omap_get_die_id(struct omap_die_id *odi)
+>>   {
+>> -    if (cpu_is_omap44xx() || soc_is_omap54xx()) {
+>> +    if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx()) {
+>>           odi->id_0 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_0);
+>>           odi->id_1 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_1);
+>>           odi->id_2 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_2);
+>> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+>> index 8c616e4..4588df1 100644
+>> --- a/arch/arm/mach-omap2/soc.h
+>> +++ b/arch/arm/mach-omap2/soc.h
+>> @@ -8,6 +8,7 @@
+>>    * Written by Tony Lindgren <tony.lindgren@nokia.com>
+>>    *
+>>    * Added OMAP4/5 specific defines - Santosh Shilimkar<santosh.shilimkar@ti.com>
+>> + * Added DRA7xxx specific defines - Sricharan R<r.sricharan@ti.com>
+>>    *
+>>    * This program is free software; you can redistribute it and/or modify
+>>    * it under the terms of the GNU General Public License as published by
+>> @@ -35,6 +36,7 @@
+>>   #ifndef __ASSEMBLY__
+>>
+>>   #include <linux/bitops.h>
+>> +#include <linux/of.h>
+>>
+>>   /*
+>>    * Test if multicore OMAP support is needed
+>> @@ -105,6 +107,15 @@
+>>   # endif
+>>   #endif
+>>
+>> +#ifdef CONFIG_SOC_DRA7XX
+>> +# ifdef OMAP_NAME
+>> +#  undef MULTI_OMAP2
+>> +#  define MULTI_OMAP2
+>> +# else
+>> +#  define OMAP_NAME DRA7XX
+>> +# endif
+>> +#endif
+>> +
+>>   /*
+>>    * Omap device type i.e. EMU/HS/TST/GP/BAD
+>>    */
+>> @@ -233,6 +244,7 @@ IS_AM_SUBCLASS(437x, 0x437)
+>>   #define cpu_is_omap447x()        0
+>>   #define soc_is_omap54xx()        0
+>>   #define soc_is_omap543x()        0
+>> +#define soc_is_dra7xx()            0
+>>
+>>   #if defined(MULTI_OMAP2)
+>>   # if defined(CONFIG_ARCH_OMAP2)
+>> @@ -379,6 +391,11 @@ IS_OMAP_TYPE(3430, 0x3430)
+>>   # define soc_is_omap543x()        is_omap543x()
+>>   #endif
+>>
+>> +#if defined(CONFIG_SOC_DRA7XX)
+>> +#undef soc_is_dra7xx
+>> +#define soc_is_dra7xx()    (of_machine_is_compatible("ti,dra7"))
+> 
+> Wouldn't that be too expensive to call of_machine_is_compatible every
+> time for DRA7 detection?
+
+Ideally these soc checks should happen only once at init (see PATCH 8/9 in the
+series for instance) so there should not be a 'every time' penalty.
+
+regards,
+Rajendra
+ 
+> 
+> May be static variable can be used to store DRA7 presence status,
+> smth. like this:
+> 
+> static inline int is_dra7xx(void)
+> {
+> static int is_dra7 = -1;
+> 
+> if (is_dra7 < 0)
+>  is_dra7 = of_machine_is_compatible("ti,dra7");
+> 
+> return !!is_dra7;
+> }
+> 
+> (it's just an idea, not verified)
+> 
+>> +#endif
+>> +
+>>   /* Various silicon revisions for omap2 */
+>>   #define OMAP242X_CLASS        0x24200024
+>>   #define OMAP2420_REV_ES1_0    OMAP242X_CLASS
 >>
 > 
-> The fix with which this series was conflicting is already in v3.11-rc4
-> So can I send pull request based on v3.11-rc4 or if you prefer any
-> particular tree, can you provide details please ?
-
-Ok, I will ping Thomas to update the tips/core branch to 3.11-rc4.
-
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> 
+> Regards,
+> -grygorii
