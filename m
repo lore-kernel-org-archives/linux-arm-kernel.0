@@ -1,63 +1,45 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Tue, 06 Aug 2013 11:28:01 -0700
-Subject: [PATCH 1/2] ARM: msm: Add support for MSM8974 Dragonboard
-In-Reply-To: <76477E73-B68A-4025-875E-4BA30F5E175A@codeaurora.org>
-References: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
- <76477E73-B68A-4025-875E-4BA30F5E175A@codeaurora.org>
-Message-ID: <52014031.7000202@codeaurora.org>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Tue, 6 Aug 2013 11:32:05 -0700
+Subject: Tegra baseline test results for v3.11-rc4
+Message-ID: <52014125.7010003@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/6/2013 8:47 AM, Kumar Gala wrote:
-> On Aug 5, 2013, at 6:02 PM, Rohit Vaswani wrote:
->
->> This patch adds basic board support for MSM8974 Dragonboard
->> which belongs to the Snapdragon 800 family.
->> For now, just support a basic machine with device tree.
-> I think the board is APQ8074 and not MSM8974.
->
->> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->> ---
->> arch/arm/boot/dts/Makefile        |  3 ++-
->> arch/arm/boot/dts/msm8974-db.dts  | 26 ++++++++++++++++++++++++++
->> arch/arm/mach-msm/Kconfig         | 21 ++++++++++++++++++---
->> arch/arm/mach-msm/Makefile        |  1 +
->> arch/arm/mach-msm/board-dt-8974.c | 23 +++++++++++++++++++++++
->> 5 files changed, 70 insertions(+), 4 deletions(-)
->> create mode 100644 arch/arm/boot/dts/msm8974-db.dts
->> create mode 100644 arch/arm/mach-msm/board-dt-8974.c
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 641b3c9a..62cea36 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -97,7 +97,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
->> 	kirkwood-openblocks_a6.dtb
->> dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
->> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->> -	msm8960-cdp.dtb
->> +	msm8960-cdp.dtb \
->> +	msm8974-db.dtb
->> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->> 	armada-370-mirabox.dtb \
->> 	armada-370-rd.dtb \
->> diff --git a/arch/arm/boot/dts/msm8974-db.dts b/arch/arm/boot/dts/msm8974-db.dts
->> new file mode 100644
->> index 0000000..badfc61
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/msm8974-db.dts
->> @@ -0,0 +1,26 @@
->> +/dts-v1/;
->> +
->> +/include/ "skeleton.dtsi"
-> We should change msm8974.dts to msm8974.dtsi and include it for the board.
+Here are some basic Tegra test results for Linux v3.11-rc4.
+Logs and other details at:
 
-We can do that once we have something separate/new to add to the dtsi file.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.11-rc4/20130806092219/
 
-<snip>
+Special thanks to Jon Hunter for pointing out that the column order
+of the boot time memory consumption report headings didn't match the
+data, in previous reports.
 
-Thanks,
-Rohit Vaswani
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+
+vmlinux object size
+(delta in bytes from test_v3.11-rc3 (5ae90d8e467e625e447000cb4335c4db973b1095)):
+    text     data      bss    total  kernel
+   +1916       -8        0    +1908  multi_v7_defconfig
+    +944      -72      +64     +936  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.11-rc3 (5ae90d8e467e625e447000cb4335c4db973b1095))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+       -4k       4k        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+      -12k      12k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+       -4k       4k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+      -12k      12k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
