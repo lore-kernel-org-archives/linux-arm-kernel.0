@@ -1,125 +1,89 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Tue, 6 Aug 2013 03:42:28 +0000
-Subject: [PATCH 4/5] fb: Add DCU framebuffer driver for Vybrid VF610
- platform
-In-Reply-To: <20130805100630.GQ26614@pengutronix.de>
-References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
- <1373609276-14566-5-git-send-email-b18965@freescale.com>
- <20130729111457.GB3029@pengutronix.de>
- <81BA6E5E0BC2344391CABCEE22D1B6D83CA6F0@039-SN1MPN1-002.039d.mgd.msft.net>
- <20130805100630.GQ26614@pengutronix.de>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D83CE90A@039-SN1MPN1-002.039d.mgd.msft.net>
+From: shaojie.sun@linaro.org (Shaojie Sun)
+Date: Tue,  6 Aug 2013 11:57:37 +0800
+Subject: [PATCH] clk: gate: add CLK_GATE_ALWAYS_ON
+Message-ID: <1375761457-16364-1-git-send-email-shaojie.sun@linaro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, Aug 05, 2013 at 09:51:40AM +0000, Wang Huan-B18965 wrote:
-> > Hi, Sascha,
-> >
-> > > On Fri, Jul 12, 2013 at 02:07:55PM +0800, Alison Wang wrote:
-> > > > The Display Controller Unit (DCU) module is a system master that
-> > > > fetches graphics stored in internal or external memory and
-> > > > displays them on a TFT LCD panel. A wide range of panel sizes is
-> > > > supported and the timing of the interface signals is highly
-> configurable.
-> > > > Graphics are read directly from memory and then blended in
-> > > > real-time, which allows for dynamic content creation with minimal
-> > > > CPU
-> > > intervention.
-> > >
-> > > Only a review of the code inline.
-> > >
-> > > Maybe the real question is whether we want to introduce another
-> > > framebuffer driver at all instead of making it a DRM driver.
-> > [Alison Wang] I think DCU module is more suitable to be designed as a
-> framebuffer driver than a DRM driver. Just like DIU framebuffer driver
-> for PowerPC.
-> > >
-> > > > +
-> > > > +#define DRIVER_NAME			"fsl-dcu-fb"
-> > > > +
-> > > > +#define DCU_DCU_MODE			0x0010
-> > > > +#define DCU_MODE_BLEND_ITER(x)		(x << 20)
-> > >
-> > > What's the result of DCU_MODE_BLEND_ITER(1 + 1)?
-> > [Alison Wang] Is it really necessary? I don't use this macro like
-> DCU_MODE_BLEND_ITER(1 + 1), just use DCU_MODE_BLEND_ITER(2).
-> 
-> <irony>
-> No it's not necessary. We can just add incorrect macros everywhere and
-> fix them as necessary after a long bug squashing session </irony>
-> 
-> YES! This is necessary.
-[Alison Wang] Ok, I will change it as follows.
-#define DCU_MODE_BLEND_ITER(x)	((x) << 20)
-> 
-> > > > +	return 0;
-> > > > +}
-> > > > +
-> > > > +static int calc_div_ratio(struct fb_info *info) {
-> > >
-> > > Use a consistent namespace for function names (fsl_dcu_)
-> > [Alison Wang] Is it necessary to use a consistent namespace for this
-> generic function? I think it is necessary to use a consistent namespace
-> (fsl_dcu_) for the function names in structure fsl_dcu_ops.
-> 
-> This function calculates some divider out of a struct fb_info. This is
-> by no means generic.
-[Alison Wang] Ok, I will use a consistent namespace for this function.
-> 
-> > > > +		if (copy_to_user(buf, &alpha, sizeof(alpha)))
-> > > > +			return -EFAULT;
-> > > > +		break;
-> > > > +	case MFB_SET_ALPHA:
-> > > > +		if (copy_from_user(&alpha, buf, sizeof(alpha)))
-> > > > +			return -EFAULT;
-> > > > +		mfbi->blend = 1;
-> > > > +		mfbi->alpha = alpha;
-> > > > +		fsl_dcu_set_par(info);
-> > > > +		break;
-> > >
-> > > Is it still state of the art to introduce ioctls in the fb
-> framework
-> > > without any kind of documentation?
-> > [Alison Wang] Do you mean I need to add a documentation in
-> Documentation/fb/?
-> 
-> This was more a question to the fb maintainers.
-> 
-> > > > +static irqreturn_t fsl_dcu_irq(int irq, void *dev_id) {
-> > > > +	struct dcu_fb_data *dcufb = dev_id;
-> > > > +	unsigned int status = readl(dcufb->reg_base +
-> DCU_INT_STATUS);
-> > > > +	u32 dcu_mode;
-> > > > +
-> > > > +	if (status) {
-> > >
-> > > Save indendation level by bailing out early.
-> > [Alison Wang] What do you mean?
-> 
-> 
-> Instead of doing:
-> 
-> 	if (bla) {
-> 		dothis();
-> 		dothat();
-> 		return;
-> 	}
-> 
-> 	return;
-> 
-> it's easier to read:
-> 
-> 	if (!bla)
-> 		return;
-> 
-> 	dothis();
-> 	dothat();
-> 	return;
-> 
-> Note that dothis() and dothat() are one indentation level to the left
-> and thus have more space per line.
-[Alison Wang] I see. Thanks.
+By default gate clock could be enable and disable. but
+in some debug condition, must keep clock on, and never be closed.
+setting this flag then gate clock never be closed.
 
+Signed-off-by: Shaojie Sun <shaojie.sun@linaro.com>
+---
+ drivers/clk/clk-gate.c       |   24 ++++++++++++++++++++++++
+ include/linux/clk-provider.h |    4 ++++
+ 2 files changed, 28 insertions(+)
 
-Best Regards,
-Alison Wang
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 790306e..cc2b00e 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/err.h>
+ #include <linux/string.h>
++#include <linux/device.h>
+ 
+ /**
+  * DOC: basic gatable clock which can gate and ungate it's ouput
+@@ -48,6 +49,9 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 	unsigned long flags = 0;
+ 	u32 reg;
+ 
++	if (!enable && (gate->flags & CLK_GATE_ALWAYS_ON))
++		return;
++
+ 	set ^= enable;
+ 
+ 	if (gate->lock)
+@@ -159,5 +163,25 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 	if (IS_ERR(clk))
+ 		kfree(gate);
+ 
++	if (clk_gate_flags & CLK_GATE_ALWAYS_ON) {
++		int ret;
++		if (flags & CLK_SET_PARENT_GATE)
++			pr_debug("%s: %salways on, but need parent gate.\n",
++					__func__, name);
++
++		ret = clk_prepare(clk);
++		if (ret) {
++			pr_debug("%s: %s could not be prepared.\n",
++					__func__, name);
++			return clk;
++		}
++		ret = clk_enable(clk);
++		if (ret) {
++			pr_debug("%s: %s could not be enabled.\n",
++					__func__, name);
++			clk_unprepare(clk);
++		}
++	}
++
+ 	return clk;
+ }
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1ec14a7..641422c 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -214,6 +214,9 @@ void of_fixed_clk_setup(struct device_node *np);
+  *   of this register, and mask of gate bits are in higher 16-bit of this
+  *   register.  While setting the gate bits, higher 16-bit should also be
+  *   updated to indicate changing gate bits.
++ * CLK_GATE_ALWAYS_ON - by default this clock could be enable and disable. but
++ *   in some debug condition, must keep this clock on, and never be closed.
++ *   setting this flag then this clock never be closed.
+  */
+ struct clk_gate {
+ 	struct clk_hw hw;
+@@ -225,6 +228,7 @@ struct clk_gate {
+ 
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+ #define CLK_GATE_HIWORD_MASK		BIT(1)
++#define CLK_GATE_ALWAYS_ON		BIT(4)
+ 
+ extern const struct clk_ops clk_gate_ops;
+ struct clk *clk_register_gate(struct device *dev, const char *name,
+-- 
+1.7.9.5
