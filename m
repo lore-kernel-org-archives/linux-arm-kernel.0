@@ -1,50 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 6 Aug 2013 08:18:27 +0100
-Subject: [PATCH v3 07/22] ARM: dts: Remove '0x's from Exynos4210 DTSI file
-In-Reply-To: <51FFE9F0.1000100@samsung.com>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-7-git-send-email-lee.jones@linaro.org>
- <20130724150937.GO26801@laptop> <51FFE9F0.1000100@samsung.com>
-Message-ID: <20130806071827.GB5100@lee--X1>
+From: B18965@freescale.com (Wang Huan-B18965)
+Date: Tue, 6 Aug 2013 07:20:58 +0000
+Subject: [PATCH 4/5] fb: Add DCU framebuffer driver for Vybrid VF610
+ platform
+In-Reply-To: <1375712322.4276.12.camel@weser.hi.pengutronix.de>
+References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
+ <1373609276-14566-5-git-send-email-b18965@freescale.com>
+ <20130729111457.GB3029@pengutronix.de>
+ <81BA6E5E0BC2344391CABCEE22D1B6D83CA6F0@039-SN1MPN1-002.039d.mgd.msft.net>
+ <20130805130911.GF30920@pengutronix.de>
+ <1375712322.4276.12.camel@weser.hi.pengutronix.de>
+Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D83CEAA6@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Aug 2013, Kukjin Kim wrote:
+Hi,
 
-> On 07/25/13 00:09, Lee Jones wrote:
-> >... for the sake of consistency and assumed convention.
+> Am Montag, den 05.08.2013, 15:09 +0200 schrieb Robert Schwebel:
+> > On Mon, Aug 05, 2013 at 09:51:40AM +0000, Wang Huan-B18965 wrote:
+> > > > On Fri, Jul 12, 2013 at 02:07:55PM +0800, Alison Wang wrote:
+> > > > > The Display Controller Unit (DCU) module is a system master
+> that
+> > > > > fetches graphics stored in internal or external memory and
+> > > > > displays them on a TFT LCD panel. A wide range of panel sizes
+> is
+> > > > > supported and the timing of the interface signals is highly
+> configurable.
+> > > > > Graphics are read directly from memory and then blended in
+> > > > > real-time, which allows for dynamic content creation with
+> > > > > minimal CPU
+> > > > intervention.
+> > > >
+> > > > Only a review of the code inline.
+> > > >
+> > > > Maybe the real question is whether we want to introduce another
+> > > > framebuffer driver at all instead of making it a DRM driver.
+> > > [Alison Wang] I think DCU module is more suitable to be designed as
+> a framebuffer driver than a DRM driver. Just like DIU framebuffer
+> driver for PowerPC.
 > >
-> >Cc: Kukjin Kim<kgene.kim@samsung.com>
-> >Cc: linux-samsung-soc at vger.kernel.org
-> >Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> > We looked at the Vybrid datasheet and it's DCU section last week, and
+> > with its 64 planes, the controller really wants to get a DRM driver.
 > >
-> >diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> >index b7f358a..53e2527 100644
-> >--- a/arch/arm/boot/dts/exynos4210.dtsi
-> >+++ b/arch/arm/boot/dts/exynos4210.dtsi
-> >@@ -72,7 +72,7 @@
-> >                 };
->    ^^^^^^^^^^^^^^^^
-> >         };
->    ^^^^^^^^
-> >
-> >-       clock: clock-controller at 0x10030000 {
->    ^^^^^^^^
-> >+       clock: clock-controller at 10030000 {
->    ^^^^^^^^
-> >                 compatible = "samsung,exynos4210-clock";
->    ^^^^^^^^^^^^^^^^
-> >                 reg =<0x10030000 0x20000>;
->    ^^^^^^^^^^^^^^^^
-> >                 #clock-cells =<1>;
->    ^^^^^^^^^^^^^^^^
+> Exactly, with it's extensive hardware composition capabilities the
+> controller begs for being driven by a proper DRM driver. There is no
+> way in fbdev to properly support all those hardware planes without
+> introducing a lot of non standard ioctls, which in turn will force you
+> into writing a lot of custom userspace code instead of running proven
+> technology that sits on top of KMS.
 > 
-> BTW, should be tab at the mark '^' not white space :(
+> Doing things in DRM might be slightly more work for the initial bring
+> up, but will pay off in the long run when you are going to really use
+> the hardware caps of the controller.
+> 
+[Alison Wang] Thanks for your comments and explanations. I understand your considerations.
 
-Agreed, but this should be a separate patch.
+In DCU module, there are 64 graphics layers, but the maximum source layers for blending of each pixel is only 6. The fb driver could satisfy the current application requirements.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+So I will push out this fb driver first, and then I will add a DRM driver for more advanced requirements.
+
+Do you have more comments?
+
+
+Best Regards,
+Alison Wang
