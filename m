@@ -1,40 +1,60 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue,  6 Aug 2013 13:37:14 +0800
-Subject: [PATCH 2/2] arm: prima2: drop nr_irqs in mach as we moved to linear
- irqdomain
-In-Reply-To: <1375767434-19842-1-git-send-email-Baohua.Song@csr.com>
-References: <1375767434-19842-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1375767434-19842-2-git-send-email-Baohua.Song@csr.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 6 Aug 2013 11:39:57 +0530
+Subject: [PATCH RESEND] ARM: dts: Add USBPHY nodes to Exynos4x12
+In-Reply-To: <1375726723-20862-1-git-send-email-tobetter@gmail.com>
+References: <1375726723-20862-1-git-send-email-tobetter@gmail.com>
+Message-ID: <CAK9yfHwxVtJFZMQNoh-RepaF53L_TruPBSUt3YH_XY+8iXjffA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we don't need nr_irqs in machine any more after we move to
-linear irqdomain for sirfsoc irqchip, so drop them.
+Hi Dongjin,
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/common.c | 2 --
- 1 file changed, 2 deletions(-)
+On 5 August 2013 23:48, Dongjin Kim <tobetter@gmail.com> wrote:
+> This patch adds device nodes for USBPHY to Exynos4x12.
+>
+> CC: Sachin Kamat <sachin.kamat@linaro.org>
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4x12.dtsi |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index 01da194..9c3335b 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -73,4 +73,22 @@
+>                 clock-names = "sclk_fimg2d", "fimg2d";
+>                 status = "disabled";
+>         };
+> +
+> +       usbphy at 125B00000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "samsung,exynos4x12-usb2phy";
+> +               reg = <0x125B0000 0x100>;
+> +               ranges;
+> +
+> +               clocks = <&clock 2>, <&clock 305>;
+> +               clock-names = "xusbxti", "otg";
+> +               status = "disabled";
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 2c70f74..e110b6d 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -42,7 +42,6 @@ static const char *atlas6_dt_match[] __initdata = {
- 
- DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
--	.nr_irqs	= 128,
- 	.map_io         = sirfsoc_map_io,
- 	.init_time	= sirfsoc_init_time,
- 	.init_late	= sirfsoc_init_late,
-@@ -59,7 +58,6 @@ static const char *prima2_dt_match[] __initdata = {
- 
- DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
--	.nr_irqs	= 128,
- 	.map_io         = sirfsoc_map_io,
- 	.init_time	= sirfsoc_init_time,
- 	.dma_zone_size	= SZ_256M,
+I don't think this node has any other board specific dependencies. In
+that case you don't need to disable this.
+
+> +
+> +               usbphy-sys {
+> +                       /* USB device and host PHY_CONTROL registers */
+> +                       reg = <0x10020704 0xc>,
+> +                             <0x1001021c 0x4>;
+> +               };
+> +       };
+>  };
+> --
+> 1.7.9.5
+>
+
+
+
 -- 
-1.8.2.3
+With warm regards,
+Sachin
