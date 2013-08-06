@@ -1,28 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Aug 2013 19:55:39 +0200
-Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
-In-Reply-To: <5200E684.5080003@free-electrons.com>
-References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
- <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
- <20130716080503.GA3125@lukather>
- <5200E684.5080003@free-electrons.com>
-Message-ID: <20130806195539.1690c0a6@skate>
+Date: Tue, 6 Aug 2013 20:00:03 +0200
+Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
+In-Reply-To: <20130806170941.GC2705@localhost>
+References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130806155343.GU19280@titan.lakedaemon.net>
+ <20130806170941.GC2705@localhost>
+Message-ID: <20130806200003.537d2e3f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+Dear Ezequiel Garcia,
 
-On Tue, 06 Aug 2013 14:05:24 +0200, Gregory CLEMENT wrote:
+On Tue, 6 Aug 2013 14:09:42 -0300, Ezequiel Garcia wrote:
 
-> But we shouldn't use it alone: we should always use:
-> compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> When I cherry-pick commit 704cc70179481c814d581597a7d2cdbbeb152bee
+> (ARM: mvebu: add support for the AXP WiFi AP board) from mvebu/dt
+> into mvebu/mbus_dt, I found it's needed to apply the changes below.
 > 
-> From my point of view using  "marvell,mv78230-i2c" alone is an error.
+> If they look fine feel free to pick them, or request any other
+> base for them.
+> 
+> I don't have the board to test this, so maybe Seif can help
+> testing them?
 
-I disagree. I believe the driver should support a Device Tree file that
-uses "marvell,mv78230-i2c" alone.
+Your two patches look good to me. Jason, if you merge them somewhere,
+it will make it easier for me to test them. I have the AXP WiFi AP
+board here to do the validation.
 
-Best regards,
+Thanks,
 
 Thomas
 -- 
