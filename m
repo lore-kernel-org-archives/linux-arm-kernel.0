@@ -1,77 +1,42 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 6 Aug 2013 19:25:45 +0400
-Subject: [PATCH 07/10] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <201308052300.22400.arnd@arndb.de>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <201308052126.08078.arnd@arndb.de>
- <20130806004223.2764bb83ce5f254b5e4fc170@mail.ru>
- <201308052300.22400.arnd@arndb.de>
-Message-ID: <20130806192545.602cfa27d5e3471f62de9512@mail.ru>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 6 Aug 2013 17:28:40 +0200
+Subject: [Linaro-mm-sig] [RFC 0/1] drm/pl111: Initial drm/kms driver for
+ pl111
+In-Reply-To: <1375791502.4276.38.camel@weser.hi.pengutronix.de>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
+ <CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>
+ <51f29ccd.f014b40a.34cc.ffffca2aSMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGvFPGueM_LHVij9KFzM6NJySHCzmaLstuzZkK5GwP+6gQ@mail.gmail.com>
+ <51ffdc7e.06b8b40a.2cc8.0fe0SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGsyKk_G-R-OX_YcgYFDgTEmCy9Vf2LV1pAOV0452QKSww@mail.gmail.com>
+ <1375791502.4276.38.camel@weser.hi.pengutronix.de>
+Message-ID: <CAKMK7uFwRfJkkAV6VpC+7RgYJ1niQOb6kHMK=pepy-zGi3aa-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Aug 2013 23:00:22 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, Aug 6, 2013 at 2:18 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> I strongly disagree with exposing low-level hardware details like tiling
+> to userspace. If we have to do the negotiation of those things in
+> userspace we will end up with having to pipe those information through
+> things like the wayland protocol. I don't see how this could ever be
+> considered a good idea.
+>
+> I would rather see kernel drivers negotiating those things at dmabuf
+> attach time in way invisible to userspace. I agree that this negotiation
+> thing isn't easy to get right for the plethora of different hardware
+> constraints we see today, but I would rather see this in-kernel, where
+> we have the chance to fix things up if needed, than in a fixed userspace
+> interface.
 
-> On Monday 05 August 2013, Alexander Shiyan wrote:
-> > On Mon, 5 Aug 2013 21:26:07 +0200
-> > Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > > On Monday 05 August 2013, Alexander Shiyan wrote:
-> > 
-> > > > > Handling them in the irqchip driver probably seemed like a logical solution
-> > > > > when the code was initially written, but if you move that access into the
-> > > > > device drivers, you can probably remove the irqchip driver entirely and just
-> > > > > use the generic irqchip implementation.
-> > > > 
-> > > > ioremap for a whole set of CPU registers is called from map_io, so ioremap
-> > > > returns already mapped address, that is, it's just converting physical to
-> > > > virtual addresses.
-> > > 
-> > > I see, that does make things better at least.
-> > > 
-> > > It would be nice to change the DT binding in some way so the register
-> > > ranges are non-overlapping, but I'm not going to insist if the other
-> > > reviewers are ok with the small inconsistency here.
-> > > 
-> > > Do you have any reason for not using the syscon driver for these
-> > > registers?
-> > 
-> > I plan to use syscon for some registers to ensure the correct sequence
-> > of read-modify-write. For all other registers, the access to which is not
-> > needed from the different subsystems, it does not make sense and seriously
-> > degrade performance due to locks.
-> 
-> Have you measure this? MMIO accesses are typically really slow already, they
-> can be multiple orders of magnitude slower than the locks. Also, note that
-> spinlocks get optimized out on uniprocessor machines.
-
-No, I just keep in mind that any access to any register in regmap (SYSCON)
-will block access to the registers of the other modules, and it will increase
-the interrupt latency.
-
-> The main reason why syscon was introduced is to handle MMIO register sets
-> that span multiple devices within a small range, which is exactly what you
-> have here. You could simply have a single ioremap in the syscon driver
-> and refer to register offsets from drivers using the syscon binding. You
-> could then actually describe all the EIO registers in a way that 
-> 
-> > As alternative, I can completely remove clps711x_ioremap_one() and simply
-> > duplicate ioremap() for the entire range set of registers
-> > (without request_mem_region). The functionality of driver will remain the same.
-> > Will it be better?
-> 
-> That wouldn't change the binding in any way, so I don't see a reason to prefer
-> one or the other (ioremap or clps711x_ioremap_one), especially since you
-> explained that the registers already come with a static boot-time mapping.
-
-What can you say about the removal "reg" property from the bindings and hard
-define the physical address in the driver?
-
-In any case, I'll make a second version of the patch, and since a lot of
-comments, I will divide each functional part in the individual patches.
-So I want to ask again, please apply "fixes" part of the series (1/10-4/10).
-Thanks.
-
+The problem with negotiating tiling in the kernel for at least
+drm/i915 is that userspace needs to know the tiling and for allocating
+actually be in charge of it. The approach used by prime thus far is to
+simply use linear buffers between different gpus. If you want
+something better I guess you need to have a fairly tightly integrate
+userspace driver, so I don't see how passing around the tiling
+information should be an issue for those cases.
+-Daniel
 -- 
-Alexander Shiyan <shc_work@mail.ru>
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
