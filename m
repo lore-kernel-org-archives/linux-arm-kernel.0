@@ -1,54 +1,59 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 06 Aug 2013 11:36:15 +0100
-Subject: [PATCH] MFD: Make VEXPRESS MFD controller depends on VEXPRESS
- systems
-In-Reply-To: <1375603249-27206-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1375603249-27206-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1375785375.12043.4.camel@hornet>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 6 Aug 2013 12:36:18 +0200
+Subject: [PATCH 3.11-rc] pci: mvebu: disable prefetchable memory support
+ in PCI-to-PCI bridge
+In-Reply-To: <20130802174350.GA15787@obsidianresearch.com>
+References: <1375364659-3228-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130802174350.GA15787@obsidianresearch.com>
+Message-ID: <20130806123618.6b95224e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2013-08-04 at 09:00 +0100, Manjunath Goudar wrote:
-> This patch adds a Kconfig dependency on an ARCH_VEXPRESS(it is for
-> both ARM and ARM64) or ARCH_VEXPRESS_CA9X being available before
-> VEXPRESS_CONFIG can be enabled. Without this patch,build system
-> can lead to issues. This was discovered during randconfig testing,
-> in which VEXPRESS_CONFIG was enabled w/o ARCH_VEXPRESS or VEXPRESS_CONFIG
-> being enabled,leading to the following error:
+Dear Jason Gunthorpe,
+
+On Fri, 2 Aug 2013 11:43:50 -0600, Jason Gunthorpe wrote:
+
+> > To achieve this, we simply make the prefetchable memory base a
+> > read-only register that always returns 0. Reading/writing all the
+> > other prefetchable memory related registers has no effect.
 > 
-> CC      drivers/mfd/vexpress-config.o
-> drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
-> drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
-> ?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
->     bridge_node = of_find_node_by_phandle(
->     ^
-> drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
-> integer without a cast [enabled by default]
->     bridge_node = of_find_node_by_phandle(
+> Looks good to me. It is very good that you were able to merge the
+> downstream prefetchable BARs into the normal MMIO window.
 
-Thanks for reporting the problem...
+Thanks.
 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 633ee43..c9202f6 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1174,7 +1174,7 @@ endmenu
->  
->  config VEXPRESS_CONFIG
->  	bool "ARM Versatile Express platform infrastructure"
-> -	depends on ARM || ARM64
-> +	depends on ARCH_VEXPRESS || ARCH_VEXPRESS_CA9X4
->  	help
->  	  Platform configuration infrastructure for the ARM Ltd.
->  	  Versatile Express.
+> Though looking at the original thread I really wonder if something
+> else is wrong here as well. The ethernet should not have only
+> prefetchable BARs.
+> 
+> For instance, I found this link:
+> 
+> https://bugzilla.redhat.com/show_bug.cgi?id=448712
+> 
+> Which shows a more resonable arrangement:
+> 
+> 02:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. RTL8111/8168B PCI Express Gigabit Ethernet controller (rev 02)
+>         Region 0: I/O ports at e800 [size=256]
+>         Region 2: Memory at dffff000 (64-bit, non-prefetchable) [size=4K]
+>         Region 4: Memory at deff0000 (64-bit, prefetchable) [size=64K]
+>         Expansion ROM at dffc0000 [disabled] [size=128K]
+> 
+> vs Finn's:
+> 
+> 01:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. RTL8111/8168B PCI Express Gigabit Ethernet controller (rev)
+>          Subsystem: Realtek Semiconductor Co., Ltd. TEG-ECTX Gigabit PCI-E Adapter [Trendnet]
+>          Flags: bus master, fast devsel, latency 0, IRQ 9
+>          I/O ports at 10000 [size=256]
+>          Memory at e0014000 (64-bit, prefetchable) [size=4K]
+>          Memory at e0010000 (64-bit, prefetchable) [size=16K]
 
-... but this is not the right way to fix it. In case of ARM64 there is
-no (or maybe: there will be no) ARCH_VEXPRESS nor ARCH_ANYTHING if it
-comes to it ;-)
+Right, but Finn had the same output in 3.10, where the old Kirkwood PCI
+driver was used. So it doesn't seem to be related to the driver, but
+maybe to how the hardware works?
 
-What is really missing is a stub for of_find_node_by_phandle() in case
-of CONFIG_OF != y. Care to send a patch adding it?
-
-Thanks!
-
-Pawel
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
