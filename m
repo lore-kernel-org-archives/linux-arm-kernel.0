@@ -1,134 +1,162 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Tue, 06 Aug 2013 12:22:33 +0200
-Subject: [PATCH 2/2] media: s5p-mfc: remove DT hacks and simplify
- initialization code
-In-Reply-To: <1375705610-12724-3-git-send-email-m.szyprowski@samsung.com>
-References: <1375705610-12724-1-git-send-email-m.szyprowski@samsung.com>
- <1375705610-12724-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <030d01ce928e$de27e190$9a77a4b0$%debski@samsung.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 6 Aug 2013 18:24:14 +0800
+Subject: [PATCH 5/5] iio: at91: introduce touch screen support in iio
+ adc driver
+In-Reply-To: <20130725164503.GB22291@e106331-lin.cambridge.arm.com>
+References: <1373789069-11604-1-git-send-email-josh.wu@atmel.com>
+ <1373789069-11604-6-git-send-email-josh.wu@atmel.com>
+ <20130722131747.GA32221@e106331-lin.cambridge.arm.com>
+ <51F0DA36.3090608@atmel.com>
+ <20130725164503.GB22291@e106331-lin.cambridge.arm.com>
+Message-ID: <5200CECE.7030804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Dear Mark
 
-This patch looks good.
+Thanks for the detailed comment. Check mine in below:
 
-Best wishes,
-Kamil Debski
+On 7/26/2013 12:45 AM, Mark Rutland wrote:
+> On Thu, Jul 25, 2013 at 08:56:38AM +0100, Josh Wu wrote:
+>> Hi, Dear Mark
+>>
+>> On 7/22/2013 9:17 PM, Mark Rutland wrote:
+>>> On Sun, Jul 14, 2013 at 09:04:29AM +0100, Josh Wu wrote:
+>>>> AT91 ADC hardware integrate touch screen support. So this patch add touch
+>>>> screen support for at91 adc iio driver.
+>>>> To enable touch screen support in adc, you need to add the dt parameters:
+>>>>     which type of touch are used? (4 or 5 wires), sample period time,
+>>>>     pen detect debounce time, average samples and pen detect resistor.
+>>>>
+>>>> In the meantime, since touch screen will use a interal period trigger of adc,
+>>>> so it is conflict to other hardware triggers. Driver will disable the hardware
+>>>> trigger support if touch screen is enabled.
+>>>>
+>>>> This driver has been tested in AT91SAM9X5-EK and SAMA5D3x-EK.
+>>>>
+>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>>> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>>>> ---
+>>>>    .../devicetree/bindings/arm/atmel-adc.txt          |   13 +
+>>>>    arch/arm/mach-at91/include/mach/at91_adc.h         |   34 ++
+>>>>    drivers/iio/adc/at91_adc.c                         |  389 ++++++++++++++++++--
+>>>>    3 files changed, 412 insertions(+), 24 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>>>> index 0db2945..925d656 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>>>> @@ -29,6 +29,19 @@ Optional properties:
+>>>>      - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
+>>>>      - atmel,adc-clock-rate: ADC clock rate. If not specified, use the default
+>>>>                             adc_op_clk.
+>>>> +  - atmel,adc-touchscreen-wires: Number of touch screen wires. Only support
+>>>> +                                4 and 5 wires touch screen.
+>>> Are 4 and 5 wire configurations that can exist, or the only ones
+>>> supported by the driver?
+>> It can be set:
+>>
+>> atmel,adc-touchscreen-wires = <4>;
+>> or
+>> atmel,adc-touchscreen-wires = <5>;
+>>
+>> according to your touch screen.
+> That doesn't answer my question.
+>
+> Is it possible that 3 or 6 wire configurations might exist, for example,
+> even if not supported by this driver? Or does the design of the adc
+> prevent this?
 
-> From: Marek Szyprowski [mailto:m.szyprowski at samsung.com]
-> Sent: Monday, August 05, 2013 2:27 PM
-> 
-> This patch removes custom initialization of reserved memory regions
-> from s5p-mfc driver. Memory initialization can be now handled by
-> generic code.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+No, only 4-wire or 5-wire touch screen support in market so far.
 
-Acked-by: Kamil Debski <k.debski@samsung.com>
+>
+> Is there any documentation that might make this clearer?
+>
+>>>> +    NOTE: when adc touch screen enabled, the adc hardware trigger will be
+>>>> +          disabled. Since touch screen will occupied the trigger register.
+>>>> +  - atmel,adc-ts-pendet-debounce: Debounce time in microsecond for touch pen
+>>>> +                                 detect.
+>>> For consistency with the adc-touchscreen-wires property, and  other
+>>> properties with timing information, how about
+>>> atmel,adc-touchscreen-debounce-delay-us ?
+>> sound nice to me.
+> Additionally, is this likely to vary from board to board? This feels
+> like configuration that could be done based on the compatible string...
+>
+>>>> +  - atmel,adc-ts-sample-period-time: Sample Period Time in microsecond for
+>>>> +                                    touch screen
+>>> Again, please be consistent with ts or touchscreen. It may also be good
+>>> to have -us to make the units explicit (though it does leave the
+>>> property name being quite a mothful):
+>>>
+>>> atmel,adc-touchscreen-sample-period-us ?
+>> nice. I will use this one.
+> Looking again at the driver code, it looks like a value derived from
+> this eventually gets written to the hardware. Is this a fixed value at
+> integration time, or is this a configuration value? If it's the latter,
+> can the driver not derive a good value for this itself?
 
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc.c |   75 ++++++----------------
-> --------
->  1 file changed, 15 insertions(+), 60 deletions(-)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index a130dcd..696e0e0 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -1011,51 +1011,11 @@ static int match_child(struct device *dev, void
-> *data)  {
->  	if (!dev_name(dev))
->  		return 0;
-> -	return !strcmp(dev_name(dev), (char *)data);
-> +	return !!strstr(dev_name(dev), (char *)data);
->  }
-> 
->  static void *mfc_get_drv_data(struct platform_device *pdev);
-> 
-> -static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev) -{
-> -	unsigned int mem_info[2] = { };
-> -
-> -	dev->mem_dev_l = devm_kzalloc(&dev->plat_dev->dev,
-> -			sizeof(struct device), GFP_KERNEL);
-> -	if (!dev->mem_dev_l) {
-> -		mfc_err("Not enough memory\n");
-> -		return -ENOMEM;
-> -	}
-> -	device_initialize(dev->mem_dev_l);
-> -	of_property_read_u32_array(dev->plat_dev->dev.of_node,
-> -			"samsung,mfc-l", mem_info, 2);
-> -	if (dma_declare_coherent_memory(dev->mem_dev_l, mem_info[0],
-> -				mem_info[0], mem_info[1],
-> -				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0)
-{
-> -		mfc_err("Failed to declare coherent memory for\n"
-> -		"MFC device\n");
-> -		return -ENOMEM;
-> -	}
-> -
-> -	dev->mem_dev_r = devm_kzalloc(&dev->plat_dev->dev,
-> -			sizeof(struct device), GFP_KERNEL);
-> -	if (!dev->mem_dev_r) {
-> -		mfc_err("Not enough memory\n");
-> -		return -ENOMEM;
-> -	}
-> -	device_initialize(dev->mem_dev_r);
-> -	of_property_read_u32_array(dev->plat_dev->dev.of_node,
-> -			"samsung,mfc-r", mem_info, 2);
-> -	if (dma_declare_coherent_memory(dev->mem_dev_r, mem_info[0],
-> -				mem_info[0], mem_info[1],
-> -				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0)
-{
-> -		pr_err("Failed to declare coherent memory for\n"
-> -		"MFC device\n");
-> -		return -ENOMEM;
-> -	}
-> -	return 0;
-> -}
-> -
->  /* MFC probe function */
->  static int s5p_mfc_probe(struct platform_device *pdev)  { @@ -1107,25
-> +1067,20 @@ static int s5p_mfc_probe(struct platform_device *pdev)
->  		goto err_res;
->  	}
-> 
-> -	if (pdev->dev.of_node) {
-> -		ret = s5p_mfc_alloc_memdevs(dev);
-> -		if (ret < 0)
-> -			goto err_res;
-> -	} else {
-> -		dev->mem_dev_l = device_find_child(&dev->plat_dev->dev,
-> -				"s5p-mfc-l", match_child);
-> -		if (!dev->mem_dev_l) {
-> -			mfc_err("Mem child (L) device get failed\n");
-> -			ret = -ENODEV;
-> -			goto err_res;
-> -		}
-> -		dev->mem_dev_r = device_find_child(&dev->plat_dev->dev,
-> -				"s5p-mfc-r", match_child);
-> -		if (!dev->mem_dev_r) {
-> -			mfc_err("Mem child (R) device get failed\n");
-> -			ret = -ENODEV;
-> -			goto err_res;
-> -		}
-> +	dev->mem_dev_l = device_find_child(&dev->plat_dev->dev, "-l",
-> +					   match_child);
-> +	if (!dev->mem_dev_l) {
-> +		mfc_err("Mem child (L) device get failed\n");
-> +		ret = -ENODEV;
-> +		goto err_res;
-> +	}
-> +
-> +	dev->mem_dev_r = device_find_child(&dev->plat_dev->dev, "-r",
-> +					   match_child);
-> +	if (!dev->mem_dev_r) {
-> +		mfc_err("Mem child (R) device get failed\n");
-> +		ret = -ENODEV;
-> +		goto err_res;
->  	}
-> 
->  	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
-> --
-> 1.7.9.5
+After a further thinking, I think it is better to remove this sample 
+period us & pen detect debouce us.
+Since it is a fixed value and no need to change it so far (in 
+at91sam9x5ek, sama5d3xek).
+
+>
+>>>> +  - atmel,adc-ts-filter-average: Numbers of sampling data will be averaged.
+>>>> +    0 means no average. 1 means average two samples. 2 means average four
+>>>> +    samples. 3 means average eight samples.
+>>> Is this averaging done in the hardware, or the kernel driver?
+>> It is done in the hardware.
+> Similarly, this seems to eventually get written to hardware, and thus
+> seems more like configuration than hardware description. Why does this
+> need to be in the DT?
+>
+> As an aside, in general it's nicer to describe a property as a logical
+> value rather than the raw value that gets programmed into hardware (e.g.
+> this property could by 2, 4, or 8 rather than 1, 2, or 4).
+>
+>> But for some soc, like AT91SAM9G45, hardware doesn't support hardware
+>> average.
+>> So I am wondering use it as for both hardware and softer average.
+>>
+>> BTW, you mentioned the kernel driver, do you mean a filter algorithm is
+>> already implemented in kernel library?
+> I do not know of any such filter algorithm in the kernel, though there
+> may be one. I was simply confused as to what this was used for.
+>
+>>> If it's the latter, this can be left for the kernel to decide.
+>>>
+>>>> +  - atmel,adc-ts-pendet-sensitivity: Pen Detection input pull-up resistor.
+>>>> +    It can be 0, 1, 2, 3.
+>>> I think "pendet" is a bit opaque. "pen-detect" may be better.
+>> yes. I'll change this.
+>>
+>>> What
+>>> physical property does this represent (are these discrete values, or an
+>>> enumeration)?
+>> This property is supported by hardware, it can change the adc internal
+>> resistor value for better pen detection,
+>>        * 0 = 200 kOhm, 1 = 150 kOhm, 2 = 100 kOhm, 3 = 50 kOhm
+>> In general, we just use default value 2 for 100kOhm.
+> This value eventually gets written to hardware, and seems more like
+> configuration than hardware description. Why does this need to be in the
+> DT?
+
+I am a little bit confused by the hardware configuration and hardware 
+description.
+It seems I prefer to put all the hardware configurable value to DT. 
+Since I think this can be changed in DT.
+But as you mentioned above, only the hardware description can be in DT.
+Could you give me a more detail about the difference between hardware 
+configuration and hardware description?
+
+Thanks in advance.
+
+>
+> Thanks,
+> Mark.
+
+[... ...]
+
+Best Regards,
+Josh Wu
