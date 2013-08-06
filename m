@@ -1,159 +1,36 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Aug 2013 10:25:13 +0200
-Subject: [PATCH v3 05/16] ARM: mvebu: remove device tree parsing for cpu
- nodes
-In-Reply-To: <51FFD2B1.70509@arm.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51FA3064.9080502@arm.com> <20130801120256.GW5882@titan.lakedaemon.net>
- <51FFD2B1.70509@arm.com>
-Message-ID: <5200B2E9.8090009@free-electrons.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 06 Aug 2013 17:26:06 +0900
+Subject: [PATCH 0/2] ARM: shmobile: remove nfsroot settings
+In-Reply-To: <20130806082333.GA10748@verge.net.au>
+References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
+ <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
+ <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
+ <20130801080226.GF15265@verge.net.au> <20130806010736.GA20940@verge.net.au>
+ <87r4e7h88z.wl%kuninori.morimoto.gx@renesas.com>
+ <20130806022955.GA25114@verge.net.au>
+ <87pptrh6f3.wl%kuninori.morimoto.gx@renesas.com>
+ <87ob9bh5mt.wl%kuninori.morimoto.gx@renesas.com>
+ <87haf3gxg6.wl%kuninori.morimoto.gx@renesas.com>
+ <20130806082333.GA10748@verge.net.au>
+Message-ID: <uzjsvrzs5.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 18:28, Sudeep KarkadaNagesha wrote:
-> On 01/08/13 13:02, Jason Cooper wrote:
->> Sudeep,
->>
->> On Thu, Aug 01, 2013 at 10:54:44AM +0100, Sudeep KarkadaNagesha wrote:
->>> On 22/07/13 12:32, Sudeep KarkadaNagesha wrote:
->>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>>
->>>> Currently set_secondary_cpus_clock assume the CPU logical ordering
->>>> and the MPDIR in DT are same, which is incorrect.
->>>>
->>>> Since the CPU device nodes can be retrieved in the logical ordering
->>>> using the DT helper, we can remove the devices tree parsing.
->>>>
->>>> This patch removes DT parsing by making use of of_get_cpu_node.
->>>>
->>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>>> Cc: Andrew Lunn <andrew@lunn.ch>
->>>> Cc: Jason Cooper <jason@lakedaemon.net>
->>>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>
->>> Hi Gregory/Andrew/Jason,
->>>
->>> Does this change look fine for mvebu?
->>> If yes, can I have your ACKs ?
->>
->> Gregory is the one best suited to review/Ack this.  He'll be back on
->> Monday.
->>
-> Hi Gregory,
-> 
-> Can you please review this patch ?
 
-Your patch is a nice improvement, I reviewed it and I also tested it on the
-Armada XP DB board.
+Hi Simon
 
-You can add my:
-Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
+> > > > Yes, I can send patches.
+> > > > But, I can't test emev2-kzm9d board.
+> > > > Do you have it ?
+> > > 
+> > > These patches remove nfsroot settings from kzm9d/armadillo dts file.
+> > > I tested #1 patch on Armadillo board, but I don't have kzm9d board.
+> > 
+> > I could test kzm9d board on Magnus's environment.
+> > It works well without "rsize/wsize"
+> 
+> Thanks, I will test Armadillo.
 
-> 
-> Regards,
-> Sudeep
->>>> ---
->>>>  arch/arm/mach-mvebu/platsmp.c | 52 ++++++++++++++++++++-----------------------
->>>>  1 file changed, 24 insertions(+), 28 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
->>>> index ce81d30..001dd42 100644
->>>> --- a/arch/arm/mach-mvebu/platsmp.c
->>>> +++ b/arch/arm/mach-mvebu/platsmp.c
->>>> @@ -23,51 +23,47 @@
->>>>  #include <linux/of.h>
->>>>  #include <linux/mbus.h>
->>>>  #include <asm/cacheflush.h>
->>>> +#include <asm/prom.h>
->>>>  #include <asm/smp_plat.h>
->>>>  #include "common.h"
->>>>  #include "armada-370-xp.h"
->>>>  #include "pmsu.h"
->>>>  #include "coherency.h"
->>>>  
->>>> +static struct clk *__init get_cpu_clk(int cpu)
->>>> +{
->>>> +	struct clk *cpu_clk;
->>>> +	struct device_node *np = of_get_cpu_node(cpu);
->>>> +
->>>> +	if (WARN(!np, "missing cpu node\n"))
->>>> +		return NULL;
->>>> +	cpu_clk = of_clk_get(np, 0);
->>>> +	if (WARN_ON(IS_ERR(cpu_clk)))
->>>> +		return NULL;
->>>> +	return cpu_clk;
->>>> +}
->>>> +
->>>>  void __init set_secondary_cpus_clock(void)
->>>>  {
->>>> -	int thiscpu;
->>>> +	int thiscpu, cpu;
->>>>  	unsigned long rate;
->>>> -	struct clk *cpu_clk = NULL;
->>>> -	struct device_node *np = NULL;
->>>> +	struct clk *cpu_clk;
->>>>  
->>>>  	thiscpu = smp_processor_id();
->>>> -	for_each_node_by_type(np, "cpu") {
->>>> -		int err;
->>>> -		int cpu;
->>>> -
->>>> -		err = of_property_read_u32(np, "reg", &cpu);
->>>> -		if (WARN_ON(err))
->>>> -			return;
->>>> -
->>>> -		if (cpu == thiscpu) {
->>>> -			cpu_clk = of_clk_get(np, 0);
->>>> -			break;
->>>> -		}
->>>> -	}
->>>> -	if (WARN_ON(IS_ERR(cpu_clk)))
->>>> +	cpu_clk = get_cpu_clk(thiscpu);
->>>> +	if (!cpu_clk)
->>>>  		return;
->>>>  	clk_prepare_enable(cpu_clk);
->>>>  	rate = clk_get_rate(cpu_clk);
->>>>  
->>>>  	/* set all the other CPU clk to the same rate than the boot CPU */
->>>> -	for_each_node_by_type(np, "cpu") {
->>>> -		int err;
->>>> -		int cpu;
->>>> -
->>>> -		err = of_property_read_u32(np, "reg", &cpu);
->>>> -		if (WARN_ON(err))
->>>> +	for_each_possible_cpu(cpu) {
->>>> +		if (cpu == thiscpu)
->>>> +			continue;
->>>> +		cpu_clk = get_cpu_clk(cpu);
->>>> +		if (!cpu_clk)
->>>>  			return;
->>>> -
->>>> -		if (cpu != thiscpu) {
->>>> -			cpu_clk = of_clk_get(np, 0);
->>>> -			clk_set_rate(cpu_clk, rate);
->>>> -		}
->>>> +		clk_set_rate(cpu_clk, rate);
->>>>  	}
->>>>  }
->>>>  
->>>>
->>>
->>>
->>
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thank you.
+But I already tested it on Armadillo :)
+It works well
