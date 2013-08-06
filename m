@@ -1,65 +1,73 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Tue, 6 Aug 2013 07:20:58 +0000
-Subject: [PATCH 4/5] fb: Add DCU framebuffer driver for Vybrid VF610
- platform
-In-Reply-To: <1375712322.4276.12.camel@weser.hi.pengutronix.de>
-References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
- <1373609276-14566-5-git-send-email-b18965@freescale.com>
- <20130729111457.GB3029@pengutronix.de>
- <81BA6E5E0BC2344391CABCEE22D1B6D83CA6F0@039-SN1MPN1-002.039d.mgd.msft.net>
- <20130805130911.GF30920@pengutronix.de>
- <1375712322.4276.12.camel@weser.hi.pengutronix.de>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D83CEAA6@039-SN1MPN1-002.039d.mgd.msft.net>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 06 Aug 2013 09:32:25 +0200
+Subject: [PATCH v10] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <51FFDFB7.6080806@wwwdotorg.org>
+References: <1374139586-6344-1-git-send-email-p.zabel@pengutronix.de>
+ <20130802092823.GA2884@e106331-lin.cambridge.arm.com>
+ <1375687936.4000.21.camel@pizza.hi.pengutronix.de>
+ <51FFDFB7.6080806@wwwdotorg.org>
+Message-ID: <1375774345.4004.25.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Am Montag, den 05.08.2013, 15:09 +0200 schrieb Robert Schwebel:
-> > On Mon, Aug 05, 2013 at 09:51:40AM +0000, Wang Huan-B18965 wrote:
-> > > > On Fri, Jul 12, 2013 at 02:07:55PM +0800, Alison Wang wrote:
-> > > > > The Display Controller Unit (DCU) module is a system master
-> that
-> > > > > fetches graphics stored in internal or external memory and
-> > > > > displays them on a TFT LCD panel. A wide range of panel sizes
-> is
-> > > > > supported and the timing of the interface signals is highly
-> configurable.
-> > > > > Graphics are read directly from memory and then blended in
-> > > > > real-time, which allows for dynamic content creation with
-> > > > > minimal CPU
-> > > > intervention.
-> > > >
-> > > > Only a review of the code inline.
-> > > >
-> > > > Maybe the real question is whether we want to introduce another
-> > > > framebuffer driver at all instead of making it a DRM driver.
-> > > [Alison Wang] I think DCU module is more suitable to be designed as
-> a framebuffer driver than a DRM driver. Just like DIU framebuffer
-> driver for PowerPC.
-> >
-> > We looked at the Vybrid datasheet and it's DCU section last week, and
-> > with its 64 planes, the controller really wants to get a DRM driver.
-> >
-> Exactly, with it's extensive hardware composition capabilities the
-> controller begs for being driven by a proper DRM driver. There is no
-> way in fbdev to properly support all those hardware planes without
-> introducing a lot of non standard ioctls, which in turn will force you
-> into writing a lot of custom userspace code instead of running proven
-> technology that sits on top of KMS.
+Am Montag, den 05.08.2013, 11:24 -0600 schrieb Stephen Warren:
+> On 08/05/2013 01:32 AM, Philipp Zabel wrote:
+> > Am Freitag, den 02.08.2013, 10:28 +0100 schrieb Mark Rutland:
+> >> On Thu, Jul 18, 2013 at 10:26:26AM +0100, Philipp Zabel wrote:
+> >>> This driver implements a reset controller device that toggle a gpio
+> >>> connected to a reset pin of a peripheral IC. The delay between assertion
+> >>> and de-assertion of the reset signal can be configured via device tree.
+> ...
+> >> I think this should look more like the below:
+> >>
+> >> /* Device with nRESET pin connected to GPIO5_0 */
+> >> sii902x at 39 {
+> >> 	/* named for the actual input line */
+> >> 	nreset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+> >> 	/* 
+> >> 	 * If there's some configurable property relating to the reset
+> >> 	 * line, we can describe it
+> >> 	 */
+> >> 	vendor,some-optional-reset-gpio-property;
+> >> 	...
+> >> };
+> > 
+> > I don't like the arbitrary name, as that makes it difficult to handle
+> > this in an automated way. In this case I'd prefer to use 'reset-gpios'
+> > and optionally 'reset-gpio-names' analogous to how clocks and interrupts
+> > (and resets) are handled.
 > 
-> Doing things in DRM might be slightly more work for the initial bring
-> up, but will pay off in the long run when you are going to really use
-> the hardware caps of the controller.
-> 
-[Alison Wang] Thanks for your comments and explanations. I understand your considerations.
+> Hmm. Just be aware that you can't force existing bindings to be
+> retro-actively modified, or you'll break the DT ABI. So, at the very
+> least we'd have to allow the existing custom-property-based approach for
+> bindings where it's already been used.
 
-In DCU module, there are 64 graphics layers, but the maximum source layers for blending of each pixel is only 6. The fb driver could satisfy the current application requirements.
+Of course we have to continue supporting existing bindings. We could
+continue using the GPIO API directly for those cases, or we could add a
+function similar to of_get_named_gpio to wrap the GPIO:
 
-So I will push out this fb driver first, and then I will add a DRM driver for more advanced requirements.
+	rstc = of_get_named_reset_control(np, "nvidia,phy-reset-gpio", 0);
+	reset_control_assert(rstc);
+	usleep(1000);
+	reset_control_deassert(rstc);
 
-Do you have more comments?
+My point is that for new bindings I'd prefer a well known property name
+such as reset-gpios and a -names string list (as described
+Documentation/devicetree/bindings/resource-names.txt) over ad-hoc
+property names such as nreset-gpios, <vendor>-<submodule>-(n)reset,
+nrst-gpios etc., both for consistency with existing resource properties
+and because it is easier to grep for a single property name than for a
+combination of all possible datasheet spellings of "reset".
 
+I'd like
+	rstc = reset_control_get(dev, "nreset");
+to go look for
+	resets = <&src 3>;
+	reset-names = "nreset";
+or for
+	reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+	reset-gpio-names = "nreset";
+by default.
 
-Best Regards,
-Alison Wang
+regards
+Philipp
