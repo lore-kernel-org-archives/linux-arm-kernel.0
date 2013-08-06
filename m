@@ -1,36 +1,27 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 06 Aug 2013 17:26:06 +0900
-Subject: [PATCH 0/2] ARM: shmobile: remove nfsroot settings
-In-Reply-To: <20130806082333.GA10748@verge.net.au>
-References: <1375175361-23027-1-git-send-email-horms+renesas@verge.net.au>
- <1375175361-23027-4-git-send-email-horms+renesas@verge.net.au>
- <87bo5h3lb3.wl%kuninori.morimoto.gx@renesas.com>
- <20130801080226.GF15265@verge.net.au> <20130806010736.GA20940@verge.net.au>
- <87r4e7h88z.wl%kuninori.morimoto.gx@renesas.com>
- <20130806022955.GA25114@verge.net.au>
- <87pptrh6f3.wl%kuninori.morimoto.gx@renesas.com>
- <87ob9bh5mt.wl%kuninori.morimoto.gx@renesas.com>
- <87haf3gxg6.wl%kuninori.morimoto.gx@renesas.com>
- <20130806082333.GA10748@verge.net.au>
-Message-ID: <uzjsvrzs5.wl%kuninori.morimoto.gx@renesas.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 6 Aug 2013 14:03:01 +0530
+Subject: [PATCH 0/3] ARM: AM33xx: Add RNG module data
+Message-ID: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds HWMOD, CLOCK and DT data for
+RNG module.
 
-Hi Simon
+Lokesh Vutla (3):
+  ARM: AM33XX: hwmod: Add rng module data
+  ARM: AM33xx: Add rng clock data
+  ARM: dts: AM33xx: Add RNG node
 
-> > > > Yes, I can send patches.
-> > > > But, I can't test emev2-kzm9d board.
-> > > > Do you have it ?
-> > > 
-> > > These patches remove nfsroot settings from kzm9d/armadillo dts file.
-> > > I tested #1 patch on Armadillo board, but I don't have kzm9d board.
-> > 
-> > I could test kzm9d board on Magnus's environment.
-> > It works well without "rsize/wsize"
-> 
-> Thanks, I will test Armadillo.
+ .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts                  |    4 +++
+ arch/arm/boot/dts/am335x-evm.dts                   |    4 +++
+ arch/arm/boot/dts/am335x-evmsk.dts                 |    4 +++
+ arch/arm/boot/dts/am33xx.dtsi                      |    8 +++++
+ arch/arm/mach-omap2/cclock33xx_data.c              |    5 +++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |   35 ++++++++++++++++++++
+ 7 files changed, 82 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
 
-Thank you.
-But I already tested it on Armadillo :)
-It works well
+-- 
+1.7.9.5
