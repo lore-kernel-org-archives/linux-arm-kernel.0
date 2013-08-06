@@ -1,159 +1,79 @@
-From: tom.cooksey@arm.com (Tom Cooksey)
-Date: Tue, 6 Aug 2013 18:38:02 +0100
-Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
-In-Reply-To: <CAF6AEGsDA8qdShWdYQRqQ0Czn4mLAe-FoADjZdRFcbeWGGe8Hg@mail.gmail.com>
-References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>	<CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>	<51f29ccd.f014b40a.34cc.ffffca2aSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGvFPGueM_LHVij9KFzM6NJySHCzmaLstuzZkK5GwP+6gQ@mail.gmail.com>	<51ffdc7e.06b8b40a.2cc8.0fe0SMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGsyKk_G-R-OX_YcgYFDgTEmCy9Vf2LV1pAOV0452QKSww@mail.gmail.com>	<5200deb3.0b24b40a.3b26.ffffbadeSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGvXcpTKrTjhvrycLqab6F9QP5fAk0ZEWxJ-WvE==PiPsA@mail.gmail.com>	<52010257.245fc20a.6ff8.1cfdSMTPIN_ADDED_BROKEN@mx.google.com>
- <CAF6AEGsDA8qdShWdYQRqQ0Czn4mLAe-FoADjZdRFcbeWGGe8Hg@mail.gmail.com>
-Message-ID: <000301ce92cb$b396e470$1ac4ad50$@cooksey@arm.com>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Tue, 6 Aug 2013 10:40:11 -0700
+Subject: [PATCH] leds: leds-netxbig: depends on ARCH_KIRKWOOD
+In-Reply-To: <20130806121750.GP19280@titan.lakedaemon.net>
+References: <1375369655-1310-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375479274-9942-1-git-send-email-simon.guinot@sequanux.org>
+ <20130803141200.GI5882@titan.lakedaemon.net>
+ <CAK5ve-+aeB1S0E=HAxPyVwoQ0WOEREQC+XnAeHX4bU_eavsP2Q@mail.gmail.com>
+ <20130806121750.GP19280@titan.lakedaemon.net>
+Message-ID: <CAK5ve-L9HWNKYTWvPtBMWCLaBxr_pLu7iXP15wAdxyGZOcjQNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 6, 2013 at 5:17 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> Bryan,
+>
+> On Mon, Aug 05, 2013 at 03:52:35PM -0700, Bryan Wu wrote:
+>> On Sat, Aug 3, 2013 at 7:12 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+>> > On Fri, Aug 02, 2013 at 11:34:34PM +0200, Simon Guinot wrote:
+>> >> With the DT conversion, the board Kconfig symbols MACH_ are going to be
+>> >> removed. In order to prepare this removal, this patch replaces alls the
+>> >> machines dependencies for leds-netxbig by ARCH_KIRKWOOD.
+>> >>
+>> >> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+>> >> ---
+>> >> Thomas,
+>> >>
+>> >> Please, insert this patch in your series before the patch named:
+>> >> [PATCHv2 7/9] ARM: kirkwood: convert LaCie Net{2, 5}Big v2 platforms to DT
+>> >
+>> > Nah, this should go through linux-leds.
+>> >
+>> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+>> >
+>>
+>> I can merge this patch through my tree but when will that kirkwood
+>> patch be merged?
+>
+> It's okay, it falls in the same category as the other patch you merged.
+> There's no dependency between this patch and the rest of this series,
+> despite the above request to insert.
+>
+> thx,
+>
+> Jason.
+>
+>> How about merge this with those kirkwood patches with my ack:
+>>
+>> Acked-by: Bryan Wu <cooloney@gmail.com>
+>
+> No, no, no.  I'm trying to encourage patches to go through the
+> proper trees when possible.  :-P
+>
 
-> >> ... This is the purpose of the attach step,
-> >> so you know all the devices involved in sharing up front before
-> >> allocating the backing pages. (Or in the worst case, if you have a
-> >> "late attacher" you at least know when no device is doing dma access
-> >> to a buffer and can reallocate and move the buffer.)  A long time
-> >> back, I had a patch that added a field or two to 'struct
-> >> device_dma_parameters' so that it could be known if a device
-> >> required contiguous buffers.. looks like that never got merged, so
-> >> I'd need to dig that back up and resend it.  But the idea was to 
-> >> have the 'struct device' encapsulate all the information that would 
-> >> be needed to do-the-right-thing when it comes to placement.
-> >
-> > As I understand it, it's up to the exporting device to allocate the
-> > memory backing the dma_buf buffer. I guess the latest possible point
-> > you can allocate the backing pages is when map_dma_buf is first
-> > called? At that point the exporter can iterate over the current set
-> > of attachments, programmatically determine the all the constraints of
-> > all the attached drivers and attempt to allocate the backing pages
-> > in such a way as to satisfy all those constraints?
-> 
-> yes, this is the idea..  possibly some room for some helpers to help
-> out with this, but that is all under the hood from userspace
-> perspective
-> 
-> > Didn't you say that programmatically describing device placement
-> > constraints was an unbounded problem? I guess we would have to
-> > accept that it's not possible to describe all possible constraints
-> > and instead find a way to describe the common ones?
-> 
-> well, the point I'm trying to make, is by dividing your constraints
-> into two groups, one that impacts and is handled by userspace, and one
-> that is in the kernel (ie. where the pages go), you cut down the
-> number of permutations that the kernel has to care about considerably.
->  And kernel already cares about, for example, what range of addresses
-> that a device can dma to/from.  I think really the only thing missing
-> is the max # of sglist entries (contiguous or not)
+No problem, merged already.
 
-I think it's more than physically contiguous or not.
+-Bryan
 
-For example, it can be more efficient to use large page sizes on
-devices with IOMMUs to reduce TLB traffic. I think the size and even
-the availability of large pages varies between different IOMMUs.
-
-There's also the issue of buffer stride alignment. As I say, if the
-buffer is to be written by a tile-based GPU like Mali, it's more
-efficient if the buffer's stride is aligned to the max AXI bus burst
-length. Though I guess a buffer stride only makes sense as a concept 
-when interpreting the data as a linear-layout 2D image, so perhaps 
-belongs in user-space along with format negotiation?
-
-
-> > One problem with this is it duplicates a lot of logic in each
-> > driver which can export a dma_buf buffer. Each exporter will need to
-> > do pretty much the same thing: iterate over all the attachments,
-> > determine of all the constraints (assuming that can be done) and
-> > allocate pages such that the lowest-common-denominator is satisfied.
-> >
-> > Perhaps rather than duplicating that logic in every driver, we could
-> > Instead move allocation of the backing pages into dma_buf itself?
-> >
-> 
-> I tend to think it is better to add helpers as we see common patterns
-> emerge, which drivers can opt-in to using.  I don't think that we
-> should move allocation into dma_buf itself, but it would perhaps be
-> useful to have dma_alloc_*() variants that could allocate for multiple
-> devices.
-
-A helper could work I guess, though I quite like the idea of having
-dma_alloc_*() variants which take a list of devices to allocate memory
-for.
-
-
-> That would help for simple stuff, although I'd suspect
-> eventually a GPU driver will move away from that.  (Since you probably
-> want to play tricks w/ pools of pages that are pre-zero'd and in the
-> correct cache state, use spare cycles on the gpu or dma engine to
-> pre-zero uncached pages, and games like that.)
-
-So presumably you're talking about a GPU driver being the exporter
-here? If so, how could the GPU driver do these kind of tricks on
-memory shared with another device?
-
-
-
-> >> > Anyway, assuming user-space can figure out how a buffer should be
-> >> > stored in memory, how does it indicate this to a kernel driver and
-> >> > actually allocate it? Which ioctl on which device does user-space
-> >> > call, with what parameters? Are you suggesting using something
-> >> > like ION which exposes the low-level details of how buffers are 
-> > >> laid out in physical memory to userspace? If not, what?
-> >> > 
-> >>
-> >> no, userspace should not need to know this.  And having a central
-> >> driver that knows this for all the other drivers in the system
-> >> doesn't really solve anything and isn't really scalable.  At best
-> >> you might want, in some cases, a flag you can pass when allocating.
-> >> For example, some of the drivers have a 'SCANOUT' flag that can be
-> >> passed when allocating a GEM buffer, as a hint to the kernel that 
-> >> 'if this hw requires contig memory for scanout, allocate this
-> >> buffer contig'. But really, when it comes to sharing buffers 
-> >> between devices, we want this sort of information in dev->dma_params
-> >> of the importing device(s).
-> >
-> > If you had a single driver which knew the constraints of all devices
-> > on that particular SoC and the interface allowed user-space to
-> > specify which devices a buffer is intended to be used with, I guess
-> > it could pretty trivially allocate pages which satisfy those
-constraints?
-> 
-> keep in mind, even a number of SoC's come with pcie these days.  You
-> already have things like
-> 
->   https://developer.nvidia.com/content/kayla-platform
-> 
-> You probably want to get out of the SoC mindset, otherwise you are
-> going to make bad assumptions that come back to bite you later on.
-
-Sure - there are always going to be PC-like devices where the 
-hardware configuration isn't fixed like it is on a traditional SoC.
-But I'd rather have a simple solution which works on traditional SoCs
-than no solution at all. Today our solution is to over-load the dumb
-buffer alloc functions of the display's DRM driver - For now I'm just
-looking for the next step up from that! ;-)
-
-
-> > wouldn't need a way to programmatically describe the constraints
-> > either: As you say, if userspace sets the "SCANOUT" flag, it would
-> > just "know" that on this SoC, that buffer needs to be physically
-> > contiguous for example.
-> 
-> not really.. it just knows it wants to scanout the buffer, and tells
-> this as a hint to the kernel.
-> 
-> For example, on omapdrm, the SCANOUT flag does nothing on omap4+
-> (where phys contig is not required for scanout), but causes CMA
-> (dma_alloc_*()) to be used on omap3.  Userspace doesn't care.  It just
-> knows that it wants to be able to scanout that particular buffer.
-
-I think that's the idea? The omap3's allocator driver would use
-contiguous memory when it detects the SCANOUT flag whereas the omap4
-allocator driver wouldn't have to. No complex negotiation of
-constraints - it just "knows".
-
-
-
-Cheers,
-
-Tom
+>> >
+>> >>  drivers/leds/Kconfig |    2 +-
+>> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+>> >> index 0e41460..7226696 100644
+>> >> --- a/drivers/leds/Kconfig
+>> >> +++ b/drivers/leds/Kconfig
+>> >> @@ -407,8 +407,8 @@ config LEDS_NS2
+>> >>
+>> >>  config LEDS_NETXBIG
+>> >>       tristate "LED support for Big Network series LEDs"
+>> >> -     depends on MACH_NET2BIG_V2 || MACH_NET5BIG_V2
+>> >>       depends on LEDS_CLASS
+>> >> +     depends on ARCH_KIRKWOOD
+>> >>       default y
+>> >>       help
+>> >>         This option enable support for LEDs found on the LaCie 2Big
+>> >> --
+>> >> 1.7.10.4
+>> >>
