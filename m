@@ -1,210 +1,139 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 6 Aug 2013 16:01:49 +0200
-Subject: [PATCH 1/2] ARM: msm: Add support for MSM8974 Dragonboard
-In-Reply-To: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
-References: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <CABxcv==vAPZ0vP7Dichm5VPW=35cHBtXCcVzwtpHZTXDjF-yBw@mail.gmail.com>
+From: tom.cooksey@arm.com (Tom Cooksey)
+Date: Tue, 6 Aug 2013 15:03:56 +0100
+Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <CAF6AEGvXcpTKrTjhvrycLqab6F9QP5fAk0ZEWxJ-WvE==PiPsA@mail.gmail.com>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>	<CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>	<51f29ccd.f014b40a.34cc.ffffca2aSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGvFPGueM_LHVij9KFzM6NJySHCzmaLstuzZkK5GwP+6gQ@mail.gmail.com>	<51ffdc7e.06b8b40a.2cc8.0fe0SMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGsyKk_G-R-OX_YcgYFDgTEmCy9Vf2LV1pAOV0452QKSww@mail.gmail.com>	<5200deb3.0b24b40a.3b26.ffffbadeSMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGvXcpTKrTjhvrycLqab6F9QP5fAk0ZEWxJ-WvE==PiPsA@mail.gmail.com>
+Message-ID: <000201ce92ad$ca954220$5fbfc660$@cooksey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 6, 2013 at 1:02 AM, Rohit Vaswani <rvaswani@codeaurora.org> wrote:
-> This patch adds basic board support for MSM8974 Dragonboard
-> which belongs to the Snapdragon 800 family.
-> For now, just support a basic machine with device tree.
->
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
->  arch/arm/boot/dts/Makefile        |  3 ++-
->  arch/arm/boot/dts/msm8974-db.dts  | 26 ++++++++++++++++++++++++++
->  arch/arm/mach-msm/Kconfig         | 21 ++++++++++++++++++---
->  arch/arm/mach-msm/Makefile        |  1 +
->  arch/arm/mach-msm/board-dt-8974.c | 23 +++++++++++++++++++++++
->  5 files changed, 70 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/boot/dts/msm8974-db.dts
->  create mode 100644 arch/arm/mach-msm/board-dt-8974.c
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 641b3c9a..62cea36 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -97,7 +97,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
->         kirkwood-openblocks_a6.dtb
->  dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
->  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
-> -       msm8960-cdp.dtb
-> +       msm8960-cdp.dtb \
-> +       msm8974-db.dtb
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->         armada-370-mirabox.dtb \
->         armada-370-rd.dtb \
-> diff --git a/arch/arm/boot/dts/msm8974-db.dts b/arch/arm/boot/dts/msm8974-db.dts
-> new file mode 100644
-> index 0000000..badfc61
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/msm8974-db.dts
-> @@ -0,0 +1,26 @@
-> +/dts-v1/;
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +       model = "Qualcomm MSM8974 Dragonboard";
-> +       compatible = "qcom,msm8974-db", "qcom,msm8974";
-> +       interrupt-parent = <&intc>;
-> +
-> +       intc: interrupt-controller at f9000000 {
-> +               compatible = "qcom,msm-qgic2";
-> +               interrupt-controller;
-> +               #interrupt-cells = <3>;
-> +               reg = < 0xf9000000 0x1000 >,
-> +                     < 0xf9002000 0x1000 >;
-> +       };
-> +
-> +       timer {
-> +               compatible = "arm,armv7-timer";
-> +               interrupts = <1 2 0xf08>,
-> +                            <1 3 0xf08>,
-> +                            <1 4 0xf08>,
-> +                            <1 1 0xf08>;
-> +               clock-frequency = <19200000>;
-> +       };
-> +};
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 614e41e..343675b 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -1,12 +1,12 @@
->  if ARCH_MSM
->
->  comment "Qualcomm MSM SoC Type"
-> -       depends on (ARCH_MSM8X60 || ARCH_MSM8960)
-> +       depends on ARCH_MSM_DT
->
->  choice
->         prompt "Qualcomm MSM SoC Type"
->         default ARCH_MSM7X00A
-> -       depends on !(ARCH_MSM8X60 || ARCH_MSM8960)
-> +       depends on !ARCH_MSM_DT
->
->  config ARCH_MSM7X00A
->         bool "MSM7x00A / MSM7x01A"
-> @@ -60,6 +60,19 @@ config ARCH_MSM8960
->         select MSM_SCM if SMP
->         select USE_OF
->
-> +config ARCH_MSM8974
-> +       bool "MSM8974"
-> +       select ARM_GIC
-> +       select CPU_V7
-> +       select HAVE_ARM_ARCH_TIMER
-> +       select HAVE_SMP
-> +       select MSM_SCM if SMP
-> +       select USE_OF
-> +
-> +config ARCH_MSM_DT
-> +       def_bool y
-> +       depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
-> +
->  config MSM_HAS_DEBUG_UART_HS
->         bool
->
-> @@ -68,6 +81,7 @@ config MSM_SOC_REV_A
->
->  config  ARCH_MSM_ARM11
->         bool
-> +
->  config  ARCH_MSM_SCORPION
->         bool
->
-> @@ -75,6 +89,7 @@ config  MSM_VIC
->         bool
->
->  menu "Qualcomm MSM Board Type"
-> +       depends on !ARCH_MSM_DT
->
->  config MACH_HALIBUT
->         depends on ARCH_MSM
-> @@ -121,7 +136,7 @@ config MSM_SMD
->         bool
->
->  config MSM_GPIOMUX
-> -       depends on !(ARCH_MSM8X60 || ARCH_MSM8960)
-> +       depends on !ARCH_MSM_DT
->         bool "MSM V1 TLMM GPIOMUX architecture"
->         help
->           Support for MSM V1 TLMM GPIOMUX architecture.
-> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-> index d257ff4..80e3b15 100644
-> --- a/arch/arm/mach-msm/Makefile
-> +++ b/arch/arm/mach-msm/Makefile
-> @@ -29,5 +29,6 @@ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
->  obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
->  obj-$(CONFIG_ARCH_MSM8X60) += board-dt-8660.o
->  obj-$(CONFIG_ARCH_MSM8960) += board-dt-8960.o
-> +obj-$(CONFIG_ARCH_MSM8974) += board-dt-8974.o
->  obj-$(CONFIG_MSM_GPIOMUX) += gpiomux.o
->  obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o
-> diff --git a/arch/arm/mach-msm/board-dt-8974.c b/arch/arm/mach-msm/board-dt-8974.c
-> new file mode 100644
-> index 0000000..697623e
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-dt-8974.c
-> @@ -0,0 +1,23 @@
-> +/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/of_platform.h>
-> +#include <asm/mach/arch.h>
-> +
-> +static const char * const msm8974_dt_match[] __initconst = {
-> +       "qcom,msm8974-db",
-> +       NULL
-> +};
-> +
-> +DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM (Flattened Device Tree)")
-> +       .dt_compat = msm8974_dt_match,
-> +MACHINE_END
-> --
+Hi Rob,
 
-Hi Rohit,
+> >> > We may also then have additional constraints when sharing buffers
+> >> > between the display HW and video decode or even camera ISP HW.
+> >> > Programmatically describing buffer allocation constraints is very
+> >> > difficult and I'm not sure you can actually do it - there's some
+> >> > pretty complex constraints out there! E.g. I believe there's a
+> >> > platform where Y and UV planes of the reference frame need to be
+> >> > in separate DRAM banks for real-time 1080p decode, or something 
+> >> > like that?
+> >>
+> >> yes, this was discussed.  This is different from pitch/format/size
+> >> constraints.. it is really just a placement constraint (ie. where 
+> >> do the physical pages go).  IIRC the conclusion was to use a dummy
+> >> devices with it's own CMA pool for attaching the Y vs UV buffers.
+> >>
+> >> > Anyway, I guess my point is that even if we solve how to allocate
+> >> > buffers which will be shared between the GPU and display HW such
+> >> > that both sets of constraints are satisfied, that may not be the
+> >> > end of the story.
+> >> >
+> >>
+> >> that was part of the reason to punt this problem to userspace ;-)
+> >>
+> >> In practice, the kernel drivers doesn't usually know too much about
+> >> the dimensions/format/etc.. that is really userspace level 
+> >> knowledge. There are a few exceptions when the kernel needs to know
+> >> how to setup GTT/etc for tiled buffers, but normally this sort of 
+> >> information is up at the next level up (userspace, and 
+> >> drm_framebuffer in case of scanout).  Userspace media frameworks 
+> >> like GStreamer already have a concept of format/caps negotiation.  
+> >> For non-display<->gpu sharing, I think this is probably where this 
+> >> sort of constraint negotiation should be handled.
+> >
+> > I agree that user-space will know which devices will access the
+> > buffer and thus can figure out at least a common pixel format. 
+> > Though I'm not so sure userspace can figure out more low-level 
+> > details like alignment and placement in physical memory, etc.
+> > 
+> 
+> well, let's divide things up into two categories:
+> 
+> 1) the arrangement and format of pixels.. ie. what userspace would
+> need to know if it mmap's a buffer.  This includes pixel format,
+> stride, etc.  This should be negotiated in userspace, it would be
+> crazy to try to do this in the kernel.
 
-I wonder if this arch/arm/mach-msm/board-dt-8974.c boad file is really
-needed. I just noticed that already exist an
-arch/arm/mach-msm/board-dt-8960.c and
-arch/arm/mach-msm/board-dt-8660.c board files which doesn't seem to be
-that different.
+Absolutely. Pixel format has to be negotiated by user-space as in
+most cases, user-space can map the buffer and thus will need to
+know how to interpret the data.
 
-I'm not familiar with msm at all so maybe all these boards files are
-needed. But one of the goals of having DeviceTree for ARM is to get
-rid of all the board files so I don't think is a good idea to add a
-board file for each DT added.
 
-In OMAP for example we only have one board file that is used for DT
-booting (arch/arm/mach-omap2/board-generic.c). These board file has a
-struct machine_desc for each OMAP family which defines a dt_compact
-for the family (i.e: ti,omap4).
 
-Since the machine init is almost the same for each SoC in a given
-family a board DTB can just define:
+> 2) the physical placement of the pages.  Ie. whether it is contiguous
+> or not.  Which bank the pages in the buffer are placed in, etc.  This
+> is not visible to userspace.
 
-compatible = "foo,bard", "ti,omap3";
+Seems sensible to me.
 
-Since the compatible string is processed from specific to generic, a
-board can define its own struct machine_desc in case it really needs
-but it should just use the generic one in case it works for it.
 
-Again, I'm not familiar with the Snapdragon 800 SoC family but maybe
-you can do something similar to what we do in OMAP for this SoC
-family.
+> ... This is the purpose of the attach step,
+> so you know all the devices involved in sharing up front before
+> allocating the backing pages. (Or in the worst case, if you have a
+> "late attacher" you at least know when no device is doing dma access
+> to a buffer and can reallocate and move the buffer.)  A long time
+> back, I had a patch that added a field or two to 'struct
+> device_dma_parameters' so that it could be known if a device required
+> contiguous buffers.. looks like that never got merged, so I'd need to
+> dig that back up and resend it.  But the idea was to have the 'struct
+> device' encapsulate all the information that would be needed to
+> do-the-right-thing when it comes to placement.
 
-Thanks a lot and best regards,
-Javier
+As I understand it, it's up to the exporting device to allocate the
+memory backing the dma_buf buffer. I guess the latest possible point
+you can allocate the backing pages is when map_dma_buf is first 
+called? At that point the exporter can iterate over the current set
+of attachments, programmatically determine the all the constraints of
+all the attached drivers and attempt to allocate the backing pages
+in such a way as to satisfy all those constraints?
+
+Didn't you say that programmatically describing device placement
+constraints was an unbounded problem? I guess we would have to
+accept that it's not possible to describe all possible constraints
+and instead find a way to describe the common ones?
+
+One problem with this is it duplicates a lot of logic in each
+driver which can export a dma_buf buffer. Each exporter will need to
+do pretty much the same thing: iterate over all the attachments,
+determine of all the constraints (assuming that can be done) and
+allocate pages such that the lowest-common-denominator is satisfied.
+
+Perhaps rather than duplicating that logic in every driver, we could
+Instead move allocation of the backing pages into dma_buf itself?
+
+
+> > Anyway, assuming user-space can figure out how a buffer should be
+> > stored in memory, how does it indicate this to a kernel driver and
+> > actually allocate it? Which ioctl on which device does user-space
+> > call, with what parameters? Are you suggesting using something like
+> > ION which exposes the low-level details of how buffers are laid out
+> in
+> > physical memory to userspace? If not, what?
+> 
+> no, userspace should not need to know this.  And having a central
+> driver that knows this for all the other drivers in the system doesn't
+> really solve anything and isn't really scalable.  At best you might
+> want, in some cases, a flag you can pass when allocating.  For
+> example, some of the drivers have a 'SCANOUT' flag that can be passed
+> when allocating a GEM buffer, as a hint to the kernel that 'if this hw
+> requires contig memory for scanout, allocate this buffer contig'.  But
+> really, when it comes to sharing buffers between devices, we want this
+> sort of information in dev->dma_params of the importing device(s).
+   
+If you had a single driver which knew the constraints of all devices
+on that particular SoC and the interface allowed user-space to specify
+which devices a buffer is intended to be used with, I guess it could
+pretty trivially allocate pages which satisfy those constraints? It
+wouldn't need a way to programmatically describe the constraints
+either: As you say, if userspace sets the "SCANOUT" flag, it would
+just "know" that on this SoC, that buffer needs to be physically 
+contiguous for example.
+
+Though It would effectively mean you'd need an "allocation" driver per
+SoC, which as you say may not be scalable?
+
+
+Cheers,
+
+Tom
