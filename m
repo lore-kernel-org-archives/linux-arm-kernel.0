@@ -1,104 +1,74 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 6 Aug 2013 11:07:07 +0900
-Subject: [PATCH 12/13] ARM: shmobile: Use clocksource_of_init() on r8a7790
-In-Reply-To: <20130806012855.GB20940@verge.net.au>
-References: <20130731190110.31796.96552.sendpatchset@w520>
- <20130731190300.31796.23926.sendpatchset@w520>
- <20130806012855.GB20940@verge.net.au>
-Message-ID: <20130806020705.GC20940@verge.net.au>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Tue, 06 Aug 2013 12:07:02 +1000
+Subject: [PATCH] mach-ks8695/Kconfig: Make MACH_KS8695 depends on PCI
+In-Reply-To: <CAJFYCKHVb7EXiYPDBACotSc8bwnBM4bTXvtV-Fr=F2MonV7rKg@mail.gmail.com>
+References: <1375693624-21548-1-git-send-email-manjunath.goudar@linaro.org>
+ <CAKohpomo-J1Y_Zf8OLCCvrgfqi7m7tBju=rPp9+wuDAYL_-x7g@mail.gmail.com>
+ <CAJFYCKHVb7EXiYPDBACotSc8bwnBM4bTXvtV-Fr=F2MonV7rKg@mail.gmail.com>
+Message-ID: <52005A46.4090306@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 10:28:56AM +0900, Simon Horman wrote:
-> On Thu, Aug 01, 2013 at 04:03:00AM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Replace the call to shmobile_timer_init() with
-> > clocksource_of_init(). This will allow us to
-> > get rid of shmobile_timer_init().
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > ---
-> > 
-> >  arch/arm/mach-shmobile/setup-r8a7790.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > --- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
-> > +++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-08-01 03:17:48.000000000 +0900
-> > @@ -263,7 +263,7 @@ void __init r8a7790_timer_init(void)
-> >  	iounmap(base);
-> >  #endif /* CONFIG_ARM_ARCH_TIMER */
-> >  
-> > -	shmobile_timer_init();
-> > +	clocksource_of_init();
-> >  }
-> >  
-> >  void __init r8a7790_init_delay(void)
+Hi Manjunath,
+
+On 05/08/13 20:31, Manjunath Goudar wrote:
+> On 5 August 2013 14:47, Viresh Kumar <viresh.kumar at linaro.org <mailto:viresh.kumar@linaro.org>> wrote:
 > 
-> I seem to need the following:
+>     On 5 August 2013 14:37, Manjunath Goudar <manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org>> wrote:
+>     > From: root <root at si-cspbld63.lge.net <mailto:root@si-cspbld63.lge.net>>
 > 
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-> index 7301255..d0f5c9f 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-> @@ -18,6 +18,7 @@
->   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
->   */
->  
-> +#include <linux/clocksource.h>
->  #include <linux/irq.h>
->  #include <linux/kernel.h>
->  #include <linux/of_platform.h>
+>     :)
+> 
+>     > This patch adds a Kconfig dependency on MACH_KS8695,MACH_CM* or MACH_IM*
+>     > being available before PCI can be enabled. Without this patch,build system
+> 
+>     Add Space after ','
+> 
+>     > can lead to issues. This was discovered during randconfig testing,
+>     > without PCI if any one of MACH_KS8695,MACH_CM* or MACH_IM* being enabled,
+> 
+>     Same here.
+> 
+>     > leading to the following error:
+>     >
+>     > LD      init/built-in.o
+>     > arch/arm/mach-ks8695/built-in.o: In function `og_register_pci':
+>     > arch/arm/mach-ks8695/board-og.c:47:undefined reference to `ks8695_init_pci'
+>     > make: *** [vmlinux] Error 1
+>     >
+>     > Signed-off-by: Manjunath Goudar <manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org>>
+>     > Cc: Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>
+>     > Cc: Deepak Saxena <dsaxena at linaro.org <mailto:dsaxena@linaro.org>>
+>     > Cc: Greg Ungerer <gerg at uclinux.org <mailto:gerg@uclinux.org>>
+>     > Cc: linux-arm-kernel at lists.infradead.org <mailto:linux-arm-kernel@lists.infradead.org>
+>     > ---
+>     >  arch/arm/mach-ks8695/Kconfig | 5 +++++
+>     >  1 file changed, 5 insertions(+)
+>     >
+>     > diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
+>     > index a545976..29d7d9f 100644
+>     > --- a/arch/arm/mach-ks8695/Kconfig
+>     > +++ b/arch/arm/mach-ks8695/Kconfig
+>     > @@ -5,6 +5,7 @@ menu "Kendin/Micrel KS8695 Implementations"
+>     >  config MACH_KS8695
+>     >         bool "KS8695 development board"
+>     >         select MIGHT_HAVE_PCI
+>     > +       depends on PCI
+> 
+>     You need both PCI and MIGHT_HAVE_PCI? Don't know but it looks
+>     like defconfig is missing PCI stuff.. and MIGHT_HAVE_PCI is enough
+>     here?
 > 
 > 
-> To avoid:
-> 
-> ...
->   CC      arch/arm/mach-shmobile/setup-r8a7790.o
-> arch/arm/mach-shmobile/setup-r8a7790.c: In function ?r8a7790_timer_init?:
-> arch/arm/mach-shmobile/setup-r8a7790.c:266:2: error: implicit declaration of function ?clocksource_of_init? [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[1]: *** [arch/arm/mach-shmobile/setup-r8a7790.o] Error 1
+>  PCI is needed here because board-og.c file depends on pci.o.
 
-As discussed off-line, I have squashed the above change into your patch.
+It shouldn't though, thus the original use of MIGHT_HAVE_PCI.
+The board-og.c machine code supports a number of boards, some of
+which don't have a PCI bus (that is they use the KS8695 CPU that
+doesn't contain the PCI bus silicon).
 
-The result, which I plan to push shortly, is as follows:
+I think you want a fix that makes the pci support code in this file
+conditional on CONFIG_PCI.
 
-From: Magnus Damm <damm@opensource.se>
-
-ARM: shmobile: Use clocksource_of_init() on r8a7790
-
-Replace the call to shmobile_timer_init() with
-clocksource_of_init(). This will allow us to
-get rid of shmobile_timer_init().
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
-[horms+renesas at verge.net.au: include linux/clocksource.h]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7790.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 86cf507..6d4aa04 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -18,6 +18,7 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
-+#include <linux/clocksource.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-@@ -263,7 +264,7 @@ void __init r8a7790_timer_init(void)
- 	iounmap(base);
- #endif /* CONFIG_ARM_ARCH_TIMER */
- 
--	shmobile_timer_init();
-+	clocksource_of_init();
- }
- 
- void __init r8a7790_init_delay(void)
--- 
-1.8.3.2
+Regards
+Greg
