@@ -1,66 +1,96 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue,  6 Aug 2013 22:43:43 +0200
-Subject: [PATCH v4 03/31] USB: fsl-mph-dr-of: cleanup clock API use
+Date: Tue,  6 Aug 2013 22:43:46 +0200
+Subject: [PATCH v4 06/31] i2c: mpc: cleanup clock API use
 In-Reply-To: <1375821851-31609-1-git-send-email-gsi@denx.de>
 References: <1374495298-22019-1-git-send-email-gsi@denx.de>
  <1375821851-31609-1-git-send-email-gsi@denx.de>
-Message-ID: <1375821851-31609-4-git-send-email-gsi@denx.de>
+Message-ID: <1375821851-31609-7-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm_get_clk() for automatic put upon device close, check for and
-propagate errors when enabling clocks, must prepare clocks before they
-can get enabled, unprepare after disable
+make the MPC I2C driver get, prepare and enable the peripheral clock
+during probe ('per' for access to the peripheral's registers); disable
+and unprepare the clock upon remove(), put is done by the devm approach;
+hold a reference to the clock over the period of use
+
+clock lookup is non-fatal in this implementation as not all platforms
+may provide clock specs in their device tree, but enable errors for
+specified clocks are considered fatal
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/usb/host/fsl-mph-dr-of.c |   16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ drivers/i2c/busses/i2c-mpc.c |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/usb/host/fsl-mph-dr-of.c b/drivers/usb/host/fsl-mph-dr-of.c
-index 11e0b79..b8a1866 100644
---- a/drivers/usb/host/fsl-mph-dr-of.c
-+++ b/drivers/usb/host/fsl-mph-dr-of.c
-@@ -260,6 +260,7 @@ int fsl_usb2_mpc5121_init(struct platform_device *pdev)
- {
- 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
- 	struct clk *clk;
+diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
+index 7607dc0..4b00dd0 100644
+--- a/drivers/i2c/busses/i2c-mpc.c
++++ b/drivers/i2c/busses/i2c-mpc.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_i2c.h>
+ #include <linux/slab.h>
+ 
++#include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/fsl_devices.h>
+ #include <linux/i2c.h>
+@@ -67,6 +68,7 @@ struct mpc_i2c {
+ #ifdef CONFIG_PM
+ 	u8 fdr, dfsrr;
+ #endif
++	struct clk *clk_per;
+ };
+ 
+ struct mpc_i2c_divider {
+@@ -623,6 +625,8 @@ static int fsl_i2c_probe(struct platform_device *op)
+ 	u32 clock = MPC_I2C_CLOCK_LEGACY;
+ 	int result = 0;
+ 	int plen;
++	struct clk *clk;
 +	int err;
- 	char clk_name[10];
- 	int base, clk_num;
  
-@@ -272,13 +273,16 @@ int fsl_usb2_mpc5121_init(struct platform_device *pdev)
- 		return -ENODEV;
- 
- 	snprintf(clk_name, sizeof(clk_name), "usb%d_clk", clk_num);
--	clk = clk_get(&pdev->dev, clk_name);
-+	clk = devm_clk_get(&pdev->dev, clk_name);
- 	if (IS_ERR(clk)) {
- 		dev_err(&pdev->dev, "failed to get clk\n");
- 		return PTR_ERR(clk);
+ 	match = of_match_device(mpc_i2c_of_match, &op->dev);
+ 	if (!match)
+@@ -653,6 +657,21 @@ static int fsl_i2c_probe(struct platform_device *op)
+ 		}
  	}
--
--	clk_enable(clk);
-+	err = clk_prepare_enable(clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to enable clk\n");
-+		return err;
+ 
++	/*
++	 * enable clock for the I2C peripheral (non fatal),
++	 * keep a reference upon successful allocation
++	 */
++	clk = devm_clk_get(&op->dev, "per");
++	if (!IS_ERR(clk)) {
++		err = clk_prepare_enable(clk);
++		if (err) {
++			dev_err(&op->dev, "failed to enable clock\n");
++			goto fail_request;
++		} else {
++			i2c->clk_per = clk;
++		}
 +	}
- 	pdata->clk = clk;
++
+ 	if (of_get_property(op->dev.of_node, "fsl,preserve-clocking", NULL)) {
+ 		clock = MPC_I2C_CLOCK_PRESERVE;
+ 	} else {
+@@ -696,6 +715,8 @@ static int fsl_i2c_probe(struct platform_device *op)
+ 	return result;
  
- 	if (pdata->phy_mode == FSL_USB2_PHY_UTMI_WIDE) {
-@@ -302,10 +306,8 @@ static void fsl_usb2_mpc5121_exit(struct platform_device *pdev)
+  fail_add:
++	if (i2c->clk_per)
++		clk_disable_unprepare(i2c->clk_per);
+ 	free_irq(i2c->irq, i2c);
+  fail_request:
+ 	irq_dispose_mapping(i2c->irq);
+@@ -711,6 +732,9 @@ static int fsl_i2c_remove(struct platform_device *op)
  
- 	pdata->regs = NULL;
+ 	i2c_del_adapter(&i2c->adap);
  
--	if (pdata->clk) {
--		clk_disable(pdata->clk);
--		clk_put(pdata->clk);
--	}
-+	if (pdata->clk)
-+		clk_disable_unprepare(pdata->clk);
- }
++	if (i2c->clk_per)
++		clk_disable_unprepare(i2c->clk_per);
++
+ 	if (i2c->irq)
+ 		free_irq(i2c->irq, i2c);
  
- static struct fsl_usb2_platform_data fsl_usb2_mpc5121_pd = {
 -- 
 1.7.10.4
