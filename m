@@ -1,18 +1,38 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Tue, 6 Aug 2013 09:52:37 +0200
-Subject: [PATCH v7] ARM: sunxi: New watchdog driver for Allwinner A10/A13
-In-Reply-To: <1375212046-12823-1-git-send-email-carlo.caione@gmail.com>
-References: <1375212046-12823-1-git-send-email-carlo.caione@gmail.com>
-Message-ID: <CAOQ7t2ajtWXZb5-6vjhk4C=VRy6BA=q3Xd_H8fGmK-JQ8N3-bw@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 06 Aug 2013 01:02:23 -0700 (PDT)
+Subject: [PATCH v7 0/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <1375775411-4545-1-git-send-email-horms+renesas@verge.net.au>
+References: <1375775411-4545-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <87fvungsc4.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 9:20 PM, Carlo Caione <carlo.caione@gmail.com> wrote:
-> This patch adds the driver for the watchdog found in the Allwinner A10 and
-> A13 SoCs. It has DT-support and uses the new watchdog framework.
->
-> Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
 
-Guys, any feedback on this patch?
+Hi Simon
+
+> this short series enables the on-board ethernet
+> of the r8a7790 SoC for on lager board.
+> 
+> This series has a run-time dependency on
+> "sh_eth: add support for r8a7790 SoC"
+> 
+> This series has been built on top of renesas-next-201300806.
+> 
+> Changes noted in changelogs of individual patches.
+> Simon Horman (3):
+>   ARM: shmobile: r8a7790: clocks for Ether support
+>   ARM: shmobile: lager: enable Ether
+>   ARM: shmobile: lager: enable nfsroot in DTS
+> 
+>  arch/arm/boot/dts/r8a7790-lager.dts    |  2 +-
+>  arch/arm/mach-shmobile/board-lager.c   | 29 +++++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+>  3 files changed, 34 insertions(+), 1 deletion(-)
+
+For all patches
+
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+Best regards
+---
+Kuninori Morimoto
