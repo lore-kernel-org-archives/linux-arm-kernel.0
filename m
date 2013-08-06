@@ -1,222 +1,363 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Tue,  6 Aug 2013 11:42:06 +0530
-Subject: [PATCH] AArch64: Add single-step and breakpoint handler hooks
-Message-ID: <1375769526-3526-1-git-send-email-sandeepa.prabhu@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue,  6 Aug 2013 14:21:21 +0800
+Subject: [PATCH] spi: sirf: use DMA if both buffer address and length are
+ aligned
+Message-ID: <1375770081-12873-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AArch64 Single Steping and Breakpoint debug exceptions will be
-used by multiple debug framworks like kprobes & kgdb.
+this patch enables DMA support for SiRFSoC SPI driver, if both
+buffers and length are aligned with DMA controller's hardware
+limitation, use generic SiRF generic dmaengine driver.
 
-This patch implements the hooks for those frameworks to register
-their own handlers for handling breakpoint and single step events.
+for PIO, SiRF SPI controller actually is using rx to trigger rx,
+that means if we write any word to tx fifo, we will get a word
+from rx fifo. for DMA, we use two different channel for tx and
+rx, and issue them both for every transfer.
 
-Reworked the debug exception handler in entry.S: do_dbg to
-pass the correct break/step address to the handlers, i.e. FAR_EL1 if
-exception is watchpoint, ELR_EL1 for all other debug exceptions.
-
-Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm64/include/asm/debug-monitors.h |  20 +++++++
- arch/arm64/kernel/debug-monitors.c      | 102 +++++++++++++++++++++++++++++++-
- arch/arm64/kernel/entry.S               |   6 +-
- 3 files changed, 124 insertions(+), 4 deletions(-)
+ drivers/spi/spi-sirf.c | 180 ++++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 157 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index a2232d0..aff3a76 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -16,6 +16,8 @@
- #ifndef __ASM_DEBUG_MONITORS_H
- #define __ASM_DEBUG_MONITORS_H
+diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
+index 9608716..62c92c3 100644
+--- a/drivers/spi/spi-sirf.c
++++ b/drivers/spi/spi-sirf.c
+@@ -19,6 +19,10 @@
+ #include <linux/of_gpio.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/spi_bitbang.h>
++#include <linux/dmaengine.h>
++#include <linux/dma-direction.h>
++#include <linux/dma-mapping.h>
++#include <linux/sirfsoc_dma.h>
  
-+#include <linux/list.h>
-+
- #ifdef __KERNEL__
+ #define DRIVER_NAME "sirfsoc_spi"
  
- #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
-@@ -62,6 +64,24 @@ struct task_struct;
+@@ -119,9 +123,20 @@
+ #define SIRFSOC_SPI_FIFO_HC(x)		(((x) & 0x3F) << 20)
+ #define SIRFSOC_SPI_FIFO_THD(x)		(((x) & 0xFF) << 2)
  
- #define DBG_ARCH_ID_RESERVED	0	/* In case of ptrace ABI updates. */
- 
-+struct step_hook {
-+	struct list_head node;
-+	int (*fn)(struct pt_regs *regs, unsigned int insn, unsigned long addr);
-+};
-+
-+void register_step_hook(struct step_hook *hook);
-+void unregister_step_hook(struct step_hook *hook);
-+
-+struct break_hook {
-+	struct list_head node;
-+	u32 esr_magic;
-+	u32 esr_mask;
-+	int (*fn)(struct pt_regs *regs, unsigned int insn, unsigned long addr);
-+};
-+
-+void register_break_hook(struct break_hook *hook);
-+void unregister_break_hook(struct break_hook *hook);
-+
- u8 debug_monitors_arch(void);
- 
- void enable_debug_monitors(enum debug_el el);
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cbfacf7..2846327 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -188,6 +188,54 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
- 	regs->pstate = spsr;
- }
- 
-+/* EL1 Single Step Handler hooks */
-+static LIST_HEAD(step_hook);
-+static DEFINE_RAW_SPINLOCK(step_lock);
-+
-+void register_step_hook(struct step_hook *hook)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&step_lock, flags);
-+	list_add(&hook->node, &step_hook);
-+	raw_spin_unlock_irqrestore(&step_lock, flags);
-+}
-+
-+void unregister_step_hook(struct step_hook *hook)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&step_lock, flags);
-+	list_del(&hook->node);
-+	raw_spin_unlock_irqrestore(&step_lock, flags);
-+}
-+
 +/*
-+ * Call registered single step handers
-+ * There is no Syndrome info to check for determining the handler.
-+ * So we call all the registered handlers, until the right handler is
-+ * found which returns zero.
++ * only if the rx/tx buffer and transfer size are 4-bytes aligned, we use dma
++ * due to the limitation of dma controller
 + */
-+static int call_step_hook(struct pt_regs *regs,
-+		unsigned int esr, unsigned long addr)
++
++#define ALIGNED(x) (!((u32)x & 0x3))
++#define IS_DMA_VALID(x) (x && ALIGNED(x->tx_buf) && ALIGNED(x->rx_buf) && \
++	ALIGNED(x->len * sspi->word_width) && (x->len * sspi->word_width < \
++		2 * PAGE_SIZE))
++
+ struct sirfsoc_spi {
+ 	struct spi_bitbang bitbang;
+-	struct completion done;
++	struct completion rx_done;
++	struct completion tx_done;
+ 
+ 	void __iomem *base;
+ 	u32 ctrl_freq;  /* SPI controller clock speed */
+@@ -140,6 +155,14 @@ struct sirfsoc_spi {
+ 	unsigned int left_tx_cnt;
+ 	unsigned int left_rx_cnt;
+ 
++	/* rx & tx DMA channels */
++	struct dma_chan *rx_chan;
++	struct dma_chan *tx_chan;
++	dma_addr_t src_start;
++	dma_addr_t dst_start;
++	void *dummypage;
++	int word_width; /* in bytes */
++
+ 	int chipselect[0];
+ };
+ 
+@@ -241,7 +264,7 @@ static irqreturn_t spi_sirfsoc_irq(int irq, void *dev_id)
+ 	/* Error Conditions */
+ 	if (spi_stat & SIRFSOC_SPI_RX_OFLOW ||
+ 			spi_stat & SIRFSOC_SPI_TX_UFLOW) {
+-		complete(&sspi->done);
++		complete(&sspi->rx_done);
+ 		writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
+ 	}
+ 
+@@ -261,22 +284,30 @@ static irqreturn_t spi_sirfsoc_irq(int irq, void *dev_id)
+ 
+ 	/* Received all words */
+ 	if ((sspi->left_rx_cnt == 0) && (sspi->left_tx_cnt == 0)) {
+-		complete(&sspi->done);
++		complete(&sspi->rx_done);
+ 		writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
+ 	}
+ 	return IRQ_HANDLED;
+ }
+ 
++static void spi_sirfsoc_dma_fini_callback(void *data)
 +{
-+	struct step_hook *hook;
-+	unsigned long flags;
++	struct completion *dma_complete = data;
 +
-+	raw_spin_lock_irqsave(&step_lock, flags);
-+	list_for_each_entry(hook, &step_hook, node)	{
-+		raw_spin_unlock_irqrestore(&step_lock, flags);
++	complete(dma_complete);
++}
 +
-+		if (hook->fn(regs, esr, addr) == 0)
-+			return 0;
+ static int spi_sirfsoc_transfer(struct spi_device *spi, struct spi_transfer *t)
+ {
+ 	struct sirfsoc_spi *sspi;
+ 	int timeout = t->len * 10;
+ 	sspi = spi_master_get_devdata(spi->master);
+ 
+-	sspi->tx = t->tx_buf;
+-	sspi->rx = t->rx_buf;
++	sspi->tx = t->tx_buf ? t->tx_buf : sspi->dummypage;
++	sspi->rx = t->rx_buf ? t->rx_buf : sspi->dummypage;
+ 	sspi->left_tx_cnt = sspi->left_rx_cnt = t->len;
+-	INIT_COMPLETION(sspi->done);
++	INIT_COMPLETION(sspi->rx_done);
++	INIT_COMPLETION(sspi->tx_done);
+ 
+ 	writel(SIRFSOC_SPI_INT_MASK_ALL, sspi->base + SIRFSOC_SPI_INT_STATUS);
+ 
+@@ -305,17 +336,65 @@ static int spi_sirfsoc_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+ 	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+ 
+-	/* Send the first word to trigger the whole tx/rx process */
+-	sspi->tx_word(sspi);
++	if (IS_DMA_VALID(t)) {
++		struct dma_async_tx_descriptor *rx_desc, *tx_desc;
++		unsigned int size = t->len * sspi->word_width;
 +
-+		raw_spin_lock_irqsave(&step_lock, flags);
++		sspi->dst_start = dma_map_single(&spi->dev, sspi->rx, t->len, DMA_FROM_DEVICE);
++		rx_desc = dmaengine_prep_slave_single(sspi->rx_chan,
++			sspi->dst_start, size, DMA_DEV_TO_MEM,
++			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++		rx_desc->callback = spi_sirfsoc_dma_fini_callback;
++		rx_desc->callback_param = &sspi->rx_done;
++
++		sspi->src_start = dma_map_single(&spi->dev, (void *)sspi->tx, t->len, DMA_TO_DEVICE);
++		tx_desc = dmaengine_prep_slave_single(sspi->tx_chan,
++			sspi->src_start, size, DMA_MEM_TO_DEV,
++			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++		tx_desc->callback = spi_sirfsoc_dma_fini_callback;
++		tx_desc->callback_param = &sspi->tx_done;
++
++		dmaengine_submit(tx_desc);
++		dmaengine_submit(rx_desc);
++		dma_async_issue_pending(sspi->tx_chan);
++		dma_async_issue_pending(sspi->rx_chan);
++	} else {
++		/* Send the first word to trigger the whole tx/rx process */
++		sspi->tx_word(sspi);
++
++		writel(SIRFSOC_SPI_RX_OFLOW_INT_EN | SIRFSOC_SPI_TX_UFLOW_INT_EN |
++			SIRFSOC_SPI_RXFIFO_THD_INT_EN | SIRFSOC_SPI_TXFIFO_THD_INT_EN |
++			SIRFSOC_SPI_FRM_END_INT_EN | SIRFSOC_SPI_RXFIFO_FULL_INT_EN |
++			SIRFSOC_SPI_TXFIFO_EMPTY_INT_EN, sspi->base + SIRFSOC_SPI_INT_EN);
 +	}
-+	raw_spin_unlock_irqrestore(&step_lock, flags);
+ 
+-	writel(SIRFSOC_SPI_RX_OFLOW_INT_EN | SIRFSOC_SPI_TX_UFLOW_INT_EN |
+-		SIRFSOC_SPI_RXFIFO_THD_INT_EN | SIRFSOC_SPI_TXFIFO_THD_INT_EN |
+-		SIRFSOC_SPI_FRM_END_INT_EN | SIRFSOC_SPI_RXFIFO_FULL_INT_EN |
+-		SIRFSOC_SPI_TXFIFO_EMPTY_INT_EN, sspi->base + SIRFSOC_SPI_INT_EN);
+ 	writel(SIRFSOC_SPI_RX_EN | SIRFSOC_SPI_TX_EN, sspi->base + SIRFSOC_SPI_TX_RX_EN);
+ 
+-	if (wait_for_completion_timeout(&sspi->done, timeout) == 0)
++	if (!IS_DMA_VALID(t)) { /* for PIO */
++		if (wait_for_completion_timeout(&sspi->rx_done, timeout) == 0)
++			dev_err(&spi->dev, "transfer timeout\n");
++	} else if (wait_for_completion_timeout(&sspi->rx_done, timeout) == 0) {
+ 		dev_err(&spi->dev, "transfer timeout\n");
++		dmaengine_terminate_all(sspi->rx_chan);
++	} else
++		sspi->left_rx_cnt = 0;
 +
-+	return 1;
-+}
++	/*
++	 * we only wait tx-done event if transferring by DMA. for PIO,
++	 * we get rx data by writing tx data, so if rx is done, tx has
++	 * done earlier
++	 */
++	if (IS_DMA_VALID(t)) {
++		if (wait_for_completion_timeout(&sspi->tx_done, timeout) == 0) {
++			dev_err(&spi->dev, "transfer timeout\n");
++			dmaengine_terminate_all(sspi->tx_chan);
++		}
++	}
 +
- static int single_step_handler(unsigned long addr, unsigned int esr,
- 			       struct pt_regs *regs)
- {
-@@ -215,8 +263,11 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		 */
- 		user_rewind_single_step(current);
- 	} else {
--		/* TODO: route to KGDB */
--		pr_warning("Unexpected kernel single-step exception at EL1\n");
-+		/* Call single step handlers for kgdb/kprobes */
-+		if (call_step_hook(regs, addr, esr) == 0)
-+			return 0;
++	if (IS_DMA_VALID(t)) {
++		dma_unmap_single(&spi->dev, sspi->src_start, t->len, DMA_TO_DEVICE);
++		dma_unmap_single(&spi->dev, sspi->dst_start, t->len, DMA_FROM_DEVICE);
++	}
+ 
+ 	/* TX, RX FIFO stop */
+ 	writel(0, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+@@ -332,7 +411,6 @@ static void spi_sirfsoc_chipselect(struct spi_device *spi, int value)
+ 
+ 	if (sspi->chipselect[spi->chip_select] == 0) {
+ 		u32 regval = readl(sspi->base + SIRFSOC_SPI_CTRL);
+-		regval |= SIRFSOC_SPI_CS_IO_OUT;
+ 		switch (value) {
+ 		case BITBANG_CS_ACTIVE:
+ 			if (spi->mode & SPI_CS_HIGH)
+@@ -369,11 +447,7 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 	bits_per_word = (t) ? t->bits_per_word : spi->bits_per_word;
+ 	hz = t && t->speed_hz ? t->speed_hz : spi->max_speed_hz;
+ 
+-	/* Enable IO mode for RX, TX */
+-	writel(SIRFSOC_SPI_IO_MODE_SEL, sspi->base + SIRFSOC_SPI_TX_DMA_IO_CTRL);
+-	writel(SIRFSOC_SPI_IO_MODE_SEL, sspi->base + SIRFSOC_SPI_RX_DMA_IO_CTRL);
+ 	regval = (sspi->ctrl_freq / (2 * hz)) - 1;
+-
+ 	if (regval > 0xFFFF || regval < 0) {
+ 		dev_err(&spi->dev, "Speed %d not supported\n", hz);
+ 		return -EINVAL;
+@@ -388,6 +462,7 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 					SIRFSOC_SPI_FIFO_WIDTH_BYTE;
+ 		rxfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+ 					SIRFSOC_SPI_FIFO_WIDTH_BYTE;
++		sspi->word_width = 1;
+ 		break;
+ 	case 12:
+ 	case 16:
+@@ -399,6 +474,7 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 					SIRFSOC_SPI_FIFO_WIDTH_WORD;
+ 		rxfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+ 					SIRFSOC_SPI_FIFO_WIDTH_WORD;
++		sspi->word_width = 2;
+ 		break;
+ 	case 32:
+ 		regval |= SIRFSOC_SPI_TRAN_DAT_FORMAT_32;
+@@ -408,6 +484,7 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 					SIRFSOC_SPI_FIFO_WIDTH_DWORD;
+ 		rxfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+ 					SIRFSOC_SPI_FIFO_WIDTH_DWORD;
++		sspi->word_width = 4;
+ 		break;
+ 	default:
+ 		BUG();
+@@ -442,6 +519,17 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 	writel(rxfifo_ctrl, sspi->base + SIRFSOC_SPI_RXFIFO_CTRL);
+ 
+ 	writel(regval, sspi->base + SIRFSOC_SPI_CTRL);
 +
-+		pr_warn("unexpected single step exception at %lx!\n", addr);
- 		/*
- 		 * Re-enable stepping since we know that we will be
- 		 * returning to regs.
-@@ -227,11 +278,56 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
++	if (IS_DMA_VALID(t)) {
++		/* Enable DMA mode for RX, TX */
++		writel(0, sspi->base + SIRFSOC_SPI_TX_DMA_IO_CTRL);
++		writel(SIRFSOC_SPI_RX_DMA_FLUSH, sspi->base + SIRFSOC_SPI_RX_DMA_IO_CTRL);
++	} else {
++		/* Enable IO mode for RX, TX */
++		writel(SIRFSOC_SPI_IO_MODE_SEL, sspi->base + SIRFSOC_SPI_TX_DMA_IO_CTRL);
++		writel(SIRFSOC_SPI_IO_MODE_SEL, sspi->base + SIRFSOC_SPI_RX_DMA_IO_CTRL);
++	}
++
  	return 0;
  }
  
-+
-+static LIST_HEAD(break_hook);
-+static DEFINE_RAW_SPINLOCK(break_lock);
-+
-+void register_break_hook(struct break_hook *hook)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&break_lock, flags);
-+	list_add(&hook->node, &break_hook);
-+	raw_spin_unlock_irqrestore(&break_lock, flags);
-+}
-+
-+void unregister_break_hook(struct break_hook *hook)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&break_lock, flags);
-+	list_del(&hook->node);
-+	raw_spin_unlock_irqrestore(&break_lock, flags);
-+}
-+
-+static int call_break_hook(struct pt_regs *regs,
-+		unsigned int esr, unsigned long addr)
-+{
-+	struct break_hook *hook;
-+	unsigned long flags;
-+	int (*fn)(struct pt_regs *regs,
-+		unsigned int esr, unsigned long addr) = NULL;
-+
-+	raw_spin_lock_irqsave(&break_lock, flags);
-+	list_for_each_entry(hook, &break_hook, node)
-+		if ((esr & hook->esr_mask) == hook->esr_magic)
-+			fn = hook->fn;
-+	raw_spin_unlock_irqrestore(&break_lock, flags);
-+
-+	return fn ? fn(regs, esr, addr) : 1;
-+}
-+
- static int brk_handler(unsigned long addr, unsigned int esr,
- 		       struct pt_regs *regs)
- {
- 	siginfo_t info;
+@@ -466,6 +554,8 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	struct spi_master *master;
+ 	struct resource *mem_res;
+ 	int num_cs, cs_gpio, irq;
++	u32 rx_dma_ch, tx_dma_ch;
++	dma_cap_mask_t dma_cap_mask;
+ 	int i;
+ 	int ret;
  
-+	/* Call single step handlers for kgdb/kprobes */
-+	if (call_break_hook(regs, esr, addr) == 0)
-+		return 0;
-+
-+	pr_warn("unexpected brk exception at %lx, esr=0x%x\n", addr, esr);
-+
- 	if (!user_mode(regs))
- 		return -EFAULT;
+@@ -476,6 +566,20 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 		goto err_cs;
+ 	}
  
-@@ -291,7 +387,7 @@ static int __init debug_traps_init(void)
- 	hook_debug_fault_code(DBG_ESR_EVT_HWSS, single_step_handler, SIGTRAP,
- 			      TRAP_HWBKPT, "single-step handler");
- 	hook_debug_fault_code(DBG_ESR_EVT_BRK, brk_handler, SIGTRAP,
--			      TRAP_BRKPT, "ptrace BRK handler");
-+			      TRAP_BRKPT, "AArch64 BRK handler");
++	ret = of_property_read_u32(pdev->dev.of_node,
++			"sirf,spi-dma-rx-channel", &rx_dma_ch);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Unable to get rx dma channel\n");
++		goto err_cs;
++	}
++
++	ret = of_property_read_u32(pdev->dev.of_node,
++			"sirf,spi-dma-tx-channel", &tx_dma_ch);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Unable to get tx dma channel\n");
++		goto err_cs;
++	}
++
+ 	master = spi_alloc_master(&pdev->dev, sizeof(*sspi) + sizeof(int) * num_cs);
+ 	if (!master) {
+ 		dev_err(&pdev->dev, "Unable to allocate SPI master\n");
+@@ -543,15 +647,33 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 					SPI_BPW_MASK(16) | SPI_BPW_MASK(32);
+ 	sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
+ 
++	/* request DMA channels */
++	dma_cap_zero(dma_cap_mask);
++	dma_cap_set(DMA_INTERLEAVE, dma_cap_mask);
++
++	sspi->rx_chan = dma_request_channel(dma_cap_mask, (dma_filter_fn)sirfsoc_dma_filter_id,
++		(void *)rx_dma_ch);
++	if (!sspi->rx_chan) {
++		dev_err(&pdev->dev, "can not allocate rx dma channel\n");
++		goto free_master;
++	}
++	sspi->tx_chan = dma_request_channel(dma_cap_mask, (dma_filter_fn)sirfsoc_dma_filter_id,
++		(void *)tx_dma_ch);
++	if (!sspi->tx_chan) {
++		dev_err(&pdev->dev, "can not allocate tx dma channel\n");
++		goto free_rx_dma;
++	}
++
+ 	sspi->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(sspi->clk)) {
+-		ret = -EINVAL;
+-		goto free_master;
++		ret = PTR_ERR(sspi->clk);
++		goto free_tx_dma;
+ 	}
+ 	clk_prepare_enable(sspi->clk);
+ 	sspi->ctrl_freq = clk_get_rate(sspi->clk);
+ 
+-	init_completion(&sspi->done);
++	init_completion(&sspi->rx_done);
++	init_completion(&sspi->tx_done);
+ 
+ 	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+ 	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+@@ -560,17 +682,26 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	/* We are not using dummy delay between command and data */
+ 	writel(0, sspi->base + SIRFSOC_SPI_DUMMY_DELAY_CTL);
+ 
++	sspi->dummypage = kmalloc(2 * PAGE_SIZE, GFP_KERNEL);
++	if (!sspi->dummypage)
++		goto free_clk;
++
+ 	ret = spi_bitbang_start(&sspi->bitbang);
+ 	if (ret)
+-		goto free_clk;
++		goto free_dummypage;
+ 
+ 	dev_info(&pdev->dev, "registerred, bus number = %d\n", master->bus_num);
+ 
+ 	return 0;
+-
++free_dummypage:
++	kfree(sspi->dummypage);
+ free_clk:
+ 	clk_disable_unprepare(sspi->clk);
+ 	clk_put(sspi->clk);
++free_tx_dma:
++	dma_release_channel(sspi->tx_chan);
++free_rx_dma:
++	dma_release_channel(sspi->rx_chan);
+ free_master:
+ 	spi_master_put(master);
+ err_cs:
+@@ -591,8 +722,11 @@ static int  spi_sirfsoc_remove(struct platform_device *pdev)
+ 		if (sspi->chipselect[i] > 0)
+ 			gpio_free(sspi->chipselect[i]);
+ 	}
++	kfree(sspi->dummypage);
+ 	clk_disable_unprepare(sspi->clk);
+ 	clk_put(sspi->clk);
++	dma_release_channel(sspi->rx_chan);
++	dma_release_channel(sspi->tx_chan);
+ 	spi_master_put(master);
  	return 0;
  }
- arch_initcall(debug_traps_init);
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 6ad781b..e7350bd 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -288,8 +288,12 @@ el1_dbg:
- 	/*
- 	 * Debug exception handling
- 	 */
-+	mrs	x25, far_el1			//far for watchpt
-+	cmp	x24, #ESR_EL1_EC_WATCHPT_EL1
-+	csel	x0, x25, x22, eq	//addr: x25->far_el1, x22->elr_el1
-+	b.ge	do_dbg
- 	tbz	x24, #0, el1_inv		// EL1 only
--	mrs	x0, far_el1
-+do_dbg:
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_debug_exception
- 
 -- 
-1.8.1.2
+1.8.2.3
