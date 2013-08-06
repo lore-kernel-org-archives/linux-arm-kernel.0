@@ -1,278 +1,173 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Aug 2013 20:10:00 +0200
-Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130806201000.3e97c63b@skate>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Aug 2013 11:10:30 -0700
+Subject: [PATCH] ARM: KVM: Fix 64-bit coprocessor handling
+In-Reply-To: <5200B72D.2080101@arm.com>
+References: <1375764086-1996-1-git-send-email-christoffer.dall@linaro.org>
+ <5200B72D.2080101@arm.com>
+Message-ID: <20130806181030.GI16694@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benjamin, Thomas,
+On Tue, Aug 06, 2013 at 09:43:25AM +0100, Marc Zyngier wrote:
+> Hi Christoffer,
+> 
+> On 06/08/13 05:41, Christoffer Dall wrote:
+> > The PAR was exported as CRn == 7 and CRm == 0, but in fact the primary
+> > coprocessor register number was determined by CRm for 64-bit coprocessor
+> > registers as the user space API was modelled after the coprocessor
+> > access instructions (see the ARM ARM rev. C - B3-1445).
+> > 
+> > However, just changing the CRn to CRm breaks the sorting check when
+> > booting the kernel, because the internal kernel logic always treats CRn
+> > as the primary register number, and it makes the table sorting
+> > impossible to understand for humans.
+> > 
+> > Alternatively we could change the logic to always have CRn == CRm, but
+> > that becomes unclear in the number of ways we do lookup of a coprocessor
+> > register.  We could also have a separate 64-bit table but that feels
+> > somewhat over-engineerd.  Instead, keep CRn the primary representation
+> 
+> over-engineered
+> 
+> > of the primary corproc. register number in-kernel and always export the
+> 
+> coproc.
+> 
+> > primary number as CRm as per the existing user space ABI.
+> > 
+> > Note: The TTBR registers just magically worked because they happened to
+> > follow the CRn(0) regs and were considered CRn(0) in the in-kernel
+> > representation.
+> 
+> Nice catch. This unfortunately shows how little of the userspace
+> interface we've been actually using so far. I suppose you found this by
+> playing with save/restore?
+> 
+Actually, I just ran a recent QEMU with Peter's reworked coprocessor
+interface and it blew up in my face, shame on us.
 
-This patch set has been around for two months now, and I would really
-like to see it merged. Your ACKs are the only ones missing to merge the
-whole thing.
-
-Would you mind having a look at:
-
- * Patches 4, 5, 6, 7 for Benjamin as the irqdomain maintainer.
-
- * Patches 8 and 9 for Thomas as the drivers/irqchip maintainer.
-
-Thanks a lot!
-
-Thomas
-
-On Thu,  1 Aug 2013 15:25:03 +0200, Thomas Petazzoni wrote:
-> Hello,
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm/kvm/coproc.c     |   23 +++++++++++++++++------
+> >  arch/arm/kvm/coproc.h     |    2 ++
+> >  arch/arm/kvm/coproc_a15.c |    5 ++++-
+> >  3 files changed, 23 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> > index 4a51990..fc5fec2 100644
+> > --- a/arch/arm/kvm/coproc.c
+> > +++ b/arch/arm/kvm/coproc.c
+> > @@ -146,7 +146,10 @@ static bool pm_fake(struct kvm_vcpu *vcpu,
+> >  #define access_pmintenclr pm_fake
+> >  
+> >  /* Architected CP15 registers.
+> > - * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
+> > + * CRn denotes the primary register number, but is copied to the CRm in the
+> > + * user space API in line with the terminology used in the ARM ARM.
 > 
-> This set of patches introduces Message Signaled Interrupt support in
-> the Marvell EBU PCIe driver. It has been successfully tested on the
-> Armada XP GP platform with an Intel e1000e PCIe network card that
-> supports MSI.
-> 
-> This patch set is intended for merging in 3.12, so the respective
-> maintainers of the different areas are invited to review/ack the
-> patches, see below for the details. Note that several of those patches
-> are also needed for the Tegra PCIe driver.
-> 
-> There are still missing ACKs from Grant Likely (5, 6, 7), Thomas
-> Gleixner (8, 9) and Bjorn Helgaas (2, 12).
-> 
-> The patches do the following:
-> 
->  * Patch 1 reworks how the architecture-specific MSI functions can be
->    overriden by architecture-specific code, by using weak
->    functions. It was suggested by Bjorn Helgaas.
-> 
->    This patch has been acked by Bjorn Helgaas, the PCI maintainter.
-> 
->  * Patch 2 removes the ARCH_SUPPORTS_MSI hidden kconfig boolean which
->    is no longer needed now that we have weak functions for all MSI
->    architecture-specific hooks.
-> 
->    This patch needs the Ack from Bjorn Helgaas, and the relevant
->    architecture maintainers.
-> 
->  * Patch 3 adds a minimal msi_chip infrastructure, that allows a
->    pci_bus to be connected to a msi_chip, and that provides default
->    implementations of the architecture-specific MSI functions to use
->    msi_chip.
-> 
->    This patch has been acked by Bjorn Helgaas, the PCI maintainter.
-> 
->  * Patch 4 adds an IRQ domain function that allows to allocate
->    dynamically a free hwirq number from an IRQ domain, and create a
->    virq mapping to it. It was suggested by Grant Likely in order to
->    remove the hwirq allocation code from the IRQ driver itself.
-> 
->    Patch has been Acked by Grant Likely, irq_domain maintainer.
-> 
->  * Patch 5 refactors the __irq_domain_add() function in the irq_domain
->    code, in preparation for the introduction of MSI support in
->    irq_domain.
-> 
->    This patch needs the ACK of Grant Likely.
-> 
->  * Patch 6 allows to create an irq_domain associated with a msi_chip,
->    thanks to the new irq_domain_add_msi() function.
-> 
->    This patch needs the ACK of Grant Likely.
-> 
->  * Patch 7 adds a new function irq_find_msi_host() to find the
->    MSI-type interrupt controller associated to a given DT node, and
->    adjusts irq_find_host() to not match MSI-type interrupt
->    controllers.
-> 
->    This patch needs the ACK of Grant Likely.
-> 
->  * Patch 8 makes some not very interesting preparation in the Armada
->    370/XP IRQ controller driver.
-> 
->    This patch needs the Ack from Thomas Gleixner.
-> 
->  * Patch 9 implements the MSI support in the Armada 370/XP IRQ
->    controller driver. It registers an msi_chip using the
->    msi_chip_add() function added in PATCH 3.
-> 
->    This patch needs the Ack from Thomas Gleixner.
-> 
->  * Patch 10 extends the ARM PCI core to expose ->add_bus() and
->    ->remove_bus() hooks to PCI drivers. This was suggested by Bjorn
->    Helgaas to allow the PCI driver to connected the PCI busses with
->    the corresponding MSI chip.
-> 
->    This patch has been Acked by Russell King, the ARM maintainer.
-> 
->  * Patch 11 adjust the Armada 370/XP Device Tree to indicate that the
->    MPIC is not only an interrupt-controller, but also an
->    msi-controller.
-> 
->    This patch needs the Ack from Jason Cooper, Gregory Clement
->    and/or Andrew Lunn, the Marvell maintainers.
-> 
->  * Patch 12 adds MSI support in the Marvell PCIe host controller
->    driver. The work to do here is minimal: get a reference to the
->    msi-parent controller thanks to msi_chip_find_by_of_node(), and
->    link it to the pci_bus structure before the bus gets enumerated.
-> 
->    This patch needs the Ack from Bjorn Helgaas.
-> 
->  * Patch 13 adjusts the Armada 370/XP Device Tree to add the msi-parent
->    properties in the PCIe controller nodes.
-> 
->    This patch needs the Ack from Jason Cooper, Gregory Clement
->    and/or Andrew Lunn, the Marvell Maintainers.
-> 
-> This version 6 follows:
->  * PATCH version 5 sent on July, 15th 2013
->  * PATCH version 4 sent on July, 1st 2013
->  * PATCH version 3 sent on June, 19th 2013
->  * PATCH version 2 sent on June, 6th 2013
->  * RFC version 1 sent on March, 26th 2013
-> 
-> Changes since v5:
-> 
->  * Rebased on top of 3.11-rc3.
-> 
->  * Implemented the suggestions of Grant Likely on "irqdomain: add
->    irq_alloc_mapping() function" and added his Acked-by.
-> 
->  * Added Bjorn Helgaas Acked-by on "PCI: use weak functions for MSI
->    arch-specific functions".
-> 
->  * Added Bjorn Helgaas Acked-by on "PCI: Introduce new MSI chip
->    infrastructure".
-> 
->  * Remove the drivers/of global registry of irq_chip, and as suggested
->    by Grant Likely, create an association between an irq_domain and a
->    msi_chip. This required refactoring the __irq_domain_add()
->    function, adding a 'msi_chip' pointer to 'irq_domain', adding an
->    irq_domain_add_msi() function and a irq_find_msi_host() function.
-> 
->  * Added Russell King Acked-by on "ARM: pci: add ->add_bus() and
->  ->remove_bus() hooks to hw_pci"
-> 
-> Changes since v4:
-> 
->  * Rebased on top of 3.11-rc1.
-> 
->  * Slightly rework the implementation of arch_setup_msi_irq(),
->    arch_teardown_msi_irq and arch_msi_check_device() according to the
->    suggestions of Bjorn Helgaas (PATCH 4)
-> 
->  * Make a few improvements to the msi_chip registry, according to the
->    suggestion of Bjorn Helgaas and Rob Herring: coding style fixes,
->    usage of mutex while traversing the list of msi_chip, usage of
->    of_pci_msi_* prefix instead of just of_msi_*.
-> 
-> Changes since v3:
-> 
->  * Keep only a default_teardown_msi_irqs() function needed for the Xen
->    PCI x86 code, and remove all other default_*() function and put the
->    default behavior directly in the weak functions. Suggested by
->    Thierry Redding and Bjorn Helgaas.
-> 
->  * Misc small improvements the MSI chip registry code: compiled only
->    under CONFIG_PCI_MSI, functions exported to modules, addition of an
->    of_msi_chip_remove() function, renaming of
->    of_msi_chip_find_by_node() to of_find_msi_chip_by_node(), move the
->    test of the "msi-controller" property to the of_msi_chip_add()
->    function, renamed the list_head field from link to list, added
->    dummy functions in the header files when !CONFIG_PCI_MSI &&
->    !CONFIG_OF. All suggested by Thierry Redding.
-> 
->  * Add a patch that entirely removes the ARCH_SUPPORTS_MSI, as we now
->    have weak functions, so even if an arch doesn't actually
->    use/support MSI, the code will build properly. Suggested by Thierry
->    Redding.
-> 
->  * Added Device Tree binding documentation updates for the IRQ
->    controller and the PCIe controller.
-> 
-> Changes since v2:
-> 
->  * Add an IRQ domain function that allows to allocate dynamically a
->    free hwirq number from an IRQ domain, and create a virq mapping to
->    it. It was suggested by Grant Likely in order to remove the hwirq
->    allocation code from the IRQ driver itself. (PATCH 1)
-> 
->  * Separate the use of weak functions from the introduction of the
->    msi_chip infrastructure, and use weak functions for all
->    architecture-specific MSI hooks. Suggested by Bjorn Helgaas (PATCH
->    2).
-> 
->  * Move the msi_chip registry to drivers/of. Suggested by Bjorn
->    Helgaas (PATCH 4).
-> 
->  * Use pcibios_add_bus() and pcibios_remove_bus() to connect the PCI
->    busses to their msi_chip, as suggested by Bjorn Helgaas. Requires
->    some ARM PCI core changes (PATCH 7), and then changes to the PCI
->    driver itself (PATCH 9).
-> 
-> This set of patches applies on top of 3.11-rc3, and is available as a
-> Git branch at
-> https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-pcie-msi-v6.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thierry Reding (1):
->   PCI: Introduce new MSI chip infrastructure
-> 
-> Thomas Petazzoni (12):
->   PCI: use weak functions for MSI arch-specific functions
->   PCI: remove ARCH_SUPPORTS_MSI kconfig option
->   irqdomain: add irq_alloc_mapping() function
->   irqdomain: refactor __irq_domain_add()
->   irqdomain: add support to associate an irq_domain with a msi_chip
->   irqdomain: add function to find a MSI irq_domain
->   irqchip: armada-370-xp: properly request resources
->   irqchip: armada-370-xp: implement MSI support
->   ARM: pci: add ->add_bus() and ->remove_bus() hooks to hw_pci
->   ARM: mvebu: the MPIC now provides MSI controller features
->   PCI: mvebu: add support for MSI
->   ARM: mvebu: link PCIe controllers to the MSI controller
-> 
->  .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   3 +
->  .../devicetree/bindings/pci/mvebu-pci.txt          |   3 +
->  arch/arm/Kconfig                                   |   1 -
->  arch/arm/boot/dts/armada-370-xp.dtsi               |   1 +
->  arch/arm/boot/dts/armada-370.dtsi                  |   1 +
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   1 +
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   1 +
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   1 +
->  arch/arm/include/asm/mach/pci.h                    |   4 +
->  arch/arm/kernel/bios32.c                           |  16 +++
->  arch/ia64/Kconfig                                  |   1 -
->  arch/mips/Kconfig                                  |   2 -
->  arch/mips/include/asm/pci.h                        |   5 -
->  arch/powerpc/Kconfig                               |   1 -
->  arch/powerpc/include/asm/pci.h                     |   5 -
->  arch/s390/Kconfig                                  |   1 -
->  arch/s390/include/asm/pci.h                        |   4 -
->  arch/sparc/Kconfig                                 |   1 -
->  arch/tile/Kconfig                                  |   1 -
->  arch/x86/Kconfig                                   |   1 -
->  arch/x86/include/asm/pci.h                         |  28 ----
->  arch/x86/kernel/x86_init.c                         |  21 +++
->  drivers/irqchip/irq-armada-370-xp.c                | 153 ++++++++++++++++++++-
->  drivers/pci/Kconfig                                |   4 -
->  drivers/pci/host/pci-mvebu.c                       |  31 +++++
->  drivers/pci/msi.c                                  |  66 +++++----
->  drivers/pci/probe.c                                |   1 +
->  include/linux/irqdomain.h                          |  62 ++++++++-
->  include/linux/msi.h                                |  18 ++-
->  include/linux/pci.h                                |   1 +
->  kernel/irq/irqdomain.c                             |  89 +++++++++---
->  31 files changed, 422 insertions(+), 106 deletions(-)
+> Please consider adding something like "in the 64bit case only".
 > 
 
+right
 
+> > + * Important: Must be sorted ascending by CRn, CRM, Op1, Op2 and with 64-bit
+> > + *            registers preceeding 32-bit ones.
+> 
+> preceding
+> 
+> >   */
+> >  static const struct coproc_reg cp15_regs[] = {
+> >  	/* CSSELR: swapped by interrupt.S. */
+> > @@ -154,8 +157,8 @@ static const struct coproc_reg cp15_regs[] = {
+> >  			NULL, reset_unknown, c0_CSSELR },
+> >  
+> >  	/* TTBR0/TTBR1: swapped by interrupt.S. */
+> > -	{ CRm( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
+> > -	{ CRm( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
+> > +	{ CRn( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
+> > +	{ CRn( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
+> 
+> How about this (untested) alternative possibility:
+> 
+> #define CRm64(_x)	.CRn = _x, .is64 = 1,
+> 	{ CRm64( 2), Op1( 0), NULL, reset_unknown64, c2_TTBR0 },
+> 	{ CRm64( 2), Op1( 1), NULL, reset_unknown64, c2_TTBR1 },
+> 
+> It has the benefit of still showing CRm as being the official field, and
+> hide the ugliness into the macro.
+> 
+> Still ugly though...
+> 
 
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+thought about this too, but discarded the idea, but seeing it written
+out, it's actually not that bad - or IOW what I suggested was at least
+as ugly.  I'll go and steal this.
+
+> >  	/* TTBCR: swapped by interrupt.S. */
+> >  	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
+> > @@ -399,12 +402,13 @@ static bool index_to_params(u64 id, struct coproc_params *params)
+> >  			      | KVM_REG_ARM_OPC1_MASK))
+> >  			return false;
+> >  		params->is_64bit = true;
+> > -		params->CRm = ((id & KVM_REG_ARM_CRM_MASK)
+> > +		/* CRm to CRn: see cp15_to_index for details */
+> > +		params->CRn = ((id & KVM_REG_ARM_CRM_MASK)
+> >  			       >> KVM_REG_ARM_CRM_SHIFT);
+> >  		params->Op1 = ((id & KVM_REG_ARM_OPC1_MASK)
+> >  			       >> KVM_REG_ARM_OPC1_SHIFT);
+> >  		params->Op2 = 0;
+> > -		params->CRn = 0;
+> > +		params->CRm = 0;
+> >  		return true;
+> >  	default:
+> >  		return false;
+> > @@ -898,7 +902,14 @@ static u64 cp15_to_index(const struct coproc_reg *reg)
+> >  	if (reg->is_64) {
+> >  		val |= KVM_REG_SIZE_U64;
+> >  		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
+> > -		val |= (reg->CRm << KVM_REG_ARM_CRM_SHIFT);
+> > +		/*
+> > +		 * CRn always denotes the primary coproc. reg. nr. for the
+> > +		 * in-kernel representation, but the user space API uses the
+> > +		 * CRm for the encoding, because it is modelled after the
+> > +		 * MRRC/MCRR instructions: see the ARM ARM rev. c page
+> > +		 * B3-1445
+> > +		 */
+> > +		val |= (reg->CRn << KVM_REG_ARM_CRM_SHIFT);
+> >  	} else {
+> >  		val |= KVM_REG_SIZE_U32;
+> >  		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
+> > diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
+> > index b7301d3..dccb904 100644
+> > --- a/arch/arm/kvm/coproc.h
+> > +++ b/arch/arm/kvm/coproc.h
+> > @@ -135,6 +135,8 @@ static inline int cmp_reg(const struct coproc_reg *i1,
+> >  		return -1;
+> >  	if (i1->CRn != i2->CRn)
+> >  		return i1->CRn - i2->CRn;
+> > +	if (i1->is_64 != i2->is_64)
+> > +		return i2->is_64 - i1->is_64;
+> >  	if (i1->CRm != i2->CRm)
+> >  		return i1->CRm - i2->CRm;
+> >  	if (i1->Op1 != i2->Op1)
+> > diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
+> > index 685063a..3d8f61f 100644
+> > --- a/arch/arm/kvm/coproc_a15.c
+> > +++ b/arch/arm/kvm/coproc_a15.c
+> > @@ -114,7 +114,10 @@ static bool access_l2ectlr(struct kvm_vcpu *vcpu,
+> >  
+> >  /*
+> >   * A15-specific CP15 registers.
+> > - * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
+> > + * CRn denotes the primary register number, but is copied to the CRm in the
+> > + * user space API in line with the terminology used in the ARM ARM.
+> > + * Important: Must be sorted ascending by CRn, CRM, Op1, Op2 and with 64-bit
+> > + *            registers preceeding 32-bit ones.
+> >   */
+> >  static const struct coproc_reg a15_regs[] = {
+> >  	/* MPIDR: we use VMPIDR for guest access. */
+> > 
+Thanks for all the spelling fixes, the time is over when I should post
+to the list after 5pm I guess.
+
+-Christoffer
