@@ -1,102 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 6 Aug 2013 10:15:56 +0530
-Subject: [PATCH] clk: gate: add CLK_GATE_ALWAYS_ON
-In-Reply-To: <1375761457-16364-1-git-send-email-shaojie.sun@linaro.com>
-References: <1375761457-16364-1-git-send-email-shaojie.sun@linaro.com>
-Message-ID: <CAKohpomdHvJULWiE44NVq+rqmOtp4K5OxcsYUd3UWDxB5W-8EQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 6 Aug 2013 09:55:14 +0530
+Subject: [PATCH v2 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851FD63C@039-SN1MPN1-004.039d.mgd.msft.net>
+References: <1375682824-11443-1-git-send-email-b35083@freescale.com>
+ <1375682824-11443-2-git-send-email-b35083@freescale.com>
+ <20130805163444.GQ29095@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E851FD63C@039-SN1MPN1-004.039d.mgd.msft.net>
+Message-ID: <20130806042514.GR29095@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added linaro-kernel & patches at linaro.org in cc list..
+On Tue, Aug 06, 2013 at 01:24:31AM +0000, Lu Jingchang-B35083 wrote:
+> > -----Original Message-----
+> > From: Vinod Koul [mailto:vinod.koul at intel.com]
+> > Sent: Tuesday, August 06, 2013 12:35 AM
+> > To: Lu Jingchang-B35083
+> > Cc: djbw at fb.com; shawn.guo at linaro.org; linux-kernel at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org; Wang Huan-B18965; Li Xiaochun-
+> > B41219
+> > Subject: Re: [PATCH v2 3/3] dma: Add Freescale eDMA engine driver support
+> > > +
+> > > +static void fsl_edma_free_desc(struct virt_dma_desc *vdesc) {
+> > > +	struct fsl_edma_desc *fsl_desc;
+> > > +	int i;
+> > > +
+> > > +	fsl_desc = to_fsl_edma_desc(vdesc);
+> > > +	for (i = 0; i < fsl_desc->n_tcds; i++)
+> > > +			dma_pool_free(fsl_desc->echan->tcd_pool,
+> > > +					fsl_desc->tcd[i].vtcd,
+> > > +					fsl_desc->tcd[i].ptcd);
+> > > +	kfree(fsl_desc);
+> > should this be called with lock held or not?
+> [Lu Jingchang-B35083] 
+> The desc list to be freed is got with lock held, and the free for each desc is independent, and the lock is not needed. Thanks.
+Would be apt to add this comment in the code, so that people know this function
+needs to be always called with lock held!
 
-On 6 August 2013 09:27, Shaojie Sun <shaojie.sun@linaro.org> wrote:
-> By default gate clock could be enable and disable. but
-> in some debug condition, must keep clock on, and never be closed.
-> setting this flag then gate clock never be closed.
+Pls add this stuff in next rev of the patch
 
-Consider rewriting it as:
-
-By default gate clk can be enabled/disabled but during debugging we
-may want to disable clk-disabling feature.
-
-This patch adds a flag for it..
-
-> Signed-off-by: Shaojie Sun <shaojie.sun@linaro.com>
-> ---
->  drivers/clk/clk-gate.c       |   24 ++++++++++++++++++++++++
->  include/linux/clk-provider.h |    4 ++++
->  2 files changed, 28 insertions(+)
-
-Honestly speaking, I am not sure if this patch is really required or not.
-And so Mike can decide on that. I will do a simple code review in
-that time.
-
-> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-> index 790306e..cc2b00e 100644
-> --- a/drivers/clk/clk-gate.c
-> +++ b/drivers/clk/clk-gate.c
-> @@ -15,6 +15,7 @@
->  #include <linux/io.h>
->  #include <linux/err.h>
->  #include <linux/string.h>
-> +#include <linux/device.h>
-
-why?
-
->  /**
->   * DOC: basic gatable clock which can gate and ungate it's ouput
-> @@ -48,6 +49,9 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
->         unsigned long flags = 0;
->         u32 reg;
->
-> +       if (!enable && (gate->flags & CLK_GATE_ALWAYS_ON))
-> +               return;
-> +
->         set ^= enable;
->
->         if (gate->lock)
-> @@ -159,5 +163,25 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
->         if (IS_ERR(clk))
->                 kfree(gate);
->
-> +       if (clk_gate_flags & CLK_GATE_ALWAYS_ON) {
-> +               int ret;
-> +               if (flags & CLK_SET_PARENT_GATE)
-> +                       pr_debug("%s: %salways on, but need parent gate.\n",
-> +                                       __func__, name);
-> +
-> +               ret = clk_prepare(clk);
-> +               if (ret) {
-> +                       pr_debug("%s: %s could not be prepared.\n",
-> +                                       __func__, name);
-> +                       return clk;
-> +               }
-> +               ret = clk_enable(clk);
-> +               if (ret) {
-> +                       pr_debug("%s: %s could not be enabled.\n",
-> +                                       __func__, name);
-> +                       clk_unprepare(clk);
-> +               }
-
-Call clk_prepare_enable instead.
-
-> +       }
-> +
->         return clk;
->  }
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 1ec14a7..641422c 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -214,6 +214,9 @@ void of_fixed_clk_setup(struct device_node *np);
->   *   of this register, and mask of gate bits are in higher 16-bit of this
->   *   register.  While setting the gate bits, higher 16-bit should also be
->   *   updated to indicate changing gate bits.
-> + * CLK_GATE_ALWAYS_ON - by default this clock could be enable and disable. but
-> + *   in some debug condition, must keep this clock on, and never be closed.
-> + *   setting this flag then this clock never be closed.
-
-Copy some part from the commit log I just suggested..
-
-If this flag is only for debugging we may name it that way.
-Maybe: CLK_GATE_DBG_ALWAYS_ON ??
+~Vinod
