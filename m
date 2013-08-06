@@ -1,186 +1,159 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 6 Aug 2013 13:36:23 -0400
-Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
-In-Reply-To: <20130806170941.GC2705@localhost>
-References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130806155343.GU19280@titan.lakedaemon.net>
- <20130806170941.GC2705@localhost>
-Message-ID: <20130806173623.GX19280@titan.lakedaemon.net>
+From: tom.cooksey@arm.com (Tom Cooksey)
+Date: Tue, 6 Aug 2013 18:38:02 +0100
+Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <CAF6AEGsDA8qdShWdYQRqQ0Czn4mLAe-FoADjZdRFcbeWGGe8Hg@mail.gmail.com>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>	<CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>	<51f29ccd.f014b40a.34cc.ffffca2aSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGvFPGueM_LHVij9KFzM6NJySHCzmaLstuzZkK5GwP+6gQ@mail.gmail.com>	<51ffdc7e.06b8b40a.2cc8.0fe0SMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGsyKk_G-R-OX_YcgYFDgTEmCy9Vf2LV1pAOV0452QKSww@mail.gmail.com>	<5200deb3.0b24b40a.3b26.ffffbadeSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGvXcpTKrTjhvrycLqab6F9QP5fAk0ZEWxJ-WvE==PiPsA@mail.gmail.com>	<52010257.245fc20a.6ff8.1cfdSMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGsDA8qdShWdYQRqQ0Czn4mLAe-FoADjZdRFcbeWGGe8Hg@mail.gmail.com>
+Message-ID: <000301ce92cb$b396e470$1ac4ad50$@cooksey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 02:09:42PM -0300, Ezequiel Garcia wrote:
-> On Tue, Aug 06, 2013 at 11:53:43AM -0400, Jason Cooper wrote:
-> > Ezequiel,
-> > 
-> > On Tue, Jul 30, 2013 at 05:44:50PM +0200, Thomas Petazzoni wrote:
-> > > The AXP WiFi AP board is a Marvell platform based on the Armada XP
-> > > MV78230 SoC. It has two mini-PCIe connectors, one USB 3.0 port powered
-> > > by a USB 3.0 controller on PCIe, two Ethernet ports, 1 GB of RAM, 1 GB
-> > > of NAND, 16 MB of SPI flash, one SATA port and one button, two UARTs
-> > > 
-> > > Successfully tested: USB 3.0 port, the mini-PCIe connectors, SPI
-> > > flash, Ethernet ports, SATA port, button, UART.
-> > > 
-> > > Untested: NAND flash, due to lack of mainline support for the Armada
-> > > 370/XP NAND controller for now.
-> > > 
-> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > ---
-> > >  arch/arm/boot/dts/Makefile                |   1 +
-> > >  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 164 ++++++++++++++++++++++++++++++
-> > >  2 files changed, 165 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> > 
-> > When I merge this code with your MBus series I get the following
-> > warning:
-> > 
-> >   DTC     arch/arm/boot/dts/armada-xp-axpwifiap.dtb
-> > Warning (ranges_format): "ranges" property in /soc has invalid length (32 bytes)
-> >  (parent #address-cells == 2, child #address-cells == 2, #size-cells == 1)
-> > 
-> > Could you please take a look and provide a separate patch to fix it up?
-> > 
-> 
-> Jason,
-> 
-> When I cherry-pick commit 704cc70179481c814d581597a7d2cdbbeb152bee
-> (ARM: mvebu: add support for the AXP WiFi AP board) from mvebu/dt
-> into mvebu/mbus_dt, I found it's needed to apply the changes below.
-> 
-> If they look fine feel free to pick them, or request any other
-> base for them.
-> 
-> I don't have the board to test this, so maybe Seif can help
-> testing them?
 
-Thanks Ezequiel!  Seif, would you mind giving this a spin and let me
-know if it's ok?
+> >> ... This is the purpose of the attach step,
+> >> so you know all the devices involved in sharing up front before
+> >> allocating the backing pages. (Or in the worst case, if you have a
+> >> "late attacher" you at least know when no device is doing dma access
+> >> to a buffer and can reallocate and move the buffer.)  A long time
+> >> back, I had a patch that added a field or two to 'struct
+> >> device_dma_parameters' so that it could be known if a device
+> >> required contiguous buffers.. looks like that never got merged, so
+> >> I'd need to dig that back up and resend it.  But the idea was to 
+> >> have the 'struct device' encapsulate all the information that would 
+> >> be needed to do-the-right-thing when it comes to placement.
+> >
+> > As I understand it, it's up to the exporting device to allocate the
+> > memory backing the dma_buf buffer. I guess the latest possible point
+> > you can allocate the backing pages is when map_dma_buf is first
+> > called? At that point the exporter can iterate over the current set
+> > of attachments, programmatically determine the all the constraints of
+> > all the attached drivers and attempt to allocate the backing pages
+> > in such a way as to satisfy all those constraints?
+> 
+> yes, this is the idea..  possibly some room for some helpers to help
+> out with this, but that is all under the hood from userspace
+> perspective
+> 
+> > Didn't you say that programmatically describing device placement
+> > constraints was an unbounded problem? I guess we would have to
+> > accept that it's not possible to describe all possible constraints
+> > and instead find a way to describe the common ones?
+> 
+> well, the point I'm trying to make, is by dividing your constraints
+> into two groups, one that impacts and is handled by userspace, and one
+> that is in the kernel (ie. where the pages go), you cut down the
+> number of permutations that the kernel has to care about considerably.
+>  And kernel already cares about, for example, what range of addresses
+> that a device can dma to/from.  I think really the only thing missing
+> is the max # of sglist entries (contiguous or not)
 
-thx,
+I think it's more than physically contiguous or not.
 
-Jason.
+For example, it can be more efficient to use large page sizes on
+devices with IOMMUs to reduce TLB traffic. I think the size and even
+the availability of large pages varies between different IOMMUs.
 
-> commit ad1821bf7fa0790f2d513f5551abcd13cf297303
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Tue Aug 6 14:02:45 2013 -0300
+There's also the issue of buffer stride alignment. As I say, if the
+buffer is to be written by a tile-based GPU like Mali, it's more
+efficient if the buffer's stride is aligned to the max AXI bus burst
+length. Though I guess a buffer stride only makes sense as a concept 
+when interpreting the data as a linear-layout 2D image, so perhaps 
+belongs in user-space along with format negotiation?
+
+
+> > One problem with this is it duplicates a lot of logic in each
+> > driver which can export a dma_buf buffer. Each exporter will need to
+> > do pretty much the same thing: iterate over all the attachments,
+> > determine of all the constraints (assuming that can be done) and
+> > allocate pages such that the lowest-common-denominator is satisfied.
+> >
+> > Perhaps rather than duplicating that logic in every driver, we could
+> > Instead move allocation of the backing pages into dma_buf itself?
+> >
 > 
->     ARM: mvebu: Fix AXP-WiFi-AP DT for MBUS DT binding
->     
->     The ranges property needs to be changed to use the new MBus DT binding.
->     Also, the pcie-controller node needs to be relocated as according the MBus
->     DT binding, it's now a child of the mbus-compatible node.
+> I tend to think it is better to add helpers as we see common patterns
+> emerge, which drivers can opt-in to using.  I don't think that we
+> should move allocation into dma_buf itself, but it would perhaps be
+> useful to have dma_alloc_*() variants that could allocate for multiple
+> devices.
+
+A helper could work I guess, though I quite like the idea of having
+dma_alloc_*() variants which take a list of devices to allocate memory
+for.
+
+
+> That would help for simple stuff, although I'd suspect
+> eventually a GPU driver will move away from that.  (Since you probably
+> want to play tricks w/ pools of pages that are pre-zero'd and in the
+> correct cache state, use spare cycles on the gpu or dma engine to
+> pre-zero uncached pages, and games like that.)
+
+So presumably you're talking about a GPU driver being the exporter
+here? If so, how could the GPU driver do these kind of tricks on
+memory shared with another device?
+
+
+
+> >> > Anyway, assuming user-space can figure out how a buffer should be
+> >> > stored in memory, how does it indicate this to a kernel driver and
+> >> > actually allocate it? Which ioctl on which device does user-space
+> >> > call, with what parameters? Are you suggesting using something
+> >> > like ION which exposes the low-level details of how buffers are 
+> > >> laid out in physical memory to userspace? If not, what?
+> >> > 
+> >>
+> >> no, userspace should not need to know this.  And having a central
+> >> driver that knows this for all the other drivers in the system
+> >> doesn't really solve anything and isn't really scalable.  At best
+> >> you might want, in some cases, a flag you can pass when allocating.
+> >> For example, some of the drivers have a 'SCANOUT' flag that can be
+> >> passed when allocating a GEM buffer, as a hint to the kernel that 
+> >> 'if this hw requires contig memory for scanout, allocate this
+> >> buffer contig'. But really, when it comes to sharing buffers 
+> >> between devices, we want this sort of information in dev->dma_params
+> >> of the importing device(s).
+> >
+> > If you had a single driver which knew the constraints of all devices
+> > on that particular SoC and the interface allowed user-space to
+> > specify which devices a buffer is intended to be used with, I guess
+> > it could pretty trivially allocate pages which satisfy those
+constraints?
 > 
->     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> keep in mind, even a number of SoC's come with pcie these days.  You
+> already have things like
 > 
-> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> index 2a542bd..c5fe572 100644
-> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> @@ -16,7 +16,7 @@
->   */
->  
->  /dts-v1/;
-> -/include/ "armada-xp-mv78230.dtsi"
-> +#include "armada-xp-mv78230.dtsi"
->  
->  / {
->  	model = "Marvell RD-AXPWiFiAP";
-> @@ -32,8 +32,30 @@
->  	};
->  
->  	soc {
-> -		ranges = <0          0 0xf1000000 0x100000  /* Internal registers 1MiB */
-> -			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-> +			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			/* First mini-PCIe port */
-> +			pcie at 1,0 {
-> +				/* Port 0, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			/* Second mini-PCIe port */
-> +			pcie at 2,0 {
-> +				/* Port 0, Lane 1 */
-> +				status = "okay";
-> +			};
-> +
-> +			/* Renesas uPD720202 USB 3.0 controller */
-> +			pcie at 3,0 {
-> +				/* Port 0, Lane 3 */
-> +				status = "okay";
-> +			};
-> +		};
->  
->  		internal-regs {
->  			pinctrl {
-> @@ -123,28 +145,6 @@
->  					spi-max-frequency = <108000000>;
->  				};
->  			};
-> -
-> -			pcie-controller {
-> -				status = "okay";
-> -
-> -				/* First mini-PCIe port */
-> -				pcie at 1,0 {
-> -					/* Port 0, Lane 0 */
-> -					status = "okay";
-> -				};
-> -
-> -				/* Second mini-PCIe port */
-> -				pcie at 2,0 {
-> -					/* Port 0, Lane 1 */
-> -					status = "okay";
-> -				};
-> -
-> -				/* Renesas uPD720202 USB 3.0 controller */
-> -				pcie at 3,0 {
-> -					/* Port 0, Lane 3 */
-> -					status = "okay";
-> -				};
-> -			};
->  		};
->  	};
->  
+>   https://developer.nvidia.com/content/kayla-platform
 > 
-> commit ae6c4bd3c2d337797ed1b8949b693d33c36ecbac
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Tue Aug 6 14:02:11 2013 -0300
+> You probably want to get out of the SoC mindset, otherwise you are
+> going to make bad assumptions that come back to bite you later on.
+
+Sure - there are always going to be PC-like devices where the 
+hardware configuration isn't fixed like it is on a traditional SoC.
+But I'd rather have a simple solution which works on traditional SoCs
+than no solution at all. Today our solution is to over-load the dumb
+buffer alloc functions of the display's DRM driver - For now I'm just
+looking for the next step up from that! ;-)
+
+
+> > wouldn't need a way to programmatically describe the constraints
+> > either: As you say, if userspace sets the "SCANOUT" flag, it would
+> > just "know" that on this SoC, that buffer needs to be physically
+> > contiguous for example.
 > 
->     ARM: mvebu: Fix missing DT preprocessor include
->     
->     Fix the armada-xp-mv78230.dtsi file which lacked a proper #include
->     to use the DT preprocessor.
+> not really.. it just knows it wants to scanout the buffer, and tells
+> this as a hint to the kernel.
 > 
->     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> index f093e39..e45e363 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> @@ -13,7 +13,7 @@
->   * common to all Armada XP SoCs.
->   */
->  
-> -/include/ "armada-xp.dtsi"
-> +#include "armada-xp.dtsi"
->  
->  / {
->  	model = "Marvell Armada XP MV78230 SoC";
-> 
-> -- 
-> Ezequiel Garc?a, Free Electrons
-> Embedded Linux, Kernel and Android Engineering
-> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> For example, on omapdrm, the SCANOUT flag does nothing on omap4+
+> (where phys contig is not required for scanout), but causes CMA
+> (dma_alloc_*()) to be used on omap3.  Userspace doesn't care.  It just
+> knows that it wants to be able to scanout that particular buffer.
+
+I think that's the idea? The omap3's allocator driver would use
+contiguous memory when it detects the SCANOUT flag whereas the omap4
+allocator driver wouldn't have to. No complex negotiation of
+constraints - it just "knows".
+
+
+
+Cheers,
+
+Tom
