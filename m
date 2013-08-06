@@ -1,79 +1,95 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Tue, 6 Aug 2013 10:40:11 -0700
-Subject: [PATCH] leds: leds-netxbig: depends on ARCH_KIRKWOOD
-In-Reply-To: <20130806121750.GP19280@titan.lakedaemon.net>
-References: <1375369655-1310-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375479274-9942-1-git-send-email-simon.guinot@sequanux.org>
- <20130803141200.GI5882@titan.lakedaemon.net>
- <CAK5ve-+aeB1S0E=HAxPyVwoQ0WOEREQC+XnAeHX4bU_eavsP2Q@mail.gmail.com>
- <20130806121750.GP19280@titan.lakedaemon.net>
-Message-ID: <CAK5ve-L9HWNKYTWvPtBMWCLaBxr_pLu7iXP15wAdxyGZOcjQNA@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 6 Aug 2013 12:49:27 -0500
+Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
+Message-ID: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 6, 2013 at 5:17 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Bryan,
->
-> On Mon, Aug 05, 2013 at 03:52:35PM -0700, Bryan Wu wrote:
->> On Sat, Aug 3, 2013 at 7:12 AM, Jason Cooper <jason@lakedaemon.net> wrote:
->> > On Fri, Aug 02, 2013 at 11:34:34PM +0200, Simon Guinot wrote:
->> >> With the DT conversion, the board Kconfig symbols MACH_ are going to be
->> >> removed. In order to prepare this removal, this patch replaces alls the
->> >> machines dependencies for leds-netxbig by ARCH_KIRKWOOD.
->> >>
->> >> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
->> >> ---
->> >> Thomas,
->> >>
->> >> Please, insert this patch in your series before the patch named:
->> >> [PATCHv2 7/9] ARM: kirkwood: convert LaCie Net{2, 5}Big v2 platforms to DT
->> >
->> > Nah, this should go through linux-leds.
->> >
->> > Acked-by: Jason Cooper <jason@lakedaemon.net>
->> >
->>
->> I can merge this patch through my tree but when will that kirkwood
->> patch be merged?
->
-> It's okay, it falls in the same category as the other patch you merged.
-> There's no dependency between this patch and the rest of this series,
-> despite the above request to insert.
->
-> thx,
->
-> Jason.
->
->> How about merge this with those kirkwood patches with my ack:
->>
->> Acked-by: Bryan Wu <cooloney@gmail.com>
->
-> No, no, no.  I'm trying to encourage patches to go through the
-> proper trees when possible.  :-P
->
+Hi,
 
-No problem, merged already.
+This is the third version of the patch series for adding basic suspend-resume
+support for AM33XX, previously submitted by Vaibhav Bedia. This patchset 
+is based on 3.11-rc4 and depends on a forthcoming patchset from Suman Anna
+that adds mailbox support for the wkup_m3. The patches at [1], [2], and [3] are 
+required for the pm code to properly suspend and resume.
 
--Bryan
+The PM code uses the firmware interface and expects the userspace to load 
+the WKUP_M3 binary before the suspend-resume functionality is made available.
+The binary file (and the source-code for WKUP_M3) can be obtained from the 
+'next2' branch at [4]. The WKUP_M3 binary can either be loaded post bootup 
+via the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or it can be 
+included in the kernel image as part of the build process.
 
->> >
->> >>  drivers/leds/Kconfig |    2 +-
->> >>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
->> >> index 0e41460..7226696 100644
->> >> --- a/drivers/leds/Kconfig
->> >> +++ b/drivers/leds/Kconfig
->> >> @@ -407,8 +407,8 @@ config LEDS_NS2
->> >>
->> >>  config LEDS_NETXBIG
->> >>       tristate "LED support for Big Network series LEDs"
->> >> -     depends on MACH_NET2BIG_V2 || MACH_NET5BIG_V2
->> >>       depends on LEDS_CLASS
->> >> +     depends on ARCH_KIRKWOOD
->> >>       default y
->> >>       help
->> >>         This option enable support for LEDs found on the LaCie 2Big
->> >> --
->> >> 1.7.10.4
->> >>
+Suspend to mem is tested on am335x-bone and am335x-evm.
+
+More details on AM335x suspend-resume are provided within the commit logs
+for each patch.
+
+Changes in v3:
+- Moved wkup_m3 code into separate driver
+- Split up ti_emif header move
+- Addressed clean-up comments
+- Removed mailbox patches
+- v2-v3 Discussion:
+http://marc.info/?l=linux-arm-kernel&m=135698501821090&w=4
+
+Changes in v2:
+- Broke patches up to isolate assembly code and build hookup.
+- Moved control module code to separate module
+- v1->v2 Discussion:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129508.html
+
+Regards,
+Dave
+
+[1] http://marc.info/?l=linux-arm-kernel&m=137303736714638&w=4
+[2] http://marc.info/?l=linux-omap&m=137303723114610&w=4
+[3] http://marc.info/?l=linux-omap&m=137401384611934&w=4
+[4] http://arago-project.org/git/projects/?p=am33x-cm3.git;a=shortlog;h=refs/heads/next2
+
+
+Dave Gerlach (1):
+  memory: emif: Move EMIF register defines to include/linux/
+
+Vaibhav Bedia (8):
+  ARM: OMAP2+: AM33XX: control: Add some control module registers and
+    APIs
+  ARM: OMAP: DTB: Update IRQ data for WKUP_M3
+  ARM: OMAP2+: AM33XX: Reserve memory to comply with EMIF spec
+  ARM: OMAP2+: AM33XX: Add assembly code for PM operations
+  ARM: OMAP2+: timer: Add suspend-resume callbacks for clkevent device
+  ARM: OMAP: omap_device: Add APIs to enable and idle hwmods
+  ARM: OMAP2+: AM33XX: Basic suspend resume support
+  ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into OMAP builds
+
+ arch/arm/boot/dts/am33xx.dtsi       |    1 +
+ arch/arm/mach-omap2/Kconfig         |    7 +-
+ arch/arm/mach-omap2/Makefile        |    2 +
+ arch/arm/mach-omap2/board-generic.c |    3 +-
+ arch/arm/mach-omap2/common.c        |   28 ++
+ arch/arm/mach-omap2/common.h        |   14 +
+ arch/arm/mach-omap2/control.c       |   57 ++++
+ arch/arm/mach-omap2/control.h       |   54 ++++
+ arch/arm/mach-omap2/io.c            |    6 +
+ arch/arm/mach-omap2/omap_device.c   |    8 +
+ arch/arm/mach-omap2/omap_device.h   |    2 +
+ arch/arm/mach-omap2/pm.c            |    3 +-
+ arch/arm/mach-omap2/pm.h            |    5 +
+ arch/arm/mach-omap2/pm33xx.c        |  474 +++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm33xx.h        |   77 +++++
+ arch/arm/mach-omap2/sleep33xx.S     |  350 ++++++++++++++++++++++
+ arch/arm/mach-omap2/sram.c          |   10 +-
+ arch/arm/mach-omap2/sram.h          |    2 +
+ arch/arm/mach-omap2/timer.c         |   32 ++
+ arch/arm/mach-omap2/wkup_m3.c       |  183 ++++++++++++
+ drivers/memory/emif.h               |  543 +---------------------------------
+ include/linux/ti_emif.h             |  558 +++++++++++++++++++++++++++++++++++
+ 22 files changed, 1872 insertions(+), 547 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/pm33xx.c
+ create mode 100644 arch/arm/mach-omap2/pm33xx.h
+ create mode 100644 arch/arm/mach-omap2/sleep33xx.S
+ create mode 100644 arch/arm/mach-omap2/wkup_m3.c
+ create mode 100644 include/linux/ti_emif.h
+
+-- 
+1.7.9.5
