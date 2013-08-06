@@ -1,18 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Aug 2013 12:16:47 +0200
-Subject: [PATCH 03/22] ARM: u300: Remove '0x's from U300 DTS file
-In-Reply-To: <1374490361-25769-3-git-send-email-lee.jones@linaro.org>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYvOKmBcJZDaeDPu1wag0qQdzSG=3mb58Xhu02kmSS=xA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 6 Aug 2013 11:20:44 +0100
+Subject: [PATCH] spi: sirf: use DMA if both buffer address and length are
+ aligned
+In-Reply-To: <1375770081-12873-1-git-send-email-Baohua.Song@csr.com>
+References: <1375770081-12873-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130806102044.GA13956@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 12:52 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Tue, Aug 06, 2013 at 02:21:21PM +0800, Barry Song wrote:
+> this patch enables DMA support for SiRFSoC SPI driver, if both
+> buffers and length are aligned with DMA controller's hardware
+> limitation, use generic SiRF generic dmaengine driver.
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Patch applied.
-
-Yours,
-Linus Walleij
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130806/c3f3e550/attachment.sig>
