@@ -1,173 +1,119 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Aug 2013 11:10:30 -0700
-Subject: [PATCH] ARM: KVM: Fix 64-bit coprocessor handling
-In-Reply-To: <5200B72D.2080101@arm.com>
-References: <1375764086-1996-1-git-send-email-christoffer.dall@linaro.org>
- <5200B72D.2080101@arm.com>
-Message-ID: <20130806181030.GI16694@cbox>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Tue, 6 Aug 2013 11:17:18 -0700
+Subject: [PATCH 3/3] ARM: dts: AM33xx: Add RNG node
+In-Reply-To: <1375777984-6267-4-git-send-email-lokeshvutla@ti.com>
+References: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
+ <1375777984-6267-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <CA+Bv8XZ0SqtCJQszrpVcRuksJU+GNBoJD7FaP+NuQrbshnnBpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 09:43:25AM +0100, Marc Zyngier wrote:
-> Hi Christoffer,
-> 
-> On 06/08/13 05:41, Christoffer Dall wrote:
-> > The PAR was exported as CRn == 7 and CRm == 0, but in fact the primary
-> > coprocessor register number was determined by CRm for 64-bit coprocessor
-> > registers as the user space API was modelled after the coprocessor
-> > access instructions (see the ARM ARM rev. C - B3-1445).
-> > 
-> > However, just changing the CRn to CRm breaks the sorting check when
-> > booting the kernel, because the internal kernel logic always treats CRn
-> > as the primary register number, and it makes the table sorting
-> > impossible to understand for humans.
-> > 
-> > Alternatively we could change the logic to always have CRn == CRm, but
-> > that becomes unclear in the number of ways we do lookup of a coprocessor
-> > register.  We could also have a separate 64-bit table but that feels
-> > somewhat over-engineerd.  Instead, keep CRn the primary representation
-> 
-> over-engineered
-> 
-> > of the primary corproc. register number in-kernel and always export the
-> 
-> coproc.
-> 
-> > primary number as CRm as per the existing user space ABI.
-> > 
-> > Note: The TTBR registers just magically worked because they happened to
-> > follow the CRn(0) regs and were considered CRn(0) in the in-kernel
-> > representation.
-> 
-> Nice catch. This unfortunately shows how little of the userspace
-> interface we've been actually using so far. I suppose you found this by
-> playing with save/restore?
-> 
-Actually, I just ran a recent QEMU with Peter's reworked coprocessor
-interface and it blew up in my face, shame on us.
+On Tue, Aug 6, 2013 at 1:33 AM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
+> Add the generic AM33xx RNG module's device tree data and
+> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
+> platforms.  Also add Documentation file describing the data
+> for the RNG module.
+>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
+>  arch/arm/boot/dts/am335x-bone.dts                  |    4 ++++
+>  arch/arm/boot/dts/am335x-evm.dts                   |    4 ++++
+>  arch/arm/boot/dts/am335x-evmsk.dts                 |    4 ++++
+>  arch/arm/boot/dts/am33xx.dtsi                      |    8 +++++++
+>  5 files changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
+>
+> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> new file mode 100644
+> index 0000000..6a62acd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> @@ -0,0 +1,22 @@
+> +OMAP SoC HWRNG Module
+> +
+> +Required properties:
+> +
+> +- compatible : Should contain entries for this and backward compatible
+> +  RNG versions:
+> +  - "ti,omap2-rng" for OMAP2.
+> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
+> +  Note that these two versions are incompatible.
+> +- ti,hwmods: Name of the hwmod associated with the RNG module
+> +- reg : Offset and length of the register set for the module
+> +- interrupts : the interrupt number for the RNG module.
+> +               Only used for "ti,omap4-rng".
+> +
+> +Example:
+> +/* AM335x */
+> +rng: rng at 48310000 {
+> +       compatible = "ti,omap4-rng";
+> +       ti,hwmods = "rng";
+> +       reg = <0x48310000 0x2000>;
+> +       interrupts = <111>;
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index 444b4ed..46a3887 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -234,3 +234,7 @@
+>         pinctrl-0 = <&davinci_mdio_default>;
+>         pinctrl-1 = <&davinci_mdio_sleep>;
+>  };
+> +
+> +&rng {
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+> index 3aee1a4..ebfbebe1 100644
+> --- a/arch/arm/boot/dts/am335x-evm.dts
+> +++ b/arch/arm/boot/dts/am335x-evm.dts
+> @@ -488,3 +488,7 @@
+>                 ti,adc-channels = <4 5 6 7>;
+>         };
+>  };
+> +
+> +&rng {
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+> index 0c8ad17..6610a05 100644
+> --- a/arch/arm/boot/dts/am335x-evmsk.dts
+> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
+> @@ -402,3 +402,7 @@
+>         phy_id = <&davinci_mdio>, <1>;
+>         phy-mode = "rgmii-txid";
+>  };
+> +
+> +&rng {
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 38b446b..b1e6205 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -530,5 +530,13 @@
+>                         #size-cells = <1>;
+>                         status = "disabled";
+>                 };
+> +
+> +               rng: rng at 48310000 {
+> +                       compatible = "ti,omap4-rng";
+> +                       ti,hwmods = "rng";
+> +                       reg = <0x48310000 0x2000>;
+> +                       interrupts = <111>;
+> +                       status = "disabled";
 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm/kvm/coproc.c     |   23 +++++++++++++++++------
-> >  arch/arm/kvm/coproc.h     |    2 ++
-> >  arch/arm/kvm/coproc_a15.c |    5 ++++-
-> >  3 files changed, 23 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> > index 4a51990..fc5fec2 100644
-> > --- a/arch/arm/kvm/coproc.c
-> > +++ b/arch/arm/kvm/coproc.c
-> > @@ -146,7 +146,10 @@ static bool pm_fake(struct kvm_vcpu *vcpu,
-> >  #define access_pmintenclr pm_fake
-> >  
-> >  /* Architected CP15 registers.
-> > - * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
-> > + * CRn denotes the primary register number, but is copied to the CRm in the
-> > + * user space API in line with the terminology used in the ARM ARM.
-> 
-> Please consider adding something like "in the 64bit case only".
-> 
+Is there any point in making this default to "disabled"? Are there any
+am335x platforms where the trng doesn't function?
 
-right
-
-> > + * Important: Must be sorted ascending by CRn, CRM, Op1, Op2 and with 64-bit
-> > + *            registers preceeding 32-bit ones.
-> 
-> preceding
-> 
-> >   */
-> >  static const struct coproc_reg cp15_regs[] = {
-> >  	/* CSSELR: swapped by interrupt.S. */
-> > @@ -154,8 +157,8 @@ static const struct coproc_reg cp15_regs[] = {
-> >  			NULL, reset_unknown, c0_CSSELR },
-> >  
-> >  	/* TTBR0/TTBR1: swapped by interrupt.S. */
-> > -	{ CRm( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
-> > -	{ CRm( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
-> > +	{ CRn( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
-> > +	{ CRn( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
-> 
-> How about this (untested) alternative possibility:
-> 
-> #define CRm64(_x)	.CRn = _x, .is64 = 1,
-> 	{ CRm64( 2), Op1( 0), NULL, reset_unknown64, c2_TTBR0 },
-> 	{ CRm64( 2), Op1( 1), NULL, reset_unknown64, c2_TTBR1 },
-> 
-> It has the benefit of still showing CRm as being the official field, and
-> hide the ugliness into the macro.
-> 
-> Still ugly though...
-> 
-
-thought about this too, but discarded the idea, but seeing it written
-out, it's actually not that bad - or IOW what I suggested was at least
-as ugly.  I'll go and steal this.
-
-> >  	/* TTBCR: swapped by interrupt.S. */
-> >  	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
-> > @@ -399,12 +402,13 @@ static bool index_to_params(u64 id, struct coproc_params *params)
-> >  			      | KVM_REG_ARM_OPC1_MASK))
-> >  			return false;
-> >  		params->is_64bit = true;
-> > -		params->CRm = ((id & KVM_REG_ARM_CRM_MASK)
-> > +		/* CRm to CRn: see cp15_to_index for details */
-> > +		params->CRn = ((id & KVM_REG_ARM_CRM_MASK)
-> >  			       >> KVM_REG_ARM_CRM_SHIFT);
-> >  		params->Op1 = ((id & KVM_REG_ARM_OPC1_MASK)
-> >  			       >> KVM_REG_ARM_OPC1_SHIFT);
-> >  		params->Op2 = 0;
-> > -		params->CRn = 0;
-> > +		params->CRm = 0;
-> >  		return true;
-> >  	default:
-> >  		return false;
-> > @@ -898,7 +902,14 @@ static u64 cp15_to_index(const struct coproc_reg *reg)
-> >  	if (reg->is_64) {
-> >  		val |= KVM_REG_SIZE_U64;
-> >  		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
-> > -		val |= (reg->CRm << KVM_REG_ARM_CRM_SHIFT);
-> > +		/*
-> > +		 * CRn always denotes the primary coproc. reg. nr. for the
-> > +		 * in-kernel representation, but the user space API uses the
-> > +		 * CRm for the encoding, because it is modelled after the
-> > +		 * MRRC/MCRR instructions: see the ARM ARM rev. c page
-> > +		 * B3-1445
-> > +		 */
-> > +		val |= (reg->CRn << KVM_REG_ARM_CRM_SHIFT);
-> >  	} else {
-> >  		val |= KVM_REG_SIZE_U32;
-> >  		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
-> > diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
-> > index b7301d3..dccb904 100644
-> > --- a/arch/arm/kvm/coproc.h
-> > +++ b/arch/arm/kvm/coproc.h
-> > @@ -135,6 +135,8 @@ static inline int cmp_reg(const struct coproc_reg *i1,
-> >  		return -1;
-> >  	if (i1->CRn != i2->CRn)
-> >  		return i1->CRn - i2->CRn;
-> > +	if (i1->is_64 != i2->is_64)
-> > +		return i2->is_64 - i1->is_64;
-> >  	if (i1->CRm != i2->CRm)
-> >  		return i1->CRm - i2->CRm;
-> >  	if (i1->Op1 != i2->Op1)
-> > diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
-> > index 685063a..3d8f61f 100644
-> > --- a/arch/arm/kvm/coproc_a15.c
-> > +++ b/arch/arm/kvm/coproc_a15.c
-> > @@ -114,7 +114,10 @@ static bool access_l2ectlr(struct kvm_vcpu *vcpu,
-> >  
-> >  /*
-> >   * A15-specific CP15 registers.
-> > - * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
-> > + * CRn denotes the primary register number, but is copied to the CRm in the
-> > + * user space API in line with the terminology used in the ARM ARM.
-> > + * Important: Must be sorted ascending by CRn, CRM, Op1, Op2 and with 64-bit
-> > + *            registers preceeding 32-bit ones.
-> >   */
-> >  static const struct coproc_reg a15_regs[] = {
-> >  	/* MPIDR: we use VMPIDR for guest access. */
-> > 
-Thanks for all the spelling fixes, the time is over when I should post
-to the list after 5pm I guess.
-
--Christoffer
+> +               };
+>         };
+>  };
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
