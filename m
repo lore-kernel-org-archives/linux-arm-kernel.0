@@ -1,66 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 05 Aug 2013 22:21:47 -0600
-Subject: [PATCH v2] ARM: DT: binding fixup to align with
- vendor-prefixes.txt
-In-Reply-To: <5200407A.4010407@broadcom.com>
-References: <1375482479-15732-1-git-send-email-csd@broadcom.com>
- <51FFCC42.6040300@wwwdotorg.org> <5200407A.4010407@broadcom.com>
-Message-ID: <520079DB.5090309@wwwdotorg.org>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Tue, 6 Aug 2013 09:55:44 +0530
+Subject: [PATCH 1/3] clk: s2mps11: Add support for s2mps11
+In-Reply-To: <20130805232337.5348.79716@quantum>
+References: <1373197462-4033-1-git-send-email-yadi.brar@samsung.com>
+ <1373197462-4033-2-git-send-email-yadi.brar@samsung.com>
+ <20130805232337.5348.79716@quantum>
+Message-ID: <CAKew6eXRuB5Q0f_GaCKOR7XwbX0n=-5BR_TeRVMUCD9AUHiL7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 06:16 PM, Christian Daudt wrote:
-> On 13-08-05 09:01 AM, Stephen Warren wrote:
->> On 08/02/2013 04:27 PM, Christian Daudt wrote:
->>> [ this is a follow-up to this discussion:
->>> http://archive.arm.linux.org.uk/lurker/message/20130730.230827.a1ceb12a.en.html
->>> ]
->>> This patchset renames all uses of "bcm," name bindings to
->>> "brcm," as they were done prior to knowing that brcm had
->>> already been standardized as Broadcom vendor prefix
->>> (in Documentation/devicetree/bindings/vendor-prefixes.txt).
->>> This will not cause any churn on devices because none of
->>> these bindings have made it into production yet.
->>> Also rename the the following dt binding docs that had "bcm,"
->>> in their name for consistency:
->>>   - bcm,kona-sdhci.txt -> kona-sdhci.txt
->>>   - bcm,kona-timer.txt -> kona-timer.txt
->>> Changes since v1:
->>>   - added driver match table entries for deprecated names
+Hi Mike,
 
->>> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
->>> b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
->>> index fb7b5cd..cf1b206 100644
->>> --- a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
->>> +++ b/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
->> I wonder if this patch should rename bindings/arm/bcm/ to
->> bindings/arm/brcm/ too?
+On Tue, Aug 6, 2013 at 4:53 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Yadwinder Singh Brar (2013-07-07 04:44:20)
+>> This patch adds support to register three(AP/CP/BT) buffered 32.768 KHz
+>> outputs of mfd-s2mps11 with common clock framework.
+>>
+>> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
 >
-> I'd rather keep it as-is - to me the vendor prefix is a DT concept only,
-> and I'd rather not extend its tentacles into other parts of the kernel
-> (and the other arm/ subtrees in there all show no attempt at
-> dirname==vendor-prefix), but I'm ok with changing it to broadcom if you
-> prefer.
-
-Well, except that Documentation/devicetree/bindings is more part of DT
-than the kernel, and there are active moves afoot to separate it out.
-
-But, I suppose it's not a big deal; we can fix it when that happens I
-suppose.
-
->>>   Required root node property:
->>>   -compatible = "bcm,bcm11351";
->>> +compatible = "brcm,bcm11351";
->> In a patch of mine that deprecated a property, Mark wondered if it would
->> make sense to mention the old deprecated DT content simply to document
->> that it existed, so that old DTs would still make sense when checking
->> the documentation. I wonder if the same argument applies to this patch?
+> Yadwinder,
 >
-> I would think the opposite. Deprecated items should be dropped from
-> documentation. They are in the code (for a holdover period) but clearly
-> marked as deprecated. No one should be extending the life of these, and
-> adding documentation on it is a step in the wrong direction of making it
-> easier for it to linger beyond what it should.
+> Looks good to me with the exception of a binding description document.
+> Can you provide one and squash it into this commit?
+>
 
-The deprecated stuff will have to be fully documented once the DT schema
-validation is in place...
+Binding description is provided in next patch :
+[PATCH 2/3] mfd: sec: Add clock cell for s2mps11  :
+https://lkml.org/lkml/2013/7/16/228
+
+Since its a MFD, so i preferred to add documentation in same file
+under mfd, same was done for regulators also.
+If its fine with you then, I think that patch can go through MFD tree
+as same file is touched in for-next of MFD tree.
+
+
+Thanks,
+Yadwinder
