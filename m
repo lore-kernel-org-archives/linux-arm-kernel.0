@@ -1,49 +1,207 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Aug 2013 04:09:45 -0700
-Subject: [PATCH] ARM: fix wrong address when loading
- PRM_FRAC_INCREMENTOR_DENUMERATOR_RELOAD
-In-Reply-To: <C635EF21-CD18-4633-AA39-16209F8EE231@gmail.com>
-References: <1375356474-24203-1-git-send-email-baozich@gmail.com>
- <C635EF21-CD18-4633-AA39-16209F8EE231@gmail.com>
-Message-ID: <20130807110945.GL7656@atomide.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 07 Aug 2013 13:13:12 +0200
+Subject: [PATCH V3 2/3] ASoC: Samsung: I2S: Add quirks as driver data in
+ I2S
+In-Reply-To: <1375865122-5258-3-git-send-email-padma.v@samsung.com>
+References: <1375865122-5258-1-git-send-email-padma.v@samsung.com>
+ <1375865122-5258-3-git-send-email-padma.v@samsung.com>
+Message-ID: <2116389.OxrlCQ9LXd@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Baozi <baozich@gmail.com> [130805 08:33]:
-> ping?
+Ahh, one more thing inline.
+
+On Wednesday 07 of August 2013 14:15:21 Padmavathi Venna wrote:
+> Samsung has different versions of I2S introduced in different
+> platforms. Each version has some new support added for multichannel,
+> secondary fifo, s/w reset control and internal mux for rclk src clk.
+> Each newly added change has a quirk. So this patch adds all the
+> required quirks as driver data and based on compatible string from
+> dtsi fetches the quirks.
 > 
-> On Aug 1, 2013, at 7:27 PM, Chen Baozi <baozich@gmail.com> wrote:
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  .../devicetree/bindings/sound/samsung-i2s.txt      |   21 +++---
+>  sound/soc/samsung/i2s.c                            |   82
+> +++++++++++++------- 2 files changed, 64 insertions(+), 39 deletions(-)
 > 
-> > The denominator should be load from INCREMENTOR_DENUMERATOR_RELOAD_OFFSET
-> > rather than INCREMENTER_NUMERATOR_OFFSET.
-
-Maybe describe what exactly happens without this fix?
-
-Also we should get few acks for this for the -rc series.
-
-Regards,
-
-Tony
-
-> > Signed-off-by: Chen Baozi <baozich@gmail.com>
-> > ---
-> > arch/arm/mach-omap2/timer.c | 2 +-
-> > 1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index b37e1fc..9265e03 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -537,7 +537,7 @@ static void __init realtime_counter_init(void)
-> > 	reg |= num;
-> > 	__raw_writel(reg, base + INCREMENTER_NUMERATOR_OFFSET);
-> > 
-> > -	reg = __raw_readl(base + INCREMENTER_NUMERATOR_OFFSET) &
-> > +	reg = __raw_readl(base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET) &
-> > 			NUMERATOR_DENUMERATOR_MASK;
-> > 	reg |= den;
-> > 	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
-> > -- 
-> > 1.8.1.4
-> > 
+> diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> b/Documentation/devicetree/bindings/sound/samsung-i2s.txt index
+> 025e66b..b3f6443 100644
+> --- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> @@ -2,7 +2,16 @@
 > 
+>  Required SoC Specific Properties:
+> 
+> -- compatible : "samsung,i2s-v5"
+> +- compatible : should be one of the following.
+> +   - samsung,s3c6410-i2s: for 8/16/24bit stereo I2S. Previous versions
+> +     has only 8/16bit support.
+> +   - samsung,s3c6410-i2sv4: for 8/16/24bit multichannel(5.1 channel)
+> I2S. +     Introduced in s3c6410. This also applicable for s5p64x0
+> platforms. +   - samsung,s5pc100-i2s: for 8/16/24bit multichannel(5.1
+> channel) I2S +     with secondary fifo and s/w reset control.
+> +   - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S with
+> +     secondary fifo, s/w reset control and internal mux for root clk
+> src. +
+>  - reg: physical base address of the controller and length of memory
+> mapped region.
+>  - dmas: list of DMA controller phandle and DMA request line ordered
+> pairs. @@ -21,13 +30,6 @@ Required SoC Specific Properties:
+> 
+>  Optional SoC Specific Properties:
+> 
+> -- samsung,supports-6ch: If the I2S Primary sound source has 5.1 Channel
+> -  support, this flag is enabled.
+> -- samsung,supports-rstclr: This flag should be set if I2S software reset
+> bit -  control is required. When this flag is set I2S software reset bit
+> will be -  enabled or disabled based on need.
+> -- samsung,supports-secdai:If I2S block has a secondary FIFO and internal
+> DMA, -  then this flag is enabled.
+>  - samsung,idma-addr: Internal DMA register base address of the audio
+>    sub system(used in secondary sound source).
+>  - pinctrl-0: Should specify pin control groups used for this controller.
+> @@ -46,9 +48,6 @@ i2s0: i2s at 03830000 {
+>  		<&clock_audss EXYNOS_I2S_BUS>,
+>  		<&clock_audss EXYNOS_SCLK_I2S>;
+>  	clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
+> -	samsung,supports-6ch;
+> -	samsung,supports-rstclr;
+> -	samsung,supports-secdai;
+>  	samsung,idma-addr = <0x03000000>;
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&i2s0_bus>;
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index 47e08dd..8a5504c 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -40,6 +40,7 @@ enum samsung_dai_type {
+> 
+>  struct samsung_i2s_dai_data {
+>  	int dai_type;
+> +	u32 quirks;
+>  };
+> 
+>  struct i2s_dai {
+> @@ -1032,18 +1033,18 @@ static struct i2s_dai *i2s_alloc_dai(struct
+> platform_device *pdev, bool sec)
+> 
+>  static const struct of_device_id exynos_i2s_match[];
+> 
+> -static inline int samsung_i2s_get_driver_data(struct platform_device
+> *pdev) +static inline struct samsung_i2s_dai_data
+> *samsung_i2s_get_driver_data( +						struct platform_device 
+*pdev)
+>  {
+>  #ifdef CONFIG_OF
+> -	struct samsung_i2s_dai_data *data;
+>  	if (pdev->dev.of_node) {
+>  		const struct of_device_id *match;
+>  		match = of_match_node(exynos_i2s_match, pdev->dev.of_node);
+> -		data = (struct samsung_i2s_dai_data *) match->data;
+> -		return data->dai_type;
+> +		return (struct samsung_i2s_dai_data *) match->data;
+>  	} else
+>  #endif
+> -		return platform_get_device_id(pdev)->driver_data;
+> +		return (struct samsung_i2s_dai_data *)
+> +				platform_get_device_id(pdev)->driver_data;
+>  }
+> 
+>  #ifdef CONFIG_PM_RUNTIME
+> @@ -1074,13 +1075,13 @@ static int samsung_i2s_probe(struct
+> platform_device *pdev) struct resource *res;
+>  	u32 regs_base, quirks = 0, idma_addr = 0;
+>  	struct device_node *np = pdev->dev.of_node;
+> -	enum samsung_dai_type samsung_dai_type;
+> +	struct samsung_i2s_dai_data *i2s_dai_data;
+>  	int ret = 0;
+> 
+>  	/* Call during Seconday interface registration */
+> -	samsung_dai_type = samsung_i2s_get_driver_data(pdev);
+> +	i2s_dai_data = samsung_i2s_get_driver_data(pdev);
+> 
+> -	if (samsung_dai_type == TYPE_SEC) {
+> +	if (i2s_dai_data->dai_type == TYPE_SEC) {
+>  		sec_dai = dev_get_drvdata(&pdev->dev);
+>  		if (!sec_dai) {
+>  			dev_err(&pdev->dev, "Unable to get drvdata\n");
+> @@ -1129,15 +1130,7 @@ static int samsung_i2s_probe(struct
+> platform_device *pdev) idma_addr = i2s_cfg->idma_addr;
+>  		}
+>  	} else {
+> -		if (of_find_property(np, "samsung,supports-6ch", NULL))
+> -			quirks |= QUIRK_PRI_6CHAN;
+> -
+> -		if (of_find_property(np, "samsung,supports-secdai", NULL))
+> -			quirks |= QUIRK_SEC_DAI;
+> -
+> -		if (of_find_property(np, "samsung,supports-rstclr", NULL))
+> -			quirks |= QUIRK_NEED_RSTCLR;
+> -
+> +		quirks = i2s_dai_data->quirks;
+>  		if (of_property_read_u32(np, "samsung,idma-addr",
+>  					 &idma_addr)) {
+>  			if (quirks & QUIRK_SEC_DAI) {
+> @@ -1250,27 +1243,60 @@ static int samsung_i2s_remove(struct
+> platform_device *pdev) return 0;
+>  }
+> 
+> +static struct samsung_i2s_dai_data i2sv3_dai_type = {
+> +	.dai_type = TYPE_PRI,
+> +	.quirks = QUIRK_NO_MUXPSR,
+> +};
+> +
+> +static struct samsung_i2s_dai_data i2sv4_dai_type = {
+> +	.dai_type = TYPE_PRI,
+> +	.quirks = QUIRK_PRI_6CHAN | QUIRK_NO_MUXPSR,
+> +};
+> +
+> +static struct samsung_i2s_dai_data i2sv5_c100_dai_type = {
+> +	.dai_type = TYPE_PRI,
+> +	.quirks = QUIRK_PRI_6CHAN | QUIRK_NO_MUXPSR | QUIRK_SEC_DAI |
+> +			QUIRK_NEED_RSTCLR,
+> +};
+> +
+> +static struct samsung_i2s_dai_data i2sv5_dai_type = {
+> +	.dai_type = TYPE_PRI,
+> +	.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR,
+> +};
+> +
+> +static struct samsung_i2s_dai_data samsung_dai_type_sec = {
+> +	.dai_type = TYPE_SEC,
+> +};
+> +
+>  static struct platform_device_id samsung_i2s_driver_ids[] = {
+>  	{
+> -		.name           = "samsung-i2s",
+> -		.driver_data	= TYPE_PRI,
+> +		.name		= "samsung,s3c6410-i2s",
+> +		.driver_data	= (kernel_ulong_t)&i2sv3_dai_type,
+> +	}, {
+> +		.name		= "samsung,s3c6410-i2s-multi",
+> +		.driver_data	= (kernel_ulong_t)&i2sv4_dai_type,
+> +	}, {
+> +		.name		= "samsung,s5pc100-i2s",
+> +		.driver_data	= (kernel_ulong_t)&i2sv5_c100_dai_type,
+>  	}, {
+> -		.name           = "samsung-i2s-sec",
+> -		.driver_data	= TYPE_SEC,
+> +		.name		= "samsung,s5pv210-i2s",
+> +		.driver_data	= (kernel_ulong_t)&i2sv5_dai_type,
+> +	}, {
+> +		.name		= "samsung-i2s-sec",
+> +		.driver_data	= (kernel_ulong_t)&samsung_dai_type_sec,
+
+I don't think you need to change the legacy platform IDs at all.
+
+IMHO it would be better to keep the old way of quirk retrieval from 
+platform_data (which I think this patch does anyway, because the probe path 
+without DT is unchanged), as it will be dropped in some point in time 
+anyway.
+
+This would also eliminate the need for patch 1.
+
+Best regards,
+Tomasz
