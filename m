@@ -1,28 +1,59 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 7 Aug 2013 10:20:20 +0200
-Subject: [PATCH v6 2/8] ASoC: atmel: machine driver for at91sam9x5-wm8731
- boards
-In-Reply-To: <20130806171156.GN6427@sirena.org.uk>
-References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
- <1375180329-4860-3-git-send-email-richard.genoud@gmail.com>
- <20130806171156.GN6427@sirena.org.uk>
-Message-ID: <CACQ1gAhVfSV1MArzTGxSfJOcEksBv-O2AjVJm6eEoBGtggw5uA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Aug 2013 09:20:35 +0100
+Subject: [PATCH 1/3] clk: exynos4: Make exynos4_plls static
+In-Reply-To: <1375846648.2424.69.camel@joe-AO722>
+References: <1375788675-2638-1-git-send-email-sachin.kamat@linaro.org>
+ <20130806200219.GD23006@n2100.arm.linux.org.uk>
+ <CAK9yfHxKn9JaA5Tbuw9qXeyEX_kio4mt3gOgJxkMNSoDHkHnBQ@mail.gmail.com>
+ <1375846648.2424.69.camel@joe-AO722>
+Message-ID: <20130807082035.GF23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/6 Mark Brown <broonie@kernel.org>:
-> On Tue, Jul 30, 2013 at 12:32:03PM +0200, Richard Genoud wrote:
->> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> Description of the Asoc machine driver for an at91sam9x5 based board
->> with a wm8731 audio DAC. Wm8731 is clocked by a crystal and used as a
->> master on the SSC/I2S interface. Its connections are a headphone jack
->> and an Line input jack.
->
-> Applied, thanks.  We should really be able to merge this with the
-> sam9g20ek driver that's here already but we can do that later.
+On Tue, Aug 06, 2013 at 08:37:28PM -0700, Joe Perches wrote:
+> On Wed, 2013-08-07 at 08:51 +0530, Sachin Kamat wrote:
+> > +CC Joe Perches
+> > 
+> > On 7 August 2013 01:32, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > > Also note:
+> > >
+> > > On Tue, Aug 06, 2013 at 05:01:13PM +0530, Sachin Kamat wrote:
+> > >> @@ -984,7 +984,7 @@ static __initdata struct of_device_id ext_clk_match[] = {
+> > >
+> > > For the declaration above...
+> > >
+> > >> -struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+> > >> +static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+> > >
+> > > And this one... __initdata should come just before the '=', not at the
+> > > start, not in the middle and not before the variable.
+> > >
+> > > The reasoning is that with how you have it above, the attributes are
+> > > applied to the structure.  You want to apply the attributes to the
+> > > declaration instead, so it should come after the variable name.
+> > >
+> > > So, for example:
+> > >
+> > >         struct foo *foo __attribute__((section(".foo"))) = (void *)1;
+> > >
+> > > will place the "foo" variable into a section called ".foo", but:
+> > >
+> > >         struct __attribute__((section(".foo"))) foo *foo = (void *)1;
+> > >
+> > > will place "foo" into the normal .data section.
+> > >
+> > > So, the rule with variable declarations is that the __ specifiers we
+> > > have as macros in the kernel always come after the variable name being
+> > > declared and nowhere else.  We consider anywhere else buggy.
+> > 
+> > Thanks for this useful tip, Russell. There are several instances in
+> > the kernel where these attributes are used at the beginning of the
+> > variable declaration.
+> > 
+> > Probably it would be useful to add this to checkpatch. Joe?
+> 
+> I think Russell is using the royal "We".
 
-I think it will be easier after the switch to the common clock framework.
-I'll look into that.
-
-Thanks !
+No I'm not.  There have been many patches to fix errors like the above
+in the past.  If it's not considered a bug by the community as a whole,
+it damn well should be.
