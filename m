@@ -1,84 +1,158 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 07 Aug 2013 19:28:29 +0200
-Subject: [PATCH] ARM: at91/dt: split sam9x5 peripheral definitions
-In-Reply-To: <20130807180854.41b4bedb@skate>
-References: <1375870466-1093-1-git-send-email-b.brezillon@overkiz.com>
- <20130807180854.41b4bedb@skate>
-Message-ID: <520283BD.9060002@overkiz.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 7 Aug 2013 10:32:31 -0700
+Subject: [PATCH] arm64: KVM: fix 2-level page tables unmapping
+In-Reply-To: <5202229C.5040007@arm.com>
+References: <1375790748-10296-1-git-send-email-marc.zyngier@arm.com>
+ <20130806204943.GK16694@cbox> <5202229C.5040007@arm.com>
+Message-ID: <20130807173231.GS16694@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+On Wed, Aug 07, 2013 at 11:34:04AM +0100, Marc Zyngier wrote:
+> On 06/08/13 21:49, Christoffer Dall wrote:
+> > On Tue, Aug 06, 2013 at 01:05:48PM +0100, Marc Zyngier wrote:
+> >> When using 64kB pages, we only have two levels of page tables,
+> >> meaning that PGD, PUD and PMD are fused. In this case, trying
+> >> to refcount PUDs and PMDs independantly is a a complete disaster,
+> > 
+> > independently
+> > 
+> >> as they are the same.
+> >>
+> >> We manage to get it right for the allocation (stage2_set_pte uses
+> >> {pmd,pud}_none), but the unmapping path clears both pud and pmd
+> >> refcounts, which fails spectacularly with 2-level page tables.
+> >>
+> >> The fix is to avoid calling clear_pud_entry when both the pmd and
+> >> pud pages are empty. For this, and instead of introducing another
+> >> pud_empty function, consolidate both pte_empty and pmd_empty into
+> >> page_empty (the code is actually identical) and use that to also
+> >> test the validity of the pud.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/kvm/mmu.c | 22 ++++++++--------------
+> >>  1 file changed, 8 insertions(+), 14 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index ca6bea4..7e1d899 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -85,6 +85,12 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+> >>  	return p;
+> >>  }
+> >>  
+> >> +static bool page_empty(void *ptr)
+> >> +{
+> >> +	struct page *ptr_page = virt_to_page(ptr);
+> >> +	return page_count(ptr_page) == 1;
+> >> +}
+> >> +
+> >>  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+> >>  {
+> >>  	pmd_t *pmd_table = pmd_offset(pud, 0);
+> >> @@ -103,12 +109,6 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+> >>  	put_page(virt_to_page(pmd));
+> >>  }
+> >>  
+> >> -static bool pmd_empty(pmd_t *pmd)
+> >> -{
+> >> -	struct page *pmd_page = virt_to_page(pmd);
+> >> -	return page_count(pmd_page) == 1;
+> >> -}
+> >> -
+> >>  static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+> >>  {
+> >>  	if (pte_present(*pte)) {
+> >> @@ -118,12 +118,6 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+> >>  	}
+> >>  }
+> >>  
+> >> -static bool pte_empty(pte_t *pte)
+> >> -{
+> >> -	struct page *pte_page = virt_to_page(pte);
+> >> -	return page_count(pte_page) == 1;
+> >> -}
+> >> -
+> >>  static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> >>  			unsigned long long start, u64 size)
+> >>  {
+> >> @@ -153,10 +147,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> >>  		range = PAGE_SIZE;
+> >>  
+> >>  		/* If we emptied the pte, walk back up the ladder */
+> >> -		if (pte_empty(pte)) {
+> >> +		if (page_empty(pte)) {
+> >>  			clear_pmd_entry(kvm, pmd, addr);
+> >>  			range = PMD_SIZE;
+> >> -			if (pmd_empty(pmd)) {
+> >> +			if (page_empty(pmd) && !page_empty(pud)) {
+> >>  				clear_pud_entry(kvm, pud, addr);
+> >>  				range = PUD_SIZE;
+> >>  			}
+> > 
+> > looks right, an alternative would be to check in clear_pud_entry if the
+> > entry actually had a value, but I don't think it's really clearer.
+> > 
+> > However, this got me thinking a bit.  What happens if we pass a non-pmd
+> > aligned address to unmap_range, and let's assume the size of the range
+> > is more than 2MB, won't we be leaking memory by incrementing with
+> > PMD_SIZE?  (same argument goes for PUD_SIZE).  See the patch below:
+> > 
+> > 
+> > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> > index ca6bea4..80a83ec 100644
+> > --- a/arch/arm/kvm/mmu.c
+> > +++ b/arch/arm/kvm/mmu.c
+> > @@ -132,37 +132,37 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> >  	pmd_t *pmd;
+> >  	pte_t *pte;
+> >  	unsigned long long addr = start, end = start + size;
+> > -	u64 range;
+> > +	u64 next;
+> >  
+> >  	while (addr < end) {
+> >  		pgd = pgdp + pgd_index(addr);
+> >  		pud = pud_offset(pgd, addr);
+> >  		if (pud_none(*pud)) {
+> > -			addr += PUD_SIZE;
+> > +			addr = pud_addr_end(addr, end);
+> >  			continue;
+> >  		}
+> >  
+> >  		pmd = pmd_offset(pud, addr);
+> >  		if (pmd_none(*pmd)) {
+> > -			addr += PMD_SIZE;
+> > +			addr = pmd_addr_end(addr, end);
+> >  			continue;
+> >  		}
+> >  
+> >  		pte = pte_offset_kernel(pmd, addr);
+> >  		clear_pte_entry(kvm, pte, addr);
+> > -		range = PAGE_SIZE;
+> > +		next = addr + PAGE_SIZE;
+> >  
+> >  		/* If we emptied the pte, walk back up the ladder */
+> >  		if (pte_empty(pte)) {
+> >  			clear_pmd_entry(kvm, pmd, addr);
+> > -			range = PMD_SIZE;
+> > +			next = pmd_addr_end(addr, end);
+> >  			if (pmd_empty(pmd)) {
+> >  				clear_pud_entry(kvm, pud, addr);
+> > -				range = PUD_SIZE;
+> > +				next = pud_addr_end(addr, end);
+> >  			}
+> >  		}
+> >  
+> > -		addr += range;
+> > +		addr = next;
+> >  	}
+> >  }
+> 
+> That looks sensible. Would you prepare a patch on which I could rebase
+> the above?
+> 
+I can just apply both patches as they are will the spell fix to
+kvm-arm-fixes.
 
-Sorry for the noise, this mail was filtered by LKML and LAKML beacause 
-thunderbird
-added HTML contents.
-
-On 07/08/2013 18:08, Thomas Petazzoni wrote:
-> Dear Boris BREZILLON,
->
-> On Wed,  7 Aug 2013 12:14:26 +0200, Boris BREZILLON wrote:
->> This patch splits the sam9x5 peripheral definitions into:
->> - a common base for all sam9x5 SoCs (at91sam9x5.dtsi)
->> - several optional peripheral definitions which will be included by specific
->>    sam9x5 SoCs (at91sam9x5_'periph name'.dtsi)
->>
->> This provides a better representation of the real hardware (drop unneeded
->> dt nodes) and avoids future peripheral id conflict (lcdc and isi both use
->> peripheral id 25).
->>
->> Signed-off-by: Boris BREZILLON<b.brezillon@overkiz.com>
->> ---
->>   arch/arm/boot/dts/at91sam9g25.dtsi       |    2 +
->>   arch/arm/boot/dts/at91sam9g35.dtsi       |    1 +
->>   arch/arm/boot/dts/at91sam9x25.dtsi       |   24 ++---------
->>   arch/arm/boot/dts/at91sam9x35.dtsi       |    1 +
->>   arch/arm/boot/dts/at91sam9x5.dtsi        |   67 ------------------------------
->>   arch/arm/boot/dts/at91sam9x5_macb0.dtsi  |   56 +++++++++++++++++++++++++
->>   arch/arm/boot/dts/at91sam9x5_macb1.dtsi  |   44 ++++++++++++++++++++
->>   arch/arm/boot/dts/at91sam9x5_usart3.dtsi |   51 +++++++++++++++++++++++
->>   8 files changed, 158 insertions(+), 88 deletions(-)
->>   create mode 100644 arch/arm/boot/dts/at91sam9x5_macb0.dtsi
->>   create mode 100644 arch/arm/boot/dts/at91sam9x5_macb1.dtsi
->>   create mode 100644 arch/arm/boot/dts/at91sam9x5_usart3.dtsi
-> Hum, do we really want to have .dtsi files per peripheral? I might have
-> overlooked this, but I think it's the first time we would have this in
-> arch/arm/boot/dts.
-It's not one .dtsi file for each available peripheral but for each 
-**optional**
-peripheral (those which are not available for all sam9x5 SoCs).
-
-For example:
-
-macb0 is available in this SoCs:
-- 9g25
-- 9g35
-- 9x25
-- 9x35
-and not available in 9g15 SoC.
-
-And we have different combinatory for each of the optional devices.
-
-IMHO, defining the unneeded dt nodes in the common sam9x5.dtsi is a bad 
-idea, because
-the dtb footprint will be bigger for SoC which does not have the 
-optional peripherals
-and the dt hardware representation will be false.
-
-I see two options to solve this issue:
-  1) define a .dtsi file describing the optional peripherals and include 
-these .dtsi in the SoC.dtsi file
-      (as I proposed, but maybe the names  are not appropriate)
-  2) copy the peripheral definitions in each SoC .dtsi file
-
-I prefer option 1) as it's safer than copying the definition (update of 
-dtsi is easier and there is no
-risk to introduce a new bug when copying definitions).
-
-Please, tell me if you see other options, or if you think this "issue" 
-should not be solved.
-
-Best Regards,
-
-Boris
-> Thomas
+-Christoffer
