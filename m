@@ -1,98 +1,62 @@
-From: poeschel@lemonage.de (Lars Poeschel)
-Date: Wed, 7 Aug 2013 17:11:00 +0200
-Subject: [PATCH] ARM: dts: am33xx: Correct gpio #interrupt-cells property
-In-Reply-To: <20130807145309.GG28558@e106331-lin.cambridge.arm.com>
-References: <1375873592-26881-1-git-send-email-larsi@wh2.tu-dresden.de>
- <20130807145309.GG28558@e106331-lin.cambridge.arm.com>
-Message-ID: <201308071711.00449.poeschel@lemonage.de>
+From: christophe.leroy@c-s.fr (leroy christophe)
+Date: Wed, 07 Aug 2013 17:20:18 +0200
+Subject: MAX7301 GPIO: Do not force SPI speed when using OF Platform
+In-Reply-To: <5202418B.5090203@antcom.de>
+References: <51EFAA19.4020905@antcom.de> <52022FFF.3060507@c-s.fr>
+ <52023AE2.3020007@antcom.de> <52023EF9.3050301@c-s.fr>
+ <5202418B.5090203@antcom.de>
+Message-ID: <520265B2.3080403@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 August 2013 at 16:53:09, Mark Rutland wrote:
-> On Wed, Aug 07, 2013 at 12:06:32PM +0100, Lars Poeschel wrote:
-> > From: Lars Poeschel <poeschel@lemonage.de>
-> > 
-> > Following commit ff5c9059 and therefore other omap platforms using
-> > the gpio-omap driver correct the #interrupt-cells property on am33xx
-> > too. The omap gpio binding documentaion also states that
-> > the #interrupt-cells property should be 2.
-> 
-> I take it there are no device nodes for which any of these nodes are an
-> interrupt parent (which would need to be updated)?
+Hi,
 
-As far as I know: No.
-
-Lars
-
-> If so:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
+Le 07/08/2013 14:46, Roland Stigge a ?crit :
+> Hi,
+>
+> On 08/07/2013 02:35 PM, leroy christophe wrote:
+>>>> spi-bits = <16>;
+>>> I tried this, both in the device's and in the controller's node. But it
+>>> didn't work. However, as described, I didn't expect it to work, because
+>>> there is no code present to handle "spi-bits". At least not in 3.10.
+>>>
+>>> Am I missing something? Otherwise, maybe something of the tree that you
+>>> are talking about is missing from mainline still?
+>>>
+>>>
+>> Strange. I'm using 3.8.13
+>> I have it handled in drivers/spi/spi.c in function
+>> of_register_spi_devices()
+> 3.8.13's (as well as newer ones') drivers/spi/spi.c doesn't handle
+> "spi-bits", see also
+>
+> https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/drivers/spi/spi.c?h=linux-3.8.y
+>
+> Maybe you have additional patches that are not in mainline, yet?
+>
 > Thanks,
-> Mark.
-> 
-> > Signed-off-by: Lars Poeschel <poeschel@lemonage.de>
-> > ---
-> > 
-> >  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/am33xx.dtsi
-> > b/arch/arm/boot/dts/am33xx.dtsi index 38b446b..033c5dd 100644
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -102,7 +102,7 @@
-> > 
-> >  			gpio-controller;
-> >  			#gpio-cells = <2>;
-> >  			interrupt-controller;
-> > 
-> > -			#interrupt-cells = <1>;
-> > +			#interrupt-cells = <2>;
-> > 
-> >  			reg = <0x44e07000 0x1000>;
-> >  			interrupts = <96>;
-> >  		
-> >  		};
-> > 
-> > @@ -113,7 +113,7 @@
-> > 
-> >  			gpio-controller;
-> >  			#gpio-cells = <2>;
-> >  			interrupt-controller;
-> > 
-> > -			#interrupt-cells = <1>;
-> > +			#interrupt-cells = <2>;
-> > 
-> >  			reg = <0x4804c000 0x1000>;
-> >  			interrupts = <98>;
-> >  		
-> >  		};
-> > 
-> > @@ -124,7 +124,7 @@
-> > 
-> >  			gpio-controller;
-> >  			#gpio-cells = <2>;
-> >  			interrupt-controller;
-> > 
-> > -			#interrupt-cells = <1>;
-> > +			#interrupt-cells = <2>;
-> > 
-> >  			reg = <0x481ac000 0x1000>;
-> >  			interrupts = <32>;
-> >  		
-> >  		};
-> > 
-> > @@ -135,7 +135,7 @@
-> > 
-> >  			gpio-controller;
-> >  			#gpio-cells = <2>;
-> >  			interrupt-controller;
-> > 
-> > -			#interrupt-cells = <1>;
-> > +			#interrupt-cells = <2>;
-> > 
-> >  			reg = <0x481ae000 0x1000>;
-> >  			interrupts = <62>;
-> >  		
-> >  		};
+>
+> Roland
+>
+Yes you are right, I have the attached patch in addition which have been 
+in our code for long time and which has never been submitted for 
+inclusion in the mainline kernel.
+Sorry about that, I will submit it.
+
+Regards
+Christophe
+-------------- next part --------------
+--- linux-3.8.13/drivers/spi/spi.c	2013-05-11 22:57:46.000000000 +0200
++++ linux/drivers/spi/spi.c	2013-08-06 18:15:34.000000000 +0200
+@@ -870,6 +870,11 @@
+ 		if (of_find_property(nc, "spi-3wire", NULL))
+ 			spi->mode |= SPI_3WIRE;
+ 
++		/* Bits per word */
++		prop = of_get_property(nc, "spi-bits", &len);
++		if (prop && len >= sizeof(*prop)) {
++			spi->bits_per_word = prop[0];
++		}
+ 		/* Device speed */
+ 		prop = of_get_property(nc, "spi-max-frequency", &len);
+ 		if (!prop || len < sizeof(*prop)) {
