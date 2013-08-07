@@ -1,94 +1,55 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 07 Aug 2013 14:40:13 +0530
-Subject: [PATCH V3 4/7] ARM: dts: exynos5250: move common i2s properties to
- exynos5 dtsi
+Date: Wed, 07 Aug 2013 14:40:15 +0530
+Subject: [PATCH V3 6/7] ASoC: Samsung: wm8994: Register the osc clock.
 In-Reply-To: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
 References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1375866616-5541-5-git-send-email-padma.v@samsung.com>
+Message-ID: <1375866616-5541-7-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2S nodes shares some properties across exynos5 SoCs (exynos5250
-and exyno5420). Common code is moved to exynos5.dtsi which is
-included in exyno5250 and exynos5420 SoC files.
+This patch registers the 16MHz oscillator clock as fixed clk.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/boot/dts/exynos5.dtsi    |   21 +++++++++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi |   12 ------------
- 2 files changed, 21 insertions(+), 12 deletions(-)
+ sound/soc/samsung/smdk_wm8994.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index ec384c9..c37b57d 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -191,4 +191,25 @@
- 		#size-cells = <0>;
- 		status = "disabled";
- 	};
-+
-+	i2s0: i2s at 03830000 {
-+		reg = <0x03830000 0x100>;
-+		samsung,idma-addr = <0x03000000>;
-+	};
-+
-+	i2s1: i2s at 12D60000 {
-+		compatible = "samsung,s3c6410-i2s";
-+		reg = <0x12D60000 0x100>;
-+		dmas = <&pdma1 12
-+			&pdma1 11>;
-+		dma-names = "tx", "rx";
-+	};
-+
-+	i2s2: i2s at 12D70000 {
-+		compatible = "samsung,s3c6410-i2s";
-+		reg = <0x12D70000 0x100>;
-+		dmas = <&pdma0 12
-+			&pdma0 11>;
-+		dma-names = "tx", "rx";
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 5b36121..3873ff7 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -394,7 +394,6 @@
+diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
+index 581ea4a..a6edded 100644
+--- a/sound/soc/samsung/smdk_wm8994.c
++++ b/sound/soc/samsung/smdk_wm8994.c
+@@ -9,6 +9,7 @@
  
- 	i2s0: i2s at 03830000 {
- 		compatible = "samsung,s5pv210-i2s";
--		reg = <0x03830000 0x100>;
- 		dmas = <&pdma0 10
- 			&pdma0 9
- 			&pdma0 8>;
-@@ -403,17 +402,11 @@
- 			<&clock_audss EXYNOS_I2S_BUS>,
- 			<&clock_audss EXYNOS_SCLK_I2S>;
- 		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
--		samsung,idma-addr = <0x03000000>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s0_bus>;
- 	};
+ #include "../codecs/wm8994.h"
+ #include <sound/pcm_params.h>
++#include <linux/clk-provider.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
  
- 	i2s1: i2s at 12D60000 {
--		compatible = "samsung,s3c6410-i2s";
--		reg = <0x12D60000 0x100>;
--		dmas = <&pdma1 12
--			&pdma1 11>;
--		dma-names = "tx", "rx";
- 		clocks = <&clock 307>, <&clock 157>;
- 		clock-names = "iis", "i2s_opclk0";
- 		pinctrl-names = "default";
-@@ -421,11 +414,6 @@
- 	};
+@@ -37,6 +38,15 @@
+ /* SMDK has a 16.934MHZ crystal attached to WM8994 */
+ #define SMDK_WM8994_FREQ 16934000
  
- 	i2s2: i2s at 12D70000 {
--		compatible = "samsung,s3c6410-i2s";
--		reg = <0x12D70000 0x100>;
--		dmas = <&pdma0 12
--			&pdma0 11>;
--		dma-names = "tx", "rx";
- 		clocks = <&clock 308>, <&clock 158>;
- 		clock-names = "iis", "i2s_opclk0";
- 		pinctrl-names = "default";
++/* 16.9MHz fixed oscillator clock */
++static void init_osc_clock(void)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "osc3_clk16mhz");
++	of_fixed_clk_setup(np);
++}
++
+ static int smdk_hw_params(struct snd_pcm_substream *substream,
+ 	struct snd_pcm_hw_params *params)
+ {
+@@ -173,6 +183,8 @@ static int smdk_audio_probe(struct platform_device *pdev)
+ 		smdk_dai[0].platform_of_node = smdk_dai[0].cpu_of_node;
+ 	}
+ 
++	init_osc_clock();
++
+ 	ret = snd_soc_register_card(card);
+ 
+ 	if (ret)
 -- 
 1.7.4.4
