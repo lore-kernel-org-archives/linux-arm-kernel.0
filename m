@@ -1,39 +1,28 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Aug 2013 17:40:39 +0100
-Subject: [PATCH 13/20] ASoC: pxa: pxa-ssp: add DT bindings
-In-Reply-To: <1375889649-14638-14-git-send-email-zonque@gmail.com>
+Date: Wed, 7 Aug 2013 17:41:57 +0100
+Subject: [PATCH 07/20] spi: spi-pxa2xx: remove legacy PXA DMA bits
+In-Reply-To: <52026EE1.6000606@gmail.com>
 References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-14-git-send-email-zonque@gmail.com>
-Message-ID: <20130807164039.GM6427@sirena.org.uk>
+ <1375889649-14638-8-git-send-email-zonque@gmail.com>
+ <20130807155549.GE6427@sirena.org.uk> <52026EE1.6000606@gmail.com>
+Message-ID: <20130807164157.GN6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 05:34:02PM +0200, Daniel Mack wrote:
-> This patch contains a cruel hack for looking up the the DMA request
-> number. The problem here is that the implementation as it stands will
-> allocate the DMA channel from the user of the ssp port, and hence we
-> cannot allocate a real channel here.
-> 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt |  7 +++++++
->  sound/soc/pxa/pxa-ssp.c                                  | 12 ++++++++++--
->  2 files changed, 17 insertions(+), 2 deletions(-)
+On Wed, Aug 07, 2013 at 05:59:29PM +0200, Daniel Mack wrote:
+> On 07.08.2013 17:55, Mark Brown wrote:
 
-So, really this should be part of a generic binding for the SSP device
-but obviously this is just a virtual device that binds to a generic bit
-of hardware that can be used for other applications like SPI.  For the
-ASoC case we could instantiate the DAI from the machine driver but that
-isn't going to work for things like SPI.  I'm not 100% sure what the
-best way to deal with that is.
+> > though this will have some trivial merge issues until the merge window
+> > they shouldn't be a problem.
 
-One way of doing this is to have two compatible strings for the same bit
-of hardware describing the application.  I'm not sure that's nice but it
-works...
+> Given the number of patches that need testing, I doubt this will hit the
+> 3.12 window. But let's see :)
+
+Pessimist!
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/452862df/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/3308afef/attachment.sig>
