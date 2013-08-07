@@ -1,589 +1,407 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 17:33:56 +0200
-Subject: [PATCH 07/20] spi: spi-pxa2xx: remove legacy PXA DMA bits
+Date: Wed,  7 Aug 2013 17:33:59 +0200
+Subject: [PATCH 10/20] net: irda: pxaficp_ir: switch to dmaengine
 In-Reply-To: <1375889649-14638-1-git-send-email-zonque@gmail.com>
 References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375889649-14638-8-git-send-email-zonque@gmail.com>
+Message-ID: <1375889649-14638-11-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic DMA support was already implemented by commit cd7bed00
-("spi/pxa2xx: break out the private DMA API usage into a separate
-file") which moved all the legacy PXA DMA implementation code into
-its own file.
-
-With generic DMA available for PXA, we can now just trash this
-file.
+This was only compile-tested.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
-Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
 ---
- drivers/spi/Kconfig             |   9 +-
- drivers/spi/Makefile            |   1 -
- drivers/spi/spi-pxa2xx-pxadma.c | 490 ----------------------------------------
- drivers/spi/spi-pxa2xx.h        |   6 +-
- include/linux/spi/pxa2xx_spi.h  |   1 -
- 5 files changed, 2 insertions(+), 505 deletions(-)
- delete mode 100644 drivers/spi/spi-pxa2xx-pxadma.c
+ drivers/net/irda/pxaficp_ir.c | 242 ++++++++++++++++++++++++++----------------
+ 1 file changed, 151 insertions(+), 91 deletions(-)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 89cbbab..219c346 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -316,16 +316,9 @@ config SPI_PPC4xx
- 	help
- 	  This selects a driver for the PPC4xx SPI Controller.
- 
--config SPI_PXA2XX_PXADMA
--	bool "PXA2xx SSP legacy PXA DMA API support"
--	depends on SPI_PXA2XX && ARCH_PXA
--	help
--	  Enable PXA private legacy DMA API support. Note that this is
--	  deprecated in favor of generic DMA engine API.
--
- config SPI_PXA2XX_DMA
- 	def_bool y
--	depends on SPI_PXA2XX && !SPI_PXA2XX_PXADMA
-+	depends on SPI_PXA2XX
- 
- config SPI_PXA2XX
- 	tristate "PXA2xx SSP SPI master"
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index 33f9c09..149bef4 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -50,7 +50,6 @@ obj-$(CONFIG_SPI_ORION)			+= spi-orion.o
- obj-$(CONFIG_SPI_PL022)			+= spi-pl022.o
- obj-$(CONFIG_SPI_PPC4xx)		+= spi-ppc4xx.o
- spi-pxa2xx-platform-objs		:= spi-pxa2xx.o
--spi-pxa2xx-platform-$(CONFIG_SPI_PXA2XX_PXADMA)	+= spi-pxa2xx-pxadma.o
- spi-pxa2xx-platform-$(CONFIG_SPI_PXA2XX_DMA)	+= spi-pxa2xx-dma.o
- obj-$(CONFIG_SPI_PXA2XX)		+= spi-pxa2xx-platform.o
- obj-$(CONFIG_SPI_PXA2XX_PCI)		+= spi-pxa2xx-pci.o
-diff --git a/drivers/spi/spi-pxa2xx-pxadma.c b/drivers/spi/spi-pxa2xx-pxadma.c
-deleted file mode 100644
-index 2916efc..0000000
---- a/drivers/spi/spi-pxa2xx-pxadma.c
-+++ /dev/null
-@@ -1,490 +0,0 @@
--/*
-- * PXA2xx SPI private DMA support.
-- *
-- * Copyright (C) 2005 Stephen Street / StreetFire Sound Labs
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- */
--
--#include <linux/init.h>
--#include <linux/delay.h>
--#include <linux/device.h>
--#include <linux/dma-mapping.h>
--#include <linux/pxa2xx_ssp.h>
--#include <linux/spi/spi.h>
--#include <linux/spi/pxa2xx_spi.h>
--
--#include "spi-pxa2xx.h"
--
--#define DMA_INT_MASK		(DCSR_ENDINTR | DCSR_STARTINTR | DCSR_BUSERR)
--#define RESET_DMA_CHANNEL	(DCSR_NODESC | DMA_INT_MASK)
--
--bool pxa2xx_spi_dma_is_possible(size_t len)
--{
--	/* Try to map dma buffer and do a dma transfer if successful, but
--	 * only if the length is non-zero and less than MAX_DMA_LEN.
--	 *
--	 * Zero-length non-descriptor DMA is illegal on PXA2xx; force use
--	 * of PIO instead.  Care is needed above because the transfer may
--	 * have have been passed with buffers that are already dma mapped.
--	 * A zero-length transfer in PIO mode will not try to write/read
--	 * to/from the buffers
--	 *
--	 * REVISIT large transfers are exactly where we most want to be
--	 * using DMA.  If this happens much, split those transfers into
--	 * multiple DMA segments rather than forcing PIO.
--	 */
--	return len > 0 && len <= MAX_DMA_LEN;
--}
--
--int pxa2xx_spi_map_dma_buffers(struct driver_data *drv_data)
--{
--	struct spi_message *msg = drv_data->cur_msg;
--	struct device *dev = &msg->spi->dev;
--
--	if (!drv_data->cur_chip->enable_dma)
--		return 0;
--
--	if (msg->is_dma_mapped)
--		return  drv_data->rx_dma && drv_data->tx_dma;
--
--	if (!IS_DMA_ALIGNED(drv_data->rx) || !IS_DMA_ALIGNED(drv_data->tx))
--		return 0;
--
--	/* Modify setup if rx buffer is null */
--	if (drv_data->rx == NULL) {
--		*drv_data->null_dma_buf = 0;
--		drv_data->rx = drv_data->null_dma_buf;
--		drv_data->rx_map_len = 4;
--	} else
--		drv_data->rx_map_len = drv_data->len;
--
--
--	/* Modify setup if tx buffer is null */
--	if (drv_data->tx == NULL) {
--		*drv_data->null_dma_buf = 0;
--		drv_data->tx = drv_data->null_dma_buf;
--		drv_data->tx_map_len = 4;
--	} else
--		drv_data->tx_map_len = drv_data->len;
--
--	/* Stream map the tx buffer. Always do DMA_TO_DEVICE first
--	 * so we flush the cache *before* invalidating it, in case
--	 * the tx and rx buffers overlap.
--	 */
--	drv_data->tx_dma = dma_map_single(dev, drv_data->tx,
--					drv_data->tx_map_len, DMA_TO_DEVICE);
--	if (dma_mapping_error(dev, drv_data->tx_dma))
--		return 0;
--
--	/* Stream map the rx buffer */
--	drv_data->rx_dma = dma_map_single(dev, drv_data->rx,
--					drv_data->rx_map_len, DMA_FROM_DEVICE);
--	if (dma_mapping_error(dev, drv_data->rx_dma)) {
--		dma_unmap_single(dev, drv_data->tx_dma,
--					drv_data->tx_map_len, DMA_TO_DEVICE);
--		return 0;
--	}
--
--	return 1;
--}
--
--static void pxa2xx_spi_unmap_dma_buffers(struct driver_data *drv_data)
--{
--	struct device *dev;
--
--	if (!drv_data->dma_mapped)
--		return;
--
--	if (!drv_data->cur_msg->is_dma_mapped) {
--		dev = &drv_data->cur_msg->spi->dev;
--		dma_unmap_single(dev, drv_data->rx_dma,
--					drv_data->rx_map_len, DMA_FROM_DEVICE);
--		dma_unmap_single(dev, drv_data->tx_dma,
--					drv_data->tx_map_len, DMA_TO_DEVICE);
--	}
--
--	drv_data->dma_mapped = 0;
--}
--
--static int wait_ssp_rx_stall(void const __iomem *ioaddr)
--{
--	unsigned long limit = loops_per_jiffy << 1;
--
--	while ((read_SSSR(ioaddr) & SSSR_BSY) && --limit)
--		cpu_relax();
--
--	return limit;
--}
--
--static int wait_dma_channel_stop(int channel)
--{
--	unsigned long limit = loops_per_jiffy << 1;
--
--	while (!(DCSR(channel) & DCSR_STOPSTATE) && --limit)
--		cpu_relax();
--
--	return limit;
--}
--
--static void pxa2xx_spi_dma_error_stop(struct driver_data *drv_data,
--				      const char *msg)
--{
--	void __iomem *reg = drv_data->ioaddr;
--
--	/* Stop and reset */
--	DCSR(drv_data->rx_channel) = RESET_DMA_CHANNEL;
--	DCSR(drv_data->tx_channel) = RESET_DMA_CHANNEL;
--	write_SSSR_CS(drv_data, drv_data->clear_sr);
--	write_SSCR1(read_SSCR1(reg) & ~drv_data->dma_cr1, reg);
--	if (!pxa25x_ssp_comp(drv_data))
--		write_SSTO(0, reg);
--	pxa2xx_spi_flush(drv_data);
--	write_SSCR0(read_SSCR0(reg) & ~SSCR0_SSE, reg);
--
--	pxa2xx_spi_unmap_dma_buffers(drv_data);
--
--	dev_err(&drv_data->pdev->dev, "%s\n", msg);
--
--	drv_data->cur_msg->state = ERROR_STATE;
--	tasklet_schedule(&drv_data->pump_transfers);
--}
--
--static void pxa2xx_spi_dma_transfer_complete(struct driver_data *drv_data)
--{
--	void __iomem *reg = drv_data->ioaddr;
--	struct spi_message *msg = drv_data->cur_msg;
--
--	/* Clear and disable interrupts on SSP and DMA channels*/
--	write_SSCR1(read_SSCR1(reg) & ~drv_data->dma_cr1, reg);
--	write_SSSR_CS(drv_data, drv_data->clear_sr);
--	DCSR(drv_data->tx_channel) = RESET_DMA_CHANNEL;
--	DCSR(drv_data->rx_channel) = RESET_DMA_CHANNEL;
--
--	if (wait_dma_channel_stop(drv_data->rx_channel) == 0)
--		dev_err(&drv_data->pdev->dev,
--			"dma_handler: dma rx channel stop failed\n");
--
--	if (wait_ssp_rx_stall(drv_data->ioaddr) == 0)
--		dev_err(&drv_data->pdev->dev,
--			"dma_transfer: ssp rx stall failed\n");
--
--	pxa2xx_spi_unmap_dma_buffers(drv_data);
--
--	/* update the buffer pointer for the amount completed in dma */
--	drv_data->rx += drv_data->len -
--			(DCMD(drv_data->rx_channel) & DCMD_LENGTH);
--
--	/* read trailing data from fifo, it does not matter how many
--	 * bytes are in the fifo just read until buffer is full
--	 * or fifo is empty, which ever occurs first */
--	drv_data->read(drv_data);
--
--	/* return count of what was actually read */
--	msg->actual_length += drv_data->len -
--				(drv_data->rx_end - drv_data->rx);
--
--	/* Transfer delays and chip select release are
--	 * handled in pump_transfers or giveback
--	 */
--
--	/* Move to next transfer */
--	msg->state = pxa2xx_spi_next_transfer(drv_data);
--
--	/* Schedule transfer tasklet */
--	tasklet_schedule(&drv_data->pump_transfers);
--}
--
--void pxa2xx_spi_dma_handler(int channel, void *data)
--{
--	struct driver_data *drv_data = data;
--	u32 irq_status = DCSR(channel) & DMA_INT_MASK;
--
--	if (irq_status & DCSR_BUSERR) {
--
--		if (channel == drv_data->tx_channel)
--			pxa2xx_spi_dma_error_stop(drv_data,
--				"dma_handler: bad bus address on tx channel");
--		else
--			pxa2xx_spi_dma_error_stop(drv_data,
--				"dma_handler: bad bus address on rx channel");
--		return;
--	}
--
--	/* PXA255x_SSP has no timeout interrupt, wait for tailing bytes */
--	if ((channel == drv_data->tx_channel)
--		&& (irq_status & DCSR_ENDINTR)
--		&& (drv_data->ssp_type == PXA25x_SSP)) {
--
--		/* Wait for rx to stall */
--		if (wait_ssp_rx_stall(drv_data->ioaddr) == 0)
--			dev_err(&drv_data->pdev->dev,
--				"dma_handler: ssp rx stall failed\n");
--
--		/* finish this transfer, start the next */
--		pxa2xx_spi_dma_transfer_complete(drv_data);
--	}
--}
--
--irqreturn_t pxa2xx_spi_dma_transfer(struct driver_data *drv_data)
--{
--	u32 irq_status;
--	void __iomem *reg = drv_data->ioaddr;
--
--	irq_status = read_SSSR(reg) & drv_data->mask_sr;
--	if (irq_status & SSSR_ROR) {
--		pxa2xx_spi_dma_error_stop(drv_data,
--					  "dma_transfer: fifo overrun");
--		return IRQ_HANDLED;
--	}
--
--	/* Check for false positive timeout */
--	if ((irq_status & SSSR_TINT)
--		&& (DCSR(drv_data->tx_channel) & DCSR_RUN)) {
--		write_SSSR(SSSR_TINT, reg);
--		return IRQ_HANDLED;
--	}
--
--	if (irq_status & SSSR_TINT || drv_data->rx == drv_data->rx_end) {
--
--		/* Clear and disable timeout interrupt, do the rest in
--		 * dma_transfer_complete */
--		if (!pxa25x_ssp_comp(drv_data))
--			write_SSTO(0, reg);
--
--		/* finish this transfer, start the next */
--		pxa2xx_spi_dma_transfer_complete(drv_data);
--
--		return IRQ_HANDLED;
--	}
--
--	/* Opps problem detected */
--	return IRQ_NONE;
--}
--
--int pxa2xx_spi_dma_prepare(struct driver_data *drv_data, u32 dma_burst)
--{
--	u32 dma_width;
--
--	switch (drv_data->n_bytes) {
--	case 1:
--		dma_width = DCMD_WIDTH1;
--		break;
--	case 2:
--		dma_width = DCMD_WIDTH2;
--		break;
--	default:
--		dma_width = DCMD_WIDTH4;
--		break;
--	}
--
--	/* Setup rx DMA Channel */
--	DCSR(drv_data->rx_channel) = RESET_DMA_CHANNEL;
--	DSADR(drv_data->rx_channel) = drv_data->ssdr_physical;
--	DTADR(drv_data->rx_channel) = drv_data->rx_dma;
--	if (drv_data->rx == drv_data->null_dma_buf)
--		/* No target address increment */
--		DCMD(drv_data->rx_channel) = DCMD_FLOWSRC
--						| dma_width
--						| dma_burst
--						| drv_data->len;
--	else
--		DCMD(drv_data->rx_channel) = DCMD_INCTRGADDR
--						| DCMD_FLOWSRC
--						| dma_width
--						| dma_burst
--						| drv_data->len;
--
--	/* Setup tx DMA Channel */
--	DCSR(drv_data->tx_channel) = RESET_DMA_CHANNEL;
--	DSADR(drv_data->tx_channel) = drv_data->tx_dma;
--	DTADR(drv_data->tx_channel) = drv_data->ssdr_physical;
--	if (drv_data->tx == drv_data->null_dma_buf)
--		/* No source address increment */
--		DCMD(drv_data->tx_channel) = DCMD_FLOWTRG
--						| dma_width
--						| dma_burst
--						| drv_data->len;
--	else
--		DCMD(drv_data->tx_channel) = DCMD_INCSRCADDR
--						| DCMD_FLOWTRG
--						| dma_width
--						| dma_burst
--						| drv_data->len;
--
--	/* Enable dma end irqs on SSP to detect end of transfer */
--	if (drv_data->ssp_type == PXA25x_SSP)
--		DCMD(drv_data->tx_channel) |= DCMD_ENDIRQEN;
--
--	return 0;
--}
--
--void pxa2xx_spi_dma_start(struct driver_data *drv_data)
--{
--	DCSR(drv_data->rx_channel) |= DCSR_RUN;
--	DCSR(drv_data->tx_channel) |= DCSR_RUN;
--}
--
--int pxa2xx_spi_dma_setup(struct driver_data *drv_data)
--{
--	struct device *dev = &drv_data->pdev->dev;
--	struct ssp_device *ssp = drv_data->ssp;
--
--	/* Get two DMA channels	(rx and tx) */
--	drv_data->rx_channel = pxa_request_dma("pxa2xx_spi_ssp_rx",
--						DMA_PRIO_HIGH,
--						pxa2xx_spi_dma_handler,
--						drv_data);
--	if (drv_data->rx_channel < 0) {
--		dev_err(dev, "problem (%d) requesting rx channel\n",
--			drv_data->rx_channel);
--		return -ENODEV;
--	}
--	drv_data->tx_channel = pxa_request_dma("pxa2xx_spi_ssp_tx",
--						DMA_PRIO_MEDIUM,
--						pxa2xx_spi_dma_handler,
--						drv_data);
--	if (drv_data->tx_channel < 0) {
--		dev_err(dev, "problem (%d) requesting tx channel\n",
--			drv_data->tx_channel);
--		pxa_free_dma(drv_data->rx_channel);
--		return -ENODEV;
--	}
--
--	DRCMR(ssp->drcmr_rx) = DRCMR_MAPVLD | drv_data->rx_channel;
--	DRCMR(ssp->drcmr_tx) = DRCMR_MAPVLD | drv_data->tx_channel;
--
--	return 0;
--}
--
--void pxa2xx_spi_dma_release(struct driver_data *drv_data)
--{
--	struct ssp_device *ssp = drv_data->ssp;
--
--	DRCMR(ssp->drcmr_rx) = 0;
--	DRCMR(ssp->drcmr_tx) = 0;
--
--	if (drv_data->tx_channel != 0)
--		pxa_free_dma(drv_data->tx_channel);
--	if (drv_data->rx_channel != 0)
--		pxa_free_dma(drv_data->rx_channel);
--}
--
--void pxa2xx_spi_dma_resume(struct driver_data *drv_data)
--{
--	if (drv_data->rx_channel != -1)
--		DRCMR(drv_data->ssp->drcmr_rx) =
--			DRCMR_MAPVLD | drv_data->rx_channel;
--	if (drv_data->tx_channel != -1)
--		DRCMR(drv_data->ssp->drcmr_tx) =
--			DRCMR_MAPVLD | drv_data->tx_channel;
--}
--
--int pxa2xx_spi_set_dma_burst_and_threshold(struct chip_data *chip,
--					   struct spi_device *spi,
--					   u8 bits_per_word, u32 *burst_code,
--					   u32 *threshold)
--{
--	struct pxa2xx_spi_chip *chip_info =
--			(struct pxa2xx_spi_chip *)spi->controller_data;
--	int bytes_per_word;
--	int burst_bytes;
--	int thresh_words;
--	int req_burst_size;
--	int retval = 0;
--
--	/* Set the threshold (in registers) to equal the same amount of data
--	 * as represented by burst size (in bytes).  The computation below
--	 * is (burst_size rounded up to nearest 8 byte, word or long word)
--	 * divided by (bytes/register); the tx threshold is the inverse of
--	 * the rx, so that there will always be enough data in the rx fifo
--	 * to satisfy a burst, and there will always be enough space in the
--	 * tx fifo to accept a burst (a tx burst will overwrite the fifo if
--	 * there is not enough space), there must always remain enough empty
--	 * space in the rx fifo for any data loaded to the tx fifo.
--	 * Whenever burst_size (in bytes) equals bits/word, the fifo threshold
--	 * will be 8, or half the fifo;
--	 * The threshold can only be set to 2, 4 or 8, but not 16, because
--	 * to burst 16 to the tx fifo, the fifo would have to be empty;
--	 * however, the minimum fifo trigger level is 1, and the tx will
--	 * request service when the fifo is at this level, with only 15 spaces.
--	 */
--
--	/* find bytes/word */
--	if (bits_per_word <= 8)
--		bytes_per_word = 1;
--	else if (bits_per_word <= 16)
--		bytes_per_word = 2;
--	else
--		bytes_per_word = 4;
--
--	/* use struct pxa2xx_spi_chip->dma_burst_size if available */
--	if (chip_info)
--		req_burst_size = chip_info->dma_burst_size;
--	else {
--		switch (chip->dma_burst_size) {
--		default:
--			/* if the default burst size is not set,
--			 * do it now */
--			chip->dma_burst_size = DCMD_BURST8;
--		case DCMD_BURST8:
--			req_burst_size = 8;
--			break;
--		case DCMD_BURST16:
--			req_burst_size = 16;
--			break;
--		case DCMD_BURST32:
--			req_burst_size = 32;
--			break;
--		}
--	}
--	if (req_burst_size <= 8) {
--		*burst_code = DCMD_BURST8;
--		burst_bytes = 8;
--	} else if (req_burst_size <= 16) {
--		if (bytes_per_word == 1) {
--			/* don't burst more than 1/2 the fifo */
--			*burst_code = DCMD_BURST8;
--			burst_bytes = 8;
--			retval = 1;
--		} else {
--			*burst_code = DCMD_BURST16;
--			burst_bytes = 16;
--		}
--	} else {
--		if (bytes_per_word == 1) {
--			/* don't burst more than 1/2 the fifo */
--			*burst_code = DCMD_BURST8;
--			burst_bytes = 8;
--			retval = 1;
--		} else if (bytes_per_word == 2) {
--			/* don't burst more than 1/2 the fifo */
--			*burst_code = DCMD_BURST16;
--			burst_bytes = 16;
--			retval = 1;
--		} else {
--			*burst_code = DCMD_BURST32;
--			burst_bytes = 32;
--		}
--	}
--
--	thresh_words = burst_bytes / bytes_per_word;
--
--	/* thresh_words will be between 2 and 8 */
--	*threshold = (SSCR1_RxTresh(thresh_words) & SSCR1_RFT)
--			| (SSCR1_TxTresh(16-thresh_words) & SSCR1_TFT);
--
--	return retval;
--}
-diff --git a/drivers/spi/spi-pxa2xx.h b/drivers/spi/spi-pxa2xx.h
-index 5adc2a1..c37efec 100644
---- a/drivers/spi/spi-pxa2xx.h
-+++ b/drivers/spi/spi-pxa2xx.h
-@@ -164,11 +164,7 @@ extern void *pxa2xx_spi_next_transfer(struct driver_data *drv_data);
- /*
-  * Select the right DMA implementation.
-  */
--#if defined(CONFIG_SPI_PXA2XX_PXADMA)
--#define SPI_PXA2XX_USE_DMA	1
--#define MAX_DMA_LEN		8191
--#define DEFAULT_DMA_CR1		(SSCR1_TSRE | SSCR1_RSRE | SSCR1_TINTE)
--#elif defined(CONFIG_SPI_PXA2XX_DMA)
-+#if defined(CONFIG_SPI_PXA2XX_DMA)
- #define SPI_PXA2XX_USE_DMA	1
- #define MAX_DMA_LEN		SZ_64K
- #define DEFAULT_DMA_CR1		(SSCR1_TSRE | SSCR1_RSRE | SSCR1_TRAIL)
-diff --git a/include/linux/spi/pxa2xx_spi.h b/include/linux/spi/pxa2xx_spi.h
-index 82d5111..48a0fee 100644
---- a/include/linux/spi/pxa2xx_spi.h
-+++ b/include/linux/spi/pxa2xx_spi.h
-@@ -56,7 +56,6 @@ struct pxa2xx_spi_chip {
- #if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
- 
+diff --git a/drivers/net/irda/pxaficp_ir.c b/drivers/net/irda/pxaficp_ir.c
+index 964b116..d77a342 100644
+--- a/drivers/net/irda/pxaficp_ir.c
++++ b/drivers/net/irda/pxaficp_ir.c
+@@ -21,13 +21,15 @@
  #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/slab.h>
++#include <linux/dmaengine.h>
++#include <linux/dma-mapping.h>
++#include <linux/dma/mmp-pdma.h>
+ 
+ #include <net/irda/irda.h>
+ #include <net/irda/irmod.h>
+ #include <net/irda/wrapper.h>
+ #include <net/irda/irda_device.h>
+ 
 -#include <mach/dma.h>
+ #include <linux/platform_data/irda-pxaficp.h>
+ #include <mach/regs-ost.h>
+ #include <mach/regs-uart.h>
+@@ -99,6 +101,9 @@
+                 IrSR_RCVEIR_UART_MODE | \
+                 IrSR_XMITIR_IR_MODE)
  
- extern void pxa2xx_set_spi_info(unsigned id, struct pxa2xx_spi_master *info);
++/* FIXME */
++extern void pxa2xx_transceiver_mode(struct device *dev, int mode);
++
+ struct pxa_irda {
+ 	int			speed;
+ 	int			newspeed;
+@@ -109,8 +114,10 @@ struct pxa_irda {
+ 	dma_addr_t		dma_rx_buff_phy;
+ 	dma_addr_t		dma_tx_buff_phy;
+ 	unsigned int		dma_tx_buff_len;
+-	int			txdma;
+-	int			rxdma;
++	struct dma_chan		*txdma;
++	struct dma_chan		*rxdma;
++	dma_cookie_t		dma_rx_cookie;
++	dma_cookie_t		dma_tx_cookie;
  
+ 	int			uart_irq;
+ 	int			icp_irq;
+@@ -122,6 +129,7 @@ struct pxa_irda {
+ 	iobuff_t		rx_buff;
+ 
+ 	struct device		*dev;
++	struct net_device	*net_dev;
+ 	struct pxaficp_platform_data *pdata;
+ 	struct clk		*fir_clk;
+ 	struct clk		*sir_clk;
+@@ -147,26 +155,121 @@ static inline void pxa_irda_enable_sirclk(struct pxa_irda *si)
+ 	clk_prepare_enable(si->sir_clk);
+ }
+ 
+-
+ #define IS_FIR(si)		((si)->speed >= 4000000)
+ #define IRDA_FRAME_SIZE_LIMIT	2047
+ 
+ inline static void pxa_irda_fir_dma_rx_start(struct pxa_irda *si)
+ {
+-	DCSR(si->rxdma)  = DCSR_NODESC;
+-	DSADR(si->rxdma) = __PREG(ICDR);
+-	DTADR(si->rxdma) = si->dma_rx_buff_phy;
+-	DCMD(si->rxdma) = DCMD_INCTRGADDR | DCMD_FLOWSRC |  DCMD_WIDTH1 | DCMD_BURST32 | IRDA_FRAME_SIZE_LIMIT;
+-	DCSR(si->rxdma) |= DCSR_RUN;
++	struct dma_async_tx_descriptor *tx;
++	struct dma_slave_config config;
++	struct dma_device *dma_dev;
++	int ret;
++
++	dma_dev = si->rxdma->device;
++
++	memset(&config, 0, sizeof(config));
++	config.src_maxburst = 32;
++	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	config.direction = DMA_DEV_TO_MEM;
++
++	ret = dmaengine_slave_config(si->rxdma, &config);
++	if (ret < 0) {
++		dev_err(si->dev, "dmaengine_slave_config() failed: %d\n", ret);
++		return;
++	}
++
++	tx = dma_dev->device_prep_dma_memcpy(si->rxdma, __PREG(ICDR),
++					     si->dma_rx_buff_phy,
++					     IRDA_FRAME_SIZE_LIMIT, 0);
++	if (!tx) {
++		dev_err(si->dev, "device_prep_dma_memcpy() failed: %d\n", ret);
++		return;
++	}
++
++	si->dma_rx_cookie = dmaengine_submit(tx);
++	dma_async_issue_pending(si->rxdma);
++}
++
++static int pxa_irda_set_speed(struct pxa_irda *si, int speed);
++
++/* FIR Transmit DMA interrupt handler */
++static void pxa_irda_fir_dma_tx_irq(void *param)
++{
++	struct net_device *dev = param;
++	struct pxa_irda *si = netdev_priv(dev);
++	struct dma_tx_state tx_state;
++	enum dma_status status;
++
++	status = dmaengine_tx_status(si->txdma, si->dma_tx_cookie, &tx_state);
++	if (status == DMA_ERROR) {
++		dev->stats.tx_errors++;
++	} else {
++		dev->stats.tx_packets++;
++		dev->stats.tx_bytes += si->dma_tx_buff_len;
++	}
++
++	while (ICSR1 & ICSR1_TBY)
++		cpu_relax();
++	si->last_oscr = readl_relaxed(OSCR);
++
++	/*
++	 * HACK: It looks like the TBY bit is dropped too soon.
++	 * Without this delay things break.
++	 */
++	udelay(120);
++
++	if (si->newspeed) {
++		pxa_irda_set_speed(si, si->newspeed);
++		si->newspeed = 0;
++	} else {
++		int i = 64;
++
++		ICCR0 = 0;
++		pxa_irda_fir_dma_rx_start(si);
++		while ((ICSR1 & ICSR1_RNE) && i--)
++			(void)ICDR;
++		ICCR0 = ICCR0_ITR | ICCR0_RXE;
++
++		if (i < 0)
++			printk(KERN_ERR "pxa_ir: cannot clear Rx FIFO!\n");
++	}
++	netif_wake_queue(dev);
+ }
+ 
++
+ inline static void pxa_irda_fir_dma_tx_start(struct pxa_irda *si)
+ {
+-	DCSR(si->txdma)  = DCSR_NODESC;
+-	DSADR(si->txdma) = si->dma_tx_buff_phy;
+-	DTADR(si->txdma) = __PREG(ICDR);
+-	DCMD(si->txdma) = DCMD_INCSRCADDR | DCMD_FLOWTRG |  DCMD_ENDIRQEN | DCMD_WIDTH1 | DCMD_BURST32 | si->dma_tx_buff_len;
+-	DCSR(si->txdma) |= DCSR_RUN;
++	struct dma_async_tx_descriptor *tx;
++	struct dma_slave_config config;
++	struct dma_device *dma_dev;
++	int ret;
++
++	dma_dev = si->txdma->device;
++
++	memset(&config, 0, sizeof(config));
++	config.dst_maxburst = 32;
++	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	config.direction = DMA_MEM_TO_DEV;
++
++	ret = dmaengine_slave_config(si->txdma, &config);
++	if (ret < 0) {
++		dev_err(si->dev, "dmaengine_slave_config() failed: %d\n", ret);
++		return;
++	}
++
++	tx = dma_dev->device_prep_dma_memcpy(si->txdma, __PREG(ICDR),
++					     si->dma_tx_buff_phy,
++					     si->dma_tx_buff_len, 0);
++	if (!tx) {
++		dev_err(si->dev, "device_prep_dma_memcpy() failed: %d\n", ret);
++		return;
++	}
++
++	tx->callback = pxa_irda_fir_dma_tx_irq;
++	tx->callback_param = si->net_dev;
++
++	si->dma_tx_cookie = dmaengine_submit(tx);
++	dma_async_issue_pending(si->txdma);
+ }
+ 
+ /*
+@@ -205,7 +308,7 @@ static int pxa_irda_set_speed(struct pxa_irda *si, int speed)
+ 
+ 		if (IS_FIR(si)) {
+ 			/* stop RX DMA */
+-			DCSR(si->rxdma) &= ~DCSR_RUN;
++			dmaengine_terminate_all(si->rxdma);
+ 			/* disable FICP */
+ 			ICCR0 = 0;
+ 			pxa_irda_disable_clk(si);
+@@ -344,68 +447,18 @@ static irqreturn_t pxa_irda_sir_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-/* FIR Receive DMA interrupt handler */
+-static void pxa_irda_fir_dma_rx_irq(int channel, void *data)
+-{
+-	int dcsr = DCSR(channel);
+-
+-	DCSR(channel) = dcsr & ~DCSR_RUN;
+-
+-	printk(KERN_DEBUG "pxa_ir: fir rx dma bus error %#x\n", dcsr);
+-}
+-
+-/* FIR Transmit DMA interrupt handler */
+-static void pxa_irda_fir_dma_tx_irq(int channel, void *data)
+-{
+-	struct net_device *dev = data;
+-	struct pxa_irda *si = netdev_priv(dev);
+-	int dcsr;
+-
+-	dcsr = DCSR(channel);
+-	DCSR(channel) = dcsr & ~DCSR_RUN;
+-
+-	if (dcsr & DCSR_ENDINTR)  {
+-		dev->stats.tx_packets++;
+-		dev->stats.tx_bytes += si->dma_tx_buff_len;
+-	} else {
+-		dev->stats.tx_errors++;
+-	}
+-
+-	while (ICSR1 & ICSR1_TBY)
+-		cpu_relax();
+-	si->last_oscr = readl_relaxed(OSCR);
+-
+-	/*
+-	 * HACK: It looks like the TBY bit is dropped too soon.
+-	 * Without this delay things break.
+-	 */
+-	udelay(120);
+-
+-	if (si->newspeed) {
+-		pxa_irda_set_speed(si, si->newspeed);
+-		si->newspeed = 0;
+-	} else {
+-		int i = 64;
+-
+-		ICCR0 = 0;
+-		pxa_irda_fir_dma_rx_start(si);
+-		while ((ICSR1 & ICSR1_RNE) && i--)
+-			(void)ICDR;
+-		ICCR0 = ICCR0_ITR | ICCR0_RXE;
+-
+-		if (i < 0)
+-			printk(KERN_ERR "pxa_ir: cannot clear Rx FIFO!\n");
+-	}
+-	netif_wake_queue(dev);
+-}
+-
+ /* EIF(Error in FIFO/End in Frame) handler for FIR */
+ static void pxa_irda_fir_irq_eif(struct pxa_irda *si, struct net_device *dev, int icsr0)
+ {
+ 	unsigned int len, stat, data;
++	struct dma_tx_state tx_state;
++	enum dma_status status;
++
++	status = dmaengine_tx_status(si->rxdma, si->dma_rx_cookie,
++				     &tx_state);
+ 
+ 	/* Get the current data position. */
+-	len = DTADR(si->rxdma) - si->dma_rx_buff_phy;
++	len = IRDA_FRAME_SIZE_LIMIT - tx_state.residue;
+ 
+ 	do {
+ 		/* Read Status, and then Data. 	 */
+@@ -472,7 +525,7 @@ static irqreturn_t pxa_irda_fir_irq(int irq, void *dev_id)
+ 	int icsr0, i = 64;
+ 
+ 	/* stop RX DMA */
+-	DCSR(si->rxdma) &= ~DCSR_RUN;
++	dmaengine_terminate_all(si->rxdma);
+ 	si->last_oscr = readl_relaxed(OSCR);
+ 	icsr0 = ICSR0;
+ 
+@@ -553,7 +606,7 @@ static int pxa_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
+ 				cpu_relax();
+ 
+ 		/* stop RX DMA,  disable FICP */
+-		DCSR(si->rxdma) &= ~DCSR_RUN;
++		dmaengine_terminate_all(si->rxdma);
+ 		ICCR0 = 0;
+ 
+ 		pxa_irda_fir_dma_tx_start(si);
+@@ -626,10 +679,6 @@ static void pxa_irda_startup(struct pxa_irda *si)
+ 	/* configure FICP ICCR2 */
+ 	ICCR2 = ICCR2_TXP | ICCR2_TRIG_32;
+ 
+-	/* configure DMAC */
+-	DRCMR(17) = si->rxdma | DRCMR_MAPVLD;
+-	DRCMR(18) = si->txdma | DRCMR_MAPVLD;
+-
+ 	/* force SIR reinitialization */
+ 	si->speed = 4000000;
+ 	pxa_irda_set_speed(si, 9600);
+@@ -649,17 +698,15 @@ static void pxa_irda_shutdown(struct pxa_irda *si)
+ 	STISR = 0;
+ 
+ 	/* disable DMA */
+-	DCSR(si->txdma) &= ~DCSR_RUN;
+-	DCSR(si->rxdma) &= ~DCSR_RUN;
++	dmaengine_terminate_all(si->rxdma);
++	dmaengine_terminate_all(si->txdma);
++
+ 	/* disable FICP */
+ 	ICCR0 = 0;
+ 
+ 	/* disable the STUART or FICP clocks */
+ 	pxa_irda_disable_clk(si);
+ 
+-	DRCMR(17) = 0;
+-	DRCMR(18) = 0;
+-
+ 	local_irq_restore(flags);
+ 
+ 	/* power off board transceiver */
+@@ -671,7 +718,8 @@ static void pxa_irda_shutdown(struct pxa_irda *si)
+ static int pxa_irda_start(struct net_device *dev)
+ {
+ 	struct pxa_irda *si = netdev_priv(dev);
+-	int err;
++	dma_cap_mask_t mask;
++	int drcmr, err;
+ 
+ 	si->speed = 9600;
+ 
+@@ -689,13 +737,21 @@ static int pxa_irda_start(struct net_device *dev)
+ 	disable_irq(si->uart_irq);
+ 	disable_irq(si->icp_irq);
+ 
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_SLAVE, mask);
++
+ 	err = -EBUSY;
+-	si->rxdma = pxa_request_dma("FICP_RX",DMA_PRIO_LOW, pxa_irda_fir_dma_rx_irq, dev);
+-	if (si->rxdma < 0)
++
++	drcmr = 17;
++	si->rxdma = dma_request_slave_channel_compat(mask, mmp_pdma_filter_fn,
++						     &drcmr, si->dev, "rx");
++	if (si->rxdma == NULL)
+ 		goto err_rx_dma;
+ 
+-	si->txdma = pxa_request_dma("FICP_TX",DMA_PRIO_LOW, pxa_irda_fir_dma_tx_irq, dev);
+-	if (si->txdma < 0)
++	drcmr = 18;
++	si->rxdma = dma_request_slave_channel_compat(mask, mmp_pdma_filter_fn,
++						     &drcmr, si->dev, "rx");
++	if (si->txdma == NULL)
+ 		goto err_tx_dma;
+ 
+ 	err = -ENOMEM;
+@@ -737,9 +793,9 @@ err_irlap:
+ err_dma_tx_buff:
+ 	dma_free_coherent(si->dev, IRDA_FRAME_SIZE_LIMIT, si->dma_rx_buff, si->dma_rx_buff_phy);
+ err_dma_rx_buff:
+-	pxa_free_dma(si->txdma);
++	dma_release_channel(si->txdma);
+ err_tx_dma:
+-	pxa_free_dma(si->rxdma);
++	dma_release_channel(si->rxdma);
+ err_rx_dma:
+ 	free_irq(si->icp_irq, dev);
+ err_irq2:
+@@ -766,8 +822,11 @@ static int pxa_irda_stop(struct net_device *dev)
+ 	free_irq(si->uart_irq, dev);
+ 	free_irq(si->icp_irq, dev);
+ 
+-	pxa_free_dma(si->rxdma);
+-	pxa_free_dma(si->txdma);
++	dmaengine_terminate_all(si->rxdma);
++	dmaengine_terminate_all(si->txdma);
++
++	dma_release_channel(si->rxdma);
++	dma_release_channel(si->txdma);
+ 
+ 	if (si->dma_rx_buff)
+ 		dma_free_coherent(si->dev, IRDA_FRAME_SIZE_LIMIT, si->dma_tx_buff, si->dma_tx_buff_phy);
+@@ -855,6 +914,7 @@ static int pxa_irda_probe(struct platform_device *pdev)
+ 	si = netdev_priv(dev);
+ 	si->dev = &pdev->dev;
+ 	si->pdata = pdev->dev.platform_data;
++	si->net_dev = dev;
+ 
+ 	si->uart_irq = platform_get_irq(pdev, 0);
+ 	si->icp_irq = platform_get_irq(pdev, 1);
 -- 
 1.8.3.1
