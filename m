@@ -1,237 +1,181 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 7 Aug 2013 18:46:51 +0200
-Subject: [RFC 1/1] drm/pl111: Initial drm/kms driver for pl111
-In-Reply-To: <CAF6AEGvGG1-4k-3_YHQ2ES6JEb-V-Xuicc8gfw9rPWze5JUEDg@mail.gmail.com>
-References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
- <1374772648-19151-2-git-send-email-tom.cooksey@arm.com>
- <CAF6AEGvGG1-4k-3_YHQ2ES6JEb-V-Xuicc8gfw9rPWze5JUEDg@mail.gmail.com>
-Message-ID: <20130807164651.GY22035@phenom.ffwll.local>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 07 Aug 2013 10:46:52 -0600
+Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
+In-Reply-To: <1375866749.8111.57.camel@jlo-ubuntu-64.nvidia.com>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+ <1374830110-30685-4-git-send-email-josephl@nvidia.com>
+ <51F6F209.2090309@wwwdotorg.org>
+ <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
+ <51FC1751.9010401@wwwdotorg.org>
+ <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
+ <51FFDA20.6050403@wwwdotorg.org> <51FFE363.4080603@wwwdotorg.org>
+ <1375780249.2261.63.camel@jlo-ubuntu-64.nvidia.com>
+ <52014258.9070602@wwwdotorg.org>
+ <1375866749.8111.57.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <520279FC.1000006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just comment a bit on Rob's review with my own opinion.
-
-On Wed, Aug 07, 2013 at 12:17:21PM -0400, Rob Clark wrote:
-> On Thu, Jul 25, 2013 at 1:17 PM,  <tom.cooksey@arm.com> wrote:
-> > From: Tom Cooksey <tom.cooksey@arm.com>
-> >
-> > This is a mode-setting driver for the pl111 CLCD display controller
-> > found on various ARM reference platforms such as the Versatile
-> > Express. The driver supports setting of a single mode (640x480) and
-> > has only been tested on Versatile Express with a Cortex-A9 core tile.
-> >
-> > Known issues:
-> >  * It still includes code to use KDS, which is not going upstream.
+On 08/07/2013 03:12 AM, Joseph Lo wrote:
+> On Wed, 2013-08-07 at 02:37 +0800, Stephen Warren wrote:
+>> On 08/06/2013 03:10 AM, Joseph Lo wrote:
+>>> On Tue, 2013-08-06 at 01:39 +0800, Stephen Warren wrote:
+>>>> On 08/05/2013 11:00 AM, Stephen Warren wrote:
+>>>>> On 08/05/2013 02:02 AM, Joseph Lo wrote:
+>>>>>> On Sat, 2013-08-03 at 04:32 +0800, Stephen Warren wrote:
+>>>>>>> On 08/02/2013 02:09 AM, Joseph Lo wrote:
+>>>>>>>> On Tue, 2013-07-30 at 06:51 +0800, Stephen Warren wrote:
+>>>>>>>>> On 07/26/2013 03:15 AM, Joseph Lo wrote:
+> [snip]
+>>> OK. It's a little difference we do in clock driver side and low level
+>>> code side.
+>>>
+>>> As you knew, we have two CPU clusters (CCLKG & CCLKLP) in Tegra chips.
+>>> And they have exactly the same clock source for Tegra20/30, but
+>>> Tegra114. From the low level side, it should be supported when the
+>>> system going to suspend with CPU_G or CPU_LP. So we switched the clock
+>>> source of CPU to CLK_M by CCLK_BURST_POLICY. This register can support
+>>> the running CPU switch to the clock source they want.
+>>>
+>>> On the clock driver side, because the clock source of CCLKG and CCLKLP
+>>> is not exactly the same for the Tegra114. The CCLKG supports DFLL clock
+>>> but CCLKLP. We need to restore it separately to avoid the CPU restore to
+>>> the wrong clock source.
+>>>
+>>> The CPU clock suspend/resume function in the tegra_cpu_car_ops of
+>>> Tegra20/30 is also using CCLK_BURST_POLICY register, because the
+>>> definition of the clock source of CCLKG and CCLKLP is the same. We can
+>>> simply the code for just using CCLK_BURST_POLICY.
+>>>
+>>> I think the code should OK when CPU_G or CPU_LP running with it.
+>>
+>> OK, so just to paraphrase what you've said, to make sure I understand it:
+>>
+>> On Tegra114, there are 3 registers:
+> It's on Tegra30 too.
+>>
+>> 1) Controls just the clock source of the G cluster.
+> CCLKG_BURST_POLICY at offset 0x368.
+>> 2) Controls just the clock source of the LP cluster.
+> CCLKLP_BURST_POLICY at offset 0x370.
+>> 3) Controls both at the same time, simulating a write to both (1) and (2)
+> CCLK_BURST_POLICY at offset 0x20.
+> Yes, exactly. And I double confirm the item 3 again with a downstream
+> kernel that support cluster switch today. It's true.
+>>
+>> In tegra30_switch_cpu_to_clk32k(), we use register (3) above to switch
+>> to clk_m then clk_s. This is possible, because in both registers (1) and
+>> (2), the values for clk_m and clk_s are identical.
+> Yes.
+>>
+>> In tegra30_lp1_reset(), we can't use the same technique (a write to
+>> register 3) to restore the clock source for both G and LP clusters,
+>> since the values we need to write to those registers to re-select their
+>> clock source is different.
+>>
+>> however, on Tegra30, there really is only one register, so we can use
+>> that to both switch to clk_m/clk_s, /and/ to switch back.
+>>
+>> That all explains the following part of patch 7/8, which disables the
+>> clock register restore path except on Tegra30 where it will work:
+>>
+>>> -	mov32	r4, ((1 << 28) | (0x8))	@ burst policy is PLLX
+>>> -	str	r4, [r0, #CLK_RESET_CCLK_BURST]
+>>> +	cmp	r10, #TEGRA30
+>>> +	movweq	r4, #:lower16:((1 << 28) | (0x8))	@ burst policy is PLLX
+>>> +	movteq	r4, #:upper16:((1 << 28) | (0x8))
+>>> +	streq	r4, [r0, #CLK_RESET_CCLK_BURST]
+>
+> OK. The burst policy of CPU clock has 5 different states (STDBY, IDLE,
+> RUN, IRQ and FIQ). The SW only can set up the clock source of each
+> state. The switching to different state was controlled by HW.
 > 
-> review's on http://lists.freedesktop.org/archives/dri-devel/2013-July/042462.html
-> can't hurt
+> So the Tegra30 code here was set up the clock source of IDLE state only
+> (the CPU runs in this state after resume) to make the performance
+> better. But It had no idea about the clock sources of the other states.
+> It still needs clock driver to take care of that.
 > 
-> although you might consider submitting a reduced functionality driver
-> w/ KDS bits removed in the mean time.. then when the fence stuff is
-> merged it is just an incremental patch rather than a whole driver ;-)
-
-Yeah, I think the KDS bits and comments need to go first before merginge.
-
-
-> > +/*
-> > + * Number of flips allowed in flight at any one time. Any more flips requested
-> > + * beyond this value will cause the caller to block until earlier flips have
-> > + * completed.
-> > + *
-> > + * For performance reasons, this must be greater than the number of buffers
-> > + * used in the rendering pipeline. Note that the rendering pipeline can contain
-> > + * different types of buffer, e.g.:
-> > + * - 2 final framebuffers
-> > + * - >2 geometry buffers for GPU use-cases
-> > + * - >2 vertex buffers for GPU use-cases
-> > + *
-> > + * For example, a system using 5 geometry buffers could have 5 flips in flight,
-> > + * and so NR_FLIPS_IN_FLIGHT_THRESHOLD must be 5 or greater.
-> > + *
-> > + * Whilst there may be more intermediate buffers (such as vertex/geometry) than
-> > + * final framebuffers, KDS is used to ensure that GPU rendering waits for the
-> > + * next off-screen buffer, so it doesn't overwrite an on-screen buffer and
-> > + * produce tearing.
-> > + */
-> > +
+> The clock source id (0x8) means PLLX_OUT0 in Tegra30. In Tegra114, it
+> means PLLX_OUT0_LJ (low jitter). It's not available at this moment. I
+> can switch it to PLLX_OUT0 (0xe) for Tegra114 too. The code may like
+> below.
 > 
-> fwiw, this is at least different from how other drivers do triple (or
-> > double) buffering.  In other drivers (intel, omap, and
-> msm/freedreno, that I know of, maybe others too) the xorg driver dri2
-> bits implement the double buffering (ie. send flip event back to
-> client immediately and queue up the flip and call page-flip after the
-> pageflip event back from kernel.
+>> -     mov32   r4, ((1 << 28) | (0x8)) @ burst policy is PLLX
+>> -     str     r4, [r0, #CLK_RESET_CCLK_BURST]
+>> +     cmp     r10, #TEGRA30
+>> +     movweq  r4, #:lower16:((1 << 28) | (0x8))
+>> +     movteq  r4, #:upper16:((1 << 28) | (0x8))
+>> +	movwne  r4, #:lower16:((1 << 28) | (0xe))
+>> +	movteq  r4, #:upper16:((1 << 28) | (0xe))
+
+I assume that should be movtne.
+
+>> +     str	r4, [r0, #CLK_RESET_CCLK_BURST]
 > 
-> I'm not saying not to do it this way, I guess I'd like to hear what
-> other folks think.  I kinda prefer doing this in userspace as it keeps
-> the kernel bits simpler (plus it would then work properly on exynosdrm
-> or other kms drivers).
+> I had tested this code before I sent this series. It didn't impact or
+> improve the resuming performance. So I removed them.
+> Do you want me to add them back?
 
-Yeah, if this is just a sw queue then I don't think it makes sense to have
-it in the kernel. Afaik the current pageflip interface drm exposes allows
-one oustanding flip only, and you _must_ wait for the flip complete event
-before you can submit the second one.
+I think adding that code back would make sense. It would mean the code
+works fundamentally the same way for all SoCs.
 
-Ofc if your hardware as a hw-based flip queue (maybe even with frame
-targets) that's a different matter, but currently we don't have a drm
-interface to expose this. I'd say for merging the basic driver first we
-should go with the existing simple pageflip semantics.
+BTW, you mentioned that LP1 resume takes 10-15 seconds on Dalmore. Are
+you sure this isn't because the above code is missing, and hence the CPU
+keeps running at 32KHz or the crystal speed, since nothing restores the
+CPU clock source until much later, when the syscore op runs?
 
-And tbh I don't understand why the amount of buffers you keep in the
-render pipeline side of things matters here at all. But I also haven't
-read the details of your driver code.
+>> However, none of this explains why the CPU clock restore logic on
+>> Tegra114 needs to be a syscore_op, rather than simply having
+>> tegra30_lp1_reset() execute some Tegra114-specific code.
+>>
+>> Re-writing the part of the patch I quoted above in C, it looks like:
+>>
+>> if (soc is tegra30)
+>>     write to CLK_RESET_CCLK_BURST to select pllx
+>>
+>> Instead of making that code do nothing on Tegra114, why can't that code be:
+>>
+>> if (soc is tegra30)
+>>     write to CLK_RESET_CCLK_BURST to re-select pllx
+>> else
+>>     write to G-cluster-specific register to restore saved value
+>>     write to LP-cluster-specific register to restore saved value
+>>
+>> or:
+>>
+>> if (soc is tegra30)
+>>     write to CLK_RESET_CCLK_BURST to re-select pllx
+>> else
+>>     write to G-cluster-specific register to re-select pllx/dfll/...
+>>     write to LP-cluster-specific register to restore ...
+>>
+> Hope the explanation above is enough for you. The low level code had no
+> idea of clock source of each CPU state in BURST_POLICY register. It
+> needs to be done by clk driver itself.
 
-> 
-> > +/*
-> > + * Here, we choose a conservative value. A lower value is most likely
-> > + * suitable for GPU use-cases.
-> > + */
-> > +#define NR_FLIPS_IN_FLIGHT_THRESHOLD 16
-> > +
-> > +#define CLCD_IRQ_NEXTBASE_UPDATE (1u<<2)
-> > +
-> > +struct pl111_drm_flip_resource;
-> > +struct pl111_drm_cursor_plane;
-> > +
-> > +enum pl111_bo_type {
-> > +       PL111_BOT_DMA,
-> > +       PL111_BOT_SHM
-> > +};
-> > +
-> > +struct pl111_gem_bo_dma {
-> > +       dma_addr_t fb_dev_addr;
-> > +       void *fb_cpu_addr;
-> > +};
-> > +
-> > +struct pl111_gem_bo_shm {
-> > +       struct page **pages;
-> > +       dma_addr_t *dma_addrs;
-> > +};
-> > +
-> > +struct pl111_gem_bo {
-> > +       struct drm_gem_object gem_object;
-> > +       enum pl111_bo_type type;
-> > +       union {
-> > +               struct pl111_gem_bo_dma dma;
-> > +               struct pl111_gem_bo_shm shm;
-> > +       } backing_data;
-> > +       struct drm_framebuffer *fb;
-> 
-> this is at least a bit odd.. normally the fb has ref to the bo(s) and
-> not the other way around.  And the same bo could be referenced by
-> multiple fb's which would kinda fall down with this approach.
+I still have absolutely no idea why Tegra30 and Tegra114 are different.
 
-I'd say that's just backwards, framebuffers are created from backing
-storage objects (which for a gem based driver is a gem object), not the
-other way round. What's this exactly used for?
+You mentioned something about this low-level code only manipulating the
+IDLE state, and the clock driver needing to restore the other 4 states.
+This raises yet more questions:
 
-[snip]
+1) Do we not need to restore the other 4 states on Tegra30? If not, why
+not? If we do, presumably Tegra30 (and Tegra20?) need to the syscore_op
+this patch series adds to Tegra114 only? If we don't, then why does
+Tegra114 have to restore them?
 
-> > +
-> > +       /*
-> > +        * Used to prevent race between pl111_dma_buf_release and
-> > +        * drm_gem_prime_handle_to_fd
-> > +        */
-> > +       struct mutex export_dma_buf_lock;
-> 
-> hmm, seems a bit suspicious.. the handle reference should keep the
-> object live.  Ie. either drm_gem_object_lookup() will fail because the
-> object is gone (userspace has closed it's handle ref and
-> dmabuf->release() already dropped it's ref) or it will succeed and
-> you'll have a reference to the bo keeping it from going away if the
-> release() comes after.
+2) What triggers the HW to switch from IDLE to RUN state? In other
+words, I think you're saying that the existing Tegra30 code:
 
-The race is real, I have an evil testcase here which Oopses my kernel. I'm
-working on a fix (v1 of my patches is submitted a few weeks back, awaiting
-review), but I need to rework a few things since now I've also spotted a
-leak or two ;-)
+	mov32	r4, ((1 << 28) | (0x8))	@ burst policy is PLLX
+	str	r4, [r0, #CLK_RESET_CCLK_BURST]
 
-[snip]
+doesn't change the clock rate right away. When does it change?
 
-> > +static void vsync_worker(struct work_struct *work)
-> > +{
-> > +       struct pl111_drm_flip_resource *flip_res;
-> > +       struct pl111_gem_bo *bo;
-> > +       struct pl111_drm_crtc *pl111_crtc;
-> > +       struct drm_device *dev;
-> > +       int flips_in_flight;
-> > +       flip_res =
-> > +               container_of(work, struct pl111_drm_flip_resource, vsync_work);
-> > +
-> > +       pl111_crtc = to_pl111_crtc(flip_res->crtc);
-> > +       dev = pl111_crtc->crtc.dev;
-> > +
-> > +       DRM_DEBUG_KMS("DRM Finalizing flip_res=%p\n", flip_res);
-> > +
-> > +       bo = PL111_BO_FROM_FRAMEBUFFER(flip_res->fb);
-> > +#ifdef CONFIG_DMA_SHARED_BUFFER_USES_KDS
-> > +       if (flip_res->worker_release_kds == true) {
-> > +               spin_lock(&pl111_crtc->current_displaying_lock);
-> > +               release_kds_resource_and_display(flip_res);
-> > +               spin_unlock(&pl111_crtc->current_displaying_lock);
-> > +       }
-> > +#endif
-> > +       /* Release DMA buffer on this flip */
-> > +       if (bo->gem_object.export_dma_buf != NULL)
-> > +               dma_buf_put(bo->gem_object.export_dma_buf);
-> 
-> I think you just want to unref the outgoing bo, and let it drop the
-> dmabuf ref when the file ref of the imported bo goes.  Or actually, it
-> would be better to hold/drop ref's to the fb, rather than the bo.  At
-> least this will make things simpler if you ever have multi-planar
-> support.
-
-Drivers have no business frobbing around the dma-buf refcount of imported
-objects imo, at least if they use all the standard drm prime
-infrastructure. And if they're bugs they need to be fixed there, not in
-drivers.
-
-[snip]
-
-> > +struct drm_framebuffer *pl111_fb_create(struct drm_device *dev,
-> > +                                       struct drm_file *file_priv,
-> > +                                       struct drm_mode_fb_cmd2 *mode_cmd)
-> > +{
-> > +       struct pl111_drm_framebuffer *pl111_fb = NULL;
-> > +       struct drm_framebuffer *fb = NULL;
-> > +       struct drm_gem_object *gem_obj;
-> > +       struct pl111_gem_bo *bo;
-> > +
-> > +       pr_info("DRM %s\n", __func__);
-> > +       gem_obj = drm_gem_object_lookup(dev, file_priv, mode_cmd->handles[0]);
-> > +       if (gem_obj == NULL) {
-> > +               DRM_ERROR("Could not get gem obj from handle to create fb\n");
-> > +               goto out;
-> > +       }
-> > +
-> > +       bo = PL111_BO_FROM_GEM(gem_obj);
-> > +       /* Don't even attempt PL111_BOT_SHM, it's not contiguous */
-> > +       BUG_ON(bo->type != PL111_BOT_DMA);
-> 
-> umm, no BUG_ON() is not really a good way to validate userspace input..
-> 
->   if (bo->type != ...)
->     return ERR_PTR(-EINVAL);
-
-Yep.
-
-> > +
-> > +       switch ((char)(mode_cmd->pixel_format & 0xFF)) {
-> > +       case 'Y':
-> > +       case 'U':
-> > +       case 'V':
-> > +       case 'N':
-> > +       case 'T':
-> 
-> perhaps we should instead add a drm_format_is_yuv().. or you could
-> (ab)use drm_fb_get_bpp_depth()..
-
-Yeah, I think a new drm_format_is_yuv is asked-for here. Now the bigger
-question is why you need this, since the drm core should filter out
-formats not in your list of supported ones. Or at least it should ...
-
-Cheers, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Related, when tegra30_switch_cpu_to_clk32k() sets the CPU clock source
+for the IDLE state to clk_s, when does that switch actually take place?
+That function appears to assume it happens immediately, since it
+immediately disables the PLLs that might have been the previous CPU
+clock source. Perhaps this is what the MSELECT register writes do?  I
+guess not since there's only 1 MSELECT write in tegra_lp1_reset() and
+two changes of CPU clock source.
