@@ -1,56 +1,85 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:39:28 +0900
-Subject: [GIT PULL 0/9] Renesas ARM based SoC SMP updates for v3.12
-Message-ID: <cover.1375841380.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:39:29 +0900
+Subject: [GIT PULL 3/9] ARM: shmobile: Use shared SCU SMP boot code on r8a7779
+In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
+References: <cover.1375841380.git.horms+renesas@verge.net.au>
+Message-ID: <0ca2894b5a9007091ad1a4d82b9f3132d4dd9410.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Magnus Damm <damm@opensource.se>
 
-please consider these Renesas ARM based SoC SMP updates for v3.12.
+Use shared SCU code on r8a7779 for SMP boot.
 
-This pull-request is based on renesas-dt2-for-v3.12, which I have
-previously sent a pull-request for.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Makefile      |  2 +-
+ arch/arm/mach-shmobile/smp-r8a7779.c | 23 ++++++++++++-----------
+ 2 files changed, 13 insertions(+), 12 deletions(-)
 
-
-The following changes since commit 8b3e32c1fe5dce55e28e76b20361841dc863ec17:
-
-  ARM: shmobile: r8a7740: Add TPU node to the device tree (2013-08-06 18:06:23 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-smp-for-v3.12
-
-for you to fetch changes up to 1d33a354bbb618ba578bb372ebc18fe58457f6f3:
-
-  ARM: shmobile: Per-CPU SMP boot / sleep code for SCU SoCs (2013-08-06 18:07:26 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC SMP updates for v3.12
-
-* Per-CPU SMP boot and sleep code on SoCs that use SCU
-* Shared SCU CPU Hotplug code on r8a7779 and sh73a0 SoCs
-* Shared SCU CPU boot code on emev2, r8a7779 and sh73a0 SoCs
-
-----------------------------------------------------------------
-Magnus Damm (9):
-      ARM: shmobile: Introduce shared SCU SMP boot code
-      ARM: shmobile: Use shared SCU SMP boot code on sh73a0
-      ARM: shmobile: Use shared SCU SMP boot code on r8a7779
-      ARM: shmobile: Use shared SCU SMP boot code on emev2
-      ARM: shmobile: Add shared SCU CPU Hotplug code
-      ARM: shmobile: Use shared SCU CPU Hotplug code on sh73a0
-      ARM: shmobile: Use shared SCU CPU Hotplug code on r8a7779
-      ARM: shmobile: Introduce per-CPU SMP boot / sleep code
-      ARM: shmobile: Per-CPU SMP boot / sleep code for SCU SoCs
-
- arch/arm/mach-shmobile/Makefile              |  6 +--
- arch/arm/mach-shmobile/headsmp.S             | 49 +++++++++++++++++
- arch/arm/mach-shmobile/include/mach/common.h |  9 ++++
- arch/arm/mach-shmobile/platsmp-scu.c         | 81 ++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/platsmp.c             | 18 +++++++
- arch/arm/mach-shmobile/smp-emev2.c           | 19 +++----
- arch/arm/mach-shmobile/smp-r8a7779.c         | 64 ++++++----------------
- arch/arm/mach-shmobile/smp-sh73a0.c          | 67 ++++++-----------------
- 8 files changed, 202 insertions(+), 111 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/platsmp-scu.c
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index a32dc15..42bbf45 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -18,7 +18,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+ # SMP objects
+ smp-y				:= platsmp.o headsmp.o
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+-smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
++smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
+ 
+ # IRQ objects
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index bb3adae..1963d0d 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -84,33 +84,34 @@ static int r8a7779_platform_cpu_kill(unsigned int cpu)
+ static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	struct r8a7779_pm_ch *ch = NULL;
+-	int ret = -EIO;
++	unsigned int lcpu = cpu_logical_map(cpu);
++	int ret;
+ 
+-	cpu = cpu_logical_map(cpu);
++	ret = shmobile_smp_scu_boot_secondary(cpu, idle);
++	if (ret)
++		return ret;
+ 
+-	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
+-		ch = r8a7779_ch_cpu[cpu];
++	if (lcpu < ARRAY_SIZE(r8a7779_ch_cpu))
++		ch = r8a7779_ch_cpu[lcpu];
+ 
+ 	if (ch)
+ 		ret = r8a7779_sysc_power_up(ch);
++	else
++		ret = -EIO;
+ 
+ 	return ret;
+ }
+ 
+ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-
+-	/* setup r8a7779 specific SCU base */
+-	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
+-	scu_enable(shmobile_scu_base);
+-
+ 	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
+ 	__raw_writel(__pa(shmobile_boot_vector), AVECR);
+ 	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
+ 	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
+ 
+-	/* enable cache coherency on booting CPU */
+-	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
++	/* setup r8a7779 specific SCU bits */
++	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
++	shmobile_smp_scu_prepare_cpus(max_cpus);
+ 
+ 	r8a7779_pm_init();
+ 
+-- 
+1.8.3.2
