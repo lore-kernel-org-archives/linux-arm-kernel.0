@@ -1,32 +1,31 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed,  7 Aug 2013 20:16:45 +0530
-Subject: [PATCH 3/6] ARM: Tegra: Enable OPP library
+Date: Wed,  7 Aug 2013 20:16:46 +0530
+Subject: [PATCH 4/6] ARM: Tegra: defconfig: select cpufreq-cpu0 driver
 In-Reply-To: <cover.1375886595.git.viresh.kumar@linaro.org>
 References: <cover.1375886595.git.viresh.kumar@linaro.org>
-Message-ID: <bfa34bd91e0fa4c6e215517e10c93ab271486418.1375886595.git.viresh.kumar@linaro.org>
+Message-ID: <4b07346ff53328e93939d03e5eac0ce4c3b3d176.1375886595.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpufreq-cpu0 driver is dependent on OPP library and hence we need to enable it
-for Tegra as we are going to use cpufreq-cpu0.
+Tegra requires cpufreq-cpu0 driver to be compiled in and hence we select it from
+the defconfig.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-tegra/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/tegra_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index ef3a8da..63875c5 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -1,6 +1,8 @@
- config ARCH_TEGRA
- 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
- 	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_OPP
-+	select PM_OPP if PM
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 1effb43..3fcec8f 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -38,6 +38,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_GENERIC_CPUFREQ_CPU0=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+ CONFIG_PM_RUNTIME=y
 -- 
 1.7.12.rc2.18.g61b472e
