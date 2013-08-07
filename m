@@ -1,44 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 07 Aug 2013 08:23:06 +0200
-Subject: [PATCH] ARM: dts: Fix memory node in skeleton64.dtsi
-In-Reply-To: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
-References: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <5201E7CA.4050601@free-electrons.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 07 Aug 2013 09:30:59 +0300
+Subject: [PATCH] mtd: atmel_nand: fix the warning when CONFIG_OF is not
+ defined
+In-Reply-To: <1375846569-9499-1-git-send-email-josh.wu@atmel.com>
+References: <1375846569-9499-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1375857059.30770.187.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2013 03:33, Stepan Moskovchenko wrote:
-> Update the reg property of the memory node in
-> skeleton64.dtsi to reflect the fact that the root node uses
-> address-cells=2 and size-cells=2.
-
-Good catch
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
+On Wed, 2013-08-07 at 11:36 +0800, Josh Wu wrote:
+> This patch fix following warning:
 > 
-> Change-Id: Ie9b61166143969e020ceebc51e9a384405d8c0f2
-> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-> ---
->  arch/arm/boot/dts/skeleton64.dtsi |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> drivers/mtd/nand/atmel_nand.c:2007: warning: 'atmel_nand_nfc_match' defined but not used
 > 
-> diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
-> index 1599415..b5d7f36 100644
-> --- a/arch/arm/boot/dts/skeleton64.dtsi
-> +++ b/arch/arm/boot/dts/skeleton64.dtsi
-> @@ -9,5 +9,5 @@
->  	#size-cells = <2>;
->  	chosen { };
->  	aliases { };
-> -	memory { device_type = "memory"; reg = <0 0>; };
-> +	memory { device_type = "memory"; reg = <0 0 0 0>; };
->  };
+> This patch add '#if defined(CONFIG_OF)' block to guard around the definition of
+> atmel_nand_nfc_match, in order to avoid the warning when kernel is configurated
+> as non-dt supported.
 > 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
+Pushed to l2-mtd.git, thanks!
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards,
+Artem Bityutskiy
