@@ -1,68 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 Aug 2013 11:13:54 +0200
-Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
- hooks to hw_pci
-In-Reply-To: <20130725165302.GA27802@dhcp-172-17-186-34.nvidia.com>
-References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130725165302.GA27802@dhcp-172-17-186-34.nvidia.com>
-Message-ID: <20130807111354.5e29a74c@skate>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 7 Aug 2013 17:20:16 +0800
+Subject: [PATCH 2/6] mtd: atmel_nand: replace pmecc enable code with one
+ function.
+In-Reply-To: <20130807072055.GA26025@norris.computersforpeace.net>
+References: <1375701279-11495-1-git-send-email-josh.wu@atmel.com>
+ <1375701279-11495-3-git-send-email-josh.wu@atmel.com>
+ <20130807072055.GA26025@norris.computersforpeace.net>
+Message-ID: <52021150.1090707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+Hi, Brian
 
-On Thu, 25 Jul 2013 09:53:03 -0700, Thierry Reding wrote:
+On 8/7/2013 3:20 PM, Brian Norris wrote:
+> Hi Josh,
+>
+> On Mon, Aug 05, 2013 at 07:14:34PM +0800, Josh Wu wrote:
+>> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+>> index 3d7db95..28d159a 100644
+>> --- a/drivers/mtd/nand/atmel_nand.c
+>> +++ b/drivers/mtd/nand/atmel_nand.c
+>> @@ -746,6 +746,30 @@ normal_check:
+>>   	return total_err;
+>>   }
+>>   
+>> +static void pmecc_enable(struct atmel_nand_host *host, int ecc_op)
+>> +{
+>> +	u32 val;
+>> +
+>> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
+>> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+>> +	val = pmecc_readl_relaxed(host->ecc, CFG);
+>> +
+>> +	if (ecc_op != NAND_ECC_READ && ecc_op != NAND_ECC_WRITE) {
+>> +		dev_err(host->dev, "atmel_nand: wrong pmecc operation type!");
+>> +		return;
+>> +	}
+> Why is this check after the reset and disable? Shouldn't it be placed at
+> the beginning of the function? But this is a somewhat strange check
+> anyway, since this function is private to the driver (static).
 
-> I just noticed two minor issues, see below.
-> 
-> > diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> [...]
-> > @@ -36,6 +36,8 @@ struct hw_pci {
-> >  					  resource_size_t start,
-> >  					  resource_size_t size,
-> >  					  resource_size_t align);
-> > +	void            (*add_bus)(struct pci_bus *bus);
-> > +	void            (*remove_bus)(struct pci_bus *bus);
-> 
-> This hunk...
-> 
-> > @@ -63,6 +65,8 @@ struct pci_sys_data {
-> >  					  resource_size_t start,
-> >  					  resource_size_t size,
-> >  					  resource_size_t align);
-> > +	void            (*add_bus)(struct pci_bus *bus);
-> > +	void            (*remove_bus)(struct pci_bus *bus);
-> >  	void		*private_data;	/* platform controller private data	*/
-> >  };
-> 
-> and this one use inconsistent indentation (spaces instead of tabs).
+yes, you are right, this check code should put in the beginning of the 
+function.
 
-Hum, I must be missing something here. Looking at the patch you're
-quoting, and my code, I see one tab before 'void' in both cases, and
-spaces between 'void' and the (*function) in both cases.
+I will send out a patch in the top of the l2-mtd.git soon. thanks
 
-Am I missing something here?
-
-> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> [...]
-> > @@ -464,6 +478,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
-> >  		sys->swizzle = hw->swizzle;
-> >  		sys->map_irq = hw->map_irq;
-> >  		sys->align_resource = hw->align_resource;
-> > +		sys->add_bus        = hw->add_bus;
-> > +		sys->remove_bus     = hw->remove_bus;
-> 
-> And this one aligns the '=' sign, whereas none of the other assignments
-> do.
-
-Right, will be fixed as part of PATCHv7.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
+>> +
+>> +	if (ecc_op == NAND_ECC_READ)
+>> +		pmecc_writel(host->ecc, CFG, (val & ~PMECC_CFG_WRITE_OP)
+>> +			| PMECC_CFG_AUTO_ENABLE);
+>> +	else
+>> +		pmecc_writel(host->ecc, CFG, (val | PMECC_CFG_WRITE_OP)
+>> +			& ~PMECC_CFG_AUTO_ENABLE);
+>> +
+>> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
+>> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
+>> +}
+>> +
+>>   static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+>>   	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
+>>   {
+> Brian
+Best Regards,
+Josh Wu
