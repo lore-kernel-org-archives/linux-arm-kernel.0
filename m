@@ -1,63 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:28:31 +0900
-Subject: [GIT PULL 10/19] ARM: shmobile: marzen: Switch to DT_MACHINE_START
+Date: Wed,  7 Aug 2013 13:28:32 +0900
+Subject: [GIT PULL 08/19] ARM: shmobile: ape6evm-reference: switch PFC to DT
 In-Reply-To: <cover.1375838900.git.horms+renesas@verge.net.au>
 References: <cover.1375838900.git.horms+renesas@verge.net.au>
-Message-ID: <7ebbb4ae6f2d6242178d332c67ad49772f9fe88d.1375838900.git.horms+renesas@verge.net.au>
+Message-ID: <59b2bc34aaa5d4c85c5c868ea6da42c1d06ff27c.1375838900.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Convert the marzen board to use DT_MACHINE_START. With this in
-place all mach-shmobile boards use DT_MACHINE_START. Also, this
-makes it possible for the r8a7779 SMP code to use DT for CPUs.
+PFC pinctrl configuration can now be performed via DT. Update
+ape6evm-reference to use this.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-[horms+renesas at verge.net.au: Select USE_OF in Kconfig]
-[horms+renesas at verge.net.au: Provide dt_compat in DT_MACHINE_START]
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig        | 1 +
- arch/arm/mach-shmobile/board-marzen.c | 8 +++++++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts  | 10 ++++++++++
+ arch/arm/mach-shmobile/board-ape6evm-reference.c |  9 ---------
+ 2 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 9e07985..16c3072 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -156,6 +156,7 @@ config MACH_MARZEN
- 	depends on ARCH_R8A7779
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-+	select USE_OF
- 
- config MACH_MARZEN_REFERENCE
- 	bool "MARZEN board - Reference Device Tree Implementation"
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index a7d1010..bcd07c0 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -238,7 +238,12 @@ static void __init marzen_init(void)
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
- }
- 
--MACHINE_START(MARZEN, "marzen")
-+static const char *marzen_boards_compat_dt[] __initdata = {
-+        "renesas,marzen",
-+        NULL,
-+};
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+index 6f4506e..bbd09d8 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+@@ -53,3 +53,13 @@
+ 	>;
+ 	voltage-tolerance = <1>; /* 1% */
+ };
 +
-+DT_MACHINE_START(MARZEN, "marzen")
- 	.smp		= smp_ops(r8a7779_smp_ops),
- 	.map_io		= r8a7779_map_io,
- 	.init_early	= r8a7779_add_early_devices,
-@@ -246,5 +251,6 @@ MACHINE_START(MARZEN, "marzen")
- 	.init_irq	= r8a7779_init_irq,
- 	.init_machine	= marzen_init,
- 	.init_late	= r8a7779_init_late,
-+	.dt_compat	= marzen_boards_compat_dt,
- 	.init_time	= r8a7779_earlytimer_init,
- MACHINE_END
++&pfc {
++	pinctrl-0 = <&scifa0_pins>;
++	pinctrl-names = "default";
++
++	scifa0_pins: scifa0 {
++		renesas,groups = "scifa0_data";
++		renesas,function = "scifa0";
++	};
++};
+diff --git a/arch/arm/mach-shmobile/board-ape6evm-reference.c b/arch/arm/mach-shmobile/board-ape6evm-reference.c
+index 46b41de..52cc5fa 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm-reference.c
++++ b/arch/arm/mach-shmobile/board-ape6evm-reference.c
+@@ -29,12 +29,6 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+-static const struct pinctrl_map ape6evm_pinctrl_map[] = {
+-	/* SCIFA0 console */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
+-				  "scifa0_data", "scifa0"),
+-};
+-
+ static void __init ape6evm_add_standard_devices(void)
+ {
+ 
+@@ -52,9 +46,6 @@ static void __init ape6evm_add_standard_devices(void)
+ 	clk_put(parent);
+ 	clk_put(mp);
+ 
+-	pinctrl_register_mappings(ape6evm_pinctrl_map,
+-				  ARRAY_SIZE(ape6evm_pinctrl_map));
+-	r8a73a4_pinmux_init();
+ 	r8a73a4_add_dt_devices();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
 -- 
 1.8.3.2
