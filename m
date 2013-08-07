@@ -1,31 +1,41 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Tue,  6 Aug 2013 18:33:06 -0700
-Subject: [PATCH] ARM: dts: Fix memory node in skeleton64.dtsi
-Message-ID: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Aug 2013 02:45:36 +0100
+Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <51FF8E84.7000108@arm.com>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+ <51FF8E84.7000108@arm.com>
+Message-ID: <20130807014536.GF15579@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the reg property of the memory node in
-skeleton64.dtsi to reflect the fact that the root node uses
-address-cells=2 and size-cells=2.
+On Mon, Aug 05, 2013 at 12:37:40PM +0100, Punit Agrawal wrote:
+> On 23/07/13 10:19, Punit Agrawal wrote:
+> > The CCI PMU can profile bus transactions at the master and slave
+> > interfaces of the CCI. The PMU can be used to observe an aggregated view
+> > of the bus traffic between the various components connected to the CCI.
+> >
+> > Extend the existing CCI driver to support the PMU by registering a perf
+> > backend for it.
+> >
+> > Document the device tree binding to describe the CCI PMU.
+> >
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Nicolas Pitre <nico@linaro.org>
+> > Cc: Dave Martin <dave.martin@linaro.org>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> > Reviewed-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >   Documentation/devicetree/bindings/arm/cci.txt |   38 ++
+> >   drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
+> >   2 files changed, 680 insertions(+)
+> >
+> 
+> It's been 2 rc's since this patch was posted. If there are no objections 
+> would you be ok to take this patch via your tree?
 
-Change-Id: Ie9b61166143969e020ceebc51e9a384405d8c0f2
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
----
- arch/arm/boot/dts/skeleton64.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Sure. I'm currently travelling at the moment, so I'll try and get this done
+as soon as I'm back.
 
-diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
-index 1599415..b5d7f36 100644
---- a/arch/arm/boot/dts/skeleton64.dtsi
-+++ b/arch/arm/boot/dts/skeleton64.dtsi
-@@ -9,5 +9,5 @@
- 	#size-cells = <2>;
- 	chosen { };
- 	aliases { };
--	memory { device_type = "memory"; reg = <0 0>; };
-+	memory { device_type = "memory"; reg = <0 0 0 0>; };
- };
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Will
