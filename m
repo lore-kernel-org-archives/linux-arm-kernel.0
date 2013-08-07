@@ -1,59 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Aug 2013 09:20:35 +0100
-Subject: [PATCH 1/3] clk: exynos4: Make exynos4_plls static
-In-Reply-To: <1375846648.2424.69.camel@joe-AO722>
-References: <1375788675-2638-1-git-send-email-sachin.kamat@linaro.org>
- <20130806200219.GD23006@n2100.arm.linux.org.uk>
- <CAK9yfHxKn9JaA5Tbuw9qXeyEX_kio4mt3gOgJxkMNSoDHkHnBQ@mail.gmail.com>
- <1375846648.2424.69.camel@joe-AO722>
-Message-ID: <20130807082035.GF23006@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 7 Aug 2013 10:37:50 +0200
+Subject: linux-next: build failure after merge of the mvebu tree
+In-Reply-To: <20130807142501.79fea47cae17a6a25f1e719e@canb.auug.org.au>
+References: <20130807142501.79fea47cae17a6a25f1e719e@canb.auug.org.au>
+Message-ID: <20130807103750.743b389a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 08:37:28PM -0700, Joe Perches wrote:
-> On Wed, 2013-08-07 at 08:51 +0530, Sachin Kamat wrote:
-> > +CC Joe Perches
-> > 
-> > On 7 August 2013 01:32, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > > Also note:
-> > >
-> > > On Tue, Aug 06, 2013 at 05:01:13PM +0530, Sachin Kamat wrote:
-> > >> @@ -984,7 +984,7 @@ static __initdata struct of_device_id ext_clk_match[] = {
-> > >
-> > > For the declaration above...
-> > >
-> > >> -struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
-> > >> +static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
-> > >
-> > > And this one... __initdata should come just before the '=', not at the
-> > > start, not in the middle and not before the variable.
-> > >
-> > > The reasoning is that with how you have it above, the attributes are
-> > > applied to the structure.  You want to apply the attributes to the
-> > > declaration instead, so it should come after the variable name.
-> > >
-> > > So, for example:
-> > >
-> > >         struct foo *foo __attribute__((section(".foo"))) = (void *)1;
-> > >
-> > > will place the "foo" variable into a section called ".foo", but:
-> > >
-> > >         struct __attribute__((section(".foo"))) foo *foo = (void *)1;
-> > >
-> > > will place "foo" into the normal .data section.
-> > >
-> > > So, the rule with variable declarations is that the __ specifiers we
-> > > have as macros in the kernel always come after the variable name being
-> > > declared and nowhere else.  We consider anywhere else buggy.
-> > 
-> > Thanks for this useful tip, Russell. There are several instances in
-> > the kernel where these attributes are used at the beginning of the
-> > variable declaration.
-> > 
-> > Probably it would be useful to add this to checkpatch. Joe?
-> 
-> I think Russell is using the royal "We".
+Dear Stephen Rothwell,
 
-No I'm not.  There have been many patches to fix errors like the above
-in the past.  If it's not considered a bug by the community as a whole,
-it damn well should be.
+On Wed, 7 Aug 2013 14:25:01 +1000, Stephen Rothwell wrote:
+> Hi all,
+> 
+> After merging the mvebu tree, today's linux-next build
+> (x86_64 allmodconfig) failed like this:
+> 
+> arch/x86/kernel/x86_init.c:115:22: error: 'default_restore_msi_irqs' undeclared here (not in a function)
+>   .restore_msi_irqs = default_restore_msi_irqs,
+>                       ^
+
+Thanks Stephen, I'm looking into this.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
