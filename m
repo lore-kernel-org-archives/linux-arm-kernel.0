@@ -1,86 +1,176 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 07 Aug 2013 17:25:36 +1000
-Subject: [PATCH] mach-ks8695/Kconfig: Make MACH_KS8695 depends on PCI
-In-Reply-To: <CAJFYCKErP_epEY6EbcK3trBWOHGW_EU6usuAwwnaDXk_maHsCA@mail.gmail.com>
-References: <1375693624-21548-1-git-send-email-manjunath.goudar@linaro.org>
- <CAKohpomo-J1Y_Zf8OLCCvrgfqi7m7tBju=rPp9+wuDAYL_-x7g@mail.gmail.com>
- <CAJFYCKHVb7EXiYPDBACotSc8bwnBM4bTXvtV-Fr=F2MonV7rKg@mail.gmail.com>
- <52005A46.4090306@uclinux.org>
- <CAJFYCKErP_epEY6EbcK3trBWOHGW_EU6usuAwwnaDXk_maHsCA@mail.gmail.com>
-Message-ID: <5201F670.4040409@uclinux.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 07 Aug 2013 09:28:15 +0200
+Subject: [PATCH v4 11/31] net: can: mscan: improve clock API use
+In-Reply-To: <1375821851-31609-12-git-send-email-gsi@denx.de>
+References: <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-12-git-send-email-gsi@denx.de>
+Message-ID: <5201F70F.8090007@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
+On 08/06/2013 10:43 PM, Gerhard Sittig wrote:
+> the .get_clock() callback is run from probe() and might allocate
+> resources, introduce a .put_clock() callback that is run from remove()
+> to undo any allocation activities
+> 
+> prepare and enable the clocks in open(), disable and unprepare the
+> clocks in close() if clocks were acquired during probe(), to not assume
+> knowledge about which activities are done in probe() and remove()
+> 
+> use devm_get_clk() to lookup the SYS and REF clocks, to have the clocks
+> put upon device shutdown
+> 
+> store pointers to data structures upon successful allocation already
+> instead of deferral until complete setup, such that subroutines in the
+> setup sequence may access those data structures as well to track their
+> resource acquisition
+> 
+> since clock allocation remains optional, the release callback as well as
+> the enable/disable calls in open/close are optional as well
+> 
+> Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> ---
+>  drivers/net/can/mscan/mpc5xxx_can.c |   18 ++++++++++++------
+>  drivers/net/can/mscan/mscan.c       |   27 ++++++++++++++++++++++++++-
+>  drivers/net/can/mscan/mscan.h       |    3 +++
+>  3 files changed, 41 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+> index bc422ba..e59b3a3 100644
+> --- a/drivers/net/can/mscan/mpc5xxx_can.c
+> +++ b/drivers/net/can/mscan/mpc5xxx_can.c
+> @@ -40,6 +40,7 @@ struct mpc5xxx_can_data {
+>  	unsigned int type;
+>  	u32 (*get_clock)(struct platform_device *ofdev, const char *clock_name,
+>  			 int *mscan_clksrc);
+> +	void (*put_clock)(struct platform_device *ofdev);
+>  };
+>  
+>  #ifdef CONFIG_PPC_MPC52xx
+> @@ -180,7 +181,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+>  			clockdiv = 1;
+>  
+>  		if (!clock_name || !strcmp(clock_name, "sys")) {
+> -			sys_clk = clk_get(&ofdev->dev, "sys_clk");
+> +			sys_clk = devm_clk_get(&ofdev->dev, "sys_clk");
+>  			if (IS_ERR(sys_clk)) {
+>  				dev_err(&ofdev->dev, "couldn't get sys_clk\n");
+>  				goto exit_unmap;
+> @@ -203,7 +204,7 @@ static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+>  		}
+>  
+>  		if (clocksrc < 0) {
+> -			ref_clk = clk_get(&ofdev->dev, "ref_clk");
+> +			ref_clk = devm_clk_get(&ofdev->dev, "ref_clk");
+>  			if (IS_ERR(ref_clk)) {
+>  				dev_err(&ofdev->dev, "couldn't get ref_clk\n");
+>  				goto exit_unmap;
+> @@ -280,6 +281,8 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
+>  	dev = alloc_mscandev();
+>  	if (!dev)
+>  		goto exit_dispose_irq;
+> +	platform_set_drvdata(ofdev, dev);
+> +	SET_NETDEV_DEV(dev, &ofdev->dev);
+>  
+>  	priv = netdev_priv(dev);
+>  	priv->reg_base = base;
+> @@ -296,8 +299,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
+>  		goto exit_free_mscan;
+>  	}
+>  
+> -	SET_NETDEV_DEV(dev, &ofdev->dev);
+> -
+>  	err = register_mscandev(dev, mscan_clksrc);
+>  	if (err) {
+>  		dev_err(&ofdev->dev, "registering %s failed (err=%d)\n",
+> @@ -305,8 +306,6 @@ static int mpc5xxx_can_probe(struct platform_device *ofdev)
+>  		goto exit_free_mscan;
+>  	}
+>  
+> -	platform_set_drvdata(ofdev, dev);
+> -
+>  	dev_info(&ofdev->dev, "MSCAN at 0x%p, irq %d, clock %d Hz\n",
+>  		 priv->reg_base, dev->irq, priv->can.clock.freq);
+>  
+> @@ -324,10 +323,17 @@ exit_unmap_mem:
+>  
+>  static int mpc5xxx_can_remove(struct platform_device *ofdev)
+>  {
+> +	const struct of_device_id *match;
+> +	const struct mpc5xxx_can_data *data;
+>  	struct net_device *dev = platform_get_drvdata(ofdev);
+>  	struct mscan_priv *priv = netdev_priv(dev);
+>  
+> +	match = of_match_device(mpc5xxx_can_table, &ofdev->dev);
+> +	data = match ? match->data : NULL;
+> +
+>  	unregister_mscandev(dev);
+> +	if (data && data->put_clock)
+> +		data->put_clock(ofdev);
+>  	iounmap(priv->reg_base);
+>  	irq_dispose_mapping(dev->irq);
+>  	free_candev(dev);
+> diff --git a/drivers/net/can/mscan/mscan.c b/drivers/net/can/mscan/mscan.c
+> index e6b4095..4f998f5 100644
+> --- a/drivers/net/can/mscan/mscan.c
+> +++ b/drivers/net/can/mscan/mscan.c
+> @@ -573,10 +573,24 @@ static int mscan_open(struct net_device *dev)
+>  	struct mscan_priv *priv = netdev_priv(dev);
+>  	struct mscan_regs __iomem *regs = priv->reg_base;
+>  
+> +	if (priv->clk_ipg) {
+> +		ret = clk_prepare_enable(priv->clk_ipg);
+> +		if (ret)
+> +			goto exit_retcode;
+> +	}
+> +	if (priv->clk_can) {
+> +		ret = clk_prepare_enable(priv->clk_can);
+> +		if (ret) {
+> +			if (priv->clk_ipg)
+> +				clk_disable_unprepare(priv->clk_ipg);
+> +			goto exit_retcode;
 
-On 06/08/13 20:43, Manjunath Goudar wrote:
-> On 6 August 2013 07:37, Greg Ungerer <gerg at uclinux.org <mailto:gerg@uclinux.org>> wrote:
->     On 05/08/13 20:31, Manjunath Goudar wrote:
->     > On 5 August 2013 14:47, Viresh Kumar <viresh.kumar at linaro.org <mailto:viresh.kumar@linaro.org> <mailto:viresh.kumar at linaro.org <mailto:viresh.kumar@linaro.org>>> wrote:
->     >
->     >     On 5 August 2013 14:37, Manjunath Goudar <manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org> <mailto:manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org>>> wrote:
->     >     > From: root <root at si-cspbld63.lge.net <mailto:root@si-cspbld63.lge.net> <mailto:root at si-cspbld63.lge.net <mailto:root@si-cspbld63.lge.net>>>
->     >
->     >     :)
->     >
->     >     > This patch adds a Kconfig dependency on MACH_KS8695,MACH_CM* or MACH_IM*
->     >     > being available before PCI can be enabled. Without this patch,build system
->     >
->     >     Add Space after ','
->     >
->     >     > can lead to issues. This was discovered during randconfig testing,
->     >     > without PCI if any one of MACH_KS8695,MACH_CM* or MACH_IM* being enabled,
->     >
->     >     Same here.
->     >
->     >     > leading to the following error:
->     >     >
->     >     > LD      init/built-in.o
->     >     > arch/arm/mach-ks8695/built-in.o: In function `og_register_pci':
->     >     > arch/arm/mach-ks8695/board-og.c:47:undefined reference to `ks8695_init_pci'
->     >     > make: *** [vmlinux] Error 1
->     >     >
->     >     > Signed-off-by: Manjunath Goudar <manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org> <mailto:manjunath.goudar at linaro.org <mailto:manjunath.goudar@linaro.org>>>
->     >     > Cc: Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de> <mailto:arnd at arndb.de <mailto:arnd@arndb.de>>>
->     >     > Cc: Deepak Saxena <dsaxena at linaro.org <mailto:dsaxena@linaro.org> <mailto:dsaxena at linaro.org <mailto:dsaxena@linaro.org>>>
->     >     > Cc: Greg Ungerer <gerg at uclinux.org <mailto:gerg@uclinux.org> <mailto:gerg at uclinux.org <mailto:gerg@uclinux.org>>>
->     >     > Cc: linux-arm-kernel at lists.infradead.org <mailto:linux-arm-kernel@lists.infradead.org> <mailto:linux-arm-kernel at lists.infradead.org <mailto:linux-arm-kernel@lists.infradead.org>>
->     >     > ---
->     >     >  arch/arm/mach-ks8695/Kconfig | 5 +++++
->     >     >  1 file changed, 5 insertions(+)
->     >     >
->     >     > diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
->     >     > index a545976..29d7d9f 100644
->     >     > --- a/arch/arm/mach-ks8695/Kconfig
->     >     > +++ b/arch/arm/mach-ks8695/Kconfig
->     >     > @@ -5,6 +5,7 @@ menu "Kendin/Micrel KS8695 Implementations"
->     >     >  config MACH_KS8695
->     >     >         bool "KS8695 development board"
->     >     >         select MIGHT_HAVE_PCI
->     >     > +       depends on PCI
->     >
->     >     You need both PCI and MIGHT_HAVE_PCI? Don't know but it looks
->     >     like defconfig is missing PCI stuff.. and MIGHT_HAVE_PCI is enough
->     >     here?
->     >
->     >
->     >  PCI is needed here because board-og.c file depends on pci.o.
-> 
->     It shouldn't though, thus the original use of MIGHT_HAVE_PCI.
->     The board-og.c machine code supports a number of boards, some of
->     which don't have a PCI bus (that is they use the KS8695 CPU that
->     doesn't contain the PCI bus silicon).
-> 
->     I think you want a fix that makes the pci support code in this file
->     conditional on CONFIG_PCI.
-> 
-> You are suggesting me,as below
-> 
->  +#ifdef CONFIG_PCI      
->         ks8695_init_pci(&og_pci);
-> +#endif
+Why don't you add another jump label and jump to that to disable the
+ipkg clock?
 
-Yes, in this case I think you will need something like this.
 
-Regards
-Greg
+> +		}
+> +	}
+> +
+>  	/* common open */
+>  	ret = open_candev(dev);
+>  	if (ret)
+> -		return ret;
+> +		goto exit_dis_clock;
+>  
+>  	napi_enable(&priv->napi);
+>  
+> @@ -604,6 +618,12 @@ exit_free_irq:
+>  exit_napi_disable:
+>  	napi_disable(&priv->napi);
+>  	close_candev(dev);
+> +exit_dis_clock:
+> +	if (priv->clk_can)
+> +		clk_disable_unprepare(priv->clk_can);
+> +	if (priv->clk_ipg)
+> +		clk_disable_unprepare(priv->clk_ipg);
+> +exit_retcode:
+>  	return ret;
+>  }
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/ff55f5e9/attachment.sig>
