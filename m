@@ -1,112 +1,71 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  7 Aug 2013 11:32:28 +0200
-Subject: [PATCHv7 07/13] irqdomain: add function to find a MSI irq_domain
+Date: Wed,  7 Aug 2013 11:32:29 +0200
+Subject: [PATCHv7 08/13] irqchip: armada-370-xp: properly request resources
 In-Reply-To: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1375867954-2320-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that an irq_domain can be associated to a msi_chip structure, a
-given PCIe driver will want to find this irq_domain, based on the
-Device Tree node of the interrupt controller, as pointed by the
-'msi-controller' DT property.
+Instead of using of_iomap(), we now use of_address_to_resource(),
+request_mem_region() and ioremap(). This allows the corresponding I/O
+regions to be properly requested and visible in /proc/iomem.
 
-However, since on those platforms a single piece of hardware,
-represented by a single DT node can provide both a "normal" IRQ domain
-and a MSI-type IRQ domain, we need separate lookup functions to
-distinguish them.
+The main motivation for this change is that the introduction of the
+MSI support requires us to get the physical address of the main
+interrupt controller registers, so we will need the corresponding
+'struct resource' anyway.
 
-This patch makes irq_find_host() find only non-MSI-type IRQ domains,
-and introduces irq_find_msi_host() to find only MSI-type IRQ
-domains. It does so by factorizing the irq_find_host() logic into
-__irq_find_host().
+We also take this opportunity to change a panic() to BUG_ON(), in
+order to be consistent with the rest of the driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Tested-by: Daniel Price <daniel.price@gmail.com>
 ---
- include/linux/irqdomain.h | 21 ++++++++++++++++++++-
- kernel/irq/irqdomain.c    | 13 ++++++++++---
- 2 files changed, 30 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index b0504ff..fc669b4 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -129,7 +129,8 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- 					 irq_hw_number_t first_hwirq,
- 					 const struct irq_domain_ops *ops,
- 					 void *host_data);
--extern struct irq_domain *irq_find_host(struct device_node *node);
-+struct irq_domain *__irq_find_host(struct device_node *node,
-+				   bool findmsi);
- extern void irq_set_default_host(struct irq_domain *host);
- 
- /**
-@@ -196,6 +197,24 @@ static inline struct irq_domain *irq_domain_add_msi(struct device_node *of_node,
- }
- 
- 
-+/**
-+ * irq_find_host() - Locates a domain for a given device node
-+ * @node: device-tree node of the interrupt controller
-+ */
-+static inline struct irq_domain *irq_find_host(struct device_node *node)
-+{
-+	return __irq_find_host(node, false);
-+}
-+
-+/**
-+ * irq_find_msi_host() - Locates a MSI domain for a given device node
-+ * @node: device-tree node of the interrupt controller
-+ */
-+static inline struct irq_domain *irq_find_msi_host(struct device_node *node)
-+{
-+	return __irq_find_host(node, true);
-+}
-+
- extern void irq_domain_remove(struct irq_domain *host);
- 
- extern int irq_domain_associate(struct irq_domain *domain, unsigned int irq,
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 8d02af7..6d066e2 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -197,10 +197,14 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- EXPORT_SYMBOL_GPL(irq_domain_add_legacy);
- 
- /**
-- * irq_find_host() - Locates a domain for a given device node
-+ * __irq_find_host() - Locates a domain for a given device node,
-+ * taking into account whether the domain is of MSI-type or not.
-  * @node: device-tree node of the interrupt controller
-+ * @findmsi: true when the domain being search is of MSI-type, false
-+ * otherwise.
-  */
--struct irq_domain *irq_find_host(struct device_node *node)
-+struct irq_domain *__irq_find_host(struct device_node *node,
-+				   bool findmsi)
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index bb328a3..26adc74 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -248,12 +248,25 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 					     struct device_node *parent)
  {
- 	struct irq_domain *h, *found = NULL;
- 	int rc;
-@@ -212,6 +216,9 @@ struct irq_domain *irq_find_host(struct device_node *node)
- 	 */
- 	mutex_lock(&irq_domain_mutex);
- 	list_for_each_entry(h, &irq_domain_list, link) {
-+		if ((findmsi && !h->msi_chip) ||
-+		    (!findmsi && h->msi_chip))
-+			continue;
- 		if (h->ops->match)
- 			rc = h->ops->match(h, node);
- 		else
-@@ -225,7 +232,7 @@ struct irq_domain *irq_find_host(struct device_node *node)
- 	mutex_unlock(&irq_domain_mutex);
- 	return found;
- }
--EXPORT_SYMBOL_GPL(irq_find_host);
-+EXPORT_SYMBOL_GPL(__irq_find_host);
++	struct resource main_int_res, per_cpu_int_res;
+ 	u32 control;
  
- /**
-  * irq_set_default_host() - Set a "default" irq domain
+-	main_int_base = of_iomap(node, 0);
+-	per_cpu_int_base = of_iomap(node, 1);
++	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
++	BUG_ON(of_address_to_resource(node, 1, &per_cpu_int_res));
+ 
++	BUG_ON(!request_mem_region(main_int_res.start,
++				   resource_size(&main_int_res),
++				   node->full_name));
++	BUG_ON(!request_mem_region(per_cpu_int_res.start,
++				   resource_size(&per_cpu_int_res),
++				   node->full_name));
++
++	main_int_base = ioremap(main_int_res.start,
++				resource_size(&main_int_res));
+ 	BUG_ON(!main_int_base);
++
++	per_cpu_int_base = ioremap(per_cpu_int_res.start,
++				   resource_size(&per_cpu_int_res));
+ 	BUG_ON(!per_cpu_int_base);
+ 
+ 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
+@@ -262,8 +275,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
+ 				&armada_370_xp_mpic_irq_ops, NULL);
+ 
+-	if (!armada_370_xp_mpic_domain)
+-		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
++	BUG_ON(!armada_370_xp_mpic_domain);
+ 
+ 	irq_set_default_host(armada_370_xp_mpic_domain);
+ 
 -- 
 1.8.1.2
