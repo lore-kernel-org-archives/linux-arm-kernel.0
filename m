@@ -1,37 +1,52 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 7 Aug 2013 17:03:59 +0530
-Subject: [PATCH] cpufreq: exynos5440: Fix to skip when new frequency same
- as current
-In-Reply-To: <52022FC2.2010109@arm.com>
-References: <1375874171-16951-1-git-send-email-amit.daniel@samsung.com>
- <CAKohpokp04HXau1fOA6w9K675LwRw6uCCZZKyFAJtF1_pkcC=Q@mail.gmail.com>
- <52022FC2.2010109@arm.com>
-Message-ID: <CAKohpom0gPk9BXRP2eEuX_HBXDut=wynrZfvOH1tcEQY6CMLNQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed,  7 Aug 2013 12:43:32 +0100
+Subject: [PATCH v3 2/3] ARM: vexpress: tc2: disable GIC CPU IF in
+ tc2_pm_suspend
+In-Reply-To: <1375875813-13358-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1375875813-13358-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1375875813-13358-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2013 17:00, Sudeep KarkadaNagesha
-<Sudeep.KarkadaNagesha@arm.com> wrote:
-> Any particular reason we need this check in all drivers after your
-> commit: 5a1c0228 "cpufreq: Avoid calling cpufreq driver's target()
-> routine if target_freq == policy->cur"
->
-> I think it can removed from all drivers, am I missing something ?
+To prevent cores from exiting wfi when they are about to be shut down
+the GIC CPU IF must be disabled so that the GIC CPU IF IRQ output line
+is not asserted to the cores. wfi completion must be prevented since,
+in absence of coordinating HW logic, if the power controller receives
+a standbywfi signal but in the meantime the processor restarts executing
+owing to a pending IRQ, the core might be reset when running in a
+non-quiescent state (eg with pending load/store transactions)
 
-Yeah.. Just a bit though :)
+Raw GIC distributor IRQ signals are routed to the power controller, that
+is capable of taking core out of reset on pending IRQs even if their GIC
+CPU IF is disabled, thus keeping the normal wfi behaviour.
 
-So, cpufreq core checks this when we call target for any frequency.
-Now, cpufreq driver actually does a cpufreq_frequency_table_target()
-and so the frequency may vary than what is requested, in case
-requested frequency isn't picked from the table.
+GIC CPU IF is restored upon CPU wake-up by the respective MCPM API
+consumers (ie CPU idle driver and suspend to RAM thread).
 
-In such cases we check it again to be sure that we aren't at this
-frequency already..
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/mach-vexpress/tc2_pm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Earlier I thought of calling cpufreq_frequency_table_target() in the
-core before calling target but dropped the idea as I wasn't sure of
-the side effects.
-
-@Rafael: Do you see why we shouldn't/can't call
-cpufreq_frequency_table_target() from the core itself and so drivers
-never need to do it?
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index dfb55d4..3303ac6 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -16,6 +16,7 @@
+ #include <linux/kernel.h>
+ #include <linux/spinlock.h>
+ #include <linux/errno.h>
++#include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/mcpm.h>
+ #include <asm/proc-fns.h>
+@@ -211,6 +212,7 @@ static void tc2_pm_suspend(u64 residency)
+ 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+ 	ve_spc_set_resume_addr(cluster, cpu, virt_to_phys(mcpm_entry_point));
++	gic_cpu_if_down();
+ 	tc2_pm_down(residency);
+ }
+ 
+-- 
+1.8.2.2
