@@ -1,41 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 7 Aug 2013 21:16:44 +0200
-Subject: [PATCH v2] pinctrl: shut up a couple of pinctrl warnings
-In-Reply-To: <20130728121300.GF24642@n2100.arm.linux.org.uk>
-References: <20130727103811.GD24642@n2100.arm.linux.org.uk>
- <20130728121300.GF24642@n2100.arm.linux.org.uk>
-Message-ID: <20130807191644.GK6104@pengutronix.de>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Wed, 07 Aug 2013 15:24:39 -0400
+Subject: [PATCH 3.10-stable] at91sam9x5 rtc causes damage
+In-Reply-To: <20130807190801.GB2525@kroah.com>
+References: <52027AB3.1040806@interlog.com> <20130807190801.GB2525@kroah.com>
+Message-ID: <52029EF7.3040105@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 13-08-07 03:08 PM, Greg KH wrote:
+> On Wed, Aug 07, 2013 at 12:49:55PM -0400, Douglas Gilbert wrote:
+>> This one probably needs more sign-offs but some folks seem to be
+>> away. It is pretty simple and fixed in the current lk 3.11.0-rc
+>> series. So it just impacts the lk 3.10 series including lk 3.10.5 .
+>>
+>> ChangeLog:
+>>    - without this patch members of the at91sam9x5 family (e.g.
+>>      at91sam9g25) that use the RTC will receive an unhandled
+>>      interrupt whenever they try to write to the RTC. In the
+>>      case of 9x5 SoCs that is the SYS interrupt shared with
+>>      several other things such as the debug port. Thereafter
+>>      the debug port becomes useless (for input), the RTC doesn't
+>>      work ...
+>>
+>> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+>
+> <formletter>
+>
+> This is not the correct way to submit patches for inclusion in the
+> stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+> for how to do this properly.
+>
+> </formletter>
 
-On Sun, Jul 28, 2013 at 01:13:00PM +0100, Russell King - ARM Linux wrote:
-> diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-> index e875f21..d16ef87 100644
-> --- a/drivers/pinctrl/pinconf.c
-> +++ b/drivers/pinctrl/pinconf.c
-> [...]
-> @@ -450,14 +449,8 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
->  		for (j = 0; j < map->data.configs.num_configs; j++) {
->  			if (!strcmp(map->data.configs.group_or_pin,
->  					dbg->pin_name)) {
-> -				/*
-> -				 * We found the right pin / state, read the
-> -				 * config and he pctldev for later use
-he?
+Fine. I'll leave it.
 
-> -				 */
-> -				configs = &map->data.configs;
-> -				pctldev = get_pinctrl_dev_from_devname
-> -					(map->ctrl_dev_name);
-> -				found = true;
-> +				/* We found the right pin / state */
-> +				found = map;
->  				break;
->  			}
->  		}
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Doug Gilbert
