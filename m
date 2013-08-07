@@ -1,32 +1,26 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 7 Aug 2013 14:52:59 -0700
-Subject: [GIT PULL] msm cleanups for v3.12
-In-Reply-To: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
-References: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <20130807215259.GA22852@codeaurora.org>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 7 Aug 2013 22:55:54 +0100
+Subject: [PATCH 03/17] Add system pointer argument to shared EFI stub
+ related functions so they no longer use global system table pointer as they
+ did when part of eboot.c.
+In-Reply-To: <CAFECyb8NbZ=hrAGyoV-UPUhh-Jst6ZVRk9RUQj_Kb1qq_xuUAg@mail.gmail.com>
+References: <1375847113-24884-1-git-send-email-roy.franz@linaro.org>
+ <1375847113-24884-4-git-send-email-roy.franz@linaro.org>
+ <20130807130851.GC2515@console-pimps.org>
+ <CAFECyb8NbZ=hrAGyoV-UPUhh-Jst6ZVRk9RUQj_Kb1qq_xuUAg@mail.gmail.com>
+Message-ID: <20130807215554.GI2515@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 01:58:16PM -0700, David Brown wrote:
->The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
->
->  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
->
->are available in the git repository at:
->
->  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git for-3.12/msm-cleanup2
->
->for you to fetch changes up to b80a0dc53df68c6862b8985ecc12856edb080248:
->
->  ARM: msm: fix compilation error in gpiomux (2013-08-07 10:39:31 -0700)
+On Wed, 07 Aug, at 10:10:54AM, Roy Franz wrote:
+> I went this way since the shared code is in a separate file - I really
+> didn't like using a global variable as part of the interface to
+> the shared code.  This has the nice side benefit of allowing the ARM
+> stub to not use any global variables, so we don't have to do
+> any GOT fixups to relocate the code - it is position independent if we
+> don't use global variables.
 
-Sigh, it looks like this fixes code that was removed in last-week's
-fix patches.  I can either regenerate the pull request, or feel free
-to "resolve" this by just using the removal of the code.
-
-David
+OK, that would be a win. Please include this rationale in the patch.
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Matt Fleming, Intel Open Source Technology Center
