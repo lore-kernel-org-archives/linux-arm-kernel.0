@@ -1,68 +1,38 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 7 Aug 2013 13:27:45 +0200
-Subject: [PATCH] ARM: dts: am33xx: Correct gpio #interrupt-cells property
-In-Reply-To: <1375873592-26881-1-git-send-email-larsi@wh2.tu-dresden.de>
-References: <1375873592-26881-1-git-send-email-larsi@wh2.tu-dresden.de>
-Message-ID: <CABxcv==8Y7WasGBMByXPybzbP2ZA7jAnwpdiz4mnrtx_hHgr6Q@mail.gmail.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 07 Aug 2013 12:30:10 +0100
+Subject: [PATCH] cpufreq: exynos5440: Fix to skip when new frequency same
+ as current
+In-Reply-To: <CAKohpokp04HXau1fOA6w9K675LwRw6uCCZZKyFAJtF1_pkcC=Q@mail.gmail.com>
+References: <1375874171-16951-1-git-send-email-amit.daniel@samsung.com>
+ <CAKohpokp04HXau1fOA6w9K675LwRw6uCCZZKyFAJtF1_pkcC=Q@mail.gmail.com>
+Message-ID: <52022FC2.2010109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 7, 2013 at 1:06 PM, Lars Poeschel <larsi@wh2.tu-dresden.de> wrote:
-> From: Lars Poeschel <poeschel@lemonage.de>
->
-> Following commit ff5c9059 and therefore other omap platforms using
-> the gpio-omap driver correct the #interrupt-cells property on am33xx
-> too. The omap gpio binding documentaion also states that
-> the #interrupt-cells property should be 2.
->
-> Signed-off-by: Lars Poeschel <poeschel@lemonage.de>
-> ---
->  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 38b446b..033c5dd 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -102,7 +102,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                         reg = <0x44e07000 0x1000>;
->                         interrupts = <96>;
->                 };
-> @@ -113,7 +113,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                         reg = <0x4804c000 0x1000>;
->                         interrupts = <98>;
->                 };
-> @@ -124,7 +124,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                         reg = <0x481ac000 0x1000>;
->                         interrupts = <32>;
->                 };
-> @@ -135,7 +135,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                         reg = <0x481ae000 0x1000>;
->                         interrupts = <62>;
->                 };
-> --
-> 1.7.10.4
->
->
+On 07/08/13 12:22, Viresh Kumar wrote:
+> On 7 August 2013 16:46, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+>> This patch fixes the issue of un-necessary setting the clock controller
+>> when the new target frequency is same as the current one. This case usually
+>> occurs with governors like ondemand which passes the target frequency as the
+>> percentage of average frequency. This check is present in most of the cpufreq
+>> driver.
+>>
+>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>>  drivers/cpufreq/exynos5440-cpufreq.c |    3 +++
+>>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> Applied.
+Hi Viresh,
 
-Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
+Any particular reason we need this check in all drivers after your
+commit: 5a1c0228 "cpufreq: Avoid calling cpufreq driver's target()
+routine if target_freq == policy->cur"
+
+I think it can removed from all drivers, am I missing something ?
+
+Regards,
+Sudeep
