@@ -1,51 +1,47 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 7 Aug 2013 09:44:42 +0200
-Subject: [BUG linux-next] watchdog: build breakage for non-SMP builds
-Message-ID: <20993.64234.352390.254920@ipc1.ka-ro>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 07 Aug 2013 00:45:46 -0700
+Subject: [PATCH 1/2] hwmon: (lm90) Add power control
+In-Reply-To: <1375860442.896960598@f427.i.mail.ru>
+References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
+ <1375858358-15070-2-git-send-email-wni@nvidia.com>
+ <1375860442.896960598@f427.i.mail.ru>
+Message-ID: <5201FB2A.2010806@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/07/2013 12:27 AM, Alexander Shiyan wrote:
+>> The device lm90 can be controlled by the vdd rail.
+>> Adding the power control support to power on/off the vdd rail.
+>> And make sure that power is enabled before accessing the device.
+>>
+>> Signed-off-by: Wei Ni <wni@nvidia.com>
+>> ---
+>>   drivers/hwmon/lm90.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++++++
+> [...]
+>> +	if (!data->lm90_reg) {
+>> +		data->lm90_reg = regulator_get(&client->dev, "vdd");
+>> +		if (IS_ERR_OR_NULL(data->lm90_reg)) {
+>> +			if (PTR_ERR(data->lm90_reg) == -ENODEV)
+>> +				dev_info(&client->dev,
+>> +					 "No regulator found for vdd. Assuming vdd is always powered.");
+>> +			else
+>> +				dev_warn(&client->dev,
+>> +					 "Error [%ld] in getting the regulator handle for vdd.\n",
+>> +					 PTR_ERR(data->lm90_reg));
+>> +			data->lm90_reg = NULL;
+>> +			mutex_unlock(&data->update_lock);
+>> +			return -ENODEV;
+>> +		}
+>> +	}
+>> +	if (is_enable) {
+>> +		ret = regulator_enable(data->lm90_reg);
+>> +		msleep(POWER_ON_DELAY);
+>
+> Can this delay be handled directly from regulator?
+>
 
-commit 0ce6966b "watchdog: update watchdog_tresh properly" breaks
-build on non-SMP systems (more specifically: on systems where
-CONFIG_USE_GENERIC_SMP_HELPERS is not set):
-linux-next/kernel/watchdog.c: In function 'update_timers':
-linux-next/kernel/watchdog.c:522:2: error: implicit declaration of function '__smp_call_function_single' [-Werror=implicit-function-declaration]
+Good question. Browsing through other regulator_enable calls,
+I don't see a similar delay anywhere else, so one should assume
+that this is not necessary.
 
-I guess the offending code should be guarded by an
-'#ifdef CONFIG_USE_GENERIC_SMP_HELPERS'
-like in kernel/softirq.c:
-#ifdef CONFIG_USE_GENERIC_SMP_HELPERS
-[...]
-static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softirq)
-{
-        if (cpu_online(cpu)) {
-                cp->func = remote_softirq_receive;
-                cp->info = &softirq;
-                cp->flags = 0;
-
-                __smp_call_function_single(cpu, cp, 0);
-                return 0;
-        }
-        return 1;
-}
-#else /* CONFIG_USE_GENERIC_SMP_HELPERS */
-static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softirq)
-{
-        return 1;
-}
-#endif
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Guenter
