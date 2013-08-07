@@ -1,55 +1,45 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 07 Aug 2013 14:40:15 +0530
-Subject: [PATCH V3 6/7] ASoC: Samsung: wm8994: Register the osc clock.
-In-Reply-To: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
-References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1375866616-5541-7-git-send-email-padma.v@samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 7 Aug 2013 11:03:41 +0200
+Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <1375828754.12557.70.camel@pasglop>
+References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130806201000.3e97c63b@skate> <1375828754.12557.70.camel@pasglop>
+Message-ID: <20130807110341.4be97aa8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the 16MHz oscillator clock as fixed clk.
+Dear Benjamin Herrenschmidt,
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- sound/soc/samsung/smdk_wm8994.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+On Wed, 07 Aug 2013 08:39:14 +1000, Benjamin Herrenschmidt wrote:
 
-diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
-index 581ea4a..a6edded 100644
---- a/sound/soc/samsung/smdk_wm8994.c
-+++ b/sound/soc/samsung/smdk_wm8994.c
-@@ -9,6 +9,7 @@
- 
- #include "../codecs/wm8994.h"
- #include <sound/pcm_params.h>
-+#include <linux/clk-provider.h>
- #include <linux/module.h>
- #include <linux/of.h>
- 
-@@ -37,6 +38,15 @@
- /* SMDK has a 16.934MHZ crystal attached to WM8994 */
- #define SMDK_WM8994_FREQ 16934000
- 
-+/* 16.9MHz fixed oscillator clock */
-+static void init_osc_clock(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "osc3_clk16mhz");
-+	of_fixed_clk_setup(np);
-+}
-+
- static int smdk_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_pcm_hw_params *params)
- {
-@@ -173,6 +183,8 @@ static int smdk_audio_probe(struct platform_device *pdev)
- 		smdk_dai[0].platform_of_node = smdk_dai[0].cpu_of_node;
- 	}
- 
-+	init_osc_clock();
-+
- 	ret = snd_soc_register_card(card);
- 
- 	if (ret)
+> > Would you mind having a look at:
+> > 
+> >  * Patches 4, 5, 6, 7 for Benjamin as the irqdomain maintainer.
+> 
+> Ah sorry, I wasn't aware you were actually waiting for my acks, I didn't
+> read the whole thread, my bad. I'm not irqdomain maintainer btw.
+
+Hum, interesting. This is not what my 3.11-rc3 kernel tree says:
+
+IRQ DOMAINS (IRQ NUMBER MAPPING LIBRARY)
+M:      Benjamin Herrenschmidt <benh@kernel.crashing.org>
+S:      Maintained
+
+As of a0062d4e3a0a ('MAINTAINERS: Remove Grant Likely'), Grant resigned
+as the maintainer of IRQ DOMAINS, so you are now the only maintainer
+for this subsystem.
+
+> I wrote the original powerpc implementation but since then it has been taken
+> over by Grant and others. But I can certainly comment :-)
+
+As the official maintainer, your comments would certainly be
+appreciated.
+
+Thanks,
+
+Thomas
 -- 
-1.7.4.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
