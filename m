@@ -1,63 +1,59 @@
-From: mhocko@suse.cz (Michal Hocko)
-Date: Wed, 7 Aug 2013 10:47:16 +0200
-Subject: [BUG linux-next] watchdog: build breakage for non-SMP builds
-In-Reply-To: <20993.64234.352390.254920@ipc1.ka-ro>
-References: <20993.64234.352390.254920@ipc1.ka-ro>
-Message-ID: <20130807084716.GA8184@dhcp22.suse.cz>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 07 Aug 2013 14:20:33 +0530
+Subject: [PATCH 1/7] ARM: dts: Change i2s compatible string on exynos5250
+In-Reply-To: <1375865442-5323-1-git-send-email-padma.v@samsung.com>
+References: <1375865442-5323-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1375865442-5323-2-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 07-08-13 09:44:42, Lothar Wa?mann wrote:
-> Hi,
-> 
-> commit 0ce6966b "watchdog: update watchdog_tresh properly" breaks
-> build on non-SMP systems (more specifically: on systems where
-> CONFIG_USE_GENERIC_SMP_HELPERS is not set):
-> linux-next/kernel/watchdog.c: In function 'update_timers':
-> linux-next/kernel/watchdog.c:522:2: error: implicit declaration of function '__smp_call_function_single' [-Werror=implicit-function-declaration]
+This patch removes quirks from i2s node and change the i2s
+compatible names.
 
-The fix is already in the Andrew's tree so it should show up in
-linux-next sometimes soon.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250.dtsi |    9 +++------
+ 1 files changed, 3 insertions(+), 6 deletions(-)
 
-Sorry about the hassles.
-
-> I guess the offending code should be guarded by an
-> '#ifdef CONFIG_USE_GENERIC_SMP_HELPERS'
-> like in kernel/softirq.c:
-> #ifdef CONFIG_USE_GENERIC_SMP_HELPERS
-> [...]
-> static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softirq)
-> {
->         if (cpu_online(cpu)) {
->                 cp->func = remote_softirq_receive;
->                 cp->info = &softirq;
->                 cp->flags = 0;
-> 
->                 __smp_call_function_single(cpu, cp, 0);
->                 return 0;
->         }
->         return 1;
-> }
-> #else /* CONFIG_USE_GENERIC_SMP_HELPERS */
-> static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softirq)
-> {
->         return 1;
-> }
-> #endif
-> 
-> 
-> Lothar Wa?mann
-> -- 
-> ___________________________________________________________
-> 
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-> 
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
-
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 48c0a88..5b36121 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -393,7 +393,7 @@
+ 	};
+ 
+ 	i2s0: i2s at 03830000 {
+-		compatible = "samsung,i2s-v5";
++		compatible = "samsung,s5pv210-i2s";
+ 		reg = <0x03830000 0x100>;
+ 		dmas = <&pdma0 10
+ 			&pdma0 9
+@@ -403,16 +403,13 @@
+ 			<&clock_audss EXYNOS_I2S_BUS>,
+ 			<&clock_audss EXYNOS_SCLK_I2S>;
+ 		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
+-		samsung,supports-6ch;
+-		samsung,supports-rstclr;
+-		samsung,supports-secdai;
+ 		samsung,idma-addr = <0x03000000>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2s0_bus>;
+ 	};
+ 
+ 	i2s1: i2s at 12D60000 {
+-		compatible = "samsung,i2s-v5";
++		compatible = "samsung,s3c6410-i2s";
+ 		reg = <0x12D60000 0x100>;
+ 		dmas = <&pdma1 12
+ 			&pdma1 11>;
+@@ -424,7 +421,7 @@
+ 	};
+ 
+ 	i2s2: i2s at 12D70000 {
+-		compatible = "samsung,i2s-v5";
++		compatible = "samsung,s3c6410-i2s";
+ 		reg = <0x12D70000 0x100>;
+ 		dmas = <&pdma0 12
+ 			&pdma0 11>;
 -- 
-Michal Hocko
-SUSE Labs
+1.7.4.4
