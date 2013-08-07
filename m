@@ -1,150 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:28:36 +0900
-Subject: [GIT PULL 15/19] ARM: shmobile: Mount root file systems in r/w mode
- for all DT platforms
-In-Reply-To: <cover.1375838900.git.horms+renesas@verge.net.au>
-References: <cover.1375838900.git.horms+renesas@verge.net.au>
-Message-ID: <d2f463a66abb1edc3b0ab6cc8252d9fa4e3d30e8.1375838900.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:29:16 +0900
+Subject: [GIT PULL 0/2] Second Round of Renesas ARM based SoC updates for v3.12
+Message-ID: <cover.1375838109.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Arnd,
 
-The shmobile DT files available in the kernel are reference
-implementations intended to be used as sample code, as well as for
-development. As such, it makes sense to mount the root file system in
-read/write mode by default.
+Please consider this second Round of renesas ARM based SoC updates for v3.12.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 2 +-
- arch/arm/boot/dts/r8a73a4-ape6evm.dts           | 2 +-
- arch/arm/boot/dts/r8a7778-bockw-reference.dts   | 2 +-
- arch/arm/boot/dts/r8a7778-bockw.dts             | 2 +-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts  | 2 +-
- arch/arm/boot/dts/r8a7790-lager-reference.dts   | 2 +-
- arch/arm/boot/dts/r8a7790-lager.dts             | 2 +-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts    | 2 +-
- arch/arm/boot/dts/sh73a0-kzm9g.dts              | 2 +-
- 9 files changed, 9 insertions(+), 9 deletions(-)
+This pull-request is based on a merge of renesas-soc-for-v3.12 and
+renesas-fixes-for-v3.12, both of which I have previously sent pull-requests
+for.
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-index bbd09d8..f444624 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-@@ -16,7 +16,7 @@
- 	compatible = "renesas,ape6evm-reference", "renesas,r8a73a4";
- 
- 	chosen {
--		bootargs = "console=ttySC0,115200 ignore_loglevel";
-+		bootargs = "console=ttySC0,115200 ignore_loglevel rw";
- 	};
- 
- 	memory at 40000000 {
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index e657a9d..72f867e 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -16,7 +16,7 @@
- 	compatible = "renesas,ape6evm", "renesas,r8a73a4";
- 
- 	chosen {
--		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
-+		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
- 	};
- 
- 	memory at 40000000 {
-diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-index f5b8d77..9bb903a 100644
---- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-@@ -22,7 +22,7 @@
- 	compatible = "renesas,bockw-reference", "renesas,r8a7778";
- 
- 	chosen {
--		bootargs = "console=ttySC0,115200 ignore_loglevel";
-+		bootargs = "console=ttySC0,115200 ignore_loglevel rw";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index 0076b1e..12bbebc 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -22,7 +22,7 @@
- 	compatible = "renesas,bockw", "renesas,r8a7778";
- 
- 	chosen {
--		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs";
-+		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs rw";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-index 72be4c8..5c22fee 100644
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-@@ -17,7 +17,7 @@
- 	compatible = "renesas,marzen-reference", "renesas,r8a7779";
- 
- 	chosen {
--		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on";
-+		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on rw";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/r8a7790-lager-reference.dts b/arch/arm/boot/dts/r8a7790-lager-reference.dts
-index 5ee71cf5..c462ef1 100644
---- a/arch/arm/boot/dts/r8a7790-lager-reference.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager-reference.dts
-@@ -17,7 +17,7 @@
- 	compatible = "renesas,lager-reference", "renesas,r8a7790";
- 
- 	chosen {
--		bootargs = "console=ttySC6,115200 ignore_loglevel";
-+		bootargs = "console=ttySC6,115200 ignore_loglevel rw";
- 	};
- 
- 	memory at 40000000 {
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 09a84fc..631b93b 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -16,7 +16,7 @@
- 	compatible = "renesas,lager", "renesas,r8a7790";
- 
- 	chosen {
--		bootargs = "console=ttySC6,115200 ignore_loglevel";
-+		bootargs = "console=ttySC6,115200 ignore_loglevel rw";
- 	};
- 
- 	memory at 40000000 {
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index b6f759e..6d9ece2 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -32,7 +32,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200";
-+		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200 rw";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index 7c4071e..0f1ca77 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -16,7 +16,7 @@
- 	compatible = "renesas,kzm9g", "renesas,sh73a0";
- 
- 	chosen {
--		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200";
-+		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200 rw";
- 	};
- 
- 	memory {
--- 
-1.8.3.2
+
+The following changes since commit 21c7a134051f2f753d359a02923223ad9181da31:
+
+  Merge tag 'renesas-fixes-for-v3.12' into soc2-base (2013-08-06 17:56:43 +0900)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.12
+
+for you to fetch changes up to d687f4d1993fa046171dbb1ca1970a3172ce11b9:
+
+  ARM: shmobile: r8a7740: Add TPU clock entry for DT platforms (2013-08-06 17:57:09 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM based SoC updates for v3.12
+
+* Increased clock coverage for r8a7740 and r8a7790 SoCs
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      ARM: shmobile: r8a7740: Add TPU clock entry for DT platforms
+
+Simon Horman (1):
+      ARM: shmobile: r8a7790: clocks for Ether support
+
+ arch/arm/mach-shmobile/clock-r8a7740.c | 1 +
+ arch/arm/mach-shmobile/clock-r8a7790.c | 4 ++++
+ 2 files changed, 5 insertions(+)
