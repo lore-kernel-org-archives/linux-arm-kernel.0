@@ -1,52 +1,51 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 12:19:21 +0200
-Subject: [PATCH 03/12] dma: mmp_pdma: factor out DRCMR register calculation
+Date: Wed,  7 Aug 2013 12:19:20 +0200
+Subject: [PATCH 02/12] dma: mmp_pdma: clear DRCMR when free a phy channel
 In-Reply-To: <1375870770-14263-1-git-send-email-zonque@gmail.com>
 References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375870770-14263-4-git-send-email-zonque@gmail.com>
+Message-ID: <1375870770-14263-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exact same calculation is done twice, so let's factor it out to a
-macro.
+From: Xiang Wang <wangx@marvell.com>
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
+In mmp pdma, phy channels are allocated/freed dynamically.
+The mapping from DMA request to DMA channel number in DRCMR
+should be cleared when a phy channel is freed. Otherwise
+conflicts will happen when:
+1. A is using channel 2 and free it after finished, but A
+still maps to channel 2 in DRCMR of A.
+2. Now another one B gets channel 2. So B maps to channel 2
+too in DRCMR of B.
+In the datasheet, it is described that "Do not map two active
+requests to the same channel since it produces unpredictable
+results" and we can observe that during test.
+
+Signed-off-by: Xiang Wang <wangx@marvell.com>
 ---
- drivers/dma/mmp_pdma.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/dma/mmp_pdma.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 2844eaf..8d6aae3 100644
+index 226158d..2844eaf 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -47,6 +47,8 @@
- #define DCSR_CMPST	(1 << 10)       /* The Descriptor Compare Status */
- #define DCSR_EORINTR	(1 << 9)        /* The end of Receive */
+@@ -252,10 +252,16 @@ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
+ {
+ 	struct mmp_pdma_device *pdev = to_mmp_pdma_dev(pchan->chan.device);
+ 	unsigned long flags;
++	u32 reg;
  
-+#define DRCMR(n)	((((n) < 64) ? 0x0100 : 0x1100) + \
-+				 (((n) & 0x3f) << 2))
- #define DRCMR_MAPVLD	(1 << 7)	/* Map Valid (read / write) */
- #define DRCMR_CHLNUM	0x1f		/* mask for Channel Number (read / write) */
- 
-@@ -143,8 +145,7 @@ static void enable_chan(struct mmp_pdma_phy *phy)
- 	if (!phy->vchan)
+ 	if (!pchan->phy)
  		return;
  
--	reg = phy->vchan->drcmr;
--	reg = (((reg) < 64) ? 0x0100 : 0x1100) + (((reg) & 0x3f) << 2);
-+	reg = DRCMR(phy->vchan->drcmr);
- 	writel(DRCMR_MAPVLD | phy->idx, phy->base + reg);
- 
- 	reg = (phy->idx << 2) + DCSR;
-@@ -258,8 +259,7 @@ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
- 		return;
- 
- 	/* clear the channel mapping in DRCMR */
--	reg = pchan->phy->vchan->drcmr;
--	reg = ((reg < 64) ? 0x0100 : 0x1100) + ((reg & 0x3f) << 2);
-+	reg = DRCMR(pchan->phy->vchan->drcmr);
- 	writel(0, pchan->phy->base + reg);
- 
++	/* clear the channel mapping in DRCMR */
++	reg = pchan->phy->vchan->drcmr;
++	reg = ((reg < 64) ? 0x0100 : 0x1100) + ((reg & 0x3f) << 2);
++	writel(0, pchan->phy->base + reg);
++
  	spin_lock_irqsave(&pdev->phy_lock, flags);
+ 	pchan->phy->vchan = NULL;
+ 	pchan->phy = NULL;
 -- 
 1.8.3.1
