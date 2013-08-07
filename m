@@ -1,76 +1,84 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 07 Aug 2013 10:27:51 -0700
-Subject: [PATCH 1/4] clk: exynos4: Fix incorrect placement of __initdata
-In-Reply-To: <1375850921-23122-1-git-send-email-sachin.kamat@linaro.org>
-References: <1375850921-23122-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <20130807172751.5348.32832@quantum>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 07 Aug 2013 19:28:29 +0200
+Subject: [PATCH] ARM: at91/dt: split sam9x5 peripheral definitions
+In-Reply-To: <20130807180854.41b4bedb@skate>
+References: <1375870466-1093-1-git-send-email-b.brezillon@overkiz.com>
+ <20130807180854.41b4bedb@skate>
+Message-ID: <520283BD.9060002@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sachin Kamat (2013-08-06 21:48:37)
-> __initdata should be placed between the variable name and equal
-> sign for the variable to be placed in the intended section.
-> 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Hello Thomas,
 
-Applied on top of the "[PATCH 1/3] clk: exynos4: Make exynos4_plls
-static" series in clk-next.
+Sorry for the noise, this mail was filtered by LKML and LAKML beacause 
+thunderbird
+added HTML contents.
 
-Thanks for following up on this.
+On 07/08/2013 18:08, Thomas Petazzoni wrote:
+> Dear Boris BREZILLON,
+>
+> On Wed,  7 Aug 2013 12:14:26 +0200, Boris BREZILLON wrote:
+>> This patch splits the sam9x5 peripheral definitions into:
+>> - a common base for all sam9x5 SoCs (at91sam9x5.dtsi)
+>> - several optional peripheral definitions which will be included by specific
+>>    sam9x5 SoCs (at91sam9x5_'periph name'.dtsi)
+>>
+>> This provides a better representation of the real hardware (drop unneeded
+>> dt nodes) and avoids future peripheral id conflict (lcdc and isi both use
+>> peripheral id 25).
+>>
+>> Signed-off-by: Boris BREZILLON<b.brezillon@overkiz.com>
+>> ---
+>>   arch/arm/boot/dts/at91sam9g25.dtsi       |    2 +
+>>   arch/arm/boot/dts/at91sam9g35.dtsi       |    1 +
+>>   arch/arm/boot/dts/at91sam9x25.dtsi       |   24 ++---------
+>>   arch/arm/boot/dts/at91sam9x35.dtsi       |    1 +
+>>   arch/arm/boot/dts/at91sam9x5.dtsi        |   67 ------------------------------
+>>   arch/arm/boot/dts/at91sam9x5_macb0.dtsi  |   56 +++++++++++++++++++++++++
+>>   arch/arm/boot/dts/at91sam9x5_macb1.dtsi  |   44 ++++++++++++++++++++
+>>   arch/arm/boot/dts/at91sam9x5_usart3.dtsi |   51 +++++++++++++++++++++++
+>>   8 files changed, 158 insertions(+), 88 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+>>   create mode 100644 arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+>>   create mode 100644 arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+> Hum, do we really want to have .dtsi files per peripheral? I might have
+> overlooked this, but I think it's the first time we would have this in
+> arch/arm/boot/dts.
+It's not one .dtsi file for each available peripheral but for each 
+**optional**
+peripheral (those which are not available for all sam9x5 SoCs).
 
-Regards,
-Mike
+For example:
 
-> ---
->  drivers/clk/samsung/clk-exynos4.c |   10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index fec319d..742b4c5 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -194,7 +194,7 @@ enum exynos4_clks {
->   * list of controller registers to be saved and restored during a
->   * suspend/resume cycle.
->   */
-> -static __initdata unsigned long exynos4210_clk_save[] = {
-> +static unsigned long exynos4210_clk_save[] __initdata = {
->         E4210_SRC_IMAGE,
->         E4210_SRC_LCD1,
->         E4210_SRC_MASK_LCD1,
-> @@ -205,7 +205,7 @@ static __initdata unsigned long exynos4210_clk_save[] = {
->         E4210_MPLL_CON0,
->  };
->  
-> -static __initdata unsigned long exynos4x12_clk_save[] = {
-> +static unsigned long exynos4x12_clk_save[] __initdata = {
->         E4X12_GATE_IP_IMAGE,
->         E4X12_GATE_IP_PERIR,
->         E4X12_SRC_CAM1,
-> @@ -214,7 +214,7 @@ static __initdata unsigned long exynos4x12_clk_save[] = {
->         E4X12_MPLL_CON0,
->  };
->  
-> -static __initdata unsigned long exynos4_clk_regs[] = {
-> +static unsigned long exynos4_clk_regs[] __initdata = {
->         SRC_LEFTBUS,
->         DIV_LEFTBUS,
->         GATE_IP_LEFTBUS,
-> @@ -978,13 +978,13 @@ static void __init exynos4_clk_register_finpll(unsigned long xom)
->  
->  }
->  
-> -static __initdata struct of_device_id ext_clk_match[] = {
-> +static struct of_device_id ext_clk_match[] __initdata = {
->         { .compatible = "samsung,clock-xxti", .data = (void *)0, },
->         { .compatible = "samsung,clock-xusbxti", .data = (void *)1, },
->         {},
->  };
->  
-> -static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
-> +static struct samsung_pll_clock exynos4_plls[nr_plls] __initdata = {
->         [apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
->                 APLL_CON0, "fout_apll", NULL),
->         [mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll",
-> -- 
-> 1.7.9.5
+macb0 is available in this SoCs:
+- 9g25
+- 9g35
+- 9x25
+- 9x35
+and not available in 9g15 SoC.
+
+And we have different combinatory for each of the optional devices.
+
+IMHO, defining the unneeded dt nodes in the common sam9x5.dtsi is a bad 
+idea, because
+the dtb footprint will be bigger for SoC which does not have the 
+optional peripherals
+and the dt hardware representation will be false.
+
+I see two options to solve this issue:
+  1) define a .dtsi file describing the optional peripherals and include 
+these .dtsi in the SoC.dtsi file
+      (as I proposed, but maybe the names  are not appropriate)
+  2) copy the peripheral definitions in each SoC .dtsi file
+
+I prefer option 1) as it's safer than copying the definition (update of 
+dtsi is easier and there is no
+risk to introduce a new bug when copying definitions).
+
+Please, tell me if you see other options, or if you think this "issue" 
+should not be solved.
+
+Best Regards,
+
+Boris
+> Thomas
