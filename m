@@ -1,125 +1,72 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  7 Aug 2013 11:32:33 +0200
-Subject: [PATCHv7 12/13] PCI: mvebu: add support for MSI
-In-Reply-To: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375867954-2320-13-git-send-email-thomas.petazzoni@free-electrons.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Wed, 7 Aug 2013 17:35:05 +0800
+Subject: [PATCH 1/2] hwmon: (lm90) Add power control
+In-Reply-To: <1375865105.562600640@f434.i.mail.ru>
+References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
+ <5201FC2C.4030908@roeck-us.net> <52020047.1080705@nvidia.com>
+ <1375865105.562600640@f434.i.mail.ru>
+Message-ID: <520214C9.1010200@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for Message Signaled Interrupts in the
-Marvell PCIe host controller. The work is very simple: it simply gets
-a reference to the msi_chip associated to the PCIe controller thanks
-to the msi-parent DT property, and stores this reference in the
-pci_bus structure. This is enough to let the Linux PCI core use the
-functions of msi_chip to setup and teardown MSIs.
+On 08/07/2013 04:45 PM, Alexander Shiyan wrote:
+>> On 08/07/2013 03:50 PM, Guenter Roeck wrote:
+>>> On 08/07/2013 12:32 AM, Wei Ni wrote:
+>>>> On 08/07/2013 03:27 PM, Alexander Shiyan wrote:
+>>>>>> The device lm90 can be controlled by the vdd rail.
+>>>>>> Adding the power control support to power on/off the vdd rail.
+>>>>>> And make sure that power is enabled before accessing the device.
+>>>>>>
+>>>>>> Signed-off-by: Wei Ni <wni@nvidia.com>
+>>>>>> ---
+>>>>>>   drivers/hwmon/lm90.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>>> [...]
+>>>>>> +	if (!data->lm90_reg) {
+>>>>>> +		data->lm90_reg = regulator_get(&client->dev, "vdd");
+>>>>>> +		if (IS_ERR_OR_NULL(data->lm90_reg)) {
+>>>>>> +			if (PTR_ERR(data->lm90_reg) == -ENODEV)
+>>>>>> +				dev_info(&client->dev,
+>>>>>> +					 "No regulator found for vdd. Assuming vdd is always powered.");
+>>>>>> +			else
+>>>>>> +				dev_warn(&client->dev,
+>>>>>> +					 "Error [%ld] in getting the regulator handle for vdd.\n",
+>>>>>> +					 PTR_ERR(data->lm90_reg));
+>>>>>> +			data->lm90_reg = NULL;
+>>>>>> +			mutex_unlock(&data->update_lock);
+>>>>>> +			return -ENODEV;
+>>>>>> +		}
+>>>>>> +	}
+>>>>>> +	if (is_enable) {
+>>>>>> +		ret = regulator_enable(data->lm90_reg);
+>>>>>> +		msleep(POWER_ON_DELAY);
+>>>>>
+>>>>> Can this delay be handled directly from regulator?
+>>>>
+>>>> I think it should be handled in the device driver.
+>>>> Because there have different delay time to wait devices stable.
+>>>>
+>>>
+>>> Then why does no other caller of regulator_enable() need this ?
+>>> I don't think lm90 is so much different to other users of regulator
+>>> functionality.
+>>
+>> May be I'm wrong. I noticed that in lm90 SPEC, the max of "SMBus Clock
+>> Low Time" is 25ms, so I supposed that it may need about 20ms to stable
+>> after power on.
+>>
+>> Anyway, if I remove this delay, the driver also works fine, so I will
+>> remove it in my next patch.
+> 
+> I originally had in mind that regulator API contain own delay option.
+> E.g. reg-fixed-voltage && gpio-regulator contains "startup-delay-us" property.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-Tested-by: Daniel Price <daniel.price@gmail.com>
----
- .../devicetree/bindings/pci/mvebu-pci.txt          |  3 +++
- drivers/pci/host/pci-mvebu.c                       | 31 ++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
+As I know the "startup-delay-us" is used for the regulator device, not
+the consumer devices.
+In this patch, msleep(POWER_ON_DELAY) was used to wait the lm90 stable,
+but it seems it's unnecessary now :)
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index f8d4058..77e0ffe 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -12,6 +12,8 @@ Mandatory properties:
- - device_type, set to "pci"
- - ranges: ranges for the PCI memory and I/O regions, as well as the
-   MMIO registers to control the PCIe interfaces.
-+- msi-parent: Link to the hardware entity that serves as the Message
-+  Signaled Interrupt controller for this PCI controller.
- 
- In addition, the Device Tree node must have sub-nodes describing each
- PCIe interface, having the following mandatory properties:
-@@ -46,6 +48,7 @@ pcie-controller {
- 	#size-cells = <2>;
- 
- 	bus-range = <0x00 0xff>;
-+	msi-parent = <&mpic>;
- 
- 	ranges = <0x82000000 0 0xd0040000 0xd0040000 0 0x00002000   /* Port 0.0 registers */
- 		  0x82000000 0 0xd0042000 0xd0042000 0 0x00002000   /* Port 2.0 registers */
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13a633b..884cf82 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -11,6 +11,7 @@
- #include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/mbus.h>
-+#include <linux/msi.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
-@@ -107,6 +108,7 @@ struct mvebu_pcie_port;
- struct mvebu_pcie {
- 	struct platform_device *pdev;
- 	struct mvebu_pcie_port *ports;
-+	struct msi_chip *msi;
- 	struct resource io;
- 	struct resource realio;
- 	struct resource mem;
-@@ -695,6 +697,12 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 	return bus;
- }
- 
-+void mvebu_pcie_add_bus(struct pci_bus *bus)
-+{
-+	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
-+	bus->msi = pcie->msi;
-+}
-+
- resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 					  const struct resource *res,
- 					  resource_size_t start,
-@@ -731,6 +739,7 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.map_irq        = mvebu_pcie_map_irq;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
-+	hw.add_bus        = mvebu_pcie_add_bus;
- 
- 	pci_common_init(&hw);
- }
-@@ -755,6 +764,26 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
- 	return devm_request_and_ioremap(&pdev->dev, &regs);
- }
- 
-+static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
-+{
-+	struct device_node *msi_node;
-+	struct irq_domain *msi_domain;
-+
-+	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
-+				    "msi-parent", 0);
-+	if (!msi_node)
-+		return;
-+
-+	msi_domain = irq_find_msi_host(msi_node);
-+	if (!msi_domain)
-+		return;
-+
-+	pcie->msi = msi_domain->msi_chip;
-+
-+	if (pcie->msi)
-+		pcie->msi->dev = &pcie->pdev->dev;
-+}
-+
- static int __init mvebu_pcie_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pcie *pcie;
-@@ -879,6 +908,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 		i++;
- 	}
- 
-+	mvebu_pcie_msi_enable(pcie);
-+
- 	mvebu_pcie_enable(pcie);
- 
- 	return 0;
--- 
-1.8.1.2
+Wei.
+
+> 
+> ---
+> 
