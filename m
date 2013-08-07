@@ -1,118 +1,76 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Wed, 7 Aug 2013 14:52:37 +0800
-Subject: [PATCH 1/2] hwmon: (lm90) Add power control
-In-Reply-To: <1375858358-15070-1-git-send-email-wni@nvidia.com>
-References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
-Message-ID: <1375858358-15070-2-git-send-email-wni@nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Aug 2013 23:57:55 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] arch/arm SoC organization
+In-Reply-To: <CAGFynZ-sk7bzZMKujAZ9y1OQJFEQQwqWNY_SZUhz+0xEWiF=_A@mail.gmail.com>
+References: <20130731141841.GP5882@titan.lakedaemon.net>
+ <20130802083346.GC7656@atomide.com>
+ <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
+ <20130805062129.GK7656@atomide.com>
+ <CAGFynZ-sk7bzZMKujAZ9y1OQJFEQQwqWNY_SZUhz+0xEWiF=_A@mail.gmail.com>
+Message-ID: <20130807065754.GJ7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device lm90 can be controlled by the vdd rail.
-Adding the power control support to power on/off the vdd rail.
-And make sure that power is enabled before accessing the device.
+* Christian Daudt <csd_b@daudt.org> [130806 16:14]:
+> On Sun, Aug 4, 2013 at 11:21 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Christian Daudt <csd_b@daudt.org> [130802 16:13]:
+> >> On Fri, Aug 2, 2013 at 1:33 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > * Jason Cooper <jason@lakedaemon.net> [130731 07:25]:
+> >> >> So, I'd like to propose we discuss some lessons learned and maybe arrive
+> >> >> at some best practices.  eg, should we just go with mach-$COMPANY/?  How
+> >> >> best to handle config symbols for efficient building?  Deprecation path
+> >> >> for legacy (unconverted) boards?
+> >> >
+> >> > A lot of that problem goes away by initializing everything as late
+> >> > as possible, and making things to live under drivers.
+> >> One category of items that we haven't found a good place for in this
+> >> new multiplatform world is where does dt-driven non-driver code reside
+> >> ? e.g. we have a secure monitor access function that only kicks in if
+> >> the appropriate dt entry is available . It currently resides in
+> >> mach-bcm/bcm_kona_smc.c as it seems like the only location for it at
+> >> the moment, but that doesn't seem like the best place because (a)
+> >> mach-bcm might end up littered with one-of cases like this and (b)
+> >> anything in mach-bcm is not visible to arm64 SoCs, and some of those
+> >> in the future will need to share with their arm32 cousins.
+> >>  But putting in drivers (e.g. drivers/smc) seems like the wrong thing
+> >> to do also because this is not a driver.
+> >>  We have a couple of other smallish pieces of IP that just need a bit
+> >> of generic init code to keep them happy, which we were discussing
+> >> internally where to best land them. At present they are also headed to
+> >> mach-bcm.
+> >>  Ultimately the question is 'what is allowed to reside in mach-<misc>
+> >> ?' And by extension: 'is there a good home for everything else ?''
+> >
+> > Well I guess the question is how early do you need it?
+> >
+> > We only need the following things early on that might be SoC specific:
+> >
+> > 1. Timers for clockevents
+> >
+> > 2. Interrupt controller
+> >
+> > If you need the SoC specific code for the two items above, then
+> > you probably want to set it up in the SoC specific init_early.
+> >
+> > Everything else should be possible to do as device drivers with
+> > initramfs. If the code has an interrupt handler, chances are it
+> > can be a driver :)
+> >
+> I agree that most anything can be made into a driver. I'm asking if
+> that's what we want to do for all arm code that doesn't need to be
+> done at the earliest stages. If there's code that doesn't need
+> interrupts, doesn't register for fileops, doesn't register for any
+> framework, etc... Do we still want to make a driver out of it ?
 
-Signed-off-by: Wei Ni <wni@nvidia.com>
----
- drivers/hwmon/lm90.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+If we can, then yes I think that's the way to go. Making things into
+loadable modules already automatically prevents quite a bit of
+potential for nasty hacks and spaghetti code as the interfaces are
+standard.
 
-diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
-index cdff742..eeb0115 100644
---- a/drivers/hwmon/lm90.c
-+++ b/drivers/hwmon/lm90.c
-@@ -89,6 +89,8 @@
- #include <linux/err.h>
- #include <linux/mutex.h>
- #include <linux/sysfs.h>
-+#include <linux/delay.h>
-+#include <linux/regulator/consumer.h>
- 
- /*
-  * Addresses to scan
-@@ -179,6 +181,8 @@ enum chips { lm90, adm1032, lm99, lm86, max6657, max6659, adt7461, max6680,
- #define LM90_HAVE_TEMP3		(1 << 6) /* 3rd temperature sensor	*/
- #define LM90_HAVE_BROKEN_ALERT	(1 << 7) /* Broken alert		*/
- 
-+#define POWER_ON_DELAY 20 /*ms*/
-+
- /*
-  * Driver data (common to all clients)
-  */
-@@ -302,6 +306,7 @@ static const struct lm90_params lm90_params[] = {
- struct lm90_data {
- 	struct device *hwmon_dev;
- 	struct mutex update_lock;
-+	struct regulator *lm90_reg;
- 	char valid; /* zero until following fields are valid */
- 	unsigned long last_updated; /* in jiffies */
- 	int kind;
-@@ -1391,6 +1396,48 @@ static void lm90_init_client(struct i2c_client *client)
- 		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
- }
- 
-+static int lm90_power_control(struct i2c_client *client, bool is_enable)
-+{
-+	struct lm90_data *data = i2c_get_clientdata(client);
-+	int ret;
-+
-+	mutex_lock(&data->update_lock);
-+
-+	if (!data->lm90_reg) {
-+		data->lm90_reg = regulator_get(&client->dev, "vdd");
-+		if (IS_ERR_OR_NULL(data->lm90_reg)) {
-+			if (PTR_ERR(data->lm90_reg) == -ENODEV)
-+				dev_info(&client->dev,
-+					 "No regulator found for vdd. Assuming vdd is always powered.");
-+			else
-+				dev_warn(&client->dev,
-+					 "Error [%ld] in getting the regulator handle for vdd.\n",
-+					 PTR_ERR(data->lm90_reg));
-+			data->lm90_reg = NULL;
-+			mutex_unlock(&data->update_lock);
-+			return -ENODEV;
-+		}
-+	}
-+	if (is_enable) {
-+		ret = regulator_enable(data->lm90_reg);
-+		msleep(POWER_ON_DELAY);
-+	} else {
-+		ret = regulator_disable(data->lm90_reg);
-+	}
-+
-+	if (ret < 0)
-+		dev_err(&client->dev,
-+			"Error in %s rail vdd, error %d\n",
-+			(is_enable) ? "enabling" : "disabling", ret);
-+	else
-+		dev_info(&client->dev, "success in %s rail vdd\n",
-+			 (is_enable) ? "enabling" : "disabling");
-+
-+	mutex_unlock(&data->update_lock);
-+
-+	return ret;
-+}
-+
- static int lm90_probe(struct i2c_client *client,
- 		      const struct i2c_device_id *id)
- {
-@@ -1406,6 +1453,10 @@ static int lm90_probe(struct i2c_client *client,
- 	i2c_set_clientdata(client, data);
- 	mutex_init(&data->update_lock);
- 
-+	err = lm90_power_control(client, true);
-+	if (err < 0)
-+		return err;
-+
- 	/* Set the device type */
- 	data->kind = id->driver_data;
- 	if (data->kind == adm1032) {
-@@ -1483,6 +1534,7 @@ static int lm90_remove(struct i2c_client *client)
- 	hwmon_device_unregister(data->hwmon_dev);
- 	lm90_remove_files(client, data);
- 	lm90_restore_conf(client, data);
-+	lm90_power_control(client, false);
- 
- 	return 0;
- }
--- 
-1.7.9.5
+Also, then the related pieces can easily be shared across multiple
+SoCs or archs, and we may even have proper maintainers for those
+drivers eventually :)
+
+Regards,
+
+Tony
