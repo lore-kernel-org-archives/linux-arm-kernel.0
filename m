@@ -1,108 +1,79 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed,  7 Aug 2013 16:09:44 +0100
-Subject: [PATCH v2 1/5] ARM: vexpress/dcscb: fix cache disabling sequences
+Date: Wed,  7 Aug 2013 16:09:46 +0100
+Subject: [PATCH v2 3/5] ARM: vexpress: Add SCC to V2P-CA15_A7's device tree
 In-Reply-To: <1375888188-30213-1-git-send-email-pawel.moll@arm.com>
 References: <1375888188-30213-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1375888188-30213-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1375888188-30213-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
+SCC (Serial Configuration Controller) is used to set initial
+conditions for the test chip (TC2). Its registers are also mapped
+in normal address space and used to obtain runtime information
+and for power management.
 
-Unlike real A15/A7's, the RTSM simulation doesn't appear to hit the
-cache when the CTRL.C bit is cleared.  Let's ensure there is no memory
-access within the disable and flush cache sequence, including to the
-stack.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/dcscb.c | 58 +++++++++++++++++++++++++++---------------
- 1 file changed, 37 insertions(+), 21 deletions(-)
+ .../devicetree/bindings/arm/vexpress-scc.txt       | 33 ++++++++++++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  6 ++++
+ 2 files changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress-scc.txt
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 16d57a8..85fffa7 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -136,14 +136,29 @@ static void dcscb_power_down(void)
- 		/*
- 		 * Flush all cache levels for this cluster.
- 		 *
--		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
--		 * a preliminary flush here for those CPUs.  At least, that's
--		 * the theory -- without the extra flush, Linux explodes on
--		 * RTSM (to be investigated).
-+		 * To do so we do:
-+		 * - Clear the SCTLR.C bit to prevent further cache allocations
-+		 * - Flush the whole cache
-+		 * - Clear the ACTLR "SMP" bit to disable local coherency
-+		 *
-+		 * Let's do it in the safest possible way i.e. with
-+		 * no memory access within the following sequence
-+		 * including to the stack.
- 		 */
--		flush_cache_all();
--		set_cr(get_cr() & ~CR_C);
--		flush_cache_all();
-+		asm volatile(
-+		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
-+		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-+		"isb	\n\t"
-+		"bl	v7_flush_dcache_all \n\t"
-+		"clrex	\n\t"
-+		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
-+		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
-+		"isb	\n\t"
-+		"dsb	"
-+		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-+		      "r9","r10","r11","lr","memory");
+diff --git a/Documentation/devicetree/bindings/arm/vexpress-scc.txt b/Documentation/devicetree/bindings/arm/vexpress-scc.txt
+new file mode 100644
+index 0000000..ae5043e4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vexpress-scc.txt
+@@ -0,0 +1,33 @@
++ARM Versatile Express Serial Configuration Controller
++-----------------------------------------------------
++
++Test chips for ARM Versatile Express platform implement SCC (Serial
++Configuration Controller) interface, used to set initial conditions
++for the test chip.
++
++In some cases its registers are also mapped in normal address space
++and can be used to obtain runtime information about the chip internals
++(like silicon temperature sensors) and as interface to other subsystems
++like platform configuration control and power management.
++
++Required properties:
++
++- compatible value: "arm,vexpress-scc,<model>", "arm,vexpress-scc";
++		    where <model> is the full tile model name (as used
++		    in the tile's Technical Reference Manual),
++		    eg. for Coretile Express A15x2 A7x3 (V2P-CA15_A7):
++	compatible = "arm,vexpress-scc,v2p-ca15_a7", "arm,vexpress-scc";
++
++Optional properties:
++
++- reg: when the SCC is memory mapped, physical address and size of the
++       registers window
++- interrupts: when the SCC can generate a system-level interrupt
++
++Example:
++
++	scc at 7fff0000 {
++		compatible = "arm,vexpress-scc,v2p-ca15_a7", "arm,vexpress-scc";
++		reg = <0 0x7fff0000 0 0x1000>;
++		interrupts = <0 95 4>;
++	};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index d2803be..759b0cd 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -125,6 +125,12 @@
+ 		clock-names = "apb_pclk";
+ 	};
  
- 		/*
- 		 * This is a harmless no-op.  On platforms with a real
-@@ -152,9 +167,6 @@ static void dcscb_power_down(void)
- 		 */
- 		outer_flush_all();
- 
--		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
--		set_auxcr(get_auxcr() & ~(1 << 6));
--
- 		/*
- 		 * Disable cluster-level coherency by masking
- 		 * incoming snoops and DVM messages:
-@@ -167,18 +179,22 @@ static void dcscb_power_down(void)
- 
- 		/*
- 		 * Flush the local CPU cache.
--		 *
--		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
--		 * a preliminary flush here for those CPUs.  At least, that's
--		 * the theory -- without the extra flush, Linux explodes on
--		 * RTSM (to be investigated).
-+		 * Let's do it in the safest possible way as above.
- 		 */
--		flush_cache_louis();
--		set_cr(get_cr() & ~CR_C);
--		flush_cache_louis();
--
--		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
--		set_auxcr(get_auxcr() & ~(1 << 6));
-+		asm volatile(
-+		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
-+		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-+		"isb	\n\t"
-+		"bl	v7_flush_dcache_louis \n\t"
-+		"clrex	\n\t"
-+		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
-+		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
-+		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
-+		"isb	\n\t"
-+		"dsb	"
-+		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-+		      "r9","r10","r11","lr","memory");
- 	}
- 
- 	__mcpm_cpu_down(cpu, cluster);
++        scc at 7fff0000 {
++		compatible = "arm,vexpress-scc,v2p-ca15_a7", "arm,vexpress-scc";
++		reg = <0 0x7fff0000 0 0x1000>;
++		interrupts = <0 95 4>;
++        };
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <1 13 0xf08>,
 -- 
 1.8.1.2
