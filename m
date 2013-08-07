@@ -1,47 +1,94 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 07 Aug 2013 14:20:40 +0530
-Subject: [PATCH 5/7] ARM: dts: Add osc clock node on smdk5420.
+Date: Wed, 07 Aug 2013 14:20:39 +0530
+Subject: [PATCH 4/7] ARM: dts: exynos5250: move common i2s properties to
+ exynos5 dtsi
 In-Reply-To: <1375865442-5323-1-git-send-email-padma.v@samsung.com>
 References: <1375865442-5323-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1375865442-5323-9-git-send-email-padma.v@samsung.com>
+Message-ID: <1375865442-5323-8-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds 16MHz oscillator clock node required for audio
-on smdk5420 and adds the phandle of the same in wm8994 clock info.
+I2S nodes shares some properties across exynos5 SoCs (exynos5250
+and exyno5420). Common code is moved to exynos5.dtsi which is
+included in exyno5250 and exynos5420 SoC files.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420-smdk5420.dts |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5.dtsi    |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi |   12 ------------
+ 2 files changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index e86c1ae..3c56a91 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -31,6 +31,13 @@
- 		};
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index ec384c9..c37b57d 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -191,4 +191,25 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
  	};
- 
-+	osc3_clk16mhz: clk16mhz {
-+		compatible = "osc3_clk16mhz";
-+		#clock-cells = <0>;
-+		clock-frequency = <16934400>;
-+		clock-output-names = "osc3_clk16mhz";
++
++	i2s0: i2s at 03830000 {
++		reg = <0x03830000 0x100>;
++		samsung,idma-addr = <0x03000000>;
 +	};
 +
- 	dwmmc0 at 12200000 {
- 		status = "okay";
- 		num-slots = <1>;
-@@ -123,6 +130,9 @@
- 			DBVDD-supply = <&dbvdd>;
- 			SPKVDD1-supply = <&spkvdd>;
- 			SPKVDD2-supply = <&spkvdd>;
++	i2s1: i2s at 12D60000 {
++		compatible = "samsung,s3c6410-i2s";
++		reg = <0x12D60000 0x100>;
++		dmas = <&pdma1 12
++			&pdma1 11>;
++		dma-names = "tx", "rx";
++	};
 +
-+			clocks = <&osc3_clk16mhz>;
-+			clock-names = "mclk1";
- 		};
++	i2s2: i2s at 12D70000 {
++		compatible = "samsung,s3c6410-i2s";
++		reg = <0x12D70000 0x100>;
++		dmas = <&pdma0 12
++			&pdma0 11>;
++		dma-names = "tx", "rx";
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 5b36121..3873ff7 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -394,7 +394,6 @@
+ 
+ 	i2s0: i2s at 03830000 {
+ 		compatible = "samsung,s5pv210-i2s";
+-		reg = <0x03830000 0x100>;
+ 		dmas = <&pdma0 10
+ 			&pdma0 9
+ 			&pdma0 8>;
+@@ -403,17 +402,11 @@
+ 			<&clock_audss EXYNOS_I2S_BUS>,
+ 			<&clock_audss EXYNOS_SCLK_I2S>;
+ 		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
+-		samsung,idma-addr = <0x03000000>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2s0_bus>;
  	};
  
+ 	i2s1: i2s at 12D60000 {
+-		compatible = "samsung,s3c6410-i2s";
+-		reg = <0x12D60000 0x100>;
+-		dmas = <&pdma1 12
+-			&pdma1 11>;
+-		dma-names = "tx", "rx";
+ 		clocks = <&clock 307>, <&clock 157>;
+ 		clock-names = "iis", "i2s_opclk0";
+ 		pinctrl-names = "default";
+@@ -421,11 +414,6 @@
+ 	};
+ 
+ 	i2s2: i2s at 12D70000 {
+-		compatible = "samsung,s3c6410-i2s";
+-		reg = <0x12D70000 0x100>;
+-		dmas = <&pdma0 12
+-			&pdma0 11>;
+-		dma-names = "tx", "rx";
+ 		clocks = <&clock 308>, <&clock 158>;
+ 		clock-names = "iis", "i2s_opclk0";
+ 		pinctrl-names = "default";
 -- 
 1.7.4.4
