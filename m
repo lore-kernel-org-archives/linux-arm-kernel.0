@@ -1,44 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:29:16 +0900
-Subject: [GIT PULL 0/2] Second Round of Renesas ARM based SoC updates for v3.12
-Message-ID: <cover.1375838109.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:29:25 +0900
+Subject: [GIT PULL 2/2] ARM: shmobile: r8a7740: Add TPU clock entry for DT
+ platforms
+In-Reply-To: <cover.1375838109.git.horms+renesas@verge.net.au>
+References: <cover.1375838109.git.horms+renesas@verge.net.au>
+Message-ID: <d687f4d1993fa046171dbb1ca1970a3172ce11b9.1375838109.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Please consider this second Round of renesas ARM based SoC updates for v3.12.
-
-This pull-request is based on a merge of renesas-soc-for-v3.12 and
-renesas-fixes-for-v3.12, both of which I have previously sent pull-requests
-for.
-
-
-The following changes since commit 21c7a134051f2f753d359a02923223ad9181da31:
-
-  Merge tag 'renesas-fixes-for-v3.12' into soc2-base (2013-08-06 17:56:43 +0900)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.12
-
-for you to fetch changes up to d687f4d1993fa046171dbb1ca1970a3172ce11b9:
-
-  ARM: shmobile: r8a7740: Add TPU clock entry for DT platforms (2013-08-06 17:57:09 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM based SoC updates for v3.12
-
-* Increased clock coverage for r8a7740 and r8a7790 SoCs
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-      ARM: shmobile: r8a7740: Add TPU clock entry for DT platforms
-
-Simon Horman (1):
-      ARM: shmobile: r8a7790: clocks for Ether support
-
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/clock-r8a7740.c | 1 +
- arch/arm/mach-shmobile/clock-r8a7790.c | 4 ++++
- 2 files changed, 5 insertions(+)
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index f4265e5..c826bca 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -597,6 +597,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("r8a7740-gether",		&mstp_clks[MSTP309]),
+ 	CLKDEV_DEV_ID("e9a00000.sh-eth",	&mstp_clks[MSTP309]),
+ 	CLKDEV_DEV_ID("renesas-tpu-pwm",	&mstp_clks[MSTP304]),
++	CLKDEV_DEV_ID("e6600000.pwm",		&mstp_clks[MSTP304]),
+ 
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2",	&mstp_clks[MSTP415]),
+ 	CLKDEV_DEV_ID("e6870000.sdhi",          &mstp_clks[MSTP415]),
+-- 
+1.8.3.2
