@@ -1,30 +1,62 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 12:19:26 +0200
-Subject: [PATCH 08/12] dma: mmp_pdma: remove duplicate assignment
+Date: Wed,  7 Aug 2013 12:19:24 +0200
+Subject: [PATCH 06/12] dma: mmp_pdma: make the controller a DMA provider
 In-Reply-To: <1375870770-14263-1-git-send-email-zonque@gmail.com>
 References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375870770-14263-9-git-send-email-zonque@gmail.com>
+Message-ID: <1375870770-14263-7-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA_SLAVE is currently set twice.
+This patch makes the mmp_pdma controller able to provide DMA resources
+in DT environments.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/dma/mmp_pdma.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 2d48f31..1c2c00b 100644
+index 60a1410..d60217a 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -852,7 +852,6 @@ static int mmp_pdma_probe(struct platform_device *op)
+@@ -18,6 +18,7 @@
+ #include <linux/platform_data/mmp_dma.h>
+ #include <linux/dmapool.h>
+ #include <linux/of_device.h>
++#include <linux/of_dma.h>
+ #include <linux/of.h>
+ #include <linux/dma/mmp-pdma.h>
  
- 	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
- 	dma_cap_set(DMA_MEMCPY, pdev->device.cap_mask);
--	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
- 	pdev->device.dev = &op->dev;
- 	pdev->device.device_alloc_chan_resources = mmp_pdma_alloc_chan_resources;
- 	pdev->device.device_free_chan_resources = mmp_pdma_free_chan_resources;
+@@ -783,6 +784,10 @@ static struct of_device_id mmp_pdma_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, mmp_pdma_dt_ids);
+ 
++static struct of_dma_filter_info mmp_pdma_info = {
++	.filter_fn = mmp_pdma_filter_fn,
++};
++
+ static int mmp_pdma_probe(struct platform_device *op)
+ {
+ 	struct mmp_pdma_device *pdev;
+@@ -869,6 +874,19 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 		return ret;
+ 	}
+ 
++	if (op->dev.of_node) {
++		mmp_pdma_info.dma_cap = pdev->device.cap_mask;
++
++		/* Device-tree DMA controller registration */
++		ret = of_dma_controller_register(op->dev.of_node,
++						 of_dma_simple_xlate,
++						 &mmp_pdma_info);
++		if (ret < 0) {
++			dev_err(&op->dev, "of_dma_controller_register failed\n");
++			return ret;
++		}
++	}
++
+ 	dev_info(pdev->device.dev, "initialized\n");
+ 	return 0;
+ }
 -- 
 1.8.3.1
