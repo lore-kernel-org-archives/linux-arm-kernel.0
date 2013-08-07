@@ -1,22 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Aug 2013 15:05:19 +0100
-Subject: [PATCH 6/7] ASoC: Samsung: wm8994: Register the osc clock.
-In-Reply-To: <1375865442-5323-10-git-send-email-padma.v@samsung.com>
-References: <1375865442-5323-1-git-send-email-padma.v@samsung.com>
- <1375865442-5323-10-git-send-email-padma.v@samsung.com>
-Message-ID: <20130807140518.GB6427@sirena.org.uk>
+From: baozich@gmail.com (Chen Baozi)
+Date: Wed,  7 Aug 2013 22:05:21 +0800
+Subject: [PATCH] ARM: fix wrong address when loading
+ PRM_FRAC_INCREMENTOR_DENUMERATOR_RELOAD
+Message-ID: <1375884321-30489-1-git-send-email-baozich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 02:20:41PM +0530, Padmavathi Venna wrote:
-> This patch registers the 16MHz oscillator clock as fixed clk.
+The denominator should be load from INCREMENTOR_DENUMERATOR_RELOAD_OFFSET
+rather than INCREMENTER_NUMERATOR_OFFSET.
 
-This appears to be the same as one of the patches in another series you
-sent?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/f9e25fba/attachment.sig>
+This is more likely a typo, since INCREMENTER_DENUMERATOR_RELOAD[23:17] is
+reserved. It seems that it won't make much trouble without this fix, because
+the useful [11:0] bits are mask and set the right value. Anyway, reading
+from a right address is better choice.
+
+Signed-off-by: Chen Baozi <baozich@gmail.com>
+---
+ arch/arm/mach-omap2/timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 1e77f11..ccc5c72 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -537,7 +537,7 @@ static void __init realtime_counter_init(void)
+ 	reg |= num;
+ 	__raw_writel(reg, base + INCREMENTER_NUMERATOR_OFFSET);
+ 
+-	reg = __raw_readl(base + INCREMENTER_NUMERATOR_OFFSET) &
++	reg = __raw_readl(base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET) &
+ 			NUMERATOR_DENUMERATOR_MASK;
+ 	reg |= den;
+ 	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+-- 
+1.8.1.4
