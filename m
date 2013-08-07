@@ -1,25 +1,31 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Aug 2013 10:56:02 -0600
-Subject: [PATCH 1/5] clk: tegra: Correct sbc mux width & parent
-In-Reply-To: <1375874709-10438-1-git-send-email-markz@nvidia.com>
+Date: Wed, 07 Aug 2013 10:58:03 -0600
+Subject: [PATCH 2/5] clk: tegra: Add reset only clock node flag and COP
+In-Reply-To: <1375874709-10438-2-git-send-email-markz@nvidia.com>
 References: <1375874709-10438-1-git-send-email-markz@nvidia.com>
-Message-ID: <52027C22.9080707@wwwdotorg.org>
+ <1375874709-10438-2-git-send-email-markz@nvidia.com>
+Message-ID: <52027C9B.2030009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/07/2013 05:25 AM, Mark Zhang wrote:
-> T114 sbc1-sbc6 have more possible parent clocks than t30.
-> So correct the parents and mux width for them.
+> From: Peter De Schrijver <pdeschrijver@nvidia.com>
+> 
+> COP is a reset only clock. So this patch adds NO_CLK support
+> then adds the COP clock.
 
-s/T114/Tegra114/ s/t30/Tegra30/
+Do we actually need this clock upstream yet?
+
+IIRC, Prashant was working on implementing the common reset API, so I'd
+prefer not to add any reset-only "clocks" to the clock driver, but
+rather to simply make sure that the new reset driver exposes them.
 
 > diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
 
-> -	TEGRA_INIT_DATA_MUX("sbc1", NULL, "tegra11-spi.0", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SBC1, 41, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc1),
-...
-> +	TEGRA_INIT_DATA_MUX8("sbc1", NULL, "tegra11-spi.0", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC1, 41, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc1),
+>  enum tegra114_clk {
+> -	rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
+> +	cop = 1, rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
 
-This isn't a comment on this patch, but sometime later, can we remove
-those device names from these entries? They're wrong on many different
-levels, and shouldn't be required now that all our devices get clocks
-from DT.
+To make this change, you would also need to edit
+include/dt-bindings/clock/tegra114-car.h. BTW, why doesn't the Tegra
+clock driver include that file rather than defining its own enum?
