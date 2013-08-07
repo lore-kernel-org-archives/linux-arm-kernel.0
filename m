@@ -1,31 +1,23 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Aug 2013 10:58:03 -0600
-Subject: [PATCH 2/5] clk: tegra: Add reset only clock node flag and COP
-In-Reply-To: <1375874709-10438-2-git-send-email-markz@nvidia.com>
+Date: Wed, 07 Aug 2013 11:00:08 -0600
+Subject: [PATCH 3/5] clk: tegra: Fix vde/2d/3d clock src offset
+In-Reply-To: <1375874709-10438-3-git-send-email-markz@nvidia.com>
 References: <1375874709-10438-1-git-send-email-markz@nvidia.com>
- <1375874709-10438-2-git-send-email-markz@nvidia.com>
-Message-ID: <52027C9B.2030009@wwwdotorg.org>
+ <1375874709-10438-3-git-send-email-markz@nvidia.com>
+Message-ID: <52027D18.5040106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/07/2013 05:25 AM, Mark Zhang wrote:
-> From: Peter De Schrijver <pdeschrijver@nvidia.com>
+> In Tegra114, vde/gr_2d/gr_3d have 3 bits for clock source selection.
+> So change the clock init macro for these clocks from
+> "TEGRA_INIT_DATA_INT" to "TEGRA_INIT_DATA_INT8".
 > 
-> COP is a reset only clock. So this patch adds NO_CLK support
-> then adds the COP clock.
+> Besides, no one uses "TEGRA_INIT_DATA_INT" after this change, so
+> remove this macro.
 
-Do we actually need this clock upstream yet?
+Patches 3-5 look fine as far as I'm concerned, although I'd like Peter
+or Prashant to ack them too.
 
-IIRC, Prashant was working on implementing the common reset API, so I'd
-prefer not to add any reset-only "clocks" to the clock driver, but
-rather to simply make sure that the new reset driver exposes them.
-
-> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-
->  enum tegra114_clk {
-> -	rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
-> +	cop = 1, rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
-
-To make this change, you would also need to edit
-include/dt-bindings/clock/tegra114-car.h. BTW, why doesn't the Tegra
-clock driver include that file rather than defining its own enum?
+Patches 3-5,
+Acked-by: Stephen Warren <swarren@nvidia.com>
