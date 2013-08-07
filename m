@@ -1,668 +1,550 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 17:34:03 +0200
-Subject: [PATCH 14/20] ASoC: pxa: use snd_dmaengine_dai_dma_data
+Date: Wed,  7 Aug 2013 17:34:09 +0200
+Subject: [PATCH 20/20] ARM: pxa: remove old DMA implementation
 In-Reply-To: <1375889649-14638-1-git-send-email-zonque@gmail.com>
 References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375889649-14638-15-git-send-email-zonque@gmail.com>
+Message-ID: <1375889649-14638-21-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use snd_dmaengine_dai_dma_data for passing the dma parameters from
-clients to the pxa pcm lib. This does no functional change, it's just an
-intermedia step to migrate the pxa bits over to dmaengine.
-
-The calculation of dcmd is a transition hack which will be removed again
-in a later patch. It's just there to make the transition more readable.
-
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- include/sound/pxa2xx-lib.h  |  7 -----
- sound/arm/pxa2xx-ac97.c     | 26 ++++++++++--------
- sound/arm/pxa2xx-pcm-lib.c  | 52 +++++++++++++++++++++++++++++------
- sound/arm/pxa2xx-pcm.c      |  5 +++-
- sound/arm/pxa2xx-pcm.h      |  6 ++--
- sound/soc/pxa/mmp-pcm.c     |  8 ++++--
- sound/soc/pxa/mmp-sspa.c    | 12 +++++---
- sound/soc/pxa/pxa-ssp.c     | 36 ++++++++----------------
- sound/soc/pxa/pxa2xx-ac97.c | 67 +++++++++++++++++++++++----------------------
- sound/soc/pxa/pxa2xx-i2s.c  | 28 +++++++++----------
- sound/soc/pxa/pxa2xx-pcm.c  |  8 ++++--
- 11 files changed, 142 insertions(+), 113 deletions(-)
+ arch/arm/mach-pxa/include/mach/dma.h |  21 --
+ arch/arm/plat-pxa/Makefile           |   2 -
+ arch/arm/plat-pxa/dma.c              | 391 -----------------------------------
+ arch/arm/plat-pxa/include/plat/dma.h |  85 --------
+ 4 files changed, 499 deletions(-)
+ delete mode 100644 arch/arm/mach-pxa/include/mach/dma.h
+ delete mode 100644 arch/arm/plat-pxa/dma.c
+ delete mode 100644 arch/arm/plat-pxa/include/plat/dma.h
 
-diff --git a/include/sound/pxa2xx-lib.h b/include/sound/pxa2xx-lib.h
-index 2fd3d25..56e818e 100644
---- a/include/sound/pxa2xx-lib.h
-+++ b/include/sound/pxa2xx-lib.h
-@@ -6,13 +6,6 @@
+diff --git a/arch/arm/mach-pxa/include/mach/dma.h b/arch/arm/mach-pxa/include/mach/dma.h
+deleted file mode 100644
+index 5bd5589..0000000
+--- a/arch/arm/mach-pxa/include/mach/dma.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- *  arch/arm/mach-pxa/include/mach/dma.h
+- *
+- *  Author:	Nicolas Pitre
+- *  Created:	Jun 15, 2001
+- *  Copyright:	MontaVista Software, Inc.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __ASM_ARCH_DMA_H
+-#define __ASM_ARCH_DMA_H
+-
+-#include <mach/hardware.h>
+-
+-/* DMA Controller Registers Definitions */
+-#define DMAC_REGS_VIRT	io_p2v(0x40000000)
+-
+-#include <plat/dma.h>
+-#endif /* _ASM_ARCH_DMA_H */
+diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
+index 1fc9419..826ef87 100644
+--- a/arch/arm/plat-pxa/Makefile
++++ b/arch/arm/plat-pxa/Makefile
+@@ -2,8 +2,6 @@
+ # Makefile for code common across different PXA processor families
+ #
  
- /* PCM */
+-obj-y	:= dma.o
+-
+ obj-$(CONFIG_PXA3xx)		+= mfp.o
+ obj-$(CONFIG_ARCH_MMP)		+= mfp.o
  
--struct pxa2xx_pcm_dma_params {
--	char *name;			/* stream identifier */
--	u32 dcmd;			/* DMA descriptor dcmd field */
--	volatile u32 *drcmr;		/* the DMA request channel to use */
--	u32 dev_addr;			/* device physical address for DMA */
+diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
+deleted file mode 100644
+index 79ef102..0000000
+--- a/arch/arm/plat-pxa/dma.c
++++ /dev/null
+@@ -1,391 +0,0 @@
+-/*
+- *  linux/arch/arm/plat-pxa/dma.c
+- *
+- *  PXA DMA registration and IRQ dispatching
+- *
+- *  Author:	Nicolas Pitre
+- *  Created:	Nov 15, 2001
+- *  Copyright:	MontaVista Software Inc.
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the GNU General Public License version 2 as
+- *  published by the Free Software Foundation.
+- */
+-
+-#include <linux/module.h>
+-#include <linux/init.h>
+-#include <linux/slab.h>
+-#include <linux/kernel.h>
+-#include <linux/interrupt.h>
+-#include <linux/errno.h>
+-#include <linux/dma-mapping.h>
+-
+-#include <asm/irq.h>
+-#include <asm/memory.h>
+-#include <mach/hardware.h>
+-#include <mach/dma.h>
+-
+-#define DMA_DEBUG_NAME		"pxa_dma"
+-#define DMA_MAX_REQUESTERS	64
+-
+-struct dma_channel {
+-	char *name;
+-	pxa_dma_prio prio;
+-	void (*irq_handler)(int, void *);
+-	void *data;
+-	spinlock_t lock;
 -};
 -
- extern int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 				struct snd_pcm_hw_params *params);
- extern int __pxa2xx_pcm_hw_free(struct snd_pcm_substream *substream);
-diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
-index ce431e6..5066a37 100644
---- a/sound/arm/pxa2xx-ac97.c
-+++ b/sound/arm/pxa2xx-ac97.c
-@@ -14,12 +14,14 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/ac97_codec.h>
- #include <sound/initval.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/regs-ac97.h>
- #include <mach/audio.h>
-@@ -41,20 +43,20 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
- 	.reset	= pxa2xx_ac97_reset,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_out = {
--	.name			= "AC97 PCM out",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(12),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_out_req = 12;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_out = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_in = {
--	.name			= "AC97 PCM in",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(11),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_in_req = 11;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_in = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_in_req,
- };
- 
- static struct snd_pcm *pxa2xx_ac97_pcm;
-diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
-index 823359e..a61d7a9 100644
---- a/sound/arm/pxa2xx-pcm-lib.c
-+++ b/sound/arm/pxa2xx-pcm-lib.c
-@@ -7,11 +7,13 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/dma.h>
- 
-@@ -43,6 +45,35 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	size_t period = params_period_bytes(params);
- 	pxa_dma_desc *dma_desc;
- 	dma_addr_t dma_buff_phys, next_desc_phys;
-+	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-+
-+	/* temporary transition hack */
-+	switch (rtd->params->addr_width) {
-+	case DMA_SLAVE_BUSWIDTH_1_BYTE:
-+		dcmd |= DCMD_WIDTH1;
-+		break;
-+	case DMA_SLAVE_BUSWIDTH_2_BYTES:
-+		dcmd |= DCMD_WIDTH2;
-+		break;
-+	case DMA_SLAVE_BUSWIDTH_4_BYTES:
-+		dcmd |= DCMD_WIDTH4;
-+		break;
-+	default:
-+		/* can't happen */
-+		break;
-+	}
-+
-+	switch (rtd->params->maxburst) {
-+	case 8:
-+		dcmd |= DCMD_BURST8;
-+		break;
-+	case 16:
-+		dcmd |= DCMD_BURST16;
-+		break;
-+	case 32:
-+		dcmd |= DCMD_BURST32;
-+		break;
-+	}
- 
- 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
- 	runtime->dma_bytes = totsize;
-@@ -55,14 +86,14 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 		dma_desc->ddadr = next_desc_phys;
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
- 			dma_desc->dsadr = dma_buff_phys;
--			dma_desc->dtadr = rtd->params->dev_addr;
-+			dma_desc->dtadr = rtd->params->addr;
- 		} else {
--			dma_desc->dsadr = rtd->params->dev_addr;
-+			dma_desc->dsadr = rtd->params->addr;
- 			dma_desc->dtadr = dma_buff_phys;
- 		}
- 		if (period > totsize)
- 			period = totsize;
--		dma_desc->dcmd = rtd->params->dcmd | period | DCMD_ENDIRQEN;
-+		dma_desc->dcmd = dcmd | period | DCMD_ENDIRQEN;
- 		dma_desc++;
- 		dma_buff_phys += period;
- 	} while (totsize -= period);
-@@ -76,8 +107,10 @@ int __pxa2xx_pcm_hw_free(struct snd_pcm_substream *substream)
- {
- 	struct pxa2xx_runtime_data *rtd = substream->runtime->private_data;
- 
--	if (rtd && rtd->params && rtd->params->drcmr)
--		*rtd->params->drcmr = 0;
-+	if (rtd && rtd->params && rtd->params->filter_data) {
-+		unsigned long req = *(unsigned long *) rtd->params->filter_data;
-+		DRCMR(req) = 0;
-+	}
- 
- 	snd_pcm_set_runtime_buffer(substream, NULL);
- 	return 0;
-@@ -136,6 +169,7 @@ EXPORT_SYMBOL(pxa2xx_pcm_pointer);
- int __pxa2xx_pcm_prepare(struct snd_pcm_substream *substream)
- {
- 	struct pxa2xx_runtime_data *prtd = substream->runtime->private_data;
-+	unsigned long req;
- 
- 	if (!prtd || !prtd->params)
- 		return 0;
-@@ -146,7 +180,8 @@ int __pxa2xx_pcm_prepare(struct snd_pcm_substream *substream)
- 	DCSR(prtd->dma_ch) &= ~DCSR_RUN;
- 	DCSR(prtd->dma_ch) = 0;
- 	DCMD(prtd->dma_ch) = 0;
--	*prtd->params->drcmr = prtd->dma_ch | DRCMR_MAPVLD;
-+	req = *(unsigned long *) prtd->params->filter_data;
-+	DRCMR(req) = prtd->dma_ch | DRCMR_MAPVLD;
- 
- 	return 0;
- }
-@@ -155,7 +190,6 @@ EXPORT_SYMBOL(__pxa2xx_pcm_prepare);
- void pxa2xx_pcm_dma_irq(int dma_ch, void *dev_id)
- {
- 	struct snd_pcm_substream *substream = dev_id;
--	struct pxa2xx_runtime_data *rtd = substream->runtime->private_data;
- 	int dcsr;
- 
- 	dcsr = DCSR(dma_ch);
-@@ -164,8 +198,8 @@ void pxa2xx_pcm_dma_irq(int dma_ch, void *dev_id)
- 	if (dcsr & DCSR_ENDINTR) {
- 		snd_pcm_period_elapsed(substream);
- 	} else {
--		printk(KERN_ERR "%s: DMA error on channel %d (DCSR=%#x)\n",
--			rtd->params->name, dma_ch, dcsr);
-+		printk(KERN_ERR "DMA error on channel %d (DCSR=%#x)\n",
-+			dma_ch, dcsr);
- 		snd_pcm_stream_lock(substream);
- 		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
- 		snd_pcm_stream_unlock(substream);
-diff --git a/sound/arm/pxa2xx-pcm.c b/sound/arm/pxa2xx-pcm.c
-index 26422a3..69a2455 100644
---- a/sound/arm/pxa2xx-pcm.c
-+++ b/sound/arm/pxa2xx-pcm.c
-@@ -11,8 +11,11 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/dmaengine.h>
-+
- #include <sound/core.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include "pxa2xx-pcm.h"
- 
-@@ -40,7 +43,7 @@ static int pxa2xx_pcm_open(struct snd_pcm_substream *substream)
- 
- 	rtd->params = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ?
- 		      client->playback_params : client->capture_params;
--	ret = pxa_request_dma(rtd->params->name, DMA_PRIO_LOW,
-+	ret = pxa_request_dma("dma", DMA_PRIO_LOW,
- 			      pxa2xx_pcm_dma_irq, substream);
- 	if (ret < 0)
- 		goto err2;
-diff --git a/sound/arm/pxa2xx-pcm.h b/sound/arm/pxa2xx-pcm.h
-index 65f86b5..2a8fc08 100644
---- a/sound/arm/pxa2xx-pcm.h
-+++ b/sound/arm/pxa2xx-pcm.h
-@@ -13,14 +13,14 @@
- 
- struct pxa2xx_runtime_data {
- 	int dma_ch;
--	struct pxa2xx_pcm_dma_params *params;
-+	struct snd_dmaengine_dai_dma_data *params;
- 	pxa_dma_desc *dma_desc_array;
- 	dma_addr_t dma_desc_array_phys;
- };
- 
- struct pxa2xx_pcm_client {
--	struct pxa2xx_pcm_dma_params *playback_params;
--	struct pxa2xx_pcm_dma_params *capture_params;
-+	struct snd_dmaengine_dai_dma_data *playback_params;
-+	struct snd_dmaengine_dai_dma_data *capture_params;
- 	int (*startup)(struct snd_pcm_substream *);
- 	void (*shutdown)(struct snd_pcm_substream *);
- 	int (*prepare)(struct snd_pcm_substream *);
-diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
-index 5d57e07..9a97843 100644
---- a/sound/soc/pxa/mmp-pcm.c
-+++ b/sound/soc/pxa/mmp-pcm.c
-@@ -17,6 +17,8 @@
- #include <linux/dmaengine.h>
- #include <linux/platform_data/dma-mmp_tdma.h>
- #include <linux/platform_data/mmp_audio.h>
-+#include <linux/dmaengine.h>
-+
- #include <sound/pxa2xx-lib.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -67,7 +69,7 @@ static int mmp_pcm_hw_params(struct snd_pcm_substream *substream,
- {
- 	struct dma_chan *chan = snd_dmaengine_pcm_get_chan(substream);
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct pxa2xx_pcm_dma_params *dma_params;
-+	struct snd_dmaengine_dai_dma_data *dma_params;
- 	struct dma_slave_config slave_config;
- 	int ret;
- 
-@@ -80,10 +82,10 @@ static int mmp_pcm_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
- 
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
--		slave_config.dst_addr     = dma_params->dev_addr;
-+		slave_config.dst_addr     = dma_params->addr;
- 		slave_config.dst_maxburst = 4;
- 	} else {
--		slave_config.src_addr	  = dma_params->dev_addr;
-+		slave_config.src_addr	  = dma_params->addr;
- 		slave_config.src_maxburst = 4;
- 	}
- 
-diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
-index 62142ce..84f1e9e 100644
---- a/sound/soc/pxa/mmp-sspa.c
-+++ b/sound/soc/pxa/mmp-sspa.c
-@@ -27,12 +27,15 @@
- #include <linux/slab.h>
- #include <linux/pxa2xx_ssp.h>
- #include <linux/io.h>
-+#include <linux/dmaengine.h>
-+
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/initval.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- #include "mmp-sspa.h"
- 
- /*
-@@ -40,7 +43,7 @@
-  */
- struct sspa_priv {
- 	struct ssp_device *sspa;
--	struct pxa2xx_pcm_dma_params *dma_params;
-+	struct snd_dmaengine_dai_dma_data *dma_params;
- 	struct clk *audio_clk;
- 	struct clk *sysclk;
- 	int dai_fmt;
-@@ -266,7 +269,7 @@ static int mmp_sspa_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
- 	struct sspa_priv *sspa_priv = snd_soc_dai_get_drvdata(dai);
- 	struct ssp_device *sspa = sspa_priv->sspa;
--	struct pxa2xx_pcm_dma_params *dma_params;
-+	struct snd_dmaengine_dai_dma_data *dma_params;
- 	u32 sspa_ctrl;
- 
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-@@ -309,7 +312,7 @@ static int mmp_sspa_hw_params(struct snd_pcm_substream *substream,
- 	}
- 
- 	dma_params = &sspa_priv->dma_params[substream->stream];
--	dma_params->dev_addr = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-+	dma_params->addr = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
- 				(sspa->phys_base + SSPA_TXD) :
- 				(sspa->phys_base + SSPA_RXD);
- 	snd_soc_dai_set_dma_data(cpu_dai, substream, dma_params);
-@@ -425,7 +428,8 @@ static int asoc_mmp_sspa_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	priv->dma_params = devm_kzalloc(&pdev->dev,
--			2 * sizeof(struct pxa2xx_pcm_dma_params), GFP_KERNEL);
-+			2 * sizeof(struct snd_dmaengine_dai_dma_data),
-+			GFP_KERNEL);
- 	if (priv->dma_params == NULL)
- 		return -ENOMEM;
- 
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 82b9985..3903343 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <linux/pxa2xx_ssp.h>
- #include <linux/of.h>
-+#include <linux/dmaengine.h>
- 
- #include <asm/irq.h>
- 
-@@ -31,9 +32,9 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/hardware.h>
--#include <mach/dma.h>
- 
- #include "../../arm/pxa2xx-pcm.h"
- #include "pxa-ssp.h"
-@@ -80,27 +81,14 @@ static void pxa_ssp_disable(struct ssp_device *ssp)
- 	__raw_writel(sscr0, ssp->mmio_base + SSCR0);
- }
- 
--struct pxa2xx_pcm_dma_data {
--	struct pxa2xx_pcm_dma_params params;
--	char name[20];
--};
+-static struct dma_channel *dma_channels;
+-static int num_dma_channels;
 -
- static void pxa_ssp_set_dma_params(struct ssp_device *ssp, int width4,
--			int out, struct pxa2xx_pcm_dma_params *dma_data)
-+			int out, struct snd_dmaengine_dai_dma_data *dma)
- {
--	struct pxa2xx_pcm_dma_data *dma;
+-/*
+- * Debug fs
+- */
+-#ifdef CONFIG_DEBUG_FS
+-#include <linux/debugfs.h>
+-#include <linux/uaccess.h>
+-#include <linux/seq_file.h>
 -
--	dma = container_of(dma_data, struct pxa2xx_pcm_dma_data, params);
+-static struct dentry *dbgfs_root, *dbgfs_state, **dbgfs_chan;
 -
--	snprintf(dma->name, 20, "SSP%d PCM %s %s", ssp->port_id,
--			width4 ? "32-bit" : "16-bit", out ? "out" : "in");
+-static int dbg_show_requester_chan(struct seq_file *s, void *p)
+-{
+-	int pos = 0;
+-	int chan = (int)s->private;
+-	int i;
+-	u32 drcmr;
 -
--	dma->params.name = dma->name;
--	dma->params.drcmr = &DRCMR(out ? ssp->drcmr_tx : ssp->drcmr_rx);
--	dma->params.dcmd = (out ? (DCMD_INCSRCADDR | DCMD_FLOWTRG) :
--				  (DCMD_INCTRGADDR | DCMD_FLOWSRC)) |
--			(width4 ? DCMD_WIDTH4 : DCMD_WIDTH2) | DCMD_BURST16;
--	dma->params.dev_addr = ssp->phys_base + SSDR;
-+	dma->filter_data = out ? &ssp->drcmr_tx : &ssp->drcmr_rx;
-+	dma->addr_width = width4 ? DMA_SLAVE_BUSWIDTH_4_BYTES :
-+				   DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	dma->maxburst = 16;
-+	dma->addr = ssp->phys_base + SSDR;
- }
- 
- static int pxa_ssp_startup(struct snd_pcm_substream *substream,
-@@ -108,7 +96,7 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
- {
- 	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
- 	struct ssp_device *ssp = priv->ssp;
--	struct pxa2xx_pcm_dma_data *dma;
-+	struct snd_dmaengine_dai_dma_data *dma;
- 	int ret = 0;
- 
- 	if (!cpu_dai->active) {
-@@ -116,10 +104,10 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
- 		pxa_ssp_disable(ssp);
- 	}
- 
--	dma = kzalloc(sizeof(struct pxa2xx_pcm_dma_data), GFP_KERNEL);
-+	dma = kzalloc(sizeof(struct snd_dmaengine_dai_dma_data), GFP_KERNEL);
- 	if (!dma)
- 		return -ENOMEM;
--	snd_soc_dai_set_dma_data(cpu_dai, substream, &dma->params);
-+	snd_soc_dai_set_dma_data(cpu_dai, substream, dma);
- 
- 	return ret;
- }
-@@ -560,7 +548,7 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
- 	u32 sspsp;
- 	int width = snd_pcm_format_physical_width(params_format(params));
- 	int ttsa = pxa_ssp_read_reg(ssp, SSTSA) & 0xf;
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	dma_data = snd_soc_dai_get_dma_data(cpu_dai, substream);
- 
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index 1475515..f1059d9 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -14,15 +14,16 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/ac97_codec.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/hardware.h>
- #include <mach/regs-ac97.h>
--#include <mach/dma.h>
- #include <mach/audio.h>
- 
- #include "pxa2xx-ac97.h"
-@@ -48,44 +49,44 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
- 	.reset	= pxa2xx_ac97_cold_reset,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_stereo_out = {
--	.name			= "AC97 PCM Stereo out",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(12),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_stereo_in_req = 12;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_in = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_stereo_in_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_stereo_in = {
--	.name			= "AC97 PCM Stereo in",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(11),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_stereo_out_req = 11;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_out = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_stereo_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_aux_mono_out = {
--	.name			= "AC97 Aux PCM (Slot 5) Mono out",
--	.dev_addr		= __PREG(MODR),
--	.drcmr			= &DRCMR(10),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST16 | DCMD_WIDTH2,
-+static unsigned long pxa2xx_ac97_pcm_aux_mono_out_req = 10;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_out = {
-+	.addr		= __PREG(MODR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.maxburst	= 16,
-+	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_aux_mono_in = {
--	.name			= "AC97 Aux PCM (Slot 5) Mono in",
--	.dev_addr		= __PREG(MODR),
--	.drcmr			= &DRCMR(9),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST16 | DCMD_WIDTH2,
-+static unsigned long pxa2xx_ac97_pcm_aux_mono_in_req = 9;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_in = {
-+	.addr		= __PREG(MODR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.maxburst	= 16,
-+	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_in_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_mic_mono_in = {
--	.name			= "AC97 Mic PCM (Slot 6) Mono in",
--	.dev_addr		= __PREG(MCDR),
--	.drcmr			= &DRCMR(8),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST16 | DCMD_WIDTH2,
-+static unsigned long pxa2xx_ac97_pcm_aux_mic_mono_req = 8;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_mic_mono_in = {
-+	.addr		= __PREG(MCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.maxburst	= 16,
-+	.filter_data	= &pxa2xx_ac97_pcm_aux_mic_mono_req,
- };
- 
- #ifdef CONFIG_PM
-@@ -119,7 +120,7 @@ static int pxa2xx_ac97_hw_params(struct snd_pcm_substream *substream,
- 				 struct snd_pcm_hw_params *params,
- 				 struct snd_soc_dai *cpu_dai)
- {
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
- 		dma_data = &pxa2xx_ac97_pcm_stereo_out;
-@@ -135,7 +136,7 @@ static int pxa2xx_ac97_hw_aux_params(struct snd_pcm_substream *substream,
- 				     struct snd_pcm_hw_params *params,
- 				     struct snd_soc_dai *cpu_dai)
- {
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
- 		dma_data = &pxa2xx_ac97_pcm_aux_mono_out;
-diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
-index f7ca716..d5340a0 100644
---- a/sound/soc/pxa/pxa2xx-i2s.c
-+++ b/sound/soc/pxa/pxa2xx-i2s.c
-@@ -23,9 +23,9 @@
- #include <sound/initval.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/hardware.h>
--#include <mach/dma.h>
- #include <mach/audio.h>
- 
- #include "pxa2xx-i2s.h"
-@@ -82,20 +82,20 @@ static struct pxa_i2s_port pxa_i2s;
- static struct clk *clk_i2s;
- static int clk_ena = 0;
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_i2s_pcm_stereo_out = {
--	.name			= "I2S PCM Stereo out",
--	.dev_addr		= __PREG(SADR),
--	.drcmr			= &DRCMR(3),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_i2s_pcm_stereo_out_req = 3;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_out = {
-+	.addr		= __PREG(SADR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_i2s_pcm_stereo_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_i2s_pcm_stereo_in = {
--	.name			= "I2S PCM Stereo in",
--	.dev_addr		= __PREG(SADR),
--	.drcmr			= &DRCMR(2),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_i2s_pcm_stereo_in_req = 2;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_in = {
-+	.addr		= __PREG(SADR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_i2s_pcm_stereo_in_req,
- };
- 
- static int pxa2xx_i2s_startup(struct snd_pcm_substream *substream,
-@@ -163,7 +163,7 @@ static int pxa2xx_i2s_hw_params(struct snd_pcm_substream *substream,
- 				struct snd_pcm_hw_params *params,
- 				struct snd_soc_dai *dai)
- {
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	BUG_ON(IS_ERR(clk_i2s));
- 	clk_prepare_enable(clk_i2s);
-diff --git a/sound/soc/pxa/pxa2xx-pcm.c b/sound/soc/pxa/pxa2xx-pcm.c
-index ecff116..0aa2d69 100644
---- a/sound/soc/pxa/pxa2xx-pcm.c
-+++ b/sound/soc/pxa/pxa2xx-pcm.c
-@@ -12,10 +12,12 @@
- 
- #include <linux/dma-mapping.h>
- #include <linux/module.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include "../../arm/pxa2xx-pcm.h"
- 
-@@ -25,7 +27,7 @@ static int pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct pxa2xx_runtime_data *prtd = runtime->private_data;
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct pxa2xx_pcm_dma_params *dma;
-+	struct snd_dmaengine_dai_dma_data *dma;
- 	int ret;
- 
- 	dma = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
-@@ -39,7 +41,7 @@ static int pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	 * with different params */
- 	if (prtd->params == NULL) {
- 		prtd->params = dma;
--		ret = pxa_request_dma(prtd->params->name, DMA_PRIO_LOW,
-+		ret = pxa_request_dma("name", DMA_PRIO_LOW,
- 			      pxa2xx_pcm_dma_irq, substream);
- 		if (ret < 0)
- 			return ret;
-@@ -47,7 +49,7 @@ static int pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	} else if (prtd->params != dma) {
- 		pxa_free_dma(prtd->dma_ch);
- 		prtd->params = dma;
--		ret = pxa_request_dma(prtd->params->name, DMA_PRIO_LOW,
-+		ret = pxa_request_dma("name", DMA_PRIO_LOW,
- 			      pxa2xx_pcm_dma_irq, substream);
- 		if (ret < 0)
- 			return ret;
+-	pos += seq_printf(s, "DMA channel %d requesters list :\n", chan);
+-	for (i = 0; i < DMA_MAX_REQUESTERS; i++) {
+-		drcmr = DRCMR(i);
+-		if ((drcmr & DRCMR_CHLNUM) == chan)
+-			pos += seq_printf(s, "\tRequester %d (MAPVLD=%d)\n", i,
+-					  !!(drcmr & DRCMR_MAPVLD));
+-	}
+-	return pos;
+-}
+-
+-static inline int dbg_burst_from_dcmd(u32 dcmd)
+-{
+-	int burst = (dcmd >> 16) & 0x3;
+-
+-	return burst ? 4 << burst : 0;
+-}
+-
+-static int is_phys_valid(unsigned long addr)
+-{
+-	return pfn_valid(__phys_to_pfn(addr));
+-}
+-
+-#define DCSR_STR(flag) (dcsr & DCSR_##flag ? #flag" " : "")
+-#define DCMD_STR(flag) (dcmd & DCMD_##flag ? #flag" " : "")
+-
+-static int dbg_show_descriptors(struct seq_file *s, void *p)
+-{
+-	int pos = 0;
+-	int chan = (int)s->private;
+-	int i, max_show = 20, burst, width;
+-	u32 dcmd;
+-	unsigned long phys_desc;
+-	struct pxa_dma_desc *desc;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&dma_channels[chan].lock, flags);
+-	phys_desc = DDADR(chan);
+-
+-	pos += seq_printf(s, "DMA channel %d descriptors :\n", chan);
+-	pos += seq_printf(s, "[%03d] First descriptor unknown\n", 0);
+-	for (i = 1; i < max_show && is_phys_valid(phys_desc); i++) {
+-		desc = phys_to_virt(phys_desc);
+-		dcmd = desc->dcmd;
+-		burst = dbg_burst_from_dcmd(dcmd);
+-		width = (1 << ((dcmd >> 14) & 0x3)) >> 1;
+-
+-		pos += seq_printf(s, "[%03d] Desc at %08lx(virt %p)\n",
+-				  i, phys_desc, desc);
+-		pos += seq_printf(s, "\tDDADR = %08x\n", desc->ddadr);
+-		pos += seq_printf(s, "\tDSADR = %08x\n", desc->dsadr);
+-		pos += seq_printf(s, "\tDTADR = %08x\n", desc->dtadr);
+-		pos += seq_printf(s, "\tDCMD  = %08x (%s%s%s%s%s%s%sburst=%d"
+-				  " width=%d len=%d)\n",
+-				  dcmd,
+-				  DCMD_STR(INCSRCADDR), DCMD_STR(INCTRGADDR),
+-				  DCMD_STR(FLOWSRC), DCMD_STR(FLOWTRG),
+-				  DCMD_STR(STARTIRQEN), DCMD_STR(ENDIRQEN),
+-				  DCMD_STR(ENDIAN), burst, width,
+-				  dcmd & DCMD_LENGTH);
+-		phys_desc = desc->ddadr;
+-	}
+-	if (i == max_show)
+-		pos += seq_printf(s, "[%03d] Desc at %08lx ... max display reached\n",
+-				  i, phys_desc);
+-	else
+-		pos += seq_printf(s, "[%03d] Desc at %08lx is %s\n",
+-				  i, phys_desc, phys_desc == DDADR_STOP ?
+-				  "DDADR_STOP" : "invalid");
+-
+-	spin_unlock_irqrestore(&dma_channels[chan].lock, flags);
+-	return pos;
+-}
+-
+-static int dbg_show_chan_state(struct seq_file *s, void *p)
+-{
+-	int pos = 0;
+-	int chan = (int)s->private;
+-	u32 dcsr, dcmd;
+-	int burst, width;
+-	static char *str_prio[] = { "high", "normal", "low" };
+-
+-	dcsr = DCSR(chan);
+-	dcmd = DCMD(chan);
+-	burst = dbg_burst_from_dcmd(dcmd);
+-	width = (1 << ((dcmd >> 14) & 0x3)) >> 1;
+-
+-	pos += seq_printf(s, "DMA channel %d\n", chan);
+-	pos += seq_printf(s, "\tPriority : %s\n",
+-			  str_prio[dma_channels[chan].prio]);
+-	pos += seq_printf(s, "\tUnaligned transfer bit: %s\n",
+-			  DALGN & (1 << chan) ? "yes" : "no");
+-	pos += seq_printf(s, "\tDCSR  = %08x (%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s)\n",
+-			  dcsr, DCSR_STR(RUN), DCSR_STR(NODESC),
+-			  DCSR_STR(STOPIRQEN), DCSR_STR(EORIRQEN),
+-			  DCSR_STR(EORJMPEN), DCSR_STR(EORSTOPEN),
+-			  DCSR_STR(SETCMPST), DCSR_STR(CLRCMPST),
+-			  DCSR_STR(CMPST), DCSR_STR(EORINTR), DCSR_STR(REQPEND),
+-			  DCSR_STR(STOPSTATE), DCSR_STR(ENDINTR),
+-			  DCSR_STR(STARTINTR), DCSR_STR(BUSERR));
+-
+-	pos += seq_printf(s, "\tDCMD  = %08x (%s%s%s%s%s%s%sburst=%d width=%d"
+-			  " len=%d)\n",
+-			  dcmd,
+-			  DCMD_STR(INCSRCADDR), DCMD_STR(INCTRGADDR),
+-			  DCMD_STR(FLOWSRC), DCMD_STR(FLOWTRG),
+-			  DCMD_STR(STARTIRQEN), DCMD_STR(ENDIRQEN),
+-			  DCMD_STR(ENDIAN), burst, width, dcmd & DCMD_LENGTH);
+-	pos += seq_printf(s, "\tDSADR = %08x\n", DSADR(chan));
+-	pos += seq_printf(s, "\tDTADR = %08x\n", DTADR(chan));
+-	pos += seq_printf(s, "\tDDADR = %08x\n", DDADR(chan));
+-	return pos;
+-}
+-
+-static int dbg_show_state(struct seq_file *s, void *p)
+-{
+-	int pos = 0;
+-
+-	/* basic device status */
+-	pos += seq_printf(s, "DMA engine status\n");
+-	pos += seq_printf(s, "\tChannel number: %d\n", num_dma_channels);
+-
+-	return pos;
+-}
+-
+-#define DBGFS_FUNC_DECL(name) \
+-static int dbg_open_##name(struct inode *inode, struct file *file) \
+-{ \
+-	return single_open(file, dbg_show_##name, inode->i_private); \
+-} \
+-static const struct file_operations dbg_fops_##name = { \
+-	.owner		= THIS_MODULE, \
+-	.open		= dbg_open_##name, \
+-	.llseek		= seq_lseek, \
+-	.read		= seq_read, \
+-	.release	= single_release, \
+-}
+-
+-DBGFS_FUNC_DECL(state);
+-DBGFS_FUNC_DECL(chan_state);
+-DBGFS_FUNC_DECL(descriptors);
+-DBGFS_FUNC_DECL(requester_chan);
+-
+-static struct dentry *pxa_dma_dbg_alloc_chan(int ch, struct dentry *chandir)
+-{
+-	char chan_name[11];
+-	struct dentry *chan, *chan_state = NULL, *chan_descr = NULL;
+-	struct dentry *chan_reqs = NULL;
+-	void *dt;
+-
+-	scnprintf(chan_name, sizeof(chan_name), "%d", ch);
+-	chan = debugfs_create_dir(chan_name, chandir);
+-	dt = (void *)ch;
+-
+-	if (chan)
+-		chan_state = debugfs_create_file("state", 0400, chan, dt,
+-						 &dbg_fops_chan_state);
+-	if (chan_state)
+-		chan_descr = debugfs_create_file("descriptors", 0400, chan, dt,
+-						 &dbg_fops_descriptors);
+-	if (chan_descr)
+-		chan_reqs = debugfs_create_file("requesters", 0400, chan, dt,
+-						&dbg_fops_requester_chan);
+-	if (!chan_reqs)
+-		goto err_state;
+-
+-	return chan;
+-
+-err_state:
+-	debugfs_remove_recursive(chan);
+-	return NULL;
+-}
+-
+-static void pxa_dma_init_debugfs(void)
+-{
+-	int i;
+-	struct dentry *chandir;
+-
+-	dbgfs_root = debugfs_create_dir(DMA_DEBUG_NAME, NULL);
+-	if (IS_ERR(dbgfs_root) || !dbgfs_root)
+-		goto err_root;
+-
+-	dbgfs_state = debugfs_create_file("state", 0400, dbgfs_root, NULL,
+-					  &dbg_fops_state);
+-	if (!dbgfs_state)
+-		goto err_state;
+-
+-	dbgfs_chan = kmalloc(sizeof(*dbgfs_state) * num_dma_channels,
+-			     GFP_KERNEL);
+-	if (!dbgfs_chan)
+-		goto err_alloc;
+-
+-	chandir = debugfs_create_dir("channels", dbgfs_root);
+-	if (!chandir)
+-		goto err_chandir;
+-
+-	for (i = 0; i < num_dma_channels; i++) {
+-		dbgfs_chan[i] = pxa_dma_dbg_alloc_chan(i, chandir);
+-		if (!dbgfs_chan[i])
+-			goto err_chans;
+-	}
+-
+-	return;
+-err_chans:
+-err_chandir:
+-	kfree(dbgfs_chan);
+-err_alloc:
+-err_state:
+-	debugfs_remove_recursive(dbgfs_root);
+-err_root:
+-	pr_err("pxa_dma: debugfs is not available\n");
+-}
+-
+-static void __exit pxa_dma_cleanup_debugfs(void)
+-{
+-	debugfs_remove_recursive(dbgfs_root);
+-}
+-#else
+-static inline void pxa_dma_init_debugfs(void) {}
+-static inline void pxa_dma_cleanup_debugfs(void) {}
+-#endif
+-
+-int pxa_request_dma (char *name, pxa_dma_prio prio,
+-			void (*irq_handler)(int, void *),
+-			void *data)
+-{
+-	unsigned long flags;
+-	int i, found = 0;
+-
+-	/* basic sanity checks */
+-	if (!name || !irq_handler)
+-		return -EINVAL;
+-
+-	local_irq_save(flags);
+-
+-	do {
+-		/* try grabbing a DMA channel with the requested priority */
+-		for (i = 0; i < num_dma_channels; i++) {
+-			if ((dma_channels[i].prio == prio) &&
+-			    !dma_channels[i].name) {
+-				found = 1;
+-				break;
+-			}
+-		}
+-		/* if requested prio group is full, try a hier priority */
+-	} while (!found && prio--);
+-
+-	if (found) {
+-		DCSR(i) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
+-		dma_channels[i].name = name;
+-		dma_channels[i].irq_handler = irq_handler;
+-		dma_channels[i].data = data;
+-	} else {
+-		printk (KERN_WARNING "No more available DMA channels for %s\n", name);
+-		i = -ENODEV;
+-	}
+-
+-	local_irq_restore(flags);
+-	return i;
+-}
+-EXPORT_SYMBOL(pxa_request_dma);
+-
+-void pxa_free_dma (int dma_ch)
+-{
+-	unsigned long flags;
+-
+-	if (!dma_channels[dma_ch].name) {
+-		printk (KERN_CRIT
+-			"%s: trying to free channel %d which is already freed\n",
+-			__func__, dma_ch);
+-		return;
+-	}
+-
+-	local_irq_save(flags);
+-	DCSR(dma_ch) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
+-	dma_channels[dma_ch].name = NULL;
+-	local_irq_restore(flags);
+-}
+-EXPORT_SYMBOL(pxa_free_dma);
+-
+-static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+-{
+-	int i, dint = DINT;
+-	struct dma_channel *channel;
+-
+-	while (dint) {
+-		i = __ffs(dint);
+-		dint &= (dint - 1);
+-		channel = &dma_channels[i];
+-		if (channel->name && channel->irq_handler) {
+-			channel->irq_handler(i, channel->data);
+-		} else {
+-			/*
+-			 * IRQ for an unregistered DMA channel:
+-			 * let's clear the interrupts and disable it.
+-			 */
+-			printk (KERN_WARNING "spurious IRQ for DMA channel %d\n", i);
+-			DCSR(i) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
+-		}
+-	}
+-	return IRQ_HANDLED;
+-}
+-
+-int __init pxa_init_dma(int irq, int num_ch)
+-{
+-	int i, ret;
+-
+-	dma_channels = kzalloc(sizeof(struct dma_channel) * num_ch, GFP_KERNEL);
+-	if (dma_channels == NULL)
+-		return -ENOMEM;
+-
+-	/* dma channel priorities on pxa2xx processors:
+-	 * ch 0 - 3,  16 - 19  <--> (0) DMA_PRIO_HIGH
+-	 * ch 4 - 7,  20 - 23  <--> (1) DMA_PRIO_MEDIUM
+-	 * ch 8 - 15, 24 - 31  <--> (2) DMA_PRIO_LOW
+-	 */
+-	for (i = 0; i < num_ch; i++) {
+-		DCSR(i) = 0;
+-		dma_channels[i].prio = min((i & 0xf) >> 2, DMA_PRIO_LOW);
+-		spin_lock_init(&dma_channels[i].lock);
+-	}
+-
+-	ret = request_irq(irq, dma_irq_handler, IRQF_DISABLED, "DMA", NULL);
+-	if (ret) {
+-		printk (KERN_CRIT "Wow!  Can't register IRQ for DMA\n");
+-		kfree(dma_channels);
+-		return ret;
+-	}
+-	num_dma_channels = num_ch;
+-
+-	pxa_dma_init_debugfs();
+-
+-	return 0;
+-}
+diff --git a/arch/arm/plat-pxa/include/plat/dma.h b/arch/arm/plat-pxa/include/plat/dma.h
+deleted file mode 100644
+index a7b91dc..0000000
+--- a/arch/arm/plat-pxa/include/plat/dma.h
++++ /dev/null
+@@ -1,85 +0,0 @@
+-#ifndef __PLAT_DMA_H
+-#define __PLAT_DMA_H
+-
+-#define DMAC_REG(x)	(*((volatile u32 *)(DMAC_REGS_VIRT + (x))))
+-
+-#define DCSR(n)		DMAC_REG((n) << 2)
+-#define DALGN		DMAC_REG(0x00a0)  /* DMA Alignment Register */
+-#define DINT		DMAC_REG(0x00f0)  /* DMA Interrupt Register */
+-#define DDADR(n)	DMAC_REG(0x0200 + ((n) << 4))
+-#define DSADR(n)	DMAC_REG(0x0204 + ((n) << 4))
+-#define DTADR(n)	DMAC_REG(0x0208 + ((n) << 4))
+-#define DCMD(n)		DMAC_REG(0x020c + ((n) << 4))
+-#define DRCMR(n)	DMAC_REG((((n) < 64) ? 0x0100 : 0x1100) + \
+-				 (((n) & 0x3f) << 2))
+-
+-#define DCSR_RUN	(1 << 31)	/* Run Bit (read / write) */
+-#define DCSR_NODESC	(1 << 30)	/* No-Descriptor Fetch (read / write) */
+-#define DCSR_STOPIRQEN	(1 << 29)	/* Stop Interrupt Enable (read / write) */
+-#define DCSR_REQPEND	(1 << 8)	/* Request Pending (read-only) */
+-#define DCSR_STOPSTATE	(1 << 3)	/* Stop State (read-only) */
+-#define DCSR_ENDINTR	(1 << 2)	/* End Interrupt (read / write) */
+-#define DCSR_STARTINTR	(1 << 1)	/* Start Interrupt (read / write) */
+-#define DCSR_BUSERR	(1 << 0)	/* Bus Error Interrupt (read / write) */
+-
+-#define DCSR_EORIRQEN	(1 << 28)       /* End of Receive Interrupt Enable (R/W) */
+-#define DCSR_EORJMPEN	(1 << 27)       /* Jump to next descriptor on EOR */
+-#define DCSR_EORSTOPEN	(1 << 26)       /* STOP on an EOR */
+-#define DCSR_SETCMPST	(1 << 25)       /* Set Descriptor Compare Status */
+-#define DCSR_CLRCMPST	(1 << 24)       /* Clear Descriptor Compare Status */
+-#define DCSR_CMPST	(1 << 10)       /* The Descriptor Compare Status */
+-#define DCSR_EORINTR	(1 << 9)        /* The end of Receive */
+-
+-#define DRCMR_MAPVLD	(1 << 7)	/* Map Valid (read / write) */
+-#define DRCMR_CHLNUM	0x1f		/* mask for Channel Number (read / write) */
+-
+-#define DDADR_DESCADDR	0xfffffff0	/* Address of next descriptor (mask) */
+-#define DDADR_STOP	(1 << 0)	/* Stop (read / write) */
+-
+-#define DCMD_INCSRCADDR	(1 << 31)	/* Source Address Increment Setting. */
+-#define DCMD_INCTRGADDR	(1 << 30)	/* Target Address Increment Setting. */
+-#define DCMD_FLOWSRC	(1 << 29)	/* Flow Control by the source. */
+-#define DCMD_FLOWTRG	(1 << 28)	/* Flow Control by the target. */
+-#define DCMD_STARTIRQEN	(1 << 22)	/* Start Interrupt Enable */
+-#define DCMD_ENDIRQEN	(1 << 21)	/* End Interrupt Enable */
+-#define DCMD_ENDIAN	(1 << 18)	/* Device Endian-ness. */
+-#define DCMD_BURST8	(1 << 16)	/* 8 byte burst */
+-#define DCMD_BURST16	(2 << 16)	/* 16 byte burst */
+-#define DCMD_BURST32	(3 << 16)	/* 32 byte burst */
+-#define DCMD_WIDTH1	(1 << 14)	/* 1 byte width */
+-#define DCMD_WIDTH2	(2 << 14)	/* 2 byte width (HalfWord) */
+-#define DCMD_WIDTH4	(3 << 14)	/* 4 byte width (Word) */
+-#define DCMD_LENGTH	0x01fff		/* length mask (max = 8K - 1) */
+-
+-/*
+- * Descriptor structure for PXA's DMA engine
+- * Note: this structure must always be aligned to a 16-byte boundary.
+- */
+-
+-typedef struct pxa_dma_desc {
+-	volatile u32 ddadr;	/* Points to the next descriptor + flags */
+-	volatile u32 dsadr;	/* DSADR value for the current transfer */
+-	volatile u32 dtadr;	/* DTADR value for the current transfer */
+-	volatile u32 dcmd;	/* DCMD value for the current transfer */
+-} pxa_dma_desc;
+-
+-typedef enum {
+-	DMA_PRIO_HIGH = 0,
+-	DMA_PRIO_MEDIUM = 1,
+-	DMA_PRIO_LOW = 2
+-} pxa_dma_prio;
+-
+-/*
+- * DMA registration
+- */
+-
+-int __init pxa_init_dma(int irq, int num_ch);
+-
+-int pxa_request_dma (char *name,
+-			 pxa_dma_prio prio,
+-			 void (*irq_handler)(int, void *),
+-			 void *data);
+-
+-void pxa_free_dma (int dma_ch);
+-
+-#endif /* __PLAT_DMA_H */
 -- 
 1.8.3.1
