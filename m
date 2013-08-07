@@ -1,272 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:38:40 +0900
-Subject: [GIT PULL 23/26] ARM: shmobile: r8a7779: move r8a7779_init_irq_xxx()
- to setup
+Date: Wed,  7 Aug 2013 13:38:35 +0900
+Subject: [GIT PULL 18/26] ARM: shmobile: Remove unused shmobile_init_time()
 In-Reply-To: <cover.1375840527.git.horms+renesas@verge.net.au>
 References: <cover.1375840527.git.horms+renesas@verge.net.au>
-Message-ID: <5b3859d7b2c10419e1cc7ce6c456995e757f4390.1375840527.git.horms+renesas@verge.net.au>
+Message-ID: <13eb604665c94d4cd9d7e2aeceef974cf1f30701.1375840527.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-This patch moves r8a7779_init_irq_xxx() to setup code,
-and remove intc-r8a7779.
+Remove shmobile_timer_init() since it now is unused.
 
-Now, r8a7779_init_irq_extpin() uses
-platform_device_register_resndata() instead of
-platform_device_register()
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile        |   2 +-
- arch/arm/mach-shmobile/intc-r8a7779.c  | 116 ---------------------------------
- arch/arm/mach-shmobile/setup-r8a7779.c |  80 +++++++++++++++++++++++
- 3 files changed, 81 insertions(+), 117 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/intc-r8a7779.c
+ arch/arm/mach-shmobile/include/mach/common.h | 1 -
+ arch/arm/mach-shmobile/timer.c               | 4 ----
+ 2 files changed, 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 7418131..969c3a9 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -11,7 +11,7 @@ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o clock-sh73a0.o intc-sh73a0.o
- obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o clock-r8a73a4.o
- obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o clock-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o clock-r8a7778.o
--obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o clock-r8a7779.o intc-r8a7779.o
-+obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o clock-r8a7779.o
- obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o clock-r8a7790.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index e818f02..18a76f9 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -2,7 +2,6 @@
+ #define __ARCH_MACH_COMMON_H
  
-diff --git a/arch/arm/mach-shmobile/intc-r8a7779.c b/arch/arm/mach-shmobile/intc-r8a7779.c
-deleted file mode 100644
-index e992a68..0000000
---- a/arch/arm/mach-shmobile/intc-r8a7779.c
-+++ /dev/null
-@@ -1,116 +0,0 @@
--/*
-- * r8a7779 processor support - INTC hardware block
-- *
-- * Copyright (C) 2011  Renesas Solutions Corp.
-- * Copyright (C) 2011  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/io.h>
--#include <linux/irqchip/arm-gic.h>
--#include <linux/platform_data/irq-renesas-intc-irqpin.h>
--#include <linux/irqchip.h>
--#include <mach/common.h>
--#include <mach/irqs.h>
--#include <mach/r8a7779.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--
--#define INT2SMSKCR0 IOMEM(0xfe7822a0)
--#define INT2SMSKCR1 IOMEM(0xfe7822a4)
--#define INT2SMSKCR2 IOMEM(0xfe7822a8)
--#define INT2SMSKCR3 IOMEM(0xfe7822ac)
--#define INT2SMSKCR4 IOMEM(0xfe7822b0)
--
--#define INT2NTSR0 IOMEM(0xfe700060)
--#define INT2NTSR1 IOMEM(0xfe700064)
--
--static struct renesas_intc_irqpin_config irqpin0_platform_data = {
--	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
--	.sense_bitfield_width = 2,
--};
--
--static struct resource irqpin0_resources[] = {
--	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
--	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
--	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
--	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
--	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
--	DEFINE_RES_IRQ(gic_spi(27)), /* IRQ0 */
--	DEFINE_RES_IRQ(gic_spi(28)), /* IRQ1 */
--	DEFINE_RES_IRQ(gic_spi(29)), /* IRQ2 */
--	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ3 */
--};
--
--static struct platform_device irqpin0_device = {
--	.name		= "renesas_intc_irqpin",
--	.id		= 0,
--	.resource	= irqpin0_resources,
--	.num_resources	= ARRAY_SIZE(irqpin0_resources),
--	.dev		= {
--		.platform_data	= &irqpin0_platform_data,
--	},
--};
--
--void __init r8a7779_init_irq_extpin(int irlm)
--{
--	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
--	unsigned long tmp;
--
--	if (icr0) {
--		tmp = ioread32(icr0);
--		if (irlm)
--			tmp |= 1 << 23; /* IRQ0 -> IRQ3 as individual pins */
--		else
--			tmp &= ~(1 << 23); /* IRL mode - not supported */
--		tmp |= (1 << 21); /* LVLMODE = 1 */
--		iowrite32(tmp, icr0);
--		iounmap(icr0);
--
--		if (irlm)
--			platform_device_register(&irqpin0_device);
--	} else
--		pr_warn("r8a7779: unable to setup external irq pin mode\n");
--}
--
--#ifdef CONFIG_OF
--static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
--{
--	return 0; /* always allow wakeup */
--}
--
--void __init r8a7779_init_irq_dt(void)
--{
--	gic_arch_extn.irq_set_wake = r8a7779_set_wake;
--
--	irqchip_init();
--
--	/* route all interrupts to ARM */
--	__raw_writel(0xffffffff, INT2NTSR0);
--	__raw_writel(0x3fffffff, INT2NTSR1);
--
--	/* unmask all known interrupts in INTCS2 */
--	__raw_writel(0xfffffff0, INT2SMSKCR0);
--	__raw_writel(0xfff7ffff, INT2SMSKCR1);
--	__raw_writel(0xfffbffdf, INT2SMSKCR2);
--	__raw_writel(0xbffffffc, INT2SMSKCR3);
--	__raw_writel(0x003fee3f, INT2SMSKCR4);
--
--}
--#endif
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index f0b6c7d..6a99333 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -22,8 +22,11 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
-+#include <linux/irqchip/arm-gic.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/gpio-rcar.h>
-+#include <linux/platform_data/irq-renesas-intc-irqpin.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/input.h>
-@@ -67,6 +70,60 @@ void __init r8a7779_map_io(void)
- 	iotable_init(r8a7779_io_desc, ARRAY_SIZE(r8a7779_io_desc));
+ extern void shmobile_earlytimer_init(void);
+-extern void shmobile_timer_init(void);
+ extern void shmobile_setup_delay(unsigned int max_cpu_core_mhz,
+ 			 unsigned int mult, unsigned int div);
+ struct twd_local_timer;
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index f321dbe..62d7052 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -59,7 +59,3 @@ void __init shmobile_earlytimer_init(void)
+ 	late_time_init = shmobile_late_time_init;
  }
  
-+/* IRQ */
-+#define INT2SMSKCR0 IOMEM(0xfe7822a0)
-+#define INT2SMSKCR1 IOMEM(0xfe7822a4)
-+#define INT2SMSKCR2 IOMEM(0xfe7822a8)
-+#define INT2SMSKCR3 IOMEM(0xfe7822ac)
-+#define INT2SMSKCR4 IOMEM(0xfe7822b0)
-+
-+#define INT2NTSR0 IOMEM(0xfe700060)
-+#define INT2NTSR1 IOMEM(0xfe700064)
-+
-+static struct renesas_intc_irqpin_config irqpin0_platform_data __initdata = {
-+	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
-+	.sense_bitfield_width = 2,
-+};
-+
-+static struct resource irqpin0_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
-+	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
-+	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
-+	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
-+	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
-+	DEFINE_RES_IRQ(gic_spi(27)), /* IRQ0 */
-+	DEFINE_RES_IRQ(gic_spi(28)), /* IRQ1 */
-+	DEFINE_RES_IRQ(gic_spi(29)), /* IRQ2 */
-+	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ3 */
-+};
-+
-+void __init r8a7779_init_irq_extpin(int irlm)
-+{
-+	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
-+	u32 tmp;
-+
-+	if (!icr0) {
-+		pr_warn("r8a7779: unable to setup external irq pin mode\n");
-+		return;
-+	}
-+
-+	tmp = ioread32(icr0);
-+	if (irlm)
-+		tmp |= 1 << 23; /* IRQ0 -> IRQ3 as individual pins */
-+	else
-+		tmp &= ~(1 << 23); /* IRL mode - not supported */
-+	tmp |= (1 << 21); /* LVLMODE = 1 */
-+	iowrite32(tmp, icr0);
-+	iounmap(icr0);
-+
-+	if (irlm)
-+		platform_device_register_resndata(
-+			&platform_bus, "renesas_intc_irqpin", -1,
-+			irqpin0_resources, ARRAY_SIZE(irqpin0_resources),
-+			&irqpin0_platform_data, sizeof(irqpin0_platform_data));
-+}
-+
-+/* PFC/GPIO */
- static struct resource r8a7779_pfc_resources[] = {
- 	DEFINE_RES_MEM(0xfffc0000, 0x023c),
- };
-@@ -641,6 +698,29 @@ void __init r8a7779_init_late(void)
- }
- 
- #ifdef CONFIG_USE_OF
-+static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
-+{
-+	return 0; /* always allow wakeup */
-+}
-+
-+void __init r8a7779_init_irq_dt(void)
-+{
-+	gic_arch_extn.irq_set_wake = r8a7779_set_wake;
-+
-+	irqchip_init();
-+
-+	/* route all interrupts to ARM */
-+	__raw_writel(0xffffffff, INT2NTSR0);
-+	__raw_writel(0x3fffffff, INT2NTSR1);
-+
-+	/* unmask all known interrupts in INTCS2 */
-+	__raw_writel(0xfffffff0, INT2SMSKCR0);
-+	__raw_writel(0xfff7ffff, INT2SMSKCR1);
-+	__raw_writel(0xfffbffdf, INT2SMSKCR2);
-+	__raw_writel(0xbffffffc, INT2SMSKCR3);
-+	__raw_writel(0x003fee3f, INT2SMSKCR4);
-+}
-+
- void __init r8a7779_init_delay(void)
- {
- 	shmobile_setup_delay(1000, 2, 4); /* Cortex-A9 @ 1000MHz */
+-void __init shmobile_timer_init(void)
+-{
+-	clocksource_of_init();
+-}
 -- 
 1.8.3.2
