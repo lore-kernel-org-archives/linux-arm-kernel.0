@@ -1,407 +1,318 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 17:33:59 +0200
-Subject: [PATCH 10/20] net: irda: pxaficp_ir: switch to dmaengine
+Date: Wed,  7 Aug 2013 17:34:01 +0200
+Subject: [PATCH 12/20] net: smc911x.c: switch to dmaengine API
 In-Reply-To: <1375889649-14638-1-git-send-email-zonque@gmail.com>
 References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375889649-14638-11-git-send-email-zonque@gmail.com>
+Message-ID: <1375889649-14638-13-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was only compile-tested.
+Drop all PXA-DMA specific implementation details and switch over to
+generic dmaengine usage.
+
+This patch is only compile-tested.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/net/irda/pxaficp_ir.c | 242 ++++++++++++++++++++++++++----------------
- 1 file changed, 151 insertions(+), 91 deletions(-)
+ drivers/net/ethernet/smsc/smc911x.c | 80 ++++++++++++++++++++++-------------
+ drivers/net/ethernet/smsc/smc911x.h | 83 ++++++++++++++++++++-----------------
+ 2 files changed, 98 insertions(+), 65 deletions(-)
 
-diff --git a/drivers/net/irda/pxaficp_ir.c b/drivers/net/irda/pxaficp_ir.c
-index 964b116..d77a342 100644
---- a/drivers/net/irda/pxaficp_ir.c
-+++ b/drivers/net/irda/pxaficp_ir.c
-@@ -21,13 +21,15 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/slab.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dma/mmp-pdma.h>
+diff --git a/drivers/net/ethernet/smsc/smc911x.c b/drivers/net/ethernet/smsc/smc911x.c
+index 345558f..19cdf8f 100644
+--- a/drivers/net/ethernet/smsc/smc911x.c
++++ b/drivers/net/ethernet/smsc/smc911x.c
+@@ -1178,9 +1178,9 @@ static irqreturn_t smc911x_interrupt(int irq, void *dev_id)
  
- #include <net/irda/irda.h>
- #include <net/irda/irmod.h>
- #include <net/irda/wrapper.h>
- #include <net/irda/irda_device.h>
+ #ifdef SMC_USE_DMA
+ static void
+-smc911x_tx_dma_irq(int dma, void *data)
++smc911x_tx_dma_irq(void *param)
+ {
+-	struct net_device *dev = (struct net_device *)data;
++	struct net_device *dev = (struct net_device *) param;
+ 	struct smc911x_local *lp = netdev_priv(dev);
+ 	struct sk_buff *skb = lp->current_tx_skb;
+ 	unsigned long flags;
+@@ -1189,7 +1189,6 @@ smc911x_tx_dma_irq(int dma, void *data)
+ 
+ 	DBG(SMC_DEBUG_TX | SMC_DEBUG_DMA, "%s: TX DMA irq handler\n", dev->name);
+ 	/* Clear the DMA interrupt sources */
+-	SMC_DMA_ACK_IRQ(dev, dma);
+ 	BUG_ON(skb == NULL);
+ 	dma_unmap_single(NULL, tx_dmabuf, tx_dmalen, DMA_TO_DEVICE);
+ 	dev->trans_start = jiffies;
+@@ -1212,10 +1211,9 @@ smc911x_tx_dma_irq(int dma, void *data)
+ 		"%s: TX DMA irq completed\n", dev->name);
+ }
+ static void
+-smc911x_rx_dma_irq(int dma, void *data)
++smc911x_rx_dma_irq(void *param)
+ {
+-	struct net_device *dev = (struct net_device *)data;
+-	unsigned long ioaddr = dev->base_addr;
++	struct net_device *dev = (struct net_device *) param;
+ 	struct smc911x_local *lp = netdev_priv(dev);
+ 	struct sk_buff *skb = lp->current_rx_skb;
+ 	unsigned long flags;
+@@ -1224,7 +1222,6 @@ smc911x_rx_dma_irq(int dma, void *data)
+ 	DBG(SMC_DEBUG_FUNC, "%s: --> %s\n", dev->name, __func__);
+ 	DBG(SMC_DEBUG_RX | SMC_DEBUG_DMA, "%s: RX DMA irq handler\n", dev->name);
+ 	/* Clear the DMA interrupt sources */
+-	SMC_DMA_ACK_IRQ(dev, dma);
+ 	dma_unmap_single(NULL, rx_dmabuf, rx_dmalen, DMA_FROM_DEVICE);
+ 	BUG_ON(skb == NULL);
+ 	lp->current_rx_skb = NULL;
+@@ -1754,6 +1751,37 @@ static int smc911x_findirq(struct net_device *dev)
+ 	return probe_irq_off(cookie);
+ }
+ 
++#ifdef SMC_USE_DMA
++static void smc_alloc_dma(struct net_device *dev,
++			  struct smc911x_local *lp)
++{
++	dma_cap_mask_t mask;
++
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_MEMCPY, mask);
++
++	lp->rxdma = dma_request_channel(mask, NULL, NULL);
++	if (!lp->rxdma) {
++		printk("%s(): unable to allocate RX channel\n", __func__);
++		return;
++	}
++
++	lp->txdma = dma_request_channel(mask, NULL, NULL);
++	if (!lp->txdma) {
++		printk("%s(): unable to allocate TX channel\n", __func__);
++		return;
++	}
++
++	lp->rxdma_active = 0;
++	lp->txdma_active = 0;
++}
++#else
++static inline void smc_alloc_dma(struct net_device *dev,
++				 struct smc911x_local *lp)
++{
++}
++#endif
++
+ static const struct net_device_ops smc911x_netdev_ops = {
+ 	.ndo_open		= smc911x_open,
+ 	.ndo_stop		= smc911x_close,
+@@ -1969,13 +1997,7 @@ static int smc911x_probe(struct net_device *dev)
+ 	if (retval)
+ 		goto err_out;
+ 
+-#ifdef SMC_USE_DMA
+-	lp->rxdma = SMC_DMA_REQUEST(dev, smc911x_rx_dma_irq);
+-	lp->txdma = SMC_DMA_REQUEST(dev, smc911x_tx_dma_irq);
+-	lp->rxdma_active = 0;
+-	lp->txdma_active = 0;
+-	dev->dma = lp->rxdma;
+-#endif
++	smc_alloc_dma(dev, lp);
+ 
+ 	retval = register_netdev(dev);
+ 	if (retval == 0) {
+@@ -1985,11 +2007,11 @@ static int smc911x_probe(struct net_device *dev)
+ 			dev->base_addr, dev->irq);
+ 
+ #ifdef SMC_USE_DMA
+-		if (lp->rxdma != -1)
+-			printk(" RXDMA %d ", lp->rxdma);
++		if (lp->rxdma)
++			printk(" RXDMA %p", lp->rxdma);
+ 
+-		if (lp->txdma != -1)
+-			printk("TXDMA %d", lp->txdma);
++		if (lp->txdma)
++			printk("TXDMA %p", lp->txdma);
+ #endif
+ 		printk("\n");
+ 		if (!is_valid_ether_addr(dev->dev_addr)) {
+@@ -2013,11 +2035,14 @@ static int smc911x_probe(struct net_device *dev)
+ err_out:
+ #ifdef SMC_USE_DMA
+ 	if (retval) {
+-		if (lp->rxdma != -1) {
+-			SMC_DMA_FREE(dev, lp->rxdma);
++		if (lp->rxdma) {
++			dmaengine_terminate_all(lp->rxdma);
++			dma_release_channel(lp->rxdma);
+ 		}
+-		if (lp->txdma != -1) {
+-			SMC_DMA_FREE(dev, lp->txdma);
++
++		if (lp->txdma) {
++			dmaengine_terminate_all(lp->txdma);
++			dma_release_channel(lp->txdma);
+ 		}
+ 	}
+ #endif
+@@ -2119,12 +2144,11 @@ static int smc911x_drv_remove(struct platform_device *pdev)
+ 
+ #ifdef SMC_USE_DMA
+ 	{
+-		if (lp->rxdma != -1) {
+-			SMC_DMA_FREE(dev, lp->rxdma);
+-		}
+-		if (lp->txdma != -1) {
+-			SMC_DMA_FREE(dev, lp->txdma);
+-		}
++		if (lp->rxdma)
++			dma_release_channel(lp->rxdma);
++
++		if (lp->txdma)
++			dma_release_channel(lp->txdma);
+ 	}
+ #endif
+ 	iounmap(lp->base);
+diff --git a/drivers/net/ethernet/smsc/smc911x.h b/drivers/net/ethernet/smsc/smc911x.h
+index d51261b..9323f1d 100644
+--- a/drivers/net/ethernet/smsc/smc911x.h
++++ b/drivers/net/ethernet/smsc/smc911x.h
+@@ -29,6 +29,7 @@
+ #ifndef _SMC911X_H_
+ #define _SMC911X_H_
+ 
++#include <linux/dmaengine.h>
+ #include <linux/smc911x.h>
+ /*
+  * Use the DMA feature on PXA chips
+@@ -102,8 +103,8 @@ struct smc911x_local {
+ #ifdef SMC_USE_DMA
+ 	/* DMA needs the physical address of the chip */
+ 	u_long physaddr;
+-	int rxdma;
+-	int txdma;
++	struct dma_chan	*rxdma;
++	struct dma_chan *txdma;
+ 	int rxdma_active;
+ 	int txdma_active;
+ 	struct sk_buff *current_rx_skb;
+@@ -211,27 +212,6 @@ static inline void SMC_outsl(struct smc911x_local *lp, int reg,
+ 
+ #ifdef SMC_USE_PXA_DMA
  
 -#include <mach/dma.h>
- #include <linux/platform_data/irda-pxaficp.h>
- #include <mach/regs-ost.h>
- #include <mach/regs-uart.h>
-@@ -99,6 +101,9 @@
-                 IrSR_RCVEIR_UART_MODE | \
-                 IrSR_XMITIR_IR_MODE)
- 
-+/* FIXME */
-+extern void pxa2xx_transceiver_mode(struct device *dev, int mode);
-+
- struct pxa_irda {
- 	int			speed;
- 	int			newspeed;
-@@ -109,8 +114,10 @@ struct pxa_irda {
- 	dma_addr_t		dma_rx_buff_phy;
- 	dma_addr_t		dma_tx_buff_phy;
- 	unsigned int		dma_tx_buff_len;
--	int			txdma;
--	int			rxdma;
-+	struct dma_chan		*txdma;
-+	struct dma_chan		*rxdma;
-+	dma_cookie_t		dma_rx_cookie;
-+	dma_cookie_t		dma_tx_cookie;
- 
- 	int			uart_irq;
- 	int			icp_irq;
-@@ -122,6 +129,7 @@ struct pxa_irda {
- 	iobuff_t		rx_buff;
- 
- 	struct device		*dev;
-+	struct net_device	*net_dev;
- 	struct pxaficp_platform_data *pdata;
- 	struct clk		*fir_clk;
- 	struct clk		*sir_clk;
-@@ -147,26 +155,121 @@ static inline void pxa_irda_enable_sirclk(struct pxa_irda *si)
- 	clk_prepare_enable(si->sir_clk);
- }
- 
 -
- #define IS_FIR(si)		((si)->speed >= 4000000)
- #define IRDA_FRAME_SIZE_LIMIT	2047
- 
- inline static void pxa_irda_fir_dma_rx_start(struct pxa_irda *si)
- {
--	DCSR(si->rxdma)  = DCSR_NODESC;
--	DSADR(si->rxdma) = __PREG(ICDR);
--	DTADR(si->rxdma) = si->dma_rx_buff_phy;
--	DCMD(si->rxdma) = DCMD_INCTRGADDR | DCMD_FLOWSRC |  DCMD_WIDTH1 | DCMD_BURST32 | IRDA_FRAME_SIZE_LIMIT;
--	DCSR(si->rxdma) |= DCSR_RUN;
-+	struct dma_async_tx_descriptor *tx;
-+	struct dma_slave_config config;
-+	struct dma_device *dma_dev;
-+	int ret;
-+
-+	dma_dev = si->rxdma->device;
-+
-+	memset(&config, 0, sizeof(config));
-+	config.src_maxburst = 32;
-+	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	config.direction = DMA_DEV_TO_MEM;
-+
-+	ret = dmaengine_slave_config(si->rxdma, &config);
-+	if (ret < 0) {
-+		dev_err(si->dev, "dmaengine_slave_config() failed: %d\n", ret);
-+		return;
-+	}
-+
-+	tx = dma_dev->device_prep_dma_memcpy(si->rxdma, __PREG(ICDR),
-+					     si->dma_rx_buff_phy,
-+					     IRDA_FRAME_SIZE_LIMIT, 0);
-+	if (!tx) {
-+		dev_err(si->dev, "device_prep_dma_memcpy() failed: %d\n", ret);
-+		return;
-+	}
-+
-+	si->dma_rx_cookie = dmaengine_submit(tx);
-+	dma_async_issue_pending(si->rxdma);
-+}
-+
-+static int pxa_irda_set_speed(struct pxa_irda *si, int speed);
-+
-+/* FIR Transmit DMA interrupt handler */
-+static void pxa_irda_fir_dma_tx_irq(void *param)
-+{
-+	struct net_device *dev = param;
-+	struct pxa_irda *si = netdev_priv(dev);
-+	struct dma_tx_state tx_state;
-+	enum dma_status status;
-+
-+	status = dmaengine_tx_status(si->txdma, si->dma_tx_cookie, &tx_state);
-+	if (status == DMA_ERROR) {
-+		dev->stats.tx_errors++;
-+	} else {
-+		dev->stats.tx_packets++;
-+		dev->stats.tx_bytes += si->dma_tx_buff_len;
-+	}
-+
-+	while (ICSR1 & ICSR1_TBY)
-+		cpu_relax();
-+	si->last_oscr = readl_relaxed(OSCR);
-+
-+	/*
-+	 * HACK: It looks like the TBY bit is dropped too soon.
-+	 * Without this delay things break.
-+	 */
-+	udelay(120);
-+
-+	if (si->newspeed) {
-+		pxa_irda_set_speed(si, si->newspeed);
-+		si->newspeed = 0;
-+	} else {
-+		int i = 64;
-+
-+		ICCR0 = 0;
-+		pxa_irda_fir_dma_rx_start(si);
-+		while ((ICSR1 & ICSR1_RNE) && i--)
-+			(void)ICDR;
-+		ICCR0 = ICCR0_ITR | ICCR0_RXE;
-+
-+		if (i < 0)
-+			printk(KERN_ERR "pxa_ir: cannot clear Rx FIFO!\n");
-+	}
-+	netif_wake_queue(dev);
- }
- 
-+
- inline static void pxa_irda_fir_dma_tx_start(struct pxa_irda *si)
- {
--	DCSR(si->txdma)  = DCSR_NODESC;
--	DSADR(si->txdma) = si->dma_tx_buff_phy;
--	DTADR(si->txdma) = __PREG(ICDR);
--	DCMD(si->txdma) = DCMD_INCSRCADDR | DCMD_FLOWTRG |  DCMD_ENDIRQEN | DCMD_WIDTH1 | DCMD_BURST32 | si->dma_tx_buff_len;
--	DCSR(si->txdma) |= DCSR_RUN;
-+	struct dma_async_tx_descriptor *tx;
-+	struct dma_slave_config config;
-+	struct dma_device *dma_dev;
-+	int ret;
-+
-+	dma_dev = si->txdma->device;
-+
-+	memset(&config, 0, sizeof(config));
-+	config.dst_maxburst = 32;
-+	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	config.direction = DMA_MEM_TO_DEV;
-+
-+	ret = dmaengine_slave_config(si->txdma, &config);
-+	if (ret < 0) {
-+		dev_err(si->dev, "dmaengine_slave_config() failed: %d\n", ret);
-+		return;
-+	}
-+
-+	tx = dma_dev->device_prep_dma_memcpy(si->txdma, __PREG(ICDR),
-+					     si->dma_tx_buff_phy,
-+					     si->dma_tx_buff_len, 0);
-+	if (!tx) {
-+		dev_err(si->dev, "device_prep_dma_memcpy() failed: %d\n", ret);
-+		return;
-+	}
-+
-+	tx->callback = pxa_irda_fir_dma_tx_irq;
-+	tx->callback_param = si->net_dev;
-+
-+	si->dma_tx_cookie = dmaengine_submit(tx);
-+	dma_async_issue_pending(si->txdma);
- }
- 
+-/*
+- * Define the request and free functions
+- * These are unfortunately architecture specific as no generic allocation
+- * mechanism exits
+- */
+-#define SMC_DMA_REQUEST(dev, handler) \
+-	 pxa_request_dma(dev->name, DMA_PRIO_LOW, handler, dev)
+-
+-#define SMC_DMA_FREE(dev, dma) \
+-	 pxa_free_dma(dma)
+-
+-#define SMC_DMA_ACK_IRQ(dev, dma)					\
+-{									\
+-	if (DCSR(dma) & DCSR_BUSERR) {					\
+-		printk("%s: DMA %d bus error!\n", dev->name, dma);	\
+-	}								\
+-	DCSR(dma) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;		\
+-}
+-
  /*
-@@ -205,7 +308,7 @@ static int pxa_irda_set_speed(struct pxa_irda *si, int speed)
+  * Use a DMA for RX and TX packets.
+  */
+@@ -240,6 +220,9 @@ static inline void SMC_outsl(struct smc911x_local *lp, int reg,
+ static dma_addr_t rx_dmabuf, tx_dmabuf;
+ static int rx_dmalen, tx_dmalen;
  
- 		if (IS_FIR(si)) {
- 			/* stop RX DMA */
--			DCSR(si->rxdma) &= ~DCSR_RUN;
-+			dmaengine_terminate_all(si->rxdma);
- 			/* disable FICP */
- 			ICCR0 = 0;
- 			pxa_irda_disable_clk(si);
-@@ -344,68 +447,18 @@ static irqreturn_t pxa_irda_sir_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
++static void smc911x_tx_dma_irq(void *param);
++static void smc911x_rx_dma_irq(void *param);
++
+ #ifdef SMC_insl
+ #undef SMC_insl
+ #define SMC_insl(lp, r, p, l) \
+@@ -247,8 +230,17 @@ static int rx_dmalen, tx_dmalen;
+ 
+ static inline void
+ smc_pxa_dma_insl(struct smc911x_local *lp, u_long physaddr,
+-		int reg, int dma, u_char *buf, int len)
++		int reg, struct dma_chan *chan, u_char *buf, int len)
+ {
++	struct dma_async_tx_descriptor *tx;
++	struct dma_slave_config conf;
++
++	memset(&conf, 0, sizeof(conf));
++
++	conf.direction = DMA_DEV_TO_MEM;
++	conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	conf.src_maxburst = 32;
++
+ 	/* 64 bit alignment is required for memory to memory DMA */
+ 	if ((long)buf & 4) {
+ 		*((u32 *)buf) = SMC_inl(lp, reg);
+@@ -259,12 +251,16 @@ smc_pxa_dma_insl(struct smc911x_local *lp, u_long physaddr,
+ 	len *= 4;
+ 	rx_dmabuf = dma_map_single(lp->dev, buf, len, DMA_FROM_DEVICE);
+ 	rx_dmalen = len;
+-	DCSR(dma) = DCSR_NODESC;
+-	DTADR(dma) = rx_dmabuf;
+-	DSADR(dma) = physaddr + reg;
+-	DCMD(dma) = (DCMD_INCTRGADDR | DCMD_BURST32 |
+-		DCMD_WIDTH4 | DCMD_ENDIRQEN | (DCMD_LENGTH & rx_dmalen));
+-	DCSR(dma) = DCSR_NODESC | DCSR_RUN;
++
++	dmaengine_slave_config(chan, &conf);
++	tx = chan->device->device_prep_dma_memcpy(chan, rx_dmabuf,
++						  physaddr + reg, len, 0);
++
++	tx->callback = smc911x_rx_dma_irq;
++	tx->callback_param = lp->netdev;
++
++	dmaengine_submit(tx);
++	dma_async_issue_pending(chan);
  }
+ #endif
  
--/* FIR Receive DMA interrupt handler */
--static void pxa_irda_fir_dma_rx_irq(int channel, void *data)
--{
--	int dcsr = DCSR(channel);
--
--	DCSR(channel) = dcsr & ~DCSR_RUN;
--
--	printk(KERN_DEBUG "pxa_ir: fir rx dma bus error %#x\n", dcsr);
--}
--
--/* FIR Transmit DMA interrupt handler */
--static void pxa_irda_fir_dma_tx_irq(int channel, void *data)
--{
--	struct net_device *dev = data;
--	struct pxa_irda *si = netdev_priv(dev);
--	int dcsr;
--
--	dcsr = DCSR(channel);
--	DCSR(channel) = dcsr & ~DCSR_RUN;
--
--	if (dcsr & DCSR_ENDINTR)  {
--		dev->stats.tx_packets++;
--		dev->stats.tx_bytes += si->dma_tx_buff_len;
--	} else {
--		dev->stats.tx_errors++;
--	}
--
--	while (ICSR1 & ICSR1_TBY)
--		cpu_relax();
--	si->last_oscr = readl_relaxed(OSCR);
--
--	/*
--	 * HACK: It looks like the TBY bit is dropped too soon.
--	 * Without this delay things break.
--	 */
--	udelay(120);
--
--	if (si->newspeed) {
--		pxa_irda_set_speed(si, si->newspeed);
--		si->newspeed = 0;
--	} else {
--		int i = 64;
--
--		ICCR0 = 0;
--		pxa_irda_fir_dma_rx_start(si);
--		while ((ICSR1 & ICSR1_RNE) && i--)
--			(void)ICDR;
--		ICCR0 = ICCR0_ITR | ICCR0_RXE;
--
--		if (i < 0)
--			printk(KERN_ERR "pxa_ir: cannot clear Rx FIFO!\n");
--	}
--	netif_wake_queue(dev);
--}
--
- /* EIF(Error in FIFO/End in Frame) handler for FIR */
- static void pxa_irda_fir_irq_eif(struct pxa_irda *si, struct net_device *dev, int icsr0)
+@@ -275,8 +271,17 @@ smc_pxa_dma_insl(struct smc911x_local *lp, u_long physaddr,
+ 
+ static inline void
+ smc_pxa_dma_outsl(struct smc911x_local *lp, u_long physaddr,
+-		int reg, int dma, u_char *buf, int len)
++		int reg, struct dma_chan *chan, u_char *buf, int len)
  {
- 	unsigned int len, stat, data;
-+	struct dma_tx_state tx_state;
-+	enum dma_status status;
++	struct dma_async_tx_descriptor *tx;
++	struct dma_slave_config conf;
 +
-+	status = dmaengine_tx_status(si->rxdma, si->dma_rx_cookie,
-+				     &tx_state);
- 
- 	/* Get the current data position. */
--	len = DTADR(si->rxdma) - si->dma_rx_buff_phy;
-+	len = IRDA_FRAME_SIZE_LIMIT - tx_state.residue;
- 
- 	do {
- 		/* Read Status, and then Data. 	 */
-@@ -472,7 +525,7 @@ static irqreturn_t pxa_irda_fir_irq(int irq, void *dev_id)
- 	int icsr0, i = 64;
- 
- 	/* stop RX DMA */
--	DCSR(si->rxdma) &= ~DCSR_RUN;
-+	dmaengine_terminate_all(si->rxdma);
- 	si->last_oscr = readl_relaxed(OSCR);
- 	icsr0 = ICSR0;
- 
-@@ -553,7 +606,7 @@ static int pxa_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
- 				cpu_relax();
- 
- 		/* stop RX DMA,  disable FICP */
--		DCSR(si->rxdma) &= ~DCSR_RUN;
-+		dmaengine_terminate_all(si->rxdma);
- 		ICCR0 = 0;
- 
- 		pxa_irda_fir_dma_tx_start(si);
-@@ -626,10 +679,6 @@ static void pxa_irda_startup(struct pxa_irda *si)
- 	/* configure FICP ICCR2 */
- 	ICCR2 = ICCR2_TXP | ICCR2_TRIG_32;
- 
--	/* configure DMAC */
--	DRCMR(17) = si->rxdma | DRCMR_MAPVLD;
--	DRCMR(18) = si->txdma | DRCMR_MAPVLD;
--
- 	/* force SIR reinitialization */
- 	si->speed = 4000000;
- 	pxa_irda_set_speed(si, 9600);
-@@ -649,17 +698,15 @@ static void pxa_irda_shutdown(struct pxa_irda *si)
- 	STISR = 0;
- 
- 	/* disable DMA */
--	DCSR(si->txdma) &= ~DCSR_RUN;
--	DCSR(si->rxdma) &= ~DCSR_RUN;
-+	dmaengine_terminate_all(si->rxdma);
-+	dmaengine_terminate_all(si->txdma);
++	memset(&conf, 0, sizeof(conf));
 +
- 	/* disable FICP */
- 	ICCR0 = 0;
- 
- 	/* disable the STUART or FICP clocks */
- 	pxa_irda_disable_clk(si);
- 
--	DRCMR(17) = 0;
--	DRCMR(18) = 0;
--
- 	local_irq_restore(flags);
- 
- 	/* power off board transceiver */
-@@ -671,7 +718,8 @@ static void pxa_irda_shutdown(struct pxa_irda *si)
- static int pxa_irda_start(struct net_device *dev)
- {
- 	struct pxa_irda *si = netdev_priv(dev);
--	int err;
-+	dma_cap_mask_t mask;
-+	int drcmr, err;
- 
- 	si->speed = 9600;
- 
-@@ -689,13 +737,21 @@ static int pxa_irda_start(struct net_device *dev)
- 	disable_irq(si->uart_irq);
- 	disable_irq(si->icp_irq);
- 
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
++	conf.direction = DMA_MEM_TO_DEV;
++	conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	conf.dst_maxburst = 32;
 +
- 	err = -EBUSY;
--	si->rxdma = pxa_request_dma("FICP_RX",DMA_PRIO_LOW, pxa_irda_fir_dma_rx_irq, dev);
--	if (si->rxdma < 0)
+ 	/* 64 bit alignment is required for memory to memory DMA */
+ 	if ((long)buf & 4) {
+ 		SMC_outl(*((u32 *)buf), lp, reg);
+@@ -287,12 +292,16 @@ smc_pxa_dma_outsl(struct smc911x_local *lp, u_long physaddr,
+ 	len *= 4;
+ 	tx_dmabuf = dma_map_single(lp->dev, buf, len, DMA_TO_DEVICE);
+ 	tx_dmalen = len;
+-	DCSR(dma) = DCSR_NODESC;
+-	DSADR(dma) = tx_dmabuf;
+-	DTADR(dma) = physaddr + reg;
+-	DCMD(dma) = (DCMD_INCSRCADDR | DCMD_BURST32 |
+-		DCMD_WIDTH4 | DCMD_ENDIRQEN | (DCMD_LENGTH & tx_dmalen));
+-	DCSR(dma) = DCSR_NODESC | DCSR_RUN;
 +
-+	drcmr = 17;
-+	si->rxdma = dma_request_slave_channel_compat(mask, mmp_pdma_filter_fn,
-+						     &drcmr, si->dev, "rx");
-+	if (si->rxdma == NULL)
- 		goto err_rx_dma;
- 
--	si->txdma = pxa_request_dma("FICP_TX",DMA_PRIO_LOW, pxa_irda_fir_dma_tx_irq, dev);
--	if (si->txdma < 0)
-+	drcmr = 18;
-+	si->rxdma = dma_request_slave_channel_compat(mask, mmp_pdma_filter_fn,
-+						     &drcmr, si->dev, "rx");
-+	if (si->txdma == NULL)
- 		goto err_tx_dma;
- 
- 	err = -ENOMEM;
-@@ -737,9 +793,9 @@ err_irlap:
- err_dma_tx_buff:
- 	dma_free_coherent(si->dev, IRDA_FRAME_SIZE_LIMIT, si->dma_rx_buff, si->dma_rx_buff_phy);
- err_dma_rx_buff:
--	pxa_free_dma(si->txdma);
-+	dma_release_channel(si->txdma);
- err_tx_dma:
--	pxa_free_dma(si->rxdma);
-+	dma_release_channel(si->rxdma);
- err_rx_dma:
- 	free_irq(si->icp_irq, dev);
- err_irq2:
-@@ -766,8 +822,11 @@ static int pxa_irda_stop(struct net_device *dev)
- 	free_irq(si->uart_irq, dev);
- 	free_irq(si->icp_irq, dev);
- 
--	pxa_free_dma(si->rxdma);
--	pxa_free_dma(si->txdma);
-+	dmaengine_terminate_all(si->rxdma);
-+	dmaengine_terminate_all(si->txdma);
++	dmaengine_slave_config(chan, &conf);
++	tx = chan->device->device_prep_dma_memcpy(chan, physaddr + reg,
++						  tx_dmabuf, len, 0);
 +
-+	dma_release_channel(si->rxdma);
-+	dma_release_channel(si->txdma);
- 
- 	if (si->dma_rx_buff)
- 		dma_free_coherent(si->dev, IRDA_FRAME_SIZE_LIMIT, si->dma_tx_buff, si->dma_tx_buff_phy);
-@@ -855,6 +914,7 @@ static int pxa_irda_probe(struct platform_device *pdev)
- 	si = netdev_priv(dev);
- 	si->dev = &pdev->dev;
- 	si->pdata = pdev->dev.platform_data;
-+	si->net_dev = dev;
- 
- 	si->uart_irq = platform_get_irq(pdev, 0);
- 	si->icp_irq = platform_get_irq(pdev, 1);
++	tx->callback = smc911x_tx_dma_irq;
++	tx->callback_param = lp->netdev;
++
++	dmaengine_submit(tx);
++	dma_async_issue_pending(chan);
+ }
+ #endif
+ #endif	 /* SMC_USE_PXA_DMA */
 -- 
 1.8.3.1
