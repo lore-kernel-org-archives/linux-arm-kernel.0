@@ -1,44 +1,38 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 08 Aug 2013 07:14:07 +0900
-Subject: [PATCH 05/05] ARM: shmobile: Introduce shmobile_boot_size
-In-Reply-To: <20130807221321.22251.22774.sendpatchset@w520>
-References: <20130807221321.22251.22774.sendpatchset@w520>
-Message-ID: <20130807221407.22251.28821.sendpatchset@w520>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 7 Aug 2013 15:14:16 -0700
+Subject: [GIT PULL] msm cleanups for v3.12
+In-Reply-To: <20130807215259.GA22852@codeaurora.org>
+References: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
+ <20130807215259.GA22852@codeaurora.org>
+Message-ID: <20130807221416.GA23229@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Wed, Aug 07, 2013 at 02:52:59PM -0700, David Brown wrote:
+>On Wed, Aug 07, 2013 at 01:58:16PM -0700, David Brown wrote:
+>>The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+>>
+>>  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>>
+>>are available in the git repository at:
+>>
+>>  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git for-3.12/msm-cleanup2
+>>
+>>for you to fetch changes up to b80a0dc53df68c6862b8985ecc12856edb080248:
+>>
+>>  ARM: msm: fix compilation error in gpiomux (2013-08-07 10:39:31 -0700)
+>
+>Sigh, it looks like this fixes code that was removed in last-week's
+>fix patches.  I can either regenerate the pull request, or feel free
+>to "resolve" this by just using the removal of the code.
 
-Introduce shmobile_boot_size that can be used by
-future SMP code to determine the size of the boot
-code that needs to be copied to internal SRAM.
+Sorry, this patch doesn't actually conflict with the fixes, but is
+incorrect in light of them.  I will resend the pull request without
+this patch.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+David
 
- arch/arm/mach-shmobile/headsmp.S             |    3 +++
- arch/arm/mach-shmobile/include/mach/common.h |    1 +
- 2 files changed, 4 insertions(+)
-
---- 0001/arch/arm/mach-shmobile/headsmp.S
-+++ work/arch/arm/mach-shmobile/headsmp.S	2013-08-07 19:11:46.000000000 +0900
-@@ -40,6 +40,9 @@ shmobile_boot_fn:
- 	.globl	shmobile_boot_arg
- shmobile_boot_arg:
- 2:	.space	4
-+	.globl	shmobile_boot_size
-+shmobile_boot_size:
-+	.long	. - shmobile_boot_vector
- 
- /*
-  * Per-CPU SMP boot function/argument selection code based on MPIDR
---- 0008/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-08-07 19:11:46.000000000 +0900
-@@ -9,6 +9,7 @@ extern void shmobile_setup_console(void)
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
-+extern unsigned long shmobile_boot_size;
- extern void shmobile_smp_boot(void);
- extern void shmobile_smp_sleep(void);
- extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
