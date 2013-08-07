@@ -1,107 +1,116 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed,  7 Aug 2013 20:52:34 -0300
-Subject: [PATCH 3/5] clocksource: armada-370-xp: Introduce new compatibles
-In-Reply-To: <1375919556-24104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1375919556-24104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1375919556-24104-4-git-send-email-ezequiel.garcia@free-electrons.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Wed, 7 Aug 2013 16:52:51 -0700
+Subject: [PATCH v3 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <51FAA6F4.2010002@arm.com>
+References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
+ <1374870345-8276-2-git-send-email-markus.mayer@linaro.org>
+ <51FAA6F4.2010002@arm.com>
+Message-ID: <CAPdLdqk45yHhiRo=99yTXYEQfiPs83=Un2YTLwpR851H+=0gyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP SoC clocksource driver cannot work without the 25 MHz
-fixed timer. Therefore it's appropriate to introduce a new compatible
-string and use it to set the 25 MHz fixed timer.
+On 1 August 2013 11:20, Sudeep KarkadaNagesha
+<Sudeep.KarkadaNagesha@arm.com> wrote:
+> On 26/07/13 21:25, Markus Mayer wrote:
+>> From: Markus Mayer <mmayer@broadcom.com>
+>>
+>> This patch adds the GPIO driver for the bcm281xx family of chips.
+>>
+> May be I am missing my mails, but I could not find even in archives.
+> The patch says its v3, I could not trace v1/v2 and not change log.
 
-The 'marvell,timer-25MHz' property will be marked as deprecated.
+No, you didn't miss any e-mails. We had some internal reviews and the
+plan was for me to renumber the patches and start from v1 again for
+the public review, but I clearly forgot. Hence v3 is really the first
+public version of this patch.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/clocksource/time-armada-370-xp.c | 59 ++++++++++++++++++++++++--------
- 1 file changed, 45 insertions(+), 14 deletions(-)
+> Why these macros can't be something like this ?
+> #define GPIO_GPOR_OFFSET(bank)  (0x00000000 + (bank) << 2)
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index a2351ac..1458a85 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -212,7 +212,7 @@ static struct local_timer_ops armada_370_xp_local_timer_ops = {
- 	.stop	=  armada_370_xp_timer_stop,
- };
- 
--static void __init armada_370_xp_timer_init(struct device_node *np)
-+static void __init armada_370_xp_timer_common_init(struct device_node *np)
- {
- 	u32 clr = 0, set = 0;
- 	int res;
-@@ -221,21 +221,10 @@ static void __init armada_370_xp_timer_init(struct device_node *np)
- 	WARN_ON(!timer_base);
- 	local_base = of_iomap(np, 1);
- 
--	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
--
--		/* The fixed 25MHz timer is available so let's use it */
-+	if (timer25Mhz)
- 		set = TIMER0_25MHZ;
--		timer_clk = 25000000;
--	} else {
--		unsigned long rate = 0;
--		struct clk *clk = of_clk_get(np, 0);
--		WARN_ON(IS_ERR(clk));
--		rate =  clk_get_rate(clk);
--		timer_clk = rate / TIMER_DIVIDER;
--
-+	else
- 		clr = TIMER0_25MHZ;
--		timer25Mhz = false;
--	}
- 	local_timer_ctrl_clrset(clr, set);
- 	timer_ctrl_clrset(clr, set);
- 
-@@ -289,5 +278,47 @@ static void __init armada_370_xp_timer_init(struct device_node *np)
- #endif
- 	}
- }
-+
-+static void __init armada_370_xp_timer_init(struct device_node *np)
-+{
-+	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
-+		/* The fixed 25MHz timer is required */
-+		timer_clk = 25000000;
-+	} else {
-+		unsigned long rate = 0;
-+		struct clk *clk = of_clk_get(np, 0);
-+		WARN_ON(IS_ERR(clk));
-+		rate =  clk_get_rate(clk);
-+		timer_clk = rate / TIMER_DIVIDER;
-+		timer25Mhz = false;
-+	}
-+
-+	armada_370_xp_timer_common_init(np);
-+}
- CLOCKSOURCE_OF_DECLARE(armada_370_xp, "marvell,armada-370-xp-timer",
- 		       armada_370_xp_timer_init);
-+
-+static void __init armada_xp_timer_init(struct device_node *np)
-+{
-+	/* The fixed 25MHz timer is required */
-+	timer_clk = 25000000;
-+
-+	armada_370_xp_timer_common_init(np);
-+}
-+CLOCKSOURCE_OF_DECLARE(armada_xp, "marvell,armada-xp-timer",
-+		       armada_xp_timer_init);
-+
-+static void __init armada_370_timer_init(struct device_node *np)
-+{
-+	unsigned long rate = 0;
-+	struct clk *clk = of_clk_get(np, 0);
-+
-+	WARN_ON(IS_ERR(clk));
-+	rate =  clk_get_rate(clk);
-+	timer_clk = rate / TIMER_DIVIDER;
-+	timer25Mhz = false;
-+
-+	armada_370_xp_timer_common_init(np);
-+}
-+CLOCKSOURCE_OF_DECLARE(armada_370, "marvell,armada-370-timer",
-+		       armada_370_timer_init);
+Done.
+
+> Can this be embed in bcm_kona_gpio?
+> You can then get rid of all the accesses to global variable
+> bcm_kona_gpio.
+
+Still working on this one, but the global variable will go away. The
+same is true of the other globals.
+
+>> +static inline u32 bcm_kona_gpio_out_status(int bank)
+>> +{
+>> +       return GPIO_GPOR0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_in_status(int bank)
+>> +{
+>> +       return GPIO_GPIR0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_out_set(int bank)
+>> +{
+>> +       return GPIO_GPORS0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_out_clear(int bank)
+>> +{
+>> +       return GPIO_GPORC0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_int_status(int bank)
+>> +{
+>> +       return GPIO_ISR0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_int_mask(int bank)
+>> +{
+>> +       return GPIO_IMR0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_int_mskclr(int bank)
+>> +{
+>> +       return GPIO_IMRC0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_pwd_status(int bank)
+>> +{
+>> +       return GPIO_GPPLSR0_OFFSET + (bank << 2);
+>> +}
+>> +
+>> +static inline u32 bcm_kona_gpio_control(int gpio)
+>> +{
+>> +       return GPIO_GPCTR0_OFFSET + (gpio << 2);
+>> +}
+> All these functions can go away if you can have the macros as shown above ?
+
+I took those functions out.
+
+>> +static int bcm_kona_count_irq_resources(struct platform_device *pdev)
+>> +{
+>> +       struct resource *res;
+>> +       int count = 0;
+>> +
+>> +       for (;;) {
+>> +               res = platform_get_resource(pdev, IORESOURCE_IRQ, count);
+> platform_get_irq instead
+
+Done.
+
+>> +               if (!res)
+>> +                       break;
+>> +               count++;
+>> +       }
+>> +       return count;
+>> +}
+
+> IMO, you don't require any global data or pointers if probe populates
+> all the pdev, irq/gpio_chip data member appropriately
+
+Yes, they'll go away in the next revision of this driver which I am
+hoping to post shortly.
+
+Thanks,
+-Markus
+
 -- 
-1.8.1.5
+Markus Mayer
+Broadcom Landing Team
