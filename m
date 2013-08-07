@@ -1,63 +1,52 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Wed, 07 Aug 2013 11:45:41 -0400
-Subject: at91sam9x5: uart (not usart) broken
-In-Reply-To: <5201EA4D.8030106@overkiz.com>
-References: <52019591.2010408@interlog.com> <5201EA4D.8030106@overkiz.com>
-Message-ID: <52026BA5.40707@interlog.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 7 Aug 2013 11:51:24 -0400
+Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <520157B2.8080205@wwwdotorg.org>
+References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130806200256.GB19280@titan.lakedaemon.net>
+ <520157B2.8080205@wwwdotorg.org>
+Message-ID: <20130807155124.GC19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-07 02:33 AM, boris brezillon wrote:
-> Hello Doug,
->
-> On 07/08/2013 02:32, Douglas Gilbert wrote:
->> Between lk 3.10.0 and lk 3.11.0-rc4 the uarts (not usarts)
->> have been broken in the at91sam9x5 family. The DT files have
->> been re-factored for uarts but look correct.
->>
->> So suspicion moves to the atmel_serial driver which enjoyed
->> a lot of changes in June.
->>
->
-> My patch (the last one in log history) is adding error checks on clk_get and
-> clk_enable (clk_prepare_enable) calls.
-> I think the issue you're having comes from these new checks, and the fact
-> that uart clks DT entries are missing.
->
-> The previous version was just silently ignoring these errors.
-> It may work if these clks (uart clks) are already enabled by bootstrap or
-> bootloader.
->
-> Anyway, I think the cleaner way for resolving this issue is to apply the patch
-> I joined in attachment.
->
-> Could you test it (I don't have any sam9x5 boards), and if this works I'll submit
-> it.
+On Tue, Aug 06, 2013 at 02:08:18PM -0600, Stephen Warren wrote:
+> On 08/06/2013 02:02 PM, Jason Cooper wrote:
+> > Thomas,
+> > 
+> > In order to get some testing in -next, I've *tentatively* applied this
+> > series in the following way:
+> > 
+> > +---+ mvebu/msi_common (1,2,3,10)
+> >     |
+> >     +---+---+ mvebu/msi_irq (4-9)
+> >             |
+> >             +---+---+ mvebu/msi_mvebu (11-13)
+> > 
+> > I had to make one change to patch #9, I protected the last two blocks
+> > with #ifdef CONFIG_PCI_MSI to prevent a build failure at that point.
+> > 
+> > mvebu/msi_common should be appropriate for Thierry to base off, however,
+> > I make no guarantees about the stability of the branch until I send a
+> > PR for it.  Code-wise, it should be fine, but the commit-ids may change
+> > due to adding Tested-by's, etc.
+> 
+> When do you intend to send the pull-request? I need a stable branch
+> before I can even apply Thierry's changes, and I'd prefer to get those
+> changes applied and in linux-next well before I send my pull requests to
+> arm-soc. At the very latest, I need enough time to apply Thierry's
+> patches on top of your final version of that branch, get it briefly
+> tested, and then send a pull-request to arm-soc before -rc6 is out, so
+> if your pull request goes in just before -rc6, that's going to be a problem.
 
-Hi Boris,
-Yes, your patch works with lk 3.11.0-rc4 on a at91sam9g25
-(aria G25). So please apply to the current rc series.
+I'll tag the head of mvebu/msi_common once it makes it through -next
+successfully (I saw a linux-next email go by, but I haven't gotten that
+far down my inbox yet)
 
-Also since in the lk 3.10 series this is silently broken and/or
-works by accident (e.g. when a boot loader sets the uart clocks)
-then perhaps this fix should be sent to Greg K-H for inclusion
-in the lk 3.10.x stable series.
+Hopefully today or tomorrow, depending on where the -next problem is.
+I'll send the PR along side that.  Once I tag it, you should be able to
+base off of it before it gets into arm-soc, since the commit-id won't
+change.
 
-Doug Gilbert
+thx,
 
->> Tested on a at91sam9g25 (Aria G25) which is a member of the
->> at91sam9x5 family with two uarts (four usarts and a debug
->> serial port). The failure looks like this in dmesg:
->>
->>  console [ttyS0] enabled
->>  f801c000.serial: ttyS1 at MMIO 0xf801c000 (irq = 23) is a ATMEL_SERIAL
->>  f8020000.serial: ttyS2 at MMIO 0xf8020000 (irq = 24) is a ATMEL_SERIAL
->>  f8024000.serial: ttyS3 at MMIO 0xf8024000 (irq = 25) is a ATMEL_SERIAL
->>  atmel_usart: probe of f8040000.serial failed with error -2
->>  f8028000.serial: ttyS4 at MMIO 0xf8028000 (irq = 32) is a ATMEL_SERIAL
->>
->> The device at 0xf8040000 is uart0 . My DT file was trying
->> to bring up uart0 but not uart1.
->>
->> Doug Gilbert
->
+Jason.
