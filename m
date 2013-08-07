@@ -1,51 +1,24 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed,  7 Aug 2013 20:16:42 +0530
-Subject: [PATCH 0/6] Tegra: Use cpufreq-cpu0 driver
-Message-ID: <cover.1375886595.git.viresh.kumar@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 7 Aug 2013 16:59:26 +0200
+Subject: [PATCH] i2c: mv64xxx: Document the newly introduced allwinner
+ compatible
+In-Reply-To: <1374650075-26190-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1374650075-26190-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130807145926.GF2978@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wed, Jul 24, 2013 at 09:14:35AM +0200, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-This is the first attempt to get rid of tegra-cpufreq driver. This patchset
-tries to add supporting infrastructure for tegra to use cpufreq-cpu0 driver.
+Applied to for-current, thanks!
 
-I don't have hardware to test it and so is compiled tested only.. Few bits may
-be missing as I couldn't think of all aspects and so may need your help getting
-them fixed.
-
-Once this is tested by you, I would like to take it through my ARM cpufreq tree
-if nobody else has a problem with it.
-
-Thanks
-
---
-Viresh.
-
-Viresh Kumar (6):
-  clk: Tegra: Add CPU0 clock driver
-  ARM: Tegra: Add CPU's OPPs for using cpufreq-cpu0 driver
-  ARM: Tegra: Enable OPP library
-  ARM: Tegra: defconfig: select cpufreq-cpu0 driver
-  ARM: Tegra: start using cpufreq-cpu0 driver
-  cpufreq: Tegra: Remove tegra-cpufreq driver
-
- arch/arm/boot/dts/tegra114.dtsi  |  12 ++
- arch/arm/boot/dts/tegra20.dtsi   |  12 ++
- arch/arm/boot/dts/tegra30.dtsi   |  12 ++
- arch/arm/configs/tegra_defconfig |   1 +
- arch/arm/mach-tegra/Kconfig      |   2 +
- arch/arm/mach-tegra/tegra.c      |   2 +
- drivers/clk/tegra/Makefile       |   1 +
- drivers/clk/tegra/clk-cpu.c      | 164 ++++++++++++++++++++++
- drivers/clk/tegra/clk-tegra30.c  |   4 +
- drivers/cpufreq/Kconfig.arm      |   8 --
- drivers/cpufreq/Makefile         |   1 -
- drivers/cpufreq/tegra-cpufreq.c  | 291 ---------------------------------------
- include/linux/clk/tegra.h        |   1 +
- 13 files changed, 211 insertions(+), 300 deletions(-)
- create mode 100644 drivers/clk/tegra/clk-cpu.c
- delete mode 100644 drivers/cpufreq/tegra-cpufreq.c
-
--- 
-1.7.12.rc2.18.g61b472e
+And please, always send to the I2C list. I work heavily with patchwork
+monitoring the I2C list; everything not there will easily be forgotten!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/46746d90/attachment.sig>
