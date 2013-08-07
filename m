@@ -1,47 +1,251 @@
 From: b35083@freescale.com (Jingchang Lu)
-Date: Wed, 7 Aug 2013 17:05:38 +0800
-Subject: [PATCH 3/8] i2c: imx: don't change platform device id_entry directly
+Date: Wed, 7 Aug 2013 17:05:39 +0800
+Subject: [PATCH 4/8] i2c: imx: wrap registers read/write to inline function
 In-Reply-To: <1375866343-2074-1-git-send-email-b35083@freescale.com>
 References: <1375866343-2074-1-git-send-email-b35083@freescale.com>
-Message-ID: <1375866343-2074-3-git-send-email-b35083@freescale.com>
+Message-ID: <1375866343-2074-4-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The id_entry field should be changed by platform driver core,
-driver should prevent changing it derectly. Use local variable
-to save and extract platform_device_id info of the dts devices
-instead.
+wrap the readb(), writeb() into inline function calls.
+It would make the driver more clearer to support platform
+with different register offset.
 
 Signed-off-by: Jingchang Lu <b35083@freescale.com>
 ---
- drivers/i2c/busses/i2c-imx.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-imx.c | 80 +++++++++++++++++++++++++-------------------
+ 1 file changed, 46 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 7adb351..cbea84b 100644
+index cbea84b..1a3c608 100644
 --- a/drivers/i2c/busses/i2c-imx.c
 +++ b/drivers/i2c/busses/i2c-imx.c
-@@ -499,6 +499,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	struct imx_i2c_struct *i2c_imx;
- 	struct resource *res;
- 	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
-+	const struct platform_device_id *imx_id;
- 	void __iomem *base;
- 	int irq, ret;
- 	u32 bitrate;
-@@ -524,8 +525,11 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+@@ -160,6 +160,18 @@ static inline int is_imx1_i2c(struct imx_i2c_struct *i2c_imx)
+ 	return i2c_imx->devtype == IMX1_I2C;
+ }
+ 
++static inline void imx_i2c_write_reg(unsigned int val,
++		struct imx_i2c_struct *i2c_imx, unsigned int reg)
++{
++	writeb(val, i2c_imx->base + reg);
++}
++
++static inline unsigned char imx_i2c_read_reg(struct imx_i2c_struct *i2c_imx,
++		unsigned int reg)
++{
++	return readb(i2c_imx->base + reg);
++}
++
+ /** Functions for IMX I2C adapter driver ***************************************
+ *******************************************************************************/
+ 
+@@ -171,7 +183,7 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+ 
+ 	while (1) {
+-		temp = readb(i2c_imx->base + IMX_I2C_I2SR);
++		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+ 		if (for_busy && (temp & I2SR_IBB))
+ 			break;
+ 		if (!for_busy && !(temp & I2SR_IBB))
+@@ -202,7 +214,7 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
+ 
+ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
+ {
+-	if (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_RXAK) {
++	if (imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR) & I2SR_RXAK) {
+ 		dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
+ 		return -EIO;  /* No ACK */
+ 	}
+@@ -219,25 +231,25 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+ 
+ 	clk_prepare_enable(i2c_imx->clk);
+-	writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
++	imx_i2c_write_reg(i2c_imx->ifdr, i2c_imx, IMX_I2C_IFDR);
+ 	/* Enable I2C controller */
+-	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+-	writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2SR);
++	imx_i2c_write_reg(I2CR_IEN, i2c_imx, IMX_I2C_I2CR);
+ 
+ 	/* Wait controller to be stable */
+ 	udelay(50);
+ 
+ 	/* Start I2C transaction */
+-	temp = readb(i2c_imx->base + IMX_I2C_I2CR);
++	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+ 	temp |= I2CR_MSTA;
+-	writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+ 	result = i2c_imx_bus_busy(i2c_imx, 1);
+ 	if (result)
+ 		return result;
+ 	i2c_imx->stopped = 0;
+ 
+ 	temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
+-	writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+ 	return result;
+ }
+ 
+@@ -248,9 +260,9 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+ 	if (!i2c_imx->stopped) {
+ 		/* Stop I2C transaction */
+ 		dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+-		temp = readb(i2c_imx->base + IMX_I2C_I2CR);
++		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+ 		temp &= ~(I2CR_MSTA | I2CR_MTX);
+-		writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+ 	}
+ 	if (is_imx1_i2c(i2c_imx)) {
+ 		/*
+@@ -266,7 +278,7 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
  	}
  
- 	if (of_id)
--		pdev->id_entry = of_id->data;
--	i2c_imx->devtype = pdev->id_entry->driver_data;
-+		imx_id = of_id->data;
-+	else
-+		imx_id = platform_get_device_id(pdev);
-+
-+	i2c_imx->devtype = imx_id->driver_data;
+ 	/* Disable I2C controller */
+-	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2CR);
+ 	clk_disable_unprepare(i2c_imx->clk);
+ }
  
- 	/* Setup i2c_imx driver structure */
- 	strlcpy(i2c_imx->adapter.name, pdev->name, sizeof(i2c_imx->adapter.name));
+@@ -313,12 +325,12 @@ static irqreturn_t i2c_imx_isr(int irq, void *dev_id)
+ 	struct imx_i2c_struct *i2c_imx = dev_id;
+ 	unsigned int temp;
+ 
+-	temp = readb(i2c_imx->base + IMX_I2C_I2SR);
++	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+ 	if (temp & I2SR_IIF) {
+ 		/* save status register */
+ 		i2c_imx->i2csr = temp;
+ 		temp &= ~I2SR_IIF;
+-		writeb(temp, i2c_imx->base + IMX_I2C_I2SR);
++		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2SR);
+ 		wake_up(&i2c_imx->queue);
+ 		return IRQ_HANDLED;
+ 	}
+@@ -334,7 +346,7 @@ static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+ 		__func__, msgs->addr << 1);
+ 
+ 	/* write slave address */
+-	writeb(msgs->addr << 1, i2c_imx->base + IMX_I2C_I2DR);
++	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
+ 	result = i2c_imx_trx_complete(i2c_imx);
+ 	if (result)
+ 		return result;
+@@ -348,7 +360,7 @@ static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+ 		dev_dbg(&i2c_imx->adapter.dev,
+ 			"<%s> write byte: B%d=0x%X\n",
+ 			__func__, i, msgs->buf[i]);
+-		writeb(msgs->buf[i], i2c_imx->base + IMX_I2C_I2DR);
++		imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
+ 		result = i2c_imx_trx_complete(i2c_imx);
+ 		if (result)
+ 			return result;
+@@ -369,7 +381,7 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+ 		__func__, (msgs->addr << 1) | 0x01);
+ 
+ 	/* write slave address */
+-	writeb((msgs->addr << 1) | 0x01, i2c_imx->base + IMX_I2C_I2DR);
++	imx_i2c_write_reg((msgs->addr << 1) | 0x01, i2c_imx, IMX_I2C_I2DR);
+ 	result = i2c_imx_trx_complete(i2c_imx);
+ 	if (result)
+ 		return result;
+@@ -380,12 +392,12 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s> setup bus\n", __func__);
+ 
+ 	/* setup bus to read data */
+-	temp = readb(i2c_imx->base + IMX_I2C_I2CR);
++	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+ 	temp &= ~I2CR_MTX;
+ 	if (msgs->len - 1)
+ 		temp &= ~I2CR_TXAK;
+-	writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+-	readb(i2c_imx->base + IMX_I2C_I2DR); /* dummy read */
++	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
++	imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR); /* dummy read */
+ 
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s> read data\n", __func__);
+ 
+@@ -399,19 +411,19 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+ 			   controller from generating another clock cycle */
+ 			dev_dbg(&i2c_imx->adapter.dev,
+ 				"<%s> clear MSTA\n", __func__);
+-			temp = readb(i2c_imx->base + IMX_I2C_I2CR);
++			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+ 			temp &= ~(I2CR_MSTA | I2CR_MTX);
+-			writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++			imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+ 			i2c_imx_bus_busy(i2c_imx, 0);
+ 			i2c_imx->stopped = 1;
+ 		} else if (i == (msgs->len - 2)) {
+ 			dev_dbg(&i2c_imx->adapter.dev,
+ 				"<%s> set TXAK\n", __func__);
+-			temp = readb(i2c_imx->base + IMX_I2C_I2CR);
++			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+ 			temp |= I2CR_TXAK;
+-			writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++			imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+ 		}
+-		msgs->buf[i] = readb(i2c_imx->base + IMX_I2C_I2DR);
++		msgs->buf[i] = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR);
+ 		dev_dbg(&i2c_imx->adapter.dev,
+ 			"<%s> read byte: B%d=0x%X\n",
+ 			__func__, i, msgs->buf[i]);
+@@ -438,9 +450,9 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
+ 		if (i) {
+ 			dev_dbg(&i2c_imx->adapter.dev,
+ 				"<%s> repeated start\n", __func__);
+-			temp = readb(i2c_imx->base + IMX_I2C_I2CR);
++			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+ 			temp |= I2CR_RSTA;
+-			writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++			imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+ 			result =  i2c_imx_bus_busy(i2c_imx, 1);
+ 			if (result)
+ 				goto fail0;
+@@ -449,13 +461,13 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
+ 			"<%s> transfer message: %d\n", __func__, i);
+ 		/* write/read data */
+ #ifdef CONFIG_I2C_DEBUG_BUS
+-		temp = readb(i2c_imx->base + IMX_I2C_I2CR);
++		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+ 		dev_dbg(&i2c_imx->adapter.dev, "<%s> CONTROL: IEN=%d, IIEN=%d, "
+ 			"MSTA=%d, MTX=%d, TXAK=%d, RSTA=%d\n", __func__,
+ 			(temp & I2CR_IEN ? 1 : 0), (temp & I2CR_IIEN ? 1 : 0),
+ 			(temp & I2CR_MSTA ? 1 : 0), (temp & I2CR_MTX ? 1 : 0),
+ 			(temp & I2CR_TXAK ? 1 : 0), (temp & I2CR_RSTA ? 1 : 0));
+-		temp = readb(i2c_imx->base + IMX_I2C_I2SR);
++		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+ 		dev_dbg(&i2c_imx->adapter.dev,
+ 			"<%s> STATUS: ICF=%d, IAAS=%d, IBB=%d, "
+ 			"IAL=%d, SRW=%d, IIF=%d, RXAK=%d\n", __func__,
+@@ -575,8 +587,8 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+ 	i2c_imx_set_clk(i2c_imx, bitrate);
+ 
+ 	/* Set up chip registers to defaults */
+-	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+-	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2CR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2SR);
+ 
+ 	/* Add I2C adapter */
+ 	ret = i2c_add_numbered_adapter(&i2c_imx->adapter);
+@@ -612,10 +624,10 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
+ 	i2c_del_adapter(&i2c_imx->adapter);
+ 
+ 	/* setup chip registers to defaults */
+-	writeb(0, i2c_imx->base + IMX_I2C_IADR);
+-	writeb(0, i2c_imx->base + IMX_I2C_IFDR);
+-	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+-	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_IADR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_IFDR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2CR);
++	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2SR);
+ 
+ 	return 0;
+ }
 -- 
 1.8.0
