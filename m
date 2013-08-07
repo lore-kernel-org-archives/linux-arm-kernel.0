@@ -1,95 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 7 Aug 2013 14:16:11 -0500
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <52028E15.7080207@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <52027439.7080206@ti.com> <52028E15.7080207@ti.com>
-Message-ID: <52029CFB.3060808@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Aug 2013 21:16:40 +0200
+Subject: [PATCH 2/2] pinctrl: sunxi: Add spinlocks
+In-Reply-To: <CACRpkdYS-7MPTTSg4psJ3NZ_jhA15aMeFLoxFNAN7hSqe4hRTA@mail.gmail.com>
+References: <1375612728-20501-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375612728-20501-3-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdYS-7MPTTSg4psJ3NZ_jhA15aMeFLoxFNAN7hSqe4hRTA@mail.gmail.com>
+Message-ID: <20130807191640.GG2911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2013 01:12 PM, Dave Gerlach wrote:
-> On 08/07/2013 11:22 AM, Nishanth Menon wrote:
->> On 08/06/2013 12:49 PM, Dave Gerlach wrote:
->> [...]
->>
->>> +
->>> +struct forced_standby_module am33xx_mod[] = {
->>> +    {.oh_name = "usb_otg_hs"},
->>> +    {.oh_name = "tptc0"},
->>> +    {.oh_name = "tptc1"},
->>> +    {.oh_name = "tptc2"},
->>> +    {.oh_name = "cpgmac0"},
->>> +};
->>> +
->> [...]
->>> +
->>> +static int am33xx_pm_suspend(void)
->>> +{
->>> +    int i, j, ret = 0;
->>> +
->>> +    int status = 0;
->>> +    struct platform_device *pdev;
->>> +    struct omap_device *od;
->>> +
->>> +    /*
->>> +     * By default the following IPs do not have MSTANDBY asserted
->>> +     * which is necessary for PER domain transition. If the drivers
->>> +     * are not compiled into the kernel HWMOD code will not change the
->>> +     * state of the IPs if the IP was not never enabled. To ensure
->>> +     * that there no issues with or without the drivers being compiled
->>> +     * in the kernel, we forcefully put these IPs to idle.
->>> +     */
->>> +    for (i = 0; i < ARRAY_SIZE(am33xx_mod); i++) {
->>> +        pdev = to_platform_device(am33xx_mod[i].dev);
->>> +        od = to_omap_device(pdev);
->>> +        if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
->>> +            omap_device_enable_hwmods(od);
->>> +            omap_device_idle_hwmods(od);
->>> +        }
->>> +    }
->>
->> Sorry, I dont like this one bit. this is the job of the suspend / resume
->> handler dealing with the specific device. I recollect having a similar
->> issue on OMAP5 where without USB driver, USB wont idle, hence we cant
->> suspend either. is the solution to do a custom handling for specific
->> nodes as above? is it even necessary - considering that in multiple
->> suspend-resume iterations, do we need to "enable and idle" multiple
->> times? Cant we do it just in hwmod/omap_device level where unbound
->> devices are disabled? Is there absolutely no possible way to do this in
->> a generic manner?
->>
->
-> The issue here is that during a low-power transition the peripheral
-> power domain loses context so the MSTANDBY config gets lost which is why
-> the custom handling is needed on every cycle if there is no driver to
-> handle it. I was unable to come up with a more generic way to handle
-> this but I am certainly open for suggestions.
->
+Hi Linus,
 
-If the dts entry for device status = "disabled" you should not have 
-these even registered right? kinda makes me wonder if M3 could do 
-something about it -> since they are minimal?
+On Wed, Aug 07, 2013 at 08:42:42PM +0200, Linus Walleij wrote:
+> On Sun, Aug 4, 2013 at 12:38 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> 
+> > The current code use no locking at all, which is obviously not that
+> > great and can lead to concurrency issues, especially with the newer SMP
+> > SoCs from Allwinner.
+> >
+> > Add some locking where it's needed.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> This does not apply to my fixes branch which is based off
+> v3.11-rc4.
 
-When they are not,
+I think you're missing this patch that I sent previously:
 
-I think the generic omap_device_pm_domain ops does not apply for these 
-devices due to the quirks?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186342.html
 
-Making a flag for these improper devices should let omap_device 
-abstraction setup different pm_domain configuration also shut them up at 
-boot as well (if un-bound). that will let a generic device solution 
-scale out to more SoCs without custom handling, perhaps?
+> It is also too big to go into fixes.
+> 
+> I think it may be requiring the other queued Allwinner things,
+> so it is better if I apply this on the devel branch after looking over
+> that Allwinner A20/A31 stuff?
 
-just an quick idea - not sure about validity about the approach without 
-digging in more.
+The A20/A31 stuff shouldn't conflict with this one, but yes, I you
+prefer to do it that way, it's fine for me.
 
-
-usually, we try to ensure system is exactly the same state as it entered 
--> so at boot, we shut down everything, on wakeup, if unexpected things 
-like these are present, we shut them down again (in .finish handler).
+Maxime
 
 -- 
-Regards,
-Nishanth Menon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/081021b0/attachment.sig>
