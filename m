@@ -1,46 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Aug 2013 02:52:14 +0100
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802115334.GN2465@mudshark.cambridge.arm.com>
- <20130802142010.GC7533@kroah.com>
- <20130802160932.GG5292@mudshark.cambridge.arm.com>
- <20130802223247.GC28831@kroah.com>
- <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
-Message-ID: <20130807015214.GH15579@mudshark.cambridge.arm.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 7 Aug 2013 08:51:49 +0530
+Subject: [PATCH 1/3] clk: exynos4: Make exynos4_plls static
+In-Reply-To: <20130806200219.GD23006@n2100.arm.linux.org.uk>
+References: <1375788675-2638-1-git-send-email-sachin.kamat@linaro.org>
+ <20130806200219.GD23006@n2100.arm.linux.org.uk>
+Message-ID: <CAK9yfHxKn9JaA5Tbuw9qXeyEX_kio4mt3gOgJxkMNSoDHkHnBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 03, 2013 at 06:16:57AM +0100, Olof Johansson wrote:
-> On Fri, Aug 2, 2013 at 3:32 PM, Greg KH <greg@kroah.com> wrote:
-> > I don't scale if I'm forced to review every driver to ensure that they
-> > shouldn't be using platform device and should be creating their own bus
-> > type.  You can do that, along with the other ARM developers reviewing
-> > these new subsystems and code being added.
-> 
-> For most new platforms, using basic platform_bus devices makes sense
-> when the setup is simple and just has a few devices. It's only when
-> they need to add support for {S,IO}MMUs and get the more advanced
-> functionality going that things get messy and platform_bus stops
-> working.
++CC Joe Perches
 
-Right, but being more forward-looking, we will need to know this kind of
-topological information to do simple things like (coherent) DMA or even
-just to generate/route an interrupt.
+On 7 August 2013 01:32, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> Also note:
+>
+> On Tue, Aug 06, 2013 at 05:01:13PM +0530, Sachin Kamat wrote:
+>> @@ -984,7 +984,7 @@ static __initdata struct of_device_id ext_clk_match[] = {
+>
+> For the declaration above...
+>
+>> -struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+>> +static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+>
+> And this one... __initdata should come just before the '=', not at the
+> start, not in the middle and not before the variable.
+>
+> The reasoning is that with how you have it above, the attributes are
+> applied to the structure.  You want to apply the attributes to the
+> declaration instead, so it should come after the variable name.
+>
+> So, for example:
+>
+>         struct foo *foo __attribute__((section(".foo"))) = (void *)1;
+>
+> will place the "foo" variable into a section called ".foo", but:
+>
+>         struct __attribute__((section(".foo"))) foo *foo = (void *)1;
+>
+> will place "foo" into the normal .data section.
+>
+> So, the rule with variable declarations is that the __ specifiers we
+> have as macros in the kernel always come after the variable name being
+> declared and nowhere else.  We consider anywhere else buggy.
 
-> So, we have the option of having someone care about the {S,IO}MMU
-> pieces, and when they spot the attempts to make that work, push them
-> towards a proper bus architecture. Until then, the simpler solution is
-> probably a reasonable idea compared to having newcomers worry about
-> defining new bus architectures and raising the bar for what it takes
-> to sort out the initial contributions and getting engaged upstream.
+Thanks for this useful tip, Russell. There are several instances in
+the kernel where these attributes are used at the beginning of the
+variable declaration.
 
-I take your point, but at the same time we don't want to find ourselves
-suddenly landed with having to convert a bunch of drivers to sit on
-different buses as an afterthought. There's likely some middle-ground that
-is difficult to envisage up-front.
+Probably it would be useful to add this to checkpatch. Joe?
 
-Will
+-- 
+With warm regards,
+Sachin
