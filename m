@@ -1,73 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:39:35 +0900
-Subject: [GIT PULL 9/9] ARM: shmobile: Per-CPU SMP boot / sleep code for SCU
- SoCs
-In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
-References: <cover.1375841380.git.horms+renesas@verge.net.au>
-Message-ID: <1d33a354bbb618ba578bb372ebc18fe58457f6f3.1375841380.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:39:28 +0900
+Subject: [GIT PULL 0/9] Renesas ARM based SoC SMP updates for v3.12
+Message-ID: <cover.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Olof, Hi Arnd,
 
-Hook in the per-CPU boot and sleep code in the shared
-mach-shmobile SCU code. CPUs may be kept in the asm
-routine until ->boot_secondary() when the per-CPU
-boot vector is installed. At the end of ->die() the
-asm sleep routine is invoked.
+please consider these Renesas ARM based SoC SMP updates for v3.12.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/platsmp-scu.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+This pull-request is based on renesas-dt2-for-v3.12, which I have
+previously sent a pull-request for.
 
-diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
-index 7a0c066..c96f501 100644
---- a/arch/arm/mach-shmobile/platsmp-scu.c
-+++ b/arch/arm/mach-shmobile/platsmp-scu.c
-@@ -18,8 +18,9 @@
- 
- void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
- {
--	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
--	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
-+	/* install boot code shared by all CPUs */
-+	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
-+	shmobile_boot_arg = MPIDR_HWID_BITMASK;
- 
- 	/* enable SCU and cache coherency on booting CPU */
- 	scu_enable(shmobile_scu_base);
-@@ -28,22 +29,26 @@ void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
- 
- int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	/* do nothing for now */
-+	/* For this particular CPU register SCU boot vector */
-+	shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
-+			  (unsigned long)shmobile_scu_base);
- 	return 0;
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
- void shmobile_smp_scu_cpu_die(unsigned int cpu)
- {
-+	/* For this particular CPU deregister boot vector */
-+	shmobile_smp_hook(cpu, 0, 0);
-+
- 	dsb();
- 	flush_cache_all();
- 
- 	/* disable cache coherency */
- 	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
- 
--	/* Endless loop until reset */
--	while (1)
--		cpu_do_idle();
-+	/* jump to shared mach-shmobile sleep / reset code */
-+	shmobile_smp_sleep();
- }
- 
- static int shmobile_smp_scu_psr_core_disabled(int cpu)
--- 
-1.8.3.2
+
+The following changes since commit 8b3e32c1fe5dce55e28e76b20361841dc863ec17:
+
+  ARM: shmobile: r8a7740: Add TPU node to the device tree (2013-08-06 18:06:23 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-smp-for-v3.12
+
+for you to fetch changes up to 1d33a354bbb618ba578bb372ebc18fe58457f6f3:
+
+  ARM: shmobile: Per-CPU SMP boot / sleep code for SCU SoCs (2013-08-06 18:07:26 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC SMP updates for v3.12
+
+* Per-CPU SMP boot and sleep code on SoCs that use SCU
+* Shared SCU CPU Hotplug code on r8a7779 and sh73a0 SoCs
+* Shared SCU CPU boot code on emev2, r8a7779 and sh73a0 SoCs
+
+----------------------------------------------------------------
+Magnus Damm (9):
+      ARM: shmobile: Introduce shared SCU SMP boot code
+      ARM: shmobile: Use shared SCU SMP boot code on sh73a0
+      ARM: shmobile: Use shared SCU SMP boot code on r8a7779
+      ARM: shmobile: Use shared SCU SMP boot code on emev2
+      ARM: shmobile: Add shared SCU CPU Hotplug code
+      ARM: shmobile: Use shared SCU CPU Hotplug code on sh73a0
+      ARM: shmobile: Use shared SCU CPU Hotplug code on r8a7779
+      ARM: shmobile: Introduce per-CPU SMP boot / sleep code
+      ARM: shmobile: Per-CPU SMP boot / sleep code for SCU SoCs
+
+ arch/arm/mach-shmobile/Makefile              |  6 +--
+ arch/arm/mach-shmobile/headsmp.S             | 49 +++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |  9 ++++
+ arch/arm/mach-shmobile/platsmp-scu.c         | 81 ++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/platsmp.c             | 18 +++++++
+ arch/arm/mach-shmobile/smp-emev2.c           | 19 +++----
+ arch/arm/mach-shmobile/smp-r8a7779.c         | 64 ++++++----------------
+ arch/arm/mach-shmobile/smp-sh73a0.c          | 67 ++++++-----------------
+ 8 files changed, 202 insertions(+), 111 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/platsmp-scu.c
