@@ -1,55 +1,49 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 07 Aug 2013 00:50:04 -0700
-Subject: [PATCH 1/2] hwmon: (lm90) Add power control
-In-Reply-To: <5201F811.9050602@nvidia.com>
-References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
- <1375858358-15070-2-git-send-email-wni@nvidia.com>
- <1375860442.896960598@f427.i.mail.ru> <5201F811.9050602@nvidia.com>
-Message-ID: <5201FC2C.4030908@roeck-us.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 7 Aug 2013 15:50:42 +0800
+Subject: VM Kernel bug with CONFIG_DEBUG_VM
+In-Reply-To: <20130807054111.GQ16694@cbox>
+References: <20130807054111.GQ16694@cbox>
+Message-ID: <CACVXFVNt5j6cJGkRJuUv-yS+wqXN+Hzx2R7jY-2DPkxsNPkdcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2013 12:32 AM, Wei Ni wrote:
-> On 08/07/2013 03:27 PM, Alexander Shiyan wrote:
->>> The device lm90 can be controlled by the vdd rail.
->>> Adding the power control support to power on/off the vdd rail.
->>> And make sure that power is enabled before accessing the device.
->>>
->>> Signed-off-by: Wei Ni <wni@nvidia.com>
->>> ---
->>>   drivers/hwmon/lm90.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++++++
->> [...]
->>> +	if (!data->lm90_reg) {
->>> +		data->lm90_reg = regulator_get(&client->dev, "vdd");
->>> +		if (IS_ERR_OR_NULL(data->lm90_reg)) {
->>> +			if (PTR_ERR(data->lm90_reg) == -ENODEV)
->>> +				dev_info(&client->dev,
->>> +					 "No regulator found for vdd. Assuming vdd is always powered.");
->>> +			else
->>> +				dev_warn(&client->dev,
->>> +					 "Error [%ld] in getting the regulator handle for vdd.\n",
->>> +					 PTR_ERR(data->lm90_reg));
->>> +			data->lm90_reg = NULL;
->>> +			mutex_unlock(&data->update_lock);
->>> +			return -ENODEV;
->>> +		}
->>> +	}
->>> +	if (is_enable) {
->>> +		ret = regulator_enable(data->lm90_reg);
->>> +		msleep(POWER_ON_DELAY);
->>
->> Can this delay be handled directly from regulator?
+On Wed, Aug 7, 2013 at 1:41 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> Hi all,
 >
-> I think it should be handled in the device driver.
-> Because there have different delay time to wait devices stable.
->
+> I've found that booting a recent kernel (and as far back as 3.9 at
+> least) I get a kernel bug during boot with VM debugging enabled.  I
+> haven't had time to dig further into it, but wanted to check if this is
+> a known issue?
 
-Then why does no other caller of regulator_enable() need this ?
-I don't think lm90 is so much different to other users of regulator
-functionality.
+Remember Catalin introduced the flush_dcache_page() to fix
+cache incoherency problem when PIO reading from USB mass
+storage device to mapped page, so the flush should not need
+for pages not in page cache.
 
-Besides that, your delay is unconditional, even for static regulators
-which are always on. Other callers of regulator_enable() don't need
-all that complexity, which I take as sign that it is not needed here either.
+Care to test below patch to see if the problem can be fixed?
 
-Guenter
+diff --git a/drivers/usb/host/isp1760-hcd.c b/drivers/usb/host/isp1760-hcd.c
+index 2facee5..9d47c71 100644
+--- a/drivers/usb/host/isp1760-hcd.c
++++ b/drivers/usb/host/isp1760-hcd.c
+@@ -707,8 +707,12 @@ __acquires(priv->lock)
+ 		void *ptr;
+ 		for (ptr = urb->transfer_buffer;
+ 		     ptr < urb->transfer_buffer + urb->transfer_buffer_length;
+-		     ptr += PAGE_SIZE)
+-			flush_dcache_page(virt_to_page(ptr));
++		     ptr += PAGE_SIZE) {
++			struct page *page = virt_to_page(ptr);
++			if (PageSlab(page))
++				break;
++			flush_dcache_page(page);
++		}
+ 	}
+
+ 	/* complete() can reenter this HCD */
+
+
+Thanks,
+-- 
+Ming Lei
