@@ -1,36 +1,31 @@
-From: panetta.mike@gmail.com (Michael Panetta)
-Date: Tue,  6 Aug 2013 21:32:51 -0400
-Subject: [PATCH] ARM: dts: imx6qdl-wandboard: Add support for i2c3.
-In-Reply-To: <1375839171-13713-1-git-send-email-panetta.mike@gmail.com>
-References: <1375839171-13713-1-git-send-email-panetta.mike@gmail.com>
-Message-ID: <1375839171-13713-2-git-send-email-panetta.mike@gmail.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Tue,  6 Aug 2013 18:33:06 -0700
+Subject: [PATCH] ARM: dts: Fix memory node in skeleton64.dtsi
+Message-ID: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for i2c3 to the wandboard common dtsi file.
+Update the reg property of the memory node in
+skeleton64.dtsi to reflect the fact that the root node uses
+address-cells=2 and size-cells=2.
 
-Signed-off-by: Michael Panetta <panetta.mike@gmail.com>
+Change-Id: Ie9b61166143969e020ceebc51e9a384405d8c0f2
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/skeleton64.dtsi |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index bc494a0..cc042ea 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -73,6 +73,13 @@
- 	};
+diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
+index 1599415..b5d7f36 100644
+--- a/arch/arm/boot/dts/skeleton64.dtsi
++++ b/arch/arm/boot/dts/skeleton64.dtsi
+@@ -9,5 +9,5 @@
+ 	#size-cells = <2>;
+ 	chosen { };
+ 	aliases { };
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; reg = <0 0 0 0>; };
  };
- 
-+&i2c3 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3_3>;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
 -- 
-1.7.11.7
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
