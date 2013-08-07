@@ -1,93 +1,135 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 07 Aug 2013 17:11:37 +0200
-Subject: [PATCH V3 3/7] ARM: dts: Add i2c bus 1 and it's audio codec child
- node on smdk5420
-In-Reply-To: <1375866616-5541-4-git-send-email-padma.v@samsung.com>
-References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
- <1375866616-5541-4-git-send-email-padma.v@samsung.com>
-Message-ID: <1407261.xRZFWoXTos@amdc1227>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Aug 2013 16:13:16 +0100
+Subject: [PATCH v8] dmaengine: Add MOXA ART DMA engine driver
+In-Reply-To: <1375792711-21853-1-git-send-email-jonas.jensen@gmail.com>
+References: <1375713457-5562-1-git-send-email-jonas.jensen@gmail.com>
+ <1375792711-21853-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130807151316.GH28558@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 of August 2013 14:40:12 Padmavathi Venna wrote:
-> This patch adds i2c bus 1 and wm8994 codec node on i2c bus1 and the
-> required regulator supplies and properties on smdk5420 board.
+On Tue, Aug 06, 2013 at 01:38:31PM +0100, Jonas Jensen wrote:
+> The MOXA ART SoC has a DMA controller capable of offloading expensive
+> memory operations, such as large copies. This patch adds support for
+> the controller including four channels. Two of these are used to
+> handle MMC copy on the UC-7112-LX hardware. The remaining two can be
+> used in a future audio driver or client application.
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 > ---
->  arch/arm/boot/dts/exynos5420-smdk5420.dts |   58
-> +++++++++++++++++++++++++++++ 1 files changed, 58 insertions(+), 0
-> deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> b/arch/arm/boot/dts/exynos5420-smdk5420.dts index d05de7a..e86c1ae
-> 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -68,4 +68,62 @@
->  			bus-width = <4>;
->  		};
->  	};
+> Notes:
+>     Add test dummy DMA channels to MMC, prove the controller
+>     has support for interchangeable channel numbers [0].
+> 
+>     Add new filter data struct, store dma_spec passed in xlate,
+>     similar to proposed patch for omap/edma [1][2].
+> 
+>     [0] https://bitbucket.org/Kasreyn/linux-next/commits/2f17ac38c5d3af49bc0c559c429a351ddd40063d
+>     [1] https://lkml.org/lkml/2013/8/1/750  "[PATCH] DMA: let filter functions of of_dma_simple_xlate possible check of_node"
+>     [2] https://lkml.org/lkml/2013/3/11/203 "A proposal to check the device in generic way"
+> 
+>     Changes since v7:
+> 
+>     1. remove unnecessary loop in moxart_alloc_chan_resources()
+>     2. remove unnecessary status check in moxart_tx_status()
+>     3. check/handle dma_async_device_register() return value
+>     4. check/handle devm_request_irq() return value
+>     5. add and use filter data struct
+>     6. check if channel device is the same as passed to
+>        of_dma_controller_register()
+>     7. add check if chan->device->dev->of_node is the same as
+>        dma_spec->np (xlate)
+>     8. support interchangeable channels, #dma-cells is now <1>
+> 
+>     device tree bindings document:
+>     9. update description and example, change "#dma-cells" to "<1>"
+> 
+>     Applies to next-20130806
+> 
+>  .../devicetree/bindings/dma/moxa,moxart-dma.txt    |  19 +
+>  drivers/dma/Kconfig                                |   7 +
+>  drivers/dma/Makefile                               |   1 +
+>  drivers/dma/moxart-dma.c                           | 614 +++++++++++++++++++++
+>  4 files changed, 641 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
+>  create mode 100644 drivers/dma/moxart-dma.c
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
+> new file mode 100644
+> index 0000000..69e7001
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/moxa,moxart-dma.txt
+> @@ -0,0 +1,19 @@
+> +MOXA ART DMA Controller
 > +
-> +	avdd2: fixed-regulator at 0 {
-
-@ suffix should be present only if reg property is present as well. 
-Otherwise a suffix separated with "-" should be used, like fixed-
-regulator-0.
-
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "avdd2-supply";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-always-on;
-> +	};
+> +See dma.txt first
 > +
-> +	cpvdd: fixed-regulator at 1 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "cpvdd-supply";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-always-on;
-> +	};
+> +Required properties:
 > +
-> +	dbvdd: fixed-regulator at 2 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "dbvdd-supply";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +	};
+> +- compatible : Must be "moxa,moxart-dma"
+> +- reg :                Should contain registers location and length
+> +- interrupts : Should contain the interrupt number
+> +- #dma-cells : Should be 1, a single cell holding a line request number
 > +
-> +	spkvdd: fixed-regulator at 3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "spkvdd-supply";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-> +	};
+> +Example:
+> +
+> +       dma: dma at 90500000 {
+> +               compatible = "moxa,moxart-dma";
+> +               reg = <0x90500000 0x1000>;
+> +               interrupts = <24 0>;
+> +               #dma-cells = <1>;
+> +       };
 
-All these regulators should be made subnodes of a fixed-regulators node 
-aggregating all fixed regulators on the board, like on following example:
+The binding looks sensible to me now, but I have a couple of (hopefully
+final) questions on the probe failure path.
 
-	fixed-regulators {
-		avdd2: fixed-regulator-0 {
-			compatible = "regulator-fixed";
-			regulator-name = "avdd2-supply";
-			regulator-min-microvolt = <1800000>;
-			regulator-max-microvolt = <1800000>;
-			regulator-always-on;
-		};
+[...]
 
-		cpvdd: fixed-regulator-1 {
-			compatible = "regulator-fixed";
-			regulator-name = "cpvdd-supply";
-			regulator-min-microvolt = <1800000>;
-			regulator-max-microvolt = <1800000>;
-			regulator-always-on;
-		};
+> +
+> +       ret = dma_async_device_register(&mdc->dma_slave);
+> +       if (ret) {
+> +               dev_err(dev, "dma_async_device_register failed\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = of_dma_controller_register(node, moxart_of_xlate, mdc);
+> +       if (ret) {
+> +               dev_err(dev, "of_dma_controller_register failed\n");
+> +               dma_async_device_unregister(&mdc->dma_slave);
+> +               return ret;
+> +       }
+> +
+> +       platform_set_drvdata(pdev, mdc);
+> +
+> +       tasklet_init(&mdc->tasklet, moxart_dma_tasklet, (unsigned long)mdc);
+> +
+> +       ret = devm_request_irq(dev, irq, moxart_dma_interrupt, 0,
+> +                              "moxart-dma-engine", mdc);
+> +       if (ret) {
+> +               dev_err(dev, "devm_request_irq failed\n");
 
-		/* ... */
-	};
+Do you not need calls to of_dma_controller_free and
+dma_async_device_unregister here? I'm not all that familiar with the DMA
+API, so maybe you don't.
 
-Best regards,
-Tomasz
+> +               return ret;
+> +       }
+> +
+> +       dev_dbg(dev, "%s: IRQ=%u\n", __func__, irq);
+> +
+> +       return 0;
+> +}
+> +
+> +static int moxart_remove(struct platform_device *pdev)
+> +{
+> +       struct moxart_dma_container *m = dev_get_drvdata(&pdev->dev);
+
+Similarly, do you not need to call of_dma_controller free here?
+
+> +       dma_async_device_unregister(&m->dma_slave);
+> +       return 0;
+> +}
+
+Thanks,
+Mark.
