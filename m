@@ -1,68 +1,22 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 7 Aug 2013 23:36:52 +0530
-Subject: [PATCH 2/6] ARM: Tegra: Add CPU's OPPs for using cpufreq-cpu0
- driver
-In-Reply-To: <52028719.8070908@wwwdotorg.org>
+Date: Wed, 7 Aug 2013 23:38:03 +0530
+Subject: [PATCH 3/6] ARM: Tegra: Enable OPP library
+In-Reply-To: <52028745.6080707@wwwdotorg.org>
 References: <cover.1375886595.git.viresh.kumar@linaro.org>
- <d4cd498d9b63d761039b025216e65278dc8e0e37.1375886595.git.viresh.kumar@linaro.org>
- <52028719.8070908@wwwdotorg.org>
-Message-ID: <CAKohpo=MpOyMGFTGeZWmoCRwmZ7+nQtP_yCGokPanEVYL0xbMw@mail.gmail.com>
+ <bfa34bd91e0fa4c6e215517e10c93ab271486418.1375886595.git.viresh.kumar@linaro.org>
+ <52028745.6080707@wwwdotorg.org>
+Message-ID: <CAKohponrGLbx11f7rvamxaSme2XhgPuMDuOOmVgsmhMsTtN2Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2013 23:12, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On 7 August 2013 23:13, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > On 08/07/2013 08:46 AM, Viresh Kumar wrote:
->> cpufreq-cpu0 driver needs OPPs to be present in DT which can be probed by it to
->> get frequency table. This patch adds OPPs and clock-latency to tegra cpu0 node
->> for multiple SoCs.
->>
->> Voltage levels aren't used until now for tegra and so a flat value which would
->> eventually be ignored is used to represent voltage.
+>> cpufreq-cpu0 driver is dependent on OPP library and hence we need to enable it
+>> for Tegra as we are going to use cpufreq-cpu0.
 >
-> This patch is problematic w.r.t. DT being an ABI.
+> Shouldn't these be selected by something in drivers/cpufreq/Kconfig?
 
-:(
+There is nothing tegra specific in that directory now and so probably
+this is the best place :)
 
-> We can certainly add new optional properties to a DT binding that enable
-> new features. However, a new version of a binding can't require new
-> properties to exist that didn't before, since that means that old DTs
-> won't work with new kernels that require the new properties.
-
-To be honest I didn't get it completely. You meant operating-points
-wasn't present before? Its here:
-
-Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-Documentation/devicetree/bindings/power/opp.txt
-
-Or you meant, Tegra never required voltage levels and we are getting
-them in here.
-
-> As such, I believe we do need some Tegra-specific piece of code that
-> defines these OPP tables in the kernel, so that the operating-points
-> property is not needed.
-
-Generic cpufreq driver depends on OPP library and so somebody has
-to provide them. Now you can do it by calling opp_add() for each OPP
-you have or otherwise.
-
-Btw, you must have some specific voltage level for each freq, we can
-get them here..
-
-> Similarly, we can't put invalid voltages into the DT, since if a later
-> kernel version starts actually using that field, the HW will no longer
-> work correctly. Unless perhaps we put 0 into the DT and make the binding
-> define that 0 means "you can't change the voltage at all away from the
-> boot value"?
-
-Hmm.. so if you help me in getting actual voltage levels for these freqs
-then this problem will be resolved. Otherwise I can check what will happen
-if we pass zero to voltage.
-
-> Is the operating-points property documented in
-> Documentation/devicetree/bindings/ somewhere?
-
-Check above.
-
-> (Also Cc'ing the DT mailing list and maintainers)
-
-Thanks.
+Creating a config option only for this doesn't sound great to me..
