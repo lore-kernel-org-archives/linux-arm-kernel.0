@@ -1,86 +1,68 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  7 Aug 2013 12:43:30 +0100
-Subject: [PATCH v3 0/3] ARM: TC2 big.LITTLE CPU idle driver
-Message-ID: <1375875813-13358-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed,  7 Aug 2013 12:43:31 +0100
+Subject: [PATCH v3 1/3] drivers: irq-chip: irq-gic: introduce gic_cpu_if_down()
+In-Reply-To: <1375875813-13358-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1375875813-13358-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1375875813-13358-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is v3 of a previous posting:
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/189284.html
+When processors are about to hit low power states, the assertion of
+standbywfi signal, triggered by the wfi instruction, is essential to
+entering low power modes. If an IRQ is pending on the processor at the
+time wfi is issued, the wfi instruction completes and the processor
+restarts execution without asserting the standbywfi signal. Depending
+on the platform power controller HW this behaviour can be acceptable or
+not; if this behaviour must be prevented software should be provided
+with a way to disable the routing of interrupts to the core IRQ pins.
 
-v3 changes:
+On systems where raw GIC distributor interrupts are connected to the power
+controller as wake-up events (hence the power controller still senses
+IRQs and can wake up cores upon IRQ pending), the GIC CPU interface can
+be disabled on power down, so that the GIC CPU IF output is gated and wfi
+cannot complete, thereby preventing the standbywfi issue.
 
-- dropped RFC tag
-- updated exit_latency and target_residency values as per spec
-- added C-state tables comments
-- improved readability as per-reviews
+This patch adds a simple function to the GIC driver that allows to
+disable the GIC CPU IF from power down procedures.
 
-v2 changes:
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+[rewrote commit log]
+---
+ drivers/irqchip/irq-gic.c       | 6 ++++++
+ include/linux/irqchip/arm-gic.h | 1 +
+ 2 files changed, 7 insertions(+)
 
-- removed duplicated idle statistics and irq enabling
-- use MPIDR masks to compute cluster and cpu ids
-
-This patch series provides the implementation of CPU idle driver for the TC2
-ARM big.LITTLE SoC. It is based and dependent on Nico's branch
-
-git://git.linaro.org/people/nico/linux mcpm+tc2
-
-and relative pull request
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/185411.html
-
-First two patches in the series simply implement a method to disable the
-GIC CPU IF and add the respective call in the MCPM TC2 back-end. Details
-are explained in the commit logs.
-
-Patch 3 implements the TC2 CPU idle driver, that paves the way for a
-generic ARM idle driver, MCPM based (but PSCI can be easily integrated
-as well) for all upcoming big.LITTLE systems.
-
-The CPU idle driver is built upon the multiple drivers CPU idle infrastructure
-to define different target residencies for different clusters.
-
-Current driver matches the DT compatible string defining a TC2 testchip core
-tile, but in the future will be augmented with a proper match table to
-match against all machines that can rely on this driver to implement CPU
-idle capabilities.
-
-This CPU idle driver integrates all existing PM kernel concepts recently
-implemented for ARM, MCPM, CPU PM notifiers and cpu_suspend and lays the
-foundation for a reference implementation of a generic CPU idle driver, since
-the driver as it stands is completely generic, C-states definition
-notwithstanding.
-
-C-state definition for the driver should be made dynamic so that the driver
-can become completely generic and decoupled from static C-states definition.
-
-The driver has been tested, obviously on the TC2 testchip, with different
-Linux systems ranging from simple busybox to Android and Ubuntu rootfs,
-through millions of C-state iterations randomly triggered by the
-aforementioned root filesystem environments.
-
-Comments and review very welcome.
-
-With thanks,
-Lorenzo
-
-Lorenzo Pieralisi (2):
-  ARM: vexpress: tc2: disable GIC CPU IF in tc2_pm_suspend
-  cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver
-
-Nicolas Pitre (1):
-  drivers: irq-chip: irq-gic: introduce gic_cpu_if_down()
-
- MAINTAINERS                          |   9 ++
- arch/arm/mach-vexpress/tc2_pm.c      |   2 +
- drivers/cpuidle/Kconfig              |  10 ++
- drivers/cpuidle/Makefile             |   1 +
- drivers/cpuidle/cpuidle-big_little.c | 210 +++++++++++++++++++++++++++++++++++
- drivers/irqchip/irq-gic.c            |   6 +
- include/linux/irqchip/arm-gic.h      |   1 +
- 7 files changed, 239 insertions(+)
- create mode 100644 drivers/cpuidle/cpuidle-big_little.c
-
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index ee7c503..d0e9480 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -453,6 +453,12 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 	writel_relaxed(1, base + GIC_CPU_CTRL);
+ }
+ 
++void gic_cpu_if_down(void)
++{
++	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
++	writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
++}
++
+ #ifdef CONFIG_CPU_PM
+ /*
+  * Saves the GIC distributor registers during suspend or idle.  Must be called
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 3e203eb..0e5d9ec 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -66,6 +66,7 @@ extern struct irq_chip gic_arch_extn;
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
++void gic_cpu_if_down(void);
+ 
+ static inline void gic_init(unsigned int nr, int start,
+ 			    void __iomem *dist , void __iomem *cpu)
 -- 
 1.8.2.2
