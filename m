@@ -1,87 +1,94 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 07 Aug 2013 14:40:12 +0530
-Subject: [PATCH V3 3/7] ARM: dts: Add i2c bus 1 and it's audio codec child node
- on smdk5420
+Date: Wed, 07 Aug 2013 14:40:13 +0530
+Subject: [PATCH V3 4/7] ARM: dts: exynos5250: move common i2s properties to
+ exynos5 dtsi
 In-Reply-To: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
 References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1375866616-5541-4-git-send-email-padma.v@samsung.com>
+Message-ID: <1375866616-5541-5-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds i2c bus 1 and wm8994 codec node on i2c bus1 and the
-required regulator supplies and properties on smdk5420 board.
+I2S nodes shares some properties across exynos5 SoCs (exynos5250
+and exyno5420). Common code is moved to exynos5.dtsi which is
+included in exyno5250 and exynos5420 SoC files.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420-smdk5420.dts |   58 +++++++++++++++++++++++++++++
- 1 files changed, 58 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5.dtsi    |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi |   12 ------------
+ 2 files changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index d05de7a..e86c1ae 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -68,4 +68,62 @@
- 			bus-width = <4>;
- 		};
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index ec384c9..c37b57d 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -191,4 +191,25 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
  	};
 +
-+	avdd2: fixed-regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "avdd2-supply";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
++	i2s0: i2s at 03830000 {
++		reg = <0x03830000 0x100>;
++		samsung,idma-addr = <0x03000000>;
 +	};
 +
-+	cpvdd: fixed-regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "cpvdd-supply";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
++	i2s1: i2s at 12D60000 {
++		compatible = "samsung,s3c6410-i2s";
++		reg = <0x12D60000 0x100>;
++		dmas = <&pdma1 12
++			&pdma1 11>;
++		dma-names = "tx", "rx";
 +	};
 +
-+	dbvdd: fixed-regulator at 2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "dbvdd-supply";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
++	i2s2: i2s at 12D70000 {
++		compatible = "samsung,s3c6410-i2s";
++		reg = <0x12D70000 0x100>;
++		dmas = <&pdma0 12
++			&pdma0 11>;
++		dma-names = "tx", "rx";
 +	};
-+
-+	spkvdd: fixed-regulator at 3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "spkvdd-supply";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	i2c at 12C70000 {
-+		status = "okay";
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <20000>;
-+
-+		eeprom at 51 {
-+			compatible = "samsung,s524ad0xd1";
-+			reg = <0x51>;
-+		};
-+
-+		wm8994: wm8994 at 1a {
-+			compatible = "wlf,wm8994";
-+			reg = <0x1a>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+			AVDD2-supply = <&avdd2>;
-+			CPVDD-supply = <&cpvdd>;
-+			DBVDD-supply = <&dbvdd>;
-+			SPKVDD1-supply = <&spkvdd>;
-+			SPKVDD2-supply = <&spkvdd>;
-+		};
-+	};
-+
  };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 5b36121..3873ff7 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -394,7 +394,6 @@
+ 
+ 	i2s0: i2s at 03830000 {
+ 		compatible = "samsung,s5pv210-i2s";
+-		reg = <0x03830000 0x100>;
+ 		dmas = <&pdma0 10
+ 			&pdma0 9
+ 			&pdma0 8>;
+@@ -403,17 +402,11 @@
+ 			<&clock_audss EXYNOS_I2S_BUS>,
+ 			<&clock_audss EXYNOS_SCLK_I2S>;
+ 		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
+-		samsung,idma-addr = <0x03000000>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2s0_bus>;
+ 	};
+ 
+ 	i2s1: i2s at 12D60000 {
+-		compatible = "samsung,s3c6410-i2s";
+-		reg = <0x12D60000 0x100>;
+-		dmas = <&pdma1 12
+-			&pdma1 11>;
+-		dma-names = "tx", "rx";
+ 		clocks = <&clock 307>, <&clock 157>;
+ 		clock-names = "iis", "i2s_opclk0";
+ 		pinctrl-names = "default";
+@@ -421,11 +414,6 @@
+ 	};
+ 
+ 	i2s2: i2s at 12D70000 {
+-		compatible = "samsung,s3c6410-i2s";
+-		reg = <0x12D70000 0x100>;
+-		dmas = <&pdma0 12
+-			&pdma0 11>;
+-		dma-names = "tx", "rx";
+ 		clocks = <&clock 308>, <&clock 158>;
+ 		clock-names = "iis", "i2s_opclk0";
+ 		pinctrl-names = "default";
 -- 
 1.7.4.4
