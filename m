@@ -1,47 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Aug 2013 17:28:57 -0700
-Subject: [ARM ATTEND] Interested in R/M-class (!MMU), automated testing
-In-Reply-To: <20130806234419.GC15014@blackmetal.musicnaut.iki.fi>
-References: <51FBF93D.8040707@arm.com> <20130804122527.GV3880@pengutronix.de>
- <CAOesGMgnYLXRWRtKckofNpsxmRgT0cXL=JcAMirXibe92+AWOQ@mail.gmail.com>
- <20130806234419.GC15014@blackmetal.musicnaut.iki.fi>
-Message-ID: <CAOesGMh1=qSDv=dohW=DOLbYS0YJYnYs=7rZB-mpZTBtPWLsYw@mail.gmail.com>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Tue, 06 Aug 2013 20:32:17 -0400
+Subject: at91sam9x5: uart (not usart) broken
+Message-ID: <52019591.2010408@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 6, 2013 at 4:44 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> On Sun, Aug 04, 2013 at 11:49:03PM -0700, Olof Johansson wrote:
->> On Sun, Aug 4, 2013 at 5:25 AM, Robert Schwebel
->> <r.schwebel@pengutronix.de> wrote:
->>
->> >> - Ways to do more automated testing of ARM kernels, including hearing
->> >>   from other people what they use to build/boot/test/benchmark their
->> >>   code (perhaps even get a discussion going about using the diverse
->> >>   range of hardware people have around put to use as test-machines).
->> >
->> > That's pretty interesting; we have a test farm at PTX, but it mainly
->> > does nightly build + boot tests on mainline, for systems we care of.
->>
->> I have a small (but growing) farm of boards here that I do some (so
->> far) limited boot testing, but I do it a few times a day on mainline,
->> and nightly on linux-next and arm-soc for-next branches.
->
-> How successful is your testing? Any statistics how many pull requests
-> or patches you can shoot down or revert (or ask to be redone) before
-> they hit mainline?
+Between lk 3.10.0 and lk 3.11.0-rc4 the uarts (not usarts)
+have been broken in the at91sam9x5 family. The DT files have
+been re-factored for uarts but look correct.
 
-This is a pretty new thing, I used to do it manually a few times as
-week but the fully automated setup has only been online for about a
-month. So data is pretty limited so far.
+So suspicion moves to the atmel_serial driver which enjoyed
+a lot of changes in June.
 
-I've been able to catch quite a few things pretty quickly though. A
-few boot issues in -next, and Russell's security fixes for -rc4 showed
-up quickly so he could do a quick follow-up fix. I've also been
-weeding out warnings from the defconfig builds so that new issues are
-quicker to spot.
+Tested on a at91sam9g25 (Aria G25) which is a member of the
+at91sam9x5 family with two uarts (four usarts and a debug
+serial port). The failure looks like this in dmesg:
 
-There's a current build breakage on linux-next for bcm2835_defconfig
-and mxs_defconfig that needs looking at, btw. :)
+  console [ttyS0] enabled
+  f801c000.serial: ttyS1 at MMIO 0xf801c000 (irq = 23) is a ATMEL_SERIAL
+  f8020000.serial: ttyS2 at MMIO 0xf8020000 (irq = 24) is a ATMEL_SERIAL
+  f8024000.serial: ttyS3 at MMIO 0xf8024000 (irq = 25) is a ATMEL_SERIAL
+  atmel_usart: probe of f8040000.serial failed with error -2
+  f8028000.serial: ttyS4 at MMIO 0xf8028000 (irq = 32) is a ATMEL_SERIAL
 
+The device at 0xf8040000 is uart0 . My DT file was trying
+to bring up uart0 but not uart1.
 
--Olof
+Doug Gilbert
