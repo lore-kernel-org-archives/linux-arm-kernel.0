@@ -1,33 +1,46 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 07 Aug 2013 08:34:39 +0200
-Subject: [PATCH] [TRIVIAL] ARM: msm: fix compilation error in gpiomux
-Message-ID: <1375857279-18082-1-git-send-email-k.kozlowski@samsung.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Wed, 7 Aug 2013 14:52:38 +0800
+Subject: [PATCH 2/2] ARM: dt: t114 dalmore: add dt entry for nct1008
+In-Reply-To: <1375858358-15070-1-git-send-email-wni@nvidia.com>
+References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
+Message-ID: <1375858358-15070-3-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix compilation error in gpiomux (CONFIG_MSM_GPIOMUX=y):
-arch/arm/mach-msm/gpiomux.c:24:13: error: static declaration of
-	?__msm_gpiomux_write? follows non-static declaration
-arch/arm/mach-msm/gpiomux.h:85:6: note: previous declaration of
-	?__msm_gpiomux_write? was here
+Enable thermal sensor nct1008 for t114 dalmore.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Wei Ni <wni@nvidia.com>
 ---
- arch/arm/mach-msm/gpiomux.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/tegra114-dalmore.dts |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-msm/gpiomux.c b/arch/arm/mach-msm/gpiomux.c
-index 2b8e2d2..4110b82 100644
---- a/arch/arm/mach-msm/gpiomux.c
-+++ b/arch/arm/mach-msm/gpiomux.c
-@@ -21,7 +21,7 @@
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index b5a42f0..9d4d2b2 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -738,6 +738,14 @@
+ 			realtek,ldo1-en-gpios =
+ 				<&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
+ 		};
++
++		nct1008 {
++			compatible = "onnn,nct1008";
++			reg = <0x4c>;
++			vdd-supply = <&palmas_ldo6_reg>;
++			interrupt-parent = <&gpio>;
++			interrupts = <TEGRA_GPIO(O, 4) IRQ_TYPE_LEVEL_LOW>;
++		};
+ 	};
  
- static DEFINE_SPINLOCK(gpiomux_lock);
+ 	i2c at 7000d000 {
+@@ -945,7 +953,7 @@
+ 						regulator-max-microvolt = <1800000>;
+ 					};
  
--static void __msm_gpiomux_write(unsigned gpio, gpiomux_config_t val)
-+void __msm_gpiomux_write(unsigned gpio, gpiomux_config_t val)
- {
- 	unsigned tlmm_config  = (val & ~GPIOMUX_CTL_MASK) |
- 				((gpio & 0x3ff) << 4);
+-					ldo6 {
++					palmas_ldo6_reg: ldo6 {
+ 						regulator-name = "vdd-sensor-2v85";
+ 						regulator-min-microvolt = <2850000>;
+ 						regulator-max-microvolt = <2850000>;
 -- 
 1.7.9.5
