@@ -1,46 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:38:35 +0900
-Subject: [GIT PULL 18/26] ARM: shmobile: Remove unused shmobile_init_time()
+Date: Wed,  7 Aug 2013 13:38:33 +0900
+Subject: [GIT PULL 06/26] ARM: shmobile: Use default ->init_time() on r8a73a4
 In-Reply-To: <cover.1375840527.git.horms+renesas@verge.net.au>
 References: <cover.1375840527.git.horms+renesas@verge.net.au>
-Message-ID: <13eb604665c94d4cd9d7e2aeceef974cf1f30701.1375840527.git.horms+renesas@verge.net.au>
+Message-ID: <58909ae593e8e6fc7e89d88ffe61effedf09389a.1375840527.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove shmobile_timer_init() since it now is unused.
+Leave ->init_time() set to NULL to use the default ARM behaviour.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/common.h | 1 -
- arch/arm/mach-shmobile/timer.c               | 4 ----
- 2 files changed, 5 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a73a4.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index e818f02..18a76f9 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -2,7 +2,6 @@
- #define __ARCH_MACH_COMMON_H
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index 2ee45d5..8949170 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -223,7 +223,6 @@ static const char *r8a73a4_boards_compat_dt[] __initdata = {
  
- extern void shmobile_earlytimer_init(void);
--extern void shmobile_timer_init(void);
- extern void shmobile_setup_delay(unsigned int max_cpu_core_mhz,
- 			 unsigned int mult, unsigned int div);
- struct twd_local_timer;
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-index f321dbe..62d7052 100644
---- a/arch/arm/mach-shmobile/timer.c
-+++ b/arch/arm/mach-shmobile/timer.c
-@@ -59,7 +59,3 @@ void __init shmobile_earlytimer_init(void)
- 	late_time_init = shmobile_late_time_init;
- }
- 
--void __init shmobile_timer_init(void)
--{
--	clocksource_of_init();
--}
+ DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
+ 	.init_early	= r8a73a4_init_delay,
+-	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= r8a73a4_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
 -- 
 1.8.3.2
