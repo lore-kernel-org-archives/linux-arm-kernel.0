@@ -1,53 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:29:24 +0900
-Subject: [GIT PULL 1/2] ARM: shmobile: r8a7790: clocks for Ether support
-In-Reply-To: <cover.1375838109.git.horms+renesas@verge.net.au>
-References: <cover.1375838109.git.horms+renesas@verge.net.au>
-Message-ID: <9b0b9c0151a8e7d263cee180857068940463bd5f.1375838109.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:30:17 +0900
+Subject: [GIT PULL 0/3] Second round of Renesas ARM-based SoC board updates
+ for v3.12
+Message-ID: <cover.1375839719.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7790.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Hi Olof, Hi Arnd,
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 50d96f9..fc36d3d 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -51,6 +51,7 @@
- #define SMSTPCR3 0xe615013c
- #define SMSTPCR5 0xe6150144
- #define SMSTPCR7 0xe615014c
-+#define SMSTPCR8 0xe6150990
- 
- #define SDCKCR		0xE6150074
- #define SD2CKCR		0xE6150078
-@@ -180,6 +181,7 @@ static struct clk div6_clks[DIV6_NR] = {
- 
- /* MSTP */
- enum {
-+	MSTP813,
- 	MSTP721, MSTP720,
- 	MSTP717, MSTP716,
- 	MSTP522,
-@@ -190,6 +192,7 @@ enum {
- };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
- 	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
-@@ -258,6 +261,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
- 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
-+	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
--- 
-1.8.3.2
+please consider this second round of Renesas ARM-based SoC board updates
+for v3.12.
+
+This pull-request is based on renesas-boards-for-v3.12, which I have
+previously sent a pull-request for.
+
+
+The following changes since commit f79d68da510bf1b95beff4d556b78d06801f11dc:
+
+  ARM: shmobile: ape6evm: add SDHI interfaces (2013-07-25 14:46:38 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.12
+
+for you to fetch changes up to 4901e136aa5c35873701156c4c0af5b3c2c8faee:
+
+  ARM: shmobile: lager: enable Ether (2013-08-06 18:18:53 +0900)
+
+----------------------------------------------------------------
+Second round of Renesas ARM-based SoC board updates for v3.12
+
+* Enable ether on lager board
+* Enable GPIO LEDs and switches on ape6evm board
+
+----------------------------------------------------------------
+Simon Horman (3):
+      ARM: shmobile: ape6evm: support GPIO switches
+      ARM: shmobile: ape6evm: Add GPIO LEDs
+      ARM: shmobile: lager: enable Ether
+
+ arch/arm/mach-shmobile/board-ape6evm.c | 60 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/board-lager.c   | 29 ++++++++++++++++
+ 2 files changed, 89 insertions(+)
