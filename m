@@ -1,77 +1,55 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 08 Aug 2013 07:27:01 +0900
-Subject: [PATCH 02/02] ARM: shmobile: Rename to r8a7790_init_early()
-In-Reply-To: <20130807222638.22283.78607.sendpatchset@w520>
-References: <20130807222638.22283.78607.sendpatchset@w520>
-Message-ID: <20130807222701.22283.75763.sendpatchset@w520>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 08 Aug 2013 08:31:05 +1000
+Subject: [PATCHv7 07/13] irqdomain: add function to find a MSI irq_domain
+In-Reply-To: <20130808000443.17f57875@skate>
+References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375908620.9300.3.camel@pasglop> <20130808000443.17f57875@skate>
+Message-ID: <1375914665.12551.5.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Thu, 2013-08-08 at 00:04 +0200, Thomas Petazzoni wrote:
+> Again, this has been discussed at lengths in the previous iterations,
+> for which I already gave you all the links, as you requested in a
+> private e-mail. It'd be great if this discussion was read seriously,
+> because I really have the feeling we are restarting from zero on this
+> whole MSI thing...
 
-Rename r8a7790_init_delay() into r8a7790_init_early()
-to make the function name show that more than just
-delay setup may happen in the future.
+Well, two things here:
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+ - You don't need my ack since I am not the maintainer of the irqdomain
+code anymore, Grant is :-)
 
- arch/arm/mach-shmobile/board-lager-reference.c |    2 +-
- arch/arm/mach-shmobile/board-lager.c           |    2 +-
- arch/arm/mach-shmobile/include/mach/r8a7790.h  |    2 +-
- arch/arm/mach-shmobile/setup-r8a7790.c         |    4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ - I still don't like it. I find that it's looking more and more like
+over engineering. I don't like having any kind of infrastructure
+relationship between MSI stuff and irqdomain, ie, a PCI/PCIe specific
+construct and a generic interrupt remapper.
 
---- 0001/arch/arm/mach-shmobile/board-lager-reference.c
-+++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-08-07 19:46:28.000000000 +0900
-@@ -38,7 +38,7 @@ static const char *lager_boards_compat_d
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
--	.init_early	= r8a7790_init_delay,
-+	.init_early	= r8a7790_init_early,
- 	.init_machine	= lager_add_standard_devices,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= lager_boards_compat_dt,
---- 0001/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2013-08-07 19:46:18.000000000 +0900
-@@ -162,7 +162,7 @@ static const char *lager_boards_compat_d
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
--	.init_early	= r8a7790_init_delay,
-+	.init_early	= r8a7790_init_early,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
- 	.dt_compat	= lager_boards_compat_dt,
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-08-07 19:46:48.000000000 +0900
-@@ -5,7 +5,7 @@ void r8a7790_add_standard_devices(void);
- void r8a7790_add_dt_devices(void);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
--void r8a7790_init_delay(void);
-+void r8a7790_init_early(void);
- void r8a7790_timer_init(void);
- 
- #define MD(nr) BIT(nr)
---- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-08-07 19:47:12.000000000 +0900
-@@ -267,7 +267,7 @@ void __init r8a7790_timer_init(void)
- 	clocksource_of_init();
- }
- 
--void __init r8a7790_init_delay(void)
-+void __init r8a7790_init_early(void)
- {
- #ifndef CONFIG_ARM_ARCH_TIMER
- 	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
-@@ -282,7 +282,7 @@ static const char *r8a7790_boards_compat
- };
- 
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
--	.init_early	= r8a7790_init_delay,
-+	.init_early	= r8a7790_init_early,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
- MACHINE_END
+Trying to use irqdomain for HW number allocation seems to be pushing it
+where it wasn't designed to go. Are those interrupts really different
+domains ? Do they have separate number spaces, separate DT encodings and
+overall characteristics ?
+
+What's wrong with the bitmap allocator in the PIC driver ? It's simple,
+and does the job just fine. If anything, take it from powerpc and sparc
+and move it to generic. It's already a "generic" (ie shared)
+infrastructure in powerpc.
+
+Let's ask somebody of well known taste ... Thomas ! :-) (Yes, you tglx,
+I know you are lurking ...). What do you reckon ?
+
+That series makes me feel nervous, it feels like a hack. I really don't
+like creating that relationship between msi_chip and irqdomain. In fact,
+I think it makes it harder to understand what's happening in the code
+and following things.
+
+It's a LOT clearer to me to have an irq domain for the PIC and an
+explicit bitmap allocation for MSIs, I see where things come from, I can
+follow the code path etc... much more easily.
+
+I suspect we have a case of over-abstracting happening here. This is a
+dangerous illness and can be contagious :-)
+
+Cheers,
+Ben.
