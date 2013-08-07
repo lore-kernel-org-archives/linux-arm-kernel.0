@@ -1,48 +1,45 @@
-From: christophe.leroy@c-s.fr (leroy christophe)
-Date: Wed, 07 Aug 2013 14:35:05 +0200
-Subject: MAX7301 GPIO: Do not force SPI speed when using OF Platform
-In-Reply-To: <52023AE2.3020007@antcom.de>
-References: <51EFAA19.4020905@antcom.de> <52022FFF.3060507@c-s.fr>
- <52023AE2.3020007@antcom.de>
-Message-ID: <52023EF9.3050301@c-s.fr>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Wed, 07 Aug 2013 14:38:06 +0200
+Subject: [PATCH v4 3/4] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <5201172F.5050803@samsung.com>
+References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
+ <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
+ <CAL_JsqK7FNeqbx2DFHou5xeU08L4Stn+NrHUmFjap_A1pEq9JQ@mail.gmail.com>
+ <xa1ttxj2luxi.fsf@mina86.com> <5201172F.5050803@samsung.com>
+Message-ID: <xa1ta9kt1xsh.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Le 07/08/2013 14:17, Roland Stigge a ?crit :
-> Hi,
->
-> On 08/07/2013 01:31 PM, leroy christophe wrote:
->> Le 24/07/2013 12:19, Roland Stigge a ?crit :
->>> commit 047b93a35961f7a6561e6f5dcb040738f822b892 introduced the following
->>> to gpio-max7301.c:
->>>
->>>      /* bits_per_word cannot be configured in platform data */
->>> -    spi->bits_per_word = 16;
->>> +    if (spi->dev.platform_data)
->>> +        spi->bits_per_word = 16;
->>>        ret = spi_setup(spi);
->>>
->>> Comment is: "The bit_per_word can be set in the OF Device tree, so no
->>> need to force it as with the platform_data when using OF Platform"
->>>
->>> Can you please point me to the respective OF option? I couldn't find it
->>> under drivers/spi/spi* or Documentation/devicetree/bindings/spi/*.
->> You have to add the following in your dts:
+On Tue, Aug 06 2013, Sylwester Nawrocki wrote:
+> On 08/06/2013 05:07 PM, Michal Nazarewicz wrote:
+>> On Tue, Aug 06 2013, Rob Herring wrote:
+>>>> >> +static void reserved_mem_release_device_from_dt(struct device *dev)
+>>>> >> +{
+>>>> >> +       struct reserved_mem *region = get_dma_memory_region(dev);
+>>>> >> +       if (!region)
+>>>> >> +               return;
+>>>> >> +       if (!region->cma)
+>>> >
+>>> > if (region && !region->cma)
 >>
->> spi-bits = <16>;
-> I tried this, both in the device's and in the controller's node. But it
-> didn't work. However, as described, I didn't expect it to work, because
-> there is no code present to handle "spi-bits". At least not in 3.10.
+>> !region case is handled two lines above, so no need to check if region
+>> is not null.
 >
-> Am I missing something? Otherwise, maybe something of the tree that you
-> are talking about is missing from mainline still?
->
-> Thanks in advance,
->
-> Roland
->
-Strange. I'm using 3.8.13
-I have it handled in drivers/spi/spi.c in function of_register_spi_devices()
+> I think Rob's suggestion was to replace two 'if' statements with a single
+> one, which makes sense.
 
-Christophe
+Ah, yes, silly me...
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 835 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/16d7436a/attachment.sig>
