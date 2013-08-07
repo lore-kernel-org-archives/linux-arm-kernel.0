@@ -1,110 +1,76 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 07 Aug 2013 16:07:52 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.11-rc5
-Message-ID: <87bo59ksl3.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Aug 2013 00:08:56 +0100
+Subject: v3.11-rc4: OMAP1/Amstrad Delta (E3) crash
+In-Reply-To: <20130807190521.GD15014@blackmetal.musicnaut.iki.fi>
+References: <20130806232609.GB15014@blackmetal.musicnaut.iki.fi>
+ <20130807190521.GD15014@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130807230856.GJ23053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Aug 07, 2013 at 10:05:21PM +0300, Aaro Koskinen wrote:
+> Hi,
+> 
+> On Wed, Aug 07, 2013 at 02:26:09AM +0300, Aaro Koskinen wrote:
+> > I get the following on Amstrad Delta (E3) when booting unpatched
+> > v3.11-rc4. The kernel config is after the crash.
+> 
+> This is regression introduced between -rc3 and -rc4. According to the
+> git bisect, the first bad commit is:
+> 
+> 	commit e39e3f3ebfef03450cf7bfa7a974a8c61f7980c8
+> 	Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> 	Date:   Tue Jul 9 01:03:17 2013 +0100
+> 
+> 	    ARM: update FIQ support for relocation of vectors
+> 
+> If I revert the commit from v3.11-rc4, the board boots fine.
+> 
+> A.
+> 
+> > Uncompressing Linux... done, booting the kernel.
+> > [    0.000000] Booting Linux on physical CPU 0x0
+> > [    0.000000] Initializing cgroup subsys cpu
+> > [    0.000000] Linux version 3.11.0-rc4-e3 (aaro at blackmetal) (gcc version 4.7.3 (GCC) ) #4 PREEMPT Wed Aug 7 02:03:27 EEST 2013
+> > [    0.000000] bootconsole [earlycon0] enabled
+> > [    0.000000] OMAP1510
+> > [    0.000000]  revision 2 handled as 15xx id: bc058c9b93111a16
 
-I'm stepping in to help Olof in arm-soc land while Arnd is away for a
-bit.  Please consider the fixes below for -rc5, Thanks.
+Hmm, so ARM925T which is VIVT...
 
-Kevin
+> > [    0.238868] Installing fiq handler from c001b110, length 0x164
+> > [    0.245750] Unable to handle kernel paging request at virtual address ffff1224
 
+In one way, that's good news - that's public independent proof that the
+code associated with the vectors is well protected from kernel writes. :)
 
-The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
+Can you try this (untested) patch please?  We need to write into this
+page via the page's alias, rather than directly to it.  Thanks.
 
-  Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+ arch/arm/kernel/fiq.c |    8 ++------
+ 1 files changed, 2 insertions(+), 6 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 1154f858ab5cd3c5facde7cb9ac31c889eb780a8:
-
-  MAINTAINERS: add TI Keystone ARM platform (2013-08-07 10:30:29 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for v3.11-rc
-
-- MSM: GPIO fixes (includes old code removal)
-- OMAP: earlyprintk regression, AM33xx cpgmac PM regression
-- OMAP5: urgent fix for potentially harmful voltage regulator values
-- Renesas: gpio-keys fix, fix SD card detection, fix shdma calculation error
-- STi: critical SMP boot fix
-- tegra: DTS fix for usb-phy
-- a couple MAINTAINERS updates
-
-----------------------------------------------------------------
-Afzal Mohammed (2):
-      ARM: OMAP2+: hwmod: rt address space index for DT
-      ARM: OMAP2+: hwmod: AM335x: fix cpgmac address space
-
-Kuninori Morimoto (2):
-      ARM: shmobile: armadillo800eva: Don't request GPIO 166 in board code
-      shdma: fixup sh_dmae_get_partial() calculation error
-
-Linus Walleij (1):
-      MAINTAINERS: delete Srinidhi from ux500
-
-Lucas Stach (1):
-      ARM: tegra: enable ULPI phy on Colibri T20
-
-Nishanth Menon (3):
-      ARM: dts: omap5-uevm: document regulator signals used on the actual board
-      ARM: dts: omap5-uevm: fix regulator configurations mandatory for SoC
-      ARM: dts: omap5-uevm: update optional/unused regulator configurations
-
-Olof Johansson (4):
-      Merge tag 'msm-3.11-fix1' of git://git.kernel.org/.../davidb/linux-msm into fixes
-      Merge tag 'omap-for-v3.11/fixes-omap5' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'for-v3.11-rc/omap-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into fixes
-      Merge tag 'renesas-fixes2-for-v3.11' of git://git.kernel.org/.../horms/renesas into fixes
-
-Rajendra Nayak (3):
-      ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with DEBUG_LL
-      ARM: OMAP2+: Avoid idling memory controllers with no drivers
-      ARM: OMAP2+: Sync hwmod state with the pm_runtime and omap_device state
-
-Rohit Vaswani (2):
-      ARM: msm: dts: Fix the gpio register address for msm8960
-      ARM: msm: Consolidate gpiomux for older architectures
-
-Santosh Shilimkar (1):
-      MAINTAINERS: add TI Keystone ARM platform
-
-Sergei Shtylyov (1):
-      ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
-
-Simon Horman (1):
-      ARM: shmobile: lager: do not annotate gpio_buttons as __initdata
-
-Srinivas Kandagatla (2):
-      ARM: STi: Fix cpu nodes with correct device_type.
-      ARM: STi: remove sti_secondary_start from INIT section.
-
- MAINTAINERS                                        |  7 +-
- arch/arm/boot/dts/msm8960-cdp.dts                  |  4 +-
- arch/arm/boot/dts/omap5-uevm.dts                   | 78 ++++++++++++++--------
- arch/arm/boot/dts/stih41x.dtsi                     |  2 +
- arch/arm/boot/dts/tegra20-colibri-512.dtsi         |  1 +
- arch/arm/mach-msm/Kconfig                          |  3 +-
- arch/arm/mach-msm/gpiomux-v1.c                     | 33 ---------
- arch/arm/mach-msm/gpiomux.h                        | 10 ---
- arch/arm/mach-omap2/omap_device.c                  | 18 +++++
- arch/arm/mach-omap2/omap_hwmod.c                   |  2 +-
- arch/arm/mach-omap2/omap_hwmod.h                   | 50 ++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  6 +-
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  3 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  9 +--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  5 +-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  3 +-
- arch/arm/mach-omap2/serial.c                       | 11 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c     |  3 -
- arch/arm/mach-shmobile/board-bockw.c               |  8 ++-
- arch/arm/mach-shmobile/board-lager.c               |  2 +-
- arch/arm/mach-sti/headsmp.S                        |  2 -
- drivers/dma/sh/shdma.c                             |  4 +-
- 22 files changed, 154 insertions(+), 110 deletions(-)
- delete mode 100644 arch/arm/mach-msm/gpiomux-v1.c
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 25442f4..fc79202 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -84,17 +84,13 @@ int show_fiq_list(struct seq_file *p, int prec)
+ 
+ void set_fiq_handler(void *start, unsigned int length)
+ {
+-#if defined(CONFIG_CPU_USE_DOMAINS)
+-	void *base = (void *)0xffff0000;
+-#else
+ 	void *base = vectors_page;
+-#endif
+ 	unsigned offset = FIQ_OFFSET;
+ 
+ 	memcpy(base + offset, start, length);
++	if (!cache_is_vipt_nonaliasing())
++		flush_icache_range(base + offset, offset + length);
+ 	flush_icache_range(0xffff0000 + offset, 0xffff0000 + offset + length);
+-	if (!vectors_high())
+-		flush_icache_range(offset, offset + length);
+ }
+ 
+ int claim_fiq(struct fiq_handler *f)
