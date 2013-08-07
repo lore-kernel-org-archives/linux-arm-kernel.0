@@ -1,26 +1,89 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 7 Aug 2013 17:38:36 +0200
-Subject: [PATCH 06/27] drivers/i2c/busses: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1374602524-3398-7-git-send-email-wsa@the-dreams.de>
-References: <1374602524-3398-1-git-send-email-wsa@the-dreams.de>
- <1374602524-3398-7-git-send-email-wsa@the-dreams.de>
-Message-ID: <20130807153836.GK2978@katana>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 7 Aug 2013 10:40:17 -0500
+Subject: [PATCHv3 2/8] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <1375825216-18119-1-git-send-email-s-anna@ti.com>
+References: <1375825216-18119-1-git-send-email-s-anna@ti.com>
+Message-ID: <BB39592C-0DAC-49A4-A782-583D7EB858AF@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 23, 2013 at 08:01:39PM +0200, Wolfram Sang wrote:
-> devm_ioremap_resource does sanity checks on the given resource. No need to
-> duplicate this in the driver.
+
+On Aug 6, 2013, at 4:40 PM, Suman Anna wrote:
+
+> Logic has been added to the OMAP2+ mailbox code to
+> parse the mailbox dt nodes and construct the different
+> mailboxes associated with the instance. The design is
+> based on gathering the same information that was being
+> passed previously through the platform data, except for
+> the interrupt type configuration information.
 > 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+> .../devicetree/bindings/mailbox/omap-mailbox.txt   |  43 +++++++
+> drivers/mailbox/mailbox-omap2.c                    | 130 ++++++++++++++++++---
+> 2 files changed, 158 insertions(+), 15 deletions(-)
+> create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+> new file mode 100644
+> index 0000000..8ffb08a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+> @@ -0,0 +1,43 @@
+> +OMAP2+ Mailbox Driver
+> +
+> +Required properties:
+> +- compatible:		Should be one of the following,
+> +			    "ti,omap2-mailbox" for
+> +				OMAP2420, OMAP2430, OMAP3430, OMAP3630 SoCs
+> +			    "ti,omap4-mailbox" for
+> +				OMAP44xx, OMAP54xx, AM33xx, AM43xx, DRA7xx SoCs
+> +- reg:			Contains the mailbox register address range (base address
+> +			and length)
+> +- interrupts: 		Contains the interrupt information for the mailbox
+> +			device. The format is dependent on which interrupt
+> +			controller the OMAP device uses
+> +- ti,hwmods:		Name of the hwmod associated with the mailbox
+> +- ti,mbox-num-users:	Number of targets (processor devices) that the mailbox device
+> +			can interrupt
+> +- ti,mbox-num-fifos:	Number of h/w fifos within the mailbox device
 
-Applied to for-next, thanks!
+Isn't "ti,mbox-num-users", "ti,mbox-num-fifos" this SoC specific, why do we need to encode in the device tree.  Can we not have a more SoC specific compatiable and encode such info in the driver as part of the .data field in of_device_id ?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/5b19df26/attachment.sig>
+> +- ti,mbox-names:	Array of the names of the mailboxes
+> +- ti,mbox-data:		Mailbox descriptor data private to each mailbox. The 4
+> +			cells represent the following data,
+> +			  Cell #1 (tx_id) - mailbox fifo id used for
+> +						transmitting messages
+> +			  Cell #2 (rx_id) - mailbox fifo id on which messages
+> +						are received
+> +			  Cell #3 (irq_id) - irq identifier index number to use
+> +						from the interrupts data
+> +			  Cell #4 (usr_id) - mailbox user id for identifying the
+> +						interrupt into the MPU interrupt
+> +						controller.
+> +
+
+ti,mbox-data really seems like it should be encoded in the driver and not in the device tree.  Is it specific to the SoC?
+
+> +Example:
+> +
+> +/* OMAP4 */
+> +mailbox: mailbox at 4a0f4000 {
+> +	compatible = "ti,omap4-mailbox";
+> +	reg = <0x4a0f4000 0x200>;
+> +	interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+> +	ti,hwmods = "mailbox";
+> +	ti,mbox-num-users = <3>;
+> +	ti,mbox-num-fifos = <8>;
+> +	ti,mbox-names = "mbox-ipu", "mbox-dsp";
+> +	ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
+> +};
+
+[snip]
+
+- k
+
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
