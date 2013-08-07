@@ -1,45 +1,64 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 07 Aug 2013 14:38:06 +0200
-Subject: [PATCH v4 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <5201172F.5050803@samsung.com>
-References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
- <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
- <CAL_JsqK7FNeqbx2DFHou5xeU08L4Stn+NrHUmFjap_A1pEq9JQ@mail.gmail.com>
- <xa1ttxj2luxi.fsf@mina86.com> <5201172F.5050803@samsung.com>
-Message-ID: <xa1ta9kt1xsh.fsf@mina86.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 7 Aug 2013 09:40:12 -0300
+Subject: [PATCH 01/12] dma: mmp_pdma: add protect when alloc/free phy
+ channels
+In-Reply-To: <1375870770-14263-2-git-send-email-zonque@gmail.com>
+References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
+ <1375870770-14263-2-git-send-email-zonque@gmail.com>
+Message-ID: <20130807124011.GB2383@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06 2013, Sylwester Nawrocki wrote:
-> On 08/06/2013 05:07 PM, Michal Nazarewicz wrote:
->> On Tue, Aug 06 2013, Rob Herring wrote:
->>>> >> +static void reserved_mem_release_device_from_dt(struct device *dev)
->>>> >> +{
->>>> >> +       struct reserved_mem *region = get_dma_memory_region(dev);
->>>> >> +       if (!region)
->>>> >> +               return;
->>>> >> +       if (!region->cma)
->>> >
->>> > if (region && !region->cma)
->>
->> !region case is handled two lines above, so no need to check if region
->> is not null.
->
-> I think Rob's suggestion was to replace two 'if' statements with a single
-> one, which makes sense.
+Daniel,
 
-Ah, yes, silly me...
+It's good to see this effort is moving forward!
+
+I just have a minor nitpick.
+
+On Wed, Aug 07, 2013 at 12:19:19PM +0200, Daniel Mack wrote:
+>  
+>  #define tx_to_mmp_pdma_desc(tx) container_of(tx, struct mmp_pdma_desc_sw, async_tx)
+> @@ -219,6 +220,7 @@ static struct mmp_pdma_phy *lookup_phy(struct mmp_pdma_chan *pchan)
+>  	int prio, i;
+>  	struct mmp_pdma_device *pdev = to_mmp_pdma_dev(pchan->chan.device);
+>  	struct mmp_pdma_phy *phy;
+> +	unsigned long flags;
+>  
+>  	/*
+>  	 * dma channel priorities
+> @@ -227,6 +229,8 @@ static struct mmp_pdma_phy *lookup_phy(struct mmp_pdma_chan *pchan)
+>  	 * ch 8 - 11, 24 - 27  <--> (2)
+>  	 * ch 12 - 15, 28 - 31  <--> (3)
+>  	 */
+> +
+> +	spin_lock_irqsave(&pdev->phy_lock, flags);
+>  	for (prio = 0; prio <= (((pdev->dma_channels - 1) & 0xf) >> 2); prio++) {
+>  		for (i = 0; i < pdev->dma_channels; i++) {
+>  			if (prio != ((i & 0xf) >> 2))
+> @@ -234,14 +238,30 @@ static struct mmp_pdma_phy *lookup_phy(struct mmp_pdma_chan *pchan)
+>  			phy = &pdev->phy[i];
+>  			if (!phy->vchan) {
+>  				phy->vchan = pchan;
+> +				spin_unlock_irqrestore(&pdev->phy_lock, flags);
+
+Isn't it better to goto ...
+
+>  				return phy;
+>  			}
+>  		}
+>  	}
+>  
+
+... here?
+
+I think it's generally cleaner and less error-prone.
+
+> +	spin_unlock_irqrestore(&pdev->phy_lock, flags);
+>  	return NULL;
+>  }
+>  
 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/16d7436a/attachment.sig>
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
