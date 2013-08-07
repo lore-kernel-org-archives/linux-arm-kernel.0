@@ -1,29 +1,45 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 08 Aug 2013 07:13:21 +0900
-Subject: [PATCH 00/05] ARM: shmobile: Yet another SMP series
-Message-ID: <20130807221321.22251.22774.sendpatchset@w520>
+Date: Thu, 08 Aug 2013 07:13:30 +0900
+Subject: [PATCH 01/05] ARM: shmobile: Introduce shmobile_smp_cpu_disable()
+In-Reply-To: <20130807221321.22251.22774.sendpatchset@w520>
+References: <20130807221321.22251.22774.sendpatchset@w520>
+Message-ID: <20130807221330.22251.32764.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: Yet another SMP series
+From: Magnus Damm <damm@opensource.se>
 
-[PATCH 01/05] ARM: shmobile: Introduce shmobile_smp_cpu_disable()
-[PATCH 02/05] ARM: shmobile: Use shmobile_smp_cpu_disable() on sh73a0
-[PATCH 03/05] ARM: shmobile: Remove unused shmobile_smp_init_cpus()
-[PATCH 04/05] ARM: shmobile: Expose shmobile_invalidate_start()
-[PATCH 05/05] ARM: shmobile: Introduce shmobile_boot_size
-
-This series cleans up the existing SMP code and introduces various new SMP
-functions for mach-shmobile. The new functions are partially used by existing
-SMP support code, but are also consumed by upcoming SMP support patches.
+Introduce the shared CPU Hotplug function shmobile_smp_cpu_disable()
+for mach-shmobile. It is useful for the case when all CPUs may be
+hotplugged, including CPU 0.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Written against renesas.git renesas-devel-20130806v4 
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/platsmp.c             |    7 +++++++
+ 2 files changed, 8 insertions(+)
 
- arch/arm/mach-shmobile/headsmp.S             |    3 +++
- arch/arm/mach-shmobile/include/mach/common.h |    4 +++-
- arch/arm/mach-shmobile/platsmp.c             |   22 +++++++---------------
- arch/arm/mach-shmobile/smp-sh73a0.c          |    9 +--------
- 4 files changed, 14 insertions(+), 24 deletions(-)
+--- 0009/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-07-29 22:19:44.000000000 +0900
+@@ -17,6 +17,7 @@ extern unsigned long shmobile_smp_arg[];
+ extern unsigned long shmobile_smp_mpidr[];
+ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+ 			      unsigned long arg);
++extern int shmobile_smp_cpu_disable(unsigned int cpu);
+ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
+ extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
+--- 0009/arch/arm/mach-shmobile/platsmp.c
++++ work/arch/arm/mach-shmobile/platsmp.c	2013-07-29 22:19:29.000000000 +0900
+@@ -40,3 +40,10 @@ void shmobile_smp_hook(unsigned int cpu,
+ 	shmobile_smp_arg[cpu] = arg;
+ 	flush_cache_all();
+ }
++
++#ifdef CONFIG_HOTPLUG_CPU
++int shmobile_smp_cpu_disable(unsigned int cpu)
++{
++	return 0; /* Hotplug of any CPU is supported */
++}
++#endif
