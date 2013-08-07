@@ -1,103 +1,139 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:39:31 +0900
-Subject: [GIT PULL 5/9] ARM: shmobile: Add shared SCU CPU Hotplug code
+Date: Wed,  7 Aug 2013 13:39:34 +0900
+Subject: [GIT PULL 8/9] ARM: shmobile: Introduce per-CPU SMP boot / sleep code
 In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
 References: <cover.1375841380.git.horms+renesas@verge.net.au>
-Message-ID: <e7b1c96384181d690950530f5a64167965226744.1375841380.git.horms+renesas@verge.net.au>
+Message-ID: <cc61591e45c0457139ddd4cd7e57f75928acaaf2.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add CPU Hotplug functions for SCU equipped mach-shmobile SoCs.
+Add per-CPU SMP boot / sleep code that can be used by all
+SoCs included in mach-shmobile.
 
-The functions shmobile_smp_scu_cpu_die() together with
-shmobile_smp_scu_cpu_kill() perform basic shutdown and
-allows checking of shutdown status. These are written
-to work together with SMP boot code in  headsmp-scu.S.
+The boot code reads out the per-CPU MPIDR id value and
+matches it with the value stored for any CPU number, and
+if there is a match and the boot function is set as well
+then the boot function will be executed.
+
+The sleep code simply uses WFI and then jumps back to the
+boot code to see if anyone has asked to wake up that CPU,
+if not it will sleep again.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
+[horms+renesas at verge.net.au: Remove trailing whitespace]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/common.h |  2 ++
- arch/arm/mach-shmobile/platsmp-scu.c         | 45 ++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
+ arch/arm/mach-shmobile/headsmp.S             | 49 ++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |  4 +++
+ arch/arm/mach-shmobile/platsmp.c             | 18 ++++++++++
+ 3 files changed, 71 insertions(+)
 
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 559d1ce..2940fc9 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -38,3 +38,52 @@ shmobile_boot_fn:
+ 	.globl	shmobile_boot_arg
+ shmobile_boot_arg:
+ 2:	.space	4
++
++/*
++ * Per-CPU SMP boot function/argument selection code based on MPIDR
++ */
++
++ENTRY(shmobile_smp_boot)
++						@ r0 = MPIDR_HWID_BITMASK
++	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
++	and	r0, r1, r0			@ r0 = cpu_logical_map() value
++	mov	r1, #0				@ r1 = CPU index
++	adr	r5, 1f				@ array of per-cpu mpidr values
++	adr	r6, 2f				@ array of per-cpu functions
++	adr	r7, 3f				@ array of per-cpu arguments
++
++shmobile_smp_boot_find_mpidr:
++	ldr	r8, [r5, r1, lsl #2]
++	cmp	r8, r0
++	bne	shmobile_smp_boot_next
++
++	ldr	r9, [r6, r1, lsl #2]
++	cmp	r9, #0
++	bne	shmobile_smp_boot_found
++
++shmobile_smp_boot_next:
++	add	r1, r1, #1
++	cmp	r1, #CONFIG_NR_CPUS
++	blo	shmobile_smp_boot_find_mpidr
++
++	b	shmobile_smp_sleep
++
++shmobile_smp_boot_found:
++	ldr	r0, [r7, r1, lsl #2]
++	mov	pc, r9
++ENDPROC(shmobile_smp_boot)
++
++ENTRY(shmobile_smp_sleep)
++	wfi
++	b	shmobile_smp_boot
++ENDPROC(shmobile_smp_sleep)
++
++	.globl	shmobile_smp_mpidr
++shmobile_smp_mpidr:
++1:	.space	CONFIG_NR_CPUS * 4
++	.globl	shmobile_smp_fn
++shmobile_smp_fn:
++2:	.space	CONFIG_NR_CPUS * 4
++	.globl	shmobile_smp_arg
++shmobile_smp_arg:
++3:	.space	CONFIG_NR_CPUS * 4
 diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 42761f4..04209d5 100644
+index 04209d5..3880cf5 100644
 --- a/arch/arm/mach-shmobile/include/mach/common.h
 +++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -14,6 +14,8 @@ extern void shmobile_boot_scu(void);
+@@ -10,6 +10,10 @@ extern void shmobile_setup_console(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
++extern void shmobile_smp_boot(void);
++extern void shmobile_smp_sleep(void);
++extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
++			      unsigned long arg);
+ extern void shmobile_boot_scu(void);
  extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
  extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
- 					   struct task_struct *idle);
-+extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
-+extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
- struct clk;
- extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
-diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
-index 8f478e4..7a0c066 100644
---- a/arch/arm/mach-shmobile/platsmp-scu.c
-+++ b/arch/arm/mach-shmobile/platsmp-scu.c
-@@ -7,9 +7,11 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
+diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
+index 1f958d7..d4ae616 100644
+--- a/arch/arm/mach-shmobile/platsmp.c
++++ b/arch/arm/mach-shmobile/platsmp.c
+@@ -12,6 +12,9 @@
   */
-+#include <linux/delay.h>
  #include <linux/init.h>
- #include <linux/io.h>
  #include <linux/smp.h>
 +#include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <mach/common.h>
-@@ -29,3 +31,46 @@ int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	/* do nothing for now */
- 	return 0;
++#include <asm/smp_plat.h>
++#include <mach/common.h>
+ 
+ void __init shmobile_smp_init_cpus(unsigned int ncores)
+ {
+@@ -26,3 +29,18 @@ void __init shmobile_smp_init_cpus(unsigned int ncores)
+ 	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
  }
 +
-+#ifdef CONFIG_HOTPLUG_CPU
-+void shmobile_smp_scu_cpu_die(unsigned int cpu)
++extern unsigned long shmobile_smp_fn[];
++extern unsigned long shmobile_smp_arg[];
++extern unsigned long shmobile_smp_mpidr[];
++
++void shmobile_smp_hook(unsigned int cpu, unsigned long fn, unsigned long arg)
 +{
-+	dsb();
++	shmobile_smp_fn[cpu] = 0;
 +	flush_cache_all();
 +
-+	/* disable cache coherency */
-+	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
-+
-+	/* Endless loop until reset */
-+	while (1)
-+		cpu_do_idle();
++	shmobile_smp_mpidr[cpu] = cpu_logical_map(cpu);
++	shmobile_smp_fn[cpu] = fn;
++	shmobile_smp_arg[cpu] = arg;
++	flush_cache_all();
 +}
-+
-+static int shmobile_smp_scu_psr_core_disabled(int cpu)
-+{
-+	unsigned long mask = SCU_PM_POWEROFF << (cpu * 8);
-+
-+	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+int shmobile_smp_scu_cpu_kill(unsigned int cpu)
-+{
-+	int k;
-+
-+	/* this function is running on another CPU than the offline target,
-+	 * here we need wait for shutdown code in platform_cpu_die() to
-+	 * finish before asking SoC-specific code to power off the CPU core.
-+	 */
-+	for (k = 0; k < 1000; k++) {
-+		if (shmobile_smp_scu_psr_core_disabled(cpu))
-+			return 1;
-+
-+		mdelay(1);
-+	}
-+
-+	return 0;
-+}
-+#endif
 -- 
 1.8.3.2
