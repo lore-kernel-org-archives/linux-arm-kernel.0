@@ -1,63 +1,98 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 07 Aug 2013 17:18:10 +0200
-Subject: [PATCH V3 6/7] ASoC: Samsung: wm8994: Register the osc clock.
-In-Reply-To: <1375866616-5541-7-git-send-email-padma.v@samsung.com>
-References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
- <1375866616-5541-7-git-send-email-padma.v@samsung.com>
-Message-ID: <1445367.zmBep3Ocuo@amdc1227>
+From: poeschel@lemonage.de (Lars Poeschel)
+Date: Wed, 7 Aug 2013 17:11:00 +0200
+Subject: [PATCH] ARM: dts: am33xx: Correct gpio #interrupt-cells property
+In-Reply-To: <20130807145309.GG28558@e106331-lin.cambridge.arm.com>
+References: <1375873592-26881-1-git-send-email-larsi@wh2.tu-dresden.de>
+ <20130807145309.GG28558@e106331-lin.cambridge.arm.com>
+Message-ID: <201308071711.00449.poeschel@lemonage.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 of August 2013 14:40:15 Padmavathi Venna wrote:
-> This patch registers the 16MHz oscillator clock as fixed clk.
+On Wednesday 07 August 2013 at 16:53:09, Mark Rutland wrote:
+> On Wed, Aug 07, 2013 at 12:06:32PM +0100, Lars Poeschel wrote:
+> > From: Lars Poeschel <poeschel@lemonage.de>
+> > 
+> > Following commit ff5c9059 and therefore other omap platforms using
+> > the gpio-omap driver correct the #interrupt-cells property on am33xx
+> > too. The omap gpio binding documentaion also states that
+> > the #interrupt-cells property should be 2.
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  sound/soc/samsung/smdk_wm8994.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/sound/soc/samsung/smdk_wm8994.c
-> b/sound/soc/samsung/smdk_wm8994.c index 581ea4a..a6edded 100644
-> --- a/sound/soc/samsung/smdk_wm8994.c
-> +++ b/sound/soc/samsung/smdk_wm8994.c
-> @@ -9,6 +9,7 @@
-> 
->  #include "../codecs/wm8994.h"
->  #include <sound/pcm_params.h>
-> +#include <linux/clk-provider.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> 
-> @@ -37,6 +38,15 @@
->  /* SMDK has a 16.934MHZ crystal attached to WM8994 */
->  #define SMDK_WM8994_FREQ 16934000
-> 
-> +/* 16.9MHz fixed oscillator clock */
-> +static void init_osc_clock(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "osc3_clk16mhz");
-> +	of_fixed_clk_setup(np);
-> +}
-> +
->  static int smdk_hw_params(struct snd_pcm_substream *substream,
->  	struct snd_pcm_hw_params *params)
->  {
-> @@ -173,6 +183,8 @@ static int smdk_audio_probe(struct platform_device
-> *pdev) smdk_dai[0].platform_of_node = smdk_dai[0].cpu_of_node;
->  	}
-> 
-> +	init_osc_clock();
-> +
->  	ret = snd_soc_register_card(card);
-> 
->  	if (ret)
+> I take it there are no device nodes for which any of these nodes are an
+> interrupt parent (which would need to be updated)?
 
-I don't think this patch is needed at all. You can use generic fixed rate 
-clock bindings[1] to define a fixed rate clock using device tree.
+As far as I know: No.
 
-Best regards,
-Tomasz
+Lars
 
-[1] - Documentation/devicetree/bindings/clock/fixed-clock.txt
+> If so:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Thanks,
+> Mark.
+> 
+> > Signed-off-by: Lars Poeschel <poeschel@lemonage.de>
+> > ---
+> > 
+> >  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi
+> > b/arch/arm/boot/dts/am33xx.dtsi index 38b446b..033c5dd 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -102,7 +102,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x44e07000 0x1000>;
+> >  			interrupts = <96>;
+> >  		
+> >  		};
+> > 
+> > @@ -113,7 +113,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x4804c000 0x1000>;
+> >  			interrupts = <98>;
+> >  		
+> >  		};
+> > 
+> > @@ -124,7 +124,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x481ac000 0x1000>;
+> >  			interrupts = <32>;
+> >  		
+> >  		};
+> > 
+> > @@ -135,7 +135,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x481ae000 0x1000>;
+> >  			interrupts = <62>;
+> >  		
+> >  		};
