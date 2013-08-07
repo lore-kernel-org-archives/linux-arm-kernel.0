@@ -1,46 +1,135 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 7 Aug 2013 08:59:56 +0200
-Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <20130806200256.GB19280@titan.lakedaemon.net>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130806200256.GB19280@titan.lakedaemon.net>
-Message-ID: <20130807065954.GA22906@manwe>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 07 Aug 2013 00:03:20 -0700
+Subject: [PATCH 1/2] hwmon: (lm90) Add power control
+In-Reply-To: <1375858358-15070-2-git-send-email-wni@nvidia.com>
+References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
+ <1375858358-15070-2-git-send-email-wni@nvidia.com>
+Message-ID: <5201F138.3080906@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 04:02:56PM -0400, Jason Cooper wrote:
-> Thomas,
-> 
-> In order to get some testing in -next, I've *tentatively* applied this
-> series in the following way:
-> 
-> +---+ mvebu/msi_common (1,2,3,10)
->     |
->     +---+---+ mvebu/msi_irq (4-9)
->             |
->             +---+---+ mvebu/msi_mvebu (11-13)
-> 
-> I had to make one change to patch #9, I protected the last two blocks
-> with #ifdef CONFIG_PCI_MSI to prevent a build failure at that point.
-> 
-> mvebu/msi_common should be appropriate for Thierry to base off, however,
-> I make no guarantees about the stability of the branch until I send a
-> PR for it.  Code-wise, it should be fine, but the commit-ids may change
-> due to adding Tested-by's, etc.
+On 08/06/2013 11:52 PM, Wei Ni wrote:
+> The device lm90 can be controlled by the vdd rail.
+> Adding the power control support to power on/off the vdd rail.
+> And make sure that power is enabled before accessing the device.
+>
+> Signed-off-by: Wei Ni <wni@nvidia.com>
+> ---
+>   drivers/hwmon/lm90.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 52 insertions(+)
+>
+> diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
+> index cdff742..eeb0115 100644
+> --- a/drivers/hwmon/lm90.c
+> +++ b/drivers/hwmon/lm90.c
+> @@ -89,6 +89,8 @@
+>   #include <linux/err.h>
+>   #include <linux/mutex.h>
+>   #include <linux/sysfs.h>
+> +#include <linux/delay.h>
+> +#include <linux/regulator/consumer.h>
+>
+>   /*
+>    * Addresses to scan
+> @@ -179,6 +181,8 @@ enum chips { lm90, adm1032, lm99, lm86, max6657, max6659, adt7461, max6680,
+>   #define LM90_HAVE_TEMP3		(1 << 6) /* 3rd temperature sensor	*/
+>   #define LM90_HAVE_BROKEN_ALERT	(1 << 7) /* Broken alert		*/
+>
+> +#define POWER_ON_DELAY 20 /*ms*/
+> +
+>   /*
+>    * Driver data (common to all clients)
+>    */
+> @@ -302,6 +306,7 @@ static const struct lm90_params lm90_params[] = {
+>   struct lm90_data {
+>   	struct device *hwmon_dev;
+>   	struct mutex update_lock;
+> +	struct regulator *lm90_reg;
+>   	char valid; /* zero until following fields are valid */
+>   	unsigned long last_updated; /* in jiffies */
+>   	int kind;
+> @@ -1391,6 +1396,48 @@ static void lm90_init_client(struct i2c_client *client)
+>   		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
+>   }
+>
+> +static int lm90_power_control(struct i2c_client *client, bool is_enable)
+> +{
+> +	struct lm90_data *data = i2c_get_clientdata(client);
+> +	int ret;
+> +
+> +	mutex_lock(&data->update_lock);
+> +
+> +	if (!data->lm90_reg) {
+> +		data->lm90_reg = regulator_get(&client->dev, "vdd");
+> +		if (IS_ERR_OR_NULL(data->lm90_reg)) {
+> +			if (PTR_ERR(data->lm90_reg) == -ENODEV)
+> +				dev_info(&client->dev,
+> +					 "No regulator found for vdd. Assuming vdd is always powered.");
+> +			else
+> +				dev_warn(&client->dev,
+> +					 "Error [%ld] in getting the regulator handle for vdd.\n",
+> +					 PTR_ERR(data->lm90_reg));
+> +			data->lm90_reg = NULL;
+> +			mutex_unlock(&data->update_lock);
+> +			return -ENODEV;
 
-I noticed that patch 10 has my Reviewed-by, even though my comments
-weren't addressed. They were about stylistic issues but I'd still like
-to see them fixed now rather than having to fix them up later. Also I
-think I gave my Tested-by on those patches somewhere already and I think
-it's unlikely that anybody else will test them, so with the consistency
-style fixes applied I don't see any reason why that branch can't be
-stabilized right away.
+I don't think it is acceptable to have the driver fail on pretty much all PCs.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/10c41cd0/attachment.sig>
+Also, I dislike that - even if the calling code doesn't fail - the above message would be displayed on unload as well.
+
+In general, the 'unload' flag seems unnecessary. You could just call
+
+	if (data->lm90_reg)
+		regulator_disable();
+
+in the remove function. In addition to that, shouldn't you call regulator_put() on exit ?
+Also, I am missing error handling in the probe function; if something else fails,
+the regulator is neither disabled nor released.
+
+Guenter
+
+> +		}
+> +	}
+> +	if (is_enable) {
+> +		ret = regulator_enable(data->lm90_reg);
+> +		msleep(POWER_ON_DELAY);
+> +	} else {
+> +		ret = regulator_disable(data->lm90_reg);
+> +	}
+> +
+> +	if (ret < 0)
+> +		dev_err(&client->dev,
+> +			"Error in %s rail vdd, error %d\n",
+> +			(is_enable) ? "enabling" : "disabling", ret);
+> +	else
+> +		dev_info(&client->dev, "success in %s rail vdd\n",
+> +			 (is_enable) ? "enabling" : "disabling");
+> +
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+>   static int lm90_probe(struct i2c_client *client,
+>   		      const struct i2c_device_id *id)
+>   {
+> @@ -1406,6 +1453,10 @@ static int lm90_probe(struct i2c_client *client,
+>   	i2c_set_clientdata(client, data);
+>   	mutex_init(&data->update_lock);
+>
+> +	err = lm90_power_control(client, true);
+> +	if (err < 0)
+> +		return err;
+> +
+>   	/* Set the device type */
+>   	data->kind = id->driver_data;
+>   	if (data->kind == adm1032) {
+> @@ -1483,6 +1534,7 @@ static int lm90_remove(struct i2c_client *client)
+>   	hwmon_device_unregister(data->hwmon_dev);
+>   	lm90_remove_files(client, data);
+>   	lm90_restore_conf(client, data);
+> +	lm90_power_control(client, false);
+>
+>   	return 0;
+>   }
+>
