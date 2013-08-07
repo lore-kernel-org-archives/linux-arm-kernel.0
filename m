@@ -1,49 +1,30 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Wed, 7 Aug 2013 15:50:42 +0800
-Subject: VM Kernel bug with CONFIG_DEBUG_VM
-In-Reply-To: <20130807054111.GQ16694@cbox>
-References: <20130807054111.GQ16694@cbox>
-Message-ID: <CACVXFVNt5j6cJGkRJuUv-yS+wqXN+Hzx2R7jY-2DPkxsNPkdcQ@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed,  7 Aug 2013 15:47:40 +0800
+Subject: [RFC PATCH] clock: correct the comparison parameter of MHz
+Message-ID: <1375861660-32525-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 7, 2013 at 1:41 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> Hi all,
->
-> I've found that booting a recent kernel (and as far back as 3.9 at
-> least) I get a kernel bug during boot with VM debugging enabled.  I
-> haven't had time to dig further into it, but wanted to check if this is
-> a known issue?
+correct the comparison parameter of MHz from 4,000,000 to 1,000,000
 
-Remember Catalin introduced the flush_dcache_page() to fix
-cache incoherency problem when PIO reading from USB mass
-storage device to mapped page, so the flush should not need
-for pages not in page cache.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-Care to test below patch to see if the problem can be fixed?
+---
+ kernel/time/sched_clock.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/isp1760-hcd.c b/drivers/usb/host/isp1760-hcd.c
-index 2facee5..9d47c71 100644
---- a/drivers/usb/host/isp1760-hcd.c
-+++ b/drivers/usb/host/isp1760-hcd.c
-@@ -707,8 +707,12 @@ __acquires(priv->lock)
- 		void *ptr;
- 		for (ptr = urb->transfer_buffer;
- 		     ptr < urb->transfer_buffer + urb->transfer_buffer_length;
--		     ptr += PAGE_SIZE)
--			flush_dcache_page(virt_to_page(ptr));
-+		     ptr += PAGE_SIZE) {
-+			struct page *page = virt_to_page(ptr);
-+			if (PageSlab(page))
-+				break;
-+			flush_dcache_page(page);
-+		}
- 	}
-
- 	/* complete() can reenter this HCD */
-
-
-Thanks,
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index a326f27..62885f7 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -128,7 +128,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	clocks_calc_mult_shift(&cd.mult, &cd.shift, rate, NSEC_PER_SEC, 0);
+ 
+ 	r = rate;
+-	if (r >= 4000000) {
++	if (r >= 1000000) {
+ 		r /= 1000000;
+ 		r_unit = 'M';
+ 	} else if (r >= 1000) {
 -- 
-Ming Lei
+1.7.9.5
