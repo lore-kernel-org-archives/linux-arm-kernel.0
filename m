@@ -1,36 +1,56 @@
-From: tkazmierczak@EUROFUNK.COM (KAZMIERCZAK Tobias)
-Date: Wed, 7 Aug 2013 09:17:07 +0200
-Subject: [PATCH] Fix incorrect define for OMAP padmux
-Message-ID: <9FA67543B55C1040AED85F8B8154F91C03FFBCB8@mailsrv.eurofunk.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 7 Aug 2013 00:20:55 -0700
+Subject: [PATCH 2/6] mtd: atmel_nand: replace pmecc enable code with one
+ function.
+In-Reply-To: <1375701279-11495-3-git-send-email-josh.wu@atmel.com>
+References: <1375701279-11495-1-git-send-email-josh.wu@atmel.com>
+ <1375701279-11495-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130807072055.GA26025@norris.computersforpeace.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for the macro OMAP3_MUX() to work, _OFFSET has to be added
+Hi Josh,
 
-Signed-off-by: Tobias Kazmierczak <tkazmierczak@eurofunk.com>
----
- arch/arm/mach-omap2/mux34xx.h |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+On Mon, Aug 05, 2013 at 07:14:34PM +0800, Josh Wu wrote:
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 3d7db95..28d159a 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -746,6 +746,30 @@ normal_check:
+>  	return total_err;
+>  }
+>  
+> +static void pmecc_enable(struct atmel_nand_host *host, int ecc_op)
+> +{
+> +	u32 val;
+> +
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+> +	val = pmecc_readl_relaxed(host->ecc, CFG);
+> +
+> +	if (ecc_op != NAND_ECC_READ && ecc_op != NAND_ECC_WRITE) {
+> +		dev_err(host->dev, "atmel_nand: wrong pmecc operation type!");
+> +		return;
+> +	}
 
+Why is this check after the reset and disable? Shouldn't it be placed at
+the beginning of the function? But this is a somewhat strange check
+anyway, since this function is private to the driver (static).
 
-diff --git a/arch/arm/mach-omap2/mux34xx.h
-b/arch/arm/mach-omap2/mux34xx.h
-index 3f26d29..82a3feb 100644
---- a/arch/arm/mach-omap2/mux34xx.h
-+++ b/arch/arm/mach-omap2/mux34xx.h
-@@ -393,10 +393,10 @@
- #define OMAP3_CONTROL_PADCONF_SAD2D_SWAKEUP_OFFSET             0xa1c
- #define OMAP3_CONTROL_PADCONF_JTAG_RTCK_OFFSET                 0xa1e
- #define OMAP3_CONTROL_PADCONF_JTAG_TDO_OFFSET                  0xa20
--#define OMAP3_CONTROL_PADCONF_GPIO_127                         0xa24
--#define OMAP3_CONTROL_PADCONF_GPIO_126                         0xa26
--#define OMAP3_CONTROL_PADCONF_GPIO_128                         0xa28
--#define OMAP3_CONTROL_PADCONF_GPIO_129                         0xa2a
-+#define OMAP3_CONTROL_PADCONF_GPIO_127_OFFSET                  0xa24
-+#define OMAP3_CONTROL_PADCONF_GPIO_126_OFFSET                  0xa26
-+#define OMAP3_CONTROL_PADCONF_GPIO_128_OFFSET                  0xa28
-+#define OMAP3_CONTROL_PADCONF_GPIO_129_OFFSET                  0xa2a
- 
- #define OMAP3_CONTROL_PADCONF_MUX_SIZE                         \
--               (OMAP3_CONTROL_PADCONF_GPIO_129 + 0x2)
-+               (OMAP3_CONTROL_PADCONF_GPIO_129_OFFSET + 0x2)
+> +
+> +	if (ecc_op == NAND_ECC_READ)
+> +		pmecc_writel(host->ecc, CFG, (val & ~PMECC_CFG_WRITE_OP)
+> +			| PMECC_CFG_AUTO_ENABLE);
+> +	else
+> +		pmecc_writel(host->ecc, CFG, (val | PMECC_CFG_WRITE_OP)
+> +			& ~PMECC_CFG_AUTO_ENABLE);
+> +
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
+> +}
+> +
+>  static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+>  	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
+>  {
+
+Brian
