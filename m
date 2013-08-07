@@ -1,20 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Aug 2013 15:51:21 +0200
-Subject: [PATCH 01/22] ARM: ux500: Remove '0x's from HREF v60+ DTS file
-In-Reply-To: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYAaCrRLjRwZVsq0Av0vc5Y4PODQchEwTCcrmYS47G3jw@mail.gmail.com>
+Date: Wed, 7 Aug 2013 15:52:57 +0200
+Subject: [PATCH 05/18] ARM: integrator: Switch to sched_clock_register()
+In-Reply-To: <1375309877-16617-6-git-send-email-sboyd@codeaurora.org>
+References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
+ <1375309877-16617-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdaCn74S0WbZ+fuN_ZpKAS0eiYyOe9w-pPLbQeFquEogyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 22, 2013 at 12:52 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Aug 1, 2013 at 12:31 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
+> the 64 bit function to allow us to remove the 32 bit registration
+> interface.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-None of these patches apply since I applied your other patch series
-that rename all the files ... can you respin the ux500 "0x"-strip patches
-on top of the rename set? My ux500-devicetree branch can be used
-as a baseline.
+For this patch (given the idea is accepted)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
