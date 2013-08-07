@@ -1,34 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Aug 2013 20:19:35 +0200
-Subject: [PATCH v2] pinctrl: shut up a couple of pinctrl warnings
-In-Reply-To: <20130728121300.GF24642@n2100.arm.linux.org.uk>
-References: <20130727103811.GD24642@n2100.arm.linux.org.uk>
- <20130728121300.GF24642@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdY2-6PAyELC0_vFpSV=N2PTN2JDG5Z-1w0-7LruCAo-Pg@mail.gmail.com>
+Date: Wed, 7 Aug 2013 20:29:08 +0200
+Subject: [PATCH 1/2] pinctrl: imx: Add exception hook for select input
+In-Reply-To: <20130731052031.GA19098@S2101-09.ap.freescale.net>
+References: <1375152857-32177-1-git-send-email-peter.chen@freescale.com>
+ <20130730075018.GD12382@S2101-09.ap.freescale.net>
+ <20130730080028.GA8540@nchen-desktop>
+ <20130730083803.GF12382@S2101-09.ap.freescale.net>
+ <20130731052031.GA19098@S2101-09.ap.freescale.net>
+Message-ID: <CACRpkdYyXeig3-OngbyPBsKLXRjKVFA2euFHu7wmBj1PLKsJHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 28, 2013 at 2:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Wed, Jul 31, 2013 at 7:20 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Jul 30, 2013 at 04:38:05PM +0800, Shawn Guo wrote:
+>> On Tue, Jul 30, 2013 at 04:00:29PM +0800, Peter Chen wrote:
+>> > I searched the RM, this is the only one. If you don't think we need
+>> > to consider if it will occur in the future, I am OK to move it at machine
+>> > code, but every mx6q board need it if it does not use default select input
+>> > value.
+>>
+>> Yes, maybe you can put it into imx6q_usb_init() with
+>> if (IS_ENABLED(CONFIG_USB_OTG)) protect.
+>
+> I misunderstood it.  As it varies from board to board, we can not nicely
+> handle it in mach-imx6q.c.  I have some other idea to solve the problem,
+> and will cook up a patch to demonstrate it.
 
-> So, I notice that we get a couple of warnings from the pinctrl code:
->
-> drivers/pinctrl/pinconf.c: In function 'pinconf_dbg_config_print':
-> drivers/pinctrl/pinconf.c:433:36: warning: 'configs' may be used uninitialized in this function
-> drivers/pinctrl/pinconf.c: In function 'pinconf_dbg_config_write':
-> drivers/pinctrl/pinconf.c:511:36: warning: 'configs' may be used uninitialized in this function
->
-> While the compiler might not be able to work out that "configs" is
-> safe, the code doesn't lend itself very well to identifying that
-> fact when reading it either.  This can be trivially solved by a slight
-> restructuring of the code - which also reduces the LOC.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> So last nights build test found a silly in the last patch, so that's fixed
-> in this version.
-
-Thanks Russell, patch applied. Sorry for taking so long.
+I'm putting this patch on hold until we've seen Shawn's proof of concept.
 
 Yours,
 Linus Walleij
