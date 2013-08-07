@@ -1,76 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Aug 2013 23:57:55 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] arch/arm SoC organization
-In-Reply-To: <CAGFynZ-sk7bzZMKujAZ9y1OQJFEQQwqWNY_SZUhz+0xEWiF=_A@mail.gmail.com>
-References: <20130731141841.GP5882@titan.lakedaemon.net>
- <20130802083346.GC7656@atomide.com>
- <CAGFynZ-V6CUFXh+iC8M7spwHn3gma6gYgRFBaoAXRYtw1fbgHA@mail.gmail.com>
- <20130805062129.GK7656@atomide.com>
- <CAGFynZ-sk7bzZMKujAZ9y1OQJFEQQwqWNY_SZUhz+0xEWiF=_A@mail.gmail.com>
-Message-ID: <20130807065754.GJ7656@atomide.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 7 Aug 2013 08:59:56 +0200
+Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <20130806200256.GB19280@titan.lakedaemon.net>
+References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130806200256.GB19280@titan.lakedaemon.net>
+Message-ID: <20130807065954.GA22906@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Christian Daudt <csd_b@daudt.org> [130806 16:14]:
-> On Sun, Aug 4, 2013 at 11:21 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Christian Daudt <csd_b@daudt.org> [130802 16:13]:
-> >> On Fri, Aug 2, 2013 at 1:33 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> > * Jason Cooper <jason@lakedaemon.net> [130731 07:25]:
-> >> >> So, I'd like to propose we discuss some lessons learned and maybe arrive
-> >> >> at some best practices.  eg, should we just go with mach-$COMPANY/?  How
-> >> >> best to handle config symbols for efficient building?  Deprecation path
-> >> >> for legacy (unconverted) boards?
-> >> >
-> >> > A lot of that problem goes away by initializing everything as late
-> >> > as possible, and making things to live under drivers.
-> >> One category of items that we haven't found a good place for in this
-> >> new multiplatform world is where does dt-driven non-driver code reside
-> >> ? e.g. we have a secure monitor access function that only kicks in if
-> >> the appropriate dt entry is available . It currently resides in
-> >> mach-bcm/bcm_kona_smc.c as it seems like the only location for it at
-> >> the moment, but that doesn't seem like the best place because (a)
-> >> mach-bcm might end up littered with one-of cases like this and (b)
-> >> anything in mach-bcm is not visible to arm64 SoCs, and some of those
-> >> in the future will need to share with their arm32 cousins.
-> >>  But putting in drivers (e.g. drivers/smc) seems like the wrong thing
-> >> to do also because this is not a driver.
-> >>  We have a couple of other smallish pieces of IP that just need a bit
-> >> of generic init code to keep them happy, which we were discussing
-> >> internally where to best land them. At present they are also headed to
-> >> mach-bcm.
-> >>  Ultimately the question is 'what is allowed to reside in mach-<misc>
-> >> ?' And by extension: 'is there a good home for everything else ?''
-> >
-> > Well I guess the question is how early do you need it?
-> >
-> > We only need the following things early on that might be SoC specific:
-> >
-> > 1. Timers for clockevents
-> >
-> > 2. Interrupt controller
-> >
-> > If you need the SoC specific code for the two items above, then
-> > you probably want to set it up in the SoC specific init_early.
-> >
-> > Everything else should be possible to do as device drivers with
-> > initramfs. If the code has an interrupt handler, chances are it
-> > can be a driver :)
-> >
-> I agree that most anything can be made into a driver. I'm asking if
-> that's what we want to do for all arm code that doesn't need to be
-> done at the earliest stages. If there's code that doesn't need
-> interrupts, doesn't register for fileops, doesn't register for any
-> framework, etc... Do we still want to make a driver out of it ?
+On Tue, Aug 06, 2013 at 04:02:56PM -0400, Jason Cooper wrote:
+> Thomas,
+> 
+> In order to get some testing in -next, I've *tentatively* applied this
+> series in the following way:
+> 
+> +---+ mvebu/msi_common (1,2,3,10)
+>     |
+>     +---+---+ mvebu/msi_irq (4-9)
+>             |
+>             +---+---+ mvebu/msi_mvebu (11-13)
+> 
+> I had to make one change to patch #9, I protected the last two blocks
+> with #ifdef CONFIG_PCI_MSI to prevent a build failure at that point.
+> 
+> mvebu/msi_common should be appropriate for Thierry to base off, however,
+> I make no guarantees about the stability of the branch until I send a
+> PR for it.  Code-wise, it should be fine, but the commit-ids may change
+> due to adding Tested-by's, etc.
 
-If we can, then yes I think that's the way to go. Making things into
-loadable modules already automatically prevents quite a bit of
-potential for nasty hacks and spaghetti code as the interfaces are
-standard.
+I noticed that patch 10 has my Reviewed-by, even though my comments
+weren't addressed. They were about stylistic issues but I'd still like
+to see them fixed now rather than having to fix them up later. Also I
+think I gave my Tested-by on those patches somewhere already and I think
+it's unlikely that anybody else will test them, so with the consistency
+style fixes applied I don't see any reason why that branch can't be
+stabilized right away.
 
-Also, then the related pieces can easily be shared across multiple
-SoCs or archs, and we may even have proper maintainers for those
-drivers eventually :)
-
-Regards,
-
-Tony
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/10c41cd0/attachment.sig>
