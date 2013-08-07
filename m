@@ -1,60 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:28:32 +0900
-Subject: [GIT PULL 11/19] ARM: shmobile: r8a7779: Rely on DT for SMP CPU info
+Date: Wed,  7 Aug 2013 13:28:31 +0900
+Subject: [GIT PULL 10/19] ARM: shmobile: marzen: Switch to DT_MACHINE_START
 In-Reply-To: <cover.1375838900.git.horms+renesas@verge.net.au>
 References: <cover.1375838900.git.horms+renesas@verge.net.au>
-Message-ID: <afad20105a58c06407ad9ad85c1cd9ca79d99e00.1375838900.git.horms+renesas@verge.net.au>
+Message-ID: <7ebbb4ae6f2d6242178d332c67ad49772f9fe88d.1375838900.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove r8a7779 specific ->smp_init_cpus() callback and
-instead of relying on shmobile_smp_init_cpus() simply
-use DT for CPU core information.
+From: Magnus Damm <damm@opensource.se>
 
-Based on work for the sh73a0 by Magnus Damm.
+Convert the marzen board to use DT_MACHINE_START. With this in
+place all mach-shmobile boards use DT_MACHINE_START. Also, this
+makes it possible for the r8a7779 SMP code to use DT for CPUs.
 
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Magnus Damm <damm@opensource.se>
+[horms+renesas at verge.net.au: Select USE_OF in Kconfig]
+[horms+renesas at verge.net.au: Provide dt_compat in DT_MACHINE_START]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ arch/arm/mach-shmobile/Kconfig        | 1 +
+ arch/arm/mach-shmobile/board-marzen.c | 8 +++++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 526cfaa..bb3adae 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -99,6 +99,9 @@ static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 9e07985..16c3072 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -156,6 +156,7 @@ config MACH_MARZEN
+ 	depends on ARCH_R8A7779
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++	select USE_OF
  
- static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- {
-+
-+	/* setup r8a7779 specific SCU base */
-+	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
- 	scu_enable(shmobile_scu_base);
- 
- 	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
-@@ -117,14 +120,6 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- 	r8a7779_platform_cpu_kill(3);
+ config MACH_MARZEN_REFERENCE
+ 	bool "MARZEN board - Reference Device Tree Implementation"
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index a7d1010..bcd07c0 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -238,7 +238,12 @@ static void __init marzen_init(void)
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
  }
  
--static void __init r8a7779_smp_init_cpus(void)
--{
--	/* setup r8a7779 specific SCU base */
--	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
--
--	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
--}
--
- #ifdef CONFIG_HOTPLUG_CPU
- static int r8a7779_scu_psr_core_disabled(int cpu)
- {
-@@ -175,7 +170,6 @@ static int r8a7779_cpu_disable(unsigned int cpu)
- #endif /* CONFIG_HOTPLUG_CPU */
- 
- struct smp_operations r8a7779_smp_ops  __initdata = {
--	.smp_init_cpus		= r8a7779_smp_init_cpus,
- 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
- 	.smp_boot_secondary	= r8a7779_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
+-MACHINE_START(MARZEN, "marzen")
++static const char *marzen_boards_compat_dt[] __initdata = {
++        "renesas,marzen",
++        NULL,
++};
++
++DT_MACHINE_START(MARZEN, "marzen")
+ 	.smp		= smp_ops(r8a7779_smp_ops),
+ 	.map_io		= r8a7779_map_io,
+ 	.init_early	= r8a7779_add_early_devices,
+@@ -246,5 +251,6 @@ MACHINE_START(MARZEN, "marzen")
+ 	.init_irq	= r8a7779_init_irq,
+ 	.init_machine	= marzen_init,
+ 	.init_late	= r8a7779_init_late,
++	.dt_compat	= marzen_boards_compat_dt,
+ 	.init_time	= r8a7779_earlytimer_init,
+ MACHINE_END
 -- 
 1.8.3.2
