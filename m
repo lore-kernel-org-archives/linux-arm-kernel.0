@@ -1,83 +1,103 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:39:28 +0900
-Subject: [GIT PULL 2/9] ARM: shmobile: Use shared SCU SMP boot code on sh73a0
+Date: Wed,  7 Aug 2013 13:39:31 +0900
+Subject: [GIT PULL 5/9] ARM: shmobile: Add shared SCU CPU Hotplug code
 In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
 References: <cover.1375841380.git.horms+renesas@verge.net.au>
-Message-ID: <12eb8474386228c91e35be031d7c3eaa1318b5cf.1375841380.git.horms+renesas@verge.net.au>
+Message-ID: <e7b1c96384181d690950530f5a64167965226744.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Use shared SCU code on sh73a0 for SMP boot.
+Add CPU Hotplug functions for SCU equipped mach-shmobile SoCs.
+
+The functions shmobile_smp_scu_cpu_die() together with
+shmobile_smp_scu_cpu_kill() perform basic shutdown and
+allows checking of shutdown status. These are written
+to work together with SMP boot code in  headsmp-scu.S.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile     |  2 +-
- arch/arm/mach-shmobile/smp-sh73a0.c | 26 +++++++++++++-------------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/mach-shmobile/include/mach/common.h |  2 ++
+ arch/arm/mach-shmobile/platsmp-scu.c         | 45 ++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index e401c73..a32dc15 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -17,7 +17,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
- 
- # SMP objects
- smp-y				:= platsmp.o headsmp.o
--smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
-+smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
- 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 1b3dc7c..1096b0e 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -50,30 +50,30 @@ void __init sh73a0_register_twd(void)
- 
- static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	cpu = cpu_logical_map(cpu);
-+	unsigned int lcpu = cpu_logical_map(cpu);
-+	int ret;
- 
--	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
--		__raw_writel(1 << cpu, WUPCR);	/* wake up */
-+	ret = shmobile_smp_scu_boot_secondary(cpu, idle);
-+	if (ret)
-+		return ret;
-+
-+	if (((__raw_readl(PSTR) >> (4 * lcpu)) & 3) == 3)
-+		__raw_writel(1 << lcpu, WUPCR);	/* wake up */
- 	else
--		__raw_writel(1 << cpu, SRESCR);	/* reset */
-+		__raw_writel(1 << lcpu, SRESCR);	/* reset */
- 
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 42761f4..04209d5 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -14,6 +14,8 @@ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
+ extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
+ 					   struct task_struct *idle);
++extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
++extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
+ struct clk;
+ extern int shmobile_clk_init(void);
+ extern void shmobile_handle_irq_intc(struct pt_regs *);
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index 8f478e4..7a0c066 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -7,9 +7,11 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++#include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/smp.h>
++#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ #include <mach/common.h>
+@@ -29,3 +31,46 @@ int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	/* do nothing for now */
  	return 0;
  }
- 
- static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- {
--	/* setup sh73a0 specific SCU base */
--	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
--	scu_enable(shmobile_scu_base);
--
--	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
-+	/* Map the reset vector (in headsmp.S) */
- 	__raw_writel(0, APARMBAREA);      /* 4k */
- 	__raw_writel(__pa(shmobile_boot_vector), SBAR);
--	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
--	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
- 
--	/* enable cache coherency on booting CPU */
--	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
-+	/* setup sh73a0 specific SCU bits */
-+	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
-+	shmobile_smp_scu_prepare_cpus(max_cpus);
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
++
++#ifdef CONFIG_HOTPLUG_CPU
++void shmobile_smp_scu_cpu_die(unsigned int cpu)
++{
++	dsb();
++	flush_cache_all();
++
++	/* disable cache coherency */
++	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
++
++	/* Endless loop until reset */
++	while (1)
++		cpu_do_idle();
++}
++
++static int shmobile_smp_scu_psr_core_disabled(int cpu)
++{
++	unsigned long mask = SCU_PM_POWEROFF << (cpu * 8);
++
++	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
++		return 1;
++
++	return 0;
++}
++
++int shmobile_smp_scu_cpu_kill(unsigned int cpu)
++{
++	int k;
++
++	/* this function is running on another CPU than the offline target,
++	 * here we need wait for shutdown code in platform_cpu_die() to
++	 * finish before asking SoC-specific code to power off the CPU core.
++	 */
++	for (k = 0; k < 1000; k++) {
++		if (shmobile_smp_scu_psr_core_disabled(cpu))
++			return 1;
++
++		mdelay(1);
++	}
++
++	return 0;
++}
++#endif
 -- 
 1.8.3.2
