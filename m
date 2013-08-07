@@ -1,47 +1,61 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Wed, 7 Aug 2013 16:35:22 +0530
-Subject: [PATCH V3 6/7] ASoC: Samsung: wm8994: Register the osc clock.
-In-Reply-To: <20130807101024.GX6427@sirena.org.uk>
-References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
- <1375866616-5541-7-git-send-email-padma.v@samsung.com>
- <20130807101024.GX6427@sirena.org.uk>
-Message-ID: <CAAgF-BcoUaUkcuBpP3xRKQPCz6ceV7pvAC9kmbyckp_H1QCJaA@mail.gmail.com>
+From: larsi@wh2.tu-dresden.de (Lars Poeschel)
+Date: Wed,  7 Aug 2013 13:06:32 +0200
+Subject: [PATCH] ARM: dts: am33xx: Correct gpio #interrupt-cells property
+Message-ID: <1375873592-26881-1-git-send-email-larsi@wh2.tu-dresden.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+From: Lars Poeschel <poeschel@lemonage.de>
 
-On Wed, Aug 7, 2013 at 3:40 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Aug 07, 2013 at 02:40:15PM +0530, Padmavathi Venna wrote:
->> This patch registers the 16MHz oscillator clock as fixed clk.
->
->> +/* 16.9MHz fixed oscillator clock */
->> +static void init_osc_clock(void)
->> +{
->> +     struct device_node *np;
->> +
->> +     np = of_find_compatible_node(NULL, NULL, "osc3_clk16mhz");
->> +     of_fixed_clk_setup(np);
->> +}
->> +
->>  static int smdk_hw_params(struct snd_pcm_substream *substream,
->>       struct snd_pcm_hw_params *params)
->>  {
->> @@ -173,6 +183,8 @@ static int smdk_audio_probe(struct platform_device *pdev)
->>               smdk_dai[0].platform_of_node = smdk_dai[0].cpu_of_node;
->>       }
->>
->> +     init_osc_clock();
->> +
->
-> This doesn't seem great - it means that this machine driver needs to
+Following commit ff5c9059 and therefore other omap platforms using
+the gpio-omap driver correct the #interrupt-cells property on am33xx
+too. The omap gpio binding documentaion also states that
+the #interrupt-cells property should be 2.
 
-Yes. True. But I am not sure of the correct place to keep this code.
-Any suggestions?
+Signed-off-by: Lars Poeschel <poeschel@lemonage.de>
+---
+ arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Thanks
-Padma
-
-> know about a specifically named fixed clock which makes it hard to reuse
-> on other similar boards.  For example I'm intending to reuse this on
-> Arndale.  Mike?
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 38b446b..033c5dd 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -102,7 +102,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 			reg = <0x44e07000 0x1000>;
+ 			interrupts = <96>;
+ 		};
+@@ -113,7 +113,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 			reg = <0x4804c000 0x1000>;
+ 			interrupts = <98>;
+ 		};
+@@ -124,7 +124,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 			reg = <0x481ac000 0x1000>;
+ 			interrupts = <32>;
+ 		};
+@@ -135,7 +135,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 			reg = <0x481ae000 0x1000>;
+ 			interrupts = <62>;
+ 		};
+-- 
+1.7.10.4
