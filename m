@@ -1,61 +1,63 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 07 Aug 2013 17:16:56 +0200
-Subject: [PATCH V3 5/7] ARM: dts: Add osc clock node on smdk5420.
-In-Reply-To: <1375866616-5541-6-git-send-email-padma.v@samsung.com>
+Date: Wed, 07 Aug 2013 17:18:10 +0200
+Subject: [PATCH V3 6/7] ASoC: Samsung: wm8994: Register the osc clock.
+In-Reply-To: <1375866616-5541-7-git-send-email-padma.v@samsung.com>
 References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
- <1375866616-5541-6-git-send-email-padma.v@samsung.com>
-Message-ID: <4360230.6r2xpZjN04@amdc1227>
+ <1375866616-5541-7-git-send-email-padma.v@samsung.com>
+Message-ID: <1445367.zmBep3Ocuo@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 of August 2013 14:40:14 Padmavathi Venna wrote:
-> This patch adds 16MHz oscillator clock node required for audio
-> on smdk5420 and adds the phandle of the same in wm8994 clock info.
+On Wednesday 07 of August 2013 14:40:15 Padmavathi Venna wrote:
+> This patch registers the 16MHz oscillator clock as fixed clk.
 > 
 > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 > ---
->  arch/arm/boot/dts/exynos5420-smdk5420.dts |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
+>  sound/soc/samsung/smdk_wm8994.c |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> b/arch/arm/boot/dts/exynos5420-smdk5420.dts index e86c1ae..3c56a91
-> 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -31,6 +31,13 @@
->  		};
->  	};
+> diff --git a/sound/soc/samsung/smdk_wm8994.c
+> b/sound/soc/samsung/smdk_wm8994.c index 581ea4a..a6edded 100644
+> --- a/sound/soc/samsung/smdk_wm8994.c
+> +++ b/sound/soc/samsung/smdk_wm8994.c
+> @@ -9,6 +9,7 @@
 > 
-> +	osc3_clk16mhz: clk16mhz {
-> +		compatible = "osc3_clk16mhz";
+>  #include "../codecs/wm8994.h"
+>  #include <sound/pcm_params.h>
+> +#include <linux/clk-provider.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> 
+> @@ -37,6 +38,15 @@
+>  /* SMDK has a 16.934MHZ crystal attached to WM8994 */
+>  #define SMDK_WM8994_FREQ 16934000
+> 
+> +/* 16.9MHz fixed oscillator clock */
+> +static void init_osc_clock(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "osc3_clk16mhz");
+> +	of_fixed_clk_setup(np);
+> +}
+> +
+>  static int smdk_hw_params(struct snd_pcm_substream *substream,
+>  	struct snd_pcm_hw_params *params)
+>  {
+> @@ -173,6 +183,8 @@ static int smdk_audio_probe(struct platform_device
+> *pdev) smdk_dai[0].platform_of_node = smdk_dai[0].cpu_of_node;
+>  	}
+> 
+> +	init_osc_clock();
+> +
+>  	ret = snd_soc_register_card(card);
+> 
+>  	if (ret)
 
-Hmm?
-
-What about the generic fixed rate clock binding[1]?
-
-Also please name nodes being added with generic names, not platform-
-specific ones. For example, fixed-rate-clock-0 or oscillator-0, just like 
-it is done with fixed regulators.
+I don't think this patch is needed at all. You can use generic fixed rate 
+clock bindings[1] to define a fixed rate clock using device tree.
 
 Best regards,
 Tomasz
 
 [1] - Documentation/devicetree/bindings/clock/fixed-clock.txt
-
-> +		#clock-cells = <0>;
-> +		clock-frequency = <16934400>;
-> +		clock-output-names = "osc3_clk16mhz";
-> +	};
-> +
->  	dwmmc0 at 12200000 {
->  		status = "okay";
->  		num-slots = <1>;
-> @@ -123,6 +130,9 @@
->  			DBVDD-supply = <&dbvdd>;
->  			SPKVDD1-supply = <&spkvdd>;
->  			SPKVDD2-supply = <&spkvdd>;
-> +
-> +			clocks = <&osc3_clk16mhz>;
-> +			clock-names = "mclk1";
->  		};
->  	};
