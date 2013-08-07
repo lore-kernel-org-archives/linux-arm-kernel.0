@@ -1,48 +1,38 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Wed, 7 Aug 2013 15:32:33 +0800
-Subject: [PATCH 1/2] hwmon: (lm90) Add power control
-In-Reply-To: <1375860442.896960598@f427.i.mail.ru>
-References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
- <1375858358-15070-2-git-send-email-wni@nvidia.com>
- <1375860442.896960598@f427.i.mail.ru>
-Message-ID: <5201F811.9050602@nvidia.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 07 Aug 2013 09:35:35 +0200
+Subject: [PATCH v4 11/31] net: can: mscan: improve clock API use
+In-Reply-To: <5201F7A7.90906@pengutronix.de>
+References: <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-12-git-send-email-gsi@denx.de>
+ <5201F7A7.90906@pengutronix.de>
+Message-ID: <5201F8C7.6090208@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2013 03:27 PM, Alexander Shiyan wrote:
->> The device lm90 can be controlled by the vdd rail.
->> Adding the power control support to power on/off the vdd rail.
->> And make sure that power is enabled before accessing the device.
->>
->> Signed-off-by: Wei Ni <wni@nvidia.com>
->> ---
->>  drivers/hwmon/lm90.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++++++
-> [...]
->> +	if (!data->lm90_reg) {
->> +		data->lm90_reg = regulator_get(&client->dev, "vdd");
->> +		if (IS_ERR_OR_NULL(data->lm90_reg)) {
->> +			if (PTR_ERR(data->lm90_reg) == -ENODEV)
->> +				dev_info(&client->dev,
->> +					 "No regulator found for vdd. Assuming vdd is always powered.");
->> +			else
->> +				dev_warn(&client->dev,
->> +					 "Error [%ld] in getting the regulator handle for vdd.\n",
->> +					 PTR_ERR(data->lm90_reg));
->> +			data->lm90_reg = NULL;
->> +			mutex_unlock(&data->update_lock);
->> +			return -ENODEV;
->> +		}
->> +	}
->> +	if (is_enable) {
->> +		ret = regulator_enable(data->lm90_reg);
->> +		msleep(POWER_ON_DELAY);
+On 08/07/2013 09:30 AM, Marc Kleine-Budde wrote:
+> On 08/06/2013 10:43 PM, Gerhard Sittig wrote:
+>> the .get_clock() callback is run from probe() and might allocate
+>> resources, introduce a .put_clock() callback that is run from remove()
+>> to undo any allocation activities
 > 
-> Can this delay be handled directly from regulator?
+> AFAICS With this patch put_clock() is still a no-op, is there a patch
+> which adds some code there? If not, please remove.
 
-I think it should be handled in the device driver.
-Because there have different delay time to wait devices stable.
+I missed patch 27.
 
-> 
-> [...]
-> ---
-> 
+sorry for the noise.
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/1214eb32/attachment-0001.sig>
