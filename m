@@ -1,32 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Aug 2013 20:42:42 +0200
-Subject: [PATCH 2/2] pinctrl: sunxi: Add spinlocks
-In-Reply-To: <1375612728-20501-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375612728-20501-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375612728-20501-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdYS-7MPTTSg4psJ3NZ_jhA15aMeFLoxFNAN7hSqe4hRTA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 7 Aug 2013 14:50:28 -0400
+Subject: [RESEND PATCH 7/7] MAINTAINERS: add TI Keystone ARM platform
+In-Reply-To: <87li4dfl1d.fsf@linaro.org>
+References: <1375726274-26000-1-git-send-email-santosh.shilimkar@ti.com>
+ <1375726274-26000-8-git-send-email-santosh.shilimkar@ti.com>
+ <87li4dfl1d.fsf@linaro.org>
+Message-ID: <520296F4.7060300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 4, 2013 at 12:38 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Wednesday 07 August 2013 01:49 PM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> 
+>> Adding maintainer for arch/arm/mach-keystone/
+>>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Since I'm colleting some MAINTAINERS changes, I applied this one to
+> arm-soc/fixes.
+> 
+Thanks
 
-> The current code use no locking at all, which is obviously not that
-> great and can lead to concurrency issues, especially with the newer SMP
-> SoCs from Allwinner.
->
-> Add some locking where it's needed.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> The rest of the series looks good to me.  Are you still waiting for any
+> more feedback?  If not, are you planning to send a pull request? or
+> I could just apply 1-6 for fixes-non-critical.
+> 
+I will send a pull request dropping the last patch which you already
+applied.
 
-This does not apply to my fixes branch which is based off
-v3.11-rc4.
-
-It is also too big to go into fixes.
-
-I think it may be requiring the other queued Allwinner things,
-so it is better if I apply this on the devel branch after looking over
-that Allwinner A20/A31 stuff?
-
-Yours,
-Linus Walleij
+Regards,
+Santosh
