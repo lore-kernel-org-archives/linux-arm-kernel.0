@@ -1,89 +1,63 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 7 Aug 2013 10:40:17 -0500
-Subject: [PATCHv3 2/8] mailbox/omap: add support for parsing dt devices
-In-Reply-To: <1375825216-18119-1-git-send-email-s-anna@ti.com>
-References: <1375825216-18119-1-git-send-email-s-anna@ti.com>
-Message-ID: <BB39592C-0DAC-49A4-A782-583D7EB858AF@codeaurora.org>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Wed, 07 Aug 2013 11:45:41 -0400
+Subject: at91sam9x5: uart (not usart) broken
+In-Reply-To: <5201EA4D.8030106@overkiz.com>
+References: <52019591.2010408@interlog.com> <5201EA4D.8030106@overkiz.com>
+Message-ID: <52026BA5.40707@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13-08-07 02:33 AM, boris brezillon wrote:
+> Hello Doug,
+>
+> On 07/08/2013 02:32, Douglas Gilbert wrote:
+>> Between lk 3.10.0 and lk 3.11.0-rc4 the uarts (not usarts)
+>> have been broken in the at91sam9x5 family. The DT files have
+>> been re-factored for uarts but look correct.
+>>
+>> So suspicion moves to the atmel_serial driver which enjoyed
+>> a lot of changes in June.
+>>
+>
+> My patch (the last one in log history) is adding error checks on clk_get and
+> clk_enable (clk_prepare_enable) calls.
+> I think the issue you're having comes from these new checks, and the fact
+> that uart clks DT entries are missing.
+>
+> The previous version was just silently ignoring these errors.
+> It may work if these clks (uart clks) are already enabled by bootstrap or
+> bootloader.
+>
+> Anyway, I think the cleaner way for resolving this issue is to apply the patch
+> I joined in attachment.
+>
+> Could you test it (I don't have any sam9x5 boards), and if this works I'll submit
+> it.
 
-On Aug 6, 2013, at 4:40 PM, Suman Anna wrote:
+Hi Boris,
+Yes, your patch works with lk 3.11.0-rc4 on a at91sam9g25
+(aria G25). So please apply to the current rc series.
 
-> Logic has been added to the OMAP2+ mailbox code to
-> parse the mailbox dt nodes and construct the different
-> mailboxes associated with the instance. The design is
-> based on gathering the same information that was being
-> passed previously through the platform data, except for
-> the interrupt type configuration information.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
-> .../devicetree/bindings/mailbox/omap-mailbox.txt   |  43 +++++++
-> drivers/mailbox/mailbox-omap2.c                    | 130 ++++++++++++++++++---
-> 2 files changed, 158 insertions(+), 15 deletions(-)
-> create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
-> new file mode 100644
-> index 0000000..8ffb08a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
-> @@ -0,0 +1,43 @@
-> +OMAP2+ Mailbox Driver
-> +
-> +Required properties:
-> +- compatible:		Should be one of the following,
-> +			    "ti,omap2-mailbox" for
-> +				OMAP2420, OMAP2430, OMAP3430, OMAP3630 SoCs
-> +			    "ti,omap4-mailbox" for
-> +				OMAP44xx, OMAP54xx, AM33xx, AM43xx, DRA7xx SoCs
-> +- reg:			Contains the mailbox register address range (base address
-> +			and length)
-> +- interrupts: 		Contains the interrupt information for the mailbox
-> +			device. The format is dependent on which interrupt
-> +			controller the OMAP device uses
-> +- ti,hwmods:		Name of the hwmod associated with the mailbox
-> +- ti,mbox-num-users:	Number of targets (processor devices) that the mailbox device
-> +			can interrupt
-> +- ti,mbox-num-fifos:	Number of h/w fifos within the mailbox device
+Also since in the lk 3.10 series this is silently broken and/or
+works by accident (e.g. when a boot loader sets the uart clocks)
+then perhaps this fix should be sent to Greg K-H for inclusion
+in the lk 3.10.x stable series.
 
-Isn't "ti,mbox-num-users", "ti,mbox-num-fifos" this SoC specific, why do we need to encode in the device tree.  Can we not have a more SoC specific compatiable and encode such info in the driver as part of the .data field in of_device_id ?
+Doug Gilbert
 
-> +- ti,mbox-names:	Array of the names of the mailboxes
-> +- ti,mbox-data:		Mailbox descriptor data private to each mailbox. The 4
-> +			cells represent the following data,
-> +			  Cell #1 (tx_id) - mailbox fifo id used for
-> +						transmitting messages
-> +			  Cell #2 (rx_id) - mailbox fifo id on which messages
-> +						are received
-> +			  Cell #3 (irq_id) - irq identifier index number to use
-> +						from the interrupts data
-> +			  Cell #4 (usr_id) - mailbox user id for identifying the
-> +						interrupt into the MPU interrupt
-> +						controller.
-> +
-
-ti,mbox-data really seems like it should be encoded in the driver and not in the device tree.  Is it specific to the SoC?
-
-> +Example:
-> +
-> +/* OMAP4 */
-> +mailbox: mailbox at 4a0f4000 {
-> +	compatible = "ti,omap4-mailbox";
-> +	reg = <0x4a0f4000 0x200>;
-> +	interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-> +	ti,hwmods = "mailbox";
-> +	ti,mbox-num-users = <3>;
-> +	ti,mbox-num-fifos = <8>;
-> +	ti,mbox-names = "mbox-ipu", "mbox-dsp";
-> +	ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
-> +};
-
-[snip]
-
-- k
-
---
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>> Tested on a at91sam9g25 (Aria G25) which is a member of the
+>> at91sam9x5 family with two uarts (four usarts and a debug
+>> serial port). The failure looks like this in dmesg:
+>>
+>>  console [ttyS0] enabled
+>>  f801c000.serial: ttyS1 at MMIO 0xf801c000 (irq = 23) is a ATMEL_SERIAL
+>>  f8020000.serial: ttyS2 at MMIO 0xf8020000 (irq = 24) is a ATMEL_SERIAL
+>>  f8024000.serial: ttyS3 at MMIO 0xf8024000 (irq = 25) is a ATMEL_SERIAL
+>>  atmel_usart: probe of f8040000.serial failed with error -2
+>>  f8028000.serial: ttyS4 at MMIO 0xf8028000 (irq = 32) is a ATMEL_SERIAL
+>>
+>> The device at 0xf8040000 is uart0 . My DT file was trying
+>> to bring up uart0 but not uart1.
+>>
+>> Doug Gilbert
+>
