@@ -1,99 +1,109 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 12:19:23 +0200
-Subject: [PATCH 05/12] dma: mmp_pdma: add filter function
+Date: Wed,  7 Aug 2013 12:19:29 +0200
+Subject: [PATCH 11/12] dma: mmp_pdma: add support for residue reporting
 In-Reply-To: <1375870770-14263-1-git-send-email-zonque@gmail.com>
 References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375870770-14263-6-git-send-email-zonque@gmail.com>
+Message-ID: <1375870770-14263-12-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PXA peripherals need to obtain specific DMA request ids which will
-eventually be stored in the DRCMR register.
-
-Currently, clients are expected to store that number inside the slave
-config block as slave_id, which is unfortunately incompatible with the
-way DMA resources are handled in DT environments.
-
-This patch adds a filter function which stores the filter parameter
-passed in by of-dma.c into the channel's drcmr register.
-
-For backward compatability, cfg->slave_id is still used if set to
-a non-zero value.
+In order to report the channel's residue, we have to memorize the first
+dma buffer position when the channel is configured.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c       | 21 ++++++++++++++++++++-
- include/linux/dma/mmp-pdma.h | 15 +++++++++++++++
- 2 files changed, 35 insertions(+), 1 deletion(-)
- create mode 100644 include/linux/dma/mmp-pdma.h
+ drivers/dma/mmp_pdma.c | 39 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 1fe78d8..60a1410 100644
+index c56da7c..0c4a2d5 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -19,6 +19,7 @@
- #include <linux/dmapool.h>
- #include <linux/of_device.h>
- #include <linux/of.h>
-+#include <linux/dma/mmp-pdma.h>
+@@ -28,8 +28,8 @@
+ #define DALGN		0x00a0
+ #define DINT		0x00f0
+ #define DDADR		0x0200
+-#define DSADR		0x0204
+-#define DTADR		0x0208
++#define DSADR(n)	(0x0204 + ((n) << 4))
++#define DTADR(n)	(0x0208 + ((n) << 4))
+ #define DCMD		0x020c
  
- #include "dmaengine.h"
+ #define DCSR_RUN	(1 << 31)	/* Run Bit (read / write) */
+@@ -97,6 +97,13 @@ struct mmp_pdma_chan {
+ 	struct dma_async_tx_descriptor desc;
+ 	struct mmp_pdma_phy *phy;
+ 	enum dma_transfer_direction dir;
++	/*
++	 * We memorize the original start address of the first descriptor as
++	 * well as the original total length so we can later determine the
++	 * channel's residue.
++	 */
++	dma_addr_t start_addr;
++	u32 total_len;
  
-@@ -633,8 +634,13 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
- 			chan->dcmd |= DCMD_BURST32;
+ 	/* channel's basic info */
+ 	struct tasklet_struct tasklet;
+@@ -469,6 +476,13 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
+ 		chan->dcmd |= DCMD_BURST32;
+ 	}
  
- 		chan->dir = cfg->direction;
--		chan->drcmr = cfg->slave_id;
- 		chan->dev_addr = addr;
-+		/* FIXME: drivers should be ported over to use the filter
-+		 * function. Once that's done, the following two lines can
-+		 * be removed.
-+		 */
-+		if (cfg->slave_id)
-+			chan->drcmr = cfg->slave_id;
- 		break;
- 	default:
- 		return -ENOSYS;
-@@ -883,6 +889,19 @@ static struct platform_driver mmp_pdma_driver = {
- 	.remove		= mmp_pdma_remove,
- };
++	if (chan->dir == DMA_MEM_TO_DEV)
++		chan->start_addr = dma_src;
++	else
++		chan->start_addr = dma_dst;
++
++	chan->total_len = len;
++
+ 	do {
+ 		/* Allocate the link descriptor from DMA pool */
+ 		new = mmp_pdma_alloc_descriptor(chan);
+@@ -540,11 +554,17 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
+ 		return NULL;
  
-+bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
+ 	chan->byte_align = false;
++	chan->total_len = 0;
+ 
+ 	for_each_sg(sgl, sg, sg_len, i) {
+ 		addr = sg_dma_address(sg);
+ 		avail = sg_dma_len(sgl);
+ 
++		if (!first)
++			chan->start_addr = addr;
++
++		chan->total_len += avail;
++
+ 		do {
+ 			len = min_t(size_t, avail, PDMA_MAX_DESC_BYTES);
+ 			if (addr & 0x7)
+@@ -671,6 +691,20 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+ 	return ret;
+ }
+ 
++static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
 +{
-+	struct mmp_pdma_chan *c = to_mmp_pdma_chan(chan);
++	u32 curr, done;
 +
-+	if (chan->device->dev->driver != &mmp_pdma_driver.driver)
-+		return false;
++	if (chan->dir == DMA_DEV_TO_MEM)
++		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
++	else
++		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
 +
-+	c->drcmr = *(unsigned int *) param;
++	done = curr - chan->start_addr;
 +
-+	return true;
++	return chan->total_len - done;
 +}
-+EXPORT_SYMBOL_GPL(mmp_pdma_filter_fn);
 +
- module_platform_driver(mmp_pdma_driver);
+ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
+ 			dma_cookie_t cookie, struct dma_tx_state *txstate)
+ {
+@@ -680,6 +714,7 @@ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
  
- MODULE_DESCRIPTION("MARVELL MMP Periphera DMA Driver");
-diff --git a/include/linux/dma/mmp-pdma.h b/include/linux/dma/mmp-pdma.h
-new file mode 100644
-index 0000000..2dc9b2b
---- /dev/null
-+++ b/include/linux/dma/mmp-pdma.h
-@@ -0,0 +1,15 @@
-+#ifndef _MMP_PDMA_H_
-+#define _MMP_PDMA_H_
-+
-+struct dma_chan;
-+
-+#ifdef CONFIG_MMP_PDMA
-+bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param);
-+#else
-+static inline bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
-+{
-+	return false;
-+}
-+#endif
-+
-+#endif /* _MMP_PDMA_H_ */
+ 	spin_lock_irqsave(&chan->desc_lock, flags);
+ 	ret = dma_cookie_status(dchan, cookie, txstate);
++	txstate->residue = mmp_pdma_residue(chan);
+ 	spin_unlock_irqrestore(&chan->desc_lock, flags);
+ 
+ 	return ret;
 -- 
 1.8.3.1
