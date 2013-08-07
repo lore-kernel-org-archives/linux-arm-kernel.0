@@ -1,29 +1,29 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed,  7 Aug 2013 18:29:44 +0200
-Subject: [PATCH] ARM: at91: add missing uart clocks DT entries
-Message-ID: <1375892984-2835-1-git-send-email-b.brezillon@overkiz.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 7 Aug 2013 17:32:58 +0100
+Subject: [PATCH 17/20] ASoC: pxa: pxa-pcm-lib: switch over to
+ snd-soc-dmaengine-pcm
+In-Reply-To: <5202718F.2050507@gmail.com>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-18-git-send-email-zonque@gmail.com>
+ <20130807160743.GI6427@sirena.org.uk> <5202718F.2050507@gmail.com>
+Message-ID: <20130807163258.GL6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocks to clock lookup table for uart DT entries.
+On Wed, Aug 07, 2013 at 06:10:55PM +0200, Daniel Mack wrote:
+> On 07.08.2013 18:07, Mark Brown wrote:
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/mach-at91/at91sam9x5.c |    2 ++
- 1 file changed, 2 insertions(+)
+> > Has this been tested with the standalone non-ASoC PXA AC'97 driver?
 
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 2abee66..916e5a1 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -227,6 +227,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("usart", "f8020000.serial", &usart1_clk),
- 	CLKDEV_CON_DEV_ID("usart", "f8024000.serial", &usart2_clk),
- 	CLKDEV_CON_DEV_ID("usart", "f8028000.serial", &usart3_clk),
-+	CLKDEV_CON_DEV_ID("usart", "f8040000.serial", &uart0_clk),
-+	CLKDEV_CON_DEV_ID("usart", "f8044000.serial", &uart1_clk),
- 	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("mci_clk", "f0008000.mmc", &mmc0_clk),
--- 
-1.7.9.5
+> Nope. I have no such device.
+
+I guess the main test there will be making sure that it builds with ASoC
+disabled.  I'm not sure anything later than PXA3xx ever actually used
+AC'97.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/5584ac0c/attachment.sig>
