@@ -1,33 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 7 Aug 2013 14:08:04 -0700
-Subject: [PATCH] [TRIVIAL] ARM: msm: fix compilation error in gpiomux
-In-Reply-To: <20130807174053.GA17551@codeaurora.org>
-References: <1375857279-18082-1-git-send-email-k.kozlowski@samsung.com>
- <20130807174053.GA17551@codeaurora.org>
-Message-ID: <20130807210804.GB14845@codeaurora.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 7 Aug 2013 14:52:59 -0700
+Subject: [GIT PULL] msm cleanups for v3.12
+In-Reply-To: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
+References: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <20130807215259.GA22852@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07, David Brown wrote:
-> On Wed, Aug 07, 2013 at 08:34:39AM +0200, Krzysztof Kozlowski wrote:
-> >Fix compilation error in gpiomux (CONFIG_MSM_GPIOMUX=y):
-> >arch/arm/mach-msm/gpiomux.c:24:13: error: static declaration of
-> >	???__msm_gpiomux_write??? follows non-static declaration
-> >arch/arm/mach-msm/gpiomux.h:85:6: note: previous declaration of
-> >	???__msm_gpiomux_write??? was here
-> >
-> >Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Thanks, I'll pull this in.
-> 
->  <https://patchwork.kernel.org/patch/2839921/>
-> 
+On Wed, Aug 07, 2013 at 01:58:16PM -0700, David Brown wrote:
+>The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+>
+>  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>
+>are available in the git repository at:
+>
+>  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git for-3.12/msm-cleanup2
+>
+>for you to fetch changes up to b80a0dc53df68c6862b8985ecc12856edb080248:
+>
+>  ARM: msm: fix compilation error in gpiomux (2013-08-07 10:39:31 -0700)
 
-I believe this is fixed by Rohit's patch that has already been
-taken in a pull request?
+Sigh, it looks like this fixes code that was removed in last-week's
+fix patches.  I can either regenerate the pull request, or feel free
+to "resolve" this by just using the removal of the code.
 
-https://lkml.org/lkml/2013/7/26/608
+David
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
