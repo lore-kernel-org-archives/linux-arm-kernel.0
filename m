@@ -1,78 +1,49 @@
 From: roy.franz@linaro.org (Roy Franz)
-Date: Tue,  6 Aug 2013 20:45:09 -0700
-Subject: [PATCH 13/17] Fix types in EFI calls to match EFI function
- definitions.
+Date: Tue,  6 Aug 2013 20:45:10 -0700
+Subject: [PATCH 14/17] resolve warnings found on ARM compile
 In-Reply-To: <1375847113-24884-1-git-send-email-roy.franz@linaro.org>
 References: <1375847113-24884-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <1375847113-24884-14-git-send-email-roy.franz@linaro.org>
+Message-ID: <1375847113-24884-15-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EFI calls can made directly on ARM, so the function pointers
-are directly invoked.  This allows types to be checked at
-compile time, so here we ensure that the parameters match
-the function signature.
+2 unused labels
+1 "value computed is not used"
+
 
 Signed-off-by: Roy Franz <roy.franz@linaro.org>
 ---
- drivers/firmware/efi/efi-stub-helper.c |   15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ drivers/firmware/efi/efi-stub-helper.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-index 521a4c4..bbe02fd 100644
+index bbe02fd..3515c3a 100644
 --- a/drivers/firmware/efi/efi-stub-helper.c
 +++ b/drivers/firmware/efi/efi-stub-helper.c
-@@ -321,7 +321,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 	status = efi_call_phys3(sys_table_arg->boottime->allocate_pool,
- 				EFI_LOADER_DATA,
- 				nr_files * sizeof(*files),
--				&files);
-+				(void **)&files);
- 	if (status != EFI_SUCCESS) {
- 		efi_printk(sys_table_arg, "Failed to alloc mem for file handle list\n");
- 		goto fail;
-@@ -372,7 +372,8 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 			boottime = sys_table_arg->boottime;
+@@ -166,7 +166,6 @@ again:
+ 		*addr = max_addr;
+ 	}
  
- 			status = efi_call_phys3(boottime->handle_protocol,
--					image->device_handle, &fs_proto, &io);
-+					image->device_handle, &fs_proto,
-+						(void **)&io);
- 			if (status != EFI_SUCCESS) {
- 				efi_printk(sys_table_arg, "Failed to handle fs_proto\n");
- 				goto free_files;
-@@ -406,7 +407,8 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+-free_pool:
+ 	efi_call_phys1(sys_table_arg->boottime->free_pool, map);
  
- grow:
- 		status = efi_call_phys3(sys_table_arg->boottime->allocate_pool,
--					EFI_LOADER_DATA, info_sz, &info);
-+					EFI_LOADER_DATA, info_sz,
-+					(void **)&info);
- 		if (status != EFI_SUCCESS) {
- 			efi_printk(sys_table_arg, "Failed to alloc mem for file info\n");
- 			goto close_handles;
-@@ -456,18 +458,19 @@ grow:
+ fail:
+@@ -242,7 +241,6 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+ 	if (i == map_size / desc_size)
+ 		status = EFI_NOT_FOUND;
  
- 		addr = file_addr;
- 		for (j = 0; j < nr_files; j++) {
--			u64 size;
-+			unsigned long size;
+-free_pool:
+ 	efi_call_phys1(sys_table_arg->boottime->free_pool, map);
+ fail:
+ 	return status;
+@@ -357,7 +355,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
  
- 			size = files[j].size;
- 			while (size) {
--				u64 chunksize;
-+				unsigned long chunksize;
- 				if (size > EFI_READ_CHUNK_SIZE)
- 					chunksize = EFI_READ_CHUNK_SIZE;
- 				else
- 					chunksize = size;
- 				status = efi_call_phys3(fh->read,
- 							files[j].handle,
--							&chunksize, addr);
-+							&chunksize,
-+							(void *)addr);
- 				if (status != EFI_SUCCESS) {
- 					efi_printk(sys_table_arg, "Failed to read file\n");
- 					goto free_file_total;
+ 			if (*str == '/') {
+ 				*p++ = '\\';
+-				*str++;
++				str++;
+ 			} else {
+ 				*p++ = *str++;
+ 			}
 -- 
 1.7.10.4
