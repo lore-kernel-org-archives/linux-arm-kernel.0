@@ -1,16 +1,16 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Aug 2013 11:51:24 -0400
+Date: Wed, 7 Aug 2013 11:55:18 -0400
 Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <520157B2.8080205@wwwdotorg.org>
+In-Reply-To: <20130807065954.GA22906@manwe>
 References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <20130806200256.GB19280@titan.lakedaemon.net>
- <520157B2.8080205@wwwdotorg.org>
-Message-ID: <20130807155124.GC19280@titan.lakedaemon.net>
+ <20130807065954.GA22906@manwe>
+Message-ID: <20130807155518.GD19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 02:08:18PM -0600, Stephen Warren wrote:
-> On 08/06/2013 02:02 PM, Jason Cooper wrote:
+On Wed, Aug 07, 2013 at 08:59:56AM +0200, Thierry Reding wrote:
+> On Tue, Aug 06, 2013 at 04:02:56PM -0400, Jason Cooper wrote:
 > > Thomas,
 > > 
 > > In order to get some testing in -next, I've *tentatively* applied this
@@ -30,22 +30,21 @@ On Tue, Aug 06, 2013 at 02:08:18PM -0600, Stephen Warren wrote:
 > > PR for it.  Code-wise, it should be fine, but the commit-ids may change
 > > due to adding Tested-by's, etc.
 > 
-> When do you intend to send the pull-request? I need a stable branch
-> before I can even apply Thierry's changes, and I'd prefer to get those
-> changes applied and in linux-next well before I send my pull requests to
-> arm-soc. At the very latest, I need enough time to apply Thierry's
-> patches on top of your final version of that branch, get it briefly
-> tested, and then send a pull-request to arm-soc before -rc6 is out, so
-> if your pull request goes in just before -rc6, that's going to be a problem.
+> I noticed that patch 10 has my Reviewed-by, even though my comments
+> weren't addressed. They were about stylistic issues but I'd still like
+> to see them fixed now rather than having to fix them up later. Also I
+> think I gave my Tested-by on those patches somewhere already and I think
+> it's unlikely that anybody else will test them, so with the consistency
+> style fixes applied I don't see any reason why that branch can't be
+> stabilized right away.
 
-I'll tag the head of mvebu/msi_common once it makes it through -next
-successfully (I saw a linux-next email go by, but I haven't gotten that
-far down my inbox yet)
+Ahh, thanks.  I did miss your tested-by.  We did get one other from
+Daniel Price (which sounded like a pretty cool setup, btw), so I'll add
+yours before I tag it.
 
-Hopefully today or tomorrow, depending on where the -next problem is.
-I'll send the PR along side that.  Once I tag it, you should be able to
-base off of it before it gets into arm-soc, since the commit-id won't
-change.
+wrt your Reviewed-by, that came with the patch and may be from a
+previous revision.  At any rate, I saw your comments about the
+whitespace/alignment, and I'll fixup v7 as I pull it in.
 
 thx,
 
