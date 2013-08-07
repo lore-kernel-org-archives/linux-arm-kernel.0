@@ -1,48 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Aug 2013 12:38:07 -0400
-Subject: [PATCH] ARM: dts: Fix memory node in skeleton64.dtsi
-In-Reply-To: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
-References: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <20130807163807.GG19280@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 7 Aug 2013 17:40:39 +0100
+Subject: [PATCH 13/20] ASoC: pxa: pxa-ssp: add DT bindings
+In-Reply-To: <1375889649-14638-14-git-send-email-zonque@gmail.com>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-14-git-send-email-zonque@gmail.com>
+Message-ID: <20130807164039.GM6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 06:33:06PM -0700, Stepan Moskovchenko wrote:
-> Update the reg property of the memory node in
-> skeleton64.dtsi to reflect the fact that the root node uses
-> address-cells=2 and size-cells=2.
+On Wed, Aug 07, 2013 at 05:34:02PM +0200, Daniel Mack wrote:
+> This patch contains a cruel hack for looking up the the DMA request
+> number. The problem here is that the implementation as it stands will
+> allocate the DMA channel from the user of the ssp port, and hence we
+> cannot allocate a real channel here.
 > 
-> Change-Id: Ie9b61166143969e020ceebc51e9a384405d8c0f2
-> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
 > ---
->  arch/arm/boot/dts/skeleton64.dtsi |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt |  7 +++++++
+>  sound/soc/pxa/pxa-ssp.c                                  | 12 ++++++++++--
+>  2 files changed, 17 insertions(+), 2 deletions(-)
 
-Applied to mvebu/fixes-non-critical with Gregory's Ack an Change-Id
-removed.
+So, really this should be part of a generic binding for the SSP device
+but obviously this is just a virtual device that binds to a generic bit
+of hardware that can be used for other applications like SPI.  For the
+ASoC case we could instantiate the DAI from the machine driver but that
+isn't going to work for things like SPI.  I'm not 100% sure what the
+best way to deal with that is.
 
-thx,
-
-Jason.
-
-> 
-> diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
-> index 1599415..b5d7f36 100644
-> --- a/arch/arm/boot/dts/skeleton64.dtsi
-> +++ b/arch/arm/boot/dts/skeleton64.dtsi
-> @@ -9,5 +9,5 @@
->  	#size-cells = <2>;
->  	chosen { };
->  	aliases { };
-> -	memory { device_type = "memory"; reg = <0 0>; };
-> +	memory { device_type = "memory"; reg = <0 0 0 0>; };
->  };
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+One way of doing this is to have two compatible strings for the same bit
+of hardware describing the application.  I'm not sure that's nice but it
+works...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/452862df/attachment.sig>
