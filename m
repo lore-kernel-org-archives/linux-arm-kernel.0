@@ -1,50 +1,39 @@
-From: galak@kernel.crashing.org (Kumar Gala)
-Date: Wed, 7 Aug 2013 10:40:24 -0500
-Subject: [PATCH v4 00/31] add COMMON_CLK support for PowerPC MPC512x
-In-Reply-To: <1375821851-31609-1-git-send-email-gsi@denx.de>
-References: <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1375821851-31609-1-git-send-email-gsi@denx.de>
-Message-ID: <BF555A06-59CD-4697-927E-04657E6F1DB1@kernel.crashing.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 07 Aug 2013 18:17:28 +0200
+Subject: [PATCH 06/12] dma: mmp_pdma: make the controller a DMA provider
+In-Reply-To: <201308071812.15420.arnd@arndb.de>
+References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
+ <1375870770-14263-7-git-send-email-zonque@gmail.com>
+ <201308071812.15420.arnd@arndb.de>
+Message-ID: <52027318.3080703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07.08.2013 18:12, Arnd Bergmann wrote:
+> On Wednesday 07 August 2013, Daniel Mack wrote:
 
-On Aug 6, 2013, at 3:43 PM, Gerhard Sittig wrote:
+>> +	if (op->dev.of_node) {
+>> +		mmp_pdma_info.dma_cap = pdev->device.cap_mask;
+>> +
+>> +		/* Device-tree DMA controller registration */
+>> +		ret = of_dma_controller_register(op->dev.of_node,
+>> +						 of_dma_simple_xlate,
+>> +						 &mmp_pdma_info);
+> 
+> of_dma_simple_xlate can not be used if there is a chance that multiple instances
+> of the same dma engine, or multiple different DMA engines are present in the
+> system.
 
-> this series
-> - fixes several drivers that are used in the MPC512x platform (UART,
-> SPI, ethernet, PCI, USB, CAN, NAND flash, video capture) in how they
-> handle clocks (appropriately acquire and setup them, hold references
-> during use, release clocks after use)
-> - introduces support for the common clock framework (CCF, COMMON_CLK
-> Kconfig option) in the PowerPC based MPC512x platform, which brings
-> device tree based clock lookup as well
-> 
-> although the series does touch several subsystems -- tty (serial), spi,
-> net (can, fs_enet), mtd (nfc), usb, i2c, media (viu), and dts -- all of
-> the patches are strictly clock related or trivial
-> 
-> it appears most appropriate to take this series through either the clk
-> or the powerpc trees after it has passed review and other subsystem
-> maintainers ACKed the clock setup related driver modifications
-> 
-> the series passes 'checkpatch.pl --strict' except for one warning which
-> cannot get resolved, since that either breaks compilation (the data type
-> is preset by the clk-provider.h API) or requires a cast which shadows
-> real mismatches:
-> 
-> WARNING: static const char * array should probably be static const char * const
-> #431: FILE: arch/powerpc/platforms/512x/clock-commonclk.c:334:
-> +static const char *parent_names_mux0[] = {
-> 
-> total: 0 errors, 1 warnings, 0 checks, 807 lines checked
-> 
-> each step in the series was build and run tested (with a display that is
-> attached to the DIU as well as SPI, with an SPI attached NOR flash, with
-> multiple UART ports such that one is not the boot console, with EEPROMs
-> attached to I2C, with an SD card, booting from network)
-> 
+Both can't be the case really for PXA, but I see your point.
 
-How do the driver changes impact other PPC SoCs that use the same drivers (i2c, fs_enet, usb) ?
+> Please have a look at the changes that Zhangfei Gao proposed in
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/249077
+> and see if you can do the same here.
 
-- k
+Ok, I can do the same. As I can directly access dma_spec->args[0] from
+that context, that approach would also solve the problem with the
+hard-coded filter function, right?
+
+
+Thanks,
+Daniel
