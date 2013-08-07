@@ -1,32 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 7 Aug 2013 14:50:28 -0400
-Subject: [RESEND PATCH 7/7] MAINTAINERS: add TI Keystone ARM platform
-In-Reply-To: <87li4dfl1d.fsf@linaro.org>
-References: <1375726274-26000-1-git-send-email-santosh.shilimkar@ti.com>
- <1375726274-26000-8-git-send-email-santosh.shilimkar@ti.com>
- <87li4dfl1d.fsf@linaro.org>
-Message-ID: <520296F4.7060300@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 07 Aug 2013 12:50:59 -0600
+Subject: [PATCH 1/6] clk: Tegra: Add CPU0 clock driver
+In-Reply-To: <CAKohpokK7F7tYJnisVjF=NCRb9zUjQNzrFdXs+QsPSb4oqyytA@mail.gmail.com>
+References: <cover.1375886595.git.viresh.kumar@linaro.org>
+ <8d192a13cb7e088943da40689d62bc6353bd8604.1375886595.git.viresh.kumar@linaro.org>
+ <52028620.6000608@wwwdotorg.org>
+ <CAKohpokVgcMfmKmjkxc9Dr3z6mBKad23uUdB4ydN_xzGHdfedQ@mail.gmail.com>
+ <52028859.20008@wwwdotorg.org>
+ <CAKohpokK7F7tYJnisVjF=NCRb9zUjQNzrFdXs+QsPSb4oqyytA@mail.gmail.com>
+Message-ID: <52029713.5070808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 August 2013 01:49 PM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> Adding maintainer for arch/arm/mach-keystone/
+On 08/07/2013 11:54 AM, Viresh Kumar wrote:
+> On 7 August 2013 23:18, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/07/2013 11:45 AM, Viresh Kumar wrote:
+>>> On 7 August 2013 23:08, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> On 08/07/2013 08:46 AM, Viresh Kumar wrote:
+>>>>> This patch adds CPU0's clk driver for Tegra. It will be used by the generic
+>>>>> cpufreq-cpu0 driver to get/set cpu clk.
+>>>>>
+>>>>> Most of the platform specific bits are picked from tegra-cpufreq.c.
+>>>>
+>>>> Hmmm. I'm not sure if it makes sense to represent this as a clock
+>>>> object; isn't this more of a virtual construct that manages the rate of
+>>>> the clock, rather than an actual clock? The actual clock already exists
+>>>> as "cpu".
+>>>
+>>> I see it as this: There is a clock in system for cpu, call it "cpu". Now we
+>>> must be able to provide get/set routines for it. A set should set the
+>>> frequency to whatever is asked for and should really worry about how
+>>> that is being set. This part is internal to "cpu" clk.
 >>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Sure.
+>>
+>>> This is what cpufreq-cpu0 driver should expect and does. Current "cpu"
+>>> clock implemented doesn't provide this facility ? And so this wrapper
+>>> made sense to me.
+>>
+>> But the additional management logic on top of the raw clock is exactly
+>> what the cpufreq driver is for. This patch series is basically moving
+>> the cpufreq driver code inside the clock code instead.
 > 
-> Since I'm colleting some MAINTAINERS changes, I applied this one to
-> arm-soc/fixes.
+> Above "sure" didn't go very well with what you wrote here :)
 > 
-Thanks
+> The additional management that we are required to do isn't cpufreq
+> driver specific but cpu or platform specific.
 
-> The rest of the series looks good to me.  Are you still waiting for any
-> more feedback?  If not, are you planning to send a pull request? or
-> I could just apply 1-6 for fixes-non-critical.
-> 
-I will send a pull request dropping the last patch which you already
-applied.
-
-Regards,
-Santosh
+Right, and that's *exactly* what having a cpufreq driver is for; to
+implement the details of CPU clock management.
