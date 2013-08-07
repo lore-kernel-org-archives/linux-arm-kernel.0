@@ -1,41 +1,26 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 07 Aug 2013 13:17:42 +0200
-Subject: [PATCH V3 1/7] ARM: dts: Change i2s compatible string on
- exynos5250
-In-Reply-To: <CAAgF-Bcezj+QGm78Xpm2ahnMrZMqpcnLJaB5bbFyxJDGMTMrpA@mail.gmail.com>
-References: <1375866616-5541-1-git-send-email-padma.v@samsung.com>
- <20130807101057.GY6427@sirena.org.uk>
- <CAAgF-Bcezj+QGm78Xpm2ahnMrZMqpcnLJaB5bbFyxJDGMTMrpA@mail.gmail.com>
-Message-ID: <1804681.fPhe9eeV1F@amdc1227>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 7 Aug 2013 16:52:34 +0530
+Subject: [PATCH] cpufreq: exynos5440: Fix to skip when new frequency same
+ as current
+In-Reply-To: <1375874171-16951-1-git-send-email-amit.daniel@samsung.com>
+References: <1375874171-16951-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAKohpokp04HXau1fOA6w9K675LwRw6uCCZZKyFAJtF1_pkcC=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 of August 2013 16:02:16 Padma Venkat wrote:
-> Hi Mark,
-> 
-> On Wed, Aug 7, 2013 at 3:40 PM, Mark Brown <broonie@kernel.org> wrote:
-> > On Wed, Aug 07, 2013 at 02:40:10PM +0530, Padmavathi Venna wrote:
-> >> This patch removes quirks from i2s node and change the i2s
-> >> compatible names.
-> > 
-> > This needs to go along with the driver change otherwise we break
-> > bisection.
-> 
-> some of the patches at dts side are dependent on this patch. So I
-> separated it into another set. Should I re-post this patch along with
-> other driver side patches?
+On 7 August 2013 16:46, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+> This patch fixes the issue of un-necessary setting the clock controller
+> when the new target frequency is same as the current one. This case usually
+> occurs with governors like ondemand which passes the target frequency as the
+> percentage of average frequency. This check is present in most of the cpufreq
+> driver.
+>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  drivers/cpufreq/exynos5440-cpufreq.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 
-I fully agree with Mark. There are 2 ways of solving this:
-
-a) Do things in steps that don't break anything, i.e.:
-	1) add new bindings to the driver,
-	2) update DTS files,
-	3) remove old bindings from the driver.
-
-b) Do all the things above atomically, in one patch.
-
-Personally, I'm a fan of method a), but if it requires much effort then 
-method b) can be used as a fallback.
-
-Best regards,
-Tomasz
+Applied.
