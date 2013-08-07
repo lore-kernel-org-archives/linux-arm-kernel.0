@@ -1,24 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Aug 2013 21:57:45 +0200
-Subject: [PATCH] pinctrl: sunxi: Fix gpio_set behaviour
-In-Reply-To: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1374748876-23461-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdb7bv82O22OhCVn0ZPWD-W-gWwJP1QJfKimgnvHfHba7w@mail.gmail.com>
+Date: Wed, 7 Aug 2013 21:59:04 +0200
+Subject: [PATCH 2/2] pinctrl: sunxi: Add spinlocks
+In-Reply-To: <20130807191640.GG2911@lukather>
+References: <1375612728-20501-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375612728-20501-3-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdYS-7MPTTSg4psJ3NZ_jhA15aMeFLoxFNAN7hSqe4hRTA@mail.gmail.com>
+ <20130807191640.GG2911@lukather>
+Message-ID: <CACRpkdarfjs-RVb9VFb1vkiFsnnnv5rgTzbB1ru92B3G5MrxUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 25, 2013 at 12:41 PM, Maxime Ripard
+On Wed, Aug 7, 2013 at 9:16 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
 
-> The current gpio_set function is ignoring the previous value set in the
-> GPIO value register, which leads in erasing the values already set for
-> the other GPIOs in the same bank when setting the value of a given GPIO.
+>> This does not apply to my fixes branch which is based off
+>> v3.11-rc4.
 >
-> Add the usual read/mask/write pattern to fix this brown paper bag bug.
+> I think you're missing this patch that I sent previously:
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186342.html
 
-Patch applied for fixes.
+Ah OK applied that too.
+
+>> It is also too big to go into fixes.
+>>
+>> I think it may be requiring the other queued Allwinner things,
+>> so it is better if I apply this on the devel branch after looking over
+>> that Allwinner A20/A31 stuff?
+>
+> The A20/A31 stuff shouldn't conflict with this one, but yes, I you
+> prefer to do it that way, it's fine for me.
+
+I applied it for fixes anyway. Too much to worry about with the
+cross dependency between fixes and devel otherwise.
 
 Yours,
 Linus Walleij
