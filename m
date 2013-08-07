@@ -1,203 +1,272 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 7 Aug 2013 10:07:57 -0500
-Subject: [PATCH v4 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
-References: <1375275119-12787-1-git-send-email-m.szyprowski@samsung.com>
- <1375275119-12787-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4BB8CECD-DBAC-496D-88EE-570A01875535@codeaurora.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed,  7 Aug 2013 16:09:45 +0100
+Subject: [PATCH v2 2/5] ARM: vexpress/TC2: add Serial Power Controller (SPC)
+ support
+In-Reply-To: <1375888188-30213-1-git-send-email-pawel.moll@arm.com>
+References: <1375888188-30213-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1375888188-30213-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-On Jul 31, 2013, at 7:51 AM, Marek Szyprowski wrote:
+The TC2 versatile express core tile integrates a logic block that provides
+the interface between the dual cluster test-chip and the M3 microcontroller
+that carries out power management. The logic block, called Serial Power
+Controller (SPC), contains several memory mapped registers to control among
+other things low-power states, wake-up irqs and per-CPU jump addresses
+registers.
 
-> Add device tree support for contiguous and reserved memory regions
-> defined in device tree. Initialization is done in 2 steps. First, the
-> memory is reserved, what happens very early when only flattened device
-> tree is available. Then on device initialization the corresponding cma
-> and reserved regions are assigned to each device structure.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Documentation/devicetree/bindings/memory.txt |  152 ++++++++++++++++++++++
-> drivers/of/Kconfig                           |    6 +
-> drivers/of/Makefile                          |    1 +
-> drivers/of/of_reserved_mem.c                 |  175 ++++++++++++++++++++++++++
-> include/asm-generic/dma-coherent.h           |    6 +
-> 5 files changed, 340 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/memory.txt
-> create mode 100644 drivers/of/of_reserved_mem.c
-> 
-> diff --git a/Documentation/devicetree/bindings/memory.txt b/Documentation/devicetree/bindings/memory.txt
-> new file mode 100644
-> index 0000000..4aece19
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory.txt
-> @@ -0,0 +1,152 @@
-> +*** Memory binding ***
-> +
-> +The /memory node provides basic information about the address and size
-> +of the physical memory. This node is usually filled or updated by the
-> +bootloader, depending on the actual memory configuration of the given
-> +hardware.
-> +
-> +The memory layout is described by the folllowing node:
-> +
-> +memory {
-> +	reg =  <(baseaddr1) (size1)
-> +		(baseaddr2) (size2)
-> +		...
-> +		(baseaddrN) (sizeN)>;
-> +};
-> +
-> +baseaddrX:	the base address of the defined memory bank
-> +sizeX:		the size of the defined memory bank
-> +
-> +More than one memory bank can be defined.
-> +
-> +
-> +*** Reserved memory regions ***
-> +
-> +In /memory/reserved-memory node one can create additional nodes
-> +describing particular reserved (excluded from normal use) memory
-> +regions. Such memory regions are usually designed for the special usage
-> +by various device drivers. A good example are contiguous memory
-> +allocations or memory sharing with other operating system on the same
-> +hardware board. Those special memory regions might depend on the board
-> +configuration and devices used on the target system.
-> +
-> +Parameters for each memory region can be encoded into the device tree
-> +wit the following convention:
-> +
-> +[(label):] (name)@(address) {
-> +	compatible = "contiguous-memory-region", "reserved-memory-region";
-> +	reg = <(address) (size)>;
-> +	(linux,contiguous-region);
-> +	(linux,default-contiguous-region);
-> +};
-> +
-> +label:		label given to the defined region (optional)
-> +name:		an name given to the defined region
-> +address:	the base address of the defined region
-> +size:		the size of the memory region
+This patch provides a driver that enables run-time control of features
+implemented by the SPC power management control logic with an API to
+be used by different subsystem drivers on top.
 
-Should we try and convey some type of cacheability attributes, I know this is difficult to do in a generic way, but would seem useful and necessary.
+The SPC control logic is required to be programmed very early in the boot
+process to reset secondary CPUs on the TC2 testchip, set-up jump addresses
+and wake-up IRQs for power management. Hence, waiting for core changes to
+be made in the device core code to enable early registration of platform
+devices, the driver puts in place an early init scheme that allows kernel
+drivers to initialize the SPC driver directly from the components requiring
+it, if their initialization routine is called before this driver init
+function during the boot process.
 
-> +
-> +compatible:	"contiguous-memory-region" - enables binding of this
-> +		region to Contiguous Memory Allocator (special region for
-> +		contiguous memory allocations, shared with movable system
-> +		memory, Linux kernel-specific), alternatively if
-> +		"reserved-memory-region" - compatibility is defined, given
-> +		region is assigned for exclusive usage for DMA transfers
-> +
-> +linux,default-contiguous-region: property indicating that the region
-> +		is the default region for all contiguous memory
-> +		allocations, Linux specific (optional)
-> +
-> +Each defined region must use unique name. It is optional to specify the
-> +base address, so if one wants to use autoconfiguration of the base
-> +address, he must specify the '0' as base address in the 'reg' property
-> +and assign ann uniqe name to such regions.
-> +
-> +
-> +*** Device node's properties ***
-> +
-> +Once the regions in the /memory/reserved-memory node are defined, they
-> +can be assigned to device nodes to enable drivers for their special use.
-> +The following properties are defined:
-> +
-> +dma-memory-region = <&phandle_to_defined_region>;
+Device tree bindings documentation for the SPC component is also provided.
 
-Should we go with just 'memory-region' to be more generic?  An example might be a region of memory used for multiprocessor communication that isn't cache-able.
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Amit Kucheria <amit.kucheria@linaro.org>
+Cc: Jon Medhurst <tixy@linaro.org>
+Signed-off-by: Achin Gupta <achin.gupta@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+[ np: moved from drivers/mfd/ to drivers/platform/vexpress/ ]
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+[ PM: moved again to arch/arm/mach-vexpress, requested by Olof ]
+[ PM: removed useless printk, from Olof ]
+[ PM: made the driver SPC-only ]
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/mach-vexpress/spc.c | 180 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-vexpress/spc.h |  24 ++++++
+ 2 files changed, 204 insertions(+)
+ create mode 100644 arch/arm/mach-vexpress/spc.c
+ create mode 100644 arch/arm/mach-vexpress/spc.h
 
-> +
-> +This property indicates that the device driver should use the
-> +memory region pointed by the given phandle.
-> +
-> +
-> +*** Example ***
-> +
-> +This example defines a memory consisting of 4 memory banks. 3 contiguous
-> +regions are defined for Linux kernel, one default of all device drivers
-> +(named contig_mem, placed at 0x72000000, 64MiB), one dedicated to the
-> +framebuffer device (labelled display_mem, placed at 0x78000000, 8MiB)
-> +and one for multimedia processing (labelled multimedia_mem, placed at
-> +0x77000000, 64MiB). 'display_mem' region is then assigned to fb at 12300000
-> +device for DMA memory allocations (Linux kernel drivers will use CMA is
-> +available or dma-exclusive usage otherwise). 'multimedia_mem' is
-> +assigned to scaller at 12500000 and codec at 12600000 devices for contiguous
-> +memory allocations when CMA driver is enabled.
-> +
-> +The reason for creating a separate region for framebuffer device is to
-> +match the framebuffer base address to the one configured by bootloader,
-> +so once Linux kernel drivers starts no glitches on the displayed boot
-> +logo appears. Scaller and codec drivers should share the memory
-> +allocations.
-> +
-> +/ {
-> +	/* ... */
-> +	memory {
-> +		reg =  <0x40000000 0x10000000
-> +			0x50000000 0x10000000
-> +			0x60000000 0x10000000
-> +			0x70000000 0x10000000>;
-> +
-> +		reserved-memory {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			/*
-> +			 * global autoconfigured region for contiguous allocations
-> +			 * (used only with Contiguous Memory Allocator)
-> +			 */
-> +			contig_region at 0 {
-> +				compatible = "contiguous-memory-region";
-> +				reg = <0x0 0x4000000>;
-> +				linux,default-contiguous-region;
-> +			};
-> +
-> +			/*
-> +			 * special region for framebuffer
-> +			 */
-> +			display_mem: region at 78000000 {
-> +				compatible = "contiguous-memory-region", "reserved-memory-region";
-> +				reg = <0x78000000 0x800000>;
-> +			};
-> +
-> +			/*
-> +			 * special region for multimedia processing devices
-> +			 */
-> +			multimedia_mem: region at 77000000 {
-> +				compatible = "contiguous-memory-region";
-> +				reg = <0x77000000 0x4000000>;
-> +			};
-> +		};
-> +	};
-> +
-> +	/* ... */
-> +
-> +	fb0: fb at 12300000 {
-> +		status = "okay";
-> +		dma-memory-region = <&display_mem>;
-> +	};
-> +
-> +	scaller: scaller at 12500000 {
-> +		status = "okay";
-> +		dma-memory-region = <&multimedia_mem>;
-> +	};
-> +
-> +	codec: codec at 12600000 {
-> +		status = "okay";
-> +		dma-memory-region = <&multimedia_mem>;
-> +	};
-> +};
-
-- k
-
-
---
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+new file mode 100644
+index 0000000..eefb029
+--- /dev/null
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -0,0 +1,180 @@
++/*
++ * Versatile Express Serial Power Controller (SPC) support
++ *
++ * Copyright (C) 2013 ARM Ltd.
++ *
++ * Authors: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
++ *          Achin Gupta           <achin.gupta@arm.com>
++ *          Lorenzo Pieralisi     <lorenzo.pieralisi@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++
++#include <asm/cacheflush.h>
++
++#define SPCLOG "vexpress-spc: "
++
++/* SPC wake-up IRQs status and mask */
++#define WAKE_INT_MASK		0x24
++#define WAKE_INT_RAW		0x28
++#define WAKE_INT_STAT		0x2c
++/* SPC power down registers */
++#define A15_PWRDN_EN		0x30
++#define A7_PWRDN_EN		0x34
++/* SPC per-CPU mailboxes */
++#define A15_BX_ADDR0		0x68
++#define A7_BX_ADDR0		0x78
++
++/* wake-up interrupt masks */
++#define GBL_WAKEUP_INT_MSK	(0x3 << 10)
++
++/* TC2 static dual-cluster configuration */
++#define MAX_CLUSTERS		2
++
++struct ve_spc_drvdata {
++	void __iomem *baseaddr;
++	/*
++	 * A15s cluster identifier
++	 * It corresponds to A15 processors MPIDR[15:8] bitfield
++	 */
++	u32 a15_clusid;
++};
++
++static struct ve_spc_drvdata *info;
++
++static inline bool cluster_is_a15(u32 cluster)
++{
++	return cluster == info->a15_clusid;
++}
++
++/**
++ * ve_spc_global_wakeup_irq()
++ *
++ * Function to set/clear global wakeup IRQs. Not protected by locking since
++ * it might be used in code paths where normal cacheable locks are not
++ * working. Locking must be provided by the caller to ensure atomicity.
++ *
++ * @set: if true, global wake-up IRQs are set, if false they are cleared
++ */
++void ve_spc_global_wakeup_irq(bool set)
++{
++	u32 reg;
++
++	reg = readl_relaxed(info->baseaddr + WAKE_INT_MASK);
++
++	if (set)
++		reg |= GBL_WAKEUP_INT_MSK;
++	else
++		reg &= ~GBL_WAKEUP_INT_MSK;
++
++	writel_relaxed(reg, info->baseaddr + WAKE_INT_MASK);
++}
++
++/**
++ * ve_spc_cpu_wakeup_irq()
++ *
++ * Function to set/clear per-CPU wake-up IRQs. Not protected by locking since
++ * it might be used in code paths where normal cacheable locks are not
++ * working. Locking must be provided by the caller to ensure atomicity.
++ *
++ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
++ * @cpu: mpidr[7:0] bitfield describing cpu affinity level
++ * @set: if true, wake-up IRQs are set, if false they are cleared
++ */
++void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set)
++{
++	u32 mask, reg;
++
++	if (cluster >= MAX_CLUSTERS)
++		return;
++
++	mask = 1 << cpu;
++
++	if (!cluster_is_a15(cluster))
++		mask <<= 4;
++
++	reg = readl_relaxed(info->baseaddr + WAKE_INT_MASK);
++
++	if (set)
++		reg |= mask;
++	else
++		reg &= ~mask;
++
++	writel_relaxed(reg, info->baseaddr + WAKE_INT_MASK);
++}
++
++/**
++ * ve_spc_set_resume_addr() - set the jump address used for warm boot
++ *
++ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
++ * @cpu: mpidr[7:0] bitfield describing cpu affinity level
++ * @addr: physical resume address
++ */
++void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr)
++{
++	void __iomem *baseaddr;
++
++	if (cluster >= MAX_CLUSTERS)
++		return;
++
++	if (cluster_is_a15(cluster))
++		baseaddr = info->baseaddr + A15_BX_ADDR0 + (cpu << 2);
++	else
++		baseaddr = info->baseaddr + A7_BX_ADDR0 + (cpu << 2);
++
++	writel_relaxed(addr, baseaddr);
++}
++
++/**
++ * ve_spc_powerdown()
++ *
++ * Function to enable/disable cluster powerdown. Not protected by locking
++ * since it might be used in code paths where normal cacheable locks are not
++ * working. Locking must be provided by the caller to ensure atomicity.
++ *
++ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
++ * @enable: if true enables powerdown, if false disables it
++ */
++void ve_spc_powerdown(u32 cluster, bool enable)
++{
++	u32 pwdrn_reg;
++
++	if (cluster >= MAX_CLUSTERS)
++		return;
++
++	pwdrn_reg = cluster_is_a15(cluster) ? A15_PWRDN_EN : A7_PWRDN_EN;
++	writel_relaxed(enable, info->baseaddr + pwdrn_reg);
++}
++
++int __init ve_spc_init(void __iomem *baseaddr, u32 a15_clusid)
++{
++	info = kzalloc(sizeof(*info), GFP_KERNEL);
++	if (!info) {
++		pr_err(SPCLOG "unable to allocate mem\n");
++		return -ENOMEM;
++	}
++
++	info->baseaddr = baseaddr;
++	info->a15_clusid = a15_clusid;
++
++	/*
++	 * Multi-cluster systems may need this data when non-coherent, during
++	 * cluster power-up/power-down. Make sure driver info reaches main
++	 * memory.
++	 */
++	sync_cache_w(info);
++	sync_cache_w(&info);
++
++	return 0;
++}
+diff --git a/arch/arm/mach-vexpress/spc.h b/arch/arm/mach-vexpress/spc.h
+new file mode 100644
+index 0000000..5f7e4a4
+--- /dev/null
++++ b/arch/arm/mach-vexpress/spc.h
+@@ -0,0 +1,24 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
++ */
++
++
++#ifndef __SPC_H_
++#define __SPC_H_
++
++int __init ve_spc_init(void __iomem *base, u32 a15_clusid);
++void ve_spc_global_wakeup_irq(bool set);
++void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set);
++void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr);
++void ve_spc_powerdown(u32 cluster, bool enable);
++
++#endif
+-- 
+1.8.1.2
