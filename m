@@ -1,33 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:38:28 +0900
-Subject: [GIT PULL 11/26] ARM: shmobile: Use default ->init_time() on Bockw DT
- ref
+Date: Wed,  7 Aug 2013 13:38:34 +0900
+Subject: [GIT PULL 17/26] ARM: shmobile: Use clocksource_of_init() on r8a7790
 In-Reply-To: <cover.1375840527.git.horms+renesas@verge.net.au>
 References: <cover.1375840527.git.horms+renesas@verge.net.au>
-Message-ID: <3bdbd1c9dbff686e375696543577c8a7ad6ef801.1375840527.git.horms+renesas@verge.net.au>
+Message-ID: <c4a62a5f79f515056d9293ee0e9ce0869a326021.1375840527.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Leave ->init_time() set to NULL to use the default ARM behaviour.
+Replace the call to shmobile_timer_init() with
+clocksource_of_init(). This will allow us to
+get rid of shmobile_timer_init().
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
+[horms+renesas at verge.net.au: include linux/clocksource.h]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw-reference.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-shmobile/setup-r8a7790.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw-reference.c b/arch/arm/mach-shmobile/board-bockw-reference.c
-index 24db8de..1a7c893 100644
---- a/arch/arm/mach-shmobile/board-bockw-reference.c
-+++ b/arch/arm/mach-shmobile/board-bockw-reference.c
-@@ -57,6 +57,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
- 	.init_early	= r8a7778_init_delay,
- 	.init_irq	= r8a7778_init_irq_dt,
- 	.init_machine	= bockw_init,
--	.init_time	= shmobile_timer_init,
- 	.dt_compat	= bockw_boards_compat_dt,
- MACHINE_END
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 86cf507..6d4aa04 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -18,6 +18,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <linux/clocksource.h>
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+@@ -263,7 +264,7 @@ void __init r8a7790_timer_init(void)
+ 	iounmap(base);
+ #endif /* CONFIG_ARM_ARCH_TIMER */
+ 
+-	shmobile_timer_init();
++	clocksource_of_init();
+ }
+ 
+ void __init r8a7790_init_delay(void)
 -- 
 1.8.3.2
