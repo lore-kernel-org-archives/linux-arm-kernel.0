@@ -1,16 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Aug 2013 09:02:53 +0100
-Subject: [RFC PATCH] clock: correct the comparison parameter of MHz
-In-Reply-To: <1375861660-32525-1-git-send-email-voice.shen@atmel.com>
-References: <1375861660-32525-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20130807080253.GE23006@n2100.arm.linux.org.uk>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 7 Aug 2013 10:20:20 +0200
+Subject: [PATCH v6 2/8] ASoC: atmel: machine driver for at91sam9x5-wm8731
+ boards
+In-Reply-To: <20130806171156.GN6427@sirena.org.uk>
+References: <1375180329-4860-1-git-send-email-richard.genoud@gmail.com>
+ <1375180329-4860-3-git-send-email-richard.genoud@gmail.com>
+ <20130806171156.GN6427@sirena.org.uk>
+Message-ID: <CACQ1gAhVfSV1MArzTGxSfJOcEksBv-O2AjVJm6eEoBGtggw5uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 03:47:40PM +0800, Bo Shen wrote:
-> correct the comparison parameter of MHz from 4,000,000 to 1,000,000
+2013/8/6 Mark Brown <broonie@kernel.org>:
+> On Tue, Jul 30, 2013 at 12:32:03PM +0200, Richard Genoud wrote:
+>> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>> Description of the Asoc machine driver for an at91sam9x5 based board
+>> with a wm8731 audio DAC. Wm8731 is clocked by a crystal and used as a
+>> master on the SSC/I2S interface. Its connections are a headphone jack
+>> and an Line input jack.
+>
+> Applied, thanks.  We should really be able to merge this with the
+> sam9g20ek driver that's here already but we can do that later.
 
-You're assuming this wasn't intentional.  As the division by 1000000
-ends up losing the fractional rate, I decided to leave 1-4MHz as kHz,
-so something like 1.832MHz would be displayed as 1832kHz and not
-1MHz.
+I think it will be easier after the switch to the common clock framework.
+I'll look into that.
+
+Thanks !
