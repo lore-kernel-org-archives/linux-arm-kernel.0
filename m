@@ -1,24 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 7 Aug 2013 16:59:26 +0200
-Subject: [PATCH] i2c: mv64xxx: Document the newly introduced allwinner
- compatible
-In-Reply-To: <1374650075-26190-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1374650075-26190-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130807145926.GF2978@katana>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 7 Aug 2013 17:06:29 +0200
+Subject: [PATCHv5 08/11] ARM: pci: add ->add_bus() and ->remove_bus()
+ hooks to hw_pci
+In-Reply-To: <20130807133719.GA26302@manwe>
+References: <1373889167-27878-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373889167-27878-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130725165302.GA27802@dhcp-172-17-186-34.nvidia.com>
+ <20130807111354.5e29a74c@skate> <20130807133719.GA26302@manwe>
+Message-ID: <20130807170629.76ca63c1@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 24, 2013 at 09:14:35AM +0200, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Dear Thierry Reding,
 
-Applied to for-current, thanks!
+On Wed, 7 Aug 2013 15:37:20 +0200, Thierry Reding wrote:
 
-And please, always send to the I2C list. I work heavily with patchwork
-monitoring the I2C list; everything not there will easily be forgotten!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/46746d90/attachment.sig>
+> > Hum, I must be missing something here. Looking at the patch you're
+> > quoting, and my code, I see one tab before 'void' in both cases, and
+> > spaces between 'void' and the (*function) in both cases.
+> > 
+> > Am I missing something here?
+> 
+> Perhaps I should've said "alignment" instead of "indentation" to make it
+> more explicit. All other members use tabs to separate the data type and
+> the field name, while the lines that you add use spaces.
+
+Ah, right, I understand now. Unfortunately, I've already sent PATCHv7
+with some other fixes. So either Jason Cooper can fix this when
+applying, or I'll fix it if a PATCHv8 is needed for some other reason.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
