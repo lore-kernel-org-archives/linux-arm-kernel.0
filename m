@@ -1,39 +1,224 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:28:33 +0900
-Subject: [GIT PULL 12/19] ARM: shmobile: r8a7740: add PMU information to
- r8a7740.dtsi
+Date: Wed,  7 Aug 2013 13:28:27 +0900
+Subject: [GIT PULL 03/19] ARM: shmobile: lager: Add DT reference
 In-Reply-To: <cover.1375838900.git.horms+renesas@verge.net.au>
 References: <cover.1375838900.git.horms+renesas@verge.net.au>
-Message-ID: <b21ed4eb948e6c59dea30a7102d9736903bff26e.1375838900.git.horms+renesas@verge.net.au>
+Message-ID: <6dace67f9bd43cdfc2de3ff1a573420ecfc33390.1375838900.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+This is sufficient to allow boot of the Lager board with
+a console without boards-lager.c compiled into the kernel.
+This is an example of a minimal but still useful initialisation
+of the board using DT as much as possible.
 
-Add PMU information to r8a7740.dtsi. With this
-included Armadillo800eva DT reference may use the PMU.
+As such it is the same as the boot of Lager that can be achieved
+without a board file. The intention of adding this file
+is to facilitate further work to allow board specific devices to be
+initialised via DT.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/Makefile                     |  1 +
+ arch/arm/boot/dts/r8a7790-lager-reference.dts  | 31 +++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig                 | 11 ++++++
+ arch/arm/mach-shmobile/Makefile                |  1 +
+ arch/arm/mach-shmobile/Makefile.boot           |  1 +
+ arch/arm/mach-shmobile/board-lager-reference.c | 46 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a7790.h  |  1 +
+ arch/arm/mach-shmobile/setup-r8a7790.c         |  9 +++--
+ 8 files changed, 99 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7790-lager-reference.dts
+ create mode 100644 arch/arm/mach-shmobile/board-lager-reference.c
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 24e9306..4b0728f 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -32,6 +32,11 @@
- 		      <0xc2000000 0x1000>;
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <0 83 4>;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 6d79bde..492a807 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -189,6 +189,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva-reference.dtb \
+ 	r8a7779-marzen-reference.dtb \
+ 	r8a7790-lager.dtb \
++	r8a7790-lager-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+ 	sh73a0-kzm9g-reference.dtb \
+ 	r8a73a4-ape6evm.dtb \
+diff --git a/arch/arm/boot/dts/r8a7790-lager-reference.dts b/arch/arm/boot/dts/r8a7790-lager-reference.dts
+new file mode 100644
+index 0000000..fa5b81b
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7790-lager-reference.dts
+@@ -0,0 +1,31 @@
++/*
++ * Device Tree Source for the Lager board
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "r8a7790.dtsi"
++
++/ {
++	model = "Lager";
++	compatible = "renesas,lager-reference", "renesas,r8a7790";
++
++	chosen {
++		bootargs = "console=ttySC6,115200 ignore_loglevel";
 +	};
 +
- 	/* irqpin0: IRQ0 - IRQ7 */
- 	irqpin0: irqpin at e6900000 {
- 		compatible = "renesas,intc-irqpin";
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x80000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index ad28f91..05ea103 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -161,6 +161,17 @@ config MACH_LAGER
+ 	depends on ARCH_R8A7790
+ 	select USE_OF
+ 
++config MACH_LAGER_REFERENCE
++	bool "Lager board - Reference Device Tree Implementation"
++	depends on ARCH_R8A7790
++	select USE_OF
++	---help---
++	   Use reference implementation of Lager board support
++	   which makes use of device tree at the expense
++	   of not supporting a number of devices.
++
++	   This is intended to aid developers
++
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 26a5784..397bb36 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -44,6 +44,7 @@ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
++obj-$(CONFIG_MACH_LAGER_REFERENCE)	+= board-lager-reference.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index c938b58..761d7b1 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -12,6 +12,7 @@ loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+ loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+ loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
++loadaddr-$(CONFIG_MACH_LAGER_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
+ loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
+ loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+new file mode 100644
+index 0000000..eb6c55e
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -0,0 +1,46 @@
++/*
++ * Lager board support - Reference DT implementation
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Simon Horman
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/init.h>
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++#include <mach/r8a7790.h>
++#include <asm/mach/arch.h>
++
++void __init lager_add_standard_devices(void)
++{
++	/* clocks are setup late during boot in the case of DT */
++	r8a7790_clock_init();
++
++	r8a7790_add_dt_devices();
++        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char *lager_boards_compat_dt[] __initdata = {
++	"renesas,lager-reference",
++	NULL,
++};
++
++DT_MACHINE_START(LAGER_DT, "lager")
++	.init_early	= r8a7790_init_delay,
++	.init_machine	= lager_add_standard_devices,
++	.init_time	= r8a7790_timer_init,
++	.dt_compat	= lager_boards_compat_dt,
++MACHINE_END
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+index 7aaef40..788d559 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+@@ -2,6 +2,7 @@
+ #define __ASM_R8A7790_H__
+ 
+ void r8a7790_add_standard_devices(void);
++void r8a7790_add_dt_devices(void);
+ void r8a7790_clock_init(void);
+ void r8a7790_pinmux_init(void);
+ void r8a7790_init_delay(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 4c96dad..86cf507 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -179,7 +179,7 @@ static struct resource cmt00_resources[] = {
+ 					  &cmt##idx##_platform_data,	\
+ 					  sizeof(struct sh_timer_config))
+ 
+-void __init r8a7790_add_standard_devices(void)
++void __init r8a7790_add_dt_devices(void)
+ {
+ 	r8a7790_register_scif(SCIFA0);
+ 	r8a7790_register_scif(SCIFA1);
+@@ -191,9 +191,14 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(SCIF1);
+ 	r8a7790_register_scif(HSCIF0);
+ 	r8a7790_register_scif(HSCIF1);
++	r8a7790_register_cmt(00);
++}
++
++void __init r8a7790_add_standard_devices(void)
++{
++	r8a7790_add_dt_devices();
+ 	r8a7790_register_irqc(0);
+ 	r8a7790_register_thermal();
+-	r8a7790_register_cmt(00);
+ }
+ 
+ #define MODEMR 0xe6160060
 -- 
 1.8.3.2
