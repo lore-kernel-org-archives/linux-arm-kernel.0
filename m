@@ -1,309 +1,370 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Aug 2013 16:23:22 -0400
-Subject: [PATCHv7 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130807202322.GB8204@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  7 Aug 2013 22:23:46 +0200
+Subject: [PATCH] pinctrl: nomadik: delete ancient pin control API
+Message-ID: <1375907026-15075-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+From: Linus Walleij <linus.walleij@stericsson.com>
 
-Ok, take two.  :)  I've applied (again, *tentatively*) this series in
-the following fashion:
+The pin control subsystem was created to do away with custom pin
+control APIs such as this one. It was kept for backward-compatibility
+but is completely unused in the current kernel, so let's delete
+it.
 
-+ v3.11-rc1
-\
- +---+ mvebu/msi_common (1-3,10)
-     |
-     +---+---+ mvebu/msi_irq (4-9)
-             |
-             +---+---+ mvebu/msi_mvebu (11-13)
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/pinctrl/pinctrl-nomadik.c             | 295 --------------------------
+ include/linux/platform_data/pinctrl-nomadik.h |  24 ---
+ 2 files changed, 319 deletions(-)
 
-If it makes it through -next tonight (and it should, I built the
-bejeezuz out of it), I'll tag mvebu/msi_common and send a PR for that so
-that Thierry can base off of it.
-
-I believe our only blocker is waiting for an Ack from Benjamin.
-
-thx,
-
-Jason.
-
-On Wed, Aug 07, 2013 at 11:32:21AM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This set of patches introduces Message Signaled Interrupt support in
-> the Marvell EBU PCIe driver. It has been successfully tested on the
-> Armada XP GP platform with an Intel e1000e PCIe network card that
-> supports MSI.
-> 
-> This patch set is intended for merging in 3.12, so the respective
-> maintainers of the different areas are invited to review/ack the
-> patches, see below for the details.
-> 
-> There are still missing ACKs from Benjamin Herrenschmidt (5, 6, 7),
-> Thomas Gleixner (8, 9).
-> 
-> The patches do the following:
-> 
->  * Patch 1 reworks how the architecture-specific MSI functions can be
->    overriden by architecture-specific code, by using weak
->    functions. It was suggested by Bjorn Helgaas.
-> 
->    This patch has been acked by Bjorn Helgaas, the PCI maintainter.
-> 
->  * Patch 2 removes the ARCH_SUPPORTS_MSI hidden kconfig boolean which
->    is no longer needed now that we have weak functions for all MSI
->    architecture-specific hooks.
-> 
->    This patch has been acked by Bjorn Helgaas, the PCI maintainer.
-> 
->  * Patch 3 adds a minimal msi_chip infrastructure, that allows a
->    pci_bus to be connected to a msi_chip, and that provides default
->    implementations of the architecture-specific MSI functions to use
->    msi_chip.
-> 
->    This patch has been acked by Bjorn Helgaas, the PCI maintainter.
-> 
->  * Patch 4 adds an IRQ domain function that allows to allocate
->    dynamically a free hwirq number from an IRQ domain, and create a
->    virq mapping to it. It was suggested by Grant Likely in order to
->    remove the hwirq allocation code from the IRQ driver itself.
-> 
->    Patch has been Acked by Grant Likely, former irq_domain maintainer.
-> 
->  * Patch 5 refactors the __irq_domain_add() function in the irq_domain
->    code, in preparation for the introduction of MSI support in
->    irq_domain.
-> 
->    This patch needs the ACK of the irq_domain maintainer Benjamin
->    Herrenschmidt <benh@kernel.crashing.org>.
-> 
->  * Patch 6 allows to create an irq_domain associated with a msi_chip,
->    thanks to the new irq_domain_add_msi() function.
-> 
->    This patch needs the ACK of the irq_domain maintainer Benjamin
->    Herrenschmidt <benh@kernel.crashing.org>.
-> 
->  * Patch 7 adds a new function irq_find_msi_host() to find the
->    MSI-type interrupt controller associated to a given DT node, and
->    adjusts irq_find_host() to not match MSI-type interrupt
->    controllers.
-> 
->    This patch needs the ACK of the irq_domain maintainer Benjamin
->    Herrenschmidt <benh@kernel.crashing.org>.
-> 
->  * Patch 8 makes some not very interesting preparation in the Armada
->    370/XP IRQ controller driver.
-> 
->    This patch needs the Ack from Thomas Gleixner, as the
->    drivers/irqchip maintainer.
-> 
->  * Patch 9 implements the MSI support in the Armada 370/XP IRQ
->    controller driver. It registers an msi_chip using the
->    msi_chip_add() function added in PATCH 3.
-> 
->    This patch needs the Ack from Thomas Gleixner, as the
->    drivers/irqchip maintainer.
-> 
->  * Patch 10 extends the ARM PCI core to expose ->add_bus() and
->    ->remove_bus() hooks to PCI drivers. This was suggested by Bjorn
->    Helgaas to allow the PCI driver to connected the PCI busses with
->    the corresponding MSI chip.
-> 
->    This patch has been Acked by Russell King, the ARM maintainer.
-> 
->  * Patch 11 adjust the Armada 370/XP Device Tree to indicate that the
->    MPIC is not only an interrupt-controller, but also an
->    msi-controller.
-> 
->    This patch needs the Ack from Jason Cooper, Gregory Clement
->    and/or Andrew Lunn, the Marvell maintainers.
-> 
->  * Patch 12 adds MSI support in the Marvell PCIe host controller
->    driver. The work to do here is minimal: get a reference to the
->    msi-parent controller thanks to msi_chip_find_by_of_node(), and
->    link it to the pci_bus structure before the bus gets enumerated.
-> 
->    This patch has been acked by Bjorn Helgaas, the PCI maintainer.
-> 
->  * Patch 13 adjusts the Armada 370/XP Device Tree to add the msi-parent
->    properties in the PCIe controller nodes.
-> 
->    This patch needs the Ack from Jason Cooper, Gregory Clement
->    and/or Andrew Lunn, the Marvell Maintainers.
-> 
-> This version 7 follows:
->  * PATCH version 6 sent on August, 1st 2013
->  * PATCH version 5 sent on July, 15th 2013
->  * PATCH version 4 sent on July, 1st 2013
->  * PATCH version 3 sent on June, 19th 2013
->  * PATCH version 2 sent on June, 6th 2013
->  * RFC version 1 sent on March, 26th 2013
-> 
-> Changes since v6:
-> 
->  * Fixed x86 build failure related to default_restore_msi_irqs(),
->    noticed by Stephen Rothwell on linux-next.
-> 
->  * Added Acked-by from Bjorn Helgaas on 'PCI: remove ARCH_SUPPORTS_MSI
->    kconfig option'.
-> 
->  * Fixed a compile-time issue in drivers/irqchip/irq-armada-370-xp.c
->    in the !CONFIG_PCI_MSI case.
-> 
->  * Fixed one of the stylistic issue raised by Thierry Reding on 'ARM:
->    pci: add ->add_bus() and ->remove_bus() hooks to hw_pci' (i.e do
->    not align '=' when assigning elements of the pci_sys_data
->    structure). I however didn't fix the tab vs. spaces indentation
->    issue noticed by Thierry, since I couldn't see it (to me the
->    indentation was identical in both locations).
-> 
->  * Added Tested-by from Daniel Price on all patches.
-> 
-> Changes since v5:
-> 
->  * Rebased on top of 3.11-rc3.
-> 
->  * Implemented the suggestions of Grant Likely on "irqdomain: add
->    irq_alloc_mapping() function" and added his Acked-by.
-> 
->  * Added Bjorn Helgaas Acked-by on "PCI: use weak functions for MSI
->    arch-specific functions".
-> 
->  * Added Bjorn Helgaas Acked-by on "PCI: Introduce new MSI chip
->    infrastructure".
-> 
->  * Remove the drivers/of global registry of irq_chip, and as suggested
->    by Grant Likely, create an association between an irq_domain and a
->    msi_chip. This required refactoring the __irq_domain_add()
->    function, adding a 'msi_chip' pointer to 'irq_domain', adding an
->    irq_domain_add_msi() function and a irq_find_msi_host() function.
-> 
->  * Added Russell King Acked-by on "ARM: pci: add ->add_bus() and
->  ->remove_bus() hooks to hw_pci"
-> 
-> Changes since v4:
-> 
->  * Rebased on top of 3.11-rc1.
-> 
->  * Slightly rework the implementation of arch_setup_msi_irq(),
->    arch_teardown_msi_irq and arch_msi_check_device() according to the
->    suggestions of Bjorn Helgaas (PATCH 4)
-> 
->  * Make a few improvements to the msi_chip registry, according to the
->    suggestion of Bjorn Helgaas and Rob Herring: coding style fixes,
->    usage of mutex while traversing the list of msi_chip, usage of
->    of_pci_msi_* prefix instead of just of_msi_*.
-> 
-> Changes since v3:
-> 
->  * Keep only a default_teardown_msi_irqs() function needed for the Xen
->    PCI x86 code, and remove all other default_*() function and put the
->    default behavior directly in the weak functions. Suggested by
->    Thierry Redding and Bjorn Helgaas.
-> 
->  * Misc small improvements the MSI chip registry code: compiled only
->    under CONFIG_PCI_MSI, functions exported to modules, addition of an
->    of_msi_chip_remove() function, renaming of
->    of_msi_chip_find_by_node() to of_find_msi_chip_by_node(), move the
->    test of the "msi-controller" property to the of_msi_chip_add()
->    function, renamed the list_head field from link to list, added
->    dummy functions in the header files when !CONFIG_PCI_MSI &&
->    !CONFIG_OF. All suggested by Thierry Redding.
-> 
->  * Add a patch that entirely removes the ARCH_SUPPORTS_MSI, as we now
->    have weak functions, so even if an arch doesn't actually
->    use/support MSI, the code will build properly. Suggested by Thierry
->    Redding.
-> 
->  * Added Device Tree binding documentation updates for the IRQ
->    controller and the PCIe controller.
-> 
-> Changes since v2:
-> 
->  * Add an IRQ domain function that allows to allocate dynamically a
->    free hwirq number from an IRQ domain, and create a virq mapping to
->    it. It was suggested by Grant Likely in order to remove the hwirq
->    allocation code from the IRQ driver itself. (PATCH 1)
-> 
->  * Separate the use of weak functions from the introduction of the
->    msi_chip infrastructure, and use weak functions for all
->    architecture-specific MSI hooks. Suggested by Bjorn Helgaas (PATCH
->    2).
-> 
->  * Move the msi_chip registry to drivers/of. Suggested by Bjorn
->    Helgaas (PATCH 4).
-> 
->  * Use pcibios_add_bus() and pcibios_remove_bus() to connect the PCI
->    busses to their msi_chip, as suggested by Bjorn Helgaas. Requires
->    some ARM PCI core changes (PATCH 7), and then changes to the PCI
->    driver itself (PATCH 9).
-> 
-> This set of patches applies on top of 3.11-rc3, and is available as a
-> Git branch at
-> https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-pcie-msi-v7.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thierry Reding (1):
->   PCI: Introduce new MSI chip infrastructure
-> 
-> Thomas Petazzoni (12):
->   PCI: use weak functions for MSI arch-specific functions
->   PCI: remove ARCH_SUPPORTS_MSI kconfig option
->   irqdomain: add irq_alloc_mapping() function
->   irqdomain: refactor __irq_domain_add()
->   irqdomain: add support to associate an irq_domain with a msi_chip
->   irqdomain: add function to find a MSI irq_domain
->   irqchip: armada-370-xp: properly request resources
->   irqchip: armada-370-xp: implement MSI support
->   ARM: pci: add ->add_bus() and ->remove_bus() hooks to hw_pci
->   ARM: mvebu: the MPIC now provides MSI controller features
->   PCI: mvebu: add support for MSI
->   ARM: mvebu: link PCIe controllers to the MSI controller
-> 
->  .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   3 +
->  .../devicetree/bindings/pci/mvebu-pci.txt          |   3 +
->  arch/arm/Kconfig                                   |   1 -
->  arch/arm/boot/dts/armada-370-xp.dtsi               |   1 +
->  arch/arm/boot/dts/armada-370.dtsi                  |   1 +
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   1 +
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   1 +
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   1 +
->  arch/arm/include/asm/mach/pci.h                    |   4 +
->  arch/arm/kernel/bios32.c                           |  16 +++
->  arch/ia64/Kconfig                                  |   1 -
->  arch/mips/Kconfig                                  |   2 -
->  arch/mips/include/asm/pci.h                        |   5 -
->  arch/powerpc/Kconfig                               |   1 -
->  arch/powerpc/include/asm/pci.h                     |   5 -
->  arch/s390/Kconfig                                  |   1 -
->  arch/s390/include/asm/pci.h                        |   4 -
->  arch/sparc/Kconfig                                 |   1 -
->  arch/tile/Kconfig                                  |   1 -
->  arch/x86/Kconfig                                   |   1 -
->  arch/x86/include/asm/pci.h                         |  28 ----
->  arch/x86/kernel/x86_init.c                         |  21 +++
->  drivers/irqchip/irq-armada-370-xp.c                | 158 ++++++++++++++++++++-
->  drivers/pci/Kconfig                                |   4 -
->  drivers/pci/host/pci-mvebu.c                       |  31 ++++
->  drivers/pci/msi.c                                  |  69 ++++++---
->  drivers/pci/probe.c                                |   1 +
->  include/linux/irqdomain.h                          |  62 +++++++-
->  include/linux/msi.h                                |  19 ++-
->  include/linux/pci.h                                |   1 +
->  kernel/irq/irqdomain.c                             |  89 +++++++++---
->  31 files changed, 432 insertions(+), 105 deletions(-)
-> 
-> -- 
-> 1.8.1.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 4a1cfdc..89280bc 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -337,97 +337,6 @@ static void nmk_prcm_altcx_set_mode(struct nmk_pinctrl *npct,
+ 	nmk_write_masked(npct->prcm_base + reg, BIT(bit), BIT(bit));
+ }
+ 
+-static void __nmk_config_pin(struct nmk_gpio_chip *nmk_chip, unsigned offset,
+-			     pin_cfg_t cfg, bool sleep, unsigned int *slpmregs)
+-{
+-	static const char *afnames[] = {
+-		[NMK_GPIO_ALT_GPIO]	= "GPIO",
+-		[NMK_GPIO_ALT_A]	= "A",
+-		[NMK_GPIO_ALT_B]	= "B",
+-		[NMK_GPIO_ALT_C]	= "C"
+-	};
+-	static const char *pullnames[] = {
+-		[NMK_GPIO_PULL_NONE]	= "none",
+-		[NMK_GPIO_PULL_UP]	= "up",
+-		[NMK_GPIO_PULL_DOWN]	= "down",
+-		[3] /* illegal */	= "??"
+-	};
+-	static const char *slpmnames[] = {
+-		[NMK_GPIO_SLPM_INPUT]		= "input/wakeup",
+-		[NMK_GPIO_SLPM_NOCHANGE]	= "no-change/no-wakeup",
+-	};
+-
+-	int pin = PIN_NUM(cfg);
+-	int pull = PIN_PULL(cfg);
+-	int af = PIN_ALT(cfg);
+-	int slpm = PIN_SLPM(cfg);
+-	int output = PIN_DIR(cfg);
+-	int val = PIN_VAL(cfg);
+-	bool glitch = af == NMK_GPIO_ALT_C;
+-
+-	dev_dbg(nmk_chip->chip.dev, "pin %d [%#lx]: af %s, pull %s, slpm %s (%s%s)\n",
+-		pin, cfg, afnames[af], pullnames[pull], slpmnames[slpm],
+-		output ? "output " : "input",
+-		output ? (val ? "high" : "low") : "");
+-
+-	if (sleep) {
+-		int slpm_pull = PIN_SLPM_PULL(cfg);
+-		int slpm_output = PIN_SLPM_DIR(cfg);
+-		int slpm_val = PIN_SLPM_VAL(cfg);
+-
+-		af = NMK_GPIO_ALT_GPIO;
+-
+-		/*
+-		 * The SLPM_* values are normal values + 1 to allow zero to
+-		 * mean "same as normal".
+-		 */
+-		if (slpm_pull)
+-			pull = slpm_pull - 1;
+-		if (slpm_output)
+-			output = slpm_output - 1;
+-		if (slpm_val)
+-			val = slpm_val - 1;
+-
+-		dev_dbg(nmk_chip->chip.dev, "pin %d: sleep pull %s, dir %s, val %s\n",
+-			pin,
+-			slpm_pull ? pullnames[pull] : "same",
+-			slpm_output ? (output ? "output" : "input") : "same",
+-			slpm_val ? (val ? "high" : "low") : "same");
+-	}
+-
+-	if (output)
+-		__nmk_gpio_make_output(nmk_chip, offset, val);
+-	else {
+-		__nmk_gpio_make_input(nmk_chip, offset);
+-		__nmk_gpio_set_pull(nmk_chip, offset, pull);
+-	}
+-
+-	__nmk_gpio_set_lowemi(nmk_chip, offset, PIN_LOWEMI(cfg));
+-
+-	/*
+-	 * If the pin is switching to altfunc, and there was an interrupt
+-	 * installed on it which has been lazy disabled, actually mask the
+-	 * interrupt to prevent spurious interrupts that would occur while the
+-	 * pin is under control of the peripheral.  Only SKE does this.
+-	 */
+-	if (af != NMK_GPIO_ALT_GPIO)
+-		nmk_gpio_disable_lazy_irq(nmk_chip, offset);
+-
+-	/*
+-	 * If we've backed up the SLPM registers (glitch workaround), modify
+-	 * the backups since they will be restored.
+-	 */
+-	if (slpmregs) {
+-		if (slpm == NMK_GPIO_SLPM_NOCHANGE)
+-			slpmregs[nmk_chip->bank] |= BIT(offset);
+-		else
+-			slpmregs[nmk_chip->bank] &= ~BIT(offset);
+-	} else
+-		__nmk_gpio_set_slpm(nmk_chip, offset, slpm);
+-
+-	__nmk_gpio_set_mode_safe(nmk_chip, offset, af, glitch);
+-}
+-
+ /*
+  * Safe sequence used to switch IOs between GPIO and Alternate-C mode:
+  *  - Save SLPM registers
+@@ -474,210 +383,6 @@ static void nmk_gpio_glitch_slpm_restore(unsigned int *slpm)
+ 	}
+ }
+ 
+-static int __nmk_config_pins(pin_cfg_t *cfgs, int num, bool sleep)
+-{
+-	static unsigned int slpm[NUM_BANKS];
+-	unsigned long flags;
+-	bool glitch = false;
+-	int ret = 0;
+-	int i;
+-
+-	for (i = 0; i < num; i++) {
+-		if (PIN_ALT(cfgs[i]) == NMK_GPIO_ALT_C) {
+-			glitch = true;
+-			break;
+-		}
+-	}
+-
+-	spin_lock_irqsave(&nmk_gpio_slpm_lock, flags);
+-
+-	if (glitch) {
+-		memset(slpm, 0xff, sizeof(slpm));
+-
+-		for (i = 0; i < num; i++) {
+-			int pin = PIN_NUM(cfgs[i]);
+-			int offset = pin % NMK_GPIO_PER_CHIP;
+-
+-			if (PIN_ALT(cfgs[i]) == NMK_GPIO_ALT_C)
+-				slpm[pin / NMK_GPIO_PER_CHIP] &= ~BIT(offset);
+-		}
+-
+-		nmk_gpio_glitch_slpm_init(slpm);
+-	}
+-
+-	for (i = 0; i < num; i++) {
+-		struct nmk_gpio_chip *nmk_chip;
+-		int pin = PIN_NUM(cfgs[i]);
+-
+-		nmk_chip = nmk_gpio_chips[pin / NMK_GPIO_PER_CHIP];
+-		if (!nmk_chip) {
+-			ret = -EINVAL;
+-			break;
+-		}
+-
+-		clk_enable(nmk_chip->clk);
+-		spin_lock(&nmk_chip->lock);
+-		__nmk_config_pin(nmk_chip, pin % NMK_GPIO_PER_CHIP,
+-				 cfgs[i], sleep, glitch ? slpm : NULL);
+-		spin_unlock(&nmk_chip->lock);
+-		clk_disable(nmk_chip->clk);
+-	}
+-
+-	if (glitch)
+-		nmk_gpio_glitch_slpm_restore(slpm);
+-
+-	spin_unlock_irqrestore(&nmk_gpio_slpm_lock, flags);
+-
+-	return ret;
+-}
+-
+-/**
+- * nmk_config_pin - configure a pin's mux attributes
+- * @cfg: pin confguration
+- * @sleep: Non-zero to apply the sleep mode configuration
+- * Configures a pin's mode (alternate function or GPIO), its pull up status,
+- * and its sleep mode based on the specified configuration.  The @cfg is
+- * usually one of the SoC specific macros defined in mach/<soc>-pins.h.  These
+- * are constructed using, and can be further enhanced with, the macros in
+- * <linux/platform_data/pinctrl-nomadik.h>
+- *
+- * If a pin's mode is set to GPIO, it is configured as an input to avoid
+- * side-effects.  The gpio can be manipulated later using standard GPIO API
+- * calls.
+- */
+-int nmk_config_pin(pin_cfg_t cfg, bool sleep)
+-{
+-	return __nmk_config_pins(&cfg, 1, sleep);
+-}
+-EXPORT_SYMBOL(nmk_config_pin);
+-
+-/**
+- * nmk_config_pins - configure several pins at once
+- * @cfgs: array of pin configurations
+- * @num: number of elments in the array
+- *
+- * Configures several pins using nmk_config_pin().  Refer to that function for
+- * further information.
+- */
+-int nmk_config_pins(pin_cfg_t *cfgs, int num)
+-{
+-	return __nmk_config_pins(cfgs, num, false);
+-}
+-EXPORT_SYMBOL(nmk_config_pins);
+-
+-int nmk_config_pins_sleep(pin_cfg_t *cfgs, int num)
+-{
+-	return __nmk_config_pins(cfgs, num, true);
+-}
+-EXPORT_SYMBOL(nmk_config_pins_sleep);
+-
+-/**
+- * nmk_gpio_set_slpm() - configure the sleep mode of a pin
+- * @gpio: pin number
+- * @mode: NMK_GPIO_SLPM_INPUT or NMK_GPIO_SLPM_NOCHANGE,
+- *
+- * This register is actually in the pinmux layer, not the GPIO block itself.
+- * The GPIO1B_SLPM register defines the GPIO mode when SLEEP/DEEP-SLEEP
+- * mode is entered (i.e. when signal IOFORCE is HIGH by the platform code).
+- * Each GPIO can be configured to be forced into GPIO mode when IOFORCE is
+- * HIGH, overriding the normal setting defined by GPIO_AFSELx registers.
+- * When IOFORCE returns LOW (by software, after SLEEP/DEEP-SLEEP exit),
+- * the GPIOs return to the normal setting defined by GPIO_AFSELx registers.
+- *
+- * If @mode is NMK_GPIO_SLPM_INPUT, the corresponding GPIO is switched to GPIO
+- * mode when signal IOFORCE is HIGH (i.e. when SLEEP/DEEP-SLEEP mode is
+- * entered) regardless of the altfunction selected. Also wake-up detection is
+- * ENABLED.
+- *
+- * If @mode is NMK_GPIO_SLPM_NOCHANGE, the corresponding GPIO remains
+- * controlled by NMK_GPIO_DATC, NMK_GPIO_DATS, NMK_GPIO_DIR, NMK_GPIO_PDIS
+- * (for altfunction GPIO) or respective on-chip peripherals (for other
+- * altfuncs) when IOFORCE is HIGH. Also wake-up detection DISABLED.
+- *
+- * Note that enable_irq_wake() will automatically enable wakeup detection.
+- */
+-int nmk_gpio_set_slpm(int gpio, enum nmk_gpio_slpm mode)
+-{
+-	struct nmk_gpio_chip *nmk_chip;
+-	unsigned long flags;
+-
+-	nmk_chip = nmk_gpio_chips[gpio / NMK_GPIO_PER_CHIP];
+-	if (!nmk_chip)
+-		return -EINVAL;
+-
+-	clk_enable(nmk_chip->clk);
+-	spin_lock_irqsave(&nmk_gpio_slpm_lock, flags);
+-	spin_lock(&nmk_chip->lock);
+-
+-	__nmk_gpio_set_slpm(nmk_chip, gpio % NMK_GPIO_PER_CHIP, mode);
+-
+-	spin_unlock(&nmk_chip->lock);
+-	spin_unlock_irqrestore(&nmk_gpio_slpm_lock, flags);
+-	clk_disable(nmk_chip->clk);
+-
+-	return 0;
+-}
+-
+-/**
+- * nmk_gpio_set_pull() - enable/disable pull up/down on a gpio
+- * @gpio: pin number
+- * @pull: one of NMK_GPIO_PULL_DOWN, NMK_GPIO_PULL_UP, and NMK_GPIO_PULL_NONE
+- *
+- * Enables/disables pull up/down on a specified pin.  This only takes effect if
+- * the pin is configured as an input (either explicitly or by the alternate
+- * function).
+- *
+- * NOTE: If enabling the pull up/down, the caller must ensure that the GPIO is
+- * configured as an input.  Otherwise, due to the way the controller registers
+- * work, this function will change the value output on the pin.
+- */
+-int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull)
+-{
+-	struct nmk_gpio_chip *nmk_chip;
+-	unsigned long flags;
+-
+-	nmk_chip = nmk_gpio_chips[gpio / NMK_GPIO_PER_CHIP];
+-	if (!nmk_chip)
+-		return -EINVAL;
+-
+-	clk_enable(nmk_chip->clk);
+-	spin_lock_irqsave(&nmk_chip->lock, flags);
+-	__nmk_gpio_set_pull(nmk_chip, gpio % NMK_GPIO_PER_CHIP, pull);
+-	spin_unlock_irqrestore(&nmk_chip->lock, flags);
+-	clk_disable(nmk_chip->clk);
+-
+-	return 0;
+-}
+-
+-/* Mode functions */
+-/**
+- * nmk_gpio_set_mode() - set the mux mode of a gpio pin
+- * @gpio: pin number
+- * @gpio_mode: one of NMK_GPIO_ALT_GPIO, NMK_GPIO_ALT_A,
+- *	       NMK_GPIO_ALT_B, and NMK_GPIO_ALT_C
+- *
+- * Sets the mode of the specified pin to one of the alternate functions or
+- * plain GPIO.
+- */
+-int nmk_gpio_set_mode(int gpio, int gpio_mode)
+-{
+-	struct nmk_gpio_chip *nmk_chip;
+-	unsigned long flags;
+-
+-	nmk_chip = nmk_gpio_chips[gpio / NMK_GPIO_PER_CHIP];
+-	if (!nmk_chip)
+-		return -EINVAL;
+-
+-	clk_enable(nmk_chip->clk);
+-	spin_lock_irqsave(&nmk_chip->lock, flags);
+-	__nmk_gpio_set_mode(nmk_chip, gpio % NMK_GPIO_PER_CHIP, gpio_mode);
+-	spin_unlock_irqrestore(&nmk_chip->lock, flags);
+-	clk_disable(nmk_chip->clk);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(nmk_gpio_set_mode);
+-
+ static int __maybe_unused nmk_prcm_gpiocr_get_mode(struct pinctrl_dev *pctldev, int gpio)
+ {
+ 	int i;
+diff --git a/include/linux/platform_data/pinctrl-nomadik.h b/include/linux/platform_data/pinctrl-nomadik.h
+index f73b2f0..abf5bed 100644
+--- a/include/linux/platform_data/pinctrl-nomadik.h
++++ b/include/linux/platform_data/pinctrl-nomadik.h
+@@ -226,30 +226,6 @@ enum nmk_gpio_slpm {
+ 	NMK_GPIO_SLPM_WAKEUP_DISABLE = NMK_GPIO_SLPM_NOCHANGE,
+ };
+ 
+-/* Older deprecated pin config API that should go away soon */
+-extern int nmk_config_pin(pin_cfg_t cfg, bool sleep);
+-extern int nmk_config_pins(pin_cfg_t *cfgs, int num);
+-extern int nmk_config_pins_sleep(pin_cfg_t *cfgs, int num);
+-extern int nmk_gpio_set_slpm(int gpio, enum nmk_gpio_slpm mode);
+-extern int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull);
+-#ifdef CONFIG_PINCTRL_NOMADIK
+-extern int nmk_gpio_set_mode(int gpio, int gpio_mode);
+-#else
+-static inline int nmk_gpio_set_mode(int gpio, int gpio_mode)
+-{
+-	return -ENODEV;
+-}
+-#endif
+-extern int nmk_gpio_get_mode(int gpio);
+-
+-extern void nmk_gpio_wakeups_suspend(void);
+-extern void nmk_gpio_wakeups_resume(void);
+-
+-extern void nmk_gpio_clocks_enable(void);
+-extern void nmk_gpio_clocks_disable(void);
+-
+-extern void nmk_gpio_read_pull(int gpio_bank, u32 *pull_up);
+-
+ /*
+  * Platform data to register a block: only the initial gpio/irq number.
+  */
+-- 
+1.8.1.4
