@@ -1,76 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Aug 2013 00:08:56 +0100
-Subject: v3.11-rc4: OMAP1/Amstrad Delta (E3) crash
-In-Reply-To: <20130807190521.GD15014@blackmetal.musicnaut.iki.fi>
-References: <20130806232609.GB15014@blackmetal.musicnaut.iki.fi>
- <20130807190521.GD15014@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130807230856.GJ23053@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 08 Aug 2013 01:25:08 +0200
+Subject: [PATCH] cpufreq: exynos5440: Fix to skip when new frequency same
+ as current
+In-Reply-To: <CAKohpom0gPk9BXRP2eEuX_HBXDut=wynrZfvOH1tcEQY6CMLNQ@mail.gmail.com>
+References: <1375874171-16951-1-git-send-email-amit.daniel@samsung.com>
+ <52022FC2.2010109@arm.com>
+ <CAKohpom0gPk9BXRP2eEuX_HBXDut=wynrZfvOH1tcEQY6CMLNQ@mail.gmail.com>
+Message-ID: <2331427.ybQdfvflPh@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 10:05:21PM +0300, Aaro Koskinen wrote:
-> Hi,
+On Wednesday, August 07, 2013 05:03:59 PM Viresh Kumar wrote:
+> On 7 August 2013 17:00, Sudeep KarkadaNagesha
+> <Sudeep.KarkadaNagesha@arm.com> wrote:
+> > Any particular reason we need this check in all drivers after your
+> > commit: 5a1c0228 "cpufreq: Avoid calling cpufreq driver's target()
+> > routine if target_freq == policy->cur"
+> >
+> > I think it can removed from all drivers, am I missing something ?
 > 
-> On Wed, Aug 07, 2013 at 02:26:09AM +0300, Aaro Koskinen wrote:
-> > I get the following on Amstrad Delta (E3) when booting unpatched
-> > v3.11-rc4. The kernel config is after the crash.
+> Yeah.. Just a bit though :)
 > 
-> This is regression introduced between -rc3 and -rc4. According to the
-> git bisect, the first bad commit is:
+> So, cpufreq core checks this when we call target for any frequency.
+> Now, cpufreq driver actually does a cpufreq_frequency_table_target()
+> and so the frequency may vary than what is requested, in case
+> requested frequency isn't picked from the table.
 > 
-> 	commit e39e3f3ebfef03450cf7bfa7a974a8c61f7980c8
-> 	Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> 	Date:   Tue Jul 9 01:03:17 2013 +0100
+> In such cases we check it again to be sure that we aren't at this
+> frequency already..
 > 
-> 	    ARM: update FIQ support for relocation of vectors
+> Earlier I thought of calling cpufreq_frequency_table_target() in the
+> core before calling target but dropped the idea as I wasn't sure of
+> the side effects.
 > 
-> If I revert the commit from v3.11-rc4, the board boots fine.
-> 
-> A.
-> 
-> > Uncompressing Linux... done, booting the kernel.
-> > [    0.000000] Booting Linux on physical CPU 0x0
-> > [    0.000000] Initializing cgroup subsys cpu
-> > [    0.000000] Linux version 3.11.0-rc4-e3 (aaro at blackmetal) (gcc version 4.7.3 (GCC) ) #4 PREEMPT Wed Aug 7 02:03:27 EEST 2013
-> > [    0.000000] bootconsole [earlycon0] enabled
-> > [    0.000000] OMAP1510
-> > [    0.000000]  revision 2 handled as 15xx id: bc058c9b93111a16
+> @Rafael: Do you see why we shouldn't/can't call
+> cpufreq_frequency_table_target() from the core itself and so drivers
+> never need to do it?
 
-Hmm, so ARM925T which is VIVT...
+It looks like it would require us to redefine .target() to take next_state
+instead of target_freq (at least in the acpi-cpufreq case), wouldn't it?
 
-> > [    0.238868] Installing fiq handler from c001b110, length 0x164
-> > [    0.245750] Unable to handle kernel paging request at virtual address ffff1224
-
-In one way, that's good news - that's public independent proof that the
-code associated with the vectors is well protected from kernel writes. :)
-
-Can you try this (untested) patch please?  We need to write into this
-page via the page's alias, rather than directly to it.  Thanks.
-
- arch/arm/kernel/fiq.c |    8 ++------
- 1 files changed, 2 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 25442f4..fc79202 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -84,17 +84,13 @@ int show_fiq_list(struct seq_file *p, int prec)
- 
- void set_fiq_handler(void *start, unsigned int length)
- {
--#if defined(CONFIG_CPU_USE_DOMAINS)
--	void *base = (void *)0xffff0000;
--#else
- 	void *base = vectors_page;
--#endif
- 	unsigned offset = FIQ_OFFSET;
- 
- 	memcpy(base + offset, start, length);
-+	if (!cache_is_vipt_nonaliasing())
-+		flush_icache_range(base + offset, offset + length);
- 	flush_icache_range(0xffff0000 + offset, 0xffff0000 + offset + length);
--	if (!vectors_high())
--		flush_icache_range(offset, offset + length);
- }
- 
- int claim_fiq(struct fiq_handler *f)
+Rafael
