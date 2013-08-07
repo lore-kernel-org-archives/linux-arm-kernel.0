@@ -1,28 +1,33 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed,  7 Aug 2013 09:14:15 -0500
-Subject: [PATCH] ARM: dts: omap3-beagle-xm: fix string error in compatible
- property
-Message-ID: <1375884855-19414-1-git-send-email-robertcnelson@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 7 Aug 2013 16:35:46 +0200
+Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <5200E684.5080003@free-electrons.com>
+References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
+ <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130716080503.GA3125@lukather>
+ <5200E684.5080003@free-electrons.com>
+Message-ID: <20130807143546.GD2978@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
----
- arch/arm/boot/dts/omap3-beagle-xm.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index afdb164..0c514dc 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -11,7 +11,7 @@
- 
- / {
- 	model = "TI OMAP3 BeagleBoard xM";
--	compatible = "ti,omap3-beagle-xm, ti,omap3-beagle", "ti,omap3";
-+	compatible = "ti,omap3-beagle-xm", "ti,omap3-beagle", "ti,omap3";
- 
- 	cpus {
- 		cpu at 0 {
--- 
-1.7.10.4
+> But we shouldn't use it alone: we should always use:
+> compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> 
+> From my point of view using  "marvell,mv78230-i2c" alone is an error.
+> 
+> Wolfram what is your opinion on it?
+
+It is not strictly an error, but risky. If you use an older Kernel
+version (or other OS) which only offers "mv64xxx" you will have no
+match. Although the driver theoretically could have basic support for
+all mv64xxx variants skipping all additional features of later IP
+revisions.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/a53878e3/attachment.sig>
