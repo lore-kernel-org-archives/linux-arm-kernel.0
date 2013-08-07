@@ -1,75 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:38:32 +0900
-Subject: [GIT PULL 05/26] ARM: shmobile: r8a7778: cleanup registration of hspi
+Date: Wed,  7 Aug 2013 13:38:33 +0900
+Subject: [GIT PULL 16/26] ARM: shmobile: Use default ->init_time() on KZM9G DT
+ ref
 In-Reply-To: <cover.1375840527.git.horms+renesas@verge.net.au>
 References: <cover.1375840527.git.horms+renesas@verge.net.au>
-Message-ID: <3c7b5362323cd4b5d09a5b21ba8e74b3de05fc73.1375840527.git.horms+renesas@verge.net.au>
+Message-ID: <f6110210347fea5599223fba6ecce14f1683f510.1375840527.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-sh-hspi driver which doesn't need platform data at the time of
-registration can be registerd on SoC.
-And, registering these drivers in the SoC code can avoid
-unwanted device numbering issue.
-(ex. the hspi2 device number will be spi.0 if hspi2 only registered)
-This patch registers it on SoC code as cleanup C code
+Leave ->init_time() set to NULL to use the default ARM behaviour.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c          | 1 -
- arch/arm/mach-shmobile/include/mach/r8a7778.h | 1 -
- arch/arm/mach-shmobile/setup-r8a7778.c        | 5 ++++-
- 3 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/board-kzm9g-reference.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index d7d3427..b6f3d2f 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -200,7 +200,6 @@ static void __init bockw_init(void)
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
- 	r8a7778_add_ether_device(&ether_platform_data);
--	r8a7778_add_hspi_device(0);
- 
- 	i2c_register_board_info(0, i2c0_devices,
- 				ARRAY_SIZE(i2c0_devices));
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index 9874511..41fd6da 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -23,7 +23,6 @@
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
- extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
--extern void r8a7778_add_hspi_device(int id);
- extern void r8a7778_add_dt_devices(void);
- 
- extern void r8a7778_init_late(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index ce3b54d..1a154d4 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -272,7 +272,7 @@ static struct resource hspi_resources[] __initdata = {
- 	DEFINE_RES_IRQ(gic_iid(0x75)),
- };
- 
--void __init r8a7778_add_hspi_device(int id)
-+void __init r8a7778_register_hspi(int id)
- {
- 	BUG_ON(id < 0 || id > 2);
- 
-@@ -312,6 +312,9 @@ void __init r8a7778_add_standard_devices(void)
- 	r8a7778_register_i2c(1);
- 	r8a7778_register_i2c(2);
- 	r8a7778_register_i2c(3);
-+	r8a7778_register_hspi(0);
-+	r8a7778_register_hspi(1);
-+	r8a7778_register_hspi(2);
- }
- 
- void __init r8a7778_init_late(void)
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+index 41092bb..4cf6bab 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -99,6 +99,5 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+ 	.init_early	= sh73a0_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_machine	= kzm_init,
+-	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= kzm9g_boards_compat_dt,
+ MACHINE_END
 -- 
 1.8.3.2
