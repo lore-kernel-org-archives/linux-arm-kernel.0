@@ -1,51 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Aug 2013 11:55:18 -0400
-Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <20130807065954.GA22906@manwe>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130806200256.GB19280@titan.lakedaemon.net>
- <20130807065954.GA22906@manwe>
-Message-ID: <20130807155518.GD19280@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Aug 2013 17:54:17 +0200
+Subject: [PATCH 04/20] ARM: pxa: ssp: add DT bindings
+In-Reply-To: <1375889649-14638-5-git-send-email-zonque@gmail.com>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-5-git-send-email-zonque@gmail.com>
+Message-ID: <201308071754.17741.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 08:59:56AM +0200, Thierry Reding wrote:
-> On Tue, Aug 06, 2013 at 04:02:56PM -0400, Jason Cooper wrote:
-> > Thomas,
-> > 
-> > In order to get some testing in -next, I've *tentatively* applied this
-> > series in the following way:
-> > 
-> > +---+ mvebu/msi_common (1,2,3,10)
-> >     |
-> >     +---+---+ mvebu/msi_irq (4-9)
-> >             |
-> >             +---+---+ mvebu/msi_mvebu (11-13)
-> > 
-> > I had to make one change to patch #9, I protected the last two blocks
-> > with #ifdef CONFIG_PCI_MSI to prevent a build failure at that point.
-> > 
-> > mvebu/msi_common should be appropriate for Thierry to base off, however,
-> > I make no guarantees about the stability of the branch until I send a
-> > PR for it.  Code-wise, it should be fine, but the commit-ids may change
-> > due to adding Tested-by's, etc.
-> 
-> I noticed that patch 10 has my Reviewed-by, even though my comments
-> weren't addressed. They were about stylistic issues but I'd still like
-> to see them fixed now rather than having to fix them up later. Also I
-> think I gave my Tested-by on those patches somewhere already and I think
-> it's unlikely that anybody else will test them, so with the consistency
-> style fixes applied I don't see any reason why that branch can't be
-> stabilized right away.
+On Wednesday 07 August 2013, Daniel Mack wrote:
+> +Device tree bindings for Marvell PXA SSP ports
+> +
+> +Required properties:
+> +
+> +       - compatible:   Must be one of
+> +                               mrvl,pxa25x-ssp
+> +                               mvrl,pxa25x-nssp
+> +                               mrvl,pxa27x-ssp
+> +                               mrvl,pxa3xx-ssp
+> +                               mvrl,pxa168-ssp
+> +                               mrvl,pxa910-ssp
+> +                               mrvl,ce4100-ssp
+> +                               mrvl,lpss-ssp
+> +
+> +       - reg:          The memory base
+> +
+> +
 
-Ahh, thanks.  I did miss your tested-by.  We did get one other from
-Daniel Price (which sounded like a pretty cool setup, btw), so I'll add
-yours before I tag it.
+It seems you are missing the 'dmas' properties here and that two of them
+("rx" and "tx") are required by the code.
 
-wrt your Reviewed-by, that came with the patch and may be from a
-previous revision.  At any rate, I saw your comments about the
-whitespace/alignment, and I'll fixup v7 as I pull it in.
-
-thx,
-
-Jason.
+	Arnd
