@@ -1,71 +1,63 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 7 Aug 2013 12:00:51 +0530
-Subject: [PATCH V2] ARM: dts: AM33xx: Add RNG node
-In-Reply-To: <1375777984-6267-4-git-send-email-lokeshvutla@ti.com>
-References: <1375777984-6267-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1375857051-8188-1-git-send-email-lokeshvutla@ti.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 07 Aug 2013 08:33:49 +0200
+Subject: at91sam9x5: uart (not usart) broken
+In-Reply-To: <52019591.2010408@interlog.com>
+References: <52019591.2010408@interlog.com>
+Message-ID: <5201EA4D.8030106@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the AM33xx RNG module's device tree data.
-Also add Documentation file describing the data
-for the RNG module.
+Hello Doug,
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Changes since V1:
-- Drop "status=disabled" entry in dt node, Since
-  RNG is present on all AM33xx platforms.
+On 07/08/2013 02:32, Douglas Gilbert wrote:
+> Between lk 3.10.0 and lk 3.11.0-rc4 the uarts (not usarts)
+> have been broken in the at91sam9x5 family. The DT files have
+> been re-factored for uarts but look correct.
+>
+> So suspicion moves to the atmel_serial driver which enjoyed
+> a lot of changes in June.
+>
 
- .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
- arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
- 2 files changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
+My patch (the last one in log history) is adding error checks on clk_get and
+clk_enable (clk_prepare_enable) calls.
+I think the issue you're having comes from these new checks, and the fact
+that uart clks DT entries are missing.
 
-diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-new file mode 100644
-index 0000000..6a62acd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-@@ -0,0 +1,22 @@
-+OMAP SoC HWRNG Module
-+
-+Required properties:
-+
-+- compatible : Should contain entries for this and backward compatible
-+  RNG versions:
-+  - "ti,omap2-rng" for OMAP2.
-+  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
-+  Note that these two versions are incompatible.
-+- ti,hwmods: Name of the hwmod associated with the RNG module
-+- reg : Offset and length of the register set for the module
-+- interrupts : the interrupt number for the RNG module.
-+		Only used for "ti,omap4-rng".
-+
-+Example:
-+/* AM335x */
-+rng: rng at 48310000 {
-+	compatible = "ti,omap4-rng";
-+	ti,hwmods = "rng";
-+	reg = <0x48310000 0x2000>;
-+	interrupts = <111>;
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 38b446b..26ebe30 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -530,5 +530,12 @@
- 			#size-cells = <1>;
- 			status = "disabled";
- 		};
-+
-+		rng: rng at 48310000 {
-+			compatible = "ti,omap4-rng";
-+			ti,hwmods = "rng";
-+			reg = <0x48310000 0x2000>;
-+			interrupts = <111>;
-+		};
- 	};
- };
--- 
-1.7.9.5
+The previous version was just silently ignoring these errors.
+It may work if these clks (uart clks) are already enabled by bootstrap or
+bootloader.
+
+Anyway, I think the cleaner way for resolving this issue is to apply the 
+patch
+I joined in attachment.
+
+Could you test it (I don't have any sam9x5 boards), and if this works 
+I'll submit
+it.
+
+Best Regards,
+
+Boris
+> Tested on a at91sam9g25 (Aria G25) which is a member of the
+> at91sam9x5 family with two uarts (four usarts and a debug
+> serial port). The failure looks like this in dmesg:
+>
+>  console [ttyS0] enabled
+>  f801c000.serial: ttyS1 at MMIO 0xf801c000 (irq = 23) is a ATMEL_SERIAL
+>  f8020000.serial: ttyS2 at MMIO 0xf8020000 (irq = 24) is a ATMEL_SERIAL
+>  f8024000.serial: ttyS3 at MMIO 0xf8024000 (irq = 25) is a ATMEL_SERIAL
+>  atmel_usart: probe of f8040000.serial failed with error -2
+>  f8028000.serial: ttyS4 at MMIO 0xf8028000 (irq = 32) is a ATMEL_SERIAL
+>
+> The device at 0xf8040000 is uart0 . My DT file was trying
+> to bring up uart0 but not uart1.
+>
+> Doug Gilbert
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-at91-add-missing-uart-clocks-DT-entries.patch
+Type: text/x-patch
+Size: 1172 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/4f82ce04/attachment.bin>
