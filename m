@@ -1,89 +1,99 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 12:19:27 +0200
-Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned transfers
+Date: Wed,  7 Aug 2013 12:19:23 +0200
+Subject: [PATCH 05/12] dma: mmp_pdma: add filter function
 In-Reply-To: <1375870770-14263-1-git-send-email-zonque@gmail.com>
 References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375870770-14263-10-git-send-email-zonque@gmail.com>
+Message-ID: <1375870770-14263-6-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PXA DMA controller has a DALGN register which allows for
-byte-aligned DMA transfers. Use it in case any of the transfer
-descriptors is not aligned to a mask of ~0x7.
+PXA peripherals need to obtain specific DMA request ids which will
+eventually be stored in the DRCMR register.
+
+Currently, clients are expected to store that number inside the slave
+config block as slave_id, which is unfortunately incompatible with the
+way DMA resources are handled in DT environments.
+
+This patch adds a filter function which stores the filter parameter
+passed in by of-dma.c into the channel's drcmr register.
+
+For backward compatability, cfg->slave_id is still used if set to
+a non-zero value.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ drivers/dma/mmp_pdma.c       | 21 ++++++++++++++++++++-
+ include/linux/dma/mmp-pdma.h | 15 +++++++++++++++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/dma/mmp-pdma.h
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 1c2c00b..7eb235b 100644
+index 1fe78d8..60a1410 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -109,6 +109,7 @@ struct mmp_pdma_chan {
- 	struct list_head chain_pending;	/* Link descriptors queue for pending */
- 	struct list_head chain_running;	/* Link descriptors queue for running */
- 	bool idle;			/* channel statue machine */
-+	bool byte_align;
+@@ -19,6 +19,7 @@
+ #include <linux/dmapool.h>
+ #include <linux/of_device.h>
+ #include <linux/of.h>
++#include <linux/dma/mmp-pdma.h>
  
- 	struct dma_pool *desc_pool;	/* Descriptors pool */
+ #include "dmaengine.h"
+ 
+@@ -633,8 +634,13 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+ 			chan->dcmd |= DCMD_BURST32;
+ 
+ 		chan->dir = cfg->direction;
+-		chan->drcmr = cfg->slave_id;
+ 		chan->dev_addr = addr;
++		/* FIXME: drivers should be ported over to use the filter
++		 * function. Once that's done, the following two lines can
++		 * be removed.
++		 */
++		if (cfg->slave_id)
++			chan->drcmr = cfg->slave_id;
+ 		break;
+ 	default:
+ 		return -ENOSYS;
+@@ -883,6 +889,19 @@ static struct platform_driver mmp_pdma_driver = {
+ 	.remove		= mmp_pdma_remove,
  };
-@@ -142,7 +143,7 @@ static void set_desc(struct mmp_pdma_phy *phy, dma_addr_t addr)
  
- static void enable_chan(struct mmp_pdma_phy *phy)
- {
--	u32 reg;
-+	u32 reg, dalgn;
- 
- 	if (!phy->vchan)
- 		return;
-@@ -150,6 +151,13 @@ static void enable_chan(struct mmp_pdma_phy *phy)
- 	reg = DRCMR(phy->vchan->drcmr);
- 	writel(DRCMR_MAPVLD | phy->idx, phy->base + reg);
- 
-+	dalgn = readl(phy->base + DALGN);
-+	if (phy->vchan->byte_align)
-+		dalgn |= 1 << phy->idx;
-+	else
-+		dalgn &= ~(1 << phy->idx);
-+	writel(dalgn, phy->base + DALGN);
++bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
++{
++	struct mmp_pdma_chan *c = to_mmp_pdma_chan(chan);
 +
- 	reg = (phy->idx << 2) + DCSR;
- 	writel(readl(phy->base + reg) | DCSR_RUN,
- 					phy->base + reg);
-@@ -453,6 +461,7 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
- 		return NULL;
- 
- 	chan = to_mmp_pdma_chan(dchan);
-+	chan->byte_align = false;
- 
- 	if (!chan->dir) {
- 		chan->dir = DMA_MEM_TO_MEM;
-@@ -469,6 +478,8 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
- 		}
- 
- 		copy = min_t(size_t, len, PDMA_MAX_DESC_BYTES);
-+		if (dma_src & 0x7 || dma_dst & 0x7)
-+			chan->byte_align = true;
- 
- 		new->desc.dcmd = chan->dcmd | (DCMD_LENGTH & copy);
- 		new->desc.dsadr = dma_src;
-@@ -528,12 +539,16 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
- 	if ((sgl == NULL) || (sg_len == 0))
- 		return NULL;
- 
-+	chan->byte_align = false;
++	if (chan->device->dev->driver != &mmp_pdma_driver.driver)
++		return false;
 +
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		addr = sg_dma_address(sg);
- 		avail = sg_dma_len(sgl);
++	c->drcmr = *(unsigned int *) param;
++
++	return true;
++}
++EXPORT_SYMBOL_GPL(mmp_pdma_filter_fn);
++
+ module_platform_driver(mmp_pdma_driver);
  
- 		do {
- 			len = min_t(size_t, avail, PDMA_MAX_DESC_BYTES);
-+			if (addr & 0x7)
-+				chan->byte_align = true;
- 
- 			/* allocate and populate the descriptor */
- 			new = mmp_pdma_alloc_descriptor(chan);
+ MODULE_DESCRIPTION("MARVELL MMP Periphera DMA Driver");
+diff --git a/include/linux/dma/mmp-pdma.h b/include/linux/dma/mmp-pdma.h
+new file mode 100644
+index 0000000..2dc9b2b
+--- /dev/null
++++ b/include/linux/dma/mmp-pdma.h
+@@ -0,0 +1,15 @@
++#ifndef _MMP_PDMA_H_
++#define _MMP_PDMA_H_
++
++struct dma_chan;
++
++#ifdef CONFIG_MMP_PDMA
++bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param);
++#else
++static inline bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
++{
++	return false;
++}
++#endif
++
++#endif /* _MMP_PDMA_H_ */
 -- 
 1.8.3.1
