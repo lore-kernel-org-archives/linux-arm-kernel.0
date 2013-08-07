@@ -1,39 +1,78 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 7 Aug 2013 11:36:09 +0800
-Subject: [PATCH] mtd: atmel_nand: fix the warning when CONFIG_OF is not defined
-Message-ID: <1375846569-9499-1-git-send-email-josh.wu@atmel.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Tue,  6 Aug 2013 20:44:56 -0700
+Subject: [PATCH V2 00/17] EFI stub for ARM
+Message-ID: <1375847113-24884-1-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix following warning:
+This patch series adds EFI stub support for the ARM architecture.
+Some code that was previously only used by x86/x86_64 is now shared
+and has been made more general.  The stub for ARM is implemented in
+a similar manner to x86 in that it is a shim layer between EFI and
+the normal zImage/bzImage boot process, and that an image with the
+stub configured is bootable as both a zImage and EFI application.
 
-drivers/mtd/nand/atmel_nand.c:2007: warning: 'atmel_nand_nfc_match' defined but not used
+This patchset depends (trivially) on a separately submitted bugfix to the
+EFI stub: "correct call to free_pages"
+http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=df981edcb9bce00b9c5e4f3cc33f3f98bc9a2394
 
-This patch add '#if defined(CONFIG_OF)' block to guard around the definition of
-atmel_nand_nfc_match, in order to avoid the warning when kernel is configurated
-as non-dt supported.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/mtd/nand/atmel_nand.c |    2 ++
- 1 file changed, 2 insertions(+)
+Changes since V1:
+* Updated head.S based on feedback from Dave Martin.  ARM/THUMB
+  switches now much cleaner.
+* Broke up changes to x86 and common code into more patches.
+  10 more patches in this series.
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 65b302c..ddcd575 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -2251,10 +2251,12 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#if defined(CONFIG_OF)
- static struct of_device_id atmel_nand_nfc_match[] = {
- 	{ .compatible = "atmel,sama5d3-nfc" },
- 	{ /* sentinel */ }
- };
-+#endif
- 
- static struct platform_driver atmel_nand_nfc_driver = {
- 	.driver = {
+
+
+Roy Franz (17):
+  EFI stub documentation updates
+  Move common EFI stub code from x86 arch code to common location
+  Add system pointer argument to shared EFI stub related     functions
+    so they no longer use global system table     pointer as they did
+    when part of eboot.c.
+  Rename memory allocation/free functions
+  Add minimum address parameter to efi_low_alloc()
+  rename __get_map() to efi_get_memory_map(), add parameter     to
+    optionally return mmap key. The mmap key is required     to exit
+    EFI boot services, and allows efi_get_memory_map()     to be used
+    for getting final memory map.
+  Enforce minimum alignment of 1 page on allocations.     The
+    efi_high_alloc() and efi_low_alloc() functions     use the
+    EFI_ALLOCATE_ADDRESS option to the EFI     function
+    allocate_pages(), which requires a minimum     of page alignment,
+    and rejects all other requests.
+  Allow efi_free() to be called with size of 0, and do nothing in that
+    case.
+  Generalize handle_ramdisks() and rename to handle_cmdline_files().
+  Renames in handle_cmdline_files() to complete generalization.
+  Move EFI_READ_CHUNK_SIZE define to shared location.
+  Add proper definitions for some EFI function pointers.
+  Fix types in EFI calls to match EFI function definitions.
+  resolve warnings found on ARM compile
+  Add strstr to compressed string.c for ARM.
+  Add EFI stub for ARM
+  Add config EFI_STUB for ARM to Kconfig
+
+ Documentation/efi-stub.txt             |   78 +++++
+ Documentation/x86/efi-stub.txt         |   65 ----
+ arch/arm/Kconfig                       |   10 +
+ arch/arm/boot/compressed/Makefile      |   18 +-
+ arch/arm/boot/compressed/efi-header.S  |  114 +++++++
+ arch/arm/boot/compressed/efi-stub.c    |  514 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/compressed/head.S        |   90 +++++-
+ arch/arm/boot/compressed/string.c      |   21 ++
+ arch/x86/Kconfig                       |    2 +-
+ arch/x86/boot/compressed/eboot.c       |  490 ++----------------------------
+ arch/x86/boot/compressed/eboot.h       |    7 -
+ drivers/firmware/efi/efi-stub-helper.c |  505 +++++++++++++++++++++++++++++++
+ include/linux/efi.h                    |   48 ++-
+ 13 files changed, 1405 insertions(+), 557 deletions(-)
+ create mode 100644 Documentation/efi-stub.txt
+ delete mode 100644 Documentation/x86/efi-stub.txt
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/boot/compressed/efi-stub.c
+ create mode 100644 drivers/firmware/efi/efi-stub-helper.c
+
 -- 
-1.7.9.5
+1.7.10.4
