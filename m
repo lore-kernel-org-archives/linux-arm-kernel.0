@@ -1,73 +1,107 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  7 Aug 2013 17:34:02 +0200
-Subject: [PATCH 13/20] ASoC: pxa: pxa-ssp: add DT bindings
+Date: Wed,  7 Aug 2013 17:33:54 +0200
+Subject: [PATCH 05/20] ARM: pxa: ssp: use devm_ functions
 In-Reply-To: <1375889649-14638-1-git-send-email-zonque@gmail.com>
 References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
-Message-ID: <1375889649-14638-14-git-send-email-zonque@gmail.com>
+Message-ID: <1375889649-14638-6-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains a cruel hack for looking up the the DMA request
-number. The problem here is that the implementation as it stands will
-allocate the DMA channel from the user of the ssp port, and hence we
-cannot allocate a real channel here.
+Use devm_ functions to allocate memory, ioremap, clk_get etc to clean up
+the error unwind path.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt |  7 +++++++
- sound/soc/pxa/pxa-ssp.c                                  | 12 ++++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
+ arch/arm/plat-pxa/ssp.c | 40 ++++++++++++----------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt b/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
-new file mode 100644
-index 0000000..19d5488
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
-@@ -0,0 +1,7 @@
-+Marvell PXA SSP CPU DAI bindings
-+
-+Required properties:
-+
-+	compatible	Must be "mrvl,pxa-ssp-dai"
-+
-+
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 6f4dd75..82b9985 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -21,6 +21,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/pxa2xx_ssp.h>
-+#include <linux/of.h>
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index 7628e85..29fe314 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -95,20 +95,17 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct ssp_device *ssp;
+ 	struct device *dev = &pdev->dev;
+-	int ret = 0;
  
- #include <asm/irq.h>
+-	ssp = kzalloc(sizeof(struct ssp_device), GFP_KERNEL);
++	ssp = devm_kzalloc(dev, sizeof(struct ssp_device), GFP_KERNEL);
+ 	if (ssp == NULL) {
+ 		dev_err(dev, "failed to allocate memory");
+ 		return -ENOMEM;
+ 	}
+ 	ssp->pdev = pdev;
  
-@@ -798,6 +799,12 @@ static const struct snd_soc_component_driver pxa_ssp_component = {
- 	.name		= "pxa-ssp",
- };
+-	ssp->clk = clk_get(dev, NULL);
+-	if (IS_ERR(ssp->clk)) {
+-		ret = PTR_ERR(ssp->clk);
+-		goto err_free;
+-	}
++	ssp->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(ssp->clk))
++		return PTR_ERR(ssp->clk);
  
-+#ifdef CONFIG_OF
-+static const struct of_device_id pxa_ssp_of_ids[] = {
-+	{ .compatible = "mrvl,pxa-ssp-dai" },
-+};
-+#endif
-+
- static int asoc_ssp_probe(struct platform_device *pdev)
- {
- 	return snd_soc_register_component(&pdev->dev, &pxa_ssp_component,
-@@ -812,8 +819,9 @@ static int asoc_ssp_remove(struct platform_device *pdev)
+ 	if (dev->of_node) {
+ 		struct of_phandle_args dma_spec;
+@@ -150,32 +147,28 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (res == NULL) {
+ 		dev_err(dev, "no memory resource defined\n");
+-		ret = -ENODEV;
+-		goto err_free_clk;
++		return -ENODEV;
+ 	}
  
- static struct platform_driver asoc_ssp_driver = {
- 	.driver = {
--			.name = "pxa-ssp-dai",
--			.owner = THIS_MODULE,
-+		.name = "pxa-ssp-dai",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(pxa_ssp_of_ids),
- 	},
+-	res = request_mem_region(res->start, resource_size(res),
+-			pdev->name);
++	res = devm_request_mem_region(dev, res->start, resource_size(res),
++				      pdev->name);
+ 	if (res == NULL) {
+ 		dev_err(dev, "failed to request memory resource\n");
+-		ret = -EBUSY;
+-		goto err_free_clk;
++		return -EBUSY;
+ 	}
  
- 	.probe = asoc_ssp_probe,
+ 	ssp->phys_base = res->start;
+ 
+-	ssp->mmio_base = ioremap(res->start, resource_size(res));
++	ssp->mmio_base = devm_ioremap(dev, res->start, resource_size(res));
+ 	if (ssp->mmio_base == NULL) {
+ 		dev_err(dev, "failed to ioremap() registers\n");
+-		ret = -ENODEV;
+-		goto err_free_mem;
++		return -ENODEV;
+ 	}
+ 
+ 	ssp->irq = platform_get_irq(pdev, 0);
+ 	if (ssp->irq < 0) {
+ 		dev_err(dev, "no IRQ resource defined\n");
+-		ret = -ENODEV;
+-		goto err_free_io;
++		return -ENODEV;
+ 	}
+ 
+ 	if (dev->of_node) {
+@@ -202,17 +195,8 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 	mutex_unlock(&ssp_lock);
+ 
+ 	platform_set_drvdata(pdev, ssp);
+-	return 0;
+ 
+-err_free_io:
+-	iounmap(ssp->mmio_base);
+-err_free_mem:
+-	release_mem_region(res->start, resource_size(res));
+-err_free_clk:
+-	clk_put(ssp->clk);
+-err_free:
+-	kfree(ssp);
+-	return ret;
++	return 0;
+ }
+ 
+ static int pxa_ssp_remove(struct platform_device *pdev)
 -- 
 1.8.3.1
