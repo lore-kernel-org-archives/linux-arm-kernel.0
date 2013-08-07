@@ -1,189 +1,138 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Aug 2013 16:11:41 -0400
-Subject: [PATCH 1/2] ARM: mvebu: add support for the AXP WiFi AP board
-In-Reply-To: <20130806170941.GC2705@localhost>
-References: <1375199091-31215-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375199091-31215-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130806155343.GU19280@titan.lakedaemon.net>
- <20130806170941.GC2705@localhost>
-Message-ID: <20130807201141.GA8204@titan.lakedaemon.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 7 Aug 2013 15:08:07 -0500
+Subject: [PATCHv3 2/8] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <FF52B913-A5AB-4516-BDA6-ED0BCFFBD4D1@codeaurora.org>
+References: <1375825216-18119-1-git-send-email-s-anna@ti.com>
+ <BB39592C-0DAC-49A4-A782-583D7EB858AF@codeaurora.org>
+ <52027CDC.8080205@ti.com>
+ <FF52B913-A5AB-4516-BDA6-ED0BCFFBD4D1@codeaurora.org>
+Message-ID: <5202A927.4030708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 02:09:42PM -0300, Ezequiel Garcia wrote:
-> On Tue, Aug 06, 2013 at 11:53:43AM -0400, Jason Cooper wrote:
-> > Ezequiel,
-> > 
-> > On Tue, Jul 30, 2013 at 05:44:50PM +0200, Thomas Petazzoni wrote:
-> > > The AXP WiFi AP board is a Marvell platform based on the Armada XP
-> > > MV78230 SoC. It has two mini-PCIe connectors, one USB 3.0 port powered
-> > > by a USB 3.0 controller on PCIe, two Ethernet ports, 1 GB of RAM, 1 GB
-> > > of NAND, 16 MB of SPI flash, one SATA port and one button, two UARTs
-> > > 
-> > > Successfully tested: USB 3.0 port, the mini-PCIe connectors, SPI
-> > > flash, Ethernet ports, SATA port, button, UART.
-> > > 
-> > > Untested: NAND flash, due to lack of mainline support for the Armada
-> > > 370/XP NAND controller for now.
-> > > 
-> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > ---
-> > >  arch/arm/boot/dts/Makefile                |   1 +
-> > >  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 164 ++++++++++++++++++++++++++++++
-> > >  2 files changed, 165 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> > 
-> > When I merge this code with your MBus series I get the following
-> > warning:
-> > 
-> >   DTC     arch/arm/boot/dts/armada-xp-axpwifiap.dtb
-> > Warning (ranges_format): "ranges" property in /soc has invalid length (32 bytes)
-> >  (parent #address-cells == 2, child #address-cells == 2, #size-cells == 1)
-> > 
-> > Could you please take a look and provide a separate patch to fix it up?
-> > 
+On 08/07/2013 12:41 PM, Kumar Gala wrote:
 > 
-> Jason,
+> On Aug 7, 2013, at 11:59 AM, Suman Anna wrote:
 > 
-> When I cherry-pick commit 704cc70179481c814d581597a7d2cdbbeb152bee
-> (ARM: mvebu: add support for the AXP WiFi AP board) from mvebu/dt
-> into mvebu/mbus_dt, I found it's needed to apply the changes below.
+>> Kumar,
+>>
+>>>> Logic has been added to the OMAP2+ mailbox code to
+>>>> parse the mailbox dt nodes and construct the different
+>>>> mailboxes associated with the instance. The design is
+>>>> based on gathering the same information that was being
+>>>> passed previously through the platform data, except for
+>>>> the interrupt type configuration information.
+>>>>
+>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>>> ---
+>>>> .../devicetree/bindings/mailbox/omap-mailbox.txt   |  43 +++++++
+>>>> drivers/mailbox/mailbox-omap2.c                    | 130 ++++++++++++++++++---
+>>>> 2 files changed, 158 insertions(+), 15 deletions(-)
+>>>> create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+>>>> new file mode 100644
+>>>> index 0000000..8ffb08a
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+>>>> @@ -0,0 +1,43 @@
+>>>> +OMAP2+ Mailbox Driver
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible:		Should be one of the following,
+>>>> +			    "ti,omap2-mailbox" for
+>>>> +				OMAP2420, OMAP2430, OMAP3430, OMAP3630 SoCs
+>>>> +			    "ti,omap4-mailbox" for
+>>>> +				OMAP44xx, OMAP54xx, AM33xx, AM43xx, DRA7xx SoCs
+>>>> +- reg:			Contains the mailbox register address range (base address
+>>>> +			and length)
+>>>> +- interrupts: 		Contains the interrupt information for the mailbox
+>>>> +			device. The format is dependent on which interrupt
+>>>> +			controller the OMAP device uses
+>>>> +- ti,hwmods:		Name of the hwmod associated with the mailbox
+>>>> +- ti,mbox-num-users:	Number of targets (processor devices) that the mailbox device
+>>>> +			can interrupt
+>>>> +- ti,mbox-num-fifos:	Number of h/w fifos within the mailbox device
+>>>
+>>> Isn't "ti,mbox-num-users", "ti,mbox-num-fifos" this SoC specific, why do we need to encode in the device tree.  Can we not have a more SoC specific compatiable and encode such info in the driver as part of the .data field in of_device_id ?
+>>
+>> They are IP design parameters for the number of h/w fifos and interrupts
+>> coming out of the IP block, with the functionality identical. This
+>> information could not be read from any registers. Until OMAP5, we always
+>> had a single IP in the SoC and so these could been encoded in the
+>> driver. But in DRA7xx, a new SoC, we have 13 mailboxes which have
+>> differing number of these properties even though the functional IP block
+>> is same.
 > 
-> If they look fine feel free to pick them, or request any other
-> base for them.
+> Ah, I see.  Since you've got examples of the same IP with different design params in a given SoC than this makes sense.
 > 
-> I don't have the board to test this, so maybe Seif can help
-> testing them?
-> 
-> Thanks!
-> 
-> commit ad1821bf7fa0790f2d513f5551abcd13cf297303
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Tue Aug 6 14:02:45 2013 -0300
-> 
->     ARM: mvebu: Fix AXP-WiFi-AP DT for MBUS DT binding
->     
->     The ranges property needs to be changed to use the new MBus DT binding.
->     Also, the pcie-controller node needs to be relocated as according the MBus
->     DT binding, it's now a child of the mbus-compatible node.
-> 
->     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Is that true of ti,mbox-num-users?
 
-Applied to mvebu/mbus_dt along with the original patch introducing the
-board.  Also added a patch to use the dts pre-processor for mv78230.
+Yes, it is true of both "ti,mbox-num-users" and "ti,mbox-num-fifos".
 
-thx,
-
-Jason.
+regards
+Suman
 
 > 
-> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> index 2a542bd..c5fe572 100644
-> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> @@ -16,7 +16,7 @@
->   */
->  
->  /dts-v1/;
-> -/include/ "armada-xp-mv78230.dtsi"
-> +#include "armada-xp-mv78230.dtsi"
->  
->  / {
->  	model = "Marvell RD-AXPWiFiAP";
-> @@ -32,8 +32,30 @@
->  	};
->  
->  	soc {
-> -		ranges = <0          0 0xf1000000 0x100000  /* Internal registers 1MiB */
-> -			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-> +			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			/* First mini-PCIe port */
-> +			pcie at 1,0 {
-> +				/* Port 0, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			/* Second mini-PCIe port */
-> +			pcie at 2,0 {
-> +				/* Port 0, Lane 1 */
-> +				status = "okay";
-> +			};
-> +
-> +			/* Renesas uPD720202 USB 3.0 controller */
-> +			pcie at 3,0 {
-> +				/* Port 0, Lane 3 */
-> +				status = "okay";
-> +			};
-> +		};
->  
->  		internal-regs {
->  			pinctrl {
-> @@ -123,28 +145,6 @@
->  					spi-max-frequency = <108000000>;
->  				};
->  			};
-> -
-> -			pcie-controller {
-> -				status = "okay";
-> -
-> -				/* First mini-PCIe port */
-> -				pcie at 1,0 {
-> -					/* Port 0, Lane 0 */
-> -					status = "okay";
-> -				};
-> -
-> -				/* Second mini-PCIe port */
-> -				pcie at 2,0 {
-> -					/* Port 0, Lane 1 */
-> -					status = "okay";
-> -				};
-> -
-> -				/* Renesas uPD720202 USB 3.0 controller */
-> -				pcie at 3,0 {
-> -					/* Port 0, Lane 3 */
-> -					status = "okay";
-> -				};
-> -			};
->  		};
->  	};
->  
+>>>> +- ti,mbox-names:	Array of the names of the mailboxes
+>>>> +- ti,mbox-data:		Mailbox descriptor data private to each mailbox. The 4
+>>>> +			cells represent the following data,
+>>>> +			  Cell #1 (tx_id) - mailbox fifo id used for
+>>>> +						transmitting messages
+>>>> +			  Cell #2 (rx_id) - mailbox fifo id on which messages
+>>>> +						are received
+>>>> +			  Cell #3 (irq_id) - irq identifier index number to use
+>>>> +						from the interrupts data
+>>>> +			  Cell #4 (usr_id) - mailbox user id for identifying the
+>>>> +						interrupt into the MPU interrupt
+>>>> +						controller.
+>>>> +
+>>>
+>>> ti,mbox-data really seems like it should be encoded in the driver and not in the device tree.  Is it specific to the SoC?
+>>
+>> The mbox-data represents the assignment of h/w fifos between a pair of
+>> processors on an SoC, so it is specific to a mailbox IP instance in an
+>> SoC. Also, this assignment makes it flexible for anyone wishing to use
+>> their own firmware/stack on the remote processor side if using different
+>> h/w fifo combination.
+>>
+>> So, a single SoC-specific compatible string would not be enough to
+>> identify either of the above data in the driver.
 > 
-> commit ae6c4bd3c2d337797ed1b8949b693d33c36ecbac
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Tue Aug 6 14:02:11 2013 -0300
+> ok
 > 
->     ARM: mvebu: Fix missing DT preprocessor include
->     
->     Fix the armada-xp-mv78230.dtsi file which lacked a proper #include
->     to use the DT preprocessor.
+> - k
 > 
->     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>
+>> regards
+>> Suman
+>>
+>>>
+>>>> +Example:
+>>>> +
+>>>> +/* OMAP4 */
+>>>> +mailbox: mailbox at 4a0f4000 {
+>>>> +	compatible = "ti,omap4-mailbox";
+>>>> +	reg = <0x4a0f4000 0x200>;
+>>>> +	interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+>>>> +	ti,hwmods = "mailbox";
+>>>> +	ti,mbox-num-users = <3>;
+>>>> +	ti,mbox-num-fifos = <8>;
+>>>> +	ti,mbox-names = "mbox-ipu", "mbox-dsp";
+>>>> +	ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
+>>>> +};
+>>>
+>>> [snip]
+>>>
+>>> - k
+>>>
+>>> --
+>>> Employee of Qualcomm Innovation Center, Inc.
+>>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>>>
+>>
 > 
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> index f093e39..e45e363 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> @@ -13,7 +13,7 @@
->   * common to all Armada XP SoCs.
->   */
->  
-> -/include/ "armada-xp.dtsi"
-> +#include "armada-xp.dtsi"
->  
->  / {
->  	model = "Marvell Armada XP MV78230 SoC";
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
 > 
-> -- 
-> Ezequiel Garc?a, Free Electrons
-> Embedded Linux, Kernel and Android Engineering
-> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
