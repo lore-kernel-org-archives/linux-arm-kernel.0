@@ -1,49 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:38:41 +0900
-Subject: [GIT PULL 24/26] ARM: shmobile: armadillo800eva: remove nfsroot
- settings from bootargs
-In-Reply-To: <cover.1375840527.git.horms+renesas@verge.net.au>
-References: <cover.1375840527.git.horms+renesas@verge.net.au>
-Message-ID: <3d814499ad80d7876d6d484e4d37fae79cb403c6.1375840527.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:39:35 +0900
+Subject: [GIT PULL 9/9] ARM: shmobile: Per-CPU SMP boot / sleep code for SCU
+ SoCs
+In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
+References: <cover.1375841380.git.horms+renesas@verge.net.au>
+Message-ID: <1d33a354bbb618ba578bb372ebc18fe58457f6f3.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-NFS detail settings like "nfsroot=,rsize=4096,wsize=4096" are no longer needed
+Hook in the per-CPU boot and sleep code in the shared
+mach-shmobile SCU code. CPUs may be kept in the asm
+routine until ->boot_secondary() when the per-CPU
+boot vector is installed. At the end of ->die() the
+asm sleep routine is invoked.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts           | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/platsmp-scu.c | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 09ea22c..43abf3a 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -16,7 +16,7 @@
- 	compatible = "renesas,armadillo800eva-reference", "renesas,r8a7740";
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index 7a0c066..c96f501 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -18,8 +18,9 @@
  
- 	chosen {
--		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
-+		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
- 	};
+ void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
+ {
+-	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
+-	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
++	/* install boot code shared by all CPUs */
++	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
++	shmobile_boot_arg = MPIDR_HWID_BITMASK;
  
- 	memory {
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index 93da655..426cd9c 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -16,7 +16,7 @@
- 	compatible = "renesas,armadillo800eva";
+ 	/* enable SCU and cache coherency on booting CPU */
+ 	scu_enable(shmobile_scu_base);
+@@ -28,22 +29,26 @@ void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
  
- 	chosen {
--		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
-+		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
- 	};
+ int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	/* do nothing for now */
++	/* For this particular CPU register SCU boot vector */
++	shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
++			  (unsigned long)shmobile_scu_base);
+ 	return 0;
+ }
  
- 	memory {
+ #ifdef CONFIG_HOTPLUG_CPU
+ void shmobile_smp_scu_cpu_die(unsigned int cpu)
+ {
++	/* For this particular CPU deregister boot vector */
++	shmobile_smp_hook(cpu, 0, 0);
++
+ 	dsb();
+ 	flush_cache_all();
+ 
+ 	/* disable cache coherency */
+ 	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
+ 
+-	/* Endless loop until reset */
+-	while (1)
+-		cpu_do_idle();
++	/* jump to shared mach-shmobile sleep / reset code */
++	shmobile_smp_sleep();
+ }
+ 
+ static int shmobile_smp_scu_psr_core_disabled(int cpu)
 -- 
 1.8.3.2
