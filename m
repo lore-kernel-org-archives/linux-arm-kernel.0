@@ -1,38 +1,60 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 7 Aug 2013 15:14:16 -0700
-Subject: [GIT PULL] msm cleanups for v3.12
-In-Reply-To: <20130807215259.GA22852@codeaurora.org>
-References: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
- <20130807215259.GA22852@codeaurora.org>
-Message-ID: <20130807221416.GA23229@codeaurora.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 08 Aug 2013 07:13:49 +0900
+Subject: [PATCH 03/05] ARM: shmobile: Remove unused shmobile_smp_init_cpus()
+In-Reply-To: <20130807221321.22251.22774.sendpatchset@w520>
+References: <20130807221321.22251.22774.sendpatchset@w520>
+Message-ID: <20130807221349.22251.44228.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 02:52:59PM -0700, David Brown wrote:
->On Wed, Aug 07, 2013 at 01:58:16PM -0700, David Brown wrote:
->>The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
->>
->>  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
->>
->>are available in the git repository at:
->>
->>  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git for-3.12/msm-cleanup2
->>
->>for you to fetch changes up to b80a0dc53df68c6862b8985ecc12856edb080248:
->>
->>  ARM: msm: fix compilation error in gpiomux (2013-08-07 10:39:31 -0700)
->
->Sigh, it looks like this fixes code that was removed in last-week's
->fix patches.  I can either regenerate the pull request, or feel free
->to "resolve" this by just using the removal of the code.
+From: Magnus Damm <damm@opensource.se>
 
-Sorry, this patch doesn't actually conflict with the fixes, but is
-incorrect in light of them.  I will resend the pull request without
-this patch.
+Remove shmobile_smp_init_cpus() since all SMP platforms in
+mach-shmobile now rely on DT for CPU core description instead
+of for instance determining number of cores from the SCU.
 
-David
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+ arch/arm/mach-shmobile/include/mach/common.h |    1 -
+ arch/arm/mach-shmobile/platsmp.c             |   15 ---------------
+ 2 files changed, 16 deletions(-)
+
+--- 0003/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-08-07 13:42:20.000000000 +0900
+@@ -40,7 +40,6 @@ static inline int shmobile_cpuidle_init(
+ #endif
+ 
+ extern void __iomem *shmobile_scu_base;
+-extern void shmobile_smp_init_cpus(unsigned int ncores);
+ 
+ static inline void __init shmobile_init_late(void)
+ {
+--- 0003/arch/arm/mach-shmobile/platsmp.c
++++ work/arch/arm/mach-shmobile/platsmp.c	2013-08-07 14:29:34.000000000 +0900
+@@ -11,25 +11,10 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/init.h>
+-#include <linux/smp.h>
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <mach/common.h>
+ 
+-void __init shmobile_smp_init_cpus(unsigned int ncores)
+-{
+-	unsigned int i;
+-
+-	if (ncores > nr_cpu_ids) {
+-		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+-			ncores, nr_cpu_ids);
+-		ncores = nr_cpu_ids;
+-	}
+-
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-}
+-
+ extern unsigned long shmobile_smp_fn[];
+ extern unsigned long shmobile_smp_arg[];
+ extern unsigned long shmobile_smp_mpidr[];
