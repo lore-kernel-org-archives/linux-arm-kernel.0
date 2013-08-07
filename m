@@ -1,44 +1,33 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 8 Aug 2013 04:34:04 +0900
-Subject: [PATCH 3.10-stable] at91sam9x5 rtc causes damage
-In-Reply-To: <52029EF7.3040105@interlog.com>
-References: <52027AB3.1040806@interlog.com> <20130807190801.GB2525@kroah.com>
- <52029EF7.3040105@interlog.com>
-Message-ID: <20130807193404.GA3248@kroah.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 7 Aug 2013 12:35:42 -0700
+Subject: [PATCH v6 13/20] pwm: Add new pwm-samsung driver
+In-Reply-To: <1374623475.SoL01ZHzWk@flatron>
+References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
+ <1374278673-25615-15-git-send-email-tomasz.figa@gmail.com>
+ <1478465.17AL5GbAI8@flatron> <1374623475.SoL01ZHzWk@flatron>
+Message-ID: <CAL1qeaF1Mxs_Q6QnLznW3SoXBoNhBb+gCYMESMgx6g+bUFVCmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 03:24:39PM -0400, Douglas Gilbert wrote:
-> On 13-08-07 03:08 PM, Greg KH wrote:
-> >On Wed, Aug 07, 2013 at 12:49:55PM -0400, Douglas Gilbert wrote:
-> >>This one probably needs more sign-offs but some folks seem to be
-> >>away. It is pretty simple and fixed in the current lk 3.11.0-rc
-> >>series. So it just impacts the lk 3.10 series including lk 3.10.5 .
-> >>
-> >>ChangeLog:
-> >>   - without this patch members of the at91sam9x5 family (e.g.
-> >>     at91sam9g25) that use the RTC will receive an unhandled
-> >>     interrupt whenever they try to write to the RTC. In the
-> >>     case of 9x5 SoCs that is the SYS interrupt shared with
-> >>     several other things such as the debug port. Thereafter
-> >>     the debug port becomes useless (for input), the RTC doesn't
-> >>     work ...
-> >>
-> >>Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
-> >
-> ><formletter>
-> >
-> >This is not the correct way to submit patches for inclusion in the
-> >stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
-> >for how to do this properly.
-> >
-> ></formletter>
-> 
-> Fine. I'll leave it.
+Hi Tomasz,
 
-Leave what?  Did you read the above file that shows how to get a patch
-into the stable tree?  Follow that and all should be fine.
+> +#ifndef CONFIG_CLKSRC_SAMSUNG_PWM
+> +/*
+> + * PWM block is shared between pwm-samsung and samsung_pwm_timer drivers
+> + * and some registers need access synchronization. If both drivers are
+> + * compiled in, the spinlock is defined in the clocksource driver,
+> + * otherwise following definition is used.
+> + *
+> + * Currently we do not need any more complex synchronization method
+> + * because all the supported SoCs contain only one instance of the PWM
+> + * IP. Should this change, both drivers will need to be modified to
+> + * properly synchronize accesses to particular instances.
+> + */
+> +static DEFINE_SPINLOCK(samsung_pwm_lock);
 
-thanks,
+Shouldn't this not be static?  It's declared in
+clocksource/samsung_pwm.h whether or not the samsung_pwm_timer is
+compiled in or not.
 
-greg k-h
+Thanks,
+Andrew
