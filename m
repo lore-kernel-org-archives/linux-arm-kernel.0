@@ -1,44 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:30:17 +0900
-Subject: [GIT PULL 0/3] Second round of Renesas ARM-based SoC board updates
- for v3.12
-Message-ID: <cover.1375839719.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:30:23 +0900
+Subject: [GIT PULL 1/3] ARM: shmobile: ape6evm: support GPIO switches
+In-Reply-To: <cover.1375839719.git.horms+renesas@verge.net.au>
+References: <cover.1375839719.git.horms+renesas@verge.net.au>
+Message-ID: <5c6db1a421c6ceef199a956c7e0c1244ea6dfef7.1375839719.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+The ape6evm board has switches S16 - S23 wired up to GPIO pins.
+This patch allows access to those pins as gpio-keys.
 
-please consider this second round of Renesas ARM-based SoC board updates
-for v3.12.
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-ape6evm.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-This pull-request is based on renesas-boards-for-v3.12, which I have
-previously sent a pull-request for.
-
-
-The following changes since commit f79d68da510bf1b95beff4d556b78d06801f11dc:
-
-  ARM: shmobile: ape6evm: add SDHI interfaces (2013-07-25 14:46:38 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.12
-
-for you to fetch changes up to 4901e136aa5c35873701156c4c0af5b3c2c8faee:
-
-  ARM: shmobile: lager: enable Ether (2013-08-06 18:18:53 +0900)
-
-----------------------------------------------------------------
-Second round of Renesas ARM-based SoC board updates for v3.12
-
-* Enable ether on lager board
-* Enable GPIO LEDs and switches on ape6evm board
-
-----------------------------------------------------------------
-Simon Horman (3):
-      ARM: shmobile: ape6evm: support GPIO switches
-      ARM: shmobile: ape6evm: Add GPIO LEDs
-      ARM: shmobile: lager: enable Ether
-
- arch/arm/mach-shmobile/board-ape6evm.c | 60 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-lager.c   | 29 ++++++++++++++++
- 2 files changed, 89 insertions(+)
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index ccf8b04..677752c 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -19,6 +19,8 @@
+  */
+ 
+ #include <linux/gpio.h>
++#include <linux/gpio_keys.h>
++#include <linux/input.h>
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/mfd/tmio.h>
+@@ -37,6 +39,24 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++/* GPIO KEY */
++#define GPIO_KEY(c, g, d, ...) \
++	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
++
++static struct gpio_keys_button gpio_buttons[] = {
++	GPIO_KEY(KEY_0,			324,	"S16"),
++	GPIO_KEY(KEY_MENU,		325,	"S17"),
++	GPIO_KEY(KEY_HOME,		326,	"S18"),
++	GPIO_KEY(KEY_BACK,		327,	"S19"),
++	GPIO_KEY(KEY_VOLUMEUP,		328,	"S20"),
++	GPIO_KEY(KEY_VOLUMEDOWN,	329,	"S21"),
++};
++
++static struct __initdata gpio_keys_platform_data ape6evm_keys_pdata = {
++	.buttons	= gpio_buttons,
++	.nbuttons	= ARRAY_SIZE(gpio_buttons),
++};
++
+ /* Dummy supplies, where voltage doesn't matter */
+ static struct regulator_consumer_supply dummy_supplies[] = {
+ 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
+@@ -172,6 +192,9 @@ static void __init ape6evm_add_standard_devices(void)
+ 	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 1,
+ 					  sdhi1_resources, ARRAY_SIZE(sdhi1_resources),
+ 					  &sdhi1_pdata, sizeof(sdhi1_pdata));
++	platform_device_register_data(&platform_bus, "gpio-keys", -1,
++				      &ape6evm_keys_pdata,
++				      sizeof(ape6evm_keys_pdata));
+ }
+ 
+ static const char *ape6evm_boards_compat_dt[] __initdata = {
+-- 
+1.8.3.2
