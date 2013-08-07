@@ -1,38 +1,29 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Wed, 7 Aug 2013 11:59:41 -0700
-Subject: [PATCH] ARM: mmc: fix NONREMOVABLE test in sdhci-bcm-kona
-Message-ID: <1375901981-1495-1-git-send-email-csd@broadcom.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 7 Aug 2013 21:03:36 +0200
+Subject: [PATCH 1/7] gpio: mxc: Support initialization as subdevice
+In-Reply-To: <1375439907-10462-2-git-send-email-mpa@pengutronix.de>
+References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
+ <1375439907-10462-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <CACRpkda+oLASgNkCWD5n9f6a2ECvvb95wJoEvqXF3ebeQu9Spw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sdhci-bcm-kona driver is incorrectly doing "|" to bit-test
-NONREMOVABLE. Switch to "&"
+On Fri, Aug 2, 2013 at 12:38 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Signed-off-by: Christian Daudt <csd@broadcom.com>
+> On imx27 and imx21, there is no clear seperation between iomux control
+> registers and GPIO data registers. For easier pingroup definitions, the
+> gpio drivers will be initialized as subnodes of the iomux controller. It
+> is necessary to share the registers between iomux and gpio.
+>
+> This patch adds support to pass a register memory region via platform
+> data.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
-index 87175f9..9ffac0b 100644
---- a/drivers/mmc/host/sdhci-bcm-kona.c
-+++ b/drivers/mmc/host/sdhci-bcm-kona.c
-@@ -263,7 +263,7 @@ static int __init sdhci_bcm_kona_probe(struct platform_device *pdev)
- 		(mmc_gpio_get_cd(host->mmc) != -ENOSYS) ? 'Y' : 'N',
- 		(mmc_gpio_get_ro(host->mmc) != -ENOSYS) ? 'Y' : 'N');
- 
--	if (host->mmc->caps | MMC_CAP_NONREMOVABLE)
-+	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
- 		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
- 
- 	dev_dbg(dev, "is_8bit=%c\n",
-@@ -282,7 +282,7 @@ static int __init sdhci_bcm_kona_probe(struct platform_device *pdev)
- 	}
- 
- 	/* if device is eMMC, emulate card insert right here */
--	if (host->mmc->caps | MMC_CAP_NONREMOVABLE) {
-+	if (host->mmc->caps & MMC_CAP_NONREMOVABLE) {
- 		ret = sdhci_bcm_kona_sd_card_emulate(host, 1);
- 		if (ret) {
- 			dev_err(dev,
--- 
-1.7.10.4
+I think you have misunderstood that it is perfectly legal for
+several drivers to remap the same memory range. I think
+you should just drop this quirk and happily remap the memory
+in both drivers.
+
+Yours,
+Linus Walleij
