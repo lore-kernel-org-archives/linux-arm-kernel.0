@@ -1,41 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Aug 2013 02:45:36 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <51FF8E84.7000108@arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <51FF8E84.7000108@arm.com>
-Message-ID: <20130807014536.GF15579@mudshark.cambridge.arm.com>
+Date: Wed, 7 Aug 2013 02:49:46 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130802223247.GC28831@kroah.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802115334.GN2465@mudshark.cambridge.arm.com>
+ <20130802142010.GC7533@kroah.com>
+ <20130802160932.GG5292@mudshark.cambridge.arm.com>
+ <20130802223247.GC28831@kroah.com>
+Message-ID: <20130807014945.GG15579@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 12:37:40PM +0100, Punit Agrawal wrote:
-> On 23/07/13 10:19, Punit Agrawal wrote:
-> > The CCI PMU can profile bus transactions at the master and slave
-> > interfaces of the CCI. The PMU can be used to observe an aggregated view
-> > of the bus traffic between the various components connected to the CCI.
-> >
-> > Extend the existing CCI driver to support the PMU by registering a perf
-> > backend for it.
-> >
-> > Document the device tree binding to describe the CCI PMU.
-> >
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Nicolas Pitre <nico@linaro.org>
-> > Cc: Dave Martin <dave.martin@linaro.org>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> > Reviewed-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >   Documentation/devicetree/bindings/arm/cci.txt |   38 ++
-> >   drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
-> >   2 files changed, 680 insertions(+)
-> >
+On Fri, Aug 02, 2013 at 11:32:47PM +0100, Greg KH wrote:
+> On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
+> > I would anticipate most of these drivers going through the arm-soc tree, so
+> > Olof and Kevin would be doing the yelling. You could join in the chorus too!
+> > 
+> > We basically need reviewers to adopt the position that a new bus should be
+> > considered and dismissed before using the platform_bus, then you can yell
+> > transitively through them.
 > 
-> It's been 2 rc's since this patch was posted. If there are no objections 
-> would you be ok to take this patch via your tree?
+> I don't scale if I'm forced to review every driver to ensure that they
+> shouldn't be using platform device and should be creating their own bus
+> type.  You can do that, along with the other ARM developers reviewing
+> these new subsystems and code being added.
 
-Sure. I'm currently travelling at the moment, so I'll try and get this done
-as soon as I'm back.
+Of course, I wasn't suggesting that you have to take the frontline for this
+(quite the opposite in fact). Once the usual ARM reviewers know which line
+to tow, it will start to be enforced by the ARM subtrees automatically.
+
+Cheers,
 
 Will
