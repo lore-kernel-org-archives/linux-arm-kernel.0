@@ -1,67 +1,64 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:38:43 +0900
-Subject: [GIT PULL 26/26] ARM: shmobile: sh73a0: Remove global GPIO_NR
- definition
-In-Reply-To: <cover.1375840527.git.horms+renesas@verge.net.au>
-References: <cover.1375840527.git.horms+renesas@verge.net.au>
-Message-ID: <282b583f752f996ee5c33b0cdc18adf3b5094ee0.1375840527.git.horms+renesas@verge.net.au>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed,  7 Aug 2013 10:18:37 +0530
+Subject: [PATCH 1/4] clk: exynos4: Fix incorrect placement of __initdata
+Message-ID: <1375850921-23122-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+__initdata should be placed between the variable name and equal
+sign for the variable to be placed in the intended section.
 
-The total number of SoC GPIOs is only used to compute the base GPIO
-number of th PCF8575 GPIO extender on the KZM9G board. As GPIO
-allocation became fully dynamic with DT, no other SH73A0 board will use
-the GPIO_NR macro. Move it to the KZM9G board file.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- arch/arm/mach-shmobile/board-kzm9g.c         | 16 ++++++++--------
- arch/arm/mach-shmobile/include/mach/sh73a0.h |  2 --
- 2 files changed, 8 insertions(+), 10 deletions(-)
+ drivers/clk/samsung/clk-exynos4.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index 1068120..f199496 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -54,14 +54,14 @@
- /*
-  * external GPIO
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index fec319d..742b4c5 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -194,7 +194,7 @@ enum exynos4_clks {
+  * list of controller registers to be saved and restored during a
+  * suspend/resume cycle.
   */
--#define GPIO_PCF8575_BASE	(GPIO_NR)
--#define GPIO_PCF8575_PORT10	(GPIO_NR + 8)
--#define GPIO_PCF8575_PORT11	(GPIO_NR + 9)
--#define GPIO_PCF8575_PORT12	(GPIO_NR + 10)
--#define GPIO_PCF8575_PORT13	(GPIO_NR + 11)
--#define GPIO_PCF8575_PORT14	(GPIO_NR + 12)
--#define GPIO_PCF8575_PORT15	(GPIO_NR + 13)
--#define GPIO_PCF8575_PORT16	(GPIO_NR + 14)
-+#define GPIO_PCF8575_BASE	(310)
-+#define GPIO_PCF8575_PORT10	(GPIO_PCF8575_BASE + 8)
-+#define GPIO_PCF8575_PORT11	(GPIO_PCF8575_BASE + 9)
-+#define GPIO_PCF8575_PORT12	(GPIO_PCF8575_BASE + 10)
-+#define GPIO_PCF8575_PORT13	(GPIO_PCF8575_BASE + 11)
-+#define GPIO_PCF8575_PORT14	(GPIO_PCF8575_BASE + 12)
-+#define GPIO_PCF8575_PORT15	(GPIO_PCF8575_BASE + 13)
-+#define GPIO_PCF8575_PORT16	(GPIO_PCF8575_BASE + 14)
+-static __initdata unsigned long exynos4210_clk_save[] = {
++static unsigned long exynos4210_clk_save[] __initdata = {
+ 	E4210_SRC_IMAGE,
+ 	E4210_SRC_LCD1,
+ 	E4210_SRC_MASK_LCD1,
+@@ -205,7 +205,7 @@ static __initdata unsigned long exynos4210_clk_save[] = {
+ 	E4210_MPLL_CON0,
+ };
  
- /* Dummy supplies, where voltage doesn't matter */
- static struct regulator_consumer_supply dummy_supplies[] = {
-diff --git a/arch/arm/mach-shmobile/include/mach/sh73a0.h b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-index 680dc5f..359b582 100644
---- a/arch/arm/mach-shmobile/include/mach/sh73a0.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-@@ -1,8 +1,6 @@
- #ifndef __ASM_SH73A0_H__
- #define __ASM_SH73A0_H__
+-static __initdata unsigned long exynos4x12_clk_save[] = {
++static unsigned long exynos4x12_clk_save[] __initdata = {
+ 	E4X12_GATE_IP_IMAGE,
+ 	E4X12_GATE_IP_PERIR,
+ 	E4X12_SRC_CAM1,
+@@ -214,7 +214,7 @@ static __initdata unsigned long exynos4x12_clk_save[] = {
+ 	E4X12_MPLL_CON0,
+ };
  
--#define GPIO_NR			310
--
- /* DMA slave IDs */
- enum {
- 	SHDMA_SLAVE_INVALID,
+-static __initdata unsigned long exynos4_clk_regs[] = {
++static unsigned long exynos4_clk_regs[] __initdata = {
+ 	SRC_LEFTBUS,
+ 	DIV_LEFTBUS,
+ 	GATE_IP_LEFTBUS,
+@@ -978,13 +978,13 @@ static void __init exynos4_clk_register_finpll(unsigned long xom)
+ 
+ }
+ 
+-static __initdata struct of_device_id ext_clk_match[] = {
++static struct of_device_id ext_clk_match[] __initdata = {
+ 	{ .compatible = "samsung,clock-xxti", .data = (void *)0, },
+ 	{ .compatible = "samsung,clock-xusbxti", .data = (void *)1, },
+ 	{},
+ };
+ 
+-static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
++static struct samsung_pll_clock exynos4_plls[nr_plls] __initdata = {
+ 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+ 		APLL_CON0, "fout_apll", NULL),
+ 	[mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll",
 -- 
-1.8.3.2
+1.7.9.5
