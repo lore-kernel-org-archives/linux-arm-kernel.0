@@ -1,36 +1,89 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 08 Aug 2013 06:50:20 +1000
-Subject: [PATCHv7 07/13] irqdomain: add function to find a MSI irq_domain
-In-Reply-To: <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1375908620.9300.3.camel@pasglop>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed,  7 Aug 2013 13:58:16 -0700
+Subject: [GIT PULL] msm cleanups for v3.12
+Message-ID: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-08-07 at 11:32 +0200, Thomas Petazzoni wrote:
-> Now that an irq_domain can be associated to a msi_chip structure, a
-> given PCIe driver will want to find this irq_domain, based on the
-> Device Tree node of the interrupt controller, as pointed by the
-> 'msi-controller' DT property.
+The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
 
-I still don't quite understand why you have to do all that.
+  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
 
-> However, since on those platforms a single piece of hardware,
-> represented by a single DT node can provide both a "normal" IRQ domain
-> and a MSI-type IRQ domain, we need separate lookup functions to
-> distinguish them.
+are available in the git repository at:
 
-At least on power we have cases where an mpic does both MSIs and LSIs,
-we have the XICS that happily mixes both in a single large domain,
-etc... and never needed any of that.
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git for-3.12/msm-cleanup2
 
-I don't quite understand what problem that stuff is trying to solve
-really. Are you trying to avoid having an added MSI bitmap allocator for
-the MSI side of the PIC and use the irq domain stuff both as your virq
-and your hwirq allocator ?
+for you to fetch changes up to b80a0dc53df68c6862b8985ecc12856edb080248:
 
-> This patch makes irq_find_host() find only non-MSI-type IRQ domains,
-> and introduces irq_find_msi_host() to find only MSI-type IRQ
-> domains. It does so by factorizing the irq_find_host() logic into
-> __irq_find_host().
+  ARM: msm: fix compilation error in gpiomux (2013-08-07 10:39:31 -0700)
+
+----------------------------------------------------------------
+General cleanups for MSM for 3.12
+
+This is a series of cleanups to the MSM code.  These are a healthy
+start to bringing the MSM code closer to the state of current ARM code
+and getting more of it ready for conversion to devicetree.
+
+----------------------------------------------------------------
+
+This is missing an Ack for the "Move debug-macro.S to include/debug".
+Stephen incorporated feedback from RMK, which I folded into the patch.
+
+There are conflicts in arch/arm/Kconfig.debug which are resolved in
+the linux-next tree.
+
+Krzysztof Kozlowski (1):
+      ARM: msm: fix compilation error in gpiomux
+
+Rohit Vaswani (1):
+      ARM: msm: Remove unused and unmapped MSM_TLMM_BASE for 8x60
+
+Stephen Boyd (8):
+      ARM: msm: Don't compile __msm_ioremap_caller() unless used
+      ARM: msm: Move debug-macro.S to include/debug
+      ARM: msm: Remove TMR and TMR0 static mappings
+      ARM: msm: Migrate msm_timer to CLOCKSOURCE_OF_DECLARE
+      ARM: msm: Move mach/board.h contents to common.h
+      ARM: msm: Remove devices-iommu.c
+      iommu/msm: Move mach includes to iommu directory
+      ARM: msm: Only compile io.c on platforms that use it
+
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/Kconfig.debug                             |   9 +-
+ .../mach/debug-macro.S => include/debug/msm.S}     |  32 +-
+ arch/arm/mach-msm/Makefile                         |   9 +-
+ arch/arm/mach-msm/board-dt-8660.c                  |   4 +-
+ arch/arm/mach-msm/board-dt-8960.c                  |   3 +-
+ arch/arm/mach-msm/board-halibut.c                  |   1 -
+ arch/arm/mach-msm/board-mahimahi.c                 |   2 +-
+ arch/arm/mach-msm/board-msm7x30.c                  |   1 -
+ arch/arm/mach-msm/board-qsd8x50.c                  |   1 -
+ arch/arm/mach-msm/board-sapphire.c                 |   2 +-
+ arch/arm/mach-msm/board-trout.c                    |   1 -
+ arch/arm/mach-msm/board-trout.h                    |   2 +-
+ arch/arm/mach-msm/common.h                         |  18 +-
+ arch/arm/mach-msm/devices-iommu.c                  | 912 ---------------------
+ arch/arm/mach-msm/devices-msm7x30.c                |   2 +-
+ arch/arm/mach-msm/devices-qsd8x50.c                |   2 +-
+ arch/arm/mach-msm/gpiomux.c                        |   2 +-
+ arch/arm/mach-msm/include/mach/board.h             |  38 -
+ arch/arm/mach-msm/include/mach/msm_iomap-8960.h    |  46 --
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |  53 --
+ arch/arm/mach-msm/include/mach/msm_iomap.h         |  17 -
+ arch/arm/mach-msm/include/mach/uncompress.h        |  63 --
+ arch/arm/mach-msm/io.c                             |  67 +-
+ arch/arm/mach-msm/timer.c                          |  17 +-
+ drivers/iommu/msm_iommu.c                          |   4 +-
+ .../mach/iommu.h => drivers/iommu/msm_iommu.h      |   0
+ drivers/iommu/msm_iommu_dev.c                      |   4 +-
+ .../iommu/msm_iommu_hw-8xxx.h                      |   0
+ drivers/video/msm/msm_fb.c                         |   1 -
+ 30 files changed, 94 insertions(+), 1220 deletions(-)
+ rename arch/arm/{mach-msm/include/mach/debug-macro.S => include/debug/msm.S} (61%)
+ delete mode 100644 arch/arm/mach-msm/devices-iommu.c
+ delete mode 100644 arch/arm/mach-msm/include/mach/board.h
+ delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8960.h
+ delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+ delete mode 100644 arch/arm/mach-msm/include/mach/uncompress.h
+ rename arch/arm/mach-msm/include/mach/iommu.h => drivers/iommu/msm_iommu.h (100%)
+ rename arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h => drivers/iommu/msm_iommu_hw-8xxx.h (100%)
