@@ -1,41 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:28:28 +0900
-Subject: [GIT PULL 04/19] ARM: shmobile: Minor update for the Lager DT
- reference code
+Date: Wed,  7 Aug 2013 13:28:31 +0900
+Subject: [GIT PULL 07/19] ARM: shmobile: sh73a0: Rely on DT for SMP CPU info
 In-Reply-To: <cover.1375838900.git.horms+renesas@verge.net.au>
 References: <cover.1375838900.git.horms+renesas@verge.net.au>
-Message-ID: <d144f3623ab37c8cd8365533217e9059d8eb4636.1375838900.git.horms+renesas@verge.net.au>
+Message-ID: <5489cde560f2b13dc9fb34e2d7dfd09a69fa21b1.1375838900.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Update the Lager DT reference code to get rid of the redundant
-irqchip header and also make lager_add_standard_devices() static.
+Remove sh73a0 specific ->smp_init_cpus() callback and
+instead of relying on shmobile_smp_init_cpus() simply
+use DT for CPU core information.
+
+This assumes that DT_MACHINE_START is used which is
+the case when AG5EVM and Kota2 are removed.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager-reference.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-shmobile/smp-sh73a0.c | 11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index eb6c55e..9c316a1 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -19,12 +19,11 @@
-  */
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index d613113..1b3dc7c 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -62,6 +62,8 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
  
- #include <linux/init.h>
--#include <linux/irqchip.h>
- #include <linux/of_platform.h>
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
- 
--void __init lager_add_standard_devices(void)
-+static void __init lager_add_standard_devices(void)
+ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	/* clocks are setup late during boot in the case of DT */
- 	r8a7790_clock_init();
++	/* setup sh73a0 specific SCU base */
++	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
+ 	scu_enable(shmobile_scu_base);
+ 
+ 	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
+@@ -74,14 +76,6 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+ }
+ 
+-static void __init sh73a0_smp_init_cpus(void)
+-{
+-	/* setup sh73a0 specific SCU base */
+-	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
+-
+-	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
+-}
+-
+ #ifdef CONFIG_HOTPLUG_CPU
+ static int sh73a0_cpu_kill(unsigned int cpu)
+ {
+@@ -120,7 +114,6 @@ static int sh73a0_cpu_disable(unsigned int cpu)
+ #endif /* CONFIG_HOTPLUG_CPU */
+ 
+ struct smp_operations sh73a0_smp_ops __initdata = {
+-	.smp_init_cpus		= sh73a0_smp_init_cpus,
+ 	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
+ 	.smp_boot_secondary	= sh73a0_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
 1.8.3.2
