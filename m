@@ -1,90 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:39:33 +0900
-Subject: [GIT PULL 7/9] ARM: shmobile: Use shared SCU CPU Hotplug code on
- r8a7779
+Date: Wed,  7 Aug 2013 13:39:30 +0900
+Subject: [GIT PULL 4/9] ARM: shmobile: Use shared SCU SMP boot code on emev2
 In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
 References: <cover.1375841380.git.horms+renesas@verge.net.au>
-Message-ID: <e9e7c4fbf468e205387b21463dddacfe44da2d9a.1375841380.git.horms+renesas@verge.net.au>
+Message-ID: <0da60225dee270a4a4b86c08509e772e78961b82.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Update the r8a7779 specific CPU Hotplug code to make use of
-the recently introduced shared SCU functions. The r8a7779
-power domain hardware requires special power down handling
-at ->kill() time.
+Use shared SCU code on emev2 for SMP boot.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c | 41 ++++--------------------------------
- 1 file changed, 4 insertions(+), 37 deletions(-)
+ arch/arm/mach-shmobile/Makefile    |  2 +-
+ arch/arm/mach-shmobile/smp-emev2.c | 19 ++++++++++---------
+ 2 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 1963d0d..c159964 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -122,47 +122,14 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- }
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 42bbf45..d7b1c71 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -19,7 +19,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+ smp-y				:= platsmp.o headsmp.o
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+-smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
++smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
  
- #ifdef CONFIG_HOTPLUG_CPU
--static int r8a7779_scu_psr_core_disabled(int cpu)
--{
--	unsigned long mask = 3 << (cpu * 8);
--
--	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
--		return 1;
--
--	return 0;
--}
--
- static int r8a7779_cpu_kill(unsigned int cpu)
+ # IRQ objects
+ obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index 1bf8bc7..d1c101d 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -34,6 +34,12 @@
+ 
+ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
--	int k;
--
--	/* this function is running on another CPU than the offline target,
--	 * here we need wait for shutdown code in platform_cpu_die() to
--	 * finish before asking SoC-specific code to power off the CPU core.
--	 */
--	for (k = 0; k < 1000; k++) {
--		if (r8a7779_scu_psr_core_disabled(cpu))
--			return r8a7779_platform_cpu_kill(cpu);
--
--		mdelay(1);
--	}
-+	if (shmobile_smp_scu_cpu_kill(cpu))
-+		return r8a7779_platform_cpu_kill(cpu);
- 
++	int ret;
++
++	ret = shmobile_smp_scu_boot_secondary(cpu, idle);
++	if (ret)
++		return ret;
++
+ 	arch_send_wakeup_ipi_mask(cpumask_of(cpu_logical_map(cpu)));
  	return 0;
  }
- 
--static void r8a7779_cpu_die(unsigned int cpu)
--{
--	dsb();
--	flush_cache_all();
--
--	/* disable cache coherency */
--	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
--
--	/* Endless loop until power off from r8a7779_cpu_kill() */
--	while (1)
--		cpu_do_idle();
--}
--
- static int r8a7779_cpu_disable(unsigned int cpu)
+@@ -42,21 +48,16 @@ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
-@@ -174,8 +141,8 @@ struct smp_operations r8a7779_smp_ops  __initdata = {
- 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
- 	.smp_boot_secondary	= r8a7779_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
--	.cpu_kill		= r8a7779_cpu_kill,
--	.cpu_die		= r8a7779_cpu_die,
- 	.cpu_disable		= r8a7779_cpu_disable,
-+	.cpu_die		= shmobile_smp_scu_cpu_die,
-+	.cpu_kill		= r8a7779_cpu_kill,
- #endif
- };
+ 	void __iomem *smu;
+ 
+-	/* setup EMEV2 specific SCU base, enable */
+-	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
+-	scu_enable(shmobile_scu_base);
+-
+-	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
++	/* Tell ROM loader about our vector (in headsmp.S) */
+ 	smu = ioremap(EMEV2_SMU_BASE, PAGE_SIZE);
+ 	if (smu) {
+ 		iowrite32(__pa(shmobile_boot_vector), smu + SMU_GENERAL_REG0);
+ 		iounmap(smu);
+ 	}
+-	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
+-	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
+ 
+-	/* enable cache coherency on booting CPU */
+-	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
++	/* setup EMEV2 specific SCU bits */
++	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
++	shmobile_smp_scu_prepare_cpus(max_cpus);
+ }
+ 
+ struct smp_operations emev2_smp_ops __initdata = {
 -- 
 1.8.3.2
