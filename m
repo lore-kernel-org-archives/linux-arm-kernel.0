@@ -1,59 +1,44 @@
 From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 7 Aug 2013 14:08:51 +0100
-Subject: [PATCH 03/17] Add system pointer argument to shared EFI stub
- related functions so they no longer use global system table pointer as they
- did when part of eboot.c.
-In-Reply-To: <1375847113-24884-4-git-send-email-roy.franz@linaro.org>
+Date: Wed, 7 Aug 2013 14:09:06 +0100
+Subject: [PATCH 04/17] Rename memory allocation/free functions
+In-Reply-To: <1375847113-24884-5-git-send-email-roy.franz@linaro.org>
 References: <1375847113-24884-1-git-send-email-roy.franz@linaro.org>
- <1375847113-24884-4-git-send-email-roy.franz@linaro.org>
-Message-ID: <20130807130851.GC2515@console-pimps.org>
+ <1375847113-24884-5-git-send-email-roy.franz@linaro.org>
+Message-ID: <20130807130906.GD2515@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Aug, at 08:44:59PM, Roy Franz wrote:
+On Tue, 06 Aug, at 08:45:00PM, Roy Franz wrote:
+> Rename them to be more similar, as low_free() could be used to free
+> memory allocated by both high_alloc() and low_alloc().
+> high_alloc() -> efi_high_alloc()
+> low_alloc()  -> efi_low_alloc()
+> low_free()   -> efi_free()
+> 
 > Signed-off-by: Roy Franz <roy.franz@linaro.org>
 > ---
->  arch/x86/boot/compressed/eboot.c       |   38 +++++++------
->  drivers/firmware/efi/efi-stub-helper.c |   96 +++++++++++++++++---------------
->  2 files changed, 72 insertions(+), 62 deletions(-)
-
-For future reference you should really use a shorter first line in your
-git commit message, which would produe a shorter subject when mailing
-your patches.
-
-I'll fix up the commit messages when I apply these patches, so don't
-worry about it for now.
+>  arch/x86/boot/compressed/eboot.c       |   19 ++++++++++---------
+>  drivers/firmware/efi/efi-stub-helper.c |   16 ++++++++--------
+>  2 files changed, 18 insertions(+), 17 deletions(-)
 
 [...]
 
-> @@ -19,15 +19,16 @@ struct initrd {
->  
->  
->  
-> -static void efi_char16_printk(efi_char16_t *str)
-> +static void efi_char16_printk(efi_system_table_t *sys_table_arg,
-> +			      efi_char16_t *str)
->  {
->  	struct efi_simple_text_output_protocol *out;
->  
-> -	out = (struct efi_simple_text_output_protocol *)sys_table->con_out;
-> +	out = (struct efi_simple_text_output_protocol *)sys_table_arg->con_out;
->  	efi_call_phys2(out->output_string, out, str);
+> @@ -163,10 +163,10 @@ fail:
 >  }
 >  
-> -static void efi_printk(char *str)
-> +static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
+>  /*
+> - * Allocate at the lowest possible address.
+> + * Allocate at the lowest possible address, that is not below 'min'
+>   */
+> -static efi_status_t low_alloc(efi_system_table_t *sys_table_arg,
+> -		unsigned long size, unsigned long align,
+> +static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+> +			      unsigned long size, unsigned long align,
+>  			      unsigned long *addr)
 >  {
->  	char *s8;
->  
+>  	unsigned long map_size, desc_size;
 
-Hmm... I'm not necessarily convinced this is an improvement over using
-some kind of a global pointer to the EFI System Table.
-
-Parameterizing stuff like this is useful when the argument changes at
-runtime from call to call, but that isn't the case for the boot stubs. I
-don't think there's anything wrong with a global in this scenario, and
-this patch is a fair amount of churn for no real improvement.
+Whoops, did this change to the comment slip in from some other patch?
 
 -- 
 Matt Fleming, Intel Open Source Technology Center
