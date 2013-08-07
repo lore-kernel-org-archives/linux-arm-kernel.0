@@ -1,24 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Aug 2013 15:52:57 +0200
-Subject: [PATCH 05/18] ARM: integrator: Switch to sched_clock_register()
-In-Reply-To: <1375309877-16617-6-git-send-email-sboyd@codeaurora.org>
-References: <1375309877-16617-1-git-send-email-sboyd@codeaurora.org>
- <1375309877-16617-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CACRpkdaCn74S0WbZ+fuN_ZpKAS0eiYyOe9w-pPLbQeFquEogyA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 7 Aug 2013 14:57:25 +0100
+Subject: [PATCH] ARM: ux500: fix devicetree builds
+In-Reply-To: <1375883212-3266-1-git-send-email-linus.walleij@linaro.org>
+References: <1375883212-3266-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130807135725.GD18668@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 12:31 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Wed, 07 Aug 2013, Linus Walleij wrote:
 
-> The 32 bit sched_clock interface now supports 64 bits. Upgrade to
-> the 64 bit function to allow us to remove the 32 bit registration
-> interface.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> From: Linus Walleij <linus.walleij@stericsson.com>
+> 
+> The patch set beginning with commit:
+> "ARM: ux500: Apply a ste-* prefix onto snowball.dts"
+> thru commit:
+> "ARM: ux500: Remove u9540.dts as it's been replaced"
+> altered the names of the ux500 device tree files but forgot
+> to:
+> 
+> - Rename the ccu8540-pinctrl.dtsi file
+> 
+> - Update #include statements from files using these
+>   files, so the build broke.
+> 
+> - Update the Makefile for the device trees so the build
+>   broke.
+> 
+> Fix it up so we can build them all again.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  arch/arm/boot/dts/Makefile                 |  10 +-
+>  arch/arm/boot/dts/ccu8540-pinctrl.dtsi     | 196 -----------------------------
+>  arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi | 196 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/ste-ccu8540.dts          |   4 +-
+>  arch/arm/boot/dts/ste-ccu9540.dts          |   2 +-
+>  arch/arm/boot/dts/ste-href.dtsi            |   2 +-
+>  arch/arm/boot/dts/ste-hrefprev60.dts       |   6 +-
+>  arch/arm/boot/dts/ste-hrefv60plus.dts      |   6 +-
+>  arch/arm/boot/dts/ste-snowball.dts         |   2 +-
+>  9 files changed, 212 insertions(+), 212 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/ccu8540-pinctrl.dtsi
+>  create mode 100644 arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi
 
-For this patch (given the idea is accepted)
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I would have been (and still am) happy to fixup the original patches
+if you think that is a better approach.
 
-Yours,
-Linus Walleij
+If you think this way is better, feel free to add my Acked-by to this
+patch.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
