@@ -1,44 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Aug 2013 22:43:31 +0200
-Subject: [PATCH 2/2] pinctrl: sunxi: Add spinlocks
-In-Reply-To: <CACRpkdarfjs-RVb9VFb1vkiFsnnnv5rgTzbB1ru92B3G5MrxUA@mail.gmail.com>
-References: <1375612728-20501-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375612728-20501-3-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdYS-7MPTTSg4psJ3NZ_jhA15aMeFLoxFNAN7hSqe4hRTA@mail.gmail.com>
- <20130807191640.GG2911@lukather>
- <CACRpkdarfjs-RVb9VFb1vkiFsnnnv5rgTzbB1ru92B3G5MrxUA@mail.gmail.com>
-Message-ID: <20130807204331.GH2911@lukather>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  7 Aug 2013 14:39:12 -0600
+Subject: [PATCH] ARM: tegra: unify Tegra's Kconfig a bit more
+Message-ID: <1375907952-24746-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 09:59:04PM +0200, Linus Walleij wrote:
-> On Wed, Aug 7, 2013 at 9:16 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> >> It is also too big to go into fixes.
-> >>
-> >> I think it may be requiring the other queued Allwinner things,
-> >> so it is better if I apply this on the devel branch after looking over
-> >> that Allwinner A20/A31 stuff?
-> >
-> > The A20/A31 stuff shouldn't conflict with this one, but yes, I you
-> > prefer to do it that way, it's fine for me.
-> 
-> I applied it for fixes anyway. Too much to worry about with the
-> cross dependency between fixes and devel otherwise.
+From: Stephen Warren <swarren@nvidia.com>
 
-Ok, great!
+Move all common select clauses from ARCH_TEGRA_*_SOC to ARCH_TEGRA to
+eliminate duplication. The USB-related selects all should have been
+common too, but were missing from Tegra114 previously. Move these to
+ARCH_TEGRA too. The latter fixes a build break when only Tegra114
+support was enabled, but not Tegra20 or Tegra30 support.
 
-Thanks,
-Maxime
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/Kconfig | 21 ++++++---------------
+ 1 file changed, 6 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 80d3b82..50db6bf 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -2,18 +2,24 @@ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARM_GIC
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
++	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select HAVE_CLK
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select PINCTRL
+ 	select SOC_BUS
+ 	select SPARSE_IRQ
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
++	select USB_ULPI if USB_PHY
++	select USB_ULPI_VIEWPORT if USB_PHY
+ 	select USE_OF
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems.
+@@ -27,15 +33,9 @@ config ARCH_TEGRA_2x_SOC
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_754327 if SMP
+ 	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA20
+ 	select PL310_ERRATA_727915 if CACHE_L2X0
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -44,14 +44,8 @@ config ARCH_TEGRA_3x_SOC
+ 	bool "Enable support for Tegra30 family"
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA30
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
+ 	help
+ 	  Support for NVIDIA Tegra T30 processor family, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -60,10 +54,7 @@ config ARCH_TEGRA_114_SOC
+ 	bool "Enable support for Tegra114 family"
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select ARM_ERRATA_798181
+-	select ARM_GIC
+ 	select ARM_L1_CACHE_SHIFT_6
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA114
+ 	help
+ 	  Support for NVIDIA Tegra T114 processor family, based on the
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/ff242696/attachment.sig>
+1.8.1.5
