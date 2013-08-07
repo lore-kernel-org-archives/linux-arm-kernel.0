@@ -1,61 +1,80 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:38:38 +0900
-Subject: [GIT PULL 21/26] ARM: shmobile: bockw: add missing __initdata
-In-Reply-To: <cover.1375840527.git.horms+renesas@verge.net.au>
-References: <cover.1375840527.git.horms+renesas@verge.net.au>
-Message-ID: <8c23c7caeb5750fcf6d7a0258692071b06fdc772.1375840527.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Aug 2013 13:39:27 +0900
+Subject: [GIT PULL 1/9] ARM: shmobile: Introduce shared SCU SMP boot code
+In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
+References: <cover.1375841380.git.horms+renesas@verge.net.au>
+Message-ID: <c970d4ef3ac6d56f5fd02902ad2ad80377c0bca1.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-This patch adds missing __initdata to driver data/resource
-which are used from platform_device_register_xxx()
+Add SMP boot functions for SCU equipped mach-shmobile SoCs.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+At this point shmobile_smp_scu_prepare_cpus() controls the SCU and
+installs boot fn and arg, while shmobile_smp_scu_boot_secondary()
+currently does nothing. In the future the boot function and arg
+install code will be reworked, so the empty function is ground
+work for that.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/include/mach/common.h |  3 +++
+ arch/arm/mach-shmobile/platsmp-scu.c         | 31 ++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/platsmp-scu.c
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index b40885de..0dd2b90 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -67,14 +67,14 @@ static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
- };
- 
--static struct smsc911x_platform_config smsc911x_data = {
-+static struct smsc911x_platform_config smsc911x_data __initdata = {
- 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
- 	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
- 	.flags		= SMSC911X_USE_32BIT,
- 	.phy_interface	= PHY_INTERFACE_MODE_MII,
- };
- 
--static struct resource smsc911x_resources[] = {
-+static struct resource smsc911x_resources[] __initdata = {
- 	DEFINE_RES_MEM(0x18300000, 0x1000),
- 	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
- };
-@@ -88,7 +88,7 @@ static struct resource usb_phy_resources[] __initdata = {
- static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
- 
- /* SDHI */
--static struct sh_mobile_sdhi_info sdhi0_info = {
-+static struct sh_mobile_sdhi_info sdhi0_info __initdata = {
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
- 	.tmio_ocr_mask	= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
-@@ -153,7 +153,7 @@ static struct resource mmc_resources[] __initdata = {
- 	DEFINE_RES_IRQ(gic_iid(0x5d)),
- };
- 
--static struct sh_mmcif_plat_data sh_mmcif_plat = {
-+static struct sh_mmcif_plat_data sh_mmcif_plat __initdata = {
- 	.sup_pclk	= 0,
- 	.ocr		= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
- 	.caps		= MMC_CAP_4_BIT_DATA |
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index e818f02..42761f4 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -11,6 +11,9 @@ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
+ extern void shmobile_boot_scu(void);
++extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
++extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
++					   struct task_struct *idle);
+ struct clk;
+ extern int shmobile_clk_init(void);
+ extern void shmobile_handle_irq_intc(struct pt_regs *);
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+new file mode 100644
+index 0000000..8f478e4
+--- /dev/null
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -0,0 +1,31 @@
++/*
++ * SMP support for SoCs with SCU covered by mach-shmobile
++ *
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/smp.h>
++#include <asm/smp_plat.h>
++#include <asm/smp_scu.h>
++#include <mach/common.h>
++
++void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
++{
++	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
++	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
++
++	/* enable SCU and cache coherency on booting CPU */
++	scu_enable(shmobile_scu_base);
++	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
++}
++
++int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	/* do nothing for now */
++	return 0;
++}
 -- 
 1.8.3.2
