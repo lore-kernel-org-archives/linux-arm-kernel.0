@@ -1,62 +1,63 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 07 Aug 2013 12:45:05 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIGh3bW9uOiAobG05MCkgQWRkIHBvd2VyIGNvbnRy?=
- =?UTF-8?B?b2w=?=
-In-Reply-To: <52020047.1080705@nvidia.com>
-References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
- <5201FC2C.4030908@roeck-us.net> <52020047.1080705@nvidia.com>
-Message-ID: <1375865105.562600640@f434.i.mail.ru>
+From: mhocko@suse.cz (Michal Hocko)
+Date: Wed, 7 Aug 2013 10:47:16 +0200
+Subject: [BUG linux-next] watchdog: build breakage for non-SMP builds
+In-Reply-To: <20993.64234.352390.254920@ipc1.ka-ro>
+References: <20993.64234.352390.254920@ipc1.ka-ro>
+Message-ID: <20130807084716.GA8184@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 08/07/2013 03:50 PM, Guenter Roeck wrote:
-> > On 08/07/2013 12:32 AM, Wei Ni wrote:
-> >> On 08/07/2013 03:27 PM, Alexander Shiyan wrote:
-> >>>> The device lm90 can be controlled by the vdd rail.
-> >>>> Adding the power control support to power on/off the vdd rail.
-> >>>> And make sure that power is enabled before accessing the device.
-> >>>>
-> >>>> Signed-off-by: Wei Ni <wni@nvidia.com>
-> >>>> ---
-> >>>>   drivers/hwmon/lm90.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++++++
-> >>> [...]
-> >>>> +	if (!data->lm90_reg) {
-> >>>> +		data->lm90_reg = regulator_get(&client->dev, "vdd");
-> >>>> +		if (IS_ERR_OR_NULL(data->lm90_reg)) {
-> >>>> +			if (PTR_ERR(data->lm90_reg) == -ENODEV)
-> >>>> +				dev_info(&client->dev,
-> >>>> +					 "No regulator found for vdd. Assuming vdd is always powered.");
-> >>>> +			else
-> >>>> +				dev_warn(&client->dev,
-> >>>> +					 "Error [%ld] in getting the regulator handle for vdd.\n",
-> >>>> +					 PTR_ERR(data->lm90_reg));
-> >>>> +			data->lm90_reg = NULL;
-> >>>> +			mutex_unlock(&data->update_lock);
-> >>>> +			return -ENODEV;
-> >>>> +		}
-> >>>> +	}
-> >>>> +	if (is_enable) {
-> >>>> +		ret = regulator_enable(data->lm90_reg);
-> >>>> +		msleep(POWER_ON_DELAY);
-> >>>
-> >>> Can this delay be handled directly from regulator?
-> >>
-> >> I think it should be handled in the device driver.
-> >> Because there have different delay time to wait devices stable.
-> >>
-> > 
-> > Then why does no other caller of regulator_enable() need this ?
-> > I don't think lm90 is so much different to other users of regulator
-> > functionality.
+On Wed 07-08-13 09:44:42, Lothar Wa?mann wrote:
+> Hi,
 > 
-> May be I'm wrong. I noticed that in lm90 SPEC, the max of "SMBus Clock
-> Low Time" is 25ms, so I supposed that it may need about 20ms to stable
-> after power on.
+> commit 0ce6966b "watchdog: update watchdog_tresh properly" breaks
+> build on non-SMP systems (more specifically: on systems where
+> CONFIG_USE_GENERIC_SMP_HELPERS is not set):
+> linux-next/kernel/watchdog.c: In function 'update_timers':
+> linux-next/kernel/watchdog.c:522:2: error: implicit declaration of function '__smp_call_function_single' [-Werror=implicit-function-declaration]
+
+The fix is already in the Andrew's tree so it should show up in
+linux-next sometimes soon.
+
+Sorry about the hassles.
+
+> I guess the offending code should be guarded by an
+> '#ifdef CONFIG_USE_GENERIC_SMP_HELPERS'
+> like in kernel/softirq.c:
+> #ifdef CONFIG_USE_GENERIC_SMP_HELPERS
+> [...]
+> static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softirq)
+> {
+>         if (cpu_online(cpu)) {
+>                 cp->func = remote_softirq_receive;
+>                 cp->info = &softirq;
+>                 cp->flags = 0;
 > 
-> Anyway, if I remove this delay, the driver also works fine, so I will
-> remove it in my next patch.
+>                 __smp_call_function_single(cpu, cp, 0);
+>                 return 0;
+>         }
+>         return 1;
+> }
+> #else /* CONFIG_USE_GENERIC_SMP_HELPERS */
+> static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softirq)
+> {
+>         return 1;
+> }
+> #endif
+> 
+> 
+> Lothar Wa?mann
+> -- 
+> ___________________________________________________________
+> 
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> 
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
 
-I originally had in mind that regulator API contain own delay option.
-E.g. reg-fixed-voltage && gpio-regulator contains "startup-delay-us" property.
-
----
+-- 
+Michal Hocko
+SUSE Labs
