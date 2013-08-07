@@ -1,139 +1,68 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:39:34 +0900
-Subject: [GIT PULL 8/9] ARM: shmobile: Introduce per-CPU SMP boot / sleep code
-In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
-References: <cover.1375841380.git.horms+renesas@verge.net.au>
-Message-ID: <cc61591e45c0457139ddd4cd7e57f75928acaaf2.1375841380.git.horms+renesas@verge.net.au>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed,  7 Aug 2013 10:18:38 +0530
+Subject: [PATCH 2/4] clk: exynos5250: Fix incorrect placement of __initdata
+In-Reply-To: <1375850921-23122-1-git-send-email-sachin.kamat@linaro.org>
+References: <1375850921-23122-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1375850921-23122-2-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+__initdata should be placed between the variable name and equal
+sign for the variable to be placed in the intended section.
 
-Add per-CPU SMP boot / sleep code that can be used by all
-SoCs included in mach-shmobile.
-
-The boot code reads out the per-CPU MPIDR id value and
-matches it with the value stored for any CPU number, and
-if there is a match and the boot function is set as well
-then the boot function will be executed.
-
-The sleep code simply uses WFI and then jumps back to the
-boot code to see if anyone has asked to wake up that CPU,
-if not it will sleep again.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
-[horms+renesas at verge.net.au: Remove trailing whitespace]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- arch/arm/mach-shmobile/headsmp.S             | 49 ++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/common.h |  4 +++
- arch/arm/mach-shmobile/platsmp.c             | 18 ++++++++++
- 3 files changed, 71 insertions(+)
+ drivers/clk/samsung/clk-exynos5250.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index 559d1ce..2940fc9 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -38,3 +38,52 @@ shmobile_boot_fn:
- 	.globl	shmobile_boot_arg
- shmobile_boot_arg:
- 2:	.space	4
-+
-+/*
-+ * Per-CPU SMP boot function/argument selection code based on MPIDR
-+ */
-+
-+ENTRY(shmobile_smp_boot)
-+						@ r0 = MPIDR_HWID_BITMASK
-+	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
-+	and	r0, r1, r0			@ r0 = cpu_logical_map() value
-+	mov	r1, #0				@ r1 = CPU index
-+	adr	r5, 1f				@ array of per-cpu mpidr values
-+	adr	r6, 2f				@ array of per-cpu functions
-+	adr	r7, 3f				@ array of per-cpu arguments
-+
-+shmobile_smp_boot_find_mpidr:
-+	ldr	r8, [r5, r1, lsl #2]
-+	cmp	r8, r0
-+	bne	shmobile_smp_boot_next
-+
-+	ldr	r9, [r6, r1, lsl #2]
-+	cmp	r9, #0
-+	bne	shmobile_smp_boot_found
-+
-+shmobile_smp_boot_next:
-+	add	r1, r1, #1
-+	cmp	r1, #CONFIG_NR_CPUS
-+	blo	shmobile_smp_boot_find_mpidr
-+
-+	b	shmobile_smp_sleep
-+
-+shmobile_smp_boot_found:
-+	ldr	r0, [r7, r1, lsl #2]
-+	mov	pc, r9
-+ENDPROC(shmobile_smp_boot)
-+
-+ENTRY(shmobile_smp_sleep)
-+	wfi
-+	b	shmobile_smp_boot
-+ENDPROC(shmobile_smp_sleep)
-+
-+	.globl	shmobile_smp_mpidr
-+shmobile_smp_mpidr:
-+1:	.space	CONFIG_NR_CPUS * 4
-+	.globl	shmobile_smp_fn
-+shmobile_smp_fn:
-+2:	.space	CONFIG_NR_CPUS * 4
-+	.globl	shmobile_smp_arg
-+shmobile_smp_arg:
-+3:	.space	CONFIG_NR_CPUS * 4
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 04209d5..3880cf5 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -10,6 +10,10 @@ extern void shmobile_setup_console(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
-+extern void shmobile_smp_boot(void);
-+extern void shmobile_smp_sleep(void);
-+extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
-+			      unsigned long arg);
- extern void shmobile_boot_scu(void);
- extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
- extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index 1f958d7..d4ae616 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -12,6 +12,9 @@
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 5865cef..a9916a4 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -132,7 +132,7 @@ enum exynos5250_clks {
+  * list of controller registers to be saved and restored during a
+  * suspend/resume cycle.
   */
- #include <linux/init.h>
- #include <linux/smp.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include <mach/common.h>
+-static __initdata unsigned long exynos5250_clk_regs[] = {
++static unsigned long exynos5250_clk_regs[] __initdata = {
+ 	SRC_CPU,
+ 	DIV_CPU0,
+ 	SRC_CORE1,
+@@ -494,7 +494,7 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
+ 	GATE(g2d, "g2d", "aclk200", GATE_IP_ACP, 3, 0, 0),
+ };
  
- void __init shmobile_smp_init_cpus(unsigned int ncores)
- {
-@@ -26,3 +29,18 @@ void __init shmobile_smp_init_cpus(unsigned int ncores)
- 	for (i = 0; i < ncores; i++)
- 		set_cpu_possible(i, true);
- }
-+
-+extern unsigned long shmobile_smp_fn[];
-+extern unsigned long shmobile_smp_arg[];
-+extern unsigned long shmobile_smp_mpidr[];
-+
-+void shmobile_smp_hook(unsigned int cpu, unsigned long fn, unsigned long arg)
-+{
-+	shmobile_smp_fn[cpu] = 0;
-+	flush_cache_all();
-+
-+	shmobile_smp_mpidr[cpu] = cpu_logical_map(cpu);
-+	shmobile_smp_fn[cpu] = fn;
-+	shmobile_smp_arg[cpu] = arg;
-+	flush_cache_all();
-+}
+-static __initdata struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
++static struct samsung_pll_rate_table vpll_24mhz_tbl[] __initdata = {
+ 	/* sorted in descending order */
+ 	/* PLL_36XX_RATE(rate, m, p, s, k) */
+ 	PLL_36XX_RATE(266000000, 266, 3, 3, 0),
+@@ -503,7 +503,7 @@ static __initdata struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
+ 	{ },
+ };
+ 
+-static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
++static struct samsung_pll_rate_table epll_24mhz_tbl[] __initdata = {
+ 	/* sorted in descending order */
+ 	/* PLL_36XX_RATE(rate, m, p, s, k) */
+ 	PLL_36XX_RATE(192000000, 64, 2, 2, 0),
+@@ -517,7 +517,7 @@ static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
+ 	{ },
+ };
+ 
+-static struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
++static struct samsung_pll_clock exynos5250_plls[nr_plls] __initdata = {
+ 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+ 		APLL_CON0, "fout_apll", NULL),
+ 	[mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
+@@ -534,7 +534,7 @@ static struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
+ 		VPLL_LOCK, VPLL_CON0, NULL),
+ };
+ 
+-static __initdata struct of_device_id ext_clk_match[] = {
++static struct of_device_id ext_clk_match[] __initdata = {
+ 	{ .compatible = "samsung,clock-xxti", .data = (void *)0, },
+ 	{ },
+ };
 -- 
-1.8.3.2
+1.7.9.5
