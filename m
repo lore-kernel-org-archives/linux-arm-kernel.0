@@ -1,29 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Aug 2013 17:32:58 +0100
-Subject: [PATCH 17/20] ASoC: pxa: pxa-pcm-lib: switch over to
- snd-soc-dmaengine-pcm
-In-Reply-To: <5202718F.2050507@gmail.com>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-18-git-send-email-zonque@gmail.com>
- <20130807160743.GI6427@sirena.org.uk> <5202718F.2050507@gmail.com>
-Message-ID: <20130807163258.GL6427@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 7 Aug 2013 12:38:07 -0400
+Subject: [PATCH] ARM: dts: Fix memory node in skeleton64.dtsi
+In-Reply-To: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
+References: <1375839186-1904-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <20130807163807.GG19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 06:10:55PM +0200, Daniel Mack wrote:
-> On 07.08.2013 18:07, Mark Brown wrote:
+On Tue, Aug 06, 2013 at 06:33:06PM -0700, Stepan Moskovchenko wrote:
+> Update the reg property of the memory node in
+> skeleton64.dtsi to reflect the fact that the root node uses
+> address-cells=2 and size-cells=2.
+> 
+> Change-Id: Ie9b61166143969e020ceebc51e9a384405d8c0f2
+> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/skeleton64.dtsi |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 
-> > Has this been tested with the standalone non-ASoC PXA AC'97 driver?
+Applied to mvebu/fixes-non-critical with Gregory's Ack an Change-Id
+removed.
 
-> Nope. I have no such device.
+thx,
 
-I guess the main test there will be making sure that it builds with ASoC
-disabled.  I'm not sure anything later than PXA3xx ever actually used
-AC'97.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130807/5584ac0c/attachment.sig>
+Jason.
+
+> 
+> diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
+> index 1599415..b5d7f36 100644
+> --- a/arch/arm/boot/dts/skeleton64.dtsi
+> +++ b/arch/arm/boot/dts/skeleton64.dtsi
+> @@ -9,5 +9,5 @@
+>  	#size-cells = <2>;
+>  	chosen { };
+>  	aliases { };
+> -	memory { device_type = "memory"; reg = <0 0>; };
+> +	memory { device_type = "memory"; reg = <0 0 0 0>; };
+>  };
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
