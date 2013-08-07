@@ -1,83 +1,110 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed,  7 Aug 2013 16:06:32 -0700
-Subject: [GIT PULL v2] msm cleanups for v3.12
-In-Reply-To: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
-References: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1375916792-24408-1-git-send-email-davidb@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 07 Aug 2013 16:07:52 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.11-rc5
+Message-ID: <87bo59ksl3.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+Hi Linus,
 
-  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+I'm stepping in to help Olof in arm-soc land while Arnd is away for a
+bit.  Please consider the fixes below for -rc5, Thanks.
+
+Kevin
+
+
+The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
+
+  Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-cleanup3-for-3.12
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-for you to fetch changes up to 3294a7e7c3a55bb4eb9d98b0af5643a7ea44afe1:
+for you to fetch changes up to 1154f858ab5cd3c5facde7cb9ac31c889eb780a8:
 
-  ARM: msm: Only compile io.c on platforms that use it (2013-08-06 11:18:04 -0700)
-
-----------------------------------------------------------------
-General cleanups for MSM for 3.12
-
-This is a series of cleanups to the MSM code.  These are a healthy
-start to bringing the MSM code closer to the state of current ARM code
-and getting more of it ready for conversion to devicetree.
+  MAINTAINERS: add TI Keystone ARM platform (2013-08-07 10:30:29 -0700)
 
 ----------------------------------------------------------------
+ARM: SoC fixes for v3.11-rc
 
-Otherwise, same as last pull with head commit dropped.
+- MSM: GPIO fixes (includes old code removal)
+- OMAP: earlyprintk regression, AM33xx cpgmac PM regression
+- OMAP5: urgent fix for potentially harmful voltage regulator values
+- Renesas: gpio-keys fix, fix SD card detection, fix shdma calculation error
+- STi: critical SMP boot fix
+- tegra: DTS fix for usb-phy
+- a couple MAINTAINERS updates
 
-Rohit Vaswani (1):
-      ARM: msm: Remove unused and unmapped MSM_TLMM_BASE for 8x60
+----------------------------------------------------------------
+Afzal Mohammed (2):
+      ARM: OMAP2+: hwmod: rt address space index for DT
+      ARM: OMAP2+: hwmod: AM335x: fix cpgmac address space
 
-Stephen Boyd (8):
-      ARM: msm: Don't compile __msm_ioremap_caller() unless used
-      ARM: msm: Move debug-macro.S to include/debug
-      ARM: msm: Remove TMR and TMR0 static mappings
-      ARM: msm: Migrate msm_timer to CLOCKSOURCE_OF_DECLARE
-      ARM: msm: Move mach/board.h contents to common.h
-      ARM: msm: Remove devices-iommu.c
-      iommu/msm: Move mach includes to iommu directory
-      ARM: msm: Only compile io.c on platforms that use it
+Kuninori Morimoto (2):
+      ARM: shmobile: armadillo800eva: Don't request GPIO 166 in board code
+      shdma: fixup sh_dmae_get_partial() calculation error
 
- arch/arm/Kconfig                                   |   1 +
- arch/arm/Kconfig.debug                             |   9 +-
- .../mach/debug-macro.S => include/debug/msm.S}     |  32 +-
- arch/arm/mach-msm/Makefile                         |   9 +-
- arch/arm/mach-msm/board-dt-8660.c                  |   4 +-
- arch/arm/mach-msm/board-dt-8960.c                  |   3 +-
- arch/arm/mach-msm/board-halibut.c                  |   1 -
- arch/arm/mach-msm/board-mahimahi.c                 |   2 +-
- arch/arm/mach-msm/board-msm7x30.c                  |   1 -
- arch/arm/mach-msm/board-qsd8x50.c                  |   1 -
- arch/arm/mach-msm/board-sapphire.c                 |   2 +-
- arch/arm/mach-msm/board-trout.c                    |   1 -
- arch/arm/mach-msm/board-trout.h                    |   2 +-
- arch/arm/mach-msm/common.h                         |  18 +-
- arch/arm/mach-msm/devices-iommu.c                  | 912 ---------------------
- arch/arm/mach-msm/devices-msm7x30.c                |   2 +-
- arch/arm/mach-msm/devices-qsd8x50.c                |   2 +-
- arch/arm/mach-msm/include/mach/board.h             |  38 -
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h    |  46 --
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |  53 --
- arch/arm/mach-msm/include/mach/msm_iomap.h         |  17 -
- arch/arm/mach-msm/include/mach/uncompress.h        |  63 --
- arch/arm/mach-msm/io.c                             |  67 +-
- arch/arm/mach-msm/timer.c                          |  17 +-
- drivers/iommu/msm_iommu.c                          |   4 +-
- .../mach/iommu.h => drivers/iommu/msm_iommu.h      |   0
- drivers/iommu/msm_iommu_dev.c                      |   4 +-
- .../iommu/msm_iommu_hw-8xxx.h                      |   0
- drivers/video/msm/msm_fb.c                         |   1 -
- 29 files changed, 93 insertions(+), 1219 deletions(-)
- rename arch/arm/{mach-msm/include/mach/debug-macro.S => include/debug/msm.S} (61%)
- delete mode 100644 arch/arm/mach-msm/devices-iommu.c
- delete mode 100644 arch/arm/mach-msm/include/mach/board.h
- delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8960.h
- delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
- delete mode 100644 arch/arm/mach-msm/include/mach/uncompress.h
- rename arch/arm/mach-msm/include/mach/iommu.h => drivers/iommu/msm_iommu.h (100%)
- rename arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h => drivers/iommu/msm_iommu_hw-8xxx.h (100%)
+Linus Walleij (1):
+      MAINTAINERS: delete Srinidhi from ux500
+
+Lucas Stach (1):
+      ARM: tegra: enable ULPI phy on Colibri T20
+
+Nishanth Menon (3):
+      ARM: dts: omap5-uevm: document regulator signals used on the actual board
+      ARM: dts: omap5-uevm: fix regulator configurations mandatory for SoC
+      ARM: dts: omap5-uevm: update optional/unused regulator configurations
+
+Olof Johansson (4):
+      Merge tag 'msm-3.11-fix1' of git://git.kernel.org/.../davidb/linux-msm into fixes
+      Merge tag 'omap-for-v3.11/fixes-omap5' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'for-v3.11-rc/omap-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into fixes
+      Merge tag 'renesas-fixes2-for-v3.11' of git://git.kernel.org/.../horms/renesas into fixes
+
+Rajendra Nayak (3):
+      ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with DEBUG_LL
+      ARM: OMAP2+: Avoid idling memory controllers with no drivers
+      ARM: OMAP2+: Sync hwmod state with the pm_runtime and omap_device state
+
+Rohit Vaswani (2):
+      ARM: msm: dts: Fix the gpio register address for msm8960
+      ARM: msm: Consolidate gpiomux for older architectures
+
+Santosh Shilimkar (1):
+      MAINTAINERS: add TI Keystone ARM platform
+
+Sergei Shtylyov (1):
+      ARM: shmobile: BOCK-W: fix SDHI0 PFC settings
+
+Simon Horman (1):
+      ARM: shmobile: lager: do not annotate gpio_buttons as __initdata
+
+Srinivas Kandagatla (2):
+      ARM: STi: Fix cpu nodes with correct device_type.
+      ARM: STi: remove sti_secondary_start from INIT section.
+
+ MAINTAINERS                                        |  7 +-
+ arch/arm/boot/dts/msm8960-cdp.dts                  |  4 +-
+ arch/arm/boot/dts/omap5-uevm.dts                   | 78 ++++++++++++++--------
+ arch/arm/boot/dts/stih41x.dtsi                     |  2 +
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi         |  1 +
+ arch/arm/mach-msm/Kconfig                          |  3 +-
+ arch/arm/mach-msm/gpiomux-v1.c                     | 33 ---------
+ arch/arm/mach-msm/gpiomux.h                        | 10 ---
+ arch/arm/mach-omap2/omap_device.c                  | 18 +++++
+ arch/arm/mach-omap2/omap_hwmod.c                   |  2 +-
+ arch/arm/mach-omap2/omap_hwmod.h                   | 50 ++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  6 +-
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  3 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  9 +--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  5 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  3 +-
+ arch/arm/mach-omap2/serial.c                       | 11 ---
+ arch/arm/mach-shmobile/board-armadillo800eva.c     |  3 -
+ arch/arm/mach-shmobile/board-bockw.c               |  8 ++-
+ arch/arm/mach-shmobile/board-lager.c               |  2 +-
+ arch/arm/mach-sti/headsmp.S                        |  2 -
+ drivers/dma/sh/shdma.c                             |  4 +-
+ 22 files changed, 154 insertions(+), 110 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/gpiomux-v1.c
