@@ -1,33 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Aug 2013 17:54:17 +0200
-Subject: [PATCH 04/20] ARM: pxa: ssp: add DT bindings
-In-Reply-To: <1375889649-14638-5-git-send-email-zonque@gmail.com>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-5-git-send-email-zonque@gmail.com>
-Message-ID: <201308071754.17741.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 7 Aug 2013 11:57:00 -0400
+Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <20130807143546.GD2978@katana>
+References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
+ <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130716080503.GA3125@lukather>
+ <5200E684.5080003@free-electrons.com>
+ <20130807143546.GD2978@katana>
+Message-ID: <20130807155700.GE19280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 August 2013, Daniel Mack wrote:
-> +Device tree bindings for Marvell PXA SSP ports
-> +
-> +Required properties:
-> +
-> +       - compatible:   Must be one of
-> +                               mrvl,pxa25x-ssp
-> +                               mvrl,pxa25x-nssp
-> +                               mrvl,pxa27x-ssp
-> +                               mrvl,pxa3xx-ssp
-> +                               mvrl,pxa168-ssp
-> +                               mrvl,pxa910-ssp
-> +                               mrvl,ce4100-ssp
-> +                               mrvl,lpss-ssp
-> +
-> +       - reg:          The memory base
-> +
-> +
+On Wed, Aug 07, 2013 at 04:35:46PM +0200, Wolfram Sang wrote:
+> 
+> > But we shouldn't use it alone: we should always use:
+> > compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> > 
+> > From my point of view using  "marvell,mv78230-i2c" alone is an error.
+> > 
+> > Wolfram what is your opinion on it?
+> 
+> It is not strictly an error, but risky. If you use an older Kernel
+> version (or other OS) which only offers "mv64xxx" you will have no
+> match. Although the driver theoretically could have basic support for
+> all mv64xxx variants skipping all additional features of later IP
+> revisions.
 
-It seems you are missing the 'dmas' properties here and that two of them
-("rx" and "tx") are required by the code.
+I agree here.  The driver is advertising what IP blocks it can handle,
+so it makes sense to add both strings since it can handle both.
 
-	Arnd
+thx,
+
+Jason.
