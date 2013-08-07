@@ -1,78 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Aug 2013 13:39:30 +0900
-Subject: [GIT PULL 4/9] ARM: shmobile: Use shared SCU SMP boot code on emev2
+Date: Wed,  7 Aug 2013 13:39:28 +0900
+Subject: [GIT PULL 2/9] ARM: shmobile: Use shared SCU SMP boot code on sh73a0
 In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
 References: <cover.1375841380.git.horms+renesas@verge.net.au>
-Message-ID: <0da60225dee270a4a4b86c08509e772e78961b82.1375841380.git.horms+renesas@verge.net.au>
+Message-ID: <12eb8474386228c91e35be031d7c3eaa1318b5cf.1375841380.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Use shared SCU code on emev2 for SMP boot.
+Use shared SCU code on sh73a0 for SMP boot.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile    |  2 +-
- arch/arm/mach-shmobile/smp-emev2.c | 19 ++++++++++---------
- 2 files changed, 11 insertions(+), 10 deletions(-)
+ arch/arm/mach-shmobile/Makefile     |  2 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c | 26 +++++++++++++-------------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 42bbf45..d7b1c71 100644
+index e401c73..a32dc15 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -19,7 +19,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+@@ -17,7 +17,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+ 
+ # SMP objects
  smp-y				:= platsmp.o headsmp.o
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
--smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
-+smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+-smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
++smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
  
- # IRQ objects
- obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
-diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
-index 1bf8bc7..d1c101d 100644
---- a/arch/arm/mach-shmobile/smp-emev2.c
-+++ b/arch/arm/mach-shmobile/smp-emev2.c
-@@ -34,6 +34,12 @@
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 1b3dc7c..1096b0e 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -50,30 +50,30 @@ void __init sh73a0_register_twd(void)
  
- static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
+-	cpu = cpu_logical_map(cpu);
++	unsigned int lcpu = cpu_logical_map(cpu);
 +	int ret;
-+
+ 
+-	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
+-		__raw_writel(1 << cpu, WUPCR);	/* wake up */
 +	ret = shmobile_smp_scu_boot_secondary(cpu, idle);
 +	if (ret)
 +		return ret;
 +
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu_logical_map(cpu)));
++	if (((__raw_readl(PSTR) >> (4 * lcpu)) & 3) == 3)
++		__raw_writel(1 << lcpu, WUPCR);	/* wake up */
+ 	else
+-		__raw_writel(1 << cpu, SRESCR);	/* reset */
++		__raw_writel(1 << lcpu, SRESCR);	/* reset */
+ 
  	return 0;
  }
-@@ -42,21 +48,16 @@ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	void __iomem *smu;
  
--	/* setup EMEV2 specific SCU base, enable */
--	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
+ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	/* setup sh73a0 specific SCU base */
+-	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
 -	scu_enable(shmobile_scu_base);
 -
--	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
-+	/* Tell ROM loader about our vector (in headsmp.S) */
- 	smu = ioremap(EMEV2_SMU_BASE, PAGE_SIZE);
- 	if (smu) {
- 		iowrite32(__pa(shmobile_boot_vector), smu + SMU_GENERAL_REG0);
- 		iounmap(smu);
- 	}
+-	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
++	/* Map the reset vector (in headsmp.S) */
+ 	__raw_writel(0, APARMBAREA);      /* 4k */
+ 	__raw_writel(__pa(shmobile_boot_vector), SBAR);
 -	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
 -	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
  
 -	/* enable cache coherency on booting CPU */
 -	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
-+	/* setup EMEV2 specific SCU bits */
-+	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
++	/* setup sh73a0 specific SCU bits */
++	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
 +	shmobile_smp_scu_prepare_cpus(max_cpus);
  }
  
- struct smp_operations emev2_smp_ops __initdata = {
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
 1.8.3.2
