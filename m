@@ -1,46 +1,115 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Thu, 8 Aug 2013 14:56:30 +0800
-Subject: [PATCH v2 2/3] ARM: dt: t114 dalmore: add dt entry for nct1008
+Date: Thu, 8 Aug 2013 14:56:29 +0800
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
 In-Reply-To: <1375944991-29182-1-git-send-email-wni@nvidia.com>
 References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
-Message-ID: <1375944991-29182-3-git-send-email-wni@nvidia.com>
+Message-ID: <1375944991-29182-2-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable thermal sensor nct1008 for t114 dalmore.
+The device lm90 can be controlled by the vdd rail.
+Adding the power control support to power on/off the vdd rail.
+And make sure that power is enabled before accessing the device.
 
 Signed-off-by: Wei Ni <wni@nvidia.com>
 ---
- arch/arm/boot/dts/tegra114-dalmore.dts |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/hwmon/lm90.c |   49 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index b5a42f0..9d4d2b2 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -738,6 +738,14 @@
- 			realtek,ldo1-en-gpios =
- 				<&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
- 		};
+diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
+index cdff742..306a348 100644
+--- a/drivers/hwmon/lm90.c
++++ b/drivers/hwmon/lm90.c
+@@ -89,6 +89,7 @@
+ #include <linux/err.h>
+ #include <linux/mutex.h>
+ #include <linux/sysfs.h>
++#include <linux/regulator/consumer.h>
+ 
+ /*
+  * Addresses to scan
+@@ -302,6 +303,7 @@ static const struct lm90_params lm90_params[] = {
+ struct lm90_data {
+ 	struct device *hwmon_dev;
+ 	struct mutex update_lock;
++	struct regulator *lm90_reg;
+ 	char valid; /* zero until following fields are valid */
+ 	unsigned long last_updated; /* in jiffies */
+ 	int kind;
+@@ -1391,6 +1393,32 @@ static void lm90_init_client(struct i2c_client *client)
+ 		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
+ }
+ 
++static void lm90_power_control(struct i2c_client *client, bool is_enable)
++{
++	struct lm90_data *data = i2c_get_clientdata(client);
++	int ret;
 +
-+		nct1008 {
-+			compatible = "onnn,nct1008";
-+			reg = <0x4c>;
-+			vdd-supply = <&palmas_ldo6_reg>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <TEGRA_GPIO(O, 4) IRQ_TYPE_LEVEL_LOW>;
-+		};
- 	};
++	if (!data->lm90_reg)
++		return;
++
++	mutex_lock(&data->update_lock);
++
++	if (is_enable)
++		ret = regulator_enable(data->lm90_reg);
++	else
++		ret = regulator_disable(data->lm90_reg);
++
++	if (ret < 0)
++		dev_err(&client->dev,
++			"Error in %s rail vdd, error %d\n",
++			(is_enable) ? "enabling" : "disabling", ret);
++	else
++		dev_info(&client->dev, "success in %s rail vdd\n",
++			 (is_enable) ? "enabling" : "disabling");
++
++	mutex_unlock(&data->update_lock);
++}
++
+ static int lm90_probe(struct i2c_client *client,
+ 		      const struct i2c_device_id *id)
+ {
+@@ -1406,6 +1434,20 @@ static int lm90_probe(struct i2c_client *client,
+ 	i2c_set_clientdata(client, data);
+ 	mutex_init(&data->update_lock);
  
- 	i2c at 7000d000 {
-@@ -945,7 +953,7 @@
- 						regulator-max-microvolt = <1800000>;
- 					};
++	data->lm90_reg = regulator_get(&client->dev, "vdd");
++	if (IS_ERR_OR_NULL(data->lm90_reg)) {
++		if (PTR_ERR(data->lm90_reg) == -ENODEV)
++			dev_info(&client->dev,
++				 "No regulator found for vdd. Assuming vdd is always powered.");
++		else
++			dev_warn(&client->dev,
++				 "Error [%ld] in getting the regulator handle for vdd.\n",
++				 PTR_ERR(data->lm90_reg));
++		data->lm90_reg = NULL;
++	}
++
++	lm90_power_control(client, true);
++
+ 	/* Set the device type */
+ 	data->kind = id->driver_data;
+ 	if (data->kind == adm1032) {
+@@ -1473,6 +1515,10 @@ exit_remove_files:
+ 	lm90_remove_files(client, data);
+ exit_restore:
+ 	lm90_restore_conf(client, data);
++	lm90_power_control(client, false);
++	if (data->lm90_reg)
++		regulator_put(data->lm90_reg);
++
+ 	return err;
+ }
  
--					ldo6 {
-+					palmas_ldo6_reg: ldo6 {
- 						regulator-name = "vdd-sensor-2v85";
- 						regulator-min-microvolt = <2850000>;
- 						regulator-max-microvolt = <2850000>;
+@@ -1483,6 +1529,9 @@ static int lm90_remove(struct i2c_client *client)
+ 	hwmon_device_unregister(data->hwmon_dev);
+ 	lm90_remove_files(client, data);
+ 	lm90_restore_conf(client, data);
++	lm90_power_control(client, false);
++	if (data->lm90_reg)
++		regulator_put(data->lm90_reg);
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
