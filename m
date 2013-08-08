@@ -1,30 +1,41 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  8 Aug 2013 10:49:43 +0200
-Subject: [PATCH 5/6] ARM: at91: move sama5d3 SoC to common clk
-Message-ID: <1375951783-11021-1-git-send-email-b.brezillon@overkiz.com>
+Date: Thu,  8 Aug 2013 10:50:02 +0200
+Subject: [PATCH 6/6] ARM: at91/dt: remove old main clk definition from
+ sama5d3xcm.dtsi
+Message-ID: <1375951802-11060-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the selection of AT91_USE_OLD_CLK when selecting sama5d3
-SoC support. This will enable automatically enable COMMON_CLK_AT91 option
-and add support for at91 common clk implementation.
+This patch removes the old main clk node which is now useless as sama5d3
+SoCs and boards are no longer compatible with the old at91 clk
+implementations.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/mach-at91/Kconfig |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/sama5d3xcm.dtsi |   11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 97033f7..b4f7d6f 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -86,7 +86,6 @@ config SOC_SAMA5D3
- 	select SOC_SAMA5
- 	select HAVE_FB_ATMEL
- 	select HAVE_AT91_DBGU1
--	select AT91_USE_OLD_CLK
- 	select HAVE_AT91_UTMI
- 	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index f19d5bf..81c3957 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -18,17 +18,6 @@
+ 		reg = <0x20000000 0x20000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			spi0: spi at f0004000 {
 -- 
 1.7.9.5
