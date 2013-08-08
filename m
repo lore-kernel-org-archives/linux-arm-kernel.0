@@ -1,41 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 8 Aug 2013 18:25:18 +0200
-Subject: [PATCH 0/2] Support for another NSA310
-In-Reply-To: <5203C5A4.8000906@harsszegi.com>
-References: <1374079910-24345-1-git-send-email-andrew@lunn.ch>
- <20130808135338.GF29815@lunn.ch> <5203C5A4.8000906@harsszegi.com>
-Message-ID: <20130808162518.GK29815@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Aug 2013 17:34:54 +0100
+Subject: [ARM ATTEND] DT binding management and long-term stability
+Message-ID: <20130808163454.GC27325@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 06:21:56PM +0200, Tibor Harsszegi wrote:
-> >On Wed, Jul 17, 2013 at 06:51:48PM +0200, Andrew Lunn wrote:
-> >>There are apparently three different designs of the ZyXEL NSA310 NAS
-> >>box. This patchset adds support for a second one, refactoring the
-> >>common DTS parts into a shared DTSI file.
-> >>
-> >>What is not clear is naming. There is no obvious marketing name
-> >>difference, hardware version label, etc. So for the same of argument,
-> >>this new device uses the name NSA310a in DTS.
-> >>
-> >>The second patch adds to the kirkwood_defconfig drivers not already in
-> >>the default configuration, plus some additional drivers used by other
-> >>kirkwood devices. The aim is to improve build test coverage.
-> >I've rebased these patches onto 3.11-rc4, which contains Thomas's PCI
-> >fix, so that the Ethernet should work again. There are no changes to
-> >my patches. It would be nice if people could test on there hardware
-> >and send some tested-by:
+[resending with lakml included]
 
-> Hello, can confirm the nsa310a works fine (sytem boots, LEDs are
-> working, eth0
-> is up and running).
+With the current move to devicetree, several binding additions or
+changes appear every day, hampering the use of a current dtb with a
+future kernel, or a current kernel with a future dtb, even for a fixed
+platform. To solve this and ensure long-term stability, we must have a
+stable set of bindings that may be relied upon to function from release
+to release. This is critical for the long term health of the ARM Linux
+port.
 
-Hi Tibor
+Several steps on path to achieving this have been discussed so far in
+person or on list, and there needs to be some consensus reached by the
+community as to the steps that still need to be taken (e.g. deprecation
+of bindings). There's obvious overlap with several other areas of
+interest (e.g. describing non-probable system topologies, ARM SoC
+organisation), and it would be extremely useful to have devicetree
+maintainers present as part of these discussions.
 
-thanks for testing. Is it O.K. if i add a Tested-By: tag with your
-name. See:
-
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n423
-
-Thanks
-	Andrew
+Thanks,
+Mark.
