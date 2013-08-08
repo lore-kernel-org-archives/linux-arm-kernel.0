@@ -1,34 +1,61 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 08 Aug 2013 12:39:35 +0200
-Subject: [PATCH 17/20] ASoC: pxa: pxa-pcm-lib: switch over to
- snd-soc-dmaengine-pcm
-In-Reply-To: <20130808103510.GV6427@sirena.org.uk>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-18-git-send-email-zonque@gmail.com>
- <20130807160743.GI6427@sirena.org.uk> <5202718F.2050507@gmail.com>
- <20130807163258.GL6427@sirena.org.uk> <52035463.1030909@gmail.com>
- <52035A81.6090903@metafoo.de> <52035EF0.1030208@gmail.com>
- <20130808093628.GS6427@sirena.org.uk> <5203683C.2000904@gmail.com>
- <20130808103510.GV6427@sirena.org.uk>
-Message-ID: <52037567.2000805@gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu,  8 Aug 2013 12:38:42 +0200
+Subject: [PATCH v3 12/14] mmc: sh_mobile_sdhi: Remove .set_pwr() callback from
+ platform data
+In-Reply-To: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1375958324-29683-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.08.2013 12:35, Mark Brown wrote:
-> On Thu, Aug 08, 2013 at 11:43:24AM +0200, Daniel Mack wrote:
-> 
->> Hmm. We have this big "if SND_SOC" in sound/soc/Kconfig which prevent
->> that symbol to be selected. In fact, SND_PXA2XX_LIB already selected
->> SND_SOC_DMAENGINE_PCM, but that didn't help.
-> 
-> Ah, that'd cause problems.
-> 
->> And code that is not ASoC specific should live outside of sound/soc, no?
-> 
-> Yeah, OTOH it's pretty much entirely for ASoC and it'd be less churn.
-> No problem to move it though, but please leave in the files pattern for
-> ASoC.
+The .set_pwr() callback isn't used anymore as all platforms register
+GPIO-controlled regulators. Remove it.
 
-So you'd be unhappy with this?
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+ drivers/mmc/host/sh_mobile_sdhi.c  | 9 ---------
+ include/linux/mmc/sh_mobile_sdhi.h | 1 -
+ 2 files changed, 10 deletions(-)
 
-  https://github.com/zonque/linux/commit/77eaba6ed
+diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
+index 663a672..b3fd2c3 100644
+--- a/drivers/mmc/host/sh_mobile_sdhi.c
++++ b/drivers/mmc/host/sh_mobile_sdhi.c
+@@ -70,13 +70,6 @@ static void sh_mobile_sdhi_clk_disable(struct platform_device *pdev)
+ 	clk_disable(priv->clk);
+ }
+ 
+-static void sh_mobile_sdhi_set_pwr(struct platform_device *pdev, int state)
+-{
+-	struct sh_mobile_sdhi_info *p = pdev->dev.platform_data;
+-
+-	p->set_pwr(pdev, state);
+-}
+-
+ static int sh_mobile_sdhi_wait_idle(struct tmio_mmc_host *host)
+ {
+ 	int timeout = 1000;
+@@ -173,8 +166,6 @@ static int sh_mobile_sdhi_probe(struct platform_device *pdev)
+ 		mmc_data->capabilities |= p->tmio_caps;
+ 		mmc_data->capabilities2 |= p->tmio_caps2;
+ 		mmc_data->cd_gpio = p->cd_gpio;
+-		if (p->set_pwr)
+-			mmc_data->set_pwr = sh_mobile_sdhi_set_pwr;
+ 
+ 		if (p->dma_slave_tx > 0 && p->dma_slave_rx > 0) {
+ 			/*
+diff --git a/include/linux/mmc/sh_mobile_sdhi.h b/include/linux/mmc/sh_mobile_sdhi.h
+index f31c692..68927ae 100644
+--- a/include/linux/mmc/sh_mobile_sdhi.h
++++ b/include/linux/mmc/sh_mobile_sdhi.h
+@@ -25,7 +25,6 @@ struct sh_mobile_sdhi_info {
+ 	unsigned long tmio_caps2;
+ 	u32 tmio_ocr_mask;	/* available MMC voltages */
+ 	unsigned int cd_gpio;
+-	void (*set_pwr)(struct platform_device *pdev, int state);
+ 
+ 	/* callbacks for board specific setup code */
+ 	int (*init)(struct platform_device *pdev,
+-- 
+1.8.1.5
