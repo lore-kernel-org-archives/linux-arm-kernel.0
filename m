@@ -1,33 +1,50 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 08 Aug 2013 22:03:55 +0400
-Subject: =?UTF-8?B?UmU6IF9fQVJNX0FSQ0hfMl9f?=
-In-Reply-To: <20130808175253.GB2356@localhost.localdomain>
-References: <CANEcUBWAYe1Zkes3ZxFr9Copwh-H9Meijg6eupiQaKRUR0Jmdg@mail.gmail.com>
- <20130808082719.GH23006@n2100.arm.linux.org.uk>
- <20130808175253.GB2356@localhost.localdomain>
-Message-ID: <1375985035.647275432@f399.i.mail.ru>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Aug 2013 19:13:55 +0100
+Subject: angel_SWI_ARM
+In-Reply-To: <52025020.1020506@codeaurora.org>
+References: <CANEcUBW2OsQqN_Cm_9ThJmcmNB5oQfNvqNi_MU+DsCNAPJtaFQ@mail.gmail.com>
+ <52025020.1020506@codeaurora.org>
+Message-ID: <20130808181355.GC2356@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Aug 08, 2013 at 09:27:19AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Aug 08, 2013 at 10:08:02AM +0800, zhaobin xv wrote:
-> > > I don't know what the"__ARM_ARCH_2__" mean?
-> > > "__ARM_ARCH_2__" is definded by gcc or definded byarmlinux?
-> > > where does it come from? what does it want to do?
-> > 
-> > You could try a few things before posting:
-> > 
-> > 1. You could try grepping the kernel source to find out if anything
-> >    in the kernel defines it.
-> > 2. You could try asking google and seeing what it returns.
-> > 
-> > Either of those will tell you that it's not defined by the kernel but by
-> > the compiler.  For me, the first link on google explains it really well.
+On Wed, Aug 07, 2013 at 09:48:16AM -0400, Christopher Covington wrote:
+> On 08/07/2013 06:57 AM, zhaobin xv wrote:
+> > Hello
+> > when I read linux/arch/arm/boot/compressed/head.S
+> > I can't understand :
+> >  mrs    r2, cpsr        @ get current mode
+> >         tst    r2, #3            @ not user?
+> >         bne    not_angel
+> >         mov    r0, #0x17        @ angel_SWIreason_EnterSVC
+> >         swi    0x123456        @ angel_SWI_ARM
+> > I want to know :
+> > a) what is angel_SWI_ARM
+> > b) what is angel debuger
+> > c)Do the code " swi    0x123456 " make interrupt what make program
+> > jump to addr 0x0000 0008
+> > ,but addr 0x0000 0008 doesn't initialize.
 > 
-> Should that code go away?  I believe we don't support v2 or v3 any more...
-> Did teqp actually work in 32-bit modes?
+> Angel is ARM's semihosting interface.
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.dui0471c/CHDJHHDI.html
 
-"ARM: 7770/1: remove residual ARMv2 support from decompressor":
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/compressed/head.S?id=52c08a9e399739979027ea1e463f5529476da104
+I believe it's been used in the past to boot some early StrongARM based
+boards like Assabet.
 
----
+Since this seems to require an image to be downloaded via the serial
+port, boards configured to use this are probably not self-booting.  I
+doubt there are many people still using this today.
+
+
+For all other configurations, the kernel is entered in SVC mode, not
+User mode, so the code will be skipped.
+
+
+Documentation/arm/Booting:
+
+  For CPUs which do not include the ARM virtualization extensions, the
+  CPU must be in SVC mode.  (A special exception exists for Angel)
+
+Cheers
+---Dave
