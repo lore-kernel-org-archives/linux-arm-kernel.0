@@ -1,50 +1,47 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 08 Aug 2013 12:14:36 +0200
-Subject: [PATCH 01/20] mtd: pxa3xx-nand: replace pxa_request_dma with
- dmaengine
-In-Reply-To: <20130808101221.GC2295@localhost>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-2-git-send-email-zonque@gmail.com>
- <20130807174612.GB18567@localhost> <52033DE1.5050700@gmail.com>
- <20130808101221.GC2295@localhost>
-Message-ID: <52036F8C.2060104@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu,  8 Aug 2013 11:20:42 +0100
+Subject: [PATCH] drm/agp: Fix build for non-AGP platforms
+Message-ID: <1375957242-18444-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.08.2013 12:12, Ezequiel Garcia wrote:
-> On Thu, Aug 08, 2013 at 08:42:41AM +0200, Daniel Mack wrote:
->> On 07.08.2013 19:46, Ezequiel Garcia wrote:
->>> Hi Daniel,
->>>
->>> On Wed, Aug 07, 2013 at 05:33:50PM +0200, Daniel Mack wrote:
->>>> From: Zhangfei Gao <zhangfei.gao@marvell.com>
->>>>
->>>> [zonque at gmail.com: rebased in top of l2-mtd.git. The newly introduced
->>>> ARCH_HAS_DMA hack was changed into a check for CONFIG_HAS_DMA]
->>>>
->>>
->>> Are you sure you need to introduce the CONFIG_HAS_DMA ifdef?
->>>
->>> The reason I introduced the ARCH_HAS_DMA macro was to avoid including
->>> the "mach/dma.h" header. Now that you've removed it, I don't think
->>> this driver can be used in any platform where CONFIG_HAS_DMA=n.
->>
->> Well, yes it can, or at least you could decide to use it without DMA on
->> PXA/MMP. The idea of CONFIG_HAS_DMA is to save binary size.
->>
-> 
-> Ok, I see.
-> 
-> I think maybe we will have to add something to force use_dma=0
-> when "armada370-nand" is used. AFAIK, the dmaengine does not support
-> the kind of DMA operations this driver needs.
+From: Mark Brown <broonie@linaro.org>
 
-What kind of operation is that?
+Commit 28ec711 (drm/agp: move AGP cleanup paths to drm_agpsupport.c)
+broke the build for platforms which do not have AGP since it moved the
+AGP cleanup code inside an #ifdef __OS_HAS_AGP which are referenced
+unconditionally in drm_drv.c.  This causes build failures for embedded
+SoCs which use DRM but do not have AGP.
 
-> I can take care of that if this patchset hits mainline before
-> we have something really usable for Armada 370/XP NAND.
+Fix this by providing stub static inlines in the header.
 
-Ok :)
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ include/drm/drmP.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-
-Daniel
+diff --git a/include/drm/drmP.h b/include/drm/drmP.h
+index fba5473..e7f7da0 100644
+--- a/include/drm/drmP.h
++++ b/include/drm/drmP.h
+@@ -1453,6 +1453,7 @@ extern int drm_modeset_ctl(struct drm_device *dev, void *data,
+ 			   struct drm_file *file_priv);
+ 
+ 				/* AGP/GART support (drm_agpsupport.h) */
++#if __OS_HAS_AGP
+ extern struct drm_agp_head *drm_agp_init(struct drm_device *dev);
+ extern void drm_agp_destroy(struct drm_agp_head *agp);
+ extern void drm_agp_clear(struct drm_device *dev);
+@@ -1480,6 +1481,10 @@ extern int drm_agp_unbind_ioctl(struct drm_device *dev, void *data,
+ extern int drm_agp_bind(struct drm_device *dev, struct drm_agp_binding *request);
+ extern int drm_agp_bind_ioctl(struct drm_device *dev, void *data,
+ 			struct drm_file *file_priv);
++#else
++static inline void drm_agp_destroy(struct drm_agp_head *agp) { }
++static inline void drm_agp_clear(struct drm_device *dev) { }
++#endif
+ 
+ 				/* Stub support (drm_stub.h) */
+ extern int drm_setmaster_ioctl(struct drm_device *dev, void *data,
+-- 
+1.8.4.rc1
