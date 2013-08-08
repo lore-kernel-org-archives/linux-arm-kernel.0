@@ -1,33 +1,100 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 08 Aug 2013 11:03:44 +0200
-Subject: [PATCH 17/20] ASoC: pxa: pxa-pcm-lib: switch over to
- snd-soc-dmaengine-pcm
-In-Reply-To: <52035A81.6090903@metafoo.de>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-18-git-send-email-zonque@gmail.com>
- <20130807160743.GI6427@sirena.org.uk> <5202718F.2050507@gmail.com>
- <20130807163258.GL6427@sirena.org.uk> <52035463.1030909@gmail.com>
- <52035A81.6090903@metafoo.de>
-Message-ID: <52035EF0.1030208@gmail.com>
+From: wangx@marvell.com (Xiang Wang)
+Date: Thu, 8 Aug 2013 02:04:25 -0700
+Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
+ transfers
+In-Reply-To: <1375870770-14263-10-git-send-email-zonque@gmail.com>
+References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
+ <1375870770-14263-10-git-send-email-zonque@gmail.com>
+Message-ID: <4CF37FDA40C2184293FA2CF8CFAE31322007F0131D@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.08.2013 10:44, Lars-Peter Clausen wrote:
-> On 08/08/2013 10:18 AM, Daniel Mack wrote:
-
->> I guess we have two options: either duplicate code from
->> soc-dmaengine-pcm, or move soc-dmaengine-pcm out of the ASoC context. I
->> actually see no dependecy to ASoC from there anyway.
+> Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned transfers
 > 
-> There is intentionally no dependency on ASoC for the soc-dmaengine-pcm code, 
-> though since I wasn't sure whether there was ever going to be a userside 
-> outside of ASoC the coded ended up in ASoC folder. It shouldn't be a problem to 
-> make it available to all of ALSA.
+> The PXA DMA controller has a DALGN register which allows for
+> byte-aligned DMA transfers. Use it in case any of the transfer
+> descriptors is not aligned to a mask of ~0x7.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  drivers/dma/mmp_pdma.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+> index 1c2c00b..7eb235b 100644
+> --- a/drivers/dma/mmp_pdma.c
+> +++ b/drivers/dma/mmp_pdma.c
+> @@ -109,6 +109,7 @@ struct mmp_pdma_chan {
+>  	struct list_head chain_pending;	/* Link descriptors queue for pending */
+>  	struct list_head chain_running;	/* Link descriptors queue for running */
+>  	bool idle;			/* channel statue machine */
+> +	bool byte_align;
+> 
+>  	struct dma_pool *desc_pool;	/* Descriptors pool */
+>  };
+> @@ -142,7 +143,7 @@ static void set_desc(struct mmp_pdma_phy *phy, dma_addr_t addr)
+> 
+>  static void enable_chan(struct mmp_pdma_phy *phy)
+>  {
+> -	u32 reg;
+> +	u32 reg, dalgn;
+> 
+>  	if (!phy->vchan)
+>  		return;
+> @@ -150,6 +151,13 @@ static void enable_chan(struct mmp_pdma_phy *phy)
+>  	reg = DRCMR(phy->vchan->drcmr);
+>  	writel(DRCMR_MAPVLD | phy->idx, phy->base + reg);
+> 
+> +	dalgn = readl(phy->base + DALGN);
+> +	if (phy->vchan->byte_align)
+> +		dalgn |= 1 << phy->idx;
+> +	else
+> +		dalgn &= ~(1 << phy->idx);
+> +	writel(dalgn, phy->base + DALGN);
+> +
+>  	reg = (phy->idx << 2) + DCSR;
+>  	writel(readl(phy->base + reg) | DCSR_RUN,
+>  					phy->base + reg);
+> @@ -453,6 +461,7 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
+>  		return NULL;
+> 
+>  	chan = to_mmp_pdma_chan(dchan);
+> +	chan->byte_align = false;
+> 
+>  	if (!chan->dir) {
+>  		chan->dir = DMA_MEM_TO_MEM;
+> @@ -469,6 +478,8 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
+>  		}
+> 
+>  		copy = min_t(size_t, len, PDMA_MAX_DESC_BYTES);
+> +		if (dma_src & 0x7 || dma_dst & 0x7)
+> +			chan->byte_align = true;
+> 
+>  		new->desc.dcmd = chan->dcmd | (DCMD_LENGTH & copy);
+>  		new->desc.dsadr = dma_src;
+> @@ -528,12 +539,16 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
+>  	if ((sgl == NULL) || (sg_len == 0))
+>  		return NULL;
+> 
+> +	chan->byte_align = false;
+> +
+>  	for_each_sg(sgl, sg, sg_len, i) {
+>  		addr = sg_dma_address(sg);
+>  		avail = sg_dma_len(sgl);
+> 
+>  		do {
+>  			len = min_t(size_t, avail, PDMA_MAX_DESC_BYTES);
+> +			if (addr & 0x7)
+> +				chan->byte_align = true;
+> 
+>  			/* allocate and populate the descriptor */
+>  			new = mmp_pdma_alloc_descriptor(chan);
+> --
+> 1.8.3.1
+We do need to set DALGN bit in some of our drivers. But we cannot configure this via standard dma engine API.
+In this patch, dma address is used to determine whether or not to set DALGN. But what if we need to use 1-byte-aligned mode when addresses are 8-byte-aligned?
+Is it proper to always use 1-byte-aligned mode?
+Thanks.
 
-Ok, great. I queued a patch for that. Will be part of my next spin, or,
-in case the series doesn't make it in time, I'll re-post all the patches
-that can be applied independently up front.
-
-
-Thanks,
-Daniel
+Regards,
+Xiang
