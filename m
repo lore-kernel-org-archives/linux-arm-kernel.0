@@ -1,98 +1,62 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 8 Aug 2013 06:27:15 -0300
-Subject: [PATCH 3/5] clocksource: armada-370-xp: Introduce new compatibles
-In-Reply-To: <20130808075356.GC29815@lunn.ch>
+Date: Thu, 8 Aug 2013 06:29:33 -0300
+Subject: [PATCH 2/5] clocksource: armada-370-xp: Simplify TIMER_CTRL
+ register access
+In-Reply-To: <20130808072016.GB29815@lunn.ch>
 References: <1375919556-24104-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1375919556-24104-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130808075356.GC29815@lunn.ch>
-Message-ID: <20130808092714.GA2295@localhost>
+ <1375919556-24104-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130808072016.GB29815@lunn.ch>
+Message-ID: <20130808092932.GB2295@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 09:53:56AM +0200, Andrew Lunn wrote:
-> On Wed, Aug 07, 2013 at 08:52:34PM -0300, Ezequiel Garcia wrote:
-> > The Armada XP SoC clocksource driver cannot work without the 25 MHz
-> > fixed timer. Therefore it's appropriate to introduce a new compatible
-> > string and use it to set the 25 MHz fixed timer.
+On Thu, Aug 08, 2013 at 09:20:16AM +0200, Andrew Lunn wrote:
+> On Wed, Aug 07, 2013 at 08:52:33PM -0300, Ezequiel Garcia wrote:
+> > This commit creates two functions to access the TIMER_CTRL register:
+> > one for global one for the per-cpu. This makes the code much more
+> > readable. In addition, since the TIMER_CTRL register is also used for
+> > watchdog, this is preparation work for future thread-safe improvements.
 > > 
-> > The 'marvell,timer-25MHz' property will be marked as deprecated.
-> > 
+> > Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > > ---
-> >  drivers/clocksource/time-armada-370-xp.c | 59 ++++++++++++++++++++++++--------
-> >  1 file changed, 45 insertions(+), 14 deletions(-)
+> >  drivers/clocksource/time-armada-370-xp.c | 70 ++++++++++++++------------------
+> >  1 file changed, 31 insertions(+), 39 deletions(-)
 > > 
 > > diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-> > index a2351ac..1458a85 100644
+> > index 5ee4329..a2351ac 100644
 > > --- a/drivers/clocksource/time-armada-370-xp.c
 > > +++ b/drivers/clocksource/time-armada-370-xp.c
-> > @@ -212,7 +212,7 @@ static struct local_timer_ops armada_370_xp_local_timer_ops = {
-> >  	.stop	=  armada_370_xp_timer_stop,
-> >  };
+> > @@ -71,6 +71,18 @@ static u32 ticks_per_jiffy;
 > >  
-> > -static void __init armada_370_xp_timer_init(struct device_node *np)
-> > +static void __init armada_370_xp_timer_common_init(struct device_node *np)
-> >  {
-> >  	u32 clr = 0, set = 0;
-> >  	int res;
-> > @@ -221,21 +221,10 @@ static void __init armada_370_xp_timer_init(struct device_node *np)
-> >  	WARN_ON(!timer_base);
-> >  	local_base = of_iomap(np, 1);
+> >  static struct clock_event_device __percpu **percpu_armada_370_xp_evt;
 > >  
-> > -	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
-> > -
-> > -		/* The fixed 25MHz timer is available so let's use it */
-> > +	if (timer25Mhz)
-> >  		set = TIMER0_25MHZ;
-> > -		timer_clk = 25000000;
-> > -	} else {
-> > -		unsigned long rate = 0;
-> > -		struct clk *clk = of_clk_get(np, 0);
-> > -		WARN_ON(IS_ERR(clk));
-> > -		rate =  clk_get_rate(clk);
-> > -		timer_clk = rate / TIMER_DIVIDER;
-> > -
-> > +	else
-> >  		clr = TIMER0_25MHZ;
-> > -		timer25Mhz = false;
-> > -	}
-> >  	local_timer_ctrl_clrset(clr, set);
-> >  	timer_ctrl_clrset(clr, set);
-> >  
-> > @@ -289,5 +278,47 @@ static void __init armada_370_xp_timer_init(struct device_node *np)
-> >  #endif
-> >  	}
-> >  }
-> > +
-> > +static void __init armada_370_xp_timer_init(struct device_node *np)
+> > +void timer_ctrl_clrset(u32 clr, u32 set)
 > > +{
-> > +	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
-> > +		/* The fixed 25MHz timer is required */
-> > +		timer_clk = 25000000;
-> > +	} else {
-> > +		unsigned long rate = 0;
-> > +		struct clk *clk = of_clk_get(np, 0);
-> > +		WARN_ON(IS_ERR(clk));
-> > +		rate =  clk_get_rate(clk);
-> > +		timer_clk = rate / TIMER_DIVIDER;
-> > +		timer25Mhz = false;
-> > +	}
-> > +
-> > +	armada_370_xp_timer_common_init(np);
+> > +       writel((readl(timer_base + TIMER_CTRL_OFF) & ~clr) | set,
+> > +               timer_base + TIMER_CTRL_OFF);
 > > +}
-> >  CLOCKSOURCE_OF_DECLARE(armada_370_xp, "marvell,armada-370-xp-timer",
-> >  		       armada_370_xp_timer_init);
+> > +
+> > +void local_timer_ctrl_clrset(u32 clr, u32 set)
+> > +{
+> > +       writel((readl(local_base + TIMER_CTRL_OFF) & ~clr) | set,
+> > +               local_base + TIMER_CTRL_OFF);
+> > +}
+> > +
 > 
-> Hi Ezequiel
+> Ezequiel
 > 
-> I think it would be good to have a comment saying this compatibility
-> string, and the marvell,timer-25Mhz is depreciated, and a short
-> explanation why. Maybe sometime in the future we can even remove it,
-> depending on the outcome of the DT stability discussions.
+> I guess the watchdog will only require one of these two functions
+> above, and probably not the local_timer function. So maybe make it
+> static? Also, do you get sparse warnings from timer_ctrl_clrset()
+> since it is not static, but also not declared in a header file
+> somewhere?
 > 
 
-Sure, I'll do that.
+Nice catch! Both should be static for now, we can export/declare
+the proper one in the proper time.
 
+Thanks,
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
