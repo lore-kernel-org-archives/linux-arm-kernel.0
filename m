@@ -1,64 +1,65 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 8 Aug 2013 16:02:30 +0530
-Subject: [PATCH v3 6/6] ARM: davinci: da850: configure system
- configuration chip(CFGCHIP3) for emac
-In-Reply-To: <51F8A4FF.8020803@ti.com>
-References: <1371999607-6483-1-git-send-email-prabhakar.csengg@gmail.com>
- <1371999607-6483-7-git-send-email-prabhakar.csengg@gmail.com>
- <51F8A4FF.8020803@ti.com>
-Message-ID: <CA+V-a8smEd_75Ab-_vxjBATr8Q9Sefs0tpxc+kgQJRtuLJad=w@mail.gmail.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Thu, 08 Aug 2013 12:33:26 +0200
+Subject: [PATCH 0/6] ARM: at91: use new at91 clks for samad3 SoCs
+In-Reply-To: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <520373F6.10200@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Sorry for the noise, I forgot to add the --in-reply-to option.
 
-Sorry for the  delayed response I was on leave and now back again up
-and running.
+You'll find the dependencies patch series in attachements.
 
-On Wed, Jul 31, 2013 at 11:17 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Sunday 23 June 2013 08:30 PM, Prabhakar Lad wrote:
->> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>
->> This patch makes a common function for to configure emac and calls
->> it appropriately in DT and non DT boot mode. The system configuration
->> chip CFGCHIP3, controls the emac module. This patch appropriately
->> configures this register for emac and sets DA850_MII_MDIO_CLKEN_PIN
->> GPIO pin appropriately.
->>
-[Snip]
-
->> +     if (rmii_enabled)
->> +             val |= BIT(8);
->> +     else
->> +             val &= ~BIT(8);
->> +
->> +     /* configure the CFGCHIP3 register for RMII or MII */
->> +     writel(val, cfg_chip3_base);
->> +
->> +     ret = davinci_cfg_reg(DA850_GPIO2_6);
->> +     if (ret)
->> +             pr_warn("%s:GPIO(2,6) mux setup failed\n", __func__);
->> +
->> +     ret = gpio_request(DA850_MII_MDIO_CLKEN_PIN, "mdio_clk_en");
->> +     if (ret) {
->> +             pr_warn("Cannot open GPIO %d\n", DA850_MII_MDIO_CLKEN_PIN);
->> +             return;
->> +     }
+On 08/08/2013 10:46, Boris BREZILLON wrote:
+> Hello,
 >
-> You cannot do this in SoC specific code. All boards wont use a GPIO to
-> choose between MII/RMII. You need to do this in a EVM specific manner.
-> This just means you retain the GPIO part of code in board-da850-evm.c
-
-OK
-
-> and for the DT case use a board specific GPIO node. See a similar
-> example in arch/arm/boot/dts/ste-nomadik-s8815.dts and how the code uses
-Alrite something similar to usb-s8815 node.
-
-> it in arch/arm/mach-nomadik/cpu-8815.c.
+> This patch series was formerly part of the
+> "ARM: at91: move to common clk framework" patch series.
 >
-But I don't see any code to access this node in this file, can
-you point me to right direction ?
+> It moves sama5d3 SoCs and boards to the new at91 clks (clk implementation
+> using common clk framework).
+>
+> This patch series depends on following patch series (they must be applied in
+> this order):
+> 1) "ARM: at91/dt: split sama5d3 definition" (v1)
+> 2) "ARM: at91/dt: make use of periph id macros" (v2, not submitted yet)
+> 3) "ARM: at91: move to common clk framework" (v3)
+>
+> I will answer to this mail and join this patch series' dependencies in
+> attachments.
+>
+> Best Regards,
+>
+> Boris
+>
+> Boris BREZILLON (6):
+>    ARM: at91: prepare sama5 dt boards transition to common clk
+>    ARM: at91: prepare common clk transition for sama5d3 SoC
+>    ARM: at91/dt: define sama5d3 clocks
+>    ARM: at91/dt: define sama5d3xek's main clk frequency
+>    ARM: at91: move sama5d3 SoC to common clk
+>    ARM: at91/dt: remove old main clk definition from sama5d3xcm.dtsi
+>
+>   arch/arm/boot/dts/sama5d3.dtsi      |  331 ++++++++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/sama5d3_can.dtsi  |   19 ++
+>   arch/arm/boot/dts/sama5d3_emac.dtsi |   12 ++
+>   arch/arm/boot/dts/sama5d3_gmac.dtsi |   12 ++
+>   arch/arm/boot/dts/sama5d3_lcd.dtsi  |   17 ++
+>   arch/arm/boot/dts/sama5d3_mci2.dtsi |   11 ++
+>   arch/arm/boot/dts/sama5d3_tcb1.dtsi |   12 ++
+>   arch/arm/boot/dts/sama5d3_uart.dtsi |   19 ++
+>   arch/arm/boot/dts/sama5d3xcm.dtsi   |   17 +-
+>   arch/arm/mach-at91/Kconfig          |    1 -
+>   arch/arm/mach-at91/board-dt-sama5.c |   10 +-
+>   arch/arm/mach-at91/sama5d3.c        |    6 +-
+>   12 files changed, 451 insertions(+), 16 deletions(-)
+>
 
-Regards,
---Prabhakar Lad
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: dependencies.tgz
+Type: application/x-compressed-tar
+Size: 47581 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/37b3afbf/attachment-0001.bin>
