@@ -1,68 +1,83 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 8 Aug 2013 21:35:37 +0530
-Subject: [PATCH v3 6/6] ARM: davinci: da850: configure system configuration
- chip(CFGCHIP3) for emac
-In-Reply-To: <CA+V-a8smEd_75Ab-_vxjBATr8Q9Sefs0tpxc+kgQJRtuLJad=w@mail.gmail.com>
-References: <1371999607-6483-1-git-send-email-prabhakar.csengg@gmail.com>
- <1371999607-6483-7-git-send-email-prabhakar.csengg@gmail.com>
- <51F8A4FF.8020803@ti.com>
- <CA+V-a8smEd_75Ab-_vxjBATr8Q9Sefs0tpxc+kgQJRtuLJad=w@mail.gmail.com>
-Message-ID: <5203C1D1.8020707@ti.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu,  8 Aug 2013 12:38:30 +0200
+Subject: [PATCH v3 00/14] Remove platform callbacks from mmc_spi,
+ sh_mmcif and sh_mobile_sdhi drivers
+Message-ID: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 August 2013 04:02 PM, Prabhakar Lad wrote:
-> Hi Sekhar,
-> 
-> Sorry for the  delayed response I was on leave and now back again up
-> and running.
-> 
-> On Wed, Jul 31, 2013 at 11:17 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->> On Sunday 23 June 2013 08:30 PM, Prabhakar Lad wrote:
->>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>>
->>> This patch makes a common function for to configure emac and calls
->>> it appropriately in DT and non DT boot mode. The system configuration
->>> chip CFGCHIP3, controls the emac module. This patch appropriately
->>> configures this register for emac and sets DA850_MII_MDIO_CLKEN_PIN
->>> GPIO pin appropriately.
->>>
-> [Snip]
-> 
->>> +     if (rmii_enabled)
->>> +             val |= BIT(8);
->>> +     else
->>> +             val &= ~BIT(8);
->>> +
->>> +     /* configure the CFGCHIP3 register for RMII or MII */
->>> +     writel(val, cfg_chip3_base);
->>> +
->>> +     ret = davinci_cfg_reg(DA850_GPIO2_6);
->>> +     if (ret)
->>> +             pr_warn("%s:GPIO(2,6) mux setup failed\n", __func__);
->>> +
->>> +     ret = gpio_request(DA850_MII_MDIO_CLKEN_PIN, "mdio_clk_en");
->>> +     if (ret) {
->>> +             pr_warn("Cannot open GPIO %d\n", DA850_MII_MDIO_CLKEN_PIN);
->>> +             return;
->>> +     }
->>
->> You cannot do this in SoC specific code. All boards wont use a GPIO to
->> choose between MII/RMII. You need to do this in a EVM specific manner.
->> This just means you retain the GPIO part of code in board-da850-evm.c
-> 
-> OK
-> 
->> and for the DT case use a board specific GPIO node. See a similar
->> example in arch/arm/boot/dts/ste-nomadik-s8815.dts and how the code uses
-> Alrite something similar to usb-s8815 node.
-> 
->> it in arch/arm/mach-nomadik/cpu-8815.c.
->>
-> But I don't see any code to access this node in this file, can
-> you point me to right direction ?
+Hello,
 
-Look at cpu8815_eth_init() function in this file.
+This patch set replaces callbacks to board code with regulators and GPIOs in
+the mmc_spi, sh_mmcif and sh_mobile_sdhi MMC drivers.
 
-Thanks,
-Sekhar
+Most of the required infrastructure is in place already on the drivers side,
+except for CD debouncing support in the MMC core and CD/RO GPIOs support in
+the mmc_spi driver. The series thus starts with patches 01/14 and 02/14 that
+add those features to the MMC core and mmc_spi driver.
+
+Patches 03/14 to 07/14 remove the board callbacks from the ecovec24 and
+vision_ep9307 boards. The code has been compile-tested only as I don't have
+access to those boards.
+
+Patches 08/14 to 14/14 then proceed to remove the callbacks from the drivers
+themselves and from the platform data structures.
+
+Compared to v2, the patches have been rebased on the mmc-next branch from
+git://git.kernel.org/pub/scm/linux/kernel/git/cjb/mmc.git. I've also added
+patch 07/14 that removes the .set_pwr() callback from the ag5evm board to avoid
+compilation breakage during bisection.
+
+The series interleaves patches for drivers and board files. The ep93xx and
+ecovec24 patches have been acked, and the respective ARM subtree maintainers
+have indicated that they are fine with the patches going through the MMC tree.
+The ag5evm patch is new, but as the ag5evm board is going to be removed in
+v3.12, it shouldn't cause any issue.
+
+Chris, could you take the patches in your tree ? I've pushed them to
+
+	git://linuxtv.org/pinchartl/fbdev.git mmc/devel
+
+Laurent Pinchart (14):
+  mmc: slot-gpio: Add debouncing capability to mmc_gpio_request_cd()
+  mmc: mmc_spi: Support CD/RO GPIOs
+  ARM: ep93xx: vision_ep9307: Use MMC CD and RO GPIO
+  sh: ecovec24: Use MMC/SDHI CD and RO GPIO
+  sh: ecovec24: Remove mmcif .down_pwr() callback
+  sh: ecovec24: Remove MMCIF and SDHI .set_pwr() callbacks
+  ARM: shmobile: ag5evm: Remove SDHI .set_pwr() callback
+  mmc: mmc_spi: Remove platform data .get_cd() and .get_ro() callbacks
+  mmc: sh_mmcif: Remove .down_pwr() callback from platform data
+  mmc: sh_mmcif: Remove .set_pwr() callback from platform data
+  mmc: sh_mobile_sdhi: Remove .get_cd() callback from platform data
+  mmc: sh_mobile_sdhi: Remove .set_pwr() callback from platform data
+  mmc: tmio-mmc: Remove .get_cd() callback from platform data
+  mmc: tmio-mmc: Remove .set_pwr() callback from platform data
+
+ arch/arm/mach-ep93xx/vision_ep9307.c  | 57 ++--------------------
+ arch/arm/mach-shmobile/board-ag5evm.c | 23 ---------
+ arch/sh/boards/mach-ecovec24/setup.c  | 89 ++++-------------------------------
+ drivers/mmc/core/host.c               |  2 +-
+ drivers/mmc/core/slot-gpio.c          | 14 +++++-
+ drivers/mmc/host/jz4740_mmc.c         |  2 +-
+ drivers/mmc/host/mmc_spi.c            | 49 +++++++++----------
+ drivers/mmc/host/mvsdio.c             |  3 +-
+ drivers/mmc/host/of_mmc_spi.c         | 46 +++++-------------
+ drivers/mmc/host/sdhci-esdhc-imx.c    |  2 +-
+ drivers/mmc/host/sdhci-pxav3.c        |  3 +-
+ drivers/mmc/host/sdhci-sirf.c         |  2 +-
+ drivers/mmc/host/sh_mmcif.c           |  5 +-
+ drivers/mmc/host/sh_mobile_sdhi.c     | 18 -------
+ drivers/mmc/host/tmio_mmc.h           |  1 -
+ drivers/mmc/host/tmio_mmc_pio.c       | 25 +---------
+ include/linux/mfd/tmio.h              |  2 -
+ include/linux/mmc/sh_mmcif.h          |  2 -
+ include/linux/mmc/sh_mobile_sdhi.h    |  2 -
+ include/linux/mmc/slot-gpio.h         |  3 +-
+ include/linux/spi/mmc_spi.h           | 19 +++++---
+ 21 files changed, 86 insertions(+), 283 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
