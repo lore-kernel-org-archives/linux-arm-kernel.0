@@ -1,108 +1,87 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 08 Aug 2013 10:10:27 +0200
-Subject: [PATCH V3 2/3] ASoC: Samsung: I2S: Add quirks as driver data in
- I2S
-In-Reply-To: <CAAgF-BdpsgQk8myq7OOk5zJ8Zxy+J6LUPb3-d40+iE2aNwdwDw@mail.gmail.com>
-References: <1375865122-5258-1-git-send-email-padma.v@samsung.com>
- <2116389.OxrlCQ9LXd@amdc1227>
- <CAAgF-BdpsgQk8myq7OOk5zJ8Zxy+J6LUPb3-d40+iE2aNwdwDw@mail.gmail.com>
-Message-ID: <3759902.V2gf68Lg3g@flatron>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 8 Aug 2013 10:16:27 +0200
+Subject: [PATCHv7 07/13] irqdomain: add function to find a MSI irq_domain
+In-Reply-To: <1375914665.12551.5.camel@pasglop>
+References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375908620.9300.3.camel@pasglop> <20130808000443.17f57875@skate>
+ <1375914665.12551.5.camel@pasglop>
+Message-ID: <20130808101627.065ec95a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 of August 2013 13:13:02 Padma Venkat wrote:
-> Hi Tomasz,
-> 
-> On Wed, Aug 7, 2013 at 4:43 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > Ahh, one more thing inline.
-> 
-> [snip]
-> 
-> >> +static struct samsung_i2s_dai_data i2sv3_dai_type = {
-> >> +     .dai_type = TYPE_PRI,
-> >> +     .quirks = QUIRK_NO_MUXPSR,
-> >> +};
-> >> +
-> >> +static struct samsung_i2s_dai_data i2sv4_dai_type = {
-> >> +     .dai_type = TYPE_PRI,
-> >> +     .quirks = QUIRK_PRI_6CHAN | QUIRK_NO_MUXPSR,
-> >> +};
-> >> +
-> >> +static struct samsung_i2s_dai_data i2sv5_c100_dai_type = {
-> >> +     .dai_type = TYPE_PRI,
-> >> +     .quirks = QUIRK_PRI_6CHAN | QUIRK_NO_MUXPSR | QUIRK_SEC_DAI |
-> >> +                     QUIRK_NEED_RSTCLR,
-> >> +};
-> >> +
-> >> +static struct samsung_i2s_dai_data i2sv5_dai_type = {
-> >> +     .dai_type = TYPE_PRI,
-> >> +     .quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR,
-> >> +};
-> >> +
-> >> +static struct samsung_i2s_dai_data samsung_dai_type_sec = {
-> >> +     .dai_type = TYPE_SEC,
-> >> +};
-> >> +
-> >> 
-> >>  static struct platform_device_id samsung_i2s_driver_ids[] = {
-> >>  
-> >>       {
-> >> 
-> >> -             .name           = "samsung-i2s",
-> >> -             .driver_data    = TYPE_PRI,
-> >> +             .name           = "samsung,s3c6410-i2s",
-> >> +             .driver_data    = (kernel_ulong_t)&i2sv3_dai_type,
-> >> +     }, {
-> >> +             .name           = "samsung,s3c6410-i2s-multi",
-> >> +             .driver_data    = (kernel_ulong_t)&i2sv4_dai_type,
-> >> +     }, {
-> >> +             .name           = "samsung,s5pc100-i2s",
-> >> +             .driver_data    = (kernel_ulong_t)&i2sv5_c100_dai_type,
-> >> 
-> >>       }, {
-> >> 
-> >> -             .name           = "samsung-i2s-sec",
-> >> -             .driver_data    = TYPE_SEC,
-> >> +             .name           = "samsung,s5pv210-i2s",
-> >> +             .driver_data    = (kernel_ulong_t)&i2sv5_dai_type,
-> >> +     }, {
-> >> +             .name           = "samsung-i2s-sec",
-> >> +             .driver_data    =
-> >> (kernel_ulong_t)&samsung_dai_type_sec,
-> > 
-> > I don't think you need to change the legacy platform IDs at all.
-> 
-> If legacy platforms not required to change then I need to introduce a
-> new samsung_i2s_dai_data structure which holds only dai_type for
-> non-dt platforms. If I change legacy platforms it breaks the older
-> platforms now. Is it okay adding a samsung_i2s_dai_data structure for
-> non-dt platforms which will be removed later?
+Dear Benjamin Herrenschmidt,
 
-Sorry, I don't understand the problem here.
+On Thu, 08 Aug 2013 08:31:05 +1000, Benjamin Herrenschmidt wrote:
 
-Original contents of samsung_i2s_driver_ids[] array already conveyed 
-information about dai type inside driver_data field of each 
-platform_device_id entry.
+>  - I still don't like it. I find that it's looking more and more like
+> over engineering. I don't like having any kind of infrastructure
+> relationship between MSI stuff and irqdomain, ie, a PCI/PCIe specific
+> construct and a generic interrupt remapper.
 
-If you really need to have samsung_i2s_dai_data struct for both DT and 
-non-DT cases you can create dummy dai_data for both platform ID entries, 
-which would have only dai type field initialized. This would be fine, 
-because the non-DT probe path takes anything else from platform_data and 
-would not need samsung_i2s_dai_data struct in any other way than getting 
-dai_type in probe.
+This is *exactly* the opposite of what Grant Likely said in:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187083.html
+[PATCHv5 05/11] of: pci: add registry of MSI chips
+
+Grant said:
+
+"""
+Actually, I'm going to disagree on this one and say NAK. I don't think
+it is a good idea to create a completely separate registry of msi_chips
+for binding to dt nodes. I think it would be better to include the
+msi_chip pointer directly into the irq_domain which has to be there
+anyway. It then becomes another feature for irq controllers if it can
+support doing MSI.
+"""
+
+So Grant is completely in favor of a strong relationship between MSI
+stuff and irqdomain.
+
+> Trying to use irqdomain for HW number allocation seems to be pushing it
+> where it wasn't designed to go. Are those interrupts really different
+> domains ? Do they have separate number spaces, separate DT encodings and
+> overall characteristics ?
+
+This is also *exactly* the opoosite of what Grant Likely said in:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175430.html
+[PATCH v2 4/8] irqchip: armada-370-xp: implement MSI support
+
+He was replying to the patch that did a bitmap based allocation scheme,
+within the IRQ controller driver, for MSI interrupts. And Grant said:
+
+"""
+This looks like something that the irq_domain should handle for you.
+It would be good to have a variant of irq_create_mapping() that keeps
+track of available hwirqs, allocates a free one, and maps it all with
+one function call. I can see that being useful by other MSI interrupt
+controllers and would eliminate needing to open-code it above.
+"""
+
+> What's wrong with the bitmap allocator in the PIC driver ? It's simple,
+> and does the job just fine. If anything, take it from powerpc and sparc
+> and move it to generic. It's already a "generic" (ie shared)
+> infrastructure in powerpc.
+
+See above. Grant said to *NOT* implement a bitmap allocator. He even
+said it would be useful for other MSI interrupt controllers, and that
+ultimately they should be migrated to not use the bitmap allocator that
+you're talking about, but instead rely on irqdomain based allocations.
+
+> That series makes me feel nervous, it feels like a hack. I really don't
+> like creating that relationship between msi_chip and irqdomain. In fact,
+> I think it makes it harder to understand what's happening in the code
+> and following things.
+
+Please see above, you're going completely backwards to what Grant
+Likely was saying.
 
 Best regards,
-Tomasz
 
-> > IMHO it would be better to keep the old way of quirk retrieval from
-> > platform_data (which I think this patch does anyway, because the probe
-> > path without DT is unchanged), as it will be dropped in some point in
-> > time anyway.
-> > 
-> > This would also eliminate the need for patch 1.
-> > 
-> > Best regards,
-> > Tomasz
-> 
-> Thanks
-> Padma
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
