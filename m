@@ -1,66 +1,91 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed,  7 Aug 2013 20:52:36 -0300
-Subject: [PATCH 5/5] ARM: mvebu: Fix the Armada 370/XP timer compatible strings
-In-Reply-To: <1375919556-24104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1375919556-24104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1375919556-24104-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 8 Aug 2013 03:05:03 +0300
+Subject: v3.11-rc4: OMAP1/Amstrad Delta (E3) crash
+In-Reply-To: <20130807230856.GJ23053@n2100.arm.linux.org.uk>
+References: <20130806232609.GB15014@blackmetal.musicnaut.iki.fi>
+ <20130807190521.GD15014@blackmetal.musicnaut.iki.fi>
+ <20130807230856.GJ23053@n2100.arm.linux.org.uk>
+Message-ID: <20130808000503.GE15014@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "marvell,armada-370-xp-timer" compatible string, together with
-the "marvell,timer-25Mhz" property are deprecated and should be
-removed from current DT.
+Hi,
 
-Instead, the timer DT nodes are now required to have an appropriate
-compatible string, which should be either "marvell,armada-370-timer"
-or "marvell,armada-xp-timer", depending on SoC.
+On Thu, Aug 08, 2013 at 12:08:56AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 07, 2013 at 10:05:21PM +0300, Aaro Koskinen wrote:
+> > On Wed, Aug 07, 2013 at 02:26:09AM +0300, Aaro Koskinen wrote:
+> > > I get the following on Amstrad Delta (E3) when booting unpatched
+> > > v3.11-rc4. The kernel config is after the crash.
+> > 
+> > This is regression introduced between -rc3 and -rc4. According to the
+> > git bisect, the first bad commit is:
+> > 
+> > 	commit e39e3f3ebfef03450cf7bfa7a974a8c61f7980c8
+> > 	Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 	Date:   Tue Jul 9 01:03:17 2013 +0100
+> > 
+> > 	    ARM: update FIQ support for relocation of vectors
+> > 
+> > If I revert the commit from v3.11-rc4, the board boots fine.
+> > 
+> > A.
+> > 
+> > > Uncompressing Linux... done, booting the kernel.
+> > > [    0.000000] Booting Linux on physical CPU 0x0
+> > > [    0.000000] Initializing cgroup subsys cpu
+> > > [    0.000000] Linux version 3.11.0-rc4-e3 (aaro at blackmetal) (gcc version 4.7.3 (GCC) ) #4 PREEMPT Wed Aug 7 02:03:27 EEST 2013
+> > > [    0.000000] bootconsole [earlycon0] enabled
+> > > [    0.000000] OMAP1510
+> > > [    0.000000]  revision 2 handled as 15xx id: bc058c9b93111a16
+> 
+> Hmm, so ARM925T which is VIVT...
+> 
+> > > [    0.238868] Installing fiq handler from c001b110, length 0x164
+> > > [    0.245750] Unable to handle kernel paging request at virtual address ffff1224
+> 
+> In one way, that's good news - that's public independent proof that the
+> code associated with the vectors is well protected from kernel writes. :)
+> 
+> Can you try this (untested) patch please?  We need to write into this
+> page via the page's alias, rather than directly to it.  Thanks.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi | 1 -
- arch/arm/boot/dts/armada-370.dtsi    | 4 ++++
- arch/arm/boot/dts/armada-xp.dtsi     | 2 +-
- 3 files changed, 5 insertions(+), 2 deletions(-)
+That seems to work - the board boots fine to shell as before. Feel free
+to add Reported-by: or Tested-by: from me to the patch.
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 90b1176..3ed5de4 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -81,7 +81,6 @@
- 			};
- 
- 			timer at 20300 {
--				compatible = "marvell,armada-370-xp-timer";
- 				reg = <0x20300 0x30>, <0x21040 0x30>;
- 				interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
- 				clocks = <&coreclk 2>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index fa3dfc6..f7b9fc6 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -104,6 +104,10 @@
- 				interrupts = <91>;
- 			};
- 
-+			timer at 20300 {
-+				compatible = "marvell,armada-370-timer";
-+			};
-+
- 			coreclk: mvebu-sar at 18230 {
- 				compatible = "marvell,armada-370-core-clock";
- 				reg = <0x18230 0x08>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 416eb94..549151e 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -62,7 +62,7 @@
- 			};
- 
- 			timer at 20300 {
--				marvell,timer-25Mhz;
-+				compatible = "marvell,armada-xp-timer";
- 			};
- 
- 			coreclk: mvebu-sar at 18230 {
--- 
-1.8.1.5
+Thanks,
+
+A.
+
+>  arch/arm/kernel/fiq.c |    8 ++------
+>  1 files changed, 2 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+> index 25442f4..fc79202 100644
+> --- a/arch/arm/kernel/fiq.c
+> +++ b/arch/arm/kernel/fiq.c
+> @@ -84,17 +84,13 @@ int show_fiq_list(struct seq_file *p, int prec)
+>  
+>  void set_fiq_handler(void *start, unsigned int length)
+>  {
+> -#if defined(CONFIG_CPU_USE_DOMAINS)
+> -	void *base = (void *)0xffff0000;
+> -#else
+>  	void *base = vectors_page;
+> -#endif
+>  	unsigned offset = FIQ_OFFSET;
+>  
+>  	memcpy(base + offset, start, length);
+> +	if (!cache_is_vipt_nonaliasing())
+> +		flush_icache_range(base + offset, offset + length);
+>  	flush_icache_range(0xffff0000 + offset, 0xffff0000 + offset + length);
+> -	if (!vectors_high())
+> -		flush_icache_range(offset, offset + length);
+>  }
+>  
+>  int claim_fiq(struct fiq_handler *f)
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
