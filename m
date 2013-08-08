@@ -1,23 +1,77 @@
-From: csd_b@daudt.org (Christian Daudt)
-Date: Thu, 8 Aug 2013 14:02:39 -0700
-Subject: [PATCH 06/22] ARM: dts: bcm281xx: Remove '0x's from BCM11351 DTS
- file
-In-Reply-To: <20130723075309.GE26801@laptop>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-6-git-send-email-lee.jones@linaro.org>
- <51EDAC90.6010108@broadcom.com> <20130723075309.GE26801@laptop>
-Message-ID: <CAGFynZ-+UoML32ecX4nSGAaFJXqQpdq+D8j7GqJSKhxsE7w=9A@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu,  8 Aug 2013 18:03:09 -0300
+Subject: [PATCH for v3.12] ARM: mvebu: Relocate PCIe node in Armada 370 RD
+ board
+Message-ID: <1375995789-24146-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
- I had to change some of the lines in the dts files you modified, so
-I've added your mods. This patch:
-https://lkml.org/lkml/2013/8/8/477
+The pcie-controller node needs to be relocated according the MBus
+DT binding, since it's now a child of the mbus-compatible node.
 
-includes your changes to bcm11351.dtsi and bcm11351-brt.dts. Not sure
-where your patch is at this point, but I just wanted to point that
-out.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+Applies on mvebu's for-next.
 
- Thanks,
-   csd
+Jason,
+
+Please pick this in mvebu/mbus_dt. Somehow this slipped through
+our tests until just now.
+
+Thanks!
+
+ arch/arm/boot/dts/armada-370-rd.dts | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 0b3acf3..f81810a 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -31,6 +31,22 @@
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
+ 			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
+ 
++		pcie-controller {
++			status = "okay";
++
++			/* Internal mini-PCIe connector */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++
++			/* Internal mini-PCIe connector */
++			pcie at 2,0 {
++				/* Port 1, Lane 0 */
++				status = "okay";
++			};
++		};
++
+ 		internal-regs {
+ 			serial at 12000 {
+ 				clock-frequency = <200000000>;
+@@ -88,22 +104,6 @@
+ 					gpios = <&gpio0 6 1>;
+ 				};
+ 			};
+-
+-			pcie-controller {
+-				status = "okay";
+-
+-				/* Internal mini-PCIe connector */
+-				pcie at 1,0 {
+-					/* Port 0, Lane 0 */
+-					status = "okay";
+-				};
+-
+-				/* Internal mini-PCIe connector */
+-				pcie at 2,0 {
+-					/* Port 1, Lane 0 */
+-					status = "okay";
+-				};
+-			};
+ 		};
+ 	};
+  };
+-- 
+1.8.1.5
