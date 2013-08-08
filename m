@@ -1,82 +1,47 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 8 Aug 2013 15:32:00 -0500
-Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <5203FC1A.3090903@wwwdotorg.org>
-References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
- <5203FC1A.3090903@wwwdotorg.org>
-Message-ID: <1375993920.22740.9.camel@linux-builds1>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 09 Aug 2013 00:36:22 +0400
+Subject: [PATCH v2 2/3] ARM: dt: t114 dalmore: add dt entry for nct1008
+In-Reply-To: <1375944991-29182-3-git-send-email-wni@nvidia.com>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-3-git-send-email-wni@nvidia.com>
+Message-ID: <52040146.7060703@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-08 at 14:14 -0600, Stephen Warren wrote:
-> On 08/05/2013 02:43 PM, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Add bindings for SD/MMC for SOCFPGA.
-> > Add "syscon" to the "altr,sys-mgr" binding.
-> 
-> > diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-> > new file mode 100644
-> > index 0000000..dc14922
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-> > @@ -0,0 +1,48 @@
-> > +* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
-> > +  Storage Host Controller
-> > +
-> > +Required Properties:
-> > +
-> > +* compatible: should be
-> > +	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
-> > +	  specific extensions.
-> > +
-> > +* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
-> > +  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
-> > +  value is fixed at 3, which means parent_clock/4.
-> 
-> This feels like something that should be represented using the common
-> clock API; a driver should query the rate of its input clock, and then
-> calculate the MMC block's internal divider based on that (perhaps also
-> call clk_set_rate() on the input clock?).
+Hello.
 
-This means a change to the dw_mmc driver, which I can look into for the
-next round? I have promised Pawel to consolidate the bindings for both
-exynos and socfpga in the next round already. I will also look into
-using the common clock API for the MMC as well. 
+On 08/08/2013 10:56 AM, Wei Ni wrote:
 
-This patch is the only thing that is preventing from SD/MMC working for
-SOCFPGA in the mainline, can I get your Ack if I look into doing this
-for 3.13 for both the exynos and socfpga driver, and address your latter
-comments?
+> Enable thermal sensor nct1008 for t114 dalmore.
 
-> 
-> > +Example:
-> > +	dwmmc0 at ff704000 {
-> > +		compatible = "altr,socfpga-dw-mshc", "snps,dw-mshc";
-> > +		reg = <0xff704000 0x1000>;
-> > +		interrupts = <0 139 4>;
-> 
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		num-slots = <1>;
-> > +		supports-highspeed;
-> > +		fifo-depth = <0x400>;
-> 
-> Those properties aren't defined in this document anywhere. I guess this
-> binding is meant to "inherit" from that described in
-> "synopsis-dw-mshc.txt"? If so, that should be stated explicitly.
+> Signed-off-by: Wei Ni <wni@nvidia.com>
+> ---
+>   arch/arm/boot/dts/tegra114-dalmore.dts |   10 +++++++++-
+>   1 file changed, 9 insertions(+), 1 deletion(-)
 
-Yes, will state in v3.
-> 
-> A similar comment applies to the clocks properties in the *.dtsi changes.
-> 
-> > +		altr,dw-mshc-ciu-div = <3>;
-> > +      		altr,dw-mshc-sdr-timing = <0 3>;
-> 
-> Indentation issue.
+> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+> index b5a42f0..9d4d2b2 100644
+> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
+> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+> @@ -738,6 +738,14 @@
+>   			realtek,ldo1-en-gpios =
+>   				<&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
+>   		};
+> +
+> +		nct1008 {
 
-Will fix..
+    ePAPR [1] says: "the name of a node should be somewhat generic, reflecting 
+the function of the device and not its precise programming model". So I 
+suggest "thermal"
 
-Dinh
-> 
-> 
+> +			compatible = "onnn,nct1008";
+> +			reg = <0x4c>;
+> +			vdd-supply = <&palmas_ldo6_reg>;
+> +			interrupt-parent = <&gpio>;
+> +			interrupts = <TEGRA_GPIO(O, 4) IRQ_TYPE_LEVEL_LOW>;
+> +		};
+>   	};
+
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+WBR, Sergei
