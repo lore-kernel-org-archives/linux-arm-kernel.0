@@ -1,76 +1,53 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 08 Aug 2013 14:14:06 -0700
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <5203C211.7040207@ti.com> (Dave Gerlach's message of "Thu, 8 Aug
- 2013 11:06:41 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
- <5203C211.7040207@ti.com>
-Message-ID: <87iozfga1t.fsf@kernel.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 8 Aug 2013 22:18:25 +0100
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
+In-Reply-To: <20130808200026.GA18226@roeck-us.net>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-2-git-send-email-wni@nvidia.com>
+ <20130808110136.GA6427@sirena.org.uk>
+ <52038035.7030803@roeck-us.net>
+ <20130808130840.GC6427@sirena.org.uk>
+ <5203B78C.7010101@roeck-us.net>
+ <20130808171554.GI6427@sirena.org.uk>
+ <20130808200026.GA18226@roeck-us.net>
+Message-ID: <20130808211825.GN6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+On Thu, Aug 08, 2013 at 01:00:26PM -0700, Guenter Roeck wrote:
+> On Thu, Aug 08, 2013 at 06:15:54PM +0100, Mark Brown wrote:
 
-> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
->> $subject and patch don't match.
->>
->> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
->>> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>>>    In reference to
->>>> the M3 handling it, the M3 wouldn't know which devices have a driver
->>>> bound and which don't.
->>> Does it need to? M3 firmware can pretty much define "I will force
->>> the device into low power state, and if the drivers dont handle
->>> things properly, fix the darned driver". M3 behavior should be
->>> considered as a "hardware" as far as Linux running on MPU is
->>> concerned, and firmware helps change the behavior by accounting for
->>> SoC quirks. *if* we have ability to handle this in the firmware,
->>> there is no need to carry this in Linux.
->>>
->> I agree with Nishant. I don't like this patch and IIRC, I gave same
->> comment in the last version. Linux need not know about all such firmware
->> quirks. Also all these M3 specific stuff, should be done somewhere
->> else. Probably having a small M3 driver won't be a bad idea.
->>
->> Regards,
->> Santosh
->>
->
-> I am not opposed to doing it this way and letting the M3 firmware
-> handle idling these modules, however the one concern raised in the
-> last series is that an approach that does not acknowledge drivers will
-> hide driver PM bugs. I suppose as long as I make sure to document that
-> the devices are being idled by the M3 firmware this may not be an
-> issue. I will look into implementing this.
+> > Sure, that's the transition issues I mentioned - the regulator API does
+> > have stubbing facilities which should cover things and it's very easy to
+> > define stub regulators if you need to.  Like I say I expect this to be a
+> > lot easier after the next merge window as another way of doing stubs is
+> > being added which should make this even easier by avoiding disrupting
+> > drivers that do genuinely want to check for absent supplies and handle
+> > that better.
 
-No, please don't start idling devices in firmware that are otherwise
-managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
-these devices, it should manage their bugs too.
+> We will need to make sure that all dts files using any of the compatible chips
+> are updated accordingly. There are several entries in various dts files for
+> adm1032, adt7461, lm90, and nct1008.
 
-This is not just about idling devices.  This is about handling broken IP
-blocks whose power-on reset state does not allow the the powerdomain to
-reach its target state.  That's just bad hardware design.  
+Yes, and probably also board files as well.  Or either just accept
+bisection trouble for now or wait till the better stubbing is in there -
+that will mean that for DT systems the core will just assume the supply
+is really there and not fail requests if it's not in the DT.
 
-That being said, IMO, the kernel (specifically omap_device) should
-handle this, and it should be rather easy to do in the omap_device layer
-and keep the SoC suspend/resume core code simple and ignorant of these
-"quirks."
+> > The names requested by a driver are defined with regard to the device
+> > and should be the names used by the chip itself as defined in the
 
-AFAICT, there's no reason these quirks need to be dealt with immediatly
-on suspend.  A slight delay should be fine, as long as it's before the
-next suspend/idle attempt, right?  
+> 9 votes for vdd, 11 votes for vcc, one undecided (no datasheet available).
+> Guess one is as good as the other ;-).
 
-Given that, what we need to do (and by we, I mean you) is to flag all
-broken IP blocks, and let omap_device handle them in a suspend/resume
-notifier (c.f. register_pm_notifier() and PM_POST_SUSPEND.)
-
-That will keep things contained to the omap_device/hwmod level and allow
-flexiblity for future broken SoCs where the list of broken IP blocks is
-different.  Though surely this broken hardware doesn't exist in AM4xxx
-because someone noticed this early on and pointed out that it should be
-fixed in hardware, right?  ;)
-
-Kevin
+What I've suggested before is to use the name from the part for which
+the driver is named.  Assuming the vendor doesn't randomly change their
+datasheet (but that causes problems for hardware engineers so tends to
+be avoided).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/df7e3102/attachment.sig>
