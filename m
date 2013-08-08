@@ -1,42 +1,16 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu,  8 Aug 2013 19:18:37 +0530
-Subject: [PATCH 35/35] cpufreq: tegra: use cpufreq_table_validate_and_show()
-In-Reply-To: <cover.1375964117.git.viresh.kumar@linaro.org>
+Date: Thu, 8 Aug 2013 19:23:36 +0530
+Subject: [PATCH 00/35] cpufreq: Introduce cpufreq_table_validate_and_show()
+In-Reply-To: <12886440.vo6SHbG01c@vostro.rjw.lan>
 References: <cover.1375964117.git.viresh.kumar@linaro.org>
-Message-ID: <568f3dbd414b050bb2319d960fb5044a5aed8ee3.1375964117.git.viresh.kumar@linaro.org>
+ <12886440.vo6SHbG01c@vostro.rjw.lan>
+Message-ID: <CAKohponFNLjUBaXc3vsFW+Up3PamqPeFF2gjG06+qTSYawTjhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets use cpufreq_table_validate_and_show() instead of calling
-cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+On 8 August 2013 19:30, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> I'm not going to take this for 3.12, sorry.  Please resend in the 3.12-rc1 /
+> 3.12-rc2 time frame.
 
-Cc: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/tegra-cpufreq.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
-index cd66b85..b50d2c4 100644
---- a/drivers/cpufreq/tegra-cpufreq.c
-+++ b/drivers/cpufreq/tegra-cpufreq.c
-@@ -215,8 +215,7 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- 	clk_prepare_enable(emc_clk);
- 	clk_prepare_enable(cpu_clk);
- 
--	cpufreq_frequency_table_cpuinfo(policy, freq_table);
--	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
-+	cpufreq_table_validate_and_show(policy, freq_table);
- 	policy->cur = tegra_getspeed(policy->cpu);
- 	target_cpu_speed[policy->cpu] = policy->cur;
- 
-@@ -233,7 +232,6 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- 
- static int tegra_cpu_exit(struct cpufreq_policy *policy)
- {
--	cpufreq_frequency_table_cpuinfo(policy, freq_table);
- 	clk_disable_unprepare(emc_clk);
- 	return 0;
- }
--- 
-1.7.12.rc2.18.g61b472e
+Okay.. By that time I will accumulate all reviews/Acks for it
+and the next patchset that I will send.
