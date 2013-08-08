@@ -1,26 +1,41 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 8 Aug 2013 07:26:48 -0500
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
-Message-ID: <52038E88.2050604@ti.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Thu,  8 Aug 2013 14:51:24 +0200
+Subject: [PATCH 5/8] ARM: dts: mxs: add pin config for LCD sync and clock pins
+In-Reply-To: <1375966287-6784-1-git-send-email-LW@KARO-electronics.de>
+References: <1375966287-6784-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1375966287-6784-6-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 03:45 AM, Russ Dill wrote:
->   In reference to
-> the M3 handling it, the M3 wouldn't know which devices have a driver
-> bound and which don't.
-Does it need to? M3 firmware can pretty much define "I will force the 
-device into low power state, and if the drivers dont handle things 
-properly, fix the darned driver". M3 behavior should be considered as a 
-"hardware" as far as Linux running on MPU is concerned, and firmware 
-helps change the behavior by accounting for SoC quirks. *if* we have 
-ability to handle this in the firmware, there is no need to carry this 
-in Linux.
 
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx28.dtsi |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 6de6342..7363fde 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -648,6 +648,19 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				lcdif_sync_pins_a: lcdif-sync at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x11a1 /* MX28_PAD_LCD_RS__LCD_DOTCLK */
++						0x11b1 /* MX28_PAD_LCD_CS__LCD_ENABLE */
++						0x1181 /* MX28_PAD_LCD_RD_E__LCD_VSYNC */
++						0x1191 /* MX28_PAD_LCD_WR_RWN__LCD_HSYNC */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 				can0_pins_a: can0 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
 -- 
-Regards,
-Nishanth Menon
+1.7.2.5
