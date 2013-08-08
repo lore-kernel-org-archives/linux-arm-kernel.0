@@ -1,23 +1,30 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 8 Aug 2013 08:03:33 +0530
-Subject: [PATCH] cpufreq: exynos5440: Fix to skip when new frequency same
- as current
-In-Reply-To: <2331427.ybQdfvflPh@vostro.rjw.lan>
-References: <1375874171-16951-1-git-send-email-amit.daniel@samsung.com>
- <52022FC2.2010109@arm.com>
- <CAKohpom0gPk9BXRP2eEuX_HBXDut=wynrZfvOH1tcEQY6CMLNQ@mail.gmail.com>
- <2331427.ybQdfvflPh@vostro.rjw.lan>
-Message-ID: <CAKohpokdvJxcWjbOgDLAzjcW_vN6hdZz_OWjFSBSLrFTccCmJg@mail.gmail.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Thu, 8 Aug 2013 10:36:25 +0800
+Subject: [PATCH 2/2] ARM: dt: t114 dalmore: add dt entry for nct1008
+In-Reply-To: <52026FEE.9070003@wwwdotorg.org>
+References: <1375858358-15070-1-git-send-email-wni@nvidia.com>
+ <1375858358-15070-3-git-send-email-wni@nvidia.com>
+ <52026FEE.9070003@wwwdotorg.org>
+Message-ID: <52030429.7010400@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2013 04:55, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> It looks like it would require us to redefine .target() to take next_state
-> instead of target_freq (at least in the acpi-cpufreq case), wouldn't it?
+On 08/08/2013 12:03 AM, Stephen Warren wrote:
+> On 08/07/2013 12:52 AM, Wei Ni wrote:
+>> Enable thermal sensor nct1008 for t114 dalmore.
+> 
+> Wei, I assume this patch doesn't depend on any of the other LM90-related
+> patches you've sent; I can simply apply it right away?
 
-If we don't do it, then atleast for few drivers, like acpi-cpufreq, which
-use index more than just for frequency, we may end up calling
-cpufreq_frequency_table_target() twice. Once in the core and then
-in driver.
+In my [PATCH 1/2], I add codes to get the vdd regulator and enable it,
+so if without it, the lm90 can't work properly on Dalmore, although it
+can be loaded.
+I think it's better to wait my fist patch applied.
 
-I believe this is doable and will post a patch soon.
+> 
+> Is the LM90 DT binding fully documented somewhere, including the
+> vdd-supply property?
+
+No LM90 DT binding document yet, I will add it in my next version.
+
+> 
