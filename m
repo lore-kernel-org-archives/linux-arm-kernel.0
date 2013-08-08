@@ -1,48 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Aug 2013 17:43:23 +0100
-Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
-In-Reply-To: <5203B97A.8060605@free-electrons.com>
-References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
- <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
- <20130716080503.GA3125@lukather>
- <5200E684.5080003@free-electrons.com>
- <20130807143546.GD2978@katana>
- <20130807155700.GE19280@titan.lakedaemon.net>
- <5203B97A.8060605@free-electrons.com>
-Message-ID: <20130808164323.GD27325@e106331-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 08 Aug 2013 09:50:11 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <20130805085114.GE15885@kroah.com> (Greg KH's message of "Mon, 5
+ Aug 2013 16:51:14 +0800")
+References: <20130801192730.GC9174@kroah.com>
+ <20130802090355.GF7656@atomide.com> <20130802093222.GA8982@kroah.com>
+ <20130802123445.GG7656@atomide.com> <20130802141449.GA7533@kroah.com>
+ <20130805065535.GP7656@atomide.com> <20130805071106.GA14215@kroah.com>
+ <20130805073730.GU7656@atomide.com> <20130805080254.GA15376@kroah.com>
+ <20130805082138.GV7656@atomide.com> <20130805085114.GE15885@kroah.com>
+Message-ID: <87txj0rut8.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 04:30:02PM +0100, Gregory CLEMENT wrote:
-> On 07/08/2013 17:57, Jason Cooper wrote:
-> > On Wed, Aug 07, 2013 at 04:35:46PM +0200, Wolfram Sang wrote:
-> >>
-> >>> But we shouldn't use it alone: we should always use:
-> >>> compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-> >>>
-> >>> From my point of view using  "marvell,mv78230-i2c" alone is an error.
-> >>>
-> >>> Wolfram what is your opinion on it?
-> >>
-> >> It is not strictly an error, but risky. If you use an older Kernel
-> >> version (or other OS) which only offers "mv64xxx" you will have no
-> >> match. Although the driver theoretically could have basic support for
-> >> all mv64xxx variants skipping all additional features of later IP
-> >> revisions.
-> > 
-> > I agree here.  The driver is advertising what IP blocks it can handle,
-> > so it makes sense to add both strings since it can handle both.
-> 
-> Wolfram,
-> so beside remarks about the compatibility strings. I didn't any other
-> comment since the v3 which was 7 weeks ago.
-> 
-> Does it mean that once I will have added the handle of this string,
-> you will be able to take the series for the 3.12 kernel?
+Greg KH <greg@kroah.com> writes:
 
-Please could you also ensure the new string is documented in
-Documentation/devicetree, with a brief description of what it implies
-about the hardware beyond the exiting "marvell,mv64xxx-i2c" string.
+> On Mon, Aug 05, 2013 at 01:21:38AM -0700, Tony Lindgren wrote:
 
-Thanks,
-Mark.
+[...]
+
+>> 
+>> How the power and clock domains are done and how the clocks are gated
+>> or idled. So basically how the devices are reset and idled at the bus
+>> level.
+>
+> I think of a "bus" as the way that a device talks to the hardware (i.e.
+> PCI, USB, i2c, spi, etc.)  You are saying a "bus" is something
+> different, something that is used to control the "raw" devices that just
+> do iowrites.
+>
+> Why not just create a bus for your devices, have them register platform
+> devices (so you can take advantage of the existing drivers) and have
+> your own "platform bus" of a specific type?  The code to do that would
+> only need to be created once "per bus", and that way you can handle all
+> of the needed reset/idle stuff properly for things "attached" to it.
+
+Each time we've looked at doing this (when pre-cursors to runtime PM
+were being explored, for example), what you end up with is essentially
+with a copy of drivers/base/platform.c with a few lines of additional
+code.  So each time this has happened, the outcome has been that the
+platform_bus has just extended slightly with the new features to avoid
+the massive duplication.
+
+This has followed the "extend instead of duplicate" philosophy we
+generally follow, but the question now is whether we've finally extended
+the platform_bus to it's breaking point.  (I don't think we don't have
+to guess what your answer is.) :)
+
+At least for the PM stuff (including reset/idle), I don't think we need
+a new bus type.  We now have PM domains which IMO should be used for
+this stuff.  PM domains allow arbitrary groupings of (independent of
+underlying bus type) that have common PM operations (read struct
+dev_pm_ops.)  For these things, it's probabably PM domains (along with
+runtime PM/dev_pm_ops) that should be extended for some of the PM
+features Tony is referring to.  Then the driver core (not the bus) might
+need to grow some new operations to handle new items in dev_pm_ops.
+
+While I think that could address the device/bus specific PM related
+operations without the need for a new bus type, it doesn't really solve
+the bigger forward-looking features Will is raising.
+
+> Perhaps we need to get in front of a whiteboard at the ARM mini summit
+> and hash this all out...
+
+Agreed, this will be a great topic for the ARM mini summit.
+
+Kevin
