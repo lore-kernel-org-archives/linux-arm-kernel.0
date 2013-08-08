@@ -1,110 +1,56 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Thu, 8 Aug 2013 16:16:14 +0100
-Subject: [PATCH v2] arm: update advice on kernel,
- initramfs and FDT load address.
-Message-ID: <1375974974-31603-1-git-send-email-ian.campbell@citrix.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 08 Aug 2013 17:30:02 +0200
+Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <20130807155700.GE19280@titan.lakedaemon.net>
+References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
+ <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130716080503.GA3125@lukather> <5200E684.5080003@free-electrons.com>
+ <20130807143546.GD2978@katana> <20130807155700.GE19280@titan.lakedaemon.net>
+Message-ID: <5203B97A.8060605@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  - Recommend that the kernel be placed under 128MiB, this is required if
-    CONFIG_AUTO_ZRELADDR=y and good (or at least not bad) advice even if
-    CONFIG_AUTO_ZRELADDR=n.
-  - Recommend that a zImage kernel be placed above 32MiB, this avoids the need
-    to relocate prior to decompression, which can speed up boot.
-  - Add basic info on the requirements when loading a raw (non-zImage) kernel
-    which are stricter than the zImage requirements.
-  - Recommend that the DTB be placed after the 128MiB boundary, avoiding any
-    potential conflict with the kernel decompressor, and within the lowmem
-    region.  In practice it could follow the kernel loaded after 32MiB,
-    assuming the kernel decompesses to less than 32MiB, but the 128MiB
-    recommendation is simple and unambiguous.
-  - Add similar recommendation regarding initramfs.
+On 07/08/2013 17:57, Jason Cooper wrote:
+> On Wed, Aug 07, 2013 at 04:35:46PM +0200, Wolfram Sang wrote:
+>>
+>>> But we shouldn't use it alone: we should always use:
+>>> compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+>>>
+>>> From my point of view using  "marvell,mv78230-i2c" alone is an error.
+>>>
+>>> Wolfram what is your opinion on it?
+>>
+>> It is not strictly an error, but risky. If you use an older Kernel
+>> version (or other OS) which only offers "mv64xxx" you will have no
+>> match. Although the driver theoretically could have basic support for
+>> all mv64xxx variants skipping all additional features of later IP
+>> revisions.
+> 
+> I agree here.  The driver is advertising what IP blocks it can handle,
+> so it makes sense to add both strings since it can handle both.
 
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Dave Martin <dave.martin@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Roy Franz <roy.franz@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
----
-v2: Update based upon discussion with Russell, Nico, Will.
-    Unconditionally recommend loading the kernel below 128MiB, but above 32MiB.    Recommend loading DTB at 128MiB and initramfs right after.
-    Try to focus on concrete recommendations without getting into to much
-    into the details of why or other alternatives/corner cases.
----
- Documentation/arm/Booting |   42 ++++++++++++++++++++++++++++++++----------
- 1 files changed, 32 insertions(+), 10 deletions(-)
+Wolfram,
+so beside remarks about the compatibility strings. I didn't any other
+comment since the v3 which was 7 weeks ago.
 
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index 0c1f475..6fcd45e 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -18,7 +18,8 @@ following:
- 2. Initialise one serial port.
- 3. Detect the machine type.
- 4. Setup the kernel tagged list.
--5. Call the kernel image.
-+5. Load initramfs.
-+6. Call the kernel image.
- 
- 
- 1. Setup and initialise RAM
-@@ -120,12 +121,27 @@ tagged list.
- The boot loader must pass at a minimum the size and location of the
- system memory, and the root filesystem location.  The dtb must be
- placed in a region of memory where the kernel decompressor will not
--overwrite it.  The recommended placement is in the first 16KiB of RAM
--with the caveat that it may not be located at physical address 0 since
--the kernel interprets a value of 0 in r2 to mean neither a tagged list
--nor a dtb were passed.
-+overwrite it while also with the region which will be covered by the
-+kernel's low-memory mapping.
- 
--5. Calling the kernel image
-+A safe location is just above the 128MiB boundary from start of RAM.
-+
-+5. Load initramfs.
-+------------------
-+
-+Existing boot loaders:		OPTIONAL
-+New boot loaders:		OPTIONAL
-+
-+If an initramfs is in use then, as with the dtb, it must be placed in
-+a region of memory where the kernel decompressor will not overwrite it
-+while also with the region which will be covered by the kernel's
-+low-memory mapping.
-+
-+A safe location is just above the device tree blob which itself will
-+be loaded just above the 128MiB boundary from the start of RAM as
-+recommended above.
-+
-+6. Calling the kernel image
- ---------------------------
- 
- Existing boot loaders:		MANDATORY
-@@ -136,11 +152,17 @@ is stored in flash, and is linked correctly to be run from flash,
- then it is legal for the boot loader to call the zImage in flash
- directly.
- 
--The zImage may also be placed in system RAM (at any location) and
--called there.  Note that the kernel uses 16K of RAM below the image
--to store page tables.  The recommended placement is 32KiB into RAM.
-+The zImage may also be placed in system RAM and called there.  The
-+kernel should be placed in the first 128MiB of RAM.  It is recommended
-+that it is loaded above 32MiB in order to avoid the need to relocate
-+prior to decompression, which will make the boot process slightly
-+faster.
-+
-+When booting a raw (non-zImage) kernel the constraints are tighter.
-+In this case the kernel must be loaded at an offset into system equal
-+to TEXT_OFFSET - PAGE_OFFSET.
- 
--In either case, the following conditions must be met:
-+In any case, the following conditions must be met:
- 
- - Quiesce all DMA capable devices so that memory does not get
-   corrupted by bogus network packets or disk data. This will save
+Does it mean that once I will have added the handle of this string,
+you will be able to take the series for the 3.12 kernel?
+
+Thanks,
+
+> 
+> thx,
+> 
+> Jason.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
 -- 
-1.7.2.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
