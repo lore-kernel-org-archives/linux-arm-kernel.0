@@ -1,77 +1,21 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 8 Aug 2013 10:22:55 +0200
-Subject: [PATCHv7 07/13] irqdomain: add function to find a MSI irq_domain
-In-Reply-To: <1375915536.12551.9.camel@pasglop>
-References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375908620.9300.3.camel@pasglop> <20130808000443.17f57875@skate>
- <1375914665.12551.5.camel@pasglop>
- <1375915344.12551.6.camel@pasglop>
- <1375915536.12551.9.camel@pasglop>
-Message-ID: <20130808102255.05fd79d8@skate>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Thu, 8 Aug 2013 16:31:22 +0800
+Subject: [PATCH 0/6] Tegra: Use cpufreq-cpu0 driver
+In-Reply-To: <cover.1375886595.git.viresh.kumar@linaro.org>
+References: <cover.1375886595.git.viresh.kumar@linaro.org>
+Message-ID: <CANg6MZgqxF1GBOhtebZLuHBh_F6CxWT=YRsQunPR+wdCQRunPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Benjamin Herrenschmidt,
+On Wed, Aug 7, 2013 at 10:46 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Hi Stephen,
+>
+> This is the first attempt to get rid of tegra-cpufreq driver. This patchset
+> tries to add supporting infrastructure for tegra to use cpufreq-cpu0 driver.
 
-On Thu, 08 Aug 2013 08:45:36 +1000, Benjamin Herrenschmidt wrote:
+If tegra has only 4-core fast cpu, I would agree with the patch set. But now
+I'm not so sure. Tegra cpuquiet driver and cluster switch may need special
+settings of cpufreq driver.
 
-> > >  - You don't need my ack since I am not the maintainer of the irqdomain
-> > > code anymore, Grant is :-)
-> > 
-> > Hrm, I'm being told Grant isn't anymore... I can step in and take it all
-> > back but you might not like the result ....
-> 
-> Oh but it looks like MAINTAINERS says I am :-)
-> 
-> Ok so from that perspective, I don't like it at all. You can try to
-> convince me otherwise but I don't think we need to introduce a
-> dependency to something like msi into the core remapper. It's already to
-> complex.
-> 
-> Why don't you move the powerpc bitmap allocator over to a generic
-> place ? I feel like it would be actually simpler but feel free to prove
-> me wrong.
-
-I'm sorry, but I'm not buying this. There must be some continuity when
-the maintenance of one subsystem transitions from one maintainer to
-another. I'm perfectly ok with accepting some hick-ups, but not radical
-changes in design decisions.
-
-What you're asking me to do is to go completely backwards compared to
-the comments and review Grant made. The irqdomain-based allocator was
-suggested by Grant (see my previous e-mail, or Grant reply at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175430.html)
-and was even Acked-by Grant in
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187082.html.
-
-Note that this patch set has been posted at the following dates:
-
- * PATCH version 7 sent on August, 7th 2013
- * PATCH version 6 sent on August, 1st 2013
- * PATCH version 5 sent on July, 15th 2013
- * PATCH version 4 sent on July, 1st 2013
- * PATCH version 3 sent on June, 19th 2013
- * PATCH version 2 sent on June, 6th 2013
- * RFC version 1 sent on March, 26th 2013
-
-So it has been around since 4 months, I've taken into account all the
-comments from the various maintainers who were involved, and especially
-the comments from Grant. You cannot ask me now, as we are approaching
-the next merge window for which this code is intended, to take
-completely opposite design choices than what the previous irqdomain
-maintainer was suggesting.
-
-Could you contact Grant and align with him on those design decisions?
-It would also be good if you could read the past discussions on this
-patch set, because all what you're pointing at has already been
-discussed at length, as I pointed out in my previous e-mail.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks
+Richard
