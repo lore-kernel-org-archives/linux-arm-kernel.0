@@ -1,42 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 8 Aug 2013 09:27:02 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6q: add quirky select input for
- USB_OTG_ID
-In-Reply-To: <CACRpkdb5caZkqweDF5Sr6z3ikYZENP58ot5GpL8Eer2pdB8YCw@mail.gmail.com>
-References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
- <1375330924-27384-2-git-send-email-shawn.guo@linaro.org>
- <CACRpkdb5caZkqweDF5Sr6z3ikYZENP58ot5GpL8Eer2pdB8YCw@mail.gmail.com>
-Message-ID: <20130808012700.GA26546@shlinux1.ap.freescale.net>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Thu, 08 Aug 2013 06:09:02 +0200
+Subject: [PATCH 1/8] ARM: at91: move peripheral id definitions to
+ dt-bindings include dir
+In-Reply-To: <201308072224.30614.arnd@arndb.de>
+References: <1375339733-3488-1-git-send-email-b.brezillon@overkiz.com>
+ <1375339933-3643-1-git-send-email-b.brezillon@overkiz.com>
+ <201308072224.30614.arnd@arndb.de>
+Message-ID: <520319DE.5090100@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 08:34:05PM +0200, Linus Walleij wrote:
-> On Thu, Aug 1, 2013 at 6:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > For some reason, the select input of pin function USB_OTG_ID is not
-> > implemented via a regular select input register but using the bit
-> > USB_OTG_ID_ SEL (shift 13) of IOMUXC_GPR1 register (offset 0x4).
-> >
-> > As per the workaround for such quirk implemented in pinctrl driver,
-> > we need to compose the input_val cell as below.
-> >
-> >         31     23      15      7        0
-> >         | 0xff | shift | width | select |
-> >
-> > Thus, we have 0xff0d0100 for MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID and
-> > 0xff0d0101 for MX6QDL_PAD_GPIO_1__USB_OTG_ID in input_val cell.
-> >
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> This does not apply on top of my "devel" branch in the pinctrl tree.
-> 
-> Could you respin this on top of devel and resend?
-> 
-> Or do I need some other patch(es) for this to apply?
+Hello Arnd,
 
-Sorry for not making this clear.  Due to the changes happened on IMX
-tree, we will have to queue this one for 3.13 merge window through IMX
-tree, after driver change hits mainline.  In short, I will take care of
-the merge of this patch.
+On 07/08/2013 22:24, Arnd Bergmann wrote:
+> On Thursday 01 August 2013, Boris BREZILLON wrote:
+>> This patch moves peripheral id definitions from machine specific include
+>> dir (arch/arm/mach-at91/include/mach/'soc-name'.h) to dt-bindinds include
+>> dir (include/dt-bindings/at91/'soc-name'/peripherals.h).
+>>
+>> These definitions will be used inside dt to define interrupt ids and
+>> peripheral clk ids.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> This seems counterproductive, why would you do that?
 
-Shawn
+This was requested by Jean-Christophe Plagniol-Villard (and proposed by 
+Richard Genoud)
+for the 3rd version of the "ARM: at91: move to common clk framework" 
+patch series (see
+https://lkml.org/lkml/2013/7/29/361) and thought it was a good idea too 
+(even if I didn't know
+where to put the macro files as there are no soc specific macro files in 
+dt-bindings include
+dir).
+
+Indeed I found it much easier to detect bugs in dt definition using 
+macros because
+the macro names and dt node names are the same (it does not protect 
+against errors
+in the macro definitions).
+
+If you think these macro definitions should be dropped, I won't argue 
+against this.
+But please, have a talk with Jean-Christophe first.
+
+Best Regards,
+
+Boris
+
+> There is no sharing of identifiers across SoCs here, you just move the
+> data around, and changing the .dts files to use the abstract macros would
+> just end up making them harder to understand, not easier, since you then
+> have to look up the numbers in another file.
+>
+> 	Arnd
