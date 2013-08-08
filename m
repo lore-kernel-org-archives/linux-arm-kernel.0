@@ -1,242 +1,95 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 09 Aug 2013 01:05:46 +0200
-Subject: [PATCH V3 3/3] ASoC: Samsung: I2S: Modify the I2S driver to
- support I2S on Exynos5420
-In-Reply-To: <1375865122-5258-4-git-send-email-padma.v@samsung.com>
-References: <1375865122-5258-1-git-send-email-padma.v@samsung.com>
- <1375865122-5258-4-git-send-email-padma.v@samsung.com>
-Message-ID: <2802930.EccX991DZW@flatron>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 8 Aug 2013 18:10:57 -0500
+Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <520409F2.1090906@wwwdotorg.org>
+References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
+ <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
+ <5204017A.1040607@wwwdotorg.org> <1375995281.22740.16.camel@linux-builds1>
+ <520409F2.1090906@wwwdotorg.org>
+Message-ID: <1376003457.22740.25.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padmavathi,
+On Thu, 2013-08-08 at 15:13 -0600, Stephen Warren wrote:
+> On 08/08/2013 02:54 PM, Dinh Nguyen wrote:
+> > On Thu, 2013-08-08 at 14:37 -0600, Stephen Warren wrote:
+> >> On 08/08/2013 02:32 PM, Dinh Nguyen wrote:
+> >>> On Thu, 2013-08-08 at 14:14 -0600, Stephen Warren wrote:
+> >>>> On 08/05/2013 02:43 PM, dinguyen at altera.com wrote:
+> >>>>> From: Dinh Nguyen <dinguyen@altera.com>
+> >>>>>
+> >>>>> Add bindings for SD/MMC for SOCFPGA.
+> >>>>> Add "syscon" to the "altr,sys-mgr" binding.
+> >>>>
+> >>>>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+> >>>>> new file mode 100644
+> >>>>> index 0000000..dc14922
+> >>>>> --- /dev/null
+> >>>>> +++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+> >>>>> @@ -0,0 +1,48 @@
+> >>>>> +* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
+> >>>>> +  Storage Host Controller
+> >>>>> +
+> >>>>> +Required Properties:
+> >>>>> +
+> >>>>> +* compatible: should be
+> >>>>> +	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
+> >>>>> +	  specific extensions.
+> >>>>> +
+> >>>>> +* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
+> >>>>> +  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
+> >>>>> +  value is fixed at 3, which means parent_clock/4.
+> >>>>
+> >>>> This feels like something that should be represented using the common
+> >>>> clock API; a driver should query the rate of its input clock, and then
+> >>>> calculate the MMC block's internal divider based on that (perhaps also
+> >>>> call clk_set_rate() on the input clock?).
+> >>>
+> >>> This means a change to the dw_mmc driver, which I can look into for the
+> >>> next round? I have promised Pawel to consolidate the bindings for both
+> >>> exynos and socfpga in the next round already. I will also look into
+> >>> using the common clock API for the MMC as well. 
+> >>>
+> >>> This patch is the only thing that is preventing from SD/MMC working for
+> >>> SOCFPGA in the mainline, can I get your Ack if I look into doing this
+> >>> for 3.13 for both the exynos and socfpga driver, and address your latter
+> >>> comments?
+> >>
+> >> The problem is that if the binding supports or requires that property
+> >> now, it has to at least support it forever. Given that we're getting
+> >> serious about DT ABI now, we should be only introducing DT bindings that
+> >> we believe are complete and corrrect, rather than bindings which we
+> >> actively expect to be temporary and to change incompatibly later.
+> >>
+> > Right ok. Then I guess I will have to look into consolidating the
+> > bindings sooner rather than later.
+> > 
+> > I went back to look at the driver again, and I think it is doing as you
+> > are suggesting:
+> > 
+> > host->bus_hz is getting its input value from the common clock API.
+> > "altr,dw-mshc-ciu-div" is specifying the internal divider that is in the
+> > SD/MMC IP itself.
+> > 
+> > I guess I'm still not clear on how I can represent the SD/MMC divider in
+> > in the context of the common clock API.
+> 
+> Why is there a need to directly represent the divider anywhere? The
+> driver can find the rate of the input clock, and I assume it knows what
+> rate it wants the clock to run at, so can't it calculate the divider
+> based on those two pieces of information?
 
-On Wednesday 07 of August 2013 14:15:22 Padmavathi Venna wrote:
-> Exynos5420 added support for I2S TDM mode. For this, there are some
-> register changes in the I2S controller. This patch adds the relevant
-> register changes to support I2S in normal mode. This patch adds a
-> quirk for TDM mode and if TDM mode is present all the relevent changes
-> will be applied.
+CC: Chris Ball
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  .../devicetree/bindings/sound/samsung-i2s.txt      |    4 +
->  include/linux/platform_data/asoc-s3c.h             |    1 +
->  sound/soc/samsung/i2s-regs.h                       |   15 ++++
->  sound/soc/samsung/i2s.c                            |   81
-> ++++++++++++++++++-- 4 files changed, 93 insertions(+), 8 deletions(-)
+> Or, does the driver really not know what rate it wants the clock to be
+> after the internal divider? If not, then I think that *rate* should be
+> recorded in DT, not the divider to obtain that rate.
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> b/Documentation/devicetree/bindings/sound/samsung-i2s.txt index
-> b3f6443..9b5c892 100644
-> --- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> @@ -11,6 +11,10 @@ Required SoC Specific Properties:
->       with secondary fifo and s/w reset control.
->     - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S with
->       secondary fifo, s/w reset control and internal mux for root clk
-> src. +   - samsung,exynos5420-i2s: for 8/16/24bit multichannel(7.1) I2S
-> with +     secondary fifo, s/w reset control, internal mux for root clk
-> src and +     TDM support. TDM (Time division multiplexing) is to allow
-> transfer of +     multiple channel audio data on single data line.
-> 
->  - reg: physical base address of the controller and length of memory
-> mapped region.
-> diff --git a/include/linux/platform_data/asoc-s3c.h
-> b/include/linux/platform_data/asoc-s3c.h index 8827259..9efc04d 100644
-> --- a/include/linux/platform_data/asoc-s3c.h
-> +++ b/include/linux/platform_data/asoc-s3c.h
-> @@ -36,6 +36,7 @@ struct samsung_i2s {
->   */
->  #define QUIRK_NO_MUXPSR		(1 << 2)
->  #define QUIRK_NEED_RSTCLR	(1 << 3)
-> +#define QUIRK_SUPPORTS_TDM	(1 << 4)
->  	/* Quirks of the I2S controller */
->  	u32 quirks;
->  	dma_addr_t idma_addr;
-> diff --git a/sound/soc/samsung/i2s-regs.h b/sound/soc/samsung/i2s-regs.h
-> index 30513b7..821a502 100644
-> --- a/sound/soc/samsung/i2s-regs.h
-> +++ b/sound/soc/samsung/i2s-regs.h
-> @@ -31,6 +31,10 @@
->  #define I2SLVL1ADDR	0x34
->  #define I2SLVL2ADDR	0x38
->  #define I2SLVL3ADDR	0x3c
-> +#define I2SSTR1		0x40
-> +#define I2SVER		0x44
-> +#define I2SFIC2		0x48
-> +#define I2STDM		0x4c
-> 
->  #define CON_RSTCLR		(1 << 31)
->  #define CON_FRXOFSTATUS		(1 << 26)
-> @@ -117,6 +121,17 @@
->  #define MOD_BCLK_MASK		3
->  #define MOD_8BIT		(1 << 0)
-> 
-> +#define EXYNOS5420_MOD_LRP_SHIFT	15
-> +#define EXYNOS5420_MOD_SDF_SHIFT	6
-> +#define EXYNOS5420_MOD_RCLK_SHIFT	4
-> +#define EXYNOS5420_MOD_BCLK_SHIFT	0
-> +#define EXYNOS5420_MOD_BCLK_64FS	4
-> +#define EXYNOS5420_MOD_BCLK_96FS	5
-> +#define EXYNOS5420_MOD_BCLK_128FS	6
-> +#define EXYNOS5420_MOD_BCLK_192FS	7
-> +#define EXYNOS5420_MOD_BCLK_256FS	8
-> +#define EXYNOS5420_MOD_BCLK_MASK	0xf
-> +
->  #define MOD_CDCLKCON		(1 << 12)
-> 
->  #define PSR_PSREN		(1 << 15)
-> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-> index 8a5504c..6964672 100644
-> --- a/sound/soc/samsung/i2s.c
-> +++ b/sound/soc/samsung/i2s.c
-> @@ -199,7 +199,12 @@ static inline bool is_manager(struct i2s_dai *i2s)
->  /* Read RCLK of I2S (in multiples of LRCLK) */
->  static inline unsigned get_rfs(struct i2s_dai *i2s)
->  {
-> -	u32 rfs = (readl(i2s->addr + I2SMOD) >> MOD_RCLK_SHIFT);
-> +	u32 rfs;
-> +
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM)
-> +		rfs = readl(i2s->addr + I2SMOD) >> 
-EXYNOS5420_MOD_RCLK_SHIFT;
-> +	else
-> +		rfs = (readl(i2s->addr + I2SMOD) >> MOD_RCLK_SHIFT);
->  	rfs &= MOD_RCLK_MASK;
-> 
->  	switch (rfs) {
-> @@ -214,8 +219,12 @@ static inline unsigned get_rfs(struct i2s_dai *i2s)
-> static inline void set_rfs(struct i2s_dai *i2s, unsigned rfs) {
->  	u32 mod = readl(i2s->addr + I2SMOD);
-> -	int rfs_shift =  MOD_RCLK_SHIFT;
-> +	int rfs_shift;
-> 
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM)
-> +		rfs_shift = EXYNOS5420_MOD_RCLK_SHIFT;
-> +	else
-> +		rfs_shift = MOD_RCLK_SHIFT;
->  	mod &= ~(MOD_RCLK_MASK << rfs_shift);
-> 
->  	switch (rfs) {
-> @@ -239,10 +248,22 @@ static inline void set_rfs(struct i2s_dai *i2s,
-> unsigned rfs) /* Read Bit-Clock of I2S (in multiples of LRCLK) */
->  static inline unsigned get_bfs(struct i2s_dai *i2s)
->  {
-> -	u32 bfs =  readl(i2s->addr + I2SMOD) >> MOD_BCLK_SHIFT;
-> -	bfs &= MOD_BCLK_MASK;
-> +	u32 bfs;
-> +
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
-> +		bfs = readl(i2s->addr + I2SMOD) >> 
-EXYNOS5420_MOD_BCLK_SHIFT;
-> +		bfs &= EXYNOS5420_MOD_BCLK_MASK;
-> +	} else {
-> +		bfs =  readl(i2s->addr + I2SMOD) >> MOD_BCLK_SHIFT;
-> +		bfs &= MOD_BCLK_MASK;
-> +	}
-> 
->  	switch (bfs) {
-> +	case 8: return 256;
-> +	case 7: return 192;
-> +	case 6: return 128;
-> +	case 5: return 96;
-> +	case 4: return 64;
->  	case 3: return 24;
->  	case 2: return 16;
->  	case 1:	return 48;
-> @@ -254,9 +275,22 @@ static inline unsigned get_bfs(struct i2s_dai *i2s)
-> static inline void set_bfs(struct i2s_dai *i2s, unsigned bfs) {
->  	u32 mod = readl(i2s->addr + I2SMOD);
-> -	int bfs_shift = MOD_BCLK_SHIFT;
-> +	int bfs_shift;
-> +	int tdm = i2s->quirks & QUIRK_SUPPORTS_TDM;
-> 
-> -	mod &= ~(MOD_BCLK_MASK << bfs_shift);
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
-> +		bfs_shift = EXYNOS5420_MOD_BCLK_SHIFT;
-> +		mod &= ~(EXYNOS5420_MOD_BCLK_MASK << bfs_shift);
-> +	} else {
-> +		bfs_shift = MOD_BCLK_SHIFT;
-> +		mod &= ~(MOD_BCLK_MASK << bfs_shift);
-> +	}
-> +
-> +	/* Non-TDM I2S controllers do not support BCLK > 48 * FS */
-> +	if (!tdm && bfs > 48) {
-> +		dev_err(&i2s->pdev->dev, "Unsupported BCLK divider\n");
-> +		return;
-> +	}
-> 
->  	switch (bfs) {
->  	case 48:
-> @@ -271,6 +305,21 @@ static inline void set_bfs(struct i2s_dai *i2s,
-> unsigned bfs) case 16:
->  		mod |= (MOD_BCLK_16FS << bfs_shift);
->  		break;
-> +	case 64:
-> +		mod |= (EXYNOS5420_MOD_BCLK_64FS << bfs_shift);
-> +		break;
-> +	case 96:
-> +		mod |= (EXYNOS5420_MOD_BCLK_96FS << bfs_shift);
-> +		break;
-> +	case 128:
-> +		mod |= (EXYNOS5420_MOD_BCLK_128FS << bfs_shift);
-> +		break;
-> +	case 192:
-> +		mod |= (EXYNOS5420_MOD_BCLK_192FS << bfs_shift);
-> +		break;
-> +	case 256:
-> +		mod |= (EXYNOS5420_MOD_BCLK_256FS << bfs_shift);
-> +		break;
->  	default:
->  		dev_err(&i2s->pdev->dev, "Wrong BCLK Divider!\n");
->  		return;
-> @@ -496,10 +545,17 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
->  {
->  	struct i2s_dai *i2s = to_info(dai);
->  	u32 mod = readl(i2s->addr + I2SMOD);
-> -	int lrp_shift = MOD_LRP_SHIFT, sdf_shift = MOD_SDF_SHIFT;
-> -	int sdf_mask, lrp_rlow;
-> +	int lrp_shift, sdf_shift, sdf_mask, lrp_rlow;
->  	u32 tmp = 0;
-> 
-> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
-> +		lrp_shift = EXYNOS5420_MOD_LRP_SHIFT;
-> +		sdf_shift = EXYNOS5420_MOD_SDF_SHIFT;
-> +	} else {
-> +		lrp_shift = MOD_LRP_SHIFT;
-> +		sdf_shift = MOD_SDF_SHIFT;
-> +	}
-> +
->  	sdf_mask = MOD_SDF_MASK << sdf_shift;
->  	lrp_rlow = MOD_LR_RLOW << lrp_shift;
-> 
-> @@ -1264,6 +1320,12 @@ static struct samsung_i2s_dai_data i2sv5_dai_type
-> = { .quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR, };
-> 
-> +static struct samsung_i2s_dai_data i2sv6_dai_type = {
-> +	.dai_type = TYPE_PRI,
-> +	.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR |
-> +			QUIRK_SUPPORTS_TDM,
-> +};
-> +
->  static struct samsung_i2s_dai_data samsung_dai_type_sec = {
->  	.dai_type = TYPE_SEC,
->  };
-> @@ -1297,6 +1359,9 @@ static const struct of_device_id
-> exynos_i2s_match[] = { }, {
->  		.compatible = "samsung,s5pv210-i2s",
->  		.data = &i2sv5_dai_type,
-> +	}, {
-> +		.compatible = "samsung,exynos5420-i2s",
-> +		.data = &i2sv6_dai_type,
->  	},
->  	{},
->  };
 
-This one looks good to me.
+I believe that this is the case, that the driver does not know what rate
+it will clock the SD card at. I think internally we did have a "bus_hz"
+in DT a while back. I guess I don't really understand why it would be
+better to have a *rate* DT entry instead of a fixed-divider entry?
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+Dinh
+> 
