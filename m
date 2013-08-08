@@ -1,39 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Aug 2013 15:10:52 -0600
-Subject: [RESEND PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and
- dw-apb-timer-sp to just dw-apb-timer
-In-Reply-To: <20130808210108.GA17855@amd.pavel.ucw.cz>
-References: <1375740158-10012-1-git-send-email-dinguyen@altera.com>
- <5203FCEA.7040709@wwwdotorg.org> <20130808210108.GA17855@amd.pavel.ucw.cz>
-Message-ID: <5204095C.9010504@wwwdotorg.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 9 Aug 2013 00:11:15 +0300
+Subject: v3.11-rc4: OMAP1/Amstrad Delta (E3) crash
+In-Reply-To: <20130808110108.GK23053@n2100.arm.linux.org.uk>
+References: <20130806232609.GB15014@blackmetal.musicnaut.iki.fi>
+ <20130808110108.GK23053@n2100.arm.linux.org.uk>
+Message-ID: <20130808211114.GF15014@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 03:01 PM, Pavel Machek wrote:
-> On Thu 2013-08-08 14:17:46, Stephen Warren wrote:
->> On 08/05/2013 04:02 PM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
->>> DW APB timer, just fed by different clocks.
->>
->> I assume patch 1/1 made similar changes to the driver?
->>
->>> diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
->>
->>>  Required properties:
->>> -- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
->>> +- compatible: "snps,dw-apb-timer"
->>
->> This change is problematic w.r.t device tree as an ABI. any DT that uses
->> the new value "snps,dw-apb-timer" will not work with older software that
->> was written to expect the old values.
-> 
-> I'm pretty sure there's no such software out there. Actually, I don't
-> think timers ever worked properly on any mainline kernels.
-> 
-> So I believe we can still fix it the right way... it is same hardware
-> with different labels after all.
+Hi,
 
-If even Linux 3.11 isn't going to work properly with the current DT
-content, then I think breaking ABI compatibility is fine.
+On Thu, Aug 08, 2013 at 12:01:08PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 07, 2013 at 02:26:09AM +0300, Aaro Koskinen wrote:
+> > [    0.258589] [ffff1224] *pgd=00000000, *pte=11fff0cb000001f1, *ppte=11fff00a00000000
+> 
+> BTW, your oops dump is interesting for another reason - the above.
+> You seem to have 64-bit page table entries above.
+
+Yes, this is worrying...
+
+> Now, this is totally legal C:
+> 
+> 	unsigned int val = 0x12345678;
+> 
+> 	printk("%08llx\n", (long long)val);
+> 
+> and it should produce "12345678" but I'm willing to bet with your compiler
+> it produces "12345678xxxxxxxx" where xxxxxxxx is just what happens to be
+> sitting in some register.  IOW, I think you have a compiler bug here.  Can
+> you investigate what's going on with this yourself please?
+
+I made a quick check and added that to the fault handler, and yes,
+the result is crap:
+
++unsigned int test_bar = 0x12345678;
+ void show_pte(struct mm_struct *mm, unsigned long addr)
+ {
+        pgd_t *pgd;
+ 
++       printk(KERN_INFO "%d\n", 0);
++       printk(KERN_INFO "%llx\n", (long long)test_bar);
++       printk(KERN_INFO "%d %llx\n", 1, (long long)test_bar);
+[...]
+[    0.261788] 0
+[    0.263849] 1234567800000000
+[    0.267201] 1 0
+
+However, addings similar prints to early boot produces correct results:
+
++unsigned int test_foo = 0x12345678;
+ void __init smp_setup_processor_id(void)
+[...]
+        printk(KERN_INFO "Booting Linux on physical CPU 0x%x\n", mpidr);
++       printk(KERN_INFO "%llx\n", (long long)test_foo);
++       printk(KERN_INFO "%d %llx\n", 1, (long long)test_foo);
+[...]
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] 12345678
+[    0.000000] 1 12345678
+
+So I'm pretty confused. Anyway, I'll continue investigating this next week...
+
+A.
