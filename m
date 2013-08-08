@@ -1,43 +1,57 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Thu,  8 Aug 2013 14:51:23 +0200
-Subject: [PATCH 4/8] ARM: dts: mxs: add pin config for SSP3 interface
+Date: Thu,  8 Aug 2013 14:51:25 +0200
+Subject: [PATCH 6/8] ARM: dts: mxs: add pin config options for usbphy pins
 In-Reply-To: <1375966287-6784-1-git-send-email-LW@KARO-electronics.de>
 References: <1375966287-6784-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1375966287-6784-5-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1375966287-6784-7-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx28.dtsi |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx28.dtsi |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 7d7f277..6de6342 100644
+index 7363fde..f941648 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -683,6 +683,21 @@
- 					fsl,pull-up = <1>;
+@@ -731,6 +731,17 @@
+ 					fsl,pull-up = <0>;
  				};
  
-+				spi3_pins_a: spi3 at 0 {
-+					reg = <0>;
++				usbphy0_pins_c: usbphy0 at 2 {
++					reg = <2>;
 +					fsl,pinmux-ids = <
-+						0x3082 /* MX28_PAD_AUART2_RX__SSP3_D4 */
-+						0x3092 /* MX28_PAD_AUART2_TX__SSP3_D5 */
-+						0x2180 /* MX28_PAD_SSP3_SCK__SSP3_SCK */
-+						0x2190 /* MX28_PAD_SSP3_MOSI__SSP3_CMD */
-+						0x21A0 /* MX28_PAD_SSP3_MISO__SSP3_D0 */
-+						0x21B0 /* MX28_PAD_SSP3_SS0__SSP3_D3 */
++						0x0123 /* MX28_PAD_GPMI_CE2N__GPIO_0_18 - USBOTG_VBUSEN */
++						0x0133 /* MX28_PAD_GPMI_CE3N__GPIO_0_19 - USBOTH_OC */
 +					>;
-+					fsl,drive-strength = <1>;
++					fsl,drive-strength = <2>;
 +					fsl,voltage = <1>;
 +					fsl,pull-up = <0>;
 +				};
 +
- 				usbphy0_pins_a: usbphy0 at 0 {
+ 				usbphy1_pins_a: usbphy1 at 0 {
  					reg = <0>;
  					fsl,pinmux-ids = <
+@@ -740,6 +751,17 @@
+ 					fsl,voltage = <1>;
+ 					fsl,pull-up = <0>;
+ 				};
++
++				usbphy1_pins_b: usbphy1 at 1 {
++					reg = <1>;
++					fsl,pinmux-ids = <
++						0x31b3 /* MX28_PAD_SPDIF__GPIO_3_27 - USBH_VBUSEN */
++						0x4143 /* MX28_PAD_JTAG_RTCK__GPIO_4_20 - USBH_OC */
++					>;
++					fsl,drive-strength = <2>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
+ 			};
+ 
+ 			digctl: digctl at 8001c000 {
 -- 
 1.7.2.5
