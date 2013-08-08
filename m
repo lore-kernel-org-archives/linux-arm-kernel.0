@@ -1,69 +1,43 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 8 Aug 2013 14:52:32 +0900
-Subject: [PATCH 01/02] ARM: shmobile: Add r8a73a4 SMP support using APMU
- code
-In-Reply-To: <20130807225540.9856.67383.sendpatchset@w520>
-References: <20130807225531.9856.18974.sendpatchset@w520>
- <20130807225540.9856.67383.sendpatchset@w520>
-Message-ID: <CANqRtoQmoOWwTyed4-KnWPJfWV8rLMHLCSiN1a5v6=4Bmj7Z6A@mail.gmail.com>
+From: markz@nvidia.com (Mark Zhang)
+Date: Thu, 8 Aug 2013 13:55:27 +0800
+Subject: [PATCH v2] clk: tegra: Correct sbc mux width & parent
+Message-ID: <1375941327-4231-1-git-send-email-markz@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Tegra114 sbc1-sbc6 have more possible parent clocks than Tegra30.
+So correct the parents and mux width for them.
 
-On Thu, Aug 8, 2013 at 7:55 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> From: Magnus Damm <damm@opensource.se>
->
-> Add r8a73a4 SMP support using the shared APMU code. To enable
-> SMP the r8a73a4 specific DTS needs to be updated to include
-> CPU cores, and this is happening in a separate patch.
->
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
->
->  arch/arm/mach-shmobile/Makefile               |    1
->  arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1
->  arch/arm/mach-shmobile/setup-r8a73a4.c        |    3 +
->  arch/arm/mach-shmobile/smp-r8a73a4.c          |   75 +++++++++++++++++++++++++
->  4 files changed, 80 insertions(+)
->
-> --- 0001/arch/arm/mach-shmobile/Makefile
-> +++ work/arch/arm/mach-shmobile/Makefile        2013-08-07 20:07:31.000000000 +0900
-> @@ -33,6 +33,7 @@ endif
->  # SMP objects
->  smp-y                          := platsmp.o headsmp.o
->  smp-$(CONFIG_ARCH_SH73A0)      += smp-sh73a0.o headsmp-scu.o platsmp-scu.o
-> +smp-$(CONFIG_ARCH_R8A73A4)     += smp-r8a73a4.o platsmp-apmu.o
->  smp-$(CONFIG_ARCH_R8A7779)     += smp-r8a7779.o headsmp-scu.o platsmp-scu.o
->  smp-$(CONFIG_ARCH_EMEV2)       += smp-emev2.o headsmp-scu.o platsmp-scu.o
->
-> --- 0008/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-> +++ work/arch/arm/mach-shmobile/include/mach/r8a73a4.h  2013-08-07 20:08:02.000000000 +0900
-> @@ -6,5 +6,6 @@ void r8a73a4_add_dt_devices(void);
->  void r8a73a4_clock_init(void);
->  void r8a73a4_pinmux_init(void);
->  void r8a73a4_init_early(void);
-> +extern struct smp_operations r8a73a4_smp_ops;
->
->  #endif /* __ASM_R8A73A4_H__ */
-> --- 0008/arch/arm/mach-shmobile/setup-r8a73a4.c
-> +++ work/arch/arm/mach-shmobile/setup-r8a73a4.c 2013-08-07 20:07:48.000000000 +0900
-> @@ -212,6 +212,9 @@ void __init r8a73a4_init_early(void)
->  #ifndef CONFIG_ARM_ARCH_TIMER
->         shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
->  #endif
-> +#ifdef CONFIG_SMP
-> +       smp_set_ops(&r8a73a4_smp_ops);
-> +#endif
->  }
+Signed-off-by: Mark Zhang <markz@nvidia.com>
+---
+Changes from v1:
+- "s/T114/Tegra114/ s/t30/Tegra30/" in commit message
 
-Arnd or Olof, may I ask for your advice here?
+ drivers/clk/tegra/clk-tegra114.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-I think it's quite nice to use smp_set_ops() in ->init_early() to
-install the per-SoC SMP operations. I prefer that over using the
-smp_ops directly in the per-board DT_MACHINE_START. Which way do you
-prefer?
-
-Thanks,
-
-/ magnus
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index f74ed19..71db736 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -1844,12 +1844,12 @@ static struct tegra_periph_init_data tegra_periph_clk_list[] = {
+ 	TEGRA_INIT_DATA_MUX("amx", NULL, "amx", mux_plla_pllc_pllp_clkm, CLK_SOURCE_AMX, 153, &periph_w_regs, TEGRA_PERIPH_ON_APB, amx),
+ 	TEGRA_INIT_DATA_MUX("hda", "hda", "tegra30-hda", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_HDA, 125, &periph_v_regs, TEGRA_PERIPH_ON_APB, hda),
+ 	TEGRA_INIT_DATA_MUX("hda2codec_2x", "hda2codec", "tegra30-hda", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_HDA2CODEC_2X, 111, &periph_v_regs, TEGRA_PERIPH_ON_APB, hda2codec_2x),
+-	TEGRA_INIT_DATA_MUX("sbc1", NULL, "tegra11-spi.0", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SBC1, 41, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc1),
+-	TEGRA_INIT_DATA_MUX("sbc2", NULL, "tegra11-spi.1", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SBC2, 44, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc2),
+-	TEGRA_INIT_DATA_MUX("sbc3", NULL, "tegra11-spi.2", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SBC3, 46, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc3),
+-	TEGRA_INIT_DATA_MUX("sbc4", NULL, "tegra11-spi.3", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SBC4, 68, &periph_u_regs, TEGRA_PERIPH_ON_APB, sbc4),
+-	TEGRA_INIT_DATA_MUX("sbc5", NULL, "tegra11-spi.4", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SBC5, 104, &periph_v_regs, TEGRA_PERIPH_ON_APB, sbc5),
+-	TEGRA_INIT_DATA_MUX("sbc6", NULL, "tegra11-spi.5", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SBC6, 105, &periph_v_regs, TEGRA_PERIPH_ON_APB, sbc6),
++	TEGRA_INIT_DATA_MUX8("sbc1", NULL, "tegra11-spi.0", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC1, 41, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc1),
++	TEGRA_INIT_DATA_MUX8("sbc2", NULL, "tegra11-spi.1", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC2, 44, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc2),
++	TEGRA_INIT_DATA_MUX8("sbc3", NULL, "tegra11-spi.2", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC3, 46, &periph_h_regs, TEGRA_PERIPH_ON_APB, sbc3),
++	TEGRA_INIT_DATA_MUX8("sbc4", NULL, "tegra11-spi.3", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC4, 68, &periph_u_regs, TEGRA_PERIPH_ON_APB, sbc4),
++	TEGRA_INIT_DATA_MUX8("sbc5", NULL, "tegra11-spi.4", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC5, 104, &periph_v_regs, TEGRA_PERIPH_ON_APB, sbc5),
++	TEGRA_INIT_DATA_MUX8("sbc6", NULL, "tegra11-spi.5", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC6, 105, &periph_v_regs, TEGRA_PERIPH_ON_APB, sbc6),
+ 	TEGRA_INIT_DATA_MUX8("ndflash", NULL, "tegra_nand", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_NDFLASH, 13, &periph_u_regs, TEGRA_PERIPH_ON_APB, ndspeed),
+ 	TEGRA_INIT_DATA_MUX8("ndspeed", NULL, "tegra_nand_speed", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_NDSPEED, 80, &periph_u_regs, TEGRA_PERIPH_ON_APB, ndspeed),
+ 	TEGRA_INIT_DATA_MUX("vfir", NULL, "vfir", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_VFIR, 7, &periph_l_regs, TEGRA_PERIPH_ON_APB, vfir),
+-- 
+1.7.9.5
