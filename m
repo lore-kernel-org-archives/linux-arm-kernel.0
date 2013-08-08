@@ -1,125 +1,40 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 8 Aug 2013 15:50:49 +0530
-Subject: OMAP2430 SDP boot broken after Linus' rmk merge
-In-Reply-To: <52032EA3.90106@ti.com>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com>
- <alpine.DEB.2.02.1308071807240.28993@utopia.booyaka.com>
- <52032EA3.90106@ti.com>
-Message-ID: <52037101.4030608@ti.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Thu, 08 Aug 2013 11:22:54 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Interested in R/M-class
+ (!MMU), automated testing
+In-Reply-To: <1375725497.22073.103.camel@gandalf.local.home>
+References: <51FBF93D.8040707@arm.com> <20130804122527.GV3880@pengutronix.de>
+ <CAOesGMgnYLXRWRtKckofNpsxmRgT0cXL=JcAMirXibe92+AWOQ@mail.gmail.com>
+ <CAOesGMhDQE8S=L-h+5u3Q_h8Vm=vFs4swfR5Za2MVut7ai-yRQ@mail.gmail.com>
+ <51FF799B.1000007@arm.com> <1375725497.22073.103.camel@gandalf.local.home>
+Message-ID: <5203717E.203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 August 2013 11:07 AM, Rajendra Nayak wrote:
-> On Wednesday 07 August 2013 11:39 PM, Paul Walmsley wrote:
->> Hi Rajendra,
->>
->> On Tue, 23 Jul 2013, Rajendra Nayak wrote:
->>
->>> So I tried commit 'fb2af00' on the 4430SDP and it did boot fine, though I see
->>> the below errors. (I am using the mainline bootloaders which do not lock any
->>> additional DPLLs like USB)
->>
->> Could you please send patches to fix these problems, or ensure that 
->> someone else from TI fixes them?  Let's see if we can deal with the 
->> remaining bootloader dependencies here.
-> 
-> Sure Paul, I'll take a look at this.
+On 05/08/13 18:58, Steven Rostedt wrote:
+> On Mon, 2013-08-05 at 11:08 +0100, Jonathan Austin wrote:
+>
+>> So that seems to be at least three separate approaches. Further, I took a
+>> look recently at the ktest.pl script, which looked handy but not so
+>> targetted at the ARM world, where you care about testing the same thing on
+>> a wide array of platforms, might want an NFS root file-system, etc.
+>
+> As the maintainer of ktest.pl, I would be very interested in working
+> with you to make it easier to handle your requirements. This was the
+> purpose of ktest.pl in the first place :-)
 
-+Mike,
+Thanks very much - I don't know if I'm the only one that's looked at 
+ktest, but hopefully some of the others that already have fuller systems 
+also have thoughts on this. I'll be sure to have a more thorough look at 
+how this might work beforehand, so that if I am at the summit I can have 
+some more input.
 
-Paul, I just posted a fix for this [1] though I am not sure if doing the
-PLL locks in a certain sequence is the right thing to do, or perhaps there
-is a need to relook at the need for a clk_set_rate() on all downstream clocks
-as part of CCF.
+>
+> I'll happily attend any of the ARM sessions that talk about testing.
+>
 
-regards,
-Rajendra
+Olof, perhaps your idea of sharing what you've recently set up could 
+form the core of a session? From your other email it looks like that 
+system is already being quite useful...
 
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93627.html
-
-> 
->>
->> thanks
->>
->>
->> - Paul
->>
->>>
->>> [    0.000000] clock: dpll_usb_ck failed transition to 'locked'
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] clock: trace_clk_div_ck: could not find divisor for target rate 0 for parent pmd_trace_clk_mux_ck
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] Division by zero in kernel.
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->>> [    0.000000] clock: dpll_per_m7x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->>> [    0.000000] clock: dpll_per_m6x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->>> [    0.000000] clock: dpll_per_m5x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->>> [    0.000000] clock: dpll_per_m4x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->>>
->>>>
->>>>
->>>> - Paul
->>>>
->>>
->>
->>
->> - Paul
->>
-> 
+Jonny
