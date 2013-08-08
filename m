@@ -1,45 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 08 Aug 2013 23:39:47 +0400
-Subject: [PATCH 3/3] crypto: dcp: rename 'compatible' property to 'fsl,
- dcp'
-In-Reply-To: <1375968629-10091-4-git-send-email-LW@KARO-electronics.de>
-References: <1375968629-10091-1-git-send-email-LW@KARO-electronics.de>
- <1375968629-10091-4-git-send-email-LW@KARO-electronics.de>
-Message-ID: <5203F403.1040800@cogentembedded.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 8 Aug 2013 14:49:49 -0500
+Subject: [PATCHv3 6/9] ARM: OMAP2+: timer: Add suspend-resume callbacks
+ for clkevent device
+In-Reply-To: <8738qkhwey.fsf@kernel.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-7-git-send-email-d-gerlach@ti.com>
+ <8738qkhwey.fsf@kernel.org>
+Message-ID: <5203F65D.9030501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 08/08/2013 05:30 PM, Lothar Wa?mann wrote:
-
-> Leave the old 'fsl-dcp' value in place with an appropriate comment
-> until external users have updated their DTBs.
-
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->   arch/arm/boot/dts/imx28.dtsi |    2 +-
->   drivers/crypto/dcp.c         |    2 ++
->   2 files changed, 3 insertions(+), 1 deletions(-)
-
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index ea99d09..0584935 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -794,7 +794,7 @@
->   			};
+On 08/08/2013 01:25 PM, Kevin Hilman wrote:
+> Dave Gerlach <d-gerlach@ti.com> writes:
 >
->   			dcp: dcp at 80028000 {
+>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>
+>> OMAP timer code registers two timers - one as clocksource
+>> and one as clockevent. Since AM33XX has only one usable timer
+>> in the WKUP domain one of the timers needs suspend-resume
+>> support to restore the configuration to pre-suspend state.
+>>
+>> commit adc78e6 (timekeeping: Add suspend and resume
+>> of clock event devices) introduced .suspend and .resume
+>> callbacks for clock event devices. Leverages these
+>> callbacks to have AM33XX clockevent timer which is
+>> in not in WKUP domain to behave properly across system
+>> suspend.
+>>
+>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++++++++++
+>>   1 file changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index b37e1fc..cce5d39 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -118,11 +118,43 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+>>   	}
+>>   }
+>>
+>> +static void omap_clkevt_suspend(struct clock_event_device *unused)
+>> +{
+>> +	char name[10];
+>> +	struct omap_hwmod *oh;
+>> +
+>> +	sprintf(name, "timer%d", clkev.id);
+>> +	oh = omap_hwmod_lookup(name);
+>
+> /me stops reviewing here.  This should be a one-time thing.
+>
+> Seeing things *again* in patches that I've already reviewed (multiple
+> times) is very frustrating.  It also increases the likelihood of future
+> patches to be "filtered."  (in this case, you get a pass since you seem
+> to have inherited Vaibhav's code, but please take care to address all
+> reviewer comments, or at least explain why you didn'.)
+>
+> Kevin
+>
 
-     By the way, I see that this is a crypto device, so it should be named 
-"crypto" according to ePAPR spec. [1]
+Sorry for missing this. Seems I missed this patch completely when taking 
+over. I'll make sure it's addressed in the next version.
 
-> -				compatible = "fsl-dcp";
-> +				compatible = "fsl,dcp";
->   				reg = <0x80028000 0x2000>;
->   				interrupts = <52 53 54>;
->   				status = "disabled";
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+Regards,
+Dave
