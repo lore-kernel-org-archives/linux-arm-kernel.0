@@ -1,88 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 8 Aug 2013 08:27:38 +0530
-Subject: [PATCH 2/6] ARM: Tegra: Add CPU's OPPs for using cpufreq-cpu0
- driver
-In-Reply-To: <52029811.9080704@wwwdotorg.org>
-References: <cover.1375886595.git.viresh.kumar@linaro.org>
- <d4cd498d9b63d761039b025216e65278dc8e0e37.1375886595.git.viresh.kumar@linaro.org>
- <52028719.8070908@wwwdotorg.org>
- <CAKohpo=MpOyMGFTGeZWmoCRwmZ7+nQtP_yCGokPanEVYL0xbMw@mail.gmail.com>
- <52029811.9080704@wwwdotorg.org>
-Message-ID: <CAKohpom658XKf5qPb3Wekb_uRfBEGHSxE=T06tEi30UTQ4K=Sg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 8 Aug 2013 09:27:02 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6q: add quirky select input for
+ USB_OTG_ID
+In-Reply-To: <CACRpkdb5caZkqweDF5Sr6z3ikYZENP58ot5GpL8Eer2pdB8YCw@mail.gmail.com>
+References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
+ <1375330924-27384-2-git-send-email-shawn.guo@linaro.org>
+ <CACRpkdb5caZkqweDF5Sr6z3ikYZENP58ot5GpL8Eer2pdB8YCw@mail.gmail.com>
+Message-ID: <20130808012700.GA26546@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2013 00:25, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/07/2013 12:06 PM, Viresh Kumar wrote:
->> On 7 August 2013 23:12, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 08/07/2013 08:46 AM, Viresh Kumar wrote:
->>>> cpufreq-cpu0 driver needs OPPs to be present in DT which can be probed by it to
->>>> get frequency table. This patch adds OPPs and clock-latency to tegra cpu0 node
->>>> for multiple SoCs.
->>>>
->>>> Voltage levels aren't used until now for tegra and so a flat value which would
->>>> eventually be ignored is used to represent voltage.
->>>
->>> This patch is problematic w.r.t. DT being an ABI.
->>
->> :(
->>
->>> We can certainly add new optional properties to a DT binding that enable
->>> new features. However, a new version of a binding can't require new
->>> properties to exist that didn't before, since that means that old DTs
->>> won't work with new kernels that require the new properties.
->>
->> To be honest I didn't get it completely. You meant operating-points
->> wasn't present before? Its here:
->>
->> Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
->> Documentation/devicetree/bindings/power/opp.txt
->>
->> Or you meant, Tegra never required voltage levels and we are getting
->> them in here.
->
-> The current Tegra *.dts files do not contain this property. The current
-> Tegra *.dts files must continue to work without modification in future
-> kernels.
+On Wed, Aug 07, 2013 at 08:34:05PM +0200, Linus Walleij wrote:
+> On Thu, Aug 1, 2013 at 6:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+> > For some reason, the select input of pin function USB_OTG_ID is not
+> > implemented via a regular select input register but using the bit
+> > USB_OTG_ID_ SEL (shift 13) of IOMUXC_GPR1 register (offset 0x4).
+> >
+> > As per the workaround for such quirk implemented in pinctrl driver,
+> > we need to compose the input_val cell as below.
+> >
+> >         31     23      15      7        0
+> >         | 0xff | shift | width | select |
+> >
+> > Thus, we have 0xff0d0100 for MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID and
+> > 0xff0d0101 for MX6QDL_PAD_GPIO_1__USB_OTG_ID in input_val cell.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> This does not apply on top of my "devel" branch in the pinctrl tree.
+> 
+> Could you respin this on top of devel and resend?
+> 
+> Or do I need some other patch(es) for this to apply?
 
-But that can't be true always.. Specially when we are moving things to
-DT...
+Sorry for not making this clear.  Due to the changes happened on IMX
+tree, we will have to queue this one for 3.13 merge window through IMX
+tree, after driver change hits mainline.  In short, I will take care of
+the merge of this patch.
 
-For example, we are moving your DMA driver to DT and hence in the
-platform code, we are making a new DT node + removing static
-platform device.
-
-Now, old DT can't work with new kernel... That is just not possible.
-That statement might be true for cases where we are just upgrading
-existing DT support (but I doubt it there as well :) )..
-
->>> As such, I believe we do need some Tegra-specific piece of code that
->>> defines these OPP tables in the kernel, so that the operating-points
->>> property is not needed.
->>
->> Generic cpufreq driver depends on OPP library and so somebody has
->> to provide them. Now you can do it by calling opp_add() for each OPP
->> you have or otherwise.
->
-> Sure. That's what the Tegra-specific cpufreq driver should do. It should
-> be the top-level cpufreq driver. If parts of the code can be implemented
-> by library functions or a core parameterizable driver, then presumably
-> the Tegra driver would simply exist to provide those parameters and/or
-> callback functions to the generic driver.
-
-That would be something similar to what we are discussing on other
-thread about new platform device...
-
-You are asking me to go back to platform specific code instead of DT.
-When there exists a generic enough way of providing this information
-via DT, why should we put this in a driver?
-
-
->> Btw, you must have some specific voltage level for each freq, we can
->> get them here..
->
-> Yes, I'm sure we do, but I have no idea what they are:-( It may even be
-> board-specific or SoC-SKU-specific. I think we should defer this aspect
-> for now.
-
-Ok.
+Shawn
