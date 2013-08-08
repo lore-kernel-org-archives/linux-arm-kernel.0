@@ -1,32 +1,97 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 8 Aug 2013 21:37:43 +0530
-Subject: [PATCH 35/35] cpufreq: tegra: use
- cpufreq_table_validate_and_show()
-In-Reply-To: <5203BCDD.40809@wwwdotorg.org>
-References: <cover.1375964117.git.viresh.kumar@linaro.org>
- <568f3dbd414b050bb2319d960fb5044a5aed8ee3.1375964117.git.viresh.kumar@linaro.org>
- <5203BCDD.40809@wwwdotorg.org>
-Message-ID: <CAKohpomr8kwDitAFD7FKvHo3zNWz8qT5bkd3yOVEnC_k16o=Dw@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 8 Aug 2013 11:09:21 -0500
+Subject: [PATCHv3 6/9] ARM: OMAP2+: timer: Add suspend-resume callbacks
+ for clkevent device
+In-Reply-To: <5203A9E8.2090901@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-7-git-send-email-d-gerlach@ti.com>
+ <5203A9E8.2090901@ti.com>
+Message-ID: <5203C2B1.7050106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2013 21:14, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/08/2013 07:48 AM, Viresh Kumar wrote:
->> Lets use cpufreq_table_validate_and_show() instead of calling
->> cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+On 08/08/2013 09:23 AM, Santosh Shilimkar wrote:
+> On Tuesday 06 August 2013 01:49 PM, Dave Gerlach wrote:
+>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>
+>> OMAP timer code registers two timers - one as clocksource
+>> and one as clockevent. Since AM33XX has only one usable timer
+>> in the WKUP domain one of the timers needs suspend-resume
+>> support to restore the configuration to pre-suspend state.
+>>
+>> commit adc78e6 (timekeeping: Add suspend and resume
+>> of clock event devices) introduced .suspend and .resume
+>> callbacks for clock event devices. Leverages these
+>> callbacks to have AM33XX clockevent timer which is
+>> in not in WKUP domain to behave properly across system
+>> suspend.
+>>
+>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+> NAK
 >
-> Assuming the new function simply does what the two removed lines do,
-> this looks fine to me.
-
-http://lkml.org/lkml/2013/8/8/266
-
->>  static int tegra_cpu_exit(struct cpufreq_policy *policy)
->>  {
->> -     cpufreq_frequency_table_cpuinfo(policy, freq_table);
+> This patch doesn't addressed previous comments.
+> - The issue is specific to AM33XX and hence you
+> need to take care of that. These callbacks will happen on
+> all OMAP machines where the problem doesn't exist.
 >
-> This doesn't seem to be mentioned in the commit description. I assume
-> this is simply dead/useless code removal?
+> - Don't use hwmod APIs directly. At least abstract it
+> at omap_device layer and use that one instead.
+>
 
-Its useless and the correct routine isn't called at all :) .. I will add that
-additional patch and send it to you and will get this change out of this
-commit.
+Ok I will fix this, seems I missed those.
+
+>>   arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++++++++++
+>>   1 file changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index b37e1fc..cce5d39 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -118,11 +118,43 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+>>   	}
+>>   }
+>>
+>> +static void omap_clkevt_suspend(struct clock_event_device *unused)
+>> +{
+>> +	char name[10];
+>> +	struct omap_hwmod *oh;
+>> +
+>> +	sprintf(name, "timer%d", clkev.id);
+>> +	oh = omap_hwmod_lookup(name);
+>> +	if (!oh)
+>> +		return;
+>> +
+>> +	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
+>> +	omap_hwmod_idle(oh);
+>> +}
+>> +
+>> +static void omap_clkevt_resume(struct clock_event_device *unused)
+>> +{
+>> +	char name[10];
+>> +	struct omap_hwmod *oh;
+>> +
+>> +	sprintf(name, "timer%d", clkev.id);
+>> +	oh = omap_hwmod_lookup(name);
+>> +	if (!oh)
+>> +		return;
+>> +
+>> +	omap_hwmod_enable(oh);
+>> +	__omap_dm_timer_load_start(&clkev,
+>> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+>> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
+>> +}
+>> +
+>>   static struct clock_event_device clockevent_gpt = {
+>>   	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+>>   	.rating		= 300,
+>>   	.set_next_event	= omap2_gp_timer_set_next_event,
+>>   	.set_mode	= omap2_gp_timer_set_mode,
+>> +	.suspend	= omap_clkevt_suspend,
+>> +	.resume		= omap_clkevt_resume,
+>>   };
+>>
+>>   static struct property device_disabled = {
+>>
+>
