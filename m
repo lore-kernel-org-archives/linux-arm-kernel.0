@@ -1,79 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 8 Aug 2013 13:17:34 -0400
-Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
-In-Reply-To: <20130808170901.GG27325@e106331-lin.cambridge.arm.com>
-References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
- <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
- <20130716080503.GA3125@lukather>
- <5200E684.5080003@free-electrons.com>
- <20130807143546.GD2978@katana>
- <20130807155700.GE19280@titan.lakedaemon.net>
- <5203B97A.8060605@free-electrons.com>
- <20130808164323.GD27325@e106331-lin.cambridge.arm.com>
- <20130808170238.GK8204@titan.lakedaemon.net>
- <20130808170901.GG27325@e106331-lin.cambridge.arm.com>
-Message-ID: <20130808171734.GL8204@titan.lakedaemon.net>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 8 Aug 2013 23:02:50 +0530
+Subject: [PATCH 1/2] include: dt-binding: input: create a DT header
+ defining key codes.
+In-Reply-To: <20130808171331.GA6960@core.coreip.homeip.net>
+References: <1375798370-2231-1-git-send-email-ldewangan@nvidia.com>
+ <52014E50.6030508@wwwdotorg.org> <5203D138.4030107@nvidia.com>
+ <20130808171331.GA6960@core.coreip.homeip.net>
+Message-ID: <5203D642.60405@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 06:09:01PM +0100, Mark Rutland wrote:
-> On Thu, Aug 08, 2013 at 06:02:38PM +0100, Jason Cooper wrote:
-> > On Thu, Aug 08, 2013 at 05:43:23PM +0100, Mark Rutland wrote:
-> > > On Thu, Aug 08, 2013 at 04:30:02PM +0100, Gregory CLEMENT wrote:
-> > > > On 07/08/2013 17:57, Jason Cooper wrote:
-> > > > > On Wed, Aug 07, 2013 at 04:35:46PM +0200, Wolfram Sang wrote:
-> > > > >>
-> > > > >>> But we shouldn't use it alone: we should always use:
-> > > > >>> compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-> > > > >>>
-> > > > >>> From my point of view using  "marvell,mv78230-i2c" alone is an error.
-> > > > >>>
-> > > > >>> Wolfram what is your opinion on it?
-> > > > >>
-> > > > >> It is not strictly an error, but risky. If you use an older Kernel
-> > > > >> version (or other OS) which only offers "mv64xxx" you will have no
-> > > > >> match. Although the driver theoretically could have basic support for
-> > > > >> all mv64xxx variants skipping all additional features of later IP
-> > > > >> revisions.
-> > > > > 
-> > > > > I agree here.  The driver is advertising what IP blocks it can handle,
-> > > > > so it makes sense to add both strings since it can handle both.
-> > > > 
-> > > > Wolfram,
-> > > > so beside remarks about the compatibility strings. I didn't any other
-> > > > comment since the v3 which was 7 weeks ago.
-> > > > 
-> > > > Does it mean that once I will have added the handle of this string,
-> > > > you will be able to take the series for the 3.12 kernel?
-> > > 
-> > > Please could you also ensure the new string is documented in
-> > > Documentation/devicetree, with a brief description of what it implies
-> > > about the hardware beyond the exiting "marvell,mv64xxx-i2c" string.
-> > 
-> > That was in patch 3/3:
-> > 
-> >   ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c
-> > 
-> > Which I've applied here:
-> > 
-> >   http://git.infradead.org/linux-mvebu.git/commitdiff/e7c4a1e9f937453a32a5119868cac49de098640a
-> > 
-> > And my reasoning for taking it:
-> > 
-> >   http://marc.info/?l=linux-arm-kernel&m=137555145730141&w=2
-> 
-> My bad, I missed that.
+On Thursday 08 August 2013 10:43 PM, Dmitry Torokhov wrote:
+> On Thu, Aug 08, 2013 at 10:41:20PM +0530, Laxman Dewangan wrote:
+>> On Wednesday 07 August 2013 12:58 AM, Stephen Warren wrote:
+>>> (CC'ing DT bindings maintainers too, hence quoting a bit of the patch)
+>>>
+>>> On 08/06/2013 08:12 AM, Laxman Dewangan wrote:
+>>>> Many of Key device tree bindings uses the constant number as key code
+>>>> which matches with kernel header key code and then comment as follows
+>>>> for reference/better readability:
+>>>> 	linux,code = <102>; /* KEY_HOME */
+>>>>
+>>>> Create a DT header which defines all the key code so that DT key bindings
+>>>> can use it as follows:
+>>>> 	linux,code = <KEY_HOME>;
+>>> This looks fine to me.
+>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> A comment in support of the patch: This is adding OS-specific content to
+>>> the DT. However, the bindings this header file supports are already
+>>> written that way. There's not really any alternative here, since some
+>>> numbering scheme had to be chosen for keycodes, and it may as well be
+>>> the same set as the first/primary OS that'll use the binding.
+>>>
+>>> As far as merging it, this patch should probably go through the core DT
+>>> tree, perhaps in a topic branch so that e.g. Tegra an MVEBU can merge it
+>>> in to apply your subsequent patches (or we can just wait until the next
+>>> kernel release to merge them in).
+>> Do I need to include anyone for this patch to be applied or can go
+>> through Dmitry's input git branch?
+> I am uncomfortable that we are duplicating the whole list of keycodes
+> here. Do you think we could split keycodes and other event codes from
+> include/uapi/linux/input.h into include/uapi/linux/input-events.h and
+> unclude it directly into DTS?
 
-No problem, I know you guys are drinking from a fire hose. :)
-
-> > I haven't sent a PR to arm-soc yet (I like to let things gel in -next
-> > for a few days), so if there's something wrong with it, please let me
-> > know.
-> 
-> It looks fine to me. :)
-
-Great!
-
-thx,
-
-Jason.
+Yes, it will be very much possible to split this but I am not sure it is 
+allowed to include the header in DTS file which is not inside 
+include/dt-bindings.
+If there is no limitation/restriction then we can split this adn amke 
+single header for key code which will be used by code and dts.
