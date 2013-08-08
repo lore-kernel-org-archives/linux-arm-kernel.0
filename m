@@ -1,49 +1,170 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 Aug 2013 15:44:09 +0200
-Subject: [PATCH v9 02/16] iommu/exynos: add missing cache flush for removed
- page table entries
-In-Reply-To: <002601ce941a$e987ba50$bc972ef0$@samsung.com>
-References: <002601ce941a$e987ba50$bc972ef0$@samsung.com>
-Message-ID: <1726114.ptuhYydfjT@amdc1227>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 8 Aug 2013 09:44:28 -0400
+Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
+ module registers and APIs
+In-Reply-To: <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
+Message-ID: <5203A0BC.8060205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 of August 2013 18:37:34 Cho KyongHo wrote:
-> This commit adds cache flush for removed small and large page entries
-> in exynos_iommu_unmap(). Missing cache flush of removed page table
-> entries can cause missing page fault interrupt when a master IP
-> accesses an unmapped area.
+On Tuesday 06 August 2013 01:49 PM, Dave Gerlach wrote:
+> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
 > 
-> Tested-by: Grant Grundler <grundler@chromium.org>
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> Interacting with WKUP-M3 requires some more control
+> module register writes. Add the register offsets and
+> APIs to write to these.
+> 
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 > ---
->  drivers/iommu/exynos-iommu.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+>  arch/arm/mach-omap2/control.c |   57 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/control.h |   54 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 111 insertions(+)
 > 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 233f382..d545a25 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -1002,6 +1002,7 @@ static size_t exynos_iommu_unmap(struct
-> iommu_domain *domain, if (lv2ent_small(ent)) {
->  		*ent = 0;
->  		size = SPAGE_SIZE;
-> +		pgtable_flush(ent, ent + 1);
->  		priv->lv2entcnt[lv1ent_offset(iova)] += 1;
->  		goto done;
->  	}
-> @@ -1010,6 +1011,7 @@ static size_t exynos_iommu_unmap(struct
-> iommu_domain *domain, BUG_ON(size < LPAGE_SIZE);
-> 
->  	memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
-> +	pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
-> 
->  	size = LPAGE_SIZE;
->  	priv->lv2entcnt[lv1ent_offset(iova)] += SPAGES_PER_LPAGE;
+> diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+> index 31e0dfe..934041a 100644
+> --- a/arch/arm/mach-omap2/control.c
+> +++ b/arch/arm/mach-omap2/control.c
+> @@ -605,3 +605,60 @@ int omap3_ctrl_save_padconf(void)
+>  }
+>  
+>  #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+> +
+> +#if defined(CONFIG_SOC_AM33XX) && defined(CONFIG_PM)
+> +void am33xx_txev_eoi(void)
+> +{
+> +	omap_ctrl_writel(AM33XX_M3_TXEV_ACK, AM33XX_CONTROL_M3_TXEV_EOI);
+> +}
+> +
+> +void am33xx_txev_enable(void)
+> +{
+> +	omap_ctrl_writel(AM33XX_M3_TXEV_ENABLE, AM33XX_CONTROL_M3_TXEV_EOI);
+> +}
+> +
+> +/*
+> + * Invalidate M3 firmware version before hardreset.
+> + * Write invalid version in lower 4 nibbles of parameter
+> + * register (ipc_regs + 0x8).
+> + */
+> +void am33xx_pm_version_clear(void)
+> +{
+> +	omap_ctrl_writel(0xffff0000, AM33XX_CONTROL_IPC_MSG_REG2);
+> +}
+> +
+> +int am33xx_pm_version_get(void)
+> +{
+> +	return omap_ctrl_readl(AM33XX_CONTROL_IPC_MSG_REG2) & M3_VERSION_MASK;
+> +}
+> +
+> +void am33xx_pm_ipc_cmd(struct am33xx_ipc_data *data)
+> +{
+> +	omap_ctrl_writel(data->resume_addr, AM33XX_CONTROL_IPC_MSG_REG0);
+> +	omap_ctrl_writel(data->sleep_mode, AM33XX_CONTROL_IPC_MSG_REG1);
+> +	omap_ctrl_writel(data->param1, AM33XX_CONTROL_IPC_MSG_REG2);
+> +	omap_ctrl_writel(data->param2, AM33XX_CONTROL_IPC_MSG_REG3);
+> +	omap_ctrl_writel(data->param3, AM33XX_CONTROL_IPC_MSG_REG4);
+> +}
+> +
+> +int am33xx_pm_status(void)
+> +{
+> +	int i;
+> +
+> +	i = omap_ctrl_readl(AM33XX_CONTROL_IPC_MSG_REG1);
+> +	i &= IPC_RESP_MASK;
+> +	i >>= __ffs(IPC_RESP_MASK);
+> +
+> +	return i;
+> +}
+> +
+> +int am33xx_pm_wake_src(void)
+> +{
+> +	int i;
+> +
+> +	i = omap_ctrl_readl(AM33XX_CONTROL_IPC_MSG_REG6);
+> +	i &= 0xff;
+> +
+> +	return i;
+> +}
+> +#endif /* CONFIG_SOC_AM33XX && CONFIG_PM */
+> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+> index f7d7c2e..9be587c 100644
+> --- a/arch/arm/mach-omap2/control.h
+> +++ b/arch/arm/mach-omap2/control.h
+> @@ -370,6 +370,22 @@
+>  #define AM33XX_DEV_FEATURE		0x604
+>  #define AM33XX_SGX_MASK			BIT(29)
+>  
+> +/* AM33XX M3_TXEV_EOI register */
+> +#define AM33XX_CONTROL_M3_TXEV_EOI	0x1324
+> +
+> +#define AM33XX_M3_TXEV_ACK		(0x1 << 0)
+> +#define AM33XX_M3_TXEV_ENABLE		(0x0 << 0)
+> +
+> +/* AM33XX IPC message registers */
+> +#define AM33XX_CONTROL_IPC_MSG_REG0	0x1328
+> +#define AM33XX_CONTROL_IPC_MSG_REG1	0x132C
+> +#define AM33XX_CONTROL_IPC_MSG_REG2	0x1330
+> +#define AM33XX_CONTROL_IPC_MSG_REG3	0x1334
+> +#define AM33XX_CONTROL_IPC_MSG_REG4	0x1338
+> +#define AM33XX_CONTROL_IPC_MSG_REG5	0x133C
+> +#define AM33XX_CONTROL_IPC_MSG_REG6	0x1340
+> +#define AM33XX_CONTROL_IPC_MSG_REG7	0x1344
+> +
+>  /* CONTROL OMAP STATUS register to identify OMAP3 features */
+>  #define OMAP3_CONTROL_OMAP_STATUS	0x044c
+>  
+> @@ -429,6 +445,44 @@ extern void omap3630_ctrl_disable_rta(void);
+>  extern int omap3_ctrl_save_padconf(void);
+>  extern void omap2_set_globals_control(void __iomem *ctrl,
+>  				      void __iomem *ctrl_pad);
+> +struct am33xx_ipc_data {
+> +	u32 resume_addr;
+> +	u32 sleep_mode;
+> +	u32 param1;
+> +	u32 param2;
+> +	u32 param3;
+> +	u32 param4;
+> +	u32 param5;
+> +	u32 param6;
+> +};
+> +
+> +#define IPC_RESP_SHIFT			16
+> +#define IPC_RESP_MASK			(0xffff << 16)
+> +
+> +#define M3_VERSION_SHIFT		0
+> +#define M3_VERSION_MASK			(0xffff << 0)
+> +
+> +/*
+> + * 9-4 = VTT GPIO PIN (6 Bits)
+> + *   3 = VTT Status (1 Bit)
+> + * 2-0 = Memory Type (2 Bits)
+> +*/
+> +#define MEM_TYPE_SHIFT		(0x0)
+> +#define MEM_TYPE_MASK		(0x7 << 0)
+> +#define VTT_STAT_SHIFT		(0x3)
+> +#define VTT_STAT_MASK		(0x1 << 3)
+> +#define VTT_GPIO_PIN_SHIFT	(0x4)
+> +#define VTT_GPIO_PIN_MASK	(0x2f << 4)
+> +
+> +extern void am33xx_wkup_m3_ipc_cmd(struct am33xx_ipc_data *data);
+> +extern void am33xx_txev_eoi(void);
+> +extern void am33xx_txev_enable(void);
+> +extern void am33xx_pm_version_clear(void);
+> +extern int am33xx_pm_version_get(void);
+> +extern void am33xx_pm_ipc_cmd(struct am33xx_ipc_data *data);
+> +extern int am33xx_pm_status(void);
+> +extern int am33xx_pm_wake_src(void);
+> +
+Lets address the above better. I don't see a need of 8 functions
+exported doing one or 2 register writes.
 
-Looks reasonable.
+Look M3 based handling is going to be there on future SOCs
+as well and this kind of handling of IPC is very short cited.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Probably we should have a separate driver for M3 in linux which
+can have all this local code instead of all these exports.
 
-Best regards,
-Tomasz
+Regards,
+Santosh
