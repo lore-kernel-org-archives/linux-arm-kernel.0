@@ -1,240 +1,109 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  8 Aug 2013 07:06:09 +0200
-Subject: [PATCH v3 05/19] clk: at91: add PMC main clock
-In-Reply-To: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1375938369-4002-1-git-send-email-b.brezillon@overkiz.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 8 Aug 2013 11:07:39 +0530
+Subject: OMAP2430 SDP boot broken after Linus' rmk merge
+In-Reply-To: <alpine.DEB.2.02.1308071807240.28993@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
+ <20130722184325.GA21614@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
+ <51EE2AA7.5060503@ti.com>
+ <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
+ <51EE474D.5070804@ti.com>
+ <alpine.DEB.2.02.1308071807240.28993@utopia.booyaka.com>
+Message-ID: <52032EA3.90106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new at91 main oscillator clock implementation using common
-clk framework.
+On Wednesday 07 August 2013 11:39 PM, Paul Walmsley wrote:
+> Hi Rajendra,
+> 
+> On Tue, 23 Jul 2013, Rajendra Nayak wrote:
+> 
+>> So I tried commit 'fb2af00' on the 4430SDP and it did boot fine, though I see
+>> the below errors. (I am using the mainline bootloaders which do not lock any
+>> additional DPLLs like USB)
+> 
+> Could you please send patches to fix these problems, or ensure that 
+> someone else from TI fixes them?  Let's see if we can deal with the 
+> remaining bootloader dependencies here.
 
-If rate is not provided during clock registration it is calculated using
-the slow clock (main clk parent in this case) rate and MCFR register.
+Sure Paul, I'll take a look at this.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/clk/at91/Makefile   |    1 +
- drivers/clk/at91/clk-main.c |  171 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/at91/pmc.c      |    5 ++
- drivers/clk/at91/pmc.h      |    3 +
- 4 files changed, 180 insertions(+)
- create mode 100644 drivers/clk/at91/clk-main.c
-
-diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index 1d4fb21..44105bd 100644
---- a/drivers/clk/at91/Makefile
-+++ b/drivers/clk/at91/Makefile
-@@ -3,3 +3,4 @@
- #
- 
- obj-y += pmc.o
-+obj-y += clk-main.o
-diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-new file mode 100644
-index 0000000..68738dd
---- /dev/null
-+++ b/drivers/clk/at91/clk-main.c
-@@ -0,0 +1,171 @@
-+/*
-+ * drivers/clk/at91/clk-main.c
-+ *
-+ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk/at91_pmc.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/sched.h>
-+#include <linux/wait.h>
-+
-+#include "pmc.h"
-+
-+#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
-+struct clk_main {
-+	struct clk_hw hw;
-+	struct at91_pmc *pmc;
-+	unsigned long rate;
-+	unsigned int irq;
-+	wait_queue_head_t wait;
-+};
-+
-+static irqreturn_t clk_main_irq_handler(int irq, void *dev_id)
-+{
-+	struct clk_main *clkmain = (struct clk_main *)dev_id;
-+
-+	wake_up(&clkmain->wait);
-+	disable_irq_nosync(clkmain->irq);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int clk_main_prepare(struct clk_hw *hw)
-+{
-+	struct clk_main *clkmain = to_clk_main(hw);
-+	struct at91_pmc *pmc = clkmain->pmc;
-+
-+	while (!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_MOSCS)) {
-+		enable_irq(clkmain->irq);
-+		wait_event(clkmain->wait,
-+			   pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_MOSCS);
-+	}
-+
-+	return 0;
-+}
-+
-+static int clk_main_is_prepared(struct clk_hw *hw)
-+{
-+	struct clk_main *clkmain = to_clk_main(hw);
-+
-+	return !!(pmc_read(clkmain->pmc, AT91_PMC_SR) & AT91_PMC_MOSCS);
-+}
-+
-+static unsigned long clk_main_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	u32 tmp;
-+	struct clk_main *clkmain = to_clk_main(hw);
-+	struct at91_pmc *pmc = clkmain->pmc;
-+
-+	if (clkmain->rate)
-+		return clkmain->rate;
-+
-+	while (!((tmp = pmc_read(pmc, AT91_CKGR_MCFR)) & AT91_PMC_MAINRDY))
-+		;
-+
-+	tmp &= AT91_PMC_MAINF;
-+	clkmain->rate = (tmp * parent_rate) / 16;
-+
-+	return clkmain->rate;
-+}
-+
-+static const struct clk_ops main_ops = {
-+	.prepare = clk_main_prepare,
-+	.is_prepared = clk_main_is_prepared,
-+	.recalc_rate = clk_main_recalc_rate,
-+};
-+
-+static struct clk * __init
-+at91_clk_register_main(struct at91_pmc *pmc,
-+		       unsigned int irq,
-+		       const char *name,
-+		       const char *parent_name,
-+		       unsigned long rate)
-+{
-+	int ret;
-+	struct clk_main *clkmain;
-+	struct clk *clk = NULL;
-+	struct clk_init_data init;
-+
-+	if (!pmc || !irq || !name)
-+		return ERR_PTR(-EINVAL);
-+
-+	if (!rate && !parent_name)
-+		return ERR_PTR(-EINVAL);
-+
-+	clkmain = kzalloc(sizeof(*clkmain), GFP_KERNEL);
-+	if (!clkmain)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &main_ops;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
-+	init.flags = parent_name ? 0 : CLK_IS_ROOT;
-+
-+	clkmain->hw.init = &init;
-+	clkmain->rate = rate;
-+	clkmain->pmc = pmc;
-+	clkmain->irq = irq;
-+	init_waitqueue_head(&clkmain->wait);
-+	irq_set_status_flags(clkmain->irq, IRQ_NOAUTOEN);
-+	ret = request_irq(clkmain->irq, clk_main_irq_handler,
-+			  IRQF_TRIGGER_HIGH, "clk-main", clkmain);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	clk = clk_register(NULL, &clkmain->hw);
-+
-+	if (IS_ERR(clk)) {
-+		free_irq(clkmain->irq, clkmain);
-+		kfree(clkmain);
-+	}
-+
-+	return clk;
-+}
-+
-+
-+
-+static void __init
-+of_at91_clk_main_setup(struct device_node *np, struct at91_pmc *pmc)
-+{
-+	struct clk *clk;
-+	unsigned int irq;
-+	const char *parent_name;
-+	const char *name = np->name;
-+	u32 rate = 0;
-+
-+	parent_name = of_clk_get_parent_name(np, 0);
-+	of_property_read_string(np, "clock-output-names", &name);
-+	of_property_read_u32(np, "clock-frequency", &rate);
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq)
-+		return;
-+
-+	clk = at91_clk_register_main(pmc, irq, name, parent_name, rate);
-+
-+	if (!IS_ERR(clk))
-+		return;
-+
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+
-+void __init of_at91rm9200_clk_main_setup(struct device_node *np,
-+					 struct at91_pmc *pmc)
-+{
-+	of_at91_clk_main_setup(np, pmc);
-+}
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index f6bd03d..42f0c19 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -216,6 +216,11 @@ out_free_pmc:
- }
- 
- static const struct of_device_id pmc_clk_ids[] __initdata = {
-+	/* Main clock */
-+	{
-+		.compatible = "atmel,at91rm9200-clk-main",
-+		.data = of_at91rm9200_clk_main_setup
-+	},
- 	{ /*sentinel*/ }
- };
- 
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index b7e8397..294e230 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -55,4 +55,7 @@ static inline void pmc_write(struct at91_pmc *pmc, int offset, u32 value)
- 	return writel_relaxed(value, pmc->regbase + offset);
- }
- 
-+extern void __init of_at91rm9200_clk_main_setup(struct device_node *np,
-+						struct at91_pmc *pmc);
-+
- #endif /* __PMC_H_ */
--- 
-1.7.9.5
+> 
+> thanks
+> 
+> 
+> - Paul
+> 
+>>
+>> [    0.000000] clock: dpll_usb_ck failed transition to 'locked'
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] clock: trace_clk_div_ck: could not find divisor for target rate 0 for parent pmd_trace_clk_mux_ck
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] Division by zero in kernel.
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
+>> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
+>> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
+>> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
+>> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
+>> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
+>> [    0.000000] clock: dpll_per_m7x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
+>> [    0.000000] clock: dpll_per_m6x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
+>> [    0.000000] clock: dpll_per_m5x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
+>> [    0.000000] clock: dpll_per_m4x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
+>>
+>>>
+>>>
+>>> - Paul
+>>>
+>>
+> 
+> 
+> - Paul
+> 
