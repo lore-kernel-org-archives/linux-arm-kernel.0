@@ -1,109 +1,242 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 08 Aug 2013 16:04:08 -0700
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <52040E67.4050402@ti.com> (Nishanth Menon's message of "Thu, 8
- Aug 2013 16:32:23 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
- <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
- <52040E67.4050402@ti.com>
-Message-ID: <87pptndbtj.fsf@kernel.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 09 Aug 2013 01:05:46 +0200
+Subject: [PATCH V3 3/3] ASoC: Samsung: I2S: Modify the I2S driver to
+ support I2S on Exynos5420
+In-Reply-To: <1375865122-5258-4-git-send-email-padma.v@samsung.com>
+References: <1375865122-5258-1-git-send-email-padma.v@samsung.com>
+ <1375865122-5258-4-git-send-email-padma.v@samsung.com>
+Message-ID: <2802930.EccX991DZW@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+Hi Padmavathi,
 
-> On 08/08/2013 04:14 PM, Kevin Hilman wrote:
->> Dave Gerlach <d-gerlach@ti.com> writes:
->>
->>> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
->>>> $subject and patch don't match.
->>>>
->>>> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
->>>>> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>>>>>     In reference to
->>>>>> the M3 handling it, the M3 wouldn't know which devices have a driver
->>>>>> bound and which don't.
->>>>> Does it need to? M3 firmware can pretty much define "I will force
->>>>> the device into low power state, and if the drivers dont handle
->>>>> things properly, fix the darned driver". M3 behavior should be
->>>>> considered as a "hardware" as far as Linux running on MPU is
->>>>> concerned, and firmware helps change the behavior by accounting for
->>>>> SoC quirks. *if* we have ability to handle this in the firmware,
->>>>> there is no need to carry this in Linux.
->>>>>
->>>> I agree with Nishant. I don't like this patch and IIRC, I gave same
->>>> comment in the last version. Linux need not know about all such firmware
->>>> quirks. Also all these M3 specific stuff, should be done somewhere
->>>> else. Probably having a small M3 driver won't be a bad idea.
->>>
->>> I am not opposed to doing it this way and letting the M3 firmware
->>> handle idling these modules, however the one concern raised in the
->>> last series is that an approach that does not acknowledge drivers will
->>> hide driver PM bugs. I suppose as long as I make sure to document that
->>> the devices are being idled by the M3 firmware this may not be an
->>> issue. I will look into implementing this.
->>
->> No, please don't start idling devices in firmware that are otherwise
->> managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
->> these devices, it should manage their bugs too.
->
->>
->> This is not just about idling devices.  This is about handling broken IP
->> blocks whose power-on reset state does not allow the the powerdomain to
->> reach its target state.  That's just bad hardware design.
->
-> Right, this is where M3 can help -> provide a consistent state for
-> linux kernel to work with. by the fact that we want to keep majority
-> of the power code inside master CPU, we are just letting M3 help us
-> with nothing major at all.. 
+On Wednesday 07 of August 2013 14:15:22 Padmavathi Venna wrote:
+> Exynos5420 added support for I2S TDM mode. For this, there are some
+> register changes in the I2S controller. This patch adds the relevant
+> register changes to support I2S in normal mode. This patch adds a
+> quirk for TDM mode and if TDM mode is present all the relevent changes
+> will be applied.
+> 
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  .../devicetree/bindings/sound/samsung-i2s.txt      |    4 +
+>  include/linux/platform_data/asoc-s3c.h             |    1 +
+>  sound/soc/samsung/i2s-regs.h                       |   15 ++++
+>  sound/soc/samsung/i2s.c                            |   81
+> ++++++++++++++++++-- 4 files changed, 93 insertions(+), 8 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> b/Documentation/devicetree/bindings/sound/samsung-i2s.txt index
+> b3f6443..9b5c892 100644
+> --- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> @@ -11,6 +11,10 @@ Required SoC Specific Properties:
+>       with secondary fifo and s/w reset control.
+>     - samsung,s5pv210-i2s: for 8/16/24bit multichannel(5.1) I2S with
+>       secondary fifo, s/w reset control and internal mux for root clk
+> src. +   - samsung,exynos5420-i2s: for 8/16/24bit multichannel(7.1) I2S
+> with +     secondary fifo, s/w reset control, internal mux for root clk
+> src and +     TDM support. TDM (Time division multiplexing) is to allow
+> transfer of +     multiple channel audio data on single data line.
+> 
+>  - reg: physical base address of the controller and length of memory
+> mapped region.
+> diff --git a/include/linux/platform_data/asoc-s3c.h
+> b/include/linux/platform_data/asoc-s3c.h index 8827259..9efc04d 100644
+> --- a/include/linux/platform_data/asoc-s3c.h
+> +++ b/include/linux/platform_data/asoc-s3c.h
+> @@ -36,6 +36,7 @@ struct samsung_i2s {
+>   */
+>  #define QUIRK_NO_MUXPSR		(1 << 2)
+>  #define QUIRK_NEED_RSTCLR	(1 << 3)
+> +#define QUIRK_SUPPORTS_TDM	(1 << 4)
+>  	/* Quirks of the I2S controller */
+>  	u32 quirks;
+>  	dma_addr_t idma_addr;
+> diff --git a/sound/soc/samsung/i2s-regs.h b/sound/soc/samsung/i2s-regs.h
+> index 30513b7..821a502 100644
+> --- a/sound/soc/samsung/i2s-regs.h
+> +++ b/sound/soc/samsung/i2s-regs.h
+> @@ -31,6 +31,10 @@
+>  #define I2SLVL1ADDR	0x34
+>  #define I2SLVL2ADDR	0x38
+>  #define I2SLVL3ADDR	0x3c
+> +#define I2SSTR1		0x40
+> +#define I2SVER		0x44
+> +#define I2SFIC2		0x48
+> +#define I2STDM		0x4c
+> 
+>  #define CON_RSTCLR		(1 << 31)
+>  #define CON_FRXOFSTATUS		(1 << 26)
+> @@ -117,6 +121,17 @@
+>  #define MOD_BCLK_MASK		3
+>  #define MOD_8BIT		(1 << 0)
+> 
+> +#define EXYNOS5420_MOD_LRP_SHIFT	15
+> +#define EXYNOS5420_MOD_SDF_SHIFT	6
+> +#define EXYNOS5420_MOD_RCLK_SHIFT	4
+> +#define EXYNOS5420_MOD_BCLK_SHIFT	0
+> +#define EXYNOS5420_MOD_BCLK_64FS	4
+> +#define EXYNOS5420_MOD_BCLK_96FS	5
+> +#define EXYNOS5420_MOD_BCLK_128FS	6
+> +#define EXYNOS5420_MOD_BCLK_192FS	7
+> +#define EXYNOS5420_MOD_BCLK_256FS	8
+> +#define EXYNOS5420_MOD_BCLK_MASK	0xf
+> +
+>  #define MOD_CDCLKCON		(1 << 12)
+> 
+>  #define PSR_PSREN		(1 << 15)
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index 8a5504c..6964672 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -199,7 +199,12 @@ static inline bool is_manager(struct i2s_dai *i2s)
+>  /* Read RCLK of I2S (in multiples of LRCLK) */
+>  static inline unsigned get_rfs(struct i2s_dai *i2s)
+>  {
+> -	u32 rfs = (readl(i2s->addr + I2SMOD) >> MOD_RCLK_SHIFT);
+> +	u32 rfs;
+> +
+> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM)
+> +		rfs = readl(i2s->addr + I2SMOD) >> 
+EXYNOS5420_MOD_RCLK_SHIFT;
+> +	else
+> +		rfs = (readl(i2s->addr + I2SMOD) >> MOD_RCLK_SHIFT);
+>  	rfs &= MOD_RCLK_MASK;
+> 
+>  	switch (rfs) {
+> @@ -214,8 +219,12 @@ static inline unsigned get_rfs(struct i2s_dai *i2s)
+> static inline void set_rfs(struct i2s_dai *i2s, unsigned rfs) {
+>  	u32 mod = readl(i2s->addr + I2SMOD);
+> -	int rfs_shift =  MOD_RCLK_SHIFT;
+> +	int rfs_shift;
+> 
+> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM)
+> +		rfs_shift = EXYNOS5420_MOD_RCLK_SHIFT;
+> +	else
+> +		rfs_shift = MOD_RCLK_SHIFT;
+>  	mod &= ~(MOD_RCLK_MASK << rfs_shift);
+> 
+>  	switch (rfs) {
+> @@ -239,10 +248,22 @@ static inline void set_rfs(struct i2s_dai *i2s,
+> unsigned rfs) /* Read Bit-Clock of I2S (in multiples of LRCLK) */
+>  static inline unsigned get_bfs(struct i2s_dai *i2s)
+>  {
+> -	u32 bfs =  readl(i2s->addr + I2SMOD) >> MOD_BCLK_SHIFT;
+> -	bfs &= MOD_BCLK_MASK;
+> +	u32 bfs;
+> +
+> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
+> +		bfs = readl(i2s->addr + I2SMOD) >> 
+EXYNOS5420_MOD_BCLK_SHIFT;
+> +		bfs &= EXYNOS5420_MOD_BCLK_MASK;
+> +	} else {
+> +		bfs =  readl(i2s->addr + I2SMOD) >> MOD_BCLK_SHIFT;
+> +		bfs &= MOD_BCLK_MASK;
+> +	}
+> 
+>  	switch (bfs) {
+> +	case 8: return 256;
+> +	case 7: return 192;
+> +	case 6: return 128;
+> +	case 5: return 96;
+> +	case 4: return 64;
+>  	case 3: return 24;
+>  	case 2: return 16;
+>  	case 1:	return 48;
+> @@ -254,9 +275,22 @@ static inline unsigned get_bfs(struct i2s_dai *i2s)
+> static inline void set_bfs(struct i2s_dai *i2s, unsigned bfs) {
+>  	u32 mod = readl(i2s->addr + I2SMOD);
+> -	int bfs_shift = MOD_BCLK_SHIFT;
+> +	int bfs_shift;
+> +	int tdm = i2s->quirks & QUIRK_SUPPORTS_TDM;
+> 
+> -	mod &= ~(MOD_BCLK_MASK << bfs_shift);
+> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
+> +		bfs_shift = EXYNOS5420_MOD_BCLK_SHIFT;
+> +		mod &= ~(EXYNOS5420_MOD_BCLK_MASK << bfs_shift);
+> +	} else {
+> +		bfs_shift = MOD_BCLK_SHIFT;
+> +		mod &= ~(MOD_BCLK_MASK << bfs_shift);
+> +	}
+> +
+> +	/* Non-TDM I2S controllers do not support BCLK > 48 * FS */
+> +	if (!tdm && bfs > 48) {
+> +		dev_err(&i2s->pdev->dev, "Unsupported BCLK divider\n");
+> +		return;
+> +	}
+> 
+>  	switch (bfs) {
+>  	case 48:
+> @@ -271,6 +305,21 @@ static inline void set_bfs(struct i2s_dai *i2s,
+> unsigned bfs) case 16:
+>  		mod |= (MOD_BCLK_16FS << bfs_shift);
+>  		break;
+> +	case 64:
+> +		mod |= (EXYNOS5420_MOD_BCLK_64FS << bfs_shift);
+> +		break;
+> +	case 96:
+> +		mod |= (EXYNOS5420_MOD_BCLK_96FS << bfs_shift);
+> +		break;
+> +	case 128:
+> +		mod |= (EXYNOS5420_MOD_BCLK_128FS << bfs_shift);
+> +		break;
+> +	case 192:
+> +		mod |= (EXYNOS5420_MOD_BCLK_192FS << bfs_shift);
+> +		break;
+> +	case 256:
+> +		mod |= (EXYNOS5420_MOD_BCLK_256FS << bfs_shift);
+> +		break;
+>  	default:
+>  		dev_err(&i2s->pdev->dev, "Wrong BCLK Divider!\n");
+>  		return;
+> @@ -496,10 +545,17 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
+>  {
+>  	struct i2s_dai *i2s = to_info(dai);
+>  	u32 mod = readl(i2s->addr + I2SMOD);
+> -	int lrp_shift = MOD_LRP_SHIFT, sdf_shift = MOD_SDF_SHIFT;
+> -	int sdf_mask, lrp_rlow;
+> +	int lrp_shift, sdf_shift, sdf_mask, lrp_rlow;
+>  	u32 tmp = 0;
+> 
+> +	if (i2s->quirks & QUIRK_SUPPORTS_TDM) {
+> +		lrp_shift = EXYNOS5420_MOD_LRP_SHIFT;
+> +		sdf_shift = EXYNOS5420_MOD_SDF_SHIFT;
+> +	} else {
+> +		lrp_shift = MOD_LRP_SHIFT;
+> +		sdf_shift = MOD_SDF_SHIFT;
+> +	}
+> +
+>  	sdf_mask = MOD_SDF_MASK << sdf_shift;
+>  	lrp_rlow = MOD_LR_RLOW << lrp_shift;
+> 
+> @@ -1264,6 +1320,12 @@ static struct samsung_i2s_dai_data i2sv5_dai_type
+> = { .quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR, };
+> 
+> +static struct samsung_i2s_dai_data i2sv6_dai_type = {
+> +	.dai_type = TYPE_PRI,
+> +	.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR |
+> +			QUIRK_SUPPORTS_TDM,
+> +};
+> +
+>  static struct samsung_i2s_dai_data samsung_dai_type_sec = {
+>  	.dai_type = TYPE_SEC,
+>  };
+> @@ -1297,6 +1359,9 @@ static const struct of_device_id
+> exynos_i2s_match[] = { }, {
+>  		.compatible = "samsung,s5pv210-i2s",
+>  		.data = &i2sv5_dai_type,
+> +	}, {
+> +		.compatible = "samsung,exynos5420-i2s",
+> +		.data = &i2sv6_dai_type,
+>  	},
+>  	{},
+>  };
 
-heh, I would say HW design bugs like this are more than "nothing major
-at all." :)  
+This one looks good to me.
 
-> tiny stuff like these can help "fix" the hardware design quirks by
-> hiding it behind the firmware and modifying the hardware behavior.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-I disagree here.  I'm a firmware minimalist, and hiding bugs like this
-in the firmware is wrong when Linux is otherwise managing these devices.
-It also imposes criteria on the firmware of future SoCs that doesn't
-belong there either.  IMO, the only stuff the firmware should do is what
-Linux *cannot* do.
-
-Remember, this only needs to happen when there isn't a driver for these
-devices.  Should we communicate to the firmware that the OS has no
-driver, so please enable the hack?  I think not.
-
-> I know it breaks the purity of role, but as the
-> next evolution, we might want to consider M3 something like an
-> "accelerator" for power management activity.. (not saying it is that
-> fast.. but conceptually).
-
-Yes, it breaks the purity of role, and makes it hard to maintain and
-extend to future SoCs.  As a maintainer, that's a red flag.  IMO, the
-roles need to be kept clear.  The M3 manages some devices and the
-interconnect that MPU/Linux cannot, the rest are managed by Linux.
-
->> That being said, IMO, the kernel (specifically omap_device) should
->> handle this, and it should be rather easy to do in the omap_device layer
->> and keep the SoC suspend/resume core code simple and ignorant of these
->> "quirks."
->>
->> AFAICT, there's no reason these quirks need to be dealt with immediatly
->> on suspend.  A slight delay should be fine, as long as it's before the
->> next suspend/idle attempt, right?
->>
->> Given that, what we need to do (and by we, I mean you) is to flag all
->> broken IP blocks, and let omap_device handle them in a suspend/resume
->> notifier (c.f. register_pm_notifier() and PM_POST_SUSPEND.)
->
-> yes - that is the alternate that comes to mind.
-
-In the earlier reviews of this series (many months ago now), I
-complained about the presence of this device specific handling in the
-core MPU PM code.  I'm somewhat troubled by the fact that nobody explored
-alternatives that so easily come to mind.
-
-Kevin
+Best regards,
+Tomasz
