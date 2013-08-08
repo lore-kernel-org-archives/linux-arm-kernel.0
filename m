@@ -1,127 +1,23 @@
-From: russ.dill@gmail.com (Russ Dill)
-Date: Wed, 7 Aug 2013 19:30:13 -0700
-Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
- EMIF spec
-In-Reply-To: <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
-Message-ID: <CA+Bv8XaGf=BGNX1=DKLQTwiFkisvkt3H-J3Wjy5dhqb1z9NtVw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 8 Aug 2013 08:03:33 +0530
+Subject: [PATCH] cpufreq: exynos5440: Fix to skip when new frequency same
+ as current
+In-Reply-To: <2331427.ybQdfvflPh@vostro.rjw.lan>
+References: <1375874171-16951-1-git-send-email-amit.daniel@samsung.com>
+ <52022FC2.2010109@arm.com>
+ <CAKohpom0gPk9BXRP2eEuX_HBXDut=wynrZfvOH1tcEQY6CMLNQ@mail.gmail.com>
+ <2331427.ybQdfvflPh@vostro.rjw.lan>
+Message-ID: <CAKohpokdvJxcWjbOgDLAzjcW_vN6hdZz_OWjFSBSLrFTccCmJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 6, 2013 at 10:49 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
-> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
->
-> SDRAM controller on AM33XX requires that a modification of certain
-> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
-> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
-> scenario arises when entering a low power state like DeepSleep.
-> To ensure that the read is not from a cached region we reserve
-> some memory during bootup using the arm_memblock_steal() API.
->
-> A subsequent patch will pass along the location of the reserved
-> memory location to the AM335x suspend handler which modifies the
-> PWR_MGMT_CTRL register in the EMIF.
->
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+On 8 August 2013 04:55, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> It looks like it would require us to redefine .target() to take next_state
+> instead of target_freq (at least in the acpi-cpufreq case), wouldn't it?
 
-Reviewed-by: Russ Dill <russ.dill@ti.com>
+If we don't do it, then atleast for few drivers, like acpi-cpufreq, which
+use index more than just for frequency, we may end up calling
+cpufreq_frequency_table_target() twice. Once in the core and then
+in driver.
 
-> ---
->  arch/arm/mach-omap2/board-generic.c |    2 +-
->  arch/arm/mach-omap2/common.c        |   28 ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/common.h        |    4 ++++
->  arch/arm/mach-omap2/io.c            |    1 +
->  4 files changed, 34 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index be5d005..aed750c 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -156,7 +156,7 @@ static const char *am33xx_boards_compat[] __initdata = {
->  };
->
->  DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
-> -       .reserve        = omap_reserve,
-> +       .reserve        = am33xx_reserve,
->         .map_io         = am33xx_map_io,
->         .init_early     = am33xx_init_early,
->         .init_irq       = omap_intc_of_init,
-> diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-> index 2dabb9e..756586f 100644
-> --- a/arch/arm/mach-omap2/common.c
-> +++ b/arch/arm/mach-omap2/common.c
-> @@ -15,6 +15,8 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/platform_data/dsp-omap.h>
-> +#include <asm/memblock.h>
-> +#include <asm/mach/map.h>
->
->  #include "common.h"
->  #include "omap-secure.h"
-> @@ -34,3 +36,29 @@ void __init omap_reserve(void)
->         omap_secure_ram_reserve_memblock();
->         omap_barrier_reserve_memblock();
->  }
-> +
-> +static phys_addr_t am33xx_paddr;
-> +static u32 am33xx_size;
-> +
-> +/* Steal one page physical memory for uncached read DeepSleep */
-> +void __init am33xx_reserve(void)
-> +{
-> +       am33xx_size = ALIGN(PAGE_SIZE, SZ_1M);
-> +       am33xx_paddr = arm_memblock_steal(am33xx_size, SZ_1M);
-> +}
-> +
-> +void __iomem *am33xx_dram_sync;
-> +
-> +void __init am33xx_dram_sync_init(void)
-> +{
-> +       struct map_desc dram_io_desc[1];
-> +
-> +       dram_io_desc[0].virtual = __phys_to_virt(am33xx_paddr);
-> +       dram_io_desc[0].pfn = __phys_to_pfn(am33xx_paddr);
-> +       dram_io_desc[0].length = am33xx_size;
-> +       dram_io_desc[0].type = MT_MEMORY_SO;
-> +
-> +       iotable_init(dram_io_desc, ARRAY_SIZE(dram_io_desc));
-> +
-> +       am33xx_dram_sync = (void __iomem *) dram_io_desc[0].virtual;
-> +}
-> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-> index dfcc182..6b8ef74 100644
-> --- a/arch/arm/mach-omap2/common.h
-> +++ b/arch/arm/mach-omap2/common.h
-> @@ -294,6 +294,10 @@ struct omap2_hsmmc_info;
->  extern int omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers);
->  extern void omap_reserve(void);
->
-> +extern void am33xx_reserve(void);
-> +extern void am33xx_dram_sync_init(void);
-> +extern void __iomem *am33xx_dram_sync;
-> +
->  struct omap_hwmod;
->  extern int omap_dss_reset(struct omap_hwmod *);
->
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index 4a3f06f..3ad7543 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -322,6 +322,7 @@ void __init ti81xx_map_io(void)
->  void __init am33xx_map_io(void)
->  {
->         iotable_init(omapam33xx_io_desc, ARRAY_SIZE(omapam33xx_io_desc));
-> +       am33xx_dram_sync_init();
->  }
->  #endif
->
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I believe this is doable and will post a patch soon.
