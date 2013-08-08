@@ -1,79 +1,78 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 8 Aug 2013 21:50:20 +0200
-Subject: [PATCH v4 11/31] net: can: mscan: improve clock API use
-In-Reply-To: <5201F70F.8090007@pengutronix.de>
-References: <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1375821851-31609-1-git-send-email-gsi@denx.de>
- <1375821851-31609-12-git-send-email-gsi@denx.de>
- <5201F70F.8090007@pengutronix.de>
-Message-ID: <20130808195020.GZ2580@book.gsilab.sittig.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Aug 2013 13:54:14 -0600
+Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
+In-Reply-To: <1375928591.1758.66.camel@jlo-ubuntu-64.nvidia.com>
+References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
+ <1374830110-30685-4-git-send-email-josephl@nvidia.com>
+ <51F6F209.2090309@wwwdotorg.org>
+ <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
+ <51FC1751.9010401@wwwdotorg.org>
+ <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
+ <51FFDA20.6050403@wwwdotorg.org> <51FFE363.4080603@wwwdotorg.org>
+ <1375780249.2261.63.camel@jlo-ubuntu-64.nvidia.com>
+ <52014258.9070602@wwwdotorg.org>
+ <1375866749.8111.57.camel@jlo-ubuntu-64.nvidia.com>
+ <520279FC.1000006@wwwdotorg.org>
+ <1375928591.1758.66.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <5203F766.9050100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 09:28 +0200, Marc Kleine-Budde wrote:
+On 08/07/2013 08:23 PM, Joseph Lo wrote:
+> On Thu, 2013-08-08 at 00:46 +0800, Stephen Warren wrote:
+..
+>> I still have absolutely no idea why Tegra30 and Tegra114 are different.
+>>
+>> You mentioned something about this low-level code only manipulating the
+>> IDLE state, and the clock driver needing to restore the other 4 states.
+>> This raises yet more questions:
+>>
+>> 1) Do we not need to restore the other 4 states on Tegra30? If not, why
+>> not? If we do, presumably Tegra30 (and Tegra20?) need to the syscore_op
+>> this patch series adds to Tegra114 only? If we don't, then why does
+>> Tegra114 have to restore them?
+>
+> We need to restore all of them for all Tegra chips. For Tegra20/30, we
+> had done it in the tegra_cpu_car_ops.suspend/resume. For Tegra114, the
+> patch was here.
 > 
-> On 08/06/2013 10:43 PM, Gerhard Sittig wrote:
-> > [ ... ]
-> > diff --git a/drivers/net/can/mscan/mscan.c b/drivers/net/can/mscan/mscan.c
-> > index e6b4095..4f998f5 100644
-> > --- a/drivers/net/can/mscan/mscan.c
-> > +++ b/drivers/net/can/mscan/mscan.c
-> > @@ -573,10 +573,24 @@ static int mscan_open(struct net_device *dev)
-> >  	struct mscan_priv *priv = netdev_priv(dev);
-> >  	struct mscan_regs __iomem *regs = priv->reg_base;
-> >  
-> > +	if (priv->clk_ipg) {
-> > +		ret = clk_prepare_enable(priv->clk_ipg);
-> > +		if (ret)
-> > +			goto exit_retcode;
-> > +	}
-> > +	if (priv->clk_can) {
-> > +		ret = clk_prepare_enable(priv->clk_can);
-> > +		if (ret) {
-> > +			if (priv->clk_ipg)
-> > +				clk_disable_unprepare(priv->clk_ipg);
-> > +			goto exit_retcode;
-> 
-> Why don't you add another jump label and jump to that to disable the
-> ipkg clock?
+> The other reason is:
+> 1) The PLLX is the main CPU clock source in Tegra20/30. We can restore
+> it ASAP to get a better performance.
+> 2) For Tegra114, the PLLX is the CPU clock source when CPU runs at low
+> rates. When CPU in high rate, it uses DFLL as clock source. So it
+> depends on what the clock source of the CPU when it goes into suspend.
+> And the DFLL has its own resume code, it needs to be restored before the
+> CPU uses it as clock source again. It makes the CPU clock restore
+> sequence like this.
 
-You are right.  I've queued this change for v5 (adding a label in
-the existing error path, jumping to it instead of explicitly
-disabling the clock).
+So, we don't yet support the DFLL upstream. Presumably, the CPU is
+always running off PLLX on Tegra114 upstream right now. As such, we can
+hard-code that into the resume path just like we do on earlier chips,
+i.e. using tegra_cpu_car_ops.resume().
 
-> 
-> > +		}
-> > +	}
-> > +
-> >  	/* common open */
-> >  	ret = open_candev(dev);
-> >  	if (ret)
-> > -		return ret;
-> > +		goto exit_dis_clock;
-> >  
-> >  	napi_enable(&priv->napi);
-> >  
-> > @@ -604,6 +618,12 @@ exit_free_irq:
-> >  exit_napi_disable:
-> >  	napi_disable(&priv->napi);
-> >  	close_candev(dev);
-> > +exit_dis_clock:
-> > +	if (priv->clk_can)
-> > +		clk_disable_unprepare(priv->clk_can);
-> > +	if (priv->clk_ipg)
-> > +		clk_disable_unprepare(priv->clk_ipg);
-> > +exit_retcode:
-> >  	return ret;
-> >  }
-> 
-> Marc
+Once we do get DFLL support, presumably the DFLL resume path can switch
+the register from PLLX to DFLL, and we still won't need a custom
+syscore_ops.
 
-Thank you for reviewing several versions of the patch!
+Will that work?
 
+>> 2) What triggers the HW to switch from IDLE to RUN state? 
+>
+> I also want to know more detail about it. The TRM only said it decided
+> by HW and gave an example about when switching to IRQ or FIQ state.
+>
+>> In other
+>> words, I think you're saying that the existing Tegra30 code:
+>>
+>> 	mov32	r4, ((1 << 28) | (0x8))	@ burst policy is PLLX
+>> 	str	r4, [r0, #CLK_RESET_CCLK_BURST]
+>>
+>> doesn't change the clock rate right away. When does it change?
+>
+> The code before this is the PLLX re-enable code. Then it switches to
+> PLLX. The rate is still kept the same when it suspended. The next rate
+> change after resume would be happened in the CPUfreq driver.
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Sorry, when I wrote "doesn't change the clock rate right away", I really
+meant "doesn't change the clock *source* right away".
