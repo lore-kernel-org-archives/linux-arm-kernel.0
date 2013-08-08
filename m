@@ -1,100 +1,30 @@
-From: wangx@marvell.com (Xiang Wang)
-Date: Thu, 8 Aug 2013 02:04:25 -0700
-Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
- transfers
-In-Reply-To: <1375870770-14263-10-git-send-email-zonque@gmail.com>
-References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
- <1375870770-14263-10-git-send-email-zonque@gmail.com>
-Message-ID: <4CF37FDA40C2184293FA2CF8CFAE31322007F0131D@SC-VEXCH4.marvell.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 8 Aug 2013 10:05:30 +0100
+Subject: [PATCH 2/3] mfd: sec: Add clock cell for s2mps11
+In-Reply-To: <20130807171606.5348.76732@quantum>
+References: <1373197462-4033-1-git-send-email-yadi.brar@samsung.com>
+ <1373197462-4033-3-git-send-email-yadi.brar@samsung.com>
+ <20130807171606.5348.76732@quantum>
+Message-ID: <20130808090530.GB14515@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned transfers
-> 
-> The PXA DMA controller has a DALGN register which allows for
-> byte-aligned DMA transfers. Use it in case any of the transfer
-> descriptors is not aligned to a mask of ~0x7.
-> 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  drivers/dma/mmp_pdma.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-> index 1c2c00b..7eb235b 100644
-> --- a/drivers/dma/mmp_pdma.c
-> +++ b/drivers/dma/mmp_pdma.c
-> @@ -109,6 +109,7 @@ struct mmp_pdma_chan {
->  	struct list_head chain_pending;	/* Link descriptors queue for pending */
->  	struct list_head chain_running;	/* Link descriptors queue for running */
->  	bool idle;			/* channel statue machine */
-> +	bool byte_align;
-> 
->  	struct dma_pool *desc_pool;	/* Descriptors pool */
->  };
-> @@ -142,7 +143,7 @@ static void set_desc(struct mmp_pdma_phy *phy, dma_addr_t addr)
-> 
->  static void enable_chan(struct mmp_pdma_phy *phy)
->  {
-> -	u32 reg;
-> +	u32 reg, dalgn;
-> 
->  	if (!phy->vchan)
->  		return;
-> @@ -150,6 +151,13 @@ static void enable_chan(struct mmp_pdma_phy *phy)
->  	reg = DRCMR(phy->vchan->drcmr);
->  	writel(DRCMR_MAPVLD | phy->idx, phy->base + reg);
-> 
-> +	dalgn = readl(phy->base + DALGN);
-> +	if (phy->vchan->byte_align)
-> +		dalgn |= 1 << phy->idx;
-> +	else
-> +		dalgn &= ~(1 << phy->idx);
-> +	writel(dalgn, phy->base + DALGN);
-> +
->  	reg = (phy->idx << 2) + DCSR;
->  	writel(readl(phy->base + reg) | DCSR_RUN,
->  					phy->base + reg);
-> @@ -453,6 +461,7 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
->  		return NULL;
-> 
->  	chan = to_mmp_pdma_chan(dchan);
-> +	chan->byte_align = false;
-> 
->  	if (!chan->dir) {
->  		chan->dir = DMA_MEM_TO_MEM;
-> @@ -469,6 +478,8 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
->  		}
-> 
->  		copy = min_t(size_t, len, PDMA_MAX_DESC_BYTES);
-> +		if (dma_src & 0x7 || dma_dst & 0x7)
-> +			chan->byte_align = true;
-> 
->  		new->desc.dcmd = chan->dcmd | (DCMD_LENGTH & copy);
->  		new->desc.dsadr = dma_src;
-> @@ -528,12 +539,16 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
->  	if ((sgl == NULL) || (sg_len == 0))
->  		return NULL;
-> 
-> +	chan->byte_align = false;
-> +
->  	for_each_sg(sgl, sg, sg_len, i) {
->  		addr = sg_dma_address(sg);
->  		avail = sg_dma_len(sgl);
-> 
->  		do {
->  			len = min_t(size_t, avail, PDMA_MAX_DESC_BYTES);
-> +			if (addr & 0x7)
-> +				chan->byte_align = true;
-> 
->  			/* allocate and populate the descriptor */
->  			new = mmp_pdma_alloc_descriptor(chan);
-> --
-> 1.8.3.1
-We do need to set DALGN bit in some of our drivers. But we cannot configure this via standard dma engine API.
-In this patch, dma address is used to determine whether or not to set DALGN. But what if we need to use 1-byte-aligned mode when addresses are 8-byte-aligned?
-Is it proper to always use 1-byte-aligned mode?
-Thanks.
+On Wed, 07 Aug 2013, Mike Turquette wrote:
 
-Regards,
-Xiang
+> Quoting Yadwinder Singh Brar (2013-07-07 04:44:21)
+> > This patch adds clock to list of mfd cells for s2mps11 and DT documentation
+> > for clock part.
+> > 
+> > Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> 
+> Reviewed-by: Mike Turquette <mturquette@linaro.org>
+
+Thanks Mike.
+
+Patch applied, thanks.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
