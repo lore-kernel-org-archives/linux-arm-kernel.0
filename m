@@ -1,31 +1,36 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Thu, 8 Aug 2013 12:24:23 -0700
-Subject: [PATCH] ARM: bcm: Rename board_bcm
-Message-ID: <1375989863-17144-1-git-send-email-csd@broadcom.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 8 Aug 2013 20:27:47 +0100
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
+In-Reply-To: <5203D5B6.3060806@wwwdotorg.org>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-2-git-send-email-wni@nvidia.com>
+ <520359E9.1000600@roeck-us.net> <5203D5B6.3060806@wwwdotorg.org>
+Message-ID: <20130808192747.GM6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support multiple SoC models in the mach-bcm
-directory, board_bcm.c is being renamed board_bcm281xx.c
+On Thu, Aug 08, 2013 at 11:30:30AM -0600, Stephen Warren wrote:
+> On 08/08/2013 02:42 AM, Guenter Roeck wrote:
 
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Signed-off-by: Christian Daudt <csd@broadcom.com>
+> > If the regulator subsystem is not configured, you especially don't need
+> > or want
+> > to pollute the log with an error message.
 
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 6adb6aec..873817e 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -10,6 +10,6 @@
- # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU General Public License for more details.
- 
--obj-$(CONFIG_ARCH_BCM)		:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
-+obj-$(CONFIG_ARCH_BCM)		:= board_bcm281xx.o bcm_kona_smc.o bcm_kona_smc_asm.o
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
-diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm281xx.c
-similarity index 100%
-rename from arch/arm/mach-bcm/board_bcm.c
-rename to arch/arm/mach-bcm/board_bcm281xx.c
--- 
-1.7.10.4
+> DT parsing errors should be reported. However, if there's nothing to
+> parse, it's not an error.
+
+> So, I think this should report an error message *if* there is a DT
+> property that defines the regulator to use. If there's no property, just
+> use no regulator. If there is a property, it had better be possible to
+> parse it.
+
+On a DT system you should get this behaviour simply by paying attention
+to the error code from the regualtor API - the core should complain
+loudly if the DT is incomprehensible.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/5d4dd604/attachment.sig>
