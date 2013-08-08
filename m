@@ -1,46 +1,61 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 Aug 2013 16:11:01 -0400
-Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
- EMIF spec
-In-Reply-To: <87vc3ggd8s.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
- <87fvukhwtv.fsf@kernel.org> <5203F21F.3010801@ti.com>
- <87vc3ggd8s.fsf@kernel.org>
-Message-ID: <5203FB55.6000300@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Aug 2013 14:14:18 -0600
+Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
+References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
+Message-ID: <5203FC1A.3090903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 August 2013 04:05 PM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On 08/05/2013 02:43 PM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
->> On Thursday 08 August 2013 02:16 PM, Kevin Hilman wrote:
->>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>
->>>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
->>>>
->>>> SDRAM controller on AM33XX requires that a modification of certain
->>>> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
->>>> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
->>>> scenario arises when entering a low power state like DeepSleep.
->>>> To ensure that the read is not from a cached region we reserve
->>>> some memory during bootup using the arm_memblock_steal() API.
->>>
->>> Hmm, sounds to me an awful lot like the existing omap_bus_sync() ?
->>>
->> All the credit of that awful omap_bus_sync() goes to me since 
->> I introduced it. And I keep beating the hardware guys
->> who have not left a choice but to introduce the ugly work
->> around in software. ;-)
-> 
-> Agreed, but what's even more awful than the current version is
-> duplicating it in a slightly different way using yet another whole page
-> mapping for a single read/write location.
-> 
-The real issue is limitation of the kernel memory steal(memblock) API which
-won't let you still less than 1 MB. It would have been ok for page allocation
-because that is any way what you will get minimum on standard non-cached
-allocations.
+> Add bindings for SD/MMC for SOCFPGA.
+> Add "syscon" to the "altr,sys-mgr" binding.
 
-Regards,
-Santosh
+> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+> new file mode 100644
+> index 0000000..dc14922
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+> @@ -0,0 +1,48 @@
+> +* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
+> +  Storage Host Controller
+> +
+> +Required Properties:
+> +
+> +* compatible: should be
+> +	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
+> +	  specific extensions.
+> +
+> +* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
+> +  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
+> +  value is fixed at 3, which means parent_clock/4.
+
+This feels like something that should be represented using the common
+clock API; a driver should query the rate of its input clock, and then
+calculate the MMC block's internal divider based on that (perhaps also
+call clk_set_rate() on the input clock?).
+
+> +Example:
+> +	dwmmc0 at ff704000 {
+> +		compatible = "altr,socfpga-dw-mshc", "snps,dw-mshc";
+> +		reg = <0xff704000 0x1000>;
+> +		interrupts = <0 139 4>;
+
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		num-slots = <1>;
+> +		supports-highspeed;
+> +		fifo-depth = <0x400>;
+
+Those properties aren't defined in this document anywhere. I guess this
+binding is meant to "inherit" from that described in
+"synopsis-dw-mshc.txt"? If so, that should be stated explicitly.
+
+A similar comment applies to the clocks properties in the *.dtsi changes.
+
+> +		altr,dw-mshc-ciu-div = <3>;
+> +      		altr,dw-mshc-sdr-timing = <0 3>;
+
+Indentation issue.
