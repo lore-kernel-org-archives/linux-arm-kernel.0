@@ -1,23 +1,105 @@
-From: xdai@uoregon.edu (Ender Dai)
-Date: Thu, 08 Aug 2013 11:29:23 -0700
-Subject: exclude_* flags for perf_event_open()
-Message-ID: <87iozgniik.fsf@cortana.d.cs.uoregon.edu>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 8 Aug 2013 20:41:20 +0200
+Subject: [PATCH v4 00/31] add COMMON_CLK support for PowerPC MPC512x
+In-Reply-To: <BF555A06-59CD-4697-927E-04657E6F1DB1@kernel.crashing.org>
+References: <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-1-git-send-email-gsi@denx.de>
+ <BF555A06-59CD-4697-927E-04657E6F1DB1@kernel.crashing.org>
+Message-ID: <20130808184036.GY2580@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 07, 2013 at 10:40 -0500, Kumar Gala wrote:
+> 
+> On Aug 6, 2013, at 3:43 PM, Gerhard Sittig wrote:
+> 
+> > this series
+> > - fixes several drivers that are used in the MPC512x platform (UART,
+> > SPI, ethernet, PCI, USB, CAN, NAND flash, video capture) in how they
+> > handle clocks (appropriately acquire and setup them, hold references
+> > during use, release clocks after use)
+> > - introduces support for the common clock framework (CCF, COMMON_CLK
+> > Kconfig option) in the PowerPC based MPC512x platform, which brings
+> > device tree based clock lookup as well
+> > 
+> > although the series does touch several subsystems -- tty (serial), spi,
+> > net (can, fs_enet), mtd (nfc), usb, i2c, media (viu), and dts -- all of
+> > the patches are strictly clock related or trivial
+> > 
+> > it appears most appropriate to take this series through either the clk
+> > or the powerpc trees after it has passed review and other subsystem
+> > maintainers ACKed the clock setup related driver modifications
+> > 
+> > the series passes 'checkpatch.pl --strict' except for one warning which
+> > cannot get resolved, since that either breaks compilation (the data type
+> > is preset by the clk-provider.h API) or requires a cast which shadows
+> > real mismatches:
+> > 
+> > WARNING: static const char * array should probably be static const char * const
+> > #431: FILE: arch/powerpc/platforms/512x/clock-commonclk.c:334:
+> > +static const char *parent_names_mux0[] = {
+> > 
+> > total: 0 errors, 1 warnings, 0 checks, 807 lines checked
+> > 
+> > each step in the series was build and run tested (with a display that is
+> > attached to the DIU as well as SPI, with an SPI attached NOR flash, with
+> > multiple UART ports such that one is not the boot console, with EEPROMs
+> > attached to I2C, with an SD card, booting from network)
+> > 
+> 
+> How do the driver changes impact other PPC SoCs that use the
+> same drivers (i2c, fs_enet, usb) ?
 
-I know that kernel already support those flags for PMUv2 enabled chips
-with event filter. However, for PMUv1 chips without event filter
-capability, those flags are simply not supported.
+For SPI and UART (the PSC component), the hardware is shared
+between MPC512x and MPC5200, but only routines and data specific
+to MPC512x get changed.
 
-Considering that we can manually enable/disable any event counters for
-both PMUv1 and PMUv2 chips, technically we can support exlcude_* flags
-for PMUv1 chips by enable/disable the event counters in appropriate
-time manully.
+For USB the "fsl.*usb2" hardware appears to be shared among
+Freescale SoCs.  AFAICS i.MX has a separate driver under arm/,
+MPC83xx has a separate driver under arch/powerpc/platforms/83xx/,
+and the driver I'm touching is only changed in routines specific
+to MPC512x.
 
-As fearless kernel hackers didn't do that till now, I am almost sure
-that I missed some apparent truth here. So, what's that?
+The NAND and VIU drivers only attach to hardware on the MPC512x
+platform (checked the compatible string, only referenced from the
+mpc5121.dtsi).
 
-Thanks,
-Ender
+I2C, ethernet, PCI all are similar:  A non-fatal clock lookup is
+introduced, CCF platforms (512x only ATM) will carry out
+appropriate clock operations, non-CCF platforms won't see a
+change in behaviour (lookup fails which isn't fatal, and the
+drivers assume that somebody else will have taken care of clocks
+for them).
+
+MSCAN is shared among 512x and 52xx, the common code introduces
+transparent yet optional support for CCF, the 512x code path
+makes use of it, 52xx sees no change in behaviour.
+
+The DIU component (display output) is shared among platforms, but
+only the platform initialization in the MPC512x code path gets
+changed to make use of the CCF support, while no other platform
+sees any change.
+
+The MPC512x common clock core driver does use common primitives
+and redirects the register access primitives.  But the series
+doesn't change register access for ARM (static inline call to the
+previous hardcoded routine and thus identical object code), and
+doesn't modify nor extend the shared code for gates, dividers and
+multiplexers.
+
+The device tree changes only apply to MPC512x, and only provide
+hardware related information that formerly was missing.
+
+
+To summarize, I see no impact for other architectures or
+platforms.  Although it would be good to get a second opinion
+from persons with USB knowledge, to make sure I haven't missed
+something.
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
