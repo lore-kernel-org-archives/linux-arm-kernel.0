@@ -1,97 +1,25 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 8 Aug 2013 11:09:21 -0500
-Subject: [PATCHv3 6/9] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clkevent device
-In-Reply-To: <5203A9E8.2090901@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-7-git-send-email-d-gerlach@ti.com>
- <5203A9E8.2090901@ti.com>
-Message-ID: <5203C2B1.7050106@ti.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Thu, 8 Aug 2013 10:09:38 -0600
+Subject: [PATCH RESEND 1/2] ARM: mmp: Add compatible entries for OLPC XO
+ laptops
+In-Reply-To: <20130719162536.GH16015@ns203013.ovh.net>
+References: <20130716180605.A63C7FAAF3@dev.laptop.org>
+ <20130719162536.GH16015@ns203013.ovh.net>
+Message-ID: <CAMLZHHQeMc2qj9x4zC7Dt=BcYTxUbU4a94C3-RHbUqDMCAHA6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 09:23 AM, Santosh Shilimkar wrote:
-> On Tuesday 06 August 2013 01:49 PM, Dave Gerlach wrote:
->> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
->>
->> OMAP timer code registers two timers - one as clocksource
->> and one as clockevent. Since AM33XX has only one usable timer
->> in the WKUP domain one of the timers needs suspend-resume
->> support to restore the configuration to pre-suspend state.
->>
->> commit adc78e6 (timekeeping: Add suspend and resume
->> of clock event devices) introduced .suspend and .resume
->> callbacks for clock event devices. Leverages these
->> callbacks to have AM33XX clockevent timer which is
->> in not in WKUP domain to behave properly across system
->> suspend.
->>
->> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
-> NAK
->
-> This patch doesn't addressed previous comments.
-> - The issue is specific to AM33XX and hence you
-> need to take care of that. These callbacks will happen on
-> all OMAP machines where the problem doesn't exist.
->
-> - Don't use hwmod APIs directly. At least abstract it
-> at omap_device layer and use that one instead.
->
+Hi,
 
-Ok I will fix this, seems I missed those.
+On Fri, Jul 19, 2013 at 10:25 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> documentation not consistnt with code
 
->>   arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++++++++++
->>   1 file changed, 32 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->> index b37e1fc..cce5d39 100644
->> --- a/arch/arm/mach-omap2/timer.c
->> +++ b/arch/arm/mach-omap2/timer.c
->> @@ -118,11 +118,43 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
->>   	}
->>   }
->>
->> +static void omap_clkevt_suspend(struct clock_event_device *unused)
->> +{
->> +	char name[10];
->> +	struct omap_hwmod *oh;
->> +
->> +	sprintf(name, "timer%d", clkev.id);
->> +	oh = omap_hwmod_lookup(name);
->> +	if (!oh)
->> +		return;
->> +
->> +	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
->> +	omap_hwmod_idle(oh);
->> +}
->> +
->> +static void omap_clkevt_resume(struct clock_event_device *unused)
->> +{
->> +	char name[10];
->> +	struct omap_hwmod *oh;
->> +
->> +	sprintf(name, "timer%d", clkev.id);
->> +	oh = omap_hwmod_lookup(name);
->> +	if (!oh)
->> +		return;
->> +
->> +	omap_hwmod_enable(oh);
->> +	__omap_dm_timer_load_start(&clkev,
->> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
->> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
->> +}
->> +
->>   static struct clock_event_device clockevent_gpt = {
->>   	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
->>   	.rating		= 300,
->>   	.set_next_event	= omap2_gp_timer_set_next_event,
->>   	.set_mode	= omap2_gp_timer_set_mode,
->> +	.suspend	= omap_clkevt_suspend,
->> +	.resume		= omap_clkevt_resume,
->>   };
->>
->>   static struct property device_disabled = {
->>
->
+Sorry for the slow response - I have been away.
+That may also explain why I seem to be missing something: I can't see
+any inconsistency.
+
+Any chance you can briefly clarify the issue you have spotted?
+
+Thanks
+Daniel
