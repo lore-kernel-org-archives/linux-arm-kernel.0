@@ -1,75 +1,79 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 8 Aug 2013 16:09:50 +0530
-Subject: [PATCH v3 6/6] ARM: davinci: da850: configure system
- configuration chip(CFGCHIP3) for emac
-In-Reply-To: <5203C1D1.8020707@ti.com>
-References: <1371999607-6483-1-git-send-email-prabhakar.csengg@gmail.com>
- <1371999607-6483-7-git-send-email-prabhakar.csengg@gmail.com>
- <51F8A4FF.8020803@ti.com>
- <CA+V-a8smEd_75Ab-_vxjBATr8Q9Sefs0tpxc+kgQJRtuLJad=w@mail.gmail.com>
- <5203C1D1.8020707@ti.com>
-Message-ID: <CA+V-a8vHxB0Yy46LLEtVM7-VfPwC=UNux_cpQE=Xmon6Uvxbsg@mail.gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu,  8 Aug 2013 12:38:44 +0200
+Subject: [PATCH v3 14/14] mmc: tmio-mmc: Remove .set_pwr() callback from
+ platform data
+In-Reply-To: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1375958324-29683-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 8, 2013 at 9:35 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Thursday 08 August 2013 04:02 PM, Prabhakar Lad wrote:
->> Hi Sekhar,
->>
->> Sorry for the  delayed response I was on leave and now back again up
->> and running.
->>
->> On Wed, Jul 31, 2013 at 11:17 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->>> On Sunday 23 June 2013 08:30 PM, Prabhakar Lad wrote:
->>>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>>>
->>>> This patch makes a common function for to configure emac and calls
->>>> it appropriately in DT and non DT boot mode. The system configuration
->>>> chip CFGCHIP3, controls the emac module. This patch appropriately
->>>> configures this register for emac and sets DA850_MII_MDIO_CLKEN_PIN
->>>> GPIO pin appropriately.
->>>>
->> [Snip]
->>
->>>> +     if (rmii_enabled)
->>>> +             val |= BIT(8);
->>>> +     else
->>>> +             val &= ~BIT(8);
->>>> +
->>>> +     /* configure the CFGCHIP3 register for RMII or MII */
->>>> +     writel(val, cfg_chip3_base);
->>>> +
->>>> +     ret = davinci_cfg_reg(DA850_GPIO2_6);
->>>> +     if (ret)
->>>> +             pr_warn("%s:GPIO(2,6) mux setup failed\n", __func__);
->>>> +
->>>> +     ret = gpio_request(DA850_MII_MDIO_CLKEN_PIN, "mdio_clk_en");
->>>> +     if (ret) {
->>>> +             pr_warn("Cannot open GPIO %d\n", DA850_MII_MDIO_CLKEN_PIN);
->>>> +             return;
->>>> +     }
->>>
->>> You cannot do this in SoC specific code. All boards wont use a GPIO to
->>> choose between MII/RMII. You need to do this in a EVM specific manner.
->>> This just means you retain the GPIO part of code in board-da850-evm.c
->>
->> OK
->>
->>> and for the DT case use a board specific GPIO node. See a similar
->>> example in arch/arm/boot/dts/ste-nomadik-s8815.dts and how the code uses
->> Alrite something similar to usb-s8815 node.
->>
->>> it in arch/arm/mach-nomadik/cpu-8815.c.
->>>
->> But I don't see any code to access this node in this file, can
->> you point me to right direction ?
->
-> Look at cpu8815_eth_init() function in this file.
->
-Thanks, I was looking at some earlier version of code here [1],
-where this was missing.
+The .set_pwr() callback isn't used anymore as all platforms register
+GPIO-controlled regulators. Remove it.
 
-[1] https://github.com/AndrewDB/rk3066-kernel/blob/master/arch/arm/mach-nomadik/cpu-8815.c
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+ drivers/mmc/host/tmio_mmc.h     | 1 -
+ drivers/mmc/host/tmio_mmc_pio.c | 7 -------
+ include/linux/mfd/tmio.h        | 1 -
+ 3 files changed, 9 deletions(-)
 
-Regards,
---Prabhakar Lad
+diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
+index 86fd21e..39c2f45 100644
+--- a/drivers/mmc/host/tmio_mmc.h
++++ b/drivers/mmc/host/tmio_mmc.h
+@@ -68,7 +68,6 @@ struct tmio_mmc_host {
+ 	enum tmio_mmc_power	power;
+ 
+ 	/* Callbacks for clock / power control */
+-	void (*set_pwr)(struct platform_device *host, int state);
+ 	void (*set_clk_div)(struct platform_device *host, int state);
+ 
+ 	/* pio related stuff */
+diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
+index b380225..67a3bf1 100644
+--- a/drivers/mmc/host/tmio_mmc_pio.c
++++ b/drivers/mmc/host/tmio_mmc_pio.c
+@@ -777,9 +777,6 @@ static void tmio_mmc_power_on(struct tmio_mmc_host *host, unsigned short vdd)
+ 
+ 	/* .set_ios() is returning void, so, no chance to report an error */
+ 
+-	if (host->set_pwr)
+-		host->set_pwr(host->pdev, 1);
+-
+ 	if (!IS_ERR(mmc->supply.vmmc)) {
+ 		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+ 		/*
+@@ -813,9 +810,6 @@ static void tmio_mmc_power_off(struct tmio_mmc_host *host)
+ 
+ 	if (!IS_ERR(mmc->supply.vmmc))
+ 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+-
+-	if (host->set_pwr)
+-		host->set_pwr(host->pdev, 0);
+ }
+ 
+ /* Set MMC clock / power.
+@@ -1002,7 +996,6 @@ int tmio_mmc_host_probe(struct tmio_mmc_host **host,
+ 	_host->pdev = pdev;
+ 	platform_set_drvdata(pdev, mmc);
+ 
+-	_host->set_pwr = pdata->set_pwr;
+ 	_host->set_clk_div = pdata->set_clk_div;
+ 
+ 	/* SD control register space size is 0x200, 0x400 for bus_shift=1 */
+diff --git a/include/linux/mfd/tmio.h b/include/linux/mfd/tmio.h
+index b22883d..baa2346 100644
+--- a/include/linux/mfd/tmio.h
++++ b/include/linux/mfd/tmio.h
+@@ -106,7 +106,6 @@ struct tmio_mmc_data {
+ 	struct tmio_mmc_dma		*dma;
+ 	struct device			*dev;
+ 	unsigned int			cd_gpio;
+-	void (*set_pwr)(struct platform_device *host, int state);
+ 	void (*set_clk_div)(struct platform_device *host, int state);
+ 	int (*write16_hook)(struct tmio_mmc_host *host, int addr);
+ 	/* clock management callbacks */
+-- 
+1.8.1.5
