@@ -1,49 +1,70 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 08 Aug 2013 11:11:57 +0200
-Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
- transfers
-In-Reply-To: <4CF37FDA40C2184293FA2CF8CFAE31322007F0131D@SC-VEXCH4.marvell.com>
-References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
- <1375870770-14263-10-git-send-email-zonque@gmail.com>
- <4CF37FDA40C2184293FA2CF8CFAE31322007F0131D@SC-VEXCH4.marvell.com>
-Message-ID: <520360DD.9070906@gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  8 Aug 2013 11:20:54 +0200
+Subject: [PATCH 1/6] ARM: at91: prepare sama5 dt boards transition to common
+ clk
+In-Reply-To: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1375953654-11168-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiang,
+This patch prepare the transition to common clk for sama5 dt boards by
+replacing the timer init callback.
 
-On 08.08.2013 11:04, Xiang Wang wrote:
->> Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
->> transfers
->> 
->> The PXA DMA controller has a DALGN register which allows for 
->> byte-aligned DMA transfers. Use it in case any of the transfer 
->> descriptors is not aligned to a mask of ~0x7.
+Clocks registration cannot be done in early init callback (as formerly done
+by the old clk implementation) because it requires dynamic allocation
+which is not ready yet during early init.
 
-[...]
+In the other hand, at91 clocks must be registered before
+at91sam926x_pit_init is called because PIT (Periodic Interval Timer) driver
+request the master clk (mck).
 
-> We do need to set DALGN bit in some of our drivers.
+A new function (at91sama5_dt_timer_init) is created to fullfil these needs.
+This function registers all at91 clks using the dt definition before
+calling the PIT init function.
+The device tree clock registration is enabled only if common clk is
+selected. Else the old clk registration is been done during
+at91_dt_initialize call.
 
-Which ones, and how do you currently do that? I didn't find any code to
-support this yet in mmp-pdma.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/mach-at91/board-dt-sama5.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-> But we cannot
-> configure this via standard dma engine API. In this patch, dma
-> address is used to determine whether or not to set DALGN. But what if
-> we need to use 1-byte-aligned mode when addresses are
-> 8-byte-aligned?
-
-Hmm, why would you need that? What's the constraint for this driver that
-they have to rely on that?
-
-> Is it proper to always use 1-byte-aligned mode? 
-
-As far as I understand the datasheet, this bit has performance
-implications and should only be used if really needed.
-
-I think if you have that constraint in drivers, and the dmaengine
-implementation can't determine that automatically, we should introduce a
-flag or something in the dma_slave_config struct.
-
-
-Daniel
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index ad95f6a..10b6913 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -16,6 +16,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
++#include <linux/clk-provider.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/irq.h>
+@@ -26,6 +27,13 @@
+ #include "at91_aic.h"
+ #include "generic.h"
+ 
++static void __init sama5_dt_timer_init(void)
++{
++#if defined(CONFIG_COMMON_CLK)
++	of_clk_init(NULL);
++#endif
++	at91sam926x_pit_init();
++}
+ 
+ static const struct of_device_id irq_of_match[] __initconst = {
+ 
+@@ -77,7 +85,7 @@ static const char *sama5_dt_board_compat[] __initdata = {
+ 
+ DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= sama5_dt_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic5_handle_irq,
+ 	.init_early	= at91_dt_initialize,
+-- 
+1.7.9.5
