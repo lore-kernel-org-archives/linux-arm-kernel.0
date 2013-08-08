@@ -1,118 +1,82 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 Aug 2013 16:00:18 +0200
-Subject: [PATCH v9 04/16] iommu/exynos: allocate lv2 page table from own
- slab
-In-Reply-To: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
-References: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
-Message-ID: <2544843.sndV7usHTj@amdc1227>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 08 Aug 2013 15:58:38 +0200
+Subject: [PATCH 2/6] ARM: Tegra: Add CPU's OPPs for using cpufreq-cpu0
+ driver
+In-Reply-To: <52029811.9080704@wwwdotorg.org>
+References: <cover.1375886595.git.viresh.kumar@linaro.org>
+ <d4cd498d9b63d761039b025216e65278dc8e0e37.1375886595.git.viresh.kumar@linaro.org>
+ <52028719.8070908@wwwdotorg.org>
+ <CAKohpo=MpOyMGFTGeZWmoCRwmZ7+nQtP_yCGokPanEVYL0xbMw@mail.gmail.com>
+ <52029811.9080704@wwwdotorg.org>
+Message-ID: <1375970318.4276.52.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 of August 2013 18:38:04 Cho KyongHo wrote:
-> Since kmalloc() does not guarantee that the allignment of 1KiB when it
-> allocates 1KiB, it is required to allocate lv2 page table from own
-> slab that guarantees alignment of 1KiB
+Am Mittwoch, den 07.08.2013, 12:55 -0600 schrieb Stephen Warren:
+> On 08/07/2013 12:06 PM, Viresh Kumar wrote:
+> > On 7 August 2013 23:12, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> >> On 08/07/2013 08:46 AM, Viresh Kumar wrote:
+> >>> cpufreq-cpu0 driver needs OPPs to be present in DT which can be probed by it to
+> >>> get frequency table. This patch adds OPPs and clock-latency to tegra cpu0 node
+> >>> for multiple SoCs.
+> >>>
+> >>> Voltage levels aren't used until now for tegra and so a flat value which would
+> >>> eventually be ignored is used to represent voltage.
+> >>
+> >> This patch is problematic w.r.t. DT being an ABI.
+> > 
+> > :(
+> > 
+> >> We can certainly add new optional properties to a DT binding that enable
+> >> new features. However, a new version of a binding can't require new
+> >> properties to exist that didn't before, since that means that old DTs
+> >> won't work with new kernels that require the new properties.
+> > 
+> > To be honest I didn't get it completely. You meant operating-points
+> > wasn't present before? Its here:
+> > 
+> > Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+> > Documentation/devicetree/bindings/power/opp.txt
+> > 
+> > Or you meant, Tegra never required voltage levels and we are getting
+> > them in here.
 > 
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c |   24 ++++++++++++++++++++----
->  1 files changed, 20 insertions(+), 4 deletions(-)
+> The current Tegra *.dts files do not contain this property. The current
+> Tegra *.dts files must continue to work without modification in future
+> kernels.
 > 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index d90e6fa..a318049 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -100,6 +100,8 @@
->  #define REG_PB1_SADDR		0x054
->  #define REG_PB1_EADDR		0x058
+> >> As such, I believe we do need some Tegra-specific piece of code that
+> >> defines these OPP tables in the kernel, so that the operating-points
+> >> property is not needed.
+> > 
+> > Generic cpufreq driver depends on OPP library and so somebody has
+> > to provide them. Now you can do it by calling opp_add() for each OPP
+> > you have or otherwise.
 > 
-> +static struct kmem_cache *lv2table_kmem_cache;
-> +
->  static unsigned long *section_entry(unsigned long *pgtable, unsigned
-> long iova) {
->  	return pgtable + lv1ent_offset(iova);
-> @@ -765,7 +767,8 @@ static void exynos_iommu_domain_destroy(struct
-> iommu_domain *domain)
+> Sure. That's what the Tegra-specific cpufreq driver should do. It should
+> be the top-level cpufreq driver. If parts of the code can be implemented
+> by library functions or a core parameterizable driver, then presumably
+> the Tegra driver would simply exist to provide those parameters and/or
+> callback functions to the generic driver.
 > 
->  	for (i = 0; i < NUM_LV1ENTRIES; i++)
->  		if (lv1ent_page(priv->pgtable + i))
-> -			kfree(__va(lv2table_base(priv->pgtable + i)));
-> +			kmem_cache_free(lv2table_kmem_cache,
-> +					__va(lv2table_base(priv->pgtable + i)));
+> > Btw, you must have some specific voltage level for each freq, we can
+> > get them here..
 > 
->  	free_pages((unsigned long)priv->pgtable, 2);
->  	free_pages((unsigned long)priv->lv2entcnt, 1);
-> @@ -861,7 +864,7 @@ static unsigned long *alloc_lv2entry(unsigned long
-> *sent, unsigned long iova, if (lv1ent_fault(sent)) {
->  		unsigned long *pent;
-> 
-> -		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
-> +		pent = kmem_cache_zalloc(lv2table_kmem_cache, GFP_ATOMIC);
->  		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
->  		if (!pent)
->  			return ERR_PTR(-ENOMEM);
-> @@ -881,7 +884,7 @@ static int lv1set_section(unsigned long *sent,
-> phys_addr_t paddr, short *pgcnt)
-> 
->  	if (lv1ent_page(sent)) {
->  		BUG_ON(*pgcnt != NUM_LV2ENTRIES);
-> -		kfree(page_entry(sent, 0));
-> +		kmem_cache_free(lv2table_kmem_cache, page_entry(sent, 0));
->  		*pgcnt = 0;
->  	}
-> 
-> @@ -1082,10 +1085,23 @@ static int __init exynos_iommu_init(void)
->  {
->  	int ret;
-> 
-> +	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
-> +				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
-> +	if (!lv2table_kmem_cache) {
-> +		pr_err("%s: Failed to create kmem cache\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
->  	ret = platform_driver_register(&exynos_sysmmu_driver);
-> 
->  	if (ret == 0)
-> -		bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-> +		ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-> +
-> +	if (ret) {
-> +		pr_err("%s: Failed to register exynos-iommu driver.\n",
-> +								__func__);
-> +		kmem_cache_destroy(lv2table_kmem_cache);
-> +	}
+> Yes, I'm sure we do, but I have no idea what they are:-( It may even be
+> board-specific or SoC-SKU-specific. I think we should defer this aspect
+> for now.
 
-What about making the return value handling here cleaner? For example:
+>From what I learned those voltage levels are dependent on both the
+Speedo and the process ID of the specific Tegra processor. So you really
+get a two dimensional mapping table instead of a single OPP.
+Also you can not scale the CPU voltage on it's own, but have to make
+sure the core voltage isn't too far away from. Then core voltage also
+depends on the operating states of engines like GR2D or even display.
 
-	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
-				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
-	if (!lv2table_kmem_cache) {
-		...
-		return -ENOMEM;
-	}
-
-	ret = platform_driver_register(&exynos_sysmmu_driver);
-	if (ret) {
-		...
-		goto err_destroy_kmem_cache;
-	}
-
-	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-	if (ret) {
-		...
-		goto err_platform_unregister;
-	}
-
-	return 0;
-
-err_platform_unregister:
-	...
-err_destroy_kmem_cache:
-	...
-	return ret;
-}
-
-Best regards,
-Tomasz
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
