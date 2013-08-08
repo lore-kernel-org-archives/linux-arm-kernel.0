@@ -1,61 +1,128 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu,  8 Aug 2013 12:06:23 +0100
-Subject: [PATCH] clk: samsung: Staticise non-exported symbols for PLLs
-Message-ID: <1375959983-2690-1-git-send-email-broonie@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  8 Aug 2013 13:06:50 +0200
+Subject: [RFC PATCH] types.h: use GCC supplied typedefs if appropriate
+Message-ID: <1375960010-4214-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+GCC supplies a set of builtin defines that are meant to be used in the typedefs
+for types such as uint8_t, uint16_t etc. In fact, this is exactly what the
+stdint.h header does (of which GCC supplies its own version for freestanding
+builds). So in stdint.h, the types are defined as
 
-These symbols are not used outside the files they are defined in so do
-not need to be in the global namespace and they aren't declared so sparse
-warns.
+typedef __UINT16_TYPE__ uint16_t
+typedef __UINT32_TYPE__ uint32_t
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
+However, types.h in the kernel contains its own type definitions for these
+stdint.h types, and these do not depend on the GCC builtins.
+
+In the ARM world, both bare metal and glibc targeted versions of GCC are
+supported for building the kernel, and unfortunately, these do not agree on the
+definition of __UINT32_TYPE__ (likewise for __INT32_TYPE__ and __UINTPTR_TYPE__)
+- bare metal uses 'long unsigned int'
+- glibc GCC uses 'unsigned int'
+
+The result of this is that, while it is perfectly feasible in principle to
+support code that includes 'stdint.h' by compiling with -ffreestanding, (such as
+code using NEON intrinsics, whose header 'arm_neon.h' includes 'stdint.h'), in
+practice this breaks because we may end up with conflicting type definitions for
+uint32_t (and uintptr_t) depending on whether you are using bare metal GCC or
+glibc GCC.
+
+Arguably, this is a GCC issue because a) it does not pick up on the fact that
+'typedef unsigned int uint32_t' and 'typedef long unsigned int uint32_t' are not
+in fact conflicting or b) it maintains this trivial difference between bare
+metal and glibc targeted build configs.
+
+However, even if I am aware that stdint.h support or matters related to it may
+be controversial subjects, fixing it in the kernel is not /that/ obtrusive, and
+solves matters for older GCCs as well, hence this RFC patch.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/clk/samsung/clk-exynos4.c    | 2 +-
- drivers/clk/samsung/clk-exynos5250.c | 2 +-
- drivers/clk/samsung/clk-exynos5420.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ include/linux/types.h | 55 +++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 42 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 68f9a4a..fec319d 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -984,7 +984,7 @@ static __initdata struct of_device_id ext_clk_match[] = {
- 	{},
- };
+diff --git a/include/linux/types.h b/include/linux/types.h
+index 4d118ba..40c5925 100644
+--- a/include/linux/types.h
++++ b/include/linux/types.h
+@@ -33,7 +33,11 @@ typedef __kernel_gid32_t	gid_t;
+ typedef __kernel_uid16_t        uid16_t;
+ typedef __kernel_gid16_t        gid16_t;
  
--struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
-+static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
- 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, "fout_apll", NULL),
- 	[mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll",
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index df3628c..5865cef 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -517,7 +517,7 @@ static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
- 	{ },
- };
+-typedef unsigned long		uintptr_t;
++#ifndef __UINTPTR_TYPE__
++#define __UINTPTR_TYPE__	unsigned long
++#endif
++
++typedef __UINTPTR_TYPE__	uintptr_t;
  
--struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
-+static struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
- 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, "fout_apll", NULL),
- 	[mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index ca352695..872e13d 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -727,7 +727,7 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
- 	GATE(smmu_mscl2, "smmu_mscl2", "aclk400_mscl", GATE_IP_MSCL, 10, 0, 0),
- };
+ #ifdef CONFIG_UID16
+ /* This is defined by include/asm-{arch}/posix_types.h */
+@@ -91,26 +95,51 @@ typedef unsigned short		ushort;
+ typedef unsigned int		uint;
+ typedef unsigned long		ulong;
  
--struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
-+static struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
- 	[apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, NULL),
- 	[cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
++#ifndef __UINT8_TYPE__
++#define __UINT8_TYPE__		__u8
++#endif
++#ifndef __INT8_TYPE__
++#define __INT8_TYPE__		__s8
++#endif
++#ifndef __UINT16_TYPE__
++#define __UINT16_TYPE__		__u16
++#endif
++#ifndef __INT16_TYPE__
++#define __INT16_TYPE__		__s16
++#endif
++#ifndef __UINT32_TYPE__
++#define __UINT32_TYPE__		__u32
++#endif
++#ifndef __INT32_TYPE__
++#define __INT32_TYPE__		__s32
++#endif
++#ifndef __UINT64_TYPE__
++#define __UINT64_TYPE__		__u64
++#endif
++#ifndef __INT64_TYPE__
++#define __INT64_TYPE__		__s64
++#endif
++
+ #ifndef __BIT_TYPES_DEFINED__
+ #define __BIT_TYPES_DEFINED__
+ 
+-typedef		__u8		u_int8_t;
+-typedef		__s8		int8_t;
+-typedef		__u16		u_int16_t;
+-typedef		__s16		int16_t;
+-typedef		__u32		u_int32_t;
+-typedef		__s32		int32_t;
++typedef		__UINT8_TYPE__	u_int8_t;
++typedef		__INT8_TYPE__	int8_t;
++typedef		__UINT16_TYPE__	u_int16_t;
++typedef		__INT16_TYPE__	int16_t;
++typedef		__UINT32_TYPE__	u_int32_t;
++typedef		__INT32_TYPE__	int32_t;
+ 
+ #endif /* !(__BIT_TYPES_DEFINED__) */
+ 
+-typedef		__u8		uint8_t;
+-typedef		__u16		uint16_t;
+-typedef		__u32		uint32_t;
++typedef		__UINT8_TYPE__	uint8_t;
++typedef		__UINT16_TYPE__	uint16_t;
++typedef		__UINT32_TYPE__	uint32_t;
+ 
+ #if defined(__GNUC__)
+-typedef		__u64		uint64_t;
+-typedef		__u64		u_int64_t;
+-typedef		__s64		int64_t;
++typedef		__UINT64_TYPE__	uint64_t;
++typedef		__UINT64_TYPE__	u_int64_t;
++typedef		__INT64_TYPE__	int64_t;
+ #endif
+ 
+ /* this is a special 64bit data type that is 8-byte aligned */
 -- 
-1.8.4.rc1
+1.8.1.2
