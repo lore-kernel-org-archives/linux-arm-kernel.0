@@ -1,113 +1,98 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Thu, 8 Aug 2013 11:46:03 +0530
-Subject: Kexec: BE kernel on ARM VE TC2
-In-Reply-To: <51FFC490.5090907@codethink.co.uk>
-References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
- <51FFC490.5090907@codethink.co.uk>
-Message-ID: <CALicx6u4cOLCzia8oxKKCrC=d+pxJmWWvLH++ZXVkvNVWV65DA@mail.gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  8 Aug 2013 08:15:04 +0200
+Subject: [PATCH v3 10/19] ARM: at91/dt: add system clk id definitions in
+ dt-bindings include dir
+In-Reply-To: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1375942504-9010-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 5, 2013 at 8:58 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 05/08/13 13:12, Vijay Kilari wrote:
->>
->> Hi Will,
->>
->> I am trying to make kexec work on BE kernel on ARM VE TC2.
->>
->> First, to make KEXEC work with SMP on ARM VE TC2 board,
->> I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
->>
->> However, I made below changes to make KEXEC work for BE kernel.
->> my question is: why delay is required for board to reboot with kexec?.
->> Is it platform issue?.
->>
->> diff --git a/arch/arm/kernel /machine_kexec.c
->> b/arch/arm/kernel/machine_kexec.c
->> index 4fb074c..0fb0ff9 100644
->> --- a/arch/arm/kernel/machine_kexec.c
->> +++ b/arch/arm/kernel/machine_kexec.c
->> @@ -123,6 +123,18 @@ void machine_crash_shutdown(struct pt_regs *regs)
->>          printk(KERN_INFO "Loading crashdump kernel...\n");
->>   }
->>
->> +static void byte_copy_relocate_kernel(void *dst, const void *src, int
->> size)
->> +{
->> +        char *d, *s;
->> +        d = (char *) dst;
->> +        s = (char *) src;
->> +        while (size>  0)
->> +        {
->> +                *d++ = *s++;
->> +                size--;
->> +        }
->> +}
->> +
->>   /*
->>    * Function pointer to optional machine-specific reinitialization
->>    */
->> @@ -155,9 +167,8 @@ void machine_kexec(struct kimage *image)
->>
->>
->>          /* copy our kernel relocation code to the control code page */
->> -       memcpy(reboot_code_buffer,
->> -              relocate_new_kernel, relocate_new_kernel_size);
->> -
->> +       byte_copy_relocate_kernel(reboot_code_buffer,
->> +              relocate_new_kernel, relocate_new_kernel_size);
->
->
-> you should be able to use memcpy() here, as it shouldn't change the
-> endian-ness of the data being copied.
->
+This patch adds system clk ids definitions into dt-bindinds include dir
+(include/dt-bindings/clk/at91/'soc-name'/system-clk.h).
 
-Yes, you are right. I see that memcpy() works. However I see strange issue
-with  Kexec on BE kernel. If I put debug print in arch/arm/kernel/head.S code
-before turning on MMU, KEXEC works. if I remove the debug print kexec
-boot hangs.
-So I could not relate how calling printascii is solving the problem
+These definitions will be used by dt definition to define and reference
+system clks.
 
-Any suggestion?
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ .../dt-bindings/clk/at91/at91rm9200/clk-system.h   |   16 +++++++++++++++
+ .../dt-bindings/clk/at91/at91sam9261/clk-system.h  |   15 ++++++++++++++
+ include/dt-bindings/clk/at91/common/clk-system.h   |   21 ++++++++++++++++++++
+ 3 files changed, 52 insertions(+)
+ create mode 100644 include/dt-bindings/clk/at91/at91rm9200/clk-system.h
+ create mode 100644 include/dt-bindings/clk/at91/at91sam9261/clk-system.h
+ create mode 100644 include/dt-bindings/clk/at91/common/clk-system.h
 
-If printascii is called after turning on mmu, kexec hangs. Below is my
-debug code
-
-diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index 5b391a6..15d4504 100644
---- a/arch/arm/kernel/head-common.S
-+++ b/arch/arm/kernel/head-common.S
-@@ -175,6 +175,15 @@ __lookup_processor_type_data:
-        .long   __proc_info_end
-        .size   __lookup_processor_type_data, . - __lookup_processor_type_data
-
-+__print_debug:
-+       stmfd   sp!, {r0 - r6, r9, lr}
-+       adr r0, str_p3
-+       bl printascii
-+       ldmfd   sp!, {r0 - r6, r9, pc}
-+str_p3: .asciz "\nHere"
-+       .align
-+ENDPROC(__print_debug)
+diff --git a/include/dt-bindings/clk/at91/at91rm9200/clk-system.h b/include/dt-bindings/clk/at91/at91rm9200/clk-system.h
+new file mode 100644
+index 0000000..43bccd5
+--- /dev/null
++++ b/include/dt-bindings/clk/at91/at91rm9200/clk-system.h
+@@ -0,0 +1,16 @@
++/*
++ * This header provides constants for AT91RM9200 system clocks.
++ *
++ * The constants defined in this header are being used in dts.
++ */
 +
- __error_p:
- #ifdef CONFIG_DEBUG_LL
-        adr     r0, str_p1
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index d509995..a19147c 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -114,7 +114,7 @@ ENTRY(stext)
- #else
-        ldr     r8, =PHYS_OFFSET                @ always constant in this case
- #endif
--
-+       bl      __print_debug
-        /*
-         * r1 = machine no, r2 = atags or dtb,
-         * r8 = phys_offset, r9 = cpuid, r10 = procinfo
-
-
-> --
-> Ben Dooks                               http://www.codethink.co.uk/
-> Senior Engineer                         Codethink - Providing Genius
++#ifndef _DT_BINDINGS_CLK_AT91RM9200_SYSTEM_H
++#define _DT_BINDINGS_CLK_AT91RM9200_SYSTEM_H
++
++#include <dt-bindings/clk/at91/common/system-clk.h>
++
++#define AT91RM9200_UDP_SYS_CLK		1
++#define AT91RM9200_MCKUDP_SYS_CLK	2
++#define AT91RM9200_UHP_SYS_CLK		4
++
++#endif
+diff --git a/include/dt-bindings/clk/at91/at91sam9261/clk-system.h b/include/dt-bindings/clk/at91/at91sam9261/clk-system.h
+new file mode 100644
+index 0000000..28a140a
+--- /dev/null
++++ b/include/dt-bindings/clk/at91/at91sam9261/clk-system.h
+@@ -0,0 +1,15 @@
++/*
++ * This header provides constants for AT91SAM9261 system clocks.
++ *
++ * The constants defined in this header are being used in dts.
++ */
++
++#ifndef _DT_BINDINGS_CLK_AT91SAM9261_SYSTEM_H
++#define _DT_BINDINGS_CLK_AT91SAM9261_SYSTEM_H
++
++#include <dt-bindings/clk/at91/common/system-clk.h>
++
++#define AT91SAM9261_HCK0_SYS_CLK	16
++#define AT91SAM9261_HCK1_SYS_CLK	17
++
++#endif
+diff --git a/include/dt-bindings/clk/at91/common/clk-system.h b/include/dt-bindings/clk/at91/common/clk-system.h
+new file mode 100644
+index 0000000..c0fb124
+--- /dev/null
++++ b/include/dt-bindings/clk/at91/common/clk-system.h
+@@ -0,0 +1,21 @@
++/*
++ * This header provides constants for AT91 system clocks.
++ *
++ * The constants defined in this header are being used in dts.
++ */
++
++#ifndef _DT_BINDINGS_CLK_AT91_SYSTEM_H
++#define _DT_BINDINGS_CLK_AT91_SYSTEM_H
++
++#define AT91_PCK_SYS_CLK	0
++#define AT91_DDRCK_SYS_CLK	2
++#define AT91_LCDCK_SYS_CLK	3
++#define AT91_SMDCK_SYS_CLK	4
++#define AT91_UHP_SYS_CLK	6
++#define AT91_UDP_SYS_CLK	7
++
++#define AT91_PROG_SYS_CLK(id)	(8 + id)
++
++#define AT91_MAX_SYS_CLKS	32
++
++#endif
+-- 
+1.7.9.5
