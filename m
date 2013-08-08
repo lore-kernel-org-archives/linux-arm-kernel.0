@@ -1,56 +1,60 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 Aug 2013 13:40:13 +0200
-Subject: [PATCH v9 05/16] clk: exynos: add gate clock descriptions of
- System MMU
-In-Reply-To: <52037E4E.5050706@samsung.com>
-References: <002901ce941b$0130db50$039291f0$@samsung.com>
- <52037E4E.5050706@samsung.com>
-Message-ID: <1673985.XNpTEeH9vo@amdc1227>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 8 Aug 2013 17:19:39 +0530
+Subject: [PATCH v3 02/12] ARM: edma: Don't clear EMR of channel in
+ edma_stop
+In-Reply-To: <1375719297-12871-3-git-send-email-joelf@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+ <1375719297-12871-3-git-send-email-joelf@ti.com>
+Message-ID: <520385D3.1060408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 of August 2013 13:17:34 Sylwester Nawrocki wrote:
-> On 08/08/2013 11:38 AM, Cho KyongHo wrote:
-> > This adds gate clocks of all System MMUs and their master IPs
-> > that are not apeared in clk-exynos5250.c
-> > Also fixes GATE_IP_ACP to 0x18800 and changed GATE_DA to GATE
-> > for System MMU clocks in clk-exynos4.c
-> > 
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > ---
-> > 
-> >  .../devicetree/bindings/clock/exynos5250-clock.txt |   26 +++++++++
-> >  drivers/clk/samsung/clk-exynos4.c                  |   27 +++------
-> >  drivers/clk/samsung/clk-exynos5250.c               |   57
-> >  ++++++++++++++++---- 3 files changed, 82 insertions(+), 28
-> >  deletions(-)
+On Monday 05 August 2013 09:44 PM, Joel Fernandes wrote:
+> We certainly don't want error conditions to be cleared any other
+> place but the EDMA error handler, as this will make us 'forget'
+> about missed events we might need to know errors have occurred.
 > 
-> [...]
+> This fixes a race condition where the EMR was being cleared
+> by the transfer completion interrupt handler.
 > 
-> > @@ -349,19 +358,26 @@ static struct samsung_gate_clock
-> > exynos5250_gate_clks[] __initdata = {> 
-> >  	GATE(gscl3, "gscl3", "aclk266", GATE_IP_GSCL, 3, 0, 0),
-> >  	GATE(gscl_wa, "gscl_wa", "div_gscl_wa", GATE_IP_GSCL, 5, 0, 0),
-> >  	GATE(gscl_wb, "gscl_wb", "div_gscl_wb", GATE_IP_GSCL, 6, 0, 0),
-> > 
-> > -	GATE(smmu_gscl0, "smmu_gscl0", "aclk266", GATE_IP_GSCL, 7, 0, 0),
-> > -	GATE(smmu_gscl1, "smmu_gscl1", "aclk266", GATE_IP_GSCL, 8, 0, 0),
-> > -	GATE(smmu_gscl2, "smmu_gscl2", "aclk266", GATE_IP_GSCL, 9, 0, 0),
-> > -	GATE(smmu_gscl3, "smmu_gscl3", "aclk266", GATE_IP_GSCL, 10, 0, 0),
-> > +	GATE(smmu_gscl0, "smmu_gscl0", "none", GATE_IP_GSCL, 7, 0, 0),
-> > +	GATE(smmu_gscl1, "smmu_gscl1", "none", GATE_IP_GSCL, 8, 0, 0),
-> > +	GATE(smmu_gscl2, "smmu_gscl2", "none", GATE_IP_GSCL, 9, 0, 0),
-> > +	GATE(smmu_gscl3, "smmu_gscl3", "none", GATE_IP_GSCL, 10, 0, 0),
+> Basically, what was happening was:
 > 
-> Why are the smmu clocks' parent clocks removed ? Shouldn't both the
-> gscaler gate clock and the gscaler smmu clock be still same, as it is in
-> case of exynos4 ?
+>             Missed event
+>              |
+>              |
+>              V
+> SG1-SG2-SG3-Null
+>          \
+>           \__TC Interrupt (Almost same time as ARM is executing
+> TC interrupt handler, an event got missed and also forgotten
+> by clearing the EMR).
+> 
+> This causes the following  problems:
+> 
+> 1.
+> If error interrupt is also pending and TC interrupt clears the EMR
+> by calling edma_stop as has been observed in the edma_callback function,
+> the ARM will execute the error interrupt even though the EMR is clear.
+> As a result, the  dma_ccerr_handler returns IRQ_NONE. If this happens
+> enough number of times, IRQ subsystem disables the interrupt thinking
+> its spurious which makes error handler never execute again.
+> 
+> 2.
+> Also even if error handler doesn't return IRQ_NONE, the removing of EMR
+> removes the knowledge about which channel had a missed event, and thus
+> a manual trigger on such channels cannot be performed.
+> 
+> The EMR is ultimately being cleared by the Error interrupt handler
+> once it is handled so we remove code that does it in edma_stop and
+> allow it to happen there.
+> 
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
 
-I agree with Sylwester.
+Queuing this for v3.11 fixes. While committing, I changed the headline
+to remove capitalization and made it more readable by removing register
+level details. The new headline is:
 
-In fact, it is not a valid clock setup. A valid clock must be either root 
-clock (indicated by appropriate clock flag and specified frequency) or have 
-a valid parent.
+ARM: edma: don't clear missed events in edma_stop()
 
-Best regards,
-Tomasz
+Thanks,
+Sekhar
