@@ -1,34 +1,30 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  8 Aug 2013 10:48:01 +0200
-Subject: [PATCH 4/6] ARM: at91/dt: define sama5d3xek's main clk frequency
-Message-ID: <1375951681-10982-1-git-send-email-b.brezillon@overkiz.com>
+Date: Thu,  8 Aug 2013 10:49:43 +0200
+Subject: [PATCH 5/6] ARM: at91: move sama5d3 SoC to common clk
+Message-ID: <1375951783-11021-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the main clock frequency for the new main clock node
-in sama5d3xcm.dtsi.
+This patch removes the selection of AT91_USE_OLD_CLK when selecting sama5d3
+SoC support. This will enable automatically enable COMMON_CLK_AT91 option
+and add support for at91 common clk implementation.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/boot/dts/sama5d3xcm.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-at91/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index 6a1871b..f19d5bf 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -38,6 +38,12 @@
- 			macb0: ethernet at f0028000 {
- 				phy-mode = "rgmii";
- 			};
-+
-+			pmc: pmc at fffffc00 {
-+				main: mainck {
-+					clock-frequency = <12000000>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 60000000 {
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 97033f7..b4f7d6f 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -86,7 +86,6 @@ config SOC_SAMA5D3
+ 	select SOC_SAMA5
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_AT91_DBGU1
+-	select AT91_USE_OLD_CLK
+ 	select HAVE_AT91_UTMI
+ 	select HAVE_AT91_SMD
+ 	select HAVE_AT91_USB_CLK
 -- 
 1.7.9.5
