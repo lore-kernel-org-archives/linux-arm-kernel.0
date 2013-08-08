@@ -1,40 +1,46 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  8 Aug 2013 10:19:25 +0200
-Subject: [PATCH v3 19/19] ARM: at91: add new compatible strings for pmc driver
-In-Reply-To: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1375949965-10586-1-git-send-email-b.brezillon@overkiz.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 08 Aug 2013 10:20:57 +0200
+Subject: [PATCH 03/20] ARM: pxa: ssp: add shortcut for &pdev->dev
+In-Reply-To: <1375948365.2219.21.camel@sauron.fi.intel.com>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-4-git-send-email-zonque@gmail.com>
+ <20130808073253.GA17106@norris.computersforpeace.net>
+ <1375948365.2219.21.camel@sauron.fi.intel.com>
+Message-ID: <520354E9.10407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new compatible string for PMC node to prepare the
-transition to common clk.
+On 08.08.2013 09:52, Artem Bityutskiy wrote:
+> On Thu, 2013-08-08 at 00:32 -0700, Brian Norris wrote:
+>> On Wed, Aug 07, 2013 at 05:33:52PM +0200, Daniel Mack wrote:
+>>> No functional change, just a cosmetic cleanup.
+>>>
+>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>> ---
+>>> --- a/arch/arm/plat-pxa/ssp.c
+>>> +++ b/arch/arm/plat-pxa/ssp.c
+>>> @@ -77,16 +77,17 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+>>>  	const struct platform_device_id *id = platform_get_device_id(pdev);
+>>>  	struct resource *res;
+>>>  	struct ssp_device *ssp;
+>>> +	struct device *dev = &pdev->dev;
+>>>  	int ret = 0;
+>>>  
+>>>  	ssp = kzalloc(sizeof(struct ssp_device), GFP_KERNEL);
+>>>  	if (ssp == NULL) {
+>>> -		dev_err(&pdev->dev, "failed to allocate memory");
+>>> +		dev_err(dev, "failed to allocate memory");
+>>
+>> Two options here: either remove the message entirely (I believe kzalloc
+>> will complain loudly if the allocation fails) or at least add a newline
+>> at the end of it!
+> 
+> I think only to former is the right option.
+> 
 
-These compatible string come from pmc driver in clk subsystem and are
-needed to provide new device tree compatibility with old at91 clks
-(device tree using common clks will use the new compatible strings).
+Ok, I've added a patch for this to my series.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/mach-at91/clock.c |    6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 5f02aea..4d4463a 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -884,6 +884,12 @@ static int __init at91_pmc_init(unsigned long main_clock)
- #if defined(CONFIG_OF)
- static struct of_device_id pmc_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-pmc" },
-+	{ .compatible = "atmel,at91sam9260-pmc" },
-+	{ .compatible = "atmel,at91sam9g45-pmc" },
-+	{ .compatible = "atmel,at91sam9n12-pmc" },
-+	{ .compatible = "atmel,at91sam9x5-pmc" },
-+	{ .compatible = "atmel,at91sam9g35-pmc" },
-+	{ .compatible = "atmel,sama5d3-pmc" },
- 	{ /*sentinel*/ }
- };
- 
--- 
-1.7.9.5
+Thanks!
+
+Daniel
