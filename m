@@ -1,69 +1,39 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 08 Aug 2013 09:50:11 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <20130805085114.GE15885@kroah.com> (Greg KH's message of "Mon, 5
- Aug 2013 16:51:14 +0800")
-References: <20130801192730.GC9174@kroah.com>
- <20130802090355.GF7656@atomide.com> <20130802093222.GA8982@kroah.com>
- <20130802123445.GG7656@atomide.com> <20130802141449.GA7533@kroah.com>
- <20130805065535.GP7656@atomide.com> <20130805071106.GA14215@kroah.com>
- <20130805073730.GU7656@atomide.com> <20130805080254.GA15376@kroah.com>
- <20130805082138.GV7656@atomide.com> <20130805085114.GE15885@kroah.com>
-Message-ID: <87txj0rut8.fsf@linaro.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 8 Aug 2013 22:41:20 +0530
+Subject: [PATCH 1/2] include: dt-binding: input: create a DT header
+ defining key codes.
+In-Reply-To: <52014E50.6030508@wwwdotorg.org>
+References: <1375798370-2231-1-git-send-email-ldewangan@nvidia.com>
+ <52014E50.6030508@wwwdotorg.org>
+Message-ID: <5203D138.4030107@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg KH <greg@kroah.com> writes:
-
-> On Mon, Aug 05, 2013 at 01:21:38AM -0700, Tony Lindgren wrote:
-
-[...]
-
->> 
->> How the power and clock domains are done and how the clocks are gated
->> or idled. So basically how the devices are reset and idled at the bus
->> level.
+On Wednesday 07 August 2013 12:58 AM, Stephen Warren wrote:
+> (CC'ing DT bindings maintainers too, hence quoting a bit of the patch)
 >
-> I think of a "bus" as the way that a device talks to the hardware (i.e.
-> PCI, USB, i2c, spi, etc.)  You are saying a "bus" is something
-> different, something that is used to control the "raw" devices that just
-> do iowrites.
+> On 08/06/2013 08:12 AM, Laxman Dewangan wrote:
+>> Many of Key device tree bindings uses the constant number as key code
+>> which matches with kernel header key code and then comment as follows
+>> for reference/better readability:
+>> 	linux,code = <102>; /* KEY_HOME */
+>>
+>> Create a DT header which defines all the key code so that DT key bindings
+>> can use it as follows:
+>> 	linux,code = <KEY_HOME>;
+> This looks fine to me.
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 >
-> Why not just create a bus for your devices, have them register platform
-> devices (so you can take advantage of the existing drivers) and have
-> your own "platform bus" of a specific type?  The code to do that would
-> only need to be created once "per bus", and that way you can handle all
-> of the needed reset/idle stuff properly for things "attached" to it.
+> A comment in support of the patch: This is adding OS-specific content to
+> the DT. However, the bindings this header file supports are already
+> written that way. There's not really any alternative here, since some
+> numbering scheme had to be chosen for keycodes, and it may as well be
+> the same set as the first/primary OS that'll use the binding.
+>
+> As far as merging it, this patch should probably go through the core DT
+> tree, perhaps in a topic branch so that e.g. Tegra an MVEBU can merge it
+> in to apply your subsequent patches (or we can just wait until the next
+> kernel release to merge them in).
 
-Each time we've looked at doing this (when pre-cursors to runtime PM
-were being explored, for example), what you end up with is essentially
-with a copy of drivers/base/platform.c with a few lines of additional
-code.  So each time this has happened, the outcome has been that the
-platform_bus has just extended slightly with the new features to avoid
-the massive duplication.
-
-This has followed the "extend instead of duplicate" philosophy we
-generally follow, but the question now is whether we've finally extended
-the platform_bus to it's breaking point.  (I don't think we don't have
-to guess what your answer is.) :)
-
-At least for the PM stuff (including reset/idle), I don't think we need
-a new bus type.  We now have PM domains which IMO should be used for
-this stuff.  PM domains allow arbitrary groupings of (independent of
-underlying bus type) that have common PM operations (read struct
-dev_pm_ops.)  For these things, it's probabably PM domains (along with
-runtime PM/dev_pm_ops) that should be extended for some of the PM
-features Tony is referring to.  Then the driver core (not the bus) might
-need to grow some new operations to handle new items in dev_pm_ops.
-
-While I think that could address the device/bus specific PM related
-operations without the need for a new bus type, it doesn't really solve
-the bigger forward-looking features Will is raising.
-
-> Perhaps we need to get in front of a whiteboard at the ARM mini summit
-> and hash this all out...
-
-Agreed, this will be a great topic for the ARM mini summit.
-
-Kevin
+Do I need to include anyone for this patch to be applied or can go 
+through Dmitry's input git branch?
