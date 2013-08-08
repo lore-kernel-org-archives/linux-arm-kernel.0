@@ -1,53 +1,33 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 8 Aug 2013 10:59:32 -0700
-Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
-In-Reply-To: <5203D5B6.3060806@wwwdotorg.org>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <1375944991-29182-2-git-send-email-wni@nvidia.com>
- <520359E9.1000600@roeck-us.net> <5203D5B6.3060806@wwwdotorg.org>
-Message-ID: <20130808175932.GB15013@roeck-us.net>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 08 Aug 2013 22:03:55 +0400
+Subject: =?UTF-8?B?UmU6IF9fQVJNX0FSQ0hfMl9f?=
+In-Reply-To: <20130808175253.GB2356@localhost.localdomain>
+References: <CANEcUBWAYe1Zkes3ZxFr9Copwh-H9Meijg6eupiQaKRUR0Jmdg@mail.gmail.com>
+ <20130808082719.GH23006@n2100.arm.linux.org.uk>
+ <20130808175253.GB2356@localhost.localdomain>
+Message-ID: <1375985035.647275432@f399.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 11:30:30AM -0600, Stephen Warren wrote:
-> On 08/08/2013 02:42 AM, Guenter Roeck wrote:
-> > On 08/07/2013 11:56 PM, Wei Ni wrote:
-> >> The device lm90 can be controlled by the vdd rail.
-> >> Adding the power control support to power on/off the vdd rail.
-> >> And make sure that power is enabled before accessing the device.
-> 
-> >> diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
-> 
-> >>   static int lm90_probe(struct i2c_client *client,
-> >>                 const struct i2c_device_id *id)
-> >>   {
-> >> @@ -1406,6 +1434,20 @@ static int lm90_probe(struct i2c_client *client,
-> >>       i2c_set_clientdata(client, data);
-> >>       mutex_init(&data->update_lock);
-> >>
-> >> +    data->lm90_reg = regulator_get(&client->dev, "vdd");
+> On Thu, Aug 08, 2013 at 09:27:19AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Aug 08, 2013 at 10:08:02AM +0800, zhaobin xv wrote:
+> > > I don't know what the"__ARM_ARCH_2__" mean?
+> > > "__ARM_ARCH_2__" is definded by gcc or definded byarmlinux?
+> > > where does it come from? what does it want to do?
 > > 
-> > You should use devm_regulator_get(). Then you also don't need the call
-> > to regulator_put().
+> > You could try a few things before posting:
 > > 
-> >> +    if (IS_ERR_OR_NULL(data->lm90_reg)) {
+> > 1. You could try grepping the kernel source to find out if anything
+> >    in the kernel defines it.
+> > 2. You could try asking google and seeing what it returns.
 > > 
-> > The function never returns NULL except if the regulator subsystem is not
-> > configured,
-> > so IS_ERR() is more appropriate.
-> > 
-> > If the regulator subsystem is not configured, you especially don't need
-> > or want
-> > to pollute the log with an error message.
+> > Either of those will tell you that it's not defined by the kernel but by
+> > the compiler.  For me, the first link on google explains it really well.
 > 
-> DT parsing errors should be reported. However, if there's nothing to
-> parse, it's not an error.
-> 
-> So, I think this should report an error message *if* there is a DT
-> property that defines the regulator to use. If there's no property, just
-> use no regulator. If there is a property, it had better be possible to
-> parse it.
-> 
-Agreed.
+> Should that code go away?  I believe we don't support v2 or v3 any more...
+> Did teqp actually work in 32-bit modes?
 
-Guenter
+"ARM: 7770/1: remove residual ARMv2 support from decompressor":
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/compressed/head.S?id=52c08a9e399739979027ea1e463f5529476da104
+
+---
