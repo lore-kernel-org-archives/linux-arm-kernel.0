@@ -1,31 +1,30 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 08 Aug 2013 06:10:54 +0200
-Subject: [PATCH] pinctrl: at91: choose appropriate handler for level
- interrupts
-In-Reply-To: <CACRpkdbte37s-nG-QqmbD=TrVEsSDBFTRX0fjbfUfHpwHSjLDw@mail.gmail.com>
-References: <1374331893-16009-1-git-send-email-b.brezillon@overkiz.com>
- <CACRpkdbte37s-nG-QqmbD=TrVEsSDBFTRX0fjbfUfHpwHSjLDw@mail.gmail.com>
-Message-ID: <52031A4E.8010605@overkiz.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu,  8 Aug 2013 09:55:47 +0530
+Subject: [PATCH 1/3] clk: tegra114: Fix incorrect placement of __initdata
+Message-ID: <1375935949-19557-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2013 20:59, Linus Walleij wrote:
-> On Sat, Jul 20, 2013 at 4:51 PM, Boris BREZILLON
-> <b.brezillon@overkiz.com> wrote:
->
->> The current implementation handle both edge and level interrupts with the
->> 'handle_simple_irq' handler.
->>
->> Level interrupts are active as long as the pin stays at the configured
->> level (low or high). In this case we have to use 'handle_level_irq' which
->> mask the interrupt until the handle has treated it.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Patch applied with Alexandre's Tested-by tag.
-Thanks
->
-> Worst thing that can happen is that I have to revert it.
-> Now it will atleast get some testing in linux-next.
->
-> Yours,
-> Linus Walleij
+__initdata should be placed between the variable name and equal
+sign for the variable to be placed in the intended section.
+
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/tegra/clk-tegra114.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index f74ed19..66fa1d6 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -2182,7 +2182,7 @@ static const struct of_device_id pmc_match[] __initconst = {
+  * dfll_soc/dfll_ref apparently must be kept enabled, otherwise I2C5
+  * breaks
+  */
+-static __initdata struct tegra_clk_init_table init_table[] = {
++static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{uarta, pll_p, 408000000, 0},
+ 	{uartb, pll_p, 408000000, 0},
+ 	{uartc, pll_p, 408000000, 0},
+-- 
+1.7.9.5
