@@ -1,34 +1,45 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 Aug 2013 15:31:43 -0400
-Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
- EMIF spec
-In-Reply-To: <87fvukhwtv.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
- <87fvukhwtv.fsf@kernel.org>
-Message-ID: <5203F21F.3010801@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 08 Aug 2013 23:39:47 +0400
+Subject: [PATCH 3/3] crypto: dcp: rename 'compatible' property to 'fsl,
+ dcp'
+In-Reply-To: <1375968629-10091-4-git-send-email-LW@KARO-electronics.de>
+References: <1375968629-10091-1-git-send-email-LW@KARO-electronics.de>
+ <1375968629-10091-4-git-send-email-LW@KARO-electronics.de>
+Message-ID: <5203F403.1040800@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 August 2013 02:16 PM, Kevin Hilman wrote:
-> Dave Gerlach <d-gerlach@ti.com> writes:
-> 
->> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
->>
->> SDRAM controller on AM33XX requires that a modification of certain
->> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
->> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
->> scenario arises when entering a low power state like DeepSleep.
->> To ensure that the read is not from a cached region we reserve
->> some memory during bootup using the arm_memblock_steal() API.
-> 
-> Hmm, sounds to me an awful lot like the existing omap_bus_sync() ?
->
-All the credit of that awful omap_bus_sync() goes to me since 
-I introduced it. And I keep beating the hardware guys
-who have not left a choice but to introduce the ugly work
-around in software. ;-)
+Hello.
 
-Regards,
-Santosh
- 
+On 08/08/2013 05:30 PM, Lothar Wa?mann wrote:
+
+> Leave the old 'fsl-dcp' value in place with an appropriate comment
+> until external users have updated their DTBs.
+
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>   arch/arm/boot/dts/imx28.dtsi |    2 +-
+>   drivers/crypto/dcp.c         |    2 ++
+>   2 files changed, 3 insertions(+), 1 deletions(-)
+
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index ea99d09..0584935 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -794,7 +794,7 @@
+>   			};
+>
+>   			dcp: dcp at 80028000 {
+
+     By the way, I see that this is a crypto device, so it should be named 
+"crypto" according to ePAPR spec. [1]
+
+> -				compatible = "fsl-dcp";
+> +				compatible = "fsl,dcp";
+>   				reg = <0x80028000 0x2000>;
+>   				interrupts = <52 53 54>;
+>   				status = "disabled";
+
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+WBR, Sergei
