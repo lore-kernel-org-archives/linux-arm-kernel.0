@@ -1,59 +1,44 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 08 Aug 2013 11:25:41 -0700
-Subject: [PATCHv3 6/9] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clkevent device
-In-Reply-To: <1375811376-49985-7-git-send-email-d-gerlach@ti.com> (Dave
- Gerlach's message of "Tue, 6 Aug 2013 12:49:33 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-7-git-send-email-d-gerlach@ti.com>
-Message-ID: <8738qkhwey.fsf@kernel.org>
+From: grundler@chromium.org (Grant Grundler)
+Date: Thu, 8 Aug 2013 11:28:44 -0700
+Subject: [PATCH v9 03/16] iommu/exynos: fix page table maintenance
+In-Reply-To: <1516548.d7oQuzQS7g@amdc1227>
+References: <002701ce941a$eecebdb0$cc6c3910$@samsung.com>
+ <1516548.d7oQuzQS7g@amdc1227>
+Message-ID: <CANEJEGu1ponghpfvyUsQX16+TZWUV+0KXJ7AehjXpju2N_H+Ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+Tomasz,
 
-> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+On Thu, Aug 8, 2013 at 6:54 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+...
+>> +     BUG_ON(lv1ent_section(sent));
 >
-> OMAP timer code registers two timers - one as clocksource
-> and one as clockevent. Since AM33XX has only one usable timer
-> in the WKUP domain one of the timers needs suspend-resume
-> support to restore the configuration to pre-suspend state.
+> Is this condition really a critical one, to the point that the system
+> should not continue execution?
 >
-> commit adc78e6 (timekeeping: Add suspend and resume
-> of clock event devices) introduced .suspend and .resume
-> callbacks for clock event devices. Leverages these
-> callbacks to have AM33XX clockevent timer which is
-> in not in WKUP domain to behave properly across system
-> suspend.
+...
+>>       if (lv1ent_page(sent)) {
+>> -             if (*pgcnt != NUM_LV2ENTRIES)
+>> -                     return -EADDRINUSE;
+>> -
+>> +             BUG_ON(*pgcnt != NUM_LV2ENTRIES);
 >
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index b37e1fc..cce5d39 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -118,11 +118,43 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
->  	}
->  }
->  
-> +static void omap_clkevt_suspend(struct clock_event_device *unused)
-> +{
-> +	char name[10];
-> +	struct omap_hwmod *oh;
-> +
-> +	sprintf(name, "timer%d", clkev.id);
-> +	oh = omap_hwmod_lookup(name);
+> Ditto.
 
-/me stops reviewing here.  This should be a one-time thing.
+I can't speak to the previous BUG_ON(). I believe the EADDRESSINUSE
+failures could be either WARN_ON or BUG_ON.   This condition is
+clearly a bug in the generic IOMMU allocator and I think that's why
+KyongHo Cho used BUG_ON.
 
-Seeing things *again* in patches that I've already reviewed (multiple
-times) is very frustrating.  It also increases the likelihood of future
-patches to be "filtered."  (in this case, you get a pass since you seem
-to have inherited Vaibhav's code, but please take care to address all
-reviewer comments, or at least explain why you didn'.)
+Handing out duplicate addresses will generally lead to some sort of
+data corruption or other fault depending on how robust the underlying
+device drivers are written.  So my preference is a BUG_ON to
+immediately flag this condition instead of hoping a device driver will
+correctly handling the dma mapping failure (Some do, most currently
+don't).
 
-Kevin
+WARN_ON() + return -EADDRESSINUSE would be a good alternative.
+
+thanks,
+grant
