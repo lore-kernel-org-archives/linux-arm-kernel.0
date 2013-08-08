@@ -1,70 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 8 Aug 2013 13:00:26 -0700
-Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
-In-Reply-To: <20130808171554.GI6427@sirena.org.uk>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <1375944991-29182-2-git-send-email-wni@nvidia.com>
- <20130808110136.GA6427@sirena.org.uk>
- <52038035.7030803@roeck-us.net>
- <20130808130840.GC6427@sirena.org.uk>
- <5203B78C.7010101@roeck-us.net>
- <20130808171554.GI6427@sirena.org.uk>
-Message-ID: <20130808200026.GA18226@roeck-us.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 08 Aug 2013 13:05:07 -0700
+Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
+ EMIF spec
+In-Reply-To: <5203F21F.3010801@ti.com> (Santosh Shilimkar's message of "Thu, 8
+ Aug 2013 15:31:43 -0400")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
+ <87fvukhwtv.fsf@kernel.org> <5203F21F.3010801@ti.com>
+Message-ID: <87vc3ggd8s.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 06:15:54PM +0100, Mark Brown wrote:
-> On Thu, Aug 08, 2013 at 08:21:48AM -0700, Guenter Roeck wrote:
-> > On 08/08/2013 06:08 AM, Mark Brown wrote:
-> 
-> > >I'd be most surprised if the device worked without power, if the driver
-> > >fails to get and enable a regulator for it then that's not great
-> > >(especially if it does so silently).
-> 
-> > Correct, but it appears that the driver magically worked for a long time
-> > without it.
-> 
-> Sure, it'll work in systems that have always on regulators.
-> 
-> > Is it guaranteed that the driver keeps working for all cases where
-> > regulator support is enabled in the kernel, and where it used to work
-> > so far without mandating the existence of this specific regulator ?
-> > My main concern is having to deal with complaints that the driver stopped
-> > working for no good reason.
-> 
-> Sure, that's the transition issues I mentioned - the regulator API does
-> have stubbing facilities which should cover things and it's very easy to
-> define stub regulators if you need to.  Like I say I expect this to be a
-> lot easier after the next merge window as another way of doing stubs is
-> being added which should make this even easier by avoiding disrupting
-> drivers that do genuinely want to check for absent supplies and handle
-> that better.
-> 
-We will need to make sure that all dts files using any of the compatible chips
-are updated accordingly. There are several entries in various dts files for
-adm1032, adt7461, lm90, and nct1008.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-> > In this context, is it common practice to name such regulators "vdd"
-> > or similar ? What if there are multiple LM90 or compatible chips
-> > in a system, connected to different power rails ? Who determines
-> > if the regulator is supposed to be named "vdd" or "vcc" or anything
-> > else, and to which power rails it is actually connected ? How can
-> > and does one guarantee that "vdd" is the correct regulator to use
-> > for all systems ? What if some other driver requests "vdd", but the chip
-> > it supports happens to be connected to a different power rail ?
-> 
-> That's not what the name means - they are nothing to do with the board.
+> On Thursday 08 August 2013 02:16 PM, Kevin Hilman wrote:
+>> Dave Gerlach <d-gerlach@ti.com> writes:
+>> 
+>>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>>
+>>> SDRAM controller on AM33XX requires that a modification of certain
+>>> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
+>>> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
+>>> scenario arises when entering a low power state like DeepSleep.
+>>> To ensure that the read is not from a cached region we reserve
+>>> some memory during bootup using the arm_memblock_steal() API.
+>> 
+>> Hmm, sounds to me an awful lot like the existing omap_bus_sync() ?
+>>
+> All the credit of that awful omap_bus_sync() goes to me since 
+> I introduced it. And I keep beating the hardware guys
+> who have not left a choice but to introduce the ugly work
+> around in software. ;-)
 
-Ok, makes sense.
+Agreed, but what's even more awful than the current version is
+duplicating it in a slightly different way using yet another whole page
+mapping for a single read/write location.
 
-> The names requested by a driver are defined with regard to the device
-> and should be the names used by the chip itself as defined in the
-
-9 votes for vdd, 11 votes for vcc, one undecided (no datasheet available).
-Guess one is as good as the other ;-).
-
-Guenter
-
-> datasheet.  A board that uses regulators then maps these onto specific
-> regulators in the system, the driver doesn't need to know anything about
-> this process.
+Kevin
