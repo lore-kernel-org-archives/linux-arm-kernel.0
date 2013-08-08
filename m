@@ -1,38 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 08 Aug 2013 08:32:16 +0200
-Subject: [PATCH] [TRIVIAL] ARM: msm: fix compilation error in gpiomux
-In-Reply-To: <20130807210804.GB14845@codeaurora.org>
-References: <1375857279-18082-1-git-send-email-k.kozlowski@samsung.com>
- <20130807174053.GA17551@codeaurora.org>
- <20130807210804.GB14845@codeaurora.org>
-Message-ID: <1375943536.30982.1.camel@AMDC1943>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 08 Aug 2013 08:42:41 +0200
+Subject: [PATCH 01/20] mtd: pxa3xx-nand: replace pxa_request_dma with
+ dmaengine
+In-Reply-To: <20130807174612.GB18567@localhost>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-2-git-send-email-zonque@gmail.com>
+ <20130807174612.GB18567@localhost>
+Message-ID: <52033DE1.5050700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2013-08-07 at 14:08 -0700, Stephen Boyd wrote:
-> On 08/07, David Brown wrote:
-> > On Wed, Aug 07, 2013 at 08:34:39AM +0200, Krzysztof Kozlowski wrote:
-> > >Fix compilation error in gpiomux (CONFIG_MSM_GPIOMUX=y):
-> > >arch/arm/mach-msm/gpiomux.c:24:13: error: static declaration of
-> > >	???__msm_gpiomux_write??? follows non-static declaration
-> > >arch/arm/mach-msm/gpiomux.h:85:6: note: previous declaration of
-> > >	???__msm_gpiomux_write??? was here
-> > >
-> > >Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > 
-> > Thanks, I'll pull this in.
-> > 
-> >  <https://patchwork.kernel.org/patch/2839921/>
-> > 
+On 07.08.2013 19:46, Ezequiel Garcia wrote:
+> Hi Daniel,
 > 
-> I believe this is fixed by Rohit's patch that has already been
-> taken in a pull request?
+> On Wed, Aug 07, 2013 at 05:33:50PM +0200, Daniel Mack wrote:
+>> From: Zhangfei Gao <zhangfei.gao@marvell.com>
+>>
+>> [zonque at gmail.com: rebased in top of l2-mtd.git. The newly introduced
+>> ARCH_HAS_DMA hack was changed into a check for CONFIG_HAS_DMA]
+>>
 > 
-> https://lkml.org/lkml/2013/7/26/608
+> Are you sure you need to introduce the CONFIG_HAS_DMA ifdef?
+> 
+> The reason I introduced the ARCH_HAS_DMA macro was to avoid including
+> the "mach/dma.h" header. Now that you've removed it, I don't think
+> this driver can be used in any platform where CONFIG_HAS_DMA=n.
 
-Yes, Rohit's patch fixes the problem so this is already in linux-msm
-tree.
+Well, yes it can, or at least you could decide to use it without DMA on
+PXA/MMP. The idea of CONFIG_HAS_DMA is to save binary size.
 
 
-Best regards,
-Krzysztof
+Daniel
