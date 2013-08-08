@@ -1,99 +1,33 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu,  8 Aug 2013 12:38:36 +0200
-Subject: [PATCH v3 06/14] sh: ecovec24: Remove MMCIF and SDHI .set_pwr()
- callbacks
+Date: Thu,  8 Aug 2013 12:38:39 +0200
+Subject: [PATCH v3 09/14] mmc: sh_mmcif: Remove .down_pwr() callback from
+ platform data
 In-Reply-To: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1375958324-29683-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1375958324-29683-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMCIF and SHDI platform data .set_pwr() callbacks are used to
-control the vmmc/vqmmc power supplies. As the power supplies already
-register control GPIOs there's no need to perform the operation
-manually. Remove the callback functions.
+The callback isn't used by the driver and isn't initialized by board
+code. Remove it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- arch/sh/boards/mach-ecovec24/setup.c | 41 ------------------------------------
- 1 file changed, 41 deletions(-)
+ include/linux/mmc/sh_mmcif.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24/setup.c
-index 5af40f5..0332d25 100644
---- a/arch/sh/boards/mach-ecovec24/setup.c
-+++ b/arch/sh/boards/mach-ecovec24/setup.c
-@@ -598,29 +598,9 @@ static struct platform_device sdhi0_power = {
- 	},
- };
+diff --git a/include/linux/mmc/sh_mmcif.h b/include/linux/mmc/sh_mmcif.h
+index e7d5dd6..39011eb 100644
+--- a/include/linux/mmc/sh_mmcif.h
++++ b/include/linux/mmc/sh_mmcif.h
+@@ -34,7 +34,6 @@
  
--static void sdhi0_set_pwr(struct platform_device *pdev, int state)
--{
--	static int power_gpio = -EINVAL;
--
--	if (power_gpio < 0) {
--		int ret = gpio_request(GPIO_PTB6, NULL);
--		if (!ret) {
--			power_gpio = GPIO_PTB6;
--			gpio_direction_output(power_gpio, 0);
--		}
--	}
--
--	/*
--	 * Toggle the GPIO regardless, whether we managed to grab it above or
--	 * the fixed regulator driver did.
--	 */
--	gpio_set_value(GPIO_PTB6, state);
--}
--
- static struct sh_mobile_sdhi_info sdhi0_info = {
- 	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
- 	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
--	.set_pwr	= sdhi0_set_pwr,
- 	.tmio_caps      = MMC_CAP_SDIO_IRQ | MMC_CAP_POWER_OFF_CARD |
- 			  MMC_CAP_NEEDS_POLL,
- 	.tmio_flags	= TMIO_MMC_USE_GPIO_CD,
-@@ -650,25 +630,6 @@ static struct platform_device sdhi0_device = {
- 	},
- };
- 
--static void cn12_set_pwr(struct platform_device *pdev, int state)
--{
--	static int power_gpio = -EINVAL;
--
--	if (power_gpio < 0) {
--		int ret = gpio_request(GPIO_PTB7, NULL);
--		if (!ret) {
--			power_gpio = GPIO_PTB7;
--			gpio_direction_output(power_gpio, 0);
--		}
--	}
--
--	/*
--	 * Toggle the GPIO regardless, whether we managed to grab it above or
--	 * the fixed regulator driver did.
--	 */
--	gpio_set_value(GPIO_PTB7, state);
--}
--
- #if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
- /* SDHI1 */
- static struct sh_mobile_sdhi_info sdhi1_info = {
-@@ -678,7 +639,6 @@ static struct sh_mobile_sdhi_info sdhi1_info = {
- 			  MMC_CAP_NEEDS_POLL,
- 	.tmio_flags	= TMIO_MMC_USE_GPIO_CD,
- 	.cd_gpio	= GPIO_PTW7,
--	.set_pwr	= cn12_set_pwr,
- };
- 
- static struct resource sdhi1_resources[] = {
-@@ -1000,7 +960,6 @@ static struct resource sh_mmcif_resources[] = {
- };
- 
- static struct sh_mmcif_plat_data sh_mmcif_plat = {
--	.set_pwr	= cn12_set_pwr,
- 	.sup_pclk	= 0, /* SH7724: Max Pclk/2 */
- 	.caps		= MMC_CAP_4_BIT_DATA |
- 			  MMC_CAP_8_BIT_DATA |
+ struct sh_mmcif_plat_data {
+ 	void (*set_pwr)(struct platform_device *pdev, int state);
+-	void (*down_pwr)(struct platform_device *pdev);
+ 	int (*get_cd)(struct platform_device *pdef);
+ 	unsigned int		slave_id_tx;	/* embedded slave_id_[tr]x */
+ 	unsigned int		slave_id_rx;
 -- 
 1.8.1.5
