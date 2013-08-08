@@ -1,61 +1,50 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu,  8 Aug 2013 12:38:41 +0200
-Subject: [PATCH v3 11/14] mmc: sh_mobile_sdhi: Remove .get_cd() callback from
+Date: Thu,  8 Aug 2013 12:38:40 +0200
+Subject: [PATCH v3 10/14] mmc: sh_mmcif: Remove .set_pwr() callback from
  platform data
 In-Reply-To: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1375958324-29683-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1375958324-29683-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All platforms pass the CD GPIO number to the driver in the .cd_gpio
-field. The .get_cd() callback isn't used anymore, remove it.
+The .set_pwr() callback isn't used anymore as all platforms register
+GPIO-controlled regulators. Remove it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- drivers/mmc/host/sh_mobile_sdhi.c  | 9 ---------
- include/linux/mmc/sh_mobile_sdhi.h | 1 -
- 2 files changed, 10 deletions(-)
+ drivers/mmc/host/sh_mmcif.c  | 3 ---
+ include/linux/mmc/sh_mmcif.h | 1 -
+ 2 files changed, 4 deletions(-)
 
-diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
-index ebea749..663a672 100644
---- a/drivers/mmc/host/sh_mobile_sdhi.c
-+++ b/drivers/mmc/host/sh_mobile_sdhi.c
-@@ -77,13 +77,6 @@ static void sh_mobile_sdhi_set_pwr(struct platform_device *pdev, int state)
- 	p->set_pwr(pdev, state);
- }
+diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+index 35f61cc..ac8e109 100644
+--- a/drivers/mmc/host/sh_mmcif.c
++++ b/drivers/mmc/host/sh_mmcif.c
+@@ -956,11 +956,8 @@ static int sh_mmcif_clk_update(struct sh_mmcif_host *host)
  
--static int sh_mobile_sdhi_get_cd(struct platform_device *pdev)
--{
--	struct sh_mobile_sdhi_info *p = pdev->dev.platform_data;
--
--	return p->get_cd(pdev);
--}
--
- static int sh_mobile_sdhi_wait_idle(struct tmio_mmc_host *host)
+ static void sh_mmcif_set_power(struct sh_mmcif_host *host, struct mmc_ios *ios)
  {
- 	int timeout = 1000;
-@@ -182,8 +175,6 @@ static int sh_mobile_sdhi_probe(struct platform_device *pdev)
- 		mmc_data->cd_gpio = p->cd_gpio;
- 		if (p->set_pwr)
- 			mmc_data->set_pwr = sh_mobile_sdhi_set_pwr;
--		if (p->get_cd)
--			mmc_data->get_cd = sh_mobile_sdhi_get_cd;
+-	struct sh_mmcif_plat_data *pd = host->pd->dev.platform_data;
+ 	struct mmc_host *mmc = host->mmc;
  
- 		if (p->dma_slave_tx > 0 && p->dma_slave_rx > 0) {
- 			/*
-diff --git a/include/linux/mmc/sh_mobile_sdhi.h b/include/linux/mmc/sh_mobile_sdhi.h
-index b76bcf0..f31c692 100644
---- a/include/linux/mmc/sh_mobile_sdhi.h
-+++ b/include/linux/mmc/sh_mobile_sdhi.h
-@@ -26,7 +26,6 @@ struct sh_mobile_sdhi_info {
- 	u32 tmio_ocr_mask;	/* available MMC voltages */
- 	unsigned int cd_gpio;
- 	void (*set_pwr)(struct platform_device *pdev, int state);
--	int (*get_cd)(struct platform_device *pdev);
+-	if (pd && pd->set_pwr)
+-		pd->set_pwr(host->pd, ios->power_mode != MMC_POWER_OFF);
+ 	if (!IS_ERR(mmc->supply.vmmc))
+ 		/* Errors ignored... */
+ 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+diff --git a/include/linux/mmc/sh_mmcif.h b/include/linux/mmc/sh_mmcif.h
+index 39011eb..767fac5 100644
+--- a/include/linux/mmc/sh_mmcif.h
++++ b/include/linux/mmc/sh_mmcif.h
+@@ -33,7 +33,6 @@
+  */
  
- 	/* callbacks for board specific setup code */
- 	int (*init)(struct platform_device *pdev,
+ struct sh_mmcif_plat_data {
+-	void (*set_pwr)(struct platform_device *pdev, int state);
+ 	int (*get_cd)(struct platform_device *pdef);
+ 	unsigned int		slave_id_tx;	/* embedded slave_id_[tr]x */
+ 	unsigned int		slave_id_rx;
 -- 
 1.8.1.5
