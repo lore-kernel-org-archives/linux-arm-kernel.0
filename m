@@ -1,35 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 8 Aug 2013 11:35:10 +0100
-Subject: [PATCH 17/20] ASoC: pxa: pxa-pcm-lib: switch over to
- snd-soc-dmaengine-pcm
-In-Reply-To: <5203683C.2000904@gmail.com>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-18-git-send-email-zonque@gmail.com>
- <20130807160743.GI6427@sirena.org.uk> <5202718F.2050507@gmail.com>
- <20130807163258.GL6427@sirena.org.uk> <52035463.1030909@gmail.com>
- <52035A81.6090903@metafoo.de> <52035EF0.1030208@gmail.com>
- <20130808093628.GS6427@sirena.org.uk> <5203683C.2000904@gmail.com>
-Message-ID: <20130808103510.GV6427@sirena.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 8 Aug 2013 21:35:37 +0530
+Subject: [PATCH v3 6/6] ARM: davinci: da850: configure system configuration
+ chip(CFGCHIP3) for emac
+In-Reply-To: <CA+V-a8smEd_75Ab-_vxjBATr8Q9Sefs0tpxc+kgQJRtuLJad=w@mail.gmail.com>
+References: <1371999607-6483-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1371999607-6483-7-git-send-email-prabhakar.csengg@gmail.com>
+ <51F8A4FF.8020803@ti.com>
+ <CA+V-a8smEd_75Ab-_vxjBATr8Q9Sefs0tpxc+kgQJRtuLJad=w@mail.gmail.com>
+Message-ID: <5203C1D1.8020707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 11:43:24AM +0200, Daniel Mack wrote:
+On Thursday 08 August 2013 04:02 PM, Prabhakar Lad wrote:
+> Hi Sekhar,
+> 
+> Sorry for the  delayed response I was on leave and now back again up
+> and running.
+> 
+> On Wed, Jul 31, 2013 at 11:17 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On Sunday 23 June 2013 08:30 PM, Prabhakar Lad wrote:
+>>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>>
+>>> This patch makes a common function for to configure emac and calls
+>>> it appropriately in DT and non DT boot mode. The system configuration
+>>> chip CFGCHIP3, controls the emac module. This patch appropriately
+>>> configures this register for emac and sets DA850_MII_MDIO_CLKEN_PIN
+>>> GPIO pin appropriately.
+>>>
+> [Snip]
+> 
+>>> +     if (rmii_enabled)
+>>> +             val |= BIT(8);
+>>> +     else
+>>> +             val &= ~BIT(8);
+>>> +
+>>> +     /* configure the CFGCHIP3 register for RMII or MII */
+>>> +     writel(val, cfg_chip3_base);
+>>> +
+>>> +     ret = davinci_cfg_reg(DA850_GPIO2_6);
+>>> +     if (ret)
+>>> +             pr_warn("%s:GPIO(2,6) mux setup failed\n", __func__);
+>>> +
+>>> +     ret = gpio_request(DA850_MII_MDIO_CLKEN_PIN, "mdio_clk_en");
+>>> +     if (ret) {
+>>> +             pr_warn("Cannot open GPIO %d\n", DA850_MII_MDIO_CLKEN_PIN);
+>>> +             return;
+>>> +     }
+>>
+>> You cannot do this in SoC specific code. All boards wont use a GPIO to
+>> choose between MII/RMII. You need to do this in a EVM specific manner.
+>> This just means you retain the GPIO part of code in board-da850-evm.c
+> 
+> OK
+> 
+>> and for the DT case use a board specific GPIO node. See a similar
+>> example in arch/arm/boot/dts/ste-nomadik-s8815.dts and how the code uses
+> Alrite something similar to usb-s8815 node.
+> 
+>> it in arch/arm/mach-nomadik/cpu-8815.c.
+>>
+> But I don't see any code to access this node in this file, can
+> you point me to right direction ?
 
-> Hmm. We have this big "if SND_SOC" in sound/soc/Kconfig which prevent
-> that symbol to be selected. In fact, SND_PXA2XX_LIB already selected
-> SND_SOC_DMAENGINE_PCM, but that didn't help.
+Look at cpu8815_eth_init() function in this file.
 
-Ah, that'd cause problems.
-
-> And code that is not ASoC specific should live outside of sound/soc, no?
-
-Yeah, OTOH it's pretty much entirely for ASoC and it'd be less churn.
-No problem to move it though, but please leave in the files pattern for
-ASoC.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/87bb04c1/attachment.sig>
+Thanks,
+Sekhar
