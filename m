@@ -1,67 +1,79 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 8 Aug 2013 14:49:49 -0500
-Subject: [PATCHv3 6/9] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clkevent device
-In-Reply-To: <8738qkhwey.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-7-git-send-email-d-gerlach@ti.com>
- <8738qkhwey.fsf@kernel.org>
-Message-ID: <5203F65D.9030501@ti.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 8 Aug 2013 21:50:20 +0200
+Subject: [PATCH v4 11/31] net: can: mscan: improve clock API use
+In-Reply-To: <5201F70F.8090007@pengutronix.de>
+References: <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-12-git-send-email-gsi@denx.de>
+ <5201F70F.8090007@pengutronix.de>
+Message-ID: <20130808195020.GZ2580@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 01:25 PM, Kevin Hilman wrote:
-> Dave Gerlach <d-gerlach@ti.com> writes:
->
->> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
->>
->> OMAP timer code registers two timers - one as clocksource
->> and one as clockevent. Since AM33XX has only one usable timer
->> in the WKUP domain one of the timers needs suspend-resume
->> support to restore the configuration to pre-suspend state.
->>
->> commit adc78e6 (timekeeping: Add suspend and resume
->> of clock event devices) introduced .suspend and .resume
->> callbacks for clock event devices. Leverages these
->> callbacks to have AM33XX clockevent timer which is
->> in not in WKUP domain to behave properly across system
->> suspend.
->>
->> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->>   arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++++++++++
->>   1 file changed, 32 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->> index b37e1fc..cce5d39 100644
->> --- a/arch/arm/mach-omap2/timer.c
->> +++ b/arch/arm/mach-omap2/timer.c
->> @@ -118,11 +118,43 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
->>   	}
->>   }
->>
->> +static void omap_clkevt_suspend(struct clock_event_device *unused)
->> +{
->> +	char name[10];
->> +	struct omap_hwmod *oh;
->> +
->> +	sprintf(name, "timer%d", clkev.id);
->> +	oh = omap_hwmod_lookup(name);
->
-> /me stops reviewing here.  This should be a one-time thing.
->
-> Seeing things *again* in patches that I've already reviewed (multiple
-> times) is very frustrating.  It also increases the likelihood of future
-> patches to be "filtered."  (in this case, you get a pass since you seem
-> to have inherited Vaibhav's code, but please take care to address all
-> reviewer comments, or at least explain why you didn'.)
->
-> Kevin
->
+On Wed, Aug 07, 2013 at 09:28 +0200, Marc Kleine-Budde wrote:
+> 
+> On 08/06/2013 10:43 PM, Gerhard Sittig wrote:
+> > [ ... ]
+> > diff --git a/drivers/net/can/mscan/mscan.c b/drivers/net/can/mscan/mscan.c
+> > index e6b4095..4f998f5 100644
+> > --- a/drivers/net/can/mscan/mscan.c
+> > +++ b/drivers/net/can/mscan/mscan.c
+> > @@ -573,10 +573,24 @@ static int mscan_open(struct net_device *dev)
+> >  	struct mscan_priv *priv = netdev_priv(dev);
+> >  	struct mscan_regs __iomem *regs = priv->reg_base;
+> >  
+> > +	if (priv->clk_ipg) {
+> > +		ret = clk_prepare_enable(priv->clk_ipg);
+> > +		if (ret)
+> > +			goto exit_retcode;
+> > +	}
+> > +	if (priv->clk_can) {
+> > +		ret = clk_prepare_enable(priv->clk_can);
+> > +		if (ret) {
+> > +			if (priv->clk_ipg)
+> > +				clk_disable_unprepare(priv->clk_ipg);
+> > +			goto exit_retcode;
+> 
+> Why don't you add another jump label and jump to that to disable the
+> ipkg clock?
 
-Sorry for missing this. Seems I missed this patch completely when taking 
-over. I'll make sure it's addressed in the next version.
+You are right.  I've queued this change for v5 (adding a label in
+the existing error path, jumping to it instead of explicitly
+disabling the clock).
 
-Regards,
-Dave
+> 
+> > +		}
+> > +	}
+> > +
+> >  	/* common open */
+> >  	ret = open_candev(dev);
+> >  	if (ret)
+> > -		return ret;
+> > +		goto exit_dis_clock;
+> >  
+> >  	napi_enable(&priv->napi);
+> >  
+> > @@ -604,6 +618,12 @@ exit_free_irq:
+> >  exit_napi_disable:
+> >  	napi_disable(&priv->napi);
+> >  	close_candev(dev);
+> > +exit_dis_clock:
+> > +	if (priv->clk_can)
+> > +		clk_disable_unprepare(priv->clk_can);
+> > +	if (priv->clk_ipg)
+> > +		clk_disable_unprepare(priv->clk_ipg);
+> > +exit_retcode:
+> >  	return ret;
+> >  }
+> 
+> Marc
+
+Thank you for reviewing several versions of the patch!
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
