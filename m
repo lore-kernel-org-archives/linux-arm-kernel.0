@@ -1,261 +1,113 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  8 Aug 2013 08:12:26 +0200
-Subject: [PATCH v3 09/19] clk: at91: add PMC system clocks
-In-Reply-To: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1375942346-8966-1-git-send-email-b.brezillon@overkiz.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Thu, 8 Aug 2013 11:46:03 +0530
+Subject: Kexec: BE kernel on ARM VE TC2
+In-Reply-To: <51FFC490.5090907@codethink.co.uk>
+References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
+ <51FFC490.5090907@codethink.co.uk>
+Message-ID: <CALicx6u4cOLCzia8oxKKCrC=d+pxJmWWvLH++ZXVkvNVWV65DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new at91 system clock implementation using common clk
-framework.
+On Mon, Aug 5, 2013 at 8:58 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 05/08/13 13:12, Vijay Kilari wrote:
+>>
+>> Hi Will,
+>>
+>> I am trying to make kexec work on BE kernel on ARM VE TC2.
+>>
+>> First, to make KEXEC work with SMP on ARM VE TC2 board,
+>> I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
+>>
+>> However, I made below changes to make KEXEC work for BE kernel.
+>> my question is: why delay is required for board to reboot with kexec?.
+>> Is it platform issue?.
+>>
+>> diff --git a/arch/arm/kernel /machine_kexec.c
+>> b/arch/arm/kernel/machine_kexec.c
+>> index 4fb074c..0fb0ff9 100644
+>> --- a/arch/arm/kernel/machine_kexec.c
+>> +++ b/arch/arm/kernel/machine_kexec.c
+>> @@ -123,6 +123,18 @@ void machine_crash_shutdown(struct pt_regs *regs)
+>>          printk(KERN_INFO "Loading crashdump kernel...\n");
+>>   }
+>>
+>> +static void byte_copy_relocate_kernel(void *dst, const void *src, int
+>> size)
+>> +{
+>> +        char *d, *s;
+>> +        d = (char *) dst;
+>> +        s = (char *) src;
+>> +        while (size>  0)
+>> +        {
+>> +                *d++ = *s++;
+>> +                size--;
+>> +        }
+>> +}
+>> +
+>>   /*
+>>    * Function pointer to optional machine-specific reinitialization
+>>    */
+>> @@ -155,9 +167,8 @@ void machine_kexec(struct kimage *image)
+>>
+>>
+>>          /* copy our kernel relocation code to the control code page */
+>> -       memcpy(reboot_code_buffer,
+>> -              relocate_new_kernel, relocate_new_kernel_size);
+>> -
+>> +       byte_copy_relocate_kernel(reboot_code_buffer,
+>> +              relocate_new_kernel, relocate_new_kernel_size);
+>
+>
+> you should be able to use memcpy() here, as it shouldn't change the
+> endian-ness of the data being copied.
+>
 
-Some peripherals need to enable a "system" clock in order to work properly.
-Each system clock is given an id based on the bit position in SCER/SCDR
-registers.
+Yes, you are right. I see that memcpy() works. However I see strange issue
+with  Kexec on BE kernel. If I put debug print in arch/arm/kernel/head.S code
+before turning on MMU, KEXEC works. if I remove the debug print kexec
+boot hangs.
+So I could not relate how calling printascii is solving the problem
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/clk/at91/Makefile     |    1 +
- drivers/clk/at91/clk-system.c |  191 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/at91/pmc.c        |    5 ++
- drivers/clk/at91/pmc.h        |    3 +
- 4 files changed, 200 insertions(+)
- create mode 100644 drivers/clk/at91/clk-system.c
+Any suggestion?
 
-diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index e28fb2b..c2b7068 100644
---- a/drivers/clk/at91/Makefile
-+++ b/drivers/clk/at91/Makefile
-@@ -4,3 +4,4 @@
- 
- obj-y += pmc.o
- obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
-+obj-y += clk-system.o
-diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
-new file mode 100644
-index 0000000..11a3eb8
---- /dev/null
-+++ b/drivers/clk/at91/clk-system.c
-@@ -0,0 +1,191 @@
-+/*
-+ * drivers/clk/at91/clk-system.c
-+ *
-+ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
+If printascii is called after turning on mmu, kexec hangs. Below is my
+debug code
+
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 5b391a6..15d4504 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -175,6 +175,15 @@ __lookup_processor_type_data:
+        .long   __proc_info_end
+        .size   __lookup_processor_type_data, . - __lookup_processor_type_data
+
++__print_debug:
++       stmfd   sp!, {r0 - r6, r9, lr}
++       adr r0, str_p3
++       bl printascii
++       ldmfd   sp!, {r0 - r6, r9, pc}
++str_p3: .asciz "\nHere"
++       .align
++ENDPROC(__print_debug)
 +
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk/at91_pmc.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
-+
-+#include "pmc.h"
-+
-+#define SYSTEM_MAX		32
-+
-+#define to_clk_system(hw) container_of(hw, struct clk_system, hw)
-+struct clk_system {
-+	struct clk_hw hw;
-+	struct at91_pmc *pmc;
-+	u8 id;
-+};
-+
-+static int clk_system_enable(struct clk_hw *hw)
-+{
-+	struct clk_system *sys = to_clk_system(hw);
-+	struct at91_pmc *pmc = sys->pmc;
-+
-+	pmc_write(pmc, AT91_PMC_SCER, 1 << sys->id);
-+	return 0;
-+}
-+
-+static void clk_system_disable(struct clk_hw *hw)
-+{
-+	struct clk_system *sys = to_clk_system(hw);
-+	struct at91_pmc *pmc = sys->pmc;
-+
-+	pmc_write(pmc, AT91_PMC_SCDR, 1 << sys->id);
-+}
-+
-+static int clk_system_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_system *sys = to_clk_system(hw);
-+	struct at91_pmc *pmc = sys->pmc;
-+
-+	return !!(pmc_read(pmc, AT91_PMC_SCSR) & (1 << sys->id));
-+}
-+
-+static const struct clk_ops system_ops = {
-+	.enable = clk_system_enable,
-+	.disable = clk_system_disable,
-+	.is_enabled = clk_system_is_enabled,
-+};
-+
-+static struct clk * __init
-+at91_clk_register_system(struct at91_pmc *pmc, const char *name, u8 id)
-+{
-+	struct clk_system *sys;
-+	struct clk *clk = NULL;
-+	struct clk_init_data init;
-+
-+	id &= 31;
-+
-+	sys = kzalloc(sizeof(*sys), GFP_KERNEL);
-+	if (!sys)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &system_ops;
-+	init.parent_names = NULL;
-+	init.num_parents = 0;
-+	/*
-+	 * CLK_IGNORE_UNUSED is used to avoid ddrck switch off.
-+	 * TODO : we should implement a driver supporting at91 ddr controller
-+	 * (see drivers/memory) which would request and enable the ddrck clock.
-+	 * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
-+	 */
-+	init.flags = CLK_IS_ROOT | CLK_IGNORE_UNUSED;
-+
-+	sys->id = id;
-+	sys->hw.init = &init;
-+	sys->pmc = pmc;
-+
-+	clk = clk_register(NULL, &sys->hw);
-+
-+	if (IS_ERR(clk))
-+		kfree(sys);
-+
-+	return clk;
-+}
-+
-+struct clk_system_data {
-+	struct clk **clks;
-+	u8 *ids;
-+	unsigned int clk_num;
-+};
-+
-+static struct clk * __init
-+of_clk_src_system_get(struct of_phandle_args *clkspec, void *data)
-+{
-+	struct clk_system_data *clk_data = data;
-+	unsigned int id = clkspec->args[0];
-+	int i;
-+
-+	if (id >= SYSTEM_MAX)
-+		goto err;
-+
-+	for (i = 0; i < clk_data->clk_num; i++) {
-+		if (clk_data->ids[i] == id)
-+			return clk_data->clks[i];
-+	}
-+
-+err:
-+	pr_err("%s: invalid clock id %d\n", __func__, id);
-+	return ERR_PTR(-EINVAL);
-+}
-+
-+static void __init
-+of_at91_clk_sys_setup(struct device_node *np, struct at91_pmc *pmc)
-+{
-+	int i;
-+	int num;
-+	u32 id;
-+	struct clk *clk;
-+	u8 *ids;
-+	struct clk **clks;
-+	struct clk_system_data *clktab;
-+	const char *name;
-+	struct device_node *sysclknp;
-+
-+	num = of_get_child_count(np);
-+	if (num > SYSTEM_MAX)
-+		return;
-+
-+	clktab = kzalloc(sizeof(*clktab), GFP_KERNEL);
-+	if (!clktab)
-+		return;
-+
-+	ids = kzalloc(num * sizeof(*ids), GFP_KERNEL);
-+	if (!ids)
-+		goto out_free_clktab;
-+
-+	clks = kzalloc(num * sizeof(*clks), GFP_KERNEL);
-+	if (!clks)
-+		goto out_free_ids;
-+
-+	i = 0;
-+	for_each_child_of_node(np, sysclknp) {
-+		name = sysclknp->name;
-+
-+		if (of_property_read_u32(sysclknp, "atmel,clk-id", &id))
-+			goto out_free_clks;
-+		if (id >= SYSTEM_MAX)
-+			goto out_free_clks;
-+
-+		clk = at91_clk_register_system(pmc, name, id);
-+		if (IS_ERR(clk))
-+			goto out_free_clks;
-+
-+		clks[i] = clk;
-+		ids[i] = id;
-+
-+		i++;
-+	}
-+
-+	clktab->clk_num = num;
-+	clktab->clks = clks;
-+	clktab->ids = ids;
-+	of_clk_add_provider(np, of_clk_src_system_get, clktab);
-+	return;
-+
-+out_free_clks:
-+	kfree(clks);
-+out_free_ids:
-+	kfree(ids);
-+out_free_clktab:
-+	kfree(clktab);
-+}
-+
-+void __init of_at91rm9200_clk_sys_setup(struct device_node *np,
-+					struct at91_pmc *pmc)
-+{
-+	of_at91_clk_sys_setup(np, pmc);
-+}
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 5258f1d..c674ef2 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -251,6 +251,11 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
- 		.compatible = "atmel,at91sam9x5-clk-master",
- 		.data = of_at91sam9x5_clk_master_setup,
- 	},
-+	/* System clocks */
-+	{
-+		.compatible = "atmel,at91rm9200-clk-system",
-+		.data = of_at91rm9200_clk_sys_setup,
-+	},
- 	{ /*sentinel*/ }
- };
- 
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index 2e1dcb8..f88ef41 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -74,4 +74,7 @@ extern void __init of_at91rm9200_clk_master_setup(struct device_node *np,
- extern void __init of_at91sam9x5_clk_master_setup(struct device_node *np,
- 						  struct at91_pmc *pmc);
- 
-+extern void __init of_at91rm9200_clk_sys_setup(struct device_node *np,
-+					       struct at91_pmc *pmc);
-+
- #endif /* __PMC_H_ */
--- 
-1.7.9.5
+ __error_p:
+ #ifdef CONFIG_DEBUG_LL
+        adr     r0, str_p1
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index d509995..a19147c 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -114,7 +114,7 @@ ENTRY(stext)
+ #else
+        ldr     r8, =PHYS_OFFSET                @ always constant in this case
+ #endif
+-
++       bl      __print_debug
+        /*
+         * r1 = machine no, r2 = atags or dtb,
+         * r8 = phys_offset, r9 = cpuid, r10 = procinfo
+
+
+> --
+> Ben Dooks                               http://www.codethink.co.uk/
+> Senior Engineer                         Codethink - Providing Genius
