@@ -1,70 +1,39 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 08 Aug 2013 15:54:55 +0100
-Subject: [PATCH 3/5] ARM: mach-mvebu: remove redundant DT parsing and
- validation
-In-Reply-To: <1374579164-30255-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374579164-30255-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <5203B13F.4060009@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 08 Aug 2013 07:58:59 -0700
+Subject: [GIT PULL] ARM: keystone: Few non-critical fixes,
+ cleanups for 3.12
+In-Reply-To: <1375904298-5899-1-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Wed, 7 Aug 2013 15:38:18 -0400")
+References: <1375904298-5899-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87ob98jkjw.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/07/13 12:32, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> arm_dt_init_cpu_maps parses the device tree, validates and sets the
-> cpu_possible_mask appropriately. It is unnecessary to do another DT
-> parse to get the number of cpus, use num_possible_cpus instead.
-> 
-Hi Gregory,
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Does this change look fine ?
-If OK, not sure if you prefer to pick up this or want me to send to
-arm-soc guys.
+> The following changes since commit eb788f43a6c6e6c7a5b2879543b565e4cd452de8:
+>
+>   ARM: Keystone: Convert device tree file to use IRQ defines (2013-08-05 14:06:24 -0400)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-fixes-non-critical
+>
+> for you to fetch changes up to eb788f43a6c6e6c7a5b2879543b565e4cd452de8:
+>
+>   ARM: Keystone: Convert device tree file to use IRQ defines (2013-08-05 14:06:24 -0400)
+>
+> ----------------------------------------------------------------
+> ARM: keystone: non-critical fixes, cleanup for 3.12
+>
+> Summary of changes:
+> 	- Drop unused HAVE_SCHED_CLOCK config option
+> 	- Remove now redundant smp_init_cpus call
+> 	- Update the smc code to remove dsb and r12 usage
+> 	- Convert device tree to use #include and GIC bindings
 
-Regards,
-Sudeep
+Pulled into next/fixes-non-critical.
 
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> ---
->  arch/arm/mach-mvebu/platsmp.c | 19 +------------------
->  1 file changed, 1 insertion(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> index ce81d30..2e4508a 100644
-> --- a/arch/arm/mach-mvebu/platsmp.c
-> +++ b/arch/arm/mach-mvebu/platsmp.c
-> @@ -87,28 +87,11 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  
->  static void __init armada_xp_smp_init_cpus(void)
->  {
-> -	struct device_node *np;
-> -	unsigned int i, ncores;
-> +	unsigned int ncores = num_possible_cpus();
->  
-> -	np = of_find_node_by_name(NULL, "cpus");
-> -	if (!np)
-> -		panic("No 'cpus' node found\n");
-> -
-> -	ncores = of_get_child_count(np);
->  	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
->  		panic("Invalid number of CPUs in DT\n");
->  
-> -	/* Limit possible CPUs to defconfig */
-> -	if (ncores > nr_cpu_ids) {
-> -		pr_warn("SMP: %d CPUs physically present. Only %d configured.",
-> -			ncores, nr_cpu_ids);
-> -		pr_warn("Clipping CPU count to %d\n", nr_cpu_ids);
-> -		ncores = nr_cpu_ids;
-> -	}
-> -
-> -	for (i = 0; i < ncores; i++)
-> -		set_cpu_possible(i, true);
-> -
->  	set_smp_cross_call(armada_mpic_send_doorbell);
->  }
->  
-> 
+Thanks,
+
+Kevin
