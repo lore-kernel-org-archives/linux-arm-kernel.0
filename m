@@ -1,31 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 8 Aug 2013 14:20:00 +0100
-Subject: [PATCH 13/20] ASoC: pxa: pxa-ssp: add DT bindings
-In-Reply-To: <5203676F.6090708@gmail.com>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-14-git-send-email-zonque@gmail.com>
- <20130807164039.GM6427@sirena.org.uk> <5203676F.6090708@gmail.com>
-Message-ID: <20130808132000.GD6427@sirena.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 8 Aug 2013 09:31:04 -0400
+Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <52039D98.8080309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 11:39:59AM +0200, Daniel Mack wrote:
+On Tuesday 06 August 2013 01:49 PM, Dave Gerlach wrote:
+> Hi,
+> 
+> This is the third version of the patch series for adding basic suspend-resume
+> support for AM33XX, previously submitted by Vaibhav Bedia. This patchset 
+> is based on 3.11-rc4 and depends on a forthcoming patchset from Suman Anna
+> that adds mailbox support for the wkup_m3. The patches at [1], [2], and [3] are 
+> required for the pm code to properly suspend and resume.
+> 
+> The PM code uses the firmware interface and expects the userspace to load 
+> the WKUP_M3 binary before the suspend-resume functionality is made available.
+> The binary file (and the source-code for WKUP_M3) can be obtained from the 
+> 'next2' branch at [4]. The WKUP_M3 binary can either be loaded post bootup 
+> via the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or it can be 
+> included in the kernel image as part of the build process.
+> 
+> Suspend to mem is tested on am335x-bone and am335x-evm.
+> 
+> More details on AM335x suspend-resume are provided within the commit logs
+> for each patch.
+> 
+> Changes in v3:
+> - Moved wkup_m3 code into separate driver
+> - Split up ti_emif header move
+> - Addressed clean-up comments
+> - Removed mailbox patches
+> - v2-v3 Discussion:
+> http://marc.info/?l=linux-arm-kernel&m=135698501821090&w=4
+> 
+Please CC people who have at least reviewed the last version of
+the series. Couple of patches I was CC'ed o.w I would missed this series.
 
-> Then, we should also allocate the DMA channel from the upstream device
-> and pass it down to the DAI. But then again, the pxa-pcm-lib needs some
-> rework, as it's currently in charge of obtaining and releasing the channel.
-
-> I wanted to postpone that issue until the rest of the series has settled
-> and limit changes to the bare minimum for now. Does that sound feasible?
-
-Yup, the big problem here is the whole DT as ABI thing - what happens in
-the code isn't so important but the DT is supposed to be stable.  Or we
-could decide that this is one of the cases that's unstable in which case
-we should probably flag it up in the DT binding document if nothing else.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/3b7a01cb/attachment.sig>
+Regards,
+Santosh
