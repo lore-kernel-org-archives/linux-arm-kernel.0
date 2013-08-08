@@ -1,54 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Aug 2013 09:36:22 +0100
-Subject: Kexec: BE kernel on ARM VE TC2
-In-Reply-To: <CALicx6u4cOLCzia8oxKKCrC=d+pxJmWWvLH++ZXVkvNVWV65DA@mail.gmail.com>
-References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
- <51FFC490.5090907@codethink.co.uk>
- <CALicx6u4cOLCzia8oxKKCrC=d+pxJmWWvLH++ZXVkvNVWV65DA@mail.gmail.com>
-Message-ID: <20130808083622.GI23006@n2100.arm.linux.org.uk>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 08 Aug 2013 10:38:45 +0200
+Subject: [PATCH 06/12] dma: mmp_pdma: make the controller a DMA provider
+In-Reply-To: <201308071812.15420.arnd@arndb.de>
+References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
+ <1375870770-14263-7-git-send-email-zonque@gmail.com>
+ <201308071812.15420.arnd@arndb.de>
+Message-ID: <52035915.50509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 11:46:03AM +0530, Vijay Kilari wrote:
-> Yes, you are right. I see that memcpy() works. However I see strange issue
-> with  Kexec on BE kernel. If I put debug print in arch/arm/kernel/head.S code
-> before turning on MMU, KEXEC works. if I remove the debug print kexec
-> boot hangs.
-> So I could not relate how calling printascii is solving the problem
-> 
-> Any suggestion?
-> 
-> If printascii is called after turning on mmu, kexec hangs. Below is my
-> debug code
-> 
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index 5b391a6..15d4504 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -175,6 +175,15 @@ __lookup_processor_type_data:
->         .long   __proc_info_end
->         .size   __lookup_processor_type_data, . - __lookup_processor_type_data
-> 
-> +__print_debug:
-> +       stmfd   sp!, {r0 - r6, r9, lr}
-> +       adr r0, str_p3
-> +       bl printascii
-> +       ldmfd   sp!, {r0 - r6, r9, pc}
-> +str_p3: .asciz "\nHere"
-> +       .align
-> +ENDPROC(__print_debug)
-> +
+On 07.08.2013 18:12, Arnd Bergmann wrote:
+> On Wednesday 07 August 2013, Daniel Mack wrote:
 
-This is rather broken.  Who says you have a stack here to store those
-registers?  The answer is - you generally won't have a stack.  So this
-is going to scribble on whatever memory 'sp' happens to be pointing at
-at the time the kernel is entered.
+>> @@ -869,6 +874,19 @@ static int mmp_pdma_probe(struct platform_device *op)
+>>  		return ret;
+>>  	}
+>>  
+>> +	if (op->dev.of_node) {
+>> +		mmp_pdma_info.dma_cap = pdev->device.cap_mask;
+>> +
+>> +		/* Device-tree DMA controller registration */
+>> +		ret = of_dma_controller_register(op->dev.of_node,
+>> +						 of_dma_simple_xlate,
+>> +						 &mmp_pdma_info);
+> 
+> of_dma_simple_xlate can not be used if there is a chance that multiple instances
+> of the same dma engine, or multiple different DMA engines are present in the
+> system. I generally advise against using it.
+> 
+> Please have a look at the changes that Zhangfei Gao proposed in
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/249077
+> and see if you can do the same here.
 
-printascii is designed to avoid disrupting as many registers as possible.
-It will only modify r0-r3 and of course lr.  I'm sure you can temporarily
-move r1/r2 to a different register pair, and move the above inline, and
-then move these back.  The comment just after where you place it documents
-the 'live' registers.
+Ok, I'll rebase my series on top of that one, hoping that Zhangfei's
+patch will make it upstream before mine.
 
-I'm not saying anything about the problem you're reporting; I'm trying
-to teach you how to use the early debug correctly.
+
+Daniel
