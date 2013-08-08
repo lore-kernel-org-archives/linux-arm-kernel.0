@@ -1,71 +1,144 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 08 Aug 2013 18:41:14 +1000
-Subject: [PATCHv7 07/13] irqdomain: add function to find a MSI irq_domain
-In-Reply-To: <20130808102255.05fd79d8@skate>
-References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375908620.9300.3.camel@pasglop> <20130808000443.17f57875@skate>
- <1375914665.12551.5.camel@pasglop> <1375915344.12551.6.camel@pasglop>
- <1375915536.12551.9.camel@pasglop> <20130808102255.05fd79d8@skate>
-Message-ID: <1375951274.12551.31.camel@pasglop>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 08 Aug 2013 01:42:17 -0700
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
+In-Reply-To: <1375944991-29182-2-git-send-email-wni@nvidia.com>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-2-git-send-email-wni@nvidia.com>
+Message-ID: <520359E9.1000600@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-08 at 10:22 +0200, Thomas Petazzoni wrote:
-> Dear Benjamin Herrenschmidt,
+On 08/07/2013 11:56 PM, Wei Ni wrote:
+> The device lm90 can be controlled by the vdd rail.
+> Adding the power control support to power on/off the vdd rail.
+> And make sure that power is enabled before accessing the device.
+>
+> Signed-off-by: Wei Ni <wni@nvidia.com>
+> ---
+>   drivers/hwmon/lm90.c |   49 +++++++++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 49 insertions(+)
+>
+> diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
+> index cdff742..306a348 100644
+> --- a/drivers/hwmon/lm90.c
+> +++ b/drivers/hwmon/lm90.c
+> @@ -89,6 +89,7 @@
+>   #include <linux/err.h>
+>   #include <linux/mutex.h>
+>   #include <linux/sysfs.h>
+> +#include <linux/regulator/consumer.h>
+>
+>   /*
+>    * Addresses to scan
+> @@ -302,6 +303,7 @@ static const struct lm90_params lm90_params[] = {
+>   struct lm90_data {
+>   	struct device *hwmon_dev;
+>   	struct mutex update_lock;
+> +	struct regulator *lm90_reg;
+>   	char valid; /* zero until following fields are valid */
+>   	unsigned long last_updated; /* in jiffies */
+>   	int kind;
+> @@ -1391,6 +1393,32 @@ static void lm90_init_client(struct i2c_client *client)
+>   		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
+>   }
+>
+> +static void lm90_power_control(struct i2c_client *client, bool is_enable)
+> +{
+> +	struct lm90_data *data = i2c_get_clientdata(client);
+> +	int ret;
+> +
+> +	if (!data->lm90_reg)
+> +		return;
+> +
+> +	mutex_lock(&data->update_lock);
+> +
 
-> I'm sorry, but I'm not buying this. There must be some continuity when
-> the maintenance of one subsystem transitions from one maintainer to
-> another. I'm perfectly ok with accepting some hick-ups, but not radical
-> changes in design decisions.
+This is only called during probe and remove, so the mutex is unnecessary.
 
-Well, I wrote it in the first place :-)
+> +	if (is_enable)
+> +		ret = regulator_enable(data->lm90_reg);
+> +	else
+> +		ret = regulator_disable(data->lm90_reg);
+> +
+> +	if (ret < 0)
+> +		dev_err(&client->dev,
+> +			"Error in %s rail vdd, error %d\n",
+> +			(is_enable) ? "enabling" : "disabling", ret);
+> +	else
+> +		dev_info(&client->dev, "success in %s rail vdd\n",
+> +			 (is_enable) ? "enabling" : "disabling");
+> +
+which reduces the function to (pretty much unnecessary) messages and an if statement
+which you only need because you have the function.
 
-> What you're asking me to do is to go completely backwards compared to
-> the comments and review Grant made. The irqdomain-based allocator was
-> suggested by Grant (see my previous e-mail, or Grant reply at
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175430.html)
-> and was even Acked-by Grant in
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187082.html.
-> 
-> Note that this patch set has been posted at the following dates:
-> 
->  * PATCH version 7 sent on August, 7th 2013
->  * PATCH version 6 sent on August, 1st 2013
->  * PATCH version 5 sent on July, 15th 2013
->  * PATCH version 4 sent on July, 1st 2013
->  * PATCH version 3 sent on June, 19th 2013
->  * PATCH version 2 sent on June, 6th 2013
->  * RFC version 1 sent on March, 26th 2013
+You should just call regulator_enable in probe and regulator_disable in remove.
 
-I'm really sorry and I feel your pain. I have not actively been
-monitoring any of that stuff, and you might have gotten away without
-CC'ing me or asking for my point of view but you did (and I thank you
-for that), and sadly this is my opinion.
+Guenter
 
-> So it has been around since 4 months, I've taken into account all the
-> comments from the various maintainers who were involved, and especially
-> the comments from Grant. You cannot ask me now, as we are approaching
-> the next merge window for which this code is intended, to take
-> completely opposite design choices than what the previous irqdomain
-> maintainer was suggesting.
+> +	mutex_unlock(&data->update_lock);
+> +}
+> +
+>   static int lm90_probe(struct i2c_client *client,
+>   		      const struct i2c_device_id *id)
+>   {
+> @@ -1406,6 +1434,20 @@ static int lm90_probe(struct i2c_client *client,
+>   	i2c_set_clientdata(client, data);
+>   	mutex_init(&data->update_lock);
+>
+> +	data->lm90_reg = regulator_get(&client->dev, "vdd");
 
-I can and I do. However, I also leave the opportunity of bringing in a
-third party into the debate with a well known track record to overrule
-me if he thinks I'm being unnecessarily obstructive.
+You should use devm_regulator_get(). Then you also don't need the call to regulator_put().
 
-> Could you contact Grant and align with him on those design decisions?
-> It would also be good if you could read the past discussions on this
-> patch set, because all what you're pointing at has already been
-> discussed at length, as I pointed out in my previous e-mail.
+> +	if (IS_ERR_OR_NULL(data->lm90_reg)) {
 
-I can try... Grant, are you around ? (I've added you to the CC list), we
-might be able to catch up on IRC and discuss it ...
+The function never returns NULL except if the regulator subsystem is not configured,
+so IS_ERR() is more appropriate.
 
-Cheers,
-Ben.
+If the regulator subsystem is not configured, you especially don't need or want
+to pollute the log with an error message.
 
+> +		if (PTR_ERR(data->lm90_reg) == -ENODEV)
+> +			dev_info(&client->dev,
+> +				 "No regulator found for vdd. Assuming vdd is always powered.");
+> +		else
+> +			dev_warn(&client->dev,
+> +				 "Error [%ld] in getting the regulator handle for vdd.\n",
+> +				 PTR_ERR(data->lm90_reg));
 
-> Thanks,
-> 
-> Thomas
+I consider the messages unnecessary and confusing. You are polluting the log
+of pretty much every PC user who has one of the supported chips in the system,
+and of everyone else not using regulators for this chip.
+
+> +		data->lm90_reg = NULL;
+
+As pointed out, this is unnecessary, and you should handle -EPROBE_DEFER correctly.
+
+> +	}
+> +
+> +	lm90_power_control(client, true);
+> +
+>   	/* Set the device type */
+>   	data->kind = id->driver_data;
+>   	if (data->kind == adm1032) {
+> @@ -1473,6 +1515,10 @@ exit_remove_files:
+>   	lm90_remove_files(client, data);
+>   exit_restore:
+>   	lm90_restore_conf(client, data);
+> +	lm90_power_control(client, false);
+> +	if (data->lm90_reg)
+> +		regulator_put(data->lm90_reg);
+> +
+>   	return err;
+>   }
+>
+> @@ -1483,6 +1529,9 @@ static int lm90_remove(struct i2c_client *client)
+>   	hwmon_device_unregister(data->hwmon_dev);
+>   	lm90_remove_files(client, data);
+>   	lm90_restore_conf(client, data);
+> +	lm90_power_control(client, false);
+> +	if (data->lm90_reg)
+> +		regulator_put(data->lm90_reg);
+>
+>   	return 0;
+>   }
+>
