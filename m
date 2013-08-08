@@ -1,109 +1,46 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 8 Aug 2013 11:07:39 +0530
-Subject: OMAP2430 SDP boot broken after Linus' rmk merge
-In-Reply-To: <alpine.DEB.2.02.1308071807240.28993@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1307221801110.10891@utopia.booyaka.com>
- <20130722184325.GA21614@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1307222005370.26048@utopia.booyaka.com>
- <51EE2AA7.5060503@ti.com>
- <alpine.DEB.2.02.1307230705000.27017@utopia.booyaka.com>
- <51EE474D.5070804@ti.com>
- <alpine.DEB.2.02.1308071807240.28993@utopia.booyaka.com>
-Message-ID: <52032EA3.90106@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 8 Aug 2013 15:40:43 +1000
+Subject: linux-next: manual merge of the mvebu tree with the i2c tree
+Message-ID: <20130808154043.fe160a4e178e87a8c1c5a045@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 August 2013 11:39 PM, Paul Walmsley wrote:
-> Hi Rajendra,
-> 
-> On Tue, 23 Jul 2013, Rajendra Nayak wrote:
-> 
->> So I tried commit 'fb2af00' on the 4430SDP and it did boot fine, though I see
->> the below errors. (I am using the mainline bootloaders which do not lock any
->> additional DPLLs like USB)
-> 
-> Could you please send patches to fix these problems, or ensure that 
-> someone else from TI fixes them?  Let's see if we can deal with the 
-> remaining bootloader dependencies here.
+Hi all,
 
-Sure Paul, I'll take a look at this.
+Today's linux-next merge of the mvebu tree got a conflict in
+Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt between
+commit f480adaf1b71 ("i2c: mv64xxx: Document the newly introduced
+allwinner compatible") from the i2c tree and commit e7c4a1e9f937 ("ARM:
+dts: mvebu: Introduce a new compatible string for mv64xxx-i2c") from the
+mvebu tree.
 
-> 
-> thanks
-> 
-> 
-> - Paul
-> 
->>
->> [    0.000000] clock: dpll_usb_ck failed transition to 'locked'
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] clock: trace_clk_div_ck: could not find divisor for target rate 0 for parent pmd_trace_clk_mux_ck
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] Division by zero in kernel.
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
->> [    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
->> [    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
->> [    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
->> [    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
->> [    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
->> [    0.000000] clock: dpll_per_m7x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->> [    0.000000] clock: dpll_per_m6x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->> [    0.000000] clock: dpll_per_m5x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->> [    0.000000] clock: dpll_per_m4x2_ck: could not find divisor for target rate 0 for parent dpll_per_x2_ck
->>
->>>
->>>
->>> - Paul
->>>
->>
-> 
-> 
-> - Paul
-> 
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+index 6113f92,c5dd952..0000000
+--- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+@@@ -4,7 -4,8 +4,9 @@@
+  Required properties :
+  
+   - reg             : Offset and length of the register set for the device
+ - - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
+ -for controller which support the I2C Transaction Generator
+ + - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
+++                     or "marvell,mv7230-i2c" for controller which support
+++                     the I2C Transaction Generator
+   - interrupts      : The interrupt number
+  
+  Optional properties :
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/d8fa821d/attachment.sig>
