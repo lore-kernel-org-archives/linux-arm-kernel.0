@@ -1,58 +1,66 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu,  8 Aug 2013 19:18:28 +0530
-Subject: [PATCH 26/35] cpufreq: ppc: use cpufreq_table_validate_and_show()
+Date: Thu,  8 Aug 2013 19:18:29 +0530
+Subject: [PATCH 27/35] cpufreq: pxa: use cpufreq_table_validate_and_show()
 In-Reply-To: <cover.1375964117.git.viresh.kumar@linaro.org>
 References: <cover.1375964117.git.viresh.kumar@linaro.org>
-Message-ID: <f230ab3e64a1323b7e06d67df77b9d489f134d00.1375964117.git.viresh.kumar@linaro.org>
+Message-ID: <abd1fc91a2709d8ad7879163b8f96f1d5be47057.1375964117.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Lets use cpufreq_table_validate_and_show() instead of calling
 cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
 
+Cc: Eric Miao <eric.y.miao@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ppc-corenet-cpufreq.c | 3 +--
- drivers/cpufreq/ppc_cbe_cpufreq.c     | 4 +---
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ drivers/cpufreq/pxa2xx-cpufreq.c | 6 ++----
+ drivers/cpufreq/pxa3xx-cpufreq.c | 8 ++------
+ 2 files changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/cpufreq/ppc-corenet-cpufreq.c b/drivers/cpufreq/ppc-corenet-cpufreq.c
-index 60e81d5..5716b44 100644
---- a/drivers/cpufreq/ppc-corenet-cpufreq.c
-+++ b/drivers/cpufreq/ppc-corenet-cpufreq.c
-@@ -202,7 +202,7 @@ static int corenet_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 	table[i].frequency = CPUFREQ_TABLE_END;
+diff --git a/drivers/cpufreq/pxa2xx-cpufreq.c b/drivers/cpufreq/pxa2xx-cpufreq.c
+index c7ea005..a429d7c 100644
+--- a/drivers/cpufreq/pxa2xx-cpufreq.c
++++ b/drivers/cpufreq/pxa2xx-cpufreq.c
+@@ -454,12 +454,10 @@ static int pxa_cpufreq_init(struct cpufreq_policy *policy)
+ 		pr_info("PXA255 cpufreq using %s frequency table\n",
+ 			pxa255_turbo_table ? "turbo" : "run");
  
- 	/* set the min and max frequency properly */
+-		cpufreq_frequency_table_cpuinfo(policy, pxa255_freq_table);
+-		cpufreq_frequency_table_get_attr(pxa255_freq_table, policy->cpu);
++		cpufreq_table_validate_and_show(policy, pxa255_freq_table);
+ 	}
+ 	else if (cpu_is_pxa27x()) {
+-		cpufreq_frequency_table_cpuinfo(policy, pxa27x_freq_table);
+-		cpufreq_frequency_table_get_attr(pxa27x_freq_table, policy->cpu);
++		cpufreq_table_validate_and_show(policy, pxa27x_freq_table);
+ 	}
+ 
+ 	printk(KERN_INFO "PXA CPU frequency change support initialized\n");
+diff --git a/drivers/cpufreq/pxa3xx-cpufreq.c b/drivers/cpufreq/pxa3xx-cpufreq.c
+index f53f28d6..89841f5 100644
+--- a/drivers/cpufreq/pxa3xx-cpufreq.c
++++ b/drivers/cpufreq/pxa3xx-cpufreq.c
+@@ -91,7 +91,7 @@ static int setup_freqs_table(struct cpufreq_policy *policy,
+ 			     struct pxa3xx_freq_info *freqs, int num)
+ {
+ 	struct cpufreq_frequency_table *table;
+-	int i, ret;
++	int i;
+ 
+ 	table = kzalloc((num + 1) * sizeof(*table), GFP_KERNEL);
+ 	if (table == NULL)
+@@ -108,11 +108,7 @@ static int setup_freqs_table(struct cpufreq_policy *policy,
+ 	pxa3xx_freqs_num = num;
+ 	pxa3xx_freqs_table = table;
+ 
 -	ret = cpufreq_frequency_table_cpuinfo(policy, table);
-+	ret = cpufreq_table_validate_and_show(policy, table);
- 	if (ret) {
- 		pr_err("invalid frequency table: %d\n", ret);
- 		goto err_nomem1;
-@@ -219,7 +219,6 @@ static int corenet_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
- 	policy->cur = corenet_cpufreq_get_speed(policy->cpu);
- 
--	cpufreq_frequency_table_get_attr(table, cpu);
- 	of_node_put(np);
- 
- 	return 0;
-diff --git a/drivers/cpufreq/ppc_cbe_cpufreq.c b/drivers/cpufreq/ppc_cbe_cpufreq.c
-index 2e448f0..6c5be63 100644
---- a/drivers/cpufreq/ppc_cbe_cpufreq.c
-+++ b/drivers/cpufreq/ppc_cbe_cpufreq.c
-@@ -123,11 +123,9 @@ static int cbe_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 	cpumask_copy(policy->cpus, cpu_sibling_mask(policy->cpu));
- #endif
- 
--	cpufreq_frequency_table_get_attr(cbe_freqs, policy->cpu);
+-	if (!ret)
+-		cpufreq_frequency_table_get_attr(table, policy->cpu);
 -
- 	/* this ensures that policy->cpuinfo_min
- 	 * and policy->cpuinfo_max are set correctly */
--	return cpufreq_frequency_table_cpuinfo(policy, cbe_freqs);
-+	return cpufreq_table_validate_and_show(policy, cbe_freqs);
+-	return ret;
++	return cpufreq_table_validate_and_show(policy, table);
  }
  
- static int cbe_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+ static void __update_core_freq(struct pxa3xx_freq_info *info)
 -- 
 1.7.12.rc2.18.g61b472e
