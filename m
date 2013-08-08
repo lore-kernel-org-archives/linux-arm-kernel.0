@@ -1,74 +1,71 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 8 Aug 2013 15:54:41 -0500
-Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <5204017A.1040607@wwwdotorg.org>
-References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
- <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
- <5204017A.1040607@wwwdotorg.org>
-Message-ID: <1375995281.22740.16.camel@linux-builds1>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Aug 2013 15:00:52 -0600
+Subject: [PATCH 1/2] ARM: Exynos: replace custom MFC reserved memory
+ handling with generic code
+In-Reply-To: <1375705610-12724-2-git-send-email-m.szyprowski@samsung.com>
+References: <1375705610-12724-1-git-send-email-m.szyprowski@samsung.com>
+ <1375705610-12724-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <52040704.6090100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-08 at 14:37 -0600, Stephen Warren wrote:
-> On 08/08/2013 02:32 PM, Dinh Nguyen wrote:
-> > On Thu, 2013-08-08 at 14:14 -0600, Stephen Warren wrote:
-> >> On 08/05/2013 02:43 PM, dinguyen at altera.com wrote:
-> >>> From: Dinh Nguyen <dinguyen@altera.com>
-> >>>
-> >>> Add bindings for SD/MMC for SOCFPGA.
-> >>> Add "syscon" to the "altr,sys-mgr" binding.
-> >>
-> >>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-> >>> new file mode 100644
-> >>> index 0000000..dc14922
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-> >>> @@ -0,0 +1,48 @@
-> >>> +* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
-> >>> +  Storage Host Controller
-> >>> +
-> >>> +Required Properties:
-> >>> +
-> >>> +* compatible: should be
-> >>> +	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
-> >>> +	  specific extensions.
-> >>> +
-> >>> +* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
-> >>> +  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
-> >>> +  value is fixed at 3, which means parent_clock/4.
-> >>
-> >> This feels like something that should be represented using the common
-> >> clock API; a driver should query the rate of its input clock, and then
-> >> calculate the MMC block's internal divider based on that (perhaps also
-> >> call clk_set_rate() on the input clock?).
-> > 
-> > This means a change to the dw_mmc driver, which I can look into for the
-> > next round? I have promised Pawel to consolidate the bindings for both
-> > exynos and socfpga in the next round already. I will also look into
-> > using the common clock API for the MMC as well. 
-> > 
-> > This patch is the only thing that is preventing from SD/MMC working for
-> > SOCFPGA in the mainline, can I get your Ack if I look into doing this
-> > for 3.13 for both the exynos and socfpga driver, and address your latter
-> > comments?
+On 08/05/2013 06:26 AM, Marek Szyprowski wrote:
+> MFC driver use custom bindings for managing reserved memory. Those bindings
+> are not really specific to MFC device and no even well discussed. They can
+> be easily replaced with generic, platform independent code for handling
+> reserved and contiguous memory.
 > 
-> The problem is that if the binding supports or requires that property
-> now, it has to at least support it forever. Given that we're getting
-> serious about DT ABI now, we should be only introducing DT bindings that
-> we believe are complete and corrrect, rather than bindings which we
-> actively expect to be temporary and to change incompatibly later.
-> 
-Right ok. Then I guess I will have to look into consolidating the
-bindings sooner rather than later.
+> Two additional child devices for each memory port (AXI master) are
+> introduced to let one assign some properties to each of them. Later one
+> can also use them to assign properties related to SYSMMU controllers,
+> which can be used to manage the limited dma window provided by those
+> memory ports.
 
-I went back to look at the driver again, and I think it is doing as you
-are suggesting:
+> diff --git a/Documentation/devicetree/bindings/media/s5p-mfc.txt b/Documentation/devicetree/bindings/media/s5p-mfc.txt
 
-host->bus_hz is getting its input value from the common clock API.
-"altr,dw-mshc-ciu-div" is specifying the internal divider that is in the
-SD/MMC IP itself.
+> +The MFC device is connected to system bus with two memory ports (AXI
+> +masters) for better performance. Those memory ports are modelled as
+> +separate child devices, so one can assign some properties to them (like
+> +memory region for dma buffer allocation or sysmmu controller).
+> +
+>  Required properties:
+>    - compatible : value should be either one among the following
+>  	(a) "samsung,mfc-v5" for MFC v5 present in Exynos4 SoCs
+>  	(b) "samsung,mfc-v6" for MFC v6 present in Exynos5 SoCs
+> +	and additionally "simple-bus" to correctly initialize child
+> +	devices for memory ports (AXI masters)
 
-I guess I'm still not clear on how I can represent the SD/MMC divider in
-in the context of the common clock API.
+simple-bus is wrong here; the child nodes aren't independent entities
+that can be instantiated separately from their parent and without
+depending on their parent.
 
-Dinh
+> -  - samsung,mfc-r : Base address of the first memory bank used by MFC
+> -		    for DMA contiguous memory allocation and its size.
+> -
+> -  - samsung,mfc-l : Base address of the second memory bank used by MFC
+> -		    for DMA contiguous memory allocation and its size.
+
+These properties shouldn't be removed, but simply marked deprecated. The
+driver will need to continue to support them so that old DTs work with
+new kernels. The binding must therefore continue to document them so
+that the old DT content still makes sense.
+
+> +Two child nodes must be defined for MFC device. Their names must be
+> +following: "memport-r" and "memport-l" ("right" and "left"). Required
+
+Node names shouldn't have semantic meaning.
+
+> +properties:
+> +  - compatible : value should be "samsung,memport"
+
+There's no need to define compatible properties for things which aren't
+separate devices.
+
+> +  - dma-memory-region : optional property with a phandle to respective memory
+> +			region (see devicetree/bindings/memory.txt), if no region
+> +			is defined, sysmmu controller must be used for managing
+> +			limited dma window of each memory port.
+
+What's the benefit of putting this property in a sub-node; surely you
+can put the property in the main MFC node yet follow the same conceptual
+schema for its content as a dma-memory-region node?
