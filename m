@@ -1,40 +1,42 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Thu,  8 Aug 2013 14:51:24 +0200
-Subject: [PATCH 5/8] ARM: dts: mxs: add pin config for LCD sync and clock pins
+Date: Thu,  8 Aug 2013 14:51:23 +0200
+Subject: [PATCH 4/8] ARM: dts: mxs: add pin config for SSP3 interface
 In-Reply-To: <1375966287-6784-1-git-send-email-LW@KARO-electronics.de>
 References: <1375966287-6784-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1375966287-6784-6-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1375966287-6784-5-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx28.dtsi |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx28.dtsi |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 6de6342..7363fde 100644
+index 7d7f277..6de6342 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -648,6 +648,19 @@
- 					fsl,pull-up = <0>;
+@@ -683,6 +683,21 @@
+ 					fsl,pull-up = <1>;
  				};
  
-+				lcdif_sync_pins_a: lcdif-sync at 0 {
++				spi3_pins_a: spi3 at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						0x11a1 /* MX28_PAD_LCD_RS__LCD_DOTCLK */
-+						0x11b1 /* MX28_PAD_LCD_CS__LCD_ENABLE */
-+						0x1181 /* MX28_PAD_LCD_RD_E__LCD_VSYNC */
-+						0x1191 /* MX28_PAD_LCD_WR_RWN__LCD_HSYNC */
++						0x3082 /* MX28_PAD_AUART2_RX__SSP3_D4 */
++						0x3092 /* MX28_PAD_AUART2_TX__SSP3_D5 */
++						0x2180 /* MX28_PAD_SSP3_SCK__SSP3_SCK */
++						0x2190 /* MX28_PAD_SSP3_MOSI__SSP3_CMD */
++						0x21A0 /* MX28_PAD_SSP3_MISO__SSP3_D0 */
++						0x21B0 /* MX28_PAD_SSP3_SS0__SSP3_D3 */
 +					>;
-+					fsl,drive-strength = <0>;
++					fsl,drive-strength = <1>;
 +					fsl,voltage = <1>;
 +					fsl,pull-up = <0>;
 +				};
 +
- 				can0_pins_a: can0 at 0 {
+ 				usbphy0_pins_a: usbphy0 at 0 {
  					reg = <0>;
  					fsl,pinmux-ids = <
 -- 
