@@ -1,53 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 8 Aug 2013 09:20:16 +0200
-Subject: [PATCH 2/5] clocksource: armada-370-xp: Simplify TIMER_CTRL
- register access
-In-Reply-To: <1375919556-24104-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1375919556-24104-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1375919556-24104-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130808072016.GB29815@lunn.ch>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 8 Aug 2013 00:32:54 -0700
+Subject: [PATCH 03/20] ARM: pxa: ssp: add shortcut for &pdev->dev
+In-Reply-To: <1375889649-14638-4-git-send-email-zonque@gmail.com>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-4-git-send-email-zonque@gmail.com>
+Message-ID: <20130808073253.GA17106@norris.computersforpeace.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 08:52:33PM -0300, Ezequiel Garcia wrote:
-> This commit creates two functions to access the TIMER_CTRL register:
-> one for global one for the per-cpu. This makes the code much more
-> readable. In addition, since the TIMER_CTRL register is also used for
-> watchdog, this is preparation work for future thread-safe improvements.
+On Wed, Aug 07, 2013 at 05:33:52PM +0200, Daniel Mack wrote:
+> No functional change, just a cosmetic cleanup.
 > 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
 > ---
->  drivers/clocksource/time-armada-370-xp.c | 70 ++++++++++++++------------------
->  1 file changed, 31 insertions(+), 39 deletions(-)
-> 
-> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-> index 5ee4329..a2351ac 100644
-> --- a/drivers/clocksource/time-armada-370-xp.c
-> +++ b/drivers/clocksource/time-armada-370-xp.c
-> @@ -71,6 +71,18 @@ static u32 ticks_per_jiffy;
+> --- a/arch/arm/plat-pxa/ssp.c
+> +++ b/arch/arm/plat-pxa/ssp.c
+> @@ -77,16 +77,17 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+>  	const struct platform_device_id *id = platform_get_device_id(pdev);
+>  	struct resource *res;
+>  	struct ssp_device *ssp;
+> +	struct device *dev = &pdev->dev;
+>  	int ret = 0;
 >  
->  static struct clock_event_device __percpu **percpu_armada_370_xp_evt;
+>  	ssp = kzalloc(sizeof(struct ssp_device), GFP_KERNEL);
+>  	if (ssp == NULL) {
+> -		dev_err(&pdev->dev, "failed to allocate memory");
+> +		dev_err(dev, "failed to allocate memory");
+
+Two options here: either remove the message entirely (I believe kzalloc
+will complain loudly if the allocation fails) or at least add a newline
+at the end of it!
+
+>  		return -ENOMEM;
+>  	}
+>  	ssp->pdev = pdev;
 >  
-> +void timer_ctrl_clrset(u32 clr, u32 set)
-> +{
-> +       writel((readl(timer_base + TIMER_CTRL_OFF) & ~clr) | set,
-> +               timer_base + TIMER_CTRL_OFF);
-> +}
-> +
-> +void local_timer_ctrl_clrset(u32 clr, u32 set)
-> +{
-> +       writel((readl(local_base + TIMER_CTRL_OFF) & ~clr) | set,
-> +               local_base + TIMER_CTRL_OFF);
-> +}
-> +
+...
 
-Ezequiel
-
-I guess the watchdog will only require one of these two functions
-above, and probably not the local_timer function. So maybe make it
-static? Also, do you get sparse warnings from timer_ctrl_clrset()
-since it is not static, but also not declared in a header file
-somewhere?
-
-	Andrew
+Brian
