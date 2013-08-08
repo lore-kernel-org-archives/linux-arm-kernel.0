@@ -1,39 +1,26 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 08 Aug 2013 13:17:34 +0200
-Subject: [PATCH v9 05/16] clk: exynos: add gate clock descriptions of
- System MMU
-In-Reply-To: <002901ce941b$0130db50$039291f0$@samsung.com>
-References: <002901ce941b$0130db50$039291f0$@samsung.com>
-Message-ID: <52037E4E.5050706@samsung.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 8 Aug 2013 13:21:40 +0200
+Subject: [PATCH v4 0/1] ASoc: kirkwood: extend the kirkwood audio subsystem
+ for DT usage
+Message-ID: <20130808132140.3d248ab1@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 11:38 AM, Cho KyongHo wrote:
-> This adds gate clocks of all System MMUs and their master IPs
-> that are not apeared in clk-exynos5250.c
-> Also fixes GATE_IP_ACP to 0x18800 and changed GATE_DA to GATE
-> for System MMU clocks in clk-exynos4.c
-> 
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  .../devicetree/bindings/clock/exynos5250-clock.txt |   26 +++++++++
->  drivers/clk/samsung/clk-exynos4.c                  |   27 +++------
->  drivers/clk/samsung/clk-exynos5250.c               |   57 ++++++++++++++++----
->  3 files changed, 82 insertions(+), 28 deletions(-)
-[...]
-> @@ -349,19 +358,26 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
->  	GATE(gscl3, "gscl3", "aclk266", GATE_IP_GSCL, 3, 0, 0),
->  	GATE(gscl_wa, "gscl_wa", "div_gscl_wa", GATE_IP_GSCL, 5, 0, 0),
->  	GATE(gscl_wb, "gscl_wb", "div_gscl_wb", GATE_IP_GSCL, 6, 0, 0),
-> -	GATE(smmu_gscl0, "smmu_gscl0", "aclk266", GATE_IP_GSCL, 7, 0, 0),
-> -	GATE(smmu_gscl1, "smmu_gscl1", "aclk266", GATE_IP_GSCL, 8, 0, 0),
-> -	GATE(smmu_gscl2, "smmu_gscl2", "aclk266", GATE_IP_GSCL, 9, 0, 0),
-> -	GATE(smmu_gscl3, "smmu_gscl3", "aclk266", GATE_IP_GSCL, 10, 0, 0),
-> +	GATE(smmu_gscl0, "smmu_gscl0", "none", GATE_IP_GSCL, 7, 0, 0),
-> +	GATE(smmu_gscl1, "smmu_gscl1", "none", GATE_IP_GSCL, 8, 0, 0),
-> +	GATE(smmu_gscl2, "smmu_gscl2", "none", GATE_IP_GSCL, 9, 0, 0),
-> +	GATE(smmu_gscl3, "smmu_gscl3", "none", GATE_IP_GSCL, 10, 0, 0),
+This patch series adds DT support to the kirkwood/mvebu audio subsystem.
 
-Why are the smmu clocks' parent clocks removed ? Shouldn't both the gscaler
-gate clock and the gscaler smmu clock be still same, as it is in case of
-exynos4 ?
+History
+v4
+	- change the DT name to "mrvl,mvebu-audio"
+	- remove previous patches 1..3 which have been applied by Russell King
+v3
+	- change the DT name from "kirkwood-i2s" to "mvebu-pcm-audio"
+	- apply to linux-next
+	- let NULL as the internal i2s clock for compatibility
+	- change i2s external clock name to "extclk" instead of "external"
+	- cancel previous patch 1/4. Russell's patch should be applied instead.
+v2
+	- fix compilation errors
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
