@@ -1,31 +1,52 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 08 Aug 2013 14:27:07 -0700 (PDT)
-Subject: [PATCH v6 13/20] pwm: Add new pwm-samsung driver
-In-Reply-To: <CAL1qeaH=r0Yr-8gqy+QctvaM_1awT1aHjT_HjXA71sjpK4BJHg@mail.gmail.com>
-References: <1374278673-25615-1-git-send-email-tomasz.figa@gmail.com>
- <4144776.HcbubHMX0J@flatron>
- <CAL1qeaH=r0Yr-8gqy+QctvaM_1awT1aHjT_HjXA71sjpK4BJHg@mail.gmail.com>
-Message-ID: <1914245.MWaKtJIXGf@flatron>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 08 Aug 2013 14:30:10 -0700
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
+In-Reply-To: <20130808211825.GN6427@sirena.org.uk>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-2-git-send-email-wni@nvidia.com>
+ <20130808110136.GA6427@sirena.org.uk> <52038035.7030803@roeck-us.net>
+ <20130808130840.GC6427@sirena.org.uk> <5203B78C.7010101@roeck-us.net>
+ <20130808171554.GI6427@sirena.org.uk> <20130808200026.GA18226@roeck-us.net>
+ <20130808211825.GN6427@sirena.org.uk>
+Message-ID: <52040DE2.50201@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 of August 2013 10:13:27 Andrew Bresticker wrote:
-> > ..it should not be defined as non-static in this case (= an ifdef is
-> > needed in this header). I believe I had this already fixed, not sure
-> > what happened with the fix...
-> 
-> Perhaps this is it: https://patchwork.kernel.org/patch/2787271/.  That
-> should probably land with this patchset too.
+On 08/08/2013 02:18 PM, Mark Brown wrote:
+> On Thu, Aug 08, 2013 at 01:00:26PM -0700, Guenter Roeck wrote:
+>> On Thu, Aug 08, 2013 at 06:15:54PM +0100, Mark Brown wrote:
+>
+>>> Sure, that's the transition issues I mentioned - the regulator API does
+>>> have stubbing facilities which should cover things and it's very easy to
+>>> define stub regulators if you need to.  Like I say I expect this to be a
+>>> lot easier after the next merge window as another way of doing stubs is
+>>> being added which should make this even easier by avoiding disrupting
+>>> drivers that do genuinely want to check for absent supplies and handle
+>>> that better.
+>
+>> We will need to make sure that all dts files using any of the compatible chips
+>> are updated accordingly. There are several entries in various dts files for
+>> adm1032, adt7461, lm90, and nct1008.
+>
+> Yes, and probably also board files as well.  Or either just accept
+> bisection trouble for now or wait till the better stubbing is in there -
 
-Oh yes, this is it.
+Ah, that is exactly the trouble I wanted to avoid.
 
-I know what happened now. This series was already queued for 3.11 in 
-Samsung tree. After a bit of testing in linux-next Bart found the build 
-error and sent a fix, which was going to be merged for 3.11 as well. 
-However since there have been some problems just before merge window 
-started, this series had to be dropped, including the fixup patch.
+> that will mean that for DT systems the core will just assume the supply
+> is really there and not fail requests if it's not in the DT.
+>
+>>> The names requested by a driver are defined with regard to the device
+>>> and should be the names used by the chip itself as defined in the
+>
+>> 9 votes for vdd, 11 votes for vcc, one undecided (no datasheet available).
+>> Guess one is as good as the other ;-).
+>
+> What I've suggested before is to use the name from the part for which
+> the driver is named.  Assuming the vendor doesn't randomly change their
+> datasheet (but that causes problems for hardware engineers so tends to
+> be avoided).
+>
+Makes sense.
 
-Thanks for reporting. Let me try to sort this out.
-
-Best regards,
-Tomasz
+Guenter
