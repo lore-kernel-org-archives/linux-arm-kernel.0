@@ -1,39 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 08 Aug 2013 09:22:00 +0100
-Subject: [PATCH v2] ARM: KVM: Fix 64-bit coprocessor handling
-In-Reply-To: <1375814453-8425-1-git-send-email-christoffer.dall@linaro.org>
-References: <1375814453-8425-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <52035528.4020509@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 8 Aug 2013 10:22:55 +0200
+Subject: [PATCHv7 07/13] irqdomain: add function to find a MSI irq_domain
+In-Reply-To: <1375915536.12551.9.camel@pasglop>
+References: <1375867954-2320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375867954-2320-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375908620.9300.3.camel@pasglop> <20130808000443.17f57875@skate>
+ <1375914665.12551.5.camel@pasglop>
+ <1375915344.12551.6.camel@pasglop>
+ <1375915536.12551.9.camel@pasglop>
+Message-ID: <20130808102255.05fd79d8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/13 19:40, Christoffer Dall wrote:
-> The PAR was exported as CRn == 7 and CRm == 0, but in fact the primary
-> coprocessor register number was determined by CRm for 64-bit coprocessor
-> registers as the user space API was modeled after the coprocessor
-> access instructions (see the ARM ARM rev. C - B3-1445).
-> 
-> However, just changing the CRn to CRm breaks the sorting check when
-> booting the kernel, because the internal kernel logic always treats CRn
-> as the primary register number, and it makes the table sorting
-> impossible to understand for humans.
-> 
-> Alternatively we could change the logic to always have CRn == CRm, but
-> that becomes unclear in the number of ways we do look up of a coprocessor
-> register.  We could also have a separate 64-bit table but that feels
-> somewhat over-engineered.  Instead, keep CRn the primary representation
-> of the primary coproc. register number in-kernel and always export the
-> primary number as CRm as per the existing user space ABI.
-> 
-> Note: The TTBR registers just magically worked because they happened to
-> follow the CRn(0) regs and were considered CRn(0) in the in-kernel
-> representation.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Dear Benjamin Herrenschmidt,
 
-FWIW: Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, 08 Aug 2013 08:45:36 +1000, Benjamin Herrenschmidt wrote:
 
-	M.
+> > >  - You don't need my ack since I am not the maintainer of the irqdomain
+> > > code anymore, Grant is :-)
+> > 
+> > Hrm, I'm being told Grant isn't anymore... I can step in and take it all
+> > back but you might not like the result ....
+> 
+> Oh but it looks like MAINTAINERS says I am :-)
+> 
+> Ok so from that perspective, I don't like it at all. You can try to
+> convince me otherwise but I don't think we need to introduce a
+> dependency to something like msi into the core remapper. It's already to
+> complex.
+> 
+> Why don't you move the powerpc bitmap allocator over to a generic
+> place ? I feel like it would be actually simpler but feel free to prove
+> me wrong.
+
+I'm sorry, but I'm not buying this. There must be some continuity when
+the maintenance of one subsystem transitions from one maintainer to
+another. I'm perfectly ok with accepting some hick-ups, but not radical
+changes in design decisions.
+
+What you're asking me to do is to go completely backwards compared to
+the comments and review Grant made. The irqdomain-based allocator was
+suggested by Grant (see my previous e-mail, or Grant reply at
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/175430.html)
+and was even Acked-by Grant in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187082.html.
+
+Note that this patch set has been posted at the following dates:
+
+ * PATCH version 7 sent on August, 7th 2013
+ * PATCH version 6 sent on August, 1st 2013
+ * PATCH version 5 sent on July, 15th 2013
+ * PATCH version 4 sent on July, 1st 2013
+ * PATCH version 3 sent on June, 19th 2013
+ * PATCH version 2 sent on June, 6th 2013
+ * RFC version 1 sent on March, 26th 2013
+
+So it has been around since 4 months, I've taken into account all the
+comments from the various maintainers who were involved, and especially
+the comments from Grant. You cannot ask me now, as we are approaching
+the next merge window for which this code is intended, to take
+completely opposite design choices than what the previous irqdomain
+maintainer was suggesting.
+
+Could you contact Grant and align with him on those design decisions?
+It would also be good if you could read the past discussions on this
+patch set, because all what you're pointing at has already been
+discussed at length, as I pointed out in my previous e-mail.
+
+Thanks,
+
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
