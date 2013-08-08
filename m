@@ -1,40 +1,251 @@
-From: csd_b@daudt.org (Christian Daudt)
-Date: Thu, 8 Aug 2013 15:56:37 -0700
-Subject: [PATCH v2] ARM: DT: binding fixup to align with
- vendor-prefixes.txt
-In-Reply-To: <1375482479-15732-1-git-send-email-csd@broadcom.com>
-References: <1375482479-15732-1-git-send-email-csd@broadcom.com>
-Message-ID: <CAGFynZ-mNRXKt8QxH4kBAUE0LB0r7sW1Lb4WcSe_DM4buSNd3A@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 09 Aug 2013 01:03:05 +0200
+Subject: [PATCH v9 14/16] iommu/exynos: add support for power management
+ subsystems.
+In-Reply-To: <003201ce941b$6e5a90e0$4b0fb2a0$@samsung.com>
+References: <003201ce941b$6e5a90e0$4b0fb2a0$@samsung.com>
+Message-ID: <1949492.N82v2nAcIY@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 2, 2013 at 3:27 PM, Christian Daudt <csd@broadcom.com> wrote:
-> [ this is a follow-up to this discussion:
-> http://archive.arm.linux.org.uk/lurker/message/20130730.230827.a1ceb12a.en.html ]
-> This patchset renames all uses of "bcm," name bindings to
-> "brcm," as they were done prior to knowing that brcm had
-> already been standardized as Broadcom vendor prefix
-> (in Documentation/devicetree/bindings/vendor-prefixes.txt).
-> This will not cause any churn on devices because none of
-> these bindings have made it into production yet.
-> Also rename the the following dt binding docs that had "bcm,"
-> in their name for consistency:
->  - bcm,kona-sdhci.txt -> kona-sdhci.txt
->  - bcm,kona-timer.txt -> kona-timer.txt
->
-> Changes since v1:
->  - added driver match table entries for deprecated names
->
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
->
+Hi KyongHo,
 
-Hi,
- Any ACKs for this patch ? Alternatively, I can instead just patch
-vendor-prefix to add "bcm" as an additional Broadcom prefix and just
-stick to using bcm. I have told people internally to switch over to
-brcm and there are patches for 3.12 that will be migrating to brcm but
-I'd rather not have half bcm and half brcm and that will make things
-quite confusing.
+nit: Please drop the trailing dot at the end of patch subject.
 
- Thanks,
-   csd
+On Thursday 08 of August 2013 18:41:17 Cho KyongHo wrote:
+> This adds support for Advance Power Management and Runtime Power
+> Management.
+
+This patch adds support for system-wide and runtime power management.
+
+> Since System MMU is located in the same local power domain of its
+> master H/W, System MMU must be initialized before it is working if
+> its power domain was ever turned off. TLB invalidation according to
+> unmapping on page tables must also be performed while power domain is
+> turned on.
+> 
+> This patch ensures that resume and runtime_resume(restore_state)
+> functions in this driver is called before the calls to resume and
+> runtime_resume callback functions in the drivers of master H/Ws.
+> Likewise, suspend and runtime_suspend(save_state) functions in this
+> driver is called after the calls to suspend and runtime_suspend in the
+> drivers of master H/Ws.
+> 
+> In order to get benefit of this support, the master H/W and its System
+> MMU must resides in the same power domain in terms of Linux kernel. If
+> a master H/W does not use generic I/O power domain, its driver must
+> call iommu_attach_device() after its local power domain is turned on,
+> iommu_detach_device before turned off.
+
+I don't get the point of this last paragraph. What a power domain can be 
+in other terms? Is there any other way to support power domains on Exynos 
+than generic power domains?
+
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> ---
+>  drivers/iommu/exynos-iommu.c |  235
+> +++++++++++++++++++++++++++++++++++++++++- 1 files changed, 231
+> insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 9e64483..56aead9 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/export.h>
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/pm_domain.h>
+>  #include <linux/notifier.h>
+> 
+>  #include <asm/cacheflush.h>
+> @@ -186,6 +187,7 @@ struct sysmmu_drvdata {
+>  	int activations;
+>  	rwlock_t lock;
+>  	struct iommu_domain *domain;
+> +	bool runtime_active;
+>  	unsigned long pgtable;
+>  	void __iomem *sfrbases[0];
+>  };
+> @@ -438,7 +440,8 @@ static bool __sysmmu_disable(struct sysmmu_drvdata
+> *data) data->pgtable = 0;
+>  		data->domain = NULL;
+> 
+> -		__sysmmu_disable_nocount(data);
+> +		if (data->runtime_active)
+> +			__sysmmu_disable_nocount(data);
+> 
+>  		dev_dbg(data->sysmmu, "Disabled\n");
+>  	} else  {
+> @@ -505,7 +508,8 @@ static int __sysmmu_enable(struct sysmmu_drvdata
+> *data, data->pgtable = pgtable;
+>  		data->domain = domain;
+> 
+> -		__sysmmu_enable_nocount(data);
+> +		if (data->runtime_active)
+> +			__sysmmu_enable_nocount(data);
+> 
+>  		dev_dbg(data->sysmmu, "Enabled\n");
+>  	} else {
+> @@ -609,7 +613,7 @@ static void sysmmu_tlb_invalidate_entry(struct
+> device *dev, unsigned long iova) data =
+> dev_get_drvdata(client->sysmmu[i]);
+> 
+>  		read_lock_irqsave(&data->lock, flags);
+> -		if (is_sysmmu_active(data)) {
+> +		if (is_sysmmu_active(data) && data->runtime_active) {
+>  			int i;
+>  			clk_enable(data->clk_master);
+>  			for (i = 0; i < data->nsfrs; i++)
+> @@ -637,7 +641,8 @@ void exynos_sysmmu_tlb_invalidate(struct device
+> *dev) data = dev_get_drvdata(client->sysmmu[i]);
+> 
+>  		read_lock_irqsave(&data->lock, flags);
+> -		if (is_sysmmu_active(data)) {
+> +		if (is_sysmmu_active(data) &&
+> +				data->runtime_active) {
+
+nit: The whole if condition fits into single line.
+
+>  			int i;
+>  			for (i = 0; i < data->nsfrs; i++) {
+>  				clk_enable(data->clk_master);
+> @@ -711,6 +716,8 @@ static int __init exynos_sysmmu_probe(struct
+> platform_device *pdev) }
+>  	}
+> 
+> +	pm_runtime_enable(dev);
+> +
+>  	data->sysmmu = dev;
+> 
+>  	data->clk = devm_clk_get(dev, "sysmmu");
+> @@ -736,6 +743,8 @@ static int __init exynos_sysmmu_probe(struct
+> platform_device *pdev) return ret;
+>  	}
+> 
+> +	data->runtime_active = !pm_runtime_enabled(dev);
+> +
+>  	rwlock_init(&data->lock);
+> 
+>  	platform_set_drvdata(pdev, data);
+> @@ -744,6 +753,34 @@ static int __init exynos_sysmmu_probe(struct
+> platform_device *pdev) return ret;
+>  }
+> 
+> +#ifdef CONFIG_PM_SLEEP
+> +static int sysmmu_suspend(struct device *dev)
+> +{
+> +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
+> +	unsigned long flags;
+> +	read_lock_irqsave(&data->lock, flags);
+> +	if (is_sysmmu_active(data) &&
+> +		(!pm_runtime_enabled(dev) || data->runtime_active))
+> +		__sysmmu_disable_nocount(data);
+> +	read_unlock_irqrestore(&data->lock, flags);
+> +	return 0;
+> +}
+> +
+> +static int sysmmu_resume(struct device *dev)
+> +{
+> +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
+> +	unsigned long flags;
+> +	read_lock_irqsave(&data->lock, flags);
+> +	if (is_sysmmu_active(data) &&
+> +		(!pm_runtime_enabled(dev) || data->runtime_active))
+> +		__sysmmu_enable_nocount(data);
+> +	read_unlock_irqrestore(&data->lock, flags);
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(sysmmu_pm_ops, sysmmu_suspend, sysmmu_resume);
+> +
+>  #ifdef CONFIG_OF
+>  static struct of_device_id sysmmu_of_match[] __initconst = {
+>  	{ .compatible	= "samsung,exynos4210-sysmmu", },
+> @@ -756,6 +793,7 @@ static struct platform_driver exynos_sysmmu_driver
+> __refdata = { .driver	= {
+>  		.owner		= THIS_MODULE,
+>  		.name		= "exynos-sysmmu",
+> +		.pm		= &sysmmu_pm_ops,
+>  		.of_match_table	= of_match_ptr(sysmmu_of_match),
+>  	}
+>  };
+> @@ -1141,6 +1179,163 @@ static int __init exynos_iommu_init(void)
+>  }
+>  subsys_initcall(exynos_iommu_init);
+> 
+> +#ifdef CONFIG_PM_SLEEP
+> +static int sysmmu_pm_genpd_suspend(struct device *dev)
+> +{
+> +	struct exynos_iommu_client *client = dev->archdata.iommu;
+> +	int ret = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < client->num_sysmmu; i++) {
+> +		ret = pm_generic_suspend(client->sysmmu[i]);
+> +		if (ret)
+> +			break;
+> +	}
+> +
+> +	if (!ret)
+> +		ret = pm_generic_suspend(dev);
+> +
+> +	if (ret) {
+> +		int j;
+> +
+> +		for (j = 0; j < i; j++)
+> +			pm_generic_resume(client->sysmmu[j]);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int sysmmu_pm_genpd_resume(struct device *dev)
+> +{
+> +	struct exynos_iommu_client *client = dev->archdata.iommu;
+> +	int ret = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < client->num_sysmmu; i++) {
+> +		ret = pm_generic_resume(client->sysmmu[i]);
+> +		if (ret)
+> +			break;
+
+Error handling here can be cleaned up a lot.
+
+s/break/goto err_suspend/
+
+> +	}
+> +
+> +	if (!ret)
+
+Now you can drop this check.
+
+> +		ret = pm_generic_resume(dev);
+
+	ret = pm_generic_resume(dev);
+	if (ret)
+		goto err_suspend;
+
+	return 0;
+
+> +
+
+err_suspend:
+> +	if (ret) {
+
+This check can be dropped here as well now.
+
+> +		int j;
+> +
+> +		for (j = 0; j < i; j++)
+> +			pm_generic_suspend(client->sysmmu[j]);
+> +	}
+> +
+> +	return ret;
+> +}
+> +#endif
+
+Best regards,
+Tomasz
