@@ -1,41 +1,23 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 8 Aug 2013 23:01:08 +0200
-Subject: [RESEND PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and
- dw-apb-timer-sp to just dw-apb-timer
-In-Reply-To: <5203FCEA.7040709@wwwdotorg.org>
-References: <1375740158-10012-1-git-send-email-dinguyen@altera.com>
- <5203FCEA.7040709@wwwdotorg.org>
-Message-ID: <20130808210108.GA17855@amd.pavel.ucw.cz>
+From: csd_b@daudt.org (Christian Daudt)
+Date: Thu, 8 Aug 2013 14:02:39 -0700
+Subject: [PATCH 06/22] ARM: dts: bcm281xx: Remove '0x's from BCM11351 DTS
+ file
+In-Reply-To: <20130723075309.GE26801@laptop>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-6-git-send-email-lee.jones@linaro.org>
+ <51EDAC90.6010108@broadcom.com> <20130723075309.GE26801@laptop>
+Message-ID: <CAGFynZ-+UoML32ecX4nSGAaFJXqQpdq+D8j7GqJSKhxsE7w=9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2013-08-08 14:17:46, Stephen Warren wrote:
-> On 08/05/2013 04:02 PM, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
-> > DW APB timer, just fed by different clocks.
-> 
-> I assume patch 1/1 made similar changes to the driver?
-> 
-> > diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
-> 
-> >  Required properties:
-> > -- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
-> > +- compatible: "snps,dw-apb-timer"
-> 
-> This change is problematic w.r.t device tree as an ABI. any DT that uses
-> the new value "snps,dw-apb-timer" will not work with older software that
-> was written to expect the old values.
+Hi Lee,
+ I had to change some of the lines in the dts files you modified, so
+I've added your mods. This patch:
+https://lkml.org/lkml/2013/8/8/477
 
-I'm pretty sure there's no such software out there. Actually, I don't
-think timers ever worked properly on any mainline kernels.
+includes your changes to bcm11351.dtsi and bcm11351-brt.dts. Not sure
+where your patch is at this point, but I just wanted to point that
+out.
 
-So I believe we can still fix it the right way... it is same hardware
-with different labels after all.
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+ Thanks,
+   csd
