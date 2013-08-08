@@ -1,43 +1,33 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  8 Aug 2013 12:30:37 +0200
-Subject: [PATCH 6/6] ARM: at91/dt: remove old main clk definition from
- sama5d3xcm.dtsi
-In-Reply-To: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1375957837-11600-1-git-send-email-b.brezillon@overkiz.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Aug 2013 11:25:43 +0100
+Subject: [PATCH 17/20] ASoC: pxa: pxa-pcm-lib: switch over to
+ snd-soc-dmaengine-pcm
+In-Reply-To: <20130808093628.GS6427@sirena.org.uk>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-18-git-send-email-zonque@gmail.com>
+ <20130807160743.GI6427@sirena.org.uk> <5202718F.2050507@gmail.com>
+ <20130807163258.GL6427@sirena.org.uk> <52035463.1030909@gmail.com>
+ <52035A81.6090903@metafoo.de> <52035EF0.1030208@gmail.com>
+ <20130808093628.GS6427@sirena.org.uk>
+Message-ID: <20130808102543.GJ23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the old main clk node which is now useless as sama5d3
-SoCs and boards are no longer compatible with the old at91 clk
-implementations.
+On Thu, Aug 08, 2013 at 10:36:28AM +0100, Mark Brown wrote:
+> On Thu, Aug 08, 2013 at 11:03:44AM +0200, Daniel Mack wrote:
+> > On 08.08.2013 10:44, Lars-Peter Clausen wrote:
+> 
+> > > There is intentionally no dependency on ASoC for the soc-dmaengine-pcm code, 
+> > > though since I wasn't sure whether there was ever going to be a userside 
+> > > outside of ASoC the coded ended up in ASoC folder. It shouldn't be a problem to 
+> > > make it available to all of ALSA.
+> 
+> > Ok, great. I queued a patch for that. Will be part of my next spin, or,
+> > in case the series doesn't make it in time, I'll re-post all the patches
+> > that can be applied independently up front.
+> 
+> You probably don't need to move it, just adding a select (which should
+> ignore Kconfig dependencies) from the non-ASoC PXA stuff ought to do the
+> trick.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/sama5d3xcm.dtsi |   11 -----------
- 1 file changed, 11 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index f19d5bf..81c3957 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -18,17 +18,6 @@
- 		reg = <0x20000000 0x20000000>;
- 	};
- 
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--	};
--
- 	ahb {
- 		apb {
- 			spi0: spi at f0004000 {
--- 
-1.7.9.5
+... which gets you a warning from modern kconfig tools.
