@@ -1,40 +1,32 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 8 Aug 2013 11:06:41 -0500
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <5203B336.90102@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
-Message-ID: <5203C211.7040207@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 8 Aug 2013 21:37:43 +0530
+Subject: [PATCH 35/35] cpufreq: tegra: use
+ cpufreq_table_validate_and_show()
+In-Reply-To: <5203BCDD.40809@wwwdotorg.org>
+References: <cover.1375964117.git.viresh.kumar@linaro.org>
+ <568f3dbd414b050bb2319d960fb5044a5aed8ee3.1375964117.git.viresh.kumar@linaro.org>
+ <5203BCDD.40809@wwwdotorg.org>
+Message-ID: <CAKohpomr8kwDitAFD7FKvHo3zNWz8qT5bkd3yOVEnC_k16o=Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
-> $subject and patch don't match.
+On 8 August 2013 21:14, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/08/2013 07:48 AM, Viresh Kumar wrote:
+>> Lets use cpufreq_table_validate_and_show() instead of calling
+>> cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
 >
-> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
->> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>>    In reference to
->>> the M3 handling it, the M3 wouldn't know which devices have a driver
->>> bound and which don't.
->> Does it need to? M3 firmware can pretty much define "I will force the device into low power state, and if the drivers dont handle things properly, fix the darned driver". M3 behavior should be considered as a "hardware" as far as Linux running on MPU is concerned, and firmware helps change the behavior by accounting for SoC quirks. *if* we have ability to handle this in the firmware, there is no need to carry this in Linux.
->>
-> I agree with Nishant. I don't like this patch and IIRC, I gave same
-> comment in the last version. Linux need not know about all such firmware
-> quirks. Also all these M3 specific stuff, should be done somewhere
-> else. Probably having a small M3 driver won't be a bad idea.
->
-> Regards,
-> Santosh
->
+> Assuming the new function simply does what the two removed lines do,
+> this looks fine to me.
 
-I am not opposed to doing it this way and letting the M3 firmware handle 
-idling these modules, however the one concern raised in the last series 
-is that an approach that does not acknowledge drivers will hide driver 
-PM bugs. I suppose as long as I make sure to document that the devices 
-are being idled by the M3 firmware this may not be an issue. I will look 
-into implementing this.
+http://lkml.org/lkml/2013/8/8/266
 
-Regards,
-Dave
+>>  static int tegra_cpu_exit(struct cpufreq_policy *policy)
+>>  {
+>> -     cpufreq_frequency_table_cpuinfo(policy, freq_table);
+>
+> This doesn't seem to be mentioned in the commit description. I assume
+> this is simply dead/useless code removal?
+
+Its useless and the correct routine isn't called at all :) .. I will add that
+additional patch and send it to you and will get this change out of this
+commit.
