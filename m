@@ -1,36 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 8 Aug 2013 20:27:47 +0100
-Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
-In-Reply-To: <5203D5B6.3060806@wwwdotorg.org>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <1375944991-29182-2-git-send-email-wni@nvidia.com>
- <520359E9.1000600@roeck-us.net> <5203D5B6.3060806@wwwdotorg.org>
-Message-ID: <20130808192747.GM6427@sirena.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 8 Aug 2013 15:31:43 -0400
+Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
+ EMIF spec
+In-Reply-To: <87fvukhwtv.fsf@kernel.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
+ <87fvukhwtv.fsf@kernel.org>
+Message-ID: <5203F21F.3010801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 11:30:30AM -0600, Stephen Warren wrote:
-> On 08/08/2013 02:42 AM, Guenter Roeck wrote:
+On Thursday 08 August 2013 02:16 PM, Kevin Hilman wrote:
+> Dave Gerlach <d-gerlach@ti.com> writes:
+> 
+>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>
+>> SDRAM controller on AM33XX requires that a modification of certain
+>> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
+>> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
+>> scenario arises when entering a low power state like DeepSleep.
+>> To ensure that the read is not from a cached region we reserve
+>> some memory during bootup using the arm_memblock_steal() API.
+> 
+> Hmm, sounds to me an awful lot like the existing omap_bus_sync() ?
+>
+All the credit of that awful omap_bus_sync() goes to me since 
+I introduced it. And I keep beating the hardware guys
+who have not left a choice but to introduce the ugly work
+around in software. ;-)
 
-> > If the regulator subsystem is not configured, you especially don't need
-> > or want
-> > to pollute the log with an error message.
-
-> DT parsing errors should be reported. However, if there's nothing to
-> parse, it's not an error.
-
-> So, I think this should report an error message *if* there is a DT
-> property that defines the regulator to use. If there's no property, just
-> use no regulator. If there is a property, it had better be possible to
-> parse it.
-
-On a DT system you should get this behaviour simply by paying attention
-to the error code from the regualtor API - the core should complain
-loudly if the DT is incomprehensible.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/5d4dd604/attachment.sig>
+Regards,
+Santosh
+ 
