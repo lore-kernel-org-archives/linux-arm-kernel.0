@@ -1,71 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Aug 2013 15:00:52 -0600
-Subject: [PATCH 1/2] ARM: Exynos: replace custom MFC reserved memory
- handling with generic code
-In-Reply-To: <1375705610-12724-2-git-send-email-m.szyprowski@samsung.com>
-References: <1375705610-12724-1-git-send-email-m.szyprowski@samsung.com>
- <1375705610-12724-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <52040704.6090100@wwwdotorg.org>
+From: pavel@denx.de (Pavel Machek)
+Date: Thu, 8 Aug 2013 23:01:08 +0200
+Subject: [RESEND PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and
+ dw-apb-timer-sp to just dw-apb-timer
+In-Reply-To: <5203FCEA.7040709@wwwdotorg.org>
+References: <1375740158-10012-1-git-send-email-dinguyen@altera.com>
+ <5203FCEA.7040709@wwwdotorg.org>
+Message-ID: <20130808210108.GA17855@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2013 06:26 AM, Marek Szyprowski wrote:
-> MFC driver use custom bindings for managing reserved memory. Those bindings
-> are not really specific to MFC device and no even well discussed. They can
-> be easily replaced with generic, platform independent code for handling
-> reserved and contiguous memory.
+On Thu 2013-08-08 14:17:46, Stephen Warren wrote:
+> On 08/05/2013 04:02 PM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
+> > DW APB timer, just fed by different clocks.
 > 
-> Two additional child devices for each memory port (AXI master) are
-> introduced to let one assign some properties to each of them. Later one
-> can also use them to assign properties related to SYSMMU controllers,
-> which can be used to manage the limited dma window provided by those
-> memory ports.
+> I assume patch 1/1 made similar changes to the driver?
+> 
+> > diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> 
+> >  Required properties:
+> > -- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
+> > +- compatible: "snps,dw-apb-timer"
+> 
+> This change is problematic w.r.t device tree as an ABI. any DT that uses
+> the new value "snps,dw-apb-timer" will not work with older software that
+> was written to expect the old values.
 
-> diff --git a/Documentation/devicetree/bindings/media/s5p-mfc.txt b/Documentation/devicetree/bindings/media/s5p-mfc.txt
+I'm pretty sure there's no such software out there. Actually, I don't
+think timers ever worked properly on any mainline kernels.
 
-> +The MFC device is connected to system bus with two memory ports (AXI
-> +masters) for better performance. Those memory ports are modelled as
-> +separate child devices, so one can assign some properties to them (like
-> +memory region for dma buffer allocation or sysmmu controller).
-> +
->  Required properties:
->    - compatible : value should be either one among the following
->  	(a) "samsung,mfc-v5" for MFC v5 present in Exynos4 SoCs
->  	(b) "samsung,mfc-v6" for MFC v6 present in Exynos5 SoCs
-> +	and additionally "simple-bus" to correctly initialize child
-> +	devices for memory ports (AXI masters)
+So I believe we can still fix it the right way... it is same hardware
+with different labels after all.
 
-simple-bus is wrong here; the child nodes aren't independent entities
-that can be instantiated separately from their parent and without
-depending on their parent.
-
-> -  - samsung,mfc-r : Base address of the first memory bank used by MFC
-> -		    for DMA contiguous memory allocation and its size.
-> -
-> -  - samsung,mfc-l : Base address of the second memory bank used by MFC
-> -		    for DMA contiguous memory allocation and its size.
-
-These properties shouldn't be removed, but simply marked deprecated. The
-driver will need to continue to support them so that old DTs work with
-new kernels. The binding must therefore continue to document them so
-that the old DT content still makes sense.
-
-> +Two child nodes must be defined for MFC device. Their names must be
-> +following: "memport-r" and "memport-l" ("right" and "left"). Required
-
-Node names shouldn't have semantic meaning.
-
-> +properties:
-> +  - compatible : value should be "samsung,memport"
-
-There's no need to define compatible properties for things which aren't
-separate devices.
-
-> +  - dma-memory-region : optional property with a phandle to respective memory
-> +			region (see devicetree/bindings/memory.txt), if no region
-> +			is defined, sysmmu controller must be used for managing
-> +			limited dma window of each memory port.
-
-What's the benefit of putting this property in a sub-node; surely you
-can put the property in the main MFC node yet follow the same conceptual
-schema for its content as a dma-memory-region node?
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
