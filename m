@@ -1,50 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Aug 2013 19:13:55 +0100
-Subject: angel_SWI_ARM
-In-Reply-To: <52025020.1020506@codeaurora.org>
-References: <CANEcUBW2OsQqN_Cm_9ThJmcmNB5oQfNvqNi_MU+DsCNAPJtaFQ@mail.gmail.com>
- <52025020.1020506@codeaurora.org>
-Message-ID: <20130808181355.GC2356@localhost.localdomain>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Thu, 8 Aug 2013 20:14:30 +0200
+Subject: [PATCH] drm/agp: Fix build for non-AGP platforms
+In-Reply-To: <1375957242-18444-1-git-send-email-broonie@kernel.org>
+References: <1375957242-18444-1-git-send-email-broonie@kernel.org>
+Message-ID: <CANq1E4RcgT+pjxc6UqD7Ft_5=ajHqHNARFs7V0rTWL5M6DhWEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 09:48:16AM -0400, Christopher Covington wrote:
-> On 08/07/2013 06:57 AM, zhaobin xv wrote:
-> > Hello
-> > when I read linux/arch/arm/boot/compressed/head.S
-> > I can't understand :
-> >  mrs    r2, cpsr        @ get current mode
-> >         tst    r2, #3            @ not user?
-> >         bne    not_angel
-> >         mov    r0, #0x17        @ angel_SWIreason_EnterSVC
-> >         swi    0x123456        @ angel_SWI_ARM
-> > I want to know :
-> > a) what is angel_SWI_ARM
-> > b) what is angel debuger
-> > c)Do the code " swi    0x123456 " make interrupt what make program
-> > jump to addr 0x0000 0008
-> > ,but addr 0x0000 0008 doesn't initialize.
-> 
-> Angel is ARM's semihosting interface.
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.dui0471c/CHDJHHDI.html
+Hi
 
-I believe it's been used in the past to boot some early StrongARM based
-boards like Assabet.
+On Thu, Aug 8, 2013 at 12:20 PM, Mark Brown <broonie@kernel.org> wrote:
+> From: Mark Brown <broonie@linaro.org>
+>
+> Commit 28ec711 (drm/agp: move AGP cleanup paths to drm_agpsupport.c)
+> broke the build for platforms which do not have AGP since it moved the
+> AGP cleanup code inside an #ifdef __OS_HAS_AGP which are referenced
+> unconditionally in drm_drv.c.  This causes build failures for embedded
+> SoCs which use DRM but do not have AGP.
+>
+> Fix this by providing stub static inlines in the header.
+>
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 
-Since this seems to require an image to be downloaded via the serial
-port, boards configured to use this are probably not self-booting.  I
-doubt there are many people still using this today.
+A very similar patch which does it for all AGP functions is already
+pending on dri-devel:
+  http://lists.freedesktop.org/archives/dri-devel/2013-August/043077.html
 
+Thanks
+David
 
-For all other configurations, the kernel is entered in SVC mode, not
-User mode, so the code will be skipped.
-
-
-Documentation/arm/Booting:
-
-  For CPUs which do not include the ARM virtualization extensions, the
-  CPU must be in SVC mode.  (A special exception exists for Angel)
-
-Cheers
----Dave
+> ---
+>  include/drm/drmP.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/include/drm/drmP.h b/include/drm/drmP.h
+> index fba5473..e7f7da0 100644
+> --- a/include/drm/drmP.h
+> +++ b/include/drm/drmP.h
+> @@ -1453,6 +1453,7 @@ extern int drm_modeset_ctl(struct drm_device *dev, void *data,
+>                            struct drm_file *file_priv);
+>
+>                                 /* AGP/GART support (drm_agpsupport.h) */
+> +#if __OS_HAS_AGP
+>  extern struct drm_agp_head *drm_agp_init(struct drm_device *dev);
+>  extern void drm_agp_destroy(struct drm_agp_head *agp);
+>  extern void drm_agp_clear(struct drm_device *dev);
+> @@ -1480,6 +1481,10 @@ extern int drm_agp_unbind_ioctl(struct drm_device *dev, void *data,
+>  extern int drm_agp_bind(struct drm_device *dev, struct drm_agp_binding *request);
+>  extern int drm_agp_bind_ioctl(struct drm_device *dev, void *data,
+>                         struct drm_file *file_priv);
+> +#else
+> +static inline void drm_agp_destroy(struct drm_agp_head *agp) { }
+> +static inline void drm_agp_clear(struct drm_device *dev) { }
+> +#endif
+>
+>                                 /* Stub support (drm_stub.h) */
+>  extern int drm_setmaster_ioctl(struct drm_device *dev, void *data,
+> --
+> 1.8.4.rc1
+>
