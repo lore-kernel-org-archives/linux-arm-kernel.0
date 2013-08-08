@@ -1,78 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Aug 2013 13:54:14 -0600
-Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
-In-Reply-To: <1375928591.1758.66.camel@jlo-ubuntu-64.nvidia.com>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-4-git-send-email-josephl@nvidia.com>
- <51F6F209.2090309@wwwdotorg.org>
- <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
- <51FC1751.9010401@wwwdotorg.org>
- <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
- <51FFDA20.6050403@wwwdotorg.org> <51FFE363.4080603@wwwdotorg.org>
- <1375780249.2261.63.camel@jlo-ubuntu-64.nvidia.com>
- <52014258.9070602@wwwdotorg.org>
- <1375866749.8111.57.camel@jlo-ubuntu-64.nvidia.com>
- <520279FC.1000006@wwwdotorg.org>
- <1375928591.1758.66.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <5203F766.9050100@wwwdotorg.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 8 Aug 2013 13:00:26 -0700
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
+In-Reply-To: <20130808171554.GI6427@sirena.org.uk>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-2-git-send-email-wni@nvidia.com>
+ <20130808110136.GA6427@sirena.org.uk>
+ <52038035.7030803@roeck-us.net>
+ <20130808130840.GC6427@sirena.org.uk>
+ <5203B78C.7010101@roeck-us.net>
+ <20130808171554.GI6427@sirena.org.uk>
+Message-ID: <20130808200026.GA18226@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2013 08:23 PM, Joseph Lo wrote:
-> On Thu, 2013-08-08 at 00:46 +0800, Stephen Warren wrote:
-..
->> I still have absolutely no idea why Tegra30 and Tegra114 are different.
->>
->> You mentioned something about this low-level code only manipulating the
->> IDLE state, and the clock driver needing to restore the other 4 states.
->> This raises yet more questions:
->>
->> 1) Do we not need to restore the other 4 states on Tegra30? If not, why
->> not? If we do, presumably Tegra30 (and Tegra20?) need to the syscore_op
->> this patch series adds to Tegra114 only? If we don't, then why does
->> Tegra114 have to restore them?
->
-> We need to restore all of them for all Tegra chips. For Tegra20/30, we
-> had done it in the tegra_cpu_car_ops.suspend/resume. For Tegra114, the
-> patch was here.
+On Thu, Aug 08, 2013 at 06:15:54PM +0100, Mark Brown wrote:
+> On Thu, Aug 08, 2013 at 08:21:48AM -0700, Guenter Roeck wrote:
+> > On 08/08/2013 06:08 AM, Mark Brown wrote:
 > 
-> The other reason is:
-> 1) The PLLX is the main CPU clock source in Tegra20/30. We can restore
-> it ASAP to get a better performance.
-> 2) For Tegra114, the PLLX is the CPU clock source when CPU runs at low
-> rates. When CPU in high rate, it uses DFLL as clock source. So it
-> depends on what the clock source of the CPU when it goes into suspend.
-> And the DFLL has its own resume code, it needs to be restored before the
-> CPU uses it as clock source again. It makes the CPU clock restore
-> sequence like this.
+> > >I'd be most surprised if the device worked without power, if the driver
+> > >fails to get and enable a regulator for it then that's not great
+> > >(especially if it does so silently).
+> 
+> > Correct, but it appears that the driver magically worked for a long time
+> > without it.
+> 
+> Sure, it'll work in systems that have always on regulators.
+> 
+> > Is it guaranteed that the driver keeps working for all cases where
+> > regulator support is enabled in the kernel, and where it used to work
+> > so far without mandating the existence of this specific regulator ?
+> > My main concern is having to deal with complaints that the driver stopped
+> > working for no good reason.
+> 
+> Sure, that's the transition issues I mentioned - the regulator API does
+> have stubbing facilities which should cover things and it's very easy to
+> define stub regulators if you need to.  Like I say I expect this to be a
+> lot easier after the next merge window as another way of doing stubs is
+> being added which should make this even easier by avoiding disrupting
+> drivers that do genuinely want to check for absent supplies and handle
+> that better.
+> 
+We will need to make sure that all dts files using any of the compatible chips
+are updated accordingly. There are several entries in various dts files for
+adm1032, adt7461, lm90, and nct1008.
 
-So, we don't yet support the DFLL upstream. Presumably, the CPU is
-always running off PLLX on Tegra114 upstream right now. As such, we can
-hard-code that into the resume path just like we do on earlier chips,
-i.e. using tegra_cpu_car_ops.resume().
+> > In this context, is it common practice to name such regulators "vdd"
+> > or similar ? What if there are multiple LM90 or compatible chips
+> > in a system, connected to different power rails ? Who determines
+> > if the regulator is supposed to be named "vdd" or "vcc" or anything
+> > else, and to which power rails it is actually connected ? How can
+> > and does one guarantee that "vdd" is the correct regulator to use
+> > for all systems ? What if some other driver requests "vdd", but the chip
+> > it supports happens to be connected to a different power rail ?
+> 
+> That's not what the name means - they are nothing to do with the board.
 
-Once we do get DFLL support, presumably the DFLL resume path can switch
-the register from PLLX to DFLL, and we still won't need a custom
-syscore_ops.
+Ok, makes sense.
 
-Will that work?
+> The names requested by a driver are defined with regard to the device
+> and should be the names used by the chip itself as defined in the
 
->> 2) What triggers the HW to switch from IDLE to RUN state? 
->
-> I also want to know more detail about it. The TRM only said it decided
-> by HW and gave an example about when switching to IRQ or FIQ state.
->
->> In other
->> words, I think you're saying that the existing Tegra30 code:
->>
->> 	mov32	r4, ((1 << 28) | (0x8))	@ burst policy is PLLX
->> 	str	r4, [r0, #CLK_RESET_CCLK_BURST]
->>
->> doesn't change the clock rate right away. When does it change?
->
-> The code before this is the PLLX re-enable code. Then it switches to
-> PLLX. The rate is still kept the same when it suspended. The next rate
-> change after resume would be happened in the CPUfreq driver.
+9 votes for vdd, 11 votes for vcc, one undecided (no datasheet available).
+Guess one is as good as the other ;-).
 
-Sorry, when I wrote "doesn't change the clock rate right away", I really
-meant "doesn't change the clock *source* right away".
+Guenter
+
+> datasheet.  A board that uses regulators then maps these onto specific
+> regulators in the system, the driver doesn't need to know anything about
+> this process.
