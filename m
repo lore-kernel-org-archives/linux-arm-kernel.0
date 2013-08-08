@@ -1,91 +1,53 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 Aug 2013 10:23:36 -0400
-Subject: [PATCHv3 6/9] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clkevent device
-In-Reply-To: <1375811376-49985-7-git-send-email-d-gerlach@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-7-git-send-email-d-gerlach@ti.com>
-Message-ID: <5203A9E8.2090901@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 08 Aug 2013 16:22:29 +0200
+Subject: [PATCH 2/6] ARM: Tegra: Add CPU's OPPs for using cpufreq-cpu0
+ driver
+In-Reply-To: <CAKohpon=GGn5-8ucTrrf6TyPMn3+1Oh6Sd5bAj_ztpVDONZ3QA@mail.gmail.com>
+References: <cover.1375886595.git.viresh.kumar@linaro.org>
+ <d4cd498d9b63d761039b025216e65278dc8e0e37.1375886595.git.viresh.kumar@linaro.org>
+ <52028719.8070908@wwwdotorg.org>
+ <CAKohpo=MpOyMGFTGeZWmoCRwmZ7+nQtP_yCGokPanEVYL0xbMw@mail.gmail.com>
+ <52029811.9080704@wwwdotorg.org>
+ <1375970318.4276.52.camel@weser.hi.pengutronix.de>
+ <CAKohpon=GGn5-8ucTrrf6TyPMn3+1Oh6Sd5bAj_ztpVDONZ3QA@mail.gmail.com>
+Message-ID: <1375971749.4276.61.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 August 2013 01:49 PM, Dave Gerlach wrote:
-> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Am Donnerstag, den 08.08.2013, 19:41 +0530 schrieb Viresh Kumar:
+> On 8 August 2013 19:28, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > From what I learned those voltage levels are dependent on both the
+> > Speedo and the process ID of the specific Tegra processor. So you really
+> > get a two dimensional mapping table instead of a single OPP.
+> > Also you can not scale the CPU voltage on it's own, but have to make
+> > sure the core voltage isn't too far away from. Then core voltage also
+> > depends on the operating states of engines like GR2D or even display.
 > 
-> OMAP timer code registers two timers - one as clocksource
-> and one as clockevent. Since AM33XX has only one usable timer
-> in the WKUP domain one of the timers needs suspend-resume
-> support to restore the configuration to pre-suspend state.
+> So if they depend on a certain type of SoC, which they should, then we
+> can get these initialized from that SoC's dts/dtsi file instead of a common
+> file.. And so that would resolve the issue you just reported.
 > 
-> commit adc78e6 (timekeeping: Add suspend and resume
-> of clock event devices) introduced .suspend and .resume
-> callbacks for clock event devices. Leverages these
-> callbacks to have AM33XX clockevent timer which is
-> in not in WKUP domain to behave properly across system
-> suspend.
-> 
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-NAK
+You can certainly define the mapping table in DT where a specialized
+Tegra cpufreq driver could read it in and then map frequency to voltage.
+But that's a runtime decision, as Speedo and process ID are fuse values
+and can not be represented in DT.
 
-This patch doesn't addressed previous comments.
-- The issue is specific to AM33XX and hence you
-need to take care of that. These callbacks will happen on
-all OMAP machines where the problem doesn't exist.
-
-- Don't use hwmod APIs directly. At least abstract it
-at omap_device layer and use that one instead.
-
->  arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
+> Now I haven't proposed in the patch that we will change these voltage
+> levels at all.. This is regulator specific code and would come into play
+> only when regulators are registered for cpu.. Otherwise we will just
+> play with frequency..
 > 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index b37e1fc..cce5d39 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -118,11 +118,43 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
->  	}
->  }
->  
-> +static void omap_clkevt_suspend(struct clock_event_device *unused)
-> +{
-> +	char name[10];
-> +	struct omap_hwmod *oh;
-> +
-> +	sprintf(name, "timer%d", clkev.id);
-> +	oh = omap_hwmod_lookup(name);
-> +	if (!oh)
-> +		return;
-> +
-> +	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
-> +	omap_hwmod_idle(oh);
-> +}
-> +
-> +static void omap_clkevt_resume(struct clock_event_device *unused)
-> +{
-> +	char name[10];
-> +	struct omap_hwmod *oh;
-> +
-> +	sprintf(name, "timer%d", clkev.id);
-> +	oh = omap_hwmod_lookup(name);
-> +	if (!oh)
-> +		return;
-> +
-> +	omap_hwmod_enable(oh);
-> +	__omap_dm_timer_load_start(&clkev,
-> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
-> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-> +}
-> +
->  static struct clock_event_device clockevent_gpt = {
->  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
->  	.rating		= 300,
->  	.set_next_event	= omap2_gp_timer_set_next_event,
->  	.set_mode	= omap2_gp_timer_set_mode,
-> +	.suspend	= omap_clkevt_suspend,
-> +	.resume		= omap_clkevt_resume,
->  };
->  
->  static struct property device_disabled = {
-> 
+> Passing OPP instead of just list of frequencies is the generic way this
+> is done now a days..
+
+The problem with this is that the hardware description now associates
+voltages with certain frequencies and even if they are not used by the
+Linux driver they are plain wrong.
+
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
