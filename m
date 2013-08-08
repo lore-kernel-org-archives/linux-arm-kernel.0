@@ -1,52 +1,25 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Thu, 8 Aug 2013 18:07:52 +0800
-Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
-In-Reply-To: <1375955834.368114617@f197.i.mail.ru>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <520359E9.1000600@roeck-us.net> <52036920.4050808@nvidia.com>
- <1375955834.368114617@f197.i.mail.ru>
-Message-ID: <52036DF8.8000903@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Aug 2013 12:09:54 +0200
+Subject: [PATCH] Documentation: Add device tree binding file for MOXA ART
+ SoCs interrupt controller
+In-Reply-To: <CACmBeS0wbCSU+3DJwtyN5CuX8GDCNWJxeiDq8YUrfTL8DwU_1w@mail.gmail.com>
+References: <1374137426-6763-1-git-send-email-jonas.jensen@gmail.com>
+ <20130802093559.GB2884@e106331-lin.cambridge.arm.com>
+ <CACmBeS0wbCSU+3DJwtyN5CuX8GDCNWJxeiDq8YUrfTL8DwU_1w@mail.gmail.com>
+Message-ID: <201308081209.54412.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 05:57 PM, Alexander Shiyan wrote:
->> On 08/08/2013 04:42 PM, Guenter Roeck wrote:
->>> On 08/07/2013 11:56 PM, Wei Ni wrote:
->>>> The device lm90 can be controlled by the vdd rail.
->>>> Adding the power control support to power on/off the vdd rail.
->>>> And make sure that power is enabled before accessing the device.
->>>>
->>>> Signed-off-by: Wei Ni <wni@nvidia.com>
->>>> ---
->>>>   drivers/hwmon/lm90.c |   49 +++++++++++++++++++++++++++++++++++++++++++++++++
-> [...]
->>> I consider the messages unnecessary and confusing. You are polluting the log
->>> of pretty much every PC user who has one of the supported chips in the system,
->>> and of everyone else not using regulators for this chip.
->>
->> Ok, I will remove these codes.
->> So I will write something like:
->> if (!IS_ERR(data->lm90_reg)) {
->>     ret = regulator_enable(data->lm90_reg);
->>     if (ret < 0) {
->>         dev_err();
->>         return ret;
->>     }
->> } else {
->>     if (PTR_ERR(data->lm90_reg) == -EPROBE_DEFER)
->>         return -EPRPBE_DEFER;
->>
->>         data->lm90_reg = !!IS_ERR(data->lm90_reg);
+On Thursday 08 August 2013, Jonas Jensen wrote:
+> It's true that "interrupt-mask" is redundant, DT "interrupts" hold the
+> same information. I just never found nice way to collect it from DT.
+> 
+> See registers written on line 111:
+> http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/drivers/irqchip/irq-moxart.c#n111
+> 
 
-BTW, since it may return EPROBE_DEFER, these codes should be put in the
-beginning of the probe() function, should before allocate lm90_data.
+Can't you just update the register whenever an interrupt gets mapped?
 
-> 
-> No. You do not need this line.
-> 
-> Just use in remove():
-> if (!IS_ERR(data->lm90_reg))
-> regulator_disable(data->lm90_reg);
-> 
-> ---
-> 
+All unused interrupts can start out as edge triggered.
+
+	Arnd
