@@ -1,40 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Aug 2013 12:01:08 +0100
-Subject: v3.11-rc4: OMAP1/Amstrad Delta (E3) crash
-In-Reply-To: <20130806232609.GB15014@blackmetal.musicnaut.iki.fi>
-References: <20130806232609.GB15014@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130808110108.GK23053@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu,  8 Aug 2013 12:06:23 +0100
+Subject: [PATCH] clk: samsung: Staticise non-exported symbols for PLLs
+Message-ID: <1375959983-2690-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 02:26:09AM +0300, Aaro Koskinen wrote:
-> [    0.258589] [ffff1224] *pgd=00000000, *pte=11fff0cb000001f1, *ppte=11fff00a00000000
+From: Mark Brown <broonie@linaro.org>
 
-BTW, your oops dump is interesting for another reason - the above.
-You seem to have 64-bit page table entries above.  This is produced
-by this:
+These symbols are not used outside the files they are defined in so do
+not need to be in the global namespace and they aren't declared so sparse
+warns.
 
-                pte_t *pte;
-...
-                printk(", *pte=%08llx", (long long)pte_val(*pte));
-#ifndef CONFIG_ARM_LPAE
-                printk(", *ppte=%08llx",
-                       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
-#endif
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ drivers/clk/samsung/clk-exynos4.c    | 2 +-
+ drivers/clk/samsung/clk-exynos5250.c | 2 +-
+ drivers/clk/samsung/clk-exynos5420.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-with:
-
-#define pte_val(x)      (x)
-typedef pteval_t pte_t;
-typedef u32 pteval_t;
-
-Now, this is totally legal C:
-
-	unsigned int val = 0x12345678;
-
-	printk("%08llx\n", (long long)val);
-
-and it should produce "12345678" but I'm willing to bet with your compiler
-it produces "12345678xxxxxxxx" where xxxxxxxx is just what happens to be
-sitting in some register.  IOW, I think you have a compiler bug here.  Can
-you investigate what's going on with this yourself please?
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 68f9a4a..fec319d 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -984,7 +984,7 @@ static __initdata struct of_device_id ext_clk_match[] = {
+ 	{},
+ };
+ 
+-struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
++static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+ 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+ 		APLL_CON0, "fout_apll", NULL),
+ 	[mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll",
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index df3628c..5865cef 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -517,7 +517,7 @@ static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
+ 	{ },
+ };
+ 
+-struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
++static struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
+ 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+ 		APLL_CON0, "fout_apll", NULL),
+ 	[mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index ca352695..872e13d 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -727,7 +727,7 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+ 	GATE(smmu_mscl2, "smmu_mscl2", "aclk400_mscl", GATE_IP_MSCL, 10, 0, 0),
+ };
+ 
+-struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
++static struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
+ 	[apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+ 		APLL_CON0, NULL),
+ 	[cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
+-- 
+1.8.4.rc1
