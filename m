@@ -1,46 +1,37 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 8 Aug 2013 15:40:43 +1000
-Subject: linux-next: manual merge of the mvebu tree with the i2c tree
-Message-ID: <20130808154043.fe160a4e178e87a8c1c5a045@canb.auug.org.au>
+From: markz@nvidia.com (Mark Zhang)
+Date: Thu, 8 Aug 2013 13:50:22 +0800
+Subject: [PATCH 2/5] clk: tegra: Add reset only clock node flag and COP
+In-Reply-To: <52027C9B.2030009@wwwdotorg.org>
+References: <1375874709-10438-1-git-send-email-markz@nvidia.com>
+ <1375874709-10438-2-git-send-email-markz@nvidia.com>
+ <52027C9B.2030009@wwwdotorg.org>
+Message-ID: <5203319E.6050002@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Okay, I don't know these background infos. If so, there is no reason to
+upstream this kind of patches.
 
-Today's linux-next merge of the mvebu tree got a conflict in
-Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt between
-commit f480adaf1b71 ("i2c: mv64xxx: Document the newly introduced
-allwinner compatible") from the i2c tree and commit e7c4a1e9f937 ("ARM:
-dts: mvebu: Introduce a new compatible string for mv64xxx-i2c") from the
-mvebu tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-index 6113f92,c5dd952..0000000
---- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-@@@ -4,7 -4,8 +4,9 @@@
-  Required properties :
-  
-   - reg             : Offset and length of the register set for the device
- - - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
- -for controller which support the I2C Transaction Generator
- + - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
-++                     or "marvell,mv7230-i2c" for controller which support
-++                     the I2C Transaction Generator
-   - interrupts      : The interrupt number
-  
-  Optional properties :
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/d8fa821d/attachment.sig>
+On 08/08/2013 12:58 AM, Stephen Warren wrote:
+> On 08/07/2013 05:25 AM, Mark Zhang wrote:
+>> From: Peter De Schrijver <pdeschrijver@nvidia.com>
+>>
+>> COP is a reset only clock. So this patch adds NO_CLK support
+>> then adds the COP clock.
+> 
+> Do we actually need this clock upstream yet?
+> 
+> IIRC, Prashant was working on implementing the common reset API, so I'd
+> prefer not to add any reset-only "clocks" to the clock driver, but
+> rather to simply make sure that the new reset driver exposes them.
+> 
+>> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+> 
+>>  enum tegra114_clk {
+>> -	rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
+>> +	cop = 1, rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
+> 
+> To make this change, you would also need to edit
+> include/dt-bindings/clock/tegra114-car.h. BTW, why doesn't the Tegra
+> clock driver include that file rather than defining its own enum?
+> 
