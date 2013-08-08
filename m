@@ -1,47 +1,57 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 09 Aug 2013 00:36:22 +0400
-Subject: [PATCH v2 2/3] ARM: dt: t114 dalmore: add dt entry for nct1008
-In-Reply-To: <1375944991-29182-3-git-send-email-wni@nvidia.com>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <1375944991-29182-3-git-send-email-wni@nvidia.com>
-Message-ID: <52040146.7060703@cogentembedded.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Aug 2013 14:37:14 -0600
+Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1375993920.22740.9.camel@linux-builds1>
+References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
+ <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
+Message-ID: <5204017A.1040607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 08/08/2013 02:32 PM, Dinh Nguyen wrote:
+> On Thu, 2013-08-08 at 14:14 -0600, Stephen Warren wrote:
+>> On 08/05/2013 02:43 PM, dinguyen at altera.com wrote:
+>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>
+>>> Add bindings for SD/MMC for SOCFPGA.
+>>> Add "syscon" to the "altr,sys-mgr" binding.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+>>> new file mode 100644
+>>> index 0000000..dc14922
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+>>> @@ -0,0 +1,48 @@
+>>> +* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
+>>> +  Storage Host Controller
+>>> +
+>>> +Required Properties:
+>>> +
+>>> +* compatible: should be
+>>> +	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
+>>> +	  specific extensions.
+>>> +
+>>> +* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
+>>> +  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
+>>> +  value is fixed at 3, which means parent_clock/4.
+>>
+>> This feels like something that should be represented using the common
+>> clock API; a driver should query the rate of its input clock, and then
+>> calculate the MMC block's internal divider based on that (perhaps also
+>> call clk_set_rate() on the input clock?).
+> 
+> This means a change to the dw_mmc driver, which I can look into for the
+> next round? I have promised Pawel to consolidate the bindings for both
+> exynos and socfpga in the next round already. I will also look into
+> using the common clock API for the MMC as well. 
+> 
+> This patch is the only thing that is preventing from SD/MMC working for
+> SOCFPGA in the mainline, can I get your Ack if I look into doing this
+> for 3.13 for both the exynos and socfpga driver, and address your latter
+> comments?
 
-On 08/08/2013 10:56 AM, Wei Ni wrote:
-
-> Enable thermal sensor nct1008 for t114 dalmore.
-
-> Signed-off-by: Wei Ni <wni@nvidia.com>
-> ---
->   arch/arm/boot/dts/tegra114-dalmore.dts |   10 +++++++++-
->   1 file changed, 9 insertions(+), 1 deletion(-)
-
-> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-> index b5a42f0..9d4d2b2 100644
-> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
-> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-> @@ -738,6 +738,14 @@
->   			realtek,ldo1-en-gpios =
->   				<&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
->   		};
-> +
-> +		nct1008 {
-
-    ePAPR [1] says: "the name of a node should be somewhat generic, reflecting 
-the function of the device and not its precise programming model". So I 
-suggest "thermal"
-
-> +			compatible = "onnn,nct1008";
-> +			reg = <0x4c>;
-> +			vdd-supply = <&palmas_ldo6_reg>;
-> +			interrupt-parent = <&gpio>;
-> +			interrupts = <TEGRA_GPIO(O, 4) IRQ_TYPE_LEVEL_LOW>;
-> +		};
->   	};
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+The problem is that if the binding supports or requires that property
+now, it has to at least support it forever. Given that we're getting
+serious about DT ABI now, we should be only introducing DT bindings that
+we believe are complete and corrrect, rather than bindings which we
+actively expect to be temporary and to change incompatibly later.
