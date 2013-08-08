@@ -1,100 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 08 Aug 2013 17:19:43 +0200
-Subject: [PATCH 3/5] ARM: mach-mvebu: remove redundant DT parsing and
- validation
-In-Reply-To: <5203B13F.4060009@arm.com>
-References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374579164-30255-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <5203B13F.4060009@arm.com>
-Message-ID: <5203B70F.1050109@free-electrons.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 08 Aug 2013 08:21:48 -0700
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
+In-Reply-To: <20130808130840.GC6427@sirena.org.uk>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-2-git-send-email-wni@nvidia.com>
+ <20130808110136.GA6427@sirena.org.uk> <52038035.7030803@roeck-us.net>
+ <20130808130840.GC6427@sirena.org.uk>
+Message-ID: <5203B78C.7010101@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 16:54, Sudeep KarkadaNagesha wrote:
-> On 23/07/13 12:32, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> arm_dt_init_cpu_maps parses the device tree, validates and sets the
->> cpu_possible_mask appropriately. It is unnecessary to do another DT
->> parse to get the number of cpus, use num_possible_cpus instead.
->>
-> Hi Gregory,
-> 
-> Does this change look fine ?
+On 08/08/2013 06:08 AM, Mark Brown wrote:
+> On Thu, Aug 08, 2013 at 04:25:41AM -0700, Guenter Roeck wrote:
+>> On 08/08/2013 04:01 AM, Mark Brown wrote:
+>
+>>> That said if you *are* going to do this you should request the
+>>> regulator using devm_regulator_get_optional(), this is intended to
+>>> support things that don't need regulators (though that's not the case
+>>> here).
+>
+>> The lm90 driver works perfectly fine without regulator.
+>
+> I'd be most surprised if the device worked without power, if the driver
+> fails to get and enable a regulator for it then that's not great
+> (especially if it does so silently).
+>
+Correct, but it appears that the driver magically worked for a long time
+without it.
 
-Yes it is a nice cleanup.
+Is it guaranteed that the driver keeps working for all cases where
+regulator support is enabled in the kernel, and where it used to work
+so far without mandating the existence of this specific regulator ?
+My main concern is having to deal with complaints that the driver stopped
+working for no good reason.
 
-and I have just test it on an Armada XP DB board.
+In this context, is it common practice to name such regulators "vdd"
+or similar ? What if there are multiple LM90 or compatible chips
+in a system, connected to different power rails ? Who determines
+if the regulator is supposed to be named "vdd" or "vcc" or anything
+else, and to which power rails it is actually connected ? How can
+and does one guarantee that "vdd" is the correct regulator to use
+for all systems ? What if some other driver requests "vdd", but the chip
+it supports happens to be connected to a different power rail ?
 
-So you can add
+Sorry for my ignorance in that matter. I did browse through Documentation/power,
+but did not find a clear answer.
 
-my Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
+> Note that the regulator API is written to stub itself out if not
+> enabled, the code should be able to assume that it's there.
+>
+I am aware of that; this is why the driver should not dump an error message
+if the function returns NULL and bail out, as it did originally.
 
-> If OK, not sure if you prefer to pick up this or want me to send to
-> arm-soc guys.
-
-I think it is better if we pick up this patch as it only touch a file
-belonging to mvebu.
-
-Jason,
-do you agree to pick it up and then push it to in your next (and maybe
-last) pull request?
-
-Thanks,
-
-> 
-> Regards,
-> Sudeep
-> 
->> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> ---
->>  arch/arm/mach-mvebu/platsmp.c | 19 +------------------
->>  1 file changed, 1 insertion(+), 18 deletions(-)
->>
->> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
->> index ce81d30..2e4508a 100644
->> --- a/arch/arm/mach-mvebu/platsmp.c
->> +++ b/arch/arm/mach-mvebu/platsmp.c
->> @@ -87,28 +87,11 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>  
->>  static void __init armada_xp_smp_init_cpus(void)
->>  {
->> -	struct device_node *np;
->> -	unsigned int i, ncores;
->> +	unsigned int ncores = num_possible_cpus();
->>  
->> -	np = of_find_node_by_name(NULL, "cpus");
->> -	if (!np)
->> -		panic("No 'cpus' node found\n");
->> -
->> -	ncores = of_get_child_count(np);
->>  	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
->>  		panic("Invalid number of CPUs in DT\n");
->>  
->> -	/* Limit possible CPUs to defconfig */
->> -	if (ncores > nr_cpu_ids) {
->> -		pr_warn("SMP: %d CPUs physically present. Only %d configured.",
->> -			ncores, nr_cpu_ids);
->> -		pr_warn("Clipping CPU count to %d\n", nr_cpu_ids);
->> -		ncores = nr_cpu_ids;
->> -	}
->> -
->> -	for (i = 0; i < ncores; i++)
->> -		set_cpu_possible(i, true);
->> -
->>  	set_smp_cross_call(armada_mpic_send_doorbell);
->>  }
->>  
->>
-> 
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Guenter
