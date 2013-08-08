@@ -1,54 +1,40 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 08 Aug 2013 18:41:49 +0900
-Subject: [PATCH v9 16/16] iommu/exynos: return 0 if iommu_attach_device()
- successes
-Message-ID: <003401ce941b$8113a820$833af860$@samsung.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 08 Aug 2013 11:43:24 +0200
+Subject: [PATCH 17/20] ASoC: pxa: pxa-pcm-lib: switch over to
+ snd-soc-dmaengine-pcm
+In-Reply-To: <20130808093628.GS6427@sirena.org.uk>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-18-git-send-email-zonque@gmail.com>
+ <20130807160743.GI6427@sirena.org.uk> <5202718F.2050507@gmail.com>
+ <20130807163258.GL6427@sirena.org.uk> <52035463.1030909@gmail.com>
+ <52035A81.6090903@metafoo.de> <52035EF0.1030208@gmail.com>
+ <20130808093628.GS6427@sirena.org.uk>
+Message-ID: <5203683C.2000904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iommu_attach_device() against exynos-iommu positive integer on success
-if the caller calls iommu_attach_device() with the same iommu_domain
-multiple times without call to iommu_detach_device() to inform the
-caller how many calls to iommu_detach_device() to really detach iommu.
+On 08.08.2013 11:36, Mark Brown wrote:
+> On Thu, Aug 08, 2013 at 11:03:44AM +0200, Daniel Mack wrote:
+>> On 08.08.2013 10:44, Lars-Peter Clausen wrote:
+> 
+>>> There is intentionally no dependency on ASoC for the soc-dmaengine-pcm code, 
+>>> though since I wasn't sure whether there was ever going to be a userside 
+>>> outside of ASoC the coded ended up in ASoC folder. It shouldn't be a problem to 
+>>> make it available to all of ALSA.
+> 
+>> Ok, great. I queued a patch for that. Will be part of my next spin, or,
+>> in case the series doesn't make it in time, I'll re-post all the patches
+>> that can be applied independently up front.
+> 
+> You probably don't need to move it, just adding a select (which should
+> ignore Kconfig dependencies) from the non-ASoC PXA stuff ought to do the
+> trick.
 
-However the convention of the return value of success of common API is
-zero, this patch makes iommu_attach_device() call against exynos-iommu
-always return zero if the given device is successfully attached to
-the given iommu_domain even though it is already attached to the same
-iommu_domain.
+Hmm. We have this big "if SND_SOC" in sound/soc/Kconfig which prevent
+that symbol to be selected. In fact, SND_PXA2XX_LIB already selected
+SND_SOC_DMAENGINE_PCM, but that didn't help.
 
-Reviewed-by: Grant Grundler <grundler@chromium.org>
-Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
----
- drivers/iommu/exynos-iommu.c |   13 +++++++------
- 1 files changed, 7 insertions(+), 6 deletions(-)
+And code that is not ASoC specific should live outside of sound/soc, no?
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 2d16fc0..d959e95 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -891,15 +891,16 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 
- 	spin_unlock_irqrestore(&priv->lock, flags);
- 
--	if (ret < 0)
-+	if (ret < 0) {
- 		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %#lx\n",
- 				__func__, __pa(priv->pgtable));
--	else
--		dev_dbg(dev, "%s: Attached IOMMU with pgtable 0x%lx%s\n",
--					__func__, __pa(priv->pgtable),
--					(ret == 0) ? "" : ", again");
-+		return ret;
-+	}
- 
--	return ret;
-+	dev_dbg(dev, "%s: Attached IOMMU with pgtable 0x%lx%s\n",
-+		__func__, __pa(priv->pgtable), (ret == 0) ? "" : ", again");
-+
-+	return 0;
- }
- 
- static void exynos_iommu_detach_device(struct iommu_domain *domain,
--- 
-1.7.2.5
+
+Daniel
