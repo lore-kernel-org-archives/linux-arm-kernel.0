@@ -1,173 +1,127 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 8 Aug 2013 10:23:11 +0800
-Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
-In-Reply-To: <520279FC.1000006@wwwdotorg.org>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-4-git-send-email-josephl@nvidia.com>
- <51F6F209.2090309@wwwdotorg.org>
- <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
- <51FC1751.9010401@wwwdotorg.org>
- <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
- <51FFDA20.6050403@wwwdotorg.org>  <51FFE363.4080603@wwwdotorg.org>
- <1375780249.2261.63.camel@jlo-ubuntu-64.nvidia.com>
- <52014258.9070602@wwwdotorg.org>
- <1375866749.8111.57.camel@jlo-ubuntu-64.nvidia.com>
- <520279FC.1000006@wwwdotorg.org>
-Message-ID: <1375928591.1758.66.camel@jlo-ubuntu-64.nvidia.com>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Wed, 7 Aug 2013 19:30:13 -0700
+Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
+ EMIF spec
+In-Reply-To: <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
+Message-ID: <CA+Bv8XaGf=BGNX1=DKLQTwiFkisvkt3H-J3Wjy5dhqb1z9NtVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-08 at 00:46 +0800, Stephen Warren wrote:
-> On 08/07/2013 03:12 AM, Joseph Lo wrote:
-> > On Wed, 2013-08-07 at 02:37 +0800, Stephen Warren wrote:
-> >> On 08/06/2013 03:10 AM, Joseph Lo wrote:
-> >>> On Tue, 2013-08-06 at 01:39 +0800, Stephen Warren wrote:
-> >>>> On 08/05/2013 11:00 AM, Stephen Warren wrote:
-> >>>>> On 08/05/2013 02:02 AM, Joseph Lo wrote:
-> >>>>>> On Sat, 2013-08-03 at 04:32 +0800, Stephen Warren wrote:
-> >>>>>>> On 08/02/2013 02:09 AM, Joseph Lo wrote:
-> >>>>>>>> On Tue, 2013-07-30 at 06:51 +0800, Stephen Warren wrote:
-> >>>>>>>>> On 07/26/2013 03:15 AM, Joseph Lo wrote:
-> > [snip]
-[snip]
-> >> In tegra30_lp1_reset(), we can't use the same technique (a write to
-> >> register 3) to restore the clock source for both G and LP clusters,
-> >> since the values we need to write to those registers to re-select their
-> >> clock source is different.
-> >>
-> >> however, on Tegra30, there really is only one register, so we can use
-> >> that to both switch to clk_m/clk_s, /and/ to switch back.
-> >>
-> >> That all explains the following part of patch 7/8, which disables the
-> >> clock register restore path except on Tegra30 where it will work:
-> >>
-> >>> -	mov32	r4, ((1 << 28) | (0x8))	@ burst policy is PLLX
-> >>> -	str	r4, [r0, #CLK_RESET_CCLK_BURST]
-> >>> +	cmp	r10, #TEGRA30
-> >>> +	movweq	r4, #:lower16:((1 << 28) | (0x8))	@ burst policy is PLLX
-> >>> +	movteq	r4, #:upper16:((1 << 28) | (0x8))
-> >>> +	streq	r4, [r0, #CLK_RESET_CCLK_BURST]
-> >
-> > OK. The burst policy of CPU clock has 5 different states (STDBY, IDLE,
-> > RUN, IRQ and FIQ). The SW only can set up the clock source of each
-> > state. The switching to different state was controlled by HW.
-> > 
-> > So the Tegra30 code here was set up the clock source of IDLE state only
-> > (the CPU runs in this state after resume) to make the performance
-> > better. But It had no idea about the clock sources of the other states.
-> > It still needs clock driver to take care of that.
-> > 
-> > The clock source id (0x8) means PLLX_OUT0 in Tegra30. In Tegra114, it
-> > means PLLX_OUT0_LJ (low jitter). It's not available at this moment. I
-> > can switch it to PLLX_OUT0 (0xe) for Tegra114 too. The code may like
-> > below.
-> > 
-> >> -     mov32   r4, ((1 << 28) | (0x8)) @ burst policy is PLLX
-> >> -     str     r4, [r0, #CLK_RESET_CCLK_BURST]
-> >> +     cmp     r10, #TEGRA30
-> >> +     movweq  r4, #:lower16:((1 << 28) | (0x8))
-> >> +     movteq  r4, #:upper16:((1 << 28) | (0x8))
-> >> +	movwne  r4, #:lower16:((1 << 28) | (0xe))
-> >> +	movteq  r4, #:upper16:((1 << 28) | (0xe))
-> 
-> I assume that should be movtne.
-Ah, yes.
-> 
-> >> +     str	r4, [r0, #CLK_RESET_CCLK_BURST]
-> > 
-> > I had tested this code before I sent this series. It didn't impact or
-> > improve the resuming performance. So I removed them.
-> > Do you want me to add them back?
-> 
-> I think adding that code back would make sense. It would mean the code
-> works fundamentally the same way for all SoCs.
-OK.
-> 
-> BTW, you mentioned that LP1 resume takes 10-15 seconds on Dalmore. Are
-> you sure this isn't because the above code is missing, and hence the CPU
-> keeps running at 32KHz or the crystal speed, since nothing restores the
-> CPU clock source until much later, when the syscore op runs?
-It's due to the long time that SDRAM leaves self-refresh. Looks
-something that related to BCT not be flashed during the flashing
-process. Please also check the internal bug 1314918.
-> 
-> >> However, none of this explains why the CPU clock restore logic on
-> >> Tegra114 needs to be a syscore_op, rather than simply having
-> >> tegra30_lp1_reset() execute some Tegra114-specific code.
-> >>
-> >> Re-writing the part of the patch I quoted above in C, it looks like:
-> >>
-> >> if (soc is tegra30)
-> >>     write to CLK_RESET_CCLK_BURST to select pllx
-> >>
-> >> Instead of making that code do nothing on Tegra114, why can't that code be:
-> >>
-> >> if (soc is tegra30)
-> >>     write to CLK_RESET_CCLK_BURST to re-select pllx
-> >> else
-> >>     write to G-cluster-specific register to restore saved value
-> >>     write to LP-cluster-specific register to restore saved value
-> >>
-> >> or:
-> >>
-> >> if (soc is tegra30)
-> >>     write to CLK_RESET_CCLK_BURST to re-select pllx
-> >> else
-> >>     write to G-cluster-specific register to re-select pllx/dfll/...
-> >>     write to LP-cluster-specific register to restore ...
-> >>
-> > Hope the explanation above is enough for you. The low level code had no
-> > idea of clock source of each CPU state in BURST_POLICY register. It
-> > needs to be done by clk driver itself.
-> 
-> I still have absolutely no idea why Tegra30 and Tegra114 are different.
-> 
-> You mentioned something about this low-level code only manipulating the
-> IDLE state, and the clock driver needing to restore the other 4 states.
-> This raises yet more questions:
-> 
-> 1) Do we not need to restore the other 4 states on Tegra30? If not, why
-> not? If we do, presumably Tegra30 (and Tegra20?) need to the syscore_op
-> this patch series adds to Tegra114 only? If we don't, then why does
-> Tegra114 have to restore them?
-We need to restore all of them for all Tegra chips. For Tegra20/30, we
-had done it in the tegra_cpu_car_ops.suspend/resume. For Tegra114, the
-patch was here.
+On Tue, Aug 6, 2013 at 10:49 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>
+> SDRAM controller on AM33XX requires that a modification of certain
+> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
+> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
+> scenario arises when entering a low power state like DeepSleep.
+> To ensure that the read is not from a cached region we reserve
+> some memory during bootup using the arm_memblock_steal() API.
+>
+> A subsequent patch will pass along the location of the reserved
+> memory location to the AM335x suspend handler which modifies the
+> PWR_MGMT_CTRL register in the EMIF.
+>
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 
-The other reason is:
-1) The PLLX is the main CPU clock source in Tegra20/30. We can restore
-it ASAP to get a better performance.
-2) For Tegra114, the PLLX is the CPU clock source when CPU runs at low
-rates. When CPU in high rate, it uses DFLL as clock source. So it
-depends on what the clock source of the CPU when it goes into suspend.
-And the DFLL has its own resume code, it needs to be restored before the
-CPU uses it as clock source again. It makes the CPU clock restore
-sequence like this.
+Reviewed-by: Russ Dill <russ.dill@ti.com>
 
-> 
-> 2) What triggers the HW to switch from IDLE to RUN state? 
-I also want to know more detail about it. The TRM only said it decided
-by HW and gave an example about when switching to IRQ or FIQ state.
-> In other
-> words, I think you're saying that the existing Tegra30 code:
-> 
-> 	mov32	r4, ((1 << 28) | (0x8))	@ burst policy is PLLX
-> 	str	r4, [r0, #CLK_RESET_CCLK_BURST]
-> 
-> doesn't change the clock rate right away. When does it change?
-The code before this is the PLLX re-enable code. Then it switches to
-PLLX. The rate is still kept the same when it suspended. The next rate
-change after resume would be happened in the CPUfreq driver.
-> 
-> Related, when tegra30_switch_cpu_to_clk32k() sets the CPU clock source
-> for the IDLE state to clk_s, when does that switch actually take place?
-After the PLLs was disabled, only SCLK switched to CLK_S, the CPU and
-MSELECT still keep in CLK_M. Because the CPU would be powered off
-immediately.
-> That function appears to assume it happens immediately, since it
-> immediately disables the PLLs that might have been the previous CPU
-> clock source. Perhaps this is what the MSELECT register writes do?  
-Yes, switching them to the Oscillator before disabling the PLLs.
-> I
-> guess not since there's only 1 MSELECT write in tegra_lp1_reset() and
-> two changes of CPU clock source.
+> ---
+>  arch/arm/mach-omap2/board-generic.c |    2 +-
+>  arch/arm/mach-omap2/common.c        |   28 ++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/common.h        |    4 ++++
+>  arch/arm/mach-omap2/io.c            |    1 +
+>  4 files changed, 34 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index be5d005..aed750c 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -156,7 +156,7 @@ static const char *am33xx_boards_compat[] __initdata = {
+>  };
+>
+>  DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+> -       .reserve        = omap_reserve,
+> +       .reserve        = am33xx_reserve,
+>         .map_io         = am33xx_map_io,
+>         .init_early     = am33xx_init_early,
+>         .init_irq       = omap_intc_of_init,
+> diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
+> index 2dabb9e..756586f 100644
+> --- a/arch/arm/mach-omap2/common.c
+> +++ b/arch/arm/mach-omap2/common.c
+> @@ -15,6 +15,8 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/platform_data/dsp-omap.h>
+> +#include <asm/memblock.h>
+> +#include <asm/mach/map.h>
+>
+>  #include "common.h"
+>  #include "omap-secure.h"
+> @@ -34,3 +36,29 @@ void __init omap_reserve(void)
+>         omap_secure_ram_reserve_memblock();
+>         omap_barrier_reserve_memblock();
+>  }
+> +
+> +static phys_addr_t am33xx_paddr;
+> +static u32 am33xx_size;
+> +
+> +/* Steal one page physical memory for uncached read DeepSleep */
+> +void __init am33xx_reserve(void)
+> +{
+> +       am33xx_size = ALIGN(PAGE_SIZE, SZ_1M);
+> +       am33xx_paddr = arm_memblock_steal(am33xx_size, SZ_1M);
+> +}
+> +
+> +void __iomem *am33xx_dram_sync;
+> +
+> +void __init am33xx_dram_sync_init(void)
+> +{
+> +       struct map_desc dram_io_desc[1];
+> +
+> +       dram_io_desc[0].virtual = __phys_to_virt(am33xx_paddr);
+> +       dram_io_desc[0].pfn = __phys_to_pfn(am33xx_paddr);
+> +       dram_io_desc[0].length = am33xx_size;
+> +       dram_io_desc[0].type = MT_MEMORY_SO;
+> +
+> +       iotable_init(dram_io_desc, ARRAY_SIZE(dram_io_desc));
+> +
+> +       am33xx_dram_sync = (void __iomem *) dram_io_desc[0].virtual;
+> +}
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index dfcc182..6b8ef74 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -294,6 +294,10 @@ struct omap2_hsmmc_info;
+>  extern int omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers);
+>  extern void omap_reserve(void);
+>
+> +extern void am33xx_reserve(void);
+> +extern void am33xx_dram_sync_init(void);
+> +extern void __iomem *am33xx_dram_sync;
+> +
+>  struct omap_hwmod;
+>  extern int omap_dss_reset(struct omap_hwmod *);
+>
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index 4a3f06f..3ad7543 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -322,6 +322,7 @@ void __init ti81xx_map_io(void)
+>  void __init am33xx_map_io(void)
+>  {
+>         iotable_init(omapam33xx_io_desc, ARRAY_SIZE(omapam33xx_io_desc));
+> +       am33xx_dram_sync_init();
+>  }
+>  #endif
+>
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
