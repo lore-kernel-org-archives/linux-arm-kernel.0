@@ -1,251 +1,109 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 09 Aug 2013 01:03:05 +0200
-Subject: [PATCH v9 14/16] iommu/exynos: add support for power management
- subsystems.
-In-Reply-To: <003201ce941b$6e5a90e0$4b0fb2a0$@samsung.com>
-References: <003201ce941b$6e5a90e0$4b0fb2a0$@samsung.com>
-Message-ID: <1949492.N82v2nAcIY@flatron>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 08 Aug 2013 16:04:08 -0700
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <52040E67.4050402@ti.com> (Nishanth Menon's message of "Thu, 8
+ Aug 2013 16:32:23 -0500")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
+ <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
+ <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
+ <52040E67.4050402@ti.com>
+Message-ID: <87pptndbtj.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi KyongHo,
+Nishanth Menon <nm@ti.com> writes:
 
-nit: Please drop the trailing dot at the end of patch subject.
+> On 08/08/2013 04:14 PM, Kevin Hilman wrote:
+>> Dave Gerlach <d-gerlach@ti.com> writes:
+>>
+>>> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
+>>>> $subject and patch don't match.
+>>>>
+>>>> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
+>>>>> On 08/08/2013 03:45 AM, Russ Dill wrote:
+>>>>>>     In reference to
+>>>>>> the M3 handling it, the M3 wouldn't know which devices have a driver
+>>>>>> bound and which don't.
+>>>>> Does it need to? M3 firmware can pretty much define "I will force
+>>>>> the device into low power state, and if the drivers dont handle
+>>>>> things properly, fix the darned driver". M3 behavior should be
+>>>>> considered as a "hardware" as far as Linux running on MPU is
+>>>>> concerned, and firmware helps change the behavior by accounting for
+>>>>> SoC quirks. *if* we have ability to handle this in the firmware,
+>>>>> there is no need to carry this in Linux.
+>>>>>
+>>>> I agree with Nishant. I don't like this patch and IIRC, I gave same
+>>>> comment in the last version. Linux need not know about all such firmware
+>>>> quirks. Also all these M3 specific stuff, should be done somewhere
+>>>> else. Probably having a small M3 driver won't be a bad idea.
+>>>
+>>> I am not opposed to doing it this way and letting the M3 firmware
+>>> handle idling these modules, however the one concern raised in the
+>>> last series is that an approach that does not acknowledge drivers will
+>>> hide driver PM bugs. I suppose as long as I make sure to document that
+>>> the devices are being idled by the M3 firmware this may not be an
+>>> issue. I will look into implementing this.
+>>
+>> No, please don't start idling devices in firmware that are otherwise
+>> managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
+>> these devices, it should manage their bugs too.
+>
+>>
+>> This is not just about idling devices.  This is about handling broken IP
+>> blocks whose power-on reset state does not allow the the powerdomain to
+>> reach its target state.  That's just bad hardware design.
+>
+> Right, this is where M3 can help -> provide a consistent state for
+> linux kernel to work with. by the fact that we want to keep majority
+> of the power code inside master CPU, we are just letting M3 help us
+> with nothing major at all.. 
 
-On Thursday 08 of August 2013 18:41:17 Cho KyongHo wrote:
-> This adds support for Advance Power Management and Runtime Power
-> Management.
+heh, I would say HW design bugs like this are more than "nothing major
+at all." :)  
 
-This patch adds support for system-wide and runtime power management.
+> tiny stuff like these can help "fix" the hardware design quirks by
+> hiding it behind the firmware and modifying the hardware behavior.
 
-> Since System MMU is located in the same local power domain of its
-> master H/W, System MMU must be initialized before it is working if
-> its power domain was ever turned off. TLB invalidation according to
-> unmapping on page tables must also be performed while power domain is
-> turned on.
-> 
-> This patch ensures that resume and runtime_resume(restore_state)
-> functions in this driver is called before the calls to resume and
-> runtime_resume callback functions in the drivers of master H/Ws.
-> Likewise, suspend and runtime_suspend(save_state) functions in this
-> driver is called after the calls to suspend and runtime_suspend in the
-> drivers of master H/Ws.
-> 
-> In order to get benefit of this support, the master H/W and its System
-> MMU must resides in the same power domain in terms of Linux kernel. If
-> a master H/W does not use generic I/O power domain, its driver must
-> call iommu_attach_device() after its local power domain is turned on,
-> iommu_detach_device before turned off.
+I disagree here.  I'm a firmware minimalist, and hiding bugs like this
+in the firmware is wrong when Linux is otherwise managing these devices.
+It also imposes criteria on the firmware of future SoCs that doesn't
+belong there either.  IMO, the only stuff the firmware should do is what
+Linux *cannot* do.
 
-I don't get the point of this last paragraph. What a power domain can be 
-in other terms? Is there any other way to support power domains on Exynos 
-than generic power domains?
+Remember, this only needs to happen when there isn't a driver for these
+devices.  Should we communicate to the firmware that the OS has no
+driver, so please enable the hack?  I think not.
 
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c |  235
-> +++++++++++++++++++++++++++++++++++++++++- 1 files changed, 231
-> insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 9e64483..56aead9 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -28,6 +28,7 @@
->  #include <linux/export.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/pm_domain.h>
->  #include <linux/notifier.h>
-> 
->  #include <asm/cacheflush.h>
-> @@ -186,6 +187,7 @@ struct sysmmu_drvdata {
->  	int activations;
->  	rwlock_t lock;
->  	struct iommu_domain *domain;
-> +	bool runtime_active;
->  	unsigned long pgtable;
->  	void __iomem *sfrbases[0];
->  };
-> @@ -438,7 +440,8 @@ static bool __sysmmu_disable(struct sysmmu_drvdata
-> *data) data->pgtable = 0;
->  		data->domain = NULL;
-> 
-> -		__sysmmu_disable_nocount(data);
-> +		if (data->runtime_active)
-> +			__sysmmu_disable_nocount(data);
-> 
->  		dev_dbg(data->sysmmu, "Disabled\n");
->  	} else  {
-> @@ -505,7 +508,8 @@ static int __sysmmu_enable(struct sysmmu_drvdata
-> *data, data->pgtable = pgtable;
->  		data->domain = domain;
-> 
-> -		__sysmmu_enable_nocount(data);
-> +		if (data->runtime_active)
-> +			__sysmmu_enable_nocount(data);
-> 
->  		dev_dbg(data->sysmmu, "Enabled\n");
->  	} else {
-> @@ -609,7 +613,7 @@ static void sysmmu_tlb_invalidate_entry(struct
-> device *dev, unsigned long iova) data =
-> dev_get_drvdata(client->sysmmu[i]);
-> 
->  		read_lock_irqsave(&data->lock, flags);
-> -		if (is_sysmmu_active(data)) {
-> +		if (is_sysmmu_active(data) && data->runtime_active) {
->  			int i;
->  			clk_enable(data->clk_master);
->  			for (i = 0; i < data->nsfrs; i++)
-> @@ -637,7 +641,8 @@ void exynos_sysmmu_tlb_invalidate(struct device
-> *dev) data = dev_get_drvdata(client->sysmmu[i]);
-> 
->  		read_lock_irqsave(&data->lock, flags);
-> -		if (is_sysmmu_active(data)) {
-> +		if (is_sysmmu_active(data) &&
-> +				data->runtime_active) {
+> I know it breaks the purity of role, but as the
+> next evolution, we might want to consider M3 something like an
+> "accelerator" for power management activity.. (not saying it is that
+> fast.. but conceptually).
 
-nit: The whole if condition fits into single line.
+Yes, it breaks the purity of role, and makes it hard to maintain and
+extend to future SoCs.  As a maintainer, that's a red flag.  IMO, the
+roles need to be kept clear.  The M3 manages some devices and the
+interconnect that MPU/Linux cannot, the rest are managed by Linux.
 
->  			int i;
->  			for (i = 0; i < data->nsfrs; i++) {
->  				clk_enable(data->clk_master);
-> @@ -711,6 +716,8 @@ static int __init exynos_sysmmu_probe(struct
-> platform_device *pdev) }
->  	}
-> 
-> +	pm_runtime_enable(dev);
-> +
->  	data->sysmmu = dev;
-> 
->  	data->clk = devm_clk_get(dev, "sysmmu");
-> @@ -736,6 +743,8 @@ static int __init exynos_sysmmu_probe(struct
-> platform_device *pdev) return ret;
->  	}
-> 
-> +	data->runtime_active = !pm_runtime_enabled(dev);
-> +
->  	rwlock_init(&data->lock);
-> 
->  	platform_set_drvdata(pdev, data);
-> @@ -744,6 +753,34 @@ static int __init exynos_sysmmu_probe(struct
-> platform_device *pdev) return ret;
->  }
-> 
-> +#ifdef CONFIG_PM_SLEEP
-> +static int sysmmu_suspend(struct device *dev)
-> +{
-> +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-> +	unsigned long flags;
-> +	read_lock_irqsave(&data->lock, flags);
-> +	if (is_sysmmu_active(data) &&
-> +		(!pm_runtime_enabled(dev) || data->runtime_active))
-> +		__sysmmu_disable_nocount(data);
-> +	read_unlock_irqrestore(&data->lock, flags);
-> +	return 0;
-> +}
-> +
-> +static int sysmmu_resume(struct device *dev)
-> +{
-> +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-> +	unsigned long flags;
-> +	read_lock_irqsave(&data->lock, flags);
-> +	if (is_sysmmu_active(data) &&
-> +		(!pm_runtime_enabled(dev) || data->runtime_active))
-> +		__sysmmu_enable_nocount(data);
-> +	read_unlock_irqrestore(&data->lock, flags);
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(sysmmu_pm_ops, sysmmu_suspend, sysmmu_resume);
-> +
->  #ifdef CONFIG_OF
->  static struct of_device_id sysmmu_of_match[] __initconst = {
->  	{ .compatible	= "samsung,exynos4210-sysmmu", },
-> @@ -756,6 +793,7 @@ static struct platform_driver exynos_sysmmu_driver
-> __refdata = { .driver	= {
->  		.owner		= THIS_MODULE,
->  		.name		= "exynos-sysmmu",
-> +		.pm		= &sysmmu_pm_ops,
->  		.of_match_table	= of_match_ptr(sysmmu_of_match),
->  	}
->  };
-> @@ -1141,6 +1179,163 @@ static int __init exynos_iommu_init(void)
->  }
->  subsys_initcall(exynos_iommu_init);
-> 
-> +#ifdef CONFIG_PM_SLEEP
-> +static int sysmmu_pm_genpd_suspend(struct device *dev)
-> +{
-> +	struct exynos_iommu_client *client = dev->archdata.iommu;
-> +	int ret = 0;
-> +	int i;
-> +
-> +	for (i = 0; i < client->num_sysmmu; i++) {
-> +		ret = pm_generic_suspend(client->sysmmu[i]);
-> +		if (ret)
-> +			break;
-> +	}
-> +
-> +	if (!ret)
-> +		ret = pm_generic_suspend(dev);
-> +
-> +	if (ret) {
-> +		int j;
-> +
-> +		for (j = 0; j < i; j++)
-> +			pm_generic_resume(client->sysmmu[j]);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int sysmmu_pm_genpd_resume(struct device *dev)
-> +{
-> +	struct exynos_iommu_client *client = dev->archdata.iommu;
-> +	int ret = 0;
-> +	int i;
-> +
-> +	for (i = 0; i < client->num_sysmmu; i++) {
-> +		ret = pm_generic_resume(client->sysmmu[i]);
-> +		if (ret)
-> +			break;
+>> That being said, IMO, the kernel (specifically omap_device) should
+>> handle this, and it should be rather easy to do in the omap_device layer
+>> and keep the SoC suspend/resume core code simple and ignorant of these
+>> "quirks."
+>>
+>> AFAICT, there's no reason these quirks need to be dealt with immediatly
+>> on suspend.  A slight delay should be fine, as long as it's before the
+>> next suspend/idle attempt, right?
+>>
+>> Given that, what we need to do (and by we, I mean you) is to flag all
+>> broken IP blocks, and let omap_device handle them in a suspend/resume
+>> notifier (c.f. register_pm_notifier() and PM_POST_SUSPEND.)
+>
+> yes - that is the alternate that comes to mind.
 
-Error handling here can be cleaned up a lot.
+In the earlier reviews of this series (many months ago now), I
+complained about the presence of this device specific handling in the
+core MPU PM code.  I'm somewhat troubled by the fact that nobody explored
+alternatives that so easily come to mind.
 
-s/break/goto err_suspend/
-
-> +	}
-> +
-> +	if (!ret)
-
-Now you can drop this check.
-
-> +		ret = pm_generic_resume(dev);
-
-	ret = pm_generic_resume(dev);
-	if (ret)
-		goto err_suspend;
-
-	return 0;
-
-> +
-
-err_suspend:
-> +	if (ret) {
-
-This check can be dropped here as well now.
-
-> +		int j;
-> +
-> +		for (j = 0; j < i; j++)
-> +			pm_generic_suspend(client->sysmmu[j]);
-> +	}
-> +
-> +	return ret;
-> +}
-> +#endif
-
-Best regards,
-Tomasz
+Kevin
