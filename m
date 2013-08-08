@@ -1,32 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 8 Aug 2013 11:31:24 +0100
-Subject: [PATCH V3 2/3] ASoC: Samsung: I2S: Add quirks as driver data in
- I2S
-In-Reply-To: <CAAgF-BdpsgQk8myq7OOk5zJ8Zxy+J6LUPb3-d40+iE2aNwdwDw@mail.gmail.com>
-References: <1375865122-5258-1-git-send-email-padma.v@samsung.com>
- <1375865122-5258-3-git-send-email-padma.v@samsung.com>
- <2116389.OxrlCQ9LXd@amdc1227>
- <CAAgF-BdpsgQk8myq7OOk5zJ8Zxy+J6LUPb3-d40+iE2aNwdwDw@mail.gmail.com>
-Message-ID: <20130808103124.GU6427@sirena.org.uk>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 8 Aug 2013 16:02:30 +0530
+Subject: [PATCH v3 6/6] ARM: davinci: da850: configure system
+ configuration chip(CFGCHIP3) for emac
+In-Reply-To: <51F8A4FF.8020803@ti.com>
+References: <1371999607-6483-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1371999607-6483-7-git-send-email-prabhakar.csengg@gmail.com>
+ <51F8A4FF.8020803@ti.com>
+Message-ID: <CA+V-a8smEd_75Ab-_vxjBATr8Q9Sefs0tpxc+kgQJRtuLJad=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 01:13:02PM +0530, Padma Venkat wrote:
+Hi Sekhar,
 
-> If legacy platforms not required to change then I need to introduce a
-> new samsung_i2s_dai_data structure which holds only dai_type for
-> non-dt platforms. If I change legacy platforms it breaks the older
-> platforms now. Is it okay adding a samsung_i2s_dai_data structure for
-> non-dt platforms which will be removed later?
+Sorry for the  delayed response I was on leave and now back again up
+and running.
 
-This is totally fine and looks much nicer - you're not creating DT style
-names in the platform bus, nor making names that are so long that we
-need to expand the maximum length of a plaform device name (which isn't
-awesome).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130808/3311f5b7/attachment.sig>
+On Wed, Jul 31, 2013 at 11:17 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Sunday 23 June 2013 08:30 PM, Prabhakar Lad wrote:
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> This patch makes a common function for to configure emac and calls
+>> it appropriately in DT and non DT boot mode. The system configuration
+>> chip CFGCHIP3, controls the emac module. This patch appropriately
+>> configures this register for emac and sets DA850_MII_MDIO_CLKEN_PIN
+>> GPIO pin appropriately.
+>>
+[Snip]
+
+>> +     if (rmii_enabled)
+>> +             val |= BIT(8);
+>> +     else
+>> +             val &= ~BIT(8);
+>> +
+>> +     /* configure the CFGCHIP3 register for RMII or MII */
+>> +     writel(val, cfg_chip3_base);
+>> +
+>> +     ret = davinci_cfg_reg(DA850_GPIO2_6);
+>> +     if (ret)
+>> +             pr_warn("%s:GPIO(2,6) mux setup failed\n", __func__);
+>> +
+>> +     ret = gpio_request(DA850_MII_MDIO_CLKEN_PIN, "mdio_clk_en");
+>> +     if (ret) {
+>> +             pr_warn("Cannot open GPIO %d\n", DA850_MII_MDIO_CLKEN_PIN);
+>> +             return;
+>> +     }
+>
+> You cannot do this in SoC specific code. All boards wont use a GPIO to
+> choose between MII/RMII. You need to do this in a EVM specific manner.
+> This just means you retain the GPIO part of code in board-da850-evm.c
+
+OK
+
+> and for the DT case use a board specific GPIO node. See a similar
+> example in arch/arm/boot/dts/ste-nomadik-s8815.dts and how the code uses
+Alrite something similar to usb-s8815 node.
+
+> it in arch/arm/mach-nomadik/cpu-8815.c.
+>
+But I don't see any code to access this node in this file, can
+you point me to right direction ?
+
+Regards,
+--Prabhakar Lad
