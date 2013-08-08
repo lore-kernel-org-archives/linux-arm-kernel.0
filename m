@@ -1,55 +1,131 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 08 Aug 2013 08:21:48 -0700
-Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
-In-Reply-To: <20130808130840.GC6427@sirena.org.uk>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <1375944991-29182-2-git-send-email-wni@nvidia.com>
- <20130808110136.GA6427@sirena.org.uk> <52038035.7030803@roeck-us.net>
- <20130808130840.GC6427@sirena.org.uk>
-Message-ID: <5203B78C.7010101@roeck-us.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 8 Aug 2013 11:22:34 -0400
+Subject: [PATCHv3 5/9] ARM: OMAP2+: AM33XX: Add assembly code for PM
+ operations
+In-Reply-To: <CA+Bv8XY9kziMftrEAnJkenzg6yS+DUYeVy+NQaPTKygJDWNnWw@mail.gmail.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-6-git-send-email-d-gerlach@ti.com>
+ <5203B03B.4030306@ti.com>
+ <CA+Bv8XY9kziMftrEAnJkenzg6yS+DUYeVy+NQaPTKygJDWNnWw@mail.gmail.com>
+Message-ID: <5203B7BA.9020206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 06:08 AM, Mark Brown wrote:
-> On Thu, Aug 08, 2013 at 04:25:41AM -0700, Guenter Roeck wrote:
->> On 08/08/2013 04:01 AM, Mark Brown wrote:
+On Thursday 08 August 2013 11:16 AM, Russ Dill wrote:
+> On Thu, Aug 8, 2013 at 7:50 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Tuesday 06 August 2013 01:49 PM, Dave Gerlach wrote:
+>>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>>
+>>> In preparation for suspend-resume support for AM33XX, add
+>>> the assembly file with the code which is copied to internal
+>>> memory (OCMC RAM) during bootup and runs from there.
+>>>
+>>> As part of the low power entry (DeepSleep0 mode in AM33XX TRM),
+>>> the code running from OCMC RAM does the following
+>>> 1. Stores the EMIF configuration
+>>> 2. Puts external memory in self-refresh
+>>> 3. Disables EMIF clock
+>>> 4. Executes WFI after writing to MPU_CLKCTRL register.
+>>>
+>>> If no interrupts have come, WFI execution on MPU gets registered
+>>> as an interrupt with the WKUP-M3. WKUP-M3 takes care of disabling
+>>> some clocks which MPU should not (L3, L4, OCMC RAM etc) and takes
+>>> care of clockdomain and powerdomain transitions as part of the
+>>> DeepSleep0 mode entry.
+>>>
+>>> In case a late interrupt comes in, WFI ends up as a NOP and MPU
+>>> continues execution from internal memory. The 'abort path' code
+>>> undoes whatever was done as part of the low power entry and indicates
+>>> a suspend failure by passing a non-zero value to the cpu_resume routine.
+>>>
+>>> The 'resume path' code is similar to the 'abort path' with the key
+>>> difference of MMU being enabled in the 'abort path' but being
+>>> disabled in the 'resume path' due to MPU getting powered off.
+>>>
+>>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Cc: Kevin Hilman <khilman@linaro.org>
+>>> ---
+>>>  arch/arm/mach-omap2/sleep33xx.S |  350 +++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 350 insertions(+)
+>>>  create mode 100644 arch/arm/mach-omap2/sleep33xx.S
+>>>
+>>> diff --git a/arch/arm/mach-omap2/sleep33xx.S b/arch/arm/mach-omap2/sleep33xx.S
+>>> new file mode 100644
+>>> index 0000000..834c7d4
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-omap2/sleep33xx.S
+>>> @@ -0,0 +1,350 @@
+>>> +/*
+>>> + * Low level suspend code for AM33XX SoCs
+>>> + *
+>>> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+>>> + * Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or
+>>> + * modify it under the terms of the GNU General Public License as
+>>> + * published by the Free Software Foundation version 2.
+>>> + *
+>>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>>> + * kind, whether express or implied; without even the implied warranty
+>>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
+>>> +
+>>> +#include <linux/linkage.h>
+>>> +#include <linux/ti_emif.h>
+>>> +#include <asm/memory.h>
+>>> +#include <asm/assembler.h>
+>>> +
+>>> +#include "cm33xx.h"
+>>> +#include "pm33xx.h"
+>>> +#include "prm33xx.h"
+>>> +
+>>> +     .text
+>>> +     .align 3
+>>> +
+>>> +/*
+>>> + * This routine is executed from internal RAM and expects some
+>>> + * parameters to be passed in r0 _strictly_ in following order:
+>>> + * 1) emif_addr_virt - ioremapped EMIF address
+>>> + * 2) mem_type - 2 -> DDR2, 3-> DDR3
+>>> + * 3) dram_sync_word - uncached word in SDRAM
+>>> + *
+>>> + * The code loads these values taking r0 value as reference to
+>>> + * the array in registers starting from r0, i.e emif_addr_virt
+>>> + * goes to r1, mem_type goes to r2 and and so on. These are
+>>> + * then saved into memory locations before proceeding with the
+>>> + * sleep sequence and hence registers r0, r1 etc can still be
+>>> + * used in the rest of the sleep code.
+>>> + */
+>>> +
+>>> +ENTRY(am33xx_do_wfi)
+>>> +     stmfd   sp!, {r4 - r11, lr}     @ save registers on stack
+>>> +
+>>> +     ldm     r0, {r1-r3}             @ gather values passed
+>>> +
+>>> +     /* Save the values passed */
+>>> +     str     r1, emif_addr_virt
+>>> +     str     r2, mem_type
+>>> +     str     r3, dram_sync_word
+>>
+>> None of this parameter are going to change for every suspend entry and
+>> exit so saving them once and accessing them should be fine. Just
+>> create a structure with above, save them in init from C code and
+>> then access that structure where you need to.
+> 
+> It isn't possible to do so since the structure would be in SDRAM and
+> at resume time, we don't have access to SDRAM. Additionally, I'd like
+> to expand the mem_type parameter to a bit field in the future to allow
+> this code path to be shared with CPU idle.
 >
->>> That said if you *are* going to do this you should request the
->>> regulator using devm_regulator_get_optional(), this is intended to
->>> support things that don't need regulators (though that's not the case
->>> here).
->
->> The lm90 driver works perfectly fine without regulator.
->
-> I'd be most surprised if the device worked without power, if the driver
-> fails to get and enable a regulator for it then that's not great
-> (especially if it does so silently).
->
-Correct, but it appears that the driver magically worked for a long time
-without it.
+You can copy the structure in SRAM. So how does memtype need
+changes for CPUIDLE ?
 
-Is it guaranteed that the driver keeps working for all cases where
-regulator support is enabled in the kernel, and where it used to work
-so far without mandating the existence of this specific regulator ?
-My main concern is having to deal with complaints that the driver stopped
-working for no good reason.
+I have several comments on this patch so I assume you are
+going to address them then.
 
-In this context, is it common practice to name such regulators "vdd"
-or similar ? What if there are multiple LM90 or compatible chips
-in a system, connected to different power rails ? Who determines
-if the regulator is supposed to be named "vdd" or "vcc" or anything
-else, and to which power rails it is actually connected ? How can
-and does one guarantee that "vdd" is the correct regulator to use
-for all systems ? What if some other driver requests "vdd", but the chip
-it supports happens to be connected to a different power rail ?
-
-Sorry for my ignorance in that matter. I did browse through Documentation/power,
-but did not find a clear answer.
-
-> Note that the regulator API is written to stub itself out if not
-> enabled, the code should be able to assume that it's there.
->
-I am aware of that; this is why the driver should not dump an error message
-if the function returns NULL and bail out, as it did originally.
-
-Guenter
+Regards,
+Santosh
