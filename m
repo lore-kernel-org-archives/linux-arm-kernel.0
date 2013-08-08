@@ -1,31 +1,20 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 08 Aug 2013 11:16:44 -0700
-Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
- EMIF spec
-In-Reply-To: <1375811376-49985-5-git-send-email-d-gerlach@ti.com> (Dave
- Gerlach's message of "Tue, 6 Aug 2013 12:49:31 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
-Message-ID: <87fvukhwtv.fsf@kernel.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Aug 2013 12:16:55 -0600
+Subject: [PATCH 1/3] clk: tegra114: Fix incorrect placement of __initdata
+In-Reply-To: <1375935949-19557-1-git-send-email-sachin.kamat@linaro.org>
+References: <1375935949-19557-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <5203E097.1040502@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+On 08/07/2013 10:25 PM, Sachin Kamat wrote:
+> __initdata should be placed between the variable name and equal
+> sign for the variable to be placed in the intended section.
 
-> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
->
-> SDRAM controller on AM33XX requires that a modification of certain
-> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
-> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
-> scenario arises when entering a low power state like DeepSleep.
-> To ensure that the read is not from a cached region we reserve
-> some memory during bootup using the arm_memblock_steal() API.
+The series,
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Hmm, sounds to me an awful lot like the existing omap_bus_sync() ?
+Patch 1,
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-However, you remove that feature when you remove omap_reserve() here
-becasue omap_reserve() ss not called from your new reserve function.
-Are you *really* sure you don't need the functions called there?  This
-is a pretty big change that's not mentioned anywhere in the changelog.
-
-Kevin
+Mike, I assume you'll take these through the clock tree.
