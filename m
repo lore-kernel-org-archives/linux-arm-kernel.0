@@ -1,25 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Aug 2013 12:09:54 +0200
-Subject: [PATCH] Documentation: Add device tree binding file for MOXA ART
- SoCs interrupt controller
-In-Reply-To: <CACmBeS0wbCSU+3DJwtyN5CuX8GDCNWJxeiDq8YUrfTL8DwU_1w@mail.gmail.com>
-References: <1374137426-6763-1-git-send-email-jonas.jensen@gmail.com>
- <20130802093559.GB2884@e106331-lin.cambridge.arm.com>
- <CACmBeS0wbCSU+3DJwtyN5CuX8GDCNWJxeiDq8YUrfTL8DwU_1w@mail.gmail.com>
-Message-ID: <201308081209.54412.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 8 Aug 2013 07:12:23 -0300
+Subject: [PATCH 01/20] mtd: pxa3xx-nand: replace pxa_request_dma with
+ dmaengine
+In-Reply-To: <52033DE1.5050700@gmail.com>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-2-git-send-email-zonque@gmail.com>
+ <20130807174612.GB18567@localhost> <52033DE1.5050700@gmail.com>
+Message-ID: <20130808101221.GC2295@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 August 2013, Jonas Jensen wrote:
-> It's true that "interrupt-mask" is redundant, DT "interrupts" hold the
-> same information. I just never found nice way to collect it from DT.
+On Thu, Aug 08, 2013 at 08:42:41AM +0200, Daniel Mack wrote:
+> On 07.08.2013 19:46, Ezequiel Garcia wrote:
+> > Hi Daniel,
+> > 
+> > On Wed, Aug 07, 2013 at 05:33:50PM +0200, Daniel Mack wrote:
+> >> From: Zhangfei Gao <zhangfei.gao@marvell.com>
+> >>
+> >> [zonque at gmail.com: rebased in top of l2-mtd.git. The newly introduced
+> >> ARCH_HAS_DMA hack was changed into a check for CONFIG_HAS_DMA]
+> >>
+> > 
+> > Are you sure you need to introduce the CONFIG_HAS_DMA ifdef?
+> > 
+> > The reason I introduced the ARCH_HAS_DMA macro was to avoid including
+> > the "mach/dma.h" header. Now that you've removed it, I don't think
+> > this driver can be used in any platform where CONFIG_HAS_DMA=n.
 > 
-> See registers written on line 111:
-> http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/drivers/irqchip/irq-moxart.c#n111
+> Well, yes it can, or at least you could decide to use it without DMA on
+> PXA/MMP. The idea of CONFIG_HAS_DMA is to save binary size.
 > 
 
-Can't you just update the register whenever an interrupt gets mapped?
+Ok, I see.
 
-All unused interrupts can start out as edge triggered.
+I think maybe we will have to add something to force use_dma=0
+when "armada370-nand" is used. AFAIK, the dmaengine does not support
+the kind of DMA operations this driver needs.
 
-	Arnd
+I can take care of that if this patchset hits mainline before
+we have something really usable for Armada 370/XP NAND.
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
