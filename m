@@ -1,177 +1,438 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 09 Aug 2013 08:39:57 +1000
-Subject: [PATCHv8 02/10] PCI: remove ARCH_SUPPORTS_MSI kconfig option
-In-Reply-To: <1376000268-18397-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1376000268-18397-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1376001597.12551.51.camel@pasglop>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 09 Aug 2013 00:41:25 +0200
+Subject: [PATCH v9 07/16] iommu/exynos: support for device tree
+In-Reply-To: <002b01ce941b$160a88a0$421f99e0$@samsung.com>
+References: <002b01ce941b$160a88a0$421f99e0$@samsung.com>
+Message-ID: <5396565.vjlSOm37Vf@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-08-09 at 00:17 +0200, Thomas Petazzoni wrote:
-> Now that we have weak versions for each of the PCI MSI architecture
-> functions, we can actually build the MSI support for all platforms,
-> regardless of whether they provide or not architecture-specific
-> versions of those functions. For this reason, the ARCH_SUPPORTS_MSI
-> hidden kconfig boolean becomes useless, and this patch gets rid of it.
+Hi KyongHo,
+
+On Thursday 08 of August 2013 18:38:49 Cho KyongHo wrote:
+> This commit adds device tree support for System MMU.
+> This also include the following changes and enhancements:
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> Tested-by: Daniel Price <daniel.price@gmail.com>
-> Tested-by: Thierry Reding <thierry.reding@gmail.com>
+> * use managed device helper functions.
+> Simplyfies System MMU device driver.
+> 
+> * use only a single clock descriptor.
+> System MMU device descriptor is seperate if it is imposible to make
+> a single clock descriptor to make a device descriptor for a group of
+> System MMUs.
+> 
+> * removed dbgname member from sysmmu_drvdata structure.
+> debugging kernel message for a System MMU is distinguisheable with the
+> name of device descroptors.
 
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Please put all these three changes in separate patches. This patch is hard 
+to review with all the changes mixed together...
 
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: linux390 at de.ibm.com
-> Cc: linux-s390 at vger.kernel.org
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: H. Peter Anvin <hpa@zytor.com>
-> Cc: x86 at kernel.org
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: linux-ia64 at vger.kernel.org
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: linux-mips at linux-mips.org
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: sparclinux at vger.kernel.org
-> Cc: Chris Metcalf <cmetcalf@tilera.com>
+In addition, I believe this is the patch that should be adding device tree 
+binding documentation, not the 6/16 one, as this is where actually support 
+for this binding gets added to the kernel.
+
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 > ---
->  arch/arm/Kconfig     | 1 -
->  arch/ia64/Kconfig    | 1 -
->  arch/mips/Kconfig    | 2 --
->  arch/powerpc/Kconfig | 1 -
->  arch/s390/Kconfig    | 1 -
->  arch/sparc/Kconfig   | 1 -
->  arch/tile/Kconfig    | 1 -
->  arch/x86/Kconfig     | 1 -
->  drivers/pci/Kconfig  | 4 ----
->  9 files changed, 13 deletions(-)
+>  drivers/iommu/Kconfig        |    5 +-
+>  drivers/iommu/exynos-iommu.c |  186
+> ++++++++++++++++------------------------- 2 files changed, 75
+> insertions(+), 116 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 37c0f4e..41b6c96 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -441,7 +441,6 @@ config ARCH_NETX
->  config ARCH_IOP13XX
->  	bool "IOP13xx-based"
->  	depends on MMU
-> -	select ARCH_SUPPORTS_MSI
->  	select CPU_XSC3
->  	select NEED_MACH_MEMORY_H
->  	select NEED_RET_TO_USER
-> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> index 5a768ad..098602b 100644
-> --- a/arch/ia64/Kconfig
-> +++ b/arch/ia64/Kconfig
-> @@ -9,7 +9,6 @@ config IA64
->  	select PCI if (!IA64_HP_SIM)
->  	select ACPI if (!IA64_HP_SIM)
->  	select PM if (!IA64_HP_SIM)
-> -	select ARCH_SUPPORTS_MSI
->  	select HAVE_UNSTABLE_SCHED_CLOCK
->  	select HAVE_IDE
->  	select HAVE_OPROFILE
-> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-> index c3abed3..01b5f5a 100644
-> --- a/arch/mips/Kconfig
-> +++ b/arch/mips/Kconfig
-> @@ -726,7 +726,6 @@ config CAVIUM_OCTEON_SOC
->  	select SYS_HAS_CPU_CAVIUM_OCTEON
->  	select SWAP_IO_SPACE
->  	select HW_HAS_PCI
-> -	select ARCH_SUPPORTS_MSI
->  	select ZONE_DMA32
->  	select USB_ARCH_HAS_OHCI
->  	select USB_ARCH_HAS_EHCI
-> @@ -762,7 +761,6 @@ config NLM_XLR_BOARD
->  	select CEVT_R4K
->  	select CSRC_R4K
->  	select IRQ_CPU
-> -	select ARCH_SUPPORTS_MSI
->  	select ZONE_DMA32 if 64BIT
->  	select SYNC_R4K
->  	select SYS_HAS_EARLY_PRINTK
-> diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-> index 3bf72cd..183a165 100644
-> --- a/arch/powerpc/Kconfig
-> +++ b/arch/powerpc/Kconfig
-> @@ -727,7 +727,6 @@ config PCI
->  	default y if !40x && !CPM2 && !8xx && !PPC_83xx \
->  		&& !PPC_85xx && !PPC_86xx && !GAMECUBE_COMMON
->  	default PCI_QSPAN if !4xx && !CPM2 && 8xx
-> -	select ARCH_SUPPORTS_MSI
->  	select GENERIC_PCI_IOMAP
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 820d85c..9ad45f1 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -168,16 +168,15 @@ config TEGRA_IOMMU_SMMU
+> 
+>  config EXYNOS_IOMMU
+>  	bool "Exynos IOMMU Support"
+> -	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
+> +	depends on ARCH_EXYNOS
+>  	select IOMMU_API
+> +	default n
 >  	help
->  	  Find out whether your system includes a PCI bus. PCI is the name of
-> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-> index 22f75b5..e9982a3 100644
-> --- a/arch/s390/Kconfig
-> +++ b/arch/s390/Kconfig
-> @@ -428,7 +428,6 @@ menuconfig PCI
->  	bool "PCI support"
->  	default n
->  	depends on 64BIT
-> -	select ARCH_SUPPORTS_MSI
->  	select PCI_MSI
->  	help
->  	  Enable PCI support.
-> diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-> index a00cbd3..1570ad2 100644
-> --- a/arch/sparc/Kconfig
-> +++ b/arch/sparc/Kconfig
-> @@ -52,7 +52,6 @@ config SPARC32
->  
->  config SPARC64
->  	def_bool 64BIT
-> -	select ARCH_SUPPORTS_MSI
->  	select HAVE_FUNCTION_TRACER
->  	select HAVE_FUNCTION_GRAPH_TRACER
->  	select HAVE_FUNCTION_GRAPH_FP_TEST
-> diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
-> index 24565a7..74dff90 100644
-> --- a/arch/tile/Kconfig
-> +++ b/arch/tile/Kconfig
-> @@ -380,7 +380,6 @@ config PCI
->  	select PCI_DOMAINS
->  	select GENERIC_PCI_IOMAP
->  	select TILE_GXIO_TRIO if TILEGX
-> -	select ARCH_SUPPORTS_MSI if TILEGX
->  	select PCI_MSI if TILEGX
->  	---help---
->  	  Enable PCI root complex support, so PCIe endpoint devices can
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index b32ebf9..5db62ef 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -2014,7 +2014,6 @@ menu "Bus options (PCI etc.)"
->  config PCI
->  	bool "PCI support"
->  	default y
-> -	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
->  	---help---
->  	  Find out whether you have a PCI motherboard. PCI is the name of a
->  	  bus system, i.e. the way the CPU talks to the other stuff inside
-> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-> index 81944fb..b6a99f7 100644
-> --- a/drivers/pci/Kconfig
-> +++ b/drivers/pci/Kconfig
-> @@ -1,13 +1,9 @@
->  #
->  # PCI configuration
->  #
-> -config ARCH_SUPPORTS_MSI
-> -	bool
+>  	  Support for the IOMMU(System MMU) of Samsung Exynos application
+>  	  processor family. This enables H/W multimedia accellerators to 
+see
+>  	  non-linear physical memory chunks as a linear memory in their
+>  	  address spaces
+> 
+> -	  If unsure, say N here.
 > -
->  config PCI_MSI
->  	bool "Message Signaled Interrupts (MSI and MSI-X)"
->  	depends on PCI
-> -	depends on ARCH_SUPPORTS_MSI
->  	help
->  	   This allows device drivers to enable MSI (Message Signaled
->  	   Interrupts).  Message Signaled Interrupts enable a device to
+>  config EXYNOS_IOMMU_DEBUG
+>  	bool "Debugging log for Exynos IOMMU"
+>  	depends on EXYNOS_IOMMU
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index a318049..0ee73e8 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/list.h>
+>  #include <linux/memblock.h>
+>  #include <linux/export.h>
+> +#include <linux/of.h>
+> 
+>  #include <asm/cacheflush.h>
+>  #include <asm/pgtable.h>
+> @@ -170,15 +171,14 @@ struct sysmmu_drvdata {
+>  	struct list_head node; /* entry of exynos_iommu_domain.clients */
+>  	struct device *sysmmu;	/* System MMU's device descriptor */
+>  	struct device *dev;	/* Owner of system MMU */
+> -	char *dbgname;
+>  	int nsfrs;
+> -	void __iomem **sfrbases;
+> -	struct clk *clk[2];
+> +	struct clk *clk;
+>  	int activations;
+>  	rwlock_t lock;
+>  	struct iommu_domain *domain;
+>  	sysmmu_fault_handler_t fault_handler;
+>  	unsigned long pgtable;
+> +	void __iomem *sfrbases[0];
+>  };
+> 
+>  static bool set_sysmmu_active(struct sysmmu_drvdata *data)
+> @@ -385,8 +385,8 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void
+> *dev_id) if (!ret && (itype != SYSMMU_FAULT_UNKNOWN))
+>  		__raw_writel(1 << itype, data->sfrbases[i] + 
+REG_INT_CLEAR);
+>  	else
+> -		dev_dbg(data->sysmmu, "(%s) %s is not handled.\n",
+> -				data->dbgname, sysmmu_fault_name[itype]);
+> +		dev_dbg(data->sysmmu, "%s is not handled.\n",
+> +				sysmmu_fault_name[itype]);
+> 
+>  	if (itype != SYSMMU_FAULT_UNKNOWN)
+>  		sysmmu_unblock(data->sfrbases[i]);
+> @@ -410,10 +410,8 @@ static bool __exynos_sysmmu_disable(struct
+> sysmmu_drvdata *data) for (i = 0; i < data->nsfrs; i++)
+>  		__raw_writel(CTRL_DISABLE, data->sfrbases[i] + 
+REG_MMU_CTRL);
+> 
+> -	if (data->clk[1])
+> -		clk_disable(data->clk[1]);
+> -	if (data->clk[0])
+> -		clk_disable(data->clk[0]);
+> +	if (data->clk)
+> +		clk_disable(data->clk);
+> 
+>  	disabled = true;
+>  	data->pgtable = 0;
+> @@ -422,10 +420,10 @@ finish:
+>  	write_unlock_irqrestore(&data->lock, flags);
+> 
+>  	if (disabled)
+> -		dev_dbg(data->sysmmu, "(%s) Disabled\n", data->dbgname);
+> +		dev_dbg(data->sysmmu, "Disabled\n");
+>  	else
+> -		dev_dbg(data->sysmmu, "(%s) %d times left to be 
+disabled\n",
+> -					data->dbgname, data->activations);
+> +		dev_dbg(data->sysmmu, "%d times left to be disabled\n",
+> +					data->activations);
+> 
+>  	return disabled;
+>  }
+> @@ -452,14 +450,12 @@ static int __exynos_sysmmu_enable(struct
+> sysmmu_drvdata *data, ret = 1;
+>  		}
+> 
+> -		dev_dbg(data->sysmmu, "(%s) Already enabled\n", data-
+>dbgname);
+> +		dev_dbg(data->sysmmu, "Already enabled\n");
+>  		goto finish;
+>  	}
+> 
+> -	if (data->clk[0])
+> -		clk_enable(data->clk[0]);
+> -	if (data->clk[1])
+> -		clk_enable(data->clk[1]);
+> +	if (data->clk)
+> +		clk_enable(data->clk);
+> 
+>  	data->pgtable = pgtable;
+> 
+> @@ -479,7 +475,7 @@ static int __exynos_sysmmu_enable(struct
+> sysmmu_drvdata *data,
+> 
+>  	data->domain = domain;
+> 
+> -	dev_dbg(data->sysmmu, "(%s) Enabled\n", data->dbgname);
+> +	dev_dbg(data->sysmmu, "Enabled\n");
+>  finish:
+>  	write_unlock_irqrestore(&data->lock, flags);
+> 
+> @@ -495,7 +491,7 @@ int exynos_sysmmu_enable(struct device *dev,
+> unsigned long pgtable)
+> 
+>  	ret = pm_runtime_get_sync(data->sysmmu);
+>  	if (ret < 0) {
+> -		dev_dbg(data->sysmmu, "(%s) Failed to enable\n", data-
+>dbgname);
+> +		dev_dbg(data->sysmmu, "Failed to enable\n");
+>  		return ret;
+>  	}
+> 
+> @@ -503,8 +499,8 @@ int exynos_sysmmu_enable(struct device *dev,
+> unsigned long pgtable) if (WARN_ON(ret < 0)) {
+>  		pm_runtime_put(data->sysmmu);
+>  		dev_err(data->sysmmu,
+> -			"(%s) Already enabled with page table %#lx\n",
+> -			data->dbgname, data->pgtable);
+> +			"Already enabled with page table %#lx\n",
+> +			data->pgtable);
+>  	} else {
+>  		data->dev = dev;
+>  	}
+> @@ -540,9 +536,7 @@ static void sysmmu_tlb_invalidate_entry(struct
+> device *dev, unsigned long iova) }
+>  		}
+>  	} else {
+> -		dev_dbg(data->sysmmu,
+> -			"(%s) Disabled. Skipping invalidating TLB.\n",
+> -			data->dbgname);
+> +		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating 
+TLB.\n");
+>  	}
+> 
+>  	read_unlock_irqrestore(&data->lock, flags);
+> @@ -564,141 +558,107 @@ void exynos_sysmmu_tlb_invalidate(struct device
+> *dev) }
+>  		}
+>  	} else {
+> -		dev_dbg(data->sysmmu,
+> -			"(%s) Disabled. Skipping invalidating TLB.\n",
+> -			data->dbgname);
+> +		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating 
+TLB.\n");
+>  	}
+> 
+>  	read_unlock_irqrestore(&data->lock, flags);
+>  }
+> 
+> -static int exynos_sysmmu_probe(struct platform_device *pdev)
+> +static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+>  {
+>  	int i, ret;
+> -	struct device *dev;
+> +	struct device *dev = &pdev->dev;
+>  	struct sysmmu_drvdata *data;
+> 
+> -	dev = &pdev->dev;
+> -
+> -	data = kzalloc(sizeof(*data), GFP_KERNEL);
+> -	if (!data) {
+> -		dev_dbg(dev, "Not enough memory\n");
+> -		ret = -ENOMEM;
+> -		goto err_alloc;
+> +	if (pdev->num_resources == 0) {
+> +		dev_err(dev, "No System MMU resource defined\n");
+> +		return -ENODEV;
+>  	}
+> 
+> -	ret = dev_set_drvdata(dev, data);
+> -	if (ret) {
+> -		dev_dbg(dev, "Unabled to initialize driver data\n");
+> -		goto err_init;
+> +	data = devm_kzalloc(dev,
+> +			sizeof(*data) +
+> +			sizeof(*data->sfrbases) * (pdev->num_resources / 
+2),
+> +			GFP_KERNEL);
+> +	if (!data) {
+> +		dev_err(dev, "Not enough memory for initialization\n");
+
+nit: This message is not necessary, as kmalloc() already prints a message 
+if allocation error occurs.
+
+> +		return -ENOMEM;
+>  	}
+> 
+>  	data->nsfrs = pdev->num_resources / 2;
+
+As Marek and Bart already mentioned before, please (oh please, really 
+please) finally remove this brokenness from this driver.
+
+A device driver should not do this kind of abstraction, emulating one 
+instance of particular IP from multiple instances. This is a task for the 
+IOMMU core and this is already supported by IOMMU domains, which is the 
+right way to achieve a single virtual address space for multiple IOMMUs.
+
+> -	data->sfrbases = kmalloc(sizeof(*data->sfrbases) * data->nsfrs,
+> -								
+GFP_KERNEL);
+> -	if (data->sfrbases == NULL) {
+> -		dev_dbg(dev, "Not enough memory\n");
+> -		ret = -ENOMEM;
+> -		goto err_init;
+> -	}
+> 
+>  	for (i = 0; i < data->nsfrs; i++) {
+>  		struct resource *res;
+> +
+>  		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+>  		if (!res) {
+> -			dev_dbg(dev, "Unable to find IOMEM region\n");
+> -			ret = -ENOENT;
+> -			goto err_res;
+> +			dev_err(dev, "Unable to find IOMEM region\n");
+> +			return -ENOENT;
+>  		}
+> 
+> -		data->sfrbases[i] = ioremap(res->start, 
+resource_size(res));
+> +		data->sfrbases[i] = devm_request_and_ioremap(dev, res);
+
+devm_request_and_ioremap() is deprecated. Please use 
+devm_ioremap_resource().
+
+>  		if (!data->sfrbases[i]) {
+
+In case of devm_ioremap_resource() remember to adjust this check to check 
+for IS_ERR, not for NULL.
+
+> -			dev_dbg(dev, "Unable to map IOMEM @ PA:%#x\n",
+> -							res->start);
+> -			ret = -ENOENT;
+> -			goto err_res;
+> +			dev_err(dev, "Unable to map IOMEM @ %#x\n", res-
+>start);
+
+This message will not be needed with devm_ioremap_resource() as it already 
+prints a message if an error occurs.
+
+> +			return -EBUSY;
+>  		}
+>  	}
+> 
+>  	for (i = 0; i < data->nsfrs; i++) {
+> -		ret = platform_get_irq(pdev, i);
+> -		if (ret <= 0) {
+> -			dev_dbg(dev, "Unable to find IRQ resource\n");
+> -			goto err_irq;
+> +		int irq;
+> +
+> +		irq = platform_get_irq(pdev, i);
+> +		if (irq <= 0) {
+> +			dev_err(dev, "Unable to find IRQ resource\n");
+> +			return -ENOENT;
+>  		}
+> 
+> -		ret = request_irq(ret, exynos_sysmmu_irq, 0,
+> -					dev_name(dev), data);
+> +		ret = devm_request_irq(dev, irq, exynos_sysmmu_irq,
+> +					0, dev_name(dev), data);
+>  		if (ret) {
+> -			dev_dbg(dev, "Unabled to register interrupt 
+handler\n");
+> -			goto err_irq;
+> +			dev_err(dev, "Unable to register handler to irq 
+%d\n",
+> +				irq);
+> +			return ret;
+>  		}
+>  	}
+> 
+> -	if (dev_get_platdata(dev)) {
+> -		char *deli, *beg;
+> -		struct sysmmu_platform_data *platdata = 
+dev_get_platdata(dev);
+> -
+> -		beg = platdata->clockname;
+> -
+> -		for (deli = beg; (*deli != '\0') && (*deli != ','); 
+deli++)
+> -			/* NOTHING */;
+> +	pm_runtime_enable(dev);
+> 
+> -		if (*deli == '\0')
+> -			deli = NULL;
+> -		else
+> -			*deli = '\0';
+> -
+> -		data->clk[0] = clk_get(dev, beg);
+> -		if (IS_ERR(data->clk[0])) {
+> -			data->clk[0] = NULL;
+> -			dev_dbg(dev, "No clock descriptor registered\n");
+> -		}
+> +	__set_fault_handler(data, &default_fault_handler);
+> 
+> -		if (data->clk[0] && deli) {
+> -			*deli = ',';
+> -			data->clk[1] = clk_get(dev, deli + 1);
+> -			if (IS_ERR(data->clk[1]))
+> -				data->clk[1] = NULL;
+> -		}
+> +	data->sysmmu = dev;
+> +	data->clk = devm_clk_get(dev, "sysmmu");
+> +	if (IS_ERR(data->clk)) {
+> +		dev_info(dev, "No gate clock found!\n");
+> +		data->clk = NULL;
+
+Just a note: In common clock framework NULL is a valid value for a struct 
+clk *, which should not be interpreted as a pointer, but as an opaque 
+cookie. This is material for separate patch, but this should be fixed all 
+around this driver so data->clk is for IS_ERR instead.
+
+Best regards,
+Tomasz
+
+> +	}
+> 
+> -		data->dbgname = platdata->dbgname;
+> +	ret = clk_prepare(data->clk);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to prepare clk\n");
+> +		return ret;
+>  	}
+> 
+> -	data->sysmmu = dev;
+>  	rwlock_init(&data->lock);
+>  	INIT_LIST_HEAD(&data->node);
+> 
+> -	__set_fault_handler(data, &default_fault_handler);
+> -
+> -	if (dev->parent)
+> -		pm_runtime_enable(dev);
+> +	platform_set_drvdata(pdev, data);
+> +	dev_dbg(dev, "Probed and initialized\n");
+> 
+> -	dev_dbg(dev, "(%s) Initialized\n", data->dbgname);
+> -	return 0;
+> -err_irq:
+> -	while (i-- > 0) {
+> -		int irq;
+> -
+> -		irq = platform_get_irq(pdev, i);
+> -		free_irq(irq, data);
+> -	}
+> -err_res:
+> -	while (data->nsfrs-- > 0)
+> -		iounmap(data->sfrbases[data->nsfrs]);
+> -	kfree(data->sfrbases);
+> -err_init:
+> -	kfree(data);
+> -err_alloc:
+> -	dev_err(dev, "Failed to initialize\n");
+>  	return ret;
+>  }
+> 
+> -static struct platform_driver exynos_sysmmu_driver = {
+> -	.probe		= exynos_sysmmu_probe,
+> -	.driver		= {
+> +#ifdef CONFIG_OF
+> +static struct of_device_id sysmmu_of_match[] __initconst = {
+> +	{ .compatible	= "samsung,exynos4210-sysmmu", },
+> +	{ },
+> +};
+> +#endif
+> +
+> +static struct platform_driver exynos_sysmmu_driver __refdata = {
+> +	.probe	= exynos_sysmmu_probe,
+> +	.driver	= {
+>  		.owner		= THIS_MODULE,
+>  		.name		= "exynos-sysmmu",
+> +		.of_match_table	= of_match_ptr(sysmmu_of_match),
+>  	}
+>  };
