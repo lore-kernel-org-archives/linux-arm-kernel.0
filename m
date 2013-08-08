@@ -1,28 +1,41 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 Aug 2013 11:03:18 -0400
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <52038E88.2050604@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com>
-Message-ID: <5203B336.90102@ti.com>
+Date: Thu, 8 Aug 2013 11:04:21 -0400
+Subject: [GIT PULL] ARM: keystone: Few non-critical fixes, cleanups for
+ 3.12
+In-Reply-To: <87ob98jkjw.fsf@linaro.org>
+References: <1375904298-5899-1-git-send-email-santosh.shilimkar@ti.com>
+ <87ob98jkjw.fsf@linaro.org>
+Message-ID: <5203B375.4040708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-$subject and patch don't match.
-
-On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
-> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>   In reference to
->> the M3 handling it, the M3 wouldn't know which devices have a driver
->> bound and which don't.
-> Does it need to? M3 firmware can pretty much define "I will force the device into low power state, and if the drivers dont handle things properly, fix the darned driver". M3 behavior should be considered as a "hardware" as far as Linux running on MPU is concerned, and firmware helps change the behavior by accounting for SoC quirks. *if* we have ability to handle this in the firmware, there is no need to carry this in Linux.
+On Thursday 08 August 2013 10:58 AM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-I agree with Nishant. I don't like this patch and IIRC, I gave same
-comment in the last version. Linux need not know about all such firmware
-quirks. Also all these M3 specific stuff, should be done somewhere
-else. Probably having a small M3 driver won't be a bad idea.
+>> The following changes since commit eb788f43a6c6e6c7a5b2879543b565e4cd452de8:
+>>
+>>   ARM: Keystone: Convert device tree file to use IRQ defines (2013-08-05 14:06:24 -0400)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-fixes-non-critical
+>>
+>> for you to fetch changes up to eb788f43a6c6e6c7a5b2879543b565e4cd452de8:
+>>
+>>   ARM: Keystone: Convert device tree file to use IRQ defines (2013-08-05 14:06:24 -0400)
+>>
+>> ----------------------------------------------------------------
+>> ARM: keystone: non-critical fixes, cleanup for 3.12
+>>
+>> Summary of changes:
+>> 	- Drop unused HAVE_SCHED_CLOCK config option
+>> 	- Remove now redundant smp_init_cpus call
+>> 	- Update the smc code to remove dsb and r12 usage
+>> 	- Convert device tree to use #include and GIC bindings
+> 
+> Pulled into next/fixes-non-critical.
+> 
+That was quick. Thanks Kevin !!
 
 Regards,
 Santosh
