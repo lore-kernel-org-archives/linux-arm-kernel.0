@@ -1,21 +1,38 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 7 Aug 2013 23:24:38 -0700
-Subject: [PATCH] mtd: atmel_nand: move the sanity check to the beginning
- of pmecc_enable()
-In-Reply-To: <1375869491-25137-1-git-send-email-josh.wu@atmel.com>
-References: <1375869491-25137-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20130808062438.GA4479@brian-ubuntu>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 08 Aug 2013 08:32:16 +0200
+Subject: [PATCH] [TRIVIAL] ARM: msm: fix compilation error in gpiomux
+In-Reply-To: <20130807210804.GB14845@codeaurora.org>
+References: <1375857279-18082-1-git-send-email-k.kozlowski@samsung.com>
+ <20130807174053.GA17551@codeaurora.org>
+ <20130807210804.GB14845@codeaurora.org>
+Message-ID: <1375943536.30982.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 05:58:11PM +0800, Josh Wu wrote:
-> It is better to do the sanity check for the parameter before any hardware
-> operation.
+On ?ro, 2013-08-07 at 14:08 -0700, Stephen Boyd wrote:
+> On 08/07, David Brown wrote:
+> > On Wed, Aug 07, 2013 at 08:34:39AM +0200, Krzysztof Kozlowski wrote:
+> > >Fix compilation error in gpiomux (CONFIG_MSM_GPIOMUX=y):
+> > >arch/arm/mach-msm/gpiomux.c:24:13: error: static declaration of
+> > >	???__msm_gpiomux_write??? follows non-static declaration
+> > >arch/arm/mach-msm/gpiomux.h:85:6: note: previous declaration of
+> > >	???__msm_gpiomux_write??? was here
+> > >
+> > >Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > 
+> > Thanks, I'll pull this in.
+> > 
+> >  <https://patchwork.kernel.org/patch/2839921/>
+> > 
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> I believe this is fixed by Rohit's patch that has already been
+> taken in a pull request?
+> 
+> https://lkml.org/lkml/2013/7/26/608
 
-Pushed to l2-mtd.git. I would squash it into the original patch, but
-David has already taken it into his tree. I'll leave it up to him, then.
+Yes, Rohit's patch fixes the problem so this is already in linux-msm
+tree.
 
-Thanks,
-Brian
+
+Best regards,
+Krzysztof
