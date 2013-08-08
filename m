@@ -1,361 +1,149 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu,  8 Aug 2013 16:00:27 +0400
-Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with regulator
- API
-Message-ID: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 08 Aug 2013 14:13:57 +0200
+Subject: [PATCH v9 00/16] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <002401ce941a$dad907c0$908b1740$@samsung.com>
+References: <002401ce941a$dad907c0$908b1740$@samsung.com>
+Message-ID: <2763595.7SYUCgBHXZ@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-pxa/icontrol.c         |  3 --
- arch/arm/mach-pxa/zeus.c             | 46 ++++++++++----------
- drivers/net/can/mcp251x.c            | 81 +++++++++++++++++++-----------------
- include/linux/can/platform/mcp251x.h | 13 +-----
- 4 files changed, 69 insertions(+), 74 deletions(-)
+Hi KyongHo,
 
-diff --git a/arch/arm/mach-pxa/icontrol.c b/arch/arm/mach-pxa/icontrol.c
-index fe31bfc..c98511c 100644
---- a/arch/arm/mach-pxa/icontrol.c
-+++ b/arch/arm/mach-pxa/icontrol.c
-@@ -73,9 +73,6 @@ static struct pxa2xx_spi_chip mcp251x_chip_info4 = {
- 
- static struct mcp251x_platform_data mcp251x_info = {
- 	.oscillator_frequency = 16E6,
--	.board_specific_setup = NULL,
--	.power_enable         = NULL,
--	.transceiver_enable   = NULL
- };
- 
- static struct spi_board_info mcp251x_board_info[] = {
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index f5d4364..a49c886 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -29,6 +29,8 @@
- #include <linux/i2c/pca953x.h>
- #include <linux/apm-emulation.h>
- #include <linux/can/platform/mcp251x.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/regulator/machine.h>
- 
- #include <asm/mach-types.h>
- #include <asm/suspend.h>
-@@ -391,33 +393,34 @@ static struct pxa2xx_spi_master pxa2xx_spi_ssp3_master_info = {
- };
- 
- /* CAN bus on SPI */
--static int zeus_mcp2515_setup(struct spi_device *sdev)
--{
--	int err;
--
--	err = gpio_request(ZEUS_CAN_SHDN_GPIO, "CAN shutdown");
--	if (err)
--		return err;
-+static struct regulator_consumer_supply can_regulator_consumer =
-+	REGULATOR_SUPPLY("vdd", "mcp251x.0");
- 
--	err = gpio_direction_output(ZEUS_CAN_SHDN_GPIO, 1);
--	if (err) {
--		gpio_free(ZEUS_CAN_SHDN_GPIO);
--		return err;
--	}
-+static struct regulator_init_data can_regulator_init_data = {
-+	.constraints	= {
-+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-+	},
-+	.consumer_supplies	= &can_regulator_consumer,
-+	.num_consumer_supplies	= 1,
-+};
- 
--	return 0;
--}
-+static struct fixed_voltage_config can_regulator_pdata = {
-+	.supply_name	= "CAN_SHDN",
-+	.microvolts	= 3300000,
-+	.gpio		= ZEUS_CAN_SHDN_GPIO,
-+	.init_data	= &can_regulator_init_data,
-+};
- 
--static int zeus_mcp2515_transceiver_enable(int enable)
--{
--	gpio_set_value(ZEUS_CAN_SHDN_GPIO, !enable);
--	return 0;
--}
-+static struct platform_device can_regulator_device = {
-+	.name	= "reg-fixed-volage",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &can_regulator_pdata,
-+	},
-+};
- 
- static struct mcp251x_platform_data zeus_mcp2515_pdata = {
- 	.oscillator_frequency	= 16*1000*1000,
--	.board_specific_setup	= zeus_mcp2515_setup,
--	.power_enable		= zeus_mcp2515_transceiver_enable,
- };
- 
- static struct spi_board_info zeus_spi_board_info[] = {
-@@ -516,6 +519,7 @@ static struct platform_device *zeus_devices[] __initdata = {
- 	&zeus_leds_device,
- 	&zeus_pcmcia_device,
- 	&zeus_max6369_device,
-+	&can_regulator_device,
- };
- 
- /* AC'97 */
-diff --git a/drivers/net/can/mcp251x.c b/drivers/net/can/mcp251x.c
-index 8cda23b..c220cdf 100644
---- a/drivers/net/can/mcp251x.c
-+++ b/drivers/net/can/mcp251x.c
-@@ -37,9 +37,6 @@
-  *
-  * static struct mcp251x_platform_data mcp251x_info = {
-  *         .oscillator_frequency = 8000000,
-- *         .board_specific_setup = &mcp251x_setup,
-- *         .power_enable = mcp251x_power_enable,
-- *         .transceiver_enable = NULL,
-  * };
-  *
-  * static struct spi_board_info spi_board_info[] = {
-@@ -76,6 +73,7 @@
- #include <linux/slab.h>
- #include <linux/spi/spi.h>
- #include <linux/uaccess.h>
-+#include <linux/regulator/consumer.h>
- 
- /* SPI interface instruction set */
- #define INSTRUCTION_WRITE	0x02
-@@ -264,6 +262,8 @@ struct mcp251x_priv {
- #define AFTER_SUSPEND_POWER 4
- #define AFTER_SUSPEND_RESTART 8
- 	int restart_tx;
-+	struct regulator *power;
-+	struct regulator *transceiver;
- };
- 
- #define MCP251X_IS(_model) \
-@@ -671,12 +671,11 @@ static void mcp251x_open_clean(struct net_device *net)
- {
- 	struct mcp251x_priv *priv = netdev_priv(net);
- 	struct spi_device *spi = priv->spi;
--	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
- 
- 	free_irq(spi->irq, priv);
- 	mcp251x_hw_sleep(spi);
--	if (pdata->transceiver_enable)
--		pdata->transceiver_enable(0);
-+	if (!IS_ERR(priv->transceiver))
-+		regulator_disable(priv->transceiver);
- 	close_candev(net);
- }
- 
-@@ -684,7 +683,6 @@ static int mcp251x_stop(struct net_device *net)
- {
- 	struct mcp251x_priv *priv = netdev_priv(net);
- 	struct spi_device *spi = priv->spi;
--	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
- 
- 	close_candev(net);
- 
-@@ -704,8 +702,8 @@ static int mcp251x_stop(struct net_device *net)
- 
- 	mcp251x_hw_sleep(spi);
- 
--	if (pdata->transceiver_enable)
--		pdata->transceiver_enable(0);
-+	if (!IS_ERR(priv->transceiver))
-+		regulator_disable(priv->transceiver);
- 
- 	priv->can.state = CAN_STATE_STOPPED;
- 
-@@ -939,8 +937,8 @@ static int mcp251x_open(struct net_device *net)
- 	}
- 
- 	mutex_lock(&priv->mcp_lock);
--	if (pdata->transceiver_enable)
--		pdata->transceiver_enable(1);
-+	if (!IS_ERR(priv->transceiver))
-+		regulator_enable(priv->transceiver);
- 
- 	priv->force_quit = 0;
- 	priv->tx_skb = NULL;
-@@ -956,8 +954,8 @@ static int mcp251x_open(struct net_device *net)
- 				   flags, DEVICE_NAME, priv);
- 	if (ret) {
- 		dev_err(&spi->dev, "failed to acquire irq %d\n", spi->irq);
--		if (pdata->transceiver_enable)
--			pdata->transceiver_enable(0);
-+		if (!IS_ERR(priv->transceiver))
-+			regulator_disable(priv->transceiver);
- 		close_candev(net);
- 		goto open_unlock;
- 	}
-@@ -1026,6 +1024,21 @@ static int mcp251x_can_probe(struct spi_device *spi)
- 		CAN_CTRLMODE_LOOPBACK | CAN_CTRLMODE_LISTENONLY;
- 	priv->model = spi_get_device_id(spi)->driver_data;
- 	priv->net = net;
-+
-+	priv->power = devm_regulator_get(&spi->dev, "vdd");
-+	priv->transceiver = devm_regulator_get(&spi->dev, "transceiver");
-+	if ((PTR_ERR(priv->power) == -EPROBE_DEFER) ||
-+	    (PTR_ERR(priv->transceiver) == -EPROBE_DEFER)) {
-+		ret = -EPROBE_DEFER;
-+		goto error_power;
-+	}
-+
-+	if (!IS_ERR(priv->power)) {
-+		ret = regulator_enable(priv->power);
-+		if (ret)
-+			goto error_power;
-+	}
-+
- 	spi_set_drvdata(spi, priv);
- 
- 	priv->spi = spi;
-@@ -1068,13 +1081,6 @@ static int mcp251x_can_probe(struct spi_device *spi)
- 		}
- 	}
- 
--	if (pdata->power_enable)
--		pdata->power_enable(1);
--
--	/* Call out to platform specific setup */
--	if (pdata->board_specific_setup)
--		pdata->board_specific_setup(spi);
--
- 	SET_NETDEV_DEV(net, &spi->dev);
- 
- 	/* Configure the SPI bus */
-@@ -1084,14 +1090,11 @@ static int mcp251x_can_probe(struct spi_device *spi)
- 
- 	/* Here is OK to not lock the MCP, no one knows about it yet */
- 	if (!mcp251x_hw_probe(spi)) {
--		dev_info(&spi->dev, "Probe failed\n");
-+		ret = -ENODEV;
- 		goto error_probe;
- 	}
- 	mcp251x_hw_sleep(spi);
- 
--	if (pdata->transceiver_enable)
--		pdata->transceiver_enable(0);
--
- 	ret = register_candev(net);
- 	if (ret)
- 		goto error_probe;
-@@ -1109,13 +1112,14 @@ error_rx_buf:
- 	if (!mcp251x_enable_dma)
- 		kfree(priv->spi_tx_buf);
- error_tx_buf:
--	free_candev(net);
- 	if (mcp251x_enable_dma)
- 		dma_free_coherent(&spi->dev, PAGE_SIZE,
- 				  priv->spi_tx_buf, priv->spi_tx_dma);
-+	if (!IS_ERR(priv->power))
-+		regulator_disable(priv->power);
-+error_power:
-+	free_candev(net);
- error_alloc:
--	if (pdata->power_enable)
--		pdata->power_enable(0);
- 	dev_err(&spi->dev, "probe failed\n");
- error_out:
- 	return ret;
-@@ -1123,12 +1127,10 @@ error_out:
- 
- static int mcp251x_can_remove(struct spi_device *spi)
- {
--	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
- 	struct mcp251x_priv *priv = spi_get_drvdata(spi);
- 	struct net_device *net = priv->net;
- 
- 	unregister_candev(net);
--	free_candev(net);
- 
- 	if (mcp251x_enable_dma) {
- 		dma_free_coherent(&spi->dev, PAGE_SIZE,
-@@ -1138,8 +1140,10 @@ static int mcp251x_can_remove(struct spi_device *spi)
- 		kfree(priv->spi_rx_buf);
- 	}
- 
--	if (pdata->power_enable)
--		pdata->power_enable(0);
-+	if (!IS_ERR(priv->power))
-+		regulator_disable(priv->power);
-+
-+	free_candev(net);
- 
- 	return 0;
- }
-@@ -1163,15 +1167,15 @@ static int mcp251x_can_suspend(struct device *dev)
- 		netif_device_detach(net);
- 
- 		mcp251x_hw_sleep(spi);
--		if (pdata->transceiver_enable)
--			pdata->transceiver_enable(0);
-+		if (!IS_ERR(priv->transceiver))
-+			regulator_disable(priv->transceiver);
- 		priv->after_suspend = AFTER_SUSPEND_UP;
- 	} else {
- 		priv->after_suspend = AFTER_SUSPEND_DOWN;
- 	}
- 
--	if (pdata->power_enable) {
--		pdata->power_enable(0);
-+	if (!IS_ERR(priv->power))
-+		regulator_disable(priv->power);
- 		priv->after_suspend |= AFTER_SUSPEND_POWER;
- 	}
- 
-@@ -1185,12 +1189,13 @@ static int mcp251x_can_resume(struct device *dev)
- 	struct mcp251x_priv *priv = spi_get_drvdata(spi);
- 
- 	if (priv->after_suspend & AFTER_SUSPEND_POWER) {
--		pdata->power_enable(1);
-+		if (!IS_ERR(priv->power))
-+			regulator_enable(priv->power);
- 		queue_work(priv->wq, &priv->restart_work);
- 	} else {
- 		if (priv->after_suspend & AFTER_SUSPEND_UP) {
--			if (pdata->transceiver_enable)
--				pdata->transceiver_enable(1);
-+			if (!IS_ERR(priv->transceiver))
-+				regulator_enable(priv->transceiver);
- 			queue_work(priv->wq, &priv->restart_work);
- 		} else {
- 			priv->after_suspend = 0;
-diff --git a/include/linux/can/platform/mcp251x.h b/include/linux/can/platform/mcp251x.h
-index 089fe43..8a27256 100644
---- a/include/linux/can/platform/mcp251x.h
-+++ b/include/linux/can/platform/mcp251x.h
-@@ -9,26 +9,15 @@
- 
- #include <linux/spi/spi.h>
- 
--/**
-+/*
-  * struct mcp251x_platform_data - MCP251X SPI CAN controller platform data
-  * @oscillator_frequency:       - oscillator frequency in Hz
-  * @irq_flags:                  - IRQF configuration flags
-- * @board_specific_setup:       - called before probing the chip (power,reset)
-- * @transceiver_enable:         - called to power on/off the transceiver
-- * @power_enable:               - called to power on/off the mcp *and* the
-- *                                transceiver
-- *
-- * Please note that you should define power_enable or transceiver_enable or
-- * none of them. Defining both of them is no use.
-- *
-  */
- 
- struct mcp251x_platform_data {
- 	unsigned long oscillator_frequency;
- 	unsigned long irq_flags;
--	int (*board_specific_setup)(struct spi_device *spi);
--	int (*transceiver_enable)(int enable);
--	int (*power_enable) (int enable);
- };
- 
- #endif /* __CAN_PLATFORM_MCP251X_H__ */
--- 
-1.8.1.5
+Just a little hint for future:
+
+To make reviewing your patches easier, please send all patches (01 and 
+further) as a follow up (reply) to cover letter of the series (patch 00).
+
+This can be achieved by using --thread switch of git send-email for 
+example.
+
+Best regards,
+Tomasz
+
+On Thursday 08 of August 2013 18:37:10 Cho KyongHo wrote:
+> The current exynos-iommu(System MMU) driver does not work autonomously
+> since it is lack of support for power management of peripheral blocks.
+> For example, MFC device driver must ensure that its System MMU is
+> disabled before MFC block is power-down not to invalidate IOTLB in the
+> System MMU when I/O memory mapping is changed. Because a System MMU
+> resides in the same H/W block, access to control registers of System MMU
+> while the H/W block is turned off must be prohibited.
+> 
+> This set of changes solves the above problem with setting each System
+> MMUs as the parent of the device which owns the System MMU to receive
+> the information when the device is turned off or turned on.
+> 
+> Another big change to the driver is the support for devicetree.
+> The bindings for System MMU is described in
+> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+> 
+> In addition, this patchset also includes several bug fixes and
+> enhancements of the current driver.
+> 
+> Change log:
+> v9:
+> - Rebased on the following branches
+>   git.linaro.org/git-ro/people/mturquette/linux.git/clk-next
+>  
+> git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/samsung-
+> next git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/master
+> (3.11-rc4) - Split "add bus notifier for registering System MMU" into 5
+> patches - Call clk_prepare() that was missing in v8.
+> - Fixed base address of sysmmu_tv in exynos4210.dtsi
+> - BUG_ON() instead of return -EADDRINUSE when trying mapping on an mapped
+> area - Moved camif_top to 317 in drivers/clk/samsung/clk-exynos5250.c -
+> Removed 'iommu' property from 'codec'(mfc) node
+> - Does not make 'master' clock to be the parent of 'sysmmu' clock.
+>    'master' clock is enabled before accessing control registers of System
+> MMU and disabled after the access.
+> 
+> v8:
+> - Reordered patch list: moved "change rwloc to spinlock" to the last.
+> - Fixed remained bug in "fix page table maintenance".
+> - Always return 0 from exynos_iommu_attach_device().
+> - Removed prefetch buffer setting when System MMU is enabled
+>   due to the restriction of prefetch buffers:
+>   A prefetch buffer must not hit from more than one DMA.
+>   For instance with GScalers, if a single prefetch buffer is initialized
+>   with 0x0 ~ 0xFFFFFFFF and a GScaler works on source buffer at
+> 0x10000000 and target buffer @ 0x20000000, the System MMU may be got
+> deadlock. Clients must initialize prefetch buffers with custom function
+> defined in exynos-iommu drivers whenever they need to enable prefetch
+> buffers. - The clock of System MMU has no relationship with the clock of
+> its master H/W. The clock of master H/W is always enabled when
+> exynos-iommu driver needs to access MMIO area and disabled as soon as
+> the access finishes. - Removed err_page variable used in
+> exynos_iommu_unmap() in the previous patch "fix page table maintenance".
+> - Split a big patch "add bus notifier for registering System MMU".
+>    Extracted the following 2 patches: 9/12 and 10/12.
+> - And some additional fixes...
+> 
+> v7:
+> - Rebased on the stable 3.10
+> - Registered PM domains and gate clocks with DT
+> - Changed connection method between a System MMU and its master H/W
+>    'mmu-master' property in the node of System MMU
+>    --> 'iommu' property in the node of master H/W
+> - Marking device descriptor of master H/W of a System MMU with bus
+> notifier. - Power management (PM_RUNTIME, PM_SLEEP) of System MMUs with
+> gpd_dev_ops of Generic IO Powerdomain. gpd_dev_ops are set to the master
+> H/Ws before they are probed in the bus notifier.
+> - Removed additional debugging features like debugfs entries and
+>    version names.
+> - Removed support for advanced features of System MMU 3.2 and 3.3
+>    the current IOMMU API cannot handle the feature
+>   (A kind of L2 TLB that fetches several consequence page table entries.
+>    It must be initialized by the driver of master H/W whenever it works.)
+> 
+> v6:
+> - Rebased on the branch, next/iommu-exynos of
+>   git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> 
+> v5:
+> - new bugfix: patch 01
+> - Reordered patches
+>   * patch 01 ~ 05: Bugfix and enhancements of the existing driver
+>   * patch 06 ~ 10: Device Tree support and callbacks for power management
+> * patch 11     : System MMU 3.2 and 3.3 support
+>   * patch 12 ~ 14: Debugging features
+> - Additional code compaction
+> 
+> v4:
+> - Remove Change-Id from v3 patches
+> - Change the order of the third and the first patch
+>   Thanks to Kukjin Kim.
+> - Fix memory leak when allocating and assigning exynos_iommu_owner to
+> client device if the client device has multiple System MMUs.
+>   Thanks to Rahul Sharma.
+> 
+> v3:
+> - Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
+> - Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
+>   Thanks to Prathyush.
+> 
+> v2:
+> - Split the patch to iommu/exynos into 9 patches
+> - Support for System MMU 3.3
+> - Some code compaction
+> 
+> Patch summary:
+> 
+> Diffstats:
+>  .../devicetree/bindings/clock/exynos5250-clock.txt |   26 +
+>  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 ++
+>  arch/arm/boot/dts/exynos4.dtsi                     |  122 +++
+>  arch/arm/boot/dts/exynos4210.dtsi                  |   25 +
+>  arch/arm/boot/dts/exynos4x12.dtsi                  |   82 ++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |  290 ++++++
+>  drivers/clk/samsung/clk-exynos4.c                  |   27 +-
+>  drivers/clk/samsung/clk-exynos5250.c               |   57 +-
+>  drivers/iommu/Kconfig                              |    5 +-
+>  drivers/iommu/exynos-iommu.c                       | 1061
+> +++++++++++++------- 10 files changed, 1423 insertions(+), 375
+> deletions(-)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+> linux-samsung-soc" in the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
