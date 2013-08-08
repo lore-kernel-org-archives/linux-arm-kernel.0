@@ -1,10 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu,  8 Aug 2013 19:18:14 +0530
-Subject: [PATCH 12/35] cpufreq: e_powersaver: use
- cpufreq_table_validate_and_show()
+Date: Thu,  8 Aug 2013 19:18:15 +0530
+Subject: [PATCH 13/35] cpufreq: elanfreq: use cpufreq_table_validate_and_show()
 In-Reply-To: <cover.1375964117.git.viresh.kumar@linaro.org>
 References: <cover.1375964117.git.viresh.kumar@linaro.org>
-Message-ID: <557aa7077de100ce67198fa36973b37703aa37c6.1375964117.git.viresh.kumar@linaro.org>
+Message-ID: <ebbe3ba20c4c600c20650e1eb10eae29e4beefaa.1375964117.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,27 +12,34 @@ cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/e_powersaver.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/cpufreq/elanfreq.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/drivers/cpufreq/e_powersaver.c b/drivers/cpufreq/e_powersaver.c
-index 09f64cc..c1b7c99 100644
---- a/drivers/cpufreq/e_powersaver.c
-+++ b/drivers/cpufreq/e_powersaver.c
-@@ -403,13 +403,12 @@ static int eps_cpu_init(struct cpufreq_policy *policy)
- 	policy->cpuinfo.transition_latency = 140000; /* 844mV -> 700mV in ns */
- 	policy->cur = fsb * current_multiplier;
+diff --git a/drivers/cpufreq/elanfreq.c b/drivers/cpufreq/elanfreq.c
+index 823a400..4000c34 100644
+--- a/drivers/cpufreq/elanfreq.c
++++ b/drivers/cpufreq/elanfreq.c
+@@ -202,7 +202,6 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	struct cpuinfo_x86 *c = &cpu_data(0);
+ 	unsigned int i;
+-	int result;
  
--	ret = cpufreq_frequency_table_cpuinfo(policy, &centaur->freq_table[0]);
-+	ret = cpufreq_table_validate_and_show(policy, &centaur->freq_table[0]);
- 	if (ret) {
- 		kfree(centaur);
- 		return ret;
- 	}
+ 	/* capability check */
+ 	if ((c->x86_vendor != X86_VENDOR_AMD) ||
+@@ -223,12 +222,7 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
+ 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+ 	policy->cur = elanfreq_get_cpu_frequency(0);
  
--	cpufreq_frequency_table_get_attr(&centaur->freq_table[0], policy->cpu);
- 	return 0;
+-	result = cpufreq_frequency_table_cpuinfo(policy, elanfreq_table);
+-	if (result)
+-		return result;
+-
+-	cpufreq_frequency_table_get_attr(elanfreq_table, policy->cpu);
+-	return 0;
++	return cpufreq_table_validate_and_show(policy, elanfreq_table);
  }
+ 
  
 -- 
 1.7.12.rc2.18.g61b472e
