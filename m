@@ -1,116 +1,124 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  9 Aug 2013 00:17:42 +0200
-Subject: [PATCHv8 04/10] of: pci: add registry of MSI chips
+Date: Fri,  9 Aug 2013 00:17:41 +0200
+Subject: [PATCHv8 03/10] PCI: Introduce new MSI chip infrastructure
 In-Reply-To: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1376000268-18397-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1376000268-18397-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a very basic registry of msi_chip structures, so that
-an IRQ controller driver can register an msi_chip, and a PCIe host
-controller can find it, based on a 'struct device_node'.
+From: Thierry Reding <thierry.reding@avionic-design.de>
 
+The new struct msi_chip is used to associated an MSI controller with a
+PCI bus. It is automatically handed down from the root to its children
+during bus enumeration.
+
+This patch provides default (weak) implementations for the architecture-
+specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
+and arch_msi_check_device()) which check if a PCI device's bus has an
+attached MSI chip and forward the call appropriately.
+
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Tested-by: Daniel Price <daniel.price@gmail.com>
+Tested-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- drivers/of/of_pci.c    | 45 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/msi.h    |  2 ++
- include/linux/of_pci.h | 12 ++++++++++++
- 3 files changed, 59 insertions(+)
+ drivers/pci/msi.c   | 27 +++++++++++++++++++++++++--
+ drivers/pci/probe.c |  1 +
+ include/linux/msi.h | 11 +++++++++++
+ include/linux/pci.h |  1 +
+ 4 files changed, 38 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 42c687a..e5ca008 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -89,3 +89,48 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 823c386..2837285 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -32,16 +32,39 @@ static int pci_msi_enable = 1;
+ 
+ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ {
+-	return -EINVAL;
++	struct msi_chip *chip = dev->bus->msi;
++	int err;
 +
-+#ifdef CONFIG_PCI_MSI
-+
-+static LIST_HEAD(of_pci_msi_chip_list);
-+static DEFINE_MUTEX(of_pci_msi_chip_mutex);
-+
-+int of_pci_msi_chip_add(struct msi_chip *chip)
-+{
-+	if (!of_property_read_bool(chip->of_node, "msi-controller"))
++	if (!chip || !chip->setup_irq)
 +		return -EINVAL;
 +
-+	mutex_lock(&of_pci_msi_chip_mutex);
-+	list_add(&chip->list, &of_pci_msi_chip_list);
-+	mutex_unlock(&of_pci_msi_chip_mutex);
++	err = chip->setup_irq(chip, dev, desc);
++	if (err < 0)
++		return err;
++
++	irq_set_chip_data(desc->irq, chip);
 +
 +	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_msi_chip_add);
+ }
+ 
+ void __weak arch_teardown_msi_irq(unsigned int irq)
+ {
++	struct msi_chip *chip = irq_get_chip_data(irq);
 +
-+void of_pci_msi_chip_remove(struct msi_chip *chip)
-+{
-+	mutex_lock(&of_pci_msi_chip_mutex);
-+	list_del(&chip->list);
-+	mutex_unlock(&of_pci_msi_chip_mutex);
-+}
-+EXPORT_SYMBOL_GPL(of_pci_msi_chip_remove);
++	if (!chip || !chip->teardown_irq)
++		return;
 +
-+struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node)
-+{
-+	struct msi_chip *c;
++	chip->teardown_irq(chip, irq);
+ }
+ 
+ int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+ {
+-	return 0;
++	struct msi_chip *chip = dev->bus->msi;
 +
-+	mutex_lock(&of_pci_msi_chip_mutex);
-+	list_for_each_entry(c, &of_pci_msi_chip_list, list) {
-+		if (c->of_node == of_node) {
-+			mutex_unlock(&of_pci_msi_chip_mutex);
-+			return c;
-+		}
-+	}
-+	mutex_unlock(&of_pci_msi_chip_mutex);
++	if (!chip || !chip->check_device)
++		return 0;
 +
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
-+
-+#endif /* CONFIG_PCI_MSI */
++	return chip->check_device(chip, dev, nvec, type);
+ }
+ 
+ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 46ada5c..b8eaa81 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -666,6 +666,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 
+ 	child->parent = parent;
+ 	child->ops = parent->ops;
++	child->msi = parent->msi;
+ 	child->sysdata = parent->sysdata;
+ 	child->bus_flags = parent->bus_flags;
+ 
 diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 090ddad..b17ead8 100644
+index 271dfd1..090ddad 100644
 --- a/include/linux/msi.h
 +++ b/include/linux/msi.h
-@@ -68,6 +68,8 @@ void default_restore_msi_irqs(struct pci_dev *dev, int irq);
- struct msi_chip {
- 	struct module *owner;
- 	struct device *dev;
-+	struct device_node *of_node;
-+	struct list_head list;
+@@ -65,4 +65,15 @@ void arch_restore_msi_irqs(struct pci_dev *dev, int irq);
+ void default_teardown_msi_irqs(struct pci_dev *dev);
+ void default_restore_msi_irqs(struct pci_dev *dev, int irq);
  
- 	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
- 			 struct msi_desc *desc);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 7a04826..29631eb 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -2,6 +2,7 @@
- #define __OF_PCI_H
- 
- #include <linux/pci.h>
-+#include <linux/msi.h>
- 
- struct pci_dev;
- struct of_irq;
-@@ -13,4 +14,15 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- int of_pci_get_devfn(struct device_node *np);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- 
-+#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-+int of_pci_msi_chip_add(struct msi_chip *chip);
-+void of_pci_msi_chip_remove(struct msi_chip *chip);
-+struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node);
-+#else
-+static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
-+static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
-+static inline struct msi_chip *
-+of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
-+#endif
++struct msi_chip {
++	struct module *owner;
++	struct device *dev;
 +
- #endif
++	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
++			 struct msi_desc *desc);
++	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
++	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
++			    int nvec, int type);
++};
++
+ #endif /* LINUX_MSI_H */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 0fd1f15..4044e3c 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -433,6 +433,7 @@ struct pci_bus {
+ 	struct resource busn_res;	/* bus numbers routed to this bus */
+ 
+ 	struct pci_ops	*ops;		/* configuration access functions */
++	struct msi_chip	*msi;		/* MSI controller */
+ 	void		*sysdata;	/* hook for sys-specific extension */
+ 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
+ 
 -- 
 1.8.1.2
