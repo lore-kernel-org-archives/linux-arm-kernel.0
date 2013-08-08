@@ -1,133 +1,50 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 8 Aug 2013 15:44:11 +0530
-Subject: [PATCH] ARM: OMAP4: clock: Lock PLLs in the right sequence
-Message-ID: <1375956851-842-1-git-send-email-rnayak@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 08 Aug 2013 12:14:36 +0200
+Subject: [PATCH 01/20] mtd: pxa3xx-nand: replace pxa_request_dma with
+ dmaengine
+In-Reply-To: <20130808101221.GC2295@localhost>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-2-git-send-email-zonque@gmail.com>
+ <20130807174612.GB18567@localhost> <52033DE1.5050700@gmail.com>
+ <20130808101221.GC2295@localhost>
+Message-ID: <52036F8C.2060104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4 we have clk_set_rate()s being done for a few
-DPLL clock nodes, as part of the clock init code, since
-the bootloaders no longer locks these DPLLs.
+On 08.08.2013 12:12, Ezequiel Garcia wrote:
+> On Thu, Aug 08, 2013 at 08:42:41AM +0200, Daniel Mack wrote:
+>> On 07.08.2013 19:46, Ezequiel Garcia wrote:
+>>> Hi Daniel,
+>>>
+>>> On Wed, Aug 07, 2013 at 05:33:50PM +0200, Daniel Mack wrote:
+>>>> From: Zhangfei Gao <zhangfei.gao@marvell.com>
+>>>>
+>>>> [zonque at gmail.com: rebased in top of l2-mtd.git. The newly introduced
+>>>> ARCH_HAS_DMA hack was changed into a check for CONFIG_HAS_DMA]
+>>>>
+>>>
+>>> Are you sure you need to introduce the CONFIG_HAS_DMA ifdef?
+>>>
+>>> The reason I introduced the ARCH_HAS_DMA macro was to avoid including
+>>> the "mach/dma.h" header. Now that you've removed it, I don't think
+>>> this driver can be used in any platform where CONFIG_HAS_DMA=n.
+>>
+>> Well, yes it can, or at least you could decide to use it without DMA on
+>> PXA/MMP. The idea of CONFIG_HAS_DMA is to save binary size.
+>>
+> 
+> Ok, I see.
+> 
+> I think maybe we will have to add something to force use_dma=0
+> when "armada370-nand" is used. AFAIK, the dmaengine does not support
+> the kind of DMA operations this driver needs.
 
-So we have a clk_set_rate() done for a ABE DPLL node (which
-inturn locks it) followed by a clk_set_rate() for the USB DPLL.
+What kind of operation is that?
 
-With USB DPLL being in bypass, we have this parent->child
-relationship thats formed while the clocks get registered.
+> I can take care of that if this patchset hits mainline before
+> we have something really usable for Armada 370/XP NAND.
 
-dpll_abe_ck
-    |
-    V
-dpll_abe_x2_ck
-    |
-    V
-dpll_abe_m3x2_ck
-    |
-    V
-usb_hs_clk_div_ck
-    |
-    V
-dpll_usb_ck
+Ok :)
 
-This is because usb_hs_clk_div_ck is bypass clock for dpll_usb_ck.
 
-So with this parent->child relationship in place, a clk_set_rate()
-on ABE DPLL results eventually in a clk_set_rate() call on USB DPLL,
-because CCF does a clk_change_rate() (as part of clk_set_rate()) on
-all downstream clocks resulting from a rate change on the top clock.
-
-So its important that we lock USB DPLL before we lock ABE DPLL.
-Without which we see these error logs at boot.
-[These error logs will not be seen if using a bootloader that locks
-USB DPLL]
-
-[    0.000000] clock: dpll_usb_ck failed transition to 'locked'
-[    0.000000] Division by zero in kernel.
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
-[    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
-[    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
-[    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
-[    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
-[    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
-[    0.000000] Division by zero in kernel.
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
-[    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
-[    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
-[    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
-[    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
-[    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
-[    0.000000] Division by zero in kernel.
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
-[    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
-[    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
-[    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
-[    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
-[    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
-[    0.000000] Division by zero in kernel.
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
-[    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
-[    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
-[    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
-[    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
-[    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
-[    0.000000] Division by zero in kernel.
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
-[    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
-[    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
-[    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
-[    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
-[    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
-[    0.000000] Division by zero in kernel.
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.10.0-03445-gfb2af00-dirty #7
-[    0.000000] [<c001bfe8>] (unwind_backtrace+0x0/0xf4) from [<c001868c>] (show_stack+0x10/0x14)
-[    0.000000] [<c001868c>] (show_stack+0x10/0x14) from [<c02deb28>] (Ldiv0+0x8/0x10)
-[    0.000000] [<c02deb28>] (Ldiv0+0x8/0x10) from [<c0477030>] (clk_divider_set_rate+0x10/0x114)
-[    0.000000] [<c0477030>] (clk_divider_set_rate+0x10/0x114) from [<c0476ef4>] (clk_change_rate+0x38/0xb8)
-[    0.000000] [<c0476ef4>] (clk_change_rate+0x38/0xb8) from [<c0476f5c>] (clk_change_rate+0xa0/0xb8)
-[    0.000000] clock: trace_clk_div_ck: could not find divisor for target rate 0 for parent pmd_trace_clk_mux_ck
-[    0.000000] Division by zero in kernel.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/cclock44xx_data.c |   20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index 88e37a4..1d5b529 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -1707,6 +1707,18 @@ int __init omap4xxx_clk_init(void)
- 	omap2_clk_disable_autoidle_all();
- 
- 	/*
-+	 * A set rate of ABE DPLL inturn triggers a set rate of USB DPLL
-+	 * when its in bypass. So always lock USB before ABE DPLL.
-+	 */
-+	/*
-+	 * Lock USB DPLL on OMAP4 devices so that the L3INIT power
-+	 * domain can transition to retention state when not in use.
-+	 */
-+	rc = clk_set_rate(&dpll_usb_ck, OMAP4_DPLL_USB_DEFFREQ);
-+	if (rc)
-+		pr_err("%s: failed to configure USB DPLL!\n", __func__);
-+
-+	/*
- 	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
- 	 * state when turning the ABE clock domain. Workaround this by
- 	 * locking the ABE DPLL on boot.
-@@ -1718,13 +1730,5 @@ int __init omap4xxx_clk_init(void)
- 	if (rc)
- 		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
- 
--	/*
--	 * Lock USB DPLL on OMAP4 devices so that the L3INIT power
--	 * domain can transition to retention state when not in use.
--	 */
--	rc = clk_set_rate(&dpll_usb_ck, OMAP4_DPLL_USB_DEFFREQ);
--	if (rc)
--		pr_err("%s: failed to configure USB DPLL!\n", __func__);
--
- 	return 0;
- }
--- 
-1.7.9.5
+Daniel
