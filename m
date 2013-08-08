@@ -1,79 +1,70 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu,  8 Aug 2013 12:38:44 +0200
-Subject: [PATCH v3 14/14] mmc: tmio-mmc: Remove .set_pwr() callback from
- platform data
-In-Reply-To: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1375958324-29683-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 8 Aug 2013 06:44:37 -0400
+Subject: [PATCH 4/5] clocksource: armada-370-xp: Fix device-tree binding
+In-Reply-To: <1375919556-24104-5-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1375919556-24104-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1375919556-24104-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130808104437.GE8204@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .set_pwr() callback isn't used anymore as all platforms register
-GPIO-controlled regulators. Remove it.
++ devicetree ml
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- drivers/mmc/host/tmio_mmc.h     | 1 -
- drivers/mmc/host/tmio_mmc_pio.c | 7 -------
- include/linux/mfd/tmio.h        | 1 -
- 3 files changed, 9 deletions(-)
-
-diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
-index 86fd21e..39c2f45 100644
---- a/drivers/mmc/host/tmio_mmc.h
-+++ b/drivers/mmc/host/tmio_mmc.h
-@@ -68,7 +68,6 @@ struct tmio_mmc_host {
- 	enum tmio_mmc_power	power;
- 
- 	/* Callbacks for clock / power control */
--	void (*set_pwr)(struct platform_device *host, int state);
- 	void (*set_clk_div)(struct platform_device *host, int state);
- 
- 	/* pio related stuff */
-diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
-index b380225..67a3bf1 100644
---- a/drivers/mmc/host/tmio_mmc_pio.c
-+++ b/drivers/mmc/host/tmio_mmc_pio.c
-@@ -777,9 +777,6 @@ static void tmio_mmc_power_on(struct tmio_mmc_host *host, unsigned short vdd)
- 
- 	/* .set_ios() is returning void, so, no chance to report an error */
- 
--	if (host->set_pwr)
--		host->set_pwr(host->pdev, 1);
--
- 	if (!IS_ERR(mmc->supply.vmmc)) {
- 		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
- 		/*
-@@ -813,9 +810,6 @@ static void tmio_mmc_power_off(struct tmio_mmc_host *host)
- 
- 	if (!IS_ERR(mmc->supply.vmmc))
- 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
--
--	if (host->set_pwr)
--		host->set_pwr(host->pdev, 0);
- }
- 
- /* Set MMC clock / power.
-@@ -1002,7 +996,6 @@ int tmio_mmc_host_probe(struct tmio_mmc_host **host,
- 	_host->pdev = pdev;
- 	platform_set_drvdata(pdev, mmc);
- 
--	_host->set_pwr = pdata->set_pwr;
- 	_host->set_clk_div = pdata->set_clk_div;
- 
- 	/* SD control register space size is 0x200, 0x400 for bus_shift=1 */
-diff --git a/include/linux/mfd/tmio.h b/include/linux/mfd/tmio.h
-index b22883d..baa2346 100644
---- a/include/linux/mfd/tmio.h
-+++ b/include/linux/mfd/tmio.h
-@@ -106,7 +106,6 @@ struct tmio_mmc_data {
- 	struct tmio_mmc_dma		*dma;
- 	struct device			*dev;
- 	unsigned int			cd_gpio;
--	void (*set_pwr)(struct platform_device *host, int state);
- 	void (*set_clk_div)(struct platform_device *host, int state);
- 	int (*write16_hook)(struct tmio_mmc_host *host, int addr);
- 	/* clock management callbacks */
--- 
-1.8.1.5
+On Wed, Aug 07, 2013 at 08:52:35PM -0300, Ezequiel Garcia wrote:
+> This commit fixes the DT binding for the Armada 370/XP SoC timer.
+> The old "marvell,armada-370-xp-timer" compatible is marked deprecated and
+> new compatible strings: "marvell,armada-xp-timer" and "marvell,armada-370-timer"
+> are added instead.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  .../bindings/timer/marvell,armada-370-xp-timer.txt | 29 +++++++++++++++++++---
+>  1 file changed, 26 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> index 3638112..d6aeb5b 100644
+> --- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> @@ -2,7 +2,9 @@ Marvell Armada 370 and Armada XP Timers
+>  ---------------------------------------
+>  
+>  Required properties:
+> -- compatible: Should be "marvell,armada-370-xp-timer"
+> +- compatible: Should be either "marvell,armada-370-timer" or
+> +  "marvell,armada-xp-timer" as appropriate.
+> +  The older "marvell,armada-370-xp-timer" is DEPRECATED and shouldn't be used.
+>  - interrupts: Should contain the list of Global Timer interrupts and
+>    then local timer interrupts
+>  - reg: Should contain location and length for timers register. First
+> @@ -11,5 +13,26 @@ Required properties:
+>  - clocks: clock driving the timer hardware
+>  
+>  Optional properties:
+> -- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
+> -  Mhz fixed mode (available on Armada XP and not on Armada 370)
+> +- marvell,timer-25Mhz [DEPRECATED]:
+> +  Tells whether the Global timer supports the 25 Mhz fixed mode
+> +  (available on Armada XP and not on Armada 370).
+> +
+> +Examples:
+> +
+> +- Armada 370:
+> +
+> +	timer {
+> +		compatible = "marvell,armada-370-timer";
+> +		reg = <0x20300 0x30>, <0x21040 0x30>;
+> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+> +		clocks = <&coreclk 2>;
+> +	};
+> +
+> +- Armada XP:
+> +
+> +	timer {
+> +		compatible = "marvell,armada-xp-timer";
+> +		reg = <0x20300 0x30>, <0x21040 0x30>;
+> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+> +		clocks = <&coreclk 2>;
+> +	};
+> -- 
+> 1.8.1.5
+> 
