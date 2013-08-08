@@ -1,80 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 8 Aug 2013 08:09:49 -0500
-Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of
- Exynos SoCs
-In-Reply-To: <003801ce8eb7$d7647f10$862d7d30$@samsung.com>
-References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
- <CAL_JsqJdh5F0rK3koAW7DvRVU3RwS5pLgR5sV_Bak+K-6CrRFA@mail.gmail.com>
- <003801ce8eb7$d7647f10$862d7d30$@samsung.com>
-Message-ID: <CAL_Jsq+_5GekzXpjWrtKZi2jWuxHSJxkPmVC4zmakfjAYai=eA@mail.gmail.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Thu,  8 Aug 2013 15:11:10 +0200
+Subject: [PATCH 0/2] ARM: dts: mxs: add pinctrl header files to be able to use
+ symbolic names in dts
+Message-ID: <1375967472-7755-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 1, 2013 at 8:05 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
->> -----Original Message-----
->> From: Rob Herring [mailto:robherring2 at gmail.com]
->> Sent: Saturday, July 27, 2013 10:55 PM
->> On Fri, Jul 26, 2013 at 6:28 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
->> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
->> > ---
->> >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
->> >  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
->> >  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
->> >  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
->> >  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
->> >  5 files changed, 617 insertions(+), 0 deletions(-)
->> >  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
->> > b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
->> > new file mode 100644
->> > index 0000000..92f0a33
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
->> > @@ -0,0 +1,103 @@
->> > +Samsung Exynos4210 IOMMU H/W, System MMU (System Memory Management Unit)
->> > +
->> > +Samsung's Exynos architecture contains System MMU that enables scattered
->> > +physical memory chunks visible as a contiguous region to DMA-capable peripheral
->> > +devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
->> > +
->> > +System MMU is a sort of IOMMU and support identical translation table format to
->> > +ARMv7 translation tables with minimum set of page properties including access
->> > +permissions, shareability and security protection. In addition, System MMU has
->> > +another capabilities like L2 TLB or block-fetch buffers to minimize translation
->> > +latency.
->> > +
->> > +A System MMU is dedicated to a single master peripheral device.  Thus, it is
->> > +important to specify the correct System MMU in the device node of its master
->> > +device. Whereas a System MMU is dedicated to a master device, the master device
->> > +may have more than one System MMU.
->>
->> I don't follow the last sentence. Can you elaborate on the type of
->> connection you are talking about.
->>
-> Grant also addressed that.
-> He corrected the sentence like the following:
->
->   " Can I suggest rewriting the last two sentences to:
->      The master device node must correctly specify at least one
->      SystemMMU. A master  device may have more than one System MMU. "
->
-> I will change the sentence
->
->> Also, please align with the ARM system MMU binding that Will Deacon
->> has submitted particularly in terms of how master connections are
->> described.
->>
-> I didn't check it.
->
-> Should this align with ARM System MMU bindings?
-> System MMU in Exynos SoC is different from ARM System MMU.
-> It does not follows the specifications of ARM System MMU.
+These patches add header files for the MXS arch to
+include/dt-bindings/pinctrl and convert the DTS files to use the pad
+definitions from thoose files rather than hardcoding the pinctrl
+values.
 
-I'm not saying the h/w is the same or even the same spec, but how you
-describe a master to iommu connection needs to be done in the same
-way. This should be done in the same way for ALL iommu's. And if what
-is defined does not work for you, then we need to understand that and
-fix the binding now.
+The conversion from numerical representation to symbolic names has
+been done with a perl script that checked the definitions for
+consistency of the pin function comments and the numerical values
+used.
 
-Rob
+This revealed an inconsistency in:
+arch/arm/boot/dts/imx28-apx4devkit.dts, which pretended to use
+MX28_PAD_SSP2_SS0__GPIO_2_19 in the comment (equivalent to 0x2133),
+but actually was using MX28_PAD_SSP2_SS0__AUART3_TX by the numerical
+value 0x2131.
+
+I decided to use the (probably wrong) assignment
+MX28_PAD_SSP2_SS0__AUART3_TX because that is what is actually
+configured without this patch.
+
+ arch/arm/boot/dts/imx23-evk.dts           |   10 -
+ arch/arm/boot/dts/imx23-olinuxino.dts     |    6 
+ arch/arm/boot/dts/imx23-stmp378x_devb.dts |    6 
+ arch/arm/boot/dts/imx23.dtsi              |  163 ++++++++--------
+ arch/arm/boot/dts/imx28-apf28.dts         |    2 
+ arch/arm/boot/dts/imx28-apf28dev.dts      |   24 +-
+ arch/arm/boot/dts/imx28-apx4devkit.dts    |   38 +--
+ arch/arm/boot/dts/imx28-cfa10036.dts      |    8 
+ arch/arm/boot/dts/imx28-cfa10037.dts      |    6 
+ arch/arm/boot/dts/imx28-cfa10049.dts      |   84 ++++----
+ arch/arm/boot/dts/imx28-cfa10055.dts      |   56 ++---
+ arch/arm/boot/dts/imx28-cfa10056.dts      |   20 +-
+ arch/arm/boot/dts/imx28-cfa10057.dts      |   48 ++--
+ arch/arm/boot/dts/imx28-cfa10058.dts      |   12 -
+ arch/arm/boot/dts/imx28-evk.dts           |   32 +--
+ arch/arm/boot/dts/imx28-m28evk.dts        |   16 -
+ arch/arm/boot/dts/imx28-sps1.dts          |    8 
+ arch/arm/boot/dts/imx28-tx28.dts          |   85 ++++----
+ arch/arm/boot/dts/imx28.dtsi              |  345 +++++++++++++++++------------------
+ include/dt-bindings/pinctrl/mx23.h        |  333 ++++++++++++++++++++++++++++++++++
+ include/dt-bindings/pinctrl/mx28.h        |  506 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/pinctrl/mxs.h         |   31 +++
+ 22 files changed, 1356 insertions(+), 483 deletions(-)
