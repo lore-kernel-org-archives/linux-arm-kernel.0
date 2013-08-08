@@ -1,57 +1,41 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 8 Aug 2013 11:22:02 -0500
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <5203C211.7040207@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com> <5203C211.7040207@ti.com>
-Message-ID: <5203C5AA.9020507@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 8 Aug 2013 18:25:18 +0200
+Subject: [PATCH 0/2] Support for another NSA310
+In-Reply-To: <5203C5A4.8000906@harsszegi.com>
+References: <1374079910-24345-1-git-send-email-andrew@lunn.ch>
+ <20130808135338.GF29815@lunn.ch> <5203C5A4.8000906@harsszegi.com>
+Message-ID: <20130808162518.GK29815@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 11:06 AM, Dave Gerlach wrote:
-> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
->> $subject and patch don't match.
->>
->> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
->>> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>>>    In reference to
->>>> the M3 handling it, the M3 wouldn't know which devices have a driver
->>>> bound and which don't.
->>> Does it need to? M3 firmware can pretty much define "I will force the
->>> device into low power state, and if the drivers dont handle things
->>> properly, fix the darned driver". M3 behavior should be considered as
->>> a "hardware" as far as Linux running on MPU is concerned, and
->>> firmware helps change the behavior by accounting for SoC quirks. *if*
->>> we have ability to handle this in the firmware, there is no need to
->>> carry this in Linux.
->>>
->> I agree with Nishant. I don't like this patch and IIRC, I gave same
->> comment in the last version. Linux need not know about all such firmware
->> quirks. Also all these M3 specific stuff, should be done somewhere
->> else. Probably having a small M3 driver won't be a bad idea.
->>
->> Regards,
->> Santosh
->>
->
-> I am not opposed to doing it this way and letting the M3 firmware handle
-> idling these modules, however the one concern raised in the last series
-> is that an approach that does not acknowledge drivers will hide driver
-> PM bugs. I suppose as long as I make sure to document that the devices
-> are being idled by the M3 firmware this may not be an issue. I will look
-> into implementing this.
+On Thu, Aug 08, 2013 at 06:21:56PM +0200, Tibor Harsszegi wrote:
+> >On Wed, Jul 17, 2013 at 06:51:48PM +0200, Andrew Lunn wrote:
+> >>There are apparently three different designs of the ZyXEL NSA310 NAS
+> >>box. This patchset adds support for a second one, refactoring the
+> >>common DTS parts into a shared DTSI file.
+> >>
+> >>What is not clear is naming. There is no obvious marketing name
+> >>difference, hardware version label, etc. So for the same of argument,
+> >>this new device uses the name NSA310a in DTS.
+> >>
+> >>The second patch adds to the kirkwood_defconfig drivers not already in
+> >>the default configuration, plus some additional drivers used by other
+> >>kirkwood devices. The aim is to improve build test coverage.
+> >I've rebased these patches onto 3.11-rc4, which contains Thomas's PCI
+> >fix, so that the Ethernet should work again. There are no changes to
+> >my patches. It would be nice if people could test on there hardware
+> >and send some tested-by:
 
-yes, but doing it in M3 will ensure it is a "hardware behavior" - from 
-debug perspective, you could make M3 firmware "release mode" - which it 
-is stringent in terms of forcing all down to target state, OR "debug" 
-where it does nothing - thus helping pick up driver bugs. With M3 in the 
-picture, we now have an awesome flexibility of "defining what the 
-hardware behavior should be" - that allows us to have lesser code to 
-carry in kernel- especially ones(like quirks) that does not really add 
-value from power saving strategies.
+> Hello, can confirm the nsa310a works fine (sytem boots, LEDs are
+> working, eth0
+> is up and running).
 
--- 
-Regards,
-Nishanth Menon
+Hi Tibor
+
+thanks for testing. Is it O.K. if i add a Tested-By: tag with your
+name. See:
+
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n423
+
+Thanks
+	Andrew
