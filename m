@@ -1,34 +1,43 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 08 Aug 2013 22:38:17 +0200
-Subject: [PATCH] ARM: pxa: make pwm driver module_platform_driver
-In-Reply-To: <1375981237-7167-1-git-send-email-mikedunn@newsguy.com> (Mike
- Dunn's message of "Thu, 8 Aug 2013 10:00:37 -0700")
-References: <1375981237-7167-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <87fvuj2a12.fsf@free.fr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Aug 2013 14:40:22 -0600
+Subject: [PATCH v2 2/3] ARM: dt: t114 dalmore: add dt entry for nct1008
+In-Reply-To: <52040146.7060703@cogentembedded.com>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-3-git-send-email-wni@nvidia.com>
+ <52040146.7060703@cogentembedded.com>
+Message-ID: <52040236.2080701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Dunn <mikedunn@newsguy.com> writes:
+On 08/08/2013 02:36 PM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 08/08/2013 10:56 AM, Wei Ni wrote:
+> 
+>> Enable thermal sensor nct1008 for t114 dalmore.
+> 
+>> Signed-off-by: Wei Ni <wni@nvidia.com>
+>> ---
+>>   arch/arm/boot/dts/tegra114-dalmore.dts |   10 +++++++++-
+>>   1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+>> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts
+>> b/arch/arm/boot/dts/tegra114-dalmore.dts
+>> index b5a42f0..9d4d2b2 100644
+>> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
+>> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+>> @@ -738,6 +738,14 @@
+>>               realtek,ldo1-en-gpios =
+>>                   <&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
+>>           };
+>> +
+>> +        nct1008 {
+> 
+>    ePAPR [1] says: "the name of a node should be somewhat generic,
+> reflecting the function of the device and not its precise programming
+> model". So I suggest "thermal"
 
-> Commit 76abbdde2d95a3807d0dc6bf9f84d03d0dbd4f3d
->
->     pwm: Add sysfs interface
->
-> causes a kernel oops due to a null pointer dereference on pxa platforms.  This
-> happens because the class added by the patch is registered in a subsys_initcall
-> (initcall4), but the pxa pwm driver is registered in arch_initcall (initcall3).
-> If the class is not registered before the driver probe function runs, the oops
-> occurs in device_add() when the uninitialized pointers in struct class are
-> dereferenced.  I don't see a reason that the driver must be an arch_initcall, so
-> this patch makes it a regular module_platform_driver (initcall6), preventing the
-> oops.
-
-That makes sense.
-The only users I'm aware of for PWM on pxa is backlight, and that can certainly
-wait for regular driver initcall level. I'm not aware of any usage in early boot
-stages.
-
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
--- 
-Robert
+True, although there's quite some precedent for node-names being the
+chip name for external chips in existing DTs. If we change this node
+name, I'd like to see a patch that makes all the other "nct1008" nodes
+match the new name...
