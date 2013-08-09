@@ -1,55 +1,58 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 9 Aug 2013 15:46:11 +0200
-Subject: [PATCH 4/7] pinctrl: imx27: imx27 pincontrol driver
-In-Reply-To: <20130805061204.GD24629@S2101-09.ap.freescale.net>
+Date: Fri, 9 Aug 2013 15:54:00 +0200
+Subject: [PATCH 6/7] ARM: dts: imx27 pinctrl
+In-Reply-To: <20130805061819.GF24629@S2101-09.ap.freescale.net>
 References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-5-git-send-email-mpa@pengutronix.de>
- <20130805061204.GD24629@S2101-09.ap.freescale.net>
-Message-ID: <20130809134611.GF13664@s25.your-server.de>
+ <1375439907-10462-7-git-send-email-mpa@pengutronix.de>
+ <20130805061819.GF24629@S2101-09.ap.freescale.net>
+Message-ID: <20130809135400.GG13664@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 02:12:06PM +0800, Shawn Guo wrote:
-> On Fri, Aug 02, 2013 at 12:38:24PM +0200, Markus Pargmann wrote:
+On Mon, Aug 05, 2013 at 02:18:21PM +0800, Shawn Guo wrote:
+> On Fri, Aug 02, 2013 at 12:38:26PM +0200, Markus Pargmann wrote:
+> > Pinctrl driver node and pin group definitions for other driver nodes.
+> > 
 > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > > ---
-> >  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  53 +++
-> >  drivers/pinctrl/Kconfig                            |   8 +
-> >  drivers/pinctrl/Makefile                           |   1 +
-> >  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
-> >  4 files changed, 539 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-> >  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+> >  arch/arm/boot/dts/imx27.dtsi | 216 +++++++++++++++++++++++++++++++------------
+> >  1 file changed, 158 insertions(+), 58 deletions(-)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-> > new file mode 100644
-> > index 0000000..3352d94
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-> > @@ -0,0 +1,53 @@
-> > +* Freescale IMX27 IOMUX Controller
-> > +
-> > +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
-> > +and usage.
-> > +
-> > +The iomuxc driver node can have pin configuration and gpio subnodes. gpio
-> > +nodes defined as childs will share the registers with the iomuxc driver.
-> > +Please have a look into
-> > +Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt for information about
-> > +the gpio properties.
-> > +
-> > +Required properties:
-> > +- compatible: "fsl,imx27-iomuxc"
-> > +
-> > +Required properties for pin configuration node:
-> > +- fsl,pins: three integers array, represents a group of pins mux and config
-> > +  setting. The format is fsl,pins = <PIN MUX_ID CONFIG>. PIN and MUX_ID are
+> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> > index 76cd89f..57a4855 100644
+> > --- a/arch/arm/boot/dts/imx27.dtsi
+> > +++ b/arch/arm/boot/dts/imx27.dtsi
+> > @@ -10,6 +10,7 @@
+> >   */
+> >  
+> >  #include "skeleton.dtsi"
+> > +#include "imx27-pinfunc.h"
+> >  
+> >  / {
+> >  	aliases {
+> > @@ -142,6 +143,8 @@
+> >  				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
+> >  				reg = <0x10009000 0x1000>;
+> >  				clocks = <&clks 35>;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_owire>;
 > 
-> Neither here nor imx27-pinfunc.h is PIN documented clearly.  Also,
-> imx27-pinfunc.h names MUX_CONFIG for what we name MUX_ID here.
+> These should be added in board level dts file.
+> 
+> Shawn
+> 
+> >  				status = "disabled";
+> >  			};
+> 
+> <snip>
+> 
+> > +				fec {
+> > +					pinctrl_fec: fec-1 {
+> 
+> I suggest we name the node and label in the same pattern we use in
+> imx5/6.  I do not know how you will label node fec-2.
 
-I added PIN documentation in imx27-pinfunc.h and the bindings
-docs. Fixed MUX_ID/MUX_CONFIG.
+Will fix both.
 
 Thanks,
 
@@ -58,42 +61,28 @@ Markus
 > 
 > Shawn
 > 
-> > +  defined as macros in arch/arm/boot/dts/imx27-pinfunc.h. CONFIG can be 0 or
-> > +  1, meaning Pullup disable/enable.
-> > +
-> > +Example:
-> > +
-> > +iomuxc: iomuxc at 10015000 {
-> > +	compatible = "fsl,imx27-iomuxc";
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +	reg = <0x10015000 0x600>;
-> > +
-> > +	gpio1: gpio at 10015000 {
-> > +		compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
-> > +		reg = <0x10015000>;
-> > +		interrupts = <8>;
-> > +		gpio-controller;
-> > +		#gpio-cells = <2>;
-> > +		interrupt-controller;
-> > +		#interrupt-cells = <2>;
-> > +	};
-> > +
-> > +	...
-> > +
-> > +	uart {
-> > +		pinctrl_uart1: uart-1 {
-> > +			fsl,pins = <
-> > +				MX27_PAD_UART1_TXD__UART1_TXD 0x0
-> > +				MX27_PAD_UART1_RXD__UART1_RXD 0x0
-> > +				MX27_PAD_UART1_CTS__UART1_CTS 0x0
-> > +				MX27_PAD_UART1_RTS__UART1_RTS 0x0
-> > +			>;
-> > +		};
-> > +
-> > +		...
-> > +	};
-> > +};
+> > +						fsl,pins = <
+> > +							MX27_PAD_SD3_CMD__FEC_TXD0 0x0
+> > +							MX27_PAD_SD3_CLK__FEC_TXD1 0x0
+> > +							MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
+> > +							MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
+> > +							MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
+> > +							MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
+> > +							MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
+> > +							MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
+> > +							MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
+> > +							MX27_PAD_ATA_DATA7__FEC_MDC 0x0
+> > +							MX27_PAD_ATA_DATA8__FEC_CRS 0x0
+> > +							MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
+> > +							MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
+> > +							MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
+> > +							MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
+> > +							MX27_PAD_ATA_DATA13__FEC_COL 0x0
+> > +							MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
+> > +							MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
+> > +						>;
+> > +					};
+> > +				};
 > 
 > 
 
