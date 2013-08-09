@@ -1,197 +1,126 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 09 Aug 2013 11:32:42 +0100
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
-References: <51F77D93.4030505@linaro.org> <51F97842.6050200@linaro.org>
- <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
- <51F97CE3.9030306@linaro.org>
- <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
- <51F99747.4060901@linaro.org>
- <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
-Message-ID: <5204C54A.9020105@st.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 09 Aug 2013 12:47:35 +0200
+Subject: [PATCH 04/14] ARM: shmobile: sh73a0: Remove ->init_machine()
+ special case
+In-Reply-To: <20130809094832.6530.9438.sendpatchset@w520>
+References: <20130809094748.6530.16511.sendpatchset@w520>
+ <20130809094832.6530.9438.sendpatchset@w520>
+Message-ID: <1580455.O5Pubhdtgp@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/13 18:11, S?ren Brinkmann wrote:
-> Hi Daniel,
-> 
-> On Thu, Aug 01, 2013 at 07:48:04PM +0200, Daniel Lezcano wrote:
->> On 08/01/2013 07:43 PM, S?ren Brinkmann wrote:
->>> On Thu, Aug 01, 2013 at 07:29:12PM +0200, Daniel Lezcano wrote:
->>>> On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
->>>>> On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
->>>>>> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
->>>>>>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
->>>>>>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
->>>>>>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
->>>>>>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
->>>>>>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
->>>>>>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
->>>>>>>>>>>>> Hi Daniel,
->>>>>>>>>>>>>
->>>>>>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
->>>>>>>>>>>>> (snip)
->>>>>>>>>>>>>>
->>>>>>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
->>>>>>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
->>>>>>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
->>>>>>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
->>>>>>>>>>>>>> idle state, switching the local timer back in use.
->>>>>>>>>>>>>
->>>>>>>>>>>>> I've been thinking about this, trying to understand how this makes my
->>>>>>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
->>>>>>>>>>>>> would make the timer core switch to a broadcast device even though it
->>>>>>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
->>>>>>>>>>>>> something useless, but nothing wrong in a sense that it should result in
->>>>>>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
->>>>>>>>>>>>> always remain a mystery to me.
->>>>>>>>>>>>>
->>>>>>>>>>>>> Actually this more or less leads to the question: What is this
->>>>>>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
->>>>>>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
->>>>>>>>>>>>> hang pointing to some issue with that driver?
->>>>>>>>>>>>
->>>>>>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
->>>>>>>>>>>
->>>>>>>>>>> So, the correct run results (full output attached).
->>>>>>>>>>>
->>>>>>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
->>>>>>>>>>> broadcast device:
->>>>>>>>>>> 	Tick Device: mode:     1                                                         
->>>>>>>>>>> 	Broadcast device  
->>>>>>>>>>> 	Clock Event Device: ttc_clockevent
->>>>>>>>>>>
->>>>>>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
->>>>>>>>>>> enable the global timer, the twd timers are still used as local timers
->>>>>>>>>>> and the broadcast device is the global timer:
->>>>>>>>>>> 	Tick Device: mode:     1                                                         
->>>>>>>>>>> 	Broadcast device                                                                 
->>>>>>>>>>> 	Clock Event Device: arm_global_timer
->>>>>>>>>>>
->>>>>>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
->>>>>>>>>>> obtain this information for that case.
->>>>>>>>>>
->>>>>>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
->>>>>>>>>
->>>>>>>>> Right, that works. I forgot about that option after you mentioned, that
->>>>>>>>> it is most likely not that useful.
->>>>>>>>>
->>>>>>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
->>>>>>>>> the gt enabled and having maxcpus=1 set.
->>>>>>>>>
->>>>>>>>> /proc/timer_list:
->>>>>>>>> 	Tick Device: mode:     1
->>>>>>>>> 	Broadcast device
->>>>>>>>> 	Clock Event Device: arm_global_timer
->>>>>>>>> 	 max_delta_ns:   12884902005
->>>>>>>>> 	 min_delta_ns:   1000
->>>>>>>>> 	 mult:           715827876
->>>>>>>>> 	 shift:          31
->>>>>>>>> 	 mode:           3
->>>>>>>>
->>>>>>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
->>>>>>>>
->>>>>>>> The previous timer_list output you gave me when removing the offending
->>>>>>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
->>>>>>>>
->>>>>>>> Is it possible you try to get this output again right after onlining the
->>>>>>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
->>>>>>>
->>>>>>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
->>>>>>> and that didn't end well:
->>>>>>> 	# echo 1 > online && cat /proc/timer_list 
->>>>>>
->>>>>> Hmm, I was hoping to have a small delay before the kernel hangs but
->>>>>> apparently this is not the case... :(
->>>>>>
->>>>>> I suspect the global timer is shutdown at one moment but I don't
->>>>>> understand why and when.
->>>>>>
->>>>>> Can you add a stack trace in the "clockevents_shutdown" function with
->>>>>> the clockevent device name ? Perhaps, we may see at boot time an
->>>>>> interesting trace when it hangs.
->>>>>
->>>>> I did this change:
->>>>> 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
->>>>> 	index 38959c8..3ab11c1 100644
->>>>> 	--- a/kernel/time/clockevents.c
->>>>> 	+++ b/kernel/time/clockevents.c
->>>>> 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
->>>>> 	  */
->>>>> 	 void clockevents_shutdown(struct clock_event_device *dev)
->>>>> 	 {
->>>>> 	+       pr_info("ce->name:%s\n", dev->name);
->>>>> 	+       dump_stack();
->>>>> 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
->>>>> 	        dev->next_event.tv64 = KTIME_MAX;
->>>>> 	 }
->>>>>
->>>>> It is hit a few times during boot, so I attach a full boot log. I really
->>>>> don't know what to look for, but I hope you can spot something in it. I
->>>>> really appreciate you taking the time.
->>>>
->>>> Thanks for the traces.
->>>
->>> Sure.
->>>
->>>>
->>>> If you try without the ttc_clockevent configured in the kernel (but with
->>>> twd and gt), does it boot ?
->>>
->>> Absence of the TTC doesn't seem to make any difference. It hangs at the
->>> same location.
->>
->> Ok, IMO there is a problem with the broadcast device registration (may
->> be vs twd).
-> 
-> I have an idea, but no real evidence to prove it:
-> Some of the registers in the arm_global_timer are banked per CPU. I.e.
-> some code must be executed on the CPU the timer is associated with
-> (struct clock_event_device.cpumask) to have the intended effect
-> As far as I can tell, there is no guarantee, that the set_mode()
-> and program_next_event() calls execute on the correct CPU.
-> If this was correct, shutting down the timer for the CPU entering
-> idle might actually shut down the timer for the running CPU, if
-> set_mode() executes on the CPU which is _not_ about to enter idle.
+Hi Magnus,
 
-Hi S?ren,
-Am able to reproduce similar issue on StiH415 SOC by enabling both
-global_timer and twd and using cpuidle driver like zynq.
+Thank you for the patch.
 
-When CPU0 goes to idle, I noticed that the global timer used for
-boardcast is actually scheduled on wrong cpu.
-My traces for printk like this
-	printk("DEBUG: %s on CPU:%d CPUMASK:%s\n", __FUNCTION__,
-smp_processor_id(), scpumask);
+On Friday 09 August 2013 18:48:32 Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> No need to special case sh73a0 ->init_machine(),
+> so get rid of undesired cpufreq platform device
+> from the generic long term sh73a0 DT support code.
+> 
+> For short term support on KZM9D the DT reference
+> implementation now adds a "cpufreq-cpu0" platform
+> device so that can be used for development.
 
-shows:
+Doesn't this go against the spirit of the -reference platforms that don't use 
+DT devices in board code ? I don't see an urgent need for this, how far along 
+are the DT cpufreq-related bindings ?
 
-DEBUG: gt_clockevent_set_mode on CPU:1 CPUMASK: 0
-DEBUG: gt_clockevent_set_next_event on CPU:1 CPUMASK:0
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  arch/arm/mach-shmobile/board-kzm9g-reference.c |    9 ++++++++-
+>  arch/arm/mach-shmobile/include/mach/sh73a0.h   |    2 +- 
+>  arch/arm/mach-shmobile/setup-sh73a0.c          |   23  ++++++--------------
+>  3 files changed, 15 insertions(+), 19 deletions(-)
+> 
+> --- 0001/arch/arm/mach-shmobile/board-kzm9g-reference.c
+> +++ work/arch/arm/mach-shmobile/board-kzm9g-reference.c	2013-08-08
+> 15:56:28.000000000 +0900 @@ -33,7 +33,14 @@
+> 
+>  static void __init kzm_init(void)
+>  {
+> -	sh73a0_add_standard_devices_dt();
+> +	/* clocks are setup late during boot in the case of DT */
+> +	sh73a0_clock_init();
+> +
+> +	sh73a0_add_dt_devices();
+> +
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +
+> +	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+> 
+>  #ifdef CONFIG_CACHE_L2X0
+>  	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
+> --- 0001/arch/arm/mach-shmobile/include/mach/sh73a0.h
+> +++ work/arch/arm/mach-shmobile/include/mach/sh73a0.h	2013-08-08
+> 15:54:26.000000000 +0900 @@ -78,7 +78,7 @@ extern void sh73a0_map_io(void);
+>  extern void sh73a0_earlytimer_init(void);
+>  extern void sh73a0_add_early_devices(void);
+>  extern void sh73a0_add_standard_devices(void);
+> -extern void sh73a0_add_standard_devices_dt(void);
+> +extern void sh73a0_add_dt_devices(void);
+>  extern void sh73a0_clock_init(void);
+>  extern void sh73a0_pinmux_init(void);
+>  extern void sh73a0_pm_init(void);
+> --- 0001/arch/arm/mach-shmobile/setup-sh73a0.c
+> +++ work/arch/arm/mach-shmobile/setup-sh73a0.c	2013-08-08 
+15:57:42.000000000
+> +0900 @@ -23,7 +23,6 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/of_platform.h>
+>  #include <linux/delay.h>
+>  #include <linux/input.h>
+>  #include <linux/io.h>
+> @@ -901,6 +900,12 @@ static struct platform_device *sh73a0_la
+> 
+>  #define SRCR2          IOMEM(0xe61580b0)
+> 
+> +void __init sh73a0_add_dt_devices(void)
+> +{
+> +	platform_add_devices(sh73a0_devices_dt,
+> +			     ARRAY_SIZE(sh73a0_devices_dt));
+> +}
+> +
+>  void __init sh73a0_add_standard_devices(void)
+>  {
+>  	/* Clear software reset bit on SY-DMAC module */
+> @@ -943,21 +948,6 @@ void __init sh73a0_add_early_devices(voi
+> 
+>  #ifdef CONFIG_USE_OF
+> 
+> -void __init sh73a0_add_standard_devices_dt(void)
+> -{
+> -	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1,
+> }; -
+> -	/* clocks are setup late during boot in the case of DT */
+> -	sh73a0_clock_init();
+> -
+> -	platform_add_devices(sh73a0_devices_dt,
+> -			     ARRAY_SIZE(sh73a0_devices_dt));
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> -
+> -	/* Instantiate cpufreq-cpu0 */
+> -	platform_device_register_full(&devinfo);
+> -}
+> -
+>  static const char *sh73a0_boards_compat_dt[] __initdata = {
+>  	"renesas,sh73a0",
+>  	NULL,
+> @@ -968,7 +958,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH7
+>  	.map_io		= sh73a0_map_io,
+>  	.init_early	= sh73a0_init_delay,
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+> -	.init_machine	= sh73a0_add_standard_devices_dt,
+>  	.dt_compat	= sh73a0_boards_compat_dt,
+>  MACHINE_END
+>  #endif /* CONFIG_USE_OF */
 
-Which indicates that setting the mode and next_event for a clkevent with
-cpumask 0 is scheduled on cpu1, this will generate an global timer
-interrupt on cpu1 rather than cpu0.
+-- 
+Regards,
 
-This might be the reason for cpu0 not coming out of the cpu_idle_loop.
-
-Thanks,
-srini
-> 
-> I tried to prove this by adding some really ugly smp_call_any() wrappers
-> in kernel/time/clockevents.c for the calls to set_mode() and
-> program_net_event() but that ends in all kinds of dead locks.
-> 
-> 	S?ren
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Laurent Pinchart
