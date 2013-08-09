@@ -1,187 +1,160 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Fri, 9 Aug 2013 14:28:50 -0700
-Subject: [PATCH 1/2] power: Add APM X-Gene system reboot driver
-In-Reply-To: <1372797539-13111-2-git-send-email-lho@apm.com>
-References: <1372797539-13111-1-git-send-email-lho@apm.com>
- <1372797539-13111-2-git-send-email-lho@apm.com>
-Message-ID: <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 9 Aug 2013 16:35:41 -0500
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <87bo5661sv.fsf@kernel.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
+ <52038E88.2050604@ti.com> <5203B336.90102@ti.com> <5203C211.7040207@ti.com>
+ <87iozfga1t.fsf@kernel.org> <52040E67.4050402@ti.com>
+ <87pptndbtj.fsf@kernel.org> <520506B6.7060806@ti.com>
+ <87wqnu9720.fsf@kernel.org> <52051A9B.1060606@ti.com>
+ <87bo5661sv.fsf@kernel.org>
+Message-ID: <520560AD.6030000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 02:38:58PM -0600, Loc Ho wrote:
-> power: Add APM X-Gene SoC system reboot driver. This driver handles only
-> system reboot. System shutdown is board specific and can be handled by board
-> driver or GPIO based shutdown driver.
-> 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-> ---
+On 08/09/2013 03:34 PM, Kevin Hilman wrote:
+> Nishanth Menon <nm@ti.com> writes:
+>
+>> On 08/09/2013 11:12 AM, Kevin Hilman wrote:
+>>> Nishanth Menon <nm@ti.com> writes:
+>>>
+>>>> On 08/08/2013 06:04 PM, Kevin Hilman wrote:
+>>>>> Nishanth Menon <nm@ti.com> writes:
+>>>>>
+>>>>>> On 08/08/2013 04:14 PM, Kevin Hilman wrote:
+>>>>>>> Dave Gerlach <d-gerlach@ti.com> writes:
+>>>>>>>
+>>>>>>>> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
+>>>>>>>>> $subject and patch don't match.
+>>>>>>>>>
+>>>>>>>>> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
+>>>>>>>>>> On 08/08/2013 03:45 AM, Russ Dill wrote:
+>>>>>>>>>>>        In reference to
+>>>>>>>>>>> the M3 handling it, the M3 wouldn't know which devices have a driver
+>>>>>>>>>>> bound and which don't.
+>>>>>>>>>> Does it need to? M3 firmware can pretty much define "I will force
+>>>>>>>>>> the device into low power state, and if the drivers dont handle
+>>>>>>>>>> things properly, fix the darned driver". M3 behavior should be
+>>>>>>>>>> considered as a "hardware" as far as Linux running on MPU is
+>>>>>>>>>> concerned, and firmware helps change the behavior by accounting for
+>>>>>>>>>> SoC quirks. *if* we have ability to handle this in the firmware,
+>>>>>>>>>> there is no need to carry this in Linux.
+>>>>>>>>>>
+>>>>>>>>> I agree with Nishant. I don't like this patch and IIRC, I gave same
+>>>>>>>>> comment in the last version. Linux need not know about all such firmware
+>>>>>>>>> quirks. Also all these M3 specific stuff, should be done somewhere
+>>>>>>>>> else. Probably having a small M3 driver won't be a bad idea.
+>>>>>>>>
+>>>>>>>> I am not opposed to doing it this way and letting the M3 firmware
+>>>>>>>> handle idling these modules, however the one concern raised in the
+>>>>>>>> last series is that an approach that does not acknowledge drivers will
+>>>>>>>> hide driver PM bugs. I suppose as long as I make sure to document that
+>>>>>>>> the devices are being idled by the M3 firmware this may not be an
+>>>>>>>> issue. I will look into implementing this.
+>>>>>>>
+>>>>>>> No, please don't start idling devices in firmware that are otherwise
+>>>>>>> managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
+>>>>>>> these devices, it should manage their bugs too.
+>>>>>>
+>>>>>>>
+>>>>>>> This is not just about idling devices.  This is about handling broken IP
+>>>>>>> blocks whose power-on reset state does not allow the the powerdomain to
+>>>>>>> reach its target state.  That's just bad hardware design.
+>>>>>>
+>>>>>> Right, this is where M3 can help -> provide a consistent state for
+>>>>>> linux kernel to work with. by the fact that we want to keep majority
+>>>>>> of the power code inside master CPU, we are just letting M3 help us
+>>>>>> with nothing major at all..
+>>>>>
+>>>>> heh, I would say HW design bugs like this are more than "nothing major
+>>>>> at all." :)
+>>>>>
+>>>>>> tiny stuff like these can help "fix" the hardware design quirks by
+>>>>>> hiding it behind the firmware and modifying the hardware behavior.
+>>>>>
+>>>>> I disagree here.  I'm a firmware minimalist, and hiding bugs like this
+>>>>> in the firmware is wrong when Linux is otherwise managing these devices.
+>>>>> It also imposes criteria on the firmware of future SoCs that doesn't
+>>>>> belong there either.  IMO, the only stuff the firmware should do is what
+>>>>> Linux *cannot* do.
+>>>>>
+>>>>> Remember, this only needs to happen when there isn't a driver for these
+>>>>> devices.  Should we communicate to the firmware that the OS has no
+>>>>> driver, so please enable the hack?  I think not.
+>>>>
+>>>> My view is that the M3 should *ignore* the presence/existence of MPU's
+>>>> drivers. M3 will do whatever to force the system to go to suspend once
+>>>> notified - this saves us the prehistoric perpetual trouble when
+>>>> drivers have bugs (which get exposed in weird usage scenarios) in
+>>>> production systems, we dont get any hardware help to fix them up while
+>>>> attempting low power states and system never really hits low power
+>>>> state. This was always because OMAP and it's derivatives have been
+>>>> "democratic" in power management - if every hardware block achieves
+>>>> proper state, then we achieve a system-wide low power state.
+>>>>
+>>>>>
+>>>>>> I know it breaks the purity of role, but as the
+>>>>>> next evolution, we might want to consider M3 something like an
+>>>>>> "accelerator" for power management activity.. (not saying it is that
+>>>>>> fast.. but conceptually).
+>>>>>
+>>>>> Yes, it breaks the purity of role, and makes it hard to maintain and
+>>>>> extend to future SoCs.  As a maintainer, that's a red flag.  IMO, the
+>>>>> roles need to be kept clear.  The M3 manages some devices and the
+>>>>> interconnect that MPU/Linux cannot, the rest are managed by Linux.
+>>>>
+>>>> suspend is a very controlled state as against cpuidle where driver
+>>>> knowledge is necessary and in fact mandatory. drivers are supposed to
+>>>> release their resources - and even though we test the hell out of
+>>>> them, we do have paths untrodden when it comes to production systems.
+>>>
+>>> Since folks don't seem to care about idle for AM33xx (starting with the
+>>> hw designers, from what I can tell), you have the luxury of thinking
+>>> only about suspend, where firmware can be heavy handed and force things
+>>> into submission.  Unfortunately, with cpuidle, life is not that easy and
+>>> you have to have cooperation of the device drivers.  Coordinating that
+>>> with firmware is not so simple, to put it mildly.
+>>>
+>>> Any SW/firmware design that does not account for *both* static PM
+>>> (suspend/resume) and dynamic PM (runtime PM + CPUidle) is not long-term
+>>> maintainable, and thus ready for mainline IMO.  (BTW, this is another
+>>> theme from previous reviews of this series.)
+>>
+>> I completely agree with you.  But is'nt the specific suspend state we
+>> are attempting to achieve on AM335x just tooo expensive latency wise
+>> for being even considered for cpuidle?
+>>
+>> I am sure you recollect the latencies involved in OMAP3 OFF mode Vs
+>> OMAP4+ OFF mode - which basically kicked out OFF mode from OMAP4
+>> cpuidle C states? - it was practically useless
+>>
+>> in this *specific* power state we are attempting, we do a bunch of i2c
+>> operations, etc, in short something that cannot even be considered for
+>> cpuidle.
+>>
+>> Considering this, we can consider the same only for suspend path -
+>> hence allowing firmware to do more here.
+>>
+>>
+>> This does not conflict with cpuidle (which controls MPU) or runtime PM
+>> (which kicks in once you have drivers active, but if drivers get
+>> active, we dont need to deal with this crap).
+>>
+>> Dont you think this helps the specific case to move this into firmware
+>> rather than into omap_device?
+>
+> No, I don't.
+>
+> That means the firmware design is based on several assumptions about
+> what Linux can and can't do in idle, and then imposing that on future
+> Linux designs as well.  I dont' buy it.
 
-The patch looks great, thanks for it! Just a few minor issues I noticed...
+OK, I back out my proposal. Will let Dave try out a generic solution in 
+kernel and comment back.
 
->  drivers/power/reset/Kconfig        |    7 +++
->  drivers/power/reset/Makefile       |    1 +
->  drivers/power/reset/xgene-reboot.c |  101 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 109 insertions(+), 0 deletions(-)
->  create mode 100755 drivers/power/reset/xgene-reboot.c
-> 
-> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> index 349e9ae..c41a7de 100644
-> --- a/drivers/power/reset/Kconfig
-> +++ b/drivers/power/reset/Kconfig
-> @@ -37,3 +37,10 @@ config POWER_RESET_VEXPRESS
->  	help
->  	  Power off and reset support for the ARM Ltd. Versatile
->  	  Express boards.
-> +
-> +config POWER_RESET_XGENE
-> +        bool
-> +	default y if ARM64
 
-This is not good. You don't want to select the driver for all ARM64
-builds. I changed it to 'depends on' and made the driver optionally
-selectable.
-
-> +        depends on POWER_RESET	
-> +        help
-> +          Reboot support for the APM SoC X-Gene Eval boards.
-
-Some whitespace issues here...
-
-> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> index 372807f..e75d54c 100644
-> --- a/drivers/power/reset/Makefile
-> +++ b/drivers/power/reset/Makefile
-> @@ -2,3 +2,4 @@ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
->  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
->  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
->  obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
-> +obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
-> diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
-> new file mode 100755
-
-Executable bit on the source file?..
-
-> index 0000000..e6e4178
-> --- /dev/null
-> +++ b/drivers/power/reset/xgene-reboot.c
-> @@ -0,0 +1,101 @@
-> +/*
-> + * xgene-reboot.c - AppliedMicro X-Gene SoC Reboot Driver
-
-No need for the file name in the file itself.
-
-> + *
-> + * Copyright (c) 2013, Applied Micro Circuits Corporation
-> + * Author: Feng Kan <fkan@apm.com>
-> + * Author: Loc Ho <lho@apm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-> + * MA 02111-1307 USA
-> + *
-> + * This driver provides system reboot functionality for APM X-Gene SoC.
-> + * For system shutdown, this is board specify. If a board designer
-> + * implements GPIO shutdown, use the gpio-poweroff.c driver.
-> + *
-> + */
-> +#include <linux/io.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/stat.h>
-> +#include <linux/slab.h>
-> +#include <asm/system_misc.h>
-> +
-> +struct xgene_reboot_context {
-> +	struct platform_device *pdev;
-> +	void *csr;
-> +	u32 mask;
-> +};
-> +
-> +static struct xgene_reboot_context *xgene_restart_ctx;
-> +
-> +static void xgene_restart(char str, const char *cmd)
-> +{
-> +	struct xgene_reboot_context *ctx = xgene_restart_ctx;
-> +	unsigned long timeout;
-> +
-> +	/* Issue the reboot */
-> +	if (ctx)
-> +		writel(ctx->mask, ctx->csr);
-> +
-> +	timeout = jiffies + HZ;
-> +	while (time_before(jiffies, timeout))
-> +		cpu_relax();
-> +
-> +	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
-> +}
-> +
-> +static int xgene_reboot_probe(struct platform_device *pdev)
-> +{
-> +	struct xgene_reboot_context *ctx;
-> +
-> +	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
-> +	if (ctx == NULL) {
-
-!ctx is shorter
-
-> +		dev_err(&pdev->dev, "out of memory for context\n");
-> +		return -ENODEV;
-> +	}
-> +	ctx->csr = of_iomap(pdev->dev.of_node, 0);
-> +	if (ctx->csr == NULL) {
-> +		devm_kfree(&pdev->dev, ctx);
-> +		dev_err(&pdev->dev, "can not map resource\n");
-> +		return -ENODEV;
-> +	}
-> +	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
-> +		ctx->mask = 0xFFFFFFFF;
-> +	ctx->pdev = pdev;
-> +	arm_pm_restart = xgene_restart;
-> +	xgene_restart_ctx = ctx;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct of_device_id xgene_reboot_of_match[] = {
-> +	{ .compatible = "apm,xgene-reboot" },
-> +	{}
-> +};
-> +
-> +static struct platform_driver xgene_reboot_driver = {
-> +	.probe = xgene_reboot_probe,
-> +	.driver = {
-> +		.name = "xgene-reboot",
-> +		.of_match_table = xgene_reboot_of_match,
-> +	},
-> +};
-> +
-> +static int __init xgene_reboot_init(void)
-> +{
-> +	return platform_driver_register(&xgene_reboot_driver);
-> +}
-> +device_initcall(xgene_reboot_init);
-> -- 
-> 1.5.5
-
-Wow! This is an ancient git release, 5 years old. Just saying... :)
-
-Anyways, I fixed all the nits and applied the patch to the battery-2.6.git
-tree.
-
-Thanks!
-
-Anton
+-- 
+Regards,
+Nishanth Menon
