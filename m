@@ -1,59 +1,115 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 9 Aug 2013 15:31:15 +0200
-Subject: [PATCH 2/7] pinctrl: imx header, conditional probe functions
-In-Reply-To: <20130805054312.GC24629@S2101-09.ap.freescale.net>
-References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-3-git-send-email-mpa@pengutronix.de>
- <20130805054312.GC24629@S2101-09.ap.freescale.net>
-Message-ID: <20130809133115.GE13664@s25.your-server.de>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Fri, 09 Aug 2013 22:33:21 +0900
+Subject: [PATCH v4 2/4] mmc: dw_mmc: Add exynos resume_noirq callback to
+ clear WAKEUP_INT
+In-Reply-To: <1375825071-20922-3-git-send-email-dianders@chromium.org>
+References: <1373470926-19314-1-git-send-email-dianders@chromium.org>
+ <1375825071-20922-1-git-send-email-dianders@chromium.org>
+ <1375825071-20922-3-git-send-email-dianders@chromium.org>
+Message-ID: <001901ce9505$04483820$0cd8a860$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 01:43:15PM +0800, Shawn Guo wrote:
-> On Fri, Aug 02, 2013 at 12:38:22PM +0200, Markus Pargmann wrote:
-> > The functions are not available if included by imx1 core driver.
-> > 
+On Wed, August 07, 2013, Doug Anderson wrote:
+> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
+> looping around forever.  This has been seen to happen on exynos5420
+> silicon despite the fact that we haven't enabled any wakeup events due
+> to a silicon errata.  It is safe to do on all exynos variants.
 > 
-> Does imx1 core driver include the header?
-
-I removed the include to simplify some structs.
-
-Thanks
-
-Markus
-
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v4:
+> - Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
 > 
-> Shawn
+> Changes in v3:
+> - Add freeze/thaw and poweroff/restore noirq entries.
 > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/pinctrl/pinctrl-imx.h | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
-> > index bcedd99..446fc01 100644
-> > --- a/drivers/pinctrl/pinctrl-imx.h
-> > +++ b/drivers/pinctrl/pinctrl-imx.h
-> > @@ -89,7 +89,11 @@ struct imx_pinctrl_soc_info {
-> >  #define IMX_MUX_MASK	0x7
-> >  #define IOMUXC_CONFIG_SION	(0x1 << 4)
-> >  
-> > +#if IS_ENABLED(PINCTRL_IMX)
-> > +
-> >  int imx_pinctrl_probe(struct platform_device *pdev,
-> >  			struct imx_pinctrl_soc_info *info);
-> >  int imx_pinctrl_remove(struct platform_device *pdev);
-> > +
-> > +#endif
-> >  #endif /* __DRIVERS_PINCTRL_IMX_H */
-> > -- 
-> > 1.8.3.2
-> > 
+> Changes in v2:
+> - Use suspend_noirq as per James Hogan.
 > 
+>  drivers/mmc/host/dw_mmc-exynos.c | 51 ++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 49 insertions(+), 2 deletions(-)
 > 
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+> index 866edef..0c1f192 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.c
+> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+> @@ -30,6 +30,7 @@
+>  #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
+>  					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
+>  					SDMMC_CLKSEL_CCLK_DIVIDER(z))
+> +#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
+> 
+>  #define EXYNOS4210_FIXED_CIU_CLK_DIV	2
+>  #define EXYNOS4412_FIXED_CIU_CLK_DIV	4
+> @@ -100,6 +101,30 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
+>  	return 0;
+>  }
+> 
+> +/**
+> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
+> + *
+> + * On exynos5420 there is a silicon errata that will sometimes leave the
+> + * WAKEUP_INT bit in the CLKSEL register asserted.  This bit is 1 to indicate
+> + * that it fired and we can clear it by writing a 1 back.  Clear it to prevent
+> + * interrupts from going off constantly.
+> + *
+> + * We run this code on all exynos variants because it doesn't hurt and the bug
+> + * may be more widespread than just exynos5420.
+I guess just above comment can be removed. (Not be widespread)
+Updating the origin value of CLKSEL looks like no harm while SDMMC_CLKSEL_WAKEUP_INT is cleared.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> + */
+> +
+> +static int dw_mci_exynos_resume_noirq(struct device *dev)
+> +{
+> +	struct dw_mci *host = dev_get_drvdata(dev);
+> +	u32 clksel;
+> +
+> +	clksel = mci_readl(host, CLKSEL);
+> +	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
+> +		mci_writel(host, CLKSEL, clksel);
+> +
+> +	return 0;
+> +}
+> +
+>  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+>  {
+>  	/*
+> @@ -187,17 +212,39 @@ static int dw_mci_exynos_probe(struct platform_device *pdev)
+>  	return dw_mci_pltfm_register(pdev, drv_data);
+>  }
+> 
+> +static struct dev_pm_ops dw_mci_exynos_pmops;
+> +
+>  static struct platform_driver dw_mci_exynos_pltfm_driver = {
+>  	.probe		= dw_mci_exynos_probe,
+>  	.remove		= __exit_p(dw_mci_pltfm_remove),
+>  	.driver		= {
+>  		.name		= "dwmmc_exynos",
+>  		.of_match_table	= dw_mci_exynos_match,
+> -		.pm		= &dw_mci_pltfm_pmops,
+> +		.pm		= &dw_mci_exynos_pmops,
+>  	},
+>  };
+> 
+> -module_platform_driver(dw_mci_exynos_pltfm_driver);
+> +static int __init dw_mci_exynos_init(void)
+> +{
+> +	/* Add a "noirq" resume to platform pmops */
+> +	memcpy(&dw_mci_exynos_pmops, &dw_mci_pltfm_pmops,
+> +	       sizeof(dw_mci_exynos_pmops));
+> +	WARN_ON(dw_mci_exynos_pmops.resume_noirq ||
+> +		dw_mci_exynos_pmops.thaw_noirq ||
+> +		dw_mci_exynos_pmops.restore_noirq);
+> +	dw_mci_exynos_pmops.resume_noirq = dw_mci_exynos_resume_noirq;
+> +	dw_mci_exynos_pmops.thaw_noirq = dw_mci_exynos_resume_noirq;
+> +	dw_mci_exynos_pmops.restore_noirq = dw_mci_exynos_resume_noirq;
+
+If CONFIG_PM_SLEEP is not defined, we don't need to add it.
+And also, instead of reusing dw_mci_pltfm_pmops, how about defining dw_mci_exynos_pmops's own?
+Of course, suspend/resume will not different with dw_mci_pltfm* just now.
+But specific code for exynos would be added soon.
+
+Thanks,
+Seungwon Jeon
