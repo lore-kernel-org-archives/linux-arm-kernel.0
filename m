@@ -1,93 +1,68 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 9 Aug 2013 15:54:00 +0200
-Subject: [PATCH 6/7] ARM: dts: imx27 pinctrl
-In-Reply-To: <20130805061819.GF24629@S2101-09.ap.freescale.net>
-References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-7-git-send-email-mpa@pengutronix.de>
- <20130805061819.GF24629@S2101-09.ap.freescale.net>
-Message-ID: <20130809135400.GG13664@s25.your-server.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Aug 2013 16:01:42 +0200
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20130731205034.GA17615@obsidianresearch.com>
+References: <51DD88A4.1030506@keymile.com> <20130731100359.3e789236@skate>
+ <51F8CA44.4080802@keymile.com> <20130731110045.2dc84981@skate>
+ <20130731205034.GA17615@obsidianresearch.com>
+Message-ID: <20130809140140.GA14990@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 02:18:21PM +0800, Shawn Guo wrote:
-> On Fri, Aug 02, 2013 at 12:38:26PM +0200, Markus Pargmann wrote:
-> > Pinctrl driver node and pin group definitions for other driver nodes.
+On Wed, Jul 31, 2013 at 02:50:34PM -0600, Jason Gunthorpe wrote:
+> On Wed, Jul 31, 2013 at 11:00:45AM +0200, Thomas Petazzoni wrote:
+> 
+> > > Actually, the main reason for trying to use this driver was because I 
+> > > wanted to model a PCIe *device* within the device tree, so to expose its 
+> > > GPIOs and IRQs to be referenced (through phandles) from other device 
+> > > tree nodes. The way I understand it, turns out this is not the way to 
+> > > go, as PCI/PCIe are essentially enumerated busses, so you're not 
+> > > supposed to -and it's not a trivial task to- put any information about 
+> > > real devices within the device tree.
+> > > Do you have any suggestion about that?
 > > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx27.dtsi | 216 +++++++++++++++++++++++++++++++------------
-> >  1 file changed, 158 insertions(+), 58 deletions(-)
+> > Indeed, PCI/PCIe devices are enumerated dynamically, so they are not
+> > listed in the Device Tree, so there's no way to "attach" more
+> > information to them.
 > > 
-> > diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> > index 76cd89f..57a4855 100644
-> > --- a/arch/arm/boot/dts/imx27.dtsi
-> > +++ b/arch/arm/boot/dts/imx27.dtsi
-> > @@ -10,6 +10,7 @@
-> >   */
-> >  
-> >  #include "skeleton.dtsi"
-> > +#include "imx27-pinfunc.h"
-> >  
-> >  / {
-> >  	aliases {
-> > @@ -142,6 +143,8 @@
-> >  				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
-> >  				reg = <0x10009000 0x1000>;
-> >  				clocks = <&clks 35>;
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&pinctrl_owire>;
+> > Device Tree people, any suggestion about the above question?
 > 
-> These should be added in board level dts file.
+> No, that isn't true.
 > 
-> Shawn
+> Device tree can include the discovered PCI devices, you have to use
+> the special reg encoding and all that weirdness, but it does work. The
+> of_node will be attached to the struct pci device automatically.
 > 
-> >  				status = "disabled";
-> >  			};
+> On server/etc DT platforms the firmware will do PCI discovery and
+> resource assignment then dump all those results into DT for the OS to
+> reference.
 > 
-> <snip>
+> This is a major reason why we wanted to see the standard PCI DT be
+> used for Marvell/etc, the existing infrastructure for this is
+> valuable.
 > 
-> > +				fec {
-> > +					pinctrl_fec: fec-1 {
+> AFAIK, Thierry has tested this on tegra, and I am doing it on Kirkwood
+> (though not yet with the new driver).
 > 
-> I suggest we name the node and label in the same pattern we use in
-> imx5/6.  I do not know how you will label node fec-2.
+> It is useful for exactly the reason stated - you can describe GPIOs,
+> I2C busses, etc, etc in DT and then upon load of the PCI driver engage
+> the DT code to populate and connect all that downstream
+> infrastructure.
 
-Will fix both.
+Obviously this doesn't work in general purpose systems because the PCI
+hierarchy needs to be hardcoded in the DT. If you start adding and
+removing PCI devices that will likely change the hierarchy and break
+this matching of PCI device to DT node.
 
-Thanks,
+It's quite unlikely to have a need to hook up GPIOs or IRQs via DT in a
+general purpose system, though, so I don't really see that being a big
+problem.
 
-Markus
-
-> 
-> Shawn
-> 
-> > +						fsl,pins = <
-> > +							MX27_PAD_SD3_CMD__FEC_TXD0 0x0
-> > +							MX27_PAD_SD3_CLK__FEC_TXD1 0x0
-> > +							MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
-> > +							MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
-> > +							MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
-> > +							MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
-> > +							MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
-> > +							MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
-> > +							MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
-> > +							MX27_PAD_ATA_DATA7__FEC_MDC 0x0
-> > +							MX27_PAD_ATA_DATA8__FEC_CRS 0x0
-> > +							MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
-> > +							MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
-> > +							MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
-> > +							MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
-> > +							MX27_PAD_ATA_DATA13__FEC_COL 0x0
-> > +							MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
-> > +							MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
-> > +						>;
-> > +					};
-> > +				};
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/52a28f3e/attachment.sig>
