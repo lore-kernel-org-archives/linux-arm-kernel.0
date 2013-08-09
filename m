@@ -1,39 +1,45 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 08 Aug 2013 18:37:49 -0700
-Subject: [PATCH 1/1] clk: prima2: Fix incorrect placement of __initdata
-In-Reply-To: <1375936286-32075-1-git-send-email-sachin.kamat@linaro.org>
-References: <1375936286-32075-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <20130809013749.5348.31283@quantum>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 9 Aug 2013 08:23:44 +0800
+Subject: [PATCH 1/1] ARM: dtsi: imx6qdl-sabresd: Add USB host 1 VBUS regulator
+Message-ID: <1376007824-16325-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sachin Kamat (2013-08-07 21:31:26)
-> __initdata should be placed between the variable name and equal
-> sign for the variable to be placed in the intended section.
-> 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+We enabled USB host 1, so host 1's vbus should be on to let
+host 1 work.
 
-Taken into clk-next.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-Thanks,
-Mike
-
-> ---
->  drivers/clk/clk-prima2.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
-> index 643ca65..5ab95f1 100644
-> --- a/drivers/clk/clk-prima2.c
-> +++ b/drivers/clk/clk-prima2.c
-> @@ -1034,7 +1034,7 @@ enum prima2_clk_index {
->         usb0,  usb1,  maxclk,
->  };
->  
-> -static __initdata struct clk_hw* prima2_clk_hw_array[maxclk] = {
-> +static struct clk_hw *prima2_clk_hw_array[maxclk] __initdata = {
->         NULL, /* dummy */
->         NULL,
->         &clk_pll1.hw,
-> -- 
-> 1.7.9.5
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 6e5dfdb..6e9d4d7 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -27,6 +27,15 @@
+ 			enable-active-high;
+ 		};
+ 
++		reg_usb_h1_vbus: usb_h1_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_h1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio1 29 0>;
++			enable-active-high;
++		};
++
+ 		reg_audio: wm8962_supply {
+ 			compatible = "regulator-fixed";
+ 			regulator-name = "wm8962-supply";
+@@ -125,6 +134,7 @@
+ };
+ 
+ &usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
+ 	status = "okay";
+ };
+ 
+-- 
+1.7.1
