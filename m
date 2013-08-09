@@ -1,36 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 Aug 2013 19:00:58 +0100
-Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu audio
- subsystem
-In-Reply-To: <20130809130932.GS23006@n2100.arm.linux.org.uk>
-References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
- <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
- <20130809094340.GO23006@n2100.arm.linux.org.uk>
- <5204CC04.4000401@gmail.com> <20130809113940.GY6427@sirena.org.uk>
- <20130809130932.GS23006@n2100.arm.linux.org.uk>
-Message-ID: <20130809180058.GM6427@sirena.org.uk>
+From: myron.stowe@gmail.com (Myron Stowe)
+Date: Fri, 9 Aug 2013 12:12:24 -0600
+Subject: Linux Plumbers ACPI/PM, PCI Microconference
+Message-ID: <CAL-B5D1-CPNcOzjHx4ej5SenawvDqwC4Hef5oDkoxCb9Dz5dUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 02:09:32PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 09, 2013 at 12:39:40PM +0100, Mark Brown wrote:
+Time is passing quickly and there are still a few topic areas that we
+would like discussed during the microconference but still do not have
+any proposals/knowledgable speakers for.
 
-> > So extend Morimoto-san's work on the simple card for this - that's what
-> > it's there for, it's doing exactly this job for non-DT systems but it
-> > just didn't get DT support added yet.  All the trivial cards should end
-> > up using this.
+For the following people I'm specifically picking on: Are you going to
+plumbers, would you be willing to cover the following areas?  If you
+are not going, do you know someone who is and could cover?
 
-> It's quite rediculous to request that the simple card stuff is expanded at
-> this time, when you're also telling us that we must use DPCM for Kirkwood,
+Yinghai: host bridge hot-plug - what has been accomplished to date and
+what still remains to be done?
 
-That's the place to put the sort of shared infrastructure for trivial
-cards that Sebastian said he wanted to see - if you guys are saying that
-the machines should all be able to use a trivial binding with shared
-code that's where that code should be.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/9b45db39/attachment.sig>
+Mika: Thunderbolt activities?
+
+Jiang Liu, Gu Zheng: Would you be willing to cover your recent efforts
+with PCI device (hot-plug) reference counting?
+
+Russel, Rob, Stephen, Thomas, Jason, Thierry: ARM - especially any
+PCI(e) ideosynchronicies along with ARM's IOMMU arch and how that
+relates to PCI.
+
+Alex Williamson: you want/need to cover any of the following - PCI
+secondary bus resets; pci_is_pcie() - Not just for PCIe capabilities;
+I/O port pci-sysfs resource files (fix or remove)?
+
+Of course anyone else is free to propose something or sign up for
+covering one of the proposed topics listed at
+http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+
+
+The instructions for submitting proposals should be at:
+
+http://www.linuxplumbersconf.org/2013/submitting-topic/
+
+The Microconference link is at:
+
+http://wiki.linuxplumbersconf.org/2013:pci_subsystem
