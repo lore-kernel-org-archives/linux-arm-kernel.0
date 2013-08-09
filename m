@@ -1,289 +1,129 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 09 Aug 2013 15:56:19 +1000
-Subject: [PATCHv8 06/10] irqchip: armada-370-xp: implement MSI support
-In-Reply-To: <1376000268-18397-7-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1376000268-18397-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1376027779.32100.9.camel@pasglop>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 09 Aug 2013 14:58:49 +0900
+Subject: [PATCH v9 04/16] iommu/exynos: allocate lv2 page table from own
+ slab
+In-Reply-To: <2544843.sndV7usHTj@amdc1227>
+References: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
+ <2544843.sndV7usHTj@amdc1227>
+Message-ID: <20130809145849.790a9800f4f9893b30e54a1c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-08-09 at 00:17 +0200, Thomas Petazzoni wrote:
-> This commit introduces the support for the MSI interrupts in the
-> armada-370-xp interrupt controller driver. It registers an MSI chip to
-> the MSI chip registry, which will be used by the Marvell PCIe host
-> controller driver.
+On Thu, 08 Aug 2013 16:00:18 +0200, Tomasz Figa wrote:
+> On Thursday 08 of August 2013 18:38:04 Cho KyongHo wrote:
+> > Since kmalloc() does not guarantee that the allignment of 1KiB when it
+> > allocates 1KiB, it is required to allocate lv2 page table from own
+> > slab that guarantees alignment of 1KiB
+> > 
+> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > ---
+> >  drivers/iommu/exynos-iommu.c |   24 ++++++++++++++++++++----
+> >  1 files changed, 20 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> > index d90e6fa..a318049 100644
+> > --- a/drivers/iommu/exynos-iommu.c
+> > +++ b/drivers/iommu/exynos-iommu.c
+> > @@ -100,6 +100,8 @@
+> >  #define REG_PB1_SADDR		0x054
+> >  #define REG_PB1_EADDR		0x058
+> > 
+> > +static struct kmem_cache *lv2table_kmem_cache;
+> > +
+> >  static unsigned long *section_entry(unsigned long *pgtable, unsigned
+> > long iova) {
+> >  	return pgtable + lv1ent_offset(iova);
+> > @@ -765,7 +767,8 @@ static void exynos_iommu_domain_destroy(struct
+> > iommu_domain *domain)
+> > 
+> >  	for (i = 0; i < NUM_LV1ENTRIES; i++)
+> >  		if (lv1ent_page(priv->pgtable + i))
+> > -			kfree(__va(lv2table_base(priv->pgtable + i)));
+> > +			kmem_cache_free(lv2table_kmem_cache,
+> > +					__va(lv2table_base(priv->pgtable + i)));
+> > 
+> >  	free_pages((unsigned long)priv->pgtable, 2);
+> >  	free_pages((unsigned long)priv->lv2entcnt, 1);
+> > @@ -861,7 +864,7 @@ static unsigned long *alloc_lv2entry(unsigned long
+> > *sent, unsigned long iova, if (lv1ent_fault(sent)) {
+> >  		unsigned long *pent;
+> > 
+> > -		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
+> > +		pent = kmem_cache_zalloc(lv2table_kmem_cache, GFP_ATOMIC);
+> >  		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
+> >  		if (!pent)
+> >  			return ERR_PTR(-ENOMEM);
+> > @@ -881,7 +884,7 @@ static int lv1set_section(unsigned long *sent,
+> > phys_addr_t paddr, short *pgcnt)
+> > 
+> >  	if (lv1ent_page(sent)) {
+> >  		BUG_ON(*pgcnt != NUM_LV2ENTRIES);
+> > -		kfree(page_entry(sent, 0));
+> > +		kmem_cache_free(lv2table_kmem_cache, page_entry(sent, 0));
+> >  		*pgcnt = 0;
+> >  	}
+> > 
+> > @@ -1082,10 +1085,23 @@ static int __init exynos_iommu_init(void)
+> >  {
+> >  	int ret;
+> > 
+> > +	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+> > +				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+> > +	if (!lv2table_kmem_cache) {
+> > +		pr_err("%s: Failed to create kmem cache\n", __func__);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> >  	ret = platform_driver_register(&exynos_sysmmu_driver);
+> > 
+> >  	if (ret == 0)
+> > -		bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> > +		ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> > +
+> > +	if (ret) {
+> > +		pr_err("%s: Failed to register exynos-iommu driver.\n",
+> > +								__func__);
+> > +		kmem_cache_destroy(lv2table_kmem_cache);
+> > +	}
 > 
-> The MSI interrupts use the 16 high doorbells, and are therefore
-> notified using IRQ1 of the main interrupt controller.
-
-When you have a bit of time, have a look at
-
-arch/powerpc/sysdev/msi_bitmap.c
-
-This should be usable pretty-much as-is and thus could be moved to
-a generic place and replace your custom bitmap allocator.
-
-Cheers,
-Ben.
-
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   3 +
->  drivers/irqchip/irq-armada-370-xp.c                | 182 ++++++++++++++++++++-
->  2 files changed, 184 insertions(+), 1 deletion(-)
+> What about making the return value handling here cleaner? For example:
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
-> index 61df564..d74091a 100644
-> --- a/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
-> +++ b/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
-> @@ -4,6 +4,8 @@ Marvell Armada 370 and Armada XP Interrupt Controller
->  Required properties:
->  - compatible: Should be "marvell,mpic"
->  - interrupt-controller: Identifies the node as an interrupt controller.
-> +- msi-controller: Identifies the node as an PCI Message Signaled
-> +  Interrupt controller.
->  - #interrupt-cells: The number of cells to define the interrupts. Should be 1.
->    The cell is the IRQ number
->  
-> @@ -24,6 +26,7 @@ Example:
->                #address-cells = <1>;
->                #size-cells = <1>;
->                interrupt-controller;
-> +              msi-controller;
->                reg = <0xd0020a00 0x1d0>,
->                      <0xd0021070 0x58>;
->          };
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 26adc74..433cc85 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -21,7 +21,10 @@
->  #include <linux/io.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> +#include <linux/of_pci.h>
->  #include <linux/irqdomain.h>
-> +#include <linux/slab.h>
-> +#include <linux/msi.h>
->  #include <asm/mach/arch.h>
->  #include <asm/exception.h>
->  #include <asm/smp_plat.h>
-> @@ -51,12 +54,22 @@
->  #define IPI_DOORBELL_START                      (0)
->  #define IPI_DOORBELL_END                        (8)
->  #define IPI_DOORBELL_MASK                       0xFF
-> +#define PCI_MSI_DOORBELL_START                  (16)
-> +#define PCI_MSI_DOORBELL_NR                     (16)
-> +#define PCI_MSI_DOORBELL_END                    (32)
-> +#define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
->  
->  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->  
->  static void __iomem *per_cpu_int_base;
->  static void __iomem *main_int_base;
->  static struct irq_domain *armada_370_xp_mpic_domain;
-> +#ifdef CONFIG_PCI_MSI
-> +static struct irq_domain *armada_370_xp_msi_domain;
-> +static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
-> +static DEFINE_MUTEX(msi_used_lock);
-> +static phys_addr_t msi_doorbell_addr;
-> +#endif
->  
->  /*
->   * In SMP mode:
-> @@ -87,6 +100,144 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
->  				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
->  }
->  
-> +#ifdef CONFIG_PCI_MSI
-> +
-> +static int armada_370_xp_alloc_msi(void)
-> +{
-> +	int hwirq;
-> +
-> +	mutex_lock(&msi_used_lock);
-> +	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
-> +	if (hwirq >= PCI_MSI_DOORBELL_NR)
-> +		hwirq = -ENOSPC;
-> +	else
-> +		set_bit(hwirq, msi_used);
-> +	mutex_unlock(&msi_used_lock);
-> +
-> +	return hwirq;
-> +}
-> +
-> +static void armada_370_xp_free_msi(int hwirq)
-> +{
-> +	mutex_lock(&msi_used_lock);
-> +	if (!test_bit(hwirq, msi_used))
-> +		pr_err("trying to free unused MSI#%d\n", hwirq);
-> +	else
-> +		clear_bit(hwirq, msi_used);
-> +	mutex_unlock(&msi_used_lock);
-> +}
-> +
-> +static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
-> +				       struct pci_dev *pdev,
-> +				       struct msi_desc *desc)
-> +{
-> +	struct msi_msg msg;
-> +	irq_hw_number_t hwirq;
-> +	int virq;
-> +
-> +	hwirq = armada_370_xp_alloc_msi();
-> +	if (hwirq < 0)
-> +		return hwirq;
-> +
-> +	virq = irq_create_mapping(armada_370_xp_msi_domain, hwirq);
-> +	if (!virq) {
-> +		armada_370_xp_free_msi(hwirq);
-> +		return -EINVAL;
-> +	}
-> +
-> +	irq_set_msi_desc(virq, desc);
-> +
-> +	msg.address_lo = msi_doorbell_addr;
-> +	msg.address_hi = 0;
-> +	msg.data = 0xf00 | (hwirq + 16);
-> +
-> +	write_msi_msg(virq, &msg);
-> +	return 0;
-> +}
-> +
-> +static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
-> +					   unsigned int irq)
-> +{
-> +	struct irq_data *d = irq_get_irq_data(irq);
-> +	irq_dispose_mapping(irq);
-> +	armada_370_xp_free_msi(d->hwirq);
-> +}
-> +
-> +static struct irq_chip armada_370_xp_msi_irq_chip = {
-> +	.name = "armada_370_xp_msi_irq",
-> +	.irq_enable = unmask_msi_irq,
-> +	.irq_disable = mask_msi_irq,
-> +	.irq_mask = mask_msi_irq,
-> +	.irq_unmask = unmask_msi_irq,
-> +};
-> +
-> +static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
-> +				 irq_hw_number_t hw)
-> +{
-> +	irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
-> +				 handle_simple_irq);
-> +	set_irq_flags(virq, IRQF_VALID);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct irq_domain_ops armada_370_xp_msi_irq_ops = {
-> +	.map = armada_370_xp_msi_map,
-> +};
-> +
-> +static int armada_370_xp_msi_init(struct device_node *node,
-> +				  phys_addr_t main_int_phys_base)
-> +{
-> +	struct msi_chip *msi_chip;
-> +	u32 reg;
-> +	int ret;
-> +
-> +	msi_doorbell_addr = main_int_phys_base +
-> +		ARMADA_370_XP_SW_TRIG_INT_OFFS;
-> +
-> +	msi_chip = kzalloc(sizeof(*msi_chip), GFP_KERNEL);
-> +	if (!msi_chip)
-> +		return -ENOMEM;
-> +
-> +	msi_chip->setup_irq = armada_370_xp_setup_msi_irq;
-> +	msi_chip->teardown_irq = armada_370_xp_teardown_msi_irq;
-> +	msi_chip->of_node = node;
-> +
-> +	armada_370_xp_msi_domain =
-> +		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
-> +				      &armada_370_xp_msi_irq_ops,
-> +				      NULL);
-> +	if (!armada_370_xp_msi_domain) {
-> +		kfree(msi_chip);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	ret = of_pci_msi_chip_add(msi_chip);
-> +	if (ret < 0) {
-> +		irq_domain_remove(armada_370_xp_msi_domain);
-> +		kfree(msi_chip);
-> +		return ret;
-> +	}
-> +
-> +	reg = readl(per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_MSK_OFFS)
-> +		| PCI_MSI_DOORBELL_MASK;
-> +
-> +	writel(reg, per_cpu_int_base +
-> +	       ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
-> +
-> +	/* Unmask IPI interrupt */
-> +	writel(1, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int armada_370_xp_msi_init(struct device_node *node,
-> +					 phys_addr_t main_int_phys_base)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
->  #ifdef CONFIG_SMP
->  static int armada_xp_set_affinity(struct irq_data *d,
->  				  const struct cpumask *mask_val, bool force)
-> @@ -214,12 +365,39 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
->  		if (irqnr > 1022)
->  			break;
->  
-> -		if (irqnr > 0) {
-> +		if (irqnr > 1) {
->  			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
->  					irqnr);
->  			handle_IRQ(irqnr, regs);
->  			continue;
->  		}
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +		/* MSI handling */
-> +		if (irqnr == 1) {
-> +			u32 msimask, msinr;
-> +
-> +			msimask = readl_relaxed(per_cpu_int_base +
-> +						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
-> +				& PCI_MSI_DOORBELL_MASK;
-> +
-> +			writel(~PCI_MSI_DOORBELL_MASK, per_cpu_int_base +
-> +			       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
-> +
-> +			for (msinr = PCI_MSI_DOORBELL_START;
-> +			     msinr < PCI_MSI_DOORBELL_END; msinr++) {
-> +				int irq;
-> +
-> +				if (!(msimask & BIT(msinr)))
-> +					continue;
-> +
-> +				irq = irq_find_mapping(armada_370_xp_msi_domain,
-> +						       msinr - 16);
-> +				handle_IRQ(irq, regs);
-> +			}
-> +		}
-> +#endif
-> +
->  #ifdef CONFIG_SMP
->  		/* IPI Handling */
->  		if (irqnr == 0) {
-> @@ -292,6 +470,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
->  
->  #endif
->  
-> +	armada_370_xp_msi_init(node, main_int_res.start);
-> +
->  	set_handle_irq(armada_370_xp_handle_irq);
->  
->  	return 0;
+> 	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+> 				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+> 	if (!lv2table_kmem_cache) {
+> 		...
+> 		return -ENOMEM;
+> 	}
+> 
+> 	ret = platform_driver_register(&exynos_sysmmu_driver);
+> 	if (ret) {
+> 		...
+> 		goto err_destroy_kmem_cache;
+> 	}
+> 
+> 	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> 	if (ret) {
+> 		...
+> 		goto err_platform_unregister;
+> 	}
+> 
+> 	return 0;
+> 
+> err_platform_unregister:
+> 	...
+> err_destroy_kmem_cache:
+> 	...
+> 	return ret;
+> }
+> 
+
+Thank you for suggestion.
+I think you are worrying about missing the information who makes 'ret' non-zero.
+Ok. I will process it separately.
+
+thanks
+
+KyongHo.
+> Best regards,
+> Tomasz
+> 
