@@ -1,62 +1,189 @@
-From: dianders@google.com (Doug Anderson)
-Date: Fri, 9 Aug 2013 08:51:57 -0700
-Subject: dw_mmc: Does anyone use multiple slots?
-In-Reply-To: <000e01ce94af$12710ef0$37532cd0$%jun@samsung.com>
-References: <CAD=FV=U3aT1KKtSwAFhYURJJerp70ij8h647=xyV51et4jYipg@mail.gmail.com>
- <CAOesGMjaF2K0CnuWBj7xdXGAQk-XRetBstaQdd9EZzBYrmDjeA@mail.gmail.com>
- <86mworfzsf.fsf@void.printf.net>
- <000e01ce94af$12710ef0$37532cd0$%jun@samsung.com>
-Message-ID: <CAD=FV=X9G66zg+OQ5C0gkkkYDdrkegkZdmWNXRDiS2V5_yY+6w@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 9 Aug 2013 09:03:02 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <5204C54A.9020105@st.com>
+References: <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
+ <51F97CE3.9030306@linaro.org>
+ <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
+ <51F99747.4060901@linaro.org>
+ <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
+ <51FA9AE8.1060004@linaro.org>
+ <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
+ <5204C54A.9020105@st.com>
+Message-ID: <cacc7429-9101-4cc6-bb4d-059274604b56@CO9EHSMHS004.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 09, 2013 at 11:32:42AM +0100, Srinivas KANDAGATLA wrote:
+> On 08/08/13 18:11, S?ren Brinkmann wrote:
+> > Hi Daniel,
+> > 
+> > On Thu, Aug 01, 2013 at 07:48:04PM +0200, Daniel Lezcano wrote:
+> >> On 08/01/2013 07:43 PM, S?ren Brinkmann wrote:
+> >>> On Thu, Aug 01, 2013 at 07:29:12PM +0200, Daniel Lezcano wrote:
+> >>>> On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
+> >>>>> On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
+> >>>>>> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
+> >>>>>>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
+> >>>>>>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
+> >>>>>>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
+> >>>>>>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
+> >>>>>>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
+> >>>>>>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
+> >>>>>>>>>>>>> Hi Daniel,
+> >>>>>>>>>>>>>
+> >>>>>>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
+> >>>>>>>>>>>>> (snip)
+> >>>>>>>>>>>>>>
+> >>>>>>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
+> >>>>>>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
+> >>>>>>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
+> >>>>>>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
+> >>>>>>>>>>>>>> idle state, switching the local timer back in use.
+> >>>>>>>>>>>>>
+> >>>>>>>>>>>>> I've been thinking about this, trying to understand how this makes my
+> >>>>>>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
+> >>>>>>>>>>>>> would make the timer core switch to a broadcast device even though it
+> >>>>>>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
+> >>>>>>>>>>>>> something useless, but nothing wrong in a sense that it should result in
+> >>>>>>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
+> >>>>>>>>>>>>> always remain a mystery to me.
+> >>>>>>>>>>>>>
+> >>>>>>>>>>>>> Actually this more or less leads to the question: What is this
+> >>>>>>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
+> >>>>>>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
+> >>>>>>>>>>>>> hang pointing to some issue with that driver?
+> >>>>>>>>>>>>
+> >>>>>>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
+> >>>>>>>>>>>
+> >>>>>>>>>>> So, the correct run results (full output attached).
+> >>>>>>>>>>>
+> >>>>>>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
+> >>>>>>>>>>> broadcast device:
+> >>>>>>>>>>> 	Tick Device: mode:     1                                                         
+> >>>>>>>>>>> 	Broadcast device  
+> >>>>>>>>>>> 	Clock Event Device: ttc_clockevent
+> >>>>>>>>>>>
+> >>>>>>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
+> >>>>>>>>>>> enable the global timer, the twd timers are still used as local timers
+> >>>>>>>>>>> and the broadcast device is the global timer:
+> >>>>>>>>>>> 	Tick Device: mode:     1                                                         
+> >>>>>>>>>>> 	Broadcast device                                                                 
+> >>>>>>>>>>> 	Clock Event Device: arm_global_timer
+> >>>>>>>>>>>
+> >>>>>>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
+> >>>>>>>>>>> obtain this information for that case.
+> >>>>>>>>>>
+> >>>>>>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
+> >>>>>>>>>
+> >>>>>>>>> Right, that works. I forgot about that option after you mentioned, that
+> >>>>>>>>> it is most likely not that useful.
+> >>>>>>>>>
+> >>>>>>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
+> >>>>>>>>> the gt enabled and having maxcpus=1 set.
+> >>>>>>>>>
+> >>>>>>>>> /proc/timer_list:
+> >>>>>>>>> 	Tick Device: mode:     1
+> >>>>>>>>> 	Broadcast device
+> >>>>>>>>> 	Clock Event Device: arm_global_timer
+> >>>>>>>>> 	 max_delta_ns:   12884902005
+> >>>>>>>>> 	 min_delta_ns:   1000
+> >>>>>>>>> 	 mult:           715827876
+> >>>>>>>>> 	 shift:          31
+> >>>>>>>>> 	 mode:           3
+> >>>>>>>>
+> >>>>>>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
+> >>>>>>>>
+> >>>>>>>> The previous timer_list output you gave me when removing the offending
+> >>>>>>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
+> >>>>>>>>
+> >>>>>>>> Is it possible you try to get this output again right after onlining the
+> >>>>>>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
+> >>>>>>>
+> >>>>>>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
+> >>>>>>> and that didn't end well:
+> >>>>>>> 	# echo 1 > online && cat /proc/timer_list 
+> >>>>>>
+> >>>>>> Hmm, I was hoping to have a small delay before the kernel hangs but
+> >>>>>> apparently this is not the case... :(
+> >>>>>>
+> >>>>>> I suspect the global timer is shutdown at one moment but I don't
+> >>>>>> understand why and when.
+> >>>>>>
+> >>>>>> Can you add a stack trace in the "clockevents_shutdown" function with
+> >>>>>> the clockevent device name ? Perhaps, we may see at boot time an
+> >>>>>> interesting trace when it hangs.
+> >>>>>
+> >>>>> I did this change:
+> >>>>> 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+> >>>>> 	index 38959c8..3ab11c1 100644
+> >>>>> 	--- a/kernel/time/clockevents.c
+> >>>>> 	+++ b/kernel/time/clockevents.c
+> >>>>> 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
+> >>>>> 	  */
+> >>>>> 	 void clockevents_shutdown(struct clock_event_device *dev)
+> >>>>> 	 {
+> >>>>> 	+       pr_info("ce->name:%s\n", dev->name);
+> >>>>> 	+       dump_stack();
+> >>>>> 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
+> >>>>> 	        dev->next_event.tv64 = KTIME_MAX;
+> >>>>> 	 }
+> >>>>>
+> >>>>> It is hit a few times during boot, so I attach a full boot log. I really
+> >>>>> don't know what to look for, but I hope you can spot something in it. I
+> >>>>> really appreciate you taking the time.
+> >>>>
+> >>>> Thanks for the traces.
+> >>>
+> >>> Sure.
+> >>>
+> >>>>
+> >>>> If you try without the ttc_clockevent configured in the kernel (but with
+> >>>> twd and gt), does it boot ?
+> >>>
+> >>> Absence of the TTC doesn't seem to make any difference. It hangs at the
+> >>> same location.
+> >>
+> >> Ok, IMO there is a problem with the broadcast device registration (may
+> >> be vs twd).
+> > 
+> > I have an idea, but no real evidence to prove it:
+> > Some of the registers in the arm_global_timer are banked per CPU. I.e.
+> > some code must be executed on the CPU the timer is associated with
+> > (struct clock_event_device.cpumask) to have the intended effect
+> > As far as I can tell, there is no guarantee, that the set_mode()
+> > and program_next_event() calls execute on the correct CPU.
+> > If this was correct, shutting down the timer for the CPU entering
+> > idle might actually shut down the timer for the running CPU, if
+> > set_mode() executes on the CPU which is _not_ about to enter idle.
+> 
+> Hi S?ren,
+> Am able to reproduce similar issue on StiH415 SOC by enabling both
+> global_timer and twd and using cpuidle driver like zynq.
+> 
+> When CPU0 goes to idle, I noticed that the global timer used for
+> boardcast is actually scheduled on wrong cpu.
+> My traces for printk like this
+> 	printk("DEBUG: %s on CPU:%d CPUMASK:%s\n", __FUNCTION__,
+> smp_processor_id(), scpumask);
+> 
+> shows:
+> 
+> DEBUG: gt_clockevent_set_mode on CPU:1 CPUMASK: 0
+> DEBUG: gt_clockevent_set_next_event on CPU:1 CPUMASK:0
+> 
+> Which indicates that setting the mode and next_event for a clkevent with
+> cpumask 0 is scheduled on cpu1, this will generate an global timer
+> interrupt on cpu1 rather than cpu0.
+> 
+> This might be the reason for cpu0 not coming out of the cpu_idle_loop.
 
-On Thu, Aug 8, 2013 at 8:18 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> On Fri, August 09, 2013, Chris Ball wrote:
->> On Fri, Aug 09 2013, Olof Johansson wrote:
->> > On Thu, Aug 8, 2013 at 5:16 PM, Doug Anderson <dianders@google.com> wrote:
->> >
->> >> I guess my overall question is: if there are no actual implementations
->> >> of multislot, shouldn't we kill it and simplify the code a whole lot?
->> >> If someone out there has a real multislot device they can step back in
->> >> and do it more correctly?
->> >>
->> >> Of course we need to find someone to actually go through and do the
->> >> killing of multislot, but finding that person might be easier if there
->> >> was some agreement that it was good to do.
->> >
->> > There clearly seems to be no in-tree users of multislot. If someone
->> > new comes in, we have the code in the history and can revert the
->> > removal (or at least use it as reference for re-introduction).
->> >
->> > I vote for removing it. It adds really annoying complexity for
->> > something that nobody uses.
->>
->> I agree with Olof, for what it's worth.  (The maintainers of the
->> driver are Jaehoon and Seungwon, though.)
->
-> I feel like there is no actual use case for that though origin Synopsys IP supports.
-> Multi-slot  might be not useful in terms of performance because shared bus should be allowed.
-> (At least this is the way I see it, though)
-> As Exynos's host does so, other hosts which are introduced in Linux seems use one card per host.
-> If it's really not found now, I could agree on this topic.
+Thanks for reproducing.
+I think so too. I had similar debug prints in set_mode and
+program_next event, which compared the passed struct clocke_event_device
+pointer with the this_cpu_ptr(gt_evt) pointer, which clearly indicate
+this mismatch.
 
-This all sounds very promising.  Certainly we should wait a little
-longer to see if others find / respond to this thread, but otherwise
-we can go ahead?
-
-It's possible to do this in somewhat small steps.  I think the first
-step is to remove num_slots and remove all loops over num_slots.  That
-actually sounds pretty easy/small, though it will touch a lot of code.
- After that we can try to move things out of the separate slot
-structure, I think.  That might be a bit of a bigger change.  I can
-keep that as a back burner task, but I wouldn't object at all to
-someone else doing it!  ;)
-
-The big question, though, is what to do about device tree bindings
-(cringe).  Really bus-width, wp-gpios, and disable-wp ought to be
-promoted up and we should remove the "slot" subnode.  ...but that of
-course breaks the stable API.
-
--Doug
+	S?ren
