@@ -1,38 +1,22 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 09 Aug 2013 16:21:32 +0300
-Subject: [PATCH v14 06/12] usb: chipidea: add flag
- CI_HDRC_DUAL_ROLE_NOT_OTG
-In-Reply-To: <20130809111352.GA24763@shlinux1.ap.freescale.net>
-References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
- <1375432445-31918-7-git-send-email-peter.chen@freescale.com>
- <87fvujauqr.fsf@ashishki-desk.ger.corp.intel.com>
- <20130809111352.GA24763@shlinux1.ap.freescale.net>
-Message-ID: <877gfvatk3.fsf@ashishki-desk.ger.corp.intel.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 9 Aug 2013 15:22:11 +0200
+Subject: [PATCH 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <5203B97A.8060605@free-electrons.com>
+References: <1373898278-4805-1-git-send-email-gregory.clement@free-electrons.com>
+ <1373898278-4805-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130716080503.GA3125@lukather>
+ <5200E684.5080003@free-electrons.com>
+ <20130807143546.GD2978@katana>
+ <20130807155700.GE19280@titan.lakedaemon.net>
+ <5203B97A.8060605@free-electrons.com>
+Message-ID: <20130809132211.GA3517@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Chen <peter.chen@freescale.com> writes:
 
-> On Fri, Aug 09, 2013 at 03:55:56PM +0300, Alexander Shishkin wrote:
->> > +		} else {
->> > +			/*
->> > +			 * If the controller is not OTG capable, but support
->> > +			 * role switch, the defalt role is gadget, and the
->> > +			 * user can switch it through debugfs (proc in future?)
->> 
->> It's not going to be in procfs ever, so that part of the comment can go.
->> 
->
-> I can delete now, but the role switch does not a debug function, we
-> may not put it at debugfs, do you think so?
+> Does it mean that once I will have added the handle of this string,
+> you will be able to take the series for the 3.12 kernel?
 
-Even if we were to put the role switch elsewhere, it wouldn't be
-procfs.
-
-If there is indeed a hardware platform that intentionally allows
-software to select the role, then yes. Right now, it is a debugging
-feature.
-
-Regards,
---
-Alex
+Most looks good. The only thing I noticed from a glimpse is that maybe
+you could use be32_to_cpu or something instead of shifting 8 bit chunks
+out of the data_hi/lo?
