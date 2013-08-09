@@ -1,124 +1,176 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  9 Aug 2013 22:27:08 +0200
-Subject: [PATCHv9 03/10] PCI: Introduce new MSI chip infrastructure
+Date: Fri,  9 Aug 2013 22:27:07 +0200
+Subject: [PATCHv9 02/10] PCI: remove ARCH_SUPPORTS_MSI kconfig option
 In-Reply-To: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1376080035-29344-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1376080035-29344-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+Now that we have weak versions for each of the PCI MSI architecture
+functions, we can actually build the MSI support for all platforms,
+regardless of whether they provide or not architecture-specific
+versions of those functions. For this reason, the ARCH_SUPPORTS_MSI
+hidden kconfig boolean becomes useless, and this patch gets rid of it.
 
-The new struct msi_chip is used to associated an MSI controller with a
-PCI bus. It is automatically handed down from the root to its children
-during bus enumeration.
-
-This patch provides default (weak) implementations for the architecture-
-specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
-and arch_msi_check_device()) which check if a PCI device's bus has an
-attached MSI chip and forward the call appropriately.
-
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 Tested-by: Daniel Price <daniel.price@gmail.com>
 Tested-by: Thierry Reding <thierry.reding@gmail.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: linux390 at de.ibm.com
+Cc: linux-s390 at vger.kernel.org
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: x86 at kernel.org
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Fenghua Yu <fenghua.yu@intel.com>
+Cc: linux-ia64 at vger.kernel.org
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: linux-mips at linux-mips.org
+Cc: David S. Miller <davem@davemloft.net>
+Cc: sparclinux at vger.kernel.org
+Cc: Chris Metcalf <cmetcalf@tilera.com>
 ---
- drivers/pci/msi.c   | 27 +++++++++++++++++++++++++--
- drivers/pci/probe.c |  1 +
- include/linux/msi.h | 11 +++++++++++
- include/linux/pci.h |  1 +
- 4 files changed, 38 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig     | 1 -
+ arch/ia64/Kconfig    | 1 -
+ arch/mips/Kconfig    | 2 --
+ arch/powerpc/Kconfig | 1 -
+ arch/s390/Kconfig    | 1 -
+ arch/sparc/Kconfig   | 1 -
+ arch/tile/Kconfig    | 1 -
+ arch/x86/Kconfig     | 1 -
+ drivers/pci/Kconfig  | 4 ----
+ 9 files changed, 13 deletions(-)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 823c386..2837285 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -32,16 +32,39 @@ static int pci_msi_enable = 1;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 37c0f4e..41b6c96 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -441,7 +441,6 @@ config ARCH_NETX
+ config ARCH_IOP13XX
+ 	bool "IOP13xx-based"
+ 	depends on MMU
+-	select ARCH_SUPPORTS_MSI
+ 	select CPU_XSC3
+ 	select NEED_MACH_MEMORY_H
+ 	select NEED_RET_TO_USER
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index 5a768ad..098602b 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -9,7 +9,6 @@ config IA64
+ 	select PCI if (!IA64_HP_SIM)
+ 	select ACPI if (!IA64_HP_SIM)
+ 	select PM if (!IA64_HP_SIM)
+-	select ARCH_SUPPORTS_MSI
+ 	select HAVE_UNSTABLE_SCHED_CLOCK
+ 	select HAVE_IDE
+ 	select HAVE_OPROFILE
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index c3abed3..01b5f5a 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -726,7 +726,6 @@ config CAVIUM_OCTEON_SOC
+ 	select SYS_HAS_CPU_CAVIUM_OCTEON
+ 	select SWAP_IO_SPACE
+ 	select HW_HAS_PCI
+-	select ARCH_SUPPORTS_MSI
+ 	select ZONE_DMA32
+ 	select USB_ARCH_HAS_OHCI
+ 	select USB_ARCH_HAS_EHCI
+@@ -762,7 +761,6 @@ config NLM_XLR_BOARD
+ 	select CEVT_R4K
+ 	select CSRC_R4K
+ 	select IRQ_CPU
+-	select ARCH_SUPPORTS_MSI
+ 	select ZONE_DMA32 if 64BIT
+ 	select SYNC_R4K
+ 	select SYS_HAS_EARLY_PRINTK
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 3bf72cd..183a165 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -727,7 +727,6 @@ config PCI
+ 	default y if !40x && !CPM2 && !8xx && !PPC_83xx \
+ 		&& !PPC_85xx && !PPC_86xx && !GAMECUBE_COMMON
+ 	default PCI_QSPAN if !4xx && !CPM2 && 8xx
+-	select ARCH_SUPPORTS_MSI
+ 	select GENERIC_PCI_IOMAP
+ 	help
+ 	  Find out whether your system includes a PCI bus. PCI is the name of
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index 22f75b5..e9982a3 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -428,7 +428,6 @@ menuconfig PCI
+ 	bool "PCI support"
+ 	default n
+ 	depends on 64BIT
+-	select ARCH_SUPPORTS_MSI
+ 	select PCI_MSI
+ 	help
+ 	  Enable PCI support.
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index a00cbd3..1570ad2 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -52,7 +52,6 @@ config SPARC32
  
- int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
--	return -EINVAL;
-+	struct msi_chip *chip = dev->bus->msi;
-+	int err;
-+
-+	if (!chip || !chip->setup_irq)
-+		return -EINVAL;
-+
-+	err = chip->setup_irq(chip, dev, desc);
-+	if (err < 0)
-+		return err;
-+
-+	irq_set_chip_data(desc->irq, chip);
-+
-+	return 0;
- }
- 
- void __weak arch_teardown_msi_irq(unsigned int irq)
- {
-+	struct msi_chip *chip = irq_get_chip_data(irq);
-+
-+	if (!chip || !chip->teardown_irq)
-+		return;
-+
-+	chip->teardown_irq(chip, irq);
- }
- 
- int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
- {
--	return 0;
-+	struct msi_chip *chip = dev->bus->msi;
-+
-+	if (!chip || !chip->check_device)
-+		return 0;
-+
-+	return chip->check_device(chip, dev, nvec, type);
- }
- 
- int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 46ada5c..b8eaa81 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -666,6 +666,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 
- 	child->parent = parent;
- 	child->ops = parent->ops;
-+	child->msi = parent->msi;
- 	child->sysdata = parent->sysdata;
- 	child->bus_flags = parent->bus_flags;
- 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 271dfd1..090ddad 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -65,4 +65,15 @@ void arch_restore_msi_irqs(struct pci_dev *dev, int irq);
- void default_teardown_msi_irqs(struct pci_dev *dev);
- void default_restore_msi_irqs(struct pci_dev *dev, int irq);
- 
-+struct msi_chip {
-+	struct module *owner;
-+	struct device *dev;
-+
-+	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
-+			 struct msi_desc *desc);
-+	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
-+	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
-+			    int nvec, int type);
-+};
-+
- #endif /* LINUX_MSI_H */
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 0fd1f15..4044e3c 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -433,6 +433,7 @@ struct pci_bus {
- 	struct resource busn_res;	/* bus numbers routed to this bus */
- 
- 	struct pci_ops	*ops;		/* configuration access functions */
-+	struct msi_chip	*msi;		/* MSI controller */
- 	void		*sysdata;	/* hook for sys-specific extension */
- 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
- 
+ config SPARC64
+ 	def_bool 64BIT
+-	select ARCH_SUPPORTS_MSI
+ 	select HAVE_FUNCTION_TRACER
+ 	select HAVE_FUNCTION_GRAPH_TRACER
+ 	select HAVE_FUNCTION_GRAPH_FP_TEST
+diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
+index 24565a7..74dff90 100644
+--- a/arch/tile/Kconfig
++++ b/arch/tile/Kconfig
+@@ -380,7 +380,6 @@ config PCI
+ 	select PCI_DOMAINS
+ 	select GENERIC_PCI_IOMAP
+ 	select TILE_GXIO_TRIO if TILEGX
+-	select ARCH_SUPPORTS_MSI if TILEGX
+ 	select PCI_MSI if TILEGX
+ 	---help---
+ 	  Enable PCI root complex support, so PCIe endpoint devices can
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index b32ebf9..5db62ef 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -2014,7 +2014,6 @@ menu "Bus options (PCI etc.)"
+ config PCI
+ 	bool "PCI support"
+ 	default y
+-	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
+ 	---help---
+ 	  Find out whether you have a PCI motherboard. PCI is the name of a
+ 	  bus system, i.e. the way the CPU talks to the other stuff inside
+diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+index 81944fb..b6a99f7 100644
+--- a/drivers/pci/Kconfig
++++ b/drivers/pci/Kconfig
+@@ -1,13 +1,9 @@
+ #
+ # PCI configuration
+ #
+-config ARCH_SUPPORTS_MSI
+-	bool
+-
+ config PCI_MSI
+ 	bool "Message Signaled Interrupts (MSI and MSI-X)"
+ 	depends on PCI
+-	depends on ARCH_SUPPORTS_MSI
+ 	help
+ 	   This allows device drivers to enable MSI (Message Signaled
+ 	   Interrupts).  Message Signaled Interrupts enable a device to
 -- 
 1.8.1.2
