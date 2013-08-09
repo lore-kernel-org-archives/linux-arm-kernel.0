@@ -1,65 +1,114 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 09 Aug 2013 16:58:18 -0600
-Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1376088088.14580.4.camel@linux-builds1>
-References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
- <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
- <5204017A.1040607@wwwdotorg.org> <1375995281.22740.16.camel@linux-builds1>
- <520409F2.1090906@wwwdotorg.org> <1376003457.22740.25.camel@linux-builds1>
- <52055867.9000602@wwwdotorg.org> <1376088088.14580.4.camel@linux-builds1>
-Message-ID: <5205740A.50206@wwwdotorg.org>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri,  9 Aug 2013 16:26:01 -0700
+Subject: [PATCH V3 RFC 00/16]  EFI stub for ARM
+Message-ID: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2013 04:41 PM, Dinh Nguyen wrote:
-> On Fri, 2013-08-09 at 15:00 -0600, Stephen Warren wrote:
->> On 08/08/2013 05:10 PM, Dinh Nguyen wrote:
->>> On Thu, 2013-08-08 at 15:13 -0600, Stephen Warren wrote:
->> ...
->>>> Why is there a need to directly represent the divider anywhere? The
->>>> driver can find the rate of the input clock, and I assume it knows what
->>>> rate it wants the clock to run at, so can't it calculate the divider
->>>> based on those two pieces of information?
->>>
->>> CC: Chris Ball
->>>>
->>>> Or, does the driver really not know what rate it wants the clock to be
->>>> after the internal divider? If not, then I think that *rate* should be
->>>> recorded in DT, not the divider to obtain that rate.
->>>>
->>>
->>> I believe that this is the case, that the driver does not know what rate
->>> it will clock the SD card at. I think internally we did have a "bus_hz"
->>> in DT a while back. I guess I don't really understand why it would be
->>> better to have a *rate* DT entry instead of a fixed-divider entry?
->>
->> The value of the divider depends on two things:
->>
->> 1) Input clock rate.
->> 2) Desired rate after applying the internal divider.
->>
->> The input clock rate may vary, either between SoCs the IP is integrated
->> into, or even at run-time perhaps base on clk_set_rate() etc.
->>
->> If the MMC driver knows the clock rate it wants to run at, it can
->> calculate the divider easily; it can automatically adjust to any input
->> clock that its environment may provide.
->>
->> If the MMC driver is simply told "use this divider", that's encoding
->> assumptions about the rate of the input clock which might not be valid;.
->> Encoding the desire clock rate within the MMC HW block allows the
->> divider to be calculated based on the actual environment.
-> 
-> Thanks Stephen. That makes sense.
-> 
-> Chris, Jaehoon, and Seungwon, do you have any inputs? If not I will go
-> down the path of have the "bus-hz" in the DTS node for the clock rate of
-> the CIU clock. Then I would also make the same change to dw_mmc-exynos
-> but would need your help on what the rate would be.
-> 
-> For SOCFPGA, its 12.5 MHZ.
 
-I'm not sure "bus-hz" is the right name; it's not clear from that name
-that it refers to an internal clock inside the MMC controller rather
-than the SD bus out to the card itself. Perhaps "controller-clock-hz" or
-something like that?
+This patch series adds EFI stub support for the ARM architecture.
+Some code that was previously only used by x86/x86_64 is now shared
+and has been made more general.  The stub for ARM is implemented in
+a similar manner to x86 in that it is a shim layer between EFI and
+the normal zImage/bzImage boot process, and that an image with the
+stub configured is bootable as both a zImage and EFI application.
+
+This patch now (new for v3) series depends on the 
+"arm: Add [U]EFI runtime services support" patches by leif.lindholm at linaro.org.
+The Kconfig option now depends on the "CONFIG_EFI" option that his series
+adds, and this option will ensure a little endian configuration.  Also, the
+EFI support is used to handle the EFI memory map the stub passes to the kernel.
+There are some minor changes to be coordinated with the EFI runtime services
+patch series, so I have put this back to RFC status.  These changes should be
+minor and relate to final device tree bindings.
+
+Changes since v2:
+* EFI bugfix "correct call to free_pages" that patch series
+  depends on now in mainline
+* remove "-fno-stack-protector" from decompressor Makefile.  The current code doesn't
+  trigger the stack protection, so the decompressor now compiles with it still
+  on.  Note that there has never been any stack protection in the decompressor
+  since the stack usage doesn't trigger the heuristic in GCC, so right now
+  the "-fno-stack-protector" is a noop.
+* Changed EFI command line handling to not have a fixed limit.
+* Change FDT memory allocation to retry with a larger allocation if
+  first educated guess is inadequate.
+* Correctly set 'SizeOfCode' in PE/COFF header.
+* Reviewed ".setup" section that is in x86 PE/COFF header.  This is used for x86
+  to account for code that is not in the .text section.  We don't need this
+  for ARM, as all of our code is in the .text section, or in the PE/COFF header
+  itself.
+* Moved EFI_STUB_ERROR #define to header file to share between stub C and ASM.
+* Variety of cleanups and fixes in head.S.
+* Changed update_fdt_and_exit_boot() to just update the device tree, and
+  renamed appropriately.  Memory allocations moved out of this function as
+  well, which enables the retries if the initial FDT size is too small.
+  Note that in order to do the retried allocations, the original FDT and 
+  command line memory regions are left allocated.  This is OK since the kernel
+  has the memory map and will free these allocations along with the initrd
+  and new fdt allocations.
+* Added prefix to all prints, reduced number of prints, and reviewed all
+  messages.
+* Change mixed usage of dtb/fdt to all be fdt or "device tree" in efi-stub.c
+* remove unnecessary zimage_size variable from relocate_kernel()
+* correct return types on EFI functions - should be efi_status_t, not int.
+
+
+
+Changes since V1:
+* Updated head.S based on feedback from Dave Martin.  ARM/THUMB
+  switches now much cleaner.
+* Broke up changes to x86 and common code into more patches.
+  10 more patches in this series.
+
+Roy Franz (16):
+  Move common EFI stub code from x86 arch code to common location
+  Add system pointer argument to shared EFI stub related     functions
+    so they no longer use global system table     pointer as they did
+    when part of eboot.c.     This code is now shared, so using a
+    global variable     as part of the interface is not that nice.
+    Also,     by avoiding any global variables in the ARM EFI stub,    
+    this allows the code to be position independent without    
+    requiring GOT fixups.
+  Rename memory allocation/free functions
+  Add minimum address parameter to efi_low_alloc()
+  rename __get_map() to efi_get_memory_map(), add parameter     to
+    optionally return mmap key. The mmap key is required     to exit
+    EFI boot services, and allows efi_get_memory_map()     to be used
+    for getting final memory map.
+  Enforce minimum alignment of 1 page on allocations.     The
+    efi_high_alloc() and efi_low_alloc() functions     use the
+    EFI_ALLOCATE_ADDRESS option to the EFI     function
+    allocate_pages(), which requires a minimum     of page alignment,
+    and rejects all other requests.
+  Allow efi_free() to be called with size of 0, and do nothing in that
+    case.
+  Generalize handle_ramdisks() and rename to handle_cmdline_files().
+  Renames in handle_cmdline_files() to complete generalization.
+  Move EFI_READ_CHUNK_SIZE define to shared location.
+  Add proper definitions for some EFI function pointers.
+  Fix types in EFI calls to match EFI function definitions.
+  resolve warnings found on ARM compile
+  Add strstr to compressed string.c for ARM.
+  Add EFI stub for ARM
+  Add config EFI_STUB for ARM to Kconfig
+
+ arch/arm/Kconfig                       |   11 +
+ arch/arm/boot/compressed/Makefile      |   15 +-
+ arch/arm/boot/compressed/efi-header.S  |  111 +++++++
+ arch/arm/boot/compressed/efi-stub.c    |  448 ++++++++++++++++++++++++++++
+ arch/arm/boot/compressed/efi-stub.h    |    5 +
+ arch/arm/boot/compressed/head.S        |   90 +++++-
+ arch/arm/boot/compressed/string.c      |   21 ++
+ arch/x86/boot/compressed/eboot.c       |  490 ++-----------------------------
+ arch/x86/boot/compressed/eboot.h       |    9 -
+ drivers/firmware/efi/efi-stub-helper.c |  505 ++++++++++++++++++++++++++++++++
+ include/linux/efi.h                    |   51 +++-
+ 11 files changed, 1263 insertions(+), 493 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/boot/compressed/efi-stub.c
+ create mode 100644 arch/arm/boot/compressed/efi-stub.h
+ create mode 100644 drivers/firmware/efi/efi-stub-helper.c
+
+-- 
+1.7.10.4
