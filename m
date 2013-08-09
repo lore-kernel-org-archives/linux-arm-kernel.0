@@ -1,110 +1,36 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 09 Aug 2013 12:41:30 +0200
-Subject: [PATCH 10/14] ARM: shmobile: Rename to emev2_init_early(),
- use smp_set_ops()
-In-Reply-To: <20130809094936.6530.31840.sendpatchset@w520>
-References: <20130809094748.6530.16511.sendpatchset@w520>
- <20130809094936.6530.31840.sendpatchset@w520>
-Message-ID: <10195347.M6JWNyZrex@avalon>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Fri, 09 Aug 2013 19:41:54 +0900
+Subject: [PATCH-RESEND] ARM: dts: Add arm-pmu node for exynos4412
+Message-ID: <1376044914-1759-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+The Exynos4412 has 4 cpus and each has a performance counter.
+Thus, we should define 4 interrupts which are combined by irq-combiner for arm
+pmu.
 
-Thank you for the patch.
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4412.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-On Friday 09 August 2013 18:49:36 Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Rename emev2_init_delay() into emev2_init_early()
-> to make the function name show that more than just
-> delay setup will happen.
-> 
-> Also, instead of specifying the smp ops in DT_MACHINE
-> convert the EMEV2 SoC code to install the smp ops
-> from emev2_init_early().
-
-Could you please explain in the commit message why this is needed ? Same 
-comment for the other patches in this series.
-
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  arch/arm/mach-shmobile/board-kzm9d-reference.c |    3 +--
->  arch/arm/mach-shmobile/board-kzm9d.c           |    3 +--
->  arch/arm/mach-shmobile/include/mach/emev2.h    |    2 +-
->  arch/arm/mach-shmobile/setup-emev2.c           |    8 +++++---
->  4 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> --- 0001/arch/arm/mach-shmobile/board-kzm9d-reference.c
-> +++ work/arch/arm/mach-shmobile/board-kzm9d-reference.c	2013-08-08
-> 16:18:34.000000000 +0900 @@ -38,9 +38,8 @@ static const char
-> *kzm9d_boards_compat_d
->  };
-> 
->  DT_MACHINE_START(KZM9D_DT, "kzm9d")
-> -	.smp		= smp_ops(emev2_smp_ops),
->  	.map_io		= emev2_map_io,
-> -	.init_early	= emev2_init_delay,
-> +	.init_early	= emev2_init_early,
->  	.init_machine	= kzm9d_add_standard_devices,
->  	.init_late	= shmobile_init_late,
->  	.dt_compat	= kzm9d_boards_compat_dt,
-> --- 0001/arch/arm/mach-shmobile/board-kzm9d.c
-> +++ work/arch/arm/mach-shmobile/board-kzm9d.c	2013-08-08 
-16:18:17.000000000
-> +0900 @@ -83,9 +83,8 @@ static const char *kzm9d_boards_compat_d
->  };
-> 
->  DT_MACHINE_START(KZM9D_DT, "kzm9d")
-> -	.smp		= smp_ops(emev2_smp_ops),
->  	.map_io		= emev2_map_io,
-> -	.init_early	= emev2_init_delay,
-> +	.init_early	= emev2_init_early,
->  	.init_machine	= kzm9d_add_standard_devices,
->  	.init_late	= shmobile_init_late,
->  	.dt_compat	= kzm9d_boards_compat_dt,
-> --- 0001/arch/arm/mach-shmobile/include/mach/emev2.h
-> +++ work/arch/arm/mach-shmobile/include/mach/emev2.h	2013-08-08
-> 16:17:57.000000000 +0900 @@ -2,7 +2,7 @@
->  #define __ASM_EMEV2_H__
-> 
->  extern void emev2_map_io(void);
-> -extern void emev2_init_delay(void);
-> +extern void emev2_init_early(void);
->  extern void emev2_add_standard_devices(void);
->  extern void emev2_clock_init(void);
-> 
-> --- 0001/arch/arm/mach-shmobile/setup-emev2.c
-> +++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-08-08 
-16:17:47.000000000
-> +0900 @@ -190,9 +190,12 @@ void __init emev2_add_standard_devices(v
->  	emev2_register_pmu();
->  }
-> 
-> -void __init emev2_init_delay(void)
-> +void __init emev2_init_early(void)
->  {
->  	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
-> +#ifdef CONFIG_SMP
-> +	smp_set_ops(&emev2_smp_ops);
-> +#endif
->  }
-> 
->  #ifdef CONFIG_USE_OF
-> @@ -203,9 +206,8 @@ static const char *emev2_boards_compat_d
->  };
-> 
->  DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device
-> Tree)") -	.smp		= smp_ops(emev2_smp_ops),
->  	.map_io		= emev2_map_io,
-> -	.init_early	= emev2_init_delay,
-> +	.init_early	= emev2_init_early,
->  	.dt_compat	= emev2_boards_compat_dt,
->  MACHINE_END
-> 
-
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index e743e67..cfad655 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -35,6 +35,12 @@
+ 			     <0 107 0>, <0 108 0>, <0 48 0>, <0 42 0>;
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&combiner>;
++		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
++	};
++
+ 	mct at 10050000 {
+ 		compatible = "samsung,exynos4412-mct";
+ 		reg = <0x10050000 0x800>;
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
