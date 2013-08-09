@@ -1,28 +1,112 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 9 Aug 2013 16:09:34 -0400
-Subject: [PATCH 0/2] i2c: davinci: Couple of patches to make i2c usable
- on Keystone SOCs
-In-Reply-To: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <52054C7E.70108@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri,  9 Aug 2013 14:04:16 -0600
+Subject: [PATCH V3] ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
+Message-ID: <1376078656-1378-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram, Sekhar, 
+From: Stephen Warren <swarren@nvidia.com>
 
-On Wednesday 24 July 2013 08:28 PM, Santosh Shilimkar wrote:
-> Keystone SOCs uses the same I2C IP as available on DaVinci SOCs. These
-> couple of patches makes it possible to select the I2C_DAVINCI on
-> Keystone SOCs.
-> 
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> 
-> Santosh Shilimkar (2):
->   i2c: davinci: remove useless mach/hardware include
->   i2c: davinci: Allow i2c driver available for keystone platforms
-> 
-Who is queuing up these patches ?
+Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
+they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
+this, simply disable LP2 if the PCI driver and DT node are both enabled.
 
-regards,
-Santosh
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+I intend to apply this on top of Thierry's Tegra PCIe driver series.
+
+v3: Only disable LP2 if a PCIe device that requests an interrupt is
+actually present. This prevents the loss of power-saving when the WAR
+isn't required.
+---
+ arch/arm/mach-tegra/cpuidle-tegra20.c | 12 ++++++++++++
+ arch/arm/mach-tegra/cpuidle.c         | 10 ++++++++++
+ arch/arm/mach-tegra/cpuidle.h         |  1 +
+ drivers/pci/host/pci-tegra.c          |  5 +++++
+ 4 files changed, 28 insertions(+)
+
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+index 706aa42..b82dcae 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra20.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+@@ -211,6 +211,18 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
+ }
+ #endif
+ 
++/*
++ * Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
++ * they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
++ * this, simply disable LP2 if the PCI driver and DT node are both enabled.
++ */
++void tegra20_cpuidle_pcie_irqs_in_use(void)
++{
++	pr_info_once(
++		"Disabling cpuidle LP2 state, since PCIe IRQs are in use\n");
++	tegra_idle_driver.states[1].disabled = true;
++}
++
+ int __init tegra20_cpuidle_init(void)
+ {
+ 	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
+diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
+index e85973c..0961dfc 100644
+--- a/arch/arm/mach-tegra/cpuidle.c
++++ b/arch/arm/mach-tegra/cpuidle.c
+@@ -44,3 +44,13 @@ void __init tegra_cpuidle_init(void)
+ 		break;
+ 	}
+ }
++
++void tegra_cpuidle_pcie_irqs_in_use(void)
++{
++	switch (tegra_chip_id) {
++	case TEGRA20:
++		if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
++			tegra20_cpuidle_pcie_irqs_in_use();
++		break;
++	}
++}
+diff --git a/arch/arm/mach-tegra/cpuidle.h b/arch/arm/mach-tegra/cpuidle.h
+index 9ec2c1a..c017dab 100644
+--- a/arch/arm/mach-tegra/cpuidle.h
++++ b/arch/arm/mach-tegra/cpuidle.h
+@@ -19,6 +19,7 @@
+ 
+ #ifdef CONFIG_CPU_IDLE
+ int tegra20_cpuidle_init(void);
++void tegra20_cpuidle_pcie_irqs_in_use(void);
+ int tegra30_cpuidle_init(void);
+ int tegra114_cpuidle_init(void);
+ void tegra_cpuidle_init(void);
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index ad95c40..7356741 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -41,6 +41,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/sizes.h>
+ #include <linux/slab.h>
++#include <linux/tegra-cpuidle.h>
+ #include <linux/tegra-powergate.h>
+ #include <linux/vmalloc.h>
+ #include <linux/regulator/consumer.h>
+@@ -636,6 +637,8 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
+ {
+ 	struct tegra_pcie *pcie = sys_to_pcie(pdev->bus->sysdata);
+ 
++	tegra_cpuidle_pcie_irqs_in_use();
++
+ 	return pcie->irq;
+ }
+ 
+@@ -1221,6 +1224,8 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
+ 	irq_set_chip_data(irq, domain->host_data);
+ 	set_irq_flags(irq, IRQF_VALID);
+ 
++	tegra_cpuidle_pcie_irqs_in_use();
++
+ 	return 0;
+ }
+ 
+-- 
+1.8.1.5
