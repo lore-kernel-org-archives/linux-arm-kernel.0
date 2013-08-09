@@ -1,101 +1,71 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Aug 2013 15:14:24 +0100
-Subject: [RFC PATCH] ARM: add workaround for ambiguous C99 stdint.h types
-In-Reply-To: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20130809141424.GC3977@localhost.localdomain>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Aug 2013 16:18:07 +0200
+Subject: [PATCHv8 04/10] of: pci: add registry of MSI chips
+In-Reply-To: <20130809134427.GC25111@titan.lakedaemon.net>
+References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376000268-18397-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376027346.32100.8.camel@pasglop>
+ <20130809134427.GC25111@titan.lakedaemon.net>
+Message-ID: <20130809141806.GA15973@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 09:36:42AM +0200, Ard Biesheuvel wrote:
-> The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-> unambiguous on ARM as you would expect. For the types below, there is a
-> difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-> and the kernel itself, which results in build errors if you try to build with
-> -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-> in order to use NEON intrinsics)
+On Fri, Aug 09, 2013 at 09:44:27AM -0400, Jason Cooper wrote:
+> On Fri, Aug 09, 2013 at 03:49:06PM +1000, Benjamin Herrenschmidt wrote:
+> > On Fri, 2013-08-09 at 00:17 +0200, Thomas Petazzoni wrote:
+> > > 
+> > > +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> > > +int of_pci_msi_chip_add(struct msi_chip *chip);
+> > > +void of_pci_msi_chip_remove(struct msi_chip *chip);
+> > > +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node
+> > > *of_node);
+> > > +#else
+> > > +static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return
+> > > -EINVAL; }
+> > > +static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
+> > 
+> > Missing a ; at the end of the above line... breaks the build of
+> > CONFIG_PCI_MSI is not set.
+> > 
+> > > +static inline struct msi_chip *
+> > > +of_pci_find_msi_chip_by_node(struct device_node *of_node) { return
+> > > NULL };
+> > > +#endif
+> > > +
+> > >  #endif
 > 
-> As the typedefs for these types in 'stdint.h' are based on builtin defines
-> supplied by GCC, we can tweak these to align with the kernel's idea of those
-> types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-> source file (provided that -ffreestanding is used).
+> Reproduced, fixed and builds clean !CONFIG_OF and !CONFIG_PCI_MSI with:
 > 
->                    int32_t         uint32_t               uintptr_t
-> bare metal GCC     long            unsigned long          unsigned long
-> glibc GCC          int             unsigned int           unsigned int
-> kernel             int             unsigned int           unsigned long
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> Hi all,
-> 
-> This is another, less obtrusive way of handling the problem for which I
-> previously sent an RFC patch 'types.h: use GCC supplied typedefs if appropriate'
-> In this case, only source files that in fact include stdint.h and are being
-> built for ARM should be affected.
-> 
-> Regards,
-> -- 
-> Ard.
-> 
-> 
->  arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 arch/arm/include/asm/types.h
-> 
-> diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-> new file mode 100644
-> index 0000000..976ac31
-> --- /dev/null
-> +++ b/arch/arm/include/asm/types.h
-> @@ -0,0 +1,40 @@
-> +#ifndef _ASM_TYPES_H
-> +#define _ASM_TYPES_H
-> +
-> +#include <asm-generic/int-ll64.h>
-> +
-> +/*
-> + * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-> + * unambiguous on ARM as you would expect. For the types below, there is a
-> + * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-> + * and the kernel itself, which results in build errors if you try to build with
-> + * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-> + * in order to use NEON intrinsics)
-> + *
-> + * As the typedefs for these types in 'stdint.h' are based on builtin defines
-> + * supplied by GCC, we can tweak these to align with the kernel's idea of those
-> + * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-> + * source file (provided that -ffreestanding is used).
-> + * 
-> + *                    int32_t         uint32_t               uintptr_t
-> + * bare metal GCC     long            unsigned long          unsigned long
-> + * glibc GCC          int             unsigned int           unsigned int
-> + * kernel             int             unsigned int           unsigned long
-> + */
-> +
-> +#ifdef __INT32__TYPE__
-> +#undef __INT32__TYPE__
-> +#define __INT32__TYPE__		int
-> +#endif
-> +
-> +#ifdef __UINT32__TYPE__
-> +#undef __UINT32__TYPE__
-> +#define __UINT32__TYPE__	unsigned int
-> +#endif
-> +
-> +#ifdef __UINTPTR_TYPE__
-> +#undef __UINTPTR_TYPE__
-> +#define __UINTPTR_TYPE__	unsigned long
-> +#endif
+> ---------------->8----------------
+> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> index 29631eb..9f69507 100644
+> --- a/include/linux/of_pci.h
+> +++ b/include/linux/of_pci.h
+> @@ -19,10 +19,11 @@ int of_pci_msi_chip_add(struct msi_chip *chip);
+>  void of_pci_msi_chip_remove(struct msi_chip *chip);
+>  struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node);
+>  #else
+> -static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
+> -static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
+> +static inline int
+> +of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; };
+> +static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { };
+>  static inline struct msi_chip *
+> -of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
+> +of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL; };
+>  #endif
+>  
+>  #endif
 
-Somebody else might have the opposite problem to ARM, so I'm doubtful
-about whether it's safe to do this for all arches.  The arch maintainers
-would have to comment on that.  This looks ugly in an otherwise generic
-header.
+So why do we need a semi-colon after a closing brace? I can understand
+how the missing semi-colon after NULL would cause the compiler to flag
+an error, but all the other changes look unnecessary to me.
 
-(As a cosmetic thing, you can lose the #ifdefs.  #undef doesn't trigger
-an error of the specified macro doesn't already exist.)
-
-Cheers
----Dave
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/78740b22/attachment.sig>
