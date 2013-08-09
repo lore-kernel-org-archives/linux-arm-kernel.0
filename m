@@ -1,118 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  9 Aug 2013 22:27:09 +0200
-Subject: [PATCHv9 04/10] of: pci: add registry of MSI chips
+Date: Fri,  9 Aug 2013 22:27:13 +0200
+Subject: [PATCHv9 08/10] ARM: mvebu: the MPIC now provides MSI controller
+ features
 In-Reply-To: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1376080035-29344-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1376080035-29344-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a very basic registry of msi_chip structures, so that
-an IRQ controller driver can register an msi_chip, and a PCIe host
-controller can find it, based on a 'struct device_node'.
+Adds the 'msi-controller' property to the main interrupt controller
+Device Tree node, to indicate that it can now behave as a MSI
+controller.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+Tested-by: Daniel Price <daniel.price@gmail.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/of/of_pci.c    | 45 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/msi.h    |  2 ++
- include/linux/of_pci.h | 12 ++++++++++++
- 3 files changed, 59 insertions(+)
+ arch/arm/boot/dts/armada-370-xp.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 42c687a..e5ca008 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -89,3 +89,48 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-+
-+#ifdef CONFIG_PCI_MSI
-+
-+static LIST_HEAD(of_pci_msi_chip_list);
-+static DEFINE_MUTEX(of_pci_msi_chip_mutex);
-+
-+int of_pci_msi_chip_add(struct msi_chip *chip)
-+{
-+	if (!of_property_read_bool(chip->of_node, "msi-controller"))
-+		return -EINVAL;
-+
-+	mutex_lock(&of_pci_msi_chip_mutex);
-+	list_add(&chip->list, &of_pci_msi_chip_list);
-+	mutex_unlock(&of_pci_msi_chip_mutex);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_msi_chip_add);
-+
-+void of_pci_msi_chip_remove(struct msi_chip *chip)
-+{
-+	mutex_lock(&of_pci_msi_chip_mutex);
-+	list_del(&chip->list);
-+	mutex_unlock(&of_pci_msi_chip_mutex);
-+}
-+EXPORT_SYMBOL_GPL(of_pci_msi_chip_remove);
-+
-+struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node)
-+{
-+	struct msi_chip *c;
-+
-+	mutex_lock(&of_pci_msi_chip_mutex);
-+	list_for_each_entry(c, &of_pci_msi_chip_list, list) {
-+		if (c->of_node == of_node) {
-+			mutex_unlock(&of_pci_msi_chip_mutex);
-+			return c;
-+		}
-+	}
-+	mutex_unlock(&of_pci_msi_chip_mutex);
-+
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
-+
-+#endif /* CONFIG_PCI_MSI */
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 090ddad..b17ead8 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -68,6 +68,8 @@ void default_restore_msi_irqs(struct pci_dev *dev, int irq);
- struct msi_chip {
- 	struct module *owner;
- 	struct device *dev;
-+	struct device_node *of_node;
-+	struct list_head list;
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 90b1176..ac0bbc0 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -56,6 +56,7 @@
+ 				#interrupt-cells = <1>;
+ 				#size-cells = <1>;
+ 				interrupt-controller;
++				msi-controller;
+ 			};
  
- 	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
- 			 struct msi_desc *desc);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 7a04826..fd9c408 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -2,6 +2,7 @@
- #define __OF_PCI_H
- 
- #include <linux/pci.h>
-+#include <linux/msi.h>
- 
- struct pci_dev;
- struct of_irq;
-@@ -13,4 +14,15 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- int of_pci_get_devfn(struct device_node *np);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- 
-+#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-+int of_pci_msi_chip_add(struct msi_chip *chip);
-+void of_pci_msi_chip_remove(struct msi_chip *chip);
-+struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node);
-+#else
-+static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
-+static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
-+static inline struct msi_chip *
-+of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL; }
-+#endif
-+
- #endif
+ 			coherency-fabric at 20200 {
 -- 
 1.8.1.2
