@@ -1,67 +1,101 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Fri, 9 Aug 2013 07:13:01 -0700
-Subject: [PATCH 12/17] Add proper definitions for some EFI function
- pointers.
-In-Reply-To: <1376057413.12443.91.camel@t520.redhat.com>
-References: <1375847113-24884-1-git-send-email-roy.franz@linaro.org>
- <1375847113-24884-13-git-send-email-roy.franz@linaro.org>
- <1376057413.12443.91.camel@t520.redhat.com>
-Message-ID: <CAFECyb9=zJQ-Fhyc+QojtcCtK_ue+fvn=VoOc6_Sq8D6v0uALA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Aug 2013 15:14:24 +0100
+Subject: [RFC PATCH] ARM: add workaround for ambiguous C99 stdint.h types
+In-Reply-To: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20130809141424.GC3977@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Mark - I'll get that in the next version of the patches.
+On Fri, Aug 09, 2013 at 09:36:42AM +0200, Ard Biesheuvel wrote:
+> The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+> unambiguous on ARM as you would expect. For the types below, there is a
+> difference on ARM between GCC built for bare metal ARM, GCC built for glibc
+> and the kernel itself, which results in build errors if you try to build with
+> -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
+> in order to use NEON intrinsics)
+> 
+> As the typedefs for these types in 'stdint.h' are based on builtin defines
+> supplied by GCC, we can tweak these to align with the kernel's idea of those
+> types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+> source file (provided that -ffreestanding is used).
+> 
+>                    int32_t         uint32_t               uintptr_t
+> bare metal GCC     long            unsigned long          unsigned long
+> glibc GCC          int             unsigned int           unsigned int
+> kernel             int             unsigned int           unsigned long
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> Hi all,
+> 
+> This is another, less obtrusive way of handling the problem for which I
+> previously sent an RFC patch 'types.h: use GCC supplied typedefs if appropriate'
+> In this case, only source files that in fact include stdint.h and are being
+> built for ARM should be affected.
+> 
+> Regards,
+> -- 
+> Ard.
+> 
+> 
+>  arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 arch/arm/include/asm/types.h
+> 
+> diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+> new file mode 100644
+> index 0000000..976ac31
+> --- /dev/null
+> +++ b/arch/arm/include/asm/types.h
+> @@ -0,0 +1,40 @@
+> +#ifndef _ASM_TYPES_H
+> +#define _ASM_TYPES_H
+> +
+> +#include <asm-generic/int-ll64.h>
+> +
+> +/*
+> + * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+> + * unambiguous on ARM as you would expect. For the types below, there is a
+> + * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
+> + * and the kernel itself, which results in build errors if you try to build with
+> + * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
+> + * in order to use NEON intrinsics)
+> + *
+> + * As the typedefs for these types in 'stdint.h' are based on builtin defines
+> + * supplied by GCC, we can tweak these to align with the kernel's idea of those
+> + * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+> + * source file (provided that -ffreestanding is used).
+> + * 
+> + *                    int32_t         uint32_t               uintptr_t
+> + * bare metal GCC     long            unsigned long          unsigned long
+> + * glibc GCC          int             unsigned int           unsigned int
+> + * kernel             int             unsigned int           unsigned long
+> + */
+> +
+> +#ifdef __INT32__TYPE__
+> +#undef __INT32__TYPE__
+> +#define __INT32__TYPE__		int
+> +#endif
+> +
+> +#ifdef __UINT32__TYPE__
+> +#undef __UINT32__TYPE__
+> +#define __UINT32__TYPE__	unsigned int
+> +#endif
+> +
+> +#ifdef __UINTPTR_TYPE__
+> +#undef __UINTPTR_TYPE__
+> +#define __UINTPTR_TYPE__	unsigned long
+> +#endif
 
-On Fri, Aug 9, 2013 at 7:10 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Tue, 2013-08-06 at 20:45 -0700, Roy Franz wrote:
->> The x86/AMD64 EFI stubs must us a call wrapper to convert between
->> the Linux and EFI ABIs, so void pointers are sufficient.  For ARM,
->> the ABIs are compatible, so we can directly invoke the function
->> pointers.  The functions that are used by the ARM stub are updated
->> to match the EFI definitions.
->>
->> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->> ---
->>  include/linux/efi.h |   42 +++++++++++++++++++++++++-----------------
->>  1 file changed, 25 insertions(+), 17 deletions(-)
->>
->> diff --git a/include/linux/efi.h b/include/linux/efi.h
->> index 51f5641..96bb866 100644
->> --- a/include/linux/efi.h
->> +++ b/include/linux/efi.h
->> @@ -39,6 +39,8 @@
->>  typedef unsigned long efi_status_t;
->>  typedef u8 efi_bool_t;
->>  typedef u16 efi_char16_t;            /* UNICODE character */
->> +typedef u64 efi_physical_addr_t;
->> +typedef void *efi_handle_t;
->>
->>
->>  typedef struct {
->> @@ -96,6 +98,7 @@ typedef     struct {
->>  #define EFI_MEMORY_DESCRIPTOR_VERSION        1
->>
->>  #define EFI_PAGE_SHIFT               12
->> +#define EFI_PAGE_SIZE                (1UL << EFI_PAGE_SHIFT)
->>
->>  typedef struct {
->>       u32 type;
->> @@ -157,11 +160,12 @@ typedef struct {
->>       efi_table_hdr_t hdr;
->>       void *raise_tpl;
->>       void *restore_tpl;
->> -     void *allocate_pages;
->> -     void *free_pages;
->> -     void *get_memory_map;
->> -     void *allocate_pool;
->> -     void *free_pool;
->> +     int (*allocate_pages)(int, int, unsigned long, efi_physical_addr_t *);
->> +     int (*free_pages)(efi_physical_addr_t, unsigned long);
->
-> All of the actual function pointers that were added should return an
-> efi_status_t instead of int. On arm64, I was seeing an unrecognizable
-> error status because the truncation from 64 to 32 bits.
->
-> --Mark
->
->
+Somebody else might have the opposite problem to ARM, so I'm doubtful
+about whether it's safe to do this for all arches.  The arch maintainers
+would have to comment on that.  This looks ugly in an otherwise generic
+header.
+
+(As a cosmetic thing, you can lose the #ifdefs.  #undef doesn't trigger
+an error of the specified macro doesn't already exist.)
+
+Cheers
+---Dave
